@@ -110,6 +110,7 @@ export default async function MorphoBaseLoanTokenPage({ params }: Params) {
           {g ? (
             <MorphoLoanTokenView
               block={data.blockNumber}
+              fromLogs={data.totalsSource === "sieve"}
               group={loanTokenViewData(data, g)}
               chainId={MORPHO_BASE_CHAIN_ID}
             />

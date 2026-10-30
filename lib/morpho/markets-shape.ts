@@ -271,10 +271,18 @@ export function overviewData(resp: MorphoMarketsChainResponse): MorphoMarketsOve
  *  component; handed the whole response it would carry the roster across a
  *  second time (it did: 3 MB on Base, on a page that draws no market rows). */
 export function stampOf(resp: MorphoMarketsChainResponse): MorphoMarketsStampData {
-  return { blockNumber: resp.blockNumber, censusBlock: resp.censusBlock, chainStale: resp.chainStale };
+  return {
+    blockNumber: resp.blockNumber,
+    censusBlock: resp.censusBlock,
+    chainStale: resp.chainStale,
+    totalsSource: resp.totalsSource,
+  };
 }
 
-export type MorphoMarketsStampData = Pick<MorphoMarketsChainResponse, "blockNumber" | "censusBlock" | "chainStale">;
+export type MorphoMarketsStampData = Pick<
+  MorphoMarketsChainResponse,
+  "blockNumber" | "censusBlock" | "chainStale" | "totalsSource"
+>;
 
 /** Everything the per-token page's client view draws, and nothing else: the
  *  group's header scalars plus its shape. The never-funded rows — 2,887 of
@@ -322,6 +330,7 @@ export function loanTokenViewData(resp: MorphoMarketsChainResponse, g: MorphoLoa
 export interface MorphoMarketViewData {
   blockNumber: number;
   timestamp: number;
+  totalsSource: MorphoMarketChainResponse["totalsSource"];
   market: MorphoMarketRow;
   loanNamed: boolean;
   oraclePrice: number | null;
@@ -335,6 +344,7 @@ export function marketViewData(resp: MorphoMarketChainResponse): MorphoMarketVie
   return {
     blockNumber: resp.blockNumber,
     timestamp: resp.timestamp,
+    totalsSource: resp.totalsSource,
     market: resp.market,
     loanNamed: resp.loanNamed,
     oraclePrice: resp.oraclePrice,

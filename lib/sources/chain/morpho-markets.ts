@@ -38,6 +38,7 @@ import type { MorphoOracleFeed } from "@/lib/api/fetch-morpho-position";
 import { MORPHO_DEPLOYMENT, type MorphoDeployment } from "./morpho-deployments";
 import { withIndexedRoster } from "./morpho-roster";
 import { readOracle } from "./morpho-position";
+import { readOracleViaApi, readReplayedMarkets, type MarketTuple } from "./morpho-replayed-state";
 const ZERO = BigInt(0);
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 const SECONDS_PER_YEAR = 31_536_000;
@@ -153,8 +154,15 @@ export interface MorphoLoanGroup {
   loanTokenSupply: number | null;
 }
 
+/** Where market(id)'s totals came from: rails-server's replay of the Base
+ *  Sieve at `blockNumber`, or a chain read there. */
+export type MorphoTotalsSource = "sieve" | "chain";
+
 export interface MorphoMarketsChainResponse {
   blockNumber: number;
+  /** "sieve" when the totals are rails-server's replay of the chain's Sieve
+   *  (a market the replay does not answer is still read on chain at the block). */
+  totalsSource: MorphoTotalsSource;
   /** The block lib/morpho/market-catalog.ts was censused at — the roster is complete as of
    *  this block, and markets created since are absent until the census is re-run. */
   censusBlock: number;
@@ -179,6 +187,7 @@ export interface MorphoMarketsChainResponse {
 function empty(deployment: MorphoDeployment): MorphoMarketsChainResponse {
   return {
     blockNumber: 0,
+    totalsSource: "chain",
     censusBlock: deployment.censusBlock,
     groups: [],
     summary: {
@@ -203,6 +212,7 @@ async function chunkedMulticall<T>(
   chainId: ChainId,
   contracts: readonly unknown[],
   size = 400,
+  blockNumber?: bigint,
 ): Promise<{ status: string; result?: T }[]> {
   const client = chainClient(chainId);
   const chunks: unknown[][] = [];
@@ -214,14 +224,13 @@ async function chunkedMulticall<T>(
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           contracts: c as any,
           allowFailure: true,
+          ...(blockNumber != null ? { blockNumber } : {}),
           batchSize: 0, // one eth_call per chunk — we picked the boundaries above
         }) as Promise<{ status: string; result?: T }[]>,
     ),
   );
   return out.flat();
 }
-
-type MarketTuple = readonly [bigint, bigint, bigint, bigint, bigint, bigint];
 
 /** The IRM's borrowRateView call for one market, asked exactly as _accrueInterest
  *  asks it: with the market struct as stored, before accrual. */
@@ -322,18 +331,43 @@ export async function loadMorphoMarketsFromChain(
   const MORPHO = deployment.blue as `0x${string}`;
   try {
     const client = chainClient(deployment.chainId);
-    const [blockNumber, states] = await Promise.all([
-      client.getBlockNumber().then(Number),
-      chunkedMulticall<MarketTuple>(
-        deployment.chainId,
-        MORPHO_MARKETS.map((m) => ({
-          address: MORPHO,
-          abi: BLUE_ABI,
-          functionName: "market",
-          args: [m.id as `0x${string}`],
-        })),
-      ),
-    ]);
+    const marketCall = (m: MorphoMarketCatalogEntry) => ({
+      address: MORPHO,
+      abi: BLUE_ABI,
+      functionName: "market",
+      args: [m.id as `0x${string}`],
+    });
+    // Base: the stored totals from rails-server's replay of the Base Sieve, at its
+    // block, and every other read pinned to that block; a market the replay does
+    // not answer is read on chain there. Elsewhere, or when the api fails, every
+    // market at the head.
+    const replayed = await readReplayedMarkets(deployment.chainId);
+    let blockNumber: number;
+    let at: bigint | undefined;
+    let states: { status: string; result?: MarketTuple }[];
+    if (replayed) {
+      blockNumber = replayed.blockNumber;
+      at = BigInt(blockNumber);
+      states = MORPHO_MARKETS.map((m) => {
+        const s = replayed.states.get(m.id.toLowerCase());
+        return s ? { status: "success", result: s } : { status: "missing" };
+      });
+      const missing = states.flatMap((s, i) => (s.status === "missing" ? [i] : []));
+      if (missing.length > 0) {
+        const read = await chunkedMulticall<MarketTuple>(
+          deployment.chainId,
+          missing.map((i) => marketCall(MORPHO_MARKETS[i])),
+          400,
+          at,
+        );
+        missing.forEach((i, k) => (states[i] = read[k] ?? { status: "failure" }));
+      }
+    } else {
+      [blockNumber, states] = await Promise.all([
+        client.getBlockNumber().then(Number),
+        chunkedMulticall<MarketTuple>(deployment.chainId, MORPHO_MARKETS.map(marketCall)),
+      ]);
+    }
 
     // Rates: ask each market's OWN IRM, exactly as _accrueInterest does — with the market
     // struct as stored, before accrual. A market naming no IRM is not asked and states no
@@ -344,6 +378,8 @@ export async function loadMorphoMarketsFromChain(
     const rates = await chunkedMulticall<bigint>(
       deployment.chainId,
       rateTargets.map(({ m, i }) => rateCall(m, states[i].result as MarketTuple)),
+      400,
+      at,
     );
     const rateOf = new Map<number, bigint>();
     rateTargets.forEach(({ i }, k) => {
@@ -383,6 +419,8 @@ export async function loadMorphoMarketsFromChain(
     const supplies = await chunkedMulticall<bigint>(
       deployment.chainId,
       loanTokens.map((a) => ({ address: a as `0x${string}`, abi: ERC20_ABI, functionName: "totalSupply" })),
+      400,
+      at,
     );
     const tokenSupply = new Map<string, bigint>();
     loanTokens.forEach((a, i) => {
@@ -429,6 +467,7 @@ export async function loadMorphoMarketsFromChain(
 
     return {
       blockNumber,
+      totalsSource: replayed ? "sieve" : "chain",
       censusBlock: deployment.censusBlock,
       groups,
       summary: {
@@ -464,8 +503,9 @@ export interface MorphoMarketChainResponse {
   /** The market's immutable params, from the roster — present even when the read failed. */
   params: MorphoMarketCatalogEntry;
   blockNumber: number;
-  /** The head block's timestamp — what the oracle price's age is measured against. */
+  /** The block's timestamp — what the oracle price's age is measured against. */
   timestamp: number;
+  totalsSource: MorphoTotalsSource;
   /** Null when the chain read failed (`chainStale`). */
   market: MorphoMarketRow | null;
   /** True when the loan token's symbol() answered. */
@@ -498,6 +538,7 @@ export async function loadMorphoMarketFromChain(
     params,
     blockNumber: 0,
     timestamp: 0,
+    totalsSource: "chain",
     market: null,
     loanNamed: false,
     collateralDecimals: 18,
@@ -510,28 +551,45 @@ export async function loadMorphoMarketFromChain(
   try {
     const client = chainClient(deployment.chainId);
     const MORPHO = deployment.blue as `0x${string}`;
-    const block = await client.getBlock();
     const hasOracle = params.oracle !== ZERO_ADDR && params.collateralToken !== ZERO_ADDR;
+    // Base: market(id) from rails-server's replay at its block; elsewhere, or where the
+    // replay does not answer, read at the head. Every other read is at that block.
+    const replayed = await readReplayedMarkets(deployment.chainId, params.id);
+    const stored = replayed?.states.get(params.id.toLowerCase());
+    const head = stored ? null : await client.getBlock();
+    const blockNumber = head ? head.number : BigInt(replayed!.blockNumber);
 
-    const [state, oracle, meta, trust] = await Promise.all([
-      client.readContract({
-        address: MORPHO,
-        abi: BLUE_ABI,
-        functionName: "market",
-        args: [params.id as `0x${string}`],
-        blockNumber: block.number,
-      }),
-      // A price() that reverts leaves the market readable and the price unstated — unlike the
-      // position page, where every figure rests on it, here only one line does.
-      hasOracle
-        ? readOracle(client, params.oracle as `0x${string}`, block.number).catch(() => null)
-        : Promise.resolve(null),
+    const [state, oracleRead, meta, trust] = await Promise.all([
+      stored
+        ? Promise.resolve(stored)
+        : client.readContract({
+            address: MORPHO,
+            abi: BLUE_ABI,
+            functionName: "market",
+            args: [params.id as `0x${string}`],
+            blockNumber,
+          }),
+      // The oracle through the api (keyless first, kept 30 s), the chain where it fails.
+      hasOracle ? readOracleViaApi(deployment.chainId, params.oracle, blockNumber) : Promise.resolve(null),
       resolveErc20Meta(
         [params.loanToken, params.collateralToken].filter((a) => a !== ZERO_ADDR),
         deployment.chainId,
       ),
       resolveDecimalsTrust([params.loanToken], deployment.chainId),
     ]);
+    // A price() that reverts leaves the market readable and the price unstated — unlike the
+    // position page, where every figure rests on it, here only one line does.
+    const oracle = !hasOracle
+      ? null
+      : oracleRead
+        ? oracleRead.price == null
+          ? null
+          : { price: oracleRead.price, feeds: oracleRead.feeds }
+        : await readOracle(client, params.oracle as `0x${string}`, blockNumber).catch(() => null);
+    const timestamp =
+      head?.timestamp ??
+      (oracleRead ? BigInt(oracleRead.timestamp) : (await client.getBlock({ blockNumber })).timestamp);
+    const block = { number: blockNumber, timestamp };
 
     const ratePerSec =
       params.irm === ZERO_ADDR
@@ -550,6 +608,7 @@ export async function loadMorphoMarketFromChain(
       params,
       blockNumber: Number(block.number),
       timestamp: Number(block.timestamp),
+      totalsSource: stored ? "sieve" : "chain",
       market,
       loanNamed: Boolean(meta.get(params.loanToken)?.named),
       collateralDecimals,

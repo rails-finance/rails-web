@@ -56,6 +56,7 @@
 // so it does not bloat the payload the client-component split exists to keep small.
 
 import Link from "next/link";
+import { createContext, useContext } from "react";
 import { RatioBar } from "@/components/shared/ratio-bar";
 import { shortMarketId, MORPHO_ADDRESSES } from "@/lib/morpho/asset-catalog";
 import { chainMeta, explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
@@ -108,6 +109,10 @@ const SECONDS_PER_BLOCK: Record<ChainId, number> = {
 
 /** The page's headline instrument: every lltv in use across the protocol, with how many
  *  markets sit on each. Nine bars is the whole parameter space — that IS the claim. */
+/** True where the page's market(id) totals are rails-server's replay of the Base Sieve
+ *  (the response's totalsSource), so the receipts name the replay instead of a head read. */
+const TotalsFromLogs = createContext(false);
+
 function LltvSpread({
   lltvs,
   total,
@@ -187,6 +192,7 @@ function MarketColumns() {
 function MarketRow({ m, block, chainId }: { m: MorphoMarketRow; block: number; chainId: ChainId }) {
   const label = m.isIdle ? "idle — no collateral" : (m.collateralSymbol ?? "unnamed collateral");
   const coords: MorphoMarketCoords = {
+    fromLogs: useContext(TotalsFromLogs),
     blockNumber: block,
     marketId: m.id,
     loanSymbol: m.loanSymbol,
@@ -377,8 +383,10 @@ export function MorphoMarketsStamp({
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · <BlockRef block={data.blockNumber} chainId={chainId} /> · every market&rsquo;s state read from
-      the{" "}
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={chainId} /> ·{" "}
+      {data.totalsSource === "sieve"
+        ? "every market’s stored totals rebuilt from the logs of the"
+        : "every market’s state read from the"}{" "}
       <a
         href={explorerUrl(chainId, "address", blue)}
         target="_blank"
@@ -413,7 +421,12 @@ function LoanTokenColumns() {
 }
 
 function LoanTokenRow({ g, block, chainId }: { g: MorphoLoanGroupSummary; block: number; chainId: ChainId }) {
-  const coords: MorphoMarketCoords = { blockNumber: block, loanSymbol: g.loanSymbol, loanToken: g.loanToken };
+  const coords: MorphoMarketCoords = {
+    fromLogs: useContext(TotalsFromLogs),
+    blockNumber: block,
+    loanSymbol: g.loanSymbol,
+    loanToken: g.loanToken,
+  };
   const util = g.totalSupply > 0 ? g.totalBorrow / g.totalSupply : null;
   const overIssued =
     g.amountsTrusted && g.loanTokenSupply != null && g.loanTokenSupply > 0 && g.totalSupply > g.loanTokenSupply * 1.001;
@@ -537,8 +550,9 @@ export function MorphoMarketsOverview({
   const unfunded = data.groups.filter((g) => g.funded === 0);
 
   return (
-    <ProvReceiptsScope registry={registry}>
-      {/* The vitals band. Roster COUNTS are cardinalities over the censused
+    <TotalsFromLogs.Provider value={data.totalsSource === "sieve"}>
+      <ProvReceiptsScope registry={registry}>
+        {/* The vitals band. Roster COUNTS are cardinalities over the censused
           roster, not figures read from a slot — so each carries
           data-prov-exempt rather than being dressed as a receipt.
 
@@ -548,99 +562,100 @@ export function MorphoMarketsOverview({
           total — or the ratio between them — could be stated in. Those figures
           appear one row down, per loan token, where the unit is single. Do not
           add a USD total here. */}
-      <VitalsBand
-        className="mb-4"
-        vitals={[
-          {
-            slot: "roster",
-            label: "Markets",
-            value: <span data-prov-exempt="">{data.summary.total.toLocaleString("en-US")}</span>,
-            title:
-              "Morpho Blue's only market-making entry point always emits CreateMarket, so this roster is every market that exists — not a sample. A count over the censused catalog, not a slot read.",
-          },
-        ]}
-        notes={
-          <>
-            <span
-              data-prov-exempt=""
-              title="How many markets carry supply / carry borrowing at this block — counts over the roster's per-market state, not a single slot read."
-            >
-              <span className="text-foreground">{data.summary.funded.toLocaleString("en-US")}</span> hold supply ·{" "}
-              <span className="text-foreground">{data.summary.borrowed.toLocaleString("en-US")}</span> have borrowing
-            </span>
-            <span
-              data-prov-exempt=""
-              title="A count over the roster — how many markets hold no supply — not a slot read."
-            >
-              <span className="text-foreground">{data.summary.neverFunded.toLocaleString("en-US")}</span> never funded
-            </span>
-            {data.summary.idleMarkets > 0 && (
+        <VitalsBand
+          className="mb-4"
+          vitals={[
+            {
+              slot: "roster",
+              label: "Markets",
+              value: <span data-prov-exempt="">{data.summary.total.toLocaleString("en-US")}</span>,
+              title:
+                "Morpho Blue's only market-making entry point always emits CreateMarket, so this roster is every market that exists — not a sample. A count over the censused catalog, not a slot read.",
+            },
+          ]}
+          notes={
+            <>
               <span
                 data-prov-exempt=""
-                title="No collateral token, no oracle, no IRM: nothing can be borrowed. A place to hold cash inside Blue. A count over the roster, not a slot read."
+                title="How many markets carry supply / carry borrowing at this block — counts over the roster's per-market state, not a single slot read."
               >
-                <span className="text-foreground">{data.summary.idleMarkets}</span> idle markets
+                <span className="text-foreground">{data.summary.funded.toLocaleString("en-US")}</span> hold supply ·{" "}
+                <span className="text-foreground">{data.summary.borrowed.toLocaleString("en-US")}</span> have borrowing
               </span>
-            )}
-            <span
-              data-prov-exempt=""
-              title="Distinct loan tokens across the roster — a count over the markets, not a slot read."
-            >
-              <span className="text-foreground">{data.summary.loanTokens}</span> loan tokens ·{" "}
-              <span className="text-foreground">{funded.length}</span> with funded markets
-            </span>
-          </>
-        }
-      />
-
-      <div className="mb-5">
-        <LltvSpread lltvs={data.summary.lltvs} total={data.summary.total} block={data.blockNumber} />
-      </div>
-
-      <section className="rounded-xl bg-raised px-4 py-3.5">
-        <h2 className="text-sm font-semibold text-foreground">One row per loan token</h2>
-        <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-rb-500">
-          Every market measures in its loan token, so that is the unit of every figure on its row and the only unit the
-          row can be totalled in. Rows are ordered by how many of their markets hold money, not by size — the totals are
-          in different tokens and do not compare. Open a row for that token&rsquo;s markets, one by one.
-        </p>
-        <div className="mt-3">
-          <LoanTokenColumns />
-          <div className="divide-y divide-rb-300/25 dark:divide-rb-700/25">
-            {funded.map((g) => (
-              <LoanTokenRow key={g.loanToken} g={g} block={data.blockNumber} chainId={chainId} />
-            ))}
-          </div>
-        </div>
-        {unfunded.length > 0 && (
-          <details className="mt-3 group">
-            <summary className="cursor-pointer list-none text-[11px] text-blue-500 hover:underline">
-              <span className="group-open:hidden">
-                Show {unfunded.length} loan tokens whose markets have never been funded
+              <span
+                data-prov-exempt=""
+                title="A count over the roster — how many markets hold no supply — not a slot read."
+              >
+                <span className="text-foreground">{data.summary.neverFunded.toLocaleString("en-US")}</span> never funded
               </span>
-              <span className="hidden group-open:inline">Hide unfunded loan tokens</span>
-            </summary>
-            <div
-              className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] tabular-nums text-rb-500"
-              data-prov-exempt=""
-              title="Names and market counts over the roster — no figure here is a slot read."
-            >
-              {unfunded.map((g) => (
-                <span key={g.loanToken} title={g.loanToken}>
-                  <Link href={loanTokenHref(chainId, g.loanToken)} className="hover:underline">
-                    <span className={g.loanNamed ? "text-foreground" : "font-mono"}>{g.loanSymbol}</span>
-                  </Link>
-                  {g.ambiguous && <span className="font-mono"> {shortAddr(g.loanToken)}</span>} ·{" "}
-                  {g.markets === 1 ? "1 market" : `${g.markets} markets`}
+              {data.summary.idleMarkets > 0 && (
+                <span
+                  data-prov-exempt=""
+                  title="No collateral token, no oracle, no IRM: nothing can be borrowed. A place to hold cash inside Blue. A count over the roster, not a slot read."
+                >
+                  <span className="text-foreground">{data.summary.idleMarkets}</span> idle markets
                 </span>
+              )}
+              <span
+                data-prov-exempt=""
+                title="Distinct loan tokens across the roster — a count over the markets, not a slot read."
+              >
+                <span className="text-foreground">{data.summary.loanTokens}</span> loan tokens ·{" "}
+                <span className="text-foreground">{funded.length}</span> with funded markets
+              </span>
+            </>
+          }
+        />
+
+        <div className="mb-5">
+          <LltvSpread lltvs={data.summary.lltvs} total={data.summary.total} block={data.blockNumber} />
+        </div>
+
+        <section className="rounded-xl bg-raised px-4 py-3.5">
+          <h2 className="text-sm font-semibold text-foreground">One row per loan token</h2>
+          <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-rb-500">
+            Every market measures in its loan token, so that is the unit of every figure on its row and the only unit
+            the row can be totalled in. Rows are ordered by how many of their markets hold money, not by size — the
+            totals are in different tokens and do not compare. Open a row for that token&rsquo;s markets, one by one.
+          </p>
+          <div className="mt-3">
+            <LoanTokenColumns />
+            <div className="divide-y divide-rb-300/25 dark:divide-rb-700/25">
+              {funded.map((g) => (
+                <LoanTokenRow key={g.loanToken} g={g} block={data.blockNumber} chainId={chainId} />
               ))}
             </div>
-          </details>
-        )}
-      </section>
+          </div>
+          {unfunded.length > 0 && (
+            <details className="mt-3 group">
+              <summary className="cursor-pointer list-none text-[11px] text-blue-500 hover:underline">
+                <span className="group-open:hidden">
+                  Show {unfunded.length} loan tokens whose markets have never been funded
+                </span>
+                <span className="hidden group-open:inline">Hide unfunded loan tokens</span>
+              </summary>
+              <div
+                className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] tabular-nums text-rb-500"
+                data-prov-exempt=""
+                title="Names and market counts over the roster — no figure here is a slot read."
+              >
+                {unfunded.map((g) => (
+                  <span key={g.loanToken} title={g.loanToken}>
+                    <Link href={loanTokenHref(chainId, g.loanToken)} className="hover:underline">
+                      <span className={g.loanNamed ? "text-foreground" : "font-mono"}>{g.loanSymbol}</span>
+                    </Link>
+                    {g.ambiguous && <span className="font-mono"> {shortAddr(g.loanToken)}</span>} ·{" "}
+                    {g.markets === 1 ? "1 market" : `${g.markets} markets`}
+                  </span>
+                ))}
+              </div>
+            </details>
+          )}
+        </section>
 
-      <ProvenanceInfoTabs className="mt-6" />
-    </ProvReceiptsScope>
+        <ProvenanceInfoTabs className="mt-6" />
+      </ProvReceiptsScope>
+    </TotalsFromLogs.Provider>
   );
 }
 
@@ -658,6 +673,7 @@ function FamilyEntry({
   chainId: ChainId;
 }) {
   const coords: MorphoMarketCoords = {
+    fromLogs: useContext(TotalsFromLogs),
     blockNumber: block,
     loanSymbol: g.loanSymbol,
     loanToken: g.loanToken,
@@ -726,16 +742,19 @@ export function MorphoLoanTokenView({
   block,
   group: g,
   chainId = MAINNET_CHAIN_ID,
+  fromLogs = false,
 }: {
-  /** The head block the roster was read at. */
+  /** The block the roster was read at. */
   block: number;
+  /** The totals are rails-server's replay of the Base Sieve at `block`. */
+  fromLogs?: boolean;
   /** This token alone, already shaped (lib/morpho/markets-shape
    *  loanTokenViewData) — the rest of the roster never crosses. */
   group: MorphoLoanTokenViewData;
   chainId?: ChainId;
 }) {
   const registry = useReceiptRegistry();
-  const coords: MorphoMarketCoords = { blockNumber: block, loanSymbol: g.loanSymbol, loanToken: g.loanToken };
+  const coords: MorphoMarketCoords = { fromLogs, blockNumber: block, loanSymbol: g.loanSymbol, loanToken: g.loanToken };
   const shape = g;
   const util = g.totalSupply > 0 ? g.totalBorrow / g.totalSupply : null;
   // Blue credits accrued interest to a market's stored supply with no token moving, so a
@@ -752,156 +771,161 @@ export function MorphoLoanTokenView({
   const familiesCoverIt = overIssued && shape.familySupply > (g.loanTokenSupply ?? 0);
 
   return (
-    <ProvReceiptsScope registry={registry}>
-      {/* The vitals band. Unlike the overview one level up, this surface DOES
+    <TotalsFromLogs.Provider value={fromLogs}>
+      <ProvReceiptsScope registry={registry}>
+        {/* The vitals band. Unlike the overview one level up, this surface DOES
           have a common unit — every market here measures in {g.loanSymbol} —
           so the size slots and the one ratio Blue keeps can be stated. They
           disappear for a token that misreports its own decimals: the caveat in
           the notes is the reason, and it must stay visible. */}
-      <VitalsBand
-        vitals={[
-          {
-            slot: "roster",
-            label: "Markets",
-            value: <span data-prov-exempt="">{g.markets.toLocaleString("en-US")}</span>,
-            title: "Counts over this token's markets on the censused roster, not a slot read.",
-          },
-          g.amountsTrusted && {
-            slot: "sizeIn" as const,
-            label: "Supplied",
-            value: (
-              <Prov info={morphoGroupTotalProv("supplied", coords)}>
-                {amount(g.totalSupply)} {g.loanSymbol}
-              </Prov>
-            ),
-          },
-          g.amountsTrusted && {
-            slot: "sizeOut" as const,
-            label: "Borrowed",
-            value: (
-              <Prov info={morphoGroupTotalProv("borrowed", coords)}>
-                {amount(g.totalBorrow)} {g.loanSymbol}
-              </Prov>
-            ),
-          },
-          g.amountsTrusted &&
-            util != null && {
-              slot: "usage" as const,
-              label: "Utilisation",
-              value: <Prov info={morphoGroupUtilizationProv(coords)}>{pctText(util, 0)}</Prov>,
-              title: `Σ borrow ÷ Σ supply across this loan token's markets, both in ${g.loanSymbol} — the one aggregate ratio Blue keeps. Blue's Market struct carries no total collateral, so there is no protocol-wide LTV to state.`,
+        <VitalsBand
+          vitals={[
+            {
+              slot: "roster",
+              label: "Markets",
+              value: <span data-prov-exempt="">{g.markets.toLocaleString("en-US")}</span>,
+              title: "Counts over this token's markets on the censused roster, not a slot read.",
             },
-        ]}
-        notes={
-          <>
-            <span data-prov-exempt="" title="Counts over this token's markets on the censused roster, not a slot read.">
-              <span className="text-foreground">{g.funded.toLocaleString("en-US")}</span> hold supply ·{" "}
-              <span className="text-foreground">{g.borrowing.toLocaleString("en-US")}</span> have borrowing
-            </span>
-            {!g.amountsTrusted &&
-              (g.loanDecimalsUnread ? (
-                <span
-                  title={`${g.loanToken}: the chain didn't answer for this token's decimals. The totals show once it does.`}
-                >
-                  totals not loaded
-                </span>
-              ) : (
-                <span
-                  title={`${g.loanSymbol} misreports its own decimals, so a total over it would not be a quantity of anything.`}
-                >
-                  totals not stated — {g.loanSymbol} misreports its decimals
-                </span>
-              ))}
-            {g.amountsTrusted && g.loanTokenSupply != null && (
-              <span>
-                <span className="text-foreground">
-                  <Prov info={morphoLoanTokenSupplyProv(coords)}>{amount(g.loanTokenSupply)}</Prov>
-                </span>{" "}
-                {g.loanSymbol} exists
-              </span>
-            )}
-            {g.ambiguous && (
-              <span
-                className="font-mono"
-                title={`More than one token on this roster calls itself ${g.loanSymbol}. Only the address distinguishes them.`}
-              >
-                {g.loanToken}
-              </span>
-            )}
-          </>
-        }
-      />
-
-      {overIssued && (
-        <p className="mt-2 max-w-3xl text-[11px] leading-relaxed text-caution-500">
-          These books stand above the token itself: only{" "}
-          <Prov info={morphoLoanTokenSupplyProv(coords)}>{amount(g.loanTokenSupply ?? 0)}</Prov> {g.loanSymbol} exists.
-          Blue credits accrued interest to a market&rsquo;s stored supply without any token moving, so a market left at
-          full utilisation while its rate climbs compounds its own book past the asset behind it. The figures here are
-          what the contract stores, stated as it stores them.
-          {familiesCoverIt && (
+            g.amountsTrusted && {
+              slot: "sizeIn" as const,
+              label: "Supplied",
+              value: (
+                <Prov info={morphoGroupTotalProv("supplied", coords)}>
+                  {amount(g.totalSupply)} {g.loanSymbol}
+                </Prov>
+              ),
+            },
+            g.amountsTrusted && {
+              slot: "sizeOut" as const,
+              label: "Borrowed",
+              value: (
+                <Prov info={morphoGroupTotalProv("borrowed", coords)}>
+                  {amount(g.totalBorrow)} {g.loanSymbol}
+                </Prov>
+              ),
+            },
+            g.amountsTrusted &&
+              util != null && {
+                slot: "usage" as const,
+                label: "Utilisation",
+                value: <Prov info={morphoGroupUtilizationProv(coords)}>{pctText(util, 0)}</Prov>,
+                title: `Σ borrow ÷ Σ supply across this loan token's markets, both in ${g.loanSymbol} — the one aggregate ratio Blue keeps. Blue's Market struct carries no total collateral, so there is no protocol-wide LTV to state.`,
+              },
+          ]}
+          notes={
             <>
-              {" "}
-              The{" "}
-              {shape.families
-                .map((f) => `${f.markets.length}-market ${f.collateralSymbol ?? "unnamed"}`)
-                .join(" and ")}{" "}
-              {shape.families.length === 1 ? "family below accounts for" : "families below account for"} nearly all of
-              it.
-            </>
-          )}
-        </p>
-      )}
-
-      <div className="mt-5 grid gap-2.5">
-        {shape.material.length > 0 && (
-          <section className="rounded-xl bg-raised px-4 py-3.5">
-            <h2 className="text-sm font-semibold text-foreground">
-              {shape.families.length > 0 || shape.dust.length > 0 ? "The markets that carry the book" : "Markets"}
-            </h2>
-            <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-rb-500">
-              Biggest book first. The bar is borrow ÷ supply, the one aggregate ratio Blue keeps; the lltv beside it is
-              the market&rsquo;s whole risk surface. Sizes are the balance each market last settled, never projected
-              forward; the rates are live.
-            </p>
-            <div className="mt-3">
-              <MarketRun markets={shape.material} block={block} chainId={chainId} />
-            </div>
-          </section>
-        )}
-
-        {shape.families.map((f) => (
-          <FamilyEntry key={`${f.collateralToken}:${f.lltv}`} f={f} g={g} block={block} chainId={chainId} />
-        ))}
-
-        {shape.dust.length > 0 && (
-          <section className="rounded-xl bg-raised px-4 py-3.5">
-            <h2 className="text-sm font-semibold text-foreground">
-              <span data-prov-exempt="" title="A count over this token's markets, not a slot read.">
-                {shape.dust.length.toLocaleString("en-US")} more funded markets
+              <span
+                data-prov-exempt=""
+                title="Counts over this token's markets on the censused roster, not a slot read."
+              >
+                <span className="text-foreground">{g.funded.toLocaleString("en-US")}</span> hold supply ·{" "}
+                <span className="text-foreground">{g.borrowing.toLocaleString("en-US")}</span> have borrowing
               </span>
-              , each below 0.1% of the book
-            </h2>
-            <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-rb-500">
-              Funded, and real, and each holding less than a thousandth of what the markets above hold between them.
-              Every figure on their rows carries the same receipt as the rows above.
-            </p>
-            <details className="mt-2 group">
-              <summary className="cursor-pointer list-none text-[11px] text-blue-500 hover:underline">
-                <span className="group-open:hidden">Show {shape.dust.length.toLocaleString("en-US")} markets</span>
-                <span className="hidden group-open:inline">Hide them</span>
-              </summary>
-              <div className="mt-3">
-                <MarketRun markets={shape.dust} block={block} chainId={chainId} />
-              </div>
-            </details>
-          </section>
+              {!g.amountsTrusted &&
+                (g.loanDecimalsUnread ? (
+                  <span
+                    title={`${g.loanToken}: the chain didn't answer for this token's decimals. The totals show once it does.`}
+                  >
+                    totals not loaded
+                  </span>
+                ) : (
+                  <span
+                    title={`${g.loanSymbol} misreports its own decimals, so a total over it would not be a quantity of anything.`}
+                  >
+                    totals not stated — {g.loanSymbol} misreports its decimals
+                  </span>
+                ))}
+              {g.amountsTrusted && g.loanTokenSupply != null && (
+                <span>
+                  <span className="text-foreground">
+                    <Prov info={morphoLoanTokenSupplyProv(coords)}>{amount(g.loanTokenSupply)}</Prov>
+                  </span>{" "}
+                  {g.loanSymbol} exists
+                </span>
+              )}
+              {g.ambiguous && (
+                <span
+                  className="font-mono"
+                  title={`More than one token on this roster calls itself ${g.loanSymbol}. Only the address distinguishes them.`}
+                >
+                  {g.loanToken}
+                </span>
+              )}
+            </>
+          }
+        />
+
+        {overIssued && (
+          <p className="mt-2 max-w-3xl text-[11px] leading-relaxed text-caution-500">
+            These books stand above the token itself: only{" "}
+            <Prov info={morphoLoanTokenSupplyProv(coords)}>{amount(g.loanTokenSupply ?? 0)}</Prov> {g.loanSymbol}{" "}
+            exists. Blue credits accrued interest to a market&rsquo;s stored supply without any token moving, so a
+            market left at full utilisation while its rate climbs compounds its own book past the asset behind it. The
+            figures here are what the contract stores, stated as it stores them.
+            {familiesCoverIt && (
+              <>
+                {" "}
+                The{" "}
+                {shape.families
+                  .map((f) => `${f.markets.length}-market ${f.collateralSymbol ?? "unnamed"}`)
+                  .join(" and ")}{" "}
+                {shape.families.length === 1 ? "family below accounts for" : "families below account for"} nearly all of
+                it.
+              </>
+            )}
+          </p>
         )}
-      </div>
 
-      <NeverFunded runs={shape.empties} count={shape.emptiesCount} loanSymbol={g.loanSymbol} />
+        <div className="mt-5 grid gap-2.5">
+          {shape.material.length > 0 && (
+            <section className="rounded-xl bg-raised px-4 py-3.5">
+              <h2 className="text-sm font-semibold text-foreground">
+                {shape.families.length > 0 || shape.dust.length > 0 ? "The markets that carry the book" : "Markets"}
+              </h2>
+              <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-rb-500">
+                Biggest book first. The bar is borrow ÷ supply, the one aggregate ratio Blue keeps; the lltv beside it
+                is the market&rsquo;s whole risk surface. Sizes are the balance each market last settled, never
+                projected forward; the rates are live.
+              </p>
+              <div className="mt-3">
+                <MarketRun markets={shape.material} block={block} chainId={chainId} />
+              </div>
+            </section>
+          )}
 
-      <ProvenanceInfoTabs className="mt-6" />
-    </ProvReceiptsScope>
+          {shape.families.map((f) => (
+            <FamilyEntry key={`${f.collateralToken}:${f.lltv}`} f={f} g={g} block={block} chainId={chainId} />
+          ))}
+
+          {shape.dust.length > 0 && (
+            <section className="rounded-xl bg-raised px-4 py-3.5">
+              <h2 className="text-sm font-semibold text-foreground">
+                <span data-prov-exempt="" title="A count over this token's markets, not a slot read.">
+                  {shape.dust.length.toLocaleString("en-US")} more funded markets
+                </span>
+                , each below 0.1% of the book
+              </h2>
+              <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-rb-500">
+                Funded, and real, and each holding less than a thousandth of what the markets above hold between them.
+                Every figure on their rows carries the same receipt as the rows above.
+              </p>
+              <details className="mt-2 group">
+                <summary className="cursor-pointer list-none text-[11px] text-blue-500 hover:underline">
+                  <span className="group-open:hidden">Show {shape.dust.length.toLocaleString("en-US")} markets</span>
+                  <span className="hidden group-open:inline">Hide them</span>
+                </summary>
+                <div className="mt-3">
+                  <MarketRun markets={shape.dust} block={block} chainId={chainId} />
+                </div>
+              </details>
+            </section>
+          )}
+        </div>
+
+        <NeverFunded runs={shape.empties} count={shape.emptiesCount} loanSymbol={g.loanSymbol} />
+
+        <ProvenanceInfoTabs className="mt-6" />
+      </ProvReceiptsScope>
+    </TotalsFromLogs.Provider>
   );
 }

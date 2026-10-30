@@ -7,7 +7,7 @@
 // asks — the market's oracle. Below it the page draws the positions listing fixed to this
 // market; this component is only the market itself.
 //
-// Everything is read at ONE head block by lib/sources/chain/morpho-markets
+// Everything is at ONE block (the head, or on Base the Sieve replay's block) by lib/sources/chain/morpho-markets
 // loadMorphoMarketFromChain: market(id) as stored (never accrued forward — the roster's rule),
 // the market's own IRM on it, and the oracle's price with its feeds' latest rounds, the last
 // two read and stated exactly as the position page states them (MorphoOraclePrice). No USD,
@@ -97,6 +97,7 @@ export function MorphoMarketView({ data, chainId }: { data: MorphoMarketViewData
   const m = data.market;
   const block = data.blockNumber;
   const coords: MorphoMarketCoords = {
+    fromLogs: data.totalsSource === "sieve",
     blockNumber: block,
     marketId: m.id,
     loanSymbol: m.loanSymbol,
