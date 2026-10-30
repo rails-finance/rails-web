@@ -1160,15 +1160,25 @@ const PAGES = [
     pace: "WETH",
   },
   {
-    // Open since 9 May 2026, never redeemed, on a branch that was (ruling 11's
-    // protocol activity chart, hidden at first here).
-    id: "liquity-v2 wstETH Trove (never redeemed)",
+    // Open since 9 May 2026, on a branch with redemptions; redeemed once by
+    // 30 Oct 2026, so its protocol activity panel opens shown.
+    id: "liquity-v2 wstETH Trove (open since May)",
     path: "/ethereum/liquity-v2/trove/wstETH/36866364639024890689412217368623603118483270545575424157920590185252139913822",
+    answer: "/api/liquity-v2/prices/daily",
+    trove: "live",
+    panes: "value,price",
+    pace: "wstETH",
+  },
+  {
+    // Open since 2 Nov 2025, never redeemed on 30 Oct 2026, on a branch that
+    // was: its protocol activity panel opens hidden (ui-jobs 452).
+    id: "liquity-v2 WETH Trove (never redeemed)",
+    path: "/ethereum/liquity-v2/trove/WETH/30404411686890082603025828629969289056413589403947755681351563798146900259572",
     answer: "/api/liquity-v2/prices/daily",
     trove: "live",
     neverRedeemed: true,
     panes: "value,price",
-    pace: "wstETH",
+    pace: "WETH",
   },
 ];
 
@@ -3861,7 +3871,10 @@ async function checkLwClick(page, tag) {
   await page.waitForTimeout(200);
   const c = await cursorDay();
   check(`${t}: an arrow steps one day`, b === a - 1 && c === a, `${a} ← ${b} → ${c}`);
-  await page.locator('[data-flows-combined] [data-flow-jump="end"]').first().click();
+  // The price chart alone has no steps: End takes the cursor back.
+  const end = page.locator('[data-flows-combined] [data-flow-jump="end"]').first();
+  if (await end.isVisible()) await end.click();
+  else await page.keyboard.press("End");
   await page.locator('[data-flows-combined] [data-flow-range="All"]').first().click();
   await page.waitForTimeout(800);
 }
@@ -3931,6 +3944,9 @@ const browser = await chromium.launch();
 for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
   for (const width of [1280, 390]) {
     const tag = `${pg.id} @${width}`;
+    // One page at a time, 2 s apart: the chain overlays share a free-tier
+    // RPC key capped at 500 credits a second.
+    await new Promise((r) => setTimeout(r, 2000));
     const ctx = await browser.newContext({
       viewport: { width, height: 1000 },
       hasTouch: width < 640,
