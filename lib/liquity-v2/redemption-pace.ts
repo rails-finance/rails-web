@@ -72,12 +72,14 @@ export const v2PaceSource = (branch: PaceBranch): PaceSource => ({
   table: "redemption_events",
 });
 
-/** A fork's branch: `branch` is the display symbol, `unit` the fork's stable. */
+/** A fork's branch: `branch` is the display symbol, `unit` the fork's stable.
+ *  Ebisu's Redemption logs come from its branch managers, so its table is
+ *  mig 292's union of both emitters. */
 export const forkPaceSource = (fork: PaceFork, branch: string, unit: string): PaceSource => ({
   path: `/api/${fork}/redemption-pace`,
   branch,
   unit,
-  table: `${fork}_redemption_${branch.toLowerCase()}`,
+  table: `${fork === "ebisu" ? "ebisu_all" : fork}_redemption_${branch.toLowerCase()}`,
 });
 
 /** The range to read for a life from `first` to `last` (UTC day numbers):

@@ -202,6 +202,11 @@ const dolomiteRatio = (owner, accountNumber, extra = {}) => ({
   ],
   ...extra,
 });
+/** A fork fixture's protocol activity: the route, the branch, the stable,
+ *  and where the range read ends ("today" on an open Trove, "last" the last
+ *  row's day). */
+const forkPace = (fork, pace, unit, to) => ({ pace, paceFork: fork, paceUnit: unit, paceTo: to });
+
 const PAGES = [
   {
     id: "aave-v3 0xfb93",
@@ -834,9 +839,12 @@ const PAGES = [
     ratio: { ...MORPHO_RATIO, endDay: 20736 },
   },
   // The forks and Polaris (step 6): the collateral's price with the level
-  // against the minimum in force each day.
+  // against the minimum in force each day. The forks' protocol activity
+  // (ui-jobs 452) is their branch's redemptions in the fork's stable, read to
+  // today on an open Trove and to the last row's day otherwise.
   {
     id: "ebisu wbtc 3876 (liquidated, MCR step)",
+    ...forkPace("ebisu", "WBTC", "ebUSD", "last"),
     path: "/ethereum/ebisu/wbtc/38767992399838988350336392758823407708425408086117331868518504752269504506657",
     lwOnly: true,
     level: {
@@ -848,6 +856,7 @@ const PAGES = [
   },
   {
     id: "ebisu weeth 1065 (closed, MCR step)",
+    ...forkPace("ebisu", "weETH", "ebUSD", "last"),
     path: "/ethereum/ebisu/weeth/106525219326064530299176858413070691994107358379893271777150080609961810096862",
     lwOnly: true,
     changes: { day: 20457, name: "Minimum ratio", from: "128 %", to: "120 %", block: 24160712 },
@@ -860,24 +869,28 @@ const PAGES = [
   },
   {
     id: "ebisu stcusd 6774",
+    ...forkPace("ebisu", "stcUSD", "ebUSD", "today"),
     path: "/ethereum/ebisu/stcusd/6774201543947923016744174294482881587816035374101342731108014726689376691497",
     lwOnly: true,
     level: { asset: "stcUSD", card: "liquidates-at", help: ["115% minimum, which no governance log has moved"] },
   },
   {
     id: "asymmetry scrvusd 2145",
+    ...forkPace("asymmetry", "scrvUSD", "USDaf", "today"),
     path: "/ethereum/asymmetry/scrvusd/21455407195608252231693499135014282170032223495298941722085434215551435526302",
     lwOnly: true,
     level: { asset: "scrvUSD", card: "liquidates-at", help: ["today's 110% minimum, held across the life"] },
   },
   {
     id: "asymmetry ysybold 4577 (closed)",
+    ...forkPace("asymmetry", "ysyBOLD", "USDaf", "last"),
     path: "/ethereum/asymmetry/ysybold/45771828629529054463940548704077640517998892185928814218152521258795699925919",
     lwOnly: true,
     level: { asset: "ysyBOLD", endDay: 20392, help: ["today's", "minimum, held across the life"] },
   },
   {
     id: "basedollar cbeth 6846",
+    ...forkPace("basedollar", "cbETH", "BD", "today"),
     path: "/base/basedollar/cbeth/68469010491365517650601323854262902343759121653681014133081846278487342428277",
     lwOnly: true,
     level: {
@@ -888,6 +901,7 @@ const PAGES = [
   },
   {
     id: "basedollar wsteth 1150 (closed)",
+    ...forkPace("basedollar", "wstETH", "BD", "last"),
     path: "/base/basedollar/wsteth/115054813357214655434932038880034226794865662069657988027541148413367718171377",
     lwOnly: true,
     // Redeemed to no debt on 28 Sep 2026, closed the day after: the level
@@ -3000,6 +3014,18 @@ async function troveRows(path) {
     .sort((a, b) => a.ts - b.ts || a.block - b.block || a.logIndex - b.logIndex);
 }
 
+/** A fork Trove's rows (/api/<fork>/<branch>/<id>/timeline, the whole
+ *  history in one answer): the day and whether it is a redemption, for the
+ *  protocol activity check. */
+async function forkRows(path, fork) {
+  const parts = path.split("/");
+  const [ct, id] = parts.slice(-2);
+  const body = await hostFetch(`${BASE}/api/${fork}/${ct}/${id}/timeline`).then((r) => r.json());
+  return (body.events ?? [])
+    .map((e) => ({ ts: e.timestamp, redemption: e.actionType === "redeemCollateral" }))
+    .sort((a, b) => a.ts - b.ts);
+}
+
 /** The block the level on `day` rests on: the last row by the day's end,
  *  where it holds collateral and debt (a row stating no after-state keeps the
  *  last state); on the day a row leaves nothing, the last row that held both;
@@ -3099,6 +3125,7 @@ async function checkTroveMarks(page, tag, pg, rows) {
  *  how-to-read says the series is branch-wide and drawn by the square root. */
 async function checkPace(page, tag, pg, rows, width) {
   const t = `${tag} activity`;
+  const unit = pg.paceUnit ?? "BOLD";
   const panel = () =>
     page.evaluate(() => {
       const a = document.querySelector("[data-protocol-activity]");
@@ -3128,8 +3155,8 @@ async function checkPace(page, tag, pg, rows, width) {
   const p0 = await panel();
   if (!check(`${t}: the protocol activity panel stands under the events`, p0 != null)) return;
   check(
-    `${t}: the title names the scope, "Whole ${pg.pace} branch · BOLD redeemed a day"`,
-    p0.title === `Whole ${pg.pace} branch · BOLD redeemed a day`,
+    `${t}: the title names the scope, "Whole ${pg.pace} branch · ${unit} redeemed a day"`,
+    p0.title === `Whole ${pg.pace} branch · ${unit} redeemed a day`,
     p0.title,
   );
   check(
@@ -3168,7 +3195,10 @@ async function checkPace(page, tag, pg, rows, width) {
   if (!check(`${t}: the panel holds its days`, hook != null)) return;
   const today = Math.floor(Date.now() / 86_400_000);
   const first = Math.floor(rows[0].ts / DAY);
-  const last = pg.trove === "redeemed" || pg.trove === "live" ? today : Math.floor(rows[rows.length - 1].ts / DAY);
+  const last =
+    pg.paceTo === "today" || pg.trove === "redeemed" || pg.trove === "live"
+      ? today
+      : Math.floor(rows[rows.length - 1].ts / DAY);
   check(
     `${t}: the range read is the life, ${first} to ${last}, and the panel names the ${pg.pace} branch`,
     hook.from === first && hook.to === last && hook.label.startsWith(`Whole ${pg.pace} branch`),
@@ -3176,7 +3206,7 @@ async function checkPace(page, tag, pg, rows, width) {
   );
   const iso = (d) => new Date(d * 86_400_000).toISOString().slice(0, 10);
   const answer = await hostFetch(
-    `${BASE}/api/liquity-v2/redemption-pace?branch=${pg.pace}&from=${iso(hook.from)}&to=${iso(hook.to)}`,
+    `${BASE}/api/${pg.paceFork ?? "liquity-v2"}/redemption-pace?branch=${pg.pace}&from=${iso(hook.from)}&to=${iso(hook.to)}`,
   ).then((r) => r.json());
   const want = new Map(
     (answer.days ?? []).map((d) => [Date.parse(`${d.day}T00:00:00Z`) / 86_400_000, { bold: d.bold, count: d.count }]),
@@ -3188,7 +3218,7 @@ async function checkPace(page, tag, pg, rows, width) {
   });
   const extra = [...held.keys()].filter((d) => !want.has(d));
   check(
-    `${t}: the panel holds the route's days, BOLD and counts, nothing else`,
+    `${t}: the panel holds the route's days, ${unit} and counts, nothing else`,
     off.length === 0 && extra.length === 0 && held.size === want.size,
     `${held.size} held, ${want.size} answered; off ${off.slice(0, 3).map((x) => x[0])}; extra ${extra.slice(0, 3)}`,
   );
@@ -3210,12 +3240,12 @@ async function checkPace(page, tag, pg, rows, width) {
   const tallest = hook.drawn.reduce((a, b) => (a == null || b[3] < a[3] ? b : a), null);
   const maxDay = positive.reduce((a, b) => (a == null || b[1].bold > a[1].bold ? b : a), null);
   check(
-    `${t}: the bars drawn are the days with BOLD redeemed, the tallest the life's largest (${maxDay ? maxDay[1].bold.toFixed(0) : 0})`,
+    `${t}: the bars drawn are the days with ${unit} redeemed, the tallest the life's largest (${maxDay ? maxDay[1].bold.toFixed(0) : 0})`,
     notHeld.length === 0 &&
       drawnDays.size === positive.length &&
       (positive.length === 0 || (tallest && Math.abs(held.get(tallest[0]).bold - maxDay[1].bold) < 1e-6)) &&
       Math.abs(hook.max - (maxDay ? maxDay[1].bold : 0)) < 1e-6,
-    `${drawnDays.size} drawn, ${positive.length} with BOLD; not held ${notHeld.slice(0, 3)}`,
+    `${drawnDays.size} drawn, ${positive.length} with ${unit}; not held ${notHeld.slice(0, 3)}`,
   );
   // A scrub on the chart and a zoom over the panel leave the two level.
   const strip = page.locator('[data-flows-combined] [data-flow-strip-view="chart"]').first();
@@ -3276,8 +3306,8 @@ async function checkPace(page, tag, pg, rows, width) {
     const w = want.get(r.day) ?? { bold: 0, count: 0 };
     const words =
       w.count === 0
-        ? r.text.includes("0 BOLD") && r.text.includes("no redemptions")
-        : r.text.includes(`${Math.round(w.bold).toLocaleString("en-US")} BOLD`) &&
+        ? r.text.includes(`0 ${unit}`) && r.text.includes("no redemptions")
+        : r.text.includes(`${Math.round(w.bold).toLocaleString("en-US")} ${unit}`) &&
           r.text.includes(`${w.count.toLocaleString("en-US")} redemption`);
     return Math.abs(r.bold - w.bold) > 1e-6 || r.count !== w.count || !words;
   });
@@ -4053,6 +4083,11 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       if (pg.noChanges) await checkNoChanges(page, tag);
       if (pg.changes || pg.noChanges) await checkChangeRows(page, tag, pg, width);
       if (pg.feed) await checkFeedChanges(page, tag, pg);
+      if (pg.paceFork && pg.pace) {
+        const fr = await forkRows(pg.path, pg.paceFork);
+        if (check(`${tag} activity: the Trove's rows read`, fr.length > 0, `${fr.length}`))
+          await checkPace(page, tag, pg, fr, width);
+      }
       check(`${tag}: console clean`, errors.length === 0, errors.slice(0, 3).join(" | "));
       await ctx.close();
       continue;

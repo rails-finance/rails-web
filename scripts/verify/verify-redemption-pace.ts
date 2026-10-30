@@ -175,13 +175,14 @@ test("a fork's branch: its stable in the title, its route and table in the recei
   assert.equal(sum(bd.days.map((d) => d.count)), 203);
 });
 
-test("Ebisu, never redeemed: a chart of zeros", () => {
+test("Ebisu: the branch managers' redemptions, zeros between", () => {
   const eb = branchRedemptionPace(
-    forkPaceSource("ebisu", "weETH", "ebUSD"),
-    forks["ebisu:weETH:2026-10-20:2026-10-29"],
+    forkPaceSource("ebisu", "sUSDe", "ebUSD"),
+    forks["ebisu:sUSDe:2026-09-28:2026-10-07"],
   )!;
-  assert.equal(`${eb.scope} · ${eb.measure}`, "Whole weETH branch · ebUSD redeemed a day");
-  assert.equal(eb.days.length, 0);
-  assert.equal(paceMax(eb, eb.from, eb.to), 0);
-  assert.equal(paceWords(eb, paceAt(eb, day("2026-10-25"))!), "0 ebUSD · no redemptions");
+  assert.equal(`${eb.scope} · ${eb.measure}`, "Whole sUSDe branch · ebUSD redeemed a day");
+  assert.equal(paceFilled(eb, eb.from, eb.to).length, 10);
+  assert.equal(paceWords(eb, paceAt(eb, day("2026-10-01"))!), "0 ebUSD · no redemptions");
+  assert.equal(paceWords(eb, paceAt(eb, day("2026-10-07"))!), "6,922 ebUSD · 1 redemption");
+  assert.match(String(eb.prov(paceAt(eb, day("2026-10-07"))!, "7 Oct 2026").via), /ebisu_all_redemption_susde/);
 });
