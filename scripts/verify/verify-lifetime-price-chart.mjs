@@ -107,9 +107,9 @@
 // 4577 and Basedollar wstETH 1150 (closed: the level ends that day), Polaris USDp
 // 2420 and GOLDp 18 (open: today's level the card's price × 115 % ÷ its ratio),
 // USDp 3732 and GOLDp 29 (liquidated); the how-to-read names the minimum.
-// LlamaLend (step 6, `band`, `checkBand`): 0xeb2c (open), 0xa32e (in soft
-// liquidation), 0xd76a (under its band), 0x61db (liquidated), 0xbbc5
-// (closed): Health first, today the card's; the band stepping on event days,
+// LlamaLend (step 6, `band`, `checkBand`): wstETH 0x95f1 (open), CRV 0xe5b2
+// (in soft liquidation), 0xd76a (under its band), 0x61db and 0xa32e
+// (liquidated), 0xbbc5 (closed): Health first, today the card's; the band stepping on event days,
 // today the card's Bands; the tip's band words; the drawn band against the
 // scales' placing at All, zoomed and panned. Step 8 (`changes`, `noChanges`):
 // the markets' discount sets as markers on 0xd76a, 0x6bda (WETH, 6 % → 9.21 %)
@@ -938,17 +938,27 @@ const PAGES = [
   // LlamaLend (step 6, `band`, `checkBand`): the card's Health first, its
   // line at 0; the collateral's soft-liquidation band shaded on its price,
   // stepping at events, today the card's Bands; the tip's in-band words.
+  // An open life and one in soft liquidation go stale when their owner or a
+  // liquidator closes them (0xeb2c repaid 30 Oct 2026, 0xa32e was liquidated
+  // 29 Oct 2026). These two have sat unchanged for months: 0x95f1 well above
+  // its band, 0xe5b2 a dust debt no liquidator takes, its price mid-band.
   {
-    id: "llamalend 0xeb2c",
-    path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0xeb2cafb6ea9def8084842558ad1242bbf7fcac2b",
+    id: "llamalend 0x95f1 (wstETH, open)",
+    path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0x95f1872c2c63f54072bd42f68beee71e0d6f67d3",
     lwOnly: true,
     band: { asset: "wstETH" },
   },
   {
-    id: "llamalend 0xa32e (in soft liquidation)",
+    id: "llamalend 0xe5b2 (CRV, in soft liquidation)",
+    path: "/ethereum/llamalend/0xeda215b7666936ded834f76f3fbc6f323295110a/0xe5b2a2459914b78f52bef1d294605efc91e311a3",
+    lwOnly: true,
+    band: { asset: "CRV", place: "inside" },
+  },
+  {
+    id: "llamalend 0xa32e (liquidated from soft liquidation)",
     path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0xa32ea34ac816397e3312423f88229b24d1ae0d5d",
     lwOnly: true,
-    band: { asset: "wstETH", place: "inside" },
+    band: { asset: "wstETH", closed: true },
   },
   {
     id: "llamalend 0xd76a (under its band, liquidatable)",
