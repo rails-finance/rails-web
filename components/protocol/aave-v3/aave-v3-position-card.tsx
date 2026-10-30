@@ -68,7 +68,7 @@ import {
 } from "@/lib/aave-v3/card-deployment";
 import { aaveV3PositionModal, type AaveV3Deployment } from "@/lib/aave-v3/event-templates";
 import type { AaveV3PositionRow, AaveV3ReserveSummary } from "@/lib/api/fetch-aave-v3-positions";
-import type { AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
+import type { AaveV3PositionChainResponse, PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { formatCompact, formatCompactUsd } from "@/lib/shared/format-compact";
 
 /** One reserve the wallet holds on a given side, scaled to display units. The
@@ -114,6 +114,8 @@ export interface AaveV3PositionView {
    *  oracle didn't price is simply absent (the total then omits). */
   priceByAddress?: Record<string, number>;
   atBlock?: number;
+  /** rails-server's head read and the block it read at, where it answered the page's read. */
+  readBy?: PositionHeadStamp & { block: number };
   /** The position page's live health factor (the Pool's getUserAccountData,
    *  read on visit). Null = no debt when read; meaningless when
    *  `chainHfStale`. A listing view never carries one (0018). */
@@ -529,7 +531,13 @@ export function useAaveV3CardSlots({
         label,
         labelTip: detail ? sideTip(side) : undefined,
         value: (
-          <Prov info={side === "supply" ? dep.supply(one.symbol, v.atBlock) : dep.debt(one.symbol, v.atBlock)}>
+          <Prov
+            info={
+              side === "supply"
+                ? dep.supply(one.symbol, v.atBlock, v.readBy)
+                : dep.debt(one.symbol, v.atBlock, v.readBy)
+            }
+          >
             <AssetAmount
               value={one.amount}
               symbol={one.symbol}
@@ -560,7 +568,9 @@ export function useAaveV3CardSlots({
           // token amounts.
           <ReserveAmounts
             reserves={reserves}
-            receipt={(r) => (side === "supply" ? dep.supply(r.symbol, v.atBlock) : dep.debt(r.symbol, v.atBlock))}
+            receipt={(r) =>
+              side === "supply" ? dep.supply(r.symbol, v.atBlock, v.readBy) : dep.debt(r.symbol, v.atBlock, v.readBy)
+            }
           />
         ),
       pending: reserves.length > 0 && pending,
@@ -589,7 +599,7 @@ export function useAaveV3CardSlots({
           value: !hfRead ? null : noDebtRead ? null : v.healthFactor == null ? (
             <span className="text-rb-400">No debt</span>
           ) : (
-            <Prov info={hfProv(v.market, v.atBlock)}>{hfLabel(v.healthFactor)}</Prov>
+            <Prov info={hfProv(v.market, v.atBlock, v.readBy)}>{hfLabel(v.healthFactor)}</Prov>
           ),
         }
       : null;
@@ -647,7 +657,11 @@ export function useAaveV3CardSlots({
           amount: r.decimalsUnread ? (
             <TokenAmountNotLoaded address={r.address} label={r.symbol} />
           ) : (
-            <Prov info={side === "supply" ? dep.supply(r.symbol, v.atBlock) : dep.debt(r.symbol, v.atBlock)}>
+            <Prov
+              info={
+                side === "supply" ? dep.supply(r.symbol, v.atBlock, v.readBy) : dep.debt(r.symbol, v.atBlock, v.readBy)
+              }
+            >
               <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
                 {formatCompact(r.amount)}
               </ExactSpan>
@@ -724,7 +738,7 @@ export function useAaveV3CardSlots({
           label: "Room to borrow",
           tip: "How much more the account can borrow, in dollars, before it reaches its loan-to-value limit, as the Pool gives it at the latest block.",
           value: (
-            <Prov info={accountDataProv("Available to borrow", "availableBorrowsBase", chainPool)}>
+            <Prov info={accountDataProv("Available to borrow", "availableBorrowsBase", chainPool, v.readBy)}>
               {formatCompactUsd(chain.availableBorrowsUsd)}
             </Prov>
           ),
@@ -826,7 +840,7 @@ export function useAaveV3CardSlots({
                         address={r.address}
                         figure={`${formatUnitsExact(r.amountRaw, r.decimals)} ${r.symbol}`}
                       >
-                        <Prov info={dep.supply(r.symbol, v.atBlock)}>
+                        <Prov info={dep.supply(r.symbol, v.atBlock, v.readBy)}>
                           <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
                             {formatCompact(r.amount)}
                           </ExactSpan>

@@ -22,7 +22,11 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { Provenance } from "@/components/shared/provenance";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { AAVE_V3_POOL, MARKET_NAME, POOL_BY_MARKET } from "./asset-catalog";
-import { accountDataProv } from "./position-provenance";
+import { accountDataProv, serverReadVia } from "./position-provenance";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+
+/** rails-server's head read and the block it read at. */
+type ServerRead = PositionHeadStamp & { block: number };
 import {
   positionSupplyProv,
   positionDebtProv,
@@ -39,12 +43,13 @@ export interface AaveV3CardDeployment {
   /** Text beside the wallet naming the market; empty for a single-market
    *  deployment, where naming it would only repeat the page title. */
   marketLabel: (market: string) => string;
-  supply: (symbol: string, atBlock?: number) => Provenance;
-  debt: (symbol: string, atBlock?: number) => Provenance;
+  /** `readBy`: rails-server's head read, where it answered the page's read. */
+  supply: (symbol: string, atBlock?: number, readBy?: ServerRead) => Provenance;
+  debt: (symbol: string, atBlock?: number, readBy?: ServerRead) => Provenance;
   /** The health factor's receipt — only on a deployment whose card is the
    *  position page's, where the HF is the page's own live Pool read. A
    *  listing deployment has none: a listing card carries no HF (0018). */
-  healthFactor?: (market: string, atBlock?: number) => Provenance;
+  healthFactor?: (market: string, atBlock?: number, readBy?: ServerRead) => Provenance;
   usd: (what: string) => Provenance;
   liqPrice: (symbol: string) => Provenance;
   /** A closed account's "highest recorded" figures — where the maximum came
@@ -65,7 +70,8 @@ export const ETHEREUM_CARD_DEPLOYMENT: AaveV3CardDeployment = {
   // The position page merges its own live read over the listing view; the
   // receipt names that read (Pool.getUserAccountData @ head on the market's
   // Pool), not a snapshot.
-  healthFactor: (market) => accountDataProv("Health factor", "healthFactor", POOL_BY_MARKET[market] ?? AAVE_V3_POOL),
+  healthFactor: (market, _atBlock, readBy) =>
+    accountDataProv("Health factor", "healthFactor", POOL_BY_MARKET[market] ?? AAVE_V3_POOL, readBy),
   usd: aaveV3UsdProvOnchain,
   liqPrice: aaveV3LiqPriceProv,
   peakSupply: aaveV3PeakSupplyProv,
@@ -235,29 +241,29 @@ export function makeLivePoolCardDeployment(id: {
         { label: "oracle price", kind: "chain", note: `${oracle.name} getAssetPrice` },
       ],
     }),
-    supply: (symbol, block) => ({
+    supply: (symbol, block, readBy) => ({
       kind: "chain",
       pclass: "state",
       verify: RECOMPUTE,
       summary: `Supplied ${symbol} the position holds${at(block)} — the balance the reserve's aToken reports for this wallet at that block, read for this page. The aToken's balance climbs with the reserve's liquidity index, so every unit of interest earned up to that block is inside this figure.`,
       contract: pool,
-      via: `GET ${route} · aToken balanceOf${at(block)}`,
+      via: `GET ${route} · aToken balanceOf${at(block)}${serverReadVia(readBy)}`,
     }),
-    debt: (symbol, block) => ({
+    debt: (symbol, block, readBy) => ({
       kind: "chain",
       pclass: "state",
       verify: RECOMPUTE,
       summary: `Borrowed ${symbol} the position owes${at(block)} — the balance the reserve's variableDebtToken reports for this wallet at that block, read for this page. The debt token's balance climbs with the reserve's borrow index, so every unit of interest charged up to that block is inside this figure.`,
       contract: pool,
-      via: `GET ${route} · variableDebtToken balanceOf${at(block)}`,
+      via: `GET ${route} · variableDebtToken balanceOf${at(block)}${serverReadVia(readBy)}`,
     }),
-    healthFactor: (_market, block) => ({
+    healthFactor: (_market, block, readBy) => ({
       kind: "chain",
       pclass: "state",
       verify: RECOMPUTE,
       summary: `Health factor — the figure the Pool gives for this wallet when it is asked for the account's state${at(block)}. It is the Pool's account arithmetic over its oracle's prices at that block. The Pool writes a health factor with 18 decimal places, so 10^18 stands for a factor of 1.`,
       contract: pool,
-      via: `GET ${route} · Pool.getUserAccountData · healthFactor ÷10^18`,
+      via: `GET ${route} · Pool.getUserAccountData${at(block)}${serverReadVia(readBy)} · healthFactor ÷10^18`,
     }),
     usd: (what) => ({
       kind: "chain-derived",

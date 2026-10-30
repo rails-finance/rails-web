@@ -67,6 +67,25 @@ export interface AaveV3EMode {
   ltv: number;
 }
 
+/** Who read a head position and when: rails-server's head read
+ *  (`/api/at-block/aave-v3/position`), absent where the web read the chain. */
+export interface PositionHeadStamp {
+  /** The block's time, seconds. */
+  blockTime: number;
+  /** When rails-server read it (ISO). */
+  readAt: string;
+  /** The RPC host that answered. */
+  provider: string;
+}
+
+/** A position served from the listing's stored row because no read leg
+ *  answered: the row's block and when it was written. */
+export interface PositionStoredStamp {
+  blockNumber: number;
+  refreshedAt: string | null;
+  reservesKept: boolean;
+}
+
 export interface AaveV3PositionChainResponse {
   wallet: string;
   /** The market's Pool address (lowercase) every figure was read from. */
@@ -94,6 +113,10 @@ export interface AaveV3PositionChainResponse {
   chainStale: boolean;
   /** Reserves with non-zero supply or debt. */
   reserves: AaveV3ChainReserve[];
+  /** Set when rails-server read the position at the head. */
+  head?: PositionHeadStamp;
+  /** Set when the position is the listing's stored row (no read leg answered). */
+  stored?: PositionStoredStamp;
 }
 
 export interface FetchAaveV3PositionParams {

@@ -4,6 +4,8 @@
 // scripts/verify-spark-fork-deltas.mjs). SparkLend has one deployment, on
 // Ethereum, so every receipt names that Pool.
 
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import { serverReadVia } from "@/lib/aave-v3/position-provenance";
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import { SPARK_ADDRESSES } from "@/lib/spark/asset-catalog";
 
@@ -22,14 +24,21 @@ const ACCOUNT_VIA = "GET /api/chain/spark/position · Pool.getUserAccountData @ 
  *  Pool.getUserAccountData at the latest block (the max LTV, the liquidation
  *  threshold, available borrows, the oracle-priced USD totals). SparkLend's own
  *  oracle-priced account math — not an event-replay approximation. */
-export function accountDataProv(what: string, field: string): Provenance {
+export function accountDataProv(
+  what: string,
+  field: string,
+  readBy?: PositionHeadStamp & { block: number },
+): Provenance {
+  const via = readBy
+    ? `${ACCOUNT_VIA.replace("@ head", `@ block ${readBy.block.toLocaleString("en-US")}`)}${serverReadVia(readBy)} · ${field}`
+    : `${ACCOUNT_VIA} · ${field}`;
   return {
     kind: "chain",
     pclass: "state",
     verify: STATE_VERIFY,
     summary: `${what} — read from SparkLend's Pool.getUserAccountData for this wallet, at the latest block. The protocol's own oracle-priced account state, not an event-replay approximation.`,
     contract: POOL_CONTRACT,
-    via: `${ACCOUNT_VIA} · ${field}`,
+    via,
   };
 }
 

@@ -130,6 +130,7 @@ export function v3ViewFromChain(
     lastActivityAt: whole?.lastActivityAt ?? 0,
     priceByAddress: prices,
     atBlock: chain.blockNumber,
+    readBy: chain.head && { ...chain.head, block: chain.blockNumber },
     healthFactor: hf != null && hf < NO_DEBT_HF ? hf : null,
     chainHfStale: chain.chainStale,
   };
@@ -150,7 +151,12 @@ export function v3ViewFromChain(
  * balances, and the card marks an HF the read could not give for the debt shown.
  */
 export function v3ViewWithLiveRead(view: AaveV3PositionView, chain: AaveV3PositionChainResponse): AaveV3PositionView {
-  const live: AaveV3PositionView = { ...view, healthFactor: chain.healthFactor, chainHfStale: false };
+  const live: AaveV3PositionView = {
+    ...view,
+    healthFactor: chain.healthFactor,
+    chainHfStale: false,
+    readBy: chain.head && { ...chain.head, block: chain.blockNumber },
+  };
   const holdsNothing = chain.reserves.every((r) => r.supplyBalanceRaw === "0" && r.debtBalanceRaw === "0");
   if (view.status !== "open" || !holdsNothing) return live;
   return {

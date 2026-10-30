@@ -22,6 +22,7 @@ import { AAVE_V3_POOL, V3_LT_BY_ADDR } from "@/lib/aave-v3/asset-catalog";
 import { resolveV3Tokens } from "./aave-v3-tokens";
 import { notCollateralReserves } from "@/lib/aave-v3/collateral-split";
 import { assertDecimalsRead } from "./erc20-meta";
+import { serverAaveV3Position } from "@/lib/sources/api/aave-v3-position-head";
 import type { AaveV3ChainReserve, AaveV3EMode, AaveV3PositionChainResponse } from "@/lib/api/fetch-aave-v3-position";
 
 const POOL_ABI = parseAbi([
@@ -122,6 +123,25 @@ function stub(wallet: string, pool: string, atBlock: number): AaveV3PositionChai
  * asks and whether the Ethereum symbol catalog applies (it does not).
  */
 export async function loadAaveV3PositionFromChain(
+  walletRaw: string,
+  pool: string = AAVE_V3_POOL,
+  atBlock?: number,
+  chainId: ChainId = MAINNET_CHAIN_ID,
+): Promise<AaveV3PositionChainResponse> {
+  // At the head, rails-server's read first (lib/sources/api/aave-v3-position-head.ts);
+  // the chain below when it cannot answer. A stored row it serves is kept for
+  // when the chain read fails too.
+  if (atBlock === undefined) {
+    const got = await serverAaveV3Position(walletRaw, pool, chainId).catch(() => null);
+    if (got && !got.stored) return got.answer;
+    const read = await readAaveV3PositionFromChain(walletRaw, pool, undefined, chainId);
+    return read.chainStale && got?.stored ? got.answer : read;
+  }
+  return readAaveV3PositionFromChain(walletRaw, pool, atBlock, chainId);
+}
+
+/** The chain read itself: every call at one block, through the web's RPC. */
+export async function readAaveV3PositionFromChain(
   walletRaw: string,
   pool: string = AAVE_V3_POOL,
   atBlock?: number,

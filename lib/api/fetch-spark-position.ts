@@ -12,6 +12,8 @@
 //
 // Balances are TEXT to preserve numeric(78,0) precision; scale by `decimals`.
 
+import type { PositionHeadStamp } from "./fetch-aave-v3-position";
+
 export interface SparkChainReserve {
   address: string; // underlying token, lowercase
   symbol: string;
@@ -62,6 +64,8 @@ export interface SparkPositionChainResponse {
   reserves: SparkChainReserve[];
   /** The wallet's e-mode category at head (id 0: none); null where unread. */
   emode?: { id: number; label: string | null; ltv: number | null; lt: number | null } | null;
+  /** Set when rails-server read the position at the head. */
+  head?: PositionHeadStamp;
 }
 
 export interface FetchSparkPositionParams {

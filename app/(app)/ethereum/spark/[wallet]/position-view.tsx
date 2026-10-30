@@ -936,7 +936,12 @@ export default function SparkPositionDetail({
 }
 
 function sparkViewWithLiveRead(view: SparkPositionView, chain: SparkPositionChainResponse): SparkPositionView {
-  const live: SparkPositionView = { ...view, healthFactor: chain.healthFactor, chainHfStale: false };
+  const live: SparkPositionView = {
+    ...view,
+    healthFactor: chain.healthFactor,
+    chainHfStale: false,
+    readBy: chain.head && { ...chain.head, block: chain.blockNumber },
+  };
   const holdsNothing = chain.reserves.every((r) => r.supplyBalanceRaw === "0" && r.debtBalanceRaw === "0");
   if (view.status !== "open" || !holdsNothing) return live;
   return {

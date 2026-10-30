@@ -17,6 +17,7 @@ import { SPARK_ADDRESSES, SPARK_LT_BY_ADDR } from "@/lib/spark/asset-catalog";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import type { SparkChainReserve, SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
 import { notCollateralReserves } from "@/lib/aave-v3/collateral-split";
+import { serverSparkPosition } from "@/lib/sources/api/aave-v3-position-head";
 
 const SPARK_POOL = SPARK_ADDRESSES.POOL as `0x${string}`;
 
@@ -116,6 +117,21 @@ export async function loadSparkPositionFromChain(
   walletRaw: string,
   reserveAddrs: string[],
 ): Promise<SparkPositionChainResponse> {
+  // rails-server's head read first (lib/sources/api/aave-v3-position-head.ts),
+  // which reads every call at one block; the chain below when it cannot answer.
+  const served = await serverSparkPosition(walletRaw).catch(() => null);
+  if (served) return served;
+  return readSparkPositionFromChain(walletRaw, reserveAddrs);
+}
+
+/** The chain read itself, through the web's RPC: at the live head, or every
+ *  call at `atBlock` when one is given (the equality check against the route). */
+export async function readSparkPositionFromChain(
+  walletRaw: string,
+  reserveAddrs: string[],
+  atBlock?: number,
+): Promise<SparkPositionChainResponse> {
+  const pin = atBlock === undefined ? {} : { blockNumber: BigInt(atBlock) };
   const wallet = getAddress(walletRaw);
   const reserves = [
     ...new Set([...reserveAddrs, ...((await poolReserves()) ?? [])].map((a) => a.toLowerCase()).filter(Boolean)),
@@ -127,23 +143,26 @@ export async function loadSparkPositionFromChain(
     // Phase 1 — aggregate account data + collateral bitmap (two scalar reads), and
     // the homogeneous per-reserve getReserveData multicall, in parallel.
     const [blockNumber, account, userConfig, reserveStructs, emodeId] = await Promise.all([
-      client.getBlockNumber().then(Number),
+      atBlock !== undefined ? Promise.resolve(atBlock) : client.getBlockNumber().then(Number),
       client.readContract({
         address: SPARK_POOL,
         abi: POOL_ABI,
         functionName: "getUserAccountData",
         args: [wallet],
+        ...pin,
       }),
       client.readContract({
         address: SPARK_POOL,
         abi: POOL_ABI,
         functionName: "getUserConfiguration",
         args: [wallet],
+        ...pin,
       }),
       reserves.length === 0
         ? Promise.resolve([] as ReserveData[])
         : (client.multicall({
             allowFailure: false,
+            ...pin,
             contracts: reserves.map(
               (a) =>
                 ({
@@ -155,7 +174,7 @@ export async function loadSparkPositionFromChain(
             ),
           }) as Promise<ReserveData[]>),
       client
-        .readContract({ address: SPARK_POOL, abi: POOL_ABI, functionName: "getUserEMode", args: [wallet] })
+        .readContract({ address: SPARK_POOL, abi: POOL_ABI, functionName: "getUserEMode", args: [wallet], ...pin })
         .then(Number)
         .catch(() => null),
     ]);
@@ -169,6 +188,7 @@ export async function loadSparkPositionFromChain(
               abi: POOL_ABI,
               functionName: "getEModeCategoryData",
               args: [emodeId],
+              ...pin,
             })
             .catch(() => null)
         : null;
@@ -212,7 +232,7 @@ export async function loadSparkPositionFromChain(
         functionName: "totalSupply",
       } as const,
     ]);
-    const balances = (await client.multicall({ allowFailure: false, contracts: balCalls })) as bigint[];
+    const balances = (await client.multicall({ allowFailure: false, ...pin, contracts: balCalls })) as bigint[];
 
     // Symbols/decimals for the candidate reserves.
     const metas = await resolveErc20Meta(reserves);

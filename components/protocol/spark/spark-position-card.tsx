@@ -53,6 +53,7 @@ import {
   sparkLiqPriceProv,
 } from "@/lib/spark/event-provenance";
 import { accountDataProv, reserveDataProv, avgBorrowRateProv } from "@/lib/spark/position-provenance";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { sparkLiquidationRead, type SparkCardCaptions } from "@/lib/spark/economics";
 import { sparkPositionModal } from "@/lib/spark/event-templates";
 import { formatUsd } from "@/lib/shared/format-event";
@@ -86,6 +87,8 @@ export interface SparkPositionView {
    *  (the side's total then omits). */
   priceByAddress?: Record<string, number>;
   atBlock?: number;
+  /** rails-server's head read and the block it read at, where it answered the page's read. */
+  readBy?: PositionHeadStamp & { block: number };
   /** The position page's live health factor (Pool.getUserAccountData, read on
    *  visit). Null = no debt when read; meaningless when `chainHfStale`. A
    *  listing view never carries one (0018). */
@@ -588,7 +591,7 @@ export function useSparkCardSlots({
         ) : noDebtRead ? null : v.healthFactor == null ? (
           <span className="text-rb-400">No debt</span>
         ) : (
-          <Prov info={accountDataProv("Health factor", "healthFactor")}>{hfLabel(v.healthFactor)}</Prov>
+          <Prov info={accountDataProv("Health factor", "healthFactor", v.readBy)}>{hfLabel(v.healthFactor)}</Prov>
         ),
       });
       // The index's balances trail the live read: the Pool can read no debt
@@ -730,7 +733,7 @@ export function useSparkCardSlots({
       id: "room-to-borrow",
       label: "Room to borrow",
       value: (
-        <Prov info={accountDataProv("Available to borrow", "availableBorrowsBase")}>
+        <Prov info={accountDataProv("Available to borrow", "availableBorrowsBase", v.readBy)}>
           {formatCompactUsd(chain.availableBorrowsUsd)}
         </Prov>
       ),
