@@ -1129,7 +1129,7 @@ const PAGES = [
     answer: "/api/liquity-v2/prices/daily",
     trove: "live",
     unit: "USD",
-    panes: "value,price,pace",
+    panes: "value,price",
     pace: "WETH",
   },
   {
@@ -1137,7 +1137,7 @@ const PAGES = [
     path: "/ethereum/liquity-v2/trove/WETH/22412517865912344610666591322850826630726594253808037974356128721405243892759",
     answer: "/api/liquity-v2/prices/daily",
     trove: "redeemed",
-    panes: "value,price,pace",
+    panes: "value,price",
     pace: "WETH",
   },
   {
@@ -1145,7 +1145,7 @@ const PAGES = [
     path: "/ethereum/liquity-v2/trove/rETH/19392756892012588507808147823032851071198051944268422940534038614966657095964",
     answer: "/api/liquity-v2/prices/daily",
     trove: "liquidated",
-    panes: "value,price,pace",
+    panes: "value,price",
     pace: "rETH",
   },
   {
@@ -1154,17 +1154,18 @@ const PAGES = [
     path: "/ethereum/liquity-v2/trove/WETH/82501486677343366959104920060744506403266161051192207755275552075653445398317",
     answer: "/api/liquity-v2/prices/daily",
     trove: "closed",
-    panes: "value,price,pace",
+    panes: "value,price",
     pace: "WETH",
   },
   {
-    // Open since 9 May 2026, never redeemed, on a branch that was (ruling 11's pace lane).
+    // Open since 9 May 2026, never redeemed, on a branch that was (ruling 11's
+    // protocol activity chart, hidden at first here).
     id: "liquity-v2 wstETH Trove (never redeemed)",
     path: "/ethereum/liquity-v2/trove/wstETH/36866364639024890689412217368623603118483270545575424157920590185252139913822",
     answer: "/api/liquity-v2/prices/daily",
     trove: "live",
     neverRedeemed: true,
-    panes: "value,price,pace",
+    panes: "value,price",
     pace: "wstETH",
   },
 ];
@@ -3073,15 +3074,66 @@ async function checkTroveMarks(page, tag, pg, rows) {
     );
 }
 
-/** The pace lane (ruling 11, Liquity V2's branch redemptions): the days the
- *  chart holds are the route's over the life, from the first row's day to the
- *  close or today; each of the Trove's redemption days has the branch's
+/** The protocol activity chart (ruling 11, ui-jobs 452; Liquity V2's branch
+ *  redemptions): a panel of its own under the events, titled by its scope,
+ *  shown at first on a Trove a redemption reached and hidden otherwise; its
+ *  days are the route's over the life, from the first row's day to the close
+ *  or today; each of the Trove's redemption days has the branch's
  *  redemptions, at least as many as the Trove's; the bars drawn are the days
- *  with BOLD redeemed and the tallest is the window's largest day; the tip
- *  reads each stop's day as the route answers it, zero on a day it lists
- *  none; the how-to-read says the series is branch-wide. */
+ *  with BOLD redeemed and the tallest is the window's largest day (the scale
+ *  is the square root, which keeps the order); its window and plot are the
+ *  chart's, at open, after a scrub and after a zoom; the readout reads each
+ *  stop's day as the route answers it, zero on a day it lists none; the
+ *  how-to-read says the series is branch-wide and drawn by the square root. */
 async function checkPace(page, tag, pg, rows, width) {
-  const t = `${tag} pace`;
+  const t = `${tag} activity`;
+  const panel = () =>
+    page.evaluate(() => {
+      const a = document.querySelector("[data-protocol-activity]");
+      const w = document.querySelector("[data-flows-combined] [data-flow-chart-engine=lw]");
+      const h = document.querySelector("[data-activity-lw-from]");
+      return a
+        ? {
+            title: a.getAttribute("data-protocol-activity"),
+            shown: a.hasAttribute("data-protocol-activity-shown"),
+            main: [
+              w?.getAttribute("data-flow-lw-from"),
+              w?.getAttribute("data-flow-lw-to"),
+              w?.getAttribute("data-flow-lw-plot-w"),
+            ],
+            act: [
+              h?.getAttribute("data-activity-lw-from"),
+              h?.getAttribute("data-activity-lw-to"),
+              h?.getAttribute("data-activity-lw-plot-w"),
+            ],
+          }
+        : null;
+    });
+  const level = (p) => p && p.main.every((v, i) => v != null && v !== "" && v === p.act[i]);
+  const showP = (p) => (p ? `chart ${p.main.join("/")}, activity ${p.act.join("/")}` : "none");
+  const own = new Map();
+  for (const r of rows) if (r.redemption) own.set(Math.floor(r.ts / DAY), (own.get(Math.floor(r.ts / DAY)) ?? 0) + 1);
+  const p0 = await panel();
+  if (!check(`${t}: the protocol activity panel stands under the events`, p0 != null)) return;
+  check(
+    `${t}: the title names the scope, "Whole ${pg.pace} branch · BOLD redeemed a day"`,
+    p0.title === `Whole ${pg.pace} branch · BOLD redeemed a day`,
+    p0.title,
+  );
+  check(
+    `${t}: it starts ${own.size > 0 ? "shown, the Trove redeemed" : "hidden, the Trove never redeemed"}`,
+    p0.shown === own.size > 0,
+    `shown ${p0.shown}, ${own.size} redemption days`,
+  );
+  if (!p0.shown) {
+    await page.locator("[data-protocol-activity-toggle]").click();
+    await page.waitForSelector("[data-protocol-activity-box] canvas", { timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+  }
+  await page.locator("[data-protocol-activity]").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(600);
+  const p1 = await panel();
+  check(`${t}: its window and plot are the chart's`, level(p1), showP(p1));
   const hook = await page.evaluate(() => {
     const e = document.querySelector("[data-flow-pace]");
     return e
@@ -3101,13 +3153,13 @@ async function checkPace(page, tag, pg, rows, width) {
         }
       : null;
   });
-  if (!check(`${t}: the lane stands under the price pane`, hook != null)) return;
+  if (!check(`${t}: the panel holds its days`, hook != null)) return;
   const today = Math.floor(Date.now() / 86_400_000);
   const first = Math.floor(rows[0].ts / DAY);
   const last = pg.trove === "redeemed" || pg.trove === "live" ? today : Math.floor(rows[rows.length - 1].ts / DAY);
   check(
-    `${t}: the range read is the life, ${first} to ${last}, and the lane names the ${pg.pace} branch`,
-    hook.from === first && hook.to === last && hook.label.startsWith(`${pg.pace} branch`),
+    `${t}: the range read is the life, ${first} to ${last}, and the panel names the ${pg.pace} branch`,
+    hook.from === first && hook.to === last && hook.label.startsWith(`Whole ${pg.pace} branch`),
     `${hook.from}–${hook.to} "${hook.label}"`,
   );
   const iso = (d) => new Date(d * 86_400_000).toISOString().slice(0, 10);
@@ -3124,12 +3176,10 @@ async function checkPace(page, tag, pg, rows, width) {
   });
   const extra = [...held.keys()].filter((d) => !want.has(d));
   check(
-    `${t}: the lane holds the route's days, BOLD and counts, nothing else`,
+    `${t}: the panel holds the route's days, BOLD and counts, nothing else`,
     off.length === 0 && extra.length === 0 && held.size === want.size,
     `${held.size} held, ${want.size} answered; off ${off.slice(0, 3).map((x) => x[0])}; extra ${extra.slice(0, 3)}`,
   );
-  const own = new Map();
-  for (const r of rows) if (r.redemption) own.set(Math.floor(r.ts / DAY), (own.get(Math.floor(r.ts / DAY)) ?? 0) + 1);
   const short = [...own].filter(([d, n]) => (want.get(d)?.count ?? 0) < n);
   check(
     `${t}: each of the Trove's ${own.size} redemption days has at least its redemptions on the branch`,
@@ -3155,7 +3205,40 @@ async function checkPace(page, tag, pg, rows, width) {
       Math.abs(hook.max - (maxDay ? maxDay[1].bold : 0)) < 1e-6,
     `${drawnDays.size} drawn, ${positive.length} with BOLD; not held ${notHeld.slice(0, 3)}`,
   );
-  // The tip, stop by stop (every stop at 1280, every seventh at 390).
+  // A scrub on the chart and a zoom over the panel leave the two level.
+  const strip = page.locator('[data-flows-combined] [data-flow-strip-view="chart"]').first();
+  const sb = await strip.boundingBox();
+  if (sb) {
+    await page.mouse.move(sb.x + sb.width * 0.3, sb.y + 30);
+    await page.mouse.down();
+    await page.mouse.move(sb.x + sb.width * 0.5, sb.y + 30, { steps: 5 });
+    await page.mouse.up();
+    await page.waitForTimeout(600);
+    const p2 = await panel();
+    check(`${t}: after a scrub the window and plot are the chart's`, level(p2), showP(p2));
+  }
+  if (width >= 640) {
+    const ab = await page.locator("[data-protocol-activity-box]").boundingBox();
+    if (ab) {
+      await page.mouse.move(ab.x + ab.width * 0.4, ab.y + 30);
+      await page.keyboard.down("Control");
+      await page.mouse.wheel(0, -200);
+      await page.keyboard.up("Control");
+      await page.waitForTimeout(1200);
+      const p3 = await panel();
+      check(
+        `${t}: a zoom over the panel narrows the chart's window, the two level`,
+        level(p3) && Number(p3.main[1]) - Number(p3.main[0]) < Number(p1.main[1]) - Number(p1.main[0]),
+        showP(p3),
+      );
+      await page
+        .locator('[data-flows-combined] [data-flow-range="All"]')
+        .click()
+        .catch(() => {});
+      await page.waitForTimeout(800);
+    }
+  }
+  // The readout, stop by stop (every stop at 1280, every seventh at 390).
   const sl = page.locator(PRICE_STRIP).first();
   await sl.focus();
   await page.keyboard.press("Home");
@@ -3189,7 +3272,7 @@ async function checkPace(page, tag, pg, rows, width) {
   const zeros = read.filter((r) => r && r.count === 0).length;
   const busy = read.filter((r) => r && r.count > 0).length;
   check(
-    `${t}: the tip reads the route's day at ${read.length} stops (${busy} with redemptions, ${zeros} at zero)`,
+    `${t}: the readout states the route's day at ${read.length} stops (${busy} with redemptions, ${zeros} at zero)`,
     read.length > 0 && wrong.length === 0 && (want.size === 0 || busy > 0),
     wrong
       .slice(0, 3)
@@ -3198,7 +3281,7 @@ async function checkPace(page, tag, pg, rows, width) {
   );
   if (BASE.includes("localhost"))
     check(
-      `${t}: the tip's figure is inside a <Prov>`,
+      `${t}: the readout's figure is inside a <Prov>`,
       read.every((r) => r?.prov),
     );
   await page.keyboard.press("End");
@@ -3210,9 +3293,10 @@ async function checkPace(page, tag, pg, rows, width) {
   await page.keyboard.press("Escape");
   await page.waitForTimeout(150);
   check(
-    `${t}: the how-to-read says the bars are the ${pg.pace} branch's, every Trove on it`,
-    help.includes("The orange bars") &&
-      help.includes(`on the ${pg.pace} branch each day, every Trove on the branch, this one included`),
+    `${t}: the how-to-read says the bars are the ${pg.pace} branch's, every Trove on it, drawn by the square root`,
+    help.includes("The protocol activity chart") &&
+      help.includes(`on the ${pg.pace} branch each day, every Trove on the branch, this one included`) &&
+      help.includes("grows with the square root"),
     help.slice(0, 200),
   );
 }
@@ -3563,6 +3647,61 @@ async function checkLwKeys(page, tag) {
   );
 }
 
+/** A press lands on the day under it (ui-jobs 452): at 7D, a click on a
+ *  day's centre puts the cursor on that day (every day is a stop, at any
+ *  zoom); an arrow steps one day. ⏭ then brings the cursor back to the end. */
+async function checkLwClick(page, tag) {
+  const t = `${tag} 7D`;
+  const r7 = page.locator('[data-flows-combined] [data-flow-range="7D"]').first();
+  if ((await r7.count()) === 0) return;
+  await r7.click();
+  await page.waitForTimeout(900);
+  const box = page.locator("[data-flows-combined] [data-flow-lw-box]").first();
+  await box.scrollIntoViewIfNeeded();
+  const bb = await box.boundingBox();
+  const s = await lwState(page);
+  const cursorDay = () =>
+    page.evaluate(() =>
+      Number(
+        document
+          .querySelector("[data-flows-combined] [data-flow-lw-cursor-day]")
+          ?.getAttribute("data-flow-lw-cursor-day"),
+      ),
+    );
+  const d0 = Math.ceil(s.from / DAY);
+  const d1 = Math.floor(s.to / DAY) - 1;
+  const days = [...new Set([0.1, 0.3, 0.5, 0.7, 0.9].map((f) => Math.round(d0 + (d1 - d0) * f)))];
+  const off = [];
+  let n = 0;
+  for (const day of days) {
+    const xs = await box.evaluate((el, d) => el.flowDayX?.(d) ?? null, day);
+    if (!xs || xs[0] == null || xs[1] == null || !bb) continue;
+    await page.mouse.click(bb.x + (xs[0] + xs[1]) / 2, bb.y + bb.height - 36);
+    await page.waitForTimeout(300);
+    const got = await cursorDay();
+    n++;
+    if (got !== day) off.push(`${day} → ${got}`);
+  }
+  check(
+    `${t}: a click on a day's centre puts the cursor on that day (${n} days)`,
+    n > 0 && off.length === 0,
+    off.join("; "),
+  );
+  const sl = page.locator('[data-flows-combined] [data-flow-strip-view="chart"]').first();
+  await sl.focus();
+  const a = await cursorDay();
+  await page.keyboard.press("ArrowLeft");
+  await page.waitForTimeout(200);
+  const b = await cursorDay();
+  await page.keyboard.press("ArrowRight");
+  await page.waitForTimeout(200);
+  const c = await cursorDay();
+  check(`${t}: an arrow steps one day`, b === a - 1 && c === a, `${a} ← ${b} → ${c}`);
+  await page.locator('[data-flows-combined] [data-flow-jump="end"]').first().click();
+  await page.locator('[data-flows-combined] [data-flow-range="All"]').first().click();
+  await page.waitForTimeout(800);
+}
+
 /** The steps (⏮ ‹ › ⏭), at All and zoomed to 30D, frozen and not: ⏭ puts the
  *  cursor on the last stop at the plot's right end and releases a freeze;
  *  every step leaves the cursor in the plot, in order. */
@@ -3679,7 +3818,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     if (pg.health) await waitForHealth(page);
     if (pg.ratio) await waitForHealth(page, pg.ratio.label);
     if (pg.band) await waitForHealth(page, "Health");
-    // The pace lane lands with its own read.
+    // The protocol activity panel lands with its own read.
     if (pg.pace) await page.waitForSelector("[data-flow-pace]", { state: "attached", timeout: 60000 }).catch(() => {});
     // The drawn strips name their views; the chart names its panes.
     const views = await page.$$eval("[data-flows-combined] [data-flow-strip]", (els) =>
@@ -3719,6 +3858,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       }
       if (pg.priceOnly) await checkLwKeys(page, tag);
       else await checkLwSteps(page, tag, width < 640);
+      await checkLwClick(page, tag);
       if (width >= 640) await checkLwWheel(page, tag);
       if (pg.health) await checkHealthAlone(page, tag, pg);
       if (pg.ratio) await checkRatio(page, tag, pg);
@@ -3854,8 +3994,8 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
     const targets = [0, Math.floor(max / 2), Math.max(0, max - 1)];
     for (const target of targets) {
       await page.keyboard.press("Home");
-      for (let i = 0; i < Math.floor(target / 4); i++) await page.keyboard.press("PageUp");
-      for (let i = 0; i < target % 4; i++) await page.keyboard.press("ArrowRight");
+      for (let i = 0; i < Math.floor(target / 7); i++) await page.keyboard.press("PageUp");
+      for (let i = 0; i < target % 7; i++) await page.keyboard.press("ArrowRight");
       await page.waitForTimeout(150);
       const r = await page.$eval("[data-price-readout]", (e) => ({
         day: e.getAttribute("data-price-day"),
@@ -3895,6 +4035,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
 
     if (rows) await checkTroveEnd(page, tag, pg, rows, sl);
     if (lw) await checkLwSteps(page, tag, width < 640);
+    if (lw) await checkLwClick(page, tag);
     if (lw && width >= 640) await checkLwWheel(page, tag);
 
     // The value line is the one it was: the stops moved the cursor only.
