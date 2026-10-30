@@ -229,6 +229,7 @@ const PAGES = [
   },
   {
     id: "aave-v3 0xfb45 (liquidated)",
+    endsClosed: true,
     path: "/ethereum/aave-v3/0xfb45f0e612424104753f2e2fc9507b3d082e750a?market=core",
     answer: "/api/aave-v3/flows",
     health: true,
