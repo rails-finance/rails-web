@@ -39,6 +39,8 @@ export interface FxRatioSet {
   logIndex: number;
   /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
   transactionIndex?: number;
+  /** Read from victoria's mainnet Sieve's table; a row without it is rails-server's store. */
+  sieve?: true;
   line: FxRatioLine;
   debtRatio: number;
   bonusRatio: number;
@@ -150,7 +152,7 @@ export function fxRatioChanges(log: FxRatioLog | null | undefined, poolName: str
         pclass: "emitted",
         summary: `The ${poolName} pool's ${LINE_NAME[s.line].toLowerCase()}, set to ${to} by its ${LINE_EVENT[s.line]} log at block ${s.block.toLocaleString("en-US")}, with a bonus of ${fxRatioWords(s.bonusRatio)}. Before it, ${from}. ${LINE_LETS[s.line]}; the change applies to every position of the pool.`,
         contract: { name: `f(x) ${poolName} pool`, address: log.address },
-        via: "rails-server at-block store · /api/at-block/fx/ratio-log",
+        via: `${s.sieve ? `the mainnet Sieve's capture of the pool's ${LINE_EVENT[s.line]}` : "rails-server at-block store"} · /api/at-block/fx/ratio-log`,
         source: { block: s.block, txHash: tx },
       },
     });

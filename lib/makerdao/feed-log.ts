@@ -43,6 +43,8 @@ interface MakerLogAt {
   logIndex: number;
   /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
   transactionIndex?: number;
+  /** Read from victoria's mainnet Sieve's table; a row without it is rails-server's store. */
+  sieve?: true;
 }
 
 export interface MakerFeed extends MakerLogAt {
@@ -190,7 +192,9 @@ export function makerFeedChanges(log: MakerFeedLog | null | undefined): FlowChan
           pclass: "emitted",
           summary: `The ${ilk} price cap, set to ${usdWords(c.to)} by the capped feed's File("cap") log at block ${blockWords(c.block)}.${c.from != null ? ` Before it, ${usdWords(c.from)}.` : ""} The feed answers the lower of the cap and its OSM's price. ${REACH}`,
           contract: { name: `MakerDAO ${ilk} capped feed`, address: c.pip },
-          via,
+          via: c.sieve
+            ? `the mainnet Sieve's capture of the capped feed's File("cap") · /api/at-block/makerdao/feed-log`
+            : via,
           source: { block: c.block, txHash: tx },
         },
       }),

@@ -50,6 +50,8 @@ interface At {
   logIndex: number;
   /** The transaction's index in the block (lib/shared/log-order.ts). */
   transactionIndex?: number;
+  /** Read from victoria's mainnet Sieve's table; a row without it is rails-server's store. */
+  sieve?: true;
   timestamp: number;
   txHash: string;
 }
@@ -109,11 +111,15 @@ export function aaveConfigChanges(
     const label = cats.get(id)?.label;
     return label ? `e-mode “${label}”` : `e-mode category ${id}`;
   };
-  const source =
-    log.source === "sieve"
-      ? "the Base Sieve's capture of the PoolConfigurator"
-      : "eth_getLogs on the PoolConfigurator, stored once by rails-server";
-  const via = `${source} · /api/chain/aave-v3/config-log`;
+  // Base and Seamless answer from the Base Sieve as a whole; a mainnet row carries its own mark.
+  const viaOf = (l: At) =>
+    `${
+      log.source === "sieve"
+        ? "the Base Sieve's capture of the PoolConfigurator"
+        : l.sieve
+          ? "the mainnet Sieve's capture of the PoolConfigurator"
+          : "eth_getLogs on the PoolConfigurator, stored once by rails-server"
+    } · /api/chain/aave-v3/config-log`;
   const out: AaveConfigChange[] = [];
   const push = (l: At, name: string, from: number, to: number, assets: string[], moves: boolean, summary: string) =>
     out.push({
@@ -131,7 +137,7 @@ export function aaveConfigChanges(
           pclass: "emitted",
           summary,
           contract: { name: "PoolConfigurator", address: log.configurator },
-          via,
+          via: viaOf(l),
           source: { block: l.block, txHash: l.txHash },
         },
       }),

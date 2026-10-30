@@ -46,6 +46,8 @@ export type LlamalendConfigSet =
       logIndex: number;
       /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
       transactionIndex?: number;
+      /** Read from victoria's mainnet Sieve's table; a row without it is rails-server's store. */
+      sieve?: true;
       kind: "discounts";
       loanDiscount: number;
       liquidationDiscount: number;
@@ -57,6 +59,8 @@ export type LlamalendConfigSet =
       logIndex: number;
       /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
       transactionIndex?: number;
+      /** Read from victoria's mainnet Sieve's table; a row without it is rails-server's store. */
+      sieve?: true;
       kind: "policy";
       policy: string;
       /** The replaced and the new policy, each read at this block. */
@@ -107,6 +111,8 @@ export interface LlamalendConfigStep {
   logIndex: number;
   /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
   transactionIndex?: number;
+  /** Read from victoria's mainnet Sieve's table; a row without it is rails-server's store. */
+  sieve?: true;
   before: number | string | null;
   after: number | string;
   /** The loan discount the same set left, for the liquidation marker's receipt. */
@@ -207,6 +213,7 @@ export function llamalendConfigSteps(log: LlamalendConfigLog | null | undefined)
       txHash: s.txHash,
       logIndex: s.logIndex,
       transactionIndex: s.transactionIndex,
+      sieve: s.sieve,
     };
     if (s.kind === "discounts") {
       if (!same(liq, s.liquidationDiscount))
@@ -343,7 +350,7 @@ export function llamalendConfigChanges(
         summary,
         ...(inputs ? { inputs } : {}),
         contract: { name: `LlamaLend ${market} Controller`, address: log.controller },
-        via: "rails-server at-block store · /api/at-block/llamalend/config-log",
+        via: `${s.sieve ? `the mainnet Sieve's capture of the Controller's ${s.line === "policy" ? "SetMonetaryPolicy" : "SetBorrowingDiscounts"}` : "rails-server at-block store"} · /api/at-block/llamalend/config-log`,
         source: { block: s.block, txHash: tx },
       },
     });

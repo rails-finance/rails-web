@@ -63,6 +63,8 @@ export interface CTokenFactorLog {
     logIndex: number;
     /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
     transactionIndex?: number;
+    /** Read from victoria's mainnet Sieve's table; a row without it is rails-server's store. */
+    sieve?: true;
     /** The cToken or mToken, lowercased. */
     market: string;
     from: number;
@@ -72,7 +74,8 @@ export interface CTokenFactorLog {
 
 /** Each NewCollateralFactor on a market in `markets` (cToken address,
  *  lowercased → the timeline's key and its symbol) that moved the printed
- *  factor, as a marker. */
+ *  factor, as a marker. `names.via` is the receipt of a set from the store;
+ *  one from victoria's mainnet Sieve names it. */
 export function ctokenFactorChanges(
   log: CTokenFactorLog | null,
   markets: ReadonlyMap<string, { asset: string; symbol: string }>,
@@ -104,7 +107,9 @@ export function ctokenFactorChanges(
           pclass: "emitted",
           summary: `${symbol}'s collateral factor (market ${short(market)}), set to ${factorPct(s.to)} by the Comptroller's NewCollateralFactor at block ${block}. Before it, ${factorPct(s.from)}. It counts from that block for every account with the market entered as collateral, for the borrowing limit and the liquidation line alike.`,
           contract: { name: names.comptroller, address: log.comptroller },
-          via: names.via,
+          via: s.sieve
+            ? "the mainnet Sieve's capture of the Comptroller's NewCollateralFactor · /api/chain/ctoken-factor-log"
+            : names.via,
           source: { block: s.block, txHash: s.txHash },
         },
       }),
@@ -123,6 +128,8 @@ export interface CometConfigLog {
   logIndex: number;
   /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
   transactionIndex?: number;
+  /** Read from victoria's mainnet Sieve's table; a row without it is rails-server's store. */
+  sieve?: true;
   txHash: string;
   kind: "set" | "listed" | "deploy";
   /** The collateral asset, lowercased (`set`, `listed`). */
@@ -149,6 +156,8 @@ export interface CometFactorLog {
     block: number;
     logIndex: number;
     transactionIndex?: number;
+    /** Read from victoria's mainnet Sieve's table; a row without it is rails-server's store. */
+    sieve?: true;
     timestamp: number;
     txHash: string;
     impl: string;
@@ -165,6 +174,10 @@ export interface CometFactorStep {
   txHash: string;
   /** The setter logs the new implementation carried for this asset. */
   sets: { block: number; txHash: string }[];
+  /** Where the step's logs were read: the upgrade, the CometDeployed that
+   *  built its implementation and every set all from victoria's mainnet Sieve,
+   *  some of them (a SetConfiguration is the store's), or none. */
+  read: "sieve" | "mixed" | "store";
 }
 
 const before = (a: LogPlace, b: LogPlace) => logOrder(a, b) < 0;
@@ -181,9 +194,9 @@ export function cometFactorSteps(log: CometFactorLog | null): CometFactorStep[] 
   const pos = (x: (typeof all)[number]): Pos => (x.at === "config" ? x.c : x.u);
   all.sort((a, b) => logOrder(pos(a), pos(b)));
   const settings = new Map<string, number>();
-  const built = new Map<string, { factors: Map<string, number>; at: Pos }>();
+  const built = new Map<string, { factors: Map<string, number>; at: Pos; sieve?: true }>();
   const sets: CometConfigLog[] = [];
-  let current: { factors: Map<string, number>; at: Pos } | null = null;
+  let current: { factors: Map<string, number>; at: Pos; sieve?: true } | null = null;
   const out: CometFactorStep[] = [];
   for (const x of all) {
     if (x.at === "config") {
@@ -195,6 +208,7 @@ export function cometFactorSteps(log: CometFactorLog | null): CometFactorStep[] 
         built.set(c.impl.toLowerCase(), {
           factors: new Map(settings),
           at: { block: c.block, transactionIndex: c.transactionIndex, logIndex: c.logIndex },
+          sieve: c.sieve,
         });
       continue;
     }
@@ -205,6 +219,8 @@ export function cometFactorSteps(log: CometFactorLog | null): CometFactorStep[] 
         const from = current.factors.get(asset);
         if (from == null || factorPct(from) === factorPct(to)) continue;
         const prev = current.at;
+        const fed = sets.filter((s) => s.asset === asset && before(prev, s) && before(s, next.at));
+        const marks = [u.sieve, next.sieve, ...fed.map((s) => s.sieve)];
         out.push({
           asset,
           from,
@@ -212,15 +228,22 @@ export function cometFactorSteps(log: CometFactorLog | null): CometFactorStep[] 
           block: u.block,
           timestamp: u.timestamp,
           txHash: u.txHash,
-          sets: sets
-            .filter((s) => s.asset === asset && before(prev, s) && before(s, next.at))
-            .map((s) => ({ block: s.block, txHash: s.txHash })),
+          sets: fed.map((s) => ({ block: s.block, txHash: s.txHash })),
+          read: marks.every(Boolean) ? "sieve" : marks.some(Boolean) ? "mixed" : "store",
         });
       }
     current = next;
   }
   return out;
 }
+
+const COMET_VIA: Record<CometFactorStep["read"], string> = {
+  sieve:
+    "the mainnet Sieve's capture of the Configurator (factor setters, CometDeployed) and the Comet proxy (Upgraded)",
+  mixed:
+    "the mainnet Sieve's capture of the Configurator (factor setters, CometDeployed) and the Comet proxy (Upgraded), with eth_getLogs on the Configurator for SetConfiguration, stored once by rails-server",
+  store: "eth_getLogs on the Configurator (factor setters, CometDeployed) and the Comet proxy (Upgraded)",
+};
 
 /** Each upgrade's factor change on an asset in `assets` (lowercased → the
  *  timeline's key and its symbol), as a marker on the upgrade's block. */
@@ -253,7 +276,7 @@ export function cometFactorChanges(
             pclass: "emitted",
             summary: `${symbol}'s liquidation collateral factor in the Comet, ${factorPct(s.to)} from the proxy's upgrade at block ${block} to an implementation the Configurator built (CometDeployed). Before it, ${factorPct(s.from)}.${setWords} A Comet's factors are fixed in its implementation, so a new setting counts from the upgrade that carries it, for every account holding the asset.`,
             contract: { name: "Comet", address: log.comet },
-            via: "eth_getLogs on the Configurator (factor setters, CometDeployed) and the Comet proxy (Upgraded) · /api/chain/compound/factor-log",
+            via: `${COMET_VIA[s.read]} · /api/chain/compound/factor-log`,
             source: { block: s.block, txHash: s.txHash },
           },
         }),

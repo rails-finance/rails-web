@@ -100,6 +100,8 @@ export interface DolomiteRiskLog {
     logIndex: number;
     /** The transaction's index in the block; `logIndex` is then the log's place in it (lib/shared/log-order.ts). */
     transactionIndex?: number;
+    /** Read from victoria's mainnet Sieve's table; a row without it is rails-server's store. */
+    sieve?: true;
     kind: "margin-ratio" | "margin-premium";
     marketId: number | null;
     value: number;
@@ -143,7 +145,7 @@ export function dolomiteRiskChanges(log: DolomiteRiskLog | null, markets: Readon
             ? `${symbol}'s margin premium (market ${s.marketId}), set to ${riskPct(s.value)} by the core's LogSetMarginPremium at block ${block}. Before it, ${riskPct(before)}. The premium multiplies the margin ratio for every account that supplies or borrows the market, except an account whose risk override is set, which skips the premiums.`
             : `The core's global margin ratio, set to ${riskPct(s.value)} by its LogSetMarginRatio at block ${block}. Before it, ${riskPct(before)}. Every account without a risk override is held to 1 + this ratio.`,
           contract: { name: "DolomiteMargin", address: DOLOMITE_ADDRESSES.MARGIN },
-          via: "eth_getLogs on the core for LogSetMarginRatio and LogSetMarginPremium · /api/chain/dolomite/risk-log",
+          via: `${s.sieve ? "the mainnet Sieve's capture of the core's LogSetMarginRatio and LogSetMarginPremium" : "eth_getLogs on the core for LogSetMarginRatio and LogSetMarginPremium"} · /api/chain/dolomite/risk-log`,
           source: { block: s.block, txHash: s.txHash },
         },
       }),
