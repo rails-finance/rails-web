@@ -203,6 +203,9 @@ const SKIPS = {
     "live only: requests queued exports from the deployed site and the onboarding box " +
     "(BASE=https://rails.finance), spends test readers' daily quota, and with " +
     "RESTART_CMD redeploys the api. Run it by hand.",
+  "verify-timeline-429.mjs":
+    "needs a dev server whose RAILS_API_URL is the api proxy this script starts " +
+    "(http://127.0.0.1:3196), so the server's tail read meets the refusals it makes. Run it by hand.",
   "verify-timeline-abuse.mjs":
     "live only: bursts 310 bare /timeline requests at the deployed site to meet the " +
     "Vercel Firewall rate limit (BASE=https://rails.finance BURST=1), which " +
