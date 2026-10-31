@@ -146,6 +146,7 @@ import { getEventActionKey } from "@/lib/shared/event-filter-helpers";
 import { EventPageContext, EventPageTitle } from "@/components/shared/event-page-aside";
 import type { EventPageContract, EventPageSlot } from "@/lib/shared/explorer-adapter";
 import { setCardOpen } from "@/lib/shared/card-open-store";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { decodeEventId } from "@/lib/shared/page-metadata";
@@ -551,6 +552,10 @@ export interface TimelineSegments {
   /** The month being loaded, while one is: the rows give way to a skeleton
    *  sized from that month's days, under its label. */
   loading: number | null;
+  /** The month whose read the index did not answer, until a read lands: the
+   *  timeline draws the index notice, whose Retry is `onRetry` (ui-jobs 275). */
+  failed?: number | null;
+  onRetry?: (() => void) | null;
   /** A month was picked that the loaded rows do not hold: read it. `until`
    *  is a cut inside it, whose top the read must hold. */
   onPick: (monthIdx: number, until?: number) => void;
@@ -1332,6 +1337,10 @@ function ChainTruthTimelineBody({
   };
   /** The list a cut emptied (ui-jobs 232): what the cut hides and how to
    *  reach it, in place of the label for a history with no events. */
+  /** A month read the index did not answer: one line with a Retry, above the
+   *  rows the page still holds or in place of the empty label (ui-jobs 275). */
+  const segmentNotice: ReactNode =
+    segments?.failed != null ? <IndexNotice className="" onRetry={segments.onRetry ?? undefined} /> : null;
   const cutEmptyState = (cutTs: number, word: string): ReactNode => {
     const topDay = segments ? newestLifeDayBefore(segments.lifeDays, cutTs) : null;
     if (segments && topDay == null) return `No events on or before ${word}.`;
@@ -1444,7 +1453,13 @@ function ChainTruthTimelineBody({
       // A month the page holds only the newest days of can still miss the
       // cut's top (ui-jobs 232): read up to the cut, once per cut.
       const heldShort = topDay != null && oldestHeld > cut && askedCut.current !== cut;
-      if (segments && ((segments.month != null && segments.month !== topMonth) || heldShort)) {
+      // A month whose read failed waits for the notice's Retry: asking again
+      // on every settle would repeat a refused read in a loop.
+      if (
+        segments &&
+        segments.failed !== topMonth &&
+        ((segments.month != null && segments.month !== topMonth) || heldShort)
+      ) {
         askedMonth.current = topMonth;
         askedCut.current = cut;
         segments.onPick(topMonth, cut);
@@ -2170,6 +2185,7 @@ function ChainTruthTimelineBody({
             <SegmentSkeleton monthIdx={segments.loading} lifeDays={segments.lifeDays} />
           ) : rows.length > 0 ? (
             <>
+              {segmentNotice && <div className="pb-2">{segmentNotice}</div>}
               <div className="relative flex flex-col gap-2">
                 <SpineLine />
                 {/* The top is the NEWEST end, so the only omission that can stand
@@ -2406,13 +2422,15 @@ function ChainTruthTimelineBody({
                     </div>
                   )}
                   <div className="py-8 text-center text-sm text-rb-500" data-timeline-empty="">
-                    {tl.isFiltered && cut != null && tl.sortedEvents.some((e) => e.timestamp <= cut)
-                      ? `Nothing to ${rewind!.word} matches these filters.`
-                      : tl.isFiltered
-                        ? "All events filtered out — adjust the filters above to show some."
-                        : cut != null
-                          ? cutEmptyState(cut, rewind!.word)
-                          : emptyLabel}
+                    {segmentNotice
+                      ? segmentNotice
+                      : tl.isFiltered && cut != null && tl.sortedEvents.some((e) => e.timestamp <= cut)
+                        ? `Nothing to ${rewind!.word} matches these filters.`
+                        : tl.isFiltered
+                          ? "All events filtered out — adjust the filters above to show some."
+                          : cut != null
+                            ? cutEmptyState(cut, rewind!.word)
+                            : emptyLabel}
                   </div>
                 </>
               )}

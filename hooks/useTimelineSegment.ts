@@ -115,6 +115,10 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
     cutAt: number | null;
   } | null>(null);
   const [segmentLoading, setSegmentLoading] = useState<number | null>(null);
+  // The month read the index did not answer (a 429, a 5xx, the network): the
+  // timeline says so with a Retry that asks for the same month again
+  // (ui-jobs 275). The rows the page holds stay.
+  const [segmentFailed, setSegmentFailed] = useState<{ monthIdx: number; until?: number } | null>(null);
   const segmentRead = useRef<AbortController | null>(null);
   // Whether the api groups a segment. Learned from the first answer: one that
   // predates the grouped span answers the newest window with no `span` on it,
@@ -127,6 +131,7 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
       const ac = new AbortController();
       segmentRead.current = ac;
       setSegmentLoading(monthIdx);
+      setSegmentFailed(null);
       try {
         const span: [number, number] = [ask.from, ask.to];
         if (apiGroupsSpans.current !== false) {
@@ -153,6 +158,7 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
       } catch (err) {
         if ((err as { name?: string })?.name === "AbortError") return;
         // The rows the page holds stay; the month stays where it was.
+        if (segmentRead.current === ac) setSegmentFailed({ monthIdx, until });
       } finally {
         if (segmentRead.current === ac) {
           segmentRead.current = null;
@@ -232,9 +238,13 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
   const resetSegment = useCallback(() => {
     segmentRead.current?.abort();
     setSegmentLoading(null);
+    setSegmentFailed(null);
     setDateRange(null);
     setSegment(null);
   }, [setDateRange]);
+  const retrySegment = useCallback(() => {
+    if (segmentFailed) void loadSegment(segmentFailed.monthIdx, segmentFailed.until);
+  }, [segmentFailed, loadSegment]);
   const hasLife = useMemo(() => lifeExtent(lifeDays) != null, [lifeDays]);
   const segments = useMemo<TimelineSegments | undefined>(
     () =>
@@ -243,11 +253,13 @@ export function useTimelineSegment(o: TimelineSegmentOptions) {
             lifeDays,
             month: segment?.monthIdx ?? null,
             loading: segmentLoading,
+            failed: segmentFailed?.monthIdx ?? null,
+            onRetry: segmentFailed ? retrySegment : null,
             onPick: pickMonth,
             onReset: segment ? resetSegment : null,
           }
         : undefined,
-    [groupedTail, hasLife, lifeDays, segment, segmentLoading, pickMonth, resetSegment],
+    [groupedTail, hasLife, lifeDays, segment, segmentLoading, segmentFailed, retrySegment, pickMonth, resetSegment],
   );
 
   // The rows `tl` was built over, folders included and unfiltered — the month's
