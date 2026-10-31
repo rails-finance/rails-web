@@ -18,7 +18,7 @@
 // dolomite-markets, dolomite-position|owner|account, maker-system,
 // maker-vault|id, lv1-system, lv1-position|wallet, llamalend-markets,
 // llamalend-state, llamalend-position|controller|user, frankencoin-system,
-// frankencoin-position|position, maple-pools. One fixture at a time, 600 ms
+// frankencoin-position|position, maple-pools, llamalend-rows|offset. One fixture at a time, 600 ms
 // apart. rails-ops decisions/0056 step 3, census rank 12 stage 8.
 
 import { readFileSync, appendFileSync } from "node:fs";
@@ -40,6 +40,8 @@ import { loadLlamalendPositionFromChain } from "@/lib/sources/chain/llamalend-po
 import { loadFrankencoinSystemFromChain } from "@/lib/sources/chain/frankencoin-system";
 import { loadFrankencoinPositionFromChain } from "@/lib/sources/chain/frankencoin-position";
 import { resolveMaplePoolState } from "@/lib/sources/chain/maple-pool-state";
+import { buildLlamalendPositionRows, type RawLlamalendPositionRow } from "@/lib/sources/api/llamalend-positions";
+import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import type { FxPoolKey } from "@/lib/fx/asset-catalog";
 
 const MODE = process.env.EQ_MODE;
@@ -62,6 +64,15 @@ const LOADERS: Record<string, (a: string[]) => Promise<unknown>> = {
   "frankencoin-system": () => loadFrankencoinSystemFromChain(),
   "frankencoin-position": ([p]) => loadFrankencoinPositionFromChain(p),
   "maple-pools": () => resolveMaplePoolState(),
+  // The listing's live overlay over one page of open rows (offset in the argument).
+  "llamalend-rows": async ([offset]) => {
+    const res = await fetch(
+      `${process.env.RAILS_API_URL}/api/llamalend/positions?status=open&sortOrder=desc&limit=20&offset=${offset ?? 0}`,
+      createAuthFetchOptions(),
+    );
+    const raw = (await res.json()) as { rows: RawLlamalendPositionRow[] };
+    return buildLlamalendPositionRows(raw.rows, new Map());
+  },
 };
 
 const json = (v: unknown) =>

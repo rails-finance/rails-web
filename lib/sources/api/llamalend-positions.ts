@@ -36,7 +36,7 @@
 // orthogonal flag on open survivors too (self-liquidations counted apart).
 
 import { parseAbi } from "viem";
-import { alchemyClient } from "@/lib/sources/chain/rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { scaleRaw } from "@/lib/sources/chain/erc20-meta";
 import { resolveLlamalendMarketState, type LlamalendMarketStateMap } from "@/lib/sources/chain/llamalend-markets";
 import {
@@ -208,7 +208,7 @@ export async function buildLlamalendPositionRows(
   let liveHealth = new Map<string, bigint>();
   if (openRows.length > 0) {
     try {
-      const client = alchemyClient();
+      const client = headReadsClient();
       const results = (await client.multicall({
         allowFailure: true,
         contracts: openRows.flatMap(
