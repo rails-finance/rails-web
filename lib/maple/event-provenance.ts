@@ -29,6 +29,12 @@ import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/prov
 import type { MapleContext } from "@/lib/shared/types/event-shape";
 import { MAPLE_POOL_BY_KEY } from "./asset-catalog";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import type { ServerRead } from "@/lib/shared/server-head-read";
+
+/** Where a head read stands in a summary: "at head" for a read the web made, the block for
+ *  a read rails-server made (the via line names who read it and when). */
+const headWords = (readBy?: ServerRead | null): string =>
+  readBy ? `at block ${readBy.block.toLocaleString("en-US")}` : "at head";
 
 // Custody, not origin — the via line's leading segment only (the embedded
 // receipt renderer drops it; provenance-receipts-grammar §3). Summaries state
@@ -538,7 +544,7 @@ export const queueWaitProv = (requestAt: number, filledAt: number): Provenance =
 export const interestEarnedLifetimeProv = (sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Interest earned on the ${sym} position over its life: what it holds now ((shares + escrowed) × the exit rate at head, zero once closed) plus everything that came out (withdrawals and shares sent), less everything that went in (deposits and shares received), each transfer valued at the pool's rate in its block. It equals the interest the timeline rows state since each previous event in the pool, added up, with the rise since the last event. The exit rate leg carries the loan-book caveat: the accrued side is Maple's on-chain bookkeeping of off-chain-collateralized loans.`,
+  summary: `Interest earned on the ${sym} position over its life: what it holds now (zero once closed) plus everything that came out (withdrawals and shares sent), less everything that went in (deposits and shares received), each transfer valued at the pool's rate in its block. It equals the interest the timeline rows state since each previous event in the pool, added up, with the rise since the last event. The exit rate leg carries the loan-book caveat: the accrued side is Maple's on-chain bookkeeping of off-chain-collateralized loans.`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
   via: "held now + withdrawn + sent − deposited − received",
   formula: "held now − net principal",
@@ -603,14 +609,19 @@ export const positionEscrowProv = (poolSym: string): Provenance => ({
 
 /** Position-card CURRENT value — (shares + escrowed) × the pool's EXIT rate
  *  read at head. Chain-derived — and it carries the custody caveat. */
-export const positionCurrentValueProv = (assetSym: string, poolSym: string, atBlockNum?: number): Provenance => ({
+export const positionCurrentValueProv = (
+  assetSym: string,
+  poolSym: string,
+  atBlockNum?: number,
+  readBy?: ServerRead | null,
+): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   verify: {
     kind: "recompute",
     text: `Re-run the pool's convertToExitAssets eth_call on the wallet's share count${atBlockNum ? ` at block ${atBlockNum}` : ""} — it reproduces this figure`,
   },
-  summary: `${assetSym} the position redeems for NOW — the pool's own \`convertToExitAssets\` on the exact ${poolSym} balance (plus any queue escrow), read at head. That is the pool's own accounting, in its own integer math: shares × (totalAssets − unrealizedLosses) ÷ totalSupply, where totalAssets accrues a posted interest rate over the outstanding loan book. ${CUSTODY_NOTE}`,
+  summary: `${assetSym} the position redeems for NOW — the pool's own \`convertToExitAssets\` on the exact ${poolSym} balance (plus any queue escrow), read ${headWords(readBy)}. That is the pool's own accounting, in its own integer math: shares × (totalAssets − unrealizedLosses) ÷ totalSupply, where totalAssets accrues a posted interest rate over the outstanding loan book. ${CUSTODY_NOTE}`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
   via: "(shares + escrowed) × convertToExitAssets (eth_call at head)",
   formula: "(shares + escrowed) × (totalAssets − unrealizedLosses) ÷ totalSupply",
@@ -638,15 +649,20 @@ export const positionPrincipalProv = (sym: string): Provenance => ({
 });
 
 /** Interest earned — current redeemable value minus the replayed principal. */
-export const interestEarnedProv = (sym: string): Provenance => ({
+export const interestEarnedProv = (sym: string, readBy?: ServerRead | null): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Interest earned on the ${sym} position — what the position redeems for now ((shares + escrowed) × the exit rate at head) minus the net principal replayed from the wallet's own events: deposits and shares received, less withdrawals and shares sent, each transfer valued at the pool's rate in its block. Arithmetic over the position's own logs and the pool's own rate: "worth now minus put in". The exit rate leg carries the loan-book caveat: the accrued side is Maple's on-chain bookkeeping of off-chain-collateralized loans.`,
+  summary: `Interest earned on the ${sym} position — what the position redeems for now ((shares + escrowed) × the exit rate ${headWords(readBy)}) minus the net principal replayed from the wallet's own events: deposits and shares received, less withdrawals and shares sent, each transfer valued at the pool's rate in its block. Arithmetic over the position's own logs and the pool's own rate: "worth now minus put in". The exit rate leg carries the loan-book caveat: the accrued side is Maple's on-chain bookkeeping of off-chain-collateralized loans.`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
-  via: "(shares + escrowed) × exit rate − Σ net deposited",
+  via: "(shares + escrowed) × exit rate at head − Σ net deposited",
   formula: "current − net principal",
   inputs: [
-    { label: "current", kind: "chain-derived", pclass: "state", note: "(shares + escrowed) × convertToExitAssets" },
+    {
+      label: "current",
+      kind: "chain-derived",
+      pclass: "state",
+      note: "(shares + escrowed) × convertToExitAssets at head",
+    },
     {
       label: "net principal",
       kind: "chain-derived",
