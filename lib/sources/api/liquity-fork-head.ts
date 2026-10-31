@@ -9,12 +9,14 @@
 // arithmetic (liquity-fork-settle.ts) and the catalog's figures.
 //
 // Null when the route cannot answer: no RAILS_API_URL, a deployment it does not
-// serve, a non-2xx answer or 8 s without one. The caller then reads the chain
-// as before.
+// serve, a refused connection, a non-2xx answer or 3 s without one; after a
+// failure the chain is read for 30 s without asking (route-gate.ts). The caller
+// then reads the chain as before.
 //
 // SERVER-ONLY.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { routeGate } from "./route-gate";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import type {
@@ -36,8 +38,7 @@ import {
   type TroveDataRead,
 } from "@/lib/sources/chain/liquity-fork-settle";
 
-/** The wallet page's budget for one read. */
-const TIMEOUT_MS = 8_000;
+const gate = routeGate();
 /** rails-server's ids-array cap, the roster reader's IDS_CAP. */
 const IDS_CAP = 120;
 
@@ -101,23 +102,15 @@ interface TroveRaw {
 }
 
 async function ask<T>(path: string, params: Record<string, string>): Promise<T | null> {
-  const api = process.env.RAILS_API_URL;
-  if (!api) return null;
-  try {
-    const qs = new URLSearchParams(params);
-    const res = await fetch(`${api}/api/at-block/liquity-fork/${path}?${qs.toString()}`, {
-      ...createAuthFetchOptions(),
-      cache: "no-store",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as T & { branches?: unknown; branch?: unknown; blockNumber?: unknown };
-    return body && typeof body === "object" && typeof body.blockNumber === "number" && (body.branches || body.branch)
-      ? body
-      : null;
-  } catch {
-    return null;
-  }
+  const qs = new URLSearchParams(params);
+  const body = await gate.json<T & { branches?: unknown; branch?: unknown; blockNumber?: unknown }>(
+    "liquity-fork",
+    `${process.env.RAILS_API_URL}/api/at-block/liquity-fork/${path}?${qs.toString()}`,
+    createAuthFetchOptions(),
+  );
+  return body && typeof body === "object" && typeof body.blockNumber === "number" && (body.branches || body.branch)
+    ? body
+    : null;
 }
 
 const big = (s: string | null): bigint | null => (s == null ? null : BigInt(s));

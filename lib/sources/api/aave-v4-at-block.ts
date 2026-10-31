@@ -7,13 +7,15 @@
 // gateways first (rails-ops decisions/0056). The reads are settled here with
 // the readers' own arithmetic (aave-v4-settle.ts) and the web's names.
 //
-// Null when the route cannot answer: no RAILS_API_URL, a non-2xx answer or 8 s
-// without one. The caller then reads the chain as before.
+// Null when the route cannot answer: no RAILS_API_URL, a refused connection, a
+// non-2xx answer or 3 s without one; after a failure the chain is read for 30 s
+// without asking (route-gate.ts). The caller then reads the chain as before.
 //
 // SERVER-ONLY.
 
 import { getAddress } from "viem";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { routeGate } from "./route-gate";
 import type { AaveV4SpokePositionChainResponse } from "@/lib/api/fetch-aave-v4-spoke-position";
 import type { AaveV4HealthFactorResponse } from "@/lib/sources/chain/aave-v4-health-factor";
 import {
@@ -22,23 +24,16 @@ import {
   settleSpokePosition,
 } from "@/lib/sources/chain/aave-v4-settle";
 
-const TIMEOUT_MS = 8_000;
+const gate = routeGate();
 
 async function ask<T>(path: string, params: Record<string, string>): Promise<T | null> {
-  const api = process.env.RAILS_API_URL;
-  if (!api) return null;
-  try {
-    const qs = new URLSearchParams(params);
-    const res = await fetch(`${api}/api/at-block/aave-v4/${path}?${qs.toString()}`, {
-      ...createAuthFetchOptions(),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as T & { block?: unknown };
-    return body && typeof body === "object" && typeof body.block === "number" ? body : null;
-  } catch {
-    return null;
-  }
+  const qs = new URLSearchParams(params);
+  const body = await gate.json<T & { block?: unknown }>(
+    "aave-v4",
+    `${process.env.RAILS_API_URL}/api/at-block/aave-v4/${path}?${qs.toString()}`,
+    createAuthFetchOptions(),
+  );
+  return body && typeof body === "object" && typeof body.block === "number" ? body : null;
 }
 
 interface SpokePositionReads {

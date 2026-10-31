@@ -9,8 +9,9 @@
 // (lib/sources/chain/replay-client.ts) and states its block.
 //
 // `withServerHead` returns null when the route cannot answer — no
-// RAILS_API_URL, a non-2xx answer, 8 s without one (the wallet page passes a
-// shorter wait, so its chain read still fits its budget), or only the stored rows
+// RAILS_API_URL, a refused connection, a non-2xx answer, 3 s without one (the
+// wallet page passes its own wait, so its chain read still fits its budget;
+// after a failure the chain is read for 30 s without asking, route-gate.ts), or only the stored rows
 // (served when no read leg answered; their figures are not the reader's
 // shape) — or when the reader asked a call the answer does not hold. The
 // caller then reads the chain as before.
@@ -18,17 +19,11 @@
 // SERVER-ONLY.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { routeGate, type AskOpts } from "./route-gate";
 import { replayClient, type ServedCalls } from "@/lib/sources/chain/replay-client";
 import type { PublicClient } from "viem";
 
-/** How long a position page waits for the route. */
-const TIMEOUT_MS = 8_000;
-
-/** How long to wait, and a signal that ends the wait sooner. */
-export interface AskOpts {
-  timeoutMs?: number;
-  signal?: AbortSignal;
-}
+const gate = routeGate();
 
 export type LenderHeadRequest =
   | { kind: "compound"; family: "compound-v3" | "compound-v2" | "moonwell"; deployment: string; wallet: string }
@@ -38,40 +33,28 @@ export type LenderHeadRequest =
 /** The route's answer, or null where it cannot answer with calls. */
 async function ask(req: LenderHeadRequest, opts: AskOpts = {}): Promise<ServedCalls | null> {
   const api = process.env.RAILS_API_URL;
-  if (!api) return null;
-  try {
-    let res: Response;
-    const timeout = AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS);
-    const signal = opts.signal ? AbortSignal.any([timeout, opts.signal]) : timeout;
-    if (req.kind === "morpho-wallet") {
-      res = await fetch(
-        `${api}/api/at-block/morpho/wallet`,
-        createAuthFetchOptions({
-          method: "POST",
-          cache: "no-store",
-          signal,
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ deployment: req.deployment, wallet: req.wallet.toLowerCase(), ids: req.ids ?? [] }),
-        }),
-      );
-    } else {
-      const qs =
-        req.kind === "compound"
-          ? new URLSearchParams({ family: req.family, deployment: req.deployment, wallet: req.wallet.toLowerCase() })
-          : new URLSearchParams({ deployment: req.deployment, market: req.market, wallet: req.wallet.toLowerCase() });
-      const path = req.kind === "compound" ? "compound/position" : "morpho/position";
-      res = await fetch(
-        `${api}/api/at-block/${path}?${qs.toString()}`,
-        createAuthFetchOptions({ cache: "no-store", signal }),
-      );
-    }
-    if (!res.ok) return null;
-    const body = (await res.json()) as ServedCalls & { stored?: unknown };
-    if (!body || typeof body !== "object" || !body.calls || typeof body.blockNumber !== "number") return null;
-    return body;
-  } catch {
-    return null;
+  let body: (ServedCalls & { stored?: unknown }) | null;
+  if (req.kind === "morpho-wallet") {
+    body = await gate.json(
+      "lender",
+      `${api}/api/at-block/morpho/wallet`,
+      createAuthFetchOptions({
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ deployment: req.deployment, wallet: req.wallet.toLowerCase(), ids: req.ids ?? [] }),
+      }),
+      opts,
+    );
+  } else {
+    const qs =
+      req.kind === "compound"
+        ? new URLSearchParams({ family: req.family, deployment: req.deployment, wallet: req.wallet.toLowerCase() })
+        : new URLSearchParams({ deployment: req.deployment, market: req.market, wallet: req.wallet.toLowerCase() });
+    const path = req.kind === "compound" ? "compound/position" : "morpho/position";
+    body = await gate.json("lender", `${api}/api/at-block/${path}?${qs.toString()}`, createAuthFetchOptions(), opts);
   }
+  if (!body || typeof body !== "object" || !body.calls || typeof body.blockNumber !== "number") return null;
+  return body;
 }
 
 /** The stamp a receipt names for a read rails-server made. */

@@ -10,15 +10,17 @@
 // configuration reads as 0 left for the catalog's figure (`ltZero`).
 //
 // Null when the route cannot answer: no RAILS_API_URL, a market it does not
-// serve, a non-2xx answer or 8 s without one (the wallet page waits less, so
-// its chain read still fits its budget). The caller then reads the chain
-// as before. An answer marked `stored` is the listing's row, served because no
+// serve, a refused connection, a non-2xx answer or 3 s without one (the
+// wallet page passes its own wait, so its chain read still fits its budget);
+// after a failure the chain is read for 30 s without asking (route-gate.ts).
+// The caller then reads the chain as before. An answer marked `stored` is the listing's row, served because no
 // read leg answered; the caller reads the chain first and keeps the row for
 // when that fails too.
 //
 // SERVER-ONLY.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { routeGate, type AskOpts } from "./route-gate";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { V3_LT_BY_ADDR } from "@/lib/aave-v3/asset-catalog";
 import { SPARK_ADDRESSES, SPARK_LT_BY_ADDR } from "@/lib/spark/asset-catalog";
@@ -33,8 +35,7 @@ import type {
 } from "@/lib/api/fetch-aave-v3-position";
 import type { SparkChainReserve, SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
 
-/** How long a position page waits for the route. */
-const TIMEOUT_MS = 8_000;
+const gate = routeGate();
 
 /** rails-server's market key per (chain, Pool), as its AAVE_V3_POSITION_MARKETS names them. */
 const SERVER_MARKET: Record<string, string> = {
@@ -52,30 +53,16 @@ export const serverMarketOf = (pool: string, chainId: ChainId): string | undefin
 
 type Raw = Record<string, unknown>;
 
-/** How long to wait, and a signal that ends the wait sooner. */
-export interface AskOpts {
-  timeoutMs?: number;
-  signal?: AbortSignal;
-}
-
 /** The route's answer as it came, or null where it cannot answer. */
 async function ask(market: string, wallet: string, opts: AskOpts = {}): Promise<Raw | null> {
-  const api = process.env.RAILS_API_URL;
-  if (!api) return null;
-  try {
-    const qs = new URLSearchParams({ market, wallet: wallet.toLowerCase() });
-    const timeout = AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS);
-    const res = await fetch(`${api}/api/at-block/aave-v3/position?${qs.toString()}`, {
-      ...createAuthFetchOptions(),
-      cache: "no-store",
-      signal: opts.signal ? AbortSignal.any([timeout, opts.signal]) : timeout,
-    });
-    if (!res.ok) return null;
-    const body = (await res.json()) as Raw;
-    return body && typeof body === "object" && Array.isArray(body.reserves) ? body : null;
-  } catch {
-    return null;
-  }
+  const qs = new URLSearchParams({ market, wallet: wallet.toLowerCase() });
+  const body = await gate.json<Raw>(
+    "aave-v3",
+    `${process.env.RAILS_API_URL}/api/at-block/aave-v3/position?${qs.toString()}`,
+    createAuthFetchOptions(),
+    opts,
+  );
+  return body && typeof body === "object" && Array.isArray(body.reserves) ? body : null;
 }
 
 /** The account's figures from the route as it answers them, unnamed: what the

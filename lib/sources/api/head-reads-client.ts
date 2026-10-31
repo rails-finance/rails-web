@@ -30,16 +30,15 @@ import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { chainClient } from "@/lib/sources/chain/rpc";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { noteChainRead, noteServerHead } from "./server-head-stamps";
+import { ROUTE_WAIT_MS, routeGate } from "./route-gate";
 
 const TIMEOUT_MS = 8_000;
 /** The head is one small cached answer: past this, the api is taken as down. */
-const HEAD_TIMEOUT_MS = 3_000;
+const HEAD_TIMEOUT_MS = ROUTE_WAIT_MS;
 /** How long a block rails-server named is read there: inside its two-minute acceptance. */
 const NAMED_MS = 90_000;
 /** One head answer serves the reads that start within this long of it. */
 const HEAD_REUSE_MS = 5_000;
-/** After the route fails, how long the chain is read without asking it. */
-const DOWN_MS = 30_000;
 
 type RawRead = { kind: "call"; to: string; data: Hex; from?: string };
 type RawAnswer = { success: boolean; returnData: Hex };
@@ -52,7 +51,7 @@ interface HeadAnswer {
 
 const named = new Map<number, Map<bigint, number>>();
 const heads = new Map<number, { at: number; p: Promise<HeadAnswer | null> }>();
-const downUntil = new Map<number, number>();
+const gate = routeGate();
 
 function remember(chainId: number, block: bigint) {
   let m = named.get(chainId);
@@ -67,33 +66,17 @@ const isNamed = (chainId: number, block: bigint | undefined): block is bigint =>
   return at != null && Date.now() - at <= NAMED_MS;
 };
 
-const isDown = (chainId: number) => (downUntil.get(chainId) ?? 0) > Date.now();
-
-async function ask<T>(chainId: number, path: string, body?: unknown, timeoutMs = TIMEOUT_MS): Promise<T | null> {
-  const api = process.env.RAILS_API_URL;
-  if (!api || isDown(chainId)) return null;
-  try {
-    const res = await fetch(`${api}/api/at-block/head/${path}`, {
-      ...createAuthFetchOptions(
-        body === undefined
-          ? undefined
-          : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
-      ),
-      cache: "no-store",
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) {
-      void res.body?.cancel().catch(() => undefined);
-      // A refusal of this request (a block the route no longer names, 409, or
-      // a malformed or oversized round, 400) is not the route down.
-      if (res.status >= 500 || res.status === 429) downUntil.set(chainId, Date.now() + DOWN_MS);
-      return null;
-    }
-    return (await res.json()) as T;
-  } catch {
-    downUntil.set(chainId, Date.now() + DOWN_MS);
-    return null;
-  }
+function ask<T>(chainId: number, path: string, body?: unknown, timeoutMs = TIMEOUT_MS): Promise<T | null> {
+  return gate.json<T>(
+    String(chainId),
+    `${process.env.RAILS_API_URL}/api/at-block/head/${path}`,
+    createAuthFetchOptions(
+      body === undefined
+        ? undefined
+        : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
+    ),
+    { timeoutMs },
+  );
 }
 
 /** rails-server's block for the chain; one request serves the reads of the next few seconds. */

@@ -25,12 +25,11 @@ import { chainBatchClient } from "@/lib/sources/chain/rpc";
 import type { ChainId } from "@/lib/shared/chains";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { noteChainRead, noteServerHead } from "./server-head-stamps";
+import { ROUTE_WAIT_MS, routeGate } from "./route-gate";
 
 const TIMEOUT_MS = 8_000;
 /** The head is one small cached answer: past this, the api is taken as down. */
-const HEAD_TIMEOUT_MS = 3_000;
-/** After the route fails, how long the chain is read without asking it. */
-const DOWN_MS = 30_000;
+const HEAD_TIMEOUT_MS = ROUTE_WAIT_MS;
 /** How long a block rails-server named is read there: inside its two-minute acceptance. */
 const NAMED_MS = 90_000;
 
@@ -41,8 +40,7 @@ type RawRead =
 type RawAnswer = { success: boolean; returnData: Hex } | { hex: Hex };
 
 const named = new Map<number, Map<bigint, number>>();
-const downUntil = new Map<number, number>();
-const isDown = (chainId: number) => (downUntil.get(chainId) ?? 0) > Date.now();
+const gate = routeGate();
 
 function remember(chainId: number, block: bigint) {
   let m = named.get(chainId);
@@ -57,36 +55,17 @@ const isNamed = (chainId: number, block: bigint | undefined): block is bigint =>
   return at != null && Date.now() - at <= NAMED_MS;
 };
 
-async function ask<T>(
-  chainId: number,
-  path: string,
-  init?: { body: unknown },
-  timeoutMs = TIMEOUT_MS,
-): Promise<T | null> {
-  const api = process.env.RAILS_API_URL;
-  if (!api || isDown(chainId)) return null;
-  try {
-    const res = await fetch(`${api}/api/at-block/vault/${path}`, {
-      ...createAuthFetchOptions(
-        init
-          ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(init.body) }
-          : undefined,
-      ),
-      cache: "no-store",
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!res.ok) {
-      void res.body?.cancel().catch(() => undefined);
-      // A refusal of this request (a block the route no longer names, 409, or
-      // a malformed or oversized round, 400) is not the route down.
-      if (res.status >= 500 || res.status === 429) downUntil.set(chainId, Date.now() + DOWN_MS);
-      return null;
-    }
-    return (await res.json()) as T;
-  } catch {
-    downUntil.set(chainId, Date.now() + DOWN_MS);
-    return null;
-  }
+function ask<T>(chainId: number, path: string, init?: { body: unknown }, timeoutMs = TIMEOUT_MS): Promise<T | null> {
+  return gate.json<T>(
+    String(chainId),
+    `${process.env.RAILS_API_URL}/api/at-block/vault/${path}`,
+    createAuthFetchOptions(
+      init
+        ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(init.body) }
+        : undefined,
+    ),
+    { timeoutMs },
+  );
 }
 
 interface HeadAnswer {
