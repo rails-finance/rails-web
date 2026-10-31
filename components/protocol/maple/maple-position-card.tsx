@@ -47,7 +47,7 @@ import { mapleExitAssets } from "@/lib/maple/exit-value";
 import { maplePositionContent } from "@/lib/maple/position-content";
 import type { MaplePositionSummary, MaplePoolAmount, MaplePeakAmount } from "@/lib/sources/api/maple-positions";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
-import { serverReadAt, stampHeadRead } from "@/lib/shared/server-head-read";
+import { serverReadAt, stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { AmountText, ExactSpan } from "@/components/shared/amount-text";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { MapleMenuRows } from "./maple-menu-rows";
@@ -79,7 +79,10 @@ const claimAmount = (p: MaplePoolAmount): number => p.currentValue ?? p.deposite
 
 const claimProv = (p: MaplePoolAmount, v: MaplePositionView) =>
   p.currentValue != null
-    ? stampHeadRead(positionCurrentValueProv(p.assetSymbol, p.symbol), poolReadBy(v, p.pool))
+    ? stampHeadRead(
+        positionCurrentValueProv(p.assetSymbol, p.symbol, undefined, poolReadBy(v, p.pool)),
+        poolReadBy(v, p.pool),
+      )
     : positionPrincipalProv(p.assetSymbol);
 
 /** rails-server's read of a pool's state, when it answered every read. */
@@ -227,7 +230,7 @@ function PeakDepositedLines({ lines }: { lines: MaplePeakAmount[] }) {
 /** The panel rows for the interest the claim holds: "all withdrawn" where the
  *  claim holds none of it, the amount otherwise, and one row per pool the
  *  wallet has left. */
-function interestRows(captions?: MapleCardCaptions): PositionPanelRow[] {
+function interestRows(captions?: MapleCardCaptions, readBy?: ServerRead): PositionPanelRow[] {
   // The claim holds none of what the position earned: the figure lives in
   // Lifetime flows, and the card points there.
   if (captions?.interestWithdrawn)
@@ -250,14 +253,14 @@ function interestRows(captions?: MapleCardCaptions): PositionPanelRow[] {
       id: "interest-earned",
       label: "Interest earned",
       value: (
-        <Prov info={interestEarnedProv(it.symbol)}>
+        <Prov info={stampHeadRead(interestEarnedProv(it.symbol, readBy), readBy)}>
           <span>
             <AmountText value={it.amount} format="compact" />
           </span>
         </Prov>
       ),
       asset: { symbol: it.symbol, figure: `${formatExact(it.amount)} ${it.symbol}` },
-      tip: "What the claim holds beyond the principal the wallet put in, replayed from the wallet's events and the exit rate at head.",
+      tip: "What the claim holds beyond the principal the wallet put in, replayed from the wallet's events and the pool's exit rate now.",
     },
     // A pool the wallet has left: its interest is not in the claim.
     ...(captions?.earnedElsewhere ?? []).map((e) => ({
@@ -459,6 +462,8 @@ export function mapleCardSlots({
       })),
   ];
 
+  const it0 = captions?.interestEarned?.pool;
+
   // No health factor or liquidation row: a lender has no liquidation surface;
   // default risk socializes through the pool's exit rate (unrealizedLosses),
   // and the pool band carries that live.
@@ -469,7 +474,7 @@ export function mapleCardSlots({
     explainer: { body: explanation ?? null, viewHref },
     learnMore: maplePositionContent({ status: "open", inQueue: v.inQueue }),
     menu: { leading: menuLeading, exports: exports ?? null },
-    panel: [[...shareRows, ...interestRows(captions)], queueRows],
+    panel: [[...shareRows, ...interestRows(captions, it0 ? poolReadBy(v, it0) : undefined)], queueRows],
   };
 }
 
