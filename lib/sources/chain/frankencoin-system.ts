@@ -32,6 +32,9 @@
 
 import { parseAbi, getAddress } from "viem";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { FRANKENCOIN_ADDRESSES } from "@/lib/frankencoin/asset-catalog";
 
 const ZCHF = getAddress(FRANKENCOIN_ADDRESSES.ZCHF);
@@ -56,6 +59,8 @@ const E18 = 1e18;
 
 export interface FrankencoinSystemChainResponse {
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** ZCHF in existence — the token's own totalSupply(). */
   zchfSupply: number;
   /** The FPS holders' capital — ZCHF.equity(). */
@@ -155,6 +160,7 @@ export async function loadFrankencoinSystemFromChain(): Promise<FrankencoinSyste
 
     return {
       blockNumber,
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       zchfSupply: Number(supply) / E18,
       equity: Number(equity) / E18,
       minterReserve: Number(minterReserve) / E18,

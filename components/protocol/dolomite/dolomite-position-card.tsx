@@ -25,6 +25,7 @@
 // USD keys by MARKET ID (Dolomite's own key — symbols collide on this
 // roster), priced by the core's own getMarketPrice.
 
+import type { ServerRead } from "@/lib/shared/server-head-read";
 import { ListingTag } from "@/components/shared/listing-tag";
 import {
   PositionCard,
@@ -99,6 +100,8 @@ export interface DolomitePositionView {
   priceByMarket?: Record<string, number>;
   /** Live APRs per market id (percent). */
   ratesByMarket?: Record<string, { borrowAprPct: number | null; supplyAprPct: number | null }>;
+  /** rails-server's read of the prices and rates, when it answered every read. */
+  marketReadBy?: ServerRead;
   /** What each liquidation did, read from the rows (a page holding the whole
    *  history only). */
   liquidations?: LiquidationStory[];
@@ -341,11 +344,11 @@ export function useDolomiteCardSlots({
         label: CARD_VOCAB.collateral,
         value:
           collUsd != null ? (
-            <UsdFigure usd={collUsd} info={dolomiteUsdProv("Collateral")} />
+            <UsdFigure usd={collUsd} info={dolomiteUsdProv("Collateral", v.marketReadBy)} />
           ) : v.supplies.length > 0 ? (
             <LegLines lines={supplyLines.lines} side="supply" />
           ) : null,
-        total: collUsd != null ? { usd: collUsd, info: dolomiteUsdProv("Collateral") } : undefined,
+        total: collUsd != null ? { usd: collUsd, info: dolomiteUsdProv("Collateral", v.marketReadBy) } : undefined,
         assets: v.supplies.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(suppliesShown)} /> : undefined,
       },
       {
@@ -353,11 +356,11 @@ export function useDolomiteCardSlots({
         label: CARD_VOCAB.debt,
         value:
           debtUsd != null ? (
-            <UsdFigure usd={debtUsd} info={dolomiteUsdProv("Borrowed")} />
+            <UsdFigure usd={debtUsd} info={dolomiteUsdProv("Borrowed", v.marketReadBy)} />
           ) : v.borrows.length > 0 ? (
             <LegLines lines={borrowLines.lines} side="debt" />
           ) : null,
-        total: debtUsd != null ? { usd: debtUsd, info: dolomiteUsdProv("Borrowed") } : undefined,
+        total: debtUsd != null ? { usd: debtUsd, info: dolomiteUsdProv("Borrowed", v.marketReadBy) } : undefined,
         assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(borrowsShown)} /> : undefined,
       },
     ];
@@ -376,7 +379,7 @@ export function useDolomiteCardSlots({
         assets: undefined,
         usd:
           usd != null ? (
-            <Prov info={dolomiteUsdProv(side === "supply" ? "Collateral" : "Borrowed")}>
+            <Prov info={dolomiteUsdProv(side === "supply" ? "Collateral" : "Borrowed", v.marketReadBy)}>
               <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
             </Prov>
           ) : null,
@@ -456,7 +459,9 @@ export function useDolomiteCardSlots({
                 id: "borrow-rate",
                 label: rate.avg ? "Average borrow rate" : "Borrow rate",
                 value: (
-                  <Prov info={rate.avg ? avgBorrowRateProv() : borrowRateProv(rate.symbol)}>
+                  <Prov
+                    info={rate.avg ? avgBorrowRateProv(v.marketReadBy) : borrowRateProv(rate.symbol, v.marketReadBy)}
+                  >
                     {rate.pct.toFixed(2)}%
                   </Prov>
                 ),
@@ -499,7 +504,7 @@ function marketBreakdown(
         ),
         usdText:
           usd != null ? (
-            <Prov info={dolomiteUsdProv(`${r.symbol} ${side === "supply" ? "supplied" : "borrowed"}`)}>
+            <Prov info={dolomiteUsdProv(`${r.symbol} ${side === "supply" ? "supplied" : "borrowed"}`, v.marketReadBy)}>
               {formatUsdValue(usd)}
             </Prov>
           ) : undefined,
@@ -555,5 +560,6 @@ export function viewFromSummary(s: DolomitePositionSummary): DolomitePositionVie
     lastActivityAt: s.lastActivityAt,
     priceByMarket: s.priceByMarket,
     ratesByMarket: s.ratesByMarket,
+    marketReadBy: s.marketReadBy,
   };
 }

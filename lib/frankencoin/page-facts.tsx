@@ -9,6 +9,7 @@
 // the timeline and the chain read; a card rendered without the provider (the
 // per-event share route) falls back to the general wording.
 
+import type { ServerRead } from "@/lib/shared/server-head-read";
 import { createContext, useContext } from "react";
 
 export { dateTimeText, phaseText, spanText } from "@/lib/frankencoin/figures";
@@ -44,6 +45,8 @@ export interface FrankencoinLiveTerms {
   reserveContributionPPM: number | null;
   /** Collateral in a running challenge auction now; null where unread. */
   challengedAmount: number | null;
+  /** rails-server's read of the block, when it answered every read. */
+  readBy?: ServerRead;
 }
 
 export interface FrankencoinPageFacts {

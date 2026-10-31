@@ -20,6 +20,7 @@
 // owner-declared liq. price + the expiration countdown + the cooldown. Units
 // are native everywhere; no dollar renders on this page.
 
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { frankencoinExplorer } from "@/lib/frankencoin/explorer";
@@ -235,6 +236,7 @@ export default function FrankencoinPositionView({
               annualInterestPPM: chain.annualInterestPPM,
               reserveContributionPPM: chain.reserveContributionPPM,
               challengedAmount: chain.challengedAmount,
+              readBy: serverReadOf(chain),
             }
           : null,
     }),

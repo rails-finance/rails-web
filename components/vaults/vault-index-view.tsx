@@ -41,6 +41,7 @@ import {
 } from "@/lib/yearn/vault-provenance";
 import { poolNavRateProv, poolTotalAssetsProv } from "@/lib/maple/event-provenance";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
+import { stampServerRead } from "@/lib/shared/server-head-read";
 import type { VaultYield } from "@/lib/vaults/yield";
 import {
   chainName,
@@ -84,7 +85,7 @@ const TOKEN_FACET: VaultRosterFacet = {
 
 /** The count sentence's receipt for one roster: the roster's. */
 function rosterCountProv(r: VaultIndexRoster): Provenance {
-  const coords = { blockNumber: r.blockNumber || undefined };
+  const coords = { blockNumber: r.blockNumber || undefined, readBy: r.readBy };
   const c = r.catalog;
   switch (r.protocol) {
     case "morpho":
@@ -111,15 +112,16 @@ export function VaultIndexView({
   yields: Record<string, VaultYield>;
   rosters: VaultIndexRoster[];
 }) {
-  const blockOf = (v: VaultSummary) =>
-    rosters.find((r) => r.protocol === vaultIndexProtocol(v))?.blockNumber || undefined;
+  const rosterOf = (v: VaultSummary) => rosters.find((r) => r.protocol === vaultIndexProtocol(v));
 
   const receiptsOf = (v: VaultSummary): VaultRowReceipts => {
-    const blockNumber = blockOf(v);
+    const roster = rosterOf(v);
+    const blockNumber = roster?.blockNumber || undefined;
+    const readBy = roster?.readBy;
     const vaultName = vaultDisplayName(v) ?? undefined;
     switch (vaultIndexProtocol(v)) {
       case "morpho": {
-        const c = { blockNumber, vault: v.address, vaultName, assetSymbol: v.asset.symbol };
+        const c = { blockNumber, readBy, vault: v.address, vaultName, assetSymbol: v.asset.symbol };
         return {
           name: vaultDirectoryNameProv(c),
           totalAssets: vaultDirectoryTotalAssetsProv(c),
@@ -130,6 +132,7 @@ export function VaultIndexView({
         const family = v.family as AaveVaultFamily;
         const c = {
           blockNumber,
+          readBy,
           vault: v.address,
           vaultName,
           assetSymbol: v.asset.symbol,
@@ -146,6 +149,7 @@ export function VaultIndexView({
       case "yearn": {
         const c = {
           blockNumber,
+          readBy,
           vault: v.address,
           vaultName,
           assetSymbol: v.asset.symbol,
@@ -160,8 +164,8 @@ export function VaultIndexView({
       }
       case "maple":
         return {
-          totalAssets: poolTotalAssetsProv(v.asset.symbol, blockNumber),
-          sharePrice: poolNavRateProv(v.asset.symbol, v.symbol ?? "pool", blockNumber),
+          totalAssets: stampServerRead(poolTotalAssetsProv(v.asset.symbol, blockNumber), readBy),
+          sharePrice: stampServerRead(poolNavRateProv(v.asset.symbol, v.symbol ?? "pool", blockNumber), readBy),
         };
     }
   };

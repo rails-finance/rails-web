@@ -42,6 +42,7 @@ import {
   type LlamalendMarketCoords,
 } from "@/lib/llamalend/markets-provenance";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { serverReadAt, type ServerRead } from "@/lib/shared/server-head-read";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { VitalsBand } from "@/components/shared/vitals-band";
 import { shortAddress, FACTORY_LABEL, LLAMALEND_ADDRESSES } from "@/lib/llamalend/asset-catalog";
@@ -118,13 +119,24 @@ const timeLinearPolicy = (m: LlamalendMarketRow): TimeLinearPolicy | undefined =
  *  RewardsHandler and the DAO's FeeCollector (TO-DO-ui-jobs 169). */
 const CRVUSD_FEE_SPLITTER = "0x2dfd89449faff8a532790667bab21cf733c064f2";
 
-function MarketCard({ m, block, sharers }: { m: LlamalendMarketRow; block: number; sharers: number }) {
+function MarketCard({
+  m,
+  block,
+  sharers,
+  readBy,
+}: {
+  m: LlamalendMarketRow;
+  block: number;
+  sharers: number;
+  readBy?: ServerRead;
+}) {
   const timeLinear = timeLinearPolicy(m);
   // Every per-market figure traces to the same coordinates: the head block, the
   // three contracts this market's reads came from, and the two flags that decide
   // a figure's unit (crvUSD par) and denominator (utilisation basis).
   const coords: LlamalendMarketCoords = {
     blockNumber: block,
+    readBy,
     controller: m.controller,
     amm: m.amm,
     monetaryPolicy: m.monetaryPolicy,
@@ -322,7 +334,8 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
   const timeLinearMarkets = data.markets.filter((m) => timeLinearPolicy(m)).length;
   // Roster-summary receipts need only the block; the per-market coordinates
   // live on each card.
-  const summaryCoords: LlamalendMarketCoords = { blockNumber: data.blockNumber };
+  const readBy = serverReadAt(data.head, data.blockNumber);
+  const summaryCoords: LlamalendMarketCoords = { blockNumber: data.blockNumber, readBy };
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -449,6 +462,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
         <div className="grid gap-2.5 sm:grid-cols-2">
           {v1.map((m) => (
             <MarketCard
+              readBy={readBy}
               key={m.controller}
               m={m}
               block={data.blockNumber}
@@ -481,6 +495,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
           <div className="grid gap-2.5 sm:grid-cols-2">
             {v2.map((m) => (
               <MarketCard
+                readBy={readBy}
                 key={m.controller}
                 m={m}
                 block={data.blockNumber}

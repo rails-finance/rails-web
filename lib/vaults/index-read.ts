@@ -20,6 +20,7 @@ import { loadYearnEthereumVaultDirectory } from "@/lib/sources/chain/yearn-ether
 import { resolveMaplePoolState, type MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
 import { ssrHop } from "@/lib/shared/listing-ssr";
+import { serverReadAt } from "@/lib/shared/server-head-read";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { aaveVaultAttestation } from "@/lib/aave-vaults/vault-catalog";
@@ -126,6 +127,7 @@ export async function loadVaultIndex(): Promise<VaultIndexRead> {
         protocol: "morpho",
         chainId: BASE_CHAIN_ID,
         blockNumber: morpho.blockNumber,
+        readBy: serverReadAt(morpho.head, morpho.blockNumber || null),
         chainStale: morpho.chainStale,
         count: morphoVaults.length,
         catalog: { catalogSize: morpho.catalogSize, censusBlock: morpho.censusBlock },
@@ -134,6 +136,7 @@ export async function loadVaultIndex(): Promise<VaultIndexRead> {
         protocol: "aave",
         chainId: MAINNET_CHAIN_ID,
         blockNumber: aave.blockNumber,
+        readBy: serverReadAt(aave.head, aave.blockNumber || null),
         chainStale: aave.chainStale,
         count: aaveVaults.length,
         catalog: {
@@ -147,6 +150,7 @@ export async function loadVaultIndex(): Promise<VaultIndexRead> {
         protocol: "yearn",
         chainId: MAINNET_CHAIN_ID,
         blockNumber: yearn.blockNumber,
+        readBy: serverReadAt(yearn.head, yearn.blockNumber || null),
         chainStale: yearn.chainStale,
         count: yearnVaults.length,
         catalog: { catalogSize: yearn.catalogSize, censusBlock: yearn.censusBlock },
@@ -155,6 +159,7 @@ export async function loadVaultIndex(): Promise<VaultIndexRead> {
         protocol: "maple",
         chainId: MAINNET_CHAIN_ID,
         blockNumber: mapleBlock,
+        readBy: serverReadAt(maple.states[0]?.head, mapleBlock || null),
         chainStale: mapleStale,
         count: mapleVaults.length,
         catalog: { catalogSize: MAPLE_POOLS.length },

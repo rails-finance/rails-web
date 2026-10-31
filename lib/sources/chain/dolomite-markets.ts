@@ -46,6 +46,9 @@
 
 import { getAddress, parseAbi } from "viem";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import { DOLOMITE_ADDRESSES, DOLOMITE_BASE, SECONDS_PER_YEAR } from "@/lib/dolomite/asset-catalog";
 
@@ -131,6 +134,8 @@ export interface DolomiteMarketRow {
 
 export interface DolomiteMarketsResponse {
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   markets: DolomiteMarketRow[];
   /** Global risk constants, the core's own. */
   risk: {
@@ -333,6 +338,7 @@ export async function loadDolomiteMarkets(): Promise<DolomiteMarketsResponse> {
 
     return {
       blockNumber,
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       markets,
       risk: {
         marginRatio,
@@ -384,6 +390,7 @@ export type DolomiteMarketStateMap = Map<number, DolomiteMarketState>;
 export async function resolveDolomiteMarketState(): Promise<{
   state: DolomiteMarketStateMap;
   blockNumber: number;
+  head?: PositionHeadStamp;
 }> {
   const data = await loadDolomiteMarkets();
   const state: DolomiteMarketStateMap = new Map();
@@ -404,5 +411,5 @@ export async function resolveDolomiteMarketState(): Promise<{
       isClosing: m.isClosing,
     });
   }
-  return { state, blockNumber: data.blockNumber };
+  return { state, blockNumber: data.blockNumber, head: data.head };
 }

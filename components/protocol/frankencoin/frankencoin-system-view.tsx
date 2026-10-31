@@ -26,6 +26,7 @@
 
 import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { serverReadAt, stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { frankencoinModal } from "@/lib/frankencoin/event-templates";
@@ -56,24 +57,24 @@ import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 const dateOf = (unix: number): string => formatDate(unix);
 
 /** The franc itself — supply and the FPS equity market. */
-function FrancCard({ data }: { data: FrankencoinSystemChainResponse }) {
+function FrancCard({ data, readBy }: { data: FrankencoinSystemChainResponse; readBy?: ServerRead | null }) {
   return (
     <div className="rounded-xl bg-raised px-4 py-3.5">
       <div className="text-xs font-semibold text-foreground">The franc</div>
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
         <Stat label="ZCHF on Ethereum">
-          <Prov info={zchfSupplyProv()} value={formatExact(data.zchfSupply)}>
+          <Prov info={stampHeadRead(zchfSupplyProv(), readBy)} value={formatExact(data.zchfSupply)}>
             <AmountText value={data.zchfSupply} format="compact" /> ZCHF
           </Prov>
         </Stat>
         <Stat label="FPS outstanding">
-          <Prov info={fpsSupplyProv(data.reserveAddress)} value={formatExact(data.fpsSupply)}>
+          <Prov info={stampHeadRead(fpsSupplyProv(data.reserveAddress), readBy)} value={formatExact(data.fpsSupply)}>
             <AmountText value={data.fpsSupply} format="compact" /> FPS
           </Prov>
         </Stat>
         <Stat label="FPS price">
-          <Prov info={fpsPriceProv(data.reserveAddress)} value={formatExact(data.fpsPrice)}>
+          <Prov info={stampHeadRead(fpsPriceProv(data.reserveAddress), readBy)} value={formatExact(data.fpsPrice)}>
             <AmountText value={data.fpsPrice} /> ZCHF
           </Prov>
         </Stat>
@@ -94,7 +95,7 @@ function FrancCard({ data }: { data: FrankencoinSystemChainResponse }) {
 }
 
 /** The reserve's two accounts, as the identity the contract maintains. */
-function CapitalCard({ data }: { data: FrankencoinSystemChainResponse }) {
+function CapitalCard({ data, readBy }: { data: FrankencoinSystemChainResponse; readBy?: ServerRead | null }) {
   const total = data.reserveBalance;
   const eqShare = total > 0 ? data.equity / total : 0;
   return (
@@ -103,17 +104,17 @@ function CapitalCard({ data }: { data: FrankencoinSystemChainResponse }) {
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
         <Stat label="Equity (FPS holders)">
-          <Prov info={equityProv()} value={formatExact(data.equity)}>
+          <Prov info={stampHeadRead(equityProv(), readBy)} value={formatExact(data.equity)}>
             <AmountText value={data.equity} format="compact" /> ZCHF
           </Prov>
         </Stat>
         <Stat label="Borrowers' reserve">
-          <Prov info={minterReserveProv()} value={formatExact(data.minterReserve)}>
+          <Prov info={stampHeadRead(minterReserveProv(), readBy)} value={formatExact(data.minterReserve)}>
             <AmountText value={data.minterReserve} format="compact" /> ZCHF
           </Prov>
         </Stat>
         <Stat label="Reserve pool, total">
-          <Prov info={reserveIdentityProv(data.reserveAddress)} value={formatExact(total)}>
+          <Prov info={stampHeadRead(reserveIdentityProv(data.reserveAddress), readBy)} value={formatExact(total)}>
             <AmountText value={total} format="compact" /> ZCHF
           </Prov>
         </Stat>
@@ -141,7 +142,7 @@ function CapitalCard({ data }: { data: FrankencoinSystemChainResponse }) {
 }
 
 /** The rate frame — the Leadrate and the flat opening fee. */
-function RatesCard({ data }: { data: FrankencoinSystemChainResponse }) {
+function RatesCard({ data, readBy }: { data: FrankencoinSystemChainResponse; readBy?: ServerRead | null }) {
   const pendingChange =
     data.nextRatePPM != null &&
     data.leadratePPM != null &&
@@ -154,7 +155,7 @@ function RatesCard({ data }: { data: FrankencoinSystemChainResponse }) {
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
         <Stat label="Base rate (Leadrate)">
           {data.leadratePPM != null ? (
-            <Prov info={leadrateProv(data.leadrateAddress)} value={String(data.leadratePPM)}>
+            <Prov info={stampHeadRead(leadrateProv(data.leadrateAddress), readBy)} value={String(data.leadratePPM)}>
               {ppmToPct(data.leadratePPM).toFixed(2)}%
             </Prov>
           ) : (
@@ -163,7 +164,7 @@ function RatesCard({ data }: { data: FrankencoinSystemChainResponse }) {
         </Stat>
         <Stat label="Opening fee">
           {data.openingFeeZchf != null ? (
-            <Prov info={openingFeeProv()} value={formatExact(data.openingFeeZchf)}>
+            <Prov info={stampHeadRead(openingFeeProv(), readBy)} value={formatExact(data.openingFeeZchf)}>
               <AmountText value={data.openingFeeZchf} format="compact" /> ZCHF
             </Prov>
           ) : (
@@ -172,7 +173,7 @@ function RatesCard({ data }: { data: FrankencoinSystemChainResponse }) {
         </Stat>
         {pendingChange && (
           <Stat label="Announced change">
-            <Prov info={leadrateProv(data.leadrateAddress)} value={String(data.nextRatePPM)}>
+            <Prov info={stampHeadRead(leadrateProv(data.leadrateAddress), readBy)} value={String(data.nextRatePPM)}>
               {ppmToPct(data.nextRatePPM!).toFixed(2)}%
             </Prov>
             <span className="ml-1 text-rb-500">from {dateOf(data.nextChange!)}</span>
@@ -333,6 +334,7 @@ function EnforcementCard({ book }: { book: FrankencoinBook }) {
 }
 
 export function FrankencoinSystemView({ data, book }: { data: FrankencoinSystemChainResponse; book: FrankencoinBook }) {
+  const readBy = serverReadAt(data.head, data.blockNumber);
   const registry = useReceiptRegistry();
 
   if (data.chainStale) {
@@ -352,9 +354,9 @@ export function FrankencoinSystemView({ data, book }: { data: FrankencoinSystemC
       <section>
         <h2 className="text-sm font-semibold text-foreground">The system</h2>
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
-          <FrancCard data={data} />
-          <CapitalCard data={data} />
-          <RatesCard data={data} />
+          <FrancCard readBy={readBy} data={data} />
+          <CapitalCard readBy={readBy} data={data} />
+          <RatesCard readBy={readBy} data={data} />
         </div>
       </section>
 

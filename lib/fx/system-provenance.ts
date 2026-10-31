@@ -41,7 +41,7 @@ export const poolRosterProv = (): Provenance => ({
   summary:
     "The pool roster — exactly two AaveFundingPools hang off the one PoolManager (wstETH and WBTC; chain-verified complete, two RegisterPool events ever). Each pool answers the manager's getPoolInfo with a live capacity, which is only ever set at registration — a roster proof that needs no log scan.",
   contract: POOL_MANAGER,
-  via: `${SYSTEM_VIA} · PoolManager.getPoolInfo per pool @ pinned block`,
+  via: `${SYSTEM_VIA} · PoolManager.getPoolInfo per pool @ the pinned block`,
   verify: STATE_VERIFY,
 });
 

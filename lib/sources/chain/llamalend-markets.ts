@@ -39,6 +39,9 @@
 
 import { getAddress, parseAbi, keccak256, toHex } from "viem";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import {
   LLAMALEND_ADDRESSES,
@@ -399,6 +402,8 @@ export interface LlamalendMarketRow extends LlamalendMarketIdentity {
 
 export interface LlamalendMarketsResponse {
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   markets: LlamalendMarketRow[];
   summary: {
     total: number;
@@ -566,6 +571,7 @@ export async function loadLlamalendMarkets(): Promise<LlamalendMarketsResponse> 
 
     return {
       blockNumber,
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       markets: rows,
       summary: {
         total: rows.length,
@@ -602,6 +608,7 @@ export type LlamalendMarketStateMap = Map<string, LlamalendMarketState>;
 export async function resolveLlamalendMarketState(): Promise<{
   state: LlamalendMarketStateMap;
   blockNumber: number;
+  head?: PositionHeadStamp;
 }> {
   const state: LlamalendMarketStateMap = new Map();
   try {
@@ -625,7 +632,7 @@ export async function resolveLlamalendMarketState(): Promise<{
         priceOracleRaw: p != null ? p.toString() : null,
       });
     });
-    return { state, blockNumber };
+    return { state, blockNumber, head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber) };
   } catch (error) {
     console.error("LlamaLend market-state read failed:", error);
     return { state, blockNumber: 0 };

@@ -4,6 +4,7 @@
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
 import { isUnlaunchedPath } from "@/lib/shared/protocols";
 import type { VaultSummary } from "@/lib/vaults/summary";
+import type { ServerRead } from "@/lib/shared/server-head-read";
 import {
   baseVaultHref,
   baseVaultRosterHref,
@@ -35,6 +36,8 @@ export interface VaultIndexRoster {
   chainId: ChainId;
   /** The block the roster's figures were read at; 0 where the read failed. */
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  readBy?: ServerRead;
   chainStale: boolean;
   /** The rows the index holds from this roster. */
   count: number;

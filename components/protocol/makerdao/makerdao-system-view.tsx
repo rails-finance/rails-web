@@ -32,6 +32,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { serverReadAt, stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { RatioBar } from "@/components/shared/ratio-bar";
 import {
@@ -155,13 +156,13 @@ function Chip({ children }: { children: React.ReactNode }) {
 // ── Section 1 — the Vat ──────────────────────────────────────────────────────
 
 /** Every DAI in existence, against the one ceiling that isn't an artifact. */
-function VatCard({ data }: { data: MakerSystemChainResponse }) {
+function VatCard({ data, readBy }: { data: MakerSystemChainResponse; readBy?: ServerRead | null }) {
   return (
     <div className="rounded-xl bg-raised px-4 py-3.5">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-semibold text-foreground">The Vat</span>
         <span className="text-[11px] text-rb-500">
-          <Prov info={vatLiveProv()}>{data.live ? "live" : "shut down"}</Prov>
+          <Prov info={stampHeadRead(vatLiveProv(), readBy)}>{data.live ? "live" : "shut down"}</Prov>
         </span>
       </div>
 
@@ -170,12 +171,12 @@ function VatCard({ data }: { data: MakerSystemChainResponse }) {
             prop — the receipts row renders display + symbol and would double
             it. `value` still carries the exact figure behind the compact one. */}
         <Stat label="DAI in existence">
-          <Prov info={systemDebtProv()} value={formatExact(data.debtDai)}>
+          <Prov info={stampHeadRead(systemDebtProv(), readBy)} value={formatExact(data.debtDai)}>
             <AmountText value={data.debtDai} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
         <Stat label="Global ceiling">
-          <Prov info={globalLineProv()} value={formatExact(data.lineDai)}>
+          <Prov info={stampHeadRead(globalLineProv(), readBy)} value={formatExact(data.lineDai)}>
             <AmountText value={data.lineDai} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
@@ -185,7 +186,7 @@ function VatCard({ data }: { data: MakerSystemChainResponse }) {
         <div className="mt-3">
           <RatioBar fill={Math.min(1, data.globalFill)} ticks={[]} />
           <div className="mt-1.5 text-[11px] text-rb-500">
-            <Prov info={globalFillProv(formatExact(data.debtDai), formatExact(data.lineDai))}>
+            <Prov info={stampHeadRead(globalFillProv(formatExact(data.debtDai), formatExact(data.lineDai)), readBy)}>
               {ratio(data.globalFill)}
             </Prov>{" "}
             of the global ceiling drawn
@@ -202,16 +203,16 @@ function VatCard({ data }: { data: MakerSystemChainResponse }) {
 }
 
 /** The spine: the Vat's own identity, checked live and in full. */
-function ReconcileCard({ data }: { data: MakerSystemChainResponse }) {
+function ReconcileCard({ data, readBy }: { data: MakerSystemChainResponse; readBy?: ServerRead | null }) {
   return (
     <div className="rounded-xl bg-raised px-4 py-3.5">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-semibold text-foreground">Every DAI accounted for</span>
         <span className="text-[11px] text-rb-500">
           <Prov
-            info={rosterProv(
-              data.ilks.filter((i) => i.cls != null).length,
-              data.ilks.filter((i) => i.cls == null).length,
+            info={stampHeadRead(
+              rosterProv(data.ilks.filter((i) => i.cls != null).length, data.ilks.filter((i) => i.cls == null).length),
+              readBy,
             )}
           >
             {data.ilks.length} ilks
@@ -222,26 +223,29 @@ function ReconcileCard({ data }: { data: MakerSystemChainResponse }) {
       <div className="mt-3 space-y-1.5 text-xs tabular-nums">
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-rb-500">every ilk&apos;s debt, added up</span>
-          <Prov info={ilkDebtTotalProv(data.ilks.length)} value={formatExact(data.ilkDebtTotalDai)}>
+          <Prov
+            info={stampHeadRead(ilkDebtTotalProv(data.ilks.length), readBy)}
+            value={formatExact(data.ilkDebtTotalDai)}
+          >
             <AmountText value={data.ilkDebtTotalDai} format="compact" />
           </Prov>
         </div>
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-rb-500">+ uncollateralized</span>
-          <Prov info={viceProv()} value={formatExact(data.viceDai)}>
+          <Prov info={stampHeadRead(viceProv(), readBy)} value={formatExact(data.viceDai)}>
             <AmountText value={data.viceDai} format="compact" />
           </Prov>
         </div>
         <div className="flex items-baseline justify-between gap-2 border-t border-rb-200 pt-1.5 dark:border-rb-700">
           <span className="text-foreground">= DAI in existence</span>
-          <Prov info={systemDebtProv()} value={formatExact(data.debtDai)} echo>
+          <Prov info={stampHeadRead(systemDebtProv(), readBy)} value={formatExact(data.debtDai)} echo>
             <AmountText value={data.debtDai} format="compact" />
           </Prov>
         </div>
       </div>
 
       <div className="mt-2.5 text-[11px] leading-relaxed">
-        <Prov info={reconcileProv(data.reconciles, data.ilks.length)}>
+        <Prov info={stampHeadRead(reconcileProv(data.reconciles, data.ilks.length), readBy)}>
           {data.reconciles ? (
             <span className="text-rb-500">
               The parts add up to the total, checked to the last unit before anything is rounded.
@@ -259,19 +263,19 @@ function ReconcileCard({ data }: { data: MakerSystemChainResponse }) {
 }
 
 /** Where the uncollateralized DAI is charged. */
-function VowCard({ data }: { data: MakerSystemChainResponse }) {
+function VowCard({ data, readBy }: { data: MakerSystemChainResponse; readBy?: ServerRead | null }) {
   return (
     <div className="rounded-xl bg-raised px-4 py-3.5">
       <span className="text-xs font-semibold text-foreground">The Vow</span>
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
         <Stat label="Surplus buffer">
-          <Prov info={vowSurplusProv()} value={formatExact(data.vowSurplusDai)}>
+          <Prov info={stampHeadRead(vowSurplusProv(), readBy)} value={formatExact(data.vowSurplusDai)}>
             <AmountText value={data.vowSurplusDai} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
         <Stat label="Sin charged">
-          <Prov info={vowSinProv()} value={formatExact(data.vowSinDai)}>
+          <Prov info={stampHeadRead(vowSinProv(), readBy)} value={formatExact(data.vowSinDai)}>
             <AmountText value={data.vowSinDai} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
@@ -309,7 +313,7 @@ function CompositionBar({ data }: { data: MakerSystemChainResponse }) {
 
 // ── Section 3 — the ilk roster ───────────────────────────────────────────────
 
-function IlkRow({ row }: { row: MakerIlkRow }) {
+function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null }) {
   const showPrice = row.priceUsd != null && (row.group === "vault" || row.group === "rwa");
 
   return (
@@ -330,7 +334,7 @@ function IlkRow({ row }: { row: MakerIlkRow }) {
               {row.ilk}
             </Link>
           ) : (
-            <Prov info={ilkGroupProv(row.ilk, row.cls)}>
+            <Prov info={stampHeadRead(ilkGroupProv(row.ilk, row.cls), readBy)}>
               <span className="truncate text-xs text-foreground">{row.ilk}</span>
             </Prov>
           )}
@@ -338,13 +342,19 @@ function IlkRow({ row }: { row: MakerIlkRow }) {
         </div>
         {showPrice && (
           <div className="mt-0.5 text-[11px] tabular-nums text-rb-500">
-            <Prov info={systemOsmPriceProv(row.ilk, row.collateralSymbol)} value={formatExact(row.priceUsd as number)}>
+            <Prov
+              info={stampHeadRead(systemOsmPriceProv(row.ilk, row.collateralSymbol), readBy)}
+              value={formatExact(row.priceUsd as number)}
+            >
               {priceUsd(row.priceUsd as number)}
             </Prov>
             {row.priceCap && (
               <>
                 {" "}
-                <Prov info={systemPriceCapProv(row.ilk, row.collateralSymbol)} value={formatExact(row.priceCap.capUsd)}>
+                <Prov
+                  info={stampHeadRead(systemPriceCapProv(row.ilk, row.collateralSymbol), readBy)}
+                  value={formatExact(row.priceCap.capUsd)}
+                >
                   <span>
                     capped at {priceUsd(row.priceCap.capUsd)} by governance
                     {row.priceCap.oracleUsd != null ? <>; oracle {priceUsd(row.priceCap.oracleUsd)}</> : null}
@@ -359,32 +369,37 @@ function IlkRow({ row }: { row: MakerIlkRow }) {
       {/* Debt */}
       <div>
         <div className="text-xs tabular-nums text-foreground">
-          <Prov info={ilkDebtProv(row.ilk, formatExact(row.art), row.rate)} value={formatExact(row.debtDai)}>
+          <Prov
+            info={stampHeadRead(ilkDebtProv(row.ilk, formatExact(row.art), row.rate), readBy)}
+            value={formatExact(row.debtDai)}
+          >
             <AmountText value={row.debtDai} format="compact" />
           </Prov>
         </div>
         {row.debtShare != null && row.debtShare > 0 && (
           <div className="mt-0.5 text-[11px] tabular-nums text-rb-500">
-            <Prov info={ilkShareProv(row.ilk)}>{ratio(row.debtShare)}</Prov>
+            <Prov info={stampHeadRead(ilkShareProv(row.ilk), readBy)}>{ratio(row.debtShare)}</Prov>
           </div>
         )}
       </div>
 
       {/* Ceiling */}
       <div>
-        <Prov info={ceilingProv(row.ilk, row.ceilingState)}>
+        <Prov info={stampHeadRead(ceilingProv(row.ilk, row.ceilingState), readBy)}>
           <Chip>{CEILING_LABEL[row.ceilingState]}</Chip>
         </Prov>
         {row.ceilingState !== "dormant" && row.ceilingState !== "closed" && (
           <div className="mt-0.5 text-[11px] tabular-nums text-rb-500">
-            <Prov info={availableProv(row.ilk, formatExact(row.lineDai), formatExact(row.debtDai))}>
+            <Prov
+              info={stampHeadRead(availableProv(row.ilk, formatExact(row.lineDai), formatExact(row.debtDai)), readBy)}
+            >
               <AmountText value={row.availableDai} format="compact" />
             </Prov>{" "}
             drawable
             {row.maxLineDai != null && (
               <>
                 {" · "}
-                <Prov info={ceilingProv(row.ilk, "auto")} echo>
+                <Prov info={stampHeadRead(ceilingProv(row.ilk, "auto"), readBy)} echo>
                   <span>
                     up to <AmountText value={row.maxLineDai} format="compact" />
                   </span>
@@ -398,7 +413,7 @@ function IlkRow({ row }: { row: MakerIlkRow }) {
       {/* Fee */}
       <div className="text-xs tabular-nums text-foreground">
         {row.stabilityFeeApr != null ? (
-          <Prov info={systemFeeProv(row.ilk)} value={formatExact(row.stabilityFeeApr * 100)}>
+          <Prov info={stampHeadRead(systemFeeProv(row.ilk), readBy)} value={formatExact(row.stabilityFeeApr * 100)}>
             {feePct(row.stabilityFeeApr)}
           </Prov>
         ) : (
@@ -410,7 +425,7 @@ function IlkRow({ row }: { row: MakerIlkRow }) {
       <div>
         <div className="text-xs tabular-nums text-foreground">
           {row.matRatio != null ? (
-            <Prov info={systemMatProv(row.ilk)} value={formatExact(row.matRatio * 100)}>
+            <Prov info={stampHeadRead(systemMatProv(row.ilk), readBy)} value={formatExact(row.matRatio * 100)}>
               {ratio(row.matRatio)}
             </Prov>
           ) : (
@@ -419,7 +434,7 @@ function IlkRow({ row }: { row: MakerIlkRow }) {
         </div>
         {row.chop != null && (
           <div className="mt-0.5 text-[11px] tabular-nums text-rb-500">
-            <Prov info={systemChopProv(row.ilk)} value={formatExact((row.chop - 1) * 100)}>
+            <Prov info={stampHeadRead(systemChopProv(row.ilk), readBy)} value={formatExact((row.chop - 1) * 100)}>
               +{feePct(row.chop - 1)}
             </Prov>{" "}
             penalty
@@ -427,14 +442,17 @@ function IlkRow({ row }: { row: MakerIlkRow }) {
         )}
         {row.auctionStopped != null && row.auctionStopped > 0 && (
           <div className="mt-0.5 text-[11px] text-rb-500">
-            <Prov info={systemAuctionStopProv(row.ilk, row.auctionStopped)} value={String(row.auctionStopped)}>
+            <Prov
+              info={stampHeadRead(systemAuctionStopProv(row.ilk, row.auctionStopped), readBy)}
+              value={String(row.auctionStopped)}
+            >
               auctions off
             </Prov>
           </div>
         )}
         {row.dustDai > 0 && (
           <div className="mt-0.5 text-[11px] tabular-nums text-rb-500">
-            <Prov info={systemDustProv(row.ilk)} value={formatExact(row.dustDai)}>
+            <Prov info={stampHeadRead(systemDustProv(row.ilk), readBy)} value={formatExact(row.dustDai)}>
               <AmountText value={row.dustDai} format="compact" />
             </Prov>{" "}
             floor
@@ -445,7 +463,15 @@ function IlkRow({ row }: { row: MakerIlkRow }) {
   );
 }
 
-function GroupSection({ data, group }: { data: MakerSystemChainResponse; group: MakerIlkGroup }) {
+function GroupSection({
+  data,
+  group,
+  readBy,
+}: {
+  data: MakerSystemChainResponse;
+  group: MakerIlkGroup;
+  readBy?: ServerRead | null;
+}) {
   const meta = GROUP_META[group];
   const total = data.groups.find((g) => g.group === group);
   const rows = useMemo(() => data.ilks.filter((r) => r.group === group), [data.ilks, group]);
@@ -457,13 +483,20 @@ function GroupSection({ data, group }: { data: MakerSystemChainResponse; group: 
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-xs font-semibold text-foreground">{meta.label}</span>
           <span className="text-[11px] tabular-nums text-rb-500">
-            <Prov info={groupTotalProv(meta.label.toLowerCase(), total.ilkCount)} value={formatExact(total.debtDai)}>
+            <Prov
+              info={stampHeadRead(groupTotalProv(meta.label.toLowerCase(), total.ilkCount), readBy)}
+              value={formatExact(total.debtDai)}
+            >
               <AmountText value={total.debtDai} format="compact" /> {DEBT_SYMBOL}
             </Prov>
             {total.share != null && (
               <span className="ml-1.5 text-rb-400">
                 {/* Echo — the composition legend above owns this receipt. */}
-                <Prov info={groupShareProv(meta.label.toLowerCase())} value={formatExact(total.share * 100)} echo>
+                <Prov
+                  info={stampHeadRead(groupShareProv(meta.label.toLowerCase()), readBy)}
+                  value={formatExact(total.share * 100)}
+                  echo
+                >
                   {ratio(total.share)}
                 </Prov>
               </span>
@@ -484,7 +517,7 @@ function GroupSection({ data, group }: { data: MakerSystemChainResponse; group: 
 
       <div className="divide-y divide-rb-200 dark:divide-rb-700">
         {rows.map((r) => (
-          <IlkRow key={r.ilk} row={r} />
+          <IlkRow readBy={readBy} key={r.ilk} row={r} />
         ))}
       </div>
     </div>
@@ -496,6 +529,7 @@ function GroupSection({ data, group }: { data: MakerSystemChainResponse; group: 
 const GROUPS: MakerIlkGroup[] = ["vault", "psm", "allocator", "rwa", "d3m", "delisted"];
 
 export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
+  const readBy = serverReadAt(data.head, data.blockNumber);
   const registry = useReceiptRegistry();
   const [showAll, setShowAll] = useState(false);
 
@@ -521,9 +555,9 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
       <section>
         <h2 className="text-sm font-semibold text-foreground">The system</h2>
         <div className="mt-3 grid gap-3 lg:grid-cols-3">
-          <VatCard data={data} />
-          <ReconcileCard data={data} />
-          <VowCard data={data} />
+          <VatCard readBy={readBy} data={data} />
+          <ReconcileCard readBy={readBy} data={data} />
+          <VowCard readBy={readBy} data={data} />
         </div>
       </section>
 
@@ -538,14 +572,21 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-xs font-semibold text-foreground">
               {data.userVaultShare != null && (
-                <Prov info={userVaultShareProv(vaultIlkCount)} value={formatExact((data.userVaultShare ?? 0) * 100)}>
+                <Prov
+                  info={stampHeadRead(userVaultShareProv(vaultIlkCount), readBy)}
+                  value={formatExact((data.userVaultShare ?? 0) * 100)}
+                >
                   {ratio(data.userVaultShare)}
                 </Prov>
               )}{" "}
               of Maker&apos;s debt is a user&apos;s vault
             </span>
             <span className="text-[11px] tabular-nums text-rb-500">
-              <Prov info={groupTotalProv("vault types", vaultIlkCount)} value={formatExact(data.userVaultDebtDai)} echo>
+              <Prov
+                info={stampHeadRead(groupTotalProv("vault types", vaultIlkCount), readBy)}
+                value={formatExact(data.userVaultDebtDai)}
+                echo
+              >
                 <AmountText value={data.userVaultDebtDai} format="compact" /> {DEBT_SYMBOL}
               </Prov>
             </span>
@@ -569,7 +610,7 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
                 <span className="tabular-nums text-rb-400">
                   {g.share != null ? (
                     <Prov
-                      info={groupShareProv(GROUP_META[g.group].label.toLowerCase())}
+                      info={stampHeadRead(groupShareProv(GROUP_META[g.group].label.toLowerCase()), readBy)}
                       value={formatExact(g.share * 100)}
                     >
                       {ratio(g.share)}
@@ -619,7 +660,7 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
 
         <div className="mt-3 space-y-3">
           {visible.map((g) => (
-            <GroupSection key={g} data={data} group={g} />
+            <GroupSection readBy={readBy} key={g} data={data} group={g} />
           ))}
         </div>
       </section>

@@ -34,6 +34,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { serverReadAt, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { VitalsBand } from "@/components/shared/vitals-band";
 import { Stat } from "@/components/shared/stat";
 import { formatExact, formatNumber, formatTinyNonZero } from "@/lib/utils/format";
@@ -102,23 +103,23 @@ const ageText = (ts: number, blockTs: number): string => {
 
 // ── Pool state ───────────────────────────────────────────────────────────────
 
-function PoolStateCard({ p }: { p: FxPoolSystem }) {
+function PoolStateCard({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | null }) {
   const label = poolLabel(p);
   return (
     <div className="rounded-xl bg-raised px-4 py-3.5">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-semibold text-foreground">The pool&rsquo;s own book</span>
         <span className="text-right text-[11px] text-rb-500">
-          <Prov info={pausedProv("borrow", label, p.address)}>
+          <Prov info={stampServerRead(pausedProv("borrow", label, p.address), readBy)}>
             <span>{p.borrowPaused ? "borrow paused" : "borrow open"}</span>
           </Prov>
           {" · "}
           {p.redeemPaused ? (
-            <Prov info={pausedProv("redeem", label, p.address)}>
+            <Prov info={stampServerRead(pausedProv("redeem", label, p.address), readBy)}>
               <span>redeem paused</span>
             </Prov>
           ) : (
-            <Prov info={redeemGateProv(label, p.address)}>
+            <Prov info={stampServerRead(redeemGateProv(label, p.address), readBy)}>
               <span>
                 {p.redeemAllowed
                   ? "redemption open (fxUSD below its peg)"
@@ -136,14 +137,14 @@ function PoolStateCard({ p }: { p: FxPoolSystem }) {
             <>
               manager book:{" "}
               <Prov
-                info={capacityProv("collateral", label, p.tokenSymbol)}
+                info={stampServerRead(capacityProv("collateral", label, p.tokenSymbol), readBy)}
                 value={formatExact(p.collateralBalanceToken)}
               >
                 <AmountText value={p.collateralBalanceToken} format="compact" />
               </Prov>{" "}
               of{" "}
               <Prov
-                info={capacityProv("collateral", label, p.tokenSymbol)}
+                info={stampServerRead(capacityProv("collateral", label, p.tokenSymbol), readBy)}
                 value={formatExact(p.collateralCapacityToken)}
                 echo
               >
@@ -153,7 +154,10 @@ function PoolStateCard({ p }: { p: FxPoolSystem }) {
             </>
           }
         >
-          <Prov info={poolCollateralProv(label, p.address, p.normalizedSymbol)} value={formatExact(p.totalRawColl)}>
+          <Prov
+            info={stampServerRead(poolCollateralProv(label, p.address, p.normalizedSymbol), readBy)}
+            value={formatExact(p.totalRawColl)}
+          >
             <AmountText value={p.totalRawColl} format="compact" /> {p.normalizedSymbol}
           </Prov>
         </Stat>
@@ -162,19 +166,25 @@ function PoolStateCard({ p }: { p: FxPoolSystem }) {
           note={
             <>
               cap{" "}
-              <Prov info={capacityProv("debt", label, p.tokenSymbol)} value={formatExact(p.debtCapacity)}>
+              <Prov
+                info={stampServerRead(capacityProv("debt", label, p.tokenSymbol), readBy)}
+                value={formatExact(p.debtCapacity)}
+              >
                 <AmountText value={p.debtCapacity} format="compact" />
               </Prov>{" "}
               fxUSD
             </>
           }
         >
-          <Prov info={poolDebtProv(label, p.address)} value={formatExact(p.totalRawDebt)}>
+          <Prov info={stampServerRead(poolDebtProv(label, p.address), readBy)} value={formatExact(p.totalRawDebt)}>
             <AmountText value={p.totalRawDebt} format="compact" /> fxUSD
           </Prov>
         </Stat>
         <Stat label="Positions minted">
-          <Prov info={positionsMintedProv(label, p.address)} value={formatExact(p.positionsMinted)}>
+          <Prov
+            info={stampServerRead(positionsMintedProv(label, p.address), readBy)}
+            value={formatExact(p.positionsMinted)}
+          >
             {p.positionsMinted.toLocaleString("en-US")}
           </Prov>
         </Stat>
@@ -182,7 +192,7 @@ function PoolStateCard({ p }: { p: FxPoolSystem }) {
           label="Tick nodes allocated"
           note="a node records the debt and collateral of one tick's positions; each move of a tick opens a new one"
         >
-          <Prov info={treeNodesProv(label, p.address)} value={formatExact(p.treeNodes)}>
+          <Prov info={stampServerRead(treeNodesProv(label, p.address), readBy)} value={formatExact(p.treeNodes)}>
             {p.treeNodes.toLocaleString("en-US")}
           </Prov>
         </Stat>
@@ -192,7 +202,11 @@ function PoolStateCard({ p }: { p: FxPoolSystem }) {
         Collateral here is counted in the pool&rsquo;s own unit: the deposited token multiplied by its rate to the
         underlying (stETH per wstETH for the wstETH pool). The manager&rsquo;s token-unit line above counts the token as
         deposited. The node count against{" "}
-        <Prov info={occupiedTicksProv(poolLabel(p), p.address)} value={formatExact(p.occupiedTicks)} echo>
+        <Prov
+          info={stampServerRead(occupiedTicksProv(poolLabel(p), p.address), readBy)}
+          value={formatExact(p.occupiedTicks)}
+          echo
+        >
           <span className="tabular-nums text-foreground">{p.occupiedTicks}</span>
         </Prov>{" "}
         live ticks shows how often ticks have been rearranged: every rebalance, tick liquidation and redemption retires
@@ -204,7 +218,7 @@ function PoolStateCard({ p }: { p: FxPoolSystem }) {
 
 // ── Funding ──────────────────────────────────────────────────────────────────
 
-function FundingCard({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
+function FundingCard({ p, blockTs, readBy }: { p: FxPoolSystem; blockTs: number; readBy?: ServerRead | null }) {
   const label = poolLabel(p);
   return (
     <div className="rounded-xl bg-raised px-4 py-3.5">
@@ -212,7 +226,10 @@ function FundingCard({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
         <span className="text-xs font-semibold text-foreground">Funding — the eventless mutation</span>
         <span className="text-[11px] tabular-nums text-rb-500">
           checkpointed{" "}
-          <Prov info={fundingCheckpointProv(label, p.address)} value={String(p.fundingCheckpoint)}>
+          <Prov
+            info={stampServerRead(fundingCheckpointProv(label, p.address), readBy)}
+            value={String(p.fundingCheckpoint)}
+          >
             {ageText(p.fundingCheckpoint, blockTs)} ago
           </Prov>
         </span>
@@ -220,13 +237,16 @@ function FundingCard({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
         <Stat label="Funding rate (annual, on collateral)">
-          <Prov info={fundingRateProv(label, p.address)} value={formatExact(p.fundingRatioAnnual * 100)}>
+          <Prov
+            info={stampServerRead(fundingRateProv(label, p.address), readBy)}
+            value={formatExact(p.fundingRatioAnnual * 100)}
+          >
             {pctOf(p.fundingRatioAnnual, 2)}
           </Prov>
         </Stat>
         <Stat label="Default fees (a router can set its own)">
           <Prov
-            info={defaultFeesProv(label, p.address)}
+            info={stampServerRead(defaultFeesProv(label, p.address), readBy)}
             value={`${formatExact(p.defaultFees.borrow * 100)} / ${formatExact(p.defaultFees.repay * 100)}`}
           >
             {[
@@ -240,7 +260,10 @@ function FundingCard({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
           </Prov>
         </Stat>
         <Stat label="Redemption per-tick cap">
-          <Prov info={maxRedeemProv(label, p.address)} value={formatExact(p.maxRedeemPerTick * 100)}>
+          <Prov
+            info={stampServerRead(maxRedeemProv(label, p.address), readBy)}
+            value={formatExact(p.maxRedeemPerTick * 100)}
+          >
             {pctOf(p.maxRedeemPerTick, 0)}
           </Prov>
         </Stat>
@@ -248,7 +271,10 @@ function FundingCard({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
           label="Debt index (a share owes ×)"
           note={`each debt share owes ${((p.debtIndexMultiplier - 1) * 100).toFixed(2)}% more fxUSD than at the start: other positions' bad debt added so far`}
         >
-          <Prov info={indexProv("debt", label, p.address)} value={formatExact(p.debtIndexMultiplier)}>
+          <Prov
+            info={stampServerRead(indexProv("debt", label, p.address), readBy)}
+            value={formatExact(p.debtIndexMultiplier)}
+          >
             ×{p.debtIndexMultiplier.toFixed(6)}
           </Prov>
         </Stat>
@@ -256,7 +282,10 @@ function FundingCard({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
           label="Collateral index (a share holds ÷)"
           note={`each collateral share holds ${((1 - 1 / p.collIndexMultiplier) * 100).toFixed(1)}% less than at the start: the funding charged so far, with any collateral the manager removed pool-wide`}
         >
-          <Prov info={indexProv("coll", label, p.address)} value={formatExact(p.collIndexMultiplier)}>
+          <Prov
+            info={stampServerRead(indexProv("coll", label, p.address), readBy)}
+            value={formatExact(p.collIndexMultiplier)}
+          >
             ÷{p.collIndexMultiplier.toFixed(6)}
           </Prov>
         </Stat>
@@ -265,7 +294,7 @@ function FundingCard({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
         Two dials, no events. Funding is charged into the <em>collateral</em> index — every position in the pool holds
         less, pro-rata, each time it turns — and write-offs turn the same dials. Both started at exactly ×1.0.{" "}
-        <Prov info={indexIdentityProv(label, p.address, p.indexIdentityExact)}>
+        <Prov info={stampServerRead(indexIdentityProv(label, p.address, p.indexIdentityExact), readBy)}>
           {p.indexIdentityExact ? (
             <span>
               Re-checked on this read: shares × index equals the pool&rsquo;s own raw totals,{" "}
@@ -284,7 +313,7 @@ function FundingCard({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
 
 // ── Oracle & rungs ───────────────────────────────────────────────────────────
 
-function OracleCard({ p }: { p: FxPoolSystem }) {
+function OracleCard({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | null }) {
   const label = poolLabel(p);
   return (
     <div className="rounded-xl bg-raised px-4 py-3.5">
@@ -304,7 +333,7 @@ function OracleCard({ p }: { p: FxPoolSystem }) {
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-rb-500">min — borrowing, rebalancing, liquidation</span>
           <Prov
-            info={oracleLegProv("min", label, p.address, p.oracle, p.normalizedSymbol)}
+            info={stampServerRead(oracleLegProv("min", label, p.address, p.oracle, p.normalizedSymbol), readBy)}
             value={formatExact(p.priceMin)}
           >
             <span className="text-foreground">${formatNumber(p.priceMin)}</span>
@@ -313,7 +342,7 @@ function OracleCard({ p }: { p: FxPoolSystem }) {
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-rb-500">anchor — a position&rsquo;s stated debt ratio</span>
           <Prov
-            info={oracleLegProv("anchor", label, p.address, p.oracle, p.normalizedSymbol)}
+            info={stampServerRead(oracleLegProv("anchor", label, p.address, p.oracle, p.normalizedSymbol), readBy)}
             value={formatExact(p.priceAnchor)}
           >
             <span className="text-foreground">${formatNumber(p.priceAnchor)}</span>
@@ -322,7 +351,7 @@ function OracleCard({ p }: { p: FxPoolSystem }) {
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-rb-500">max — prices redemption</span>
           <Prov
-            info={oracleLegProv("max", label, p.address, p.oracle, p.normalizedSymbol)}
+            info={stampServerRead(oracleLegProv("max", label, p.address, p.oracle, p.normalizedSymbol), readBy)}
             value={formatExact(p.priceMax)}
           >
             <span className="text-foreground">${formatNumber(p.priceMax)}</span>
@@ -343,20 +372,23 @@ function OracleCard({ p }: { p: FxPoolSystem }) {
 
 // ── The reconciliation — the spine ───────────────────────────────────────────
 
-function ReconcileCard({ p }: { p: FxPoolSystem }) {
+function ReconcileCard({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | null }) {
   const label = poolLabel(p);
   return (
     <div className="rounded-xl bg-raised px-4 py-3.5">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-semibold text-foreground">Every debt share accounted for</span>
         <span className="text-[11px] tabular-nums text-rb-500">
-          <Prov info={occupiedTicksProv(label, p.address)} value={formatExact(p.occupiedTicks)}>
+          <Prov
+            info={stampServerRead(occupiedTicksProv(label, p.address), readBy)}
+            value={formatExact(p.occupiedTicks)}
+          >
             {p.occupiedTicks} ticks
           </Prov>
           {p.topTick != null && (
             <>
               {" · top "}
-              <Prov info={topTickProv(label, p.address)} value={formatExact(p.topTick)}>
+              <Prov info={stampServerRead(topTickProv(label, p.address), readBy)} value={formatExact(p.topTick)}>
                 {p.topTick}
               </Prov>
             </>
@@ -371,7 +403,10 @@ function ReconcileCard({ p }: { p: FxPoolSystem }) {
             added up
           </span>
           <Prov
-            info={ladderReconcileProv(label, p.address, p.debtSharesReconcile, p.occupiedTicks)}
+            info={stampServerRead(
+              ladderReconcileProv(label, p.address, p.debtSharesReconcile, p.occupiedTicks),
+              readBy,
+            )}
             value={p.tickDebtSharesSumRaw}
           >
             <span className="break-all text-right text-foreground">{p.tickDebtSharesSumRaw}</span>
@@ -380,7 +415,10 @@ function ReconcileCard({ p }: { p: FxPoolSystem }) {
         <div className="flex items-baseline justify-between gap-2 border-t border-rb-200 pt-1.5 dark:border-rb-700">
           <span className="shrink-0 text-foreground">= the pool&rsquo;s total debt shares</span>
           <Prov
-            info={ladderReconcileProv(label, p.address, p.debtSharesReconcile, p.occupiedTicks)}
+            info={stampServerRead(
+              ladderReconcileProv(label, p.address, p.debtSharesReconcile, p.occupiedTicks),
+              readBy,
+            )}
             value={p.totalDebtSharesRaw}
             echo
           >
@@ -390,7 +428,9 @@ function ReconcileCard({ p }: { p: FxPoolSystem }) {
       </div>
 
       <div className="mt-2.5 text-[11px] leading-relaxed">
-        <Prov info={ladderReconcileProv(label, p.address, p.debtSharesReconcile, p.occupiedTicks)}>
+        <Prov
+          info={stampServerRead(ladderReconcileProv(label, p.address, p.debtSharesReconcile, p.occupiedTicks), readBy)}
+        >
           {p.debtSharesReconcile ? (
             <span className="text-rb-500">
               Reconciles exactly — residual <span className="tabular-nums text-foreground">0</span>, checked in raw
@@ -409,7 +449,7 @@ function ReconcileCard({ p }: { p: FxPoolSystem }) {
       <p className="mt-2 text-[11px] leading-relaxed text-rb-500">
         Collateral reconciles to a named gap:{" "}
         <Prov
-          info={collOutsideLadderProv(label, p.address, p.normalizedSymbol)}
+          info={stampServerRead(collOutsideLadderProv(label, p.address, p.normalizedSymbol), readBy)}
           value={formatExact(p.collOutsideLadder)}
         >
           <span className="tabular-nums text-foreground">
@@ -421,7 +461,10 @@ function ReconcileCard({ p }: { p: FxPoolSystem }) {
           <>
             {" "}
             And{" "}
-            <Prov info={dustTicksProv(label, p.address, p.dustPastLiquidate)} value={formatExact(p.dustTicks)}>
+            <Prov
+              info={stampServerRead(dustTicksProv(label, p.address, p.dustPastLiquidate), readBy)}
+              value={formatExact(p.dustTicks)}
+            >
               <span className="tabular-nums text-foreground">{p.dustTicks}</span>
             </Prov>{" "}
             of the {p.occupiedTicks} ticks hold only dust — under 10⁻⁹ fxUSD, the exact line the protocol&rsquo;s own
@@ -448,7 +491,7 @@ function ReconcileCard({ p }: { p: FxPoolSystem }) {
  *  liquidation line. Heights are on a square-root scale (stated in the
  *  caption) so the small ticks stay visible next to a tick holding a quarter
  *  of the pool; the table below carries every figure exactly. */
-function LadderStrip({ p }: { p: FxPoolSystem }) {
+function LadderStrip({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | null }) {
   const label = poolLabel(p);
   const drawn = p.ticks.filter((t) => !t.dust && t.debtRatio != null);
   const maxDebt = drawn.reduce((m, t) => Math.max(m, t.rawDebt), 0);
@@ -502,27 +545,40 @@ function LadderStrip({ p }: { p: FxPoolSystem }) {
       <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[11px] tabular-nums text-rb-500">
         <span>
           borrow to{" "}
-          <Prov info={rungProv("open", label, p.address)} value={formatExact(p.maxBorrowRatio * 100)}>
+          <Prov
+            info={stampServerRead(rungProv("open", label, p.address), readBy)}
+            value={formatExact(p.maxBorrowRatio * 100)}
+          >
             <span className="text-foreground">{pctOf(p.maxBorrowRatio, 2)}</span>
           </Prov>
         </span>
         <span>
           rebalance a tick from{" "}
-          <Prov info={rungProv("rebalance", label, p.address)} value={formatExact(p.rebalanceRatio * 100)}>
+          <Prov
+            info={stampServerRead(rungProv("rebalance", label, p.address), readBy)}
+            value={formatExact(p.rebalanceRatio * 100)}
+          >
             <span className="text-foreground">{pctOf(p.rebalanceRatio, 0)}</span>
           </Prov>{" "}
           (+{pctOf(p.rebalanceBonus, 1)} bonus)
         </span>
         <span>
           liquidate it from{" "}
-          <Prov info={rungProv("liquidate", label, p.address)} value={formatExact(p.liquidateRatio * 100)}>
+          <Prov
+            info={stampServerRead(rungProv("liquidate", label, p.address), readBy)}
+            value={formatExact(p.liquidateRatio * 100)}
+          >
             <span className="text-foreground">{pctOf(p.liquidateRatio, 0)}</span>
           </Prov>{" "}
           (+{pctOf(p.liquidateBonus, 1)} bonus)
         </span>
         <span>
           redeem ≤{" "}
-          <Prov info={maxRedeemProv(label, p.address)} value={formatExact(p.maxRedeemPerTick * 100)} echo>
+          <Prov
+            info={stampServerRead(maxRedeemProv(label, p.address), readBy)}
+            value={formatExact(p.maxRedeemPerTick * 100)}
+            echo
+          >
             <span className="text-foreground">{pctOf(p.maxRedeemPerTick, 0)}</span>
           </Prov>{" "}
           of a tick per pass, top tick first
@@ -542,7 +598,17 @@ function LadderStrip({ p }: { p: FxPoolSystem }) {
 
 // ── The tick table ───────────────────────────────────────────────────────────
 
-function TickRow({ p, t, mine }: { p: FxPoolSystem; t: FxTickRow; mine?: boolean }) {
+function TickRow({
+  p,
+  t,
+  mine,
+  readBy,
+}: {
+  p: FxPoolSystem;
+  t: FxTickRow;
+  mine?: boolean;
+  readBy?: ServerRead | null;
+}) {
   const label = poolLabel(p);
   return (
     <div
@@ -550,14 +616,17 @@ function TickRow({ p, t, mine }: { p: FxPoolSystem; t: FxTickRow; mine?: boolean
       className={`grid grid-cols-2 gap-x-3 gap-y-1 px-4 py-2 sm:grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)] sm:items-baseline ${mine ? "bg-blue-500/10" : ""}`}
     >
       <div className="text-xs tabular-nums text-foreground">
-        <Prov info={tickIdProv(label, p.address, t.tick)} value={String(t.tick)}>
+        <Prov info={stampServerRead(tickIdProv(label, p.address, t.tick), readBy)} value={String(t.tick)}>
           {t.tick}
         </Prov>
         {mine && <span className="ml-1.5 text-[10px] text-blue-500">the position&rsquo;s tick</span>}
       </div>
       <div className="text-xs tabular-nums">
         {t.debtRatio != null ? (
-          <Prov info={tickRatioProv(label, p.address, t.tick)} value={formatExact(t.debtRatio * 100)}>
+          <Prov
+            info={stampServerRead(tickRatioProv(label, p.address, t.tick), readBy)}
+            value={formatExact(t.debtRatio * 100)}
+          >
             <span className="text-foreground">{pctOf(t.debtRatio, 2)}</span>
           </Prov>
         ) : (
@@ -568,19 +637,25 @@ function TickRow({ p, t, mine }: { p: FxPoolSystem; t: FxTickRow; mine?: boolean
         {t.pastLiquidate && <span className="ml-1.5 text-[10px] text-rb-500">past the liquidation rung</span>}
       </div>
       <div className="text-xs tabular-nums text-foreground">
-        <Prov info={tickDebtProv(label, p.address, t.tick, t.debtSharesRaw)} value={formatExact(t.rawDebt)}>
+        <Prov
+          info={stampServerRead(tickDebtProv(label, p.address, t.tick, t.debtSharesRaw), readBy)}
+          value={formatExact(t.rawDebt)}
+        >
           {t.rawDebt !== 0 && t.rawDebt < 0.01 ? formatTinyNonZero(t.rawDebt) : formatCompact(t.rawDebt)}
         </Prov>{" "}
         <span className="text-rb-500">fxUSD</span>
       </div>
       <div className="text-xs tabular-nums text-rb-500">
-        <Prov info={tickShareProv(label, p.address, t.tick)} value={formatExact(t.shareOfDebt * 100)}>
+        <Prov
+          info={stampServerRead(tickShareProv(label, p.address, t.tick), readBy)}
+          value={formatExact(t.shareOfDebt * 100)}
+        >
           {pctOf(t.shareOfDebt, 2)}
         </Prov>
       </div>
       <div className="text-xs tabular-nums text-rb-500">
         <Prov
-          info={tickCollProv(label, p.address, t.tick, t.collSharesRaw, p.normalizedSymbol)}
+          info={stampServerRead(tickCollProv(label, p.address, t.tick, t.collSharesRaw, p.normalizedSymbol), readBy)}
           value={formatExact(t.rawColl)}
         >
           {amt(t.rawColl)}
@@ -597,7 +672,7 @@ function TickRow({ p, t, mine }: { p: FxPoolSystem; t: FxTickRow; mine?: boolean
  *  the reconciliation above. */
 const SHARE_CUT = 0.001;
 
-function TickTable({ p }: { p: FxPoolSystem }) {
+function TickTable({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | null }) {
   const [showAll, setShowAll] = useState(false);
   // Descending tick order — the top of the ladder first, the end redemption
   // and a pool-wide rebalance sweep bite first.
@@ -649,7 +724,7 @@ function TickTable({ p }: { p: FxPoolSystem }) {
 
       <div className="divide-y divide-rb-200 dark:divide-rb-700">
         {rows.map((t) => (
-          <TickRow key={t.tick} p={p} t={t} mine={t.tick === mine} />
+          <TickRow readBy={readBy} key={t.tick} p={p} t={t} mine={t.tick === mine} />
         ))}
       </div>
     </div>
@@ -658,7 +733,7 @@ function TickTable({ p }: { p: FxPoolSystem }) {
 
 // ── One pool's section ───────────────────────────────────────────────────────
 
-function PoolSection({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
+function PoolSection({ p, blockTs, readBy }: { p: FxPoolSystem; blockTs: number; readBy?: ServerRead | null }) {
   return (
     <section className="mt-8">
       <div className="flex items-baseline gap-2">
@@ -680,23 +755,23 @@ function PoolSection({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
-        <PoolStateCard p={p} />
-        <FundingCard p={p} blockTs={blockTs} />
-        <OracleCard p={p} />
+        <PoolStateCard readBy={readBy} p={p} />
+        <FundingCard readBy={readBy} p={p} blockTs={blockTs} />
+        <OracleCard readBy={readBy} p={p} />
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="rounded-xl bg-raised px-4 py-3.5">
           <span className="text-xs font-semibold text-foreground">The tick ladder</span>
           <div className="mt-3">
-            <LadderStrip p={p} />
+            <LadderStrip readBy={readBy} p={p} />
           </div>
         </div>
-        <ReconcileCard p={p} />
+        <ReconcileCard readBy={readBy} p={p} />
       </div>
 
       <div className="mt-3">
-        <TickTable p={p} />
+        <TickTable readBy={readBy} p={p} />
       </div>
     </section>
   );
@@ -705,6 +780,7 @@ function PoolSection({ p, blockTs }: { p: FxPoolSystem; blockTs: number }) {
 // ── The view ─────────────────────────────────────────────────────────────────
 
 export function FxSystemView({ data }: { data: FxSystemChainResponse }) {
+  const readBy = serverReadAt(data.head, data.blockNumber);
   const registry = useReceiptRegistry();
 
   if (data.chainStale) {
@@ -735,7 +811,7 @@ export function FxSystemView({ data }: { data: FxSystemChainResponse }) {
             slot: "roster",
             label: "Pools registered",
             value: (
-              <Prov info={poolRosterProv()} value={String(data.pools.length)}>
+              <Prov info={stampServerRead(poolRosterProv(), readBy)} value={String(data.pools.length)}>
                 {data.pools.length}
               </Prov>
             ),
@@ -744,7 +820,7 @@ export function FxSystemView({ data }: { data: FxSystemChainResponse }) {
             slot: "sizeOut",
             label: "Debt",
             value: (
-              <Prov info={totalDebtAllPoolsProv()} value={formatExact(data.totalDebtAllPools)}>
+              <Prov info={stampServerRead(totalDebtAllPoolsProv(), readBy)} value={formatExact(data.totalDebtAllPools)}>
                 <AmountText value={data.totalDebtAllPools} format="compact" /> fxUSD
               </Prov>
             ),
@@ -753,7 +829,10 @@ export function FxSystemView({ data }: { data: FxSystemChainResponse }) {
             slot: "population",
             label: "Positions ever minted",
             value: (
-              <Prov info={totalPositionsMintedProv()} value={formatExact(data.totalPositionsMinted)}>
+              <Prov
+                info={stampServerRead(totalPositionsMintedProv(), readBy)}
+                value={formatExact(data.totalPositionsMinted)}
+              >
                 {data.totalPositionsMinted.toLocaleString("en-US")}
               </Prov>
             ),
@@ -766,7 +845,7 @@ export function FxSystemView({ data }: { data: FxSystemChainResponse }) {
       </p>
 
       {data.pools.map((p) => (
-        <PoolSection key={p.key} p={p} blockTs={data.blockTimestamp} />
+        <PoolSection readBy={readBy} key={p.key} p={p} blockTs={data.blockTimestamp} />
       ))}
     </ProvReceiptsScope>
   );

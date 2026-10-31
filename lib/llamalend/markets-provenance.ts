@@ -32,6 +32,7 @@
 // market row (m.controller / m.amm / m.monetaryPolicy).
 
 import type { Provenance } from "@/components/shared/provenance";
+import { stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { LLAMALEND_ADDRESSES, SECONDS_PER_YEAR } from "@/lib/llamalend/asset-catalog";
 
 const LANE = "live LlamaLend reads (/llamalend/markets)";
@@ -40,6 +41,8 @@ const LANE = "live LlamaLend reads (/llamalend/markets)";
  *  three contracts a market's figures come from, its symbols, and the two flags
  *  that decide a figure's unit (crvUSD par) and denominator (utilisation basis). */
 export interface LlamalendMarketCoords {
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  readBy?: ServerRead | null;
   blockNumber?: number;
   /** The Controller address — THE market key; total_debt / n_loans / the
    *  discounts cite it. */
@@ -57,6 +60,13 @@ export interface LlamalendMarketCoords {
    *  ceiling, a lend/V2 market against lender-funded liquidity. */
   utilisationBasis?: "lender deposits" | "crvUSD debt ceiling" | null;
 }
+
+/** A builder's receipt, stamped with the rails-server read its coordinates
+ *  (the last argument) carry. */
+const stamped =
+  <A extends unknown[]>(build: (...a: A) => Provenance) =>
+  (...a: A): Provenance =>
+    stampHeadRead(build(...a), (a[a.length - 1] as LlamalendMarketCoords | undefined)?.readBy);
 
 const pair = (c?: LlamalendMarketCoords): string =>
   c?.collateralSymbol && c?.borrowedSymbol ? `${c.collateralSymbol}/${c.borrowedSymbol}` : "market";
@@ -88,35 +98,39 @@ const recompute = (call: string, c?: LlamalendMarketCoords): Provenance["verify"
 
 /** The market's total debt — Controller.total_debt(), borrowed-token units.
  *  crvUSD markets read it as dollars at par; the others keep their own token. */
-export const llamaDebtProv = (c: LlamalendMarketCoords): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("Controller.total_debt", c),
-  summary: c.borrowedIsCrvusd
-    ? `${pair(c)} debt — the market's own \`total_debt\`${atBlock(c)}, in crvUSD. crvUSD is $-pegged, so this reads as dollars taken AT PAR (~$1, the market's own denomination) — not an oracle conversion. Interest is already in the slot; this is what the Controller records as borrowed.`
-    : `${pair(c)} debt — the market's own \`total_debt\`${atBlock(c)}, in ${c.borrowedSymbol ?? "the borrowed token"}, its own borrowed token. No dollar is asserted: this market does not borrow crvUSD, so the figure stays in its own unit. Interest is already in the slot, read straight from the Controller.`,
-  contract: controllerContract(c),
-  via: `${LANE} · Controller.total_debt @ head`,
-});
+export const llamaDebtProv = stamped(
+  (c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    verify: recompute("Controller.total_debt", c),
+    summary: c.borrowedIsCrvusd
+      ? `${pair(c)} debt — the market's own \`total_debt\`${atBlock(c)}, in crvUSD. crvUSD is $-pegged, so this reads as dollars taken AT PAR (~$1, the market's own denomination) — not an oracle conversion. Interest is already in the slot; this is what the Controller records as borrowed.`
+      : `${pair(c)} debt — the market's own \`total_debt\`${atBlock(c)}, in ${c.borrowedSymbol ?? "the borrowed token"}, its own borrowed token. No dollar is asserted: this market does not borrow crvUSD, so the figure stays in its own unit. Interest is already in the slot, read straight from the Controller.`,
+    contract: controllerContract(c),
+    via: `${LANE} · Controller.total_debt @ head`,
+  }),
+);
 
 // ── market-level: band geometry ──────────────────────────────────────────────
 
 /** Amplification A — the AMM's immutable A(): band density, how gradually
  *  soft-liquidation converts. */
-export const llamaAmplificationProv = (c: LlamalendMarketCoords): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("AMM.A", c),
-  summary: `${pair(c)} amplification A — the market AMM's own \`A()\`${atBlock(c)}: band density, how many bands the LLAMMA packs per price doubling and so how GRADUAL soft-liquidation is. Immutable per market (10…500 on the live roster), read straight from the AMM.`,
-  contract: ammContract(c),
-  via: `${LANE} · AMM.A() @ head`,
-});
+export const llamaAmplificationProv = stamped(
+  (c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    verify: recompute("AMM.A", c),
+    summary: `${pair(c)} amplification A — the market AMM's own \`A()\`${atBlock(c)}: band density, how many bands the LLAMMA packs per price doubling and so how GRADUAL soft-liquidation is. Immutable per market (10…500 on the live roster), read straight from the AMM.`,
+    contract: ammContract(c),
+    via: `${LANE} · AMM.A() @ head`,
+  }),
+);
 
 /** A governance discount — loan_discount sizes borrowing power, liquidation_
  *  discount arms hard liquidation. Both 1e18 fractions on the Controller. */
-export const llamaDiscountProv = (which: "loan" | "liquidation", c: LlamalendMarketCoords): Provenance => {
+export const llamaDiscountProv = stamped((which: "loan" | "liquidation", c: LlamalendMarketCoords): Provenance => {
   const method = which === "loan" ? "loan_discount" : "liquidation_discount";
   const gloss =
     which === "loan"
@@ -131,38 +145,42 @@ export const llamaDiscountProv = (which: "loan" | "liquidation", c: LlamalendMar
     contract: controllerContract(c),
     via: `${LANE} · Controller.${method} @ head`,
   };
-};
+});
 
 // ── market-level: rate ───────────────────────────────────────────────────────
 
 /** Borrow APR — the market's OWN monetary policy rate (per-second, 1e18)
  *  annualized by simple multiplication. */
-export const llamaBorrowRateProv = (c: LlamalendMarketCoords): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `${pair(c)} borrow APR — the market's OWN monetary policy \`rate\`${atBlock(c)} (a per-second rate at 1e18) annualized by simple multiplication (× ${SECONDS_PER_YEAR.toLocaleString("en-US")} seconds/year, the same reading Curve's own UI leads with). Lend-market policies take the controller as argument, mint-market policies take none — whichever the policy answers. The rate the contract itself applies this block.`,
-  contract: policyContract(c),
-  via: `${LANE} · monetary_policy.rate() × seconds/year @ head`,
-});
+export const llamaBorrowRateProv = stamped(
+  (c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain-derived",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    summary: `${pair(c)} borrow APR — the market's OWN monetary policy \`rate\`${atBlock(c)} (a per-second rate at 1e18) annualized by simple multiplication (× ${SECONDS_PER_YEAR.toLocaleString("en-US")} seconds/year, the same reading Curve's own UI leads with). Lend-market policies take the controller as argument, mint-market policies take none — whichever the policy answers. The rate the contract itself applies this block.`,
+    contract: policyContract(c),
+    via: `${LANE} · monetary_policy.rate() × seconds/year @ head`,
+  }),
+);
 
 // ── market-level: activity + utilisation ─────────────────────────────────────
 
 /** Open loans — Controller.n_loans(), the live position counter. */
-export const llamaOpenLoansProv = (c: LlamalendMarketCoords): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("Controller.n_loans", c),
-  summary: `${pair(c)} open loans — the market's own \`n_loans\`${atBlock(c)}: how many positions the Controller currently carries. A live counter slot, read straight.`,
-  contract: controllerContract(c),
-  via: `${LANE} · Controller.n_loans @ head`,
-});
+export const llamaOpenLoansProv = stamped(
+  (c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    verify: recompute("Controller.n_loans", c),
+    summary: `${pair(c)} open loans — the market's own \`n_loans\`${atBlock(c)}: how many positions the Controller currently carries. A live counter slot, read straight.`,
+    contract: controllerContract(c),
+    via: `${LANE} · Controller.n_loans @ head`,
+  }),
+);
 
 /** Utilisation — debt over its own denominator. A mint market meters against the
  *  factory's crvUSD debt ceiling; a lend/V2 market against lender-funded
  *  liquidity (debt + the borrowed token still on the Controller). */
-export const llamaUtilisationProv = (c: LlamalendMarketCoords): Provenance => {
+export const llamaUtilisationProv = stamped((c: LlamalendMarketCoords): Provenance => {
   const ceiling = c.utilisationBasis === "crvUSD debt ceiling";
   return {
     kind: "chain-derived",
@@ -209,41 +227,47 @@ export const llamaUtilisationProv = (c: LlamalendMarketCoords): Provenance => {
           },
         ],
   };
-};
+});
 
 // ── market-level: oracle price ───────────────────────────────────────────────
 
 /** The AMM's own oracle price — price_oracle(), collateral priced in the
  *  borrowed token (the price the LLAMMA converts against). */
-export const llamaPriceOracleProv = (c: LlamalendMarketCoords): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  source: { block: c.blockNumber },
-  verify: recompute("AMM.price_oracle", c),
-  summary: `${pair(c)} oracle price — the market AMM's own \`price_oracle()\`${atBlock(c)} (1e18): the collateral priced in the borrowed token, the price the LLAMMA itself converts collateral against inside its bands. Read straight from the AMM${c.borrowedIsCrvusd ? "; the borrowed token is crvUSD (~$1), so this reads as dollars at par" : `, in ${c.borrowedSymbol ?? "the borrowed token"} — no dollar asserted`}.`,
-  contract: ammContract(c),
-  via: `${LANE} · AMM.price_oracle() @ head`,
-});
+export const llamaPriceOracleProv = stamped(
+  (c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain-derived",
+    pclass: "oracle",
+    source: { block: c.blockNumber },
+    verify: recompute("AMM.price_oracle", c),
+    summary: `${pair(c)} oracle price — the market AMM's own \`price_oracle()\`${atBlock(c)} (1e18): the collateral priced in the borrowed token, the price the LLAMMA itself converts collateral against inside its bands. Read straight from the AMM${c.borrowedIsCrvusd ? "; the borrowed token is crvUSD (~$1), so this reads as dollars at par" : `, in ${c.borrowedSymbol ?? "the borrowed token"} — no dollar asserted`}.`,
+    contract: ammContract(c),
+    via: `${LANE} · AMM.price_oracle() @ head`,
+  }),
+);
 
 // ── roster summary (block-level; no single contract) ─────────────────────────
 
 /** Open loans across the whole roster — Σ of each market's own n_loans. */
-export const llamaSummaryLoansProv = (c: LlamalendMarketCoords): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `Open loans across the roster — Σ over every listed market of its own \`n_loans\`${atBlock(c)}. Each leg a live Controller counter read; the sum is ours.`,
-  via: `${LANE} · Σ Controller.n_loans over the roster @ head`,
-  formula: "Σ n_loans over the roster",
-});
+export const llamaSummaryLoansProv = stamped(
+  (c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain-derived",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    summary: `Open loans across the roster — Σ over every listed market of its own \`n_loans\`${atBlock(c)}. Each leg a live Controller counter read; the sum is ours.`,
+    via: `${LANE} · Σ Controller.n_loans over the roster @ head`,
+    formula: "Σ n_loans over the roster",
+  }),
+);
 
 /** Borrowed on the crvUSD markets — Σ total_debt over ONLY the crvUSD-borrowed
  *  markets, read as dollars at par (the others excluded, never converted). */
-export const llamaSummaryDebtProv = (c: LlamalendMarketCoords): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `Borrowed on the crvUSD markets — Σ \`total_debt\` over ONLY the markets whose borrowed token is crvUSD${atBlock(c)}. crvUSD is $-pegged, so the sum reads as dollars at par (~$1 the unit); the markets that borrow WETH / tBTC / ynETH / CRV are excluded, never converted. Each leg a live Controller read; the sum is ours.`,
-  via: `${LANE} · Σ Controller.total_debt over the crvUSD markets @ head`,
-  formula: "Σ total_debt over the crvUSD markets",
-});
+export const llamaSummaryDebtProv = stamped(
+  (c: LlamalendMarketCoords): Provenance => ({
+    kind: "chain-derived",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    summary: `Borrowed on the crvUSD markets — Σ \`total_debt\` over ONLY the markets whose borrowed token is crvUSD${atBlock(c)}. crvUSD is $-pegged, so the sum reads as dollars at par (~$1 the unit); the markets that borrow WETH / tBTC / ynETH / CRV are excluded, never converted. Each leg a live Controller read; the sum is ours.`,
+    via: `${LANE} · Σ Controller.total_debt over the crvUSD markets @ head`,
+    formula: "Σ total_debt over the crvUSD markets",
+  }),
+);

@@ -44,6 +44,9 @@
 
 import { parseAbi } from "viem";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { FX_ADDRESSES, FX_POOLS, FX_POOL_KEYS, type FxPoolKey } from "@/lib/fx/asset-catalog";
 
 const POOL_ABI = parseAbi([
@@ -195,6 +198,8 @@ export interface FxPoolSystem {
 
 export interface FxSystemChainResponse {
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** The block's own timestamp — the funding-checkpoint ages are read against it. */
   blockTimestamp: number;
   pools: FxPoolSystem[];
@@ -431,6 +436,7 @@ export async function loadFxSystemFromChain(): Promise<FxSystemChainResponse> {
 
     return {
       blockNumber: Number(blockNumber),
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       blockTimestamp: Number(block.timestamp),
       pools,
       // fxUSD is one unit system across pools, so this sum is safe; collateral

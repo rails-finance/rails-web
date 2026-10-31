@@ -35,6 +35,7 @@ import { Stat } from "@/components/shared/stat";
 import { MAPLE_POOL_BY_KEY } from "@/lib/maple/asset-catalog";
 import { mapleExitAssets } from "@/lib/maple/exit-value";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
+import { serverReadAt, stampHeadRead } from "@/lib/shared/server-head-read";
 import { formatCompactTitled } from "@/lib/shared/format-compact";
 
 export function MaplePoolStatsBand({ poolState }: { poolState: Record<string, MaplePoolState> }) {
@@ -60,7 +61,12 @@ export function MaplePoolStatsBand({ poolState }: { poolState: Record<string, Ma
                   <TokenChipIcon symbol={cat.assetSymbol} size={20} filterable={false} />
                   <span className="text-sm font-semibold">{cat.symbol}</span>
                   <span className="ml-auto text-xs tabular-nums text-rb-500">
-                    <Prov info={poolExitRateProv(cat.assetSymbol, cat.symbol, s.blockNumber)}>
+                    <Prov
+                      info={stampHeadRead(
+                        poolExitRateProv(cat.assetSymbol, cat.symbol, s.blockNumber),
+                        serverReadAt(s.head, s.blockNumber),
+                      )}
+                    >
                       <span title={`Exit rate: what one share pays out on withdrawal, read at block ${s.blockNumber}`}>
                         exit {s.exitRate.toFixed(4)} {cat.assetSymbol}
                       </span>
@@ -73,7 +79,12 @@ export function MaplePoolStatsBand({ poolState }: { poolState: Record<string, Ma
                     label="Liquid now"
                     note={pctLiquid != null ? `${pctLiquid.toFixed(1)}% of pool value` : undefined}
                   >
-                    <Prov info={poolCashProv(cat.assetSymbol, s.blockNumber)}>
+                    <Prov
+                      info={stampHeadRead(
+                        poolCashProv(cat.assetSymbol, s.blockNumber),
+                        serverReadAt(s.head, s.blockNumber),
+                      )}
+                    >
                       <span title={cash.title}>{`${cash.display} ${cat.assetSymbol}`}</span>
                     </Prov>
                   </Stat>
@@ -88,7 +99,12 @@ export function MaplePoolStatsBand({ poolState }: { poolState: Record<string, Ma
                       ) : undefined
                     }
                   >
-                    <Prov info={poolLoansAumProv(cat.assetSymbol, s.blockNumber)}>
+                    <Prov
+                      info={stampHeadRead(
+                        poolLoansAumProv(cat.assetSymbol, s.blockNumber),
+                        serverReadAt(s.head, s.blockNumber),
+                      )}
+                    >
                       <span title={loans.title}>{`${loans.display} ${cat.assetSymbol}`}</span>
                     </Prov>
                   </Stat>
@@ -105,14 +121,24 @@ export function MaplePoolStatsBand({ poolState }: { poolState: Record<string, Ma
                         : "empty"
                     }
                   >
-                    <Prov info={poolQueueSharesProv(cat.symbol, s.blockNumber)}>
+                    <Prov
+                      info={stampHeadRead(
+                        poolQueueSharesProv(cat.symbol, s.blockNumber),
+                        serverReadAt(s.head, s.blockNumber),
+                      )}
+                    >
                       <span title={queue.title}>{`${queue.display} ${cat.assetSymbol}`}</span>
                     </Prov>
                   </Stat>
                 </div>
                 {s.unrealizedLosses > 0 && (
                   <div className="mt-2 text-xs text-rb-500">
-                    <Prov info={poolUnrealizedLossesProv(cat.assetSymbol, s.blockNumber)}>
+                    <Prov
+                      info={stampHeadRead(
+                        poolUnrealizedLossesProv(cat.assetSymbol, s.blockNumber),
+                        serverReadAt(s.head, s.blockNumber),
+                      )}
+                    >
                       <span>
                         impairment live: {formatCompactTitled(s.unrealizedLosses).display} {cat.assetSymbol} marked —
                         exits realize it

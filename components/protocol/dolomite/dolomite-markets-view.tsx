@@ -48,6 +48,7 @@ import { ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { shortAddress, DOLOMITE_ADDRESSES, formatDolomitePrice } from "@/lib/dolomite/asset-catalog";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { serverReadAt, type ServerRead } from "@/lib/shared/server-head-read";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { VitalsBand } from "@/components/shared/vitals-band";
 import {
@@ -130,9 +131,19 @@ function UtilMini({ m }: { m: DolomiteMarketRow }) {
 /** One market row — a keyed component (not a `.map` callback) so it can own
  *  its own `useReceiptRegistry()` hook, the same per-row scoping the
  *  Aave-family table uses. */
-function MarketRow({ m, axisMax, block }: { m: DolomiteMarketRow; axisMax: number; block: number }) {
+function MarketRow({
+  m,
+  axisMax,
+  block,
+  readBy,
+}: {
+  m: DolomiteMarketRow;
+  axisMax: number;
+  block: number;
+  readBy?: ServerRead;
+}) {
   const registry = useReceiptRegistry();
-  const coords: DolomiteMarketCoords = { blockNumber: block, marketId: m.marketId, symbol: m.symbol };
+  const coords: DolomiteMarketCoords = { blockNumber: block, marketId: m.marketId, symbol: m.symbol, readBy };
   const priceTitle = m.priceAliasOf
     ? `This market's price equals ${m.priceAliasOf.symbol}'s (market ${m.priceAliasOf.marketId}) to the wei — a 1:1 alias through the shared oracle: live, but not an independent feed.`
     : "The market's own oracle price (DolomiteMargin.getMarketPrice)";
@@ -303,7 +314,8 @@ export function DolomiteMarketsView({ data }: { data: DolomiteMarketsResponse })
   const baseline = 1 + data.risk.marginRatio;
   const axisMax = Math.max(baseline, ...data.markets.map((m) => m.minCollateralization), 1);
   const aliased = data.markets.filter((m) => m.priceAliasOf != null);
-  const summaryCoords: DolomiteMarketCoords = { blockNumber: data.blockNumber };
+  const readBy = serverReadAt(data.head, data.blockNumber);
+  const summaryCoords: DolomiteMarketCoords = { blockNumber: data.blockNumber, readBy };
 
   const sortedMarkets = useMemo(() => {
     const cmp = (a: DolomiteMarketRow, b: DolomiteMarketRow): number => {
@@ -442,7 +454,7 @@ export function DolomiteMarketsView({ data }: { data: DolomiteMarketsResponse })
           </thead>
           <tbody>
             {sortedMarkets.map((m) => (
-              <MarketRow key={m.marketId} m={m} axisMax={axisMax} block={data.blockNumber} />
+              <MarketRow key={m.marketId} m={m} axisMax={axisMax} block={data.blockNumber} readBy={readBy} />
             ))}
           </tbody>
         </table>

@@ -47,6 +47,7 @@ import { mapleExitAssets } from "@/lib/maple/exit-value";
 import { maplePositionContent } from "@/lib/maple/position-content";
 import type { MaplePositionSummary, MaplePoolAmount, MaplePeakAmount } from "@/lib/sources/api/maple-positions";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
+import { serverReadAt, stampHeadRead } from "@/lib/shared/server-head-read";
 import { AmountText, ExactSpan } from "@/components/shared/amount-text";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { MapleMenuRows } from "./maple-menu-rows";
@@ -76,8 +77,16 @@ export interface MaplePositionView {
  *  otherwise. */
 const claimAmount = (p: MaplePoolAmount): number => p.currentValue ?? p.depositedPrincipal;
 
-const claimProv = (p: MaplePoolAmount) =>
-  p.currentValue != null ? positionCurrentValueProv(p.assetSymbol, p.symbol) : positionPrincipalProv(p.assetSymbol);
+const claimProv = (p: MaplePoolAmount, v: MaplePositionView) =>
+  p.currentValue != null
+    ? stampHeadRead(positionCurrentValueProv(p.assetSymbol, p.symbol), poolReadBy(v, p.pool))
+    : positionPrincipalProv(p.assetSymbol);
+
+/** rails-server's read of a pool's state, when it answered every read. */
+const poolReadBy = (v: MaplePositionView, pool: string) => {
+  const s = v.poolState?.[pool];
+  return serverReadAt(s?.head, s?.blockNumber);
+};
 
 /** A pool key's share token (the ERC-4626 pool), the address its icon keys on. */
 const shareAddress = (key: string): string | undefined => MAPLE_POOLS.find((m) => m.key === key)?.pool;
@@ -128,7 +137,7 @@ function ClaimLines({ v }: { v: MaplePositionView }) {
     <div className="flex flex-col gap-1">
       {live.map((p) => (
         <div key={p.pool}>
-          <Prov info={claimProv(p)}>
+          <Prov info={claimProv(p, v)}>
             {/* The tip states the claim in its own token; the shares behind
                 it are a panel row. */}
             <CardAmount
@@ -404,7 +413,12 @@ export function mapleCardSlots({
           {p.currentValue != null && v.poolState?.[p.pool] != null && (
             <>
               {" "}
-              <Prov info={poolExitRateProv(p.assetSymbol, p.symbol, v.poolState[p.pool].blockNumber)}>
+              <Prov
+                info={stampHeadRead(
+                  poolExitRateProv(p.assetSymbol, p.symbol, v.poolState[p.pool].blockNumber),
+                  poolReadBy(v, p.pool),
+                )}
+              >
                 @ <PanelFigure>{v.poolState[p.pool].exitRate.toFixed(4)}</PanelFigure>
               </Prov>
             </>

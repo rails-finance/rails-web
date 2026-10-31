@@ -51,17 +51,19 @@ export function stampServerRead(p: Provenance, readBy?: ServerRead | null): Prov
   };
 }
 
-/** A receipt builder over coordinates that may carry rails-server's read: the
- *  builder's receipt is stamped when its via line speaks of the head or the
- *  block the page pinned, and left alone when it speaks of a census or another
- *  stored block. */
+/** A receipt stamped with rails-server's read when its via line speaks of the
+ *  head or the block the page pinned; left alone when it speaks of a census or
+ *  another stored block. */
+export function stampHeadRead(p: Provenance, readBy?: ServerRead | null): Provenance {
+  return readBy && /@ the pinned block|(?:@|\bat) head\b|eth_blockNumber/.test(p.via ?? "")
+    ? stampServerRead(p, readBy)
+    : p;
+}
+
+/** A receipt builder over coordinates that may carry rails-server's read,
+ *  stamped as `stampHeadRead` stamps. */
 export function withServerRead<C extends { readBy?: ServerRead | null }, R extends unknown[]>(
   build: (c: C, ...rest: R) => Provenance,
 ): (c: C, ...rest: R) => Provenance {
-  return (c, ...rest) => {
-    const p = build(c, ...rest);
-    return c.readBy && /@ the pinned block|(?:@|\bat) head\b|eth_blockNumber/.test(p.via ?? "")
-      ? stampServerRead(p, c.readBy)
-      : p;
-  };
+  return (c, ...rest) => stampHeadRead(build(c, ...rest), c.readBy);
 }

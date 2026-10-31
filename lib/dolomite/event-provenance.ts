@@ -518,48 +518,60 @@ export const positionParProv = (sym: string, side: "supply" | "debt"): Provenanc
 });
 
 /** Oracle USD for a card/tower total — balance × getMarketPrice. `oracle`. */
-export const dolomiteUsdProv = (what: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  summary: `${what} valued in USD from Dolomite's own on-chain oracle — the balance multiplied by the same \`getMarketPrice\` the core's risk engine values accounts with (scale 1e(36 − decimals)). All 21 feeds are live (anti-pin proven: USDC's price is not exactly 1e30); one nuance — wsrUSD reuses srUSD's price to the wei, a shared-oracle alias, live but not independent.`,
-  contract: MARGIN,
-  via: "chain balance × getMarketPrice (eth_call at head)",
-  formula: "balance × oracle price",
-  inputs: [
-    { label: "balance", kind: "chain", pclass: "state", note: "par × current index" },
-    { label: "oracle price", kind: "chain", pclass: "oracle", note: "getMarketPrice — the risk engine's own read" },
-  ],
-});
+export const dolomiteUsdProv = (what: string, readBy?: ServerRead | null): Provenance =>
+  stampServerRead(
+    {
+      kind: "chain-derived",
+      pclass: "oracle",
+      summary: `${what} valued in USD from Dolomite's own on-chain oracle — the balance multiplied by the same \`getMarketPrice\` the core's risk engine values accounts with (scale 1e(36 − decimals)). All 21 feeds are live (anti-pin proven: USDC's price is not exactly 1e30); one nuance — wsrUSD reuses srUSD's price to the wei, a shared-oracle alias, live but not independent.`,
+      contract: MARGIN,
+      via: "chain balance × getMarketPrice (eth_call at head)",
+      formula: "balance × oracle price",
+      inputs: [
+        { label: "balance", kind: "chain", pclass: "state", note: "par × current index" },
+        { label: "oracle price", kind: "chain", pclass: "oracle", note: "getMarketPrice — the risk engine's own read" },
+      ],
+    },
+    readBy,
+  );
 
 /** The live per-second borrow rate on one market, annualized. */
-export const borrowRateProv = (sym?: string): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  verify: {
-    kind: "recompute",
-    text: "Re-run the core's getMarketInterestRate eth_call and multiply by 31,536,000 (seconds per year)",
-  },
-  summary: `The current borrow rate${sym ? ` on the ${sym} market` : ""} — the core's \`getMarketInterestRate\` read at head (a PER-SECOND rate: Dolomite accrues per timestamp, and the index settles on read), annualized by simple multiplication with seconds-per-year. Any live rate figure must come from this read — no stored value is current.`,
-  contract: MARGIN,
-  via: "getMarketInterestRate (eth_call at head) × 31,536,000",
-  formula: "per-second rate × seconds per year",
-  inputs: [{ label: "per-second rate", kind: "chain", pclass: "state", note: "getMarketInterestRate at head" }],
-});
+export const borrowRateProv = (sym?: string, readBy?: ServerRead | null): Provenance =>
+  stampServerRead(
+    {
+      kind: "chain-derived",
+      pclass: "state",
+      verify: {
+        kind: "recompute",
+        text: "Re-run the core's getMarketInterestRate eth_call and multiply by 31,536,000 (seconds per year)",
+      },
+      summary: `The current borrow rate${sym ? ` on the ${sym} market` : ""} — the core's \`getMarketInterestRate\` read at head (a PER-SECOND rate: Dolomite accrues per timestamp, and the index settles on read), annualized by simple multiplication with seconds-per-year. Any live rate figure must come from this read — no stored value is current.`,
+      contract: MARGIN,
+      via: "getMarketInterestRate (eth_call at head) × 31,536,000",
+      formula: "per-second rate × seconds per year",
+      inputs: [{ label: "per-second rate", kind: "chain", pclass: "state", note: "getMarketInterestRate at head" }],
+    },
+    readBy,
+  );
 
 /** Debt-USD-weighted average borrow rate across several borrowed markets. */
-export const avgBorrowRateProv = (): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary:
-    "Debt-weighted average of the markets' current borrow rates — averaged across the markets this account borrows: each market's getMarketInterestRate (per second, annualized by simple multiplication) weighted by that debt's USD value at the core's own getMarketPrice. All legs are chain reads at head.",
-  contract: MARGIN,
-  via: "Σ (rate × debt USD) ÷ Σ debt USD, per borrowed market",
-  formula: "Σ (rate × weight) ÷ Σ weight",
-  inputs: [
-    { label: "rate", kind: "chain", pclass: "state", note: "getMarketInterestRate per market, annualized" },
-    { label: "weight", kind: "chain-derived", pclass: "oracle", note: "debt × getMarketPrice" },
-  ],
-});
+export const avgBorrowRateProv = (readBy?: ServerRead | null): Provenance =>
+  stampServerRead(
+    {
+      kind: "chain-derived",
+      pclass: "state",
+      summary:
+        "Debt-weighted average of the markets' current borrow rates — averaged across the markets this account borrows: each market's getMarketInterestRate (per second, annualized by simple multiplication) weighted by that debt's USD value at the core's own getMarketPrice. All legs are chain reads at head.",
+      contract: MARGIN,
+      via: "Σ (rate × debt USD) ÷ Σ debt USD, per borrowed market",
+      formula: "Σ (rate × weight) ÷ Σ weight",
+      inputs: [
+        { label: "rate", kind: "chain", pclass: "state", note: "getMarketInterestRate per market, annualized" },
+        { label: "weight", kind: "chain-derived", pclass: "oracle", note: "debt × getMarketPrice" },
+      ],
+    },
+    readBy,
+  );
 
 /** A closed/liquidated card's PEAK par for one market lane — the maximum
  *  over the account's own emitted newPar absolutes on that lane. */

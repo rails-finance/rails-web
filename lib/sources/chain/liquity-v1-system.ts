@@ -31,6 +31,9 @@
 import { parseAbi, getAddress } from "viem";
 import { alchemyClient } from "./rpc";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { LIQUITY_V1_ADDRESSES, LIQUITY_V1_MCR, LIQUITY_V1_CCR } from "@/lib/liquity-v1/asset-catalog";
 
 const TROVE_MANAGER = getAddress(LIQUITY_V1_ADDRESSES.TROVE_MANAGER);
@@ -89,6 +92,8 @@ export interface LiquityV1QueueEntry {
 
 export interface LiquityV1SystemChainResponse {
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** The protocol's own ETH:USD price (fetchPrice simulated at head). */
   price: number;
   /** True when the simulation reverted and the lagging lastGoodPrice is shown. */
@@ -249,6 +254,7 @@ export async function loadLiquityV1SystemFromChain(): Promise<LiquityV1SystemCha
 
     return {
       blockNumber,
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       price,
       priceStale,
       systemColl: Number(systemColl) / E18,

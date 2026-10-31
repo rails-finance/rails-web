@@ -252,6 +252,7 @@ export function frankencoinSheet({
           "challengedAmount()",
           `${sym} in a challenge auction now: the position's challengedAmount() at the latest block, with the length of each of the challenge's two phases.`,
           ctx.position,
+          terms?.readBy,
         ),
         value: String(challenged),
       },
@@ -271,6 +272,7 @@ export function frankencoinSheet({
             "annualInterestPPM()",
             "The position's yearly interest rate at the latest block: annualInterestPPM(), parts per million ÷ 10,000 for a percent. Each mint pays the rate in force at its block.",
             ctx.position,
+            terms?.readBy,
           );
   const limits: SheetStat[] = [
     {
@@ -285,6 +287,7 @@ export function frankencoinSheet({
                 "expiration()",
                 "When the position expires: its expiration() at the latest block, which is fixed for the life of the position. After it, anyone can buy the collateral in a forced sale.",
                 ctx.position,
+                terms?.readBy,
               ),
               value: String(expiration),
             }
@@ -315,6 +318,7 @@ export function frankencoinSheet({
                 "reserveContribution()",
                 "The share of each mint held back in the system reserve: the position's reserveContribution() at the latest block, parts per million. Repaying returns it.",
                 ctx.position,
+                terms?.readBy,
               ),
               value: String(reserve),
             }
@@ -332,6 +336,7 @@ export function frankencoinSheet({
                 "challengePeriod()",
                 "The length of each of a challenge's two phases: the position's challengePeriod() at the latest block, in seconds.",
                 ctx.position,
+                terms?.readBy,
               ),
               value: groupExact(String(period)),
             }

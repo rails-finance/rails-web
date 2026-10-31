@@ -25,8 +25,8 @@
 // 'liquidated' names only a CLOSED account that was liquidated), and
 // `everLiquidated` is the orthogonal flag on open survivors too.
 
+import { serverReadAt, type ServerRead } from "@/lib/shared/server-head-read";
 import { resolveDolomiteMarketState, type DolomiteMarketStateMap } from "@/lib/sources/chain/dolomite-markets";
-import type { ServerRead } from "@/lib/shared/server-head-read";
 import { accountLabel, isDolomiteBalanceNumber } from "@/lib/dolomite/asset-catalog";
 
 export type DolomitePositionStatus = "open" | "closed" | "liquidated";
@@ -96,6 +96,8 @@ export interface DolomitePositionSummary {
   priceByMarket: Record<string, number>;
   /** Live APRs per market id (percent). */
   ratesByMarket: Record<string, { borrowAprPct: number | null; supplyAprPct: number | null }>;
+  /** rails-server's read of the prices and rates, when it answered every read. */
+  marketReadBy?: ServerRead;
 }
 
 /** One lifetime-peak line (per market lane's own MAX |par|, replayed). */
@@ -185,8 +187,12 @@ function statusOf(s: string): DolomitePositionStatus {
 export async function buildDolomitePositionRows(raw: RawDolomiteAccountRow[]): Promise<DolomitePositionSummary[]> {
   // ONE O(markets) multicall covers every row: par is exact from the index,
   // and current wei needs only each market's index (+ price + rates).
-  const { state } =
-    raw.length > 0 ? await resolveDolomiteMarketState() : { state: new Map() as DolomiteMarketStateMap };
+  const market =
+    raw.length > 0
+      ? await resolveDolomiteMarketState()
+      : { state: new Map() as DolomiteMarketStateMap, blockNumber: 0, head: undefined };
+  const { state } = market;
+  const marketReadBy = serverReadAt(market.head, market.blockNumber || null);
 
   const priceByMarket: Record<string, number> = {};
   const ratesByMarket: DolomitePositionSummary["ratesByMarket"] = {};
@@ -283,6 +289,7 @@ export async function buildDolomitePositionRows(raw: RawDolomiteAccountRow[]): P
       txCount: a.txCount,
       priceByMarket,
       ratesByMarket,
+      marketReadBy,
     };
   });
 }

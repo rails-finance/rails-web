@@ -46,6 +46,9 @@
 
 import { parseAbi, getAddress, stringToHex } from "viem";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { readPriceCap, type MakerPriceCap } from "./makerdao-lse-oracle";
 import {
   MAKER_ADDRESSES,
@@ -189,6 +192,8 @@ export interface MakerGroupTotal {
 
 export interface MakerSystemChainResponse {
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
 
   /** Vat.debt — every DAI in existence, rad → DAI. */
   debtDai: number;
@@ -467,6 +472,7 @@ export async function loadMakerSystemFromChain(): Promise<MakerSystemChainRespon
 
     return {
       blockNumber,
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       debtDai: debtDaiTotal,
       lineDai: lineDaiTotal,
       globalFill: lineDaiTotal > 0 ? debtDaiTotal / lineDaiTotal : null,
