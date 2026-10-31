@@ -128,7 +128,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly" as const,
       priority: 0.8,
     })),
-    ...LAUNCHED_PROTOCOLS.map((entry) => ({
+    // An explorer with no position listing redirects its route to its first
+    // sub-page, which is listed below; a redirect is no page to crawl.
+    ...LAUNCHED_PROTOCOLS.filter((entry) => entry.positionListing !== false).map((entry) => ({
       url: `${SITE_URL}${entry.href}`,
       lastModified: DEPLOYED_AT,
       changeFrequency: "daily" as const,
@@ -154,8 +156,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     })),
     // Each explorer's /info page — the intro prose, derived off `infoHref` the
-    // same way.
-    ...LAUNCHED_PROTOCOLS.map((entry) => ({
+    // same way. An explorer with no position listing redirects it too.
+    ...LAUNCHED_PROTOCOLS.filter((entry) => entry.positionListing !== false).map((entry) => ({
       url: `${SITE_URL}${entry.infoHref}`,
       lastModified: DEPLOYED_AT,
       changeFrequency: "monthly" as const,
