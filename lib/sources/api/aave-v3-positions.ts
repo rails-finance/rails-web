@@ -19,7 +19,7 @@ import { resolveV3Tokens, scaleV3 } from "@/lib/sources/chain/aave-v3-tokens";
 import { resolveAaveOraclePrices, aaveOraclePriceOf } from "@/lib/sources/chain/aave-oracle-prices";
 import { sanityCheckAaveBalances } from "@/lib/sources/chain/aave-family-balances";
 import { readAaveV3NotCollateral } from "@/lib/sources/chain/aave-v3-position";
-import { AAVE_V3_ORACLE, POOL_BY_MARKET, AAVE_V3_POOL } from "@/lib/aave-v3/asset-catalog";
+import { AAVE_V3_ORACLE, ORACLE_BY_MARKET, POOL_BY_MARKET, AAVE_V3_POOL } from "@/lib/aave-v3/asset-catalog";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
 /** Which Aave-shaped deployment a page slice belongs to. The default is
@@ -32,8 +32,16 @@ export interface AaveV3ListingDeployment {
   /** One Pool for every row (a single-market deployment). Ethereum leaves it
    *  unset and resolves the Pool per row's market. */
   pool?: string;
+  /** market → the IAaveOracle that market's Pool prices through, where the
+   *  deployment's markets each keep one (Ethereum's Core, Prime and EtherFi).
+   *  A market it does not name prices through `oracle`. */
+  oracleByMarket?: Record<string, string>;
 }
-const ETHEREUM_DEPLOYMENT: AaveV3ListingDeployment = { chainId: MAINNET_CHAIN_ID, oracle: AAVE_V3_ORACLE };
+const ETHEREUM_DEPLOYMENT: AaveV3ListingDeployment = {
+  chainId: MAINNET_CHAIN_ID,
+  oracle: AAVE_V3_ORACLE,
+  oracleByMarket: ORACLE_BY_MARKET,
+};
 import type { AaveV3PositionRow, AaveV3ReserveSummary } from "@/lib/api/fetch-aave-v3-positions";
 
 /** One open (wallet, reserve) balance pair as returned by the rails route. */
@@ -131,8 +139,20 @@ export async function buildAaveV3PositionRows(
   // Each open account's collateral split, read live from its Pool by the
   // position page's rule, so the row's Collateral is the card's.
   const poolOf = (market: string) => deployment.pool ?? POOL_BY_MARKET[market] ?? AAVE_V3_POOL;
+  const oracleOf = (market: string) => deployment.oracleByMarket?.[market] ?? deployment.oracle;
+  // Each row's reserves are priced by its market's oracle: one request per oracle.
+  const assetsByOracle = new Map<string, Set<string>>();
+  for (const w of raw) {
+    const o = oracleOf(w.market ?? "core");
+    const set = assetsByOracle.get(o) ?? assetsByOracle.set(o, new Set()).get(o)!;
+    for (const r of w.reserves) set.add(r.reserve.toLowerCase());
+    for (const r of w.peakReserves ?? []) set.add(r.reserve.toLowerCase());
+  }
   const [oraclePrices, notCollateral] = await Promise.all([
-    resolveAaveOraclePrices([{ oracle: deployment.oracle, assets: [...allAddrs] }], deployment.chainId),
+    resolveAaveOraclePrices(
+      [...assetsByOracle].map(([oracle, assets]) => ({ oracle, assets: [...assets] })),
+      deployment.chainId,
+    ),
     readAaveV3NotCollateral(
       raw.map((w) => ({
         wallet: w.wallet,
@@ -160,9 +180,9 @@ export async function buildAaveV3PositionRows(
     ),
   );
 
-  const priceOf = (addr: string) => aaveOraclePriceOf(oraclePrices, deployment.oracle, addr);
-
   return raw.map((w) => {
+    const oracle = oracleOf(w.market ?? "core");
+    const priceOf = (addr: string) => aaveOraclePriceOf(oraclePrices, oracle, addr);
     const split = notCollateral.get(`${poolOf(w.market ?? "core").toLowerCase()}:${w.wallet.toLowerCase()}`);
     const reserves: (AaveV3ReserveSummary & { _scaled: number })[] = [];
     const supplies: Candidate[] = [];
@@ -293,7 +313,7 @@ export async function buildAaveV3PositionRows(
       // peak rows stay token-only — PeakStack never looks prices up).
       priceByAddress: Object.fromEntries(
         [...cleanReserves, ...cleanPeakReserves]
-          .map((r) => [r.address.toLowerCase(), aaveOraclePriceOf(oraclePrices, deployment.oracle, r.address)] as const)
+          .map((r) => [r.address.toLowerCase(), priceOf(r.address)] as const)
           .filter((e): e is readonly [string, number] => e[1] != null),
       ),
       ...(split ? { notCollateral: [...split] } : {}),

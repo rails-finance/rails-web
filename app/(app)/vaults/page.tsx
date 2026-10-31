@@ -9,6 +9,7 @@
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { VaultIndexView } from "@/components/vaults/vault-index-view";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { loadVaultIndex } from "@/lib/vaults/index-read";
 import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
 import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
@@ -24,13 +25,14 @@ export const metadata = {
 };
 
 export default async function VaultIndexPage() {
-  const { vaults, yields, rosters } = await loadVaultIndex();
+  const { vaults, yields, rosters, indexDown } = await loadVaultIndex();
   return (
     <div className="min-h-screen">
       <div className="py-8">
         <header className="mb-6" data-skel-section="page-header">
           <h1 className="text-2xl font-semibold text-foreground">Vaults</h1>
         </header>
+        {indexDown && <IndexNotice chainFilled={vaults.length > 0} className="mb-4 text-sm text-rb-500" />}
         <div data-roster-panel data-vault-index>
           <VaultIndexView vaults={vaults} yields={yields} rosters={rosters} />
         </div>

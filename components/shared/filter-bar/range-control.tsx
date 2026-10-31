@@ -84,7 +84,7 @@ const THUMB =
   "[&:focus-visible::-webkit-slider-thumb]:ring-2 [&:focus-visible::-webkit-slider-thumb]:ring-blue-500 [&:focus-visible::-moz-range-thumb]:ring-2 [&:focus-visible::-moz-range-thumb]:ring-blue-500";
 const SLIDER = `absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none focus:outline-none [&::-moz-range-track]:bg-transparent ${THUMB}`;
 const INPUT =
-  "w-full h-7 px-2 rounded-md text-xs tabular-nums bg-transparent border border-rb-300 dark:border-rb-700 text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
+  "w-full h-7 px-2 rounded-md text-base sm:text-xs tabular-nums bg-transparent border border-rb-300 dark:border-rb-700 text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 interface RangeControlProps<F> {
   dim: FilterDimension<F>;

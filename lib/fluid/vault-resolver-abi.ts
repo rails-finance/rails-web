@@ -1263,3 +1263,24 @@ export const FLUID_VAULT_RESOLVER_ABI = [
     type: "function",
   },
 ] as const;
+
+// The per-vault pair to getVaultsEntireData: the roster, and one vault's
+// VaultEntireData (the same struct as an element of the whole-roster array).
+// Read per vault so one vault that reverts does not take the roster with it.
+const vaultsEntireData = FLUID_VAULT_RESOLVER_ABI.find((f) => f.name === "getVaultsEntireData")!;
+export const FLUID_VAULT_RESOLVER_ROSTER_ABI = [
+  {
+    inputs: [],
+    name: "getAllVaultsAddresses",
+    outputs: [{ internalType: "address[]", name: "vaults_", type: "address[]" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "vault_", type: "address" }],
+    name: "getVaultEntireData",
+    outputs: [{ ...vaultsEntireData.outputs[0], type: "tuple", internalType: "struct Structs.VaultEntireData", name: "vaultData_" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
