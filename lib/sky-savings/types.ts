@@ -18,8 +18,9 @@ export interface SkyAsOf {
   ssr: string;
   /** The ssr annualised, as a decimal string ("0.036000"). */
   ssrAnnual: string;
-  /** The stored chi and rho at the block. Not on the wire: the page reads them
-   *  from the contract (lib/sources/chain/sky-savings-drip.ts). */
+  /** The stored chi and rho at the block. Not on the wire: the page asks
+   *  rails-server's at-block store, else the contract
+   *  (lib/sources/chain/sky-savings-drip.ts). */
   drip?: SkyDrip | null;
 }
 
@@ -27,6 +28,8 @@ export interface SkyAsOf {
 export interface SkyDrip {
   chi: string;
   rho: number;
+  /** Who read them: rails-server's at-block store, or this page on the chain. */
+  readBy?: "rails-server" | "chain";
 }
 
 /** The latest verifier run. A surface states no figure unless `ok` is true. */

@@ -7,7 +7,7 @@ import type { Provenance } from "@/components/shared/provenance";
 import type { SkySavingsEventType } from "@/lib/shared/types/event-shape";
 import { explorerUrl } from "@/lib/shared/chains";
 import { LITE_PSM, SKY_CHAIN_ID, SUSDS, USDS_PSM_WRAPPER } from "@/lib/sky-savings/constants";
-import type { SkyAsOf } from "@/lib/sky-savings/types";
+import type { SkyAsOf, SkyDrip } from "@/lib/sky-savings/types";
 
 const SUSDS_CONTRACT = { name: "sUSDS (Savings USDS)", address: SUSDS.address };
 const LEDGER = "Rails index · sky-savings ledger, sealed at the page's block";
@@ -82,6 +82,12 @@ export const earnedProv = (
 
 const utc = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 19).replace("T", " ") + " UTC";
 
+/** Where a drip operand was read: rails-server's at-block store or the page's chain read. */
+const dripRead = (fn: "chi" | "rho", block: number, drip: SkyDrip): string =>
+  drip.readBy === "rails-server"
+    ? `sUSDS.${fn}() @ block ${n(block)}, read once by rails-server and kept in its at-block store (GET /api/at-block/sky-savings/drip)`
+    : `sUSDS.${fn}() @ block ${n(block)}, read from the chain by this page`;
+
 /** The share price at the sealed block. With the drip state read there, the
  *  receipt carries every operand of the contract's convertToAssets. */
 export const chiProv = (asOf: SkyAsOf): Provenance => {
@@ -95,9 +101,19 @@ export const chiProv = (asOf: SkyAsOf): Provenance => {
     formula: traced ? "rpow(ssr, t − rho) × chi ÷ 10^27" : undefined,
     inputs: traced
       ? [
-          { label: "chi at the last Drip (27 decimals)", value: drip.chi, kind: "chain" },
+          {
+            label: "chi at the last Drip (27 decimals)",
+            value: drip.chi,
+            note: dripRead("chi", block, drip),
+            kind: "chain",
+          },
           { label: "ssr (per second, 27 decimals)", value: asOf.ssr, kind: "chain" },
-          { label: "rho, the time of the last Drip", value: String(drip.rho), note: utc(drip.rho), kind: "chain" },
+          {
+            label: "rho, the time of the last Drip",
+            value: String(drip.rho),
+            note: `${utc(drip.rho)} · ${dripRead("rho", block, drip)}`,
+            kind: "chain",
+          },
           { label: "t, this block's time", value: String(timestamp), note: utc(timestamp), kind: "chain" },
           {
             label: "rpow",
