@@ -84,25 +84,6 @@ export function LifetimeFlowsSkeleton({ compact = false }: { compact?: boolean }
       </div>
     );
   return (
-    <div
-      className="mt-2 grid animate-pulse grid-cols-2 items-end gap-x-5 gap-y-6 md:grid-cols-3"
-      aria-hidden
-      data-flows-skeleton="compact"
-    >
-      <div className="col-span-2 self-start md:col-span-1">
-        <div className={`${BLOCK} mb-1.5 h-7 w-32`} />
-        <div className={`${BLOCK} h-8`} />
-        <div className={`${BLOCK} mb-1.5 mt-4 h-7 w-28`} />
-        <div className={`${BLOCK} h-8`} />
-      </div>
-      <div className={`${BLOCK} h-20 opacity-60`} />
-      <div>
-        <div className={`${BLOCK} mb-2 h-5 w-40`} />
-        <div className={`${BLOCK} h-20 opacity-60`} />
-      </div>
-    </div>
-  );
-  return (
     <div className="mt-2 animate-pulse" aria-hidden data-flows-skeleton="">
       {/* Headlines, and the date at the row's right end (it wraps under them
           on a phone). */}
