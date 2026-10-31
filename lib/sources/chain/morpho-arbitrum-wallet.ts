@@ -11,12 +11,13 @@
 //
 // SERVER-ONLY.
 
-import { getAddress, parseAbi } from "viem";
+import { getAddress, parseAbi, type PublicClient } from "viem";
 import { chainClient } from "./rpc";
 import { loadMorphoPositionFromChain } from "./morpho-position";
 import { MORPHO_ARBITRUM_DEPLOYMENT } from "./morpho-deployments";
 import type { MorphoWalletChainResponse } from "@/lib/api/fetch-morpho-wallet";
 import { AAVE_V3_ARBITRUM_ORACLE } from "@/lib/aave-v3-arbitrum/asset-catalog";
+import { withServerHead } from "@/lib/sources/api/lender-position-head";
 
 const BLUE_ABI = parseAbi([
   "function position(bytes32 id, address user) view returns (uint256 supplyShares, uint128 borrowShares, uint128 collateral)",
@@ -63,6 +64,9 @@ async function pooled<T, R>(items: T[], limit: number, work: (item: T) => Promis
 export async function loadMorphoArbitrumWallet(
   walletRaw: string,
   extraMarketIds: readonly string[] = [],
+  /** The client the reads go through (a replay of rails-server's answer, or
+   *  one pinned to a block); none asks rails-server first, then the chain. */
+  reader?: PublicClient,
 ): Promise<MorphoWalletChainResponse> {
   const deployment = MORPHO_ARBITRUM_DEPLOYMENT;
   let wallet: `0x${string}`;
@@ -75,8 +79,17 @@ export async function loadMorphoArbitrumWallet(
     (id) => MARKET_ID.test(id),
   );
 
+  // At the head, rails-server's read first (lib/sources/api/lender-position-head.ts),
+  // over the same ids.
+  if (!reader) {
+    const got = await withServerHead({ kind: "morpho-wallet", deployment: "arbitrum", wallet, ids }, (client) =>
+      loadMorphoArbitrumWallet(walletRaw, extraMarketIds, client),
+    ).catch(() => null);
+    if (got) return { ...got.answer, head: got.head };
+  }
+
   try {
-    const client = chainClient(deployment.chainId);
+    const client = reader ?? chainClient(deployment.chainId);
     const blue = deployment.blue as `0x${string}`;
     const blockNumber = await client.getBlockNumber();
     const slots = (await client.multicall({
@@ -102,8 +115,8 @@ export async function loadMorphoArbitrumWallet(
     // The keyless gateway refuses a burst now and then; a market whose full
     // read failed is asked once more before the answer counts as stale.
     const detailed = await pooled(held.slice(0, MAX_DETAILED), DETAIL_CONCURRENCY, async (id) => {
-      const first = await loadMorphoPositionFromChain(id, wallet, deployment, blockNumber);
-      return first.chainStale ? loadMorphoPositionFromChain(id, wallet, deployment, blockNumber) : first;
+      const first = await loadMorphoPositionFromChain(id, wallet, deployment, blockNumber, reader);
+      return first.chainStale ? loadMorphoPositionFromChain(id, wallet, deployment, blockNumber, reader) : first;
     });
     // A held market whose full read failed is a read we do not have: the
     // whole answer is stale rather than quietly short.
@@ -132,7 +145,7 @@ export async function loadMorphoArbitrumWallet(
 /** Dollars per whole token from the Aave V3 Arbitrum oracle at `blockNumber`,
  *  for the tokens it prices; a token it does not list reverts and is left out. */
 export async function loanUsdAt(
-  client: ReturnType<typeof chainClient>,
+  client: PublicClient,
   tokens: string[],
   blockNumber: bigint,
 ): Promise<Record<string, number>> {

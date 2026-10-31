@@ -19,6 +19,7 @@ import {
   FrankencoinSystemView,
   FrankencoinSystemStamp,
 } from "@/components/protocol/frankencoin/frankencoin-system-view";
+import { frankencoinModal } from "@/lib/frankencoin/event-templates";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadFrankencoinSystemFromChain } from "@/lib/sources/chain/frankencoin-system";
 import { loadFrankencoinBook } from "@/lib/sources/api/frankencoin-system-book";
@@ -49,7 +50,12 @@ export default async function FrankencoinSystemPage() {
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader protocol={PROTOCOL} title="System & equity" stamp={<FrankencoinSystemStamp data={data} />} />
+        <SubPageHeader
+          protocol={PROTOCOL}
+          title="System & equity"
+          learnMore={frankencoinModal("book")}
+          stamp={<FrankencoinSystemStamp data={data} />}
+        />
 
         <FrankencoinSystemView data={data} book={book} />
         <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
