@@ -18,7 +18,7 @@
 // dolomite-markets, dolomite-position|owner|account, maker-system,
 // maker-vault|id, lv1-system, lv1-position|wallet, llamalend-markets,
 // llamalend-state, llamalend-position|controller|user, frankencoin-system,
-// frankencoin-position|position, maple-pools, llamalend-rows|offset,
+// frankencoin-position|position, maple-pools, maple-custody|holder, llamalend-rows|offset,
 // fluid-vaults, fluid-position|nft, and the vault readers (`vaultHeadClient`):
 // aave-vault|vault[|holder], yearn-vault|vault[|holder],
 // morpho-vault|vault[|holder] and morpho-exposure|holder on Base,
@@ -47,6 +47,7 @@ import { loadLlamalendPositionFromChain } from "@/lib/sources/chain/llamalend-po
 import { loadFrankencoinSystemFromChain } from "@/lib/sources/chain/frankencoin-system";
 import { loadFrankencoinPositionFromChain } from "@/lib/sources/chain/frankencoin-position";
 import { resolveMaplePoolState } from "@/lib/sources/chain/maple-pool-state";
+import { resolveMapleCustodyHoldings } from "@/lib/sources/chain/maple-custody";
 import { loadFluidVaultsFromChain } from "@/lib/sources/chain/fluid-vaults";
 import { loadFluidPositionFromChain } from "@/lib/sources/chain/fluid-position";
 import { buildLlamalendPositionRows, type RawLlamalendPositionRow } from "@/lib/sources/api/llamalend-positions";
@@ -82,6 +83,7 @@ const LOADERS: Record<string, (a: string[]) => Promise<unknown>> = {
   "frankencoin-system": () => loadFrankencoinSystemFromChain(),
   "frankencoin-position": ([p]) => loadFrankencoinPositionFromChain(p),
   "maple-pools": () => resolveMaplePoolState(),
+  "maple-custody": ([holder]) => resolveMapleCustodyHoldings(holder),
   "fluid-vaults": () => loadFluidVaultsFromChain(),
   "fluid-position": ([nft]) => loadFluidPositionFromChain(nft),
   // The listing's live overlay over one page of open rows (offset in the argument).

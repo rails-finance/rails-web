@@ -20,7 +20,7 @@ import {
   type PositionPanelRow,
 } from "@/components/shared/position-card";
 import { AssetAmount } from "@/components/shared/asset-amount";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { formatUnitsExact } from "@/lib/utils/format";
 import {
@@ -34,7 +34,12 @@ import type { MapleCustodyHolding } from "@/lib/sources/chain/maple-custody";
 import { AmountText, ExactSpan } from "@/components/shared/amount-text";
 import { MapleMenuRows } from "./maple-menu-rows";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { serverReadAt, stampHeadRead } from "@/lib/shared/server-head-read";
 import { PanelFigure } from "@/components/shared/position-card-panel";
+
+/** A custody receipt, stamped with rails-server's read when it answered. */
+const stamped = (h: MapleCustodyHolding, p: Provenance): Provenance =>
+  stampHeadRead(p, serverReadAt(h.head, h.blockNumber));
 
 /** The first headline: what the locked shares redeem for, in the pool's own
  *  asset, or shares alone when the value derivation degraded. */
@@ -46,8 +51,8 @@ function CustodyLines({ holdings }: { holdings: MapleCustodyHolding[] }) {
           <Prov
             info={
               h.exitValue != null
-                ? custodyValueProv(h.assetSymbol, h.symbol, h.blockNumber)
-                : custodySharesProv(h.symbol, h.blockNumber)
+                ? stamped(h, custodyValueProv(h.assetSymbol, h.symbol, h.blockNumber))
+                : stamped(h, custodySharesProv(h.symbol, h.blockNumber))
             }
           >
             <AssetAmount
@@ -68,7 +73,7 @@ function SupplyShareLines({ holdings }: { holdings: MapleCustodyHolding[] }) {
     <div className="flex flex-col gap-1">
       {holdings.map((h) => (
         <div key={h.pool}>
-          <Prov info={custodySupplyShareProv(h.symbol, h.blockNumber)}>
+          <Prov info={stamped(h, custodySupplyShareProv(h.symbol, h.blockNumber))}>
             <span data-prov-exact={`${((h.supplyShare ?? 0) * 100).toFixed(4)}% of ${h.symbol} supply`}>
               {((h.supplyShare ?? 0) * 100).toFixed(2)}%
             </span>
@@ -164,7 +169,7 @@ export function MapleCustodyCard({
     label: `${h.symbol} locked`,
     value: (
       <span className="tabular-nums">
-        <Prov info={custodySharesProv(h.symbol, h.blockNumber)}>
+        <Prov info={stamped(h, custodySharesProv(h.symbol, h.blockNumber))}>
           <ExactSpan exact={`${formatUnitsExact(h.raw.shares, 6)} ${h.symbol}`} symbol={h.symbol}>
             <PanelFigure>{formatCompact(h.shares)}</PanelFigure> {h.symbol}
           </ExactSpan>
@@ -172,7 +177,7 @@ export function MapleCustodyCard({
         {h.exitValue != null && (
           <>
             {" "}
-            <Prov info={poolExitRateProv(h.assetSymbol, h.symbol, h.blockNumber)}>
+            <Prov info={stamped(h, poolExitRateProv(h.assetSymbol, h.symbol, h.blockNumber))}>
               @ <PanelFigure>{h.exitRate.toFixed(4)}</PanelFigure>
             </Prov>
           </>
