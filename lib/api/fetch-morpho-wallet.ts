@@ -12,6 +12,7 @@
 // states no USD anywhere, so neither does this.
 
 import type { MorphoChainPositionResponse } from "./fetch-morpho-position";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 
 export interface MorphoWalletChainResponse {
   wallet: string;
@@ -28,6 +29,9 @@ export interface MorphoWalletChainResponse {
   positionsFound: number;
   positions: MorphoChainPositionResponse[];
   chainStale: boolean;
+  /** Where rails-server read it at the head (/api/at-block/…): the block's
+   *  time, when it read it, the leg that answered. Absent on a web chain read. */
+  head?: PositionHeadStamp;
   /** Dollars per whole loan token, keyed on the lowercase loan token, for the
    *  held markets whose loan token a USD oracle prices at `blockNumber`.
    *  Arbitrum only (the Aave V3 Arbitrum oracle, lib/morpho-arbitrum/usd.ts);

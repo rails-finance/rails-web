@@ -20,7 +20,7 @@
 //
 // SERVER-ONLY — imported from /api/chain/* route handlers only.
 
-import { getAddress, parseAbi } from "viem";
+import { getAddress, parseAbi, type PublicClient } from "viem";
 import { chainClient } from "./rpc";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import type { MoonwellDeployment, MoonwellRosterMarket } from "@/lib/moonwell/asset-catalog";
@@ -52,6 +52,9 @@ const cache = new Map<string, { at: number; roster: MoonwellRoster }>();
 export async function resolveMoonwellRoster(
   deployment: MoonwellDeployment,
   now: number = Date.now(),
+  /** The client the roster is read through where none is cached (a replay of
+   *  rails-server's answer, or one pinned to a block). */
+  reader?: PublicClient,
 ): Promise<MoonwellRoster | null> {
   if (deployment.fixed) return deployment.fixed;
 
@@ -60,7 +63,7 @@ export async function resolveMoonwellRoster(
   if (hit && now - hit.at < TTL_MS) return hit.roster;
 
   try {
-    const client = chainClient(deployment.chainId);
+    const client = reader ?? chainClient(deployment.chainId);
     const comptroller = deployment.comptroller as `0x${string}`;
     const [mTokens, oracle] = await Promise.all([
       client.readContract({ address: comptroller, abi: COMPTROLLER_ABI, functionName: "getAllMarkets" }),

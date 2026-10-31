@@ -19,11 +19,13 @@
 //
 // SERVER-ONLY.
 
-import { parseAbi, getAddress, type ContractFunctionParameters } from "viem";
+import { parseAbi, getAddress, type ContractFunctionParameters, type PublicClient } from "viem";
 import { chainClient } from "./rpc";
 import { resolveMoonwellRoster } from "./moonwell-roster";
 import { MOONWELL_DEPLOYMENT, MTOKEN_DECIMALS, type MoonwellDeployment } from "@/lib/moonwell/asset-catalog";
 import type { MoonwellChainMarket, MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
+import { withServerHead } from "@/lib/sources/api/lender-position-head";
+import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 const COMPTROLLER_ABI = parseAbi([
   "function getAssetsIn(address account) view returns (address[])",
@@ -73,13 +75,26 @@ function stub(wallet: string): MoonwellChainResponse {
 export async function loadMoonwellPositionFromChain(
   walletRaw: string,
   deployment: MoonwellDeployment = MOONWELL_DEPLOYMENT,
+  /** The client the reads go through (a replay of rails-server's answer, or
+   *  one pinned to a block); none asks rails-server first, then the chain. */
+  reader?: PublicClient,
 ): Promise<MoonwellChainResponse> {
+  // At the head, rails-server's read first (lib/sources/api/lender-position-head.ts).
+  const serverDeployment =
+    deployment.chainId === MAINNET_CHAIN_ID ? "ethereum" : deployment.chainId === BASE_CHAIN_ID ? "base" : null;
+  if (!reader && serverDeployment) {
+    const got = await withServerHead(
+      { kind: "compound", family: "moonwell", deployment: serverDeployment, wallet: walletRaw },
+      (client) => loadMoonwellPositionFromChain(walletRaw, deployment, client),
+    ).catch(() => null);
+    if (got) return { ...got.answer, head: got.head };
+  }
   const wallet = getAddress(walletRaw);
   try {
-    const roster = await resolveMoonwellRoster(deployment);
+    const roster = await resolveMoonwellRoster(deployment, Date.now(), reader);
     if (!roster) return stub(wallet.toLowerCase());
 
-    const client = chainClient(deployment.chainId);
+    const client = reader ?? chainClient(deployment.chainId);
     const comptroller = deployment.comptroller as `0x${string}`;
     const atC = (functionName: string, args: readonly unknown[] = []): ContractFunctionParameters =>
       ({ address: comptroller, abi: COMPTROLLER_ABI, functionName, args }) as ContractFunctionParameters;

@@ -19,10 +19,11 @@
 //
 // SERVER-ONLY.
 
-import { parseAbi, getAddress, type ContractFunctionParameters } from "viem";
+import { parseAbi, getAddress, type ContractFunctionParameters, type PublicClient } from "viem";
 import { alchemyClient } from "./rpc";
 import { COMPOUND_V2_MARKETS, COMPOUND_V2_ADDRESSES, CTOKEN_DECIMALS } from "@/lib/compound-v2/asset-catalog";
 import type { CompoundV2ChainMarket, CompoundV2ChainResponse } from "@/lib/api/fetch-compound-v2-position";
+import { withServerHead } from "@/lib/sources/api/lender-position-head";
 
 const COMPTROLLER_ABI = parseAbi([
   "function getAssetsIn(address account) view returns (address[])",
@@ -76,10 +77,23 @@ function stub(wallet: string): CompoundV2ChainResponse {
  * `chainStale` stub on RPC failure so the caller falls back to its
  * event-derived numbers (the risk surfaces just stay off).
  */
-export async function loadCompoundV2PositionFromChain(walletRaw: string): Promise<CompoundV2ChainResponse> {
+export async function loadCompoundV2PositionFromChain(
+  walletRaw: string,
+  /** The client the reads go through (a replay of rails-server's answer, or
+   *  one pinned to a block); none asks rails-server first, then the chain. */
+  reader?: PublicClient,
+): Promise<CompoundV2ChainResponse> {
+  // At the head, rails-server's read first (lib/sources/api/lender-position-head.ts).
+  if (!reader) {
+    const got = await withServerHead(
+      { kind: "compound", family: "compound-v2", deployment: "ethereum", wallet: walletRaw },
+      (client) => loadCompoundV2PositionFromChain(walletRaw, client),
+    ).catch(() => null);
+    if (got) return { ...got.answer, head: got.head };
+  }
   const wallet = getAddress(walletRaw);
   try {
-    const client = alchemyClient();
+    const client = reader ?? alchemyClient();
     const comptroller = COMPOUND_V2_ADDRESSES.COMPTROLLER as `0x${string}`;
     const atC = (functionName: string, args: readonly unknown[] = []): ContractFunctionParameters =>
       ({ address: comptroller, abi: COMPTROLLER_ABI, functionName, args }) as ContractFunctionParameters;
