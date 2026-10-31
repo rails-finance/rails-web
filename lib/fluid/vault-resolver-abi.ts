@@ -1279,7 +1279,14 @@ export const FLUID_VAULT_RESOLVER_ROSTER_ABI = [
   {
     inputs: [{ internalType: "address", name: "vault_", type: "address" }],
     name: "getVaultEntireData",
-    outputs: [{ ...vaultsEntireData.outputs[0], type: "tuple", internalType: "struct Structs.VaultEntireData", name: "vaultData_" }],
+    outputs: [
+      {
+        ...vaultsEntireData.outputs[0],
+        type: "tuple",
+        internalType: "struct Structs.VaultEntireData",
+        name: "vaultData_",
+      },
+    ],
     stateMutability: "view",
     type: "function",
   },
