@@ -23,12 +23,21 @@
 //
 // SERVER-ONLY.
 
-import { parseAbi, getAddress, type ContractFunctionParameters } from "viem";
+import { parseAbi, getAddress, type ContractFunctionParameters, type PublicClient } from "viem";
 import { chainClient } from "./rpc";
 import { COMPOUND_DEPLOYMENT, type CometDeployment, type CometMarket } from "@/lib/compound/asset-catalog";
 import { resolveErc20Meta } from "./erc20-meta";
 import type { CompoundChainCollateral, CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
 import type { CompoundWalletChainResponse } from "@/lib/api/fetch-compound-wallet";
+import { withServerHead } from "@/lib/sources/api/lender-position-head";
+import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+
+/** rails-server's name for a Comet deployment, by chain. */
+const SERVER_DEPLOYMENT: Record<number, string> = {
+  [MAINNET_CHAIN_ID]: "ethereum",
+  [BASE_CHAIN_ID]: "base",
+  [ARBITRUM_CHAIN_ID]: "arbitrum",
+};
 
 const COMET_ABI = parseAbi([
   "function baseTokenPriceFeed() view returns (address)",
@@ -106,8 +115,9 @@ async function loadCompoundPositions(
   markets: CometMarket[],
   deployment: CometDeployment,
   pinnedBlock?: number,
+  reader?: PublicClient,
 ): Promise<{ blockNumber: number; positions: CompoundMarketChainResponse[] }> {
-  const client = chainClient(deployment.chainId);
+  const client = reader ?? chainClient(deployment.chainId);
   // Heterogeneous multicalls: type the entries as the generic viem contract
   // parameters (the per-call return types are asserted at the result casts).
   const at = (comet: string, functionName: string, args: readonly unknown[] = []): ContractFunctionParameters =>
@@ -287,8 +297,9 @@ async function loadStatedRosterPositions(
   wallet: `0x${string}`,
   deployment: CometDeployment,
   pinnedBlock?: number,
+  reader?: PublicClient,
 ): Promise<{ blockNumber: number; positions: CompoundMarketChainResponse[]; ethUsd: number | null }> {
-  const client = chainClient(deployment.chainId);
+  const client = reader ?? chainClient(deployment.chainId);
   const at = (comet: string, functionName: string, args: readonly unknown[] = []): ContractFunctionParameters =>
     ({ address: comet as `0x${string}`, abi: COMET_ABI, functionName, args }) as ContractFunctionParameters;
   const blockNumber = pinnedBlock ?? Number(await client.getBlockNumber());
@@ -339,7 +350,9 @@ async function loadStatedRosterPositions(
     );
   }
   const generic =
-    drifted.length > 0 ? await loadCompoundPositions(wallet, drifted, deployment, blockNumber) : { positions: [] };
+    drifted.length > 0
+      ? await loadCompoundPositions(wallet, drifted, deployment, blockNumber, reader)
+      : { positions: [] };
 
   const utilization = reads.map((r) => r[7] as bigint);
   const rates = (await retryOnce(() =>
@@ -441,7 +454,18 @@ export async function loadCompoundPositionFromChain(
   walletRaw: string,
   marketKey: string,
   deployment: CometDeployment = COMPOUND_DEPLOYMENT,
+  /** The client the reads go through (a replay of rails-server's answer, or
+   *  one pinned to a block); none asks rails-server first, then the chain. */
+  reader?: PublicClient,
 ): Promise<CompoundMarketChainResponse> {
+  // At the head, rails-server's read first (lib/sources/api/lender-position-head.ts).
+  if (!reader && SERVER_DEPLOYMENT[deployment.chainId]) {
+    const got = await withServerHead(
+      { kind: "compound", family: "compound-v3", deployment: SERVER_DEPLOYMENT[deployment.chainId], wallet: walletRaw },
+      (client) => loadCompoundPositionFromChain(walletRaw, marketKey, deployment, client),
+    ).catch(() => null);
+    if (got) return { ...got.answer, head: got.head };
+  }
   const wallet = getAddress(walletRaw);
   const m = deployment.markets.find((x) => x.key === marketKey);
   // An unknown slug is a market this deployment has never heard of. Answer with
@@ -449,7 +473,7 @@ export async function loadCompoundPositionFromChain(
   if (!m) return stub(wallet.toLowerCase(), { ...deployment.markets[0], key: marketKey });
 
   try {
-    const { positions } = await loadCompoundPositions(wallet, [m], deployment);
+    const { positions } = await loadCompoundPositions(wallet, [m], deployment, undefined, reader);
     return positions[0];
   } catch {
     return stub(wallet.toLowerCase(), m);
@@ -471,16 +495,27 @@ export async function loadCompoundWalletFromChain(
   opts: {
     /** Read at this block instead of the head (taken first, as always). */
     blockNumber?: number;
+    /** The client the reads go through (a replay of rails-server's answer, or
+     *  one pinned to a block); with neither this nor a block, rails-server is
+     *  asked first, then the chain. */
+    reader?: PublicClient;
   } = {},
 ): Promise<CompoundWalletChainResponse> {
+  if (!opts.reader && opts.blockNumber == null && SERVER_DEPLOYMENT[deployment.chainId]) {
+    const got = await withServerHead(
+      { kind: "compound", family: "compound-v3", deployment: SERVER_DEPLOYMENT[deployment.chainId], wallet: walletRaw },
+      (client) => loadCompoundWalletFromChain(walletRaw, deployment, { reader: client }),
+    ).catch(() => null);
+    if (got) return { ...got.answer, head: got.head };
+  }
   const wallet = getAddress(walletRaw);
   const marketsScanned = deployment.markets.length;
   try {
     const stated = statedRoster(deployment)
-      ? await loadStatedRosterPositions(wallet, deployment, opts.blockNumber)
+      ? await loadStatedRosterPositions(wallet, deployment, opts.blockNumber, opts.reader)
       : null;
     const { blockNumber, positions } =
-      stated ?? (await loadCompoundPositions(wallet, deployment.markets, deployment, opts.blockNumber));
+      stated ?? (await loadCompoundPositions(wallet, deployment.markets, deployment, opts.blockNumber, opts.reader));
     // "Holds something" is any of the three ways a Comet account can be
     // non-empty: lent base, borrowed base, or collateral parked against it.
     // The third stands alone — collateral with no debt is a real position, and

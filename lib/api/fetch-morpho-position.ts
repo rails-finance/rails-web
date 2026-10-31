@@ -13,6 +13,8 @@
 // Every derived value is in LOAN-TOKEN units — a Morpho oracle quotes the
 // collateral asset in loan-asset terms (1e36-scaled), never USD.
 
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+
 /** One feed behind a Morpho oracle's price, read at the position's block. */
 export interface MorphoOracleFeed {
   /** The oracle getter that names it. */
@@ -105,6 +107,9 @@ export interface MorphoChainPositionResponse {
 
   /** True when the RPC read failed — values are a stub; risk surfaces stay off. */
   chainStale: boolean;
+  /** Where rails-server read it at the head (/api/at-block/…): the block's
+   *  time, when it read it, the leg that answered. Absent on a web chain read. */
+  head?: PositionHeadStamp;
 }
 
 export async function fetchMorphoPosition(p: {

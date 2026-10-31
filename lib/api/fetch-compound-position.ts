@@ -31,6 +31,8 @@
 //
 // Balances are TEXT to preserve integer precision; scale by `decimals`.
 
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+
 export interface CompoundChainCollateral {
   /** Underlying token address, lowercase. */
   address: string;
@@ -87,6 +89,9 @@ export interface CompoundMarketChainResponse {
   baseBorrowMin: number;
   /** True when the chain RPC read failed and we returned an empty stub. */
   chainStale: boolean;
+  /** Where rails-server read it at the head (/api/at-block/…): the block's
+   *  time, when it read it, the leg that answered. Absent on a web chain read. */
+  head?: PositionHeadStamp;
 }
 
 export interface FetchCompoundPositionParams {

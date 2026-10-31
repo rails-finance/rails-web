@@ -25,12 +25,14 @@
 //
 // SERVER-ONLY.
 
-import { getAddress, parseAbi } from "viem";
+import { getAddress, parseAbi, type PublicClient } from "viem";
 import { chainClient } from "./rpc";
 import { loadMorphoPositionFromChain } from "./morpho-position";
 import type { MorphoDeployment } from "./morpho-deployments";
 import { withIndexedRoster } from "./morpho-roster";
 import type { MorphoWalletChainResponse } from "@/lib/api/fetch-morpho-wallet";
+import { withServerHead } from "@/lib/sources/api/lender-position-head";
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 
 const BLUE_ABI = parseAbi([
   "function position(bytes32 id, address user) view returns (uint256 supplyShares, uint128 borrowShares, uint128 collateral)",
@@ -92,7 +94,18 @@ async function pooled<T, R>(items: T[], limit: number, work: (item: T) => Promis
 export async function loadMorphoWalletFromChain(
   walletRaw: string,
   censused: MorphoDeployment,
+  /** The client the reads go through (a replay of rails-server's answer, or
+   *  one pinned to a block); none asks rails-server first on Base, then the chain. */
+  reader?: PublicClient,
 ): Promise<MorphoWalletChainResponse> {
+  // At the head on Base, rails-server's read first (lib/sources/api/lender-position-head.ts):
+  // it sweeps the index's whole roster, which holds the census and its tail.
+  if (!reader && censused.chainId === BASE_CHAIN_ID) {
+    const got = await withServerHead({ kind: "morpho-wallet", deployment: "base", wallet: walletRaw }, (client) =>
+      loadMorphoWalletFromChain(walletRaw, censused, client),
+    ).catch(() => null);
+    if (got) return { ...got.answer, head: got.head };
+  }
   // The census plus every market the index has seen created since it, so a
   // position in a market newer than the census is found too.
   const deployment = await withIndexedRoster(censused);
@@ -104,7 +117,7 @@ export async function loadMorphoWalletFromChain(
   }
 
   try {
-    const client = chainClient(deployment.chainId);
+    const client = reader ?? chainClient(deployment.chainId);
     const blue = deployment.blue as `0x${string}`;
     const markets = deployment.markets;
 
@@ -142,7 +155,7 @@ export async function loadMorphoWalletFromChain(
     });
 
     const detailed = await pooled(held.slice(0, MAX_DETAILED), DETAIL_CONCURRENCY, (m) =>
-      loadMorphoPositionFromChain(m.id, wallet, deployment),
+      loadMorphoPositionFromChain(m.id, wallet, deployment, undefined, reader),
     );
 
     // Largest live debt first, then largest collateral — a lender with supply
