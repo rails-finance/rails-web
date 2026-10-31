@@ -70,7 +70,7 @@
 
 import { unstable_cache } from "next/cache";
 import { parseAbi, type ContractFunctionParameters } from "viem";
-import { chainBatchClient } from "./rpc";
+import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
 import { resolveErc20Meta } from "./erc20-meta";
 import type { RawAmount } from "./morpho-base-vault";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -201,7 +201,7 @@ const SGHO = AAVE_ETHEREUM_BOOK_VAULTS.find((v) => v.family === "sgho")!.address
 
 async function readDirectory(): Promise<AaveEthereumVaultDirectoryResponse> {
   try {
-    const client = chainBatchClient(MAINNET_CHAIN_ID);
+    const client = vaultHeadClient(MAINNET_CHAIN_ID);
     // ONE block read; the roster and every figure below are pinned to it.
     const blockNumber = await client.getBlockNumber();
 

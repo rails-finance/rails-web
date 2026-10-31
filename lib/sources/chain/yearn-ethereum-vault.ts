@@ -27,7 +27,7 @@
 // as the MetaMorpho vault page is.
 
 import { parseAbi, type ContractFunctionParameters } from "viem";
-import { chainBatchClient } from "./rpc";
+import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
 import { erc20NameOf, resolveErc20Meta } from "./erc20-meta";
 import type { RawAmount } from "./morpho-base-vault";
 import { YEARN_REGISTRY } from "@/lib/yearn/vault-catalog";
@@ -216,7 +216,7 @@ export async function loadYearnEthereumVault(address: string, holder?: string): 
   } satisfies YearnVaultResponse["vault"];
 
   try {
-    const client = chainBatchClient(YEARN_CHAIN_ID);
+    const client = vaultHeadClient(YEARN_CHAIN_ID);
     // ONE block read; every call below is pinned to it. Beside it, the share
     // token's symbol and decimals, and its name where that was read, through
     // resolveErc20Meta (the api's token_meta first, the chain for what it

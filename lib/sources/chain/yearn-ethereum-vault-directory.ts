@@ -43,7 +43,7 @@
 
 import { unstable_cache } from "next/cache";
 import { parseAbi } from "viem";
-import { chainBatchClient } from "./rpc";
+import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
 import type { RawAmount } from "./morpho-base-vault";
 import { YEARN_REGISTRY } from "@/lib/yearn/vault-catalog";
 import { loadYearnVaultRoster, type YearnVaultRoster } from "@/lib/yearn/vault-roster";
@@ -152,7 +152,7 @@ async function readDirectory(): Promise<YearnVaultDirectoryResponse> {
   const served = await loadYearnVaultRoster();
   const roster = served.vaults;
   try {
-    const client = chainBatchClient(YEARN_CHAIN_ID);
+    const client = vaultHeadClient(YEARN_CHAIN_ID);
     // ONE block read; every call below is pinned to it.
     const blockNumber = await client.getBlockNumber();
 
