@@ -105,7 +105,7 @@ export function OptionSearchInput({ value, onChange, autoFocus, onEscape }: Opti
         }}
         placeholder="Filter options"
         aria-label="Filter options"
-        className="w-full h-7 px-2 rounded-md text-xs bg-transparent border border-rb-300 dark:border-rb-700 text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="w-full h-7 px-2 rounded-md text-base sm:text-xs bg-transparent border border-rb-300 dark:border-rb-700 text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
     </div>
   );
