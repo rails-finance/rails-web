@@ -13,8 +13,9 @@
 
 import { parseAbi, getAddress } from "viem";
 import { alchemyClient } from "./rpc";
-import { TOKEN_ADDR } from "@/lib/aave/prices";
-import type { AaveV4SpokeChainReserve, AaveV4SpokePositionChainResponse } from "@/lib/api/fetch-aave-v4-spoke-position";
+import type { AaveV4SpokePositionChainResponse } from "@/lib/api/fetch-aave-v4-spoke-position";
+import { serverAaveV4SpokePositionAt } from "@/lib/sources/api/aave-v4-at-block";
+import { HUB_KEY_BY_ADDR, settleSpokePosition, type TouchedReserveRead } from "./aave-v4-settle";
 
 // Spoke key → { display name, contract address }. Mirrors rails-server-onboarding
 // api/src/config/aave-v4-spokes.ts SPOKE_BY_KEY. Treasury has no deployed
@@ -35,14 +36,7 @@ export const SPOKES: Record<string, { name: string; address: `0x${string}` }> = 
   usdg_pendle: { name: "Stablecoin Correlated", address: "0x956d8e0a89cfa3744428c4641b5a53b56167a7f9" },
 };
 
-// Hub contract (lowercased) → the hub key the server sends on each reserve.
-// Addresses from rails-server-onboarding sieve/sieve.toml AaveV4Hub_*.
-export const HUB_KEY_BY_ADDR: Record<string, string> = {
-  "0xcca852bc40e560adc3b1cc58ca5b55638ce826c9": "core",
-  "0x06002e9c4412cb7814a791ea3666d905871e536a": "plus",
-  "0x943827dca022d0f354a8a8c332da1e5eb9f9f931": "prime",
-  "0x62d63197660c080236193ca60b70e49a08e90368": "paxos",
-};
+export { HUB_KEY_BY_ADDR };
 
 const SPOKE_ABI = parseAbi([
   "function getUserAccountData(address user) view returns (uint256 riskPremium, uint256 avgCollateralFactor, uint256 healthFactor, uint256 totalCollateralValue, uint256 totalDebtValueRay, uint256 activeCollateralCount, uint256 borrowCount)",
@@ -54,19 +48,6 @@ const SPOKE_ABI = parseAbi([
   "function getUserReserveStatus(uint256 id, address user) view returns (bool isCollateral, bool hasBorrow)",
   "function getUserPosition(uint256 id, address user) view returns ((uint120 drawnShares, uint120 premiumShares, int200 premiumOffsetRay, uint120 suppliedShares, uint32 dynamicConfigKey))",
 ]);
-
-// address (lowercased) → display symbol, reversed from the app's TOKEN_ADDR map.
-const SYMBOL_BY_ADDR: Record<string, string> = Object.fromEntries(
-  Object.entries(TOKEN_ADDR).map(([sym, addr]) => [addr.toLowerCase(), sym]),
-);
-
-// Per-reserve collateralFactor is basis points (8300 = 83%); the response wants
-// a 0..1 liquidation threshold.
-const BPS = 10_000;
-
-// getUserAccountData returns type(uint256).max for healthFactor when the user
-// has no debt; the response expresses that as null.
-const UINT_MAX = (BigInt(1) << BigInt(256)) - BigInt(1);
 
 function stub(wallet: string, spokeKey: string, name: string): AaveV4SpokePositionChainResponse {
   return {
@@ -84,14 +65,29 @@ function stub(wallet: string, spokeKey: string, name: string): AaveV4SpokePositi
   };
 }
 
-/** Read a wallet's live position on one spoke straight from chain. Returns a
+/** Read a wallet's position on one spoke from the spoke contract. Returns a
  *  `chainStale` stub for an unknown spoke so the page falls back to its
  *  event-derived numbers (same contract as a failed rails-server overlay).
  *
- *  `atBlock` pins every read to the dump's freeze block T so this overlay
- *  reconciles with the frozen DB / getLogs lanes (the verification toggle reads
- *  one instant). Omit it to read the live tip. */
+ *  `atBlock` reads the end of that block: from rails-server's at-block store
+ *  first (lib/sources/api/aave-v4-at-block.ts), the chain when it cannot
+ *  answer. Omit it to read the live tip from the chain. */
 export async function loadAaveV4SpokePositionFromChain(
+  walletRaw: string,
+  spokeKey: string,
+  atBlock?: number,
+): Promise<AaveV4SpokePositionChainResponse> {
+  const spoke = SPOKES[spokeKey];
+  if (!spoke) return stub(walletRaw, spokeKey, spokeKey);
+  if (atBlock != null) {
+    const served = await serverAaveV4SpokePositionAt(walletRaw, spokeKey, spoke.name, spoke.address, atBlock);
+    if (served) return served;
+  }
+  return readSpokePositionFromChain(walletRaw, spokeKey, atBlock);
+}
+
+/** The chain path: the same reads through Alchemy, `atBlock` pinning them. */
+export async function readSpokePositionFromChain(
   walletRaw: string,
   spokeKey: string,
   atBlock?: number,
@@ -112,7 +108,6 @@ export async function loadAaveV4SpokePositionFromChain(
     client.readContract({ address, abi: SPOKE_ABI, functionName: "getUserAccountData", args: [wallet], ...blockOpt }),
     client.readContract({ address, abi: SPOKE_ABI, functionName: "getReserveCount", ...blockOpt }),
   ]);
-  const [riskPremium, avgCollateralFactor, healthFactor, , , , borrowCount] = account as readonly bigint[];
   const count = Number(reserveCount);
 
   // Phase 1 — per-reserve metadata + this user's balances, batched via multicall.
@@ -128,38 +123,24 @@ export async function loadAaveV4SpokePositionFromChain(
     ]),
   })) as unknown[];
 
-  const reserves: AaveV4SpokeChainReserve[] = [];
-  let supplyAssetCount = 0;
-  let debtAssetCount = 0;
-  // Reserves this user touches, to batch their LT reads in phase 2.
-  const ltTargets: { reserveId: number; idx: number }[] = [];
-
+  // Reserves this user touches, to batch their factor reads in phase 2.
+  const touched: Omit<TouchedReserveRead, "collateralFactor">[] = [];
   for (let i = 0; i < count; i++) {
     const r = meta[i * 4] as { underlying: string; hub: string; decimals: bigint };
     const supplied = meta[i * 4 + 1] as bigint;
     const debt = meta[i * 4 + 2] as bigint;
     const status = meta[i * 4 + 3] as readonly [boolean, boolean];
     if (supplied === BigInt(0) && debt === BigInt(0) && !status[0]) continue;
-
-    const addr = r.underlying.toLowerCase();
-    const symbol = SYMBOL_BY_ADDR[addr] ?? `${r.underlying.slice(0, 6)}…${r.underlying.slice(-4)}`;
-    const hasBorrow = status[1] || debt > BigInt(0);
-    if (supplied > BigInt(0)) supplyAssetCount++;
-    if (hasBorrow) debtAssetCount++;
-
-    reserves.push({
+    touched.push({
       reserveId: i,
-      address: addr,
-      symbol,
-      decimals: Number(r.decimals),
-      supplyBalanceRaw: supplied.toString(),
-      debtBalanceRaw: debt.toString(),
+      underlying: r.underlying,
+      hub: r.hub,
+      decimals: r.decimals,
+      supplied,
+      debt,
       isCollateral: status[0],
-      hasBorrow,
-      lt: null, // filled in phase 2
-      hub: HUB_KEY_BY_ADDR[r.hub.toLowerCase()] ?? null,
+      hasBorrowFlag: status[1],
     });
-    ltTargets.push({ reserveId: i, idx: reserves.length - 1 });
   }
 
   // Phase 2 — liquidation thresholds for the touched reserves only. A position
@@ -167,11 +148,12 @@ export async function loadAaveV4SpokePositionFromChain(
   // older than the reserve's current one: Kelp rsETH positions hold 95% on key
   // 0 while the reserve's key 1 reads 0%. The factor is read at the
   // position's own key, the one getUserAccountData.avgCollateralFactor uses.
-  if (ltTargets.length > 0) {
+  let factors: bigint[] = [];
+  if (touched.length > 0) {
     const positions = (await client.multicall({
       allowFailure: false,
       ...blockOpt,
-      contracts: ltTargets.map(
+      contracts: touched.map(
         (t) =>
           ({
             address,
@@ -184,7 +166,7 @@ export async function loadAaveV4SpokePositionFromChain(
     const cfgs = (await client.multicall({
       allowFailure: false,
       ...blockOpt,
-      contracts: ltTargets.map(
+      contracts: touched.map(
         (t, k) =>
           ({
             address,
@@ -194,22 +176,15 @@ export async function loadAaveV4SpokePositionFromChain(
           }) as const,
       ),
     })) as { collateralFactor: bigint }[];
-    cfgs.forEach((cfg, k) => {
-      reserves[ltTargets[k].idx].lt = Number(cfg.collateralFactor) / BPS;
-    });
+    factors = cfgs.map((c) => c.collateralFactor);
   }
 
-  return {
-    wallet,
-    spoke: spokeKey,
-    spokeName: spoke.name,
-    blockNumber: Number(blockNumber),
-    healthFactor: borrowCount === BigInt(0) || healthFactor >= UINT_MAX ? null : Number(healthFactor) / 1e18,
-    avgCollateralFactor: Number(avgCollateralFactor) / 1e18,
-    riskPremiumRaw: riskPremium.toString(),
-    supplyAssetCount,
-    debtAssetCount,
-    chainStale: false,
-    reserves,
-  };
+  return settleSpokePosition(
+    walletRaw,
+    spokeKey,
+    spoke.name,
+    Number(blockNumber),
+    account as readonly bigint[],
+    touched.map((t, k) => ({ ...t, collateralFactor: factors[k] })),
+  );
 }
