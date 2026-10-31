@@ -45,7 +45,7 @@
 // SERVER-ONLY — imported from /api/chain/* route handlers and the SSR page only.
 
 import { getAddress, parseAbi } from "viem";
-import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import { DOLOMITE_ADDRESSES, DOLOMITE_BASE, SECONDS_PER_YEAR } from "@/lib/dolomite/asset-catalog";
 
@@ -181,7 +181,7 @@ const MARGIN = DOLOMITE_ADDRESSES.MARGIN as `0x${string}`;
 
 export async function loadDolomiteMarkets(): Promise<DolomiteMarketsResponse> {
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
 
     // The core states its own roster and its own risk constants.
     const [blockNumber, head] = await Promise.all([

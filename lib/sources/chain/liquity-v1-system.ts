@@ -30,6 +30,7 @@
 
 import { parseAbi, getAddress } from "viem";
 import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { LIQUITY_V1_ADDRESSES, LIQUITY_V1_MCR, LIQUITY_V1_CCR } from "@/lib/liquity-v1/asset-catalog";
 
 const TROVE_MANAGER = getAddress(LIQUITY_V1_ADDRESSES.TROVE_MANAGER);
@@ -165,7 +166,7 @@ interface SweepEntry {
  */
 export async function loadLiquityV1SystemFromChain(): Promise<LiquityV1SystemChainResponse> {
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
 
     // Phase 1 — everything that doesn't need the price.
     const [

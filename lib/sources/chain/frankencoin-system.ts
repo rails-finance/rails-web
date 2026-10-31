@@ -31,7 +31,7 @@
 // SERVER-ONLY.
 
 import { parseAbi, getAddress } from "viem";
-import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { FRANKENCOIN_ADDRESSES } from "@/lib/frankencoin/asset-catalog";
 
 const ZCHF = getAddress(FRANKENCOIN_ADDRESSES.ZCHF);
@@ -111,7 +111,7 @@ function stub(): FrankencoinSystemChainResponse {
  */
 export async function loadFrankencoinSystemFromChain(): Promise<FrankencoinSystemChainResponse> {
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
 
     // Phase 1 — the fixed addresses: the franc's slots and the hub's two
     // discovery reads.

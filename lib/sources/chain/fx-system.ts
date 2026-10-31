@@ -43,7 +43,7 @@
 // the /fx/pools SSR page only.
 
 import { parseAbi } from "viem";
-import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { FX_ADDRESSES, FX_POOLS, FX_POOL_KEYS, type FxPoolKey } from "@/lib/fx/asset-catalog";
 
 const POOL_ABI = parseAbi([
@@ -220,7 +220,7 @@ function empty(): FxSystemChainResponse {
 const BITMAP_WORDS: number[] = Array.from({ length: 256 }, (_, i) => i - 128);
 
 async function loadPool(key: FxPoolKey, blockNumber: bigint): Promise<FxPoolSystem> {
-  const client = alchemyClient();
+  const client = headReadsClient();
   const meta = FX_POOLS[key];
   const address = meta.address as `0x${string}`;
   const at = { blockNumber };
@@ -421,7 +421,7 @@ async function loadPool(key: FxPoolKey, blockNumber: bigint): Promise<FxPoolSyst
 
 export async function loadFxSystemFromChain(): Promise<FxSystemChainResponse> {
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
     // Pin every read to ONE block so the two pools, the bitmap and the node
     // values are a single coherent snapshot rather than a smear across blocks.
     const block = await client.getBlock();

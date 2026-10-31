@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAddress, parseAbi, stringToHex } from "viem";
-import { alchemyClient } from "@/lib/sources/chain/rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { MAKER_ADDRESSES, isLseIlk } from "@/lib/makerdao/asset-catalog";
 import { readAuctionStop, readPriceCap } from "@/lib/sources/chain/makerdao-lse-oracle";
 
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "ilk is required" }, { status: 400 });
   }
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
     const head = await client.getBlockNumber();
     const ilkB = stringToHex(ilk, { size: 32 });
     const [pip] = await client.readContract({

@@ -20,7 +20,7 @@
 // SERVER-ONLY (reads ALCHEMY_URL via lib/sources/chain/rpc).
 
 import { parseAbi, getAddress, stringToHex } from "viem";
-import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { MAKER_ADDRESSES, ilkToCollateralSymbol, isLseIlk } from "@/lib/makerdao/asset-catalog";
 import { readAuctionStop, readLockstakeUrn, readPriceCap } from "./makerdao-lse-oracle";
 
@@ -138,7 +138,7 @@ export async function loadMakerVaultStateFromChain(
   const isCdp = /^\d+$/.test(vaultId);
   const isUrnAddr = /^0x[0-9a-fA-F]{40}$/.test(vaultId);
   if (!isCdp && !isUrnAddr) return null;
-  const client = alchemyClient();
+  const client = headReadsClient();
   // FIRST, and before any state read: the block everything below is pinned to,
   // with its own header timestamp. A caller's named block is resolved the same
   // way, so `blockTimestamp` is that block's header either way.

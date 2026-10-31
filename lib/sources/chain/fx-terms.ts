@@ -11,7 +11,7 @@
 // SERVER-ONLY.
 
 import { getAddress, parseAbi } from "viem";
-import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { FX_ADDRESSES, FX_POOLS, type FxPoolKey } from "@/lib/fx/asset-catalog";
 
 const POOL_ABI = parseAbi([
@@ -61,7 +61,7 @@ const feeSchedule = (r: readonly [bigint, bigint, bigint, bigint]) => ({
 });
 
 async function read(pool: FxPoolKey): Promise<FxPoolTerms> {
-  const client = alchemyClient();
+  const client = headReadsClient();
   const address = getAddress(FX_POOLS[pool].address);
   const block = await client.getBlockNumber();
   const at = { blockNumber: block };

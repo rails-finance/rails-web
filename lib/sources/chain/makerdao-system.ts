@@ -45,7 +45,7 @@
 // SERVER-ONLY (reads ALCHEMY_URL via lib/sources/chain/rpc).
 
 import { parseAbi, getAddress, stringToHex } from "viem";
-import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { readPriceCap, type MakerPriceCap } from "./makerdao-lse-oracle";
 import {
   MAKER_ADDRESSES,
@@ -263,7 +263,7 @@ const GROUP_ORDER: MakerIlkGroup[] = ["vault", "psm", "allocator", "rwa", "d3m",
  */
 export async function loadMakerSystemFromChain(): Promise<MakerSystemChainResponse> {
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
 
     // Phase 1 — the block, the registry's roster, and the system scalars.
     const [blockNumber, listed, scalars] = await Promise.all([

@@ -35,7 +35,7 @@
 // SERVER-ONLY.
 
 import { getAddress, parseAbi } from "viem";
-import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { discoverLlamalendMarkets } from "./llamalend-markets";
 import { scaleRaw } from "./erc20-meta";
 import { bandPrices, scale1e18 } from "@/lib/llamalend/band-math";
@@ -127,7 +127,7 @@ export async function loadLlamalendPositionFromChain(
   if (!market) throw new UnknownLlamalendMarketError(controller);
 
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
     const amm = market.amm as `0x${string}`;
     const [blockNumber, reads] = await Promise.all([
       client.getBlockNumber().then(Number),

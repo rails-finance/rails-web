@@ -24,6 +24,7 @@
 
 import { parseAbi } from "viem";
 import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 
 const POOL_ABI = parseAbi([
@@ -93,7 +94,7 @@ export async function resolveMaplePoolState(): Promise<MaplePoolStateMap> {
   const out: MaplePoolStateMap = new Map();
   let client: ReturnType<typeof alchemyClient>;
   try {
-    client = alchemyClient();
+    client = headReadsClient();
   } catch {
     return out; // ALCHEMY_URL unset — amounts-only.
   }

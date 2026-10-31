@@ -38,7 +38,7 @@
 // SERVER-ONLY — imported from /api/chain/* route handlers and SSR pages only.
 
 import { getAddress, parseAbi, keccak256, toHex } from "viem";
-import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import {
   LLAMALEND_ADDRESSES,
@@ -160,7 +160,7 @@ function addressWords(ret: `0x${string}` | undefined): string[] {
 export async function discoverLlamalendMarkets(): Promise<LlamalendMarketMap> {
   if (identityCache && Date.now() - identityCache.at < IDENTITY_TTL_MS) return identityCache.map;
 
-  const client = alchemyClient();
+  const client = headReadsClient();
 
   const counts = (await client.multicall({
     allowFailure: true,
@@ -437,7 +437,7 @@ function empty(): LlamalendMarketsResponse {
 
 export async function loadLlamalendMarkets(): Promise<LlamalendMarketsResponse> {
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
     const [blockNumber, identity] = await Promise.all([
       client.getBlockNumber().then(Number),
       discoverLlamalendMarkets(),
@@ -605,7 +605,7 @@ export async function resolveLlamalendMarketState(): Promise<{
 }> {
   const state: LlamalendMarketStateMap = new Map();
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
     const [blockNumber, identity] = await Promise.all([
       client.getBlockNumber().then(Number),
       discoverLlamalendMarkets(),

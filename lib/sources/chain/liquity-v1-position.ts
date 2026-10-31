@@ -12,6 +12,7 @@
 
 import { parseAbi, getAddress } from "viem";
 import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { LIQUITY_V1_ADDRESSES, LIQUITY_V1_MCR, LIQUITY_V1_CCR } from "@/lib/liquity-v1/asset-catalog";
 import type { LiquityV1PositionChainResponse, LiquityV1TroveChainStatus } from "@/lib/api/fetch-liquity-v1-position";
 
@@ -94,7 +95,7 @@ export async function loadLiquityV1PositionFromChain(walletRaw: string): Promise
   const wallet = getAddress(walletRaw);
 
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
 
     // Phase 1 — everything that doesn't need the price, in parallel. The
     // protocol's own price comes from fetchPrice simulated at head (the exact

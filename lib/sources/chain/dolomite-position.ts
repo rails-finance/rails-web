@@ -26,7 +26,7 @@
 // SERVER-ONLY.
 
 import { getAddress, parseAbi } from "viem";
-import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import {
   DOLOMITE_ADDRESSES,
@@ -103,7 +103,7 @@ export async function loadDolomitePositionFromChain(
   const account = { owner, number: BigInt(accountNumber) };
 
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
 
     const [blockNumber, first] = await Promise.all([
       client.getBlockNumber().then(Number),

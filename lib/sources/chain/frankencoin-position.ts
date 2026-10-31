@@ -26,7 +26,7 @@
 // SERVER-ONLY.
 
 import { erc20Abi, getAddress } from "viem";
-import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import { POSITION_COMMON_ABI, POSITION_V2_ABI } from "@/lib/frankencoin/position-abi";
 import { COOLDOWN_CLOCK_BOUND, normalizePositionAddress } from "@/lib/frankencoin/asset-catalog";
@@ -99,7 +99,7 @@ const names = new Map<string, Promise<string | null>>();
 function tokenName(token: string): Promise<string | null> {
   let p = names.get(token);
   if (!p) {
-    p = alchemyClient()
+    p = headReadsClient()
       .readContract({ address: getAddress(token), abi: erc20Abi, functionName: "name" })
       .then((v) => (typeof v === "string" && v.trim() ? v.trim() : null))
       .catch(() => null);
@@ -123,7 +123,7 @@ export async function loadFrankencoinPositionFromChain(positionRaw: string): Pro
   const key = position.toLowerCase();
 
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
 
     const [blockNumber, first] = await Promise.all([
       client.getBlockNumber().then(Number),
