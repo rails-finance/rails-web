@@ -98,7 +98,8 @@ import {
 import { aaveV3EconomicsExplanation, aaveV3EconomicsContent } from "@/lib/aave-v3/economics-explanation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { aaveMarketVocab } from "@/lib/shared/aave-market-provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
@@ -734,19 +735,23 @@ export default function AaveV3PositionDetail({
 
   // The top row's price dropdown: the on-chain oracle
   // price of each reserve the account currently holds.
-  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!liveView || liveView.status !== "open") return [];
+    // Each price is the oracle's read at the overlay's head block; the
+    // trigger's leading figure carries that receipt.
+    const vocab = aaveMarketVocab("aave-v3", { blockNumber: chain?.blockNumber ?? liveView.atBlock });
     const seen = new Set<string>();
-    const out: PriceStripAsset[] = [];
+    const out: LatestPriceAsset[] = [];
     for (const r of [...liveView.supplies, ...liveView.borrows]) {
       const a = r.address.toLowerCase();
       if (seen.has(a)) continue;
       seen.add(a);
       const p = liveView.priceByAddress?.[a];
-      if (typeof p === "number" && p > 0) out.push({ symbol: r.symbol, address: r.address, price: p });
+      if (typeof p === "number" && p > 0)
+        out.push({ symbol: r.symbol, address: r.address, price: p, info: vocab.reservePriceProv(r.symbol) });
     }
     return out;
-  }, [liveView]);
+  }, [liveView, chain]);
 
   // Which Pool the receipts name. Core, Prime and EtherFi are three separate
   // contracts and the market is a query parameter, so before this the cards on

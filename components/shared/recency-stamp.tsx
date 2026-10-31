@@ -81,6 +81,10 @@ export function RecencyStamp({ className, compact = false }: { className?: strin
     <button
       type="button"
       data-anatomy="H6"
+      // The age ticks on the clock and the block is the head's own label: a
+      // control reading, chrome that shows a legitimately untraced figure
+      // (provenance-receipts-grammar.md, the coverage tripwire's `data-prov-exempt`).
+      data-prov-exempt
       onClick={toggle}
       aria-label={`${head.source === "index" ? `Indexed to block ${block}, minted ${age} ago` : `Chain head minted ${age} ago, block ${block}`}. Press to show the ${showAge ? "block number" : "age"}.`}
       // The control grammar: the stamp reads as pressable. Same height and
