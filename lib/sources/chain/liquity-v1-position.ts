@@ -208,17 +208,22 @@ interface SweepEntry {
 /** Walk the whole sorted list (descending nominal ICR) in pages. */
 async function sweepSortedTroves(client: ReturnType<typeof alchemyClient>, size: bigint): Promise<SweepEntry[] | null> {
   try {
+    // Every page's (start, count) is known from the list size: one Promise.all,
+    // so the head client sends them as one round. Pages keep their order by start.
+    const starts: bigint[] = [];
+    for (let start = ZERO; start < size; start += SWEEP_PAGE) starts.push(start);
+    const pages = await Promise.all(
+      starts.map((start) =>
+        client.readContract({
+          address: MULTI_TROVE_GETTER,
+          abi: MTG_ABI,
+          functionName: "getMultipleSortedTroves",
+          args: [start, size - start > SWEEP_PAGE ? SWEEP_PAGE : size - start],
+        }),
+      ),
+    );
     const all: SweepEntry[] = [];
-    for (let start = ZERO; start < size; start += SWEEP_PAGE) {
-      const count = size - start > SWEEP_PAGE ? SWEEP_PAGE : size - start;
-      const page = await client.readContract({
-        address: MULTI_TROVE_GETTER,
-        abi: MTG_ABI,
-        functionName: "getMultipleSortedTroves",
-        args: [start, count],
-      });
-      for (const t of page) all.push({ owner: t.owner, debt: t.debt });
-    }
+    for (const page of pages) for (const t of page) all.push({ owner: t.owner, debt: t.debt });
     return all;
   } catch {
     return null; // the queue surface just stays off; the rest of the read stands

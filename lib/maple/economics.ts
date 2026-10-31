@@ -282,7 +282,7 @@ const CAPTION_FLOOR = 0.01;
  *  doesn't render. */
 export interface MapleCardCaptions {
   /** Interest earned, in the pool's own asset (single-pool positions only). */
-  interestEarned: { amount: number; symbol: string } | null;
+  interestEarned: { amount: number; symbol: string; pool?: string } | null;
   /** The position earned interest and its claim holds none of it: every pool
    *  it earned in holds less than a cent now (wallet 0x1601…347e). The card
    *  says so and leaves the figure to the Lifetime flows panel. Never set
@@ -356,7 +356,7 @@ export function computeMapleCardCaptions(
     const f = lifetime.get(cur.pool);
     if (f && !f.sharesMoved) {
       const amt = legInterest(cur.currentValue, netPrincipal(f), grossIn(f));
-      if (amt > 0) interestEarned = { amount: amt, symbol: cur.assetSymbol };
+      if (amt > 0) interestEarned = { amount: amt, symbol: cur.assetSymbol, pool: cur.pool };
     }
   }
   const interestWithdrawn =
