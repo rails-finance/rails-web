@@ -10,11 +10,11 @@ export type RoundWirePoint = [number, string, number, number, number, string, st
 export type RoundWireDay = [number, string, number, 0 | 1];
 
 export interface RoundsWireLine {
-  kind: "feed" | "aave" | "compound" | "product";
+  kind: "feed" | "aave" | "compound" | "product" | "rate";
   /** "usd", "eth" (a WETH Comet's prices), "ratio" (an exchange rate); absent on an older server. */
   unit?: "usd" | "eth" | "ratio";
   scale: number;
-  legs: { kind: "feed" | "cap"; name: string; address: string }[];
+  legs: { kind: "feed" | "cap" | "rate"; name: string; address: string }[];
   from: { block: number; ts: number } | null;
   total: number;
   inWindow: number;

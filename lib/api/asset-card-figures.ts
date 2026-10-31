@@ -1,9 +1,12 @@
 // The figure a card without a price carries (rails-ops reference/asset-key-map.md,
-// "The asset explorer"; Miles, 26 Oct 2026): ZCHF's supply, read at head as
-// the Frankencoin system page reads it, with its "as of" stamp; each Liquity
-// V2-family stablecoin's trove debt, the open troves' debt across its
-// branches as Rails stores them (the explorer's trove listing). Every other
-// card without a price has none. A read that fails leaves its card blank.
+// "The asset explorer"; Miles, 26 Oct 2026): each Liquity V2-family
+// stablecoin's trove debt, the open troves' debt across its branches as Rails
+// stores them (the explorer's trove listing); every other token rails-server's
+// supply roster lists, its supply from Sieve (GET /api/prices/supply, its
+// Transfer mints less burns, stamped with Sieve's checkpoint); ZCHF's supply
+// read at head, as the Frankencoin system page reads it, until the stored one
+// answers. Every other card without a price has none. A read that fails leaves
+// its card blank.
 //
 // SERVER-ONLY: the ZCHF read goes through lib/sources/chain/rpc.
 
@@ -18,6 +21,32 @@ import { DEBT_ADDRESS as BD, DEBT_SYMBOL as BD_SYMBOL } from "@/lib/basedollar/a
 import type { CardFigure } from "@/lib/shared/asset-explorer";
 
 const BOLD = "0x6440f144b7e50d6a8439336510312d2f54beb01d";
+/** The chains rails-server's supply roster (sieve/token-supply.json) lists tokens on. */
+const SUPPLY_CHAINS = [1, 8453] as const;
+
+interface SupplyWire {
+  symbol: string;
+  decimals: number;
+  supply: string;
+  asOf: { block: number; ts: number | null };
+}
+
+/** Every stored supply the roster answers on a chain, by token; an unsettled token is left out. */
+async function storedSupply(chain: number): Promise<[string, SupplyWire][]> {
+  const api = process.env.RAILS_API_URL;
+  if (!api) throw new Error("RAILS_API_URL environment variable is not set");
+  const res = await fetch(
+    `${api}/api/prices/supply?chain=${chain}`,
+    createAuthFetchOptions({ cache: "no-store", signal: AbortSignal.timeout(TIMEOUT_MS) }),
+  );
+  if (!res.ok) throw new Error(`/api/prices/supply failed: ${res.status}`);
+  const json = (await res.json()) as { tokens?: Record<string, SupplyWire | { unsettled: string }> };
+  return Object.entries(json.tokens ?? {}).filter((e): e is [string, SupplyWire] => "supply" in e[1]);
+}
+
+/** A raw amount at `decimals` as a number of tokens. */
+const units = (raw: string, decimals: number) =>
+  Number(BigInt(raw) / BigInt(10) ** BigInt(Math.max(0, decimals - 6))) / 10 ** Math.min(6, decimals);
 const TIMEOUT_MS = 8000;
 const PAGE = 1000;
 
@@ -66,14 +95,37 @@ const list = (xs: string[]) => (xs.length < 2 ? xs.join("") : `${xs.slice(0, -1)
 export const assetCardFigures = unstable_cache(
   async (): Promise<[string, CardFigure][]> => {
     const out: [string, CardFigure][] = [];
-    const [zchf, ...debts] = await Promise.all([
+    const [stored, zchf, ...debts] = await Promise.all([
+      Promise.all(
+        SUPPLY_CHAINS.map((c) =>
+          storedSupply(c)
+            .then((xs) => xs.map(([t, w]): [string, SupplyWire] => [`${c}:${t}`, w]))
+            .catch(() => []),
+        ),
+      ).then((xs) => new Map<string, SupplyWire>(xs.flat())),
       loadFrankencoinSystemFromChain().catch(() => null),
       ...TROVE_DEBT.map((t) => troveDebt(t.path).catch(() => null)),
     ]);
-    if (zchf && !zchf.chainStale) {
+    const troveKeys = new Set(TROVE_DEBT.map((t) => `${t.chain}:${t.token.toLowerCase()}`));
+    for (const [key, w] of stored) {
+      // A Liquity V2-family stablecoin's card keeps its trove debt (Miles, 26 Oct 2026).
+      if (troveKeys.has(key)) continue;
+      out.push([
+        key,
+        {
+          label: "Supply",
+          amount: units(w.supply, w.decimals),
+          unit: w.symbol,
+          asOf: w.asOf.ts == null ? null : { block: w.asOf.block, ts: w.asOf.ts },
+          title: `Every ${w.symbol} on ${key.startsWith("1:") ? "Ethereum" : "Base"}: its mints less its burns, as Rails's Sieve stores its transfers`,
+        },
+      ]);
+    }
+    const zchfKey = `1:${FRANKENCOIN_ADDRESSES.ZCHF.toLowerCase()}`;
+    if (zchf && !zchf.chainStale && !stored.has(zchfKey)) {
       const asOf = { block: zchf.blockNumber, ts: Math.floor(Date.now() / 1000) };
       out.push([
-        `1:${FRANKENCOIN_ADDRESSES.ZCHF.toLowerCase()}`,
+        zchfKey,
         {
           label: "Supply",
           amount: zchf.zchfSupply,
@@ -100,6 +152,6 @@ export const assetCardFigures = unstable_cache(
     });
     return out;
   },
-  ["asset-card-figures-v1"],
+  ["asset-card-figures-v2"],
   { revalidate: 600 },
 );

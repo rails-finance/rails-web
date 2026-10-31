@@ -418,8 +418,8 @@ export type RoundPricePoint = [
 ];
 export interface PriceRounds {
   /** How the line is had from stored legs: a feed, or a composer over them. */
-  kind: "feed" | "aave" | "compound" | "product";
-  legs: { kind: "feed" | "cap"; name: string; address: string }[];
+  kind: "feed" | "aave" | "compound" | "product" | "rate";
+  legs: { kind: "feed" | "cap" | "rate"; name: string; address: string }[];
   /** Every change of the value in force, ascending (thinned where `thinned`). */
   points: RoundPricePoint[];
   /** The first point: the line reads rounds from here on. */

@@ -724,7 +724,13 @@ export function AssetLwChart({
           {cursorTs == null && <span>latest</span>}
           {round && (
             <span data-asset-lw-round={round[6] ?? ""}>
-              {leg?.kind === "cap" ? "cap row" : round[6] ? roundName(round[6]) : "round"}
+              {leg?.kind === "cap"
+                ? "cap row"
+                : leg?.kind === "rate"
+                  ? "rate row"
+                  : round[6]
+                    ? roundName(round[6])
+                    : "round"}
               {mainRounds && mainRounds.legs.length > 1 && leg?.kind === "feed" ? ` of ${legName(leg.name)}` : ""},
               block {round[4].toLocaleString("en-US")},{" "}
               <a href={tx(round[5])} target="_blank" rel="noreferrer" className="font-mono hover:underline">
