@@ -4,8 +4,7 @@
 
 import Link from "next/link";
 import { transmuterListingPath, v2LinesForChain, v2ListingPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
-
-const LINK = "text-blue-500 hover:underline";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export function AlchemixInfo({ deployment }: { deployment: AlchemixDeployment }) {
   const hasV2 = v2LinesForChain(deployment.chainId).length > 0;
@@ -33,7 +32,7 @@ export function AlchemixInfo({ deployment }: { deployment: AlchemixDeployment })
       <p>
         A synthetic and its collateral make a line, with its own Alchemist and its own Transmuter. This explorer covers
         the {linesText} {lineNames.length > 1 ? "lines" : "line"}.{" "}
-        <Link href={`${deployment.basePath}/lines`} className={LINK}>
+        <Link href={`${deployment.basePath}/lines`} className={INLINE_LINK}>
           Lines
         </Link>{" "}
         states, for each, how many redemptions it has had and how the explorer gets its figures: replayed from each
@@ -42,7 +41,7 @@ export function AlchemixInfo({ deployment }: { deployment: AlchemixDeployment })
       <p>The listing has a tab for each kind of position.</p>
       <ul className="list-disc space-y-1 pl-5">
         <li>
-          <Link href={deployment.basePath} className={LINK}>
+          <Link href={deployment.basePath} className={INLINE_LINK}>
             Alchemist positions
           </Link>
           : one row per loan. A position is an NFT, so the wallet holding it may not be the one that opened it. Each row
@@ -50,7 +49,7 @@ export function AlchemixInfo({ deployment }: { deployment: AlchemixDeployment })
           including every redemption that moved it.
         </li>
         <li>
-          <Link href={transmuterListingPath(deployment)} className={LINK}>
+          <Link href={transmuterListingPath(deployment)} className={INLINE_LINK}>
             Transmuter positions
           </Link>
           : one row per stake of the synthetic in a Transmuter, with the amount staked, the block it matures at and what
@@ -59,7 +58,7 @@ export function AlchemixInfo({ deployment }: { deployment: AlchemixDeployment })
         </li>
         {hasV2 && (
           <li>
-            <Link href={v2ListingPath(deployment)} className={LINK}>
+            <Link href={v2ListingPath(deployment)} className={INLINE_LINK}>
               V2 positions
             </Link>
             : accounts on Alchemix V2, the version before V3. An account there held collateral and debt in one address

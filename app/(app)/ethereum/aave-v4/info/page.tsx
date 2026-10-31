@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("aave-v4");
 
@@ -21,7 +22,7 @@ const intro = (
       factor — the number that decides when an account can be liquidated. Dollar values use Aave&apos;s own prices, the
       same ones it liquidates with. The listing searches by wallet or ENS name and filters by hub, spoke, asset or
       status. Or{" "}
-      <Link href="/ethereum/aave-v4/hubs" className="text-blue-500 hover:underline">
+      <Link href="/ethereum/aave-v4/hubs" className={INLINE_LINK}>
         see the hubs and their credit lines
       </Link>
       .

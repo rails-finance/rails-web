@@ -46,6 +46,7 @@ import { balanceAfterProv, movedDeltaProv, type DolomiteCoords } from "@/lib/dol
 import { otherAccountName } from "@/lib/dolomite/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export type DolomiteEvent = BaseActivityEvent & {
   context: { protocol: "dolomite"; data: DolomiteContext };
@@ -130,7 +131,7 @@ function Addr({ address }: { address: string }) {
       href={explorerUrl(MAINNET_CHAIN_ID, "address", address)}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-blue-500 hover:underline"
+      className={INLINE_LINK}
       onClick={(e) => e.stopPropagation()}
     >
       {address.slice(0, 6)}…{address.slice(-4)}

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("moonwell-base");
 
@@ -21,7 +22,7 @@ const intro = (
       figure read from that market&apos;s own contract at the block the row names, and dollar values from the oracle the
       Comptroller itself liquidates with, read at that same block. Opening a row shows the wallet with its whole
       history. Or{" "}
-      <Link href="/base/moonwell/markets" className="text-blue-500 hover:underline">
+      <Link href="/base/moonwell/markets" className={INLINE_LINK}>
         see every market and how heavily it is lent out
       </Link>
       .

@@ -3,6 +3,7 @@ import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { SKY_RATES_PATH } from "@/lib/sky-savings/constants";
 import { protocolForSession } from "@/lib/shared/protocols";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("sky-savings");
 
@@ -32,14 +33,13 @@ const intro = (
       whole life of sUSDS. Referral codes appear as numbers, because no public list names the front ends behind them.
     </p>
     <p>
-      The{" "}
-      <Link href={SKY_RATES_PATH} className="text-blue-500 hover:underline">
-        Savings Rate history
+      <Link href={SKY_RATES_PATH} className={INLINE_LINK}>
+        See the Savings Rate history
       </Link>{" "}
-      lists every rate change. Morpho Blue and Sky&rsquo;s bridge escrows for Arbitrum One, Base and OP Mainnet are left
+      for every rate change. Morpho Blue and Sky&rsquo;s bridge escrows for Arbitrum One, Base and OP Mainnet are left
       out of the listing, because their sUSDS backs positions elsewhere; each still opens by its address. Borrowing
       against collateral in Sky&rsquo;s vaults is on the{" "}
-      <Link href={MAKERDAO} className="text-blue-500 hover:underline">
+      <Link href={MAKERDAO} className={INLINE_LINK}>
         MakerDAO explorer
       </Link>
       . sDAI and the sUSDS on other chains are not covered yet.

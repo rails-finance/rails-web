@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("spark");
 
@@ -19,8 +20,8 @@ const intro = (
       Each row of the listing is one wallet&apos;s account: everything it supplies, everything it owes, and its health
       factor — the single number that decides when an account can be liquidated. Dollar values use SparkLend&apos;s own
       prices, the same ones it liquidates with. Or{" "}
-      <Link href="/ethereum/spark/market" className="text-blue-500 hover:underline">
-        compare the market&apos;s reserves
+      <Link href="/ethereum/spark/market" className={INLINE_LINK}>
+        see the market&apos;s reserves
       </Link>
       .
     </p>

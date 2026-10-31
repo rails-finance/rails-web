@@ -167,6 +167,9 @@ export interface AaveSpokeCardInfo {
    *  This is what the card's activity tally renders (the "transactions" metric),
    *  matching Liquity's transactionCount and the timeline's per-tx grouping. */
   txCount: number;
+  /** The timestamp of the position's last event on this spoke: the card's
+   *  "X ago". */
+  lastActivityAt: number;
   supplyingSymbols: string[];
   /** Every reserve this position has ever supplied, oldest listing order. */
   suppliedSymbolsEver: string[];
@@ -976,6 +979,7 @@ export function buildSpokeCards(
       isClosed: g.isClosed,
       eventCount: g.eventCount,
       txCount: g.txCount,
+      lastActivityAt: g.result.lastTimestamp,
       supplyingSymbols,
       borrowingSymbols,
       latestBorrowRate: spokeBorrowRate,

@@ -91,7 +91,7 @@ import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-r
 import { ExportMenu } from "@/components/shared/export-menu";
 import { liquityForkExports } from "@/components/protocol/liquity-fork/liquity-fork-export-menu";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
-import { forkLiveVocab } from "@/lib/shared/liquity-fork-live-provenance";
+import { forkLiveVocab, forkReadBy } from "@/lib/shared/liquity-fork-live-provenance";
 import { atBlockPriceProv } from "@/lib/basedollar/event-provenance";
 import { resolveBranch as resolveForkBranch } from "@/lib/basedollar/asset-catalog";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -424,7 +424,7 @@ export default function BasedollarTroveDetail({
               symbol: view.collateralType,
               price: collateralPrice,
               info: live
-                ? forkLiveVocab(live.protocol).forkPriceProv(live.symbol, live.priceStale)
+                ? forkLiveVocab(live.protocol, forkReadBy(live)).forkPriceProv(live.symbol, live.priceStale)
                 : forkLiveVocab("basedollar").trovesPriceProv(
                     resolveForkBranch(view.collateralType)?.symbol ?? view.collateralType,
                     view.priceStale === true,

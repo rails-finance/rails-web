@@ -21,7 +21,12 @@ import { formatUsd } from "@/lib/shared/format-event";
 // The position card's own formatter for this figure, so a $1.18 line reads
 // $1.18 in both places.
 import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
-import { FORK_DEBT_SYMBOL, forkLiveScaling, forkLiveVocab } from "@/lib/shared/liquity-fork-live-provenance";
+import {
+  FORK_DEBT_SYMBOL,
+  forkLiveScaling,
+  forkLiveVocab,
+  forkReadBy,
+} from "@/lib/shared/liquity-fork-live-provenance";
 import { Prov } from "@/components/shared/provenance";
 import { forkAmount, forkCollAmount, forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
@@ -191,7 +196,7 @@ export function LiquityForkPositionExplanation({
   const debtSymbol = FORK_DEBT_SYMBOL[chain.protocol] ?? "debt";
   const reserve = forkLiquidationReserve(chain.protocol);
   // The card's receipts, one per figure (the shared fork vocabulary).
-  const vocab = forkLiveVocab(chain.protocol);
+  const vocab = forkLiveVocab(chain.protocol, forkReadBy(chain));
   const sym = chain.symbol;
   const rateProv = vocab.liveRateProv(sym, isBatched, forkLiveScaling(chain, sym, debtSymbol).rate);
   const hasDebt = chain.entireDebt > 0;

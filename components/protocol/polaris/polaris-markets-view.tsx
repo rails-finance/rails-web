@@ -41,6 +41,7 @@ import type { PolarisBook } from "@/lib/sources/api/polaris-book";
 import type { PolarisMarketBook } from "@/lib/sources/api/polaris-positions";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const pct = (f: number, dp = 2): string => `${(f * 100).toFixed(dp)}%`;
 
@@ -86,7 +87,6 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
         <span className="text-[11px] text-rb-500">
           mints {stable}, tracking {cfg.tracks}
         </span>
-        <LearnMore content={polarisModal("market")} inline />
       </div>
 
       {chain ? (
@@ -280,7 +280,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
           </p>
         )}
         <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-          <Link href={`${POLARIS_BASE_PATH}?market=${market}`} className="text-blue-500 hover:underline">
+          <Link href={`${POLARIS_BASE_PATH}?market=${market}`} className={INLINE_LINK}>
             Browse the {stable} positions
           </Link>
           .

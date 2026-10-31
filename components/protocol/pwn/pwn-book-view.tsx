@@ -47,6 +47,7 @@ import type { PwnLoanBook } from "@/lib/pwn/loan-book";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const pct = (f: number): string => `${(f * 100).toFixed(1)}%`;
 const days = (d: number): string => (d < 1 ? `${(d * 24).toFixed(0)} h` : `${Math.round(d)} d`);
@@ -492,7 +493,7 @@ export function PwnBookStamp({ book }: { book: PwnLoanBook }) {
         "block —"
       )}{" "}
       · drawn from the same loan records the{" "}
-      <Link href="/ethereum/pwn" className="text-blue-500 hover:underline">
+      <Link href="/ethereum/pwn" className={INLINE_LINK}>
         loan explorer
       </Link>{" "}
       shows

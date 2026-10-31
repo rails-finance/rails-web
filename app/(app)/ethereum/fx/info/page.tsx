@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("fx");
 
@@ -19,7 +20,7 @@ const intro = (
     <p>
       Each row of the listing is one position (an NFT): its collateral, its fxUSD debt, and its standing after every
       tick-wide event that touched it. Debt stays stated as fxUSD — it is never assumed to be a dollar. Or{" "}
-      <Link href="/ethereum/fx/pools" className="text-blue-500 hover:underline">
+      <Link href="/ethereum/fx/pools" className={INLINE_LINK}>
         see the pools and their tick ladders
       </Link>
       .

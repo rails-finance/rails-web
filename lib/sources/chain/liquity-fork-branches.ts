@@ -29,6 +29,9 @@ import { parseAbi, type ContractFunctionParameters } from "viem";
 import { chainClient } from "./rpc";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { LiquityForkConfig, LiquityForkBranchConfig } from "./liquity-fork-position";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import { serverLiquityForkBranches } from "@/lib/sources/api/liquity-fork-head";
+import { emptyBranch, settleBranch, settleBranches, type RosterTroveRead } from "./liquity-fork-settle";
 
 const TM_ABI = parseAbi([
   "function getLatestTroveData(uint256 troveId) view returns ((uint256 entireDebt, uint256 entireColl, uint256 redistBoldDebtGain, uint256 redistCollGain, uint256 accruedInterest, uint256 recordedDebt, uint256 annualInterestRate, uint256 weightedRecordedDebt, uint256 accruedBatchManagementFee, uint256 lastInterestRateAdjTime))",
@@ -139,72 +142,32 @@ export interface LiquityForkBranchesResponse {
   totalCollUsdComplete: boolean;
   /** True when the whole read failed and the page must say so. */
   chainStale: boolean;
-}
-
-function emptyBranch(b: LiquityForkBranchConfig): LiquityForkBranchState {
-  return {
-    key: b.key,
-    symbol: b.symbol,
-    decimals: b.decimals,
-    troveManager: b.troveManager,
-    priceUsd: null,
-    priceStale: false,
-    oracleDown: false,
-    branchDebt: null,
-    branchColl: null,
-    branchCollUsd: null,
-    tcr: null,
-    mcr: b.mcr,
-    ccr: b.ccr,
-    scr: b.scr,
-    queue: [],
-    listedCount: 0,
-    queueCapped: false,
-    idsTotal: null,
-    idsCapped: false,
-    zombieCount: 0,
-    minRatePct: null,
-    maxRatePct: null,
-    avgRatePct: null,
-    stale: true,
-  };
-}
-
-interface TroveData {
-  entireDebt: bigint;
-  entireColl: bigint;
-  annualInterestRate: bigint;
+  /** Present when rails-server read it: the block's time, when it was read, the leg that answered. */
+  head?: PositionHeadStamp;
 }
 
 /**
- * Read one fork's whole branch roster live from its own contracts. A branch
- * whose reads fail comes back `stale` (the rest of the roster still renders);
- * a total failure comes back `chainStale` so the page states that instead of
- * showing an empty protocol.
+ * Read one fork's whole branch roster from its own contracts: from
+ * rails-server first when no block is asked (lib/sources/api/liquity-fork-head.ts),
+ * else straight from the chain; `atBlock` pins every read to that block. A
+ * branch whose reads fail comes back `stale` (the rest of the roster still
+ * renders); a total failure comes back `chainStale` so the page states that
+ * instead of showing an empty protocol.
  */
-export async function loadLiquityForkBranchesFromChain(cfg: LiquityForkConfig): Promise<LiquityForkBranchesResponse> {
+export async function loadLiquityForkBranchesFromChain(
+  cfg: LiquityForkConfig,
+  atBlock?: number,
+): Promise<LiquityForkBranchesResponse> {
   const configs = Object.values(cfg.branches);
+  if (atBlock === undefined) {
+    const served = await serverLiquityForkBranches(cfg);
+    if (served) return served;
+  }
   try {
     const client = chainClient(cfg.chainId ?? MAINNET_CHAIN_ID);
-    const blockNumber = await client.getBlockNumber().then(Number);
-    const branches = await Promise.all(configs.map((b) => loadBranch(client, b)));
-
-    const answered = branches.filter((b) => !b.stale);
-    const totalDebt = answered.reduce((sum, b) => sum + (b.branchDebt ?? 0), 0);
-    // A USD total is only stated when EVERY branch priced — summing the priced
-    // subset would understate the protocol without saying so.
-    const priced = answered.filter((b) => b.branchCollUsd != null);
-    const totalCollUsdComplete = answered.length > 0 && priced.length === answered.length;
-    return {
-      protocol: cfg.protocol,
-      debtSymbol: cfg.debtSymbol,
-      blockNumber,
-      branches,
-      totalDebt,
-      totalCollUsd: totalCollUsdComplete ? priced.reduce((sum, b) => sum + (b.branchCollUsd ?? 0), 0) : null,
-      totalCollUsdComplete,
-      chainStale: answered.length === 0,
-    };
+    const blockNumber: number = atBlock != null ? atBlock : await client.getBlockNumber().then(Number);
+    const branches = await Promise.all(configs.map((b) => loadBranch(client, b, atBlock)));
+    return settleBranches(cfg, blockNumber, branches);
   } catch {
     return {
       protocol: cfg.protocol,
@@ -222,10 +185,12 @@ export async function loadLiquityForkBranchesFromChain(cfg: LiquityForkConfig): 
 async function loadBranch(
   client: ReturnType<typeof chainClient>,
   b: LiquityForkBranchConfig,
+  atBlock?: number,
 ): Promise<LiquityForkBranchState> {
   const tm = b.troveManager as `0x${string}`;
   const pf = b.priceFeed as `0x${string}`;
   const st = b.sortedTroves as `0x${string}`;
+  const blockOpt = atBlock != null ? { blockNumber: BigInt(atBlock) } : {};
   const atTm = (functionName: string, args: readonly unknown[] = []): ContractFunctionParameters =>
     ({ address: tm, abi: TM_ABI, functionName, args }) as ContractFunctionParameters;
 
@@ -235,6 +200,7 @@ async function loadBranch(
     // ids-array count (every trove the branch has, zombies included).
     const phase1 = await client.multicall({
       allowFailure: true,
+      ...blockOpt,
       contracts: [
         { address: pf, abi: PF_ABI, functionName: "fetchPrice" } as ContractFunctionParameters,
         { address: pf, abi: PF_ABI, functionName: "lastGoodPrice" } as ContractFunctionParameters,
@@ -254,18 +220,8 @@ async function loadBranch(
     const lastId = r(5) as bigint | null;
     const listSize = r(6) as bigint | null;
     // Aggregates are the row's reason to exist — without them there is no
-    // branch to show.
+    // branch to show (and nothing to walk).
     if (branchDebtRaw == null || branchCollRaw == null) return emptyBranch(b);
-
-    const priceScale = 10 ** (36 - b.decimals);
-    const priceRaw = fetched && fetched[0] > BigInt(0) ? fetched[0] : lastGood;
-    const priceStale = !(fetched && fetched[0] > BigInt(0)) && lastGood != null;
-    const priceUsd = priceRaw != null && priceRaw > BigInt(0) ? Number(priceRaw) / priceScale : null;
-
-    const debtScale = 1e18;
-    const collScale = 10 ** b.decimals;
-    const branchDebt = Number(branchDebtRaw) / debtScale;
-    const branchColl = Number(branchCollRaw) / collScale;
 
     // Phase 2 — the sorted list walked from its TAIL (getPrev ascends the
     // rate order), so `listed` is the queue front-first and a capped walk
@@ -280,17 +236,17 @@ async function loadBranch(
         abi: ST_ABI,
         functionName: "getPrev",
         args: [id],
+        ...blockOpt,
       })) as bigint;
     }
-    const queueCapped = listSize != null && Number(listSize) > listed.length;
 
     const n = idsCount != null ? Math.min(Number(idsCount), IDS_CAP) : 0;
-    const idsCapped = idsCount != null && Number(idsCount) > IDS_CAP;
     const allIds =
       n > 0
         ? (
             (await client.multicall({
               allowFailure: true,
+              ...blockOpt,
               contracts: Array.from({ length: n }, (_, i) => atTm("getTroveFromTroveIdsArray", [BigInt(i)])),
             })) as { status: string; result?: bigint }[]
           )
@@ -308,101 +264,37 @@ async function loadBranch(
       subjects.length > 0
         ? ((await client.multicall({
             allowFailure: true,
+            ...blockOpt,
             contracts: [
               ...subjects.map((x) => atTm("getLatestTroveData", [x])),
               ...subjects.map((x) => atTm("getTroveStatus", [x])),
             ],
           })) as { status: string; result?: unknown }[])
         : [];
-    const dataOf = (i: number): TroveData | null =>
-      datas[i]?.status === "success" ? (datas[i].result as TroveData) : null;
-    const statusOf = (i: number): number | null =>
-      datas[subjects.length + i]?.status === "success" ? (datas[subjects.length + i].result as number) : null;
+    const dataBy = new Map<string, RosterTroveRead | null>();
+    const statusBy = new Map<string, number | null>();
+    subjects.forEach((x, i) => {
+      dataBy.set(String(x), datas[i]?.status === "success" ? (datas[i].result as RosterTroveRead) : null);
+      const s = datas[subjects.length + i];
+      statusBy.set(String(x), s?.status === "success" ? (s.result as number) : null);
+    });
 
-    const entry = (i: number, zombie: boolean): LiquityForkQueueEntry | null => {
-      const d = dataOf(i);
-      if (!d) return null;
-      // A trove with no debt left is in nobody's redemption path — observed
-      // live on Ebisu's stcUSD branch, where a zombie sits at exactly zero.
-      // It is real protocol state, but it is not queue state: it would add a
-      // row that consumes nothing and is redeemed for nothing.
-      if (d.entireDebt <= BigInt(0)) return null;
-      return {
-        troveId: subjects[i].toString(),
-        annualInterestRatePct: Number(d.annualInterestRate) / 1e16,
-        entireDebt: Number(d.entireDebt) / debtScale,
-        entireColl: Number(d.entireColl) / collScale,
-        zombie,
-        debtInFront: 0, // filled once the queue order is settled
-      };
-    };
-
-    // Zombies (status 4) lead the queue — a partial redemption left them below
-    // the minimum debt, and they are redeemed before the whole sorted list.
-    // The COUNT takes every status-4 trove; the QUEUE keeps only those still
-    // carrying debt (entry() drops zero-debt troves — nothing to redeem). A
-    // zombie redeemed to exactly zero is real branch state holding real
-    // collateral (asymmetry's scrvUSD zombie holds 40k), so it must count
-    // even though it stands outside every redemption path.
-    const zombies: LiquityForkQueueEntry[] = [];
-    let zombieCount = 0;
-    for (let i = listed.length; i < subjects.length; i++) {
-      if (statusOf(i) !== 4) continue; // closed / liquidated troves are not in any queue
-      zombieCount++;
-      const e = entry(i, true);
-      if (e) zombies.push(e);
-    }
-    // The listed queue in REDEMPTION order — the tail-first walk already
-    // yielded it lowest-rate (redeemed first) to highest.
-    const active: LiquityForkQueueEntry[] = [];
-    for (let i = 0; i < listed.length; i++) {
-      const e = entry(i, false);
-      if (e) active.push(e);
-    }
-
-    const queue = [...zombies, ...active];
-    let running = 0;
-    for (const e of queue) {
-      e.debtInFront = running;
-      running += e.entireDebt;
-    }
-
-    const rates = active.map((e) => e.annualInterestRatePct);
-    const activeDebt = active.reduce((s, e) => s + e.entireDebt, 0);
-    // A TCR needs debt that actually belongs to troves. A branch whose troves
-    // have all gone still reports DUST from the aggregate interest bookkeeping
-    // — Asymmetry's scrvUSD branch sits at 6,896 wei against 40k of collateral
-    // — and dividing by that yields a ratio in the quintillions. Empty branch,
-    // no ratio: gate on the queue, not on `debt > 0`.
-    const tcr = queue.length > 0 && branchDebt > 0 && priceUsd != null ? (branchColl * priceUsd) / branchDebt : null;
-
-    return {
-      key: b.key,
-      symbol: b.symbol,
-      decimals: b.decimals,
-      troveManager: b.troveManager,
-      priceUsd,
-      priceStale,
-      oracleDown: fetched != null ? fetched[1] : false,
-      branchDebt,
-      branchColl,
-      branchCollUsd: priceUsd != null ? branchColl * priceUsd : null,
-      tcr,
-      mcr: b.mcr,
-      ccr: b.ccr,
-      scr: b.scr,
-      queue,
-      listedCount: listSize != null ? Number(listSize) : active.length,
-      queueCapped,
-      idsTotal: idsCount != null ? Number(idsCount) : null,
-      idsCapped,
-      zombieCount,
-      minRatePct: rates.length > 0 ? Math.min(...rates) : null,
-      maxRatePct: rates.length > 0 ? Math.max(...rates) : null,
-      avgRatePct:
-        activeDebt > 0 ? active.reduce((s, e) => s + e.annualInterestRatePct * e.entireDebt, 0) / activeDebt : null,
-      stale: false,
-    };
+    return settleBranch(
+      b,
+      {
+        fetched,
+        lastGood,
+        branchDebtRaw,
+        branchCollRaw,
+        idsCount,
+        listSize,
+        listed,
+        allIds,
+        dataOf: (x) => dataBy.get(String(x)) ?? null,
+        statusOf: (x) => statusBy.get(String(x)) ?? null,
+      },
+      IDS_CAP,
+    );
   } catch {
     return emptyBranch(b);
   }

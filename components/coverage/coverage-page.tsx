@@ -21,6 +21,7 @@ import { DepthMatrix } from "@/components/coverage/depth-matrix";
 import { CapabilityPill } from "@/components/coverage/capability-sheet";
 import { CoverageDrawerBody } from "@/components/coverage/drawer-body";
 import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 // The coverage surface is one page component behind two per-chain routes
 // (/coverage/ethereum, /coverage/base). The toggle at the top links between
@@ -260,7 +261,7 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
                   {/* A comma-only join reads as an unfinished list once there
                       are more than two, so the last item takes a conjunction. */}
                   {i > 0 && (i === listingExceptions.length - 1 ? (listingExceptions.length > 2 ? ", and " : " and ") : ", ")}
-                  <Link href={p.listingHref} className="text-blue-500 hover:underline">
+                  <Link href={p.listingHref} className={INLINE_LINK}>
                     {explorerName(p)}
                   </Link>
                 </span>

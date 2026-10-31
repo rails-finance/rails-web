@@ -22,6 +22,8 @@ import { parseAbi } from "viem";
 import { chainClient } from "./rpc";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { LiquityForkBranchConfig } from "./liquity-fork-position";
+import { serverLiquityForkPrices } from "@/lib/sources/api/liquity-fork-head";
+import { settlePrice } from "./liquity-fork-settle";
 
 // fetchPrice mutates on-chain; declared view so eth_call simulates it.
 const PF_ABI = parseAbi([
@@ -39,10 +41,17 @@ export interface LiquityForkBranchPrice {
 /** Keyed by branch key. Empty when RPC is unavailable. */
 export type LiquityForkPriceMap = Map<string, LiquityForkBranchPrice>;
 
+/** From rails-server first when no block is asked (lib/sources/api/liquity-fork-head.ts),
+ *  else from the chain; `atBlock` pins the read to that block. */
 export async function resolveLiquityForkPrices(
   branches: LiquityForkBranchConfig[],
   chainId: ChainId = MAINNET_CHAIN_ID,
+  atBlock?: number,
 ): Promise<LiquityForkPriceMap> {
+  if (atBlock === undefined) {
+    const served = await serverLiquityForkPrices(branches, chainId);
+    if (served) return served;
+  }
   const out: LiquityForkPriceMap = new Map();
   let client: ReturnType<typeof chainClient>;
   try {
@@ -61,7 +70,11 @@ export async function resolveLiquityForkPrices(
 
   let results: { status: string; result?: unknown }[] = [];
   try {
-    results = (await client.multicall({ allowFailure: true, contracts: calls })) as {
+    results = (await client.multicall({
+      allowFailure: true,
+      contracts: calls,
+      ...(atBlock != null ? { blockNumber: BigInt(atBlock) } : {}),
+    })) as {
       status: string;
       result?: unknown;
     }[];
@@ -71,16 +84,11 @@ export async function resolveLiquityForkPrices(
 
   branches.forEach((b, i) => {
     const [fetched, last] = results.slice(i * 2, i * 2 + 2);
-    const scale = 10 ** (36 - b.decimals); // USD-per-whole-token divisor
     const fetchedRaw =
       fetched?.status === "success" && Array.isArray(fetched.result) ? (fetched.result[0] as bigint) : null;
     const lastRaw = last?.status === "success" && last.result != null ? (last.result as bigint) : null;
-    const raw = fetchedRaw != null && fetchedRaw > BigInt(0) ? fetchedRaw : lastRaw;
-    if (raw == null || raw <= BigInt(0)) return; // unpriced — absence, never 0
-    out.set(b.key, {
-      priceUsd: Number(raw) / scale,
-      stale: !(fetchedRaw != null && fetchedRaw > BigInt(0)),
-    });
+    const p = settlePrice(b, fetchedRaw, lastRaw);
+    if (p) out.set(b.key, p);
   });
 
   return out;

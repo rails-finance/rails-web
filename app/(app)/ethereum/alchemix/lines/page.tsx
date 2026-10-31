@@ -8,6 +8,7 @@ import {
   AlchemixV2CoveragePanel,
 } from "@/components/protocol/alchemix/alchemix-lines-panel";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
+import { ALCHEMIX_HOW_IT_WORKS } from "@/lib/alchemix/learn-more";
 import { ALCHEMIX_ETHEREUM } from "@/lib/alchemix/lines";
 import {
   alchemixLinesPageData,
@@ -39,7 +40,7 @@ export default async function AlchemixEthereumLinesPage() {
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader protocol={PROTOCOL} title="Lines" />
+        <SubPageHeader protocol={PROTOCOL} title="Lines" learnMore={ALCHEMIX_HOW_IT_WORKS} />
         <AlchemixCoverageGroup title="Alchemist positions">
           <AlchemixLinesPanel lines={lines} />
         </AlchemixCoverageGroup>

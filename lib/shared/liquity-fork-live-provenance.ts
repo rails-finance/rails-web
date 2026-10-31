@@ -30,6 +30,7 @@
 //     the whole roster and its queues rather than a single trove.
 
 import type { Provenance, ProvInput, ProvScaling, ProvVerify } from "@/components/shared/provenance";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { scalingOf } from "@/lib/liquity/event-provenance";
 import { EBISU_BRANCHES, DEBT_SYMBOL as EBISU_DEBT } from "@/lib/ebisu/asset-catalog";
 import { ASYMMETRY_BRANCHES, DEBT_SYMBOL as ASYMMETRY_DEBT } from "@/lib/asymmetry/asset-catalog";
@@ -548,9 +549,31 @@ const VOCABS: Record<string, LiquityForkLiveVocab> = {
   }),
 };
 
-/** The live-lane vocabulary for a fork explorer, keyed by protocol id. */
-export function forkLiveVocab(protocolId: string): LiquityForkLiveVocab {
-  return VOCABS[protocolId] ?? VOCABS.ebisu;
+/** The live-lane vocabulary for a fork explorer, keyed by protocol id. With
+ *  `readBy` (a read rails-server made, lib/sources/api/liquity-fork-head.ts),
+ *  each receipt's via line names the block for "@ head", when rails-server
+ *  read it and the leg that answered. */
+export function forkLiveVocab(
+  protocolId: string,
+  readBy?: (PositionHeadStamp & { block: number }) | null,
+): LiquityForkLiveVocab {
+  const vocab = VOCABS[protocolId] ?? VOCABS.ebisu;
+  if (!readBy) return vocab;
+  const at = `@ block ${readBy.block.toLocaleString("en-US")}`;
+  const tail = ` · read by rails-server at ${readBy.readAt.slice(11, 19)} UTC through ${readBy.provider}`;
+  const stamp = (p: Provenance): Provenance =>
+    p && typeof p.via === "string" ? { ...p, via: `${p.via.replaceAll("@ head", at)}${tail}` } : p;
+  return Object.fromEntries(
+    Object.entries(vocab).map(([k, fn]) => [
+      k,
+      typeof fn === "function" ? (...args: unknown[]) => stamp((fn as (...a: unknown[]) => Provenance)(...args)) : fn,
+    ]),
+  ) as unknown as LiquityForkLiveVocab;
+}
+
+/** The read stamp `forkLiveVocab` takes, from a live answer that carries one. */
+export function forkReadBy(answer: { head?: PositionHeadStamp; blockNumber: number } | null | undefined) {
+  return answer?.head ? { ...answer.head, block: answer.blockNumber } : null;
 }
 
 /** The stablecoin each explorer on this machinery mints (display symbol). */

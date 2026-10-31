@@ -43,15 +43,14 @@ import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { liquityForkRedemptionContent, type LiquityForkLearnMoreParams } from "@/lib/shared/learn-more-content";
-import { forkLiveVocab } from "@/lib/shared/liquity-fork-live-provenance";
+import { forkLiveVocab, forkReadBy } from "@/lib/shared/liquity-fork-live-provenance";
 import { formatExact, formatUsdValue } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl } from "@/lib/shared/chains";
 import type { LiquityForkBranchesResponse, LiquityForkBranchState } from "@/lib/api/fetch-liquity-fork-branches";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-
-const LINK = "text-blue-500 hover:underline";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const ratePct = (x: number) => `${x.toFixed(2)}%`;
 const ratio = (x: number) => `${(x * 100).toFixed(1)}%`;
@@ -113,7 +112,7 @@ function BranchCard({
   hrefBase: string;
   wiring: Required<LiquityForkUrlWiring>;
 }) {
-  const vocab = forkLiveVocab(data.protocol);
+  const vocab = forkLiveVocab(data.protocol, forkReadBy(data));
   const sym = branch.symbol;
 
   if (branch.stale) {
@@ -399,7 +398,7 @@ export function LiquityForkBranchesView({
         {queued.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">
             {queued.map((b) => (
-              <Link key={b.key} href={queueHref(basePath, b.symbol, wiring)} className={`text-[13px] ${LINK}`}>
+              <Link key={b.key} href={queueHref(basePath, b.symbol, wiring)} className={`text-[13px] ${INLINE_LINK}`}>
                 {b.symbol} queue <span aria-hidden>→</span>
               </Link>
             ))}

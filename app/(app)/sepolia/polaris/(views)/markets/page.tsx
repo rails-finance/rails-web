@@ -8,6 +8,7 @@
 
 import { PolarisMarketsView, PolarisMarketsStamp } from "@/components/protocol/polaris/polaris-markets-view";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
+import { polarisModal } from "@/lib/polaris/event-templates";
 import { loadPolarisMarketsFromChain } from "@/lib/sources/chain/polaris-position";
 import { loadPolarisBook } from "@/lib/sources/api/polaris-book";
 import { protocolForHref } from "@/lib/shared/protocols";
@@ -36,7 +37,12 @@ export default async function PolarisMarketsPage() {
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader protocol={PROTOCOL} title="Markets" stamp={<PolarisMarketsStamp chain={chain} />} />
+        <SubPageHeader
+          protocol={PROTOCOL}
+          title="Markets"
+          learnMore={polarisModal("market")}
+          stamp={<PolarisMarketsStamp chain={chain} />}
+        />
         {/* data-skel-section feeds the skeleton memory layer, so ./loading.tsx
             paints this region at the height it was last measured at. */}
         <div data-skel-section="page-table">

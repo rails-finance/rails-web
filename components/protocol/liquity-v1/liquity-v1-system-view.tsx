@@ -73,8 +73,7 @@ import type { LiquityV1SystemChainResponse } from "@/lib/api/fetch-liquity-v1-sy
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-
-const LINK = "text-blue-500 hover:underline";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const ratio = (x: number) => `${(x * 100).toFixed(1)}%`;
 
@@ -94,7 +93,7 @@ const feePct = (x: number) => {
 /** The listing URL that IS the redemption queue: every open Trove, lowest
  *  collateral ratio first.
  *
- *  ⚠️ THIS LINK FAILS SILENT IF IT DRIFTS. The listing ignores a `sortBy` it
+ *  ⚠️ THIS INLINE_LINK FAILS SILENT IF IT DRIFTS. The listing ignores a `sortBy` it
  *  does not recognise and serves its DEFAULT view (recency), so a renamed sort
  *  value leaves a page that looks entirely correct and shows the wrong Troves
  *  under a heading promising the queue. `sortBy=ratio` is the backend allow-list
@@ -337,7 +336,7 @@ function QueueCard({ data }: { data: LiquityV1SystemChainResponse }) {
           The sorted list didn&rsquo;t answer on this read, so the queue is withheld rather than estimated.
         </p>
       ) : (
-        <Link href={QUEUE_HREF} className={`mt-3 inline-block text-[13px] ${LINK}`}>
+        <Link href={QUEUE_HREF} className={`mt-3 inline-block text-[13px] ${INLINE_LINK}`}>
           Open the queue in the listing <span aria-hidden>&rarr;</span>
         </Link>
       )}

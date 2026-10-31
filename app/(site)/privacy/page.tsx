@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
 import { LEGAL_LAST_UPDATED } from "@/lib/shared/site-dates";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const SHARE = {
   title: "Privacy Policy | Rails",
@@ -172,13 +173,13 @@ export default function PrivacyPage() {
           <ul className="list-none text-rb-500">
             <li>
               Twitter/X:{" "}
-              <a href="https://x.com/rails_finance" className="text-blue-500 hover:underline">
+              <a href="https://x.com/rails_finance" className={INLINE_LINK}>
                 @rails_finance
               </a>
             </li>
             <li>
               GitHub:{" "}
-              <a href="https://github.com/rails-finance" className="text-blue-500 hover:underline">
+              <a href="https://github.com/rails-finance" className={INLINE_LINK}>
                 github.com/rails-finance
               </a>
             </li>

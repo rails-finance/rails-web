@@ -36,8 +36,7 @@ import {
   hubLtRangeProv,
   hubSupplyApyProv,
 } from "@/lib/aave-v4/hub-provenance";
-
-const LINK = "text-blue-500 hover:underline";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 // Display order for the class filter — stablecoin first, "other" last.
 const CLASS_ORDER: AssetClass[] = ["stablecoin", "eth", "btc", "gold", "other"];
@@ -270,7 +269,7 @@ export function AaveV4HubViews({ views, block }: { views: HubView[]; block?: num
         <div className="rounded-lg border border-rb-200 py-12 text-center text-rb-500 dark:border-rb-800">
           <p className="mb-1">No credit lines match these filters.</p>
           {filtersActive && (
-            <button type="button" onClick={clearFilters} className={`text-[13px] ${LINK}`}>
+            <button type="button" onClick={clearFilters} className={`text-[13px] ${INLINE_LINK}`}>
               Clear filters
             </button>
           )}
@@ -315,7 +314,7 @@ export function AaveV4HubViews({ views, block }: { views: HubView[]; block?: num
                       </div>
                     </td>
                     <td className="px-3 py-2.5 text-[13px]">
-                      <Link href={listingHref(hub)} className={LINK}>
+                      <Link href={listingHref(hub)} className={INLINE_LINK}>
                         {hubLabel}
                       </Link>
                     </td>
@@ -328,7 +327,7 @@ export function AaveV4HubViews({ views, block }: { views: HubView[]; block?: num
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-[13px]" title={`Supplied ${sUsd.title}`}>
                       {a.suppliedUsd > 0 ? (
-                        <Link href={listingHref(hub, { symbol: a.symbol, side: "supply" })} className={LINK}>
+                        <Link href={listingHref(hub, { symbol: a.symbol, side: "supply" })} className={INLINE_LINK}>
                           <Prov info={hubAssetValueProv("supplied", a.symbol, coords)}>{sUsd.display}</Prov>
                         </Link>
                       ) : (
@@ -337,7 +336,7 @@ export function AaveV4HubViews({ views, block }: { views: HubView[]; block?: num
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-[13px]" title={`Borrowed ${bUsd.title}`}>
                       {hasBorrow ? (
-                        <Link href={listingHref(hub, { symbol: a.symbol, side: "borrow" })} className={LINK}>
+                        <Link href={listingHref(hub, { symbol: a.symbol, side: "borrow" })} className={INLINE_LINK}>
                           <Prov info={hubAssetValueProv("borrowed", a.symbol, coords)}>{bUsd.display}</Prov>
                         </Link>
                       ) : a.canBorrow === false ? (

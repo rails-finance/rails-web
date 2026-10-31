@@ -143,6 +143,13 @@ export const RESET_LINK = "text-xs font-semibold text-teal-600 hover:text-teal-5
 export const PAGE_LINK = "text-xs font-semibold text-blue-500 hover:underline cursor-pointer";
 
 /**
+ * A link inside running prose (an info page's blurb, an explanation's
+ * sentence): blue, underlined on hover, and the sentence's own size and
+ * weight. PAGE_LINK fixes both, for a link that stands beside a control.
+ */
+export const INLINE_LINK = "text-blue-500 hover:underline";
+
+/**
  * Dropdown / overlay-panel title — the heading row at the top of every
  * `overlay-panel` (sort menu, filter dropdown, filter-section dropdown, …). One
  * token so every dropdown opens with the same title treatment. Canonical

@@ -5,12 +5,12 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("liquity-v2");
 
 const H = "mt-5 text-sm font-semibold text-foreground";
 const UL = "mt-1.5 list-disc space-y-1 pl-5";
-const LINK = "text-blue-500 hover:underline";
 
 const intro = (
   <>
@@ -89,8 +89,8 @@ const intro = (
       </li>
       <li>
         A queue link per branch opens its Troves in redemption order.{" "}
-        <Link href="/ethereum/liquity-v2/branches" className={LINK}>
-          Open the branches
+        <Link href="/ethereum/liquity-v2/branches" className={INLINE_LINK}>
+          See the branches
         </Link>
         .
       </li>

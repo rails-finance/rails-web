@@ -332,12 +332,15 @@ export function useAaveV4SpokeCardSlots({
       <SpokeIdentity name={spoke.name} hub={spoke.hub} debtHubs={spoke.debtHubs} />
     </span>
   );
-  // The owner transaction count and the liquidation triangle; the closed
-  // card's tip also gives the events behind them.
+  // The owner transaction count, the liquidation triangle, then the time
+  // since the last event, as every detail card orders them; the closed card's
+  // tip also gives the events behind them.
   const counters = {
+    lastActivityAt: spoke.lastActivityAt,
     eventCount: spoke.txCount,
     ...(isClosed ? { eventTotal: spoke.eventCount } : {}),
     liquidationCount: spoke.liquidationCount,
+    order: "age-last" as const,
   };
   const explainer = {
     body: showInfo ? (

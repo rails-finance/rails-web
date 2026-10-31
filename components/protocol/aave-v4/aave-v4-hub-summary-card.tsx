@@ -23,8 +23,7 @@ import { hubSummaryText, hubSupplyWeightedLt, type HubView } from "@/lib/aave-v4
 import { ASSET_CLASS_COLOR } from "@/lib/aave-v4/asset-class";
 import { Prov } from "@/components/shared/provenance";
 import { hubTotalValueProv, hubWeightedLtProv, type HubProvCoords } from "@/lib/aave-v4/hub-provenance";
-
-const LINK = "text-blue-500 hover:underline";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 // Spoke pill — an obvious, tappable link into the listing filtered to that
 // spoke. Full set always shown (never truncated): they wrap.
@@ -109,7 +108,7 @@ export function AaveV4HubSummaryCard({ hub, block }: { hub: HubView; block?: num
               it is stated (exempt), like the pilots' roster counts. */}
           <dd data-prov-exempt="" className="tabular-nums text-base font-semibold text-foreground">
             {hub.positionCount > 0 ? (
-              <Link href={listingHref(hub.hub)} className={LINK} title={`View positions in ${hub.label}`}>
+              <Link href={listingHref(hub.hub)} className={INLINE_LINK} title={`View positions in ${hub.label}`}>
                 {hub.positionCount.toLocaleString("en-US")}
               </Link>
             ) : (
@@ -172,7 +171,7 @@ export function AaveV4HubSummaryCard({ hub, block }: { hub: HubView; block?: num
         {hub.positionCount > 0 && (
           <Link
             href={listingHref(hub.hub)}
-            className={`mt-3 inline-flex items-center gap-1 text-[13px] font-medium ${LINK}`}
+            className={`mt-3 inline-flex items-center gap-1 text-[13px] font-medium ${INLINE_LINK}`}
           >
             View all {hub.positionCount.toLocaleString("en-US")} {hub.label} positions
             <span aria-hidden>→</span>

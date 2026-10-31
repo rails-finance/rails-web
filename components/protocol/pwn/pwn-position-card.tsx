@@ -64,6 +64,7 @@ import type { PwnAsset } from "@/lib/sources/api/pwn-positions";
 import type { PwnBundleAsset } from "@/lib/api/fetch-pwn-bundle";
 import { PwnMenuRows } from "./pwn-menu-rows";
 import { PanelFigure } from "@/components/shared/position-card-panel";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export interface PwnPositionView {
   loanId: string;
@@ -539,10 +540,7 @@ export function pwnCardSlots({
         {side && other && (
           <span className="basis-full text-[11px] sm:basis-auto">
             read as the {side} ·{" "}
-            <Link
-              href={`/ethereum/pwn/${other}?loan=${encodeURIComponent(v.loanId)}`}
-              className="text-blue-500 hover:underline"
-            >
+            <Link href={`/ethereum/pwn/${other}?loan=${encodeURIComponent(v.loanId)}`} className={INLINE_LINK}>
               Read as the {side === "lender" ? "borrower" : "lender"}
             </Link>
           </span>

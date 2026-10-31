@@ -3,10 +3,12 @@
 // The liquidation card's before → after health factor (rails-ops TO-DO-ui-jobs
 // §100). SERVER-ONLY.
 
-import { formatUnits, getAddress, parseAbi } from "viem";
+import { getAddress, parseAbi } from "viem";
 import { chainClient } from "./rpc";
 import { SPOKE_ADDRESS_BY_KEY, BASE_SPOKE_ADDRESSES, chainIdForSpokeAddress } from "@/lib/aave-v4/spoke-meta";
 import { TOKEN_ADDR } from "@/lib/aave/prices";
+import { serverAaveV4HealthFactorAround } from "@/lib/sources/api/aave-v4-at-block";
+import { settleHealthFactorAt, settleHealthFactorReserve } from "./aave-v4-settle";
 
 const ABI = parseAbi([
   "function getUserAccountData(address user) view returns (uint256 riskPremium, uint256 avgCollateralFactor, uint256 healthFactor, uint256 totalCollateralValue, uint256 totalDebtValueRay, uint256 activeCollateralCount, uint256 borrowCount)",
@@ -19,9 +21,6 @@ const ABI = parseAbi([
 // (spoke, underlying) → reserve id and token decimals. A spoke's reserve list
 // only grows, so an id once found never changes.
 const reserveIds = new Map<string, { id: number; decimals: number }>();
-
-// getUserAccountData answers type(uint256).max when the account has no debt.
-const UINT_MAX = (BigInt(1) << BigInt(256)) - BigInt(1);
 
 const KNOWN_SPOKES = new Set<string>([
   ...Object.values(SPOKE_ADDRESS_BY_KEY).map((a) => a.toLowerCase()),
@@ -62,7 +61,22 @@ export interface AaveV4HealthFactorResponse {
   premiumDebt?: { before: string; after: string };
 }
 
+/** From rails-server's at-block store first (lib/sources/api/aave-v4-at-block.ts),
+ *  the chain when it cannot answer. */
 export async function loadAaveV4HealthFactorAround(
+  spokeAddress: string,
+  walletRaw: string,
+  block: number,
+  assetSymbol?: string,
+): Promise<AaveV4HealthFactorResponse> {
+  const underlying = assetSymbol ? TOKEN_ADDR[assetSymbol]?.toLowerCase() : undefined;
+  const served = await serverAaveV4HealthFactorAround(spokeAddress, walletRaw, block, underlying);
+  if (served) return served;
+  return readHealthFactorAroundFromChain(spokeAddress, walletRaw, block, assetSymbol);
+}
+
+/** The chain path: the same reads through Alchemy. */
+export async function readHealthFactorAroundFromChain(
   spokeAddress: string,
   walletRaw: string,
   block: number,
@@ -79,14 +93,7 @@ export async function loadAaveV4HealthFactorAround(
       args: [wallet],
       blockNumber: BigInt(at),
     })) as readonly bigint[];
-    const [riskPremium, avgCollateralFactor, healthFactor, , , activeCollateralCount, borrowCount] = data;
-    return {
-      block: at,
-      wad: borrowCount === BigInt(0) || healthFactor >= UINT_MAX ? null : healthFactor.toString(),
-      collateralFactor: activeCollateralCount === BigInt(0) ? null : Number(avgCollateralFactor) / 1e18,
-      collateralCount: Number(activeCollateralCount),
-      riskPremiumBps: Number(riskPremium),
-    };
+    return settleHealthFactorAt(at, data);
   };
   const findReserve = async (): Promise<{ id: number; decimals: number } | null> => {
     const underlying = assetSymbol ? TOKEN_ADDR[assetSymbol]?.toLowerCase() : undefined;
@@ -134,10 +141,7 @@ export async function loadAaveV4HealthFactorAround(
         }) as Promise<readonly [bigint, bigint]>,
       ]);
     const [[sb, db], [sa, da]] = await Promise.all([at(block - 1), at(block)]);
-    return {
-      collateral: { before: sb[0], after: sa[0] },
-      premiumDebt: { before: formatUnits(db[1], reserve.decimals), after: formatUnits(da[1], reserve.decimals) },
-    };
+    return settleHealthFactorReserve(reserve.decimals, { status: sb, debt: db }, { status: sa, debt: da });
   };
   const [before, after, reserve] = await Promise.all([
     read(block - 1),

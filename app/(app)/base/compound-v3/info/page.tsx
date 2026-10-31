@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("compound-base");
 
@@ -21,7 +22,7 @@ const intro = (
       Comet), with base supplied or borrowed and collateral posted, every figure read from that market&rsquo;s contract
       at the block the row names, with dollar values from the feeds the market liquidates with. Opening a row shows that
       position with its whole history; the wallet&rsquo;s own page holds one card per market it has touched. Or{" "}
-      <Link href="/base/compound-v3/market" className="text-blue-500 hover:underline">
+      <Link href="/base/compound-v3/market" className={INLINE_LINK}>
         see each market and how heavily it is lent out
       </Link>
       .

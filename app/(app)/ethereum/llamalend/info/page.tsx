@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("llamalend");
 
@@ -22,7 +23,7 @@ const intro = (
     <p>
       Each row of the listing is one position — a market and a borrower — showing its collateral, its debt, and how much
       of the collateral currently stands converted. Or{" "}
-      <Link href="/ethereum/llamalend/markets" className="text-blue-500 hover:underline">
+      <Link href="/ethereum/llamalend/markets" className={INLINE_LINK}>
         see every market and its own terms
       </Link>
       .
