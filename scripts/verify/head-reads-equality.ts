@@ -19,13 +19,18 @@
 // maker-vault|id, lv1-system, lv1-position|wallet, llamalend-markets,
 // llamalend-state, llamalend-position|controller|user, frankencoin-system,
 // frankencoin-position|position, maple-pools, llamalend-rows|offset,
-// fluid-vaults, fluid-position|nft. The `head` stamp a served answer carries
-// is set aside in the comparison. One fixture at a time, 600 ms
-// apart. rails-ops decisions/0056 step 3, census rank 12 stage 8.
+// fluid-vaults, fluid-position|nft, and the vault readers (`vaultHeadClient`):
+// aave-vault|vault[|holder], yearn-vault|vault[|holder],
+// morpho-vault|vault[|holder] and morpho-exposure|holder on Base,
+// aave-directory, yearn-directory, morpho-directory. The chain run reads Base
+// on EQ_RPC_BASE (BASE_RPC_URL's client when unset). The `head` stamp a served
+// answer carries and a directory's `readAt` wall clock are set aside in the
+// comparison. One fixture at a time, EQ_GAP_MS (600 ms) apart.
+// rails-ops decisions/0056 step 3, census rank 12 stages 7 and 8.
 
 import { readFileSync, appendFileSync } from "node:fs";
 import { createPublicClient, http, type PublicClient } from "viem";
-import { mainnet } from "viem/chains";
+import { base as baseChain, mainnet } from "viem/chains";
 import { lastServerHead, overrideHeadReadsClient } from "@/lib/sources/api/head-reads-client";
 import { pinnedClient } from "@/lib/sources/chain/replay-client";
 import { chainClient } from "@/lib/sources/chain/rpc";
@@ -47,9 +52,18 @@ import { loadFluidPositionFromChain } from "@/lib/sources/chain/fluid-position";
 import { buildLlamalendPositionRows, type RawLlamalendPositionRow } from "@/lib/sources/api/llamalend-positions";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import type { FxPoolKey } from "@/lib/fx/asset-catalog";
+import { loadAaveEthereumVault } from "@/lib/sources/chain/aave-ethereum-vault";
+import { loadYearnEthereumVault } from "@/lib/sources/chain/yearn-ethereum-vault";
+import { loadMorphoBaseVault } from "@/lib/sources/chain/morpho-base-vault";
+import { loadMorphoBaseHolderExposure } from "@/lib/sources/chain/morpho-base-holder-exposure";
+import { loadAaveEthereumVaultDirectory } from "@/lib/sources/chain/aave-ethereum-vault-directory";
+import { loadYearnEthereumVaultDirectory } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
+import { loadMorphoBaseVaultDirectory } from "@/lib/sources/chain/morpho-base-vault-directory";
+import type { ChainId } from "@/lib/shared/chains";
 
 const MODE = process.env.EQ_MODE;
 const OUT = process.env.EQ_OUT!;
+const GAP_MS = Number(process.env.EQ_GAP_MS ?? 600);
 
 type Fx = { kind: string; args: string[] };
 
@@ -79,16 +93,31 @@ const LOADERS: Record<string, (a: string[]) => Promise<unknown>> = {
     const raw = (await res.json()) as { rows: RawLlamalendPositionRow[] };
     return buildLlamalendPositionRows(raw.rows, new Map());
   },
+  "aave-vault": ([v, h]) => loadAaveEthereumVault(v, h || undefined),
+  "yearn-vault": ([v, h]) => loadYearnEthereumVault(v, h || undefined),
+  "morpho-vault": ([v, h]) => loadMorphoBaseVault(v, h || undefined),
+  "morpho-exposure": ([h]) => loadMorphoBaseHolderExposure(h),
+  "aave-directory": () => loadAaveEthereumVaultDirectory(),
+  "yearn-directory": () => loadYearnEthereumVaultDirectory(),
+  "morpho-directory": () => loadMorphoBaseVaultDirectory(),
 };
+
+/** The chain a fixture's reader pins its block on. */
+const chainOf = (kind: string): ChainId => (kind.startsWith("morpho-") ? 8453 : 1) as ChainId;
 
 const json = (v: unknown) =>
   JSON.stringify(v, (_k, x) =>
     typeof x === "bigint" ? x.toString() : x instanceof Map ? Object.fromEntries([...x.entries()]) : x,
   );
 
-/** The answer without rails-server's `head` stamps, which only the served side carries. */
+/** The answer without rails-server's `head` stamps, which only the served side carries, and a directory's wall clock. */
 const withoutHead = (v: unknown): unknown =>
-  JSON.parse(json(v), (k, x) => (k === "head" && x && typeof x === "object" && "readAt" in x ? undefined : x));
+  JSON.parse(
+    JSON.stringify(
+      JSON.parse(json(v), (k, x) => (k === "head" && x && typeof x === "object" && "readAt" in x ? undefined : x)),
+    ),
+    (k, x) => (k === "readAt" && typeof x === "string" ? undefined : x),
+  );
 
 /** A served answer that says it was not read is no comparison. */
 const stale = (v: unknown) =>
@@ -109,19 +138,26 @@ async function main() {
     for (const f of fixtures) {
       try {
         const value = await LOADERS[f.kind](f.args);
-        const block = await lastServerHead(1);
+        const block = await lastServerHead(chainOf(f.kind));
         appendFileSync(OUT, json({ ...f, block, stale: stale(value), value }) + "\n");
         console.log(f.kind, f.args.join(" ").slice(0, 60), block, stale(value) ? "STALE" : "ok");
       } catch (e) {
         appendFileSync(OUT, json({ ...f, error: String((e as Error).message).slice(0, 200) }) + "\n");
         console.log(f.kind, f.args.join(" ").slice(0, 60), "ERROR", String((e as Error).message).slice(0, 120));
       }
-      await sleep(600);
+      await sleep(GAP_MS);
     }
   } else if (MODE === "chain") {
-    const base: PublicClient = process.env.EQ_RPC
-      ? (createPublicClient({ chain: mainnet, transport: http(process.env.EQ_RPC) }) as PublicClient)
-      : chainClient(1);
+    const bases: Partial<Record<number, PublicClient>> = {
+      1: process.env.EQ_RPC
+        ? (createPublicClient({ chain: mainnet, transport: http(process.env.EQ_RPC) }) as PublicClient)
+        : chainClient(1),
+    };
+    const baseFor = (id: ChainId): PublicClient =>
+      (bases[id] ??=
+        id === 8453 && process.env.EQ_RPC_BASE
+          ? (createPublicClient({ chain: baseChain, transport: http(process.env.EQ_RPC_BASE) }) as PublicClient)
+          : chainClient(id));
     let equal = 0;
     let differ = 0;
     let skipped = 0;
@@ -132,16 +168,18 @@ async function main() {
         console.log(s.kind, s.args.join(" ").slice(0, 60), "SKIP", s.error ?? (s.stale ? "stale" : "no block"));
         continue;
       }
-      const pinned = pinnedClient(base, s.block!);
       const B = BigInt(s.block!);
-      // LlamaLend's discovery probes the V2 factory's structs with a raw call.
-      const withCall = new Proxy(pinned, {
-        get: (t, prop, r) =>
-          prop === "call"
-            ? (p: Parameters<PublicClient["call"]>[0]) => base.call({ ...p, blockNumber: B } as never)
-            : Reflect.get(t, prop, r),
-      });
-      overrideHeadReadsClient(() => withCall);
+      // LlamaLend's discovery probes the V2 factory's structs with a raw call;
+      // the vault readers read a holder's code and two storage words.
+      const at = (base: PublicClient) =>
+        new Proxy(pinnedClient(base, s.block!), {
+          get: (t, prop, r) =>
+            prop === "call" || prop === "getCode" || prop === "getStorageAt"
+              ? (p: object) => (base[prop] as (a: unknown) => unknown)({ ...p, blockNumber: B })
+              : Reflect.get(t, prop, r),
+        });
+      // A reader on another chain than the fixture's is not pinned: it is no part of this comparison.
+      overrideHeadReadsClient((id) => (id === chainOf(s.kind) ? at(baseFor(id)) : baseFor(id)));
       try {
         const old = await LOADERS[s.kind](s.args);
         const same = json(withoutHead(old)) === json(withoutHead(s.value));
@@ -163,7 +201,7 @@ async function main() {
         differ++;
         console.log(s.kind, s.args.join(" ").slice(0, 60), "ERROR", String((e as Error).message).slice(0, 120));
       }
-      await sleep(600);
+      await sleep(GAP_MS);
     }
     console.log(JSON.stringify({ equal, differ, skipped }));
   } else {

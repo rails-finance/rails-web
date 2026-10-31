@@ -113,7 +113,7 @@
 
 import { parseAbi, type ContractFunctionParameters } from "viem";
 import { chainBatchClient } from "./rpc";
-import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
+import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta, assertDecimalsRead, erc20NameOf } from "./erc20-meta";

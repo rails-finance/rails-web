@@ -52,7 +52,7 @@
 
 import { parseAbi } from "viem";
 import { chainBatchClient } from "./rpc";
-import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
+import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import {
   loadMorphoBaseHolderShape,
   loadMorphoBaseVault,

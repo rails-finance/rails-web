@@ -1,6 +1,6 @@
 // Which blocks rails-server's head routes named, and who read them.
 // ----------------------------------------------------------------------------
-// `vault-head-client.ts` and `head-reads-client.ts` pin a page's reads to the
+// `head-reads-client.ts` pins a page's reads to the
 // block rails-server named (`head` on its answer: the block's time, when it
 // read it and the leg). A reader that finishes at that block asks here for the
 // stamp its receipts print (`lib/shared/server-head-read.ts`). A block that any
