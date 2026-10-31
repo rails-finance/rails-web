@@ -40,6 +40,7 @@
 //     case-study vault, measured). So either figure can be the larger, and no
 //     receipt here asserts an order between them.
 
+import { withServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import type { Provenance } from "@/components/shared/provenance";
 import { MORPHO_BASE_BLUE } from "@/lib/morpho-base/asset-catalog";
 import type { MorphoBaseVaultHolderShape } from "@/lib/sources/chain/morpho-base-vault";
@@ -47,6 +48,8 @@ import type { MorphoBaseVaultHolderShape } from "@/lib/sources/chain/morpho-base
 const LANE = "live Base chain reads (/base/morpho/vaults)";
 
 export interface MorphoVaultCoords {
+  /** rails-server's read of `blockNumber`, when it answered every read of the page. */
+  readBy?: ServerRead | null;
   /** The block every figure was read at — every receipt's `source` block. */
   blockNumber?: number;
   /** The vault contract — the `contract` on every MetaMorpho-side receipt. */
@@ -90,7 +93,7 @@ const legName = (c: MorphoVaultCoords) => (c.collateralSymbol ? `${c.collateralS
 /** `totalAssets()` — MetaMorpho's OWN figure for what the vault holds. It walks
  *  the supply queue and adds interest accrued to the block timestamp, so it is
  *  ahead of the stored market totals the allocation table sums. */
-export const vaultTotalAssetsProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultTotalAssetsProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -107,7 +110,7 @@ export const vaultTotalAssetsProv = (c: MorphoVaultCoords): Provenance => ({
 
 /** `totalSupply()` — every vault share in existence. The denominator of every
  *  attribution on the page. */
-export const vaultTotalSupplyProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultTotalSupplyProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -118,7 +121,7 @@ export const vaultTotalSupplyProv = (c: MorphoVaultCoords): Provenance => ({
 });
 
 /** `convertToAssets(10^decimals)` — one whole share, priced by the vault itself. */
-export const vaultSharePriceProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultSharePriceProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -130,7 +133,7 @@ export const vaultSharePriceProv = (c: MorphoVaultCoords): Provenance => ({
 
 /** `lostAssets()` — V1.1's own ledger of the shortfall it has NOT taken off the share price. Never shown
  *  for a V1.0 vault: that family reverts on the call, and a revert is not a zero. */
-export const vaultLostAssetsProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultLostAssetsProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -144,7 +147,7 @@ export const vaultLostAssetsProv = (c: MorphoVaultCoords): Provenance => ({
 
 /** One leg's assets — Blue's own share→asset conversion on the market's STORED
  *  totals, for the vault's own supply position. */
-export const vaultLegAssetsProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultLegAssetsProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -179,7 +182,7 @@ export const vaultLegAssetsProv = (c: MorphoVaultCoords): Provenance => ({
 
 /** A leg's share of the allocated total — a ratio of two figures in the same
  *  token, so the decimals cancel and no price is needed. */
-export const vaultLegShareProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultLegShareProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -191,7 +194,7 @@ export const vaultLegShareProv = (c: MorphoVaultCoords): Provenance => ({
 
 /** The market's one rung. Immutable, and self-verifying: the id IS the hash of
  *  the params. */
-export const vaultLegLltvProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultLegLltvProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -206,7 +209,7 @@ export const vaultLegLltvProv = (c: MorphoVaultCoords): Provenance => ({
 
 /** Σ over the withdraw queue of each leg's stored assets — the vault's position
  *  in Blue as Blue itself last settled it. */
-export const vaultAllocatedProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultAllocatedProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -232,7 +235,7 @@ export const vaultAllocatedProv = (c: MorphoVaultCoords): Provenance => ({
 
 /** totalAssets − Σ legs. Interest the vault has extrapolated and the markets have
  *  not yet settled, plus whatever the vault carries outside its Blue positions. */
-export const vaultGapProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultGapProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -263,7 +266,7 @@ export const vaultGapProv = (c: MorphoVaultCoords): Provenance => ({
  *  a Safe is an exact singleton match, an ERC-4626 is a contract that answered
  *  two accessors, and a proxy is an address in a slot. NOTHING here is inferred
  *  from an ABI shape — a proxy's implementation is printed, not interpreted. */
-export const vaultHolderShapeProv = (c: MorphoVaultCoords, shape: MorphoBaseVaultHolderShape): Provenance => {
+const vaultHolderShapeProv_ = (c: MorphoVaultCoords, shape: MorphoBaseVaultHolderShape): Provenance => {
   const at = atBlock(c);
   const size = `${shape.codeSize.toLocaleString("en-US")} bytes`;
   const named = (name: string | null, symbol: string | null) =>
@@ -309,7 +312,7 @@ export const vaultHolderShapeProv = (c: MorphoVaultCoords, shape: MorphoBaseVaul
 
 /** The attribution itself — the page's central figure, and the one whose receipt
  *  must state what kind of claim it is. */
-export const vaultAttributedProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultAttributedProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -331,7 +334,7 @@ export const vaultAttributedProv = (c: MorphoVaultCoords): Provenance => ({
 
 /** Σ of the attributed rows — the holder's slice of the STORED legs, which is a
  *  different question from `convertToAssets` beside it. */
-export const vaultAttributedTotalProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultAttributedTotalProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -357,7 +360,7 @@ export const vaultAttributedTotalProv = (c: MorphoVaultCoords): Provenance => ({
  *  FLOOR: a MetaMorpho deployed without a factory emits no such event and is
  *  absent; vaults created since the census block are absent until it re-runs;
  *  the Vault V2 family is not catalogued at all. */
-export const vaultDirectoryCensusProv = (
+const vaultDirectoryCensusProv_ = (
   c: MorphoVaultCoords,
   census: { catalogSize: number; censusBlock: number },
 ): Provenance => ({
@@ -376,7 +379,7 @@ export const vaultDirectoryCensusProv = (
 /** `name()` — the vault's own current name, read live because it is MUTABLE:
  *  MetaMorpho V1.1 lets the owner rename, and 44 of 505 answered a different
  *  name at the census than their creation log carries. */
-export const vaultDirectoryNameProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultDirectoryNameProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -389,7 +392,7 @@ export const vaultDirectoryNameProv = (c: MorphoVaultCoords): Provenance => ({
 /** `totalAssets()` on a directory row — the vault's own figure for what it
  *  holds, in its asset. The directory orders a group by it and never compares
  *  it across assets. */
-export const vaultDirectoryTotalAssetsProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultDirectoryTotalAssetsProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -404,7 +407,7 @@ export const vaultDirectoryTotalAssetsProv = (c: MorphoVaultCoords): Provenance 
  *  per vault (see the loader's header note); it is the same call the per-vault
  *  page's `vaultSharePriceProv` makes, over the same 18-decimal share
  *  assumption `totalSupply` above already relies on. */
-export const vaultDirectorySharePriceProv = (c: MorphoVaultCoords): Provenance => ({
+const vaultDirectorySharePriceProv_ = (c: MorphoVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -416,7 +419,7 @@ export const vaultDirectorySharePriceProv = (c: MorphoVaultCoords): Provenance =
 
 /** How many catalogued vaults in one asset hold something at the block — a
  *  count over the rows' `totalAssets()` reads, and the size of a group. */
-export const vaultDirectoryGroupCountProv = (c: MorphoVaultCoords, n: number): Provenance => ({
+const vaultDirectoryGroupCountProv_ = (c: MorphoVaultCoords, n: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -428,7 +431,7 @@ export const vaultDirectoryGroupCountProv = (c: MorphoVaultCoords, n: number): P
 /** How many catalogued vaults hold nothing at the block. A READING, not an
  *  omission: each answered zero to `totalAssets()`; a vault whose read did not
  *  answer is counted separately and never here. */
-export const vaultDirectoryEmptyCountProv = (c: MorphoVaultCoords, n: number, catalogSize: number): Provenance => ({
+const vaultDirectoryEmptyCountProv_ = (c: MorphoVaultCoords, n: number, catalogSize: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -447,3 +450,23 @@ export const vaultDirectoryEmptyCountProv = (c: MorphoVaultCoords, n: number, ca
    the section's about page says the rest in words. The `finalized` cut is still
    receipted where it is READ — on a position page's timeline
    (lib/morpho-base/vault-timeline-provenance.ts), beside the rows it decides. */
+
+// Receipts over a page's reads stamp rails-server's head read when the coordinates carry it.
+export const vaultTotalAssetsProv = withServerRead(vaultTotalAssetsProv_);
+export const vaultTotalSupplyProv = withServerRead(vaultTotalSupplyProv_);
+export const vaultSharePriceProv = withServerRead(vaultSharePriceProv_);
+export const vaultLostAssetsProv = withServerRead(vaultLostAssetsProv_);
+export const vaultLegAssetsProv = withServerRead(vaultLegAssetsProv_);
+export const vaultLegShareProv = withServerRead(vaultLegShareProv_);
+export const vaultLegLltvProv = withServerRead(vaultLegLltvProv_);
+export const vaultAllocatedProv = withServerRead(vaultAllocatedProv_);
+export const vaultGapProv = withServerRead(vaultGapProv_);
+export const vaultHolderShapeProv = withServerRead(vaultHolderShapeProv_);
+export const vaultAttributedProv = withServerRead(vaultAttributedProv_);
+export const vaultAttributedTotalProv = withServerRead(vaultAttributedTotalProv_);
+export const vaultDirectoryCensusProv = withServerRead(vaultDirectoryCensusProv_);
+export const vaultDirectoryNameProv = withServerRead(vaultDirectoryNameProv_);
+export const vaultDirectoryTotalAssetsProv = withServerRead(vaultDirectoryTotalAssetsProv_);
+export const vaultDirectorySharePriceProv = withServerRead(vaultDirectorySharePriceProv_);
+export const vaultDirectoryGroupCountProv = withServerRead(vaultDirectoryGroupCountProv_);
+export const vaultDirectoryEmptyCountProv = withServerRead(vaultDirectoryEmptyCountProv_);

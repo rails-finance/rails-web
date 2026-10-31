@@ -28,6 +28,8 @@
 
 import { parseAbi, type ContractFunctionParameters } from "viem";
 import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { erc20NameOf, resolveErc20Meta } from "./erc20-meta";
 import type { RawAmount } from "./morpho-base-vault";
 import { YEARN_REGISTRY } from "@/lib/yearn/vault-catalog";
@@ -106,6 +108,8 @@ export interface YearnVaultStrategyRow {
 export interface YearnVaultResponse {
   /** The block every figure below was read at. */
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** True when the read failed: nothing below may be rendered as a fact. */
   chainStale: boolean;
   vault: {
@@ -345,6 +349,7 @@ export async function loadYearnEthereumVault(address: string, holder?: string): 
 
     return {
       blockNumber: Number(blockNumber),
+      head: serverHeadStampAt(YEARN_CHAIN_ID, blockNumber),
       chainStale: false,
       vault: {
         ...base,

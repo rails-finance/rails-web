@@ -13,6 +13,8 @@
 import { parseAbi, getAddress } from "viem";
 import { alchemyClient } from "./rpc";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { LIQUITY_V1_ADDRESSES, LIQUITY_V1_MCR, LIQUITY_V1_CCR } from "@/lib/liquity-v1/asset-catalog";
 import type { LiquityV1PositionChainResponse, LiquityV1TroveChainStatus } from "@/lib/api/fetch-liquity-v1-position";
 
@@ -171,6 +173,7 @@ export async function loadLiquityV1PositionFromChain(walletRaw: string): Promise
     return {
       wallet: wallet.toLowerCase(),
       blockNumber,
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       troveStatus,
       coll: Number(entireCollRaw) / E18,
       debt: Number(entireDebtRaw) / E18,

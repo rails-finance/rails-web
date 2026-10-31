@@ -32,6 +32,7 @@
 // projection of an event that has not happened, and the chain-truth gate refuses
 // it on the face.
 
+import { withServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import type { Provenance } from "@/components/shared/provenance";
 import type { VaultPositionValue } from "@/lib/aave-vaults/vault-position";
 import {
@@ -46,6 +47,8 @@ import { attestedClause, attestedShortName, type AttestedAddress } from "@/lib/s
 const LANE = "live Ethereum chain reads (/ethereum/aave/vaults)";
 
 export interface AaveVaultCoords {
+  /** rails-server's read of `blockNumber`, when it answered every read of the page. */
+  readBy?: ServerRead | null;
   /** The block every figure was read at — every receipt's `source` block. */
   blockNumber?: number;
   /** The vault contract — the `contract` on every vault-side receipt. */
@@ -105,7 +108,7 @@ export const attestationClause = (a: AaveVaultAttestation): string =>
 /** The denominator: how many vaults the section lists, and who said so. Not a
  *  census and not a floor — two enumerator calls and one published address, all
  *  at the block the page states. */
-export const aaveVaultCatalogueProv = (
+const aaveVaultCatalogueProv_ = (
   c: AaveVaultCoords,
   counts: { catalogSize: number; stataCount: number; stakeCount: number },
 ): Provenance => ({
@@ -124,7 +127,7 @@ export const aaveVaultCatalogueProv = (
 // ── what a vault says about itself ───────────────────────────────────────────
 
 /** `name()` — read live rather than kept in a catalogue. */
-export const aaveVaultNameProv = (c: AaveVaultCoords, attestation: AaveVaultAttestation): Provenance => ({
+const aaveVaultNameProv_ = (c: AaveVaultCoords, attestation: AaveVaultAttestation): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -137,7 +140,7 @@ export const aaveVaultNameProv = (c: AaveVaultCoords, attestation: AaveVaultAtte
 /** `totalAssets()` — with the family's own accounting note, because the three
  *  families compute it in three different ways and a single sentence about "the
  *  vault's assets" would be wrong for two of them. */
-export const aaveVaultTotalAssetsProv = (c: AaveVaultCoords, family: AaveVaultFamily): Provenance => {
+const aaveVaultTotalAssetsProv_ = (c: AaveVaultCoords, family: AaveVaultFamily): Provenance => {
   const mechanic =
     family === "sgho"
       ? `sGHO does NOT count the GHO it holds: \`totalAssets()\` is what its stored yield index says the shares are worth (\`convertToAssets(totalSupply())\`), and the GHO balance in the contract is a separate number that can be either side of it. Withdrawals are clamped to that balance, not to this figure.`
@@ -156,7 +159,7 @@ export const aaveVaultTotalAssetsProv = (c: AaveVaultCoords, family: AaveVaultFa
 };
 
 /** `totalSupply()` — every share in existence, in the SHARE token's decimals. */
-export const aaveVaultTotalSupplyProv = (c: AaveVaultCoords, shareDecimals: number): Provenance => ({
+const aaveVaultTotalSupplyProv_ = (c: AaveVaultCoords, shareDecimals: number): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -169,7 +172,7 @@ export const aaveVaultTotalSupplyProv = (c: AaveVaultCoords, shareDecimals: numb
 /** `convertToAssets(10 ** decimals)` — one whole share, priced by the vault. The
  *  exponent is READ, and the receipt says so: it is the difference between a
  *  share price and a number 1e12 too large. */
-export const aaveVaultSharePriceProv = (c: AaveVaultCoords, shareDecimals: number): Provenance => ({
+const aaveVaultSharePriceProv_ = (c: AaveVaultCoords, shareDecimals: number): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -184,7 +187,7 @@ export const aaveVaultSharePriceProv = (c: AaveVaultCoords, shareDecimals: numbe
 /** sGHO `targetRate()` — a governance CONFIGURATION read, in basis points as
  *  stored. Deliberately not turned into a yearly percentage or into anyone's
  *  earnings: that is a forecast of what the risk council will leave it at. */
-export const aaveVaultTargetRateProv = (c: AaveVaultCoords, bps: number): Provenance => ({
+const aaveVaultTargetRateProv_ = (c: AaveVaultCoords, bps: number): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -195,7 +198,7 @@ export const aaveVaultTargetRateProv = (c: AaveVaultCoords, bps: number): Proven
 });
 
 /** sGHO `supplyCap()` — the ceiling on what the vault will accept, in GHO. */
-export const aaveVaultSupplyCapProv = (c: AaveVaultCoords): Provenance => ({
+const aaveVaultSupplyCapProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -206,7 +209,7 @@ export const aaveVaultSupplyCapProv = (c: AaveVaultCoords): Provenance => ({
 });
 
 /** stata `aToken()` — the one aToken this wrapper wraps. */
-export const aaveVaultATokenProv = (c: AaveVaultCoords): Provenance => ({
+const aaveVaultATokenProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -218,7 +221,7 @@ export const aaveVaultATokenProv = (c: AaveVaultCoords): Provenance => ({
 
 /** Umbrella `getCooldown()` / `getUnstakeWindow()` — the two seconds a holder
  *  has to wait, and then has, before redeeming. */
-export const aaveVaultCooldownProv = (c: AaveVaultCoords, cooldown: number, window: number): Provenance => ({
+const aaveVaultCooldownProv_ = (c: AaveVaultCoords, cooldown: number, window: number): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -230,7 +233,7 @@ export const aaveVaultCooldownProv = (c: AaveVaultCoords, cooldown: number, wind
 
 /** Umbrella `isReserveSlashable(reserve)` — whether a deficit is outstanding on
  *  the reserve this stake token covers. A reading about the RESERVE. */
-export const aaveVaultSlashableProv = (c: AaveVaultCoords, reserveSymbol: string, slashable: boolean): Provenance => ({
+const aaveVaultSlashableProv_ = (c: AaveVaultCoords, reserveSymbol: string, slashable: boolean): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -243,7 +246,7 @@ export const aaveVaultSlashableProv = (c: AaveVaultCoords, reserveSymbol: string
 /** The reserve a stake token covers — derived by hopping `asset()` twice, which
  *  is a claim about the chain and gets its own receipt rather than riding on the
  *  cooldown's. */
-export const aaveVaultReserveHopProv = (c: AaveVaultCoords, reserveSymbol: string): Provenance => ({
+const aaveVaultReserveHopProv_ = (c: AaveVaultCoords, reserveSymbol: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -253,7 +256,7 @@ export const aaveVaultReserveHopProv = (c: AaveVaultCoords, reserveSymbol: strin
 });
 
 /** How many funded vaults hold one asset — a count over the same reads. */
-export const aaveVaultAssetGroupCountProv = (c: AaveVaultCoords, n: number): Provenance => ({
+const aaveVaultAssetGroupCountProv_ = (c: AaveVaultCoords, n: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -263,7 +266,7 @@ export const aaveVaultAssetGroupCountProv = (c: AaveVaultCoords, n: number): Pro
 });
 
 /** The address-book pill: Aave publishes this vault's address. */
-export const aaveVaultBookProv = (c: AaveVaultCoords, attestation: AaveVaultAttestation): Provenance => ({
+const aaveVaultBookProv_ = (c: AaveVaultCoords, attestation: AaveVaultAttestation): Provenance => ({
   kind: "offchain",
   pclass: "offchain",
   summary: `In Aave's address book — ${attestationClause(attestation)}.`,
@@ -272,7 +275,7 @@ export const aaveVaultBookProv = (c: AaveVaultCoords, attestation: AaveVaultAtte
 });
 
 /** How many vaults hold nothing at the block. A READING, not an omission. */
-export const aaveVaultEmptyCountProv = (c: AaveVaultCoords, n: number, catalogSize: number): Provenance => ({
+const aaveVaultEmptyCountProv_ = (c: AaveVaultCoords, n: number, catalogSize: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -297,7 +300,7 @@ const reserveOf = (c: AaveVaultCoords) => c.reserveSymbol ?? "the reserve";
 /** `GHO.balanceOf(sGHO)` — the asset the contract actually holds, which is a
  *  different number from `totalAssets()` and the one withdrawals are clamped
  *  to. */
-export const aaveSghoAssetHeldProv = (c: AaveVaultCoords): Provenance => ({
+const aaveSghoAssetHeldProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -308,7 +311,7 @@ export const aaveSghoAssetHeldProv = (c: AaveVaultCoords): Provenance => ({
 });
 
 /** `maxDeposit()` — what is left of the cap, answered by the vault. */
-export const aaveSghoCapacityProv = (c: AaveVaultCoords): Provenance => ({
+const aaveSghoCapacityProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -319,7 +322,7 @@ export const aaveSghoCapacityProv = (c: AaveVaultCoords): Provenance => ({
 });
 
 /** `lastUpdate()` — a STORED timestamp, and the distinction matters. */
-export const aaveSghoLastUpdateProv = (c: AaveVaultCoords): Provenance => ({
+const aaveSghoLastUpdateProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -332,7 +335,7 @@ export const aaveSghoLastUpdateProv = (c: AaveVaultCoords): Provenance => ({
 // ── static aTokens ───────────────────────────────────────────────────────────
 
 /** `aToken.balanceOf(wrapper)` — the supply position the wrapper holds. */
-export const aaveStataATokenBalanceProv = (c: AaveVaultCoords, aToken: string | null): Provenance => ({
+const aaveStataATokenBalanceProv_ = (c: AaveVaultCoords, aToken: string | null): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -350,7 +353,7 @@ export const aaveStataATokenBalanceProv = (c: AaveVaultCoords, aToken: string | 
  *  score, and it is not a total — the stake token's own supply is a claim on this
  *  one position, so the two layers hold the same assets and adding them counts
  *  them twice. */
-export const aaveVaultBackedByProv = (c: AaveVaultCoords, stakeSymbol: string, stake: string): Provenance => ({
+const aaveVaultBackedByProv_ = (c: AaveVaultCoords, stakeSymbol: string, stake: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -364,7 +367,7 @@ export const aaveVaultBackedByProv = (c: AaveVaultCoords, stakeSymbol: string, s
 // ── Umbrella stake tokens ────────────────────────────────────────────────────
 
 /** `getMaxSlashableAssets()` — the contract's own figure, in native units. */
-export const aaveUmbrellaMaxSlashableProv = (c: AaveVaultCoords): Provenance => ({
+const aaveUmbrellaMaxSlashableProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -375,7 +378,7 @@ export const aaveUmbrellaMaxSlashableProv = (c: AaveVaultCoords): Provenance => 
 });
 
 /** `asset.balanceOf(stakeToken)` beside the stored counter. */
-export const aaveUmbrellaCustodyProv = (c: AaveVaultCoords): Provenance => ({
+const aaveUmbrellaCustodyProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -386,7 +389,7 @@ export const aaveUmbrellaCustodyProv = (c: AaveVaultCoords): Provenance => ({
 });
 
 /** `owner()` on a stake token — the only address that can slash it. */
-export const aaveUmbrellaOwnerProv = (c: AaveVaultCoords, owner: string): Provenance => ({
+const aaveUmbrellaOwnerProv_ = (c: AaveVaultCoords, owner: string): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -397,11 +400,7 @@ export const aaveUmbrellaOwnerProv = (c: AaveVaultCoords, owner: string): Proven
 });
 
 /** One whole wrapper share in reserve units — the middle leg of the hop. */
-export const aaveUmbrellaWrapperPriceProv = (
-  c: AaveVaultCoords,
-  wrapperSymbol: string,
-  decimals: number,
-): Provenance => ({
+const aaveUmbrellaWrapperPriceProv_ = (c: AaveVaultCoords, wrapperSymbol: string, decimals: number): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -412,7 +411,7 @@ export const aaveUmbrellaWrapperPriceProv = (
 });
 
 /** The holder's claim carried through the wrapper into reserve units. */
-export const aaveUmbrellaWrapperClaimProv = (c: AaveVaultCoords, wrapperSymbol: string): Provenance => ({
+const aaveUmbrellaWrapperClaimProv_ = (c: AaveVaultCoords, wrapperSymbol: string): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -426,7 +425,7 @@ export const aaveUmbrellaWrapperClaimProv = (c: AaveVaultCoords, wrapperSymbol: 
 
 /** `balanceOf(holder)` — the one figure everything else on the holder half
  *  hangs off. */
-export const aaveVaultHolderSharesProv = (c: AaveVaultCoords): Provenance => ({
+const aaveVaultHolderSharesProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -437,7 +436,7 @@ export const aaveVaultHolderSharesProv = (c: AaveVaultCoords): Provenance => ({
 });
 
 /** The holder's fraction of supply — two slot reads, both named. */
-export const aaveVaultHolderFractionProv = (c: AaveVaultCoords): Provenance => ({
+const aaveVaultHolderFractionProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -448,7 +447,7 @@ export const aaveVaultHolderFractionProv = (c: AaveVaultCoords): Provenance => (
 });
 
 /** `getStakerCooldown(holder)` — the struct the contract holds. */
-export const aaveVaultCooldownStateProv = (c: AaveVaultCoords): Provenance => ({
+const aaveVaultCooldownStateProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -459,7 +458,7 @@ export const aaveVaultCooldownStateProv = (c: AaveVaultCoords): Provenance => ({
 });
 
 /** What the holding address IS — a mechanism, never an identity. */
-export const aaveVaultHolderShapeProv = (c: AaveVaultCoords, kind: string, codeSize: number): Provenance => ({
+const aaveVaultHolderShapeProv_ = (c: AaveVaultCoords, kind: string, codeSize: number): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -472,7 +471,7 @@ export const aaveVaultHolderShapeProv = (c: AaveVaultCoords, kind: string, codeS
 /** THE NAME, and whose claim it is. A registry citation, not a reading of the
  *  chain: the figure under it is still the code read, and this says who publishes
  *  the address under that constant and where to check. */
-export const aaveAttestedNameProv = (c: AaveVaultCoords, a: AttestedAddress): Provenance => ({
+const aaveAttestedNameProv_ = (c: AaveVaultCoords, a: AttestedAddress): Provenance => ({
   // A PUBLISHED FILE IS OFFCHAIN, and the ladder says so rather than borrowing
   // the chain's class for a citation: rung 1 is a constant in a repository at a
   // commit, with no on-chain anchor of its own. Rung 2 IS a chain read — the
@@ -509,7 +508,7 @@ export const aaveAttestedNameProv = (c: AaveVaultCoords, a: AttestedAddress): Pr
 // of a slashing.
 
 /** The cross-link: this address is itself in the catalogue. */
-export const aaveVaultCatalogueMemberProv = (c: AaveVaultCoords, what: string): Provenance => ({
+const aaveVaultCatalogueMemberProv_ = (c: AaveVaultCoords, what: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -592,7 +591,7 @@ const atCensus = (c: AaveVaultCoords): string =>
 
 /** The census's own `balanceOf` — what this card falls back to when the live
  *  read did not answer, labelled as the census's figure at the census block. */
-export const aaveVaultCensusBalanceProv = (c: AaveVaultCoords): Provenance => ({
+const aaveVaultCensusBalanceProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.censusBlock },
@@ -610,7 +609,7 @@ export const aaveVaultCensusBalanceProv = (c: AaveVaultCoords): Provenance => ({
    receipt for a figure no surface states. */
 
 /** The first and last blocks this address appears in the vault's stream. */
-export const aaveVaultPositionSeenProv = (c: AaveVaultCoords, which: "first" | "last", block: number): Provenance => ({
+const aaveVaultPositionSeenProv_ = (c: AaveVaultCoords, which: "first" | "last", block: number): Provenance => ({
   kind: "chain-derived",
   pclass: "emitted",
   source: { block },
@@ -625,7 +624,7 @@ export const aaveVaultPositionSeenProv = (c: AaveVaultCoords, which: "first" | "
 
 /** What the holding address is, as the CENSUS classified it — the same reads as
  *  `aaveVaultHolderShapeProv`, made at the census block and kept. */
-export const aaveVaultPositionShapeProv = (c: AaveVaultCoords, kind: string, codeSize: number | null): Provenance => ({
+const aaveVaultPositionShapeProv_ = (c: AaveVaultCoords, kind: string, codeSize: number | null): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.censusBlock },
@@ -637,7 +636,7 @@ export const aaveVaultPositionShapeProv = (c: AaveVaultCoords, kind: string, cod
 
 /** The two lanes disagreeing — the card's one interpretive sentence, and it is
  *  stated rather than resolved. */
-export const aaveVaultPositionDivergenceProv = (c: AaveVaultCoords): Provenance => ({
+const aaveVaultPositionDivergenceProv_ = (c: AaveVaultCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -672,7 +671,7 @@ const usdOf = (e8: string): string => {
 
 /** The position's value in USD at the census block — the balance through the
  *  vault's own conversion and the named oracle, every input at one block. */
-export const aaveVaultValueUsdProv = (c: AaveVaultCoords, v: VaultPositionValue, shareDecimals: number): Provenance => {
+const aaveVaultValueUsdProv_ = (c: AaveVaultCoords, v: VaultPositionValue, shareDecimals: number): Provenance => {
   const block = v.pricedBlock ?? c.censusBlock;
   const assetSym = v.assetSymbol ?? "the vault's asset";
   const hop =
@@ -696,7 +695,7 @@ export const aaveVaultValueUsdProv = (c: AaveVaultCoords, v: VaultPositionValue,
 
 /** No USD figure, and why: the oracle declined the asset, or the census has not
  *  priced this vault yet. Two different absences, each said in its own words. */
-export const aaveVaultUnpricedProv = (c: AaveVaultCoords, v: VaultPositionValue): Provenance => {
+const aaveVaultUnpricedProv_ = (c: AaveVaultCoords, v: VaultPositionValue): Provenance => {
   const assetSym = v.assetSymbol ?? "the vault's asset";
   const block = v.pricedBlock ?? c.censusBlock;
   if (v.pricedBlock == null) {
@@ -723,3 +722,41 @@ export const aaveVaultUnpricedProv = (c: AaveVaultCoords, v: VaultPositionValue)
     via: `${censusLane(c)} · IAaveOracle.getAssetPrice(asset) @ the census block — declined`,
   };
 };
+
+// Receipts over a page's reads stamp rails-server's head read when the coordinates carry it.
+export const aaveVaultCatalogueProv = withServerRead(aaveVaultCatalogueProv_);
+export const aaveVaultNameProv = withServerRead(aaveVaultNameProv_);
+export const aaveVaultTotalAssetsProv = withServerRead(aaveVaultTotalAssetsProv_);
+export const aaveVaultTotalSupplyProv = withServerRead(aaveVaultTotalSupplyProv_);
+export const aaveVaultSharePriceProv = withServerRead(aaveVaultSharePriceProv_);
+export const aaveVaultTargetRateProv = withServerRead(aaveVaultTargetRateProv_);
+export const aaveVaultSupplyCapProv = withServerRead(aaveVaultSupplyCapProv_);
+export const aaveVaultATokenProv = withServerRead(aaveVaultATokenProv_);
+export const aaveVaultCooldownProv = withServerRead(aaveVaultCooldownProv_);
+export const aaveVaultSlashableProv = withServerRead(aaveVaultSlashableProv_);
+export const aaveVaultReserveHopProv = withServerRead(aaveVaultReserveHopProv_);
+export const aaveVaultAssetGroupCountProv = withServerRead(aaveVaultAssetGroupCountProv_);
+export const aaveVaultBookProv = withServerRead(aaveVaultBookProv_);
+export const aaveVaultEmptyCountProv = withServerRead(aaveVaultEmptyCountProv_);
+export const aaveSghoAssetHeldProv = withServerRead(aaveSghoAssetHeldProv_);
+export const aaveSghoCapacityProv = withServerRead(aaveSghoCapacityProv_);
+export const aaveSghoLastUpdateProv = withServerRead(aaveSghoLastUpdateProv_);
+export const aaveStataATokenBalanceProv = withServerRead(aaveStataATokenBalanceProv_);
+export const aaveVaultBackedByProv = withServerRead(aaveVaultBackedByProv_);
+export const aaveUmbrellaMaxSlashableProv = withServerRead(aaveUmbrellaMaxSlashableProv_);
+export const aaveUmbrellaCustodyProv = withServerRead(aaveUmbrellaCustodyProv_);
+export const aaveUmbrellaOwnerProv = withServerRead(aaveUmbrellaOwnerProv_);
+export const aaveUmbrellaWrapperPriceProv = withServerRead(aaveUmbrellaWrapperPriceProv_);
+export const aaveUmbrellaWrapperClaimProv = withServerRead(aaveUmbrellaWrapperClaimProv_);
+export const aaveVaultHolderSharesProv = withServerRead(aaveVaultHolderSharesProv_);
+export const aaveVaultHolderFractionProv = withServerRead(aaveVaultHolderFractionProv_);
+export const aaveVaultCooldownStateProv = withServerRead(aaveVaultCooldownStateProv_);
+export const aaveVaultHolderShapeProv = withServerRead(aaveVaultHolderShapeProv_);
+export const aaveAttestedNameProv = withServerRead(aaveAttestedNameProv_);
+export const aaveVaultCatalogueMemberProv = withServerRead(aaveVaultCatalogueMemberProv_);
+export const aaveVaultCensusBalanceProv = withServerRead(aaveVaultCensusBalanceProv_);
+export const aaveVaultPositionSeenProv = withServerRead(aaveVaultPositionSeenProv_);
+export const aaveVaultPositionShapeProv = withServerRead(aaveVaultPositionShapeProv_);
+export const aaveVaultPositionDivergenceProv = withServerRead(aaveVaultPositionDivergenceProv_);
+export const aaveVaultValueUsdProv = withServerRead(aaveVaultValueUsdProv_);
+export const aaveVaultUnpricedProv = withServerRead(aaveVaultUnpricedProv_);

@@ -27,6 +27,8 @@
 
 import { getAddress, parseAbi } from "viem";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import {
   DOLOMITE_ADDRESSES,
@@ -235,6 +237,7 @@ export async function loadDolomitePositionFromChain(
       owner: owner.toLowerCase(),
       accountNumber,
       blockNumber,
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       balances,
       supplyValueUsd,
       borrowValueUsd,

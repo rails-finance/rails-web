@@ -26,6 +26,7 @@
 // `everLiquidated` is the orthogonal flag on open survivors too.
 
 import { resolveDolomiteMarketState, type DolomiteMarketStateMap } from "@/lib/sources/chain/dolomite-markets";
+import type { ServerRead } from "@/lib/shared/server-head-read";
 import { accountLabel, isDolomiteBalanceNumber } from "@/lib/dolomite/asset-catalog";
 
 export type DolomitePositionStatus = "open" | "closed" | "liquidated";
@@ -52,6 +53,8 @@ export interface DolomiteBalanceAmount {
   current: number | null;
   /** The raw integer wei behind `current` (unsigned string). */
   currentRaw: string | null;
+  /** rails-server's read of the live account that upgraded `current` (the account page). */
+  readBy?: ServerRead;
   /** Neither the index nor the market-state read named this market's
    *  decimals, so `par` / `current` are scaled by a stand-in and the card
    *  states "Not loaded" for the leg. */

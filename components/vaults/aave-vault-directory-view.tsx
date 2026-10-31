@@ -14,6 +14,7 @@
 // THE DENOMINATOR is complete at its block: two enumerator calls answer their
 // whole family in one read, and sGHO is one address Aave's book names.
 
+import type { ServerRead } from "@/lib/shared/server-head-read";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { AaveFirstPartySources } from "@/components/vaults/aave-first-party-sources";
@@ -50,6 +51,7 @@ export function AaveVaultDirectoryView({
   vaults,
   yields,
   blockNumber,
+  readBy,
   chainStale,
   counts,
   censusBlock,
@@ -57,13 +59,15 @@ export function AaveVaultDirectoryView({
   vaults: VaultSummary[];
   yields: Record<string, VaultYield>;
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  readBy?: ServerRead | null;
   chainStale: boolean;
   /** What the enumerators answered at the block. */
   counts: { catalogSize: number; stataCount: number; stakeCount: number };
   /** The position census's block; null where the census did not answer. */
   censusBlock: number | null;
 }) {
-  const coords: AaveVaultCoords = { blockNumber: blockNumber || undefined };
+  const coords: AaveVaultCoords = { blockNumber: blockNumber || undefined, readBy };
   const rowCoords = (v: VaultSummary): AaveVaultCoords => ({
     ...coords,
     vault: v.address,

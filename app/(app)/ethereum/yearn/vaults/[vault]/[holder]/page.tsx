@@ -64,6 +64,7 @@ import { YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directo
 import { isYearnRosterVault, yearnRosterEntry } from "@/lib/yearn/vault-roster";
 import type { VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
 import { BlockRef } from "@/components/shared/block-ref";
+import { serverReadOf } from "@/lib/shared/server-head-read";
 
 // Every figure is a call at the head with the holder in the path — nothing
 // about this is cacheable across requests.
@@ -224,6 +225,7 @@ function HoldingCard({
   return (
     <VaultHoldingCard
       coords={{
+        readBy: serverReadOf(data),
         chainId: YEARN_CHAIN_ID,
         blockNumber: data.blockNumber,
         vault: vault.address,
@@ -313,6 +315,7 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
       unit: sharePrice ? data.vault.asset.symbol : undefined,
       label: `One share in ${data.vault.asset.symbol}, the vault's own convertToAssets`,
       info: yearnVaultSharePriceProv({
+        readBy: serverReadOf(data),
         blockNumber: data.blockNumber,
         vault: data.vault.address,
         vaultName: data.vault.name ?? undefined,

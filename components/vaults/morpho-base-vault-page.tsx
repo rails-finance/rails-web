@@ -6,6 +6,7 @@
 // of the vault and of Morpho Blue (lib/sources/chain/morpho-base-vault.ts);
 // Holders is the census's, Yield the daily store's.
 
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import Link from "next/link";
 import { ProvReceiptsScope, Prov, useReceiptRegistry } from "@/components/shared/provenance";
 import { BlockRef } from "@/components/shared/block-ref";
@@ -69,6 +70,7 @@ export function MorphoBaseVaultPage({
   const { vault, legs } = data;
   const v = morphoBaseVaultPageSummary(data, census);
   const coords: MorphoVaultCoords = {
+    readBy: serverReadOf(data),
     blockNumber: data.blockNumber,
     vault: vault.address,
     vaultName: vault.name,
@@ -129,7 +131,7 @@ export function MorphoBaseVaultPage({
           data-steward={steward.address}
           data-steward-role={steward.role}
         >
-          <Prov info={vaultStewardProv(v, steward)}>{shortAddress(steward.address)}</Prov>
+          <Prov info={vaultStewardProv(v, steward, coords.readBy)}>{shortAddress(steward.address)}</Prov>
         </a>
       ),
     },

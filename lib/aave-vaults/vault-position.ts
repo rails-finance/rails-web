@@ -35,6 +35,7 @@
 // vault that oracle does not price carries a null value and is stated as
 // unpriced, never guessed (chain-truth charter S3). No rate, no yield, no P&L.
 
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import type { AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 
@@ -169,6 +170,8 @@ export interface VaultPositionValue {
 export interface VaultPositionLive {
   /** The block every figure in this object was read at. */
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** `balanceOf(holder)` now, in raw share units. */
   shares: RawAmount;
   /** `convertToAssets(shares)` — the vault's own answer, in the asset's units.

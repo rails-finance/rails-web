@@ -14,6 +14,7 @@ import {
   dolomiteDropProv,
 } from "@/lib/dolomite/live-provenance";
 import type { DolomiteChainResponse } from "@/lib/api/fetch-dolomite-position";
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 
 const pct2 = (f: number) => `${(f * 100).toFixed(2)}%`;
@@ -31,7 +32,7 @@ export function dolomiteHasRisk(chain: DolomiteChainResponse): boolean {
 /** The headline figure: the account's margin ratio. */
 export function DolomiteMarginRatio({ chain }: { chain: DolomiteChainResponse }) {
   if (chain.collateralization == null) return null;
-  return <Prov info={dolomiteCollateralizationProv()}>{pct2(chain.collateralization)}</Prov>;
+  return <Prov info={dolomiteCollateralizationProv(serverReadOf(chain))}>{pct2(chain.collateralization)}</Prov>;
 }
 
 /** The panel's liquidation rows: the fall that reaches the account's line, and
@@ -47,7 +48,7 @@ export function dolomiteRiskRows(chain: DolomiteChainResponse): PositionPanelRow
           {
             id: "liquidates-on-drop",
             label: "Liquidates on a drop of",
-            value: <Prov info={dolomiteDropProv()}>{dropPct}%</Prov>,
+            value: <Prov info={dolomiteDropProv(serverReadOf(chain))}>{dropPct}%</Prov>,
             tip: "How far the collateral's value can fall, with the debt unchanged, before the margin ratio reaches the account's line. It is 1 minus the line divided by the margin ratio.",
           },
         ]
@@ -56,7 +57,7 @@ export function dolomiteRiskRows(chain: DolomiteChainResponse): PositionPanelRow
       id: "liquidation-line",
       label: "Liquidation line",
       value: (
-        <Prov info={dolomiteRequirementProv()}>
+        <Prov info={dolomiteRequirementProv(serverReadOf(chain))}>
           <PanelFigure>{pct2(req)}</PanelFigure>
           {chain.override.active ? " (account override)" : ""}
         </Prov>

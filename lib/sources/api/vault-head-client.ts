@@ -21,6 +21,8 @@ import { decodeFunctionResult, encodeFunctionData, type Abi, type Hex, type Publ
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { chainBatchClient } from "@/lib/sources/chain/rpc";
 import type { ChainId } from "@/lib/shared/chains";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import { noteChainRead, noteServerHead } from "./server-head-stamps";
 
 const TIMEOUT_MS = 8_000;
 /** How long a block rails-server named is read there: inside its two-minute acceptance. */
@@ -74,12 +76,14 @@ interface HeadAnswer {
   blockNumber: number;
   blockTimestamp: number;
   finalizedBlock?: number | null;
+  head?: PositionHeadStamp;
 }
 
 async function serverHead(chainId: number, finalized = false): Promise<HeadAnswer | null> {
   const h = await ask<HeadAnswer>(`head?chain=${chainId}${finalized ? "&finalized=1" : ""}`);
   if (!h || typeof h.blockNumber !== "number" || typeof h.blockTimestamp !== "number") return null;
   remember(chainId, BigInt(h.blockNumber));
+  noteServerHead(chainId, h.blockNumber, h.head);
   return h;
 }
 
@@ -150,6 +154,7 @@ export function vaultHeadClient(chainId: ChainId): PublicClient {
           return settled.map((s) => s.result);
         }
       }
+      noteChainRead(chainId, args.blockNumber);
       return chain.multicall(args as never);
     },
     async getCode(args: { address: string; blockNumber?: bigint }) {
@@ -157,6 +162,7 @@ export function vaultHeadClient(chainId: ChainId): PublicClient {
         const a = await serverReads(chainId, args.blockNumber, [{ kind: "code", address: args.address.toLowerCase() }]);
         if (a && "hex" in a[0]) return a[0].hex === "0x" ? undefined : a[0].hex;
       }
+      noteChainRead(chainId, args.blockNumber);
       return chain.getCode(args as never);
     },
     async getStorageAt(args: { address: string; slot: Hex; blockNumber?: bigint }) {
@@ -166,6 +172,7 @@ export function vaultHeadClient(chainId: ChainId): PublicClient {
         ]);
         if (a && "hex" in a[0]) return a[0].hex;
       }
+      noteChainRead(chainId, args.blockNumber);
       return chain.getStorageAt(args as never);
     },
   };

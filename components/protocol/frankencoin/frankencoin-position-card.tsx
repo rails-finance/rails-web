@@ -65,6 +65,7 @@ import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-posit
 import { AmountText } from "@/components/shared/amount-text";
 import { formatDate, formatDayMonth } from "@/lib/date";
 import { PanelFigure } from "@/components/shared/position-card-panel";
+import { serverReadOf, type ServerRead } from "@/lib/shared/server-head-read";
 
 export interface FrankencoinPositionView {
   /** Lowercased Position contract address — the identity. */
@@ -99,6 +100,8 @@ export interface FrankencoinPositionView {
   txCount: number;
   /** Which lane the figures assert: the live overlay or the indexed ledger. */
   basis: "chain" | "index";
+  /** rails-server's read of the live state, when the chain read answered through it. */
+  readBy?: ServerRead;
   /** The position's fixed annual interest (ppm) — chain lane only. */
   annualInterestPPM: number | null;
   /** The reserve share held against the debt, ZCHF — chain lane only. */
@@ -128,15 +131,15 @@ const STATUS: Record<Exclude<FrankencoinCardStatus, "open">, PositionCardStatus>
 
 const collProv = (v: FrankencoinPositionView): Provenance =>
   v.basis === "chain"
-    ? liveCollateralProv(v.collateralSymbol, v.position)
+    ? liveCollateralProv(v.collateralSymbol, v.position, v.readBy)
     : latestAbsoluteProv("collateral", v.collateralSymbol, v.collateralDecimals);
 
 const mintedProv = (v: FrankencoinPositionView): Provenance =>
-  v.basis === "chain" ? liveMintedProv(v.position) : latestAbsoluteProv("minted", "ZCHF", 18);
+  v.basis === "chain" ? liveMintedProv(v.position, v.readBy) : latestAbsoluteProv("minted", "ZCHF", 18);
 
 const liqPriceProv = (v: FrankencoinPositionView): Provenance =>
   v.basis === "chain"
-    ? liveLiqPriceProv(v.collateralSymbol, v.collateralDecimals, v.position)
+    ? liveLiqPriceProv(v.collateralSymbol, v.collateralDecimals, v.position, v.readBy)
     : latestAbsoluteProv("price", v.collateralSymbol, v.collateralDecimals);
 
 /** The position's contract address, which is its identity. */
@@ -569,7 +572,7 @@ export function useFrankencoinCardSlots({
       label: "Interest",
       value: (
         <>
-          <Prov info={liveInterestProv(v.hub, v.position)}>
+          <Prov info={liveInterestProv(v.hub, v.position, v.readBy)}>
             <PanelFigure>{ppmToPct(v.annualInterestPPM).toFixed(2)}%</PanelFigure>
           </Prov>{" "}
           a year, charged at each mint
@@ -682,6 +685,7 @@ export function viewFromChain(c: FrankencoinChainResponse): FrankencoinPositionV
     lastActivityAt: null,
     txCount: 0,
     basis: "chain",
+    readBy: serverReadOf(c),
     annualInterestPPM: c.annualInterestPPM,
     reserveHeld: c.reserveHeld,
   };

@@ -30,6 +30,7 @@
 // slot the chain stores (getAccountPar re-reads exactly it), unusual on this
 // roster — and the receipts say so.
 
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 export interface DolomiteChainBalance {
   /** Dolomite's own market key. */
   marketId: number;
@@ -60,6 +61,8 @@ export interface DolomiteChainBalance {
 }
 
 export interface DolomiteChainResponse {
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   owner: string;
   /** Canonical decimal string (uint256 — never a JS number). */
   accountNumber: string;

@@ -44,6 +44,8 @@
 import { unstable_cache } from "next/cache";
 import { parseAbi } from "viem";
 import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import type { RawAmount } from "./morpho-base-vault";
 import { YEARN_REGISTRY } from "@/lib/yearn/vault-catalog";
 import { loadYearnVaultRoster, type YearnVaultRoster } from "@/lib/yearn/vault-roster";
@@ -120,6 +122,8 @@ export interface YearnVaultDirectoryRow {
 export interface YearnVaultDirectoryResponse {
   /** The block every figure below was read at. */
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** True when the read failed: nothing below may be rendered as a fact. */
   chainStale: boolean;
   /** The block lib/yearn/vault-catalog.ts was censused at. */
@@ -221,6 +225,7 @@ async function readDirectory(): Promise<YearnVaultDirectoryResponse> {
 
     return {
       blockNumber: Number(blockNumber),
+      head: serverHeadStampAt(YEARN_CHAIN_ID, blockNumber),
       chainStale: false,
       censusBlock: served.censusBlock,
       censusBlockIso: served.censusBlockIso,

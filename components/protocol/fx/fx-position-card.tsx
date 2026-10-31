@@ -85,6 +85,7 @@ import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
 import { FxMenuRows } from "./fx-menu-rows";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { serverReadAt } from "@/lib/shared/server-head-read";
 
 const DUST = 1e-9;
 
@@ -445,13 +446,21 @@ function ratioRows(
       {
         id: "rebalance-line",
         label: "Rebalances from",
-        value: <Prov info={poolLineProv("rebalance", terms.block)}>{pctLine(terms.rebalanceRatio)}</Prov>,
+        value: (
+          <Prov info={poolLineProv("rebalance", terms.block, serverReadAt(terms.head, terms.block))}>
+            {pctLine(terms.rebalanceRatio)}
+          </Prov>
+        ),
         tip: "The pool's rebalance line: from this debt ratio a keeper can rebalance the position's tick, read from the pool.",
       },
       {
         id: "liquidation-line",
         label: "Liquidates from",
-        value: <Prov info={poolLineProv("liquidate", terms.block)}>{pctLine(terms.liquidateRatio)}</Prov>,
+        value: (
+          <Prov info={poolLineProv("liquidate", terms.block, serverReadAt(terms.head, terms.block))}>
+            {pctLine(terms.liquidateRatio)}
+          </Prov>
+        ),
         tip: "The pool's liquidation line: from this debt ratio a keeper can liquidate the position, read from the pool.",
       },
     );

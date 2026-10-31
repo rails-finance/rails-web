@@ -40,6 +40,7 @@ import {
   type TimelineWindow,
 } from "@/lib/shared/timeline-opening-balance";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { fetchDolomiteChainPosition, type DolomiteChainResponse } from "@/lib/api/fetch-dolomite-position";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { DOLOMITE_LIQUIDATION_RUNS } from "@/lib/dolomite/timeline-runs";
@@ -229,7 +230,12 @@ export default function DolomitePositionView({
         // sign flip since the index snapshot is a real state change the
         // replayed row should keep narrating until the index catches up.
         if (!m || Math.sign(m.wei) !== side) return l;
-        return { ...l, current: Math.abs(m.wei), currentRaw: m.weiRaw.replace("-", "") };
+        return {
+          ...l,
+          current: Math.abs(m.wei),
+          currentRaw: m.weiRaw.replace("-", ""),
+          readBy: serverReadOf(chain),
+        };
       });
     return { ...view, supplies: upgrade(view.supplies, 1), borrows: upgrade(view.borrows, -1) };
   }, [view, chain]);

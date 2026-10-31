@@ -21,6 +21,7 @@
 // toggle has something to open. The listing face has none: it states two
 // figures the census header carries and traces neither.
 
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { AaveVaultDirectoryView } from "@/components/vaults/aave-vault-directory-view";
@@ -90,6 +91,7 @@ export default async function EthereumVaultRosterPage() {
             vaults={vaults}
             yields={yields}
             blockNumber={data.blockNumber}
+            readBy={serverReadOf(data)}
             chainStale={data.chainStale}
             counts={{ catalogSize: data.catalogSize, stataCount: data.stataCount, stakeCount: data.stakeCount }}
             censusBlock={census.length > 0 ? Math.max(...census.map((c) => c.censusBlock)) : null}

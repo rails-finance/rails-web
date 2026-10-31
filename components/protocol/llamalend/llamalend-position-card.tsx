@@ -45,6 +45,7 @@ import { AssetAmount } from "@/components/shared/asset-amount";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
+import { serverReadOf, type ServerRead } from "@/lib/shared/server-head-read";
 import { positionStateProv, positionIndexProv, llamalendUsdProv } from "@/lib/llamalend/event-provenance";
 import { llamalendPositionContent } from "@/lib/llamalend/position-content";
 import { type LlamalendFactoryKind, type LlamalendVersion } from "@/lib/llamalend/asset-catalog";
@@ -88,6 +89,8 @@ export interface LlamalendPositionView {
   debtRaw: string;
   /** "chain" = live user_state at head; "index" = last emitted absolute. */
   stateBasis: "chain" | "index";
+  /** rails-server's read of the live state, when the chain read answered through it. */
+  readBy?: ServerRead;
   /** Converted amount (borrowed units) — soft-liq NOW. Null = unknown (the
    *  overlay didn't land), never zero. */
   converted: number | null;
@@ -116,7 +119,9 @@ export interface LlamalendPositionView {
 }
 
 const stateProv = (v: LlamalendPositionView, sym: string, which: "collateral" | "debt") =>
-  v.stateBasis === "chain" ? positionStateProv(sym, which, v.controller) : positionIndexProv(sym, which, v.controller);
+  v.stateBasis === "chain"
+    ? positionStateProv(sym, which, v.controller, v.readBy)
+    : positionIndexProv(sym, which, v.controller);
 
 /** The kind of market beside the pair: mint (crvUSD minted against the loan)
  *  or lend (borrowed from lenders' deposits); a V2 market says V2. */
@@ -409,6 +414,7 @@ export function viewFromChain(
     debt: c.debt ?? 0,
     debtRaw: c.debtRaw ?? "0",
     stateBasis: "chain",
+    readBy: serverReadOf(c),
     converted: c.converted,
     convertedRaw: c.convertedRaw,
     inSoftLiq: c.inSoftLiq,

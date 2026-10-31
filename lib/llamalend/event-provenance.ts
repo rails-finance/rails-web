@@ -22,6 +22,7 @@
 
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 
 // Custody, not origin — the via line's leading segment only.
 const LLAMALEND_VIA = "captured Controller events (llamalend_*)";
@@ -185,17 +186,26 @@ export const liquidationProv = (
 // ── position card / tower lanes ──────────────────────────────────────────────
 
 /** Position-card CURRENT figure from the live user_state read at head. */
-export const positionStateProv = (sym: string, which: "collateral" | "debt", controller?: string): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  verify: {
-    kind: "recompute",
-    text: "Re-run the Controller's user_state eth_call against any node — the leg reproduces this figure exactly.",
-  },
-  summary: `${sym} ${which} NOW — the ${which === "collateral" ? "collateral" : "debt"} leg of the Controller's own user_state(user) at the latest block. Debt accrues per second through the market's rate, so no stored figure is current — this is the live read.`,
-  contract: { name: "LlamaLend Controller", address: controller ?? "" },
-  via: "GET /api/chain/llamalend/position · user_state @ head",
-});
+export const positionStateProv = (
+  sym: string,
+  which: "collateral" | "debt",
+  controller?: string,
+  readBy?: ServerRead | null,
+): Provenance =>
+  stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      verify: {
+        kind: "recompute",
+        text: "Re-run the Controller's user_state eth_call against any node — the leg reproduces this figure exactly.",
+      },
+      summary: `${sym} ${which} NOW — the ${which === "collateral" ? "collateral" : "debt"} leg of the Controller's own user_state(user) at the latest block. Debt accrues per second through the market's rate, so no stored figure is current — this is the live read.`,
+      contract: { name: "LlamaLend Controller", address: controller ?? "" },
+      via: "GET /api/chain/llamalend/position · user_state @ head",
+    },
+    readBy,
+  );
 
 /** Position-card figure from the LAST emitted UserState absolute (the index
  *  basis, before the live read lands / when RPC is down). */

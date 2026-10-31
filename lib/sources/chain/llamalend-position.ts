@@ -36,6 +36,8 @@
 
 import { getAddress, parseAbi } from "viem";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { discoverLlamalendMarkets } from "./llamalend-markets";
 import { scaleRaw } from "./erc20-meta";
 import { bandPrices, scale1e18 } from "@/lib/llamalend/band-math";
@@ -168,6 +170,7 @@ export async function loadLlamalendPositionFromChain(
       borrowedIsCrvusd: market.borrowedIsCrvusd,
       A: market.A,
       blockNumber,
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       chainStale: false,
     };
 

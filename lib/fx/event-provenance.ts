@@ -35,6 +35,7 @@
 
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 
 // Custody, not origin — the via line's leading segment only (the embedded
 // receipt renderer drops it; provenance-receipts-grammar §3). Summaries state
@@ -697,14 +698,22 @@ export const anchorPriceProv = (sym: string, block?: number | null): Provenance 
 });
 
 /** A pool line: rebalance or liquidation debt ratio, with its bonus. */
-export const poolLineProv = (which: "rebalance" | "liquidate", block?: number | null): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  verify: stateVerify(which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios", block ?? null),
-  summary: `The pool's ${which === "rebalance" ? "rebalance" : "liquidation"} line — the debt ratio from which a keeper may ${which === "rebalance" ? "rebalance a tick" : "liquidate"}, and its bonus: the pool's ${which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios"}${block != null ? ` at block ${block}` : ""}.`,
-  contract: { name: "AaveFundingPool", address: "" },
-  via: `pool ${which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios"} (eth_call)`,
-});
+export const poolLineProv = (
+  which: "rebalance" | "liquidate",
+  block?: number | null,
+  readBy?: ServerRead | null,
+): Provenance =>
+  stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      verify: stateVerify(which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios", block ?? null),
+      summary: `The pool's ${which === "rebalance" ? "rebalance" : "liquidation"} line — the debt ratio from which a keeper may ${which === "rebalance" ? "rebalance a tick" : "liquidate"}, and its bonus: the pool's ${which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios"}${block != null ? ` at block ${block}` : ""}.`,
+      contract: { name: "AaveFundingPool", address: "" },
+      via: `pool ${which === "rebalance" ? "getRebalanceRatios" : "getLiquidateRatios"} (eth_call)`,
+    },
+    readBy,
+  );
 
 /** One oracle leg read at the settled block (pool.priceOracle().getPrice()). */
 export const oracleLegAtProv = (leg: "anchor" | "min", sym: string, block: number): Provenance => ({

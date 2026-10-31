@@ -18,6 +18,7 @@
 
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import { LIQUITY_V1_ADDRESSES } from "./asset-catalog";
+import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 
 const TROVE_MANAGER: Provenance["contract"] = {
   name: "Liquity V1 TroveManager",
@@ -47,16 +48,19 @@ const CHAIN_VIA = "GET /api/chain/liquity-v1/position";
  *  eth_call at the latest block: the exact price a liquidation or redemption
  *  would use this block (Chainlink with a Tellor fallback, the protocol's own
  *  selection logic). */
-export function protocolPriceProv(): Provenance {
-  return {
-    kind: "chain",
-    pclass: "oracle",
-    verify: STATE_VERIFY,
-    summary:
-      "ETH price in USD — the protocol's own PriceFeed.fetchPrice() simulated at the latest block: the exact price Liquity's liquidation and redemption paths would use this block (Chainlink, with a Tellor fallback, selected by the protocol's own logic — not a market-price cache).",
-    contract: PRICE_FEED,
-    via: `${CHAIN_VIA} · PriceFeed.fetchPrice @ head (eth_call simulation) · ÷10^18`,
-  };
+export function protocolPriceProv(readBy?: ServerRead | null): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain",
+      pclass: "oracle",
+      verify: STATE_VERIFY,
+      summary:
+        "ETH price in USD — the protocol's own PriceFeed.fetchPrice() simulated at the latest block: the exact price Liquity's liquidation and redemption paths would use this block (Chainlink, with a Tellor fallback, selected by the protocol's own logic — not a market-price cache).",
+      contract: PRICE_FEED,
+      via: `${CHAIN_VIA} · PriceFeed.fetchPrice @ head (eth_call simulation) · ÷10^18`,
+    },
+    readBy,
+  );
 }
 
 /** The Trove's ENTIRE collateral — getEntireDebtAndColl at the latest block,
@@ -64,29 +68,35 @@ export function protocolPriceProv(): Provenance {
  *  and redemption paths act on. Preferred over the last recorded TroveUpdated
  *  absolute on the live card face — the captured index is frozen while the
  *  protocol moves, so the two can differ. */
-export function entireCollateralProv(blockNumber?: number): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    verify: STATE_VERIFY,
-    summary:
-      "ETH collateral the Trove holds — TroveManager.getEntireDebtAndColl at the latest block, pending redistribution from past liquidations included: the balance the protocol's own liquidation and redemption paths act on. Read live from the chain, so it reflects every operation and redemption since the captured history's last event.",
-    contract: TROVE_MANAGER,
-    via: `${CHAIN_VIA} · TroveManager.getEntireDebtAndColl(borrower)${blockNumber ? ` @ block ${blockNumber}` : " @ head"} · ÷10^18`,
-  };
+export function entireCollateralProv(blockNumber?: number, readBy?: ServerRead | null): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      verify: STATE_VERIFY,
+      summary:
+        "ETH collateral the Trove holds — TroveManager.getEntireDebtAndColl at the latest block, pending redistribution from past liquidations included: the balance the protocol's own liquidation and redemption paths act on. Read live from the chain, so it reflects every operation and redemption since the captured history's last event.",
+      contract: TROVE_MANAGER,
+      via: `${CHAIN_VIA} · TroveManager.getEntireDebtAndColl(borrower)${blockNumber && !readBy ? ` @ block ${blockNumber}` : " @ head"} · ÷10^18`,
+    },
+    readBy,
+  );
 }
 
 /** The Trove's ENTIRE debt — same read, same basis; interest-free, so exact. */
-export function entireDebtProv(blockNumber?: number): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    verify: STATE_VERIFY,
-    summary:
-      "LUSD debt the Trove owes — TroveManager.getEntireDebtAndColl at the latest block, pending redistribution included: the exact obligation the protocol's own ratio checks measure (Liquity V1 charges no ongoing interest). Read live from the chain, so it reflects every operation and redemption since the captured history's last event.",
-    contract: TROVE_MANAGER,
-    via: `${CHAIN_VIA} · TroveManager.getEntireDebtAndColl(borrower)${blockNumber ? ` @ block ${blockNumber}` : " @ head"} · ÷10^18`,
-  };
+export function entireDebtProv(blockNumber?: number, readBy?: ServerRead | null): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      verify: STATE_VERIFY,
+      summary:
+        "LUSD debt the Trove owes — TroveManager.getEntireDebtAndColl at the latest block, pending redistribution included: the exact obligation the protocol's own ratio checks measure (Liquity V1 charges no ongoing interest). Read live from the chain, so it reflects every operation and redemption since the captured history's last event.",
+      contract: TROVE_MANAGER,
+      via: `${CHAIN_VIA} · TroveManager.getEntireDebtAndColl(borrower)${blockNumber && !readBy ? ` @ block ${blockNumber}` : " @ head"} · ÷10^18`,
+    },
+    readBy,
+  );
 }
 
 /** The Trove's current individual collateral ratio — computed BY the

@@ -26,6 +26,7 @@ import { decodeFunctionResult, encodeFunctionData, type Abi, type Hex, type Publ
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { chainClient } from "@/lib/sources/chain/rpc";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { noteChainRead, noteServerHead } from "./server-head-stamps";
 
 const TIMEOUT_MS = 8_000;
 /** How long a block rails-server named is read there: inside its two-minute acceptance. */
@@ -99,6 +100,7 @@ function serverHead(chainId: number): Promise<HeadAnswer | null> {
       return null;
     }
     remember(chainId, BigInt(h.blockNumber));
+    noteServerHead(chainId, h.blockNumber, h.head);
     return h;
   });
   heads.set(chainId, { at: Date.now(), p });
@@ -238,6 +240,7 @@ export function headReadsClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClie
           return s.result;
         }
       }
+      noteChainRead(chainId, block);
       return chain.readContract((block != null ? { ...args, blockNumber: block, blockTag: undefined } : args) as never);
     },
     async call(args: {
@@ -259,6 +262,7 @@ export function headReadsClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClie
           return { data: answers[0].returnData === "0x" ? undefined : answers[0].returnData };
         }
       }
+      noteChainRead(chainId, block);
       return chain.call((block != null ? { ...args, blockNumber: block, blockTag: undefined } : args) as never);
     },
     async multicall(args: MulticallArgs) {
@@ -277,6 +281,7 @@ export function headReadsClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClie
           return settled.map((s) => s.result);
         }
       }
+      noteChainRead(chainId, block);
       return chain.multicall((block != null ? { ...args, blockNumber: block, blockTag: undefined } : args) as never);
     },
   };

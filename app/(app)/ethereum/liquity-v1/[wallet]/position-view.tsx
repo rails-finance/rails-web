@@ -72,6 +72,7 @@ import {
 } from "@/lib/liquity-v1/use-event-read";
 import { liquityV1OutcomeTxs, liquityV1OwnerOutcome } from "@/lib/liquity-v1/owner-outcome";
 import { protocolPriceProv } from "@/lib/liquity-v1/position-provenance";
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { eventPriceProv } from "@/lib/liquity-v1/event-provenance";
 
 interface LiquityV1TroveViewProps {
@@ -478,7 +479,13 @@ export default function LiquityV1TroveView({
       : null;
   const faceView =
     view && chainLive
-      ? { ...view, collateral: chainLive.coll, debt: chainLive.debt, atBlock: chainLive.blockNumber }
+      ? {
+          ...view,
+          collateral: chainLive.coll,
+          debt: chainLive.debt,
+          atBlock: chainLive.blockNumber,
+          readBy: serverReadOf(chainLive),
+        }
       : view;
 
   const exports = view
@@ -506,7 +513,7 @@ export default function LiquityV1TroveView({
           owner={{ wallet }}
           assets={
             chain && view?.status === "open" && chain.price > 0
-              ? [{ symbol: "ETH", price: chain.price, info: protocolPriceProv() }]
+              ? [{ symbol: "ETH", price: chain.price, info: protocolPriceProv(serverReadOf(chain)) }]
               : []
           }
           closed={view != null && view.status !== "open"}

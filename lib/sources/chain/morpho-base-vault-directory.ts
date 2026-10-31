@@ -55,6 +55,8 @@
 import { unstable_cache } from "next/cache";
 import { parseAbi } from "viem";
 import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta } from "./erc20-meta";
 import type { RawAmount } from "./morpho-base-vault";
 import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
@@ -131,6 +133,8 @@ export interface MorphoBaseVaultDirectoryRow {
 export interface MorphoBaseVaultDirectoryResponse {
   /** The block every figure below was read at. */
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** True when the read failed: nothing below may be rendered as a fact. */
   chainStale: boolean;
   /** The block the roster was read at: the box's last run
@@ -234,6 +238,7 @@ async function readDirectory(): Promise<MorphoBaseVaultDirectoryResponse> {
 
     return {
       blockNumber: Number(blockNumber),
+      head: serverHeadStampAt(MORPHO_BASE_CHAIN_ID, blockNumber),
       chainStale: false,
       censusBlock: served.censusBlock,
       catalogSize: roster.length,
