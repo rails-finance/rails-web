@@ -9,6 +9,7 @@
 // surface, so no risk gauges are asserted — the card, the pool band, the
 // Lifetime flows panel and the timeline carry the whole page.
 
+import { serverReadAt, stampHeadRead } from "@/lib/shared/server-head-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { mapleExplorer } from "@/lib/maple/explorer";
@@ -459,7 +460,13 @@ export default function MaplePositionView({
         price: rate,
         unit: rate ? p.assetSymbol : undefined,
         label: `Exit rate: what one ${p.symbol} pays out on withdrawal, in ${p.assetSymbol}`,
-        info: rate && state ? poolExitRateProv(p.assetSymbol, p.symbol, state.blockNumber) : undefined,
+        info:
+          rate && state
+            ? stampHeadRead(
+                poolExitRateProv(p.assetSymbol, p.symbol, state.blockNumber),
+                serverReadAt(state.head, state.blockNumber),
+              )
+            : undefined,
         moreInWords: true,
       });
     }

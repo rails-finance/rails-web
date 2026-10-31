@@ -49,7 +49,7 @@
 
 import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { serverReadAt, stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
+import { serverReadAt, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
 import { LearnMore } from "@/components/shared/learn-more-modal";
@@ -121,7 +121,7 @@ function SystemCard({ data, readBy }: { data: LiquityV1SystemChainResponse; read
         <span className="text-xs font-semibold text-foreground">The system</span>
         <span className="text-[11px] tabular-nums text-rb-500">
           {COLLATERAL_SYMBOL}{" "}
-          <Prov info={stampHeadRead(systemPriceProv(data.priceStale), readBy)} value={formatExact(data.price)}>
+          <Prov info={stampServerRead(systemPriceProv(data.priceStale), readBy)} value={formatExact(data.price)}>
             {formatUsdValue(data.price)}
           </Prov>
           {data.priceStale && <span className="ml-1 text-rb-400">· last good</span>}
@@ -134,7 +134,7 @@ function SystemCard({ data, readBy }: { data: LiquityV1SystemChainResponse; read
             it. `value` still carries the exact figure behind the compact one. */}
         <Stat label="System debt">
           <Prov
-            info={stampHeadRead(systemLaneProv("The entire system's LUSD debt", "getEntireSystemDebt()"), readBy)}
+            info={stampServerRead(systemLaneProv("The entire system's LUSD debt", "getEntireSystemDebt()"), readBy)}
             value={formatExact(data.systemDebt)}
           >
             <AmountText value={data.systemDebt} format="compact" /> {DEBT_SYMBOL}
@@ -142,7 +142,10 @@ function SystemCard({ data, readBy }: { data: LiquityV1SystemChainResponse; read
         </Stat>
         <Stat label="System collateral">
           <Prov
-            info={stampHeadRead(systemLaneProv("The entire system's ETH collateral", "getEntireSystemColl()"), readBy)}
+            info={stampServerRead(
+              systemLaneProv("The entire system's ETH collateral", "getEntireSystemColl()"),
+              readBy,
+            )}
             value={formatExact(data.systemColl)}
           >
             <AmountText value={data.systemColl} format="compact" /> {COLLATERAL_SYMBOL}
@@ -150,13 +153,13 @@ function SystemCard({ data, readBy }: { data: LiquityV1SystemChainResponse; read
           <span className="ml-1 text-rb-500">· {formatUsdValue(data.systemCollUsd)}</span>
         </Stat>
         <Stat label="Open troves">
-          <Prov info={stampHeadRead(systemLaneProv("Open troves", "getTroveOwnersCount()"), readBy)}>
+          <Prov info={stampServerRead(systemLaneProv("Open troves", "getTroveOwnersCount()"), readBy)}>
             {data.trovesCount}
           </Prov>
         </Stat>
         <Stat label="Recovery mode">
           <Prov
-            info={stampHeadRead(
+            info={stampServerRead(
               systemLaneProv(
                 "Recovery mode",
                 "checkRecoveryMode(price)",
@@ -176,7 +179,7 @@ function SystemCard({ data, readBy }: { data: LiquityV1SystemChainResponse; read
           <div className="mt-2 flex items-baseline justify-between text-[11px] tabular-nums text-rb-500">
             <span>
               TCR{" "}
-              <Prov info={stampHeadRead(systemTcrProv(), readBy)} value={formatExact(data.tcr)}>
+              <Prov info={stampServerRead(systemTcrProv(), readBy)} value={formatExact(data.tcr)}>
                 {ratio(data.tcr)}
               </Prov>
             </span>
@@ -202,13 +205,13 @@ function StabilityPoolCard({ data, readBy }: { data: LiquityV1SystemChainRespons
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
         <Stat label="LUSD in the pool">
-          <Prov info={stampHeadRead(stabilityPoolProv(), readBy)} value={formatExact(data.spDeposits)}>
+          <Prov info={stampServerRead(stabilityPoolProv(), readBy)} value={formatExact(data.spDeposits)}>
             <AmountText value={data.spDeposits} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
         <Stat label="Against system debt">
           {coverage != null ? (
-            <Prov info={stampHeadRead(spCoverageProv(), readBy)} value={formatExact(coverage)}>
+            <Prov info={stampServerRead(spCoverageProv(), readBy)} value={formatExact(coverage)}>
               {ratio(coverage)}
             </Prov>
           ) : (
@@ -246,13 +249,13 @@ function RatesCard({ data, readBy }: { data: LiquityV1SystemChainResponse; readB
 
       <div className="mt-3 grid grid-cols-3 gap-x-4 gap-y-2">
         <Stat label="Base rate">
-          <Prov info={stampHeadRead(baseRateProv(), readBy)} value={formatExact(data.baseRate)}>
+          <Prov info={stampServerRead(baseRateProv(), readBy)} value={formatExact(data.baseRate)}>
             {feePct(data.baseRate)}
           </Prov>
         </Stat>
         <Stat label="Redemption fee">
           <Prov
-            info={stampHeadRead(
+            info={stampServerRead(
               systemFeeRateProv("Current redemption fee rate", "getRedemptionRateWithDecay()"),
               readBy,
             )}
@@ -263,7 +266,7 @@ function RatesCard({ data, readBy }: { data: LiquityV1SystemChainResponse; readB
         </Stat>
         <Stat label="Borrowing fee">
           <Prov
-            info={stampHeadRead(
+            info={stampServerRead(
               systemFeeRateProv("Current one-time borrowing fee rate", "getBorrowingRateWithDecay()"),
               readBy,
             )}
@@ -302,7 +305,7 @@ function QueueCard({ data, readBy }: { data: LiquityV1SystemChainResponse; readB
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-semibold text-foreground">The queue right now</span>
         <span className="text-[11px] tabular-nums text-rb-500">
-          <Prov info={stampHeadRead(queueOrderProv(), readBy)}>
+          <Prov info={stampServerRead(queueOrderProv(), readBy)}>
             {data.queue.length} {data.queue.length === 1 ? "trove" : "troves"}
           </Prov>
         </span>
@@ -310,13 +313,13 @@ function QueueCard({ data, readBy }: { data: LiquityV1SystemChainResponse; readB
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
         <Stat label={`${DEBT_SYMBOL} in the queue`}>
-          <Prov info={stampHeadRead(queueDebtTotalProv(), readBy)} value={formatExact(data.queueDebtTotal)}>
+          <Prov info={stampServerRead(queueDebtTotalProv(), readBy)} value={formatExact(data.queueDebtTotal)}>
             <AmountText value={data.queueDebtTotal} format="compact" /> {DEBT_SYMBOL}
           </Prov>
         </Stat>
         <Stat label="Front of the queue">
           {front?.icr != null ? (
-            <Prov info={stampHeadRead(queueIcrProv(), readBy)} value={formatExact(front.icr)}>
+            <Prov info={stampServerRead(queueIcrProv(), readBy)} value={formatExact(front.icr)}>
               {ratio(front.icr)}
             </Prov>
           ) : (
@@ -324,7 +327,7 @@ function QueueCard({ data, readBy }: { data: LiquityV1SystemChainResponse; readB
           )}
         </Stat>
         <Stat label="Below the minimum">
-          <Prov info={stampHeadRead(queueBelowMinimumProv(), readBy)}>
+          <Prov info={stampServerRead(queueBelowMinimumProv(), readBy)}>
             {/* The contract's own comparison, stated as the fact it is — and
                 stated even at zero, because "none" is the answer a reader came
                 for. A dash here would mean the read didn't happen. */}
