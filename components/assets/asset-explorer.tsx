@@ -99,7 +99,7 @@ export function AssetExplorer({ cards, initial }: { cards: AssetCard[]; initial:
         <label className="flex items-center gap-1.5 text-rb-500" data-anatomy="A5.7">
           Sort
           <select
-            className="rounded border border-rb-200 bg-transparent px-1.5 py-0.5 text-xs text-foreground dark:border-rb-800"
+            className="rounded border border-rb-200 bg-transparent px-1.5 py-0.5 text-base sm:text-xs text-foreground dark:border-rb-800"
             value={state.sort}
             data-asset-sort=""
             onChange={(e) => update({ sort: e.target.value as CardSort })}

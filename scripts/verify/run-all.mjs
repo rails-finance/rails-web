@@ -47,6 +47,18 @@
 //   JOBS=1 node scripts/verify/run-all.mjs                (default 2 — see below)
 //   RPC_PROXY=0 node scripts/verify/run-all.mjs           (no proxy, the key pays whole)
 //   RPC_PIN=keep node scripts/verify/run-all.mjs          (yesterday's pins, nothing upstream)
+//   SERVER_MAX_OLD_SPACE_MB=6144 node scripts/verify/run-all.mjs
+//        (off unless set: the server this runner starts gets
+//         NODE_OPTIONS=--max-old-space-size=6144, so a leak ends in a restart at a
+//         known size rather than at the machine's)
+//   RESTART_EVERY=40 node scripts/verify/run-all.mjs
+//        (off unless set: a planned restart of the server this runner started
+//         before every 40th row; the row is marked. Best with JOBS=1: a restart
+//         under a pool ends whatever the other worker is running.)
+//   PROBE_MS=20000 node scripts/verify/run-all.mjs
+//        (default 20000: before each row the server this runner started gets
+//         GET /; two misses with a live pid count as a death, and the server is
+//         restarted and the row marked "after a server restart")
 //
 // The scripts run two at a time by default. They are independent of each other
 // and share everything behind the page, which is what sets the ceiling; the
@@ -473,6 +485,10 @@ const SERVER_TAIL = 30;
 let serverTail = [];
 let serverDeaths = [];
 let serverRestarting = null;
+const MAX_OLD_SPACE_MB = Number(process.env.SERVER_MAX_OLD_SPACE_MB ?? 0);
+const RESTART_EVERY = Number(process.env.RESTART_EVERY ?? 0);
+const PROBE_MS = Number(process.env.PROBE_MS ?? 20000);
+let rowsSinceStart = 0;
 
 function keepTail(chunk) {
   for (const line of String(chunk).split("\n")) {
@@ -486,6 +502,9 @@ async function startServer() {
   const port = new URL(BASE).port || "3000";
   console.log(`· ${BASE} is not serving — starting next dev on :${port}`);
   const env = { ...process.env, ...proxiedEnv() };
+  if (MAX_OLD_SPACE_MB > 0)
+    env.NODE_OPTIONS = `${env.NODE_OPTIONS ?? ""} --max-old-space-size=${MAX_OLD_SPACE_MB}`.trim();
+  rowsSinceStart = 0;
   const child = spawn("npx", ["next", "dev", "--port", port], {
     cwd: ROOT,
     env,
@@ -522,29 +541,70 @@ function serverDied() {
   return server !== null && (server.exitCode !== null || server.signalCode !== null);
 }
 
-/** Called before each verifier: a dead server is restarted, with the death and
- *  its last lines printed, so the rows after it are read against a server
- *  rather than against a refused connection. One restart at a time under a
- *  pool: workers that arrive during it wait for the same promise. */
-async function ensureServer(before) {
-  if (!serverDied()) return;
-  if (!serverRestarting) {
-    serverRestarting = (async () => {
-      const death = serverDeaths.at(-1);
-      const how = death?.signal ? `killed by ${death.signal}` : `exit code ${death?.code ?? server.exitCode}`;
-      console.log(`\n⚠ dev server DIED (${how}) before ${before} — its last lines:`);
-      console.log((death?.tail ?? serverTail).join("\n").replace(/^/gm, "       │ "));
-      server = null;
-      await startServer();
-      const unhealthy = await checkDevServer(BASE);
-      if (unhealthy) throw new Error(`restarted dev server is not healthy:\n${unhealthy}`);
-      console.log(`· dev server restarted (${serverDeaths.length} death(s) this run)\n`);
-    })().finally(() => {
-      serverRestarting = null;
-    });
+/** True when a server this runner started has a live pid and does not answer
+ *  GET / twice in a row (PROBE_MS each). `next dev` restarts its own server
+ *  process on its memory threshold without the wrapper pid exiting, and the new
+ *  one can fail to come up (24 Oct 2026: rows 64-138 each timed out at 900 s). */
+async function serverHung() {
+  if (server === null || serverDied()) return false;
+  for (let i = 0; i < 2; i++) {
+    if (await isServing(BASE, PROBE_MS)) return false;
+    if (i === 0) await new Promise((r) => setTimeout(r, 2000));
   }
-  await serverRestarting;
+  return true;
 }
+
+/** Called before each verifier: a dead or hung server is restarted, with the
+ *  death and its last lines printed, so the rows after it are read against a
+ *  server rather than against a refused connection. Returns the reason when the
+ *  row about to run follows a restart (so the row is marked), else null. One
+ *  restart at a time under a pool: workers that arrive during it wait for the
+ *  same promise. */
+async function ensureServer(before) {
+  let reason = null;
+  if (!serverRestarting) {
+    let how = null;
+    if (serverDied()) {
+      const death = serverDeaths.at(-1);
+      how = `died (${death?.signal ? `killed by ${death.signal}` : `exit code ${death?.code ?? server.exitCode}`})`;
+    } else if (await serverHung()) {
+      how = `hung (no answer to GET / within ${PROBE_MS} ms, twice, pid ${server.pid} alive)`;
+      serverDeaths.push({ code: null, signal: null, at: new Date().toISOString(), tail: serverTail.slice() });
+    } else if (server !== null && RESTART_EVERY > 0 && rowsSinceStart >= RESTART_EVERY) {
+      how = `restarted on plan (every ${RESTART_EVERY} rows)`;
+    }
+    if (how && !serverRestarting) {
+      const planned = how.startsWith("restarted on plan");
+      serverRestarting = (async () => {
+        console.log(`\n⚠ dev server ${how} before ${before} — its last lines:`);
+        console.log(serverTail.join("\n").replace(/^/gm, "       │ "));
+        if (server !== null && !serverDied()) {
+          const old = server;
+          server = null;
+          signalGroup(old.pid, "SIGKILL");
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+        server = null;
+        await startServer();
+        const unhealthy = await checkDevServer(BASE);
+        if (unhealthy) throw new Error(`restarted dev server is not healthy:\n${unhealthy}`);
+        console.log(
+          `· dev server restarted (${serverDeaths.length} death(s) this run${planned ? ", this one planned" : ""})\n`,
+        );
+        restartNote = `after a server restart (${how.split(" (")[0]})`;
+      })().finally(() => {
+        serverRestarting = null;
+      });
+    }
+  }
+  if (serverRestarting) {
+    await serverRestarting;
+    reason = restartNote;
+  }
+  if (server !== null) rowsSinceStart++;
+  return reason;
+}
+let restartNote = null;
 
 for (const sig of ["exit", "SIGINT", "SIGTERM", "uncaughtException"]) {
   process.on(sig, (arg) => {
@@ -692,7 +752,9 @@ if (unhealthy) {
  *  written before the run would be separated from its outcome by whatever
  *  else finished in between, and the two halves would pair up wrongly. */
 function report(r) {
-  console.log(`${r.outcome.padEnd(6)} ${r.file} (${r.secs.toFixed(1)}s)`);
+  console.log(
+    `${r.outcome.padEnd(6)} ${r.file} (${r.secs.toFixed(1)}s)${r.afterRestart ? `  [${r.afterRestart}]` : ""}`,
+  );
   if (r.outcome === "PASS" || r.outcome === "SKIP") return;
   // A table row alone cannot be acted on, so print the evidence — but print
   // the RIGHT evidence. A verifier with sixteen failures prints them as it
@@ -766,8 +828,9 @@ async function worker() {
       console.log(`       ${SKIPS[job.file]}`);
       continue;
     }
-    await ensureServer(job.label);
+    const afterRestart = await ensureServer(job.label);
     const r = await runOne(job);
+    if (afterRestart) ((r.afterRestart = afterRestart), (r.detail = `${afterRestart} — ${r.detail}`));
     if (serverDied()) {
       // The server went down under this script. Whatever it reported was read
       // against a dying server, so the row says that instead of a verdict.
@@ -791,8 +854,9 @@ for (const job of alone) {
     report(r);
     continue;
   }
-  await ensureServer(job.label);
+  const afterRestart = await ensureServer(job.label);
   const r = await runOne(job);
+  if (afterRestart) ((r.afterRestart = afterRestart), (r.detail = `${afterRestart} — ${r.detail}`));
   if (serverDied()) {
     r.outcome = "CRASH";
     r.detail = `the dev server died during this script — ${r.detail}`;

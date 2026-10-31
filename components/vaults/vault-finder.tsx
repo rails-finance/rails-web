@@ -20,7 +20,7 @@ export function VaultFinder() {
           placeholder="Address or ENS name"
           spellCheck={false}
           autoComplete="off"
-          className="min-w-0 flex-1 rounded-lg bg-raised px-3 py-2 text-[13px] text-foreground placeholder:text-rb-500 focus-ring"
+          className="min-w-0 flex-1 rounded-lg bg-raised px-3 py-2 text-base text-foreground sm:text-[13px] placeholder:text-rb-500 focus-ring"
         />
         <button
           type="submit"
