@@ -96,7 +96,8 @@ import {
 import { sparkEconomicsExplanation, sparkEconomicsContent } from "@/lib/spark/economics-explanation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { aaveMarketVocab } from "@/lib/shared/aave-market-provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
@@ -755,19 +756,22 @@ export default function SparkPositionDetail({
 
   // The top row's price dropdown: the on-chain oracle
   // price of each reserve the account currently holds.
-  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view || view.status !== "open") return [];
+    // The oracle receipt for each price, at the overlay head block.
+    const vocab = aaveMarketVocab("spark", { blockNumber: chain?.blockNumber });
     const seen = new Set<string>();
-    const out: PriceStripAsset[] = [];
+    const out: LatestPriceAsset[] = [];
     for (const r of [...view.supplies, ...view.borrows]) {
       const a = r.address.toLowerCase();
       if (seen.has(a)) continue;
       seen.add(a);
       const p = view.priceByAddress?.[a];
-      if (typeof p === "number" && p > 0) out.push({ symbol: r.symbol, address: r.address, price: p });
+      if (typeof p === "number" && p > 0)
+        out.push({ symbol: r.symbol, address: r.address, price: p, info: vocab.reservePriceProv(r.symbol) });
     }
     return out;
-  }, [view]);
+  }, [view, chain]);
 
   // The card ⋮'s export shapes (ui-jobs 308 point 2).
   // The configurator log the markdown export's "Protocol changes" section reads.

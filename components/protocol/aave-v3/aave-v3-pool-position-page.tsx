@@ -78,7 +78,8 @@ import { useAaveV3BaseFlows } from "@/hooks/useAaveV3BaseFlows";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { aaveMarketVocab } from "@/lib/shared/aave-market-provenance";
 import { TimelineFillWell } from "@/components/shared/timeline-fill-well";
 import { CARD_PAD_X } from "@/lib/shared/ui-grammar";
 import { TimelineConfirmationFooter, TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
@@ -627,19 +628,22 @@ export function AaveV3PoolPositionView({
     emode: switches?.emode ?? null,
   });
 
-  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view) return [];
+    // The oracle receipt for each price, read at the head (the price route states no block).
+    const vocab = aaveMarketVocab(d.key, {});
     const seen = new Set<string>();
-    const out: PriceStripAsset[] = [];
+    const out: LatestPriceAsset[] = [];
     for (const r of [...view.supplies, ...view.borrows]) {
       const a = r.address.toLowerCase();
       if (seen.has(a)) continue;
       seen.add(a);
       const p = prices[a];
-      if (typeof p === "number" && p > 0) out.push({ symbol: r.symbol, address: r.address, price: p });
+      if (typeof p === "number" && p > 0)
+        out.push({ symbol: r.symbol, address: r.address, price: p, info: vocab.reservePriceProv(r.symbol) });
     }
     return out;
-  }, [view, prices]);
+  }, [view, prices, d.key]);
 
   // The export shapes: the card's ⋮, or the wallet row's Tools on the event route.
   // The configurator log the markdown export's "Protocol changes" section reads.

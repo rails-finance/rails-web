@@ -76,7 +76,8 @@ import {
 import { LlamalendLoansLine, LlamalendOwnerOutcomeLine } from "@/components/protocol/llamalend/llamalend-loans-line";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { llamalendOraclePriceProv } from "@/lib/llamalend/live-provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 interface LlamalendPositionViewProps {
@@ -388,10 +389,17 @@ export default function LlamalendPositionView({
   // The top row's price dropdown: the AMM's own oracle price of the
   // collateral — only where the borrowed token is crvUSD (~$1); a WETH-
   // denominated price is not a dollar and never renders as one.
-  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!chain || chain.chainStale || !chain.borrowedIsCrvusd) return [];
     if (typeof chain.priceOracle !== "number" || chain.priceOracle <= 0) return [];
-    return [{ symbol: chain.collateralSymbol, address: "", price: chain.priceOracle }];
+    return [
+      {
+        symbol: chain.collateralSymbol,
+        address: "",
+        price: chain.priceOracle,
+        info: llamalendOraclePriceProv(chain.collateralSymbol, chain.borrowedSymbol, chain.borrowedIsCrvusd, chain.amm),
+      },
+    ];
   }, [chain]);
 
   if (!controller || !user) {
