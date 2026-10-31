@@ -8,6 +8,7 @@ import { StageRail } from "@/components/home/stage-rail";
 import { TrackLines } from "@/components/home/track-lines";
 import { TeamSection } from "@/components/shared/team-section";
 import { getLiveExampleData } from "@/lib/home/live-example-data";
+import { packLiveExample } from "@/lib/home/live-example-wire";
 import { getCoveredPositions } from "@/lib/home/covered-positions-data";
 import { getHomeStats } from "@/lib/home/home-stats-data";
 
@@ -52,7 +53,7 @@ export default async function Home() {
         {/* Live example — a real trove in browser chrome; its hover pill
             links to the live position. */}
         <section className="pb-12" data-anatomy="S2">
-          <LiveExampleFrame data={liveExample} />
+          <LiveExampleFrame data={liveExample && packLiveExample(liveExample)} />
         </section>
 
         {/* The roster, counted — sits between the example and the directory so

@@ -8,6 +8,7 @@ import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { PILL_CTA } from "@/lib/shared/ui-grammar";
 import { LIVE_EXAMPLE_TROVE_ID, LIVE_EXAMPLE_TROVE_PATH, type LiveExampleData } from "@/lib/home/live-example";
+import { unpackLiveExample, type WireLiveExample } from "@/lib/home/live-example-wire";
 import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
 import { PositionCardStripProvider, usePublishPositionCardStrip } from "@/components/shared/position-card-strip";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -86,7 +87,8 @@ function HeroStrip({ data }: { data: LiveExampleData }) {
 }
 
 /** The Trove page's body, fed from the home page's data. */
-function HeroTroveComposition({ data }: { data: LiveExampleData }) {
+function HeroTroveComposition({ wire }: { wire: WireLiveExample }) {
+  const data = useMemo(() => unpackLiveExample(wire), [wire]);
   const {
     trove,
     liveState,
@@ -162,7 +164,7 @@ function HeroTroveComposition({ data }: { data: LiveExampleData }) {
   );
 }
 
-export function LiveExampleFrame({ data }: { data: LiveExampleData | null }) {
+export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
   // The composition stays behind the skeleton until the client has mounted —
   // see the header comment for why it never server-renders. When the data
   // fetch failed at revalidate time (data null) the skeleton simply holds.
@@ -284,7 +286,7 @@ export function LiveExampleFrame({ data }: { data: LiveExampleData | null }) {
                   animation: "fade-in 0.5s",
                 }}
               >
-                <HeroTroveComposition data={data} />
+                <HeroTroveComposition wire={data} />
               </div>
             )}
             {/* Bottom fade into the top section's gradient floor — the stops
