@@ -19,6 +19,7 @@
 // that disagree about their numeraire have no common total.
 
 import type { CompoundMarketChainResponse } from "./fetch-compound-position";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 
 export interface CompoundWalletChainResponse {
   wallet: string;
@@ -34,6 +35,9 @@ export interface CompoundWalletChainResponse {
    *  an empty wallet look identical on the page, so a failed read empties the
    *  whole answer rather than quietly dropping a market. */
   chainStale: boolean;
+  /** Where rails-server read it at the head (/api/at-block/…): the block's
+   *  time, when it read it, the leg that answered. Absent on a web chain read. */
+  head?: PositionHeadStamp;
   /** WETH in dollars at `blockNumber`, where the deployment states its
    *  rosters (Arbitrum): the first dollar-quoted Comet's `getPrice` on its
    *  WETH collateral feed, which converts the ETH-quoted Comet's figures. */

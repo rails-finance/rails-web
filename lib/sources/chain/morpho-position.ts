@@ -22,11 +22,20 @@
 //
 // SERVER-ONLY.
 
-import { parseAbi, getAddress } from "viem";
+import { parseAbi, getAddress, type PublicClient } from "viem";
 import { chainClient } from "./rpc";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import { MORPHO_DEPLOYMENT, type MorphoDeployment } from "./morpho-deployments";
 import type { MorphoChainPositionResponse, MorphoOracleFeed } from "@/lib/api/fetch-morpho-position";
+import { withServerHead } from "@/lib/sources/api/lender-position-head";
+import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+
+/** rails-server's name for a Morpho Blue deployment, by chain. */
+export const MORPHO_SERVER_DEPLOYMENT: Record<number, "ethereum" | "base" | "arbitrum"> = {
+  [MAINNET_CHAIN_ID]: "ethereum",
+  [BASE_CHAIN_ID]: "base",
+  [ARBITRUM_CHAIN_ID]: "arbitrum",
+};
 
 const MORPHO_ABI = parseAbi([
   "function idToMarketParams(bytes32 id) view returns (address loanToken, address collateralToken, address oracle, address irm, uint256 lltv)",
@@ -104,7 +113,7 @@ const lifOf = (lltv: bigint): number => {
  * price is as old as its oldest input, so a missing one leaves no age to state.
  */
 export async function readOracle(
-  client: ReturnType<typeof chainClient>,
+  client: PublicClient,
   oracle: `0x${string}`,
   blockNumber: bigint,
 ): Promise<{ price: bigint; feeds: MorphoOracleFeed[] | null }> {
@@ -213,8 +222,21 @@ export async function loadMorphoPositionFromChain(
   /** Read at this block rather than the head: a caller reading several
    *  markets states them all at one block. */
   atBlock?: bigint,
+  /** The client the reads go through (a replay of rails-server's answer, or
+   *  one pinned to a block); with neither this nor a block, rails-server is
+   *  asked first, then the chain. */
+  reader?: PublicClient,
 ): Promise<MorphoChainPositionResponse> {
   const marketId = (marketRaw.startsWith("0x") ? marketRaw : `0x${marketRaw}`).toLowerCase();
+  // At the head, rails-server's read first (lib/sources/api/lender-position-head.ts).
+  const serverDeployment = MORPHO_SERVER_DEPLOYMENT[deployment.chainId];
+  if (!reader && atBlock == null && serverDeployment && /^0x[0-9a-f]{64}$/.test(marketId)) {
+    const got = await withServerHead(
+      { kind: "morpho-position", deployment: serverDeployment, market: marketId, wallet: userRaw },
+      (client) => loadMorphoPositionFromChain(marketRaw, userRaw, deployment, undefined, client),
+    ).catch(() => null);
+    if (got) return { ...got.answer, head: got.head };
+  }
   let user: string;
   try {
     user = getAddress(userRaw);
@@ -223,7 +245,7 @@ export async function loadMorphoPositionFromChain(
   }
 
   try {
-    const client = chainClient(deployment.chainId);
+    const client = reader ?? chainClient(deployment.chainId);
     const MORPHO = deployment.blue as `0x${string}`;
     const id = marketId as `0x${string}`;
 

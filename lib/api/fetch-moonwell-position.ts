@@ -29,6 +29,8 @@
 // survives the on-chain-only gate). Balances are TEXT to preserve integer
 // precision; scale by decimals.
 
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+
 export interface MoonwellChainMarket {
   /** The market's key within this response. On Ethereum it is the backend's
    *  own `market` tag ('weth' | 'usdc' | 'usdt' | 'cbbtc'), because the index
@@ -96,6 +98,9 @@ export interface MoonwellChainResponse {
   entered: { underlying: string; symbol: string; collateralFactor: number }[] | null;
   /** True when the chain RPC read failed and we returned an empty stub. */
   chainStale: boolean;
+  /** Where rails-server read it at the head (/api/at-block/…): the block's
+   *  time, when it read it, the leg that answered. Absent on a web chain read. */
+  head?: PositionHeadStamp;
 }
 
 export interface FetchMoonwellPositionParams {
