@@ -10,7 +10,7 @@
 
 import type { ReactNode } from "react";
 import type { PositionPanelColumns, PositionPanelRow } from "@/components/shared/position-card";
-import { forkLiveVocab, FORK_DEBT_SYMBOL } from "@/lib/shared/liquity-fork-live-provenance";
+import { forkLiveVocab, FORK_DEBT_SYMBOL, forkReadBy } from "@/lib/shared/liquity-fork-live-provenance";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { pct } from "@/components/shared/ratio-bar";
@@ -24,7 +24,7 @@ const amount = (figure: ReactNode, symbol: string) => <TokenFigure symbol={symbo
 export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): PositionPanelColumns {
   if (chain.chainStale || (chain.status !== "active" && chain.status !== "zombie")) return [[], []];
   const debtSym = FORK_DEBT_SYMBOL[chain.protocol] ?? "";
-  const vocab = forkLiveVocab(chain.protocol);
+  const vocab = forkLiveVocab(chain.protocol, forkReadBy(chain));
   const left: PositionPanelRow[] = [];
   const right: PositionPanelRow[] = [];
 

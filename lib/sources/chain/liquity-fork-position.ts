@@ -24,6 +24,9 @@
 import { parseAbi, type ContractFunctionParameters } from "viem";
 import { chainClient } from "./rpc";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import { serverLiquityForkTrove } from "@/lib/sources/api/liquity-fork-head";
+import { settleTrove, troveStub, type TroveDataRead } from "./liquity-fork-settle";
 
 export interface LiquityForkBranchConfig {
   key: string;
@@ -70,7 +73,6 @@ const ST_ABI = parseAbi([
 
 /** V2 trove status enum. */
 export type LiquityForkTroveStatus = "nonExistent" | "active" | "closedByOwner" | "closedByLiquidation" | "zombie";
-const STATUS: LiquityForkTroveStatus[] = ["nonExistent", "active", "closedByOwner", "closedByLiquidation", "zombie"];
 
 export interface LiquityForkTroveChainResponse {
   protocol: string;
@@ -136,50 +138,16 @@ export interface LiquityForkTroveChainResponse {
   trovesAhead: number | null;
   /** True when the chain RPC read failed and we returned an empty stub. */
   chainStale: boolean;
-}
-
-function stub(cfg: LiquityForkConfig, b: LiquityForkBranchConfig, troveId: string): LiquityForkTroveChainResponse {
-  return {
-    protocol: cfg.protocol,
-    branch: b.key,
-    symbol: b.symbol,
-    troveId,
-    blockNumber: 0,
-    status: "nonExistent",
-    entireDebtRaw: "0",
-    entireDebt: 0,
-    entireCollRaw: "0",
-    entireColl: 0,
-    collDecimals: b.decimals,
-    accruedInterest: 0,
-    accruedBatchManagementFee: 0,
-    redistDebtGain: 0,
-    redistCollGain: 0,
-    recordedDebt: 0,
-    annualInterestRatePct: 0,
-    annualInterestRateRaw: "0",
-    priceUsd: null,
-    priceStale: false,
-    oracleDown: false,
-    icr: null,
-    mcr: b.mcr,
-    ccr: b.ccr,
-    scr: b.scr,
-    liqPriceUsd: null,
-    branchDebt: null,
-    branchColl: null,
-    branchTcr: null,
-    inSortedList: false,
-    debtInFront: null,
-    trovesAhead: null,
-    chainStale: true,
-  };
+  /** Present when rails-server read it: the block's time, when it was read, the leg that answered. */
+  head?: PositionHeadStamp;
 }
 
 const WALK_CAP = 40; // branch lists are single-digit today; a hard stop regardless
 
 /**
- * Read one trove's live state straight from its branch contracts. Returns a
+ * Read one trove's live state from its branch contracts: from rails-server
+ * first when no block is asked (lib/sources/api/liquity-fork-head.ts), else
+ * straight from the chain. `atBlock` pins every read to that block. Returns a
  * `chainStale` stub on RPC failure so the caller falls back to its
  * event-derived numbers (the risk surfaces just stay off).
  */
@@ -187,25 +155,32 @@ export async function loadLiquityForkTroveFromChain(
   cfg: LiquityForkConfig,
   branchKey: string,
   troveIdRaw: string,
+  atBlock?: number,
 ): Promise<LiquityForkTroveChainResponse> {
   const b = cfg.branches[branchKey];
   if (!b) throw new Error(`unknown branch: ${branchKey}`);
   const troveId = BigInt(troveIdRaw);
+  if (atBlock === undefined) {
+    const served = await serverLiquityForkTrove(cfg, branchKey, troveIdRaw);
+    if (served) return served;
+  }
 
   try {
     const client = chainClient(cfg.chainId ?? MAINNET_CHAIN_ID);
     const tm = b.troveManager as `0x${string}`;
     const pf = b.priceFeed as `0x${string}`;
     const st = b.sortedTroves as `0x${string}`;
+    const blockOpt = atBlock != null ? { blockNumber: BigInt(atBlock) } : {};
     const atTm = (functionName: string, args: readonly unknown[] = []): ContractFunctionParameters =>
       ({ address: tm, abi: TM_ABI, functionName, args }) as ContractFunctionParameters;
 
     // Phase 1 — price (simulated fetch + fallback), the trove struct, status,
     // and the branch aggregates, alongside the head block number.
     const [blockNumber, phase1] = await Promise.all([
-      client.getBlockNumber().then(Number),
+      atBlock != null ? Promise.resolve(atBlock) : client.getBlockNumber().then(Number),
       client.multicall({
         allowFailure: true,
+        ...blockOpt,
         contracts: [
           { address: pf, abi: PF_ABI, functionName: "fetchPrice" } as ContractFunctionParameters,
           { address: pf, abi: PF_ABI, functionName: "lastGoodPrice" } as ContractFunctionParameters,
@@ -220,56 +195,33 @@ export async function loadLiquityForkTroveFromChain(
     const r = (i: number): unknown => (phase1[i].status === "success" ? phase1[i].result : null);
     const fetched = r(0) as [bigint, boolean] | null;
     const lastGood = r(1) as bigint | null;
-    const data = r(2) as {
-      entireDebt: bigint;
-      entireColl: bigint;
-      redistBoldDebtGain: bigint;
-      redistCollGain: bigint;
-      accruedInterest: bigint;
-      recordedDebt: bigint;
-      annualInterestRate: bigint;
-      accruedBatchManagementFee: bigint;
-    } | null;
+    const data = r(2) as TroveDataRead | null;
     const statusNum = r(3) as number | null;
-    const branchDebtRaw = r(4) as bigint | null;
-    const branchCollRaw = r(5) as bigint | null;
     const firstId = r(6) as bigint | null;
-    if (!data || statusNum == null) return stub(cfg, b, troveIdRaw);
+    if (!data || statusNum == null) return troveStub(cfg, b, troveIdRaw);
 
-    const priceScale = 10 ** (36 - b.decimals); // USD per whole token divisor
     const priceRaw = fetched && fetched[0] > BigInt(0) ? fetched[0] : lastGood;
-    const priceStale = !(fetched && fetched[0] > BigInt(0)) && lastGood != null;
-    const priceUsd = priceRaw != null && priceRaw > BigInt(0) ? Number(priceRaw) / priceScale : null;
-
-    const debtScale = 1e18;
-    const collScale = 10 ** b.decimals;
-    const entireDebt = Number(data.entireDebt) / debtScale;
-    const entireColl = Number(data.entireColl) / collScale;
 
     // Phase 2 — the contract's own ICR at the same price, plus the redemption
     // queue: collect the sorted list (a linked walk), then batch the datas.
-    let icr: number | null = null;
-    let debtInFront: number | null = null;
-    let trovesAhead: number | null = null;
-    let inSortedList = false;
-    let queueLen: number | null = null;
+    let icrRaw: bigint | null = null;
+    let walk: bigint[] | null = null;
+    const debts = new Map<bigint, bigint | null>();
     if (priceRaw != null && priceRaw > BigInt(0)) {
       if (data.entireDebt > BigInt(0)) {
         try {
-          const icrRaw = (await client.readContract({
+          icrRaw = (await client.readContract({
             address: tm,
             abi: TM_ABI,
             functionName: "getCurrentICR",
             args: [troveId, priceRaw],
+            ...blockOpt,
           })) as bigint;
-          // The contract returns max-uint for debtless troves; guard on scale.
-          icr = icrRaw < BigInt("0xffffffffffffffffffffffffffffffff") ? Number(icrRaw) / 1e18 : null;
         } catch {
-          icr = null;
+          icrRaw = null;
         }
       }
-      // Walk the queue head→tail (descending rate). Debt-in-front for this
-      // trove = Σ entireDebt of troves AFTER it (lower rates, redeemed first).
+      // Walk the queue head→tail (descending rate).
       try {
         const ids: bigint[] = [];
         let id = firstId;
@@ -280,92 +232,40 @@ export async function loadLiquityForkTroveFromChain(
             abi: ST_ABI,
             functionName: "getNext",
             args: [id],
+            ...blockOpt,
           })) as bigint;
         }
         const idx = ids.findIndex((x) => x === troveId);
-        queueLen = ids.length;
-        inSortedList = idx >= 0;
-        if (inSortedList) {
-          const after = ids.slice(idx + 1);
-          if (after.length === 0) {
-            debtInFront = 0;
-            trovesAhead = 0;
-          } else {
-            const datas = (await client.multicall({
-              allowFailure: true,
-              contracts: after.map((x) => atTm("getLatestTroveData", [x])),
-            })) as { status: string; result?: { entireDebt: bigint } }[];
-            let sum = 0;
-            let n = 0;
-            for (const d of datas) {
-              if (d.status !== "success" || !d.result) continue;
-              sum += Number(d.result.entireDebt) / debtScale;
-              n++;
-            }
-            debtInFront = sum;
-            trovesAhead = n;
-          }
-        } else if (statusNum === 4) {
-          // Zombie: outside the list, redeemed before everything in it.
-          debtInFront = 0;
-          trovesAhead = 0;
+        const after = idx >= 0 ? ids.slice(idx + 1) : [];
+        if (after.length > 0) {
+          const datas = (await client.multicall({
+            allowFailure: true,
+            ...blockOpt,
+            contracts: after.map((x) => atTm("getLatestTroveData", [x])),
+          })) as { status: string; result?: { entireDebt: bigint } }[];
+          after.forEach((x, k) =>
+            debts.set(x, datas[k].status === "success" && datas[k].result ? datas[k].result!.entireDebt : null),
+          );
         }
+        walk = ids;
       } catch {
-        debtInFront = null;
-        trovesAhead = null;
+        walk = null;
       }
     }
 
-    const branchDebt = branchDebtRaw != null ? Number(branchDebtRaw) / debtScale : null;
-    const branchColl = branchCollRaw != null ? Number(branchCollRaw) / collScale : null;
-
-    return {
-      protocol: cfg.protocol,
-      branch: b.key,
-      symbol: b.symbol,
-      troveId: troveIdRaw,
+    return settleTrove(cfg, b, troveIdRaw, {
       blockNumber,
-      status: STATUS[statusNum] ?? "nonExistent",
-      entireDebtRaw: data.entireDebt.toString(),
-      entireDebt,
-      entireCollRaw: data.entireColl.toString(),
-      entireColl,
-      collDecimals: b.decimals,
-      accruedInterest: Number(data.accruedInterest) / debtScale,
-      accruedBatchManagementFee: Number(data.accruedBatchManagementFee ?? BigInt(0)) / debtScale,
-      redistDebtGain: Number(data.redistBoldDebtGain) / debtScale,
-      redistCollGain: Number(data.redistCollGain) / collScale,
-      recordedDebt: Number(data.recordedDebt) / debtScale,
-      annualInterestRatePct: Number(data.annualInterestRate) / 1e16,
-      annualInterestRateRaw: data.annualInterestRate.toString(),
-      priceUsd,
-      priceStale,
-      oracleDown: fetched != null ? fetched[1] : false,
-      icr,
-      mcr: b.mcr,
-      ccr: b.ccr,
-      scr: b.scr,
-      liqPriceUsd: entireDebt > 0 && entireColl > 0 ? (entireDebt * b.mcr) / entireColl : null,
-      branchDebt,
-      branchColl,
-      // A branch whose troves have all gone still reports DUST debt from its
-      // aggregate interest bookkeeping, and dividing collateral by dust yields
-      // a ratio in the quintillions — the branches lane's rule applies here
-      // too: gate on the QUEUE, not on debt > 0 (a failed walk falls back to
-      // a whole-token floor). An empty branch has no ratio to state.
-      branchTcr:
-        branchDebt != null &&
-        branchColl != null &&
-        priceUsd != null &&
-        (queueLen != null ? queueLen > 0 && branchDebt > 0 : branchDebt >= 1)
-          ? (branchColl * priceUsd) / branchDebt
-          : null,
-      inSortedList,
-      debtInFront,
-      trovesAhead,
-      chainStale: false,
-    };
+      fetched,
+      lastGood,
+      data,
+      statusNum,
+      branchDebtRaw: r(4) as bigint | null,
+      branchCollRaw: r(5) as bigint | null,
+      icrRaw,
+      walk,
+      entireDebtOf: (x) => debts.get(x) ?? null,
+    });
   } catch {
-    return stub(cfg, b, troveIdRaw);
+    return troveStub(cfg, b, troveIdRaw);
   }
 }

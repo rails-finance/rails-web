@@ -43,7 +43,7 @@ import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { liquityForkRedemptionContent, type LiquityForkLearnMoreParams } from "@/lib/shared/learn-more-content";
-import { forkLiveVocab } from "@/lib/shared/liquity-fork-live-provenance";
+import { forkLiveVocab, forkReadBy } from "@/lib/shared/liquity-fork-live-provenance";
 import { formatExact, formatUsdValue } from "@/lib/utils/format";
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl } from "@/lib/shared/chains";
@@ -113,7 +113,7 @@ function BranchCard({
   hrefBase: string;
   wiring: Required<LiquityForkUrlWiring>;
 }) {
-  const vocab = forkLiveVocab(data.protocol);
+  const vocab = forkLiveVocab(data.protocol, forkReadBy(data));
   const sym = branch.symbol;
 
   if (branch.stale) {
