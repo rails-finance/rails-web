@@ -768,10 +768,6 @@ trove_words:
     into Trove
   trove_not_found: |-
     Trove not found
-  trove_load_failed: |-
-    Failed to load trove data
-  trove_fetch_failed: |-
-    Failed to fetch trove: {status}
   trove_loading_state: |-
     Loading current state...
   history_unreadable: |-
