@@ -35,7 +35,7 @@
 // Provenance: the whole view owns ONE <ProvReceiptsScope> (the six other scoped
 // views' posture — the figures are one block's reading of one protocol's roster,
 // so they belong in one receipts list). Every rendered figure is a live read of
-// the VaultResolver's getVaultsEntireData() at head, so each carries a <Prov>
+// the VaultResolver's getAllVaultsAddresses() and getVaultEntireData(vault) at head, so each carries a <Prov>
 // from lib/fluid/vaults-provenance — the vaults lane, NOT the position lane that
 // live-provenance.ts hardcodes. The vaults-minted count is the length of that
 // one enumerator read, so it carries a receipt; the four summary condition
@@ -384,7 +384,11 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
           {
             slot: "roster",
             label: "Vaults minted",
-            value: <Prov info={fluidRosterProv({ blockNumber: data.blockNumber, skipped: data.skipped?.length, readBy })}>{data.summary.total}</Prov>,
+            value: (
+              <Prov info={fluidRosterProv({ blockNumber: data.blockNumber, skipped: data.skipped?.length, readBy })}>
+                {data.summary.total}
+              </Prov>
+            ),
             title: "Every vault the VaultResolver reads at this block, configured or not.",
           },
           {
@@ -497,8 +501,8 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
                 </a>
               </span>
             ))}
-            . The VaultResolver&rsquo;s read of {data.skipped.length === 1 ? "this vault" : "these vaults"} reverts at block{" "}
-            {data.blockNumber}.
+            . The VaultResolver&rsquo;s read of {data.skipped.length === 1 ? "this vault" : "these vaults"} reverts at
+            block {data.blockNumber}.
           </p>
         </section>
       )}
