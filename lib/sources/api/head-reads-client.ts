@@ -17,8 +17,11 @@
 // `readContract`s is one request, as viem would batch a multicall. A read
 // without a block is pinned to rails-server's block. A read at a block
 // rails-server did not name, or one the route cannot answer (no RAILS_API_URL,
-// a non-2xx answer or 8 s without one), is the chain read as before, at the
-// same block; after a failure the chain is read for 30 s without asking.
+// a refused connection, a non-2xx answer, 3 s without a head or 8 s without a
+// round), is the chain read as before, at the same block; after a failure the
+// chain is read for 30 s without asking. The head waits 3 s so that a slow api
+// leaves a server render's 8 s budget (`position-tail-page-data.ts`) time for
+// the chain read.
 //
 // SERVER-ONLY.
 
@@ -29,6 +32,8 @@ import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { noteChainRead, noteServerHead } from "./server-head-stamps";
 
 const TIMEOUT_MS = 8_000;
+/** The head is one small cached answer: past this, the api is taken as down. */
+const HEAD_TIMEOUT_MS = 3_000;
 /** How long a block rails-server named is read there: inside its two-minute acceptance. */
 const NAMED_MS = 90_000;
 /** One head answer serves the reads that start within this long of it. */
@@ -64,7 +69,7 @@ const isNamed = (chainId: number, block: bigint | undefined): block is bigint =>
 
 const isDown = (chainId: number) => (downUntil.get(chainId) ?? 0) > Date.now();
 
-async function ask<T>(chainId: number, path: string, body?: unknown): Promise<T | null> {
+async function ask<T>(chainId: number, path: string, body?: unknown, timeoutMs = TIMEOUT_MS): Promise<T | null> {
   const api = process.env.RAILS_API_URL;
   if (!api || isDown(chainId)) return null;
   try {
@@ -75,12 +80,13 @@ async function ask<T>(chainId: number, path: string, body?: unknown): Promise<T 
           : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) },
       ),
       cache: "no-store",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) {
       void res.body?.cancel().catch(() => undefined);
-      // A block the route no longer names (409) is not the route down.
-      if (res.status !== 409) downUntil.set(chainId, Date.now() + DOWN_MS);
+      // A refusal of this request (a block the route no longer names, 409, or
+      // a malformed or oversized round, 400) is not the route down.
+      if (res.status >= 500 || res.status === 429) downUntil.set(chainId, Date.now() + DOWN_MS);
       return null;
     }
     return (await res.json()) as T;
@@ -94,7 +100,7 @@ async function ask<T>(chainId: number, path: string, body?: unknown): Promise<T 
 function serverHead(chainId: number): Promise<HeadAnswer | null> {
   const hit = heads.get(chainId);
   if (hit && Date.now() - hit.at < HEAD_REUSE_MS) return hit.p;
-  const p = ask<HeadAnswer>(chainId, `block?chain=${chainId}`).then((h) => {
+  const p = ask<HeadAnswer>(chainId, `block?chain=${chainId}`, undefined, HEAD_TIMEOUT_MS).then((h) => {
     if (!h || typeof h.blockNumber !== "number" || typeof h.blockTimestamp !== "number") {
       heads.delete(chainId);
       return null;
@@ -202,6 +208,14 @@ let override: ((chainId: ChainId) => PublicClient) | null = null;
  *  `headReadsClient()` answers with `fn`'s client until it is cleared. */
 export function overrideHeadReadsClient(fn: ((chainId: ChainId) => PublicClient) | null): void {
   override = fn;
+}
+
+/** Forgets every named block, head answer and failure: the client tests' seam. */
+export function resetHeadReadsClient(): void {
+  named.clear();
+  heads.clear();
+  downUntil.clear();
+  queues.clear();
 }
 
 /** The block rails-server last named for the chain, for the equality check. */

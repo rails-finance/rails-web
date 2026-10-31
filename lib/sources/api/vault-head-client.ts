@@ -12,8 +12,10 @@
 //
 // A read goes to rails-server only at a block rails-server named; a read at any
 // other block, an unpinned one, or one the route cannot answer (no
-// RAILS_API_URL, a non-2xx answer or 8 s without one) is the chain read as
-// before, at the same block. Every other method is the chain client's.
+// RAILS_API_URL, a refused connection, a non-2xx answer, 3 s without a head or
+// 8 s without a round) is the chain read as before, at the same block; after a
+// failure the chain is read for 30 s without asking, as `head-reads-client.ts`
+// does. Every other method is the chain client's.
 //
 // SERVER-ONLY.
 
@@ -25,6 +27,10 @@ import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { noteChainRead, noteServerHead } from "./server-head-stamps";
 
 const TIMEOUT_MS = 8_000;
+/** The head is one small cached answer: past this, the api is taken as down. */
+const HEAD_TIMEOUT_MS = 3_000;
+/** After the route fails, how long the chain is read without asking it. */
+const DOWN_MS = 30_000;
 /** How long a block rails-server named is read there: inside its two-minute acceptance. */
 const NAMED_MS = 90_000;
 
@@ -35,6 +41,8 @@ type RawRead =
 type RawAnswer = { success: boolean; returnData: Hex } | { hex: Hex };
 
 const named = new Map<number, Map<bigint, number>>();
+const downUntil = new Map<number, number>();
+const isDown = (chainId: number) => (downUntil.get(chainId) ?? 0) > Date.now();
 
 function remember(chainId: number, block: bigint) {
   let m = named.get(chainId);
@@ -49,9 +57,14 @@ const isNamed = (chainId: number, block: bigint | undefined): block is bigint =>
   return at != null && Date.now() - at <= NAMED_MS;
 };
 
-async function ask<T>(path: string, init?: { body: unknown }): Promise<T | null> {
+async function ask<T>(
+  chainId: number,
+  path: string,
+  init?: { body: unknown },
+  timeoutMs = TIMEOUT_MS,
+): Promise<T | null> {
   const api = process.env.RAILS_API_URL;
-  if (!api) return null;
+  if (!api || isDown(chainId)) return null;
   try {
     const res = await fetch(`${api}/api/at-block/vault/${path}`, {
       ...createAuthFetchOptions(
@@ -60,14 +73,18 @@ async function ask<T>(path: string, init?: { body: unknown }): Promise<T | null>
           : undefined,
       ),
       cache: "no-store",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) {
       void res.body?.cancel().catch(() => undefined);
+      // A refusal of this request (a block the route no longer names, 409, or
+      // a malformed or oversized round, 400) is not the route down.
+      if (res.status >= 500 || res.status === 429) downUntil.set(chainId, Date.now() + DOWN_MS);
       return null;
     }
     return (await res.json()) as T;
   } catch {
+    downUntil.set(chainId, Date.now() + DOWN_MS);
     return null;
   }
 }
@@ -80,7 +97,12 @@ interface HeadAnswer {
 }
 
 async function serverHead(chainId: number, finalized = false): Promise<HeadAnswer | null> {
-  const h = await ask<HeadAnswer>(`head?chain=${chainId}${finalized ? "&finalized=1" : ""}`);
+  const h = await ask<HeadAnswer>(
+    chainId,
+    `head?chain=${chainId}${finalized ? "&finalized=1" : ""}`,
+    undefined,
+    HEAD_TIMEOUT_MS,
+  );
   if (!h || typeof h.blockNumber !== "number" || typeof h.blockTimestamp !== "number") return null;
   remember(chainId, BigInt(h.blockNumber));
   noteServerHead(chainId, h.blockNumber, h.head);
@@ -88,7 +110,7 @@ async function serverHead(chainId: number, finalized = false): Promise<HeadAnswe
 }
 
 async function serverReads(chainId: number, block: bigint, reads: RawRead[]): Promise<RawAnswer[] | null> {
-  const r = await ask<{ blockNumber?: unknown; answers?: unknown }>("reads", {
+  const r = await ask<{ blockNumber?: unknown; answers?: unknown }>(chainId, "reads", {
     body: { chain: chainId, block: Number(block), reads },
   });
   if (!r || r.blockNumber !== Number(block) || !Array.isArray(r.answers) || r.answers.length !== reads.length)
@@ -115,6 +137,12 @@ function settle(c: Contract, a: { success: boolean; returnData: Hex }): Settled 
   } catch (error) {
     return { status: "failure", error: error as Error, result: undefined };
   }
+}
+
+/** Forgets every named block and failure: the client tests' seam. */
+export function resetVaultHeadClient(): void {
+  named.clear();
+  downUntil.clear();
 }
 
 /**
