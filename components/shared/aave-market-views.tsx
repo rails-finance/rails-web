@@ -933,7 +933,7 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
                 <select
                   value={sortKey}
                   onChange={(e) => pickSort(e.target.value as SortKey)}
-                  className="rounded-md border border-rb-200 bg-background px-2 py-1 text-[12px] normal-case tracking-normal text-foreground dark:border-rb-800"
+                  className="rounded-md border border-rb-200 bg-background px-2 py-1 text-base sm:text-[12px] normal-case tracking-normal text-foreground dark:border-rb-800"
                 >
                   {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
                     <option key={k} value={k}>

@@ -340,7 +340,7 @@ export function VaultRoster({
             placeholder="Vault name, symbol or address"
             aria-label="Search the roster by vault name, symbol or address"
             data-roster-search
-            className="w-full min-w-0 rounded-lg border border-rb-200 bg-surface px-2.5 py-1.5 text-[12px] text-foreground placeholder:text-rb-500 sm:w-72 dark:border-rb-500/30"
+            className="w-full min-w-0 rounded-lg border border-rb-200 bg-surface px-2.5 py-1.5 text-base text-foreground sm:text-[12px] placeholder:text-rb-500 sm:w-72 dark:border-rb-500/30"
           />
         </div>
         <FilterChips dimensions={dimensions} filters={filters} onChange={setFilters} />

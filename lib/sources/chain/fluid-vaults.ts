@@ -39,10 +39,17 @@
 // only the vault's own rewards/fee component, not the full rate (the convention
 // lib/sources/chain/fluid-position.ts already ships).
 //
+// The block and both resolver calls are asked of rails-server first, at its
+// head block (`head-reads-client.ts`, census W-FL1); the chain is read at that
+// block when it cannot answer.
+//
 // SERVER-ONLY — imported from /api/chain/* route handlers and the SSR page only.
 
 import { getAddress } from "viem";
-import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import {
   FLUID_ADDRESSES,
@@ -152,6 +159,8 @@ export interface FluidVaultRow {
 
 export interface FluidVaultsChainResponse {
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   vaults: FluidVaultRow[];
   summary: {
     total: number;
@@ -180,7 +189,7 @@ const isZeroAddr = (a: string | undefined) => !a || BigInt(a) === ZERO;
 
 export async function loadFluidVaultsFromChain(): Promise<FluidVaultsChainResponse> {
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
     const [blockNumber, all] = await Promise.all([
       client.getBlockNumber().then(Number),
       client.readContract({
@@ -400,6 +409,7 @@ export async function loadFluidVaultsFromChain(): Promise<FluidVaultsChainRespon
 
     return {
       blockNumber,
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       vaults,
       summary: {
         total: vaults.length,

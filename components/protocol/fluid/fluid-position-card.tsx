@@ -46,6 +46,7 @@ import { pairLabel, poolShareLabel, vaultKindLabel } from "@/lib/fluid/asset-cat
 import { formatNumber, formatExact } from "@/lib/utils/format";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import type { FluidPositionChainResponse } from "@/lib/api/fetch-fluid-position";
 import { AmountText } from "@/components/shared/amount-text";
 import { TokenFigure } from "@/components/shared/token-figure";
@@ -127,7 +128,7 @@ function legFigure(v: FluidPositionView, side: "supply" | "borrow", chain?: Flui
   if (!Number.isFinite(amount) || amount <= 0) return null;
   const prov =
     live != null
-      ? liveSettledProv(side, sym, live.blockNumber)
+      ? liveSettledProv(side, sym, live.blockNumber, serverReadOf(live))
       : settled != null
         ? settledNowProv(side, sym, v.settled?.updatedBlock)
         : positionSigmaProv(side, sym);
@@ -355,7 +356,11 @@ export function fluidCardSlots({
       label: "Position ratio",
       labelTip:
         "Debt divided by collateral at the vault oracle's liquidate price, the figure Fluid's liquidation engine compares with the vault's risk lines.",
-      value: <Prov info={fluidRatioProv(colName, debtName, riskLive.vault, pairText)}>{pct(riskLive.ratio!)}</Prov>,
+      value: (
+        <Prov info={fluidRatioProv(colName, debtName, riskLive.vault, pairText, serverReadOf(riskLive))}>
+          {pct(riskLive.ratio!)}
+        </Prov>
+      ),
     });
   } else if (detail && chainPending && hasDebt) {
     // The third slot waits for the read to land, so the row does not jump.
@@ -382,7 +387,11 @@ export function fluidCardSlots({
         id: "borrow-rate",
         label: "Borrow rate",
         tip: "The vault's current borrow rate, annual, read from the vault on chain at the latest block. It floats with how heavily the vault is used.",
-        value: <Prov info={liveBorrowRateProv(riskLive.vault, pairText)}>{riskLive.borrowRatePct.toFixed(2)}%</Prov>,
+        value: (
+          <Prov info={liveBorrowRateProv(riskLive.vault, pairText, serverReadOf(riskLive))}>
+            {riskLive.borrowRatePct.toFixed(2)}%
+          </Prov>
+        ),
       });
     }
     right.push(
@@ -393,13 +402,19 @@ export function fluidCardSlots({
         value: (
           <>
             <TokenFigure symbol={debtSym} figure={`${formatExact(headroom)} ${debtSym}`}>
-              <Prov info={fluidLiqPriceProv(colSym, debtSym, riskLive.vault, pairText)}>
+              <Prov info={fluidLiqPriceProv(colSym, debtSym, riskLive.vault, pairText, serverReadOf(riskLive))}>
                 <AmountText value={headroom} format="compact" />
               </Prov>
             </TokenFigure>{" "}
             to the{" "}
             <Prov
-              info={vaultConfigProv("Collateral factor (borrow gate)", "collateralFactor", riskLive.vault, pairText)}
+              info={vaultConfigProv(
+                "Collateral factor (borrow gate)",
+                "collateralFactor",
+                riskLive.vault,
+                pairText,
+                serverReadOf(riskLive),
+              )}
             >
               <PanelFigure>{pct(riskLive.collateralFactor)}</PanelFigure>
             </Prov>{" "}
@@ -412,7 +427,15 @@ export function fluidCardSlots({
         label: "Liquidates above",
         tip: "The ratio above which Fluid can liquidate the position: the vault's liquidation threshold, read from its settings on chain at the latest block.",
         value: (
-          <Prov info={vaultConfigProv("Liquidation threshold", "liquidationThreshold", riskLive.vault, pairText)}>
+          <Prov
+            info={vaultConfigProv(
+              "Liquidation threshold",
+              "liquidationThreshold",
+              riskLive.vault,
+              pairText,
+              serverReadOf(riskLive),
+            )}
+          >
             {pct(riskLive.liquidationThreshold)}
           </Prov>
         ),

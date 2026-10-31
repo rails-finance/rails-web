@@ -63,6 +63,7 @@ import {
 import type { FluidVaultRow, FluidVaultsChainResponse, LegToken } from "@/lib/sources/chain/fluid-vaults";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { BlockRef } from "@/components/shared/block-ref";
+import { serverReadOf, type ServerRead } from "@/lib/shared/server-head-read";
 
 const pctText = (f: number | null, dp = 0) => (f == null ? "—" : `${(f * 100).toFixed(dp)}%`);
 
@@ -124,10 +125,11 @@ function LegSize({
 /** One vault row — a keyed component (not a `.map` callback) so it can own
  *  its own `useReceiptRegistry()` hook, the same per-row scoping the
  *  Aave-family table uses. */
-function VaultRow({ v, block }: { v: FluidVaultRow; block: number }) {
+function VaultRow({ v, block, readBy }: { v: FluidVaultRow; block: number; readBy?: ServerRead }) {
   const registry = useReceiptRegistry();
   const coords: FluidVaultCoords = {
     blockNumber: block,
+    readBy,
     vault: v.vault,
     vaultId: v.vaultId,
     pair: `${legLabel(v.supplySymbol, v.supplyPool)} / ${legLabel(v.borrowSymbol, v.borrowPool)}`,
@@ -303,6 +305,7 @@ export function FluidVaultsStamp({ data }: { data: FluidVaultsChainResponse }) {
 type SortKey = "vault" | "ladder" | "price" | "supplied" | "borrowed" | "borrowRate" | "supplyRate";
 
 export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
+  const readBy = serverReadOf(data);
   // Hook first (before the early return), so the receipts registry is stable
   // across renders regardless of the stale branch — the compound-markets order.
   const registry = useReceiptRegistry();
@@ -381,7 +384,7 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
           {
             slot: "roster",
             label: "Vaults minted",
-            value: <Prov info={fluidRosterProv({ blockNumber: data.blockNumber })}>{data.summary.total}</Prov>,
+            value: <Prov info={fluidRosterProv({ blockNumber: data.blockNumber, readBy })}>{data.summary.total}</Prov>,
             title: "Every vault the factory has ever minted, configured or not.",
           },
           {
@@ -459,7 +462,7 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
           </thead>
           <tbody>
             {sortedVaults.map((v) => (
-              <VaultRow key={v.vault} v={v} block={data.blockNumber} />
+              <VaultRow key={v.vault} v={v} block={data.blockNumber} readBy={readBy} />
             ))}
           </tbody>
         </table>

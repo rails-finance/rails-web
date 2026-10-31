@@ -410,7 +410,7 @@ function BookmarkRow({ session, onClose }: { session: WalletSession; onClose: ()
             }
           }}
           placeholder={fallback}
-          className="min-w-0 flex-1 rounded border border-rb-300 bg-raised px-1.5 py-0.5 text-xs font-bold outline-none dark:border-rb-700"
+          className="min-w-0 flex-1 rounded border border-rb-300 bg-raised px-1.5 py-0.5 text-base font-bold sm:text-xs outline-none dark:border-rb-700"
         />
         <div className="flex shrink-0 items-center gap-0.5">
           <button

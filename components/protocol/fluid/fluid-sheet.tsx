@@ -51,6 +51,7 @@ import { vaultConfigProv } from "@/lib/fluid/live-provenance";
 import { formatNumber } from "@/lib/utils/format";
 import { soleFlowAddress } from "@/lib/shared/format-event";
 import type { AssetFlow } from "@/lib/shared/types/event-shape";
+import type { ServerRead } from "@/lib/shared/server-head-read";
 import { settledTransition } from "./fluid-cells";
 
 /** The vault's terms, from the page's live read at the latest block. */
@@ -61,6 +62,8 @@ export interface FluidSheetTerms {
   collateralFactor: number;
   liquidationThreshold: number;
   liquidationPenalty: number;
+  /** rails-server's read of the block, when it answered every read. */
+  readBy?: ServerRead;
 }
 
 export interface FluidSheetFacts {
@@ -453,7 +456,7 @@ export function fluidSheet({
   const prevRatio = pa ? ratioOf(num(pa.col), num(pa.debt), prevPrice) : null;
   const noDebt = debtAfter != null && debtAfter <= 0;
   const termProv = (what: string, field: string): Provenance => {
-    const p = vaultConfigProv(what, field, terms?.vault ?? ctx.vault, coords.pairLabel);
+    const p = vaultConfigProv(what, field, terms?.vault ?? ctx.vault, coords.pairLabel, terms?.readBy);
     return terms ? { ...p, source: { block: terms.block } } : p;
   };
 
