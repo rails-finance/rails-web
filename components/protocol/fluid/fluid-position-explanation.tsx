@@ -18,6 +18,7 @@ import { fluidLegName, fluidPairText, type FluidPositionView } from "@/component
 import { poolShareLabel } from "@/lib/fluid/asset-catalog";
 import { Prov } from "@/components/shared/provenance";
 import { liveSettledProv } from "@/lib/fluid/live-provenance";
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { settledNowProv, positionSigmaProv } from "@/lib/fluid/event-provenance";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { operatorLead, type ExternalActorSummary } from "@/lib/shared/external-actor";
@@ -234,7 +235,7 @@ export function FluidPositionExplanation({
     const exact = side === "supply" ? live.supplyExact : live.borrowExact;
     const n = side === "supply" ? live.supply : live.borrow;
     return (
-      <Prov echo info={liveSettledProv(side, sym, live.blockNumber)} value={exact} symbol={sym}>
+      <Prov echo info={liveSettledProv(side, sym, live.blockNumber, serverReadOf(live))} value={exact} symbol={sym}>
         <H>
           <AmountText value={n} /> {sym}
         </H>

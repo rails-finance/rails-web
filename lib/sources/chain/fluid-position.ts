@@ -24,10 +24,17 @@
 // token. The decode and the ratio arithmetic are proven against the contract
 // by scripts/verify-fluid-chain.mjs.
 //
+// The block and the resolver call are asked of rails-server first, as one round
+// at its head block (`head-reads-client.ts`, census W-FL1); the chain is read
+// at that block when it cannot answer.
+//
 // SERVER-ONLY.
 
 import { getAddress } from "viem";
-import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import { FLUID_ADDRESSES, fluidOraclePriceScale, isFluidEthSentinel, vaultKindOf } from "@/lib/fluid/asset-catalog";
 import { FLUID_VAULT_RESOLVER_ABI } from "@/lib/fluid/vault-resolver-abi";
@@ -40,6 +47,8 @@ const INT_MIN = BigInt("-5789604461865809771178549250434395392663499233282028201
 export interface FluidPositionChainResponse {
   nftId: string;
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** False when the factory has never minted this NFT id (resolver returns
    *  the zero vault) — distinct from an RPC failure (`chainStale`). */
   found: boolean;
@@ -184,7 +193,7 @@ export async function loadFluidPositionFromChain(nftIdRaw: string): Promise<Flui
   const nftId = nftIdRaw.replace(/[^0-9]/g, "");
   if (!nftId) return stub(nftIdRaw);
   try {
-    const client = alchemyClient();
+    const client = headReadsClient();
     const [blockNumber, result] = await Promise.all([
       client.getBlockNumber().then(Number),
       client.readContract({
@@ -195,7 +204,8 @@ export async function loadFluidPositionFromChain(nftIdRaw: string): Promise<Flui
       }),
     ]);
     const [pos, vd] = result;
-    if (!vd.vault || BigInt(vd.vault) === ZERO) return { ...stub(nftId), blockNumber, chainStale: false };
+    if (!vd.vault || BigInt(vd.vault) === ZERO)
+      return { ...stub(nftId), blockNumber, head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber), chainStale: false };
 
     const vaultType = Number(vd.constantVariables.vaultType);
     const kind = vaultKindOf(vaultType);
@@ -274,6 +284,7 @@ export async function loadFluidPositionFromChain(nftIdRaw: string): Promise<Flui
     return {
       nftId,
       blockNumber,
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       found: true,
       vault: getAddress(vd.vault).toLowerCase(),
       vaultId: Number(vd.constantVariables.vaultId),

@@ -18,7 +18,9 @@
 // dolomite-markets, dolomite-position|owner|account, maker-system,
 // maker-vault|id, lv1-system, lv1-position|wallet, llamalend-markets,
 // llamalend-state, llamalend-position|controller|user, frankencoin-system,
-// frankencoin-position|position, maple-pools, llamalend-rows|offset. One fixture at a time, 600 ms
+// frankencoin-position|position, maple-pools, llamalend-rows|offset,
+// fluid-vaults, fluid-position|nft. The `head` stamp a served answer carries
+// is set aside in the comparison. One fixture at a time, 600 ms
 // apart. rails-ops decisions/0056 step 3, census rank 12 stage 8.
 
 import { readFileSync, appendFileSync } from "node:fs";
@@ -40,6 +42,8 @@ import { loadLlamalendPositionFromChain } from "@/lib/sources/chain/llamalend-po
 import { loadFrankencoinSystemFromChain } from "@/lib/sources/chain/frankencoin-system";
 import { loadFrankencoinPositionFromChain } from "@/lib/sources/chain/frankencoin-position";
 import { resolveMaplePoolState } from "@/lib/sources/chain/maple-pool-state";
+import { loadFluidVaultsFromChain } from "@/lib/sources/chain/fluid-vaults";
+import { loadFluidPositionFromChain } from "@/lib/sources/chain/fluid-position";
 import { buildLlamalendPositionRows, type RawLlamalendPositionRow } from "@/lib/sources/api/llamalend-positions";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import type { FxPoolKey } from "@/lib/fx/asset-catalog";
@@ -64,6 +68,8 @@ const LOADERS: Record<string, (a: string[]) => Promise<unknown>> = {
   "frankencoin-system": () => loadFrankencoinSystemFromChain(),
   "frankencoin-position": ([p]) => loadFrankencoinPositionFromChain(p),
   "maple-pools": () => resolveMaplePoolState(),
+  "fluid-vaults": () => loadFluidVaultsFromChain(),
+  "fluid-position": ([nft]) => loadFluidPositionFromChain(nft),
   // The listing's live overlay over one page of open rows (offset in the argument).
   "llamalend-rows": async ([offset]) => {
     const res = await fetch(
@@ -79,6 +85,10 @@ const json = (v: unknown) =>
   JSON.stringify(v, (_k, x) =>
     typeof x === "bigint" ? x.toString() : x instanceof Map ? Object.fromEntries([...x.entries()]) : x,
   );
+
+/** The answer without rails-server's `head` stamps, which only the served side carries. */
+const withoutHead = (v: unknown): unknown =>
+  JSON.parse(json(v), (k, x) => (k === "head" && x && typeof x === "object" && "readAt" in x ? undefined : x));
 
 /** A served answer that says it was not read is no comparison. */
 const stale = (v: unknown) =>
@@ -134,7 +144,7 @@ async function main() {
       overrideHeadReadsClient(() => withCall);
       try {
         const old = await LOADERS[s.kind](s.args);
-        const same = json(old) === json(s.value);
+        const same = json(withoutHead(old)) === json(withoutHead(s.value));
         if (same) equal++;
         else differ++;
         appendFileSync(

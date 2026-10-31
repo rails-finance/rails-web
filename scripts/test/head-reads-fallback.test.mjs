@@ -1,5 +1,6 @@
 // The api-first head clients' failure paths (rails-ops TO-DO-infra-and-backend.md
-// item 53, stages 7 and 8): `headReadsClient` and `vaultHeadClient` read the
+// item 53, stages 7 and 8, and Sky's drip): `headReadsClient`, `vaultHeadClient`
+// and `readSkyDrip` read the
 // chain whenever rails-server cannot answer — no RAILS_API_URL, a refused
 // connection, a non-2xx answer, a head slower than 3 s, a block the api did
 // not name — and, after the route fails, read the chain for 30 s without
@@ -47,6 +48,7 @@ process.env.ALCHEMY_URL = RPC;
 
 const { headReadsClient } = await import(ROOT + "lib/sources/api/head-reads-client.ts");
 const { vaultHeadClient } = await import(ROOT + "lib/sources/api/vault-head-client.ts");
+const { readSkyDrip } = await import(ROOT + "lib/sources/chain/sky-savings-drip.ts");
 
 // Each test starts two minutes after the last: past the 30 s down window, the
 // 5 s head reuse and the 90 s a named block is read at the api.
@@ -296,4 +298,48 @@ test("vault reads: no RAILS_API_URL reads the chain", async () => {
   const seen = stubFetch(async () => json(headBody()));
   assert.equal(await vaultHeadClient(1).getBlockNumber(), CHAIN_HEAD);
   assert.deepEqual(seen.api, []);
+});
+
+// ── readSkyDrip (the at-block store's chi and rho, census W-SK1) ─────────────
+
+const DRIP_BLOCK = 23_000_000;
+
+test("sky drip: rails-server's chi and rho when it answers, and no chain read", async () => {
+  const seen = stubFetch(async (p) =>
+    p.startsWith("/api/at-block/sky-savings/drip")
+      ? json({ block: DRIP_BLOCK, chi: "1071234567890123456789012345", rho: 1_761_000_000 })
+      : json({}, 404),
+  );
+  assert.deepEqual(await readSkyDrip(DRIP_BLOCK), {
+    chi: "1071234567890123456789012345",
+    rho: 1_761_000_000,
+    readBy: "rails-server",
+  });
+  assert.deepEqual(seen.api, [`/api/at-block/sky-savings/drip?block=${DRIP_BLOCK}`]);
+  assert.deepEqual(seen.rpc, []);
+});
+
+test("sky drip: a failed route (502) reads the chain at the block, then the chain for 30 s", async () => {
+  const seen = stubFetch(async () => json({ error: "Failed" }, 502));
+  assert.deepEqual(await readSkyDrip(DRIP_BLOCK), { chi: "7", rho: 7, readBy: "chain" });
+  assert.ok(seen.rpc.every(([m, b]) => m !== "eth_call" || b === "0x" + DRIP_BLOCK.toString(16)));
+  await readSkyDrip(DRIP_BLOCK);
+  assert.equal(seen.api.length, 1, "down for 30 s after a 5xx");
+});
+
+test("sky drip: an answer for another block, a refused connection or no RAILS_API_URL reads the chain", async () => {
+  let seen = stubFetch(async () => json({ block: DRIP_BLOCK + 1, chi: "1", rho: 1 }));
+  assert.equal((await readSkyDrip(DRIP_BLOCK))?.readBy, "chain");
+  test.mock.restoreAll();
+  skew += 120_000;
+  seen = stubFetch(async () => {
+    throw new TypeError("fetch failed");
+  });
+  assert.equal((await readSkyDrip(DRIP_BLOCK))?.readBy, "chain");
+  test.mock.restoreAll();
+  skew += 120_000;
+  delete process.env.RAILS_API_URL;
+  seen = stubFetch(async () => json({ block: DRIP_BLOCK, chi: "1", rho: 1 }));
+  assert.equal((await readSkyDrip(DRIP_BLOCK))?.readBy, "chain");
+  assert.equal(seen.api.length, 0);
 });
