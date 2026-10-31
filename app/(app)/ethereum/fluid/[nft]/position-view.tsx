@@ -35,6 +35,7 @@ import {
   type TimelineWindow,
 } from "@/lib/shared/timeline-opening-balance";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { fluidExplorer } from "@/lib/fluid/explorer";
 import { useFluidTimelineRuns } from "@/lib/fluid/timeline-runs";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
@@ -136,6 +137,11 @@ export default function FluidPositionView({
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<FluidPositionChainResponse | null>(null);
   // Whether the live read has answered (or failed): the Lifetime flows panel
   // waits for it, since today's figures and price are its.
@@ -149,6 +155,7 @@ export default function FluidPositionView({
     if (seeded || !nftId) return;
     (async () => {
       setLoading(true);
+      setTailFailed(false);
       try {
         const [pData, tData] = await Promise.all([
           fetchFluidPositions({ nft: nftId, limit: 1 }),
@@ -158,11 +165,14 @@ export default function FluidPositionView({
         setView(summary ? viewFromSummary(summary) : null);
         setEvents(tData.events ?? []);
         setCutoffBlock(tData.cutoffBlock ?? null);
+      } catch (err) {
+        console.error("fluid position: the tail read failed", err);
+        setTailFailed(true);
       } finally {
         setLoading(false);
       }
     })();
-  }, [nftId, seeded]);
+  }, [nftId, seeded, tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -533,6 +543,9 @@ export default function FluidPositionView({
               })()}
             <FluidSheetProvider value={sheetFacts}>
               <ChainTruthTimeline
+                emptyLabel={
+                  tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+                }
                 csvExportCeiling={INDEX_ROW_CEILING}
                 // Matches `FluidEventCard`'s own `persistKey={`fluid:${event.id}`}` —
                 // lets pinned mode (the per-event share route) force a landed

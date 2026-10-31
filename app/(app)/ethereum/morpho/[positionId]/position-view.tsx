@@ -42,6 +42,7 @@ import { fetchMorphoPosition, type MorphoChainPositionResponse } from "@/lib/api
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { MORPHO_FOLDER_REGISTER, MORPHO_LIQUIDATION_RUNS } from "@/lib/morpho/timeline-runs";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
@@ -121,6 +122,11 @@ export default function MorphoPositionView({
   const [openingFailed, setOpeningFailed] = useState(false);
   const [chain, setChain] = useState<MorphoChainPositionResponse | null>(null);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
   // Standing display framing (risk view) — a global preference, so the
   // reader's choice on one position carries to the next.
 
@@ -130,6 +136,7 @@ export default function MorphoPositionView({
     if (seeded) return;
     (async () => {
       setLoading(true);
+      setTailFailed(false);
       try {
         const { market: mkt, user: usr } = splitMorphoPositionId(positionId);
         // The same choice the server half made (`position-page-data.ts`): ONE
@@ -146,11 +153,14 @@ export default function MorphoPositionView({
         setEvents(tData?.events ?? []);
         setCutoffBlock(tData?.cutoffBlock ?? null);
         setGroupedTail(grouped);
+      } catch (err) {
+        console.error("morpho position: the tail read failed", err);
+        setTailFailed(true);
       } finally {
         setLoading(false);
       }
     })();
-  }, [positionId, seeded]);
+  }, [positionId, seeded, tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -529,6 +539,9 @@ export default function MorphoPositionView({
             )}
             <MorphoNeighboursProvider events={morphoEvents} folders={servedFolders}>
               <ChainTruthTimeline
+                emptyLabel={
+                  tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+                }
                 csvExportCeiling={INDEX_ROW_CEILING}
                 // Matches `MorphoEventCard`'s own `persistKey={`morpho:${event.id}`}`
                 // — lets pinned mode (the per-event share route) force a landed

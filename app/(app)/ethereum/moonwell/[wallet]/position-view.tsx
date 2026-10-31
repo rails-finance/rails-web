@@ -38,6 +38,7 @@ import {
 } from "@/lib/shared/timeline-opening-balance";
 import { fetchMoonwellChainPosition, type MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { MOONWELL_ACTIVITY_RUNS } from "@/lib/moonwell/timeline-runs";
 import { MOONWELL_MARKET_BY_KEY } from "@/lib/moonwell/asset-catalog";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
@@ -113,6 +114,11 @@ export default function MoonwellPositionView({
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<MoonwellChainResponse | null>(null);
   // Standing display framing (risk view) — a global preference, so the
   // reader's choice on one position carries to the next.
@@ -123,6 +129,7 @@ export default function MoonwellPositionView({
     if (seeded || !wallet) return;
     (async () => {
       setLoading(true);
+      setTailFailed(false);
       try {
         const [pData, tData] = await Promise.all([
           fetchMoonwellPositions({ wallet, limit: 1 }),
@@ -132,11 +139,14 @@ export default function MoonwellPositionView({
         setView(summary ? viewFromSummary(summary) : null);
         setEvents(tData.events ?? []);
         setCutoffBlock(tData.cutoffBlock ?? null);
+      } catch (err) {
+        console.error("moonwell position: the tail read failed", err);
+        setTailFailed(true);
       } finally {
         setLoading(false);
       }
     })();
-  }, [wallet, seeded]);
+  }, [wallet, seeded, tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -443,6 +453,9 @@ export default function MoonwellPositionView({
                 />
               )}
               <ChainTruthTimeline
+                emptyLabel={
+                  tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+                }
                 csvExportCeiling={INDEX_ROW_CEILING}
                 // Matches `MoonwellEventCard`'s own `persistKey={`moonwell:${event.id}`}` —
                 // lets pinned mode (the per-event share route) force a landed

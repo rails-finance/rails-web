@@ -57,6 +57,7 @@ import {
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import { fetchLiquityForkPosition, type LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { LIQUITY_FORK_FOLDER_REGISTER, liquityForkTimelineRuns } from "@/lib/shared/liquity-fork-timeline-runs";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
@@ -152,6 +153,11 @@ export default function BasedollarTroveDetail({
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<LiquityForkTroveChainResponse | null>(null);
   // Standing display framing (risk view) — a global preference, so the reader's
   // choice on one trove carries to the next.
@@ -161,11 +167,12 @@ export default function BasedollarTroveDetail({
   // React's development double-invoke from issuing the read twice.
   const startedTail = useRef(false);
   useEffect(() => {
-    if (seeded || startedTail.current) return;
+    if (seeded || (startedTail.current && tailTry === 0)) return;
     startedTail.current = true;
     if (!collateralType || !troveId) return;
     (async () => {
       setLoading(true);
+      setTailFailed(false);
       try {
         // The same choice the server half made (`trove-page-data.ts`): ONE
         // timeline read, in the shape the URL asked for.
@@ -181,12 +188,15 @@ export default function BasedollarTroveDetail({
         setEvents(tData?.events ?? []);
         setCutoffBlock(tData?.cutoffBlock ?? null);
         setGroupedTail(grouped);
+      } catch (err) {
+        console.error("base position: the tail read failed", err);
+        setTailFailed(true);
       } finally {
         setLoading(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -582,6 +592,9 @@ export default function BasedollarTroveDetail({
               value={surplus && lastLiq ? { creditTx: lastLiq.txHash, claimed: surplus.claimed } : null}
             >
               <ChainTruthTimeline
+                emptyLabel={
+                  tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+                }
                 displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
                 csvExportCeiling={INDEX_ROW_CEILING}
                 closed={view ? view.status !== "open" : undefined}

@@ -32,6 +32,7 @@ import {
 import { withOpeningActors } from "@/lib/shared/external-actor";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { fxExplorer } from "@/lib/fx/explorer";
 import { FX_TICK_REBALANCE_RUNS } from "@/lib/fx/timeline-runs";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
@@ -102,6 +103,11 @@ export default function FxPositionView({
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
 
   // Mount. A seeded view already holds the tail and leaves this alone; an
   // unseeded one reads it exactly as this page always did.
@@ -109,16 +115,20 @@ export default function FxPositionView({
     if (seeded || !parsed) return;
     (async () => {
       setLoading(true);
+      setTailFailed(false);
       try {
         const tData = await fetchFxTimeline(parsed.pool, parsed.positionId, { recent: TIMELINE_WINDOW_ROWS });
         setView(tData.position ? viewFromSummary(tData.position) : null);
         setEvents(tData.events ?? []);
         setCutoffBlock(tData.cutoffBlock ?? null);
+      } catch (err) {
+        console.error("fx position: the tail read failed", err);
+        setTailFailed(true);
       } finally {
         setLoading(false);
       }
     })();
-  }, [parsed, seeded]);
+  }, [parsed, seeded, tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -590,6 +600,9 @@ export default function FxPositionView({
             )}
             <FxSocializedReadsContext.Provider value={socializedReads}>
               <ChainTruthTimeline
+                emptyLabel={
+                  tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+                }
                 csvExportCeiling={null}
                 // Matches `FxEventCard`'s own `persistKey={`fx:${event.id}`}` —
                 // lets pinned mode (the per-event share route) force a landed

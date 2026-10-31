@@ -32,6 +32,7 @@ import {
   type TimelineWindow,
 } from "@/lib/shared/timeline-opening-balance";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { MAPLE_FOLDER_REGISTER, MAPLE_QUEUE_FILL_RUNS } from "@/lib/maple/timeline-runs";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { useMountedNow } from "@/hooks/useMountedNow";
@@ -141,6 +142,11 @@ export default function MaplePositionView({
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
 
   // Known infrastructure (the CCIP bridge escrows) is not a lender — the page
   // renders the custody view instead of the position scaffolding (the backend
@@ -173,6 +179,7 @@ export default function MaplePositionView({
     if (seeded || !wallet || getCcipEscrow(wallet)) return;
     (async () => {
       setLoading(true);
+      setTailFailed(false);
       try {
         // The same choice the server half made (`position-page-data.ts`): ONE
         // timeline read, in the shape the URL asked for.
@@ -189,11 +196,14 @@ export default function MaplePositionView({
         setEvents(tData?.events ?? []);
         setCutoffBlock(tData?.cutoffBlock ?? null);
         setGroupedTail(grouped);
+      } catch (err) {
+        console.error("maple position: the tail read failed", err);
+        setTailFailed(true);
       } finally {
         setLoading(false);
       }
     })();
-  }, [wallet, seeded]);
+  }, [wallet, seeded, tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately a separate one: the rows land and the list is readable while
@@ -627,6 +637,9 @@ export default function MaplePositionView({
                 />
               )}
               <ChainTruthTimeline
+                emptyLabel={
+                  tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+                }
                 // The queued export (rails-ops decision 0029) has no row cap: the
                 // card offers the CSV whenever the total is known.
                 csvExportCeiling={null}

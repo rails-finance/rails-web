@@ -23,6 +23,7 @@ import { troveWords } from "@/lib/liquity/event-templates";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { TroveSummary, TrovesResponse } from "@/types/api/trove";
 import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
+import { IndexNotice } from "@/components/shared/index-notice";
 import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { liquityV2FlowEvents } from "@/lib/shared/liquity-flows";
 import { liquityDailyBranch, useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
@@ -87,6 +88,12 @@ export default function TroveView({
   const [totalEvents, setTotalEvents] = useState<number | null>(initialTotalEvents);
   const [loading, setLoading] = useState(!seeded);
   const [error, setError] = useState<string | null>(null);
+  // The client read of the timeline failed too (the server's had already): the
+  // history slot says the index did not answer, with a Retry (ui-jobs 461).
+  const [tailFailed, setTailFailed] = useState(false);
+  // The trove read itself did not answer: the page says so in one line with a
+  // Retry, in place of the status text (ui-jobs 461).
+  const [readFailed, setReadFailed] = useState(false);
 
   // Live blockchain data and prices
   const [liveState, setLiveState] = useState<TroveStateData | undefined>(undefined);
@@ -149,6 +156,8 @@ export default function TroveView({
     try {
       setLoading(true);
       setError(null);
+      setTailFailed(false);
+      setReadFailed(false);
       // Reset second-wave chain state when switching source so a stale
       // rails-server reading never lingers under chain-sourced summary data.
       setLiveState(undefined);
@@ -173,7 +182,10 @@ export default function TroveView({
       ]);
 
       if (!troveResponse.ok) {
-        throw new Error(troveWords("trove_fetch_failed", { status: troveResponse.statusText }));
+        console.error("trove read failed:", troveResponse.status, troveResponse.statusText);
+        setReadFailed(true);
+        setLoading(false);
+        return;
       }
 
       const troveDataResp: TrovesResponse = await troveResponse.json();
@@ -186,6 +198,7 @@ export default function TroveView({
 
       setTroveData(troveDataResp.data[0]);
       setEvents(timelineResult?.events ?? []);
+      setTailFailed(timelineResult == null);
       setTotalEvents(timelineResult?.pagination?.hasMore ? timelineResult.totalEvents : null);
       if (pricesResult?.success && pricesResult.data) {
         setPrices(pricesResult.data);
@@ -194,8 +207,8 @@ export default function TroveView({
       setLoading(false);
       loadEnhancements();
     } catch (err) {
-      setError(err instanceof Error ? err.message : troveWords("trove_load_failed"));
       console.error("Error loading trove data:", err);
+      setReadFailed(true);
       setLoading(false);
     }
   };
@@ -403,6 +416,14 @@ export default function TroveView({
     );
   }
 
+  if (readFailed) {
+    return (
+      <div className="py-8">
+        <IndexNotice className="py-12 text-center text-sm text-rb-500" onRetry={() => void loadData()} />
+      </div>
+    );
+  }
+
   if (error || !troveData) {
     return (
       <>
@@ -456,6 +477,7 @@ export default function TroveView({
   return (
     <>
       <TroveBody
+        historyNotice={tailFailed ? <IndexNotice className="" onRetry={() => void loadData()} /> : undefined}
         topRow={
           <DetailTopRow
             session="liquity-v2"

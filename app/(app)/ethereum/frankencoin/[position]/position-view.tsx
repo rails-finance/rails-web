@@ -42,6 +42,7 @@ import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-his
 import { fetchFrankencoinChainPosition, type FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-position";
 import type { FrankencoinPositionSummary } from "@/lib/sources/api/frankencoin-positions";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { FRANKENCOIN_AUCTION_RUNS } from "@/lib/frankencoin/timeline-runs";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { FrankencoinEventCard } from "@/components/protocol/frankencoin/frankencoin-event-card";
@@ -109,6 +110,11 @@ export default function FrankencoinPositionView({
   const [summary, setSummary] = useState<FrankencoinPositionSummary | null>(initialSummary);
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);
   const [indexPending, setIndexPending] = useState(!indexSeeded);
+  // The client read of the index lane failed too (the server's had already):
+  // the history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
   // The checkpoint model. The timeline fetch asks for a WINDOW of the most
   // recent events; on a position that needs one, the response names the block
   // the window opened at and everything below it arrives as a declared opening
@@ -148,6 +154,7 @@ export default function FrankencoinPositionView({
   useEffect(() => {
     if (indexSeeded || !position) return;
     let cancelled = false;
+    setTailFailed(false);
     (async () => {
       try {
         const [pData, tData] = await Promise.all([
@@ -163,13 +170,16 @@ export default function FrankencoinPositionView({
       } catch (err) {
         // The chain lane above is independent and still reads.
         console.error("frankencoin detail index fetch failed:", err);
-        if (!cancelled) setIndexPending(true);
+        if (!cancelled) {
+          setIndexPending(true);
+          setTailFailed(true);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [position, indexSeeded]);
+  }, [position, indexSeeded, tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -472,7 +482,9 @@ export default function FrankencoinPositionView({
                 />
               )}
 
-              {indexPending && frankEvents.length === 0 ? (
+              {tailFailed && frankEvents.length === 0 ? (
+                <IndexNotice onRetry={() => setTailTry((n) => n + 1)} />
+              ) : indexPending && frankEvents.length === 0 ? (
                 <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
                   Event history pending — the indexed backend for this explorer is still being built. Everything above
                   is read live from the position contract at the latest block.

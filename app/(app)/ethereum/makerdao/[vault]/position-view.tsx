@@ -40,6 +40,7 @@ import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-his
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { useTimelineSegment } from "@/hooks/useTimelineSegment";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { MAKERDAO_FOLDER_REGISTER, MAKERDAO_LIQUIDATION_RUNS } from "@/lib/makerdao/timeline-runs";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
@@ -197,6 +198,11 @@ export default function MakerVaultDetailView({
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
   // The ilk's own stability-fee history, fetched once the timeline has named
   // the ilk. Nothing on this page depends on it: a null rate log simply means
   // no rate-step notes (fetchMakerRateLog fails open), never a page that
@@ -216,6 +222,7 @@ export default function MakerVaultDetailView({
     if (seeded) return;
     (async () => {
       setLoading(true);
+      setTailFailed(false);
       try {
         // The [vault] param is a cdp id, or a urn ADDRESS for LockStake engine
         // urns (cdp-less, decision 0013) — the summary lookup must use the
@@ -246,12 +253,15 @@ export default function MakerVaultDetailView({
         setEvents(tData?.events ?? []);
         setCutoffBlock(tData?.cutoffBlock ?? null);
         setGroupedTail(grouped);
+      } catch (err) {
+        console.error("makerdao position: the tail read failed", err);
+        setTailFailed(true);
       } finally {
         setChainSettled(true);
         setLoading(false);
       }
     })();
-  }, [vault, seeded]);
+  }, [vault, seeded, tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -733,6 +743,9 @@ export default function MakerVaultDetailView({
               />
             )}
             <ChainTruthTimeline
+              emptyLabel={
+                tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+              }
               csvExportCeiling={null}
               // Matches `MakerdaoEventCard`'s own `persistKey={`makerdao:${event.id}`}` —
               // lets pinned mode (the per-event share route) force a landed

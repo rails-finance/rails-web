@@ -27,6 +27,7 @@ import { fetchPolarisTimeline } from "@/lib/api/fetch-polaris-timeline";
 import { fetchPolarisChainPosition, type PolarisChainResponse } from "@/lib/api/fetch-polaris-position";
 import type { PolarisPositionSummary } from "@/lib/sources/api/polaris-positions";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { PolarisEventCard } from "@/components/protocol/polaris/polaris-event-card";
 import {
@@ -108,6 +109,11 @@ export default function PolarisPositionView({
   const [summary, setSummary] = useState<PolarisPositionSummary | null>(initialSummary);
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);
   const [indexPending, setIndexPending] = useState(!indexSeeded);
+  // The client read of the index lane failed too (the server's had already):
+  // the history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
   const stable = POLARIS_MARKET_CONFIG[market].stable.symbol;
   // The event route draws the sub-nav and the timeline alone: the card in page
   // mode beside the shared side column (ui-jobs 236, 307).
@@ -144,6 +150,7 @@ export default function PolarisPositionView({
   useEffect(() => {
     if (indexSeeded) return;
     let cancelled = false;
+    setTailFailed(false);
     (async () => {
       try {
         const [row, tData] = await Promise.all([
@@ -160,13 +167,16 @@ export default function PolarisPositionView({
         }
       } catch (err) {
         console.error("polaris detail index fetch failed:", err);
-        if (!cancelled) setIndexPending(true);
+        if (!cancelled) {
+          setIndexPending(true);
+          setTailFailed(true);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [market, cdpId, indexSeeded]);
+  }, [market, cdpId, indexSeeded, tailTry]);
 
   // Chain-first view, index-merged when it lands; index-only while RPC is down.
   const view = useMemo<PolarisView | null>(() => {
@@ -412,7 +422,9 @@ export default function PolarisPositionView({
               </>
             )}
 
-            {indexPending && polarisEvents.length === 0 ? (
+            {tailFailed && polarisEvents.length === 0 ? (
+              <IndexNotice onRetry={() => setTailTry((n) => n + 1)} />
+            ) : indexPending && polarisEvents.length === 0 ? (
               <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
                 Event history pending — the indexed backend for this explorer has not answered for this position.
                 Everything above is read from the market&rsquo;s contracts at the latest Sepolia block.

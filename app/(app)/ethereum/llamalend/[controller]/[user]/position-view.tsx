@@ -42,6 +42,7 @@ import {
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
 import { fetchLlamalendChainPosition, type LlamalendChainResponse } from "@/lib/api/fetch-llamalend-position";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { LLAMALEND_LIQUIDATION_RUNS } from "@/lib/llamalend/timeline-runs";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { LlamalendEventCard } from "@/components/protocol/llamalend/llamalend-event-card";
@@ -138,6 +139,11 @@ export default function LlamalendPositionView({
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<LlamalendChainResponse | null>(null);
   // Whether the live read has answered (or failed): the Lifetime flows panel
   // waits for it, since today's figures and price are its.
@@ -149,6 +155,7 @@ export default function LlamalendPositionView({
     if (seeded || !controller || !user) return;
     (async () => {
       setLoading(true);
+      setTailFailed(false);
       try {
         const [pData, tData] = await Promise.all([
           fetchLlamalendPositions({ controller, user, limit: 1 }),
@@ -159,14 +166,14 @@ export default function LlamalendPositionView({
         setEvents(tData.events ?? []);
         setCutoffBlock(tData.cutoffBlock ?? null);
       } catch (err) {
-        // A down index leaves the page in its explicit not-found state; the
-        // chain lane below is independent and still reads.
+        // The chain lane below is independent and still reads.
         console.error("llamalend detail index fetch failed:", err);
+        setTailFailed(true);
       } finally {
         setLoading(false);
       }
     })();
-  }, [controller, user, seeded]);
+  }, [controller, user, seeded, tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -490,6 +497,9 @@ export default function LlamalendPositionView({
               />
             )}
             <ChainTruthTimeline
+              emptyLabel={
+                tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+              }
               csvExportCeiling={DRAINED_ROW_CEILING}
               // Matches `LlamalendEventCard`'s own `persistKey={`llamalend:${event.id}`}`
               // — lets pinned mode (the per-event share route) force a landed

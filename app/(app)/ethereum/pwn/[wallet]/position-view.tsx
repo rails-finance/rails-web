@@ -34,6 +34,7 @@ import { fetchPwnBundleContents, type PwnBundleAsset } from "@/lib/api/fetch-pwn
 import { isPwnBundler } from "@/lib/pwn/asset-catalog";
 import type { PwnPositionSummary } from "@/lib/sources/api/pwn-positions";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -99,6 +100,11 @@ export default function PwnLoanView({
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
 
   // Mount. A seeded view already holds the tail and leaves this alone; an
   // unseeded one reads it exactly as this page always did.
@@ -106,6 +112,7 @@ export default function PwnLoanView({
     if (seeded || !wallet) return;
     (async () => {
       setLoading(true);
+      setTailFailed(false);
       try {
         // Fetch every loan this wallet is a party to (not limit:1) so ?loan= can
         // resolve to any of them; the timeline carries all the loans' events.
@@ -138,11 +145,14 @@ export default function PwnLoanView({
         const rows = loanScoped ? await fetchPwnTimeline(wallet) : tData;
         setEvents(rows.events ?? []);
         setCutoffBlock(rows.cutoffBlock ?? null);
+      } catch (err) {
+        console.error("pwn position: the tail read failed", err);
+        setTailFailed(true);
       } finally {
         setLoading(false);
       }
     })();
-  }, [wallet, seeded]);
+  }, [wallet, seeded, tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -489,7 +499,11 @@ export default function PwnLoanView({
         {loading ? (
           <DetailBodySkeleton />
         ) : !view ? (
-          <div className="text-sm text-rb-500">No loan captured for this wallet.</div>
+          tailFailed ? (
+            <IndexNotice onRetry={() => setTailTry((n) => n + 1)} />
+          ) : (
+            <div className="text-sm text-rb-500">No loan captured for this wallet.</div>
+          )
         ) : (
           <>
             {!onEventPage && (
@@ -529,6 +543,9 @@ export default function PwnLoanView({
               </>
             )}
             <ChainTruthTimeline
+              emptyLabel={
+                tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+              }
               csvExportCeiling={INDEX_ROW_CEILING}
               // Matches `PwnEventCard`'s own `persistKey={`pwn:${event.id}`}` —
               // lets pinned mode (the per-event share route) force a landed

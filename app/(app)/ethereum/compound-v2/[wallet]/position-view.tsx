@@ -43,6 +43,7 @@ import { fetchCompoundV2ChainPosition, type CompoundV2ChainResponse } from "@/li
 import { useParams } from "next/navigation";
 import { compoundV2Explorer } from "@/lib/compound-v2/explorer";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { COMPOUND_V2_FOLDER_REGISTER, COMPOUND_V2_LIQUIDATION_RUNS } from "@/lib/compound-v2/timeline-runs";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-folder";
@@ -128,6 +129,11 @@ export default function CompoundV2PositionView({
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<CompoundV2ChainResponse | null>(null);
   // Standing display framing (risk view) — a global preference, so the
   // reader's choice on one position carries to the next.
@@ -138,6 +144,7 @@ export default function CompoundV2PositionView({
     if (seeded || !wallet) return;
     (async () => {
       setLoading(true);
+      setTailFailed(false);
       try {
         // The same choice the server half made (`position-page-data.ts`): ONE
         // timeline read, in the shape the URL asked for.
@@ -153,11 +160,14 @@ export default function CompoundV2PositionView({
         setEvents(tData?.events ?? []);
         setCutoffBlock(tData?.cutoffBlock ?? null);
         setGroupedTail(grouped);
+      } catch (err) {
+        console.error("compound-v2 position: the tail read failed", err);
+        setTailFailed(true);
       } finally {
         setLoading(false);
       }
     })();
-  }, [wallet, seeded]);
+  }, [wallet, seeded, tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -540,6 +550,9 @@ export default function CompoundV2PositionView({
                 />
               )}
               <ChainTruthTimeline
+                emptyLabel={
+                  tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+                }
                 // The queued export (rails-ops decision 0029) has no row cap: the
                 // card offers the CSV whenever the total is known.
                 csvExportCeiling={null}

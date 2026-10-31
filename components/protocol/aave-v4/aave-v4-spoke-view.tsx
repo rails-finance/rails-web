@@ -79,6 +79,7 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { summariseExternalActors } from "@/lib/shared/external-actor";
 import type { ReserveStats } from "@/lib/aave-v4/spoke-cards";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -199,6 +200,8 @@ function AaveV4SpokePageInner({
   // box's whole-history bucket used to arrive here as `fetchAaveV4Timeline
   // failed: 429` and take the whole page down.
   const [timelineState, setTimelineState] = useState<"loading" | "ready" | "failed">(seeded ? "ready" : "loading");
+  // Bumped by the notice's Retry to re-run the unseeded read (ui-jobs 461).
+  const [tailTry, setTailTry] = useState(0);
   // What this spoke holds over its whole life. The page draws the newest
   // TIMELINE_WINDOW_ROWS of the WALLET's events, so a deep wallet's spoke page
   // holds fewer of its own rows than the spoke has; this is what it counts
@@ -273,14 +276,18 @@ function AaveV4SpokePageInner({
         setLoading(false);
       } catch (err) {
         if (cancelled) return;
-        setError(err instanceof Error ? err.message : "Failed to load spoke data");
+        // The positions read (or anything past it) did not answer: the failed
+        // state below says so with a Retry (ui-jobs 461), where the message
+        // used to read "fetchAaveV4Positions failed: 500".
+        console.error("aave-v4 spoke page: the read failed", err);
+        setTimelineState("failed");
         setLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [wallet, isValidWallet, spokeName, seeded, apiRoot]);
+  }, [wallet, isValidWallet, spokeName, seeded, apiRoot, tailTry]);
 
   const sortedEvents = useMemo(
     () => [...events].sort((a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp),
@@ -705,7 +712,7 @@ function AaveV4SpokePageInner({
           <p className="text-foreground text-lg mb-3">
             This wallet&rsquo;s history could not be read, so the {spokeName} position and its activity are unavailable.
           </p>
-          <p className="text-sm text-rb-500 mb-3">Reload to try again.</p>
+          <IndexNotice className="text-sm text-rb-500 mb-3" onRetry={() => setTailTry((n) => n + 1)} />
           <p className="text-sm text-rb-500">
             <Link href={walletFilterHref} className={`underline ${NAV_LINK}`}>
               See this wallet&rsquo;s other spokes →
@@ -820,7 +827,13 @@ function AaveV4SpokePageInner({
           tl={tl}
           runs={AAVE_V4_TIMELINE_RUNS}
           displayItems={AAVE_V4_DISPLAY_ITEMS}
-          emptyLabel={`No activity on the ${spokeName} spoke for this wallet.`}
+          emptyLabel={
+            timelineState === "failed" ? (
+              <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} />
+            ) : (
+              `No activity on the ${spokeName} spoke for this wallet.`
+            )
+          }
           toolbarLeading={
             spokeScopedEvents.length > 0 ? (
               <TimelineActivityHeader events={spokeScopedEvents} closed={positionClosed} />

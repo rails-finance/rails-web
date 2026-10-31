@@ -53,6 +53,7 @@ import {
 import { useParams } from "next/navigation";
 import { compoundExplorer } from "@/lib/compound/explorer";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { COMPOUND_FOLDER_REGISTER, COMPOUND_LIQUIDATION_RUNS } from "@/lib/compound/timeline-runs";
 import { interleaveRowPlan, servedFoldersEnabled, type ServedFolder } from "@/lib/shared/timeline-folder";
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
@@ -268,6 +269,11 @@ export default function CompoundPositionView({
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<CompoundMarketChainResponse | null>(null);
 
   // Surface the wallet in the header pill (the Aave V4 treatment), so the nav
@@ -285,6 +291,7 @@ export default function CompoundPositionView({
     let cancelled = false;
     (async () => {
       setLoading(true);
+      if (!cancelled) setTailFailed(false);
       try {
         // The same choice the server half made: ONE timeline read, in the
         // shape the URL asked for.
@@ -302,6 +309,9 @@ export default function CompoundPositionView({
         setEvents(tData?.events ?? []);
         setCutoffBlock(tData?.cutoffBlock ?? null);
         setGroupedTail(grouped);
+      } catch (err) {
+        console.error("compound-v3 position: the tail read failed", err);
+        if (!cancelled) setTailFailed(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -309,7 +319,7 @@ export default function CompoundPositionView({
     return () => {
       cancelled = true;
     };
-  }, [wallet, market, seeded]);
+  }, [wallet, market, seeded, tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -563,6 +573,9 @@ export default function CompoundPositionView({
                 />
               )}
               <ChainTruthTimeline
+                emptyLabel={
+                  tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+                }
                 // The queued export (rails-ops decision 0029) has no row cap: the
                 // card offers the CSV whenever the total is known.
                 csvExportCeiling={null}
@@ -607,6 +620,8 @@ export default function CompoundPositionView({
               {/* Ambient oracle-price pill, fixed bottom-right (the V4 treatment). */}
               <ProvInspectorLayer />
             </>
+          ) : tailFailed ? (
+            <IndexNotice className="py-12 text-center text-sm text-rb-500" onRetry={() => setTailTry((n) => n + 1)} />
           ) : (
             // The URL points at a market this wallet has no position in (typo, stale
             // link, or a market it never entered) — bail with a path back to the

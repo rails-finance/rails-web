@@ -141,6 +141,9 @@ export interface TroveBodyProps {
   liquityEvents: BaseActivityEvent[];
   /** The page's useTimelineEvents result. */
   tl: TimelineEventsState;
+  /** The history read did not answer: the timeline's empty slot draws this
+   *  (the index notice, ui-jobs 461) in place of "no events". */
+  historyNotice?: ReactNode;
   boundary: TimelineBoundary | null;
   /** The events the Lifetime flows Explanation replays, oldest first. */
   economicsEvents: Parameters<typeof computeLiquityEconomics>[0];
@@ -179,6 +182,7 @@ export function TroveBody({
   topRow,
   liquityEvents,
   tl,
+  historyNotice,
   boundary,
   economicsEvents,
   chronoEvents,
@@ -294,7 +298,7 @@ export function TroveBody({
                 runs={LIQUITY_TIMELINE_RUNS}
                 displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
                 spineKey={LIQUITY_SPINE_KEY}
-                emptyLabel={troveWords("history_empty")}
+                emptyLabel={historyNotice ?? troveWords("history_empty")}
                 still={still}
                 toolbarLeading={
                   <TimelineActivityHeader events={liquityEvents} closed={closed} firstAt={trove.activity?.createdAt} />

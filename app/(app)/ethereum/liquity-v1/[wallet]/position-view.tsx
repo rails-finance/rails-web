@@ -38,6 +38,7 @@ import {
 } from "@/lib/shared/timeline-opening-balance";
 import type { LiquityV1PositionSummary } from "@/lib/sources/api/liquity-v1-positions";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { LIQUITY_V1_REDEMPTION_RUNS } from "@/lib/liquity-v1/timeline-runs";
 import { CHAIN_TRUTH_DISPLAY_ITEMS, TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
@@ -115,6 +116,11 @@ export default function LiquityV1TroveView({
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<LiquityV1PositionChainResponse | null>(null);
   // The live read has returned or failed: until then the collateral ratio waits.
   const [chainSettled, setChainSettled] = useState(false);
@@ -127,6 +133,7 @@ export default function LiquityV1TroveView({
     if (seeded || !wallet) return;
     (async () => {
       setLoading(true);
+      setTailFailed(false);
       try {
         // Fetch every lifecycle for this wallet (not limit:1) — a reopened Trove has
         // one summary per (wallet, epoch); the timeline carries all lives' events.
@@ -165,11 +172,14 @@ export default function LiquityV1TroveView({
         const rows = lifeScoped ? await fetchLiquityV1Timeline(wallet) : tData;
         setEvents(rows.events ?? []);
         setCutoffBlock(rows.cutoffBlock ?? null);
+      } catch (err) {
+        console.error("liquity-v1 position: the tail read failed", err);
+        setTailFailed(true);
       } finally {
         setLoading(false);
       }
     })();
-  }, [wallet, seeded]);
+  }, [wallet, seeded, tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -628,6 +638,9 @@ export default function LiquityV1TroveView({
               value={surplus && closingTx ? { creditTx: closingTx, claimed: surplus.claimed } : null}
             >
               <ChainTruthTimeline
+                emptyLabel={
+                  tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+                }
                 displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
                 csvExportCeiling={INDEX_ROW_CEILING}
                 // Matches `LiquityV1EventCard`'s own `persistKey={`liquity-v1:${event.id}`}`

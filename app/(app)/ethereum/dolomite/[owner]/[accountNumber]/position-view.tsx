@@ -43,6 +43,7 @@ import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-his
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { fetchDolomiteChainPosition, type DolomiteChainResponse } from "@/lib/api/fetch-dolomite-position";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { DOLOMITE_LIQUIDATION_RUNS } from "@/lib/dolomite/timeline-runs";
 import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
@@ -132,6 +133,11 @@ export default function DolomitePositionView({
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<DolomiteChainResponse | null>(null);
   // The core read is in flight: the card's margin ratio waits behind a pulsing bar.
   const [chainPending, setChainPending] = useState(true);
@@ -144,6 +150,7 @@ export default function DolomitePositionView({
     if (seeded || !owner || accountNumber == null) return;
     (async () => {
       setLoading(true);
+      setTailFailed(false);
       try {
         const [pData, tData] = await Promise.all([
           fetchDolomitePositions({ owner, accountNumber, limit: 1 }),
@@ -154,14 +161,14 @@ export default function DolomitePositionView({
         setEvents(tData.events ?? []);
         setCutoffBlock(tData.cutoffBlock ?? null);
       } catch (err) {
-        // A down index leaves the page in its explicit not-found state; the
-        // chain lane below is independent and still reads.
+        // The chain lane below is independent and still reads.
         console.error("dolomite detail index fetch failed:", err);
+        setTailFailed(true);
       } finally {
         setLoading(false);
       }
     })();
-  }, [owner, accountNumber, seeded]);
+  }, [owner, accountNumber, seeded, tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -460,6 +467,9 @@ export default function DolomitePositionView({
                 />
               )}
               <ChainTruthTimeline
+                emptyLabel={
+                  tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+                }
                 csvExportCeiling={DRAINED_ROW_CEILING}
                 // Matches `DolomiteEventCard`'s own `persistKey={`dolomite:${event.id}`}`
                 // — lets pinned mode (the per-event share route) force a landed
