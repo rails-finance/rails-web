@@ -75,10 +75,11 @@ export const V3_LT_BY_ADDR: Record<string, number | null> = Object.fromEntries(
  *  predate multi-market; equal to POOL_BY_MARKET.core. */
 export const AAVE_V3_POOL = "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2" as const;
 
-/** Aave V3 IAaveOracle (mainnet) — the same oracle the Pool reads to price
+/** Aave V3 Core's IAaveOracle — the oracle the Core Pool reads to price
  *  collateral and compute health factors. `getAssetPrice(asset)` returns USD with
  *  8 decimals, so the USD it yields is chain-derived (survives the on-chain-only
- *  gate). Shared across all three V3 markets (they price through one oracle). */
+ *  gate). Prime and EtherFi each price through a separate oracle: read a
+ *  market's from ORACLE_BY_MARKET. Equal to ORACLE_BY_MARKET.core. */
 export const AAVE_V3_ORACLE = "0x54586be62e3c3580375ae3723c145253060ca0c2" as const;
 
 // ── Markets (Slice 3) ────────────────────────────────────────────────────────
@@ -94,13 +95,32 @@ export interface AaveV3Market {
   name: string;
   /** Lowercased Pool contract address. */
   pool: string;
+  /** Lowercased IAaveOracle the Pool prices through: its PoolAddressesProvider's
+   *  `getPriceOracle()`, read at block 26,315,712 (31 Oct 2026). */
+  oracle: string;
 }
 export const AAVE_V3_MARKETS: readonly AaveV3Market[] = [
-  { key: "core", name: "Core", pool: "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2" },
-  { key: "prime", name: "Prime", pool: "0x4e033931ad43597d96d6bcc25c280717730b58b1" },
-  { key: "etherfi", name: "EtherFi", pool: "0x0aa97c284e98396202b6a04024f5e2c65026f3c0" },
+  // PoolAddressesProvider 0x2f39d218133afab8f2b819b1066c7e434ad94e9e
+  { key: "core", name: "Core", pool: "0x87870bca3f3fd6335c3f4ce8392d69350b4fa4e2", oracle: AAVE_V3_ORACLE },
+  // PoolAddressesProvider 0xcfbf336fe147d643b9cb705648500e101504b16d
+  {
+    key: "prime",
+    name: "Prime",
+    pool: "0x4e033931ad43597d96d6bcc25c280717730b58b1",
+    oracle: "0xe3c061981870c0c7b1f3c4f4bb36b95f1f260be6",
+  },
+  // PoolAddressesProvider 0xeba440b438ad808101d1c451c1c5322c90befcda
+  {
+    key: "etherfi",
+    name: "EtherFi",
+    pool: "0x0aa97c284e98396202b6a04024f5e2c65026f3c0",
+    oracle: "0x43b64f28a678944e0655404b0b98e443851cc34f",
+  },
 ];
 export const POOL_BY_MARKET: Record<string, string> = Object.fromEntries(AAVE_V3_MARKETS.map((m) => [m.key, m.pool]));
+export const ORACLE_BY_MARKET: Record<string, string> = Object.fromEntries(
+  AAVE_V3_MARKETS.map((m) => [m.key, m.oracle]),
+);
 export const MARKET_NAME: Record<string, string> = Object.fromEntries(AAVE_V3_MARKETS.map((m) => [m.key, m.name]));
 /** Default market for back-compat: rows/links without an explicit market are Core. */
 export const DEFAULT_V3_MARKET: AaveV3MarketKey = "core";

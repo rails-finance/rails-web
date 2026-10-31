@@ -549,7 +549,7 @@ export function useAaveV3CardSlots({
         pending: false,
         usd:
           usd != null ? (
-            <Prov info={dep.usd(usdWhat)}>
+            <Prov info={dep.usd(usdWhat, v.market)}>
               <span className="font-bold text-green-400">{formatUsdValue(usd)}</span>
             </Prov>
           ) : pending ? (
@@ -562,7 +562,7 @@ export function useAaveV3CardSlots({
       labelTip: detail ? sideTip(side) : undefined,
       value:
         reserves.length === 0 ? null : usd != null ? (
-          <UsdFigure usd={usd} info={dep.usd(usdWhat)} />
+          <UsdFigure usd={usd} info={dep.usd(usdWhat, v.market)} />
         ) : (
           // A partial USD total is never asserted: an unpriced side shows its
           // token amounts.
@@ -574,7 +574,7 @@ export function useAaveV3CardSlots({
           />
         ),
       pending: reserves.length > 0 && pending,
-      total: usd != null ? { usd, info: dep.usd(usdWhat) } : undefined,
+      total: usd != null ? { usd, info: dep.usd(usdWhat, v.market) } : undefined,
       assets: reserves.length > 0 && usd != null ? <InlineAssetCluster symbols={loadedSymbols(shown)} /> : undefined,
     };
   };
@@ -669,7 +669,9 @@ export function useAaveV3CardSlots({
           ),
           usdText:
             usd != null ? (
-              <Prov info={dep.usd(`${side === "supply" ? "Supplied" : "Borrowed"} ${r.symbol}`)}>{formatUsd(usd)}</Prov>
+              <Prov info={dep.usd(`${side === "supply" ? "Supplied" : "Borrowed"} ${r.symbol}`, v.market)}>
+                {formatUsd(usd)}
+              </Prov>
             ) : undefined,
         };
       }),
@@ -771,7 +773,7 @@ export function useAaveV3CardSlots({
             value: (
               <span className="inline-flex items-center gap-1">
                 <TokenChipIcon symbol={liq.single.symbol} size={14} filterable={false} />
-                <Prov info={dep.liqPrice(liq.single.symbol)}>{fmtLiqPrice(liq.single.liqPrice)}</Prov>
+                <Prov info={dep.liqPrice(liq.single.symbol, v.market)}>{fmtLiqPrice(liq.single.liqPrice)}</Prov>
               </span>
             ),
           }
@@ -805,10 +807,10 @@ export function useAaveV3CardSlots({
             id: "not-collateral",
             label: "Supplied, not collateral",
             tip: NOT_COLLATERAL_TIP,
-            value: <Prov info={dep.usd("Supplied, not collateral")}>{formatCompactUsd(otherUsd)}</Prov>,
+            value: <Prov info={dep.usd("Supplied, not collateral", v.market)}>{formatCompactUsd(otherUsd)}</Prov>,
             breakdown: {
               symbols: loadedSymbols(othersSplit.shown),
-              total: { usd: otherUsd, info: dep.usd("Supplied, not collateral") },
+              total: { usd: otherUsd, info: dep.usd("Supplied, not collateral", v.market) },
               panel: (
                 <AssetBreakdownPanel
                   id="aave-v3-not-collateral-breakdown"
@@ -826,7 +828,7 @@ export function useAaveV3CardSlots({
             value: (
               <span className="flex flex-col gap-0.5">
                 {otherUsd != null && (
-                  <Prov info={dep.usd("Supplied, not collateral")}>
+                  <Prov info={dep.usd("Supplied, not collateral", v.market)}>
                     <PanelFigure>{formatCompactUsd(otherUsd)}</PanelFigure>
                   </Prov>
                 )}
