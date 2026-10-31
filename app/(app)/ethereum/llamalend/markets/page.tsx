@@ -19,6 +19,7 @@
 // for, so the first paint carries the real figures.
 
 import { LlamalendMarketsView, LlamalendMarketsStamp } from "@/components/protocol/llamalend/llamalend-markets-view";
+import { llamalendEventFallbackContent } from "@/lib/shared/learn-more-content";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLlamalendMarkets } from "@/lib/sources/chain/llamalend-markets";
 import { protocolForHref } from "@/lib/shared/protocols";
@@ -51,6 +52,7 @@ export default async function LlamalendMarketsPage() {
         <SubPageHeader
           protocol={PROTOCOL}
           title="Markets & the band geometry over them"
+          learnMore={llamalendEventFallbackContent()}
           stamp={<LlamalendMarketsStamp data={data} />}
         />
 
