@@ -244,6 +244,12 @@ function applyAccount(
 
 // ── Aave V3, Ethereum and Base ──────────────────────────────────────────────
 
+/** The census's USD source names "Aave V3 oracle" for every Ethereum market; each market prices
+ *  through its own oracle (ORACLE_BY_MARKET), so the label names the market's. */
+function marketOracleLabel(source: string, market: string | undefined): string {
+  return market ? source.replace(/^Aave V3 oracle/, `Aave V3 ${MARKET_NAME[market] ?? market} oracle`) : source;
+}
+
 function aaveLane(lane: "ethereum" | "base"): FamilyModule {
   const chain: ChainId = lane === "ethereum" ? MAINNET_CHAIN_ID : BASE_CHAIN_ID;
   const oracle = lane === "ethereum" ? "Aave V3 oracle" : "Aave V3 Base oracle";
@@ -276,7 +282,7 @@ function aaveLane(lane: "ethereum" | "base"): FamilyModule {
           card: { kind: "aave-v3", lane, row },
           collateralUsd: opt(r.collateralUsd),
           debtUsd: opt(r.debtUsd),
-          usdSource: r.usdSource ?? oracle,
+          usdSource: marketOracleLabel(r.usdSource ?? oracle, lane === "ethereum" ? row.market : undefined),
           usdOwnOracle: r.collateralUsd != null || r.debtUsd != null,
           notRead: row.status === "unread" ? true : undefined,
           headRead: "none",

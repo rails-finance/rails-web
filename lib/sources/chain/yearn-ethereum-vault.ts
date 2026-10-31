@@ -27,7 +27,7 @@
 // as the MetaMorpho vault page is.
 
 import { parseAbi, type ContractFunctionParameters } from "viem";
-import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
+import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { erc20NameOf, resolveErc20Meta } from "./erc20-meta";

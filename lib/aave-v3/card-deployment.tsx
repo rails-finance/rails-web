@@ -50,8 +50,9 @@ export interface AaveV3CardDeployment {
    *  position page's, where the HF is the page's own live Pool read. A
    *  listing deployment has none: a listing card carries no HF (0018). */
   healthFactor?: (market: string, atBlock?: number, readBy?: ServerRead) => Provenance;
-  usd: (what: string) => Provenance;
-  liqPrice: (symbol: string) => Provenance;
+  /** `market`: the row's market, whose oracle prices it. */
+  usd: (what: string, market?: string) => Provenance;
+  liqPrice: (symbol: string, market?: string) => Provenance;
   /** A closed account's "highest recorded" figures — where the maximum came
    *  from on this lane (the index's replay on Ethereum; the live sweep's
    *  principal replay on a Base lender). */

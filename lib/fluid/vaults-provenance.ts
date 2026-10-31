@@ -8,8 +8,7 @@
 //
 // The LANE matters. live-provenance.ts reads a single position through
 // `VaultResolver.positionByNftId` — this view reads the WHOLE roster through
-// `VaultResolver.getVaultsEntireData()` (one eth_call, the array of every
-// vault's VaultEntireData), and a smart leg's composition through the
+// `VaultResolver.getAllVaultsAddresses() → getVaultEntireData(vault)` (the roster, then each vault's VaultEntireData), and a smart leg's composition through the
 // `DexResolver.getDexEntireDatas([pool])`. Reusing live-provenance's builders
 // here would stamp the position lane on a roster receipt, so these builders are
 // written against the lane the vaults loader (lib/sources/chain/fluid-vaults.ts)
@@ -83,22 +82,21 @@ const vaultContract = (coords?: FluidVaultCoords): Provenance["contract"] => ({
 const atBlock = (coords?: FluidVaultCoords): string =>
   coords?.blockNumber != null ? ` at block ${coords.blockNumber}` : "";
 
-const recompute = (call: string, coords?: FluidVaultCoords): Provenance["verify"] => ({
+const recompute = (field: string | null, coords?: FluidVaultCoords): Provenance["verify"] => ({
   kind: "recompute",
-  text:
-    coords?.blockNumber != null
-      ? `Re-run the ${call} eth_call at block ${coords.blockNumber} against any node`
-      : `Re-run the ${call} eth_call against any node`,
+  text: `Call VaultResolver.getAllVaultsAddresses(), then getVaultEntireData(vault) for each vault${
+    coords?.blockNumber != null ? ` at block ${coords.blockNumber}` : ""
+  } against any node${field ? `, and read ${field}` : ""}`,
 });
 
 // ── roster (VaultResolver-level) ─────────────────────────────────────────────
 
-/** The count of vaults minted — the length of getVaultsEntireData()'s own array. */
+/** The count of vaults minted — the length of getAllVaultsAddresses()'s array. */
 const fluidRosterProv_ = (coords: FluidVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
-  verify: recompute("VaultResolver.getVaultsEntireData", coords),
+  verify: recompute(null, coords),
   summary: `Vaults listed — the VaultResolver's own \`getAllVaultsAddresses()\` roster${atBlock(coords)}, each vault read with \`getVaultEntireData(vault)\`. Fluid keeps no market catalog: the factory mints one vault per pair and the resolver names every one.${coords.skipped ? ` ${coords.skipped} ${coords.skipped === 1 ? "vault" : "vaults"} in the roster ${coords.skipped === 1 ? "is" : "are"} left out because the resolver's read of ${coords.skipped === 1 ? "it" : "them"} reverts at this block.` : ""}`,
   contract: VAULT_RESOLVER_CONTRACT,
   via: ROSTER_VIA,
@@ -117,15 +115,15 @@ const CONFIG_GLOSS: Record<FluidConfigField, string> = {
 };
 
 /** A vault's governance-set risk rung — one of the config block's 1e4-scaled
- *  percents, read from the vault's own config through getVaultsEntireData. */
+ *  percents, read from the vault's own config through getVaultEntireData. */
 const fluidVaultConfigProv_ = (field: FluidConfigField, coords: FluidVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
-  verify: recompute(`VaultResolver.getVaultsEntireData (configs.${field})`, coords),
+  verify: recompute(`configs.${field}`, coords),
   summary: `${field} — the vault's governance-set risk line${atBlock(coords)} (\`configs.${field}\`, a 1e4-scaled percent): ${CONFIG_GLOSS[field]}. Each Fluid vault is one (collateral, debt) pair carrying its own three-rung ladder; this is one rung, read straight from the vault's own config.`,
   contract: vaultContract(coords),
-  via: `${LANE} · VaultResolver.getVaultsEntireData() · configs.${field} @ head`,
+  via: `${LANE} · VaultResolver.getAllVaultsAddresses() → getVaultEntireData(vault) · configs.${field} @ head`,
 });
 
 // ── vault-level: the oracle price ────────────────────────────────────────────
@@ -136,10 +134,10 @@ const fluidOraclePriceProv_ = (coords: FluidVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "oracle",
   source: { block: coords.blockNumber },
-  verify: recompute("VaultResolver.getVaultsEntireData (configs.oraclePriceLiquidate)", coords),
-  summary: `The ${coords.colSym ?? "collateral"} price in ${coords.debtSym ?? "the debt token"} — the vault's own oracle (each Fluid vault names one), read as \`configs.oraclePriceLiquidate\` through getVaultsEntireData${atBlock(coords)}. Fluid oracles price the collateral IN THE DEBT TOKEN; there is no USD feed anywhere in the protocol — this pair price is the exact space the liquidation engine judges in (the liquidate-leg price, the one liquidations use).`,
+  verify: recompute("configs.oraclePriceLiquidate", coords),
+  summary: `The ${coords.colSym ?? "collateral"} price in ${coords.debtSym ?? "the debt token"} — the vault's own oracle (each Fluid vault names one), read as \`configs.oraclePriceLiquidate\` through getVaultEntireData${atBlock(coords)}. Fluid oracles price the collateral IN THE DEBT TOKEN; there is no USD feed anywhere in the protocol — this pair price is the exact space the liquidation engine judges in (the liquidate-leg price, the one liquidations use).`,
   contract: { name: "Fluid vault oracle", address: coords.oracle ?? undefined },
-  via: `${LANE} · VaultResolver.getVaultsEntireData() · configs.oraclePriceLiquidate @ head`,
+  via: `${LANE} · VaultResolver.getAllVaultsAddresses() → getVaultEntireData(vault) · configs.oraclePriceLiquidate @ head`,
 });
 
 // ── vault-level: leg sizes ───────────────────────────────────────────────────
@@ -156,10 +154,10 @@ const fluidVaultSizeProv_ = (side: "supply" | "borrow", smartLeg: boolean, coord
     kind: "chain",
     pclass: "state",
     source: { block: coords.blockNumber },
-    verify: recompute(`VaultResolver.getVaultsEntireData (totalSupplyAndBorrow.${field})`, coords),
+    verify: recompute(`totalSupplyAndBorrow.${field}`, coords),
     summary: `The vault's total ${side} — \`totalSupplyAndBorrow.${field}\`${atBlock(coords)}, the vault's own aggregate on this leg, scaled by the leg's decimals. In ${unit}. Not a sum over events: the resolver returns the vault's settled total directly.`,
     contract: vaultContract(coords),
-    via: `${LANE} · VaultResolver.getVaultsEntireData() · totalSupplyAndBorrow.${field} @ head`,
+    via: `${LANE} · VaultResolver.getAllVaultsAddresses() → getVaultEntireData(vault) · totalSupplyAndBorrow.${field} @ head`,
   };
 };
 
@@ -175,7 +173,7 @@ const fluidSmartLegProv_ = (side: "supply" | "borrow", coords: FluidVaultCoords)
     source: { block: coords.blockNumber },
     summary: `What the smart ${side} leg's DEX shares are made of${atBlock(coords)} — the leg's total shares (\`totalSupplyAndBorrow.${shareField}\`) resolved through the DexResolver's OWN per-share composition (\`${perField}\`), the vault's pro-rata slice of the pool's reserves. This is the ${side} leg's own reserves, read separately from the debt leg's. Composition, NOT price: pro-rata is Fluid's own redemption mechanic (withdrawPerfect), and no USD is implied — Fluid runs no USD feed.`,
     contract: DEX_RESOLVER_CONTRACT,
-    via: `${LANE} · VaultResolver.getVaultsEntireData() × DexResolver.getDexEntireDatas([pool]) @ head`,
+    via: `${LANE} · VaultResolver.getAllVaultsAddresses() → getVaultEntireData(vault) × DexResolver.getDexEntireDatas([pool]) @ head`,
     formula: "shares × per-share composition ÷ 1e18",
     inputs: [
       {
@@ -205,10 +203,10 @@ const fluidVaultRateProv_ = (side: "supply" | "borrow", coords: FluidVaultCoords
     kind: "chain",
     pclass: "state",
     source: { block: coords.blockNumber },
-    verify: recompute(`VaultResolver.getVaultsEntireData (exchangePricesAndRates.${field})`, coords),
+    verify: recompute(`exchangePricesAndRates.${field}`, coords),
     summary: `The vault's current ${side} rate, annual${atBlock(coords)} — the resolver's own rates block (\`exchangePricesAndRates.${field}\`, a 1e2-precision percent): the liquidity-layer rate with the vault's reward or fee magnifier applied. Rates float with utilisation; this is the rate at this block, not a projection.`,
     contract: vaultContract(coords),
-    via: `${LANE} · VaultResolver.getVaultsEntireData() · exchangePricesAndRates.${field} @ head`,
+    via: `${LANE} · VaultResolver.getAllVaultsAddresses() → getVaultEntireData(vault) · exchangePricesAndRates.${field} @ head`,
   };
 };
 

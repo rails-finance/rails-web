@@ -46,8 +46,7 @@ process.env.API_BEARER_TOKEN = "test-token";
 process.env.RAILS_API_URL = API;
 process.env.ALCHEMY_URL = RPC;
 
-const { headReadsClient } = await import(ROOT + "lib/sources/api/head-reads-client.ts");
-const { vaultHeadClient } = await import(ROOT + "lib/sources/api/vault-head-client.ts");
+const { headReadsClient, vaultHeadClient } = await import(ROOT + "lib/sources/api/head-reads-client.ts");
 const { readSkyDrip } = await import(ROOT + "lib/sources/chain/sky-savings-drip.ts");
 
 // Each test starts two minutes after the last: past the 30 s down window, the
@@ -239,7 +238,7 @@ test("head reads: no RAILS_API_URL reads the chain", async () => {
 
 test("vault reads: a named block's code from the api; an unnamed block's from the chain", async () => {
   const seen = stubFetch(async (p) =>
-    p.startsWith("/api/at-block/vault/head")
+    p.startsWith("/api/at-block/head/block")
       ? json(headBody())
       : json({ blockNumber: SERVER_HEAD, answers: [{ hex: "0xfe" }] }),
   );
@@ -263,23 +262,25 @@ test("vault reads: a refused connection reads the chain, and the api is not aske
 
 test("vault reads: a failed round reads the chain at the same block and marks the route down", async () => {
   const seen = stubFetch(async (p) =>
-    p.startsWith("/api/at-block/vault/head") ? json(headBody()) : json({ error: "proxy_error" }, 502),
+    p.startsWith("/api/at-block/head/block") ? json(headBody()) : json({ error: "proxy_error" }, 502),
   );
   const c = vaultHeadClient(1);
   const b = await c.getBlockNumber();
   assert.equal(await c.getCode({ address: TOKEN, blockNumber: b }), "0x6001");
   assert.deepEqual(seen.rpc, [["eth_getCode", "0x1f4"]]);
+  skew += 5_100; // past the head's 5 s reuse
   assert.equal(await c.getBlockNumber(), CHAIN_HEAD);
   assert.equal(seen.api.length, 2);
 });
 
 test("vault reads: a refused round (409) is not the route down", async () => {
   const seen = stubFetch(async (p) =>
-    p.startsWith("/api/at-block/vault/head") ? json(headBody()) : json({ error: "block_not_named" }, 409),
+    p.startsWith("/api/at-block/head/block") ? json(headBody()) : json({ error: "block_not_named" }, 409),
   );
   const c = vaultHeadClient(1);
   const b = await c.getBlockNumber();
   assert.equal(await c.getCode({ address: TOKEN, blockNumber: b }), "0x6001");
+  skew += 5_100; // past the head's 5 s reuse
   assert.equal(await c.getBlockNumber(), BigInt(SERVER_HEAD));
   assert.equal(seen.api.length, 3);
 });
@@ -298,6 +299,62 @@ test("vault reads: no RAILS_API_URL reads the chain", async () => {
   const seen = stubFetch(async () => json(headBody()));
   assert.equal(await vaultHeadClient(1).getBlockNumber(), CHAIN_HEAD);
   assert.deepEqual(seen.api, []);
+});
+
+test("vault reads: the finalized block from the api's head, asked with finalized=1", async () => {
+  const seen = stubFetch(async () => json({ ...headBody(), finalizedBlock: SERVER_HEAD - 64 }));
+  const c = vaultHeadClient(1);
+  assert.equal((await c.getBlock({ blockTag: "finalized" })).number, BigInt(SERVER_HEAD - 64));
+  assert.deepEqual(seen.api, ["/api/at-block/head/block?chain=1&finalized=1"]);
+  assert.deepEqual(seen.rpc, []);
+});
+
+// ── rounds (both entries) ───────────────────────────────────────────────────
+
+test("rounds: a turn's multicall, code and storage reads at one block go as one round", async () => {
+  const bodies = [];
+  const seen = stubFetch(async (p, init) => {
+    if (p.startsWith("/api/at-block/head/block")) return json(headBody());
+    const { reads } = JSON.parse(init.body);
+    bodies.push(reads.map((r) => r.kind));
+    return json({
+      blockNumber: SERVER_HEAD,
+      answers: reads.map((r) => (r.kind === "call" ? { success: true, returnData: word(42) } : { hex: word(9) })),
+    });
+  });
+  const c = vaultHeadClient(1);
+  const b = await c.getBlockNumber();
+  const [m, code, slot] = await Promise.all([
+    c.multicall({ contracts: [read(), read()], blockNumber: b }),
+    c.getCode({ address: TOKEN, blockNumber: b }),
+    c.getStorageAt({ address: TOKEN, slot: word(0), blockNumber: b }),
+  ]);
+  assert.deepEqual(
+    m.map((x) => x.result),
+    [42n, 42n],
+  );
+  assert.equal(code, word(9));
+  assert.equal(slot, word(9));
+  assert.deepEqual(bodies, [["call", "call", "code", "storage"]]);
+  assert.deepEqual(seen.rpc, []);
+});
+
+test("rounds: a turn past 1,500 reads is split between readers, never inside one", async () => {
+  const sizes = [];
+  stubFetch(async (p, init) => {
+    if (p.startsWith("/api/at-block/head/block")) return json(headBody());
+    const { reads } = JSON.parse(init.body);
+    sizes.push(reads.length);
+    return json({ blockNumber: SERVER_HEAD, answers: reads.map(() => ({ success: true, returnData: word(42) })) });
+  });
+  const c = headReadsClient(1);
+  const many = (n) => c.multicall({ contracts: Array.from({ length: n }, () => read()) });
+  const out = await Promise.all([many(900), many(900), many(10)]);
+  assert.deepEqual(
+    out.map((r) => r.length),
+    [900, 900, 10],
+  );
+  assert.deepEqual(sizes, [900, 910]);
 });
 
 // ── readSkyDrip (the at-block store's chi and rho, census W-SK1) ─────────────

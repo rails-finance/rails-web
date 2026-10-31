@@ -210,7 +210,7 @@ export async function loadFluidVaultsFromChain(): Promise<FluidVaultsChainRespon
     const resolver = FLUID_ADDRESSES.VAULT_RESOLVER as `0x${string}`;
     const at = BigInt(blockNumber);
 
-    // The roster, then each vault on its own in one multicall that lets a failed
+    // The roster, then each vault separately in one multicall that lets a failed
     // entry fail alone: the whole-roster getVaultsEntireData() reverts as a unit
     // when any one vault's getVaultEntireData reverts (five do since block
     // 26,207,288). A vault whose read fails is left out and named in `skipped`.
@@ -311,7 +311,7 @@ export async function loadFluidVaultsFromChain(): Promise<FluidVaultsChainRespon
       }
     }
 
-    /** One token's display name: the ETH sentinel answers for itself, everything
+    /** One token's display name: the ETH sentinel is named "ETH", everything
      *  else comes from the multicall (null when symbol() didn't answer). */
     const nameOf = (token: string): string | null => {
       if (isFluidEthSentinel(token)) return "ETH";
@@ -325,7 +325,7 @@ export async function loadFluidVaultsFromChain(): Promise<FluidVaultsChainRespon
      *  render the protocol's own answer, don't re-derive one that has to agree.
      *
      *  A supply leg and a debt leg are different instruments backed by different
-     *  reserves, so each reads its own pair — using the collateral figures for a
+     *  reserves, so each reads the pair it holds — using the collateral figures for a
      *  smart-DEBT leg silently resolves nothing on debt-only pools.
      *
      *  Null when the pool states 0 for both: 6 of the 40 pools hold nothing, and
@@ -392,7 +392,7 @@ export async function loadFluidVaultsFromChain(): Promise<FluidVaultsChainRespon
 
       const totalSupply = scaleRaw(vd.totalSupplyAndBorrow.totalSupplyVault, supplyDecimals);
       const totalBorrow = scaleRaw(vd.totalSupplyAndBorrow.totalBorrowVault, borrowDecimals);
-      // Only where every term is a token quantity the price actually relates:
+      // Only where every term is a token quantity the price relates:
       // a smart vault's legs are DEX shares, so the quotient would be a number
       // without a referent.
       const smartEither = smartCol || smartDebt;

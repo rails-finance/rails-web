@@ -12,7 +12,7 @@
 //     route pins for the whole response. Twenty cards is ≤ 40 + 18 calls over
 //     two Multicall3 rounds (the second depends on the first), well under the
 //     batch ceiling. The response states that block once. The block and the
-//     rounds are asked of rails-server first (lib/sources/api/vault-head-client.ts):
+//     rounds are asked of rails-server first (lib/sources/api/head-reads-client.ts):
 //     one block a chain per 30 s, each round read once at it.
 //
 // A FAILED OVERLAY IS AN UNREAD FIGURE, NOT A ZERO. If the chain read throws —
@@ -61,7 +61,7 @@ import { VAULT_SIZE_BRACKETS, VAULT_SIZE_UNPRICED } from "@/lib/aave-vaults/posi
 import { AAVE_VAULT_FAMILY_ORDER } from "@/lib/aave-vaults/vault-catalog";
 import { loadMorphoBaseVaultRoster } from "@/lib/morpho-base/vault-roster";
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
-import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
+import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import { readBlockTimes } from "@/lib/sources/chain/vault-block-reads";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";

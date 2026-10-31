@@ -477,7 +477,7 @@ export default function AaveV3PositionDetail({
     pricedFlowsRef.current = key;
     // Not cancelled when the lifetime changes under it (the route's answer
     // landing): the prices still belong to this wallet's view.
-    fetchAaveV3OraclePrices(missing)
+    fetchAaveV3OraclePrices(missing, market)
       .then((prices) => {
         if (Object.keys(prices).length === 0) return;
         setView((v) =>

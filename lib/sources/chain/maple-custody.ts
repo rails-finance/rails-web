@@ -16,10 +16,17 @@
 // Degrades to an empty array when RPC is unset/down — the custody card simply
 // does not render, and the infra identity card carries the page alone.
 //
-// SERVER-ONLY — imported from /api/* route handlers only (alchemy via rpc.ts).
+// Reads through rails-server's head routes first (headReadsClient), the chain
+// only where they cannot answer.
+//
+// SERVER-ONLY — imported from /api/* route handlers only.
 
 import { parseAbi } from "viem";
 import { alchemyClient } from "./rpc";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { mapleExitAssetsExact } from "@/lib/maple/exit-value";
 
@@ -43,6 +50,8 @@ export interface MapleCustodyHolding {
   assetSymbol: string;
   /** Block the reads landed at (head, for the receipts' coordinates). */
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** Shares the holder's balance slot carries (whole units). */
   shares: number;
   sharesRaw: string;
@@ -72,7 +81,7 @@ export async function resolveMapleCustodyHoldings(holder: string): Promise<Maple
   const out: MapleCustodyHolding[] = [];
   let client: ReturnType<typeof alchemyClient>;
   try {
-    client = alchemyClient();
+    client = headReadsClient();
   } catch {
     return out; // ALCHEMY_URL unset — the identity card carries the page.
   }
@@ -117,6 +126,7 @@ export async function resolveMapleCustodyHoldings(holder: string): Promise<Maple
         symbol: p.symbol,
         assetSymbol: p.assetSymbol,
         blockNumber,
+        head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
         shares: toNum(balance, p.decimals),
         sharesRaw: balance.toString(),
         exitValue: mapleExitAssetsExact(balance, agg, p.decimals),
