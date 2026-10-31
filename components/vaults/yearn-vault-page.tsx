@@ -6,6 +6,7 @@
 // yearn-ethereum-vault.ts); Yield is the daily store's. There is no census, so
 // Holders is empty.
 
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { ProvReceiptsScope, Prov, useReceiptRegistry } from "@/components/shared/provenance";
 import { BlockRef } from "@/components/shared/block-ref";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
@@ -83,6 +84,7 @@ export function YearnVaultPage({
   const ad = y.asset.decimals;
   const asset = { symbol: unit, address: y.asset.address };
   const coords: YearnVaultCoords = {
+    readBy: serverReadOf(data),
     blockNumber: data.blockNumber || undefined,
     vault: y.address,
     vaultName: y.name ?? y.censusName,
@@ -192,7 +194,7 @@ export function YearnVaultPage({
       amount: y.totalIdle,
       amountProv: yearnVaultIdleProv(coords),
       share: fraction(y.totalIdle, y.totalAssets),
-      shareProv: vaultVenueShareProv(v, "totalIdle()", "totalAssets()"),
+      shareProv: vaultVenueShareProv(v, "totalIdle()", "totalAssets()", coords.readBy),
       hooks: { "data-idle": "vault" },
     },
     ...data.strategies.map((s) => ({
@@ -217,7 +219,7 @@ export function YearnVaultPage({
       amount: s.currentDebt,
       amountProv: yearnVaultStrategyDebtProv(coords, s.address),
       share: fraction(s.currentDebt, y.totalAssets),
-      shareProv: vaultVenueShareProv(v, "this strategy's current_debt", "totalAssets()"),
+      shareProv: vaultVenueShareProv(v, "this strategy's current_debt", "totalAssets()", coords.readBy),
       hooks: {
         "data-strategy-row": s.address,
         "data-queue-position": String(s.position),
@@ -233,7 +235,7 @@ export function YearnVaultPage({
       amount: amount(outside),
       amountProv: yearnVaultDebtProv(coords),
       share: fraction(amount(outside), y.totalAssets),
-      shareProv: vaultVenueShareProv(v, "totalDebt() less the queue's debt", "totalAssets()"),
+      shareProv: vaultVenueShareProv(v, "totalDebt() less the queue's debt", "totalAssets()", coords.readBy),
       hooks: { "data-figure": "debt-outside-queue" },
     });
 

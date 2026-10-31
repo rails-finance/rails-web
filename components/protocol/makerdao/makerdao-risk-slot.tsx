@@ -24,6 +24,7 @@ import { formatExact, formatNumber } from "@/lib/utils/format";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import type { MakerVaultView } from "./makerdao-vault-card";
+import { stampServerRead } from "@/lib/shared/server-head-read";
 
 /** A minimum ratio at its own grain: 175%, 145%, 172.5%. */
 const pctWhole = (m: number): string => `${Number((m * 100).toFixed(2))}%`;
@@ -45,14 +46,18 @@ export function makerdaoPanelColumns(v: MakerVaultView): PositionPanelColumns {
     left.push({
       id: "stability-fee",
       label: "Stability fee",
-      value: <Prov info={stabilityFeeAprProv(v.ilk)}>{(v.stabilityFeeApr * 100).toFixed(2)}%</Prov>,
+      value: (
+        <Prov info={stampServerRead(stabilityFeeAprProv(v.ilk), v.readBy)}>
+          {(v.stabilityFeeApr * 100).toFixed(2)}%
+        </Prov>
+      ),
       tip: `The yearly rate ${v.ilk} debt grows at: the Jug's per-second fee, read from the chain at the latest block and compounded over a year. Governance can change it.`,
     });
   if (v.matRatio != null)
     left.push({
       id: "minimum-ratio",
       label: "Minimum ratio",
-      value: <Prov info={matProv(v.ilk)}>{pctWhole(v.matRatio)}</Prov>,
+      value: <Prov info={stampServerRead(matProv(v.ilk), v.readBy)}>{pctWhole(v.matRatio)}</Prov>,
       tip: `The collateral ratio ${v.ilk} vaults must keep: the Spotter's liquidation ratio for the collateral type, read from the chain. Below it the vault can be liquidated.`,
     });
 
@@ -62,10 +67,13 @@ export function makerdaoPanelColumns(v: MakerVaultView): PositionPanelColumns {
       label: "Liquidates at",
       value: (
         <Prov
-          info={liquidationPriceProv(
-            v.debtDai != null ? `${formatNumber(v.debtDai)} ${dsym}` : "—",
-            v.matRatio != null ? `${(v.matRatio * 100).toFixed(0)}%` : "—",
-            `${formatNumber(v.ink)} ${v.collateralSymbol}`,
+          info={stampServerRead(
+            liquidationPriceProv(
+              v.debtDai != null ? `${formatNumber(v.debtDai)} ${dsym}` : "—",
+              v.matRatio != null ? `${(v.matRatio * 100).toFixed(0)}%` : "—",
+              `${formatNumber(v.ink)} ${v.collateralSymbol}`,
+            ),
+            v.readBy,
           )}
         >
           {formatLiquidationPrice(v.liquidationPriceUsd)}
@@ -89,7 +97,9 @@ export function makerdaoPanelColumns(v: MakerVaultView): PositionPanelColumns {
     right.push({
       id: "room-to-borrow",
       label: "Room to borrow",
-      value: <Prov info={borrowHeadroomProv(pct(v.matRatio))}>{formatCompact(headroom)}</Prov>,
+      value: (
+        <Prov info={stampServerRead(borrowHeadroomProv(pct(v.matRatio)), v.readBy)}>{formatCompact(headroom)}</Prov>
+      ),
       asset: { symbol: dsym, figure: `${formatExact(headroom)} ${dsym}` },
       tip: `The ${dsym} the vault could still draw before its collateral ratio falls to the ${pctWhole(v.matRatio)} minimum: the collateral's value divided by the minimum, less the debt.`,
     });

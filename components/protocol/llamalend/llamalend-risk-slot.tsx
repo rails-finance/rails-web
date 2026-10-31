@@ -38,6 +38,7 @@ import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
 import { TokenFigure } from "@/components/shared/token-figure";
 import { AmountText } from "@/components/shared/amount-text";
 import type { LlamalendChainResponse } from "@/lib/api/fetch-llamalend-position";
+import { serverReadOf, stampServerRead } from "@/lib/shared/server-head-read";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 
 /** Health under this (5%) and above 0 carries the near-0 line. */
@@ -52,7 +53,9 @@ export function llamalendHasRisk(chain: LlamalendChainResponse): boolean {
 export function LlamalendHealth({ chain }: { chain: LlamalendChainResponse }) {
   if (chain.healthFull == null) return null;
   return (
-    <Prov info={llamalendHealthFullProv(chain.controller, chain.healthFullRaw)}>{fmtHealth(chain.healthFull)}</Prov>
+    <Prov info={stampServerRead(llamalendHealthFullProv(chain.controller, chain.healthFullRaw), serverReadOf(chain))}>
+      {fmtHealth(chain.healthFull)}
+    </Prov>
   );
 }
 
@@ -92,11 +95,9 @@ export function llamalendRiskRows(
     value: (
       <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
         <Prov
-          info={llamalendConvertedProv(
-            chain.borrowedSymbol,
-            chain.convertedCrossCheckExact,
-            chain.controller,
-            chain.amm,
+          info={stampServerRead(
+            llamalendConvertedProv(chain.borrowedSymbol, chain.convertedCrossCheckExact, chain.controller, chain.amm),
+            serverReadOf(chain),
           )}
         >
           {chain.converted != null ? (
@@ -138,14 +139,22 @@ export function llamalendRiskRows(
     left.push({
       id: "price-over-onset",
       label: "Price over onset",
-      value: <Prov info={llamalendHealthProv(chain.amm)}>{chain.health.toFixed(3)}×</Prov>,
+      value: (
+        <Prov info={stampServerRead(llamalendHealthProv(chain.amm), serverReadOf(chain))}>
+          {chain.health.toFixed(3)}×
+        </Prov>
+      ),
       tip: "The collateral's oracle price over the price where this position's band begins: 1.0 at the band's top, below 1.0 inside or beneath the bands. Both prices are read from the AMM at the latest block.",
     });
   if (sold != null && sold > 0)
     left.push({
       id: "sold-net",
       label: "Sold by the AMM, net",
-      value: <Prov info={llamalendSoldProv(chain.collateralSymbol, chain.controller)}>{formatCompact(sold)}</Prov>,
+      value: (
+        <Prov info={stampServerRead(llamalendSoldProv(chain.collateralSymbol, chain.controller), serverReadOf(chain))}>
+          {formatCompact(sold)}
+        </Prov>
+      ),
       asset: { symbol: chain.collateralSymbol, figure: `${formatExact(sold)} ${chain.collateralSymbol}` },
       tip: `${chain.collateralSymbol} the AMM has sold from this position and not bought back: everything deposited, less everything withdrawn, less what the position holds now.`,
     });
@@ -153,7 +162,11 @@ export function llamalendRiskRows(
     left.push({
       id: "lost-to-soft-liquidation",
       label: "Lost to soft-liquidation",
-      value: <Prov info={llamalendLostProv(chain.collateralSymbol, chain.controller)}>{formatCompact(lost)}</Prov>,
+      value: (
+        <Prov info={stampServerRead(llamalendLostProv(chain.collateralSymbol, chain.controller), serverReadOf(chain))}>
+          {formatCompact(lost)}
+        </Prov>
+      ),
       asset: { symbol: chain.collateralSymbol, figure: `${formatExact(lost)} ${chain.collateralSymbol}` },
       tip: `${chain.collateralSymbol} the AMM sold while the price sat in this position's bands and did not buy back, with nothing converted at the latest block and nothing liquidated: deposited, less withdrawn, less held now.`,
     });
@@ -198,11 +211,16 @@ export function llamalendRiskRows(
       label: "Bands",
       value: (
         <>
-          <Prov info={llamalendBandCountProv(chain.controller)}>
+          <Prov info={stampServerRead(llamalendBandCountProv(chain.controller), serverReadOf(chain))}>
             <PanelFigure>{chain.bands}</PanelFigure> band{chain.bands === 1 ? "" : "s"}
           </Prov>
           :{" "}
-          <Prov info={llamalendBandEdgeProv("pUp", chain.borrowedSymbol, chain.borrowedIsCrvusd, chain.amm)}>
+          <Prov
+            info={stampServerRead(
+              llamalendBandEdgeProv("pUp", chain.borrowedSymbol, chain.borrowedIsCrvusd, chain.amm),
+              serverReadOf(chain),
+            )}
+          >
             <PanelFigure>
               <span title={chain.pUpRaw != null ? `${formatUnitsExact(chain.pUpRaw, 18)} (exact, 1e18)` : undefined}>
                 {p(pUp)}
@@ -211,7 +229,12 @@ export function llamalendRiskRows(
           </Prov>{" "}
           →{" "}
           <TokenFigure symbol={chain.borrowedSymbol}>
-            <Prov info={llamalendBandEdgeProv("pDown", chain.borrowedSymbol, chain.borrowedIsCrvusd, chain.amm)}>
+            <Prov
+              info={stampServerRead(
+                llamalendBandEdgeProv("pDown", chain.borrowedSymbol, chain.borrowedIsCrvusd, chain.amm),
+                serverReadOf(chain),
+              )}
+            >
               <span
                 title={chain.pDownRaw != null ? `${formatUnitsExact(chain.pDownRaw, 18)} (exact, 1e18)` : undefined}
               >
@@ -235,11 +258,9 @@ export function llamalendRiskRows(
       },
       value: (
         <Prov
-          info={llamalendOraclePriceProv(
-            chain.collateralSymbol,
-            chain.borrowedSymbol,
-            chain.borrowedIsCrvusd,
-            chain.amm,
+          info={stampServerRead(
+            llamalendOraclePriceProv(chain.collateralSymbol, chain.borrowedSymbol, chain.borrowedIsCrvusd, chain.amm),
+            serverReadOf(chain),
           )}
         >
           <span

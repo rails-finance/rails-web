@@ -25,6 +25,9 @@
 import { parseAbi } from "viem";
 import { alchemyClient } from "./rpc";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 
 const POOL_ABI = parseAbi([
@@ -49,6 +52,8 @@ export interface MaplePoolState {
   pool: string;
   /** Block the reads landed at (head, for the receipts' coordinates). */
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** Shares → assets at the NAV rate (whole units, e.g. 1.1734). */
   navRate: number;
   /** Shares → assets at the EXIT rate (deducts unrealizedLosses). */
@@ -191,6 +196,7 @@ export async function resolveMaplePoolState(): Promise<MaplePoolStateMap> {
       out.set(p.key, {
         pool: p.key,
         blockNumber,
+        head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
         navRate: toNum(nav.result as bigint, p.decimals),
         exitRate: toNum(exit.result as bigint, p.decimals),
         totalAssets: ta != null ? toNum(ta, p.decimals) : 0,

@@ -11,6 +11,7 @@
 // SHARE PRICE is `convertToAssets(10^18)` — one whole share, in the vault's
 // own asset. No USD.
 
+import type { ServerRead } from "@/lib/shared/server-head-read";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
@@ -44,6 +45,7 @@ export function VaultDirectoryView({
   vaults,
   yields,
   blockNumber,
+  readBy,
   chainStale,
   catalogSize,
   censusBlock,
@@ -52,6 +54,8 @@ export function VaultDirectoryView({
   vaults: VaultSummary[];
   yields: Record<string, VaultYield>;
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  readBy?: ServerRead | null;
   chainStale: boolean;
   /** How many vaults the roster holds, and the block it was swept at. */
   catalogSize: number;
@@ -59,7 +63,7 @@ export function VaultDirectoryView({
   /** The position census answered: the rows carry Holders. */
   withCensus: boolean;
 }) {
-  const coords: MorphoVaultCoords = { blockNumber: blockNumber || undefined };
+  const coords: MorphoVaultCoords = { blockNumber: blockNumber || undefined, readBy };
   const rowCoords = (v: VaultSummary): MorphoVaultCoords => ({
     ...coords,
     vault: v.address,

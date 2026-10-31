@@ -38,6 +38,7 @@ import {
 import { COLLATERAL_SYMBOL, DEBT_SYMBOL } from "@/lib/liquity-v1/asset-catalog";
 import { V1_WORDS } from "@/lib/liquity-v1/event-templates";
 import type { LiquityV1PositionChainResponse } from "@/lib/api/fetch-liquity-v1-position";
+import { serverReadOf, stampServerRead } from "@/lib/shared/server-head-read";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 
 /** Whether the read describes an active Trove with debt and a live ratio. */
@@ -50,7 +51,7 @@ export function LiquityV1RiskHeadline({ chain }: { chain: LiquityV1PositionChain
   if (chain.icr == null) return null;
   return (
     <StatValue>
-      <Prov info={icrProv()}>
+      <Prov info={stampServerRead(icrProv(), serverReadOf(chain))}>
         <FadeNumber value={chain.icr * 100} decimals={1} />%
       </Prov>
     </StatValue>
@@ -82,7 +83,7 @@ export function liquityV1Panel(chain: LiquityV1PositionChainResponse): PositionP
               value: (
                 <>
                   <TokenFigure symbol={DEBT_SYMBOL} figure={`${fmtLusd(chain.debtInFront)} ${DEBT_SYMBOL}`}>
-                    <Prov info={debtInFrontProv()}>
+                    <Prov info={stampServerRead(debtInFrontProv(), serverReadOf(chain))}>
                       <AmountText value={chain.debtInFront} format="compact" />
                     </Prov>
                   </TokenFigure>
@@ -90,7 +91,7 @@ export function liquityV1Panel(chain: LiquityV1PositionChainResponse): PositionP
                     <>
                       {" "}
                       ·{" "}
-                      <Prov info={queueShareProv()}>
+                      <Prov info={stampServerRead(queueShareProv(), serverReadOf(chain))}>
                         <PanelFigure>{pct(share)}</PanelFigure>
                       </Prov>{" "}
                       of the queue
@@ -107,7 +108,11 @@ export function liquityV1Panel(chain: LiquityV1PositionChainResponse): PositionP
               id: "troves-in-front",
               label: "Troves in front",
               tip: "How many Troves sit ahead of this one in the redemption queue, counted from the same sweep of the protocol's sorted Trove list.",
-              value: <Prov info={trovesAheadProv()}>{chain.trovesAhead.toLocaleString("en-US")}</Prov>,
+              value: (
+                <Prov info={stampServerRead(trovesAheadProv(), serverReadOf(chain))}>
+                  {chain.trovesAhead.toLocaleString("en-US")}
+                </Prov>
+              ),
             },
           ]
         : []),
@@ -122,7 +127,14 @@ export function liquityV1Panel(chain: LiquityV1PositionChainResponse): PositionP
               value: (
                 <span className="inline-flex items-center gap-1">
                   <TokenChipIcon symbol={COLLATERAL_SYMBOL} size={14} filterable={false} />
-                  <Prov info={liquidationPriceProv({ debt: chain.debt, coll: chain.coll })}>{fmtPrice(liqPrice)}</Prov>
+                  <Prov
+                    info={stampServerRead(
+                      liquidationPriceProv({ debt: chain.debt, coll: chain.coll }),
+                      serverReadOf(chain),
+                    )}
+                  >
+                    {fmtPrice(liqPrice)}
+                  </Prov>
                 </span>
               ),
             },
@@ -133,7 +145,7 @@ export function liquityV1Panel(chain: LiquityV1PositionChainResponse): PositionP
         label: "Room to borrow",
         tip: `The LUSD this Trove could still owe before its ratio falls to the ${activeLabel} minimum${chain.recoveryMode ? " that Recovery Mode applies" : ""}, from its collateral at the PriceFeed price at the latest block.`,
         value: (
-          <Prov info={borrowHeadroomProv(activeLabel)}>
+          <Prov info={stampServerRead(borrowHeadroomProv(activeLabel), serverReadOf(chain))}>
             <AmountText value={headroomLusd} format="compact" />
           </Prov>
         ),
@@ -152,9 +164,11 @@ export function liquityV1RecoveryNotice(chain: LiquityV1PositionChainResponse) {
       <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
       <p>
         Recovery Mode is on. The system ratio is{" "}
-        <Prov info={systemStateProv("Total collateral ratio", "getTCR(price)")}>{pct(chain.tcr)}</Prov>, under the{" "}
-        <Prov info={ratioConstantProv("Critical collateral ratio", "CCR")}>{pct(chain.ccr)}</Prov> critical ratio, and a
-        Trove below the system ratio is at risk of liquidation.
+        <Prov info={stampServerRead(systemStateProv("Total collateral ratio", "getTCR(price)"), serverReadOf(chain))}>
+          {pct(chain.tcr)}
+        </Prov>
+        , under the <Prov info={ratioConstantProv("Critical collateral ratio", "CCR")}>{pct(chain.ccr)}</Prov> critical
+        ratio, and a Trove below the system ratio is at risk of liquidation.
       </p>
     </div>
   );

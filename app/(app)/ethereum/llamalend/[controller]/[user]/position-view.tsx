@@ -20,6 +20,7 @@
 // state legs upgrade from the listing snapshot to the live head read when it
 // lands.
 
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { llamalendExplorer } from "@/lib/llamalend/explorer";
@@ -244,6 +245,7 @@ export default function LlamalendPositionView({
       convertedCrossCheckExact: chain.convertedCrossCheckExact,
       priceOracle: chain.priceOracle ?? view.priceOracle,
       stateBasis: "chain",
+      readBy: serverReadOf(chain),
       collateralUsd:
         chain.borrowedIsCrvusd && chain.priceOracle != null && chain.collateral != null
           ? chain.collateral * chain.priceOracle

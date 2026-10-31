@@ -13,6 +13,7 @@
 // the replay summary if the RPC read is unavailable; the risk surfaces then
 // decline rather than guess (the replay can't supply mat/duty/dust).
 
+import { serverReadAt } from "@/lib/shared/server-head-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { useParams } from "next/navigation";
@@ -124,6 +125,7 @@ function mergeView(chain: MakerVaultState | null, summary: MakerVaultSummary | n
       everLiquidated: summary?.everLiquidated ?? false,
       source: "chain",
       atBlock: chain.atBlock || undefined,
+      readBy: serverReadAt(chain.head, chain.atBlock),
       lse: chain.lse || (summary?.lse ?? false),
       // Live-overlay-only risk facts (runway / CR strip / fee captions).
       matRatio: chain.matRatio,

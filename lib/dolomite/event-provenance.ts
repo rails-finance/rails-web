@@ -23,6 +23,7 @@
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { DOLOMITE_ADDRESSES } from "./asset-catalog";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 
 // Custody, not origin — the via line's leading segment only.
 const DOLOMITE_VIA = "captured DolomiteMargin events (dolomite_*)";
@@ -477,22 +478,31 @@ export const externalActorProv = (
 /** Position-card CURRENT token value of one leg — |par| × the market's CURRENT
  *  index. ⚠️ chain-derived + `state`, set explicitly: the kind-default would
  *  drift this to oracle, and it is a slot product, not a price. */
-export const positionCurrentProv = (sym: string, side: "supply" | "debt"): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  verify: {
-    kind: "recompute",
-    text: "Re-run the core's getAccountWei eth_call (or getAccountPar × getMarketCurrentIndex ÷ 1e18) — both legs are contract slots read at head, and the product reproduces this figure. Both of this explorer's lanes are state-class: unusual on this roster.",
-  },
-  summary: `${sym} this account's ${side === "supply" ? "balance is worth" : "debt stands at"} NOW — the replayed par (the emitted absolute, = the getAccountPar slot) × the market's CURRENT interest index (getMarketCurrentIndex, which accrues ON READ: interest here is per-second, so no stored figure is current). This is what the core's own getAccountWei returns. Both legs are chain state, so the product is chain-derived — not an oracle figure.`,
-  contract: MARGIN,
-  via: "par × getMarketCurrentIndex ÷ 1e18 (eth_call at head) — = getAccountWei",
-  formula: "par × current index",
-  inputs: [
-    { label: "par", kind: "chain", pclass: "state", note: "the emitted absolute (= getAccountPar)" },
-    { label: "current index", kind: "chain", pclass: "state", note: "getMarketCurrentIndex at head — accrues on read" },
-  ],
-});
+export const positionCurrentProv = (sym: string, side: "supply" | "debt", readBy?: ServerRead | null): Provenance =>
+  stampServerRead(
+    {
+      kind: "chain-derived",
+      pclass: "state",
+      verify: {
+        kind: "recompute",
+        text: "Re-run the core's getAccountWei eth_call (or getAccountPar × getMarketCurrentIndex ÷ 1e18) — both legs are contract slots read at head, and the product reproduces this figure. Both of this explorer's lanes are state-class: unusual on this roster.",
+      },
+      summary: `${sym} this account's ${side === "supply" ? "balance is worth" : "debt stands at"} NOW — the replayed par (the emitted absolute, = the getAccountPar slot) × the market's CURRENT interest index (getMarketCurrentIndex, which accrues ON READ: interest here is per-second, so no stored figure is current). This is what the core's own getAccountWei returns. Both legs are chain state, so the product is chain-derived — not an oracle figure.`,
+      contract: MARGIN,
+      via: "par × getMarketCurrentIndex ÷ 1e18 (eth_call at head) — = getAccountWei",
+      formula: "par × current index",
+      inputs: [
+        { label: "par", kind: "chain", pclass: "state", note: "the emitted absolute (= getAccountPar)" },
+        {
+          label: "current index",
+          kind: "chain",
+          pclass: "state",
+          note: "getMarketCurrentIndex at head — accrues on read",
+        },
+      ],
+    },
+    readBy,
+  );
 
 /** Position-card PAR figure — the replayed emitted absolute (= the slot). */
 export const positionParProv = (sym: string, side: "supply" | "debt"): Provenance => ({

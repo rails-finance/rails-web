@@ -21,6 +21,9 @@
 
 import { parseAbi, getAddress, stringToHex } from "viem";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { MAKER_ADDRESSES, ilkToCollateralSymbol, isLseIlk } from "@/lib/makerdao/asset-catalog";
 import { readAuctionStop, readLockstakeUrn, readPriceCap } from "./makerdao-lse-oracle";
 
@@ -70,6 +73,8 @@ export interface MakerVaultState {
   /** The block every read below was taken at — the chain head when the caller
    *  named none. Never 0 on a successful read. */
   atBlock: number;
+  /** rails-server's read of `atBlock`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** That block's own header timestamp, Unix seconds. Lets a surface date the
    *  reading (the live market note's later end) instead of only numbering it. */
   blockTimestamp: number;
@@ -250,6 +255,7 @@ export async function loadMakerVaultStateFromChain(
     collateralSymbol: ilkToCollateralSymbol(ilk),
     owner: owner.toLowerCase(),
     atBlock: Number(head.number),
+    head: serverHeadStampAt(MAINNET_CHAIN_ID, head.number),
     blockTimestamp: Number(head.timestamp),
     ink: inkNum,
     inkRaw: ink.toString(),

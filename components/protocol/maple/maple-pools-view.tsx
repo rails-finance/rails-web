@@ -33,7 +33,8 @@
 
 import { RatioBar, type RatioBarTick, pct } from "@/components/shared/ratio-bar";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { serverReadAt, stampServerRead } from "@/lib/shared/server-head-read";
+import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { MAPLE_POOL_BY_KEY, shortAddress, type MaplePool } from "@/lib/maple/asset-catalog";
 import { mapleExitAssets } from "@/lib/maple/exit-value";
 import {
@@ -100,6 +101,8 @@ function SplitRow({
 }
 
 function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
+  const readBy = serverReadAt(s.head, s.blockNumber);
+  const withRead = (p: Provenance) => stampServerRead(p, readBy);
   const share = (part: number): number | null => (s.totalAssets > 0 ? part / s.totalAssets : null);
   const queueValue = mapleExitAssets(s.raw.queueShares, s);
   const queueShare = share(queueValue);
@@ -134,24 +137,24 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
           </a>
         </div>
         <span className="shrink-0 text-[13px] tabular-nums text-foreground">
-          <Prov info={poolTotalAssetsProv(cat.assetSymbol, s.blockNumber)}>
+          <Prov info={withRead(poolTotalAssetsProv(cat.assetSymbol, s.blockNumber))}>
             {poolTotal(s.totalAssets, cat.assetSymbol)}
           </Prov>
         </span>
       </div>
 
       <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] tabular-nums text-rb-500">
-        <Prov info={poolTotalSupplyProv(cat.symbol, s.blockNumber)}>
+        <Prov info={withRead(poolTotalSupplyProv(cat.symbol, s.blockNumber))}>
           <span title={`${formatCompactTitled(s.totalSupply).title} ${cat.symbol}`}>
             {formatCompactTitled(s.totalSupply).display} shares outstanding
           </span>
         </Prov>
-        <Prov info={poolNavRateProv(cat.assetSymbol, cat.symbol, s.blockNumber)}>
+        <Prov info={withRead(poolNavRateProv(cat.assetSymbol, cat.symbol, s.blockNumber))}>
           <span title={mapleNavTip(s.blockNumber)}>
             NAV, the pool&rsquo;s value per share: {s.navRate.toFixed(4)} {cat.assetSymbol}
           </span>
         </Prov>
-        <Prov info={poolExitRateProv(cat.assetSymbol, cat.symbol, s.blockNumber)}>
+        <Prov info={withRead(poolExitRateProv(cat.assetSymbol, cat.symbol, s.blockNumber))}>
           <span title={mapleExitTip(s.blockNumber)}>
             exit {s.exitRate.toFixed(4)} {cat.assetSymbol}
           </span>
@@ -166,21 +169,21 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
           note="The funds asset actually in the pool contract — the only part redeemable this block"
           value={amount(s.cash, cat.assetSymbol)}
           share={liquidShare}
-          prov={poolCashProv(cat.assetSymbol, s.blockNumber)}
+          prov={withRead(poolCashProv(cat.assetSymbol, s.blockNumber))}
         />
         <SplitRow
           label="Fixed-term loans"
           note="The fixed-term LoanManager's assetsUnderManagement — loans that run to a maturity date, collateral custodied off-chain"
           value={amount(s.fixedTermAum, cat.assetSymbol)}
           share={share(s.fixedTermAum)}
-          prov={poolLoanManagerAumProv(cat.assetSymbol, "fixed-term", s.blockNumber)}
+          prov={withRead(poolLoanManagerAumProv(cat.assetSymbol, "fixed-term", s.blockNumber))}
         />
         <SplitRow
           label="Open-term loans"
           note="The open-term LoanManager's assetsUnderManagement — no maturity, callable by the delegate, collateral custodied off-chain"
           value={amount(s.openTermAum, cat.assetSymbol)}
           share={share(s.openTermAum)}
-          prov={poolLoanManagerAumProv(cat.assetSymbol, "open-term", s.blockNumber)}
+          prov={withRead(poolLoanManagerAumProv(cat.assetSymbol, "open-term", s.blockNumber))}
         />
         {/* Dust (under 0.05% of the pool) rounds to 0.0% and says nothing;
             the residual check below still counts it. */}
@@ -190,7 +193,7 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
             note="Non-LoanManager strategies' assetsUnderManagement — on-chain yield strategies"
             value={amount(s.strategiesAum, cat.assetSymbol)}
             share={share(s.strategiesAum)}
-            prov={poolStrategiesAumProv(cat.assetSymbol, s.blockNumber)}
+            prov={withRead(poolStrategiesAumProv(cat.assetSymbol, s.blockNumber))}
           />
         )}
       </div>
@@ -208,7 +211,7 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] tabular-nums text-rb-500">
         <span>
           queue{" "}
-          <Prov info={poolQueueSharesProv(cat.symbol, s.blockNumber)}>
+          <Prov info={withRead(poolQueueSharesProv(cat.symbol, s.blockNumber))}>
             <span
               className="text-foreground/80"
               title={`${formatCompactTitled(s.queueShares).title} ${cat.symbol} waiting`}
@@ -226,7 +229,7 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
           {s.queueShares === 0 && <> · empty</>}
         </span>
         {s.unrealizedLosses > 0 ? (
-          <Prov info={poolUnrealizedLossesProv(cat.assetSymbol, s.blockNumber)}>
+          <Prov info={withRead(poolUnrealizedLossesProv(cat.assetSymbol, s.blockNumber))}>
             <span>
               impairment live:{" "}
               <span className="text-foreground/80">

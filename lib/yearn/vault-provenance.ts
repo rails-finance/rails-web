@@ -32,12 +32,15 @@
 //     four names on this roster are each carried by three different vaults. The
 //     name receipt says the address beside it is what tells them apart.
 
+import { withServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import type { Provenance } from "@/components/shared/provenance";
 import { YEARN_REGISTRY } from "@/lib/yearn/vault-catalog";
 
 const LANE = "live Ethereum chain reads (/ethereum/yearn/vaults)";
 
 export interface YearnVaultCoords {
+  /** rails-server's read of `blockNumber`, when it answered every read of the page. */
+  readBy?: ServerRead | null;
   /** The block every figure was read at — every receipt's `source` block. */
   blockNumber?: number;
   /** The vault contract — the `contract` on every vault-side receipt. */
@@ -70,7 +73,7 @@ const asset = (c: YearnVaultCoords) => c.assetSymbol ?? "the vault's asset";
 
 /** The denominator, before any row: how many vaults the factories made, and
  *  what that count does and does not include. */
-export const yearnRosterCensusProv = (
+const yearnRosterCensusProv_ = (
   c: YearnVaultCoords,
   census: { catalogSize: number; censusBlock: number },
 ): Provenance => ({
@@ -88,7 +91,7 @@ export const yearnRosterCensusProv = (
 
 /** `name()` — read live because it MOVES: 3.0.4 and 3.1.0 vaults let the role
  *  manager rename through `setName`. */
-export const yearnVaultNameProv = (c: YearnVaultCoords): Provenance => ({
+const yearnVaultNameProv_ = (c: YearnVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -99,7 +102,7 @@ export const yearnVaultNameProv = (c: YearnVaultCoords): Provenance => ({
 });
 
 /** `totalAssets()` on a roster row — what the vault holds, in its asset. */
-export const yearnVaultTotalAssetsProv = (c: YearnVaultCoords): Provenance => ({
+const yearnVaultTotalAssetsProv_ = (c: YearnVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -110,7 +113,7 @@ export const yearnVaultTotalAssetsProv = (c: YearnVaultCoords): Provenance => ({
 });
 
 /** `convertToAssets(10 ** decimals)` — one whole share, priced by the vault. */
-export const yearnVaultSharePriceProv = (c: YearnVaultCoords): Provenance => ({
+const yearnVaultSharePriceProv_ = (c: YearnVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -122,7 +125,7 @@ export const yearnVaultSharePriceProv = (c: YearnVaultCoords): Provenance => ({
 
 /** `Registry.isEndorsed(vault)` — the only thing that earns the mark and the
  *  badge (rails-ops decision 0027 call 1). */
-export const yearnVaultEndorsedProv = (c: YearnVaultCoords, endorsed: boolean): Provenance => ({
+const yearnVaultEndorsedProv_ = (c: YearnVaultCoords, endorsed: boolean): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -138,7 +141,7 @@ export const yearnVaultEndorsedProv = (c: YearnVaultCoords, endorsed: boolean): 
 });
 
 /** `isShutdown()` — the vault takes no more deposits. */
-export const yearnVaultShutdownProv = (c: YearnVaultCoords): Provenance => ({
+const yearnVaultShutdownProv_ = (c: YearnVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -149,7 +152,7 @@ export const yearnVaultShutdownProv = (c: YearnVaultCoords): Provenance => ({
 });
 
 /** How many catalogued vaults in one asset hold something at the block. */
-export const yearnAssetGroupCountProv = (c: YearnVaultCoords, count: number): Provenance => ({
+const yearnAssetGroupCountProv_ = (c: YearnVaultCoords, count: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -160,7 +163,7 @@ export const yearnAssetGroupCountProv = (c: YearnVaultCoords, count: number): Pr
 
 /** How many catalogued vaults hold nothing at the block — a reading, one per
  *  vault, and never the vaults whose call went unanswered. */
-export const yearnEmptyCountProv = (c: YearnVaultCoords, count: number, catalogSize: number): Provenance => ({
+const yearnEmptyCountProv_ = (c: YearnVaultCoords, count: number, catalogSize: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -170,7 +173,7 @@ export const yearnEmptyCountProv = (c: YearnVaultCoords, count: number, catalogS
 });
 
 /** How many of the roster the Registry endorses at the block. */
-export const yearnEndorsedCountProv = (c: YearnVaultCoords, count: number, catalogSize: number): Provenance => ({
+const yearnEndorsedCountProv_ = (c: YearnVaultCoords, count: number, catalogSize: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -186,7 +189,7 @@ export const yearnEndorsedCountProv = (c: YearnVaultCoords, count: number, catal
 // holds the roles over it, and how a gain reaches the share price.
 
 /** `totalSupply()` — every share in existence, in share units. */
-export const yearnVaultTotalSupplyProv = (c: YearnVaultCoords): Provenance => ({
+const yearnVaultTotalSupplyProv_ = (c: YearnVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -197,7 +200,7 @@ export const yearnVaultTotalSupplyProv = (c: YearnVaultCoords): Provenance => ({
 });
 
 /** `totalIdle()` — the asset sitting in the vault. */
-export const yearnVaultIdleProv = (c: YearnVaultCoords): Provenance => ({
+const yearnVaultIdleProv_ = (c: YearnVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -208,7 +211,7 @@ export const yearnVaultIdleProv = (c: YearnVaultCoords): Provenance => ({
 });
 
 /** `totalDebt()` — what the strategies hold, as the vault records it. */
-export const yearnVaultDebtProv = (c: YearnVaultCoords): Provenance => ({
+const yearnVaultDebtProv_ = (c: YearnVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -219,7 +222,7 @@ export const yearnVaultDebtProv = (c: YearnVaultCoords): Provenance => ({
 });
 
 /** `get_default_queue()` — the withdrawal order, and its length. */
-export const yearnVaultQueueProv = (c: YearnVaultCoords, count: number): Provenance => ({
+const yearnVaultQueueProv_ = (c: YearnVaultCoords, count: number): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -231,7 +234,7 @@ export const yearnVaultQueueProv = (c: YearnVaultCoords, count: number): Provena
 });
 
 /** `strategies(addr).current_debt` — one strategy's share of the deployed sum. */
-export const yearnVaultStrategyDebtProv = (c: YearnVaultCoords, strategy: string): Provenance => ({
+const yearnVaultStrategyDebtProv_ = (c: YearnVaultCoords, strategy: string): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -245,7 +248,7 @@ export const yearnVaultStrategyDebtProv = (c: YearnVaultCoords, strategy: string
 });
 
 /** `strategies(addr).max_debt` — the ceiling the role manager set. */
-export const yearnVaultStrategyCapProv = (c: YearnVaultCoords, strategy: string): Provenance => ({
+const yearnVaultStrategyCapProv_ = (c: YearnVaultCoords, strategy: string): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -259,7 +262,7 @@ export const yearnVaultStrategyCapProv = (c: YearnVaultCoords, strategy: string)
 });
 
 /** `role_manager()` / `accountant()` — addresses, and only addresses. */
-export const yearnVaultRoleProv = (c: YearnVaultCoords, role: "role manager" | "accountant"): Provenance => ({
+const yearnVaultRoleProv_ = (c: YearnVaultCoords, role: "role manager" | "accountant"): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -273,7 +276,7 @@ export const yearnVaultRoleProv = (c: YearnVaultCoords, role: "role manager" | "
 });
 
 /** `profitMaxUnlockTime()` — how long a reported gain takes to reach holders. */
-export const yearnVaultUnlockProv = (c: YearnVaultCoords, seconds: number): Provenance => ({
+const yearnVaultUnlockProv_ = (c: YearnVaultCoords, seconds: number): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -285,3 +288,22 @@ export const yearnVaultUnlockProv = (c: YearnVaultCoords, seconds: number): Prov
   contract: vaultContract(c),
   via: `${LANE} · VaultV3.profitMaxUnlockTime() @ the pinned block`,
 });
+
+// Receipts over a page's reads stamp rails-server's head read when the coordinates carry it.
+export const yearnRosterCensusProv = withServerRead(yearnRosterCensusProv_);
+export const yearnVaultNameProv = withServerRead(yearnVaultNameProv_);
+export const yearnVaultTotalAssetsProv = withServerRead(yearnVaultTotalAssetsProv_);
+export const yearnVaultSharePriceProv = withServerRead(yearnVaultSharePriceProv_);
+export const yearnVaultEndorsedProv = withServerRead(yearnVaultEndorsedProv_);
+export const yearnVaultShutdownProv = withServerRead(yearnVaultShutdownProv_);
+export const yearnAssetGroupCountProv = withServerRead(yearnAssetGroupCountProv_);
+export const yearnEmptyCountProv = withServerRead(yearnEmptyCountProv_);
+export const yearnEndorsedCountProv = withServerRead(yearnEndorsedCountProv_);
+export const yearnVaultTotalSupplyProv = withServerRead(yearnVaultTotalSupplyProv_);
+export const yearnVaultIdleProv = withServerRead(yearnVaultIdleProv_);
+export const yearnVaultDebtProv = withServerRead(yearnVaultDebtProv_);
+export const yearnVaultQueueProv = withServerRead(yearnVaultQueueProv_);
+export const yearnVaultStrategyDebtProv = withServerRead(yearnVaultStrategyDebtProv_);
+export const yearnVaultStrategyCapProv = withServerRead(yearnVaultStrategyCapProv_);
+export const yearnVaultRoleProv = withServerRead(yearnVaultRoleProv_);
+export const yearnVaultUnlockProv = withServerRead(yearnVaultUnlockProv_);

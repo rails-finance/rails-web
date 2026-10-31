@@ -2,12 +2,15 @@
 // vocabulary for the three families, named per chain. The census figures keep
 // lib/aave-vaults/vault-provenance.ts, which already names the census per chain.
 
+import { withServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { VaultEarned } from "@/lib/vaults/earned";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
 export interface HoldingCoords {
+  /** rails-server's read of `blockNumber`, when it answered every read of the page. */
+  readBy?: ServerRead | null;
   chainId: number;
   /** The page's block: every live figure is a call at it. */
   blockNumber: number;
@@ -32,7 +35,7 @@ const recompute = (call: string, c: HoldingCoords, block = c.blockNumber): Prove
 });
 
 /** `balanceOf(holder)`. */
-export const holdingSharesProv = (c: HoldingCoords): Provenance => ({
+const holdingSharesProv_ = (c: HoldingCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -43,7 +46,7 @@ export const holdingSharesProv = (c: HoldingCoords): Provenance => ({
 });
 
 /** `balanceOf(holder) ÷ totalSupply()`, both at the page's block. */
-export const holdingFractionProv = (c: HoldingCoords): Provenance => ({
+const holdingFractionProv_ = (c: HoldingCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -54,7 +57,7 @@ export const holdingFractionProv = (c: HoldingCoords): Provenance => ({
 });
 
 /** `totalSupply()`, the fraction's denominator, on its subline. */
-export const holdingTotalSupplyProv = (c: HoldingCoords): Provenance => ({
+const holdingTotalSupplyProv_ = (c: HoldingCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -65,7 +68,7 @@ export const holdingTotalSupplyProv = (c: HoldingCoords): Provenance => ({
 });
 
 /** `convertToAssets(balanceOf(holder))`. */
-export const holdingClaimProv = (c: HoldingCoords): Provenance => ({
+const holdingClaimProv_ = (c: HoldingCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -76,7 +79,7 @@ export const holdingClaimProv = (c: HoldingCoords): Provenance => ({
 });
 
 /** `maxWithdraw(holder)`: Redeemable now on every family. */
-export const holdingMaxWithdrawProv = (c: HoldingCoords): Provenance => ({
+const holdingMaxWithdrawProv_ = (c: HoldingCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -87,7 +90,7 @@ export const holdingMaxWithdrawProv = (c: HoldingCoords): Provenance => ({
 });
 
 /** `maxRedeem(holder)`: the shares an Umbrella stake token lets leave. */
-export const holdingMaxRedeemProv = (c: HoldingCoords): Provenance => ({
+const holdingMaxRedeemProv_ = (c: HoldingCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -98,7 +101,7 @@ export const holdingMaxRedeemProv = (c: HoldingCoords): Provenance => ({
 });
 
 /** The page's block, as the Read at stat states it. */
-export const holdingReadAtProv = (c: HoldingCoords): Provenance => ({
+const holdingReadAtProv_ = (c: HoldingCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: c.blockNumber },
@@ -109,7 +112,7 @@ export const holdingReadAtProv = (c: HoldingCoords): Provenance => ({
 });
 
 /** The census block, as the Census at stat states it. */
-export const holdingCensusAtProv = (c: HoldingCoords, censusBlock: number): Provenance => ({
+const holdingCensusAtProv_ = (c: HoldingCoords, censusBlock: number): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: censusBlock },
@@ -124,7 +127,7 @@ export const holdingCensusAtProv = (c: HoldingCoords, censusBlock: number): Prov
 
 /** First seen from the replay: the block of this address's first Transfer in
  *  the vault, where no census exists (Yearn). */
-export const holdingFirstSeenProv = (c: HoldingCoords, block: number): Provenance => ({
+const holdingFirstSeenProv_ = (c: HoldingCoords, block: number): Provenance => ({
   kind: "chain-derived",
   pclass: "emitted",
   source: { block },
@@ -145,7 +148,7 @@ const KIND_WORD: Record<string, string> = {
 };
 
 /** The legs of Earned, each with its kind (decision 0048 point 1). */
-export function holdingEarnedProv(c: HoldingCoords, e: Extract<VaultEarned, { status: "ok" }>): Provenance {
+function holdingEarnedProv_(c: HoldingCoords, e: Extract<VaultEarned, { status: "ok" }>): Provenance {
   const units = (raw: string) => {
     const neg = raw.startsWith("-");
     const digits = (neg ? raw.slice(1) : raw).padStart(c.assetDecimals + 1, "0");
@@ -183,3 +186,15 @@ export function holdingEarnedProv(c: HoldingCoords, e: Extract<VaultEarned, { st
     ],
   };
 }
+
+// Receipts over a page's reads stamp rails-server's head read when the coordinates carry it.
+export const holdingSharesProv = withServerRead(holdingSharesProv_);
+export const holdingFractionProv = withServerRead(holdingFractionProv_);
+export const holdingTotalSupplyProv = withServerRead(holdingTotalSupplyProv_);
+export const holdingClaimProv = withServerRead(holdingClaimProv_);
+export const holdingMaxWithdrawProv = withServerRead(holdingMaxWithdrawProv_);
+export const holdingMaxRedeemProv = withServerRead(holdingMaxRedeemProv_);
+export const holdingReadAtProv = withServerRead(holdingReadAtProv_);
+export const holdingCensusAtProv = withServerRead(holdingCensusAtProv_);
+export const holdingFirstSeenProv = withServerRead(holdingFirstSeenProv_);
+export const holdingEarnedProv = withServerRead(holdingEarnedProv_);

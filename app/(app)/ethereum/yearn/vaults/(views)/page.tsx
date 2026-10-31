@@ -14,6 +14,7 @@
 // NO CENSUS. The rows' Holders slot reads "no census" and there is no listing
 // link; one address's holding opens from the vault page's finder (V4). The
 // rows are V1 vault rows (ui-jobs 407).
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
@@ -58,6 +59,7 @@ export default async function YearnVaultRosterPage() {
             vaults={yearnVaultSummaries(data)}
             yields={yields}
             blockNumber={data.blockNumber}
+            readBy={serverReadOf(data)}
             chainStale={data.chainStale}
             catalogSize={data.catalogSize}
             censusBlock={data.censusBlock}

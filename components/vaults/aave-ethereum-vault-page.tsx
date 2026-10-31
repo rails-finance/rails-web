@@ -31,6 +31,7 @@ import type { AaveVaultAttestation } from "@/lib/aave-vaults/vault-catalog";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import type { AaveEthereumVaultResponse } from "@/lib/sources/chain/aave-ethereum-vault";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import {
   aaveSghoAssetHeldProv,
   aaveSghoCapacityProv,
@@ -90,6 +91,7 @@ export function AaveEthereumVaultPage({
   const asset = { symbol: unit, address: vault.asset.address };
   const coords: AaveVaultCoords = {
     blockNumber: data.blockNumber,
+    readBy: serverReadOf(data),
     vault: vault.address,
     vaultName: vault.name ?? undefined,
     assetSymbol: unit,
@@ -311,7 +313,7 @@ export function AaveEthereumVaultPage({
       amountProv: aaveStataATokenBalanceProv(coords, s.aToken),
       amountFigure: "stata-atoken-balance",
       share,
-      shareProv: vaultVenueShareProv(v, "the aToken held", "totalAssets()"),
+      shareProv: vaultVenueShareProv(v, "the aToken held", "totalAssets()", coords.readBy),
       links: s.aToken ? (
         <a href={eth("address", s.aToken)} target="_blank" rel="noopener noreferrer" className="link-external text-xs">
           aToken
@@ -507,7 +509,7 @@ export function AaveEthereumVaultPage({
       amountProv: aaveUmbrellaCustodyProv(coords),
       amountFigure: "umbrella-asset-held",
       share,
-      shareProv: vaultVenueShareProv(v, `the ${unit} the token holds`, "totalAssets()"),
+      shareProv: vaultVenueShareProv(v, `the ${unit} the token holds`, "totalAssets()", coords.readBy),
       links: (
         <a
           href={eth("address", vault.asset.address)}

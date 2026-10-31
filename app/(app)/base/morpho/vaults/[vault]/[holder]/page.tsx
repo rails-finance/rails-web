@@ -88,6 +88,7 @@ import { ssrHop } from "@/lib/shared/listing-ssr";
 import { MORPHO_BASE_VAULT_TAIL_VERSION, type VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
 import type { VaultPositionRow } from "@/lib/aave-vaults/vault-position";
 import { BlockRef } from "@/components/shared/block-ref";
+import { serverReadOf } from "@/lib/shared/server-head-read";
 
 // Every figure is a call at the head with the holder in the path — nothing
 // about this is cacheable across requests.
@@ -287,6 +288,7 @@ async function HoldingCardSection({ data, holder }: { data: MorphoBaseVaultRespo
   const h = data.holder;
   const shareSymbol = vault.symbol || shortAddr(vault.address);
   const coords: MorphoVaultCoords = {
+    readBy: serverReadOf(data),
     blockNumber: data.blockNumber,
     vault: vault.address,
     vaultName: vault.name || undefined,
@@ -307,6 +309,7 @@ async function HoldingCardSection({ data, holder }: { data: MorphoBaseVaultRespo
   return (
     <VaultHoldingCard
       coords={{
+        readBy: serverReadOf(data),
         chainId: BASE_CHAIN_ID,
         blockNumber: data.blockNumber,
         vault: vault.address,
@@ -421,6 +424,7 @@ export default async function MorphoBaseVaultPositionPage({ params }: Props) {
       unit: !data.chainStale && data.sharePrice.value > 0 ? data.vault.asset.symbol : undefined,
       label: `One share in ${data.vault.asset.symbol}, the vault's own convertToAssets`,
       info: vaultSharePriceProv({
+        readBy: serverReadOf(data),
         blockNumber: data.blockNumber,
         vault: data.vault.address,
         vaultName: data.vault.name || undefined,

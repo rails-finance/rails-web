@@ -15,6 +15,7 @@
 //
 // No census: the Holders slot reads "no census" until Yearn has one.
 
+import type { ServerRead } from "@/lib/shared/server-head-read";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { yearnVaultHref, yearnVaultRosterHref } from "@/lib/vaults/routes";
@@ -57,6 +58,7 @@ export function YearnVaultDirectoryView({
   vaults,
   yields,
   blockNumber,
+  readBy,
   chainStale,
   catalogSize,
   censusBlock,
@@ -67,12 +69,14 @@ export function YearnVaultDirectoryView({
   vaults: VaultSummary[];
   yields: Record<string, VaultYield>;
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  readBy?: ServerRead | null;
   chainStale: boolean;
   catalogSize: number;
   censusBlock: number;
   endorsementUnread: readonly string[];
 }) {
-  const coords: YearnVaultCoords = { blockNumber: blockNumber || undefined };
+  const coords: YearnVaultCoords = { blockNumber: blockNumber || undefined, readBy };
   const rowCoords = (v: VaultSummary): YearnVaultCoords => ({
     ...coords,
     vault: v.address,

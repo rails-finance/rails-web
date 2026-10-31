@@ -222,6 +222,7 @@ function holdingSlots(p: VaultHoldingCardProps): PositionCardSlots {
   const familyWord = VAULT_FAMILIES[p.family === "yearn" ? "yearn-v3" : familyOfCensus(p.family)].singular;
   const open = BigInt(p.shares.raw) > ZERO;
   const aave: AaveVaultCoords = {
+    readBy: c.readBy,
     blockNumber: c.blockNumber,
     censusBlock: census?.census.block,
     chainId: c.chainId,

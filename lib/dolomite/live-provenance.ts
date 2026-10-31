@@ -21,6 +21,7 @@
 
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import { DOLOMITE_ADDRESSES } from "./asset-catalog";
+import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 
 const LANE_VIA = "GET /api/chain/dolomite/position";
 
@@ -33,58 +34,67 @@ const recompute = (method: string): ProvVerify => ({
 
 /** The account's effective margin ratio — the core's own choice of
  *  override-else-global (getMarginRatioForAccount). */
-export function dolomiteRequirementProv(): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    verify: recompute("getMarginRatioForAccount"),
-    summary:
-      "The minimum collateralisation this account must keep — 1 + the core's own `getMarginRatioForAccount`, which answers the account's risk override when one is set and the global `getMarginRatio` otherwise. The protocol stating its own line for exactly this account; adjusted supply ÷ adjusted borrow below it is liquidatable.",
-    contract: MARGIN,
-    via: `${LANE_VIA} · 1 + getMarginRatioForAccount @ head`,
-  };
+export function dolomiteRequirementProv(readBy?: ServerRead | null): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      verify: recompute("getMarginRatioForAccount"),
+      summary:
+        "The minimum collateralisation this account must keep — 1 + the core's own `getMarginRatioForAccount`, which answers the account's risk override when one is set and the global `getMarginRatio` otherwise. The protocol stating its own line for exactly this account; adjusted supply ÷ adjusted borrow below it is liquidatable.",
+      contract: MARGIN,
+      via: `${LANE_VIA} · 1 + getMarginRatioForAccount @ head`,
+    },
+    readBy,
+  );
 }
 
 /** collateralization = adjustedSupply ÷ adjustedBorrow — one division over
  *  the core's own two getters. */
-export function dolomiteCollateralizationProv(): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "state",
-    verify: {
-      kind: "recompute",
-      text: "Re-run the DolomiteMargin.getAdjustedAccountValues eth_call and divide supply by borrow — both legs are the core's own figures; only the division is arithmetic.",
+export function dolomiteCollateralizationProv(readBy?: ServerRead | null): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain-derived",
+      pclass: "state",
+      verify: {
+        kind: "recompute",
+        text: "Re-run the DolomiteMargin.getAdjustedAccountValues eth_call and divide supply by borrow — both legs are the core's own figures; only the division is arithmetic.",
+      },
+      summary:
+        "This account's collateralisation — the core's own adjusted supply value ÷ its own adjusted borrow value, read in one call at the same block. Both legs are the protocol's own risk math (premiums applied by the core, or skipped under the override); the division is client arithmetic over them, graded state because every input is a same-block slot read. The line it is judged against is the core's own getMarginRatioForAccount, rendered beside it.",
+      contract: MARGIN,
+      via: `${LANE_VIA} · adjusted supply ÷ adjusted borrow (both getAdjustedAccountValues legs)`,
+      formula: "adjusted supply ÷ adjusted borrow",
+      inputs: [
+        { label: "adjusted supply", kind: "chain", pclass: "state", note: "getAdjustedAccountValues @ head" },
+        { label: "adjusted borrow", kind: "chain", pclass: "state", note: "getAdjustedAccountValues @ head" },
+      ],
     },
-    summary:
-      "This account's collateralisation — the core's own adjusted supply value ÷ its own adjusted borrow value, read in one call at the same block. Both legs are the protocol's own risk math (premiums applied by the core, or skipped under the override); the division is client arithmetic over them, graded state because every input is a same-block slot read. The line it is judged against is the core's own getMarginRatioForAccount, rendered beside it.",
-    contract: MARGIN,
-    via: `${LANE_VIA} · adjusted supply ÷ adjusted borrow (both getAdjustedAccountValues legs)`,
-    formula: "adjusted supply ÷ adjusted borrow",
-    inputs: [
-      { label: "adjusted supply", kind: "chain", pclass: "state", note: "getAdjustedAccountValues @ head" },
-      { label: "adjusted borrow", kind: "chain", pclass: "state", note: "getAdjustedAccountValues @ head" },
-    ],
-  };
+    readBy,
+  );
 }
 
 /** The fall to the line: 1 − line ÷ collateralisation, over the two core
  *  reads above. */
-export function dolomiteDropProv(): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "state",
-    verify: {
-      kind: "recompute",
-      text: "Re-run DolomiteMargin.getAdjustedAccountValues and getMarginRatioForAccount, divide the line by supply ÷ borrow and take it from 1.",
+export function dolomiteDropProv(readBy?: ServerRead | null): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain-derived",
+      pclass: "state",
+      verify: {
+        kind: "recompute",
+        text: "Re-run DolomiteMargin.getAdjustedAccountValues and getMarginRatioForAccount, divide the line by supply ÷ borrow and take it from 1.",
+      },
+      summary:
+        "The fall to the liquidation line — how far the collateral's value can drop, with the debt unchanged, before this account reaches its line: 1 − line ÷ collateralisation, rounded to a whole percent. Both inputs are the core's own reads at the same block; the subtraction and division are client arithmetic.",
+      contract: MARGIN,
+      via: `${LANE_VIA} · 1 − (1 + getMarginRatioForAccount) ÷ (adjusted supply ÷ adjusted borrow)`,
+      formula: "1 − line ÷ collateralisation",
+      inputs: [
+        { label: "collateralisation", kind: "chain", pclass: "state", note: "getAdjustedAccountValues @ head" },
+        { label: "liquidation line", kind: "chain", pclass: "state", note: "getMarginRatioForAccount @ head" },
+      ],
     },
-    summary:
-      "The fall to the liquidation line — how far the collateral's value can drop, with the debt unchanged, before this account reaches its line: 1 − line ÷ collateralisation, rounded to a whole percent. Both inputs are the core's own reads at the same block; the subtraction and division are client arithmetic.",
-    contract: MARGIN,
-    via: `${LANE_VIA} · 1 − (1 + getMarginRatioForAccount) ÷ (adjusted supply ÷ adjusted borrow)`,
-    formula: "1 − line ÷ collateralisation",
-    inputs: [
-      { label: "collateralisation", kind: "chain", pclass: "state", note: "getAdjustedAccountValues @ head" },
-      { label: "liquidation line", kind: "chain", pclass: "state", note: "getMarginRatioForAccount @ head" },
-    ],
-  };
+    readBy,
+  );
 }

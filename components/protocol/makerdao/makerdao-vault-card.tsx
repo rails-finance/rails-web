@@ -51,6 +51,7 @@ import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { makerPositionModal } from "@/lib/makerdao/event-templates";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { makerdaoPanelColumns } from "./makerdao-risk-slot";
+import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 
 export interface MakerVaultView {
   cdpId: string | null;
@@ -82,6 +83,8 @@ export interface MakerVaultView {
   // summary ("api") — a primary-truth data field, NOT the retired user toggle.
   source: "api" | "chain";
   atBlock?: number;
+  /** rails-server's read of `atBlock` (source "chain" only). */
+  readBy?: ServerRead;
   // Live-overlay-only fields (present when source === "chain"; the replay
   // summary can't supply them, and the risk surfaces decline to render rather
   // than degrade to a wrong value).
@@ -356,13 +359,18 @@ export function makerVaultCardSlots({
         ? `The ${v.collateralSymbol} locked in the vault, valued at Maker's price: the oracle's, capped by governance.`
         : `The ${v.collateralSymbol} locked in the vault, valued at Maker's oracle price.`,
       value: (
-        <Prov info={vaultInkProv(v.collateralSymbol, v.atBlock, false, v.source)}>
+        <Prov info={stampServerRead(vaultInkProv(v.collateralSymbol, v.atBlock, false, v.source), v.readBy)}>
           <AssetAmount value={v.ink} symbol={v.collateralSymbol} />
         </Prov>
       ),
       usd:
         v.collateralUsd != null ? (
-          <Prov info={collateralUsdProv(v.collateralSymbol, formatNumber(v.ink), v.priceUsd ?? 0)}>
+          <Prov
+            info={stampServerRead(
+              collateralUsdProv(v.collateralSymbol, formatNumber(v.ink), v.priceUsd ?? 0),
+              v.readBy,
+            )}
+          >
             <span className="font-bold text-green-400">{formatUsdValue(v.collateralUsd)}</span>
           </Prov>
         ) : null,
@@ -381,11 +389,11 @@ export function makerVaultCardSlots({
       labelTip: `The ${debtSym} the vault owes: what it drew plus the stability fee added since.`,
       value:
         v.debtDai != null && v.rate ? (
-          <Prov info={daiDebtProv(artHuman, v.rate, debtSym)}>
+          <Prov info={stampServerRead(daiDebtProv(artHuman, v.rate, debtSym), v.readBy)}>
             <AssetAmount value={v.debtDai} symbol={debtSym} />
           </Prov>
         ) : (
-          <Prov info={vaultArtProv(v.atBlock, false, v.source)}>{artHuman} art</Prov>
+          <Prov info={stampServerRead(vaultArtProv(v.atBlock, false, v.source), v.readBy)}>{artHuman} art</Prov>
         ),
       usd:
         // A zero debt states its zero dollars, as Liquity V2's does.
@@ -403,9 +411,12 @@ export function makerVaultCardSlots({
       value:
         ratio != null ? (
           <Prov
-            info={collateralRatioProv(
-              v.collateralUsd != null ? formatUsdValue(v.collateralUsd) : "—",
-              v.debtDai != null ? `${formatNumber(v.debtDai)} ${debtSym}` : "—",
+            info={stampServerRead(
+              collateralRatioProv(
+                v.collateralUsd != null ? formatUsdValue(v.collateralUsd) : "—",
+                v.debtDai != null ? `${formatNumber(v.debtDai)} ${debtSym}` : "—",
+              ),
+              v.readBy,
             )}
           >
             <FadeNumber value={ratio} decimals={1} />%

@@ -77,6 +77,7 @@ import { ssrHop } from "@/lib/shared/listing-ssr";
 import { AAVE_VAULT_TAIL_VERSION, type VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
 import type { VaultPositionRow } from "@/lib/aave-vaults/vault-position";
 import { BlockRef } from "@/components/shared/block-ref";
+import { serverReadOf } from "@/lib/shared/server-head-read";
 
 // Every figure is a call at the head with the holder in the path — nothing
 // about this is cacheable across requests.
@@ -291,6 +292,7 @@ async function HoldingCardSection({ data, holder }: { data: AaveEthereumVaultRes
   const shareSymbol = vault.symbol ?? shortAddr(vault.address);
   const coords: AaveVaultCoords = {
     blockNumber: data.blockNumber,
+    readBy: serverReadOf(data),
     vault: vault.address,
     vaultName: vault.name ?? undefined,
     assetSymbol: vault.asset.symbol,
@@ -311,6 +313,7 @@ async function HoldingCardSection({ data, holder }: { data: AaveEthereumVaultRes
   return (
     <VaultHoldingCard
       coords={{
+        readBy: serverReadOf(data),
         chainId: MAINNET_CHAIN_ID,
         blockNumber: data.blockNumber,
         vault: vault.address,
@@ -460,6 +463,7 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
       label: `One share in ${data.vault.asset.symbol}, the vault's own convertToAssets`,
       info: aaveVaultSharePriceProv(
         {
+          readBy: serverReadOf(data),
           blockNumber: data.blockNumber,
           vault: data.vault.address,
           vaultName: data.vault.name ?? undefined,

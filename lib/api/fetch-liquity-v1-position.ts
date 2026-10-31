@@ -11,6 +11,8 @@
 // and this Trove's place in the redemption queue (debt in front, troves
 // ahead) from one MultiTroveGetter sweep of the sorted list.
 
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+
 export type LiquityV1TroveChainStatus =
   | "nonExistent"
   | "active"
@@ -21,6 +23,8 @@ export type LiquityV1TroveChainStatus =
 export interface LiquityV1PositionChainResponse {
   wallet: string;
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   troveStatus: LiquityV1TroveChainStatus;
   /** Entire ETH collateral / LUSD debt (display units) — TroveManager.
    *  getEntireDebtAndColl @ head, pending redistribution rewards INCLUDED

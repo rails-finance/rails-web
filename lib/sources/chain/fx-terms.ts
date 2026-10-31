@@ -12,6 +12,9 @@
 
 import { getAddress, parseAbi } from "viem";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { FX_ADDRESSES, FX_POOLS, type FxPoolKey } from "@/lib/fx/asset-catalog";
 
 const POOL_ABI = parseAbi([
@@ -32,6 +35,8 @@ const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
 export interface FxPoolTerms {
   pool: FxPoolKey;
   block: number;
+  /** rails-server's read of the block, when it answered every read. */
+  head?: PositionHeadStamp;
   maxBorrowRatio: number;
   rebalanceRatio: number;
   rebalanceBonus: number;
@@ -100,6 +105,7 @@ async function read(pool: FxPoolKey): Promise<FxPoolTerms> {
   return {
     pool,
     block: Number(block),
+    head: serverHeadStampAt(MAINNET_CHAIN_ID, block),
     maxBorrowRatio: wad(range[1]),
     rebalanceRatio: wad(reb[0]),
     rebalanceBonus: fee(reb[1]),

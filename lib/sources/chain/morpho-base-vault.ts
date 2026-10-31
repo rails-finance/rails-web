@@ -45,6 +45,8 @@
 import { parseAbi } from "viem";
 import { chainBatchClient } from "./rpc";
 import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import { MORPHO_BASE_BLUE, MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { type MorphoBaseVaultCatalogEntry, type MorphoBaseVaultFactory } from "@/lib/morpho-base/vault-catalog";
@@ -263,6 +265,8 @@ export interface MorphoBaseVaultHolder {
 export interface MorphoBaseVaultResponse {
   /** The block every figure below was read at. */
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** True when the read failed: nothing below may be rendered as a fact. */
   chainStale: boolean;
   /** The block lib/morpho-base/vault-catalog.ts was censused at. */
@@ -743,6 +747,7 @@ export async function loadMorphoBaseVault(
 
     return {
       blockNumber: Number(blockNumber),
+      head: serverHeadStampAt(MORPHO_BASE_CHAIN_ID, blockNumber),
       chainStale: false,
       censusBlock: roster.censusBlock,
       vault: {

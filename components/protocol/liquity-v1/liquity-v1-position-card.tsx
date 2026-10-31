@@ -27,6 +27,7 @@ import {
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { AssetPopover } from "@/components/shared/asset-popover";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { Prov } from "@/components/shared/provenance";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import {
@@ -78,6 +79,8 @@ export interface LiquityV1PositionView {
   /** Unix seconds of the most recent event (activity-meta). */
   lastActivityAt: number;
   atBlock?: number;
+  /** rails-server's read of `atBlock`, on the live face. */
+  readBy?: ServerRead;
 }
 
 /** The figure with its exact value behind it: the compact number the card
@@ -257,7 +260,7 @@ export function liquityV1CardSlots({
         label: CARD_VOCAB.collateral,
         value:
           v.collateral > 0 ? (
-            <Prov info={live ? entireCollateralProv(v.atBlock) : positionCollateralProv(v.atBlock)}>
+            <Prov info={live ? entireCollateralProv(v.atBlock, v.readBy) : positionCollateralProv(v.atBlock)}>
               <Figure value={v.collateral} symbol={COLLATERAL_SYMBOL} exact={fmtEth(v.collateral)} />
             </Prov>
           ) : null,
@@ -272,7 +275,7 @@ export function liquityV1CardSlots({
             : undefined,
         usd:
           collPrice != null && v.collateral > 0 ? (
-            <Prov info={collateralUsdProv(v.collateral, collPrice)}>
+            <Prov info={stampServerRead(collateralUsdProv(v.collateral, collPrice), v.readBy)}>
               <span className="font-bold text-green-400">{formatUsdValue(v.collateral * collPrice)}</span>
             </Prov>
           ) : null,
@@ -282,14 +285,14 @@ export function liquityV1CardSlots({
         label: CARD_VOCAB.debt,
         value:
           v.debt > 0 ? (
-            <Prov info={live ? entireDebtProv(v.atBlock) : positionDebtProv(v.atBlock)}>
+            <Prov info={live ? entireDebtProv(v.atBlock, v.readBy) : positionDebtProv(v.atBlock)}>
               <Figure value={v.debt} symbol={DEBT_SYMBOL} exact={fmtLusd(v.debt)} />
             </Prov>
           ) : null,
         assets: v.debt > 0 ? assetIcon(DEBT_SYMBOL, fmtLusd(v.debt)) : undefined,
         usd:
           v.debt > 0 ? (
-            <Prov info={debtUsdProv(v.debt)}>
+            <Prov info={stampServerRead(debtUsdProv(v.debt), v.readBy)}>
               <span className="font-bold text-green-400">{formatUsdValue(v.debt)}</span>
             </Prov>
           ) : null,

@@ -114,6 +114,8 @@
 import { parseAbi, type ContractFunctionParameters } from "viem";
 import { chainBatchClient } from "./rpc";
 import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta, assertDecimalsRead, erc20NameOf } from "./erc20-meta";
 import type { RawAmount } from "./morpho-base-vault";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -485,6 +487,8 @@ export interface AaveEthereumVaultResponse {
   served: boolean;
   /** The block the roster AND every figure below was read at. */
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** That block's own timestamp, unix seconds — a cooldown's state is a
    *  comparison against this and not against the reader's clock. */
   blockTimestamp: number;
@@ -994,6 +998,7 @@ export async function loadAaveEthereumVault(vault: string, holder?: string): Pro
     return {
       served: true,
       blockNumber: Number(blockNumber),
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       blockTimestamp: now,
       chainStale: false,
       vault: {

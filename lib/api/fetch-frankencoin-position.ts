@@ -24,12 +24,15 @@
 // owner-declared price, the expiry countdown and the cooldown, and the
 // explorer does not synthesize anything beyond them.
 
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 export interface FrankencoinChainResponse {
   /** Lowercased Position contract address — the grain. */
   position: string;
   /** Version by probe: riskPremiumPPM() succeeding marks a V2 position. */
   hub: "v1" | "v2";
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
 
   /** owner() at head — ownership is transferable; the timeline replays
    *  event-time owners, this is the current one. */

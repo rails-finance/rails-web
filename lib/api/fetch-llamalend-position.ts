@@ -33,6 +33,7 @@
 // of markets borrow WETH / tBTC / ynETH / CRV instead and present in their
 // own token (`borrowedIsCrvusd` travels on the response).
 
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import type { LlamalendVersion } from "@/lib/llamalend/asset-catalog";
 
 export interface LlamalendChainResponse {
@@ -41,6 +42,8 @@ export interface LlamalendChainResponse {
   user: string;
   amm: string;
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
 
   // Market identity (from the factories' own answers).
   version: LlamalendVersion;

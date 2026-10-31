@@ -50,6 +50,7 @@ import {
   type AaveVaultCoords,
 } from "@/lib/aave-vaults/vault-provenance";
 import { AssetAmount } from "@/components/shared/asset-amount";
+import { serverReadAt } from "@/lib/shared/server-head-read";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -102,6 +103,7 @@ function vaultCardSlots({ row }: VaultPositionCardProps): PositionCardSlots {
   // read at, the live read's or the census's.
   const coords: AaveVaultCoords = {
     blockNumber: row.live?.blockNumber,
+    readBy: serverReadAt(row.live?.head, row.live?.blockNumber),
     censusBlock: row.census.block,
     chainId,
     vault: row.vault,

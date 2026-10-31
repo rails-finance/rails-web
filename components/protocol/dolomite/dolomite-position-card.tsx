@@ -139,7 +139,7 @@ function totalUsd(v: DolomitePositionView, lines: DolomiteBalanceAmount[]): numb
 }
 
 const legProv = (r: DolomiteBalanceAmount, side: "supply" | "debt") =>
-  r.current != null ? positionCurrentProv(r.symbol, side) : positionParProv(r.symbol, side);
+  r.current != null ? positionCurrentProv(r.symbol, side, r.readBy) : positionParProv(r.symbol, side);
 
 /** The exact hover figure — the lane the line's provenance asserts. */
 const legExact = (r: DolomiteBalanceAmount): string =>

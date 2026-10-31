@@ -27,6 +27,8 @@
 
 import { erc20Abi, getAddress } from "viem";
 import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import { POSITION_COMMON_ABI, POSITION_V2_ABI } from "@/lib/frankencoin/position-abi";
 import { COOLDOWN_CLOCK_BOUND, normalizePositionAddress } from "@/lib/frankencoin/asset-catalog";
@@ -199,6 +201,7 @@ export async function loadFrankencoinPositionFromChain(positionRaw: string): Pro
       position: key,
       hub: isV2 ? "v2" : "v1",
       blockNumber,
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       owner: owner ? owner.toLowerCase() : null,
       original: original ? original.toLowerCase() : null,
       isClone: original != null && original.toLowerCase() !== key,

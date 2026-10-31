@@ -33,6 +33,7 @@ import {
 } from "@/lib/frankencoin/live-provenance";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import type { FrankencoinEnding } from "./frankencoin-position-card";
+import { serverReadOf } from "@/lib/shared/server-head-read";
 
 const GROUPS = ["holdings", "risk", "rate", "history"] as const;
 type Group = (typeof GROUPS)[number];
@@ -95,7 +96,7 @@ export function FrankencoinPositionExplanation({
   const collNode = () => (
     <Prov
       echo
-      info={liveCollateralProv(sym, chain.position)}
+      info={liveCollateralProv(sym, chain.position, serverReadOf(chain))}
       value={
         chain.collateralRaw != null ? formatUnitsExact(chain.collateralRaw, chain.collateralDecimals ?? 0) : undefined
       }
@@ -107,7 +108,7 @@ export function FrankencoinPositionExplanation({
   const debtNode = () => (
     <Prov
       echo
-      info={liveMintedProv(chain.position)}
+      info={liveMintedProv(chain.position, serverReadOf(chain))}
       value={chain.mintedRaw != null ? formatUnitsExact(chain.mintedRaw, 18) : undefined}
       symbol="ZCHF"
     >
@@ -148,7 +149,7 @@ export function FrankencoinPositionExplanation({
     const price = (
       <Prov
         echo
-        info={liveLiqPriceProv(sym, chain.collateralDecimals ?? 0, chain.position)}
+        info={liveLiqPriceProv(sym, chain.collateralDecimals ?? 0, chain.position, serverReadOf(chain))}
         value={String(chain.liqPrice)}
       >
         {strong(chain.liqPrice)}
@@ -207,7 +208,7 @@ export function FrankencoinPositionExplanation({
   // ── Rate: what a mint made now pays ──
   if (!chain.isClosed && !denied && !chain.mintingDisabledForGood && chain.annualInterestPPM != null) {
     const rate = (
-      <Prov echo info={liveInterestProv(chain.hub, chain.position)}>
+      <Prov echo info={liveInterestProv(chain.hub, chain.position, serverReadOf(chain))}>
         <H>{pct(ppmToPct(chain.annualInterestPPM))}</H>
       </Prov>
     );

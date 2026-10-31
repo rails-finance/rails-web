@@ -15,6 +15,7 @@
 // reading at the block the roster names; Holders is the census's, at the census
 // block; Yield is the daily store's (decision 0047).
 //
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
@@ -78,6 +79,7 @@ export default async function BaseVaultRosterPage() {
             vaults={morphoBaseVaultSummaries(data, census)}
             yields={yields}
             blockNumber={data.blockNumber}
+            readBy={serverReadOf(data)}
             chainStale={data.chainStale}
             catalogSize={data.catalogSize}
             censusBlock={data.censusBlock}

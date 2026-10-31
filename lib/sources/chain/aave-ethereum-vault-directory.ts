@@ -71,6 +71,8 @@
 import { unstable_cache } from "next/cache";
 import { parseAbi, type ContractFunctionParameters } from "viem";
 import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta } from "./erc20-meta";
 import type { RawAmount } from "./morpho-base-vault";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -170,6 +172,8 @@ export interface AaveEthereumVaultRow {
 export interface AaveEthereumVaultDirectoryResponse {
   /** The block the roster AND every figure below was read at. */
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   /** True when the read failed: nothing below may be rendered as a fact. */
   chainStale: boolean;
   /** How many vaults the two enumerators plus sGHO answered at that block. */
@@ -373,6 +377,7 @@ async function readDirectory(): Promise<AaveEthereumVaultDirectoryResponse> {
 
     return {
       blockNumber: Number(blockNumber),
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       chainStale: false,
       catalogSize: rows.length,
       stataCount: stata.length,

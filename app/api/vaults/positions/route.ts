@@ -62,6 +62,7 @@ import { AAVE_VAULT_FAMILY_ORDER } from "@/lib/aave-vaults/vault-catalog";
 import { loadMorphoBaseVaultRoster } from "@/lib/morpho-base/vault-roster";
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
 import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import { readBlockTimes } from "@/lib/sources/chain/vault-block-reads";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
@@ -322,6 +323,7 @@ async function applyOverlay(
     );
     const stamps = await readBlockTimes(chainId === BASE_CHAIN_ID ? BASE_CHAIN_ID : MAINNET_CHAIN_ID, blocks);
 
+    const serverHead = serverHeadStampAt(chainId, blockNumber);
     rows.forEach((r, i) => {
       const shareDecimals = r.shareDecimals ?? 18;
       const asset = assetOf.get(r.vault) ?? null;
@@ -339,6 +341,7 @@ async function applyOverlay(
       const supply = supplies.get(r.vault) ?? null;
       const live: VaultPositionLive = {
         blockNumber: Number(blockNumber),
+        head: serverHead,
         shares: amount(b, shareDecimals),
         claim: claim == null || asset == null ? null : amount(claim, asset.decimals),
         totalSupply: supply == null ? null : amount(supply, shareDecimals),

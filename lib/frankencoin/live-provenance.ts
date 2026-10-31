@@ -17,6 +17,7 @@
 // health factor is synthesized.
 
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
+import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 
 const LANE_VIA = "GET /api/chain/frankencoin/position";
 
@@ -28,68 +29,93 @@ const recompute = (method: string): ProvVerify => ({
 });
 
 /** ZCHF minted — the live minted() slot. */
-export function liveMintedProv(position?: string): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    verify: recompute("minted()"),
-    summary:
-      "ZCHF this position has minted NOW — the position's own minted() slot at the latest block. This is the debt owed to the system, in native ZCHF (Frankencoin runs no oracle; nothing here is a dollar). Repaying it (less the reserve contribution already held back) is what closes the position.",
-    contract: positionContract(position),
-    via: `${LANE_VIA} · Position.minted(): minted ZCHF`,
-  };
+export function liveMintedProv(position?: string, readBy?: ServerRead | null): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      verify: recompute("minted()"),
+      summary:
+        "ZCHF this position has minted NOW — the position's own minted() slot at the latest block. This is the debt owed to the system, in native ZCHF (Frankencoin runs no oracle; nothing here is a dollar). Repaying it (less the reserve contribution already held back) is what closes the position.",
+      contract: positionContract(position),
+      via: `${LANE_VIA} · Position.minted(): minted ZCHF`,
+    },
+    readBy,
+  );
 }
 
 /** Collateral balance — the token's balanceOf(position) at head. */
-export function liveCollateralProv(sym: string, position?: string): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    verify: recompute("collateral token balanceOf(position)"),
-    summary: `${sym} this position holds NOW — the collateral token's balanceOf(position) at the latest block. The position contract itself custodies the collateral; MintingUpdate's emitted collateral figure equals exactly this read at its block.`,
-    contract: positionContract(position),
-    via: `${LANE_VIA} · collateral().balanceOf(position): collateral balance`,
-  };
+export function liveCollateralProv(sym: string, position?: string, readBy?: ServerRead | null): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      verify: recompute("collateral token balanceOf(position)"),
+      summary: `${sym} this position holds NOW — the collateral token's balanceOf(position) at the latest block. The position contract itself custodies the collateral; MintingUpdate's emitted collateral figure equals exactly this read at its block.`,
+      contract: positionContract(position),
+      via: `${LANE_VIA} · collateral().balanceOf(position): collateral balance`,
+    },
+    readBy,
+  );
 }
 
 /** The owner-declared liquidation price — price() scaled per-token. */
-export function liveLiqPriceProv(sym: string, decimals: number, position?: string): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    verify: recompute("price()"),
-    summary: `The liquidation price, ZCHF per ${sym} — the position's own price() slot at the latest block, divided by its on-chain scale of 1e(36 − ${decimals} collateral decimals). ⚠️ OWNER-DECLARED, not an oracle: Frankencoin has no price feed, and this figure is enforced socially — anyone who thinks it too high can start a challenge auction against it. Raising it triggers a 3-day minting cooldown.`,
-    contract: positionContract(position),
-    via: `${LANE_VIA} · Position.price(): liquidation price, ÷ 1e${36 - decimals}`,
-  };
+export function liveLiqPriceProv(
+  sym: string,
+  decimals: number,
+  position?: string,
+  readBy?: ServerRead | null,
+): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      verify: recompute("price()"),
+      summary: `The liquidation price, ZCHF per ${sym} — the position's own price() slot at the latest block, divided by its on-chain scale of 1e(36 − ${decimals} collateral decimals). ⚠️ OWNER-DECLARED, not an oracle: Frankencoin has no price feed, and this figure is enforced socially — anyone who thinks it too high can start a challenge auction against it. Raising it triggers a 3-day minting cooldown.`,
+      contract: positionContract(position),
+      via: `${LANE_VIA} · Position.price(): liquidation price, ÷ 1e${36 - decimals}`,
+    },
+    readBy,
+  );
 }
 
 /** annualInterestPPM — the position's fixed annual interest rate. */
-export function liveInterestProv(hub: "v1" | "v2", position?: string): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    verify: recompute("annualInterestPPM()"),
-    summary: `The rate a mint would pay today — the position's annualInterestPPM() at the latest block (parts-per-million ÷ 10,000 = percent). Each earlier mint paid the rate in force at its own block, which an opened mint shows. Frankencoin charges interest UP FRONT at minting time, not as an ongoing accrual: each mint deducts the fee for the remaining term, so no interest lane ever grows on this page. ${
-      hub === "v2"
-        ? "On V2 the rate is the system Leadrate plus this position's fixed riskPremiumPPM — the premium is set at open; the Leadrate part moves by governance."
-        : "On V1 the rate was fixed at the position's opening."
-    }`,
-    contract: positionContract(position),
-    via: `${LANE_VIA} · Position.annualInterestPPM(): annual interest, parts per million`,
-  };
+export function liveInterestProv(hub: "v1" | "v2", position?: string, readBy?: ServerRead | null): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      verify: recompute("annualInterestPPM()"),
+      summary: `The rate a mint would pay today — the position's annualInterestPPM() at the latest block (parts-per-million ÷ 10,000 = percent). Each earlier mint paid the rate in force at its own block, which an opened mint shows. Frankencoin charges interest UP FRONT at minting time, not as an ongoing accrual: each mint deducts the fee for the remaining term, so no interest lane ever grows on this page. ${
+        hub === "v2"
+          ? "On V2 the rate is the system Leadrate plus this position's fixed riskPremiumPPM — the premium is set at open; the Leadrate part moves by governance."
+          : "On V1 the rate was fixed at the position's opening."
+      }`,
+      contract: positionContract(position),
+      via: `${LANE_VIA} · Position.annualInterestPPM(): annual interest, parts per million`,
+    },
+    readBy,
+  );
 }
 
 /** A fixed term of the position (expiry, reserve requirement, challenge
  *  period) or the challenge in the auction now: one getter on the position at
  *  the latest block. */
-export function liveTermProv(method: string, summary: string, position?: string): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    verify: recompute(method),
-    summary,
-    contract: positionContract(position),
-    via: `${LANE_VIA} · Position.${method}`,
-  };
+export function liveTermProv(
+  method: string,
+  summary: string,
+  position?: string,
+  readBy?: ServerRead | null,
+): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      verify: recompute(method),
+      summary,
+      contract: positionContract(position),
+      via: `${LANE_VIA} · Position.${method}`,
+    },
+    readBy,
+  );
 }
