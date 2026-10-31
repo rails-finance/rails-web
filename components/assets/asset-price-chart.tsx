@@ -27,7 +27,7 @@ import type { FlowPriceSeries } from "@/lib/shared/flows-price";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
 import { assetLwChartContent } from "@/lib/shared/learn-more-content";
-import { lineName, shortAddress, type PageChain, type PageLine } from "@/lib/shared/asset-roster";
+import { endAtLastPoke, lineName, shortAddress, type PageChain, type PageLine } from "@/lib/shared/asset-roster";
 import { usesWords, type ViaView } from "@/lib/shared/asset-via";
 
 const DAY_MS = 86_400_000;
@@ -92,8 +92,11 @@ export function AssetPriceChart({
         const l = byKey.get(s.key)!;
         const wire = rounds?.lane === "on" ? rounds.lines[l.oracle.address.toLowerCase()] : undefined;
         const r = wire && "points" in wire ? roundsOf(wire, rounds!.asOf) : null;
+        const joined = r ? joinRounds(s, r) : s;
+        // A retired Maker ilk ends at its last poke: the store goes on reading the frozen OSM.
+        const retired = l.series.length > 0 && l.series.every((x) => x.retired);
         return {
-          ...(r ? joinRounds(s, r) : s),
+          ...(retired && !r ? { ...joined, points: endAtLastPoke(joined.points) } : joined),
           source: l.oracle.name,
           side: "collateral" as const,
           unitLabel: "USD",

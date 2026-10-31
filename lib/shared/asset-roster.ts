@@ -146,6 +146,17 @@ export function delayedLine(l: PageLine): boolean {
   return l.oracle.kind === "osm" || /\bOSM\b/.test(l.oracle.name);
 }
 
+/** A retired Maker ilk's points ended at its last poke (Miles, 31 Oct 2026).
+ *  The store keeps reading the frozen OSM every day (LINK-A's 7.20 for a
+ *  thousand days), so the last poke is the day the final price took force:
+ *  the points after it are dropped. A series that never changed price (a
+ *  DSValue's fixed one) has no poke to end at and is kept whole. */
+export function endAtLastPoke<P extends readonly [number, number, ...unknown[]]>(points: readonly P[]): P[] {
+  let i = points.length - 1;
+  while (i > 0 && points[i - 1][1] === points[i][1]) i--;
+  return i === 0 ? [...points] : points.slice(0, i + 1);
+}
+
 const seriesSpan = (s: RosterSeries, today: number) => (s.firstDay == null ? 0 : (s.lastDay ?? today) - s.firstDay + 1);
 
 /** The chart's main line: the first line with a drawn series. */

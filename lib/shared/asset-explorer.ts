@@ -148,6 +148,9 @@ export function assetCards(
       into.chains.push(...c.chains);
       into.wrapped.push(...c.wrapped.filter((w) => !into.wrapped.some((x) => x.href === w.href)));
       into.underlying ??= c.underlying;
+      // The wrappers the other chain's row names ("also USDbC") join this card's row.
+      const more = (c.row?.also ?? []).filter((a) => !into.row?.also?.some((x) => x.symbol === a.symbol));
+      if (into.row && more.length) into.row = { ...into.row, also: [...(into.row.also ?? []), ...more] };
       continue;
     }
     bySymbol.set(c.symbol, [...same, c]);

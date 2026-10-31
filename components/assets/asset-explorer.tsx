@@ -57,7 +57,7 @@ export function AssetExplorer({ cards, initial }: { cards: AssetCard[]; initial:
   );
 
   // The list holds the priced cards; a card with no price is in the grid alone.
-  const count = state.view === "list" ? shown.filter((c) => c.row).length : shown.length;
+  const count = state.view === "list" ? shown.filter((c) => c.row && !c.row.rowless).length : shown.length;
 
   return (
     <div>
@@ -118,7 +118,7 @@ export function AssetExplorer({ cards, initial }: { cards: AssetCard[]; initial:
       </div>
       {state.view === "list" ? (
         <ul className="max-w-xl divide-y divide-rb-200 dark:divide-rb-800" data-asset-prices="">
-          {shown.map((c) => c.row && <AssetPriceRow key={c.id} row={c.row} />)}
+          {shown.map((c) => c.row && !c.row.rowless && <AssetPriceRow key={c.id} row={c.row} alsoNamed />)}
         </ul>
       ) : (
         <ul
