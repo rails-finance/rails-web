@@ -1,9 +1,12 @@
 // Aave V3 on Ethereum and Base, and SparkLend, for the wallet view (decision
 // 0050, step 3; SERVER-ONLY). The card is the family's listing row, built from
 // the summary row's `card` by the family's listing builder. The head read is
-// one Multicall per family at one block: the Pool's getUserAccountData for
-// each open account (the health factor and the oracle dollars the position
-// page reads) and getReserveData for each borrowed reserve (the debt's rate).
+// the Pool's getUserAccountData for each open account (the health factor and
+// the oracle dollars the position page reads) and the debt's rate from each
+// borrowed reserve's getReserveData. It is asked of rails-server first
+// (/api/at-block/aave-v3/position, one answer per market, every market on a
+// chain at the chain's block B), waiting apiMs; the accounts
+// it does not answer are read in one Multicall at one block, as before.
 
 import { parseAbi } from "viem";
 import { buildAaveV3PositionRows, type RawV3WalletRow } from "@/lib/sources/api/aave-v3-positions";
@@ -19,6 +22,11 @@ import { SPARK_ADDRESSES } from "@/lib/spark/asset-catalog";
 import { isSparkTreasury } from "@/lib/spark/liquidation-fee";
 import { hfLabelV3 } from "@/lib/aave-v3/position-state";
 import { chainClient } from "@/lib/sources/chain/rpc";
+import {
+  serverAaveV3HeadFigures,
+  serverMarketOf,
+  type AaveV3HeadFigures,
+} from "@/lib/sources/api/aave-v3-position-head";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { WalletPosition, WalletPositionStatus } from "@/lib/wallet/types";
 import {
@@ -129,6 +137,69 @@ async function readPools(
   return { block: Number(blockNumber), at: Number(head.timestamp), accounts: out, rates };
 }
 
+/** One account's figures as the route answers them. */
+function fromServer(f: AaveV3HeadFigures): { account: AccountRead; rates: Map<string, number> } {
+  return {
+    account: { hf: f.healthFactor, collateralUsd: f.totalCollateralUsd, debtUsd: f.totalDebtUsd },
+    rates: new Map(f.reserves.map((r) => [r.address.toLowerCase(), r.borrowApr])),
+  };
+}
+
+/** One Pool's account read: the figures, the borrowed reserves' rates, the block and its time. */
+interface PoolRead {
+  account?: AccountRead;
+  rateOf: (reserve: string) => number | undefined;
+  block: number;
+  at: number;
+}
+
+/**
+ * The head read for a wallet's accounts on one chain: rails-server's answer
+ * per market first, then one Multicall at one block for every account it did
+ * not answer. `reserves` names each account's borrowed reserves.
+ */
+async function readAccounts(
+  chainId: ChainId,
+  wallet: string,
+  accounts: { pool: string; reserves: string[] }[],
+  signal: AbortSignal,
+  apiMs: number,
+): Promise<{ byPool: Map<string, PoolRead>; reads: number }> {
+  const byPool = new Map<string, PoolRead>();
+  const served = await Promise.all(
+    accounts.map(async (a) => {
+      const market = serverMarketOf(a.pool, chainId);
+      if (!market) return null;
+      return serverAaveV3HeadFigures(market, wallet, { timeoutMs: apiMs, signal }).catch(() => null);
+    }),
+  );
+  const rest: typeof accounts = [];
+  accounts.forEach((a, i) => {
+    const f = served[i];
+    if (!f) return void rest.push(a);
+    const { account, rates } = fromServer(f);
+    byPool.set(a.pool, { account, rateOf: (x) => rates.get(x), block: f.blockNumber, at: f.head.blockTime });
+  });
+  let reads = served.filter(Boolean).length;
+  if (rest.length > 0) {
+    const r = await readPools(
+      chainId,
+      rest.map((a) => ({ pool: a.pool, wallet })),
+      rest.flatMap((a) => a.reserves.map((reserve) => ({ pool: a.pool, reserve }))),
+    );
+    reads += 1;
+    for (const a of rest) {
+      byPool.set(a.pool, {
+        account: r.accounts.get(`${a.pool}:${wallet}`),
+        rateOf: (x) => r.rates.get(`${a.pool}:${x}`),
+        block: r.block,
+        at: r.at,
+      });
+    }
+  }
+  return { byPool, reads };
+}
+
 /** The debt-weighted rate over the borrowed legs, each at the row's oracle price. */
 function weightedRate(
   legs: { address: string; amount: number }[],
@@ -227,36 +298,37 @@ function aaveLane(lane: "ethereum" | "base"): FamilyModule {
         return base;
       });
     },
-    async head(open): Promise<HeadResult> {
+    async head(open, address, signal, apiMs): Promise<HeadResult> {
       const read = open.filter((p) => !p.notRead);
       if (read.length === 0) return { positions: open, reads: 0 };
       const rowOf = (p: WalletPosition) => (p.card as { row: AaveV3PositionRow }).row;
-      const accounts = read.map((p) => ({ pool: poolOf(rowOf(p)), wallet: rowOf(p).wallet.toLowerCase() }));
-      const reserves = [
-        ...new Map(
-          read.flatMap((p) =>
-            rowOf(p)
-              .reserves.filter((x) => scaled(x.debtBalanceRaw, x.decimals) > 0)
-              .map(
-                (x) =>
-                  [
-                    `${poolOf(rowOf(p))}:${x.address.toLowerCase()}`,
-                    { pool: poolOf(rowOf(p)), reserve: x.address.toLowerCase() },
-                  ] as const,
-              ),
-          ),
-        ).values(),
-      ];
-      const r = await readPools(chain, accounts, reserves);
+      const wallet = address.toLowerCase();
+      // One account per market: the wallet page reads one address.
+      const borrowed = new Map<string, Set<string>>();
+      for (const p of read) {
+        const pool = poolOf(rowOf(p));
+        const set = borrowed.get(pool) ?? new Set<string>();
+        for (const x of rowOf(p).reserves)
+          if (scaled(x.debtBalanceRaw, x.decimals) > 0) set.add(x.address.toLowerCase());
+        borrowed.set(pool, set);
+      }
+      const r = await readAccounts(
+        chain,
+        wallet,
+        [...borrowed].map(([pool, set]) => ({ pool, reserves: [...set] })),
+        signal,
+        apiMs,
+      );
       return {
-        reads: 1,
+        reads: r.reads,
         positions: open.map((p) => {
           if (p.notRead) return p;
           const row = rowOf(p);
-          const pool = poolOf(row);
+          const got = r.byPool.get(poolOf(row));
+          if (!got) return { ...p, headRead: "failed" };
           const legs = row.reserves.map((x) => ({ address: x.address, amount: scaled(x.debtBalanceRaw, x.decimals) }));
-          const rate = weightedRate(legs, row.priceByAddress, (a) => r.rates.get(`${pool}:${a}`));
-          return applyAccount(p, r.accounts.get(`${pool}:${row.wallet.toLowerCase()}`), r.block, r.at, rate);
+          const rate = weightedRate(legs, row.priceByAddress, got.rateOf);
+          return applyAccount(p, got.account, got.block, got.at, rate);
         }),
       };
     },
@@ -312,24 +384,26 @@ export const spark: FamilyModule = {
       return base;
     });
   },
-  async head(open): Promise<HeadResult> {
+  async head(open, address, signal, apiMs): Promise<HeadResult> {
     if (open.length === 0) return { positions: open, reads: 0 };
     const rowOf = (p: WalletPosition) =>
       (p.card as { kind: "spark"; row: import("@/lib/sources/api/spark-positions").SparkPositionSummary }).row;
-    const reserves = [...new Set(open.flatMap((p) => rowOf(p).borrows.map((b) => b.address.toLowerCase())))].map(
-      (reserve) => ({ pool: SPARK_POOL, reserve }),
-    );
-    const r = await readPools(
+    const reserves = [...new Set(open.flatMap((p) => rowOf(p).borrows.map((b) => b.address.toLowerCase())))];
+    const r = await readAccounts(
       MAINNET_CHAIN_ID,
-      open.map((p) => ({ pool: SPARK_POOL, wallet: rowOf(p).wallet.toLowerCase() })),
-      reserves,
+      address.toLowerCase(),
+      [{ pool: SPARK_POOL, reserves }],
+      signal,
+      apiMs,
     );
+    const got = r.byPool.get(SPARK_POOL);
     return {
-      reads: 1,
+      reads: r.reads,
       positions: open.map((p) => {
+        if (!got) return { ...p, headRead: "failed" };
         const row = rowOf(p);
-        const rate = weightedRate(row.borrows, row.priceByAddress, (a) => r.rates.get(`${SPARK_POOL}:${a}`));
-        return applyAccount(p, r.accounts.get(`${SPARK_POOL}:${row.wallet.toLowerCase()}`), r.block, r.at, rate);
+        const rate = weightedRate(row.borrows, row.priceByAddress, got.rateOf);
+        return applyAccount(p, got.account, got.block, got.at, rate);
       }),
     };
   },

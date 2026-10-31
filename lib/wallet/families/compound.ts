@@ -4,6 +4,9 @@
 // existing wallet reader (loadCompoundWalletFromChain), which reads every
 // Comet of the deployment for the wallet at one block: the health factor,
 // the contract's isLiquidatable, the borrow rate and the borrowed balance.
+// The reader runs over rails-server's answer first (/api/at-block/compound/
+// position, at the chain's block B shared with the other families), waiting
+// up to 3.5 s for it (walletApiWait), then reads the chain.
 
 import {
   buildCompoundPositionRows,
@@ -13,6 +16,8 @@ import {
 import { COMPOUND_DEPLOYMENT, type CometDeployment } from "@/lib/compound/asset-catalog";
 import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
 import { loadCompoundWalletFromChain } from "@/lib/sources/chain/compound-position";
+import { withServerHead } from "@/lib/sources/api/lender-position-head";
+import { chainClient } from "@/lib/sources/chain/rpc";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { WalletPosition } from "@/lib/wallet/types";
 import { amountText, bufferFromHealth, historyBase, plural, scaled, storeStamp } from "@/lib/wallet/summary-row";
@@ -88,11 +93,19 @@ function lane(name: "ethereum" | "base"): FamilyModule {
         return base;
       });
     },
-    async head(open, address): Promise<HeadResult> {
+    async head(open, address, signal, apiMs): Promise<HeadResult> {
       if (open.length === 0) return { positions: open, reads: 0 };
-      const wallet = await loadCompoundWalletFromChain(address, deployment);
+      const served = await withServerHead(
+        { kind: "compound", family: "compound-v3", deployment: name, wallet: address },
+        (client) => loadCompoundWalletFromChain(address, deployment, { reader: client }),
+        { timeoutMs: apiMs, signal },
+      ).catch(() => null);
+      const wallet = served
+        ? { ...served.answer, head: served.head }
+        : await loadCompoundWalletFromChain(address, deployment, { reader: chainClient(chain) });
       if (wallet.chainStale) return { reads: 1, positions: open.map((p) => ({ ...p, headRead: "failed" })) };
-      const at = Math.floor(Date.now() / 1000);
+      // rails-server's answer states its block's time; the chain reader states none, so its stamp is the read's.
+      const at = served ? served.head.blockTime : Math.floor(Date.now() / 1000);
       return {
         reads: 1,
         positions: open.map((p): WalletPosition => {
@@ -115,7 +128,6 @@ function lane(name: "ethereum" | "base"): FamilyModule {
             debtRate: live && borrowed > 0 ? live.borrowApr : undefined,
             headRead: "read",
             readAtBlock: wallet.blockNumber,
-            // The reader states its block and no time: the stamp is the read's.
             readAt: at,
           };
         }),

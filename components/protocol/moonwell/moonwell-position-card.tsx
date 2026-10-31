@@ -20,6 +20,7 @@
 // detail page's live Comptroller read — the listing card still asserts no
 // health column (the listing snapshot carries none).
 
+import { serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { TitleTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
 import {
@@ -127,14 +128,15 @@ function totalUsd(v: MoonwellPositionView, lines: { address: string; amount: num
 /** The receipts behind each supply / debt line, and the market's receipt-token
  *  label — all resolved through the surrounding page's deployment, so a Base
  *  row never cites Ethereum's catalog or index (Ethereum's is the default). */
-function useLineReceipts() {
+function useLineReceipts(readBy?: ServerRead) {
   const dep = useMoonwellDeployment();
   return {
     supplyProv: (r: MoonwellSupplyAmount) => dep.card.supply(r, dep.market(r.market, r.symbol)),
     /** Debt-line provenance: the live borrowBalanceStored lane when the detail
      *  page's chain read upgraded this row, the emitted-accountBorrows lane
      *  otherwise. */
-    borrowProv: (r: MoonwellBorrowAmount) => dep.card.debt(r, dep.market(r.market, r.symbol)),
+    borrowProv: (r: MoonwellBorrowAmount) =>
+      stampServerRead(dep.card.debt(r, dep.market(r.market, r.symbol)), r.live ? readBy : undefined),
     mSymbolOf: (r: MoonwellSupplyAmount) => dep.market(r.market, r.symbol).mSymbol,
   };
 }
@@ -225,7 +227,12 @@ function LineValue({
 
 /** "84% · 88%", each with its market's icon: the entered markets the card
  *  lists, each at the factor the Comptroller applies to it now. */
-function factorsRow(v: MoonwellPositionView, addresses: string[], lane: MoonwellLane): PositionPanelRow | null {
+function factorsRow(
+  v: MoonwellPositionView,
+  addresses: string[],
+  lane: MoonwellLane,
+  readBy?: ServerRead,
+): PositionPanelRow | null {
   const rows = (v.entered ?? []).filter((e) => addresses.some((a) => a.toLowerCase() === e.underlying));
   if (rows.length === 0) return null;
   return {
@@ -237,7 +244,7 @@ function factorsRow(v: MoonwellPositionView, addresses: string[], lane: Moonwell
         {rows.map((e) => (
           <TokenFigure key={e.underlying} symbol={e.symbol} address={e.underlying}>
             <Prov
-              info={moonwellCollateralFactorProv(e.symbol, lane)}
+              info={moonwellCollateralFactorProv(e.symbol, lane, readBy)}
             >{`${+(e.collateralFactor * 100).toFixed(1)}%`}</Prov>
           </TokenFigure>
         ))}
@@ -294,7 +301,7 @@ export function useMoonwellCardSlots({
 }: MoonwellPositionCardProps): PositionCardSlots {
   const dep = useMoonwellDeployment();
   const session = dep.session;
-  const { supplyProv, borrowProv, mSymbolOf } = useLineReceipts();
+  const { supplyProv, borrowProv, mSymbolOf } = useLineReceipts(serverReadOf(chain));
   const detail = surface === "detail";
 
   // The collateral column holds the entered markets; a supply the account
@@ -524,6 +531,7 @@ export function useMoonwellCardSlots({
     v,
     vc.supplies.map((r) => r.address),
     { comptroller: dep.comptroller, positionRoute: dep.positionRoute },
+    serverReadOf(chain),
   );
   // Each side's markets open under its headline (the chevron by the icons);
   // the panel keeps the additive values and the supplies that are not

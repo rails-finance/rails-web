@@ -7,6 +7,7 @@
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import { AAVE_V3_MARKETS } from "@/lib/aave-v3/asset-catalog";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import { serverReadVia } from "@/lib/shared/server-head-read";
 
 /** A state read's proof: the reader makes the same call against any node. No third-party
  *  deep link (explorers only read current head). */
@@ -50,12 +51,8 @@ const ACCOUNT_SCALE: Record<string, string> = {
 };
 
 /** The via line's tail for a read rails-server made at the head
- *  (`/api/at-block/aave-v3/position`): the block, when it read it, and the leg
- *  that answered. Empty where the web read the chain. */
-export function serverReadVia(readBy?: PositionHeadStamp): string {
-  if (!readBy) return "";
-  return ` · read by rails-server at ${readBy.readAt.slice(11, 19)} UTC through ${readBy.provider}`;
-}
+ *  (lib/shared/server-head-read.ts). */
+export { serverReadVia };
 
 /** A field of the wallet's aggregate account state, read from
  *  Pool.getUserAccountData at the latest block (the max LTV, the

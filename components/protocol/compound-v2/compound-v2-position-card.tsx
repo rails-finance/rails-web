@@ -29,6 +29,7 @@
 // $14.4263): their lines carry the flag, and any USD headline they contribute
 // to says so in its receipt.
 
+import { serverReadOf, type ServerRead } from "@/lib/shared/server-head-read";
 import { TitleTip } from "@/components/shared/reveal-tip";
 import { type ReactNode, useState } from "react";
 import { Check, Copy, Link2 } from "lucide-react";
@@ -164,9 +165,9 @@ const supplyProv = (r: CompoundV2SupplyAmount) =>
 /** Debt-line provenance: the live borrowBalanceStored lane when the detail
  *  page's chain read upgraded this row, the emitted-accountBorrows lane
  *  otherwise. */
-const borrowProv = (r: CompoundV2BorrowAmount) => {
+const borrowProv = (r: CompoundV2BorrowAmount, readBy?: ServerRead) => {
   const m = COMPOUND_V2_MARKET_BY_KEY[r.market];
-  return r.live ? compoundV2LiveDebtProv(r.symbol, r.cSymbol, m?.ctoken) : positionDebtProv(r.symbol);
+  return r.live ? compoundV2LiveDebtProv(r.symbol, r.cSymbol, m?.ctoken, readBy) : positionDebtProv(r.symbol);
 };
 
 /** "price fixed, no feed" — the inline flag on a line whose oracle price is a
@@ -391,7 +392,7 @@ export function useCompoundV2CardSlots({
   );
   const borrowUnit = (r: CompoundV2BorrowAmount) => (
     <div key={r.market}>
-      <Prov info={borrowProv(r)}>
+      <Prov info={borrowProv(r, serverReadOf(chain))}>
         <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
       </Prov>
     </div>
@@ -458,7 +459,7 @@ export function useCompoundV2CardSlots({
     heads[1] = {
       ...heads[1],
       value: (
-        <Prov info={borrowProv(r)}>
+        <Prov info={borrowProv(r, serverReadOf(chain))}>
           <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
         </Prov>
       ),
@@ -533,7 +534,7 @@ export function useCompoundV2CardSlots({
         usd,
         amount: (
           <>
-            <Prov info={borrowProv(r)}>
+            <Prov info={borrowProv(r, serverReadOf(chain))}>
               <ExactSpan exact={formatUnitsExact(r.amountRaw, r.decimals)} symbol={r.symbol}>
                 {formatCompact(r.amount)}
               </ExactSpan>

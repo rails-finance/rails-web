@@ -19,6 +19,7 @@
 // at the oracle in the loan token, and Debt, already in the loan token,
 // carries no line.
 
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { ListingTag } from "@/components/shared/listing-tag";
 import { useState, type ReactNode } from "react";
 import { Check, Hash, Link2 } from "lucide-react";
@@ -410,6 +411,7 @@ export function useMorphoCardSlots({
     learnMore = positionModal({ status: v.status, hasDebt });
     // The live read counts only when it is fresh.
     const chain = live && !live.chainStale ? live : null;
+    const readBy = serverReadOf(chain);
     const chainCoords: MorphoChainCoords | undefined = live
       ? {
           marketId: live.marketId,
@@ -429,7 +431,7 @@ export function useMorphoCardSlots({
               info={
                 listed
                   ? listed.R.collateralValue(collSym, v.loanSymbol, listed.L.block)
-                  : capacityProv("Collateral value", "collateral × oracle price", chainCoords)
+                  : capacityProv("Collateral value", "collateral × oracle price", chainCoords, readBy)
               }
               value={formatExact(collValue)}
             >
@@ -506,7 +508,7 @@ export function useMorphoCardSlots({
         labelTip: `Loan-to-value: the debt over the collateral's value at the market's oracle. The market liquidates at its LLTV, ${pct(live?.lltv ?? v.lltv)}.`,
         pending: live === null,
         value: ltvUsable ? (
-          <Prov info={capacityProv("Loan-to-value", "live debt ÷ collateral value", chainCoords)}>
+          <Prov info={capacityProv("Loan-to-value", "live debt ÷ collateral value", chainCoords, readBy)}>
             {pct(ltvUsable.ltv as number)}
           </Prov>
         ) : null,
@@ -577,7 +579,7 @@ export function useMorphoCardSlots({
           label: "Room to borrow",
           value: (
             <Prov
-              info={capacityProv("Available to borrow", "collateral value × lltv − live debt", chainCoords)}
+              info={capacityProv("Available to borrow", "collateral value × lltv − live debt", chainCoords, readBy)}
               value={formatExact(Math.max(0, chain.maxBorrow - chain.currentDebt))}
             >
               <AmountText value={Math.max(0, chain.maxBorrow - chain.currentDebt)} format="compact" />
@@ -601,12 +603,13 @@ export function useMorphoCardSlots({
                   "Debt share of the liquidation line",
                   "debt ÷ (collateral value × lltv)",
                   chainCoords,
+                  readBy,
                 )}
               >
                 <PanelFigure>{share.text}</PanelFigure>
               </Prov>{" "}
               (LLTV{" "}
-              <Prov info={lltvProv(chainCoords)}>
+              <Prov info={lltvProv(chainCoords, readBy)}>
                 <PanelFigure>{pct(ltvUsable.lltv)}</PanelFigure>
               </Prov>
               )
@@ -620,7 +623,14 @@ export function useMorphoCardSlots({
             id: "liquidation-drop",
             label: "Liquidates on a drop of",
             value: (
-              <Prov info={capacityProv("Collateral price drop to liquidation", "1 − 1 ÷ health factor", chainCoords)}>
+              <Prov
+                info={capacityProv(
+                  "Collateral price drop to liquidation",
+                  "1 − 1 ÷ health factor",
+                  chainCoords,
+                  readBy,
+                )}
+              >
                 {Math.round((1 - 1 / hf) * 100)}%
               </Prov>
             ),

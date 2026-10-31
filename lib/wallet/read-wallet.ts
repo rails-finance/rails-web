@@ -8,7 +8,7 @@
 // figures and says `headRead: "failed"`. Answers are kept 60 s per address.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
-import type { HeadResult, FamilyModule } from "@/lib/wallet/families/module";
+import { walletApiWait, type HeadResult, type FamilyModule } from "@/lib/wallet/families/module";
 import { aaveV3Base, aaveV3Ethereum, spark } from "@/lib/wallet/families/aave";
 import { compoundV3Base, compoundV3Ethereum } from "@/lib/wallet/families/compound";
 import { fluid, liquityV2, makerdao, morphoEthereum } from "@/lib/wallet/families/ethereum-single";
@@ -107,7 +107,10 @@ async function readFamily(
   const readable = open.filter((p) => !p.notRead);
   if (f.head && readable.length > 0) {
     try {
-      head = await withBudget(Math.max(500, deadline - Date.now()), (signal) => f.head!(open, address, signal));
+      const remaining = deadline - Date.now();
+      head = await withBudget(Math.max(500, remaining), (signal) =>
+        f.head!(open, address, signal, walletApiWait(remaining)),
+      );
     } catch (err) {
       error = publicErrorMessage(err);
       head = { positions: open.map((p) => (p.notRead ? p : { ...p, headRead: "failed" as const })), reads: 0 };
