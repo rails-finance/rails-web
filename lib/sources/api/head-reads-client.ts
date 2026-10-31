@@ -210,14 +210,6 @@ export function overrideHeadReadsClient(fn: ((chainId: ChainId) => PublicClient)
   override = fn;
 }
 
-/** Forgets every named block, head answer and failure: the client tests' seam. */
-export function resetHeadReadsClient(): void {
-  named.clear();
-  heads.clear();
-  downUntil.clear();
-  queues.clear();
-}
-
 /** The block rails-server last named for the chain, for the equality check. */
 export async function lastServerHead(chainId: ChainId = MAINNET_CHAIN_ID): Promise<number | null> {
   return (await heads.get(chainId)?.p)?.blockNumber ?? null;

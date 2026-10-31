@@ -139,12 +139,6 @@ function settle(c: Contract, a: { success: boolean; returnData: Hex }): Settled 
   }
 }
 
-/** Forgets every named block and failure: the client tests' seam. */
-export function resetVaultHeadClient(): void {
-  named.clear();
-  downUntil.clear();
-}
-
 /**
  * The chain client a vault reader reads through: rails-server's head and
  * reads where it answers, `chainBatchClient(chainId)` everywhere else.

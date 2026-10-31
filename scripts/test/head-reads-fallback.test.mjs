@@ -45,8 +45,14 @@ process.env.API_BEARER_TOKEN = "test-token";
 process.env.RAILS_API_URL = API;
 process.env.ALCHEMY_URL = RPC;
 
-const { headReadsClient, resetHeadReadsClient } = await import(ROOT + "lib/sources/api/head-reads-client.ts");
-const { vaultHeadClient, resetVaultHeadClient } = await import(ROOT + "lib/sources/api/vault-head-client.ts");
+const { headReadsClient } = await import(ROOT + "lib/sources/api/head-reads-client.ts");
+const { vaultHeadClient } = await import(ROOT + "lib/sources/api/vault-head-client.ts");
+
+// Each test starts two minutes after the last: past the 30 s down window, the
+// 5 s head reuse and the 90 s a named block is read at the api.
+const realNow = Date.now;
+let skew = 0;
+Date.now = () => realNow() + skew;
 const { serverHeadStampAt } = await import(ROOT + "lib/sources/api/server-head-stamps.ts");
 
 const ERC20 = [
@@ -126,8 +132,7 @@ const json = (body, status = 200) =>
 
 test.beforeEach(() => {
   process.env.RAILS_API_URL = API;
-  resetHeadReadsClient();
-  resetVaultHeadClient();
+  skew += 120_000;
 });
 test.afterEach(() => {
   test.mock.restoreAll();
@@ -206,7 +211,7 @@ test("head reads: a failed round (502) reads the chain at the same block, then t
     seen.rpc.filter(([m]) => m === "eth_call"),
     [["eth_call", "0x1f4"]],
   );
-  await new Promise((r) => setTimeout(r, 5_100)); // past the head's 5 s reuse
+  skew += 5_100; // past the head's 5 s reuse
   assert.equal(await c.getBlockNumber(), CHAIN_HEAD);
   assert.equal(seen.api.length, 2);
 });
