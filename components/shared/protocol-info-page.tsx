@@ -14,6 +14,7 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 import { RailHeader } from "@/components/shared/rail-header";
 import { protocolForSession } from "@/lib/shared/protocols";
 import { CHAINS, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export function ProtocolInfoPage({ session, children }: { session: SessionProtocol; children: ReactNode }) {
   // Coverage is per-chain routes; the door leads to the matrix that actually
@@ -37,7 +38,7 @@ export function ProtocolInfoPage({ session, children }: { session: SessionProtoc
           audit reader wants that register); the intro above carries any
           reader-facing consequence in plain words instead. */}
       <p className="mt-4 text-sm text-rb-500" data-anatomy="I3">
-        <Link href={`/coverage/${CHAINS[chainId].slug}`} className="text-blue-500 hover:underline">
+        <Link href={`/coverage/${CHAINS[chainId].slug}`} className={INLINE_LINK}>
           See what Rails covers on each {CHAINS[chainId].name} explorer
         </Link>
       </p>

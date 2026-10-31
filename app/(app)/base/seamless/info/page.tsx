@@ -8,6 +8,7 @@ import { infoMetadata } from "@/lib/shared/page-metadata";
 import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
 import { BASE_CHAIN_ID, explorerUrl } from "@/lib/shared/chains";
 import { SEAMLESS_FREEZE_BLOCK, SEAMLESS_FREEZE_DATE, SEAMLESS_FREEZE_TX } from "@/lib/seamless/asset-catalog";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("seamless");
 
@@ -34,7 +35,7 @@ const intro = (
       at block {SEAMLESS_FREEZE_BLOCK.toLocaleString("en-US")}, {SEAMLESS_FREEZE_DATE}. A frozen reserve still accrues
       interest, still liquidates, and still lets a holder repay and withdraw — so the open positions here are real and
       moving, and none of them can grow. Or{" "}
-      <Link href="/base/seamless/market" className="text-blue-500 hover:underline">
+      <Link href="/base/seamless/market" className={INLINE_LINK}>
         see the reserves and what the Pool still enforces
       </Link>
       .

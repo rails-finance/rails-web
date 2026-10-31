@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("morpho-arbitrum");
 
@@ -12,12 +13,12 @@ const intro = (
       Morpho Blue&rsquo;s Arbitrum deployment: one singleton holding 258 independent lending markets, each one loan
       token, one collateral token, one oracle and one loan-to-value number that is both the borrow limit and the
       liquidation line. The{" "}
-      <Link href="/arbitrum/morpho/positions" className="text-blue-500 hover:underline">
+      <Link href="/arbitrum/morpho/positions" className={INLINE_LINK}>
         positions listing
       </Link>{" "}
       holds the positions Rails has read, from each day&rsquo;s most active wallets and any wallet a reader opened;
       enter any wallet on the{" "}
-      <Link href="/arbitrum/morpho" className="text-blue-500 hover:underline">
+      <Link href="/arbitrum/morpho" className={INLINE_LINK}>
         protocol page
       </Link>{" "}
       and every market is asked what it holds for that wallet, all at one block. Every figure is in the market&rsquo;s

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("compound-v3-arbitrum");
 
@@ -12,12 +13,12 @@ const intro = (
       Compound V3&rsquo;s Arbitrum deployment runs four markets, each its own world: one base asset that is both the
       lending side and the borrowing side, backed by a short roster of collateral assets, nothing shared between markets
       and nothing shared with the Ethereum or Base markets of the same names. The{" "}
-      <Link href="/arbitrum/compound-v3/positions" className="text-blue-500 hover:underline">
+      <Link href="/arbitrum/compound-v3/positions" className={INLINE_LINK}>
         positions listing
       </Link>{" "}
       holds the positions Rails has read, from each day&rsquo;s most active wallets and any wallet a reader opened;
       enter any wallet on the{" "}
-      <Link href="/arbitrum/compound-v3" className="text-blue-500 hover:underline">
+      <Link href="/arbitrum/compound-v3" className={INLINE_LINK}>
         protocol page
       </Link>{" "}
       and every Comet is asked about it at one block, with dollar values from the feeds each Comet liquidates with. The

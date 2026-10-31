@@ -68,6 +68,7 @@ import type { MakerIlkRow, MakerSystemChainResponse, MakerCeilingState } from "@
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const DEBT_SYMBOL = "DAI";
 
@@ -586,7 +587,7 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
             holds. An Allocator is a credit line governance gives a Sky project to fund what it runs. A real-world-asset
             (RWA) type backs DAI with an off-chain loan, valued by governance. Those are Maker positions, but they are
             nobody&apos;s position: there is no owner, no health, nothing to explore. So{" "}
-            <Link href="/ethereum/makerdao" className="text-blue-500 hover:underline">
+            <Link href="/ethereum/makerdao" className={INLINE_LINK}>
               the vault roster
             </Link>{" "}
             covers the {vaultIlkCount} ilks above the line and states the rest here.

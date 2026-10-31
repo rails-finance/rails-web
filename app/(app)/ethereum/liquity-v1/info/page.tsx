@@ -7,6 +7,7 @@ import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { liquityV1InfoModal } from "@/lib/liquity-v1/event-templates";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("liquity-v1");
 
@@ -24,9 +25,9 @@ const intro = (
     <p>
       Each row of the listing is one Trove (a collateralised loan): its ETH collateral, its exact LUSD debt, and its
       status. Open Troves show by default — clearing the Status filter brings back six years of closed and liquidated
-      history. Or see the{" "}
-      <Link href="/ethereum/liquity-v1/system" className="text-blue-500 hover:underline">
-        system state and redemption queue
+      history. Or{" "}
+      <Link href="/ethereum/liquity-v1/system" className={INLINE_LINK}>
+        see the system state and redemption queue
       </Link>
       .
     </p>

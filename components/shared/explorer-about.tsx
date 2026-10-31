@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { CAPABILITIES, DEPTH, VIEW_NOTES, type DepthCell, type DepthKey } from "@/lib/shared/coverage";
 import { CHAINS } from "@/lib/shared/chains";
 import { explorerName, protocolForHref } from "@/lib/shared/protocols";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 /**
  * The server-rendered "About this explorer" block under an explorer root: what
@@ -73,11 +74,11 @@ export function ExplorerAbout({ href }: { href: string }): ReactNode {
         </>
       )}
       <p className="body-text mt-4">
-        <Link href={entry.infoHref} className="text-blue-500 hover:underline">
+        <Link href={entry.infoHref} className={INLINE_LINK}>
           About {explorerName(entry)}
         </Link>
         {" · "}
-        <Link href={`/coverage/${CHAINS[entry.chainId].slug}`} className="text-blue-500 hover:underline">
+        <Link href={`/coverage/${CHAINS[entry.chainId].slug}`} className={INLINE_LINK}>
           What&apos;s covered on {CHAINS[entry.chainId].name}
         </Link>
       </p>

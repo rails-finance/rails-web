@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("moonwell");
 
@@ -18,7 +19,7 @@ const intro = (
     <p>
       Each row of the listing is one wallet&apos;s account: what it supplied and borrowed across the four markets, and
       where it stands now. Dollar values use the same prices Moonwell itself liquidates with. Or{" "}
-      <Link href="/ethereum/moonwell/markets" className="text-blue-500 hover:underline">
+      <Link href="/ethereum/moonwell/markets" className={INLINE_LINK}>
         see all four markets and how far each sits below its cap
       </Link>
       .

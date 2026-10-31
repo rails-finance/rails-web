@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("aave-v4-base");
 
@@ -21,7 +22,7 @@ const intro = (
       from the spoke itself at the block after the account&apos;s latest event, and valued at the prices the
       spoke&apos;s oracle gives. Those prices are Chainlink feeds that publish from Sunday 20:00 ET to Friday 20:00 ET
       and hold their last value outside those hours, so the position page states when each one was published. Or{" "}
-      <Link href="/base/aave-v4/hubs" className="text-blue-500 hover:underline">
+      <Link href="/base/aave-v4/hubs" className={INLINE_LINK}>
         see the hub&apos;s reserves and the risk parameters the spoke enforces
       </Link>
       .

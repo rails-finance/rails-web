@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("morpho-base");
 
@@ -23,7 +24,7 @@ const intro = (
       market&apos;s own oracle made of that collateral at the same moment. No dollar value appears anywhere: Morpho
       itself never states one. Opening a row shows that position — its economics and its whole history — with the
       wallet&apos;s other positions one link away. Or{" "}
-      <Link href="/base/morpho/markets" className="text-blue-500 hover:underline">
+      <Link href="/base/morpho/markets" className={INLINE_LINK}>
         see the markets, loan token by loan token, and the one number that governs each
       </Link>
       .

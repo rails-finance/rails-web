@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("frankencoin");
 
@@ -19,12 +20,12 @@ const intro = (
     <p>
       Each row of the listing is one position: its ZCHF debt, its collateral in the position&apos;s own token, its
       declared liquidation price, and any challenge currently running against it. No dollar figure or health factor
-      appears because neither exists on chain. The protocol-level picture — the franc&apos;s supply, the equity and
-      reserve capital behind it, the base rate, and the whole challenge record — lives on the{" "}
-      <Link href="/ethereum/frankencoin/system" className="text-blue-500 hover:underline">
-        system view
+      appears because neither exists on chain. Or{" "}
+      <Link href="/ethereum/frankencoin/system" className={INLINE_LINK}>
+        see the system view
       </Link>
-      .
+      : the franc&apos;s supply, the equity and reserve capital behind it, the base rate, and the whole challenge
+      record.
     </p>
     <p>
       A position&apos;s own page opens on a card: what the position holds and owes now, its declared price, its interest

@@ -18,6 +18,7 @@
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
+import { morphoVaultCardContent } from "@/lib/vaults/card-words";
 import { VaultDirectoryView } from "@/components/vaults/vault-directory-view";
 import { loadMorphoBaseVaultDirectory } from "@/lib/sources/chain/morpho-base-vault-directory";
 import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
@@ -67,7 +68,7 @@ export default async function BaseVaultRosterPage() {
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader protocol={PROTOCOL} title="Vaults" />
+        <SubPageHeader protocol={PROTOCOL} title="Vaults" learnMore={morphoVaultCardContent()} />
 
         {/* `data-roster-panel` marks the rows for the readers that hold them to
             the chain. The view states a refused read in words, so this is never

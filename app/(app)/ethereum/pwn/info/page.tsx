@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("pwn");
 
@@ -22,7 +23,7 @@ const intro = (
     <p>
       Each row of the listing is one loan: its collateral, the principal advanced, what it owes, and its status. No
       dollar value appears because none exists in the protocol. Or{" "}
-      <Link href="/ethereum/pwn/book" className="text-blue-500 hover:underline">
+      <Link href="/ethereum/pwn/book" className={INLINE_LINK}>
         see the whole loan book and what secures it
       </Link>
       .

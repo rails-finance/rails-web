@@ -113,6 +113,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
 import { decodeEventId } from "@/lib/shared/page-metadata";
 import { StoreFirstRead, SweepInFlight } from "@/components/shared/sweep-in-flight";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 /** The history as the route answers it: flat, or — asked `?group=1`, the
  *  page default — as ROWS, where `events` holds only the ungrouped events of
@@ -932,7 +933,7 @@ export function CompoundWalletView({
                   </p>
                 )}
                 <p className="mt-3 text-sm">
-                  <Link href={d.walletHref(wallet)} className="text-blue-500 hover:underline">
+                  <Link href={d.walletHref(wallet)} className={INLINE_LINK}>
                     Every market this wallet has touched
                   </Link>
                 </p>

@@ -84,6 +84,7 @@ import { summariseFxDrift, type FxDriftResult } from "@/lib/sources/api/fx-drift
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
 import { FxMenuRows } from "./fx-menu-rows";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const DUST = 1e-9;
 
@@ -400,7 +401,7 @@ function ratioRows(
           ·{" "}
           <Link
             href={`/ethereum/fx/pools?pool=${v.pool}&tick=${px.tick}#tick-${v.pool}-${px.tick}`}
-            className="text-blue-500 hover:underline"
+            className={INLINE_LINK}
           >
             find it on the pools page
           </Link>

@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("maple");
 
@@ -30,7 +31,7 @@ const intro = (
       impaired. It does not prove that the custodied collateral behind those loans exists. That last step rests on
       Maple&apos;s custodians, off-chain. Amounts stay in the pool&apos;s asset; a stablecoin is never counted as a
       dollar. Or{" "}
-      <Link href="/ethereum/maple/pools" className="text-blue-500 hover:underline">
+      <Link href="/ethereum/maple/pools" className={INLINE_LINK}>
         see the pools and what lenders can reach
       </Link>
       .

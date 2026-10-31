@@ -54,8 +54,7 @@ import {
 } from "@/lib/moonwell/markets-provenance";
 import type { MoonwellMarketRow, MoonwellMarketsResponse } from "@/lib/sources/chain/moonwell-market-state";
 import { BlockRef } from "@/components/shared/block-ref";
-
-const LINK = "text-blue-500 hover:underline";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 // A one-base-unit cap is the fork's closed door (see MoonwellMarketRow's
 // supplyCapOneUnit): named, not quoted as an amount or a share.
@@ -157,7 +156,7 @@ function MarketCard({
         </div>
         <span className="shrink-0 text-[13px] tabular-nums text-foreground">
           {supplyLink ? (
-            <Link href={supplyLink} className={LINK} title="Positions supplying this market">
+            <Link href={supplyLink} className={INLINE_LINK} title="Positions supplying this market">
               <Prov info={mwValueUsdProv("supplied", coords)}>{usd(m.totalSupplyUsd)}</Prov>
             </Link>
           ) : (
@@ -186,7 +185,7 @@ function MarketCard({
         </span>
         <span>
           {borrowLink ? (
-            <Link href={borrowLink} className={LINK} title="Positions borrowing this market">
+            <Link href={borrowLink} className={INLINE_LINK} title="Positions borrowing this market">
               <Prov info={mwValueUsdProv("borrowed", coords)}>{usd(m.totalBorrowsUsd)}</Prov>
             </Link>
           ) : (

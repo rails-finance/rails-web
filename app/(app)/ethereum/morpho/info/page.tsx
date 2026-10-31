@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("morpho");
 
@@ -20,7 +21,7 @@ const intro = (
       and its status. No dollar value appears anywhere: Morpho itself never states one, and adding one would assume the
       loan token is worth $1 — an assumption the contracts never make. The listing filters by market, loan token or
       collateral token and searches by wallet or market name. Or{" "}
-      <Link href="/ethereum/morpho/markets" className="text-blue-500 hover:underline">
+      <Link href="/ethereum/morpho/markets" className={INLINE_LINK}>
         see the markets, loan token by loan token, and the one number that governs each
       </Link>
       .

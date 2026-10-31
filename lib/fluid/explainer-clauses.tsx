@@ -60,6 +60,7 @@ import {
 import { pairLabel, shortAddress } from "@/lib/fluid/asset-catalog";
 import { formatNumber } from "@/lib/utils/format";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 /** The dust epsilon. Mirrors the DUST constant in lib/fluid/economics.ts — a
  *  balance whose magnitude sits below this is rounding dust from the vault's
@@ -794,7 +795,7 @@ function liquidationSlots(
             href={explorerUrl(MAINNET_CHAIN_ID, "address", ctx.liquidator)}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-500 hover:underline"
+            className={INLINE_LINK}
             onClick={(e) => e.stopPropagation()}
           >
             {shortAddress(ctx.liquidator)}

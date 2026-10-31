@@ -17,6 +17,7 @@
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
+import { yearnVaultCardContent } from "@/lib/vaults/card-words";
 import { YearnVaultDirectoryView } from "@/components/vaults/yearn-vault-directory-view";
 import { loadYearnEthereumVaultDirectory, YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import { listingMetadata } from "@/lib/shared/page-metadata";
@@ -48,7 +49,7 @@ export default async function YearnVaultRosterPage() {
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader protocol={PROTOCOL} title="Vaults" />
+        <SubPageHeader protocol={PROTOCOL} title="Vaults" learnMore={yearnVaultCardContent()} />
 
         {/* `data-roster-panel` marks the rows for the readers that hold them to
             the chain, the same marker the two other vault rosters carry. */}

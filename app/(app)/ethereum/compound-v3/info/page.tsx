@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("compound");
 
@@ -19,7 +20,7 @@ const intro = (
       Each row of the listing is one wallet&apos;s account in one market: base supplied or borrowed, collateral posted,
       and its lifecycle. Dollar values use each market&apos;s own prices, the same ones it liquidates with; opening a
       row adds the market&apos;s own verdict on whether the account can be liquidated, read live from its contract. Or{" "}
-      <Link href="/ethereum/compound-v3/markets" className="text-blue-500 hover:underline">
+      <Link href="/ethereum/compound-v3/markets" className={INLINE_LINK}>
         see each market and how heavily it is lent out
       </Link>
       .

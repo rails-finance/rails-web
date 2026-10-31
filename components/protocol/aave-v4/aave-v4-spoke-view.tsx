@@ -1031,8 +1031,10 @@ function AaveV4SpokeTowerBlock({
     <ProvReceiptsScope registry={registry}>
       {/* Padding matches the position card's px-5 py-4 (the V2 trove
           compaction), so the stacked panels read as one family. The section
-          title rides the chart's toolbar row instead of a row of its own. */}
-      <div className="rounded-2xl bg-raised px-5 py-4">
+          title rides the chart's toolbar row instead of a row of its own.
+          data-skel-section feeds the skeleton memory layer, as on
+          ChainTruthTower. */}
+      <div data-skel-section="detail-economics" className="rounded-2xl bg-raised px-5 py-4">
         <div className="space-y-3">
           {flowTimeline != null && (
             <div hidden={!scrubbed || undefined}>

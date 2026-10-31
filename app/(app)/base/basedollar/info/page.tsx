@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("basedollar");
 
@@ -19,8 +20,8 @@ const intro = (
     <p>
       Each row of the listing is one Trove: its collateral, its BD debt, its collateral ratio and dollar value at the
       branch&apos;s price today, the rate its owner chose, and its status. Or{" "}
-      <Link href="/base/basedollar/branches" className="text-blue-500 hover:underline">
-        compare the branches and their redemption queues
+      <Link href="/base/basedollar/branches" className={INLINE_LINK}>
+        see the branches and their redemption queues
       </Link>
       .
     </p>

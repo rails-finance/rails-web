@@ -59,8 +59,8 @@ import { VitalsBand } from "@/components/shared/vitals-band";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
-const LINK = "text-blue-500 hover:underline";
 const CLOSED = "text-tone-caution";
 const TAG = "text-[10px] uppercase tracking-wide text-rb-500";
 
@@ -420,7 +420,7 @@ function sizes({ r, vocab, assetHref }: RowProps) {
         {formatCompact(r.supplied)} {r.symbol}
       </span>
     ) : supplyLink ? (
-      <Link href={supplyLink} className={LINK}>
+      <Link href={supplyLink} className={INLINE_LINK}>
         <Prov info={vocab.reserveValueProv("supplied", r.symbol)}>{sUsd.display}</Prov>
       </Link>
     ) : (
@@ -430,7 +430,7 @@ function sizes({ r, vocab, assetHref }: RowProps) {
     );
   const borrowed = hasBorrow ? (
     borrowLink ? (
-      <Link href={borrowLink} className={LINK}>
+      <Link href={borrowLink} className={INLINE_LINK}>
         <Prov info={vocab.reserveValueProv("borrowed", r.symbol)}>{bUsd.display}</Prov>
       </Link>
     ) : (
@@ -855,7 +855,7 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
               {hasListing && (
                 <Link
                   href={listingHref}
-                  className={`mt-auto inline-flex items-center gap-1 pt-3 text-[13px] font-medium ${LINK}`}
+                  className={`mt-auto inline-flex items-center gap-1 pt-3 text-[13px] font-medium ${INLINE_LINK}`}
                 >
                   View all {view.label} positions
                   <span aria-hidden>→</span>
@@ -892,7 +892,7 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
         {filteredRows.length === 0 ? (
           <div className="rounded-lg border border-rb-200 py-12 text-center text-rb-500 dark:border-rb-800">
             <p className="mb-1">No reserves match this filter.</p>
-            <button type="button" onClick={() => setClasses(new Set())} className={`text-[13px] ${LINK}`}>
+            <button type="button" onClick={() => setClasses(new Set())} className={`text-[13px] ${INLINE_LINK}`}>
               Clear filter
             </button>
           </div>

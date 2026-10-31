@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("fluid");
 
@@ -19,8 +20,8 @@ const intro = (
     <p>
       Each row of the listing is one position: its collateral and its debt, stated in the vault&apos;s own token pair,
       with every liquidation that touched it shown on its timeline. Or{" "}
-      <Link href="/ethereum/fluid/vaults" className="text-blue-500 hover:underline">
-        compare the vaults and their risk ladders
+      <Link href="/ethereum/fluid/vaults" className={INLINE_LINK}>
+        see the vaults and their risk ladders
       </Link>
       .
     </p>

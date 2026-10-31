@@ -51,6 +51,7 @@ import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const dateOf = (unix: number): string => formatDate(unix);
 
@@ -256,7 +257,7 @@ function BookCard({ book, supply }: { book: FrankencoinBook; supply: number }) {
             already-vetted original&rsquo;s terms. The tokens are counted rather than summed:{" "}
             <span className="text-foreground">no collateral total exists here</span>, because valuing{" "}
             {book.allCollateralTokens} different tokens would take a price feed the protocol deliberately runs without.{" "}
-            <Link href="/ethereum/frankencoin" className="text-blue-500 hover:underline">
+            <Link href="/ethereum/frankencoin" className={INLINE_LINK}>
               Browse the positions
             </Link>
             .

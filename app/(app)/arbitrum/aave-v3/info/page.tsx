@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("aave-v3-arbitrum");
 
@@ -11,12 +12,12 @@ const intro = (
     <p>
       Aave V3&rsquo;s Arbitrum deployment: one Pool, every reserve, one health factor per wallet, separate from the
       Ethereum market of the same name. The{" "}
-      <Link href="/arbitrum/aave-v3/positions" className="text-blue-500 hover:underline">
+      <Link href="/arbitrum/aave-v3/positions" className={INLINE_LINK}>
         positions listing
       </Link>{" "}
       holds the positions Rails has read, from each day&rsquo;s most active wallets and any wallet a reader opened;
       enter any wallet on the{" "}
-      <Link href="/arbitrum/aave-v3" className="text-blue-500 hover:underline">
+      <Link href="/arbitrum/aave-v3" className={INLINE_LINK}>
         protocol page
       </Link>{" "}
       and its account is read from the Pool at the head, with dollar values from the oracle the Pool liquidates with.

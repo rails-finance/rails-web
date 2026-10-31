@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("ebisu");
 
@@ -33,8 +34,8 @@ const intro = (
     <p>
       Each row of the listing is one Trove: its collateral, its ebUSD debt, its collateral ratio, its dollar value, the
       rate its owner chose, and its status. Or{" "}
-      <Link href="/ethereum/ebisu/branches" className="text-blue-500 hover:underline">
-        compare the branches and their redemption queues
+      <Link href="/ethereum/ebisu/branches" className={INLINE_LINK}>
+        see the branches and their redemption queues
       </Link>
       .
     </p>

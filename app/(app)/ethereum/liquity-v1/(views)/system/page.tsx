@@ -13,6 +13,7 @@
 
 import { LiquityV1SystemView, LiquityV1SystemStamp } from "@/components/protocol/liquity-v1/liquity-v1-system-view";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
+import { liquityV1InfoModal } from "@/lib/liquity-v1/event-templates";
 import { loadLiquityV1SystemFromChain } from "@/lib/sources/chain/liquity-v1-system";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { PriceStrip } from "@/components/shared/price-strip";
@@ -44,6 +45,7 @@ export default async function LiquityV1SystemPage() {
         <SubPageHeader
           protocol={PROTOCOL}
           title="System & redemption queue"
+          learnMore={liquityV1InfoModal()}
           stamp={<LiquityV1SystemStamp data={data} />}
         />
 

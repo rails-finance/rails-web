@@ -19,7 +19,7 @@
 import type { BaseActivityEvent, FrankencoinContext } from "@/lib/shared/types/event-shape";
 import { isFrankencoinEvent } from "@/lib/shared/types/event-shape";
 import { Prov, ProvUnscoped } from "@/components/shared/provenance";
-import { POSITION_CARD_FRAME } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK, POSITION_CARD_FRAME } from "@/lib/shared/ui-grammar";
 import { EventTime } from "@/components/shared/event-time";
 import { challengeFigureProv, type FrankencoinCoords } from "@/lib/frankencoin/event-provenance";
 import { fmtFcColl, fmtFcPct, fmtZchf, dateTimeText } from "@/lib/frankencoin/figures";
@@ -181,7 +181,7 @@ function SaleLine({ e, symbol }: { e: FrankEvent; symbol: string }) {
         href={explorerUrl(MAINNET_CHAIN_ID, "tx-logs", e.txHash)}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-blue-500 hover:underline"
+        className={INLINE_LINK}
         onClick={(ev) => ev.stopPropagation()}
       >
         tx ↗

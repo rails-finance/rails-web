@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("dolomite");
 
@@ -21,7 +22,7 @@ const intro = (
       margin line Dolomite&apos;s own risk engine holds it to — including the lower line some ETH-and-staked-ETH
       accounts get by an on-chain exception. Dollar values use Dolomite&apos;s own prices, the same ones it liquidates
       with. Or{" "}
-      <Link href="/ethereum/dolomite/markets" className="text-blue-500 hover:underline">
+      <Link href="/ethereum/dolomite/markets" className={INLINE_LINK}>
         see every market and the margin ladder over it
       </Link>
       .

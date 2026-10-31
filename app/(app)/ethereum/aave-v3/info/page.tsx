@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("aave-v3");
 
@@ -19,8 +20,8 @@ const intro = (
       Each row of the listing is one wallet&apos;s account in one market: everything it supplies, everything it owes,
       and its health factor — the single number Aave uses to decide when an account can be liquidated. Dollar values use
       Aave&apos;s own prices, the same ones it liquidates with. Or{" "}
-      <Link href="/ethereum/aave-v3/market" className="text-blue-500 hover:underline">
-        compare the markets and their reserves
+      <Link href="/ethereum/aave-v3/market" className={INLINE_LINK}>
+        see the markets and their reserves
       </Link>
       .
     </p>

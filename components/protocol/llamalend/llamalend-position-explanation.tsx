@@ -21,6 +21,7 @@ import { formatDate } from "@/lib/date";
 import { isLlamalendEvent, type BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { LlamalendPositionView } from "./llamalend-position-card";
 import type { LlamalendFactoryKind } from "@/lib/llamalend/asset-catalog";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export function LlamalendPositionExplanation({
   chain,
@@ -122,12 +123,7 @@ export function LlamalendPositionExplanation({
             <>
               {" "}
               Curve&rsquo;s docs call a shortfall like this{" "}
-              <a
-                href={BAD_DEBT_DOC_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 hover:underline"
-              >
+              <a href={BAD_DEBT_DOC_URL} target="_blank" rel="noopener noreferrer" className={INLINE_LINK}>
                 bad debt
               </a>
               : the lenders in this market are exposed to it.

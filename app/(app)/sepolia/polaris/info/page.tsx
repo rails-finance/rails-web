@@ -7,12 +7,12 @@ import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { POLARIS_MARKETS_PATH } from "@/lib/polaris/routes";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("polaris");
 
 const H = "mt-5 text-sm font-semibold text-foreground";
 const UL = "mt-1.5 list-disc space-y-1 pl-5";
-const LINK = "text-blue-500 hover:underline";
 
 const intro = (
   <>
@@ -74,8 +74,8 @@ const intro = (
     <ul className={UL}>
       <li>
         Puts the two markets side by side.{" "}
-        <Link href={POLARIS_MARKETS_PATH} className={LINK}>
-          Open the markets view
+        <Link href={POLARIS_MARKETS_PATH} className={INLINE_LINK}>
+          See the markets view
         </Link>
         .
       </li>

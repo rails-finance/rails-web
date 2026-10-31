@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("compound-v2");
 
@@ -27,7 +28,7 @@ const intro = (
       survives it; every seizure is shown leg by leg. The listing&apos;s &ldquo;Liquidated before&rdquo; filter finds
       every wallet liquidated at least once, open or closed, and its &ldquo;Liquidated&rdquo; status the ones that have
       since closed. Or{" "}
-      <Link href="/ethereum/compound-v2/markets" className="text-blue-500 hover:underline">
+      <Link href="/ethereum/compound-v2/markets" className={INLINE_LINK}>
         see all twenty markets and how little of them is borrowed today
       </Link>
       .
