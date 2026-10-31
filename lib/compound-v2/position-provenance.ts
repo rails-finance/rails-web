@@ -26,6 +26,7 @@
 // market (an un-entered supply backs nothing), and a ZERO collateral factor
 // means the market is DISABLED as collateral, not parameterised at 0%.
 
+import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import { COMPOUND_V2_ADDRESSES } from "./asset-catalog";
 
@@ -48,48 +49,62 @@ const recompute = (target: string, method: string): ProvVerify => ({
  *  the Comptroller itself judges the account by; interest accrued since the
  *  market's last accrual block is not yet in it (accrual is per-block and
  *  settles on every market touch). */
-export function compoundV2LiveDebtProv(sym: string, marketLabel?: string, ctoken?: string): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    verify: recompute("cToken", "borrowBalanceStored"),
-    summary: `${sym} debt the position owes NOW — the cToken's \`borrowBalanceStored\` read at the latest block: the borrower's principal scaled by the market's borrow index, interest accrued to the market's last accrual included. This is the same figure the Comptroller's own liquidity math judges the account by.`,
-    contract: ctokenContract(marketLabel, ctoken),
-    via: `${LANE_VIA} · cToken.borrowBalanceStored @ head`,
-  };
+export function compoundV2LiveDebtProv(
+  sym: string,
+  marketLabel?: string,
+  ctoken?: string,
+  readBy?: ServerRead | null,
+): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      verify: recompute("cToken", "borrowBalanceStored"),
+      summary: `${sym} debt the position owes NOW — the cToken's \`borrowBalanceStored\` read at the latest block: the borrower's principal scaled by the market's borrow index, interest accrued to the market's last accrual included. This is the same figure the Comptroller's own liquidity math judges the account by.`,
+      contract: ctokenContract(marketLabel, ctoken),
+      via: `${LANE_VIA} · cToken.borrowBalanceStored @ head`,
+    },
+    readBy,
+  );
 }
 
 /** The Comptroller's OWN account verdict — getAccountLiquidity: the
  *  (error, liquidity, shortfall) tuple. The chain fact the risk surfaces
  *  lead with. */
-export function comptrollerVerdictProv(what: string): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    verify: recompute("Comptroller", "getAccountLiquidity"),
-    summary: `${what} — the Comptroller's own account verdict (getAccountLiquidity), computed by the risk engine itself over its oracle prices and collateral factors at the latest block. The contract exposes a tuple, not a boolean: the USD value still borrowable (liquidity), or — the moment shortfall > 0 — the amount past the liquidation line. Only markets the account has ENTERED count: supplying alone does not enter a market, so an un-entered supply backs nothing.`,
-    contract: COMPTROLLER,
-    via: `${LANE_VIA} · Comptroller.getAccountLiquidity @ head`,
-  };
+export function comptrollerVerdictProv(what: string, readBy?: ServerRead | null): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      verify: recompute("Comptroller", "getAccountLiquidity"),
+      summary: `${what} — the Comptroller's own account verdict (getAccountLiquidity), computed by the risk engine itself over its oracle prices and collateral factors at the latest block. The contract exposes a tuple, not a boolean: the USD value still borrowable (liquidity), or — the moment shortfall > 0 — the amount past the liquidation line. Only markets the account has ENTERED count: supplying alone does not enter a market, so an un-entered supply backs nothing.`,
+      contract: COMPTROLLER,
+      via: `${LANE_VIA} · Comptroller.getAccountLiquidity @ head`,
+    },
+    readBy,
+  );
 }
 
 /** A capacity aggregate — Σ entered supply × oracle price × collateral factor.
  *  Every input a chain read at the same head; the sum MIRRORS the
  *  Comptroller's hypothetical-liquidity walk but is client arithmetic — a
  *  replica, with the verdict read beside it. */
-export function compoundV2CapacityProv(what: string, formula: string): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "state",
-    verify: recompute("Comptroller", "getAccountLiquidity"),
-    summary: `${what} — Σ supply × oracle price × collateral factor over the markets the account has ENTERED (an un-entered supply backs nothing; a zero collateral factor means the market is disabled as collateral and contributes nothing), every input read at the same block. This mirrors the Comptroller's own liquidity walk as client arithmetic — a REPLICA: the authoritative judgement is the getAccountLiquidity verdict read beside it.`,
-    contract: COMPTROLLER,
-    via: `${LANE_VIA} · derived aggregate (replica)`,
-    formula,
-    inputs: [
-      { label: "supplies", kind: "chain", pclass: "state", note: "balanceOf × exchangeRateStored @ head" },
-      { label: "oracle prices", kind: "chain", pclass: "oracle", note: "getUnderlyingPrice @ head" },
-      { label: "collateral factors", kind: "chain", pclass: "state", note: "Comptroller.markets @ head" },
-    ],
-  };
+export function compoundV2CapacityProv(what: string, formula: string, readBy?: ServerRead | null): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain-derived",
+      pclass: "state",
+      verify: recompute("Comptroller", "getAccountLiquidity"),
+      summary: `${what} — Σ supply × oracle price × collateral factor over the markets the account has ENTERED (an un-entered supply backs nothing; a zero collateral factor means the market is disabled as collateral and contributes nothing), every input read at the same block. This mirrors the Comptroller's own liquidity walk as client arithmetic — a REPLICA: the authoritative judgement is the getAccountLiquidity verdict read beside it.`,
+      contract: COMPTROLLER,
+      via: `${LANE_VIA} · derived aggregate (replica)`,
+      formula,
+      inputs: [
+        { label: "supplies", kind: "chain", pclass: "state", note: "balanceOf × exchangeRateStored @ head" },
+        { label: "oracle prices", kind: "chain", pclass: "oracle", note: "getUnderlyingPrice @ head" },
+        { label: "collateral factors", kind: "chain", pclass: "state", note: "Comptroller.markets @ head" },
+      ],
+    },
+    readBy,
+  );
 }

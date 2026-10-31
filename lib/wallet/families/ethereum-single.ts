@@ -3,8 +3,11 @@
 // built from the summary row's `card` by the family's listing builder (the
 // Liquity V2 TroveSummary is the row as served). The head reads:
 //   Morpho Blue  the existing position reader once per open position with
-//                debt, every one pinned to one block: LTV against LLTV at the
-//                market's own oracle (no dollars).
+//                debt: LTV against LLTV at the market's own oracle (no
+//                dollars). It runs over rails-server's answer first
+//                (/api/at-block/morpho/position, every market at the chain's
+//                block B), waiting up to 3.5 s (walletApiWait); a position the route
+//                does not answer is read on the chain, all of those at one block.
 //   MakerDAO     the existing Vat reader once per open vault: the collateral
 //                at the OSM price, the debt in DAI, the liquidation price.
 //   Fluid        the existing VaultResolver reader once per open NFT with
@@ -24,6 +27,8 @@ import {
   type RawFluidPositionRow,
 } from "@/lib/sources/api/fluid-positions";
 import { loadMorphoPositionFromChain } from "@/lib/sources/chain/morpho-position";
+import { MORPHO_DEPLOYMENT } from "@/lib/sources/chain/morpho-deployments";
+import { withServerHead } from "@/lib/sources/api/lender-position-head";
 import { loadMakerVaultStateFromChain } from "@/lib/sources/chain/makerdao-position";
 import { loadFluidPositionFromChain } from "@/lib/sources/chain/fluid-position";
 import { chainClient } from "@/lib/sources/chain/rpc";
@@ -123,16 +128,31 @@ export const morphoEthereum: FamilyModule = {
       ];
     });
   },
-  async head(open, address): Promise<HeadResult> {
+  async head(open, address, signal, apiMs): Promise<HeadResult> {
     const owing = open.filter((p) => {
       const s = (p.card as { row: MorphoPositionSummary }).row;
       return (s.currentDebt?.amount ?? s.borrowed.amount) > 0 && !s.isIdle;
     });
     if (owing.length === 0) return { positions: open, reads: 0 };
-    const block = await chainClient(MAINNET_CHAIN_ID).getBlockNumber();
+    // The chain's block, read once and only when a position needs the chain.
+    let block: Promise<bigint> | null = null;
     const r = await eachOpen(owing, async (p) => {
       const s = (p.card as { row: MorphoPositionSummary }).row;
-      const live = await loadMorphoPositionFromChain(s.marketId, address, undefined, block);
+      const served = await withServerHead(
+        {
+          kind: "morpho-position",
+          deployment: "ethereum",
+          market: (s.marketId.startsWith("0x") ? s.marketId : `0x${s.marketId}`).toLowerCase(),
+          wallet: address,
+        },
+        (client) => loadMorphoPositionFromChain(s.marketId, address, MORPHO_DEPLOYMENT, undefined, client),
+        { timeoutMs: apiMs, signal },
+      ).catch(() => null);
+      let live = served?.answer;
+      if (!live) {
+        block ??= chainClient(MAINNET_CHAIN_ID).getBlockNumber();
+        live = await loadMorphoPositionFromChain(s.marketId, address, undefined, await block);
+      }
       if (live.chainStale) return { ...p, headRead: "failed" };
       const dollarLoan = DOLLAR_LOANS.has((live.loanSymbol ?? "").toUpperCase());
       return {

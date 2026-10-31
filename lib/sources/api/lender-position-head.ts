@@ -9,7 +9,8 @@
 // (lib/sources/chain/replay-client.ts) and states its block.
 //
 // `withServerHead` returns null when the route cannot answer — no
-// RAILS_API_URL, a non-2xx answer, 8 s without one, or only the stored rows
+// RAILS_API_URL, a non-2xx answer, 8 s without one (the wallet page passes a
+// shorter wait, so its chain read still fits its budget), or only the stored rows
 // (served when no read leg answered; their figures are not the reader's
 // shape) — or when the reader asked a call the answer does not hold. The
 // caller then reads the chain as before.
@@ -20,8 +21,14 @@ import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { replayClient, type ServedCalls } from "@/lib/sources/chain/replay-client";
 import type { PublicClient } from "viem";
 
-/** The wallet page's budget for one read. */
+/** How long a position page waits for the route. */
 const TIMEOUT_MS = 8_000;
+
+/** How long to wait, and a signal that ends the wait sooner. */
+export interface AskOpts {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
 
 export type LenderHeadRequest =
   | { kind: "compound"; family: "compound-v3" | "compound-v2" | "moonwell"; deployment: string; wallet: string }
@@ -29,12 +36,13 @@ export type LenderHeadRequest =
   | { kind: "morpho-wallet"; deployment: "base" | "arbitrum"; wallet: string; ids?: string[] };
 
 /** The route's answer, or null where it cannot answer with calls. */
-async function ask(req: LenderHeadRequest): Promise<ServedCalls | null> {
+async function ask(req: LenderHeadRequest, opts: AskOpts = {}): Promise<ServedCalls | null> {
   const api = process.env.RAILS_API_URL;
   if (!api) return null;
   try {
     let res: Response;
-    const signal = AbortSignal.timeout(TIMEOUT_MS);
+    const timeout = AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS);
+    const signal = opts.signal ? AbortSignal.any([timeout, opts.signal]) : timeout;
     if (req.kind === "morpho-wallet") {
       res = await fetch(
         `${api}/api/at-block/morpho/wallet`,
@@ -77,8 +85,9 @@ export type ServerHeadStamp = ServedCalls["head"] & { block: number };
 export async function withServerHead<T extends { chainStale: boolean }>(
   req: LenderHeadRequest,
   read: (client: PublicClient, served: ServedCalls) => Promise<T>,
+  opts: AskOpts = {},
 ): Promise<{ answer: T; head: ServerHeadStamp } | null> {
-  const served = await ask(req);
+  const served = await ask(req, opts);
   if (!served) return null;
   const replay = replayClient(served);
   try {

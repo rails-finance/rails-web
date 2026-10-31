@@ -13,6 +13,7 @@
 //
 // The verdict in words is the Explanation's.
 
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { Prov } from "@/components/shared/provenance";
 import type { PositionCardHead, PositionPanelRow } from "@/components/shared/position-card";
 import { capacityShare } from "@/lib/shared/capacity-share";
@@ -37,7 +38,11 @@ export function compoundV2RiskHead(chain: CompoundV2ChainResponse | null, hasDeb
     ...head,
     value: (
       <Prov
-        info={compoundV2CapacityProv("Debt share of the capacity line", "debt value ÷ CF-weighted capacity (replica)")}
+        info={compoundV2CapacityProv(
+          "Debt share of the capacity line",
+          "debt value ÷ CF-weighted capacity (replica)",
+          serverReadOf(chain),
+        )}
       >
         {share.text}
       </Prov>
@@ -64,7 +69,11 @@ export function compoundV2LineRows(chain: CompoundV2ChainResponse | null): {
         label: "Liquidation line",
         value: (
           <Prov
-            info={compoundV2CapacityProv("Liquidation line", "Σ entered supply × price × collateral factor (replica)")}
+            info={compoundV2CapacityProv(
+              "Liquidation line",
+              "Σ entered supply × price × collateral factor (replica)",
+              serverReadOf(chain),
+            )}
           >
             {formatCompactUsd(chain.collateralCapacityUsd)}
           </Prov>
@@ -76,7 +85,11 @@ export function compoundV2LineRows(chain: CompoundV2ChainResponse | null): {
       {
         id: "room-to-borrow",
         label: "Room to borrow",
-        value: <Prov info={comptrollerVerdictProv("Account liquidity")}>{formatCompactUsd(chain.liquidityUsd)}</Prov>,
+        value: (
+          <Prov info={comptrollerVerdictProv("Account liquidity", serverReadOf(chain))}>
+            {formatCompactUsd(chain.liquidityUsd)}
+          </Prov>
+        ),
         tip: "How many more dollars the account can borrow before the liquidation line: the Comptroller's account liquidity, read at the latest block.",
       },
       ...(dropPct != null

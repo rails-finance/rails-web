@@ -229,7 +229,8 @@ export function useMorphoBaseWalletReads(
 
   const chainByMarket = useMemo(() => {
     const m = new Map<string, MorphoChainPositionResponse>();
-    for (const p of data?.positions ?? []) m.set(p.marketId.toLowerCase(), p);
+    // Each position carries the sweep's read stamp, which its receipts name.
+    for (const p of data?.positions ?? []) m.set(p.marketId.toLowerCase(), data?.head ? { ...p, head: data.head } : p);
     return m;
   }, [data]);
 

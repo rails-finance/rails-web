@@ -10,7 +10,8 @@
 // configuration reads as 0 left for the catalog's figure (`ltZero`).
 //
 // Null when the route cannot answer: no RAILS_API_URL, a market it does not
-// serve, a non-2xx answer or 8 s without one. The caller then reads the chain
+// serve, a non-2xx answer or 8 s without one (the wallet page waits less, so
+// its chain read still fits its budget). The caller then reads the chain
 // as before. An answer marked `stored` is the listing's row, served because no
 // read leg answered; the caller reads the chain first and keeps the row for
 // when that fails too.
@@ -32,7 +33,7 @@ import type {
 } from "@/lib/api/fetch-aave-v3-position";
 import type { SparkChainReserve, SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
 
-/** The wallet page's budget for one read. */
+/** How long a position page waits for the route. */
 const TIMEOUT_MS = 8_000;
 
 /** rails-server's market key per (chain, Pool), as its AAVE_V3_POSITION_MARKETS names them. */
@@ -51,16 +52,23 @@ export const serverMarketOf = (pool: string, chainId: ChainId): string | undefin
 
 type Raw = Record<string, unknown>;
 
+/** How long to wait, and a signal that ends the wait sooner. */
+export interface AskOpts {
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
 /** The route's answer as it came, or null where it cannot answer. */
-async function ask(market: string, wallet: string): Promise<Raw | null> {
+async function ask(market: string, wallet: string, opts: AskOpts = {}): Promise<Raw | null> {
   const api = process.env.RAILS_API_URL;
   if (!api) return null;
   try {
     const qs = new URLSearchParams({ market, wallet: wallet.toLowerCase() });
+    const timeout = AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS);
     const res = await fetch(`${api}/api/at-block/aave-v3/position?${qs.toString()}`, {
       ...createAuthFetchOptions(),
       cache: "no-store",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: opts.signal ? AbortSignal.any([timeout, opts.signal]) : timeout,
     });
     if (!res.ok) return null;
     const body = (await res.json()) as Raw;
@@ -68,6 +76,28 @@ async function ask(market: string, wallet: string): Promise<Raw | null> {
   } catch {
     return null;
   }
+}
+
+/** The account's figures from the route as it answers them, unnamed: what the
+ *  wallet page reads (health factor, the Pool's dollars, the held reserves'
+ *  rates). Null where the route cannot answer or serves only the stored row. */
+export interface AaveV3HeadFigures {
+  blockNumber: number;
+  healthFactor: number | null;
+  totalCollateralUsd: number;
+  totalDebtUsd: number;
+  reserves: { address: string; debtBalanceRaw: string; borrowApr: number }[];
+  head: PositionHeadStamp;
+}
+
+export async function serverAaveV3HeadFigures(
+  market: string,
+  wallet: string,
+  opts: AskOpts = {},
+): Promise<AaveV3HeadFigures | null> {
+  const raw = await ask(market, wallet, opts);
+  if (!raw || raw.stored || typeof raw.blockNumber !== "number" || !raw.head) return null;
+  return raw as unknown as AaveV3HeadFigures;
 }
 
 const short = (addr: string) => `${addr.slice(0, 6)}…${addr.slice(-4)}`;

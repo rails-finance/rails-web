@@ -24,7 +24,7 @@
 // and kept 30 s in the api per oracle and asset set; asked at a block, from
 // Sieve's stored rounds and the at-block store. The multicall below answers
 // only when that route cannot (no RAILS_API_URL, an oracle it does not serve,
-// a failed request).
+// a failed request, 3 s without an answer).
 //
 // SERVER-ONLY — imported from /api/* route handlers only (it calls the chain via
 // lib/sources/chain/rpc). Mirrors the batched-multicall shape of compound-prices.
@@ -44,6 +44,9 @@ const SERVER_MARKET: Record<string, string> = {
   "0xfdd4e83890bccd1fbf9b10d71a5cc0a738753b01": "seamless",
   "0xb56c2f0b653b2e0b10c9b928c8580ac5df02c7c7": "arbitrum",
 };
+/** How long one request waits before the multicall answers instead: short
+ *  enough that the wallet page's cards and head reads fit its 8 s budget. */
+const SERVER_TIMEOUT_MS = 3_000;
 /** The server route's limit on assets a request. */
 const SERVER_MAX_ASSETS = 40;
 
@@ -59,6 +62,7 @@ async function serverPrices(oracle: string, assets: string[]): Promise<Map<strin
       const res = await fetch(`${api}/api/at-block/aave-v3/oracle-prices?${qs.toString()}`, {
         ...createAuthFetchOptions(),
         cache: "no-store",
+        signal: AbortSignal.timeout(SERVER_TIMEOUT_MS),
       });
       if (!res.ok) return null;
       const body = (await res.json()) as { prices?: Record<string, string> };

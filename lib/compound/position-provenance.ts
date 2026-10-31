@@ -17,6 +17,7 @@
 // feed) and quote in the market's base unit — USD for cUSDCv3/cUSDTv3, ETH for
 // cWETHv3 — never assumed USD.
 
+import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import type { CompoundCoords } from "@/lib/compound/event-provenance";
 
@@ -35,33 +36,49 @@ const stateVerify = (method: string): ProvVerify => ({
 /** The contract's OWN account verdict — isBorrowCollateralized / isLiquidatable,
  *  computed by Comet's liquidation engine over its configured feeds and factors.
  *  Chain-direct: the protocol judging its own account, not our arithmetic. */
-export function contractVerdictProv(what: string, method: string, coords?: CompoundCoords): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    verify: stateVerify(method),
-    summary: `${what} — the Comet contract's own verdict (${method}), computed by its liquidation engine over its configured price feeds and collateral factors at the latest block.`,
-    contract: cometContract(coords),
-    via: `${LANE_VIA} · Comet.${method} @ head`,
-  };
+export function contractVerdictProv(
+  what: string,
+  method: string,
+  coords?: CompoundCoords,
+  readBy?: ServerRead | null,
+): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      verify: stateVerify(method),
+      summary: `${what} — the Comet contract's own verdict (${method}), computed by its liquidation engine over its configured price feeds and collateral factors at the latest block.`,
+      contract: cometContract(coords),
+      via: `${LANE_VIA} · Comet.${method} @ head`,
+    },
+    readBy,
+  );
 }
 
 /** A capacity aggregate — Σ collateral × oracle price × factor across the held
  *  assets. Every input is a Comet read at the same head, and the sum mirrors the
  *  contract's own account math (verified against its verdicts), so chain-derived. */
-export function capacityProv(what: string, formula: string, coords?: CompoundCoords): Provenance {
-  return {
-    kind: "chain-derived",
-    pclass: "state",
-    verify: stateVerify("collateralBalanceOf / getPrice / getAssetInfo"),
-    summary: `${what} — Σ collateral × oracle price × factor over the account's held assets, every input read from the market's Comet contract at the same block. Mirrors the contract's own account math (checked against its isBorrowCollateralized / isLiquidatable verdicts).`,
-    contract: cometContract(coords),
-    via: `${LANE_VIA} · derived aggregate`,
-    formula,
-    inputs: [
-      { label: "collateral balances", kind: "chain", pclass: "state", note: "collateralBalanceOf @ head" },
-      { label: "oracle prices", kind: "chain", pclass: "oracle", note: "getPrice @ head" },
-      { label: "collateral factors", kind: "chain", pclass: "state", note: "getAssetInfo @ head" },
-    ],
-  };
+export function capacityProv(
+  what: string,
+  formula: string,
+  coords?: CompoundCoords,
+  readBy?: ServerRead | null,
+): Provenance {
+  return stampServerRead(
+    {
+      kind: "chain-derived",
+      pclass: "state",
+      verify: stateVerify("collateralBalanceOf / getPrice / getAssetInfo"),
+      summary: `${what} — Σ collateral × oracle price × factor over the account's held assets, every input read from the market's Comet contract at the same block. Mirrors the contract's own account math (checked against its isBorrowCollateralized / isLiquidatable verdicts).`,
+      contract: cometContract(coords),
+      via: `${LANE_VIA} · derived aggregate`,
+      formula,
+      inputs: [
+        { label: "collateral balances", kind: "chain", pclass: "state", note: "collateralBalanceOf @ head" },
+        { label: "oracle prices", kind: "chain", pclass: "oracle", note: "getPrice @ head" },
+        { label: "collateral factors", kind: "chain", pclass: "state", note: "getAssetInfo @ head" },
+      ],
+    },
+    readBy,
+  );
 }

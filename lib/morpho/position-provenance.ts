@@ -14,6 +14,7 @@
 // wMulDown steps, BigInt-exact — verified against live borrowers by
 // scripts/verify-morpho-chain.mjs. The summaries say so.
 
+import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import type { Provenance } from "@/components/shared/provenance";
 import { MORPHO_ADDRESSES, morphoBlueContract } from "./asset-catalog";
 import { publishedText } from "./oracle-age";
@@ -38,25 +39,38 @@ const marketInputs = (c?: MorphoChainCoords) =>
   c?.marketId ? [{ label: "market", value: c.marketId, kind: "chain" as const, note: "Morpho market id" }] : [];
 
 /** The market's liquidation LTV — a governance-enabled params constant. */
-export const lltvProv = (c?: MorphoChainCoords): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  summary: `The market's liquidation loan-to-value${marketNote(c)} — the lltv field of the immutable market params tuple (its keccak IS the market id), governance-enabled at market creation. Debt above lltv × collateral value is liquidatable; there is no separate borrow threshold.`,
-  contract: blueOf(c),
-  via: `${LANE} · Morpho.idToMarketParams(id).lltv @ head`,
-  inputs: marketInputs(c),
-});
+export const lltvProv = (c?: MorphoChainCoords, readBy?: ServerRead | null): Provenance =>
+  stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      summary: `The market's liquidation loan-to-value${marketNote(c)} — the lltv field of the immutable market params tuple (its keccak IS the market id), governance-enabled at market creation. Debt above lltv × collateral value is liquidatable; there is no separate borrow threshold.`,
+      contract: blueOf(c),
+      via: `${LANE} · Morpho.idToMarketParams(id).lltv @ head`,
+      inputs: marketInputs(c),
+    },
+    readBy,
+  );
 
 /** A capacity / LTV aggregate — products and ratios of same-head chain reads. */
-export const capacityProv = (label: string, formula: string, c?: MorphoChainCoords): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary: `${label}${marketNote(c)} — arithmetic over the position's own slots, the market's own oracle price and the lltv, all read at the same head. In loan-token units (the oracle's numeraire); no USD anywhere.`,
-  contract: blueOf(c),
-  via: `${LANE} · ${formula}`,
-  formula,
-  inputs: marketInputs(c),
-});
+export const capacityProv = (
+  label: string,
+  formula: string,
+  c?: MorphoChainCoords,
+  readBy?: ServerRead | null,
+): Provenance =>
+  stampServerRead(
+    {
+      kind: "chain-derived",
+      pclass: "state",
+      summary: `${label}${marketNote(c)} — arithmetic over the position's own slots, the market's own oracle price and the lltv, all read at the same head. In loan-token units (the oracle's numeraire); no USD anywhere.`,
+      contract: blueOf(c),
+      via: `${LANE} · ${formula}`,
+      formula,
+      inputs: marketInputs(c),
+    },
+    readBy,
+  );
 
 /** The live read's endpoint on each chain — Base reads every position a
  *  wallet holds through one sweep, Ethereum one position at a time. */

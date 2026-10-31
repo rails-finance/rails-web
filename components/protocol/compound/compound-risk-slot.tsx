@@ -15,6 +15,7 @@
 // Every figure is in base-token terms, unit-safe in every market (the WETH
 // market quotes in ETH). The verdict in words is the Explanation's.
 
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { Prov } from "@/components/shared/provenance";
 import { AmountText } from "@/components/shared/amount-text";
 import { TokenFigure } from "@/components/shared/token-figure";
@@ -53,6 +54,7 @@ export function compoundRiskSlots(
   if (chain.debtValue <= 0 || chain.borrowCapacity <= 0 || chain.liquidationCapacity <= 0)
     return { head: { ...base, value: null }, rows: [] };
   const coords = coordsOf(chain);
+  const readBy = serverReadOf(chain);
   const used = capacityShare(chain.debtValue, chain.borrowCapacity);
   const line = capacityShare(chain.debtValue, chain.liquidationCapacity);
   const hf = chain.healthFactor;
@@ -69,6 +71,7 @@ export function compoundRiskSlots(
             "Available to borrow",
             "(Σ collateral × price × borrow factor − debt value) ÷ base price",
             coords,
+            readBy,
           )}
         >
           <AmountText value={headroom} format="compact" />
@@ -88,7 +91,12 @@ export function compoundRiskSlots(
             figure={`${toBase(chain, chain.liquidationCapacity)} ${chain.baseSymbol}`}
           >
             <Prov
-              info={capacityProv("Liquidation line", "Σ collateral × price × liquidate factor ÷ base price", coords)}
+              info={capacityProv(
+                "Liquidation line",
+                "Σ collateral × price × liquidate factor ÷ base price",
+                coords,
+                readBy,
+              )}
             >
               <AmountText value={toBase(chain, chain.liquidationCapacity)} format="compact" />
             </Prov>
@@ -103,10 +111,17 @@ export function compoundRiskSlots(
       tip: "The debt as a share of the absorb line. The Comet's isLiquidatable says whether the account is past it.",
       value: (
         <>
-          <Prov info={capacityProv("Debt share of the liquidation line", "debt value ÷ liquidation capacity", coords)}>
+          <Prov
+            info={capacityProv(
+              "Debt share of the liquidation line",
+              "debt value ÷ liquidation capacity",
+              coords,
+              readBy,
+            )}
+          >
             <PanelFigure>{line.text}</PanelFigure>
           </Prov>{" "}
-          <Prov info={contractVerdictProv("Liquidation line", "isLiquidatable", coords)}>
+          <Prov info={contractVerdictProv("Liquidation line", "isLiquidatable", coords, readBy)}>
             {line.beyond ? "past it" : "reached"}
           </Prov>
         </>
@@ -119,7 +134,9 @@ export function compoundRiskSlots(
       label: "Liquidates on a drop of",
       tip: "How far the collateral's value can fall, every asset together, before the debt reaches the absorb line.",
       value: (
-        <Prov info={capacityProv("Drop to the liquidation line", "1 − debt value ÷ liquidation capacity", coords)}>
+        <Prov
+          info={capacityProv("Drop to the liquidation line", "1 − debt value ÷ liquidation capacity", coords, readBy)}
+        >
           {dropPct}%
         </Prov>
       ),
@@ -128,7 +145,7 @@ export function compoundRiskSlots(
     head: {
       ...base,
       value: (
-        <Prov info={capacityProv("Share of the borrowing limit used", "debt value ÷ borrow capacity", coords)}>
+        <Prov info={capacityProv("Share of the borrowing limit used", "debt value ÷ borrow capacity", coords, readBy)}>
           {used.text}
         </Prov>
       ),

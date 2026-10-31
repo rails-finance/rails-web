@@ -154,6 +154,13 @@ interface Section {
   replay: CometMarketReplay | null;
 }
 
+/** A Comet's part of the wallet read, carrying the read's stamp (rails-server's
+ *  head read, where it answered), which its receipts name. */
+const withReadStamp = (
+  p: CompoundMarketChainResponse | undefined,
+  wallet: { head?: CompoundMarketChainResponse["head"] },
+): CompoundMarketChainResponse | null => (p ? (wallet.head ? { ...p, head: wallet.head } : p) : null);
+
 const holdsSomething = (live: CompoundMarketChainResponse | null): boolean =>
   live != null && (live.supplyBalanceRaw !== "0" || live.borrowBalanceRaw !== "0" || live.collateral.length > 0);
 
@@ -699,7 +706,13 @@ export function CompoundWalletView({
       d.deployment.markets
         .map((market) => ({
           market,
-          chain: data && !data.chainStale ? (data.positions.find((p) => p.market === market.key) ?? null) : null,
+          chain:
+            data && !data.chainStale
+              ? withReadStamp(
+                  data.positions.find((p) => p.market === market.key),
+                  data,
+                )
+              : null,
           replay: timeline?.markets.find((r) => r.market === market.key) ?? null,
         }))
         .filter((s) => s.chain != null || s.replay != null)

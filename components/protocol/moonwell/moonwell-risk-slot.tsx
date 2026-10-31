@@ -13,6 +13,7 @@
 //
 // The verdict in words is the Explanation's.
 
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { Prov } from "@/components/shared/provenance";
 import type { PositionCardHead, PositionPanelRow } from "@/components/shared/position-card";
 import { capacityShare } from "@/lib/shared/capacity-share";
@@ -30,10 +31,10 @@ function useLane(): MoonwellLane {
   return { comptroller: dep.comptroller, positionRoute: dep.positionRoute };
 }
 
-function HealthValue({ hf }: { hf: number }) {
+function HealthValue({ hf, chain }: { hf: number; chain: MoonwellChainResponse }) {
   const lane = useLane();
   return (
-    <Prov info={moonwellCapacityProv("Health factor", "CF-weighted capacity ÷ debt value", lane)}>
+    <Prov info={moonwellCapacityProv("Health factor", "CF-weighted capacity ÷ debt value", lane, serverReadOf(chain))}>
       {hf >= 100 ? "∞" : hf.toFixed(2)}
     </Prov>
   );
@@ -43,7 +44,14 @@ function ShareValue({ chain }: { chain: MoonwellChainResponse }) {
   const lane = useLane();
   const share = capacityShare(chain.debtValueUsd, chain.collateralCapacityUsd);
   return (
-    <Prov info={moonwellCapacityProv("Debt share of the capacity line", "debt value ÷ CF-weighted capacity", lane)}>
+    <Prov
+      info={moonwellCapacityProv(
+        "Debt share of the capacity line",
+        "debt value ÷ CF-weighted capacity",
+        lane,
+        serverReadOf(chain),
+      )}
+    >
       {share.text}
     </Prov>
   );
@@ -51,7 +59,11 @@ function ShareValue({ chain }: { chain: MoonwellChainResponse }) {
 
 function RoomValue({ chain }: { chain: MoonwellChainResponse }) {
   const lane = useLane();
-  return <Prov info={comptrollerVerdictProv("Account liquidity", lane)}>{formatCompactUsd(chain.liquidityUsd)}</Prov>;
+  return (
+    <Prov info={comptrollerVerdictProv("Account liquidity", lane, serverReadOf(chain))}>
+      {formatCompactUsd(chain.liquidityUsd)}
+    </Prov>
+  );
 }
 
 /** Whether the read states a health factor: debt and capacity both stand. */
@@ -65,7 +77,7 @@ export function moonwellHealthHead(chain: MoonwellChainResponse | null, hasDebt:
   const base = { id: "health-factor", label: "Health factor", labelTip: HF_TIP };
   if (!chain) return { ...base, value: null, pending: true };
   if (!hasHealth(chain)) return { ...base, value: null };
-  return { ...base, value: <HealthValue hf={chain.healthFactor as number} /> };
+  return { ...base, value: <HealthValue hf={chain.healthFactor as number} chain={chain} /> };
 }
 
 /** The panel rows the read adds on the debt side: room to borrow, the drop to
