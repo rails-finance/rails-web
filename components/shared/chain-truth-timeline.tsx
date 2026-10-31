@@ -371,8 +371,10 @@ export interface ChainTruthTimelineProps {
   countDetail?: string;
   /** Display-menu items (default CHAIN_TRUTH_DISPLAY_ITEMS). */
   displayItems?: TimelineDisplayItem[];
-  /** Message when the wallet has no events at all (vs filtered out). */
-  emptyLabel?: string;
+  /** Message when the wallet has no events at all (vs filtered out). A page
+   *  whose history read did not answer passes the index notice here
+   *  (components/shared/index-notice.tsx, ui-jobs 461). */
+  emptyLabel?: ReactNode;
   /** Run-collapse specs, in match order (see RUN-COLLAPSE above). Hoist the
    *  array to module scope — a fresh identity per render recomputes the rows. */
   runs?: TimelineRunSpec[];

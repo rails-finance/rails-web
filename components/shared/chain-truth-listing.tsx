@@ -21,6 +21,7 @@ import type { FilterDimension } from "@/components/shared/filter-bar/types";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
 import type { ProtocolEntry } from "@/lib/shared/protocols";
 import { RailHeader } from "@/components/shared/rail-header";
+import { IndexNotice } from "@/components/shared/index-notice";
 
 // Entrance cascade — a staggered fade + rise for the row column, done in CSS
 // (see `.ct-row` in globals.css), NOT framer-motion. This tier (unlike the
@@ -50,30 +51,11 @@ export interface ChainTruthListingFilter<F extends BaseListFilters> {
   searchPlaceholder?: string;
 }
 
-/** The default failure state — rendered when a listing fetch rejected and the
- *  config supplied no bespoke `renderError`. Distinct from the empty state on
- *  purpose: a down backend (e.g. mid-deploy on the box) used to collapse to
- *  "No {noun} captured yet.", which reads as a truth claim about the index when
- *  it's actually a service interruption. Same quiet styling as the empty state,
- *  plus a retry that re-runs the fetch in place. */
-export function ListingUnavailable({ noun, onRetry }: { noun: string; onRetry?: () => void }) {
-  return (
-    <div className="text-sm text-rb-500">
-      <p>
-        The live index isn&apos;t reachable right now, so no {noun} could be loaded — a service interruption, not an
-        empty index.
-      </p>
-      {onRetry && (
-        <button
-          type="button"
-          onClick={onRetry}
-          className="mt-3 rounded-md border border-rb-300 px-3 py-1 text-foreground/80 transition-colors hover:border-blue-500 hover:text-foreground dark:border-rb-700"
-        >
-          Retry
-        </button>
-      )}
-    </div>
-  );
+/** The default failure state: a listing fetch rejected and the config
+ *  supplied no bespoke `renderError`. Distinct from the empty state, which is
+ *  for a read that answered with no rows (ui-jobs 461). */
+export function ListingUnavailable({ onRetry }: { onRetry?: () => void }) {
+  return <IndexNotice onRetry={onRetry} />;
 }
 
 /** Server-driven paging surface: for the larger listings that page against the
