@@ -24,6 +24,7 @@ import { isFluidEvent, type FluidContext } from "@/lib/shared/types/event-shape"
 import { fetchFluidPositions } from "@/lib/api/fetch-fluid-positions";
 import type { FluidPositionSummary } from "@/lib/sources/api/fluid-positions";
 import { fetchFluidTimeline } from "@/lib/api/fetch-fluid-timeline";
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import { fetchFluidChainPosition, type FluidPositionChainResponse } from "@/lib/api/fetch-fluid-position";
 import { fetchTimelineOpeningBalance } from "@/lib/api/fetch-timeline-opening-balance";
 import {
@@ -439,6 +440,7 @@ export default function FluidPositionView({
               collateralFactor: chain.collateralFactor,
               liquidationThreshold: chain.liquidationThreshold,
               liquidationPenalty: chain.liquidationPenalty,
+              readBy: serverReadOf(chain),
             }
           : null,
       previous: previousRows(fluidEvents),

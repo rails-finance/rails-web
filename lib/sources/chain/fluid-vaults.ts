@@ -1,10 +1,13 @@
 // Fluid protocol view — the whole vault roster, read at one head block.
 // ----------------------------------------------------------------------------
 // Fluid has no market catalog: the VaultFactory mints one vault per pair, and
-// the roster is whatever it has minted (181 at build time). `getVaultsEntireData()`
-// returns every one of them in a SINGLE eth_call — the same VaultEntireData
-// block positionByNftId returns as its second output, arrayed. That is the whole
-// read; the only other traffic is one cached ERC-20 multicall to name the legs.
+// the roster is whatever it has minted (181 at build time). `getAllVaultsAddresses()`
+// names them and one multicall of `getVaultEntireData(vault)` returns each one's
+// VaultEntireData block (the one positionByNftId returns as its second output),
+// a failed entry failing alone. The resolver's whole-roster `getVaultsEntireData()`
+// reverts as a unit when one vault's read does, which it has done at every block
+// since 26,207,288. The only other traffic is one cached ERC-20 multicall to name
+// the legs.
 //
 // What the view claims (the protocol's own shape, not a template): each vault
 // carries its OWN three-rung ladder — borrow up to collateralFactor, liquidate
@@ -39,10 +42,17 @@
 // only the vault's own rewards/fee component, not the full rate (the convention
 // lib/sources/chain/fluid-position.ts already ships).
 //
+// The block and both resolver calls are asked of rails-server first, at its
+// head block (`head-reads-client.ts`, census W-FL1); the chain is read at that
+// block when it cannot answer.
+//
 // SERVER-ONLY — imported from /api/chain/* route handlers and the SSR page only.
 
-import { getAddress } from "viem";
-import { alchemyClient } from "./rpc";
+import { getAddress, type ReadContractReturnType } from "viem";
+import { headReadsClient } from "@/lib/sources/api/head-reads-client";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import {
   FLUID_ADDRESSES,
@@ -51,7 +61,7 @@ import {
   vaultKindOf,
   type FluidVaultKind,
 } from "@/lib/fluid/asset-catalog";
-import { FLUID_VAULT_RESOLVER_ABI } from "@/lib/fluid/vault-resolver-abi";
+import { FLUID_VAULT_RESOLVER_ABI, FLUID_VAULT_RESOLVER_ROSTER_ABI } from "@/lib/fluid/vault-resolver-abi";
 import { FLUID_DEX_RESOLVER_ABI } from "@/lib/fluid/dex-resolver-abi";
 
 const ZERO = BigInt(0);
@@ -150,9 +160,20 @@ export interface FluidVaultRow {
   aggregateRatio: number | null;
 }
 
+export interface FluidSkippedVault {
+  vault: string;
+  /** Position in the resolver's `getAllVaultsAddresses()` array. */
+  rosterIndex: number;
+}
+
 export interface FluidVaultsChainResponse {
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read. */
+  head?: PositionHeadStamp;
   vaults: FluidVaultRow[];
+  /** Vaults whose `getVaultEntireData` reverts at `blockNumber`: left out of
+   *  `vaults`. Absent when every vault answered. */
+  skipped?: FluidSkippedVault[];
   summary: {
     total: number;
     configured: number;
@@ -162,6 +183,8 @@ export interface FluidVaultsChainResponse {
     smart: number;
     /** Configured vaults whose oracle answers 0. */
     oracleSilent: number;
+    /** Vaults left out because the resolver's read of them reverts. Absent when none. */
+    skipped?: number;
   };
   /** True when the chain read failed and we returned an empty roster. */
   chainStale: boolean;
@@ -176,19 +199,43 @@ function empty(): FluidVaultsChainResponse {
   };
 }
 
+type VaultData = ReadContractReturnType<typeof FLUID_VAULT_RESOLVER_ABI, "getVaultsEntireData">[number];
+
 const isZeroAddr = (a: string | undefined) => !a || BigInt(a) === ZERO;
 
 export async function loadFluidVaultsFromChain(): Promise<FluidVaultsChainResponse> {
   try {
-    const client = alchemyClient();
-    const [blockNumber, all] = await Promise.all([
-      client.getBlockNumber().then(Number),
-      client.readContract({
-        address: FLUID_ADDRESSES.VAULT_RESOLVER as `0x${string}`,
-        abi: FLUID_VAULT_RESOLVER_ABI,
-        functionName: "getVaultsEntireData",
-      }),
-    ]);
+    const client = headReadsClient();
+    const blockNumber = Number(await client.getBlockNumber());
+    const resolver = FLUID_ADDRESSES.VAULT_RESOLVER as `0x${string}`;
+    const at = BigInt(blockNumber);
+
+    // The roster, then each vault on its own in one multicall that lets a failed
+    // entry fail alone: the whole-roster getVaultsEntireData() reverts as a unit
+    // when any one vault's getVaultEntireData reverts (five do since block
+    // 26,207,288). A vault whose read fails is left out and named in `skipped`.
+    const addresses = await client.readContract({
+      address: resolver,
+      abi: FLUID_VAULT_RESOLVER_ROSTER_ABI,
+      functionName: "getAllVaultsAddresses",
+      blockNumber: at,
+    });
+    const reads = await client.multicall({
+      contracts: addresses.map((vault) => ({
+        address: resolver,
+        abi: FLUID_VAULT_RESOLVER_ROSTER_ABI,
+        functionName: "getVaultEntireData" as const,
+        args: [vault] as const,
+      })),
+      allowFailure: true,
+      blockNumber: at,
+    });
+    const all: VaultData[] = [];
+    const skipped: FluidSkippedVault[] = [];
+    reads.forEach((r, i) => {
+      if (r.status === "success") all.push(r.result as unknown as VaultData);
+      else skipped.push({ vault: addresses[i].toLowerCase(), rosterIndex: i });
+    });
 
     // Name every token leg in one cached multicall — skip smart legs (DEX
     // shares, not a token: null symbol by convention) and skip native ETH,
@@ -400,7 +447,9 @@ export async function loadFluidVaultsFromChain(): Promise<FluidVaultsChainRespon
 
     return {
       blockNumber,
+      head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber),
       vaults,
+      ...(skipped.length > 0 ? { skipped } : {}),
       summary: {
         total: vaults.length,
         configured: vaults.filter((v) => v.configured).length,
@@ -408,6 +457,7 @@ export async function loadFluidVaultsFromChain(): Promise<FluidVaultsChainRespon
         tokenPair: vaults.filter((v) => !v.isSmartCol && !v.isSmartDebt).length,
         smart: vaults.filter((v) => v.isSmartCol || v.isSmartDebt).length,
         oracleSilent: vaults.filter((v) => v.configured && v.oraclePriceLiquidate == null).length,
+        ...(skipped.length > 0 ? { skipped: skipped.length } : {}),
       },
       chainStale: false,
     };

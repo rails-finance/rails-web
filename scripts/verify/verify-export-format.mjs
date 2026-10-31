@@ -26,7 +26,7 @@
 //       a box file without the chain columns (a server that does not attach
 //       them) come out of the proxy with every Supply/Debt Balance cell empty
 //       (Aave V3 and SparkLend fixtures).
-//   F5  REFUSAL — with the chain reader unreachable, the proxy refuses the
+//   F5  REFUSAL — with the chain reader and the api's token_meta unreachable, the proxy refuses the
 //       file (EXPORT_TOKEN_META) and the in-browser serializer writes "not
 //       loaded" in every Amount cell, rather than a stand-in's 18 decimals
 //       (Aave V3 and SparkLend fixtures).
@@ -113,7 +113,11 @@ const BREAK = process.env.BREAK ?? "";
 
 // ── the refusal arm runs in a child with the chain reader unreachable ────────
 if (process.env.VERIFY_EXPORT_REFUSAL_ARM) {
-  if (process.env.VERIFY_RPC_OVERRIDE) process.env.ALCHEMY_URL = process.env.VERIFY_RPC_OVERRIDE;
+  if (process.env.VERIFY_RPC_OVERRIDE) {
+    process.env.ALCHEMY_URL = process.env.VERIFY_RPC_OVERRIDE;
+    // Token metadata is read through the api first (erc20-meta.ts); cut that source too.
+    process.env.RAILS_API_URL = process.env.VERIFY_RPC_OVERRIDE;
+  }
   const { formatQueuedExport } = await import("../../lib/sources/api/queued-export-format.ts");
   const { eventsToCsv } = await import("../../lib/shared/events-to-csv.ts");
   const { buildAaveV3Timeline } = await import("../../lib/sources/api/aave-v3-timeline.ts");

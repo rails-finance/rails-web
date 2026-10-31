@@ -22,6 +22,7 @@
 
 import type { Provenance, ProvVerify } from "@/components/shared/provenance";
 import { FLUID_ADDRESSES } from "./asset-catalog";
+import { stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 
 const LANE_VIA = "GET /api/chain/fluid/position";
 
@@ -35,7 +36,7 @@ const recompute = (text: string): ProvVerify => ({ kind: "recompute", text });
 
 /** Position-card / narration settled figure — the resolver's live read at the
  *  head block (the page's own eth_call, not the worker's stamped sweep). */
-export const liveSettledProv = (side: "supply" | "borrow", sym: string, blockNumber?: number | null): Provenance => ({
+const liveSettledProv_ = (side: "supply" | "borrow", sym: string, blockNumber?: number | null): Provenance => ({
   kind: "chain",
   pclass: "state",
   verify: recompute(
@@ -48,7 +49,7 @@ export const liveSettledProv = (side: "supply" | "borrow", sym: string, blockNum
 
 /** A governance risk line (collateralFactor / liquidationThreshold /
  *  liquidationMaxLimit / liquidationPenalty) from the vault's config block. */
-export const vaultConfigProv = (what: string, field: string, vault: string, pair?: string): Provenance => ({
+const vaultConfigProv_ = (what: string, field: string, vault: string, pair?: string): Provenance => ({
   kind: "chain",
   pclass: "state",
   verify: recompute(`Re-run VaultResolver.positionByNftId (or getVaultEntireData) and read configs.${field}`),
@@ -58,7 +59,7 @@ export const vaultConfigProv = (what: string, field: string, vault: string, pair
 });
 
 /** The position's ratio in the engine's own space. */
-export const fluidRatioProv = (colSym: string, debtSym: string, vault: string, pair?: string): Provenance => ({
+const fluidRatioProv_ = (colSym: string, debtSym: string, vault: string, pair?: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   verify: recompute(
@@ -77,7 +78,7 @@ export const fluidRatioProv = (colSym: string, debtSym: string, vault: string, p
 
 /** Liquidation price — the debt-per-col price at which the ratio hits the
  *  vault's liquidation threshold. */
-export const fluidLiqPriceProv = (colSym: string, debtSym: string, vault: string, pair?: string): Provenance => ({
+const fluidLiqPriceProv_ = (colSym: string, debtSym: string, vault: string, pair?: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   verify: recompute("Recompute borrow ÷ (supply × liquidationThreshold) from the same positionByNftId call"),
@@ -96,7 +97,7 @@ export const fluidLiqPriceProv = (colSym: string, debtSym: string, vault: string
  *  the resolver's rates block (exchangePricesAndRates.borrowRateVault, a
  *  1e2-precision percent). Null on a smart debt leg, where the figure is only
  *  the vault's own component. */
-export const liveBorrowRateProv = (vault: string, pair?: string): Provenance => ({
+const liveBorrowRateProv_ = (vault: string, pair?: string): Provenance => ({
   kind: "chain",
   pclass: "state",
   verify: recompute("Re-run VaultResolver.positionByNftId and read vaultData.exchangePricesAndRates.borrowRateVault"),
@@ -105,3 +106,35 @@ export const liveBorrowRateProv = (vault: string, pair?: string): Provenance => 
   contract: vaultContract(vault, pair),
   via: `${LANE_VIA} · VaultResolver.positionByNftId @ head · exchangePricesAndRates.borrowRateVault`,
 });
+
+// Each receipt over the live read, stamped with rails-server's read of its block
+// when the reader read through it (`readBy`, last).
+export const liveSettledProv = (
+  side: "supply" | "borrow",
+  sym: string,
+  blockNumber?: number | null,
+  readBy?: ServerRead | null,
+): Provenance => stampServerRead(liveSettledProv_(side, sym, blockNumber), readBy);
+export const vaultConfigProv = (
+  what: string,
+  field: string,
+  vault: string,
+  pair?: string,
+  readBy?: ServerRead | null,
+): Provenance => stampServerRead(vaultConfigProv_(what, field, vault, pair), readBy);
+export const fluidRatioProv = (
+  colSym: string,
+  debtSym: string,
+  vault: string,
+  pair?: string,
+  readBy?: ServerRead | null,
+): Provenance => stampServerRead(fluidRatioProv_(colSym, debtSym, vault, pair), readBy);
+export const fluidLiqPriceProv = (
+  colSym: string,
+  debtSym: string,
+  vault: string,
+  pair?: string,
+  readBy?: ServerRead | null,
+): Provenance => stampServerRead(fluidLiqPriceProv_(colSym, debtSym, vault, pair), readBy);
+export const liveBorrowRateProv = (vault: string, pair?: string, readBy?: ServerRead | null): Provenance =>
+  stampServerRead(liveBorrowRateProv_(vault, pair), readBy);

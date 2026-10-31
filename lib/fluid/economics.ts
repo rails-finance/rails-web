@@ -34,6 +34,7 @@ import { isFluidEvent } from "@/lib/shared/types/event-shape";
 import { settledNowProv, positionSigmaProv, fluidLifetimeFlowProv } from "@/lib/fluid/event-provenance";
 import { poolShareLabel } from "@/lib/fluid/asset-catalog";
 import { liveSettledProv } from "@/lib/fluid/live-provenance";
+import { serverReadOf } from "@/lib/shared/server-head-read";
 import type { ChainTruthTowerData, TowerLine } from "@/lib/shared/chain-truth-economics";
 import { scaleBaseUnits, type TimelineOpeningBalance } from "@/lib/shared/timeline-opening-balance";
 
@@ -212,7 +213,7 @@ export function computeFluidEconomics(
         usd: null,
         prov:
           liveExact != null
-            ? liveSettledProv(side, sym, live?.blockNumber)
+            ? liveSettledProv(side, sym, live?.blockNumber, serverReadOf(live))
             : settled != null
               ? settledNowProv(side, sym, view.settled?.updatedBlock)
               : positionSigmaProv(side, sym),

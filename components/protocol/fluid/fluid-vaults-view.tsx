@@ -63,6 +63,7 @@ import {
 import type { FluidVaultRow, FluidVaultsChainResponse, LegToken } from "@/lib/sources/chain/fluid-vaults";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { BlockRef } from "@/components/shared/block-ref";
+import { serverReadOf, type ServerRead } from "@/lib/shared/server-head-read";
 
 const pctText = (f: number | null, dp = 0) => (f == null ? "—" : `${(f * 100).toFixed(dp)}%`);
 
@@ -124,10 +125,11 @@ function LegSize({
 /** One vault row — a keyed component (not a `.map` callback) so it can own
  *  its own `useReceiptRegistry()` hook, the same per-row scoping the
  *  Aave-family table uses. */
-function VaultRow({ v, block }: { v: FluidVaultRow; block: number }) {
+function VaultRow({ v, block, readBy }: { v: FluidVaultRow; block: number; readBy?: ServerRead }) {
   const registry = useReceiptRegistry();
   const coords: FluidVaultCoords = {
     blockNumber: block,
+    readBy,
     vault: v.vault,
     vaultId: v.vaultId,
     pair: `${legLabel(v.supplySymbol, v.supplyPool)} / ${legLabel(v.borrowSymbol, v.borrowPool)}`,
@@ -286,8 +288,8 @@ export function FluidVaultsStamp({ data }: { data: FluidVaultsChainResponse }) {
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · one{" "}
-      <span className="text-foreground">getVaultsEntireData()</span> call to the{" "}
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · each vault&rsquo;s{" "}
+      <span className="text-foreground">getVaultEntireData()</span> read from the{" "}
       <a
         href={explorerUrl(MAINNET_CHAIN_ID, "address", "0xa5c3e16523eeeddcc34706b0e6be88b4c6ea95cc")}
         target="_blank"
@@ -303,6 +305,7 @@ export function FluidVaultsStamp({ data }: { data: FluidVaultsChainResponse }) {
 type SortKey = "vault" | "ladder" | "price" | "supplied" | "borrowed" | "borrowRate" | "supplyRate";
 
 export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
+  const readBy = serverReadOf(data);
   // Hook first (before the early return), so the receipts registry is stable
   // across renders regardless of the stale branch — the compound-markets order.
   const registry = useReceiptRegistry();
@@ -381,8 +384,8 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
           {
             slot: "roster",
             label: "Vaults minted",
-            value: <Prov info={fluidRosterProv({ blockNumber: data.blockNumber })}>{data.summary.total}</Prov>,
-            title: "Every vault the factory has ever minted, configured or not.",
+            value: <Prov info={fluidRosterProv({ blockNumber: data.blockNumber, skipped: data.skipped?.length, readBy })}>{data.summary.total}</Prov>,
+            title: "Every vault the VaultResolver reads at this block, configured or not.",
           },
           {
             slot: "population",
@@ -428,6 +431,18 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
                 minted but never configured
               </span>
             )}
+            {(data.summary.skipped ?? 0) > 0 && (
+              <span>
+                <span
+                  data-prov-exempt=""
+                  className="text-foreground"
+                  title="Vaults in the VaultResolver's roster whose getVaultEntireData read reverts at this block."
+                >
+                  {data.summary.skipped}
+                </span>{" "}
+                left out, the VaultResolver&rsquo;s read reverts
+              </span>
+            )}
             {data.summary.oracleSilent > 0 && (
               <span>
                 <span
@@ -459,11 +474,34 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
           </thead>
           <tbody>
             {sortedVaults.map((v) => (
-              <VaultRow key={v.vault} v={v} block={data.blockNumber} />
+              <VaultRow key={v.vault} v={v} block={data.blockNumber} readBy={readBy} />
             ))}
           </tbody>
         </table>
       </div>
+
+      {data.skipped && data.skipped.length > 0 && (
+        <section className="mt-4">
+          <p className="max-w-3xl text-[11px] leading-relaxed text-rb-500">
+            {data.skipped.length} {data.skipped.length === 1 ? "vault is" : "vaults are"} left out of the table:{" "}
+            {data.skipped.map((v, i) => (
+              <span key={v.vault}>
+                {i > 0 && "; "}
+                <a
+                  href={explorerUrl(MAINNET_CHAIN_ID, "address", v.vault)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link-external tabular-nums"
+                >
+                  {v.vault}
+                </a>
+              </span>
+            ))}
+            . The VaultResolver&rsquo;s read of {data.skipped.length === 1 ? "this vault" : "these vaults"} reverts at block{" "}
+            {data.blockNumber}.
+          </p>
+        </section>
+      )}
 
       {shells.length > 0 && (
         <section className="mt-8">
