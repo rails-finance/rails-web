@@ -484,7 +484,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
       refreshing={refreshing}
       viewKey={viewKey}
       pagination={pagination}
-      error={error != null ? (renderError?.(error) ?? <ListingUnavailable noun={noun} onRetry={retry} />) : undefined}
+      error={error != null ? (renderError?.(error) ?? <ListingUnavailable onRetry={retry} />) : undefined}
       renderCard={renderCard}
       hrefFor={hrefFor}
       keyFor={keyFor}
