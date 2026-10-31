@@ -105,6 +105,7 @@ import {
   aaveV4FocusEvents,
   isAaveV4PositionEvent,
 } from "@/lib/aave-v4/flows-timeline";
+import { LifetimeFlowsSkeleton } from "@/components/shared/lifetime-flows-skeleton";
 import { useAaveFamilyHealth } from "@/hooks/useAaveFamilyHealth";
 import { AAVE_V4_HEALTH_SOURCE } from "@/lib/aave-v4/flows-health";
 import { fetchFlowSeries, type FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
@@ -965,14 +966,18 @@ function AaveV4SpokeTowerBlock({
   // Its day rows and daily prices come from the index for the spoke's whole
   // history. A failed read leaves the towers alone.
   const [flowSeries, setFlowSeries] = useState<FlowSeries | null>(null);
+  const [flowsFailed, setFlowsFailed] = useState(false);
   useEffect(() => {
     if (!flowSeriesEnabled) return;
     const ctl = new AbortController();
     setFlowSeries(null);
+    setFlowsFailed(false);
     fetchFlowSeries("/api/aave-v4/flows", { wallet, spoke: spokeName }, ctl.signal)
       .then(setFlowSeries)
       .catch((err) => {
-        if (!ctl.signal.aborted) console.warn("Lifetime flows series not read:", err);
+        if (ctl.signal.aborted) return;
+        console.warn("Lifetime flows series not read:", err);
+        setFlowsFailed(true);
       });
     return () => ctl.abort();
   }, [wallet, spokeName, flowSeriesEnabled]);
@@ -1018,7 +1023,10 @@ function AaveV4SpokeTowerBlock({
   // stands alone, as where there is no timeline.
   const [life, setLife] = useState<FlowsLife>("full");
   const scrubbed = flowTimeline != null && life !== "none";
-  const ledgerShown = !scrubbed || ledgerOpen;
+  // The series is still on its way: the panel holds its settled shape in the
+  // loading skeleton, and the tower waits (a failed read lets it stand alone).
+  const flowsPending = flowSeriesEnabled && flowSeries == null && !flowsFailed;
+  const ledgerShown = !flowsPending && (!scrubbed || ledgerOpen);
   const title = (
     <span className={`${SECTION_HEADING} inline-flex items-center gap-1.5 text-rb-500`}>Lifetime flows</span>
   );
@@ -1068,6 +1076,12 @@ function AaveV4SpokeTowerBlock({
                   </span>
                 )}
               </div>
+            </div>
+          )}
+          {flowsPending && (
+            <div data-flows-read="pending">
+              <div className="flex min-h-[28px] items-center">{title}</div>
+              <LifetimeFlowsSkeleton />
             </div>
           )}
           <div id="aave-v4-flows-ledger" hidden={!ledgerShown}>

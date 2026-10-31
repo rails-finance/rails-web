@@ -54,7 +54,7 @@
 
 import { unstable_cache } from "next/cache";
 import { parseAbi } from "viem";
-import { chainBatchClient } from "./rpc";
+import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
 import { resolveErc20Meta } from "./erc20-meta";
 import type { RawAmount } from "./morpho-base-vault";
 import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
@@ -161,7 +161,7 @@ async function readDirectory(): Promise<MorphoBaseVaultDirectoryResponse> {
   const served = await loadMorphoBaseVaultRoster();
   const roster = served.vaults;
   try {
-    const client = chainBatchClient(MORPHO_BASE_CHAIN_ID);
+    const client = vaultHeadClient(MORPHO_BASE_CHAIN_ID);
     // ONE block read; every call below is pinned to it.
     const blockNumber = await client.getBlockNumber();
 

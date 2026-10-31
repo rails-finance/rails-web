@@ -44,6 +44,7 @@
 
 import { parseAbi } from "viem";
 import { chainBatchClient } from "./rpc";
+import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import { MORPHO_BASE_BLUE, MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { type MorphoBaseVaultCatalogEntry, type MorphoBaseVaultFactory } from "@/lib/morpho-base/vault-catalog";
@@ -517,7 +518,7 @@ export async function loadMorphoBaseVault(
   const roster = await loadMorphoBaseVaultRoster();
   const row = roster.byAddress.get(vaultAddress);
   try {
-    const client = chainBatchClient(MORPHO_BASE_CHAIN_ID);
+    const client = vaultHeadClient(MORPHO_BASE_CHAIN_ID);
     // ONE block read; everything after it is pinned to it. A caller reading
     // several vaults as one page pins the block itself and passes it in, so the
     // vaults it stacks are one reading rather than several.
@@ -813,7 +814,7 @@ export async function loadMorphoBaseHolderShape(
   holder: string,
   blockNumber: bigint,
 ): Promise<MorphoBaseVaultHolderShape | null> {
-  const client = chainBatchClient(MORPHO_BASE_CHAIN_ID);
+  const client = vaultHeadClient(MORPHO_BASE_CHAIN_ID);
   // ZERO_ADDR for both vault operands: neither flag can be true against it, and
   // no MetaMorpho or ERC-4626 answers the zero address from `asset()`.
   const shape = await readHolderShape(client, holder.toLowerCase(), blockNumber, ZERO_ADDR, ZERO_ADDR);

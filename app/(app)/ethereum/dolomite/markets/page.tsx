@@ -19,6 +19,7 @@
 // for, so the first paint carries the real figures.
 
 import { DolomiteMarketsView, DolomiteMarketsStamp } from "@/components/protocol/dolomite/dolomite-markets-view";
+import { dolomiteEventFallbackContent } from "@/lib/shared/learn-more-content";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadDolomiteMarkets } from "@/lib/sources/chain/dolomite-markets";
 import { protocolForHref } from "@/lib/shared/protocols";
@@ -51,6 +52,7 @@ export default async function DolomiteMarketsPage() {
         <SubPageHeader
           protocol={PROTOCOL}
           title="Markets & the risk ladder over them"
+          learnMore={dolomiteEventFallbackContent()}
           stamp={<DolomiteMarketsStamp data={data} />}
         />
 

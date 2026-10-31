@@ -52,6 +52,7 @@
 
 import { parseAbi } from "viem";
 import { chainBatchClient } from "./rpc";
+import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
 import {
   loadMorphoBaseHolderShape,
   loadMorphoBaseVault,
@@ -274,7 +275,7 @@ export async function loadMorphoBaseHolderSummary(holder: string): Promise<Morph
   const address = holder.toLowerCase() as `0x${string}`;
   const served = await loadMorphoBaseVaultRoster();
   try {
-    const client = chainBatchClient(MORPHO_BASE_CHAIN_ID);
+    const client = vaultHeadClient(MORPHO_BASE_CHAIN_ID);
     const blockNumber = await client.getBlockNumber();
     const swept = await sweepHolderBalances(client, address, blockNumber);
     const held: MorphoBaseHolderSummaryVault[] = swept
@@ -327,7 +328,7 @@ export async function loadMorphoBaseHolderExposure(holder: string): Promise<Morp
   const address = holder.toLowerCase() as `0x${string}`;
   const served = await loadMorphoBaseVaultRoster();
   try {
-    const client = chainBatchClient(MORPHO_BASE_CHAIN_ID);
+    const client = vaultHeadClient(MORPHO_BASE_CHAIN_ID);
     // ONE block read. Every balance, every leg and the code read below are
     // pinned to it, so the vaults stacked on the page are one moment.
     const blockNumber = await client.getBlockNumber();

@@ -11,7 +11,9 @@
 //     and `totalSupply()` per distinct vault on the page, read at ONE block this
 //     route pins for the whole response. Twenty cards is ≤ 40 + 18 calls over
 //     two Multicall3 rounds (the second depends on the first), well under the
-//     batch ceiling. The response states that block once.
+//     batch ceiling. The response states that block once. The block and the
+//     rounds are asked of rails-server first (lib/sources/api/vault-head-client.ts):
+//     one block a chain per 30 s, each round read once at it.
 //
 // A FAILED OVERLAY IS AN UNREAD FIGURE, NOT A ZERO. If the chain read throws —
 // no key, a refused batch, a timeout — every row answers with `live: null` and
@@ -59,7 +61,7 @@ import { VAULT_SIZE_BRACKETS, VAULT_SIZE_UNPRICED } from "@/lib/aave-vaults/posi
 import { AAVE_VAULT_FAMILY_ORDER } from "@/lib/aave-vaults/vault-catalog";
 import { loadMorphoBaseVaultRoster } from "@/lib/morpho-base/vault-roster";
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
-import { chainBatchClient } from "@/lib/sources/chain/rpc";
+import { vaultHeadClient } from "@/lib/sources/api/vault-head-client";
 import { readBlockTimes } from "@/lib/sources/chain/vault-block-reads";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
@@ -235,8 +237,9 @@ async function applyOverlay(
 ): Promise<{ blockNumber: number; finalized: number | null } | null> {
   if (rows.length === 0) return null;
   try {
-    const client = chainBatchClient(chainId);
-    // The head this page is read at, and the lane's OWN `finalized` block —
+    const client = vaultHeadClient(chainId);
+    // The head this page is read at, and the lane's OWN `finalized` block (the
+    // leg rails-server read the head on, or this deployment's node) —
     // asked together, in one round trip, because the second is what the
     // section's history store cuts at and the listing states the two side by
     // side rather than a lag anybody assumed. The tag means different things
