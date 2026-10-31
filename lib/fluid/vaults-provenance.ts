@@ -37,7 +37,7 @@ import { stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { FLUID_ADDRESSES } from "@/lib/fluid/asset-catalog";
 
 const LANE = "live Fluid vault reads (/fluid/vaults)";
-const ROSTER_VIA = `${LANE} · VaultResolver.getVaultsEntireData() @ head`;
+const ROSTER_VIA = `${LANE} · VaultResolver.getAllVaultsAddresses() + getVaultEntireData(vault) @ head`;
 
 /** DexResolver — HEAD-ONLY row from the vaults loader; a smart leg's per-share
  *  composition is read from it (never re-derived from reserves ÷ totalShares). */
@@ -62,6 +62,8 @@ export interface FluidVaultCoords {
   /** Collateral / debt leg symbols, for the prose. */
   colSym?: string | null;
   debtSym?: string | null;
+  /** Vaults left out of the roster because the resolver's read of them reverts. */
+  skipped?: number;
   /** rails-server's read of the block, when it answered every read of the roster. */
   readBy?: ServerRead | null;
 }
@@ -97,7 +99,7 @@ const fluidRosterProv_ = (coords: FluidVaultCoords): Provenance => ({
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("VaultResolver.getVaultsEntireData", coords),
-  summary: `Vaults minted — the length of the VaultResolver's own \`getVaultsEntireData()\` array${atBlock(coords)}. Fluid keeps no market catalog: the factory mints one vault per pair and the resolver returns every one in a single call, so the roster is what the protocol says it is.`,
+  summary: `Vaults listed — the VaultResolver's own \`getAllVaultsAddresses()\` roster${atBlock(coords)}, each vault read with \`getVaultEntireData(vault)\`. Fluid keeps no market catalog: the factory mints one vault per pair and the resolver names every one.${coords.skipped ? ` ${coords.skipped} ${coords.skipped === 1 ? "vault" : "vaults"} in the roster ${coords.skipped === 1 ? "is" : "are"} left out because the resolver's read of ${coords.skipped === 1 ? "it" : "them"} reverts at this block.` : ""}`,
   contract: VAULT_RESOLVER_CONTRACT,
   via: ROSTER_VIA,
 });
