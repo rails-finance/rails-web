@@ -43,6 +43,7 @@ import {
   fetchSparkOraclePrices,
   type SparkPositionChainResponse,
 } from "@/lib/api/fetch-spark-position";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { SPARK_FOLDER_REGISTER, SPARK_TIMELINE_RUNS } from "@/lib/spark/timeline-runs";
 import { fetchSparkGroupedTimeline, type SparkGroupedTimelineResult } from "@/lib/api/fetch-spark-timeline";
@@ -186,6 +187,11 @@ export default function SparkPositionDetail({
   const [opening, setOpening] = useState<TimelineOpeningBalance | null>(initialOpening);
   const [openingFailed, setOpeningFailed] = useState(false);
   const [loading, setLoading] = useState(!seeded);
+  // The client read of the tail failed too (the server's had already): the
+  // history slot says the index did not answer, until a retry lands
+  // (ui-jobs 461). Bumping `tailTry` re-runs the read.
+  const [tailFailed, setTailFailed] = useState(false);
+  const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<SparkPositionChainResponse | null>(null);
   // Whether the live Pool read has ANSWERED, separate from whether it gave us
   // anything: a stale read leaves `chain` null, and the market notes have to
@@ -199,11 +205,12 @@ export default function SparkPositionDetail({
   // development double-invoke from issuing the read twice.
   const startedTail = useRef(false);
   useEffect(() => {
-    if (seeded || startedTail.current) return;
+    if (seeded || (startedTail.current && tailTry === 0)) return;
     startedTail.current = true;
     if (!wallet) return;
     (async () => {
       setLoading(true);
+      setTailFailed(false);
       try {
         // The SAME choice the server half made (`position-page-data.ts`), for
         // the SSR miss that lands here: ONE timeline read, in the shape the URL
@@ -223,12 +230,15 @@ export default function SparkPositionDetail({
         setCutoffBlock(tData?.cutoffBlock ?? null);
         setLaneInterest(tData?.laneInterest ?? null);
         setGroupedTail(grouped);
+      } catch (err) {
+        console.error("spark position: the tail read failed", err);
+        setTailFailed(true);
       } finally {
         setLoading(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [tailTry]);
 
   // The opening balance — the second of the windowed page's two requests, and
   // deliberately not merged into the first: the rows land and the list is
@@ -873,6 +883,9 @@ export default function SparkPositionDetail({
               liveNotes={liveNotes}
               liveNotesPending={liveNotesPending}
               tl={tl}
+              emptyLabel={
+                tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
+              }
               // Both grouping paths, side by side: the specs group the flat
               // answer client-side, the register draws the folders the index
               // served. Only one is ever in force on a given load — see the

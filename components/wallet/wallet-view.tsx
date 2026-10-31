@@ -11,6 +11,7 @@
 // Aave V3 Base account is shown with a "not read" mark, and every wallet,
 // a sink included, is drawn the same with one line naming its count.
 
+import { IndexNotice } from "@/components/shared/index-notice";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { WalletHeading } from "@/components/shared/wallet-heading";
@@ -430,9 +431,7 @@ export function WalletView({
 
         {read.error ? (
           <section className="flex max-w-xl flex-col gap-3" data-wallet-error="">
-            <p className="text-sm text-foreground/80">
-              The wallet&rsquo;s positions could not be read. Try again in a minute.
-            </p>
+            <IndexNotice className="text-sm text-foreground/80" />
           </section>
         ) : all.length === 0 ? (
           <section className="flex max-w-xl flex-col gap-3" data-wallet-empty="">

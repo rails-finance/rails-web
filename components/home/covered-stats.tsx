@@ -1,6 +1,7 @@
 import type { CoveredPositions } from "@/lib/home/covered-positions";
 import type { HomeStats } from "@/lib/home/home-stats";
 import { CoveredStatsNote } from "@/components/home/covered-stats-note";
+import { IndexNotice } from "@/components/shared/index-notice";
 import { launchedProductionChainNames } from "@/lib/shared/protocols";
 import { formatMonthDay } from "@/lib/date";
 
@@ -37,8 +38,8 @@ const COUNTED_SCOPE = launchedProductionChainNames();
  * explorers are all unlaunched leaves both in one edit, so the sentence cannot
  * claim coverage of a chain the site does not link.
  *
- * Null when any one roster failed to resolve — the band is omitted entirely
- * rather than shown short, matching the loader's all-or-nothing contract.
+ * When any one roster failed to resolve the band is the index notice
+ * rather than a short count, matching the loader's all-or-nothing contract.
  *
  * Fixed "en-US" grouping so the server and client render identical text.
  */
@@ -65,7 +66,13 @@ function walletClauseIsInScope(covered: CoveredPositions, stats: HomeStats | nul
 }
 
 export function CoveredStats({ covered, stats }: { covered: CoveredPositions | null; stats: HomeStats | null }) {
-  if (!covered) return null;
+  // Null when the index did not answer for any one roster (ui-jobs 461).
+  if (!covered)
+    return (
+      <div className="w-full max-w-7xl mx-auto px-4 text-center">
+        <IndexNotice />
+      </div>
+    );
   const walletClause = walletClauseIsInScope(covered, stats) ? stats : null;
 
   return (
