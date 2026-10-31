@@ -33,10 +33,11 @@
 // A state read whose block lived only in a sentence could not be re-run.
 
 import type { Provenance } from "@/components/shared/provenance";
+import { stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { FLUID_ADDRESSES } from "@/lib/fluid/asset-catalog";
 
 const LANE = "live Fluid vault reads (/fluid/vaults)";
-const ROSTER_VIA = `${LANE} · VaultResolver.getVaultsEntireData() @ head`;
+const ROSTER_VIA = `${LANE} · VaultResolver.getAllVaultsAddresses() + getVaultEntireData(vault) @ head`;
 
 /** DexResolver — HEAD-ONLY row from the vaults loader; a smart leg's per-share
  *  composition is read from it (never re-derived from reserves ÷ totalShares). */
@@ -61,7 +62,18 @@ export interface FluidVaultCoords {
   /** Collateral / debt leg symbols, for the prose. */
   colSym?: string | null;
   debtSym?: string | null;
+  /** Vaults left out of the roster because the resolver's read of them reverts. */
+  skipped?: number;
+  /** rails-server's read of the block, when it answered every read of the roster. */
+  readBy?: ServerRead | null;
 }
+
+/** A builder's receipt, stamped with the rails-server read its coordinates
+ *  (the last argument) carry. */
+const stamped =
+  <A extends unknown[]>(build: (...a: A) => Provenance) =>
+  (...a: A): Provenance =>
+    stampHeadRead(build(...a), (a[a.length - 1] as FluidVaultCoords | undefined)?.readBy);
 
 const vaultContract = (coords?: FluidVaultCoords): Provenance["contract"] => ({
   name: coords?.pair ? `Fluid vault (${coords.pair})` : "Fluid vault",
@@ -82,12 +94,12 @@ const recompute = (call: string, coords?: FluidVaultCoords): Provenance["verify"
 // ── roster (VaultResolver-level) ─────────────────────────────────────────────
 
 /** The count of vaults minted — the length of getVaultsEntireData()'s own array. */
-export const fluidRosterProv = (coords: FluidVaultCoords): Provenance => ({
+const fluidRosterProv_ = (coords: FluidVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
   verify: recompute("VaultResolver.getVaultsEntireData", coords),
-  summary: `Vaults minted — the length of the VaultResolver's own \`getVaultsEntireData()\` array${atBlock(coords)}. Fluid keeps no market catalog: the factory mints one vault per pair and the resolver returns every one in a single call, so the roster is what the protocol says it is.`,
+  summary: `Vaults listed — the VaultResolver's own \`getAllVaultsAddresses()\` roster${atBlock(coords)}, each vault read with \`getVaultEntireData(vault)\`. Fluid keeps no market catalog: the factory mints one vault per pair and the resolver names every one.${coords.skipped ? ` ${coords.skipped} ${coords.skipped === 1 ? "vault" : "vaults"} in the roster ${coords.skipped === 1 ? "is" : "are"} left out because the resolver's read of ${coords.skipped === 1 ? "it" : "them"} reverts at this block.` : ""}`,
   contract: VAULT_RESOLVER_CONTRACT,
   via: ROSTER_VIA,
 });
@@ -106,7 +118,7 @@ const CONFIG_GLOSS: Record<FluidConfigField, string> = {
 
 /** A vault's governance-set risk rung — one of the config block's 1e4-scaled
  *  percents, read from the vault's own config through getVaultsEntireData. */
-export const fluidVaultConfigProv = (field: FluidConfigField, coords: FluidVaultCoords): Provenance => ({
+const fluidVaultConfigProv_ = (field: FluidConfigField, coords: FluidVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
@@ -120,7 +132,7 @@ export const fluidVaultConfigProv = (field: FluidConfigField, coords: FluidVault
 
 /** The vault's own oracle price — DEBT PER COLLATERAL, Fluid's only price
  *  space. There is no USD feed anywhere in the protocol. */
-export const fluidOraclePriceProv = (coords: FluidVaultCoords): Provenance => ({
+const fluidOraclePriceProv_ = (coords: FluidVaultCoords): Provenance => ({
   kind: "chain",
   pclass: "oracle",
   source: { block: coords.blockNumber },
@@ -135,11 +147,7 @@ export const fluidOraclePriceProv = (coords: FluidVaultCoords): Provenance => ({
 /** A leg's vault total — totalSupplyVault / totalBorrowVault, the vault's own
  *  aggregate on that leg, scaled by the leg's decimals. On a smart leg the
  *  figure is DEX pool SHARES (a quantity, not a token). */
-export const fluidVaultSizeProv = (
-  side: "supply" | "borrow",
-  smartLeg: boolean,
-  coords: FluidVaultCoords,
-): Provenance => {
+const fluidVaultSizeProv_ = (side: "supply" | "borrow", smartLeg: boolean, coords: FluidVaultCoords): Provenance => {
   const field = side === "supply" ? "totalSupplyVault" : "totalBorrowVault";
   const unit = smartLeg
     ? "DEX pool shares — the leg holds shares of a Fluid DEX pool, a quantity, not a token"
@@ -159,7 +167,7 @@ export const fluidVaultSizeProv = (
  *  resolved through the DexResolver at head. Supply and debt legs are different
  *  instruments backed by different reserves, so each reads its OWN per-share
  *  pair (perSupplyShare vs perBorrowShare). Composition, NOT price. */
-export const fluidSmartLegProv = (side: "supply" | "borrow", coords: FluidVaultCoords): Provenance => {
+const fluidSmartLegProv_ = (side: "supply" | "borrow", coords: FluidVaultCoords): Provenance => {
   const shareField = side === "supply" ? "totalSupplyVault" : "totalBorrowVault";
   const perField = side === "supply" ? "token{0,1}PerSupplyShare" : "token{0,1}PerBorrowShare";
   return {
@@ -191,7 +199,7 @@ export const fluidSmartLegProv = (side: "supply" | "borrow", coords: FluidVaultC
 /** A vault rate (annual percent) from the resolver's rates block. Only stated
  *  on a token leg — a smart leg's resolver rate is only the vault's own
  *  reward/fee component, not the full rate. */
-export const fluidVaultRateProv = (side: "supply" | "borrow", coords: FluidVaultCoords): Provenance => {
+const fluidVaultRateProv_ = (side: "supply" | "borrow", coords: FluidVaultCoords): Provenance => {
   const field = side === "supply" ? "supplyRateVault" : "borrowRateVault";
   return {
     kind: "chain",
@@ -203,3 +211,10 @@ export const fluidVaultRateProv = (side: "supply" | "borrow", coords: FluidVault
     via: `${LANE} · VaultResolver.getVaultsEntireData() · exchangePricesAndRates.${field} @ head`,
   };
 };
+
+export const fluidRosterProv = stamped(fluidRosterProv_);
+export const fluidVaultConfigProv = stamped(fluidVaultConfigProv_);
+export const fluidOraclePriceProv = stamped(fluidOraclePriceProv_);
+export const fluidVaultSizeProv = stamped(fluidVaultSizeProv_);
+export const fluidSmartLegProv = stamped(fluidSmartLegProv_);
+export const fluidVaultRateProv = stamped(fluidVaultRateProv_);

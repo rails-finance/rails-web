@@ -28,7 +28,8 @@ const DESCRIPTION_PLACEHOLDER: Record<FeedbackType, string> = {
   general: "What's working, what isn't, what you'd like to see?",
 };
 
-const FIELD_CLASSES = "w-full rounded-xl border border-rb-200 dark:border-rb-700 px-3 py-2 text-sm input-focus";
+const FIELD_CLASSES =
+  "w-full rounded-xl border border-rb-200 dark:border-rb-700 px-3 py-2 text-base sm:text-sm input-focus";
 const FIELD_BG = { background: "var(--surface-field)" } as const;
 
 export interface FeedbackModalProps {

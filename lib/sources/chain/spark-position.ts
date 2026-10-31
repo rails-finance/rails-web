@@ -17,7 +17,12 @@ import { SPARK_ADDRESSES, SPARK_LT_BY_ADDR } from "@/lib/spark/asset-catalog";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import type { SparkChainReserve, SparkPositionChainResponse } from "@/lib/api/fetch-spark-position";
 import { notCollateralReserves } from "@/lib/aave-v3/collateral-split";
-import { serverSparkPosition } from "@/lib/sources/api/aave-v3-position-head";
+import {
+  serverCollateralSplitInputs,
+  serverSparkPosition,
+  type CollateralSplitInputs,
+} from "@/lib/sources/api/aave-v3-position-head";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 const SPARK_POOL = SPARK_ADDRESSES.POOL as `0x${string}`;
 
@@ -331,10 +336,12 @@ export async function readSparkPositionFromChain(
 /**
  * The listing's collateral split: for each account, the lowercased supplied
  * reserves that back no borrowing (`notCollateralReserves`, the rule the position
- * page reads from `loadSparkPositionFromChain`). One multicall for the
- * accounts' collateral bitmaps and e-mode categories and the reserves'
- * configurations, one for the categories' thresholds. An account any of whose
- * reads failed is absent from the answer, and its row keeps no split.
+ * page reads from `loadSparkPositionFromChain`). The accounts' collateral
+ * bitmaps and e-mode categories, the reserves' configurations and the
+ * categories' thresholds: asked of rails-server first
+ * (`serverCollateralSplitInputs`, one head block), else one multicall for the
+ * first three and one for the thresholds. An account any of whose reads failed
+ * is absent from the answer, and its row keeps no split.
  */
 export async function readSparkNotCollateral(
   accounts: readonly { wallet: string; supplied: readonly string[] }[],
@@ -343,67 +350,16 @@ export async function readSparkNotCollateral(
   const asked = accounts.filter((a) => a.supplied.length > 0);
   if (asked.length === 0) return out;
   try {
-    const client = alchemyClient();
-    const reserves = [...new Set(asked.flatMap((a) => a.supplied.map((r) => r.toLowerCase())))];
-    const results = await client.multicall({
-      allowFailure: true,
-      contracts: [
-        ...asked.flatMap(
-          (a) =>
-            [
-              {
-                address: SPARK_POOL,
-                abi: POOL_ABI,
-                functionName: "getUserConfiguration",
-                args: [getAddress(a.wallet)],
-              },
-              { address: SPARK_POOL, abi: POOL_ABI, functionName: "getUserEMode", args: [getAddress(a.wallet)] },
-            ] as const,
-        ),
-        ...reserves.map(
-          (r) =>
-            ({
-              address: SPARK_POOL,
-              abi: POOL_ABI,
-              functionName: "getReserveData",
-              args: [r as `0x${string}`],
-            }) as const,
-        ),
-      ],
-    });
-    const reserveData = new Map<string, ReserveData>();
-    reserves.forEach((r, i) => {
-      const got = results[asked.length * 2 + i];
-      if (got.status === "success") reserveData.set(r, got.result as unknown as ReserveData);
-    });
-    const userOf = (i: number) => {
-      const cfg = results[i * 2];
-      const em = results[i * 2 + 1];
-      return cfg.status === "success" && em.status === "success"
-        ? { config: cfg.result as bigint, emodeId: Number(em.result as bigint) }
-        : null;
-    };
-    const emodeIds = [...new Set(asked.map((_, i) => userOf(i)?.emodeId ?? 0).filter((id) => id > 0))];
-    const emodeLt = new Map<number, number | null>();
-    if (emodeIds.length > 0) {
-      const cats = await client.multicall({
-        allowFailure: true,
-        contracts: emodeIds.map(
-          (id) => ({ address: SPARK_POOL, abi: POOL_ABI, functionName: "getEModeCategoryData", args: [id] }) as const,
-        ),
-      });
-      emodeIds.forEach((id, i) => {
-        const c = cats[i];
-        if (c.status === "success") emodeLt.set(id, Number(c.result.liquidationThreshold) / PRECISION_BPS);
-      });
-    }
-    asked.forEach((a, i) => {
-      const user = userOf(i);
+    const inputs =
+      (await serverCollateralSplitInputs(SPARK_POOL, MAINNET_CHAIN_ID, asked)) ?? (await chainSparkSplitInputs(asked));
+    asked.forEach((a) => {
+      const user = inputs.users.get(a.wallet.toLowerCase());
       if (!user) return;
-      if (user.emodeId > 0 && !emodeLt.has(user.emodeId)) return;
+      const emodeLt = inputs.emode.get(user.emodeId)?.lt;
+      if (user.emodeId > 0 && emodeLt === undefined) return;
       const reads = [];
       for (const addr of a.supplied.map((r) => r.toLowerCase())) {
-        const data = reserveData.get(addr);
+        const data = inputs.reserves.get(addr);
         if (!data) return;
         reads.push({
           address: addr,
@@ -412,10 +368,77 @@ export async function readSparkNotCollateral(
           inEmode: user.emodeId > 0 && sparkReserveEmodeId(data.configuration) === user.emodeId,
         });
       }
-      out.set(a.wallet.toLowerCase(), notCollateralReserves(reads, emodeLt.get(user.emodeId)));
+      out.set(a.wallet.toLowerCase(), notCollateralReserves(reads, emodeLt));
     });
   } catch {
     // The RPC is down: no row keeps a split.
   }
   return out;
+}
+
+/** The split's inputs from the chain at the latest block: one multicall for the
+ *  accounts' two calls and the reserves' getReserveData, one for the
+ *  categories' getEModeCategoryData. */
+async function chainSparkSplitInputs(
+  asked: readonly { wallet: string; supplied: readonly string[] }[],
+): Promise<Pick<CollateralSplitInputs, "users" | "reserves" | "emode">> {
+  const client = alchemyClient();
+  const reserves = [...new Set(asked.flatMap((a) => a.supplied.map((r) => r.toLowerCase())))];
+  const results = await client.multicall({
+    allowFailure: true,
+    contracts: [
+      ...asked.flatMap(
+        (a) =>
+          [
+            {
+              address: SPARK_POOL,
+              abi: POOL_ABI,
+              functionName: "getUserConfiguration",
+              args: [getAddress(a.wallet)],
+            },
+            { address: SPARK_POOL, abi: POOL_ABI, functionName: "getUserEMode", args: [getAddress(a.wallet)] },
+          ] as const,
+      ),
+      ...reserves.map(
+        (r) =>
+          ({
+            address: SPARK_POOL,
+            abi: POOL_ABI,
+            functionName: "getReserveData",
+            args: [r as `0x${string}`],
+          }) as const,
+      ),
+    ],
+  });
+  const reserveData: CollateralSplitInputs["reserves"] = new Map();
+  reserves.forEach((r, i) => {
+    const got = results[asked.length * 2 + i];
+    if (got.status === "success") {
+      const d = got.result as unknown as ReserveData;
+      reserveData.set(r, { id: d.id, configuration: d.configuration });
+    }
+  });
+  const users: CollateralSplitInputs["users"] = new Map();
+  asked.forEach((a, i) => {
+    const cfg = results[i * 2];
+    const em = results[i * 2 + 1];
+    if (cfg.status === "success" && em.status === "success")
+      users.set(a.wallet.toLowerCase(), { config: cfg.result as bigint, emodeId: Number(em.result as bigint) });
+  });
+  const emodeIds = [...new Set([...users.values()].map((u) => u.emodeId).filter((id) => id > 0))];
+  const emode: CollateralSplitInputs["emode"] = new Map();
+  if (emodeIds.length > 0) {
+    const cats = await client.multicall({
+      allowFailure: true,
+      contracts: emodeIds.map(
+        (id) => ({ address: SPARK_POOL, abi: POOL_ABI, functionName: "getEModeCategoryData", args: [id] }) as const,
+      ),
+    });
+    emodeIds.forEach((id, i) => {
+      const c = cats[i];
+      if (c.status === "success")
+        emode.set(id, { lt: Number(c.result.liquidationThreshold) / PRECISION_BPS, bitmap: null });
+    });
+  }
+  return { users, reserves: reserveData, emode };
 }
