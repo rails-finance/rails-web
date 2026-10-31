@@ -31,7 +31,7 @@ import type {
   AaveV3SwapPoolEvent,
   OriginEnvelope,
 } from "@/lib/shared/types/event-shape";
-import { AAVE_V3_POOL, AAVE_V3_ORACLE } from "./asset-catalog";
+import { AAVE_V3_POOL, AAVE_V3_ORACLE, ORACLE_BY_MARKET } from "./asset-catalog";
 import { explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import {
   getProtocolContract,
@@ -1394,20 +1394,23 @@ export const aaveV3PeakBorrowProv = (sym: string): Provenance => ({
   via: `${V3_INDEX_VIA} · max running Σ scaled deltas × variable borrow index accrued to the peak event`,
 });
 
-/** IAaveOracle contract — the same oracle the Pool reads to price collateral and
- *  compute health factors. */
-const V3_ORACLE = { name: "Aave V3 IAaveOracle", address: AAVE_V3_ORACLE };
+/** The market's IAaveOracle — the oracle its Pool reads to price collateral and
+ *  compute health factors (Core's when no market is named). */
+const v3Oracle = (market?: string) => ({
+  name: "Aave V3 IAaveOracle",
+  address: (market && ORACLE_BY_MARKET[market]) || AAVE_V3_ORACLE,
+});
 
 /** On-chain-oracle USD for a card/tower total. Both legs are on-chain — the
  *  chain-state token balance and Aave's own oracle price (getAssetPrice) — so the
  *  product is chain-derived and stays in the chain-state view (unlike a DefiLlama
  *  market cache). Mirrors Compound's `compoundUsdProvOnchain`. */
-export const aaveV3UsdProvOnchain = (what: string): Provenance => ({
+export const aaveV3UsdProvOnchain = (what: string, market?: string): Provenance => ({
   kind: "chain-derived",
   // Both legs on-chain; the oracle price is the furthest class, so it leads.
   pclass: "oracle",
   summary: `${what} valued in US dollars — the token balance times the price the Pool's oracle reports for that token, which is the price the Pool values collateral at. The oracle gives it in US dollars with 8 decimal places.`,
-  contract: V3_ORACLE,
+  contract: v3Oracle(market),
   via: "chain balance × on-chain oracle price",
   formula: "balance × oracle price",
   inputs: [
@@ -1512,11 +1515,11 @@ export const aaveV3InterestCaptionProv = (side: "supply" | "debt"): Provenance =
  *  getUserAccountData HF), so chain-derived. Anchored on the one reserve
  *  carrying ≥99.5% of the priced collateral (dust doesn't block the anchor);
  *  holds while the debt's USD value stands still. */
-export const aaveV3LiqPriceProv = (sym: string): Provenance => ({
+export const aaveV3LiqPriceProv = (sym: string, market?: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   summary: `Liquidation price for the ${sym} collateral — the ${sym} price at which this position becomes liquidatable: the price the Pool's oracle reports now, divided by the health factor the Pool gives now. ${sym} carries at least 99.5% of the priced collateral, so it anchors the read, and the figure holds while the debt's dollar value stands still.`,
-  contract: V3_ORACLE,
+  contract: v3Oracle(market),
   via: "IAaveOracle getAssetPrice ÷ Pool getUserAccountData health factor",
   formula: "oracle price ÷ HF",
   inputs: [

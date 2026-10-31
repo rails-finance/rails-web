@@ -89,7 +89,7 @@ export default {
     if (view.status === "open" && aaveEvents.length > 0) {
       const missing = unpricedAaveV3FlowAddresses(view, aaveEvents, precomputedLifetime);
       if (missing.length > 0) {
-        const prices = await fetchAaveV3OraclePrices(missing).catch(() => ({}));
+        const prices = await fetchAaveV3OraclePrices(missing, market).catch(() => ({}));
         if (Object.keys(prices).length > 0)
           view = { ...view, priceByAddress: { ...prices, ...(view.priceByAddress ?? {}) } };
       }

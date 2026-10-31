@@ -141,12 +141,16 @@ export async function fetchAaveV3Position(p: FetchAaveV3PositionParams): Promise
 }
 
 /** On-chain oracle USD for arbitrary reserve addresses (IAaveOracle
- *  getAssetPrice at the latest block, through rails-server) — prices the exited/liquidated reserves the listing
+ *  getAssetPrice at the latest block on the market's oracle, through rails-server) — prices the exited/liquidated reserves the listing
  *  row's priceByAddress (current reserves only) omits, so the economics tower
  *  can value lifetime flows. An unpriceable asset is simply absent. */
-export async function fetchAaveV3OraclePrices(assets: string[], baseUrl?: string): Promise<Record<string, number>> {
+export async function fetchAaveV3OraclePrices(
+  assets: string[],
+  market: string,
+  baseUrl?: string,
+): Promise<Record<string, number>> {
   if (assets.length === 0) return {};
-  const url = `${baseUrl ?? ""}/api/chain/aave-v3/oracle-prices?assets=${assets.join(",")}`;
+  const url = `${baseUrl ?? ""}/api/chain/aave-v3/oracle-prices?market=${market}&assets=${assets.join(",")}`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`fetchAaveV3OraclePrices failed: ${res.status} ${res.statusText}`);
   const data = (await res.json()) as { prices?: Record<string, number> };
