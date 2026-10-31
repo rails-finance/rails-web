@@ -47,7 +47,16 @@ export function fmtRowPrice(v: number): string {
 }
 
 /** `as="div"` draws the row inside another part (the asset explorer's card, A5.4). */
-export function AssetPriceRow({ row, as: Tag = "li" }: { row: Row; as?: "li" | "div" }) {
+export function AssetPriceRow({
+  row,
+  as: Tag = "li",
+  alsoNamed = false,
+}: {
+  row: Row;
+  as?: "li" | "div";
+  /** The list view names the wrappers with no row of their own under the row ("also WETH"). */
+  alsoNamed?: boolean;
+}) {
   const flag = row.flag ? flagWords(row.flag) : null;
   const name = `${row.symbol}${row.price != null ? `, $${fmtRowPrice(row.price)}` : ", no stored price"}${row.asOf ? ` ${asOfWords(row.asOf)}` : ""}${row.change != null ? `, ${fmtChange(row.change)} over 30 days` : ""}${flag ? `; ${flag.text}` : ""}`;
   return (
@@ -103,6 +112,19 @@ export function AssetPriceRow({ row, as: Tag = "li" }: { row: Row; as?: "li" | "
           {row.change == null ? "–" : fmtChange(row.change)}
         </span>
       </Link>
+      {alsoNamed && row.also && row.also.length > 0 && (
+        <p className="-mt-1 pb-1.5 pl-[30px] text-xs text-rb-500" data-asset-price-also="">
+          also{" "}
+          {row.also.map((a, i) => (
+            <span key={a.href}>
+              {i > 0 && ", "}
+              <Link href={a.href} className="underline decoration-rb-300 underline-offset-2 hover:text-foreground">
+                {a.symbol}
+              </Link>
+            </span>
+          ))}
+        </p>
+      )}
     </Tag>
   );
 }

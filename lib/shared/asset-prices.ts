@@ -73,6 +73,12 @@ export interface AssetPriceRow extends ChainPrice {
   flag: RowFlag | null;
   /** The main line on each of the page's other chains, for an icon on that chain. */
   elsewhere: ChainPrice[];
+  /** A one-for-one wrapper priced on its underlying's feed alone (WETH): the
+   *  list view draws no row of its own for it, and the underlying's row names
+   *  it. The card, the page and the icon's popover keep it. */
+  rowless?: true;
+  /** On an underlying's row: the wrappers it names ("also WETH"), each linking its page. */
+  also?: { symbol: string; href: string }[];
 }
 
 export interface RowFlag {
@@ -144,6 +150,24 @@ export interface AssetPriceList {
   unpriced?: string[];
 }
 
+const escapeRe = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** The underlying whose row names this page instead of giving it one (Miles,
+ *  31 Oct 2026): a page whose tokens are one-for-one wrappers and none of
+ *  whose lines is a feed of the wrapper's own ("WBTC / BTC × BTC / USD",
+ *  "cbBTC / USD"), every line a feed of the underlying ("ETH / USD"), so no
+ *  protocol prices the wrapper apart from it. Read from the lines' names, so
+ *  a wrapper that gains its own feed gets its row back. */
+export function namedOnUnderlying(own: RosterAsset[]): RosterAssetRef | null {
+  const wraps = own.flatMap((a) => (a.underlying && a.underlying.kind !== "rate" ? [a.underlying] : []));
+  if (wraps.length === 0 || wraps.length < own.length) return null;
+  const apart = own.some((a) => {
+    const re = new RegExp(`(^|[^A-Za-z0-9])${escapeRe(a.symbol)}(?![A-Za-z0-9])`, "i");
+    return a.lines.some((l) => re.test(l.oracle.name));
+  });
+  return apart ? null : wraps[0];
+}
+
 /** The page of each token in the whole roster, and the series key each row
  *  reads (the first chain's picked line). */
 export function rosterPages(assets: RosterAsset[], readAt: AssetRosterAnswer["readAt"], native: string) {
@@ -171,6 +195,7 @@ export function rosterPages(assets: RosterAsset[], readAt: AssetRosterAnswer["re
         chain: first?.chain ?? chain,
         chains: own.map((a) => a.chain),
         line,
+        alsoOf: namedOnUnderlying(own),
         others: page.chains
           .slice(1)
           .map((c) => ({ chain: c.chain, line: c.lines.find((l) => l.drawn != null) ?? null })),
@@ -249,7 +274,8 @@ export function priceRows(
 ): AssetPriceList {
   let last: number | null = null;
   const joins = new Map([...stamps].map(([k, s]) => [k, s.joinDay]));
-  const rows = pages.map(({ page, chain, chains, line, others, readers }): AssetPriceRow => {
+  const pageTokens = new Set(pages.map((p) => p.page.token));
+  const rows = pages.map(({ page, chain, chains, line, others, readers, alsoOf }): AssetPriceRow => {
     const at = (n: number) => page.chains.find((c) => c.chain === n);
     const own = chainPrices(at(chain), chain, line, prices, stamps, today);
     // The list's "at the close of" day: the last a daily-store row reads.
@@ -264,7 +290,21 @@ export function priceRows(
       readers,
       flag: pageFlag(page, points, today, joins),
       elsewhere: others.map((o) => chainPrices(at(o.chain), o.chain, o.line, prices, stamps, today)),
+      // Only where the underlying has a row to name it on.
+      ...(alsoOf && pageTokens.has(alsoOf.token) ? { rowless: true as const } : {}),
     };
+  });
+  // The underlying's row names the wrappers that have none: its own chain's
+  // page first where a symbol has two.
+  pages.forEach(({ page, alsoOf }, i) => {
+    if (!alsoOf || !rows[i].rowless) return;
+    const under = rows.find((r) => r.token === alsoOf.token);
+    if (!under) return;
+    const href = assetHref(rows[i].chain, page.token);
+    const list = (under.also ??= []);
+    const at = list.findIndex((x) => x.symbol === page.symbol);
+    if (at < 0) list.push({ symbol: page.symbol, href });
+    else if (rows[i].chain === under.chain) list[at] = { symbol: page.symbol, href };
   });
   // Flagged rows first, then the most read: the assets most protocols price.
   rows.sort(
