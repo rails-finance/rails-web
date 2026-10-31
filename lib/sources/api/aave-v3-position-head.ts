@@ -230,3 +230,71 @@ export async function nameSparkAnswer(raw: Raw): Promise<SparkPositionChainRespo
     head: raw.head as PositionHeadStamp,
   };
 }
+
+/** The listing's collateral split inputs at rails-server's head block, in the
+ *  chain readers' types. A wallet, reserve or category whose call reverted is
+ *  absent, as from the reader's multicall. */
+export interface CollateralSplitInputs {
+  blockNumber: number;
+  head: PositionHeadStamp;
+  users: Map<string, { config: bigint; emodeId: number }>;
+  reserves: Map<string, { id: number; configuration: bigint }>;
+  /** Threshold (0..1) and, on a liquid Pool, the collateral bitmap. */
+  emode: Map<number, { lt: number; bitmap: bigint | null }>;
+}
+
+const SPLIT_BATCH = 50;
+
+/** `/api/at-block/aave-v3/collateral-split` for one Pool's accounts (in batches
+ *  of 50, one block for all); null where the route cannot answer any batch or
+ *  the batches stand at different blocks. */
+export async function serverCollateralSplitInputs(
+  pool: string,
+  chainId: ChainId,
+  accounts: readonly { wallet: string; supplied: readonly string[] }[],
+): Promise<CollateralSplitInputs | null> {
+  const market = serverMarketOf(pool, chainId);
+  if (!market || accounts.length === 0) return null;
+  const batches: { wallet: string; supplied: string[] }[][] = [];
+  for (let i = 0; i < accounts.length; i += SPLIT_BATCH)
+    batches.push(
+      accounts.slice(i, i + SPLIT_BATCH).map((a) => ({
+        wallet: a.wallet.toLowerCase(),
+        supplied: a.supplied.map((r) => r.toLowerCase()),
+      })),
+    );
+  const answers = await Promise.all(
+    batches.map((wallets) =>
+      gate.json<Raw>(
+        "aave-v3",
+        `${process.env.RAILS_API_URL}/api/at-block/aave-v3/collateral-split`,
+        createAuthFetchOptions({
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ market, wallets }),
+        }),
+      ),
+    ),
+  );
+  const out: CollateralSplitInputs = {
+    blockNumber: 0,
+    head: undefined as unknown as PositionHeadStamp,
+    users: new Map(),
+    reserves: new Map(),
+    emode: new Map(),
+  };
+  for (const a of answers) {
+    const head = a?.head as (PositionHeadStamp & { blockNumber: number }) | undefined;
+    if (!a || !head || typeof head.blockNumber !== "number" || !a.accounts || !a.reserves || !a.emode) return null;
+    if (out.blockNumber && out.blockNumber !== head.blockNumber) return null;
+    out.blockNumber = head.blockNumber;
+    out.head = { blockTime: head.blockTime, readAt: head.readAt, provider: head.provider };
+    for (const [w, u] of Object.entries(a.accounts as Record<string, { config: string; emodeId: number }>))
+      out.users.set(w.toLowerCase(), { config: BigInt(u.config), emodeId: Number(u.emodeId) });
+    for (const [r, d] of Object.entries(a.reserves as Record<string, { id: number; configuration: string }>))
+      out.reserves.set(r.toLowerCase(), { id: Number(d.id), configuration: BigInt(d.configuration) });
+    for (const [id, c] of Object.entries(a.emode as Record<string, { ltBps: number; bitmap: string | null }>))
+      out.emode.set(Number(id), { lt: Number(c.ltBps) / 1e4, bitmap: c.bitmap == null ? null : BigInt(c.bitmap) });
+  }
+  return out;
+}
