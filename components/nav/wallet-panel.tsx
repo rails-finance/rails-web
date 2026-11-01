@@ -212,7 +212,7 @@ export function WalletPanel() {
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="wallet-panel-title"
+        aria-label="Look up a wallet"
         aria-hidden={!isOpen}
         inert={!isOpen}
         data-search-launcher-panel=""
@@ -229,22 +229,23 @@ export function WalletPanel() {
           visibility: isOpen ? "visible" : "hidden",
         }}
       >
-        {/* Pinned at the top: the heading, the × and the search. */}
-        <div className="shrink-0 px-5 pb-4 pt-5">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 id="wallet-panel-title" className="text-base font-semibold text-foreground">
-              Look up a wallet
-            </h2>
-            <button
-              type="button"
-              onClick={close}
-              className="cursor-pointer rounded-md p-1.5 text-rb-500 transition-colors hover:text-foreground focus-ring"
-              aria-label="Close"
-            >
-              <X size={18} aria-hidden="true" />
-            </button>
-          </div>
-          <FrontDoorSearch size="lg" surface="raised" onDone={close} />
+        {/* Pinned at the top: the search row, no heading (the field names the
+            panel; Miles, 1 Nov 2026). From `md` the row sits level with the
+            rail's glyph (H15.1), blue while the panel is open, which stands as
+            the row's icon: the rail's 16px top padding, the 30px mark, the
+            12px gap and half the 38px launcher put its centre at 77px, so the
+            48px field starts at 53px. Below `md` there is no rail and the
+            header's glyph is under the panel, so a × leads the row instead. */}
+        <div className="flex shrink-0 items-start gap-2 px-5 pb-4 pt-5 md:pt-[53px]">
+          <button
+            type="button"
+            onClick={close}
+            className="-ml-2 flex h-12 w-9 shrink-0 cursor-pointer items-center justify-center rounded-md text-rb-500 transition-colors hover:text-foreground focus-ring md:hidden"
+            aria-label="Close"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+          <FrontDoorSearch size="lg" surface="raised" onDone={close} className="min-w-0 flex-1" />
         </div>
 
         {/* The bookmarks: one list, scrolling between the search and the foot. */}

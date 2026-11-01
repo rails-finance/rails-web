@@ -56,6 +56,12 @@ const FIELD: Record<Size, string> = {
   md: "h-9 pl-8 pr-3 text-base sm:text-sm",
   lg: "h-12 pl-10 pr-3 text-base",
 };
+/** The same fields without the magnifier, the left padding closed up. */
+const FIELD_PLAIN: Record<Size, string> = {
+  sm: "h-8 px-3 text-base sm:text-xs",
+  md: "h-9 px-3 text-base sm:text-sm",
+  lg: "h-12 pl-5 pr-3 text-base",
+};
 // The home page's field (the one lg search): a full pill whose placeholder
 // shows on hover and focus only, with a blue glow behind it in dark. The field
 // keeps its accessible name at rest.
@@ -73,11 +79,13 @@ const HERO_BUTTON_READY = "border-blue-500 bg-blue-500 text-white hover:bg-blue-
  *  tone, so on the dark canvas they lift on their own and the hairline is
  *  light-mode only; on a raised surface (the wallet panel, H16) they are the
  *  surface's tone, so in dark they keep a hairline (rb-600, the event sheet's)
- *  and the button steps up a tone (Miles, 1 Nov 2026). */
+ *  and the button steps up a tone. The panel's field also draws no magnifier:
+ *  the rail's glyph (H15.1), blue while the panel is open and level with the
+ *  row, is the row's icon (Miles, 1 Nov 2026). */
 export type SearchSurface = "canvas" | "raised";
-const EDGE: Record<SearchSurface, { field: string; button: string }> = {
-  canvas: { field: "dark:border-transparent", button: "dark:border-transparent" },
-  raised: { field: "dark:border-rb-600", button: "dark:border-rb-600 dark:bg-rb-700" },
+const SURFACE: Record<SearchSurface, { field: string; button: string; glyph: boolean }> = {
+  canvas: { field: "dark:border-transparent", button: "dark:border-transparent", glyph: true },
+  raised: { field: "dark:border-rb-600", button: "dark:border-rb-600 dark:bg-rb-700", glyph: false },
 };
 const GLYPH: Record<Size, { size: number; left: string }> = {
   sm: { size: 14, left: "left-3" },
@@ -125,11 +133,13 @@ export function SearchBox({
           className="pointer-events-none absolute -inset-x-2 -inset-y-1 hidden rounded-full bg-blue-500/25 blur-2xl dark:block"
         />
       )}
-      <Search
-        size={glyph.size}
-        className={`pointer-events-none absolute z-10 ${glyph.left} top-1/2 -translate-y-1/2 text-rb-500`}
-        aria-hidden="true"
-      />
+      {SURFACE[surface].glyph && (
+        <Search
+          size={glyph.size}
+          className={`pointer-events-none absolute z-10 ${glyph.left} top-1/2 -translate-y-1/2 text-rb-500`}
+          aria-hidden="true"
+        />
+      )}
       <input
         ref={inputRef}
         value={value}
@@ -148,7 +158,7 @@ export function SearchBox({
         // A hairline in light mode: on the white canvas the raised field is a
         // shade off the page and needs an edge to read as a field; in dark the
         // surface decides (EDGE).
-        className={`w-full ${size === "lg" ? HERO_FIELD : "rounded-md"} border border-rb-300 bg-raised ${EDGE[surface].field} ${FIELD[size]} text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
+        className={`w-full ${size === "lg" ? HERO_FIELD : "rounded-md"} border border-rb-300 bg-raised ${SURFACE[surface].field} ${(SURFACE[surface].glyph ? FIELD : FIELD_PLAIN)[size]} text-foreground placeholder:text-rb-500 focus:outline-none focus:ring-2 focus:ring-blue-500`}
       />
     </div>
   );
@@ -265,7 +275,7 @@ export function FrontDoorSearch({
             type="submit"
             className={
               size === "lg"
-                ? `${HERO_BUTTON} ${lookable(value) ? HERO_BUTTON_READY : `${HERO_BUTTON_IDLE} ${EDGE[surface].button}`}`
+                ? `${HERO_BUTTON} ${lookable(value) ? HERO_BUTTON_READY : `${HERO_BUTTON_IDLE} ${SURFACE[surface].button}`}`
                 : `${NAV_BUTTON} shrink-0`
             }
             disabled={resolving}
