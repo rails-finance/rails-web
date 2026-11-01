@@ -219,6 +219,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { enGb } from "./lib/date.mjs";
+import { pageBlockRecent, serverHeadBlock } from "./lib/server-head.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3612";
@@ -639,18 +640,17 @@ check(
   bad0.length === 0,
   bad0.length ? bad0.map((v) => `${short(v)} ${PAGES.get(v).status}`).join(", ") : `${SAMPLE.length} pages`,
 );
-const bad0b = SAMPLE.filter((v) => {
-  const b = PAGES.get(v).blockNumber;
-  // The bound is on the DRIFT, either way: this script reads its head once and
-  // the pages read theirs per request, so a page's block can sit a block or two
-  // ahead of it. What must not happen is a page stating a block from an hour
-  // ago and figures read at the head.
-  return !Number.isInteger(b) || b <= 0 || Math.abs(Number(head) - b) >= 200;
-});
+// The pages read at rails-server's head (TO-DO-infra 55), or at the pin where one fell back to
+// the chain. What must not happen is a page stating a block from an hour ago and figures read at
+// the head.
+const serverHead0b = await serverHeadBlock(env, 1);
+const at0b = SAMPLE.map((v) =>
+  pageBlockRecent({ page: PAGES.get(v).blockNumber, server: serverHead0b, own: Number(head), tolerance: 200 }),
+);
 check(
-  "0b each page states the block it read at, and it is within 200 blocks of this script's own head",
-  bad0b.length === 0,
-  `own head ${head}; pages ${SAMPLE.map((v) => PAGES.get(v).blockNumber).join(", ")}`,
+  "0b each page states the block it read at, and it is within 200 blocks of the head it read from",
+  at0b.every((r) => r.ok),
+  at0b.map((r) => r.detail).join("; "),
 );
 // A market view is the ROSTER's child — the roster is where a reader met this
 // vault — so the explorer rail lights VAULTS here, and lights exactly one tab.

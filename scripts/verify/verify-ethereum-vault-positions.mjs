@@ -277,6 +277,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readPositionsRoute } from "../lib/read-positions-route.mjs";
 import { enGb } from "./lib/date.mjs";
+import { pageBlockRecent, serverHeadBlock } from "./lib/server-head.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3762";
@@ -459,11 +460,16 @@ check(
   skeletonAt !== -1 && firstCardAt !== -1 && skeletonAt < firstCardAt,
   `skeleton at ${skeletonAt}, first card at ${firstCardAt}`,
 );
-check(
-  "L0d the route's overlay block is within 30 blocks of this script's own head",
-  route0.blockNumber != null && Math.abs(head - route0.blockNumber) <= 30,
-  `route ${route0.blockNumber} vs own head ${head}`,
-);
+// The overlay reads at rails-server's head (TO-DO-infra 55): a row stamped with
+// rails-server's read is held against that head, an unstamped one against the pin.
+const l0d = pageBlockRecent({
+  page: route0.blockNumber,
+  server: await serverHeadBlock(env, 1),
+  own: head,
+  tolerance: 30,
+  stamped: route0.data.some((r) => r.live?.head),
+});
+check("L0d the route's overlay block is within 30 blocks of the head it read from", l0d.ok, l0d.detail);
 
 const censusRows = route0.census;
 const censusBlock = censusRows[0]?.censusBlock;
