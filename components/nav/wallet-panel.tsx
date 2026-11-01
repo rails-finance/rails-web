@@ -244,7 +244,7 @@ export function WalletPanel() {
               <X size={18} aria-hidden="true" />
             </button>
           </div>
-          <FrontDoorSearch size="lg" onDone={close} />
+          <FrontDoorSearch size="lg" surface="raised" onDone={close} />
         </div>
 
         {/* The bookmarks: one list, scrolling between the search and the foot. */}
