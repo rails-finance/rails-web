@@ -34,6 +34,7 @@ import { chromium } from "playwright";
 import { armScope } from "./lib/prov-inspector.mjs";
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 import { showCardTab } from "./lib/card-tabs.mjs";
+import { openGroup } from "./lib/group-rows.mjs";
 
 const ONLY = process.env.EXPLORER;
 const EXPLORERS = [
@@ -98,42 +99,6 @@ const roundsTo = (text, expected) => {
 
 // ── Page helpers (verify-at-block-prices-moonwell-base.mjs's) ─────────────
 
-/** `optional`: the item may not be on offer. "Collapse like events" is offered
- *  only where a collapse spec forms a run on the list (web aa0c3c6), so a page
- *  with no like events to collapse has no such item and nothing to turn off;
- *  that returns false instead of throwing. */
-async function setDisplayFlag(page, label, wantOn, { optional = false } = {}) {
-  const countSpan = page.getByText(COUNT_RE).first();
-  await countSpan.waitFor({ state: "visible", timeout: 30000 });
-  const row = countSpan.locator(
-    'xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " gap-2 ") and contains(concat(" ", normalize-space(@class), " "), " items-center ")][1]',
-  );
-  const trigger = row.locator("div.relative.inline-flex.items-center > button").last();
-  const item = page.getByRole("button", { name: new RegExp(`^${label}$`, "i") });
-  let opened = false;
-  for (let attempt = 0; attempt < (optional ? 3 : 6) && !opened; attempt += 1) {
-    await trigger.click();
-    opened = await item
-      .waitFor({ state: "visible", timeout: 2500 })
-      .then(() => true)
-      .catch(() => false);
-    if (!opened) await page.waitForTimeout(700);
-  }
-  if (!opened) {
-    if (!optional) throw new Error(`Display menu never offered "${label}" on ${page.url()}`);
-    await page.keyboard.press("Escape");
-    await countSpan.click().catch(() => {});
-    return false;
-  }
-  const isOn = await item
-    .locator("span")
-    .first()
-    .evaluate((el) => el.className.includes("bg-rb-500"))
-    .catch(() => false);
-  if (isOn !== wantOn) await item.click();
-  await countSpan.click();
-}
-
 /** Grow the render window until every event is painted. The cap counts PRESSES,
  *  and one press paints `TIMELINE_PAGE_ROWS` (lib/shared/timeline-opening-balance.ts)
  *  — halve that constant and a fixed cap reaches half as far, so the cap is set
@@ -152,20 +117,19 @@ async function showAll(page, max = 25) {
  *  element. The number stands in the row's number column since ui-jobs 250,
  *  outside the header's `role=button` and the content tier, so both are found
  *  from the row. */
-function cardFor(page, n) {
-  const badge = page.locator(`[data-event-number="${n}"]`);
-  return badge.locator("xpath=ancestor::*[@data-event-id][1]");
+function cardFor(page, id) {
+  return page.locator(`[data-event-id="${id}"]`).first();
 }
 
-async function expandCard(page, n) {
-  const badge = page.locator(`[data-event-number="${n}"]`);
-  await badge.waitFor({ state: "visible", timeout: 20000 });
-  await badge.scrollIntoViewIfNeeded();
-  const clickable = cardFor(page, n).locator('[data-anatomy="T1"] [role="button"]').first();
+async function expandCard(page, id) {
+  const card = cardFor(page, id);
+  await card.waitFor({ state: "visible", timeout: 20000 });
+  await card.scrollIntoViewIfNeeded();
+  const clickable = cardFor(page, id).locator('[data-anatomy="T1"] [role="button"]').first();
   await clickable.click();
   await page.waitForTimeout(250);
   // The price row and the forensics stand on the Figures tab (ui-jobs 370, decision 0044).
-  await showCardTab(cardFor(page, n), "figures");
+  await showCardTab(cardFor(page, id), "figures");
 }
 
 /** The forensics grid's own StatCard for one leg (the seized-leg caption) —
@@ -301,25 +265,28 @@ async function discoverUnpriced(x) {
   return candidates[0];
 }
 
-/** Open a wallet's page with numbers on and runs expanded; returns the page
- *  and the API-index → DOM-number map. */
+/** Open a wallet's page with its runs open; returns the page and the
+ *  API-index → event-id map (the row's `data-event-id` is the API event id). */
 async function openPage(x, wallet, events) {
   const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
   page.on("pageerror", (e) => pageErrors.push(`${x.key}/${wallet}: ${e}`));
-  // `?folders=0` PINNED (rails-ops decision 0021): since the Aave-family
-  // rollout of server-side grouping, a served page answers in folders and
-  // does not offer "Collapse like events" — the flat answer is what
-  // `?folders=0` is for, and the browser's own toggle still applies to it.
+  // `?folders=0` PINNED (rails-ops decision 0021): the flat answer, not folders.
   await page.goto(`${BASE}${x.page(wallet)}?folders=0`, { waitUntil: "domcontentloaded", timeout: 240000 });
   await page.getByText(COUNT_RE).first().waitFor({ state: "visible", timeout: 120000 });
-  await setDisplayFlag(page, "Collapse like events", false, { optional: true });
   await showAll(page, 25);
-  const badgeNumbers = await page
-    .locator("[data-event-number]")
-    .evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-event-number"))).filter(Number.isFinite));
-  const offset = badgeNumbers.length ? Math.max(...badgeNumbers) - events.length : 0;
-  console.log(`      ${badgeNumbers.length} numbered cards in the DOM; numbering offset ${offset}`);
-  return { page, domN: (n) => offset + n };
+  // Back-to-back like events (liquidations) draw as one closed run
+  // (AAVE_V3_TIMELINE_RUNS); a member's card exists once its run is open.
+  for (let guard = 0; guard < 20; guard++) {
+    const closed = page.locator('[data-flow-run] [data-group-frame="closed"]');
+    if ((await closed.count()) === 0) break;
+    if (!(await openGroup(page, closed.first()))) break;
+    await page.waitForTimeout(250);
+  }
+  await showAll(page, 25);
+  const drawn = await page.locator("[data-event-id]").count();
+  console.log(`      ${drawn} event cards in the DOM for ${events.length} API events`);
+  // A card is found by the API event's id, which is the row's data-event-id.
+  return { page, domN: (n) => events[n - 1].id };
 }
 
 async function runExplorer(x) {
