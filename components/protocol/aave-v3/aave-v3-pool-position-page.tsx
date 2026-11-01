@@ -74,7 +74,7 @@ import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { FlowFocusContext } from "@/components/shared/flow-focus-context";
 import { AaveV3BaseFlowsNote, aaveV3BaseFlowsContent } from "@/components/protocol/aave-v3/aave-v3-base-flows-note";
-import { useAaveV3BaseFlows } from "@/hooks/useAaveV3BaseFlows";
+import { useAaveV3BaseFlows, useFlowsNeedFrom } from "@/hooks/useAaveV3BaseFlows";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -612,6 +612,9 @@ export function AaveV3PoolPositionView({
       missing: whole ? (flat.coverage.omitted?.count ?? 0) : Math.max(1, flat.coverage.omitted?.count ?? 0),
     };
   }, [wallet, d]);
+  // The oldest event the timeline holds or opens, for the cards' flows past
+  // the route's newest events.
+  const flowsNeed = useFlowsNeedFrom(tl.sortedEvents, readFolderMembers);
   const flows = useAaveV3BaseFlows({
     ...d.flows,
     wallet,
@@ -626,6 +629,7 @@ export function AaveV3PoolPositionView({
     pageEvents: aaveEvents,
     liveHf: view?.status === "open" ? (view.healthFactor ?? null) : null,
     emode: switches?.emode ?? null,
+    needFrom: flowsNeed.needFrom,
   });
 
   const stripAssets = useMemo<LatestPriceAsset[]>(() => {
@@ -788,7 +792,7 @@ export function AaveV3PoolPositionView({
                       // browser, the register draws the folders the route served.
                       runs={AAVE_V3_TIMELINE_RUNS}
                       folderRegister={AAVE_V3_FOLDER_REGISTER}
-                      readFolderMembers={readFolderMembers}
+                      readFolderMembers={flowsNeed.readFolderMembers}
                       segments={segments}
                       displayItems={CHAIN_TRUTH_DISPLAY_ITEMS}
                       toolbarLeading={

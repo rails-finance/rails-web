@@ -14,9 +14,13 @@
 // its day's price from the shared daily price store (/api/prices/daily);
 // where that read fails the last event's price is carried. It also gives the
 // page the value that ties the panel to the timeline
-// (components/shared/flow-focus-context.tsx).
+// (components/shared/flow-focus-context.tsx). The route's summary carries the
+// legs of the newest TIMELINE_WINDOW_ROWS events; where the timeline holds or
+// opens an older event (`needFrom`), older pages of legs are read
+// (/api/{lane}/flows/events) until that event's day is covered.
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { FolderMembersReader } from "@/lib/shared/folder-members";
 import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import type { FlowsBuilding } from "@/components/shared/lifetime-flows-skeleton";
 import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/components/shared/flow-focus-context";
@@ -34,7 +38,13 @@ import {
   type AaveBaseFlowOptions,
   type AaveBaseLiveReserve,
 } from "@/lib/aave-v3-base/flows";
-import { fetchAaveBaseFlows, isAaveBaseSummaryAnswer, type AaveBaseFlowAnswer } from "@/lib/api/fetch-aave-base-flows";
+import {
+  fetchAaveBaseFlowEvents,
+  fetchAaveBaseFlows,
+  isAaveBaseSummaryAnswer,
+  type AaveBaseFlowAnswer,
+} from "@/lib/api/fetch-aave-base-flows";
+import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { AaveHealthSource } from "@/lib/aave-v3/flows-health";
 import { useAaveFamilyHealth } from "@/hooks/useAaveFamilyHealth";
@@ -94,6 +104,10 @@ export interface AaveV3BaseFlowsInput {
   /** The account's e-mode switches, once read: the health view's governance
    *  changes wait for them. */
   emode?: readonly AaveFamilyEmodeSwitch[] | null;
+  /** The oldest event the timeline holds or has opened (a month read, a
+   *  folder's members), unix seconds. Where the route's events do not reach
+   *  its day, older pages of their legs are read. */
+  needFrom?: number | null;
 }
 
 export interface AaveV3BaseFlowsFacts {
@@ -287,9 +301,70 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     liveHf: p.liveHf ?? null,
     emode: p.emode ?? null,
   });
+  // The cards' legs past the route's newest events, a page at a time, oldest
+  // first; `next` is the cursor of the page after (null at the first event).
+  const [older, setOlder] = useState<{
+    route: RouteSummary;
+    events: FocusEvent[];
+    next: string | null;
+    failed: boolean;
+  } | null>(null);
+  /** The page on its way, and the summary it extends. */
+  const olderRead = useRef<{ route: RouteSummary; ac: AbortController } | null>(null);
+  useEffect(() => () => olderRead.current?.ac.abort(), []);
+  const needFrom = p.needFrom ?? null;
+  useEffect(() => {
+    if (olderRead.current && olderRead.current.route !== route) {
+      olderRead.current.ac.abort();
+      olderRead.current = null;
+    }
+    if (replay || !route || needFrom == null || routeless || family === "aave-v3-arbitrum") return;
+    if (olderRead.current) return;
+    const held = older?.route === route ? older : null;
+    if (held?.failed) return;
+    const oldest = held?.events[0] ?? route.events[0];
+    const next = held
+      ? held.next
+      : route.events.length > 0 && route.events.length < route.totalEvents
+        ? route.events[0].id
+        : null;
+    // Read until the events open before the day of the oldest event the
+    // timeline holds, so that day's cards add up whole.
+    if (next == null || !oldest || oldest.ts < Math.floor(needFrom / DAY_S) * DAY_S) return;
+    const base = held ?? { route, events: [], next, failed: false };
+    const ac = new AbortController();
+    olderRead.current = { route, ac };
+    const settle = (to: typeof base) => {
+      if (olderRead.current?.ac !== ac) return;
+      olderRead.current = null;
+      setOlder(to);
+    };
+    fetchAaveBaseFlowEvents(family, wallet, next, TIMELINE_WINDOW_ROWS, ac.signal).then(
+      (a) => {
+        if ("events" in a) settle({ route, events: [...a.events, ...base.events], next: a.next, failed: false });
+        else {
+          console.warn("Lifetime flows: older events not read:", a);
+          settle({ ...base, failed: true });
+        }
+      },
+      (err) => {
+        if ((err as { name?: string })?.name === "AbortError") return;
+        console.warn("Lifetime flows: older events not read:", err);
+        settle({ ...base, failed: true });
+      },
+    );
+  }, [replay, route, needFrom, older, family, wallet, routeless]);
+  const olderEvents = older?.route === route ? older.events : null;
   const focusEvents = useMemo<FocusEvent[]>(
-    () => (replay ? aaveBaseFocusEvents(replay) : route ? route.events : []),
-    [replay, route],
+    () =>
+      replay
+        ? aaveBaseFocusEvents(replay)
+        : route
+          ? olderEvents && olderEvents.length > 0
+            ? [...olderEvents, ...route.events]
+            : route.events
+          : [],
+    [replay, route, olderEvents],
   );
   const focus = useFlowFocusValue(useFlowFocusRoot(focusEvents), timeline);
   const facts = useMemo<AaveV3BaseFlowsFacts | null>(() => {
@@ -340,4 +415,26 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
         ? "reading"
         : "done";
   return { timeline, read: state, building: state === "reading" ? fetched.building : null, focus, facts };
+}
+
+/** The page's side of `needFrom`: the oldest event the timeline holds (the
+ *  preload or a month read, oldest first) or has opened in a folder, and the
+ *  folder reader that notes what it opens. */
+export function useFlowsNeedFrom(
+  held: readonly { timestamp: number }[],
+  readFolderMembers: FolderMembersReader,
+): { needFrom: number | null; readFolderMembers: FolderMembersReader } {
+  const [opened, setOpened] = useState<number | null>(null);
+  const noting = useCallback<FolderMembersReader>(
+    async (ask) => {
+      const r = await readFolderMembers(ask);
+      const first = r.events[0]?.timestamp;
+      if (first != null) setOpened((was) => (was == null ? first : Math.min(was, first)));
+      return r;
+    },
+    [readFolderMembers],
+  );
+  const first = held[0]?.timestamp ?? null;
+  const needFrom = first == null ? opened : opened == null ? first : Math.min(first, opened);
+  return { needFrom, readFolderMembers: noting };
 }
