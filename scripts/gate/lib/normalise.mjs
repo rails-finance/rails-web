@@ -85,6 +85,14 @@ export const JSON_DROPPED_PATHS = [
     re: /^gap$/,
     why: "a vault's totalAssets less its allocated sum at the head: the difference of two live reads, which a small move in either swings past the tolerance",
   },
+  {
+    re: /^head\.(block|blockTime|provider)$/,
+    why: "the block, time and RPC host rails-server's head read answered at (ui-jobs 467)",
+  },
+  {
+    re: /^stored(\.|$)/,
+    why: "rails-server's stored snapshot, present only when a host's live read failed (ui-jobs 467)",
+  },
   { re: /^data\.cache$/, why: "rails-server's state cache answering this request (miss / fresh)" },
   { re: /^timeline\.reconcile\.(toBlock|lane|refetched|refetchDiffered)$/, why: "the read's own span and RPC lane" },
   { re: /^timeline\.history$/, why: "the cache state: how much of the history this request read from the store" },
