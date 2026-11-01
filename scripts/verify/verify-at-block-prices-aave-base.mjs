@@ -591,11 +591,21 @@ for (const x of EXPLORERS) {
     check(`${x.key}: run completed`, false, String(e).slice(0, 200));
   }
 }
-check(
-  "token-only arm: at least one lane in this run had an unpriced ordinary row",
-  tokenOnlyEvidence > 0,
-  tokenOnlyEvidence > 0 ? `${tokenOnlyEvidence} lane(s)` : "NO EVIDENCE on any lane",
-);
+// Since the price runs (1 Nov 2026, rails-ops reference/base-price-runs.md) a block
+// between two stored blocks of one price is priced; an unpriced ordinary row is a
+// block above a lane's last filled block or a gap between neighbours whose prices
+// differ. A run with no such row on the listed wallets has no token-only specimen:
+// that is a SKIP with its reason.
+if (tokenOnlyEvidence > 0)
+  check(
+    "token-only arm: at least one lane in this run had an unpriced ordinary row",
+    true,
+    `${tokenOnlyEvidence} lane(s)`,
+  );
+else
+  console.log(
+    "SKIP  token-only arm: no unpriced ordinary row on any lane (the first 500 wallets listed; price runs price a block between equal stored neighbours, so none is left below a lane's last filled block)",
+  );
 check("no page errors", pageErrors.length === 0, pageErrors.slice(0, 2).join(" | "));
 await browser.close();
 console.log(`\n${failures === 0 ? "ALL PASS" : `${failures} FAILED`}`);
