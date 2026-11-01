@@ -44,3 +44,22 @@ export async function waitOnFigures(card, sel, timeout = 120_000) {
   }
   return false;
 }
+
+/** Open a timeline card from its header and show its Figures tab, safe against
+ *  a press that lands before hydration. A press before React has attached the
+ *  handler is lost, and a card with nothing slow before its first press (the
+ *  retired "Collapse like events" menu used to spend ~10 s) loses it every
+ *  time, so the header is pressed up to `tries` times until the opened panel
+ *  (`[data-card-tab-open]`) is drawn; a press is only sent while the panel is
+ *  absent, so a late first open is never closed again. `card` is a locator for
+ *  the card's row (`[data-event-id]`). Resolves to showCardTab's answer. */
+export async function openCardOnFigures(card, { tries = 8, panelTimeout = 3000 } = {}) {
+  const header = card.locator('[data-anatomy="T1"] [role="button"]').first();
+  const panel = card.locator(CARD_TAB_OPEN).first();
+  for (let attempt = 0; attempt < tries; attempt++) {
+    if ((await panel.count()) > 0) break;
+    await header.click().catch(() => {});
+    await panel.waitFor({ state: "attached", timeout: panelTimeout }).catch(() => {});
+  }
+  return showCardTab(card, "figures");
+}

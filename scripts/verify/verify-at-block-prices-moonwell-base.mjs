@@ -45,7 +45,7 @@
 import { chromium } from "playwright";
 import { armScope } from "./lib/prov-inspector.mjs";
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
-import { showCardTab } from "./lib/card-tabs.mjs";
+import { openCardOnFigures } from "./lib/card-tabs.mjs";
 import { CLOSED_GROUP, openGroup } from "./lib/group-rows.mjs";
 
 const EXPLORERS = {
@@ -206,11 +206,8 @@ async function expandCard(page, n) {
   const badge = page.locator(`[data-event-number="${n}"]`);
   await badge.waitFor({ state: "visible", timeout: 20000 });
   await badge.scrollIntoViewIfNeeded();
-  const clickable = cardFor(page, n).locator('[data-anatomy="T1"] [role="button"]').first();
-  await clickable.click();
-  await page.waitForTimeout(250);
   // The price row and the forensics stand on the Figures tab (ui-jobs 370, decision 0044).
-  await showCardTab(cardFor(page, n), "figures");
+  await openCardOnFigures(cardFor(page, n));
 }
 
 /** The receipt behind a value on an event's card. Since ui-jobs 308 a position

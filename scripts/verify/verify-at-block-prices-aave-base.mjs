@@ -33,7 +33,7 @@
 import { chromium } from "playwright";
 import { armScope } from "./lib/prov-inspector.mjs";
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
-import { showCardTab } from "./lib/card-tabs.mjs";
+import { openCardOnFigures } from "./lib/card-tabs.mjs";
 import { openGroup } from "./lib/group-rows.mjs";
 
 const ONLY = process.env.EXPLORER;
@@ -130,17 +130,8 @@ async function expandCard(page, id) {
   const card = cardFor(page, id);
   await card.waitFor({ state: "visible", timeout: 20000 });
   await card.scrollIntoViewIfNeeded();
-  const clickable = card.locator('[data-anatomy="T1"] [role="button"]').first();
-  const panel = card.locator("[data-card-tab-open]").first();
-  // A press before hydration is lost (the retired "Collapse like events" menu
-  // used to spend ~10 s here), so press until the opened panel is drawn.
-  for (let attempt = 0; attempt < 8; attempt++) {
-    if ((await panel.count()) > 0) break;
-    await clickable.click().catch(() => {});
-    await panel.waitFor({ state: "attached", timeout: 3000 }).catch(() => {});
-  }
   // The price row and the forensics stand on the Figures tab (ui-jobs 370, decision 0044).
-  await showCardTab(card, "figures");
+  await openCardOnFigures(card);
 }
 
 /** The forensics grid's own StatCard for one leg (the seized-leg caption) —
