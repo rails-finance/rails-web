@@ -2,10 +2,10 @@
 
 // BrandRail — the narrow vertical strip down the left edge of every app/(app)
 // surface (rails-ops TO-DO-ui-jobs 67, 68). The Rails mark sits at the top with
-// the search's glyph under it (H15.1, decision 0051); the theme toggle, the
-// bookmarks control and the beta pill share the foot. The glyph and the
-// bookmarks control both open the wallet panel (ui-jobs 431), which glides out
-// from the rail's right edge.
+// the search's glyph under it (H15.1, decision 0051); the theme toggle and the
+// beta pill share the foot. The glyph opens the wallet panel (ui-jobs 431),
+// which glides out from the rail's right edge with the bookmarks listed under
+// the search; the separate bookmarks button (H11) went on 1 Nov 2026.
 //
 // IT IS A SURFACE, NOT A MARGIN (68): `bg-raised` is the same tone the cards
 // and panels take, so the strip reads as chrome the page sits beside rather
@@ -21,20 +21,25 @@
 // under app/(site).
 //
 // BELOW `md` THERE IS NO RAIL: at phone widths 56px of permanent gutter is a
-// sixth of the page. HeaderBar draws the mark, the bookmark, the theme toggle
-// and the chain trigger there, as it did before this rail existed.
+// sixth of the page. HeaderBar draws the mark, the search's glyph, the theme
+// toggle and the chain trigger there, as it did before this rail existed.
 
 import Link from "next/link";
 
-import { toggleWalletPanel } from "@/components/nav/wallet-panel";
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { SearchLauncher } from "@/components/shared/front-door-search";
 
 /** The Rails glyph, linking home — the same mark and the same link the top bar
- *  carried, without the wordmark, which will not fit at icon width. */
-function RailsGlyph() {
+ *  carried, without the wordmark, which will not fit at icon width. The wallet
+ *  panel draws it too, at the top of its phone layout. */
+export function RailsGlyph({ onClick }: { onClick?: () => void }) {
   return (
-    <Link href="/" aria-label="Rails home" className="text-foreground transition-colors hover:text-blue-500">
+    <Link
+      href="/"
+      aria-label="Rails home"
+      onClick={onClick}
+      className="text-foreground transition-colors hover:text-blue-500"
+    >
       <svg width={30} height={30} viewBox="0 0 200 200" fill="none" aria-hidden="true">
         <path
           fill="currentColor"
@@ -55,7 +60,7 @@ function RailsGlyph() {
   );
 }
 
-/** The release-stage pill at the very foot of the rail, below the bookmark
+/** The release-stage pill at the very foot of the rail, below the theme toggle
  *  (Miles, 2026-09-25). Drawn as a label coming out of the browser's left
  *  edge: a full-width strip across the foot of the 56px rail, square on every
  *  corner, the word centred. Under the glyph it read as part of the mark and pulled
@@ -67,36 +72,6 @@ function BetaPill() {
     <span className="w-full bg-caution-500 py-0.5 text-center text-[8px] font-semibold uppercase tracking-wide text-white">
       Beta
     </span>
-  );
-}
-
-/** Bookmark icon that opens the wallet panel, where the bookmarks are listed.
- *  It acts on no part of the page under it, which is why it reads as rail
- *  furniture rather than page chrome. */
-function BookmarksButton() {
-  return (
-    <button
-      onClick={(e) => toggleWalletPanel(e.currentTarget)}
-      className="cursor-pointer rounded-lg p-2.5 text-rb-700 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-rb-300"
-      aria-label="Bookmarks"
-      data-anatomy="H11"
-      title="Bookmarks"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-      </svg>
-    </button>
   );
 }
 
@@ -118,12 +93,11 @@ export function BrandRail() {
           <RailsGlyph />
           <SearchLauncher placement="rail" />
         </div>
-        {/* Toggle, bookmark, then the pill flush to the left edge. `w-full`
-            is what lets the pill sit at x=0 while the two icons stay centred
-            in the 56px. */}
+        {/* Toggle, then the pill flush to the left edge. `w-full` is what
+            lets the pill sit at x=0 while the toggle stays centred in the
+            56px. */}
         <div className="flex w-full flex-col items-center gap-1">
           <HeaderThemeToggle />
-          <BookmarksButton />
           <BetaPill />
         </div>
       </aside>

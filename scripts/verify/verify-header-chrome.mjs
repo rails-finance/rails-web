@@ -33,10 +33,13 @@ const browser = await chromium.launch();
 // the footer really carries what the menu used to.
 //
 // THE CONTRACT FROM `md` UP ON AN APP ROUTE (rails-ops TO-DO-ui-jobs 68): the
-// top bar is not drawn at all. BrandRail holds the mark, the theme toggle, the
-// bookmark and the beta pill; the chain chooser sits at the right end of the
-// protocol title row. Below `md` there is no rail and the bar carries every
-// one of those controls, which is what the mobile block at the foot holds.
+// top bar is not drawn at all. BrandRail holds the mark, the search's glyph,
+// the theme toggle and the beta pill; the chain chooser sits at the right end
+// of the protocol title row. Below `md` there is no rail and the bar carries
+// every one of those controls, which is what the mobile block at the foot
+// holds. The separate bookmarks button (H11) went on 1 Nov 2026: the glyph
+// opens the wallet panel, where the bookmarks are listed, so its locator stays
+// only to turn the table red if the button comes back.
 async function chromeState(page, path, expect) {
   await page.goto(BASE + path, { waitUntil: "networkidle" });
   const header = page.locator("header").first();
@@ -54,10 +57,7 @@ async function chromeState(page, path, expect) {
   const pos = await header.evaluate((el) => getComputedStyle(el).position);
 
   check(cta === expect.cta, `${path}: explorer-cta ${cta === expect.cta ? "" : "un"}expected (${cta})`);
-  check(
-    bookmarks === expect.bookmarks,
-    `${path}: bookmarks ${bookmarks === expect.bookmarks ? "" : "un"}expected (${bookmarks})`,
-  );
+  check(bookmarks === 0, `${path}: no bookmarks button, retired 1 Nov 2026 (${bookmarks})`);
   check(!/Coverage/.test(headerText), `${path}: no inline "Coverage" text in the header strip`);
   check(pos === expect.pos, `${path}: header position=${pos} (want ${expect.pos})`);
 }
@@ -65,7 +65,7 @@ async function chromeState(page, path, expect) {
 // ── Chrome-state table (wide viewport) ──
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 console.log("[chrome states @1280]");
-await chromeState(page, "/", { bar: true, cta: 1, bookmarks: 0, pos: "absolute" });
+await chromeState(page, "/", { bar: true, cta: 1, pos: "absolute" });
 // Every real app/(site) page: marketing chrome, but normal-flow (relative) header.
 // (/about bare 308-redirects to / — the real page is /about/architecture.)
 // Coverage is per-chain routes; both take marketing chrome (their prefix is
@@ -79,7 +79,7 @@ for (const p of [
   "/privacy",
   "/terms",
 ]) {
-  await chromeState(page, p, { bar: true, cta: 1, bookmarks: 0, pos: "relative" });
+  await chromeState(page, p, { bar: true, cta: 1, pos: "relative" });
 }
 
 // ── The app surfaces from `md` up: no bar, everything in the rail and the row ──
@@ -88,12 +88,14 @@ await chromeState(page, "/ethereum/liquity-v2", { bar: false });
 const rail = page.locator('aside[aria-label="Rails"]');
 for (const [name, sel] of [
   ["the Rails mark", 'a[href="/"]'],
-  ["the bookmark", 'button[aria-label="Bookmarks"]'],
+  ["the search's glyph", 'button[data-anatomy="H15.1"]'],
   ["the theme toggle", 'button[aria-label^="Switch to"]'],
 ]) {
   const n = await rail.locator(`${sel}:visible`).count();
   check(n === 1, `the brand rail carries ${name} (${n})`);
 }
+const railBookmarks = await rail.locator('button[aria-label="Bookmarks"]').count();
+check(railBookmarks === 0, `the brand rail carries no bookmarks button, retired 1 Nov 2026 (${railBookmarks})`);
 // The rail is a surface, not a margin: an opaque background, and the same one
 // the cards take (`bg-raised`).
 const railBg = await rail.evaluate((el) => {
@@ -108,15 +110,15 @@ const railBg = await rail.evaluate((el) => {
 console.log("   ", JSON.stringify(railBg));
 check(railBg.bg !== "rgba(0, 0, 0, 0)" && railBg.bg !== "transparent", `the rail paints a background (${railBg.bg})`);
 check(railBg.bg === railBg.raised, `the rail takes the raised surface tone (${railBg.bg} vs ${railBg.raised})`);
-// The beta pill: at the FOOT, below the bookmark, drawn as a full-width strip
-// across the rail from the browser's left edge, square on every corner, x=0
-// (c0534d67, 13 Oct 2026).
+// The beta pill: at the FOOT, below the theme toggle, drawn as a full-width
+// strip across the rail from the browser's left edge, square on every corner,
+// x=0 (c0534d67, 13 Oct 2026).
 const pill = await page.evaluate(() => {
   const r = document.querySelector('aside[aria-label="Rails"]');
   const el = [...r.querySelectorAll("span")].find((s) => /^beta$/i.test(s.textContent.trim()));
   if (!el) return null;
   const cs = getComputedStyle(el);
-  const mark = r.querySelector('button[aria-label="Bookmarks"]').getBoundingClientRect();
+  const mark = r.querySelector('button[aria-label^="Switch to"]').getBoundingClientRect();
   const b = el.getBoundingClientRect();
   return {
     left: Math.round(b.left),
@@ -125,7 +127,7 @@ const pill = await page.evaluate(() => {
     topRightRadius: cs.borderTopRightRadius,
     width: Math.round(b.width),
     railWidth: Math.round(r.getBoundingClientRect().width),
-    belowBookmark: b.top >= mark.bottom,
+    belowToggle: b.top >= mark.bottom,
     inLowerHalf: b.top > window.innerHeight / 2,
   };
 });
@@ -139,7 +141,7 @@ if (pill) {
   );
   check(pill.topRightRadius === "0px", `the beta pill is square on its right (${pill.topRightRadius})`);
   check(pill.width === pill.railWidth, `the beta pill spans the rail (${pill.width} of ${pill.railWidth}px)`);
-  check(pill.belowBookmark, "the beta pill sits below the bookmark");
+  check(pill.belowToggle, "the beta pill sits below the theme toggle");
   check(pill.inLowerHalf, "the beta pill sits at the foot of the rail, not under the glyph");
 }
 
@@ -298,12 +300,14 @@ const mSwitcher = await mob.locator('header button[aria-label$="switch blockchai
 check(mBurger === 0, `mobile header has no hamburger (${mBurger})`);
 check(mSwitcher === 1, `mobile header keeps the chain switcher trigger (${mSwitcher})`);
 // Below `md` the brand rail does not render and the bar carries the lot: mark,
-// bookmark, theme toggle, chain trigger (rails-ops TO-DO-ui-jobs
+// the search's glyph, theme toggle, chain trigger (rails-ops TO-DO-ui-jobs
 // 67, 68). The chooser is drawn ONCE — the title row's copy is `md` and up.
 const mRail = await mob.locator('aside[aria-label="Rails"]').isVisible();
 check(mRail === false, `mobile draws no brand rail (${mRail})`);
-const mBookmarks = await mob.locator('header button[aria-label="Bookmarks"]:visible').count();
-check(mBookmarks === 1, `mobile header keeps the bookmark (${mBookmarks})`);
+const mLauncher = await mob.locator('header button[data-anatomy="H15.1"]:visible').count();
+check(mLauncher === 1, `mobile header keeps the search's glyph (${mLauncher})`);
+const mBookmarks = await mob.locator('header button[aria-label="Bookmarks"]').count();
+check(mBookmarks === 0, `mobile header carries no bookmarks button, retired 1 Nov 2026 (${mBookmarks})`);
 const mToggle = await mob.locator('header button[aria-label^="Switch to"]:visible').count();
 check(mToggle === 1, `mobile header keeps the theme toggle (${mToggle})`);
 const mSwitcherAll = await mob.locator('button[aria-label$="switch blockchain"]:visible').count();

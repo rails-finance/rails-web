@@ -556,11 +556,12 @@ for (const f of fixtures) {
 const KEY = "rails-bookmarks";
 const MIGRATED = "rails-bookmarks-migrated";
 
-/** Open the wallet panel from the rail's bookmark button and read its rows:
- *  each row's link and its label. */
+/** Open the wallet panel from the rail's search glyph (H15.1; the separate
+ *  bookmarks button went on 1 Nov 2026) and read its rows: each row's link and
+ *  its label. */
 async function panelRows(page) {
   await page
-    .locator('aside[data-anatomy="H1"] button[aria-label="Bookmarks"]')
+    .locator('aside[data-anatomy="H1"] button[data-anatomy="H15.1"]')
     .first()
     .evaluate((el) => el.click());
   await page.waitForSelector("[data-bookmark-list] a", { timeout: 15_000 }).catch(() => {});

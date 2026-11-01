@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 
 import { ChainSwitcher } from "@/components/nav/chain-switcher";
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
-import { toggleWalletPanel } from "@/components/nav/wallet-panel";
 import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
 
 /** Marketing routes — everything under app/(site). Group names don't appear in
@@ -69,34 +68,6 @@ function BetaPill() {
   );
 }
 
-/** Bookmark icon that opens the wallet panel, where the bookmarks are listed. */
-function BookmarksButton() {
-  return (
-    <button
-      onClick={(e) => toggleWalletPanel(e.currentTarget)}
-      className="cursor-pointer rounded-lg p-2.5 text-rb-700 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-rb-300"
-      aria-label="Bookmarks"
-      data-anatomy="H11"
-      title="Bookmarks"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-      >
-        <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-      </svg>
-    </button>
-  );
-}
-
 export function HeaderBar() {
   const pathname = usePathname();
   // `/` reaches the search from every page; the bar is mounted on all of them.
@@ -108,10 +79,10 @@ export function HeaderBar() {
   // the header strip and breaks the gradient. HomeHero's top padding reserves
   // the room. So `isHome` owns POSITIONING.
   //
-  // Chrome — the "Open an explorer" CTA in place of the hamburger, and no
-  // bookmarks icon — is marketing chrome, and it belongs to every app/(site)
-  // page, not home alone: bookmarks are an app-side affordance and marketing
-  // pages have nothing to bookmark. So `isMarketing` owns CHROME.
+  // Chrome — the wordmark beside the mark, no beta pill, and the "Open an
+  // explorer" CTA in place of the chain trigger — is marketing chrome, and it
+  // belongs to every app/(site) page, not home alone. So `isMarketing` owns
+  // CHROME.
   const isHome = pathname === "/";
   const isMarketing = isHome || isSiteRoute(pathname);
 
@@ -120,8 +91,8 @@ export function HeaderBar() {
       data-anatomy="H2"
       className={`${isHome ? "absolute inset-x-0 top-0 z-40" : "relative z-40 mb-2"}${
         // From `md` up an app route has nothing left for this bar to carry:
-        // the mark, the bookmark and the theme toggle are in BrandRail and the
-        // chain chooser is on the protocol title row (rails-ops TO-DO-ui-jobs
+        // the mark, the search's glyph and the theme toggle are in BrandRail
+        // and the chain chooser is on the protocol title row (rails-ops TO-DO-ui-jobs
         // 68). So the bar goes rather than standing as an empty band, and
         // app/(app)/layout.tsx takes over the top spacing. Below `md` there is
         // no rail and the bar is the only chrome, so it keeps every control.
@@ -142,21 +113,18 @@ export function HeaderBar() {
             switcher trails it, rightmost: on app routes below `md` a chain
             trigger ("Ethereum ▾" — the chain, never the protocol; identity
             lives on the page), on marketing routes the "Open an explorer"
-            pill. Both open the same roster panel. Bookmarks and the toggle lead —
-            the switcher opens a panel, so it anchors the cluster's outer edge
-            rather than sitting in the middle of it. The hamburger is retired
-            with it — the site's own pages and socials live in the footers
-            (SiteFooter on marketing routes, AppFooter's quiet Coverage link
-            on app routes). */}
+            pill. Both open the same roster panel. The search's glyph and the
+            toggle lead — the switcher opens a panel, so it anchors the
+            cluster's outer edge rather than sitting in the middle of it. The
+            hamburger is retired with it — the site's own pages and socials
+            live in the footers (SiteFooter on marketing routes, AppFooter's
+            quiet Coverage link on app routes). */}
         <div className="ml-auto flex items-center gap-1">
-          {/* Bookmarks are an app-side affordance and marketing pages have
-              nothing to bookmark. From `md` up the rail's foot carries it,
-              along with the theme toggle — but this whole bar is gone by then
-              on an app route, so each control is drawn once per width. */}
           {/* The search's glyph (H15.1): everywhere but home, whose hero is
-              the search. A sheet from the top on a phone. */}
+              the search. It opens the wallet panel, where the bookmarks are
+              listed; the separate bookmarks button (H11) went on 1 Nov 2026.
+              A sheet from the top on a phone. */}
           {!isHome && <SearchLauncher placement="header" />}
-          {!isMarketing && <BookmarksButton />}
           <HeaderThemeToggle />
           <ChainSwitcher variant={isMarketing ? "cta" : "chain"} />
         </div>
