@@ -31,9 +31,11 @@ export function routeGate() {
       if (!process.env.RAILS_API_URL || (downUntil.get(key) ?? 0) > Date.now()) return null;
       try {
         const timeout = AbortSignal.timeout(opts.timeoutMs ?? ROUTE_WAIT_MS);
+        // No `cache` option: Next 15 caches no fetch by default, and an explicit
+        // "no-store" throws its dynamic-usage error inside a static or ISR render,
+        // which the catch below took for the route failing, so those pages read the chain.
         const res = await fetch(url, {
           ...init,
-          cache: "no-store",
           signal: opts.signal ? AbortSignal.any([timeout, opts.signal]) : timeout,
         });
         if (!res.ok) {
