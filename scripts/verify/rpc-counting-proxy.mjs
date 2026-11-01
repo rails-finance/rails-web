@@ -233,7 +233,7 @@ async function pinFor(lane, tag = "latest") {
             ? { jsonrpc: "2.0", id: 1, method: "eth_blockNumber", params: [] }
             : { jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: [tag, false] };
         count(lane, "upstream", body.method);
-        const { status, json } = await forward(upstream, body);
+        const { status, json } = await forward(upstream, body, lane.name);
         let hex = tag === "latest" ? json?.result : json?.result?.number;
         if (status !== 200 || typeof hex !== "string" || !/^0x[0-9a-f]+$/i.test(hex)) {
           pinning.delete(key);
@@ -265,8 +265,30 @@ function laneCounters(name) {
     cached: 0,
     errors: 0,
     byMethod: {},
+    /** What the upstream answered, by outcome: a bare HTTP status for a refusal,
+     *  `200/<code> "<first 80 characters of the message>"` for a JSON-RPC error
+     *  inside a 200, `timeout`, or `network <code>`. */
+    outcomes: {},
   });
 }
+const outcome = (laneName, key, n = 1) => {
+  const o = laneCounters(laneName).outcomes;
+  o[key] = (o[key] ?? 0) + n;
+};
+const clip = (text, n = 80) => {
+  const t = String(text ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return t.length > n ? `${t.slice(0, n)}…` : t;
+};
+/** The host of a lane's upstream and nothing else: the URL carries the key. */
+const hostOf = (url) => {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "unparsable";
+  }
+};
 /** `upstream` is every call sent to the real endpoint, whatever came back:
  *  that is what the key is charged for. `cached` is the subset whose answer
  *  was written for next time. */
@@ -282,6 +304,16 @@ function totals() {
   return t;
 }
 
+/** `, 73 errors [host] (200/-32602 "…" ×73)` for a lane that had any, else "". */
+function outcomeText(c, host) {
+  const parts = Object.entries(c.outcomes ?? {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${k} ×${n}`);
+  return c.errors > 0 || parts.length
+    ? `, ${c.errors} errors [${host}]${parts.length ? ` (${parts.join("; ")})` : ""}`
+    : "";
+}
+
 function summaryLines() {
   const t = totals();
   const lines = [
@@ -294,7 +326,9 @@ function summaryLines() {
       .slice(0, 5)
       .map(([m, n]) => `${m} ${n}`)
       .join(", ");
-    lines.push(`  ${name}: ${c.calls} calls, ${c.upstream} upstream${top ? ` (${top})` : ""}`);
+    lines.push(
+      `  ${name}: ${c.calls} calls, ${c.upstream} upstream${top ? ` (${top})` : ""}${outcomeText(c, hostOf(LANES[name]?.upstream))}`,
+    );
   }
   const pinned = Object.entries(pins).map(([c, h]) => `${c} ${parseInt(h, 16)}`);
   if (pinned.length) lines.push(`  pins: ${pinned.join(", ")}`);
@@ -303,19 +337,38 @@ function summaryLines() {
 
 // ── forwarding ──────────────────────────────────────────────────────────────
 
-async function forward(upstream, body) {
-  const res = await fetch(upstream, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const text = await res.text();
+/** A request that outlives this gives up and counts as a timeout. The default is
+ *  undici's own header timeout, so a run behaves as it did before the count. */
+const UPSTREAM_TIMEOUT_MS = Number(process.env.UPSTREAM_TIMEOUT_MS ?? 300_000);
+
+async function forward(upstream, body, laneName) {
+  let res;
+  let text;
+  try {
+    res = await fetch(upstream, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    });
+    text = await res.text();
+  } catch (err) {
+    const code = err?.cause?.code ?? err?.code ?? "";
+    const timedOut = err?.name === "TimeoutError" || /TIMEOUT/.test(String(code));
+    outcome(laneName, timedOut ? "timeout" : `network ${code || clip(err?.message, 40)}`);
+    throw err;
+  }
   let json;
   try {
     json = JSON.parse(text);
   } catch {
     json = undefined;
   }
+  if (res.status !== 200) outcome(laneName, String(res.status));
+  else if (json === undefined) outcome(laneName, "200 not JSON");
+  else
+    for (const item of Array.isArray(json) ? json : [json])
+      if (item?.error !== undefined) outcome(laneName, `200/${item.error?.code} "${clip(item.error?.message)}"`);
   return { status: res.status, text, json };
 }
 
@@ -373,7 +426,7 @@ async function handle(lane, body, res) {
   if (toSend.length) {
     let up;
     try {
-      up = await forward(lane.upstream, batch ? toSend : toSend[0]);
+      up = await forward(lane.upstream, batch ? toSend : toSend[0], lane.name);
     } catch (err) {
       lane.counters.errors += 1;
       res.writeHead(502, { "content-type": "application/json" });
@@ -434,6 +487,7 @@ const server = http.createServer((req, res) => {
       return json({
         proxy: "rpc-counting-proxy",
         lanes: Object.keys(LANES),
+        hosts: Object.fromEntries(Object.entries(LANES).map(([n, l]) => [n, hostOf(l.upstream)])),
         cacheDir: CACHE_DIR,
         pins,
         totals: totals(),
