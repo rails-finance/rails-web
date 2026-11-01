@@ -215,16 +215,14 @@ async function discoverPricedOrdinary(x) {
   return null;
 }
 
-/** A wallet with an unpriced ordinary row — a block the historic backfill
- *  walk has not reached. As it advances, an older fixture eventually gets
- *  fully priced (the fixture wallets below did, once item 87's Base RPC
- *  misdirect was fixed); rather than pin a wallet that goes stale each time
- *  the walk moves, one is discovered from recent accounts here, the same way
- *  discoverPricedOrdinary finds its. Several candidates are gathered and the
- *  OLDEST unpriced specimen wins: the newest unpriced block on a wallet is
- *  the forward tick's own frontier — it prices "within minutes"
- *  (discoverPricedOrdinary's comment) and can flip mid-run; an old one sits
- *  behind the slower historic walk and stays token-only for the run's length. */
+/** A wallet with an unpriced ordinary row. With price runs and a complete
+ *  historic at-block table (1 Nov 2026) the historic walk is done on these
+ *  lanes, so an unpriced row is a frontier row: one the index captured that
+ *  the filler prices within minutes (discoverPricedOrdinary's comment). The
+ *  specimen can therefore be priced before the run reaches it; the card check
+ *  re-reads the wallet's timeline first and SKIPs a row that has priced. One is
+ *  discovered from recent accounts, the same way discoverPricedOrdinary finds
+ *  its; several candidates are gathered and the OLDEST wins. */
 async function discoverUnpriced(x) {
   const candidates = [];
   for (const offset of [0, 100, 200, 300, 400]) {
@@ -512,40 +510,54 @@ async function runExplorer(x) {
 
   if (unpriced) {
     const { n } = unpriced;
-    const own = unpricedWallet === wallet ? { page, domN } : await openPage(x, unpricedWallet, unpricedEvents);
-    await expandCard(own.page, own.domN(n));
-    const card = cardFor(own.page, own.domN(n));
-    // rails-ops TO-DO-ui-jobs §213: once the position read lands, the chip
-    // lists the prices that read took for the card's USD figures, so an
-    // unpriced row is token-only only where the read did not price it.
-    await card
-      .locator('[data-position-state="ready"], [data-position-state="unavailable"]')
-      .first()
-      .waitFor({ timeout: 60000 })
-      .catch(() => {});
-    const readPriced = (await card.locator('[data-position-state="ready"] [data-account-total]').count()) > 0;
-    if (readPriced) {
-      const receipt = await openReceiptFor(own.page, card, "$", (c) =>
-        c.locator('[data-price-row] [title*="oracle at block"]').first(),
-      );
-      check(
-        `${x.key} unpriced #${n}: its price chip is the position read's (getAssetPrice read at the block)`,
-        !!receipt && /getAssetPrice read at block/.test(receipt),
-        receipt ? receipt.slice(0, 120).replace(/\s+/g, " ") : "no pill",
-      );
-    } else
-      check(
-        `${x.key} unpriced #${n}: renders token-only (no "oracle at block" chip)`,
-        (await card.locator('[data-price-row] [title*="oracle at block"]').count()) === 0,
-      );
-    if (own.page !== page) await own.page.close();
-    tokenOnlyEvidence += 1;
+    const spec = `${unpricedWallet} @ block ${unpriced.e.blockNumber}`;
+    // Frontier rows price within minutes and the run takes several: re-read the
+    // wallet's timeline now, and a row that has priced is no specimen.
+    const fresh = await api(x.timeline(unpricedWallet)).catch(() => null);
+    const nowRow = fresh?.events?.find((e) => e.id === unpriced.e.id);
+    if (nowRow && data(nowRow).price != null) {
+      console.log(`SKIP  ${x.key} token-only arm: priced during the run (frontier row) — ${spec}`);
+    } else {
+      const own = unpricedWallet === wallet ? { page, domN } : await openPage(x, unpricedWallet, unpricedEvents);
+      await expandCard(own.page, own.domN(n));
+      const card = cardFor(own.page, own.domN(n));
+      // rails-ops TO-DO-ui-jobs §213: once the position read lands, the chip
+      // lists the prices that read took for the card's USD figures, so an
+      // unpriced row is token-only only where the read did not price it.
+      await card
+        .locator('[data-position-state="ready"], [data-position-state="unavailable"]')
+        .first()
+        .waitFor({ timeout: 60000 })
+        .catch(() => {});
+      const ready = (await card.locator('[data-position-state="ready"]').count()) > 0;
+      const chips = card.locator('[data-price-row] [title*="oracle at block"]');
+      if ((await chips.count()) === 0) {
+        check(`${x.key} unpriced #${n}: renders token-only (no "oracle at block" chip) — ${spec}`, true);
+      } else if (ready) {
+        // The chip is the position read's own: its receipt names the read.
+        const receipt = await openReceiptFor(own.page, card, "$", (c) =>
+          c.locator('[data-price-row] [title*="oracle at block"]').first(),
+        );
+        check(
+          `${x.key} unpriced #${n}: its price chip is the position read's (getAssetPrice read at the block) — ${spec}`,
+          !!receipt && /getAssetPrice read at block/.test(receipt),
+          receipt ? receipt.slice(0, 120).replace(/\s+/g, " ") : "no receipt",
+        );
+      } else {
+        check(
+          `${x.key} unpriced #${n}: renders token-only (no "oracle at block" chip) — ${spec}`,
+          false,
+          "a chip is drawn with no ready position read",
+        );
+      }
+      if (own.page !== page) await own.page.close();
+      tokenOnlyEvidence += 1;
+    }
   } else {
-    // A lane whose every row is priced (Seamless, frozen, once the index
-    // walked it) has nothing to show here: that is no evidence, not a fault.
-    // The run still fails below if NO lane in it had a specimen.
+    // A lane whose every row is priced has nothing to show here: that is no
+    // evidence, not a fault. The run still SKIPs below if NO lane had a specimen.
     console.log(
-      `SKIP  ${x.key} token-only arm: no unpriced ordinary row on this wallet or the first 500 listed (set WALLET= to one with rows the walk has not reached)`,
+      `SKIP  ${x.key} token-only arm: no unpriced ordinary row on this wallet or the first 500 listed (set WALLET= to one with an unpriced frontier row)`,
     );
   }
   await page.close();
@@ -571,7 +583,7 @@ if (tokenOnlyEvidence > 0)
   );
 else
   console.log(
-    "SKIP  token-only arm: no unpriced ordinary row on any lane (the first 500 wallets listed; price runs price a block between equal stored neighbours, so none is left below a lane's last filled block)",
+    "SKIP  token-only arm: no unpriced ordinary row held through the run on any lane (the first 500 wallets listed; price runs price a block between equal stored neighbours, so none is left below a lane's last filled block)",
   );
 check("no page errors", pageErrors.length === 0, pageErrors.slice(0, 2).join(" | "));
 await browser.close();
