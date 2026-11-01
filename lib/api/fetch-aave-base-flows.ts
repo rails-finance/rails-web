@@ -31,7 +31,10 @@ export type AaveBaseFlowAnswer =
    *  transfers), it holds more rows than the route replays, or the server
    *  has no such route. */
   | { wallet: string; refused: "coverage" | "unavailable" }
-  | { wallet: string; refused: "rows"; rows: number; cap: number };
+  | { wallet: string; refused: "rows"; rows: number; cap: number }
+  /** The server is replaying a heavy wallet's history in the background:
+   *  `storedRows` of its `rows` are in. Asking again answers once it is built. */
+  | { wallet: string; refused: "building"; rows: number; storedRows: number };
 
 export const isAaveBaseSummaryAnswer = (a: AaveBaseFlowAnswer): a is Extract<AaveBaseFlowAnswer, { days: unknown }> =>
   !("refused" in a);

@@ -8,7 +8,8 @@
 // seed and tail, or more rows than the page draws), or the flat read comes
 // back short, the server's replay of every row answers instead
 // (/api/{aave-v3-base,seamless}/flows, lib/api/fetch-aave-base-flows.ts); a
-// read that neither gives is a failed read, since a replay of part of a
+// read that neither gives is a failed read (a replay the server is still building
+// is asked again every 45 s, up to 40 times), since a replay of part of a
 // history would state the wrong lifetime. Between events each reserve takes
 // its day's price from the shared daily price store (/api/prices/daily);
 // where that read fails the last event's price is carried. It also gives the
@@ -17,6 +18,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
+import type { FlowsBuilding } from "@/components/shared/lifetime-flows-skeleton";
 import { useFlowFocusRoot, useFlowFocusValue, type FlowFocusValue } from "@/components/shared/flow-focus-context";
 import type { FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -42,6 +44,10 @@ type RouteSummary = Extract<AaveBaseFlowAnswer, { days: unknown }>;
 
 const DAY_S = 86_400;
 const BASE_CHAIN_ID = 8453;
+/** How long to wait before asking a building replay again, and how many times
+ *  (about 30 minutes in all). */
+const BUILD_POLL_MS = 45_000;
+const BUILD_POLL_MAX = 40;
 const NO_EVENTS: readonly BaseActivityEvent[] = [];
 const NO_HEALTH: AaveHealthSource = { oracle: "", pool: "", chain: BASE_CHAIN_ID };
 
@@ -118,6 +124,9 @@ export interface AaveV3BaseFlowsFacts {
 export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
   timeline: FlowTimeline | null;
   read: FlowsRead;
+  /** The server is building the history in the background (rows stored of
+   *  rows); the hook asks again until it answers. */
+  building: FlowsBuilding | null;
   focus: FlowFocusValue;
   facts: AaveV3BaseFlowsFacts | null;
 } {
@@ -125,38 +134,49 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
     events: BaseActivityEvent[] | null;
     route: RouteSummary | null;
     read: FlowsRead;
-  }>({ events: null, route: null, read: "reading" });
+    building: FlowsBuilding | null;
+  }>({ events: null, route: null, read: "reading", building: null });
   const needRead = p.wholeEvents == null && !p.pending;
   const { fetchAll, family, wallet, elided, routeless } = p;
   const chain = p.chainId ?? BASE_CHAIN_ID;
   useEffect(() => {
     if (!needRead) return;
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const failed = (err?: unknown) => {
       if (err) console.warn("Lifetime flows history not read:", err);
-      if (!cancelled) setFetched({ events: null, route: null, read: "failed" });
+      if (!cancelled) setFetched({ events: null, route: null, read: "failed", building: null });
     };
     // The server's replay of every row.
     const viaRoute = () =>
       routeless || family === "aave-v3-arbitrum" ? failed("no server replay on this lane") : viaFlowsRoute(family);
-    const viaFlowsRoute = (lane: "aave-v3-base" | "seamless") =>
+    const viaFlowsRoute = (lane: "aave-v3-base" | "seamless", attempt = 0): Promise<void> =>
       fetchAaveBaseFlows(lane, wallet).then((a) => {
         if (cancelled) return;
-        if (isAaveBaseSummaryAnswer(a)) setFetched({ events: null, route: a, read: "done" });
-        else failed(`the flows route refused (${a.refused})`);
+        if (isAaveBaseSummaryAnswer(a)) setFetched({ events: null, route: a, read: "done", building: null });
+        else if (a.refused === "building" && attempt < BUILD_POLL_MAX) {
+          setFetched({
+            events: null,
+            route: null,
+            read: "reading",
+            building: { stored: a.storedRows, rows: a.rows },
+          });
+          timer = setTimeout(() => void viaFlowsRoute(lane, attempt + 1), BUILD_POLL_MS);
+        } else failed(`the flows route refused (${a.refused})`);
       }, failed);
-    setFetched({ events: null, route: null, read: "reading" });
+    setFetched({ events: null, route: null, read: "reading", building: null });
     if (elided || !fetchAll) void viaRoute();
     else
       fetchAll()
         .then(({ events, missing }) => {
           if (cancelled) return;
           if (missing > 0) void viaRoute();
-          else setFetched({ events, route: null, read: "done" });
+          else setFetched({ events, route: null, read: "done", building: null });
         })
         .catch(() => void viaRoute());
     return () => {
       cancelled = true;
+      clearTimeout(timer);
     };
   }, [needRead, fetchAll, family, wallet, elided, routeless]);
 
@@ -319,5 +339,5 @@ export function useAaveV3BaseFlows(p: AaveV3BaseFlowsInput): {
           (route != null && route.days.length > 0 && !dailySettled)
         ? "reading"
         : "done";
-  return { timeline, read: state, focus, facts };
+  return { timeline, read: state, building: state === "reading" ? fetched.building : null, focus, facts };
 }

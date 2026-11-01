@@ -21,6 +21,12 @@
 import { TIMELINE_WINDOW_ROWS } from "@/lib/shared/timeline-opening-balance";
 import type { LifeCount } from "@/lib/shared/life-count-store";
 
+/** Progress of a background build: `stored` of `rows` events are in. */
+export interface FlowsBuilding {
+  stored: number;
+  rows: number;
+}
+
 const BLOCK = "rounded-md bg-rb-300/70 dark:bg-rb-700/60";
 
 /** The cue's words: the scale of the read where the count is known. */
@@ -30,10 +36,18 @@ export function flowsWaitingLine(count: LifeCount | null): string {
   return `Loading ${count.atLeast ? "at least " : ""}${n} ${count.n === 1 ? "event" : "events"}…`;
 }
 
+/** The cue's words while the server builds the history in the background:
+ *  the rows stored so far of the wallet's rows, where it states them. */
+export function flowsBuildingLine(building: FlowsBuilding): string {
+  const total = building.rows.toLocaleString("en-US");
+  if (building.stored <= 0 || building.rows <= 0) return "Building the flow history…";
+  return `Building the flow history: ${building.stored.toLocaleString("en-US")} of ${total} events`;
+}
+
 /** The activity bar and the lines over the skeleton; aria-hidden, since the
  *  panel's status line says the same to a screen reader. */
-export function LifetimeFlowsWaiting({ count }: { count: LifeCount | null }) {
-  const large = count != null && count.n > TIMELINE_WINDOW_ROWS;
+export function LifetimeFlowsWaiting({ count, line }: { count: LifeCount | null; line?: string }) {
+  const large = line == null && count != null && count.n > TIMELINE_WINDOW_ROWS;
   return (
     <div
       className="pointer-events-none absolute inset-x-0 top-[28%] flex justify-center px-4"
@@ -44,7 +58,7 @@ export function LifetimeFlowsWaiting({ count }: { count: LifeCount | null }) {
       <div className="flows-cue-in flex max-w-[22rem] flex-col items-center rounded-lg bg-raised px-4 py-3 text-center shadow-sm">
         <div className="flows-cue-bar h-1 w-32 overflow-hidden rounded-full bg-rb-200 dark:bg-rb-700" />
         <p className="mt-2 text-sm text-foreground" data-flows-cue-line="">
-          {flowsWaitingLine(count)}
+          {line ?? flowsWaitingLine(count)}
         </p>
         {large && (
           <div className="flows-cue-late" data-flows-cue-late="">

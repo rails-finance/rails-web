@@ -697,6 +697,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                   <LifetimeFlowsPanel
                     scrubber={flows.timeline ? <LifetimeFlowsScrubber timeline={flows.timeline} /> : null}
                     read={timelineState === "failed" || timelineState === "unavailable" ? "failed" : flows.read}
+                    building={flows.building}
                     explanation={
                       <div className="space-y-2 text-sm text-rb-500">
                         <AaveV3BaseFlowsNote facts={flows.facts} brand="Seamless" pool="the Seamless Pool" />
