@@ -121,15 +121,26 @@ function cardFor(page, id) {
   return page.locator(`[data-event-id="${id}"]`).first();
 }
 
+/** How many elements carry the id (one is the card; a second would be a stub). */
+async function cardMatches(page, id) {
+  return page.locator(`[data-event-id="${id}"]`).count();
+}
+
 async function expandCard(page, id) {
   const card = cardFor(page, id);
   await card.waitFor({ state: "visible", timeout: 20000 });
   await card.scrollIntoViewIfNeeded();
-  const clickable = cardFor(page, id).locator('[data-anatomy="T1"] [role="button"]').first();
-  await clickable.click();
-  await page.waitForTimeout(250);
+  const clickable = card.locator('[data-anatomy="T1"] [role="button"]').first();
+  const panel = card.locator("[data-card-tab-open]").first();
+  // A press before hydration is lost (the retired "Collapse like events" menu
+  // used to spend ~10 s here), so press until the opened panel is drawn.
+  for (let attempt = 0; attempt < 8; attempt++) {
+    if ((await panel.count()) > 0) break;
+    await clickable.click().catch(() => {});
+    await panel.waitFor({ state: "attached", timeout: 3000 }).catch(() => {});
+  }
   // The price row and the forensics stand on the Figures tab (ui-jobs 370, decision 0044).
-  await showCardTab(cardFor(page, id), "figures");
+  await showCardTab(card, "figures");
 }
 
 /** The forensics grid's own StatCard for one leg (the seized-leg caption) —
@@ -400,7 +411,11 @@ async function runExplorer(x) {
     // Since ui-jobs 309 step 6 the price at the block is a then/today chip in
     // the card's price row, "<symbol> at the oracle at block" its tip.
     const pill = card.locator(`[data-price-row] [title^="${d.reserveSymbol} "][title*="oracle at block"]`).first();
-    check(`${x.key} ordinary #${n}: the price row's at-block chip renders`, (await pill.count()) > 0);
+    check(
+      `${x.key} ordinary #${n}: the price row's at-block chip renders`,
+      (await pill.count()) > 0,
+      `${await cardMatches(own.page, own.domN(n))} element(s) with the id; price rows ${await card.locator("[data-price-row]").count()}; titles ${JSON.stringify(await card.locator("[data-price-row] [title]").evaluateAll((e) => e.map((t) => t.getAttribute("title"))))}`,
+    );
     if ((await pill.count()) > 0) {
       const text = `${await pill.getAttribute("title")} ${(await pill.innerText()).replace(/\s+/g, " ").trim()}`;
       check(
