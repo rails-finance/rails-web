@@ -16,7 +16,9 @@
 // Prices and rates are keyed by MARKET KEY, not underlying address — two
 // markets share the WBTC address (wbtc, wbtc2) and cETH has no underlying
 // address at all, so the address is not a market identity here.
-// When RPC is down the market state map is empty: `current`/USD stay null and
+// `marketRead` names the block that state was read at and who answered
+// (rails-server live, its stored snapshot, or the chain).
+// When neither the read nor the snapshot answers, the map is empty: `current`/USD stay null and
 // callers degrade to amounts-only (never a partial total).
 //
 // STATUS IS TWO-AXIS: `status` is the lifecycle (open / closed / liquidated —
@@ -28,6 +30,7 @@
 import { COMPOUND_V2_MARKET_BY_KEY, CTOKEN_DECIMALS, type CompoundV2Market } from "@/lib/compound-v2/asset-catalog";
 import {
   resolveCompoundV2MarketState,
+  type CompoundV2MarketRead,
   type CompoundV2MarketStateMap,
 } from "@/lib/sources/chain/compound-v2-market-state";
 
@@ -107,6 +110,9 @@ export interface CompoundV2PositionSummary {
   priceFixedByMarket: Record<string, boolean>;
   /** Annualized per-block rates per market key (null members when unread). */
   ratesByMarket: Record<string, { borrowApr: number | null; supplyApr: number | null }>;
+  /** The block the market state above (exchange rates, prices, rates) was
+   *  read at and who answered; absent when it was not read. */
+  marketRead?: CompoundV2MarketRead;
 }
 
 /** One open (wallet, market) row as returned by the rails route. */
@@ -253,6 +259,7 @@ export async function buildCompoundV2PositionRows(raw: RawCompoundV2WalletRow[])
       priceByMarket,
       priceFixedByMarket,
       ratesByMarket,
+      ...(state.read ? { marketRead: state.read } : {}),
     };
   });
 }

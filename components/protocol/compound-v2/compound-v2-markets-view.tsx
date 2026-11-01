@@ -63,6 +63,7 @@ import {
 import type { CompoundV2MarketRow, CompoundV2MarketsResponse } from "@/lib/sources/chain/compound-v2-markets";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { BlockRef } from "@/components/shared/block-ref";
+import { headReadOf, serverReadVia, type ServerRead } from "@/lib/shared/server-head-read";
 
 const pctText = (f: number | null, dp = 1) => (f == null ? "—" : `${(f * 100).toFixed(dp)}%`);
 
@@ -81,7 +82,13 @@ const tokenAmount = (v: number, symbol: string): string => {
 
 /** The market-surface coordinates a row's receipts read against — the block, the
  *  cToken, its symbols, and the oracle / rate model the loader read alongside. */
-const coordsFor = (m: CompoundV2MarketRow, block: number, oracle: string | null): CompoundV2MarketCoords => ({
+const coordsFor = (
+  m: CompoundV2MarketRow,
+  block: number,
+  oracle: string | null,
+  readBy?: ServerRead,
+): CompoundV2MarketCoords => ({
+  readBy,
   blockNumber: block,
   cToken: m.cToken,
   cTokenSymbol: m.cTokenSymbol,
@@ -105,10 +112,20 @@ const cTokenLabel = (m: CompoundV2MarketRow) => {
   return m.cTokenSymbol;
 };
 
-function MarketCard({ m, block, oracle }: { m: CompoundV2MarketRow; block: number; oracle: string | null }) {
+function MarketCard({
+  m,
+  block,
+  oracle,
+  readBy,
+}: {
+  m: CompoundV2MarketRow;
+  block: number;
+  oracle: string | null;
+  readBy?: ServerRead;
+}) {
   const key = keyOf(m.cToken);
   const deprecatedOn = key && COMPOUND_V2_DEPRECATED[key] ? deprecationDate(key) : null;
-  const coords = coordsFor(m, block, oracle);
+  const coords = coordsFor(m, block, oracle, readBy);
   const ticks: RatioBarTick[] = [];
   if (m.kink != null)
     ticks.push({
@@ -217,7 +234,8 @@ export function CompoundV2MarketsStamp({ data }: { data: CompoundV2MarketsRespon
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · roster from the{" "}
+      {data.stored ? "Stored snapshot" : "Chain snapshot"} ·{" "}
+      <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} /> · roster from the{" "}
       <a
         href={explorerUrl(MAINNET_CHAIN_ID, "address", "0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B")}
         target="_blank"
@@ -241,6 +259,7 @@ export function CompoundV2MarketsStamp({ data }: { data: CompoundV2MarketsRespon
           </a>
         </>
       )}
+      {serverReadVia(headReadOf(data.head, data.blockNumber, data.stored))}
     </p>
   );
 }
@@ -254,7 +273,8 @@ export function CompoundV2MarketsView({ data }: { data: CompoundV2MarketsRespons
   }
 
   const s = data.summary;
-  const summaryCoords: CompoundV2MarketCoords = { blockNumber: data.blockNumber, oracle: data.oracle };
+  const readBy = headReadOf(data.head, data.blockNumber, data.stored);
+  const summaryCoords: CompoundV2MarketCoords = { blockNumber: data.blockNumber, oracle: data.oracle, readBy };
   const fixedPriceMarkets = data.markets.filter((m) => !m.priceHasFeed);
   const sai = fixedPriceMarkets.find((m) => m.underlyingSymbol === "SAI");
 
@@ -345,7 +365,7 @@ export function CompoundV2MarketsView({ data }: { data: CompoundV2MarketsRespons
 
       <div className="grid gap-2.5 sm:grid-cols-2">
         {data.markets.map((m) => (
-          <MarketCard key={m.cToken} m={m} block={data.blockNumber} oracle={data.oracle} />
+          <MarketCard key={m.cToken} m={m} block={data.blockNumber} oracle={data.oracle} readBy={readBy} />
         ))}
       </div>
 
@@ -358,7 +378,7 @@ export function CompoundV2MarketsView({ data }: { data: CompoundV2MarketsRespons
             shown as they are. The clearest case is the legacy SAI market, priced at{" "}
             <span className="text-foreground">
               {sai ? (
-                <Prov info={cvPriceProv(false, coordsFor(sai, data.blockNumber, data.oracle))}>
+                <Prov info={cvPriceProv(false, coordsFor(sai, data.blockNumber, data.oracle, readBy))}>
                   {usd(sai.priceUsd)}
                 </Prov>
               ) : (
@@ -395,7 +415,9 @@ export function CompoundV2MarketsView({ data }: { data: CompoundV2MarketsRespons
                 className="link-external"
               >
                 {cTokenLabel(m)} · {m.underlyingSymbol} at{" "}
-                <Prov info={cvPriceProv(false, coordsFor(m, data.blockNumber, data.oracle))}>{usd(m.priceUsd)}</Prov>
+                <Prov info={cvPriceProv(false, coordsFor(m, data.blockNumber, data.oracle, readBy))}>
+                  {usd(m.priceUsd)}
+                </Prov>
               </a>
             ))}
           </div>
