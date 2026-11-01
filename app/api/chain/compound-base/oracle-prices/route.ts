@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveCometPrices, cometPriceOf, type CometPriceRequest } from "@/lib/sources/chain/compound-prices";
 import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
+import { headReadOf, headReadSource } from "@/lib/shared/server-head-read";
 
 // On-chain USD for the tokens a Base Comet position touches — each market's
 // OWN `getPrice` on the feed it liquidates with, one batched read. Exists for
@@ -14,6 +15,9 @@ import { COMPOUND_BASE_DEPLOYMENT } from "@/lib/compound-base/asset-catalog";
 // assert a partial USD total.
 //
 // `?pairs=<comet>:<token>,…` — comet slugs are this deployment's market keys.
+// Beside `prices`: `blockNumber`, `source` (rails-server, rails-server-stored
+// or chain) and the stamp of who read it (`head` live, `stored` from
+// rails-server's snapshot).
 // Node runtime, no edge caching.
 
 export const runtime = "nodejs";
@@ -52,7 +56,14 @@ export async function GET(request: NextRequest) {
         if (p != null && p > 0) prices[`${key}:${t}`] = p;
       }
     }
-    return NextResponse.json({ prices });
+    const read = map.read;
+    const source = headReadSource(read && headReadOf(read.head, read.blockNumber, read.stored));
+    return NextResponse.json({
+      prices,
+      ...(read ? { blockNumber: read.blockNumber, source } : {}),
+      ...(read?.head ? { head: read.head } : {}),
+      ...(read?.stored ? { stored: read.stored } : {}),
+    });
   } catch (error) {
     console.error("Error reading Compound V3 Base oracle prices:", error);
     return NextResponse.json({ prices: {} });

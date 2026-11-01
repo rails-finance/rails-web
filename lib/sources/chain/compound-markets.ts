@@ -48,10 +48,20 @@
 //     reserves sit below the target, the market sells absorbed collateral at
 //     the configured discount to refill; at or above it, buyCollateral stops.
 //
+// Ethereum and Base read through rails-server's head routes and, when the live
+// read fails, its stored snapshot of them (lib/sources/api/head-snapshot.ts,
+// surfaces `compound-v3:ethereum:markets` and `compound-v3:base:markets`);
+// Arbitrum reads the chain.
+//
 // SERVER-ONLY — imported from /api/chain/* route handlers and the SSR page only.
 
-import { parseAbi, type ContractFunctionParameters } from "viem";
+import { parseAbi, type ContractFunctionParameters, type PublicClient } from "viem";
 import { chainClient } from "./rpc";
+import { withHeadSnapshot } from "@/lib/sources/api/head-snapshot";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import type { StoredHeadRead } from "@/lib/shared/server-head-read";
+import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { COMPOUND_DEPLOYMENT, type CometDeployment } from "@/lib/compound/asset-catalog";
 import { resolveErc20Meta } from "./erc20-meta";
 
@@ -167,6 +177,10 @@ export interface CompoundV3MarketRow {
 
 export interface CompoundV3MarketsResponse {
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read live. */
+  head?: PositionHeadStamp;
+  /** rails-server's stored snapshot the figures were computed over, when the live read failed. */
+  stored?: StoredHeadRead;
   markets: CompoundV3MarketRow[];
   summary: {
     total: number;
@@ -201,174 +215,195 @@ function empty(): CompoundV3MarketsResponse {
   };
 }
 
+/** The head-snapshot surface's chain segment, for the deployments read through rails-server. */
+const SURFACE_CHAIN: Partial<Record<number, string>> = { [MAINNET_CHAIN_ID]: "ethereum", [BASE_CHAIN_ID]: "base" };
+
+/** `compound-v3:<chain>:<what>` for Ethereum and Base; null for a deployment read on the chain. */
+export function cometSurface(deployment: CometDeployment, what: "markets" | "prices"): string | null {
+  const chain = SURFACE_CHAIN[deployment.chainId];
+  return chain ? `compound-v3:${chain}:${what}` : null;
+}
+
 export async function loadCompoundV3Markets(
   deployment: CometDeployment = COMPOUND_DEPLOYMENT,
 ): Promise<CompoundV3MarketsResponse> {
   try {
-    const client = chainClient(deployment.chainId);
-    const roster = deployment.markets;
-
-    // Heterogeneous multicalls: type the entries as the generic viem contract
-    // parameters (per-call return types are asserted at the result casts).
-    const at = (comet: string, functionName: string, args: readonly unknown[] = []): ContractFunctionParameters =>
-      ({ address: comet as `0x${string}`, abi: COMET_ABI, functionName, args }) as ContractFunctionParameters;
-
-    // The head block is taken FIRST and every call below is pinned to it. An
-    // unpinned batch can answer at a later block than the one the response
-    // names — on a 2-second chain, routinely — and a receipt that says "re-run
-    // this call at block N" has to reproduce at block N.
-    const blockNumber = Number(await client.getBlockNumber());
-    const atBlock = { blockNumber: BigInt(blockNumber) };
-
-    // Phase 1 — each market's totals, curve constants, reserve line, base feed
-    // and collateral count, in one multicall.
-    const PER1 = 10;
-    const p1 = (await client.multicall({
-      allowFailure: false,
-      ...atBlock,
-      contracts: roster.flatMap((m) => [
-        at(m.comet, "totalSupply"),
-        at(m.comet, "totalBorrow"),
-        at(m.comet, "getUtilization"),
-        at(m.comet, "supplyKink"),
-        at(m.comet, "borrowKink"),
-        at(m.comet, "getReserves"),
-        at(m.comet, "targetReserves"),
-        at(m.comet, "baseTokenPriceFeed"),
-        at(m.comet, "baseBorrowMin"),
-        at(m.comet, "numAssets"),
-      ]),
-    })) as unknown[];
-
-    const numAssets = roster.map((_, i) => Number(p1[i * PER1 + 9] as number));
-    const utilization = roster.map((_, i) => p1[i * PER1 + 2] as bigint);
-    const baseFeed = roster.map((_, i) => p1[i * PER1 + 7] as string);
-
-    // Phase 2 — the utilization-dependent rates, the base price, and each
-    // market's own collateral roster (getAssetInfo per enumerated slot).
-    const off2: number[] = [];
-    const c2: ContractFunctionParameters[] = [];
-    roster.forEach((m, i) => {
-      off2[i] = c2.length;
-      c2.push(
-        at(m.comet, "getSupplyRate", [utilization[i]]),
-        at(m.comet, "getBorrowRate", [utilization[i]]),
-        at(m.comet, "getPrice", [baseFeed[i]]),
-      );
-      for (let a = 0; a < numAssets[i]; a++) c2.push(at(m.comet, "getAssetInfo", [a]));
-    });
-    const p2 = (await client.multicall({ allowFailure: false, ...atBlock, contracts: c2 })) as unknown[];
-    const infos: AssetInfo[][] = roster.map((_, i) =>
-      Array.from({ length: numAssets[i] }, (_, a) => p2[off2[i] + 3 + a] as AssetInfo),
+    const surface = cometSurface(deployment, "markets");
+    if (!surface) return await readMarkets(chainClient(deployment.chainId), deployment);
+    const { value, stored } = await withHeadSnapshot(
+      { surface, chainId: deployment.chainId },
+      (client) => readMarkets(client, deployment),
+      () => true,
     );
-
-    // Phase 3 — per collateral asset: the market-wide total supplied
-    // (totalsCollateral) and its configured feed's price.
-    const off3: number[] = [];
-    const c3: ContractFunctionParameters[] = [];
-    roster.forEach((m, i) => {
-      off3[i] = c3.length;
-      for (const a of infos[i]) {
-        c3.push(at(m.comet, "totalsCollateral", [a.asset]), at(m.comet, "getPrice", [a.priceFeed]));
-      }
-    });
-    const p3 = (await client.multicall({ allowFailure: false, ...atBlock, contracts: c3 })) as unknown[];
-
-    // Name the collateral tokens in one cached multicall.
-    const metas = await resolveErc20Meta(
-      infos.flat().map((a) => a.asset.toLowerCase()),
-      deployment.chainId,
-    );
-
-    const markets: CompoundV3MarketRow[] = roster.map((m, i) => {
-      const b = i * PER1;
-      const baseScale = 10 ** m.baseDecimals;
-      const totalSupplyBase = Number(p1[b] as bigint) / baseScale;
-      const totalBorrowBase = Number(p1[b + 1] as bigint) / baseScale;
-      const basePrice = Number(p2[off2[i] + 2] as bigint) / PRICE;
-
-      const collateral: CompoundV3CollateralRow[] = infos[i].map((a, ai) => {
-        // totalsCollateral is a two-field return; viem decodes it positionally.
-        const [totalSuppliedRaw] = p3[off3[i] + ai * 2] as [bigint, bigint];
-        const price = Number(p3[off3[i] + ai * 2 + 1] as bigint) / PRICE;
-        const scale = Number(a.scale);
-        const totalSupplied = Number(totalSuppliedRaw) / scale;
-        const supplyCap = Number(a.supplyCap) / scale;
-        const addr = a.asset.toLowerCase();
-        const meta = metas.get(addr);
-        return {
-          asset: addr,
-          symbol: meta?.symbol ?? `${addr.slice(0, 6)}…${addr.slice(-4)}`,
-          totalSupplied,
-          supplyCap,
-          capUsed: supplyCap > 0 ? totalSupplied / supplyCap : null,
-          price,
-          suppliedValue: totalSupplied * price,
-          borrowCollateralFactor: Number(a.borrowCollateralFactor) / FACTOR,
-          liquidateCollateralFactor: Number(a.liquidateCollateralFactor) / FACTOR,
-          liquidationFactor: Number(a.liquidationFactor) / FACTOR,
-        };
-      });
-      collateral.sort((x, y) => y.suppliedValue - x.suppliedValue);
-
-      return {
-        key: m.key,
-        label: m.label,
-        comet: m.comet,
-        baseSymbol: m.baseSymbol,
-        baseToken: m.baseToken,
-        baseDecimals: m.baseDecimals,
-        quoteUnit: m.quoteUnit,
-
-        totalSupplyBase,
-        totalBorrowBase,
-        basePrice,
-        totalSupplyValue: totalSupplyBase * basePrice,
-        totalBorrowValue: totalBorrowBase * basePrice,
-
-        utilization: Number(utilization[i]) / FACTOR,
-        supplyKink: Number(p1[b + 3] as bigint) / FACTOR,
-        borrowKink: Number(p1[b + 4] as bigint) / FACTOR,
-        supplyApr: (Number(p2[off2[i]] as bigint) * SECONDS_PER_YEAR) / FACTOR,
-        borrowApr: (Number(p2[off2[i] + 1] as bigint) * SECONDS_PER_YEAR) / FACTOR,
-
-        reservesBase: Number(p1[b + 5] as bigint) / baseScale,
-        targetReservesBase: Number(p1[b + 6] as bigint) / baseScale,
-        reservesOfTarget: (() => {
-          const target = Number(p1[b + 6] as bigint) / baseScale;
-          return target > 0 ? Number(p1[b + 5] as bigint) / baseScale / target : null;
-        })(),
-        baseBorrowMin: Number(p1[b + 8] as bigint) / baseScale,
-
-        collateral,
-        totalCollateralValue: collateral.reduce((t, c) => t + c.suppliedValue, 0),
-      };
-    });
-
-    // One unit per sum: the USD-quoted markets total together, the ETH-quoted
-    // market stands alone. Never blended.
-    const usdRows = markets.filter((m) => m.quoteUnit === "USD");
-    const ethRows = markets.filter((m) => m.quoteUnit === "ETH");
-    const suppliedUsd = usdRows.length > 0 ? usdRows.reduce((t, m) => t + m.totalSupplyValue, 0) : null;
-    const borrowedUsd = usdRows.length > 0 ? usdRows.reduce((t, m) => t + m.totalBorrowValue, 0) : null;
-
-    return {
-      blockNumber,
-      markets,
-      summary: {
-        total: markets.length,
-        suppliedUsd,
-        borrowedUsd,
-        utilisationUsd:
-          suppliedUsd != null && borrowedUsd != null && suppliedUsd > 0 ? borrowedUsd / suppliedUsd : null,
-        suppliedEth: ethRows.length > 0 ? ethRows.reduce((t, m) => t + m.totalSupplyValue, 0) : null,
-        borrowedEth: ethRows.length > 0 ? ethRows.reduce((t, m) => t + m.totalBorrowValue, 0) : null,
-        collateralAssets: new Set(markets.flatMap((m) => m.collateral.map((c) => c.asset))).size,
-      },
-      chainStale: false,
-    };
+    if (stored) return { ...value, stored };
+    const head = serverHeadStampAt(deployment.chainId, value.blockNumber);
+    return head ? { ...value, head } : value;
   } catch (error) {
     console.error("Compound V3 markets chain read failed:", error);
     return empty();
   }
+}
+
+/** Every Comet in the deployment at one block; throws where a read fails. */
+async function readMarkets(client: PublicClient, deployment: CometDeployment): Promise<CompoundV3MarketsResponse> {
+  const roster = deployment.markets;
+
+  // Heterogeneous multicalls: type the entries as the generic viem contract
+  // parameters (per-call return types are asserted at the result casts).
+  const at = (comet: string, functionName: string, args: readonly unknown[] = []): ContractFunctionParameters =>
+    ({ address: comet as `0x${string}`, abi: COMET_ABI, functionName, args }) as ContractFunctionParameters;
+
+  // The head block is taken FIRST and every call below is pinned to it. An
+  // unpinned batch can answer at a later block than the one the response
+  // names — on a 2-second chain, routinely — and a receipt that says "re-run
+  // this call at block N" has to reproduce at block N.
+  const blockNumber = Number(await client.getBlockNumber());
+  const atBlock = { blockNumber: BigInt(blockNumber) };
+
+  // Phase 1 — each market's totals, curve constants, reserve line, base feed
+  // and collateral count, in one multicall.
+  const PER1 = 10;
+  const p1 = (await client.multicall({
+    allowFailure: false,
+    ...atBlock,
+    contracts: roster.flatMap((m) => [
+      at(m.comet, "totalSupply"),
+      at(m.comet, "totalBorrow"),
+      at(m.comet, "getUtilization"),
+      at(m.comet, "supplyKink"),
+      at(m.comet, "borrowKink"),
+      at(m.comet, "getReserves"),
+      at(m.comet, "targetReserves"),
+      at(m.comet, "baseTokenPriceFeed"),
+      at(m.comet, "baseBorrowMin"),
+      at(m.comet, "numAssets"),
+    ]),
+  })) as unknown[];
+
+  const numAssets = roster.map((_, i) => Number(p1[i * PER1 + 9] as number));
+  const utilization = roster.map((_, i) => p1[i * PER1 + 2] as bigint);
+  const baseFeed = roster.map((_, i) => p1[i * PER1 + 7] as string);
+
+  // Phase 2 — the utilization-dependent rates, the base price, and each
+  // market's own collateral roster (getAssetInfo per enumerated slot).
+  const off2: number[] = [];
+  const c2: ContractFunctionParameters[] = [];
+  roster.forEach((m, i) => {
+    off2[i] = c2.length;
+    c2.push(
+      at(m.comet, "getSupplyRate", [utilization[i]]),
+      at(m.comet, "getBorrowRate", [utilization[i]]),
+      at(m.comet, "getPrice", [baseFeed[i]]),
+    );
+    for (let a = 0; a < numAssets[i]; a++) c2.push(at(m.comet, "getAssetInfo", [a]));
+  });
+  const p2 = (await client.multicall({ allowFailure: false, ...atBlock, contracts: c2 })) as unknown[];
+  const infos: AssetInfo[][] = roster.map((_, i) =>
+    Array.from({ length: numAssets[i] }, (_, a) => p2[off2[i] + 3 + a] as AssetInfo),
+  );
+
+  // Phase 3 — per collateral asset: the market-wide total supplied
+  // (totalsCollateral) and its configured feed's price.
+  const off3: number[] = [];
+  const c3: ContractFunctionParameters[] = [];
+  roster.forEach((m, i) => {
+    off3[i] = c3.length;
+    for (const a of infos[i]) {
+      c3.push(at(m.comet, "totalsCollateral", [a.asset]), at(m.comet, "getPrice", [a.priceFeed]));
+    }
+  });
+  const p3 = (await client.multicall({ allowFailure: false, ...atBlock, contracts: c3 })) as unknown[];
+
+  // Name the collateral tokens in one cached multicall.
+  const metas = await resolveErc20Meta(
+    infos.flat().map((a) => a.asset.toLowerCase()),
+    deployment.chainId,
+  );
+
+  const markets: CompoundV3MarketRow[] = roster.map((m, i) => {
+    const b = i * PER1;
+    const baseScale = 10 ** m.baseDecimals;
+    const totalSupplyBase = Number(p1[b] as bigint) / baseScale;
+    const totalBorrowBase = Number(p1[b + 1] as bigint) / baseScale;
+    const basePrice = Number(p2[off2[i] + 2] as bigint) / PRICE;
+
+    const collateral: CompoundV3CollateralRow[] = infos[i].map((a, ai) => {
+      // totalsCollateral is a two-field return; viem decodes it positionally.
+      const [totalSuppliedRaw] = p3[off3[i] + ai * 2] as [bigint, bigint];
+      const price = Number(p3[off3[i] + ai * 2 + 1] as bigint) / PRICE;
+      const scale = Number(a.scale);
+      const totalSupplied = Number(totalSuppliedRaw) / scale;
+      const supplyCap = Number(a.supplyCap) / scale;
+      const addr = a.asset.toLowerCase();
+      const meta = metas.get(addr);
+      return {
+        asset: addr,
+        symbol: meta?.symbol ?? `${addr.slice(0, 6)}…${addr.slice(-4)}`,
+        totalSupplied,
+        supplyCap,
+        capUsed: supplyCap > 0 ? totalSupplied / supplyCap : null,
+        price,
+        suppliedValue: totalSupplied * price,
+        borrowCollateralFactor: Number(a.borrowCollateralFactor) / FACTOR,
+        liquidateCollateralFactor: Number(a.liquidateCollateralFactor) / FACTOR,
+        liquidationFactor: Number(a.liquidationFactor) / FACTOR,
+      };
+    });
+    collateral.sort((x, y) => y.suppliedValue - x.suppliedValue);
+
+    return {
+      key: m.key,
+      label: m.label,
+      comet: m.comet,
+      baseSymbol: m.baseSymbol,
+      baseToken: m.baseToken,
+      baseDecimals: m.baseDecimals,
+      quoteUnit: m.quoteUnit,
+
+      totalSupplyBase,
+      totalBorrowBase,
+      basePrice,
+      totalSupplyValue: totalSupplyBase * basePrice,
+      totalBorrowValue: totalBorrowBase * basePrice,
+
+      utilization: Number(utilization[i]) / FACTOR,
+      supplyKink: Number(p1[b + 3] as bigint) / FACTOR,
+      borrowKink: Number(p1[b + 4] as bigint) / FACTOR,
+      supplyApr: (Number(p2[off2[i]] as bigint) * SECONDS_PER_YEAR) / FACTOR,
+      borrowApr: (Number(p2[off2[i] + 1] as bigint) * SECONDS_PER_YEAR) / FACTOR,
+
+      reservesBase: Number(p1[b + 5] as bigint) / baseScale,
+      targetReservesBase: Number(p1[b + 6] as bigint) / baseScale,
+      reservesOfTarget: (() => {
+        const target = Number(p1[b + 6] as bigint) / baseScale;
+        return target > 0 ? Number(p1[b + 5] as bigint) / baseScale / target : null;
+      })(),
+      baseBorrowMin: Number(p1[b + 8] as bigint) / baseScale,
+
+      collateral,
+      totalCollateralValue: collateral.reduce((t, c) => t + c.suppliedValue, 0),
+    };
+  });
+
+  // One unit per sum: the USD-quoted markets total together, the ETH-quoted
+  // market stands alone. Never blended.
+  const usdRows = markets.filter((m) => m.quoteUnit === "USD");
+  const ethRows = markets.filter((m) => m.quoteUnit === "ETH");
+  const suppliedUsd = usdRows.length > 0 ? usdRows.reduce((t, m) => t + m.totalSupplyValue, 0) : null;
+  const borrowedUsd = usdRows.length > 0 ? usdRows.reduce((t, m) => t + m.totalBorrowValue, 0) : null;
+
+  return {
+    blockNumber,
+    markets,
+    summary: {
+      total: markets.length,
+      suppliedUsd,
+      borrowedUsd,
+      utilisationUsd: suppliedUsd != null && borrowedUsd != null && suppliedUsd > 0 ? borrowedUsd / suppliedUsd : null,
+      suppliedEth: ethRows.length > 0 ? ethRows.reduce((t, m) => t + m.totalSupplyValue, 0) : null,
+      borrowedEth: ethRows.length > 0 ? ethRows.reduce((t, m) => t + m.totalBorrowValue, 0) : null,
+      collateralAssets: new Set(markets.flatMap((m) => m.collateral.map((c) => c.asset))).size,
+    },
+    chainStale: false,
+  };
 }

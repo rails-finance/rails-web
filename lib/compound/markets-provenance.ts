@@ -22,8 +22,14 @@
 // the value was read from); a collateral-level receipt keeps the same proxy —
 // pooled collateral totals are a Comet slot (totalsCollateral), not a token
 // read. Real addresses throughout, threaded from the market row.
+//
+// Every builder is stamped with the coordinates' `readBy`
+// (lib/shared/server-head-read.ts): "@ head" becomes the block and the via
+// line names rails-server's live read, or its stored read and why. Without
+// `readBy` the web read the chain and "@ head" stays.
 
 import type { Provenance } from "@/components/shared/provenance";
+import { stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
 
 const LANE = "live Comet reads (/compound/markets)";
 
@@ -31,6 +37,8 @@ const LANE = "live Comet reads (/compound/markets)";
  *  Comet proxy it was read from, and the units it speaks in. Collateral-level
  *  builders add the collateral asset's identity. */
 export interface CompoundMarketCoords {
+  /** rails-server's read of `blockNumber` (live, or its stored snapshot); unset where the web read the chain. */
+  readBy?: ServerRead | null;
   blockNumber?: number;
   /** The Comet proxy address — the contract on every receipt for this market. */
   comet?: string;
@@ -63,7 +71,7 @@ const recompute = (call: string, coords?: CompoundMarketCoords): Provenance["ver
 
 /** Total base supplied or borrowed — Comet's own totals slot (interest already
  *  in it, via the live index). */
-export const cvMarketBaseProv = (side: "supplied" | "borrowed", coords: CompoundMarketCoords): Provenance => {
+const cvMarketBaseProvUnstamped = (side: "supplied" | "borrowed", coords: CompoundMarketCoords): Provenance => {
   const method = side === "supplied" ? "totalSupply" : "totalBorrow";
   return {
     kind: "chain",
@@ -78,7 +86,7 @@ export const cvMarketBaseProv = (side: "supplied" | "borrowed", coords: Compound
 
 /** Total supplied/borrowed VALUE in the market's quote unit — base amount × the
  *  market's own oracle price for its base. */
-export const cvMarketValueProv = (side: "supplied" | "borrowed", coords: CompoundMarketCoords): Provenance => ({
+const cvMarketValueProvUnstamped = (side: "supplied" | "borrowed", coords: CompoundMarketCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
   source: { block: coords.blockNumber },
@@ -101,7 +109,7 @@ export const cvMarketValueProv = (side: "supplied" | "borrowed", coords: Compoun
 
 /** Utilisation — Comet's own getUtilization (totalBorrow ÷ totalSupply of the
  *  base), the number the whole rate curve is written against. */
-export const cvUtilizationProv = (coords: CompoundMarketCoords): Provenance => ({
+const cvUtilizationProvUnstamped = (coords: CompoundMarketCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
@@ -113,7 +121,7 @@ export const cvUtilizationProv = (coords: CompoundMarketCoords): Provenance => (
 
 /** A rate-curve kink — the utilisation a curve turns steep at (supplyKink /
  *  borrowKink), a governance-set slot on the same axis as the fill. */
-export const cvKinkProv = (which: "supply" | "borrow", coords: CompoundMarketCoords): Provenance => ({
+const cvKinkProvUnstamped = (which: "supply" | "borrow", coords: CompoundMarketCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
@@ -125,7 +133,7 @@ export const cvKinkProv = (which: "supply" | "borrow", coords: CompoundMarketCoo
 
 /** A live annualised rate — getSupplyRate / getBorrowRate at the current
  *  utilisation, the contract's per-second answer × seconds per year. */
-export const cvRateProv = (side: "supply" | "borrow", coords: CompoundMarketCoords): Provenance => {
+const cvRateProvUnstamped = (side: "supply" | "borrow", coords: CompoundMarketCoords): Provenance => {
   const method = side === "supply" ? "getSupplyRate" : "getBorrowRate";
   return {
     kind: "chain-derived",
@@ -147,7 +155,7 @@ export const cvRateProv = (side: "supply" | "borrow", coords: CompoundMarketCoor
 
 /** The market's reserve line — getReserves, SIGNED base units (can run
  *  negative), and its governance target. */
-export const cvReservesProv = (kind: "line" | "target", coords: CompoundMarketCoords): Provenance => {
+const cvReservesProvUnstamped = (kind: "line" | "target", coords: CompoundMarketCoords): Provenance => {
   const method = kind === "line" ? "getReserves" : "targetReserves";
   return {
     kind: "chain",
@@ -164,7 +172,7 @@ export const cvReservesProv = (kind: "line" | "target", coords: CompoundMarketCo
 };
 
 /** The smallest borrow the market accepts — baseBorrowMin. */
-export const cvBaseBorrowMinProv = (coords: CompoundMarketCoords): Provenance => ({
+const cvBaseBorrowMinProvUnstamped = (coords: CompoundMarketCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
@@ -176,7 +184,7 @@ export const cvBaseBorrowMinProv = (coords: CompoundMarketCoords): Provenance =>
 
 /** Total collateral backing, market quote unit — Σ over the roster of each
  *  collateral's pooled total × its own oracle price. */
-export const cvCollateralBackingProv = (coords: CompoundMarketCoords): Provenance => ({
+const cvCollateralBackingProvUnstamped = (coords: CompoundMarketCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
   source: { block: coords.blockNumber },
@@ -194,7 +202,7 @@ export const cvCollateralBackingProv = (coords: CompoundMarketCoords): Provenanc
 
 /** One collateral asset's market-wide pooled total — totalsCollateral, the
  *  asset's own units (pooled per asset, not per account). */
-export const cvCollateralSuppliedProv = (coords: CompoundMarketCoords): Provenance => ({
+const cvCollateralSuppliedProvUnstamped = (coords: CompoundMarketCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
@@ -206,7 +214,7 @@ export const cvCollateralSuppliedProv = (coords: CompoundMarketCoords): Provenan
 
 /** One collateral asset's value in the market's quote unit — pooled total × its
  *  configured oracle price. */
-export const cvCollateralValueProv = (coords: CompoundMarketCoords): Provenance => ({
+const cvCollateralValueProvUnstamped = (coords: CompoundMarketCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
   source: { block: coords.blockNumber },
@@ -222,7 +230,7 @@ export const cvCollateralValueProv = (coords: CompoundMarketCoords): Provenance 
 
 /** A collateral asset's governance factor — borrowCollateralFactor /
  *  liquidateCollateralFactor / liquidationFactor, off getAssetInfo. */
-export const cvCollateralFactorProv = (
+const cvCollateralFactorProvUnstamped = (
   which: "borrow" | "liquidate" | "liquidation",
   coords: CompoundMarketCoords,
 ): Provenance => {
@@ -253,7 +261,7 @@ export const cvCollateralFactorProv = (
 
 /** A quote-unit total over the markets sharing one unit — Σ of the per-market
  *  values (never blended across units). */
-export const cvSummaryValueProv = (
+const cvSummaryValueProvUnstamped = (
   side: "supplied" | "borrowed",
   unit: string,
   coords: CompoundMarketCoords,
@@ -265,3 +273,29 @@ export const cvSummaryValueProv = (
   via: `${LANE} · Σ per-market ${side} value over the ${unit} markets @ head`,
   formula: `Σ ${unit}-market ${side} value`,
 });
+
+// ── the exported builders, stamped with who read the block ──────────────────
+
+/** A builder's receipt, stamped with the read its coordinates (the last argument) carry. */
+const stamped =
+  <A extends unknown[]>(build: (...a: A) => Provenance) =>
+  (...a: A): Provenance => {
+    const readBy = (a[a.length - 1] as CompoundMarketCoords | undefined)?.readBy;
+    const p = stampHeadRead(build(...a), readBy);
+    return readBy?.stored && p.via ? { ...p, via: p.via.replace(LANE, STORED_LANE) } : p;
+  };
+
+const STORED_LANE = "Comet reads (/compound/markets)";
+
+export const cvMarketBaseProv = stamped(cvMarketBaseProvUnstamped);
+export const cvMarketValueProv = stamped(cvMarketValueProvUnstamped);
+export const cvUtilizationProv = stamped(cvUtilizationProvUnstamped);
+export const cvKinkProv = stamped(cvKinkProvUnstamped);
+export const cvRateProv = stamped(cvRateProvUnstamped);
+export const cvReservesProv = stamped(cvReservesProvUnstamped);
+export const cvBaseBorrowMinProv = stamped(cvBaseBorrowMinProvUnstamped);
+export const cvCollateralBackingProv = stamped(cvCollateralBackingProvUnstamped);
+export const cvCollateralSuppliedProv = stamped(cvCollateralSuppliedProvUnstamped);
+export const cvCollateralValueProv = stamped(cvCollateralValueProvUnstamped);
+export const cvCollateralFactorProv = stamped(cvCollateralFactorProvUnstamped);
+export const cvSummaryValueProv = stamped(cvSummaryValueProvUnstamped);

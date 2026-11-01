@@ -15,7 +15,7 @@ import { COMPOUND_BASE_PAGE } from "@/lib/compound-base/page-deployment";
 import { compoundBaseHolderStrip } from "@/lib/compound-base/holder-strip";
 import { cometViewFromChain } from "@/lib/compound/chain-position-view";
 import type { CompoundMarketChainResponse } from "@/lib/api/fetch-compound-position";
-import { cometPriceOf, resolveCometPrices } from "@/lib/sources/chain/compound-prices";
+import { cometPriceOf, resolveCometPrices, type CometPriceRead } from "@/lib/sources/chain/compound-prices";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import type { CometChainTimelineResult } from "@/lib/sources/chain/compound-v3-events";
 import { CompoundBaseWalletOverview, type OverviewHistory, type OverviewMarket } from "./wallet-overview";
@@ -41,9 +41,10 @@ function cometPricesUsd(p: CompoundMarketChainResponse, baseToken: string, ethUs
 
 /** WETH in dollars: the ETH-quoted Comet's base price converted on
  *  cUSDCv3's WETH feed, the reading the market page's prices route makes
- *  (lib/sources/chain/compound-prices.ts). The Base roster states no feeds, so
- *  the Comet read carries no `ethUsd` of its own. Null where it is unread. */
-async function wethUsd(): Promise<number | null> {
+ *  (lib/sources/chain/compound-prices.ts), with the block and who read it.
+ *  The Base roster states no feeds, so the Comet read carries no `ethUsd` of
+ *  its own. Null where it is unread. */
+async function wethUsd(): Promise<{ price: number; read: CometPriceRead | undefined } | null> {
   const eth = COMPOUND_BASE_DEPLOYMENT.markets.find((m) => m.quoteUnit === "ETH");
   if (!eth) return null;
   try {
@@ -52,7 +53,7 @@ async function wethUsd(): Promise<number | null> {
       COMPOUND_BASE_DEPLOYMENT,
     );
     const p = cometPriceOf(map, eth.comet, eth.baseToken);
-    return p != null && p > 0 ? p : null;
+    return p != null && p > 0 ? { price: p, read: map.read } : null;
   } catch (err) {
     console.error("compound-v3-base holder view: WETH price read failed", err);
     return null;
@@ -90,8 +91,8 @@ export default async function CompoundBaseHolderPage({ params }: Props) {
   // The roster read, and the history when the index vouches for the whole of
   // it (lib/shared/swept-position-page-data.ts); a history that has to be
   // swept is read on the market pages.
-  const [tail, ethUsd] = await Promise.all([loadCompoundBaseTail(wallet), wethUsd()]);
-  const head = tail.head && ethUsd != null ? { ...tail.head, ethUsd } : tail.head;
+  const [tail, weth] = await Promise.all([loadCompoundBaseTail(wallet), wethUsd()]);
+  const head = tail.head && weth != null ? { ...tail.head, ethUsd: weth.price } : tail.head;
   const history = tail.timeline ? (rehydrateChainTimelineWire(tail.timeline) as CometChainTimelineResult) : null;
 
   // Open first, then the Comets only the history names; roster order within.
@@ -137,6 +138,7 @@ export default async function CompoundBaseHolderPage({ params }: Props) {
       ? compoundBaseHolderStrip(
           head,
           cards.map((c) => ({ market: c.market, chain: c.chain, status: c.view.status })),
+          weth?.read,
         )
       : null;
 
