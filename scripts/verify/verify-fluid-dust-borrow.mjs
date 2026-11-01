@@ -70,9 +70,12 @@ const VAULT_RESOLVER = "0xA5C3E16523eeeDDcC34706b0E6bE88b4c6EA95cC";
 const POSITIONS_RESOLVER = "0xaA21a86030EAa16546A759d2d10fd3bF9D053Bc7"; // the worker's settle.mjs
 const EX = 1_000_000_000_000n; // EXCHANGE_PRICES_PRECISION
 
-// The ABI the app ships, evaluated out of the TS module (see verify-fluid-chain.mjs).
+// The ABI the app ships, evaluated out of the TS module (see verify-fluid-chain.mjs):
+// the module's first array, FLUID_VAULT_RESOLVER_ABI. The roster pair after it
+// spreads from that array, so it cannot be evaluated on its own.
 const abiTs = readFileSync(join(root, "lib/fluid/vault-resolver-abi.ts"), "utf8");
-const RESOLVER_ABI = new Function(`return ${abiTs.slice(abiTs.indexOf("= [") + 2, abiTs.lastIndexOf(" as const;"))}`)();
+const abiStart = abiTs.indexOf("= [") + 2;
+const RESOLVER_ABI = new Function(`return ${abiTs.slice(abiStart, abiTs.indexOf(" as const;", abiStart))}`)();
 const RAW_ABI = parseAbi([
   "function getPositionDataRaw(address vault, uint256 positionId) view returns (uint256)",
   "function getTickDataRaw(address vault, int256 tick) view returns (uint256)",
