@@ -136,6 +136,8 @@ export interface SkyFlowDay {
   sharesAfter: string;
   chi: string;
   lastBlock: number;
+  /** The most the collateral side held after any event that day, in USD. Absent where unknown. */
+  collateralHigh?: number;
 }
 
 export interface SkyRates extends SkyEnvelope {

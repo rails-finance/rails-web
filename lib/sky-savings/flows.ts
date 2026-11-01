@@ -83,6 +83,7 @@ export function skyFlowTimeline(
       cum: { ...cum },
       balances: [{ asset: SUSDS.address, symbol: SUSDS.symbol, side: "collateral", amount: units(d.sharesAfter) }],
       prices: [{ asset: SUSDS.address, usd: rayNumber(d.chi) * p, ts: d.day * 86_400 }],
+      ...(d.collateralHigh != null ? { collateralHigh: d.collateralHigh } : {}),
     });
   }
   const first = days[0].day;
