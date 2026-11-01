@@ -29,6 +29,8 @@ export interface FetchFrankencoinPositionsParams {
   everChallenged?: boolean;
   /** At least one ChallengeSucceeded slice (the harder orthogonal flag). */
   challengeSucceeded?: boolean;
+  /** Collateral token addresses (lowercase); OR within, ANDed with the rest. */
+  collateralTokens?: string[];
   /** Inclusive bounds on the position's transaction count; either alone. */
   minTx?: number;
   maxTx?: number;
@@ -61,6 +63,7 @@ export async function fetchFrankencoinPositions(
   if (p.hub) qs.set("hub", p.hub);
   if (p.everChallenged != null) qs.set("everChallenged", String(p.everChallenged));
   if (p.challengeSucceeded != null) qs.set("challengeSucceeded", String(p.challengeSucceeded));
+  if (p.collateralTokens?.length) qs.set("collateralTokens", p.collateralTokens.join(","));
   if (p.minTx != null) qs.set("minTx", String(p.minTx));
   if (p.maxTx != null) qs.set("maxTx", String(p.maxTx));
   if (p.minDebt != null) qs.set("minDebt", String(p.minDebt));

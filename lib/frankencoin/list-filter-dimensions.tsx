@@ -31,11 +31,19 @@
 //     positions", plural on purpose: one owner can hold many Position
 //     contracts) + recency sort.
 //
-// There are deliberately NO per-collateral facets: anyone can open a position
-// on any ERC-20, so a hardcoded symbol chip list would assert a roster —
-// revisit when the backend exposes the observed-collateral table to build
-// chips from.
+//   • Collateral — one chip per collateral token the index has seen, from the
+//     collateral ROSTER (lib/api/fetch-frankencoin-collateral-roster, rails-server
+//     `/api/frankencoin/collateral-roster`): anyone can open a position on any
+//     ERC-20, so the list is what the index holds, fetched once and independent
+//     of any filter. The registry is a function of that roster, consumed through
+//     the shared driver's dynamic-dimensions seam (decision 0009), the shape the
+//     MakerDAO and Morpho listings use. A chip's value is the token address
+//     (`collateralTokens`), its label the symbol (a token with no resolved
+//     symbol reads as its short address), and the panel's trailing figure the
+//     token's open positions, the total the filter returns under the listing's resting Open status.
 
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import type { FrankencoinCollateralRosterResponse } from "@/lib/api/fetch-frankencoin-collateral-roster";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
@@ -78,6 +86,8 @@ export interface FrankencoinListFilters extends BaseListFilters {
   debt: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
+  /** Collateral token addresses (lowercase) — multi (OR). URL param `collateral`. */
+  collateral: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -94,6 +104,7 @@ export const FRANKENCOIN_LIST_DEFAULTS: FrankencoinListFilters = {
   challenges: [],
   debt: [],
   tx: [],
+  collateral: [],
 };
 
 // Values match Liquity V2's (lib/liquity-v2/list-filter-dimensions.tsx) so the
@@ -121,7 +132,39 @@ const CHALLENGE_OPTIONS: FilterOptionDef[] = [
   { value: "challenge-succeeded", label: "Challenge succeeded" },
 ];
 
-export function frankencoinListDimensions(): SerializableDimension<FrankencoinListFilters>[] {
+/** What the driver hands the registry: the roster once it has settled, and
+ *  whether it ever will. `loading` and `unavailable` are kept apart because they
+ *  call for opposite things: never prune a URL-provided selection while the
+ *  answer is still in flight. */
+export interface FrankencoinRosterState {
+  status: "loading" | "ready" | "unavailable";
+  roster: FrankencoinCollateralRosterResponse | null;
+}
+
+export const FRANKENCOIN_ROSTER_LOADING: FrankencoinRosterState = { status: "loading", roster: null };
+
+const shortAddress = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+/** Options standing in for a selection made before the roster landed (or made
+ *  against a deployment that has none), so an active chip always has a row to
+ *  un-tick. */
+function selectionOptions(values: string[]): FilterOptionDef[] {
+  return values.map((token) => ({ value: token, label: shortAddress(token) }));
+}
+
+export function frankencoinListDimensions(
+  filters: FrankencoinListFilters = FRANKENCOIN_LIST_DEFAULTS,
+  state?: FrankencoinRosterState,
+): SerializableDimension<FrankencoinListFilters>[] {
+  const roster = state?.status === "ready" ? state.roster : null;
+  const offered = roster != null;
+  const collateralOptions: FilterOptionDef[] = (roster?.tokens ?? []).map((t) => ({
+    value: t.token,
+    label: t.symbol,
+    icon: <TokenChipIcon symbol={t.symbol} address={t.token} size={16} filterable={false} />,
+    // Panel-only trailing figure, not part of the chip text.
+    meta: t.openPositions.toLocaleString("en-US"),
+  }));
   return [
     {
       id: "status",
@@ -138,6 +181,17 @@ export function frankencoinListDimensions(): SerializableDimension<FrankencoinLi
         const sel = canonicalStatuses(v);
         return { ...f, status: sel.length === 0 || sameStatusSet(sel, defaultStatuses(f)) ? [] : sel };
       },
+    },
+    {
+      id: "collateral",
+      label: "Collateral",
+      group: "Collateral",
+      cardinality: "multi",
+      param: "collateral",
+      options: offered ? collateralOptions : selectionOptions(filters.collateral),
+      get: (f) => f.collateral,
+      set: (f, v) => ({ ...f, collateral: v.map((t) => t.toLowerCase()) }),
+      available: (f) => offered || f.collateral.length > 0,
     },
     {
       id: "hub",
@@ -194,6 +248,7 @@ export function frankencoinFiltersToFetchParams(
     // the wire.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
     hub: hub === "v1" || hub === "v2" ? hub : undefined,
+    collateralTokens: filters.collateral.length > 0 ? filters.collateral : undefined,
     everChallenged: filters.challenges.includes("challenged") ? true : undefined,
     challengeSucceeded: filters.challenges.includes("challenge-succeeded") ? true : undefined,
     ...sizeBounds(filters, { debt: "unit" }),
@@ -203,4 +258,18 @@ export function frankencoinFiltersToFetchParams(
     limit: FRANKENCOIN_ITEMS_PER_PAGE,
     offset: (page - 1) * FRANKENCOIN_ITEMS_PER_PAGE,
   };
+}
+
+/** Drop any collateral token the loaded roster does not offer, else it would sit
+ *  in the URL as an invisible predicate no chip can clear. Only ever runs against
+ *  a READY roster: pruning while the fetch is in flight, or because it failed,
+ *  would wipe a selection a shared link legitimately carried. */
+export function reconcileFrankencoinCollateral(
+  filters: FrankencoinListFilters,
+  state: FrankencoinRosterState | undefined,
+): FrankencoinListFilters | null {
+  if (state?.status !== "ready" || !state.roster) return null;
+  const known = new Set(state.roster.tokens.map((t) => t.token));
+  const collateral = filters.collateral.filter((t) => known.has(t));
+  return collateral.length === filters.collateral.length ? null : { ...filters, collateral };
 }

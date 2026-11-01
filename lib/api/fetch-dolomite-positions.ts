@@ -40,6 +40,10 @@ export interface FetchDolomitePositionsParams {
   /** Account kind — "balance" (account 0, the Dolomite Balance) or "borrow"
    *  (isolated Borrow Positions). The backend's own param vocabulary. */
   kind?: "balance" | "borrow";
+  /** Market ids (the core's numeric ids) an account supplies (par > 0) or
+   *  borrows (par < 0); each list is OR within, the two lists AND. */
+  supplyMarkets?: string[];
+  borrowMarkets?: string[];
   status?: DolomitePositionStatus[];
   sortBy?: DolomitePositionSort;
   sortOrder?: "asc" | "desc";
@@ -69,6 +73,8 @@ export async function fetchDolomitePositions(p: FetchDolomitePositionsParams): P
     if (p[k] != null) qs.set(k, String(p[k]));
   }
   if (p.kind) qs.set("kind", p.kind);
+  if (p.supplyMarkets?.length) qs.set("supplyMarkets", p.supplyMarkets.join(","));
+  if (p.borrowMarkets?.length) qs.set("borrowMarkets", p.borrowMarkets.join(","));
   if (p.sortBy) qs.set("sortBy", p.sortBy);
   if (p.sortOrder) qs.set("sortOrder", p.sortOrder);
   if (p.limit != null) qs.set("limit", String(p.limit));

@@ -60,6 +60,11 @@ export async function readDolomitePositions(
     if (v != null && /^\d+$/.test(v)) qs.set(k, v);
   }
   if (sp.get("kind")) qs.set("kind", sp.get("kind")!);
+  // Market ids are the core's numeric ids: a CSV of whole numbers or nothing.
+  for (const k of ["supplyMarkets", "borrowMarkets"]) {
+    const v = sp.get(k);
+    if (v && /^\d+(,\d+)*$/.test(v)) qs.set(k, v);
+  }
   // Allowlist, like sortOrder: an unrecognised value is dropped rather than
   // forwarded verbatim, so rails-server's own default (recent) decides it —
   // same "unrecognised ⇒ default, no error" stance the route takes throughout.
