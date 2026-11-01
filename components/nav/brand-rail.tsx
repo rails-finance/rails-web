@@ -30,10 +30,16 @@ import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { SearchLauncher } from "@/components/shared/front-door-search";
 
 /** The Rails glyph, linking home — the same mark and the same link the top bar
- *  carried, without the wordmark, which will not fit at icon width. */
-function RailsGlyph() {
+ *  carried, without the wordmark, which will not fit at icon width. The wallet
+ *  panel draws it too, at the top of its phone layout. */
+export function RailsGlyph({ onClick }: { onClick?: () => void }) {
   return (
-    <Link href="/" aria-label="Rails home" className="text-foreground transition-colors hover:text-blue-500">
+    <Link
+      href="/"
+      aria-label="Rails home"
+      onClick={onClick}
+      className="text-foreground transition-colors hover:text-blue-500"
+    >
       <svg width={30} height={30} viewBox="0 0 200 200" fill="none" aria-hidden="true">
         <path
           fill="currentColor"
