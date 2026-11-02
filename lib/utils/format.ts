@@ -153,6 +153,7 @@ export const formatExact = (value: number, decimals = 18): string => {
   // residue of the arithmetic that produced it (133.47050099999979 for
   // 133.470501). Round to 15, then to the token's decimals (18 for a ratio or
   // a price), and let Intl drop the trailing zeros.
+  // exponent-safe: the string is parsed back to a number and printed by Intl, never shown
   const clean = Number(Math.abs(value).toPrecision(15));
   const body = clean.toLocaleString("en-US", {
     useGrouping: false,
