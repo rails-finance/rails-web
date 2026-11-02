@@ -12,7 +12,9 @@
 //   • debt = the last event's EMITTED accountBorrows; interest accrued since
 //     that event is NOT included (an uplift chain lane adds it later) — the
 //     provenance says so.
-// When RPC is down the market state map is empty: `current`/USD stay null and
+// `marketRead` names the block that state was read at and who answered
+// (rails-server live, its stored snapshot, or the chain).
+// When neither the read nor the snapshot answers, the map is empty: `current`/USD stay null and
 // callers degrade to amounts-only (never a partial total).
 //
 // The ROSTER is a seam, not a constant. Ethereum's is the fixed four-market
@@ -22,7 +24,7 @@
 // pinned block as the balances, so the proxy makes no chain call at all.
 
 import { MOONWELL_MARKET_BY_KEY, MTOKEN_DECIMALS } from "@/lib/moonwell/asset-catalog";
-import { resolveMoonwellMarketState } from "@/lib/sources/chain/moonwell-market-state";
+import { resolveMoonwellMarketState, type MoonwellMarketRead } from "@/lib/sources/chain/moonwell-market-state";
 
 /** "unread" is a row whose account has not been read from the chain yet — no
  *  state recorded, never mapped to "closed" (0018). */
@@ -98,6 +100,9 @@ export interface MoonwellPositionSummary {
   ratesByMarket: Record<string, { borrowApr: number | null; supplyApr: number | null }>;
   /** The Base lane only: the block every balance on this row was read at. */
   chainBlock?: number;
+  /** The block the market state above (exchange rates, prices, rates) was
+   *  read at and who answered; absent when it was not read (and on Base). */
+  marketRead?: MoonwellMarketRead;
 }
 
 /** One open (wallet, market) row as returned by the rails route. */
@@ -153,8 +158,9 @@ export interface MoonwellListingMarket {
   supplyApr: number | null;
 }
 
-/** The markets a page of rows resolves against, keyed by the row's market key. */
-export type MoonwellListingRoster = Map<string, MoonwellListingMarket>;
+/** The markets a page of rows resolves against, keyed by the row's market key;
+ *  `read` names the block and reader of Ethereum's market state. */
+export type MoonwellListingRoster = Map<string, MoonwellListingMarket> & { read?: MoonwellMarketRead };
 
 const ZERO = BigInt(0);
 
@@ -179,11 +185,12 @@ function statusOf(s: string | null | undefined): MoonwellPositionStatus {
 }
 
 /** Ethereum's roster: the fixed catalog, with the four markets' exchange
- *  rates + oracle prices + rates from one head multicall (empty state when RPC
- *  is down — amounts-only degradation). */
+ *  rates + oracle prices + rates read at one block (empty state when no read
+ *  and no snapshot answer — amounts-only degradation). */
 async function ethereumRoster(): Promise<MoonwellListingRoster> {
   const state = await resolveMoonwellMarketState();
   const roster: MoonwellListingRoster = new Map();
+  if (state.read) roster.read = state.read;
   for (const m of Object.values(MOONWELL_MARKET_BY_KEY)) {
     const st = state.get(m.key);
     roster.set(m.key, {
@@ -298,6 +305,7 @@ export async function buildMoonwellPositionRows(
       priceByAddress,
       ratesByMarket,
       chainBlock: w.chainBlock,
+      ...(markets.read ? { marketRead: markets.read } : {}),
     };
   });
 }
