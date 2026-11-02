@@ -48,6 +48,10 @@ import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { noteChainRead, noteServerHead } from "./server-head-stamps";
 import { ROUTE_WAIT_MS, routeGate } from "./route-gate";
+// Next's internal work store (not a public API; next 15.5.7). A Next upgrade that moves this
+// module fails the build at this import. One that keeps the module but drops
+// `isStaticGeneration` leaves it undefined: renderWait() then sends no wait and rails-server
+// keeps its 2 s default, so builds and ISR renders overflow to the paid leg sooner, as before.
 import { workAsyncStorage } from "next/dist/server/app-render/work-async-storage.external.js";
 
 const TIMEOUT_MS = 8_000;
