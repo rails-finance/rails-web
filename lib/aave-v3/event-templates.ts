@@ -7,9 +7,10 @@
 // prose writer cannot see (`pnpm check:prose` fails on one).
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import type { InfoTerm } from "@/components/shared/protocol-info-page";
 import type { AaveFamilyHeadTable } from "@/lib/aave-v3/head-words";
 import { eventProseEngine } from "@/lib/shared/event-prose/engine";
-import type { ProseFile, Words } from "@/lib/shared/event-prose/types";
+import type { ModalLink, ProseFile, Words } from "@/lib/shared/event-prose/types";
 import type { AaveV3EchoKey } from "@/lib/aave-v3/event-prose";
 import raw from "@/content/aave-v3/event-prose.yaml";
 
@@ -39,6 +40,7 @@ interface AaveV3ProseFile extends ProseFile<AaveV3L5Key> {
   position_words: Words;
   page_words: Words;
   doc_urls: Words;
+  glossary: { bold: string; text: string; sources: ModalLink[] }[];
 }
 
 const FILE = raw as AaveV3ProseFile;
@@ -133,4 +135,13 @@ export function aaveV3PositionModal(
 /** The market overview's "?". */
 export function aaveV3MarketModal(deployment: AaveV3Deployment): LearnMoreContent {
   return aaveV3Modal("market", deployment);
+}
+
+/** The info page's glossary: each term with its definition and the docs pages it rests on. */
+export function aaveV3Glossary(): [InfoTerm, ...InfoTerm[]] {
+  const terms = FILE.glossary.map((d): InfoTerm => {
+    const [first, ...rest] = d.sources.map((l) => ({ label: l.label, href: PROSE.linkUrl(l) }));
+    return { term: d.bold, definition: d.text, sources: [first, ...rest] };
+  });
+  return terms as [InfoTerm, ...InfoTerm[]];
 }
