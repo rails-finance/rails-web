@@ -24,3 +24,15 @@ test("groupDigits: the integer part only", () => {
   assert.equal(groupDigits("12,345.6789 x"), "12,345.6789 x");
   assert.equal(groupDigits("999"), "999");
 });
+
+import { widenPair } from "../../lib/utils/format.ts";
+
+test("widenPair: a before/after pair that prints alike widens to the decimals that differ", () => {
+  assert.deepEqual(widenPair("55,258", "55,258", "55258.49", "55258.29"), {
+    before: "55,258.49",
+    after: "55,258.29",
+  });
+  assert.equal(widenPair("1", "2", "1", "2"), null);
+  assert.equal(widenPair("5", "5", "5", "5"), null);
+  assert.equal(widenPair("10.97M", "10.97M", "10967283.7", "10967284.1"), null);
+});

@@ -25,7 +25,7 @@ import type {
   AlchemixTransmuterSort,
   FetchAlchemixTransmuterPositionsParams,
 } from "@/lib/sources/api/alchemix-transmuter-backend";
-import { parseAlchemixSearch } from "@/lib/alchemix/search";
+import { parseListingSearch } from "@/lib/shared/listing-search";
 import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 
 export const TRANSMUTER_ITEMS_PER_PAGE = 20;
@@ -117,7 +117,7 @@ export function transmuterFiltersToFetchParams(
       : sorts.includes(filters.sortBy as AlchemixTransmuterSort)
         ? (filters.sortBy as AlchemixTransmuterSort)
         : "maturity";
-  const q = parseAlchemixSearch(filters.q, true);
+  const q = parseListingSearch(filters.q, true);
   return {
     chainId: deployment.chainId,
     lines,

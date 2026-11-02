@@ -19,7 +19,7 @@ import { EventLedgerContext, ledgerFigure } from "@/components/shared/event-ledg
 import { offPar, usdShown } from "@/lib/shared/usd-display";
 import { todayUsdProv, useTodayBasisPrices } from "@/components/shared/price-basis";
 import { OFF_PAR_BAND, OffParFigure } from "@/components/shared/usd-figure";
-import { formatNumber, formatUsdValue } from "@/lib/utils/format";
+import { formatNumber, formatUsdValue, widenPair } from "@/lib/utils/format";
 import type { ChainTruthStat } from "@/components/shared/chain-truth-event";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
@@ -166,6 +166,10 @@ function statCell(
   if (s.sub) sub.push({ content: s.sub, changed });
   const usdOn = s.usd != null && usdShown(s.usd.value);
   const held = Number(s.value);
+  // A before/after pair that prints alike widens to the decimals that differ.
+  const shownAfter = s.display ?? compactAmount(s.value);
+  const shownBefore = t ? (t.shownAsIs ? t.before : transitionFigure(t.before, t.beforeExact, false)) : null;
+  const widened = t && shownBefore != null ? widenPair(shownBefore, shownAfter, t.beforeExact, s.value) : null;
   const value: EventCellSpec["value"] = {
     ...(t
       ? {
@@ -174,7 +178,7 @@ function statCell(
               <StatFigure
                 side={side}
                 exact={t.beforeExact}
-                shown={t.shownAsIs ? t.before : transitionFigure(t.before, t.beforeExact, false)}
+                shown={widened?.before ?? shownBefore ?? t.before}
                 symbol={s.symbol}
                 label={s.readableLabel ? readableExact(t.beforeExact, s.symbol) : undefined}
               />
@@ -202,7 +206,7 @@ function statCell(
         <StatFigure
           side={side}
           exact={s.value}
-          shown={s.display ?? compactAmount(s.value)}
+          shown={widened?.after ?? shownAfter}
           symbol={s.symbol}
           word={word}
           label={s.readableLabel && Number.isFinite(held) ? readableName(held, s.symbol) : undefined}

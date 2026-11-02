@@ -17,6 +17,7 @@
 // server strategy — pagination. There is exactly ONE copy of this wiring, so the
 // facets, sort and search can't drift or go missing per protocol.
 
+import { listingSearchNote } from "@/lib/shared/listing-search";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ChainTruthListing, ListingUnavailable } from "@/components/shared/chain-truth-listing";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -59,6 +60,10 @@ export interface ServerStrategy<T, F extends BaseListFilters, Ext = undefined> {
   /** Map the selection + page onto a backend fetch; returns the slice + total. */
   fetchPage: (filters: F, page: number) => Promise<{ data: T[]; total: number }>;
   itemsPerPage: number;
+  /** The listing's search box reads an address, an ENS name and, where
+   *  `takesId`, a position id (lib/shared/listing-search.ts): a query it cannot
+   *  read answers an empty page with a line saying what the box takes. */
+  search?: { takesId: boolean };
   /** Opt-in async external state, keyed off the filters — the driver calls this
    *  as a hook (unconditionally, so it must obey the rules of hooks). Aave V4
    *  uses it to fetch the asset universe scoped to the selected market. Omit for
@@ -475,7 +480,13 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
       protocol={directoryEntry}
       headerExtra={headerExtra}
       above={above}
-      emptyNote={emptyNote?.(filters) ?? undefined}
+      emptyNote={
+        (strategy.kind === "server" && strategy.search
+          ? listingSearchNote(filters.q, strategy.search.takesId)
+          : null) ??
+        emptyNote?.(filters) ??
+        undefined
+      }
       identity={identity}
       titleHidden={titleHidden}
       titleAs={titleAs}

@@ -13,24 +13,8 @@
 import { fetchPolarisPositions } from "@/lib/api/fetch-polaris-positions";
 import type { PolarisPositionSummary } from "@/lib/sources/api/polaris-positions";
 import { parsePolarisSearch } from "@/lib/polaris/search";
+import { resolveEnsViaApi } from "@/lib/shared/listing-search";
 import { polarisFiltersToFetchParams, type PolarisListFilters } from "@/lib/polaris/list-filter-dimensions";
-
-/** Forward-resolve an ENS name through this deployment's own resolver route.
- *  Best-effort: an unreachable resolver reads as "no address", which the caller
- *  turns into an empty page. */
-async function resolveEns(name: string, baseUrl?: string, signal?: AbortSignal): Promise<string | null> {
-  try {
-    const res = await fetch(`${baseUrl ?? ""}/api/ens/resolve?name=${encodeURIComponent(name)}`, {
-      cache: "no-store",
-      signal,
-    });
-    if (!res.ok) return null;
-    const { address } = (await res.json()) as { address: string | null };
-    return address ?? null;
-  } catch {
-    return null;
-  }
-}
 
 /** The page slice + the index's own total for the current selection. */
 export async function fetchPolarisListingPage(
@@ -43,7 +27,7 @@ export async function fetchPolarisListingPage(
   const params = polarisFiltersToFetchParams(filters, page);
   const { ownerEns } = parsePolarisSearch(filters.q);
   if (ownerEns) {
-    const address = await resolveEns(ownerEns, baseUrl, signal);
+    const address = await resolveEnsViaApi(ownerEns, baseUrl, signal);
     if (!address) return { data: [], total: 0 };
     params.wallet = address;
   }

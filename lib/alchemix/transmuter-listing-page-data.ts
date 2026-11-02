@@ -12,7 +12,7 @@ import {
 } from "@/lib/alchemix/transmuter-list-filter-dimensions";
 import { ssrDecode, ssrInitial, toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import type { AlchemixTransmuterPositionSummary } from "@/types/api/alchemix";
-import { searchedAlchemixPage } from "@/lib/alchemix/search";
+import { searchedListingPage } from "@/lib/shared/listing-search";
 
 export async function transmuterListingPageData(deployment: AlchemixDeployment, rawSearchParams: RawSearchParams) {
   const dims = transmuterListDimensions(deployment.chainId);
@@ -26,7 +26,7 @@ export async function transmuterListingPageData(deployment: AlchemixDeployment, 
     page,
     label: `Alchemix Transmuter (chain ${deployment.chainId})`,
     fetchPage: (baseUrl, signal, headers) =>
-      searchedAlchemixPage(
+      searchedListingPage(
         filters.q,
         true,
         transmuterFiltersToFetchParams(deployment, filters, page),

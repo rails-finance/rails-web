@@ -44,7 +44,7 @@ import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filt
 import type { ChainId } from "@/lib/shared/chains";
 import { isLineOnChain, linesForChain, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import type { FetchAlchemixPositionsParams } from "@/lib/api/fetch-alchemix-positions";
-import { parseAlchemixSearch } from "@/lib/alchemix/search";
+import { parseListingSearch } from "@/lib/shared/listing-search";
 import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 
@@ -165,7 +165,7 @@ export function alchemixListDimensions(chainId: ChainId): SerializableDimension<
 
 /** Map the decoded selection + page onto the fetch params.
  *
- *  The search box names a position id or a holder (lib/alchemix/search; an
+ *  The search box names a position id or a holder (lib/shared/listing-search; an
  *  ENS name is resolved where the page is fetched). A debt or collateral sort
  *  without exactly one line falls back to activity — the wire never ranks two
  *  tokens as one number, whatever a stale URL says.
@@ -189,7 +189,7 @@ export function alchemixFiltersToFetchParams(
       : filters.sortBy === "tokenId"
         ? "tokenId"
         : "lastActivity";
-  const q = parseAlchemixSearch(filters.q, true);
+  const q = parseListingSearch(filters.q, true);
   return {
     chainId: deployment.chainId,
     lines,

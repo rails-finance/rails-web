@@ -130,6 +130,7 @@ function renderTxRow(run: BaseActivityEvent[], sibs: FluidEvent[], meta: { isLas
           event={o}
           siblings={sibs}
           openedBy={o === openOperate ? (mint ?? undefined) : undefined}
+          eventNumber={numberOf.get(o.id) || undefined}
           isLast={last}
         />
       ),
@@ -152,7 +153,9 @@ function renderTxRow(run: BaseActivityEvent[], sibs: FluidEvent[], meta: { isLas
     if (operates.includes(m) || (mint === m && openOperate) || (drawnAsRoundTrip && hops.includes(m))) continue;
     cards.push({
       key: m.id,
-      node: (last) => <FluidEventCard event={m} siblings={sibs} isLast={last} />,
+      node: (last) => (
+        <FluidEventCard event={m} siblings={sibs} eventNumber={numberOf.get(m.id) || undefined} isLast={last} />
+      ),
     });
   }
   return (
