@@ -1,74 +1,174 @@
-// About this explorer — the intro prose that lived behind the listing's (i)
-// drawer, now a page of its own on the rail's sub-nav. The copy is the swept
-// intro (charter §8a), reframed for a standalone page; the anatomy lives in ProtocolInfoShell.
+// About this explorer — the page on the rail's sub-nav, drawn on the typed
+// template (rails-ops standards/info-page-template.md). The glossary terms sit
+// here; every source is the MakerDAO docs dump (rails-ops reference/official-docs/makerdao.md).
 
 import Link from "next/link";
-import { ProtocolInfoShell } from "@/components/shared/protocol-info-page";
+import { ProtocolInfoPage, type InfoTerm } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("makerdao");
 
-const intro = (
-  <>
-    <p>
-      MakerDAO is the system that mints DAI: a borrower locks collateral in a vault and draws new DAI against it, paying
-      a stability fee whose rate governance sets per collateral type. When a vault falls below its collateral
-      type&apos;s minimum ratio, it is liquidated at auction.
-    </p>
-    <p>
-      Each row of the listing is one vault: its collateral, its DAI debt with accrued fees, and its status. Dollar
-      values use the protocol&apos;s own price feeds — the same delayed oracles Maker itself acts on, and the same ones
-      the collateral ratio beside each debt divides into it. The listing filters by collateral type and searches by
-      wallet or vault number. Or{" "}
-      <Link href="/ethereum/makerdao/system" className={INLINE_LINK}>
-        see the balance sheet of the Vat
-      </Link>{" "}
-      (Maker&apos;s core accounting contract, where every vault&apos;s collateral and debt is recorded), split by
-      collateral type.
-    </p>
-    <p>
-      Each vault page follows one vault: the card states its{" "}
-      <Link href="/ethereum/makerdao/14012" className={INLINE_LINK}>
-        collateral, debt with the stability fee in it, and collateral ratio
-      </Link>{" "}
-      and who owns it; Lifetime flows adds up what went in and out; the timeline lists every event, with{" "}
-      <Link href="/ethereum/makerdao/24785" className={INLINE_LINK}>
-        what a liquidation&apos;s auction sold and handed back
-      </Link>{" "}
-      and{" "}
-      <Link href="/ethereum/makerdao/3772" className={INLINE_LINK}>
-        who the vault passed to
-      </Link>
-      .
-    </p>
-    <p>
-      MakerDAO renamed itself Sky in 2024: the same vault system, now minting USDS beside DAI. USDS and DAI are
-      exchangeable one for one, both ways, through Sky&apos;s DAI–USDS converter.
-    </p>
-    <p>
-      Vaults opened through Sky&apos;s LockStake Engine are listed here too, as urns (for example{" "}
-      <Link href="/ethereum/makerdao/0xdfdb5d44f1c0b935c00e4fff6cbfd76c0db7e97c" className={INLINE_LINK}>
-        this one
-      </Link>
-      ). The owner locks SKY and draws USDS through the engine, which makes a separate address, the urn, for the Vat to
-      record the SKY and the debt under; an urn has no vault number. The engine stakes the locked SKY in a rewards farm
-      the owner picks and passes its voting power to a delegate the owner picks, and the owner claims the farm&apos;s
-      rewards; governance can set an exit fee on SKY taken out. Picking a farm or a delegate and claiming rewards are
-      not shown here. Below the collateral type&apos;s minimum ratio (120% for LSEV2-SKY-A) an auction can sell the SKY,
-      which the engine first takes out of the farm and back from the delegate. Each urn page says whether governance has
-      these auctions switched on and what price cap it has set on SKY.
-    </p>
-    <p>
-      Sky&apos;s savings are a separate explorer:{" "}
-      <Link href="/ethereum/sky-savings" className={INLINE_LINK}>
-        Sky Savings
-      </Link>{" "}
-      lists every address holding sUSDS, with the interest each has earned.
-    </p>
-  </>
-);
+const UL = "list-disc space-y-1 pl-5";
+const DOCS = "https://github.com/sky-ecosystem/mcd-docs-content/blob/master/smart-contract-modules";
+const VAT = `${DOCS}/core-module/vat-detailed-documentation.md`;
+const RATES = `${DOCS}/rates-module/README.md`;
+const LIQUIDATIONS = `${DOCS}/dog-and-clipper-detailed-documentation.md`;
+const OSM = `${DOCS}/oracle-module/oracle-security-module-osm-detailed-documentation.md`;
+const SPOT = `${DOCS}/core-module/spot-detailed-documentation.md`;
+
+const GLOSSARY: [InfoTerm, ...InfoTerm[]] = [
+  {
+    term: "Vault",
+    definition:
+      "One borrower's position: collateral locked in it and the DAI or USDS drawn against it. Each vault holds one collateral type, such as ETH-A.",
+    sources: [{ label: "Vat glossary", href: `${VAT}#glossary-vat---vault-engine` }],
+  },
+  {
+    term: "Vat",
+    definition:
+      "Maker's core accounting contract. It records every vault's collateral and debt and sets the rules for changing them.",
+    sources: [{ label: "Vat introduction", href: `${VAT}#1-introduction-summary` }],
+  },
+  {
+    term: "Stability fee",
+    definition:
+      "The interest on a vault's debt, set by governance for each collateral type. It is booked when the rate is next updated, so debt drawn and repaid between updates pays none.",
+    sources: [
+      { label: "Stability fee accumulation", href: `${RATES}#stability-fee-accumulation` },
+      { label: "Who calls drip", href: `${RATES}#who-calls-drip` },
+    ],
+  },
+  {
+    term: "Collateral ratio",
+    definition:
+      "The collateral's value divided by the debt. Below the collateral type's minimum ratio the vault can be liquidated.",
+    sources: [{ label: "Spot variables", href: `${SPOT}#variables` }],
+  },
+  {
+    term: "Delayed price feed",
+    definition:
+      "The oracle price Maker acts on, one to two hours behind the market price. Values and ratios on this explorer use it.",
+    sources: [{ label: "Oracle Security Module", href: `${OSM}#1-introduction` }],
+  },
+  {
+    term: "Liquidation auction",
+    definition:
+      "The sale of a seized vault's collateral for DAI, at a price that falls over time. Collateral left after the debt and penalty are covered goes back to the vault.",
+    sources: [
+      { label: "Liquidation 2.0 module", href: `${LIQUIDATIONS}#1-introduction` },
+      { label: "Clipper take", href: `${LIQUIDATIONS}#clippertake-performs-several-initial-checks` },
+    ],
+  },
+  {
+    term: "Urn",
+    definition:
+      "The Vat's record of one position's collateral and debt, held under an address. A vault is an urn with a vault number; a LockStake urn has none.",
+    sources: [{ label: "Vat glossary", href: `${VAT}#glossary-vat---vault-engine` }],
+  },
+];
 
 export default function InfoPage() {
-  return <ProtocolInfoShell session="makerdao">{intro}</ProtocolInfoShell>;
+  return (
+    <ProtocolInfoPage
+      session="makerdao"
+      name="MakerDAO"
+      tracks="Every MakerDAO vault and every Sky LockStake urn on Ethereum, open, closed or liquidated, with its history, and the Vat's balance sheet. Farm and delegate choices and reward claims are not shown."
+      glossary={GLOSSARY}
+      howItWorks={[
+        "A borrower locks collateral in a vault and draws DAI against it. MakerDAO renamed itself Sky in 2024 and now also mints USDS, and the two swap one for one through Sky's DAI-USDS converter.",
+        "A vault pays a stability fee, with a rate governance sets for each collateral type.",
+        "Below the collateral type's minimum ratio the vault is liquidated and its collateral is sold at auction.",
+      ]}
+      search="Search takes a wallet address, a vault number or a collateral type. Filters: status (open, closed, liquidated) and collateral type. Sort: recent activity, collateral, debt."
+      views={[
+        {
+          heading: "Listing",
+          body: (
+            <ul className={UL}>
+              <li>One row per vault or urn: its collateral, its debt with accrued fees, and its status.</li>
+              <li>The collateral ratio beside each debt uses the delayed price feeds.</li>
+              <li>Open positions show by default. Searching a wallet shows every status.</li>
+            </ul>
+          ),
+        },
+        {
+          heading: "Vat balance sheet",
+          body: (
+            <p>
+              The Vat&apos;s debt and collateral, split by collateral type.{" "}
+              <Link href="/ethereum/makerdao/system" className={INLINE_LINK}>
+                See the balance sheet of the Vat
+              </Link>
+              .
+            </p>
+          ),
+        },
+        {
+          heading: "Vault page",
+          body: (
+            <>
+              <p>
+                The card states the{" "}
+                <Link href="/ethereum/makerdao/14012" className={INLINE_LINK}>
+                  collateral, debt with the stability fee in it, and collateral ratio
+                </Link>{" "}
+                and the owner. Lifetime flows adds up what went in and out.
+              </p>
+              <p className="mt-2">
+                The timeline lists every event, including{" "}
+                <Link href="/ethereum/makerdao/24785" className={INLINE_LINK}>
+                  what a liquidation&apos;s auction sold and handed back
+                </Link>{" "}
+                and{" "}
+                <Link href="/ethereum/makerdao/3772" className={INLINE_LINK}>
+                  who the vault passed to
+                </Link>
+                .
+              </p>
+            </>
+          ),
+        },
+        {
+          heading: "LockStake urn page",
+          body: (
+            <>
+              <p>
+                A LockStake owner locks SKY and draws USDS through Sky&apos;s LockStake Engine. The engine makes a
+                separate address, the urn, for the Vat to record the SKY and the debt under, and an urn has no vault
+                number.{" "}
+                <Link href="/ethereum/makerdao/0xdfdb5d44f1c0b935c00e4fff6cbfd76c0db7e97c" className={INLINE_LINK}>
+                  See an example urn
+                </Link>
+                .
+              </p>
+              <p className="mt-2">
+                The engine stakes the SKY in a farm and passes its voting power to a delegate, both chosen by the owner.
+                Governance can set an exit fee on SKY taken out.
+              </p>
+              <p className="mt-2">
+                Below the minimum ratio an auction can sell the SKY. The urn page says whether governance has these
+                auctions switched on and the price cap it has set on SKY.
+              </p>
+            </>
+          ),
+        },
+        {
+          heading: "Sky Savings",
+          body: (
+            <p>
+              <Link href="/ethereum/sky-savings" className={INLINE_LINK}>
+                Sky Savings
+              </Link>{" "}
+              is a separate explorer. It lists every address holding sUSDS, with the interest each has earned.
+            </p>
+          ),
+        },
+      ]}
+      docs={{
+        label: "MakerDAO technical documentation",
+        href: "https://github.com/sky-ecosystem/mcd-docs-content/blob/master/README.md",
+      }}
+    />
+  );
 }

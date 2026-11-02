@@ -1585,6 +1585,7 @@ doc_urls:
   FAQ_SUPPLY_LIMITS: https://aave.com/faq#supplying-earning-are-there-limitations-to-supply
   UMBRELLA: https://aave.com/help/umbrella/umbrella#what-is-umbrella
   UMBRELLA_DEFICIT: https://aave.com/docs/aave-v3/umbrella#slashing-risk-and-deficit-protection
+  POOL: https://aave.com/docs/aave-v3/concepts/liquidity-pool
 
 L5:
   supply:
@@ -2258,3 +2259,40 @@ L5:
       - label: |-
           Supply limits
         doc: FAQ_SUPPLY_LIMITS
+
+glossary:
+  - bold: |-
+      Market
+    text: |-
+      one Aave V3 lending pool, with its own reserves, risk settings and prices. A wallet's account in each market is separate, so one wallet can have an account in several.
+    sources: [{ label: "Liquidity pool", doc: POOL }]
+  - bold: |-
+      Reserve
+    text: |-
+      one asset inside a market, with its own supply and borrow caps, rates and risk settings. The same token can have different settings in different markets.
+    sources: [{ label: "Reserves", doc: RESERVE }]
+  - bold: |-
+      Supplied
+    text: |-
+      assets a wallet has deposited to earn interest. Aave returns interest-bearing aTokens, whose balance grows and which redeem for the asset.
+    sources: [{ label: "Supply", doc: OVERVIEW_SUPPLY }]
+  - bold: |-
+      Collateral
+    text: |-
+      supplied assets that back borrowing. A wallet can borrow only against its collateral.
+    sources: [{ label: "Collateral status", doc: TOGGLE_COLLATERAL }]
+  - bold: |-
+      Debt
+    text: |-
+      what a wallet has borrowed plus the interest on it. Collateral worth more than the debt must stay behind it.
+    sources: [{ label: "Borrow", doc: OVERVIEW_BORROW }]
+  - bold: |-
+      Health factor
+    text: |-
+      the safety of one account in one market. Above 1 the collateral covers the debt with room to spare; below 1 the account can be liquidated.
+    sources: [{ label: "Health factor", doc: HF }]
+  - bold: |-
+      Liquidation
+    text: |-
+      what happens when an account's health factor falls below 1. Anyone may repay part of its debt and take collateral worth that amount plus a bonus.
+    sources: [{ label: "Liquidation process", doc: LIQ_PROCESS }, { label: "Liquidation penalty", doc: FAQ_PENALTY }]
