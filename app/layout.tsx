@@ -5,7 +5,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import {
   LAUNCHED_PROTOCOL_VERSIONS,
-  LAUNCHED_PROTOCOL_VERSION_COUNT,
+  LAUNCHED_PRODUCTION_PROTOCOL_VERSION_COUNT,
   launchedProductionChainNames,
   launchedProductionChains,
 } from "@/lib/shared/protocols";
@@ -68,7 +68,7 @@ export const viewport: Viewport = {
 // site's own coverage claim: a count that included an explorer nothing links,
 // or a coverage page a reader cannot get to, would advertise a door that is
 // not open. Both come back on their own when the flags come off.
-const PROTOCOL_COUNT = LAUNCHED_PROTOCOL_VERSION_COUNT;
+const PROTOCOL_COUNT = LAUNCHED_PRODUCTION_PROTOCOL_VERSION_COUNT;
 /** "Ethereum, Base, and Arbitrum" — see `launchedProductionChainNames`. Polaris is named
  *  separately, in words, where the sentence has room for it: it is one
  *  explorer on Sepolia, outside the production chains. */

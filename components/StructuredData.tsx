@@ -1,5 +1,9 @@
 import { SITE_URL } from "@/lib/shared/page-metadata";
-import { LAUNCHED_PROTOCOL_VERSIONS, launchedProductionChainNames } from "@/lib/shared/protocols";
+import {
+  LAUNCHED_PRODUCTION_PROTOCOL_VERSION_COUNT,
+  LAUNCHED_PROTOCOL_VERSIONS,
+  launchedProductionChainNames,
+} from "@/lib/shared/protocols";
 
 /**
  * The machine-readable half of the home page's coverage claim (JSON-LD in
@@ -22,7 +26,9 @@ export function StructuredData() {
   // The launched roster, deduplicated to one row per protocol version, and
   // every chain it spans — one origin serves all of them, so the count is a
   // claim a crawler can follow rather than an advert for a second site.
-  const protocolCount = LAUNCHED_PROTOCOL_VERSIONS.length;
+  // Production chains only: the sentences below name Polaris on Sepolia in
+  // words (ui-jobs 475).
+  const protocolCount = LAUNCHED_PRODUCTION_PROTOCOL_VERSION_COUNT;
   const chainNames = launchedProductionChainNames();
   const structuredData = {
     "@context": "https://schema.org",
