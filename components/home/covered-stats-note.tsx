@@ -243,7 +243,7 @@ export function CoveredStatsNote({ value, caption }: { value: ValueHeld | null; 
           open ? "text-foreground" : "text-rb-500"
         }`}
       >
-        <Info className="size-[1.1em]" strokeWidth={1.75} aria-hidden="true" />
+        <Info className="size-4" strokeWidth={1.75} aria-hidden="true" />
       </button>
 
       {dialogOpen && (

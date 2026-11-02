@@ -145,7 +145,7 @@ export function CoveredStats({
 const LINE = "flex flex-col items-center gap-y-1 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-4";
 /** Both figures name the face: the count and the value read in one font. */
 const FIGURE =
-  "font-sans text-foreground font-semibold leading-none tracking-tighter tabular-nums text-5xl lg:text-6xl";
+  "font-sans text-foreground font-semibold leading-none tracking-tighter tabular-nums text-4xl sm:text-5xl";
 const LABEL = "font-sans font-light tracking-tight text-rb-500 text-lg sm:text-xl lg:text-[28px]";
 
 /**

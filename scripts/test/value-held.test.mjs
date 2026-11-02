@@ -117,9 +117,8 @@ test("stale assets read as one line per explorer", () => {
   ]);
 });
 
-test("the headline total reads with one decimal, spoken the same", () => {
-  assert.equal(formatValueHeld(38_410_261_859), "$38.4B");
-  assert.equal(formatValueHeld(5_000_000_000), "$5.0B");
-  assert.equal(spokenValueHeld(38_410_261_859), "38.4 billion dollars");
-  assert.equal(formatValueHeld(18_400_000), "$18.4M");
+test("the headline total reads in whole dollars, spoken rounded", () => {
+  assert.equal(formatValueHeld(38_410_261_859.4), "$38,410,261,859");
+  assert.equal(spokenValueHeld(38_410_261_859), "about 38.4 billion dollars");
+  assert.equal(spokenValueHeld(18_400_000), "about 18.4 million dollars");
 });
