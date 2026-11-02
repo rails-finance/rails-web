@@ -116,7 +116,6 @@ export default function InfoPage() {
   return (
     <ProtocolInfoPage
       session="fluid"
-      name="Fluid"
       tracks={
         <>
           The Rails Fluid explorer shows every borrowing position in Fluid&apos;s vaults on Ethereum, whether still open

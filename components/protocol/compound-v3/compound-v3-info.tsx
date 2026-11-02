@@ -128,7 +128,6 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
     return (
       <ProtocolInfoPage
         session="compound"
-        name="Compound V3"
         tracks={
           <>
             The Rails Compound V3 explorer shows every account in Compound V3&apos;s three Ethereum markets, whether
@@ -194,7 +193,6 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
     return (
       <ProtocolInfoPage
         session="compound-base"
-        name="Compound V3"
         tracks={
           <>
             The Rails Compound V3 explorer shows the accounts in Compound V3&apos;s five Base markets, whether still
@@ -269,7 +267,6 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
   return (
     <ProtocolInfoPage
       session="compound-v3-arbitrum"
-      name="Compound V3"
       tracks={
         <>
           The Rails Compound V3 explorer shows the accounts on Arbitrum that Rails has read, with the full history of

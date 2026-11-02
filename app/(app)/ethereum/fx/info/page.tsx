@@ -102,7 +102,6 @@ export default function InfoPage() {
   return (
     <ProtocolInfoPage
       session="fx"
-      name="f(x)"
       tracks={
         <>
           The Rails f(x) explorer shows every long position that has borrowed fxUSD against wstETH or WBTC in f(x)

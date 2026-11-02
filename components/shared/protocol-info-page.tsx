@@ -1,7 +1,6 @@
-// ProtocolInfoPage is the typed template every moved /info page follows (rails-ops
-// standards/info-page-template.md); ProtocolInfoShell below is the older untyped
-// shell, kept for the pages not yet moved and the exempt testnet page. `rg
-// ProtocolInfoShell app` lists what is left to move.
+// ProtocolInfoPage is the typed template every /info page follows (rails-ops
+// standards/info-page-template.md). ProtocolInfoShell below is the untyped shell
+// that only the exempt testnet page (Polaris on Sepolia) still uses.
 //
 // ProtocolInfoShell — the one shell for every explorer's /info page: the rail
 // header with the (i) lit, then the intro prose that used to live behind the
@@ -107,8 +106,6 @@ export interface ProtocolInfoPageProps {
   search?: ReactNode;
   /** One sentence naming what a reader might expect here and will not find, shown beside the coverage door. Omit it when nothing is expected and missing. */
   notCovered?: string;
-  /** Unused since the pointer line stopped naming the protocol (2 Nov 2026); each page still passes it until a later sweep removes it. */
-  name?: string;
   /** Slot 6: the official documentation, the page's final line. */
   docs: InfoDocLink;
 }

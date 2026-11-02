@@ -124,7 +124,6 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
     return (
       <ProtocolInfoPage
         session="morpho"
-        name="Morpho Blue"
         tracks={
           <>
             The Rails Morpho Blue explorer shows every position on Ethereum, whether still open, closed or liquidated,
@@ -177,7 +176,6 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
     return (
       <ProtocolInfoPage
         session="morpho-base"
-        name="Morpho Blue"
         tracks={
           <>
             The Rails Morpho Blue explorer shows every position on Base, a network built on Ethereum, whether still
@@ -278,7 +276,6 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
   return (
     <ProtocolInfoPage
       session="morpho-arbitrum"
-      name="Morpho Blue"
       tracks={
         <>
           The Rails Morpho Blue explorer reads the positions of any wallet you enter on{" "}

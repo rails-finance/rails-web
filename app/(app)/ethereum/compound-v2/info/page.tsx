@@ -134,7 +134,6 @@ export default function InfoPage() {
   return (
     <ProtocolInfoPage
       session="compound-v2"
-      name="Compound V2"
       tracks={
         <>
           The Rails Compound V2 explorer shows the full history of every wallet that has supplied to or borrowed from

@@ -101,7 +101,6 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
   return (
     <ProtocolInfoPage
       session={deployment.session}
-      name="Alchemix"
       tracks={
         <>
           The Rails Alchemix explorer shows every self-repaying Alchemix V3 loan on {chain}, on the {lineNames}{" "}

@@ -79,7 +79,6 @@ export function AaveV4InfoPage({ deployment }: { deployment: "ethereum" | "base"
     return (
       <ProtocolInfoPage
         session="aave-v4-base"
-        name="Aave V4"
         tracks={
           <>
             The Rails Aave V4 explorer shows every account on the Mag7 spoke on Base, whether still open or closed, and
@@ -141,7 +140,6 @@ export function AaveV4InfoPage({ deployment }: { deployment: "ethereum" | "base"
   return (
     <ProtocolInfoPage
       session="aave-v4"
-      name="Aave V4"
       tracks={
         <>
           The Rails Aave V4 explorer shows every position on Ethereum, one for each wallet and spoke, whether still open

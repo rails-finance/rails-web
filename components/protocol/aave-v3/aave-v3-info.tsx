@@ -72,7 +72,6 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
     return (
       <ProtocolInfoPage
         session="aave-v3"
-        name="Aave V3"
         tracks={
           <>
             The Rails Aave V3 explorer shows every account on Ethereum, whether still open or closed, across the Core,
@@ -129,7 +128,6 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
   return (
     <ProtocolInfoPage
       session={base ? "aave-v3-base" : "aave-v3-arbitrum"}
-      name="Aave V3"
       tracks={
         <>
           {base

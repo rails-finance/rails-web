@@ -16,7 +16,6 @@ export default function InfoPage() {
   return (
     <ProtocolInfoPage
       session="frankencoin"
-      name="Frankencoin"
       tracks={
         <>
           The Rails Frankencoin explorer shows every position that has minted Frankencoin (ZCHF) on Ethereum, whether

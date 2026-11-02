@@ -78,7 +78,6 @@ export default function InfoPage() {
   return (
     <ProtocolInfoPage
       session="makerdao"
-      name="MakerDAO"
       tracks={
         <>
           The Rails MakerDAO explorer shows every MakerDAO vault and every Sky LockStake urn on Ethereum, whether open,

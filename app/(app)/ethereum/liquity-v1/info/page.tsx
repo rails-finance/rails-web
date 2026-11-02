@@ -16,7 +16,6 @@ export default function InfoPage() {
   return (
     <ProtocolInfoPage
       session="liquity-v1"
-      name="Liquity V1"
       tracks={
         <>
           The Rails Liquity V1 explorer shows every Trove on Ethereum, whether still open or closed, and the full

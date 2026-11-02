@@ -109,7 +109,6 @@ export default function InfoPage() {
   return (
     <ProtocolInfoPage
       session="maple"
-      name="Maple"
       tracks={
         <>
           The Rails Maple explorer shows every wallet that has lent into Maple&apos;s syrupUSDC and syrupUSDT pools on

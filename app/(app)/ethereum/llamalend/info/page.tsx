@@ -129,7 +129,6 @@ export default function InfoPage() {
   return (
     <ProtocolInfoPage
       session="llamalend"
-      name="LlamaLend"
       tracks={
         <>
           The Rails LlamaLend explorer shows every position in Curve&apos;s LlamaLend markets on Ethereum, whether still

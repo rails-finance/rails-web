@@ -16,7 +16,6 @@ export default function InfoPage() {
   return (
     <ProtocolInfoPage
       session="spark"
-      name="SparkLend"
       tracks={
         <>
           The Rails SparkLend explorer shows the account of every wallet on SparkLend on Ethereum, whether still open,

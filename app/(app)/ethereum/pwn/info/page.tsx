@@ -64,7 +64,6 @@ export default function InfoPage() {
   return (
     <ProtocolInfoPage
       session="pwn"
-      name="PWN"
       tracks={
         <>
           The Rails PWN explorer shows every peer-to-peer loan funded through PWN&apos;s SimpleLoan contracts (the
