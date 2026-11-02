@@ -4,7 +4,7 @@
 // per chain is the markets, the listing and the market view.
 
 import Link from "next/link";
-import { ProtocolInfoPage, type InfoView } from "@/components/shared/protocol-info-page";
+import { GlossaryLink, ProtocolInfoPage, type InfoView } from "@/components/shared/protocol-info-page";
 import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
 import { aaveV3Glossary } from "@/lib/aave-v3/event-templates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -13,17 +13,40 @@ const UL = "list-disc space-y-1 pl-5";
 
 export type AaveV3InfoDeployment = "ethereum" | "base" | "arbitrum";
 
-const ONE_HEALTH_FACTOR =
-  "Within a market, everything a wallet supplies as collateral backs everything it owes, under one health factor.";
+const WHAT_IT_IS = (
+  <>
+    Aave V3 is a lending protocol where people lend crypto, which Aave calls{" "}
+    <GlossaryLink term="Supplied">supplying</GlossaryLink> it, and borrow other crypto against it. An account is the
+    assets one wallet (an address that holds crypto) has supplied and the <GlossaryLink term="Debt">debt</GlossaryLink>{" "}
+    it owes in one market.
+  </>
+);
 
-const PRICES = "Dollar values use Aave's own prices, the same ones it liquidates with.";
+const ONE_HEALTH_FACTOR = (
+  <>
+    All the assets in an account that count as <GlossaryLink term="Collateral">collateral</GlossaryLink> back all of its
+    debt together. One <GlossaryLink term="Health factor">health factor</GlossaryLink> scores how safe the whole account
+    is.
+  </>
+);
+
+const PRICES = (
+  <>
+    Dollar values use the prices from the market&apos;s price oracle, a contract that reports asset prices.{" "}
+    <GlossaryLink term="Liquidation">Liquidation</GlossaryLink> is checked with the same prices, so a price fall can
+    trigger it.
+  </>
+);
 
 const POSITION_PAGE: InfoView = {
   heading: "Position page",
   body: (
     <ul className={UL}>
-      <li>The top card shows what the wallet supplied, what it owes and its health factor, read from the Pool now.</li>
-      <li>The timeline lists each event of the account, newest first.</li>
+      <li>
+        The top card shows what the wallet supplied, what it owes and its health factor, read now from the market&apos;s
+        pool contract, the smart contract that holds its supplied assets.
+      </li>
+      <li>The timeline lists the account&apos;s events, newest first.</li>
     </ul>
   ),
 };
@@ -36,8 +59,8 @@ function marketView(href: string, body: string, linkText: string): InfoView {
         {body}{" "}
         <Link href={href} className={INLINE_LINK}>
           {linkText}
-        </Link>
-        .
+        </Link>{" "}
+        to open it.
       </p>
     ),
   };
@@ -50,30 +73,50 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
       <ProtocolInfoPage
         session="aave-v3"
         name="Aave V3"
-        tracks="Every Aave V3 account on Ethereum, open or closed, with its history, across the Core, Prime and EtherFi markets. The market view shows Core's reserves only."
+        tracks={
+          <>
+            The Rails Aave V3 explorer shows every account on Ethereum, whether still open or closed, across the Core,
+            Prime and EtherFi markets, and the full history of each one. It also shows the reserves of{" "}
+            <Link href="/ethereum/aave-v3/market" className={INLINE_LINK}>
+              the Core market
+            </Link>
+            , with their rates, risk settings and prices.
+          </>
+        }
+        notCovered="The reserves of the Prime and EtherFi markets aren't covered here."
         glossary={aaveV3Glossary()}
         howItWorks={[
-          "Ethereum has three separate markets: Core, Prime and EtherFi. Each is its own pool with its own reserves, risk settings and prices.",
-          "A wallet's account in each market is separate. A wallet that uses two markets appears on two rows.",
+          WHAT_IT_IS,
+          <>
+            Ethereum has three separate <GlossaryLink term="Market">markets</GlossaryLink>: Core, Prime and EtherFi.
+            Each is its own pool with its own <GlossaryLink term="Reserve">reserves</GlossaryLink> (one asset each),
+            risk settings and prices.
+          </>,
+          "A wallet's account in each market is separate, so a wallet that uses two markets has two accounts.",
           ONE_HEALTH_FACTOR,
           PRICES,
         ]}
-        search="Search takes a wallet address. Filters: status, market, debt and collateral size, liquidated before, transactions. Sort: recent activity, debt, collateral."
+        search="You can search by wallet address. The listing filters by Status (open, closed or liquidated), Market, Debt and Collateral by size in US dollars, History (liquidated before) and Transactions, and sorts by recent activity, debt or collateral."
         views={[
           {
             heading: "Listing",
             body: (
               <ul className={UL}>
-                <li>One card per wallet and market: what it supplied, what it owes and its health factor.</li>
-                <li>Open accounts show by default. Searching a wallet shows every status.</li>
+                <li>
+                  Each card shows one account: the wallet, its market, what it supplied, what it owes and its health
+                  factor.
+                </li>
+                <li>
+                  The listing shows open accounts by default. Searching for a wallet shows its accounts of every status.
+                </li>
               </ul>
             ),
           },
           POSITION_PAGE,
           marketView(
             "/ethereum/aave-v3/market",
-            "Core's reserves, with each asset's size, rates, risk settings and price.",
-            "See the Core market",
+            "The market view shows each Core reserve with its size, rates, risk settings and price.",
+            "Use the Core market link",
           ),
         ]}
         docs={docs}
@@ -88,22 +131,38 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
       session={base ? "aave-v3-base" : "aave-v3-arbitrum"}
       name="Aave V3"
       tracks={
-        base
-          ? "Every account on Aave V3's Base market, open or closed, with its history, and the market's reserves."
-          : "The Aave V3 accounts on Arbitrum that Rails has read, with their history, and the market's reserves. Other wallets appear once someone opens them."
+        <>
+          {base
+            ? "The Rails Aave V3 explorer shows every account on Aave V3's Base market, whether still open or closed, and the full history of each one. It also shows the reserves of "
+            : "The Rails Aave V3 explorer shows the accounts on Arbitrum that Rails has read, with the full history of each one, and a wallet appears once someone opens it. It also shows the reserves of "}
+          <Link href={base ? "/base/aave-v3/market" : "/arbitrum/aave-v3/markets"} className={INLINE_LINK}>
+            the {chain} market
+          </Link>
+          , with their rates, risk settings and prices.
+        </>
       }
       glossary={aaveV3Glossary()}
       howItWorks={[
-        `${chain} has one market, its own pool. Its reserves, risk settings and prices are separate from Aave V3 on Ethereum.`,
+        WHAT_IT_IS,
+        <>
+          {chain} has one <GlossaryLink term="Market">market</GlossaryLink>, which is its own pool. Its{" "}
+          <GlossaryLink term="Reserve">reserves</GlossaryLink> (one asset each), risk settings and prices are separate
+          from Aave V3 on Ethereum.
+        </>,
         ONE_HEALTH_FACTOR,
-        base
-          ? "Dollar values use the pool's prices at the block the row names, the same prices it liquidates with."
-          : PRICES,
+        base ? (
+          <>
+            Dollar values use the pool&apos;s prices at the block the row names, the same prices that decide{" "}
+            <GlossaryLink term="Liquidation">liquidation</GlossaryLink>.
+          </>
+        ) : (
+          PRICES
+        ),
       ]}
       search={
         base
-          ? "Search takes a wallet address. Filters: status, debt and collateral size, liquidated before, transactions. Sort: recent activity, debt, collateral."
-          : "Search takes a wallet address and finds the wallets already read. Enter any other wallet on the protocol page to read it. Filters: debt and collateral size, transactions. Sort: last activity, last opened, collateral, debt."
+          ? "You can search by wallet address. The listing filters by Status (open, closed or liquidated), Debt and Collateral by size in US dollars, History (liquidated before) and Transactions, and sorts by recent activity, debt or collateral."
+          : "You can search by wallet address, which finds the wallets already read. To read any other wallet, enter it on the protocol page. The listing filters by Debt, Collateral and Transactions, and sorts by last activity, last opened, collateral or debt."
       }
       views={[
         base
@@ -112,8 +171,13 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
               body: (
                 <>
                   <ul className={UL}>
-                    <li>One card per wallet: what it supplied, what it owes and its health factor.</li>
-                    <li>Open accounts show by default. Searching a wallet shows every status.</li>
+                    <li>
+                      Each card shows one account: the wallet, what it supplied, what it owes and its health factor.
+                    </li>
+                    <li>
+                      The listing shows open accounts by default. Searching for a wallet shows its accounts of every
+                      status.
+                    </li>
                   </ul>
                   <BaseLendingCoverageNote route="/api/aave-v3-base/coverage" restsOnOpen />
                 </>
@@ -123,10 +187,12 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
               heading: "Listing",
               body: (
                 <ul className={UL}>
-                  <li>One card per open wallet: what it supplied, what it owes and its health factor.</li>
                   <li>
-                    The wallets come from each day&apos;s most active wallets and any wallet a reader opened. The footer
-                    says how many positions are read.
+                    Each card shows one open account: the wallet, what it supplied, what it owes and its health factor.
+                  </li>
+                  <li>
+                    The listing draws on each day&apos;s most active wallets and any wallet a reader has opened. The
+                    footer says how many positions have been read.
                   </li>
                 </ul>
               ),
@@ -134,8 +200,8 @@ export function AaveV3InfoPage({ deployment }: { deployment: AaveV3InfoDeploymen
         POSITION_PAGE,
         marketView(
           base ? "/base/aave-v3/market" : "/arbitrum/aave-v3/markets",
-          `The ${chain} market's reserves, with each asset's size, rates, risk settings and price.`,
-          `See the ${chain} market`,
+          `The market view shows each ${chain} reserve with its size, rates, risk settings and price.`,
+          `Use the ${chain} market link`,
         ),
       ]}
       docs={docs}
