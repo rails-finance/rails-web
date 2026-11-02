@@ -69,7 +69,7 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Reserves",
     definition:
-      "Reserves are the base asset a market's protocol holds to pay for liquidations. A liquidation adds the seized collateral to the protocol's holdings.",
+      "Reserves are a balance of the base or collateral asset that a market's protocol holds to protect users from bad debt. A liquidation adds the seized collateral to the protocol's holdings.",
     sources: [{ label: "Reserves", href: `${LIQUIDATION}#reserves` }],
   },
 ];
