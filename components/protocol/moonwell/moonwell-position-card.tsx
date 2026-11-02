@@ -20,7 +20,7 @@
 // detail page's live Comptroller read — the listing card still asserts no
 // health column (the listing snapshot carries none).
 
-import { serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
+import { headReadOf, serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { TitleTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
 import {
@@ -82,6 +82,9 @@ export interface MoonwellPositionView {
   priceByAddress?: Record<string, number>;
   /** Annualized per-timestamp rates per market key (from the same multicall). */
   ratesByMarket?: Record<string, { borrowApr: number | null; supplyApr: number | null }>;
+  /** The block the exchange rates, prices and rates above were read at and
+   *  who answered (`MoonwellPositionSummary.marketRead`). */
+  marketRead?: MoonwellPositionSummary["marketRead"];
   /** Each liquidation as the rows tell it, where the page holds them. */
   liquidations?: LiquidationStory[];
   /** Every row of the history, beside the transaction count (the detail page). */
@@ -125,13 +128,21 @@ function totalUsd(v: MoonwellPositionView, lines: { address: string; amount: num
   return any ? sum : null;
 }
 
+/** rails-server's read (live or stored) of the market state a view's
+ *  exchange rates, prices and rates come from; undefined where the web read
+ *  the chain, and the receipts keep "@ head". */
+const marketReadBy = (v: MoonwellPositionView): ServerRead | undefined =>
+  v.marketRead ? headReadOf(v.marketRead.head, v.marketRead.blockNumber, v.marketRead.stored) : undefined;
+
 /** The receipts behind each supply / debt line, and the market's receipt-token
  *  label — all resolved through the surrounding page's deployment, so a Base
- *  row never cites Ethereum's catalog or index (Ethereum's is the default). */
-function useLineReceipts(readBy?: ServerRead) {
+ *  row never cites Ethereum's catalog or index (Ethereum's is the default).
+ *  A current supply value is stamped with the market read (`marketBy`). */
+function useLineReceipts(readBy?: ServerRead, marketBy?: ServerRead) {
   const dep = useMoonwellDeployment();
   return {
-    supplyProv: (r: MoonwellSupplyAmount) => dep.card.supply(r, dep.market(r.market, r.symbol)),
+    supplyProv: (r: MoonwellSupplyAmount) =>
+      stampServerRead(dep.card.supply(r, dep.market(r.market, r.symbol)), r.current != null ? marketBy : undefined),
     /** Debt-line provenance: the live borrowBalanceStored lane when the detail
      *  page's chain read upgraded this row, the emitted-accountBorrows lane
      *  otherwise. */
@@ -180,10 +191,21 @@ function PeakLines({ lines, side }: { lines: MoonwellPeakAmount[]; side: "supply
 /** A USD figure traced to the oracle read: `compact` for a side of several
  *  markets (its cents on hover), `cents` for the line under a one-market
  *  head and a panel row, `whole` in the breakdown. */
-function UsdFigure({ usd, what, form }: { usd: number; what: string; form: "compact" | "cents" | "whole" }) {
+function UsdFigure({
+  usd,
+  what,
+  form,
+  marketBy,
+}: {
+  usd: number;
+  what: string;
+  form: "compact" | "cents" | "whole";
+  /** The market read the oracle price came from. */
+  marketBy?: ServerRead;
+}) {
   const dep = useMoonwellDeployment();
   const figure = (
-    <Prov info={dep.card.usd(what)}>
+    <Prov info={stampServerRead(dep.card.usd(what), marketBy)}>
       {form === "cents" ? formatUsdValue(usd) : form === "compact" ? formatCompactUsd(usd) : formatUsd(usd)}
     </Prov>
   );
@@ -197,11 +219,13 @@ function LineValue({
   usd,
   share,
   usdWhat,
+  marketBy,
 }: {
   amount: ReactNode;
   usd: number | null;
   share: number | null;
   usdWhat: string;
+  marketBy?: ServerRead;
 }) {
   const dep = useMoonwellDeployment();
   return (
@@ -210,7 +234,7 @@ function LineValue({
       {usd != null && (
         <>
           {" · "}
-          <Prov info={dep.card.usd(usdWhat)}>
+          <Prov info={stampServerRead(dep.card.usd(usdWhat), marketBy)}>
             <PanelFigure>{formatUsdValue(usd)}</PanelFigure>
           </Prov>
           {share != null && (
@@ -255,10 +279,18 @@ function factorsRow(
 
 /** The borrow rate row: the live per-timestamp rate on the single borrowed
  *  market, or the debt-USD-weighted average across several. */
-function BorrowRateValue({ rate }: { rate: NonNullable<MoonwellCardCaptions["borrowRate"]> }) {
+function BorrowRateValue({
+  rate,
+  marketBy,
+}: {
+  rate: NonNullable<MoonwellCardCaptions["borrowRate"]>;
+  marketBy?: ServerRead;
+}) {
   const dep = useMoonwellDeployment();
   return (
-    <Prov info={rate.avg ? dep.card.avgBorrowRate() : dep.card.borrowRate(rate.symbol)}>{rate.pct.toFixed(2)}%</Prov>
+    <Prov info={stampServerRead(rate.avg ? dep.card.avgBorrowRate() : dep.card.borrowRate(rate.symbol), marketBy)}>
+      {rate.pct.toFixed(2)}%
+    </Prov>
   );
 }
 
@@ -301,7 +333,8 @@ export function useMoonwellCardSlots({
 }: MoonwellPositionCardProps): PositionCardSlots {
   const dep = useMoonwellDeployment();
   const session = dep.session;
-  const { supplyProv, borrowProv, mSymbolOf } = useLineReceipts(serverReadOf(chain));
+  const marketBy = marketReadBy(v);
+  const { supplyProv, borrowProv, mSymbolOf } = useLineReceipts(serverReadOf(chain), marketBy);
   const detail = surface === "detail";
 
   // The collateral column holds the entered markets; a supply the account
@@ -386,7 +419,7 @@ export function useMoonwellCardSlots({
         label: CARD_VOCAB.collateral,
         value:
           vc.supplies.length === 0 ? null : collUsd != null ? (
-            <UsdFigure usd={collUsd} what="Collateral" form="compact" />
+            <UsdFigure usd={collUsd} what="Collateral" form="compact" marketBy={marketBy} />
           ) : (
             <AmountStack>
               {collDust.lines.map((r) => (
@@ -403,14 +436,15 @@ export function useMoonwellCardSlots({
           ),
         assets:
           vc.supplies.length > 0 ? <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} /> : undefined,
-        total: collUsd != null ? { usd: collUsd, info: dep.card.usd("Collateral") } : undefined,
+        total:
+          collUsd != null ? { usd: collUsd, info: stampServerRead(dep.card.usd("Collateral"), marketBy) } : undefined,
       },
       {
         id: "debt",
         label: CARD_VOCAB.debt,
         value:
           v.borrows.length === 0 ? null : debtUsd != null ? (
-            <UsdFigure usd={debtUsd} what="Borrowed" form="compact" />
+            <UsdFigure usd={debtUsd} what="Borrowed" form="compact" marketBy={marketBy} />
           ) : (
             <AmountStack>
               {debtDust.lines.map((r) => (
@@ -421,7 +455,8 @@ export function useMoonwellCardSlots({
             </AmountStack>
           ),
         assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} /> : undefined,
-        total: debtUsd != null ? { usd: debtUsd, info: dep.card.usd("Borrowed") } : undefined,
+        total:
+          debtUsd != null ? { usd: debtUsd, info: stampServerRead(dep.card.usd("Borrowed"), marketBy) } : undefined,
       },
     ];
     // One market on a side: its amount with its icon, the dollars beneath
@@ -444,7 +479,7 @@ export function useMoonwellCardSlots({
         usd:
           collUsd != null ? (
             <span className="font-bold text-green-400">
-              <UsdFigure usd={collUsd} what="Collateral" form="cents" />
+              <UsdFigure usd={collUsd} what="Collateral" form="cents" marketBy={marketBy} />
             </span>
           ) : null,
       };
@@ -462,7 +497,7 @@ export function useMoonwellCardSlots({
         usd:
           debtUsd != null ? (
             <span className="font-bold text-green-400">
-              <UsdFigure usd={debtUsd} what="Borrowed" form="cents" />
+              <UsdFigure usd={debtUsd} what="Borrowed" form="cents" marketBy={marketBy} />
             </span>
           ) : null,
       };
@@ -520,6 +555,7 @@ export function useMoonwellCardSlots({
           usd={usd}
           share={usd != null && total ? usd / total : null}
           usdWhat={`${r.symbol} supplied`}
+          marketBy={marketBy}
         />
       ),
     };
@@ -539,7 +575,7 @@ export function useMoonwellCardSlots({
   const usdCell = (usd: number | null, what: string) =>
     usd != null ? (
       <span className="text-foreground">
-        <UsdFigure usd={usd} what={what} form="whole" />
+        <UsdFigure usd={usd} what={what} form="whole" marketBy={marketBy} />
       </span>
     ) : undefined;
   const collBreakdown: AssetBreakdown = {
@@ -600,7 +636,7 @@ export function useMoonwellCardSlots({
             tip: rate.avg
               ? "The live variable borrow rate of each borrowed market, annualised from its per-timestamp rate and weighted by the debt in each."
               : `The live variable borrow rate on the ${rate.symbol} market, annualised from its per-timestamp rate.`,
-            value: <BorrowRateValue rate={rate} />,
+            value: <BorrowRateValue rate={rate} marketBy={marketBy} />,
           },
         ]
       : []),
@@ -667,5 +703,6 @@ export function viewFromSummary(s: MoonwellPositionSummary): MoonwellPositionVie
     lastActivityAt: s.lastActivityAt,
     priceByAddress: s.priceByAddress,
     ratesByMarket: s.ratesByMarket,
+    marketRead: s.marketRead,
   };
 }

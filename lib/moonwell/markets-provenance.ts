@@ -27,8 +27,14 @@
 // oracle() (data.oracle), and the Comptroller itself is the deployment's known
 // registry address. Contracts differ per figure — an mToken read cites the
 // mToken, a cap read the Comptroller, a price read the oracle wrapper.
+//
+// Every builder is stamped with the coordinates' `readBy`
+// (lib/shared/server-head-read.ts): "@ head" becomes the block and the via
+// line names rails-server's live read, or its stored read and why. Without
+// `readBy` the web read the chain and "@ head" stays.
 
 import type { Provenance } from "@/components/shared/provenance";
+import { stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
 
 const LANE = "live Moonwell reads (/moonwell/markets)";
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
@@ -37,6 +43,8 @@ const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
  *  whichever contracts the figure was read from. Not every builder uses every
  *  field — a cap read wants the Comptroller, a price read the oracle wrapper. */
 export interface MoonwellMarketCoords {
+  /** rails-server's read of `blockNumber` (live, or its stored snapshot); unset where the web read the chain. */
+  readBy?: ServerRead | null;
   blockNumber?: number;
   /** The mToken (MErc20Delegator) address — most per-market reads. */
   mToken?: string;
@@ -90,7 +98,7 @@ const sym = (coords?: MoonwellMarketCoords) => coords?.underlyingSymbol ?? "the 
 /** Supplied underlying — the mToken's totalSupply (8-dp mTokens) × its
  *  exchangeRateStored, the accrued rate that turns mTokens into underlying. Two
  *  state slots multiplied, so chain-derived but never off the chain. */
-export const mwSuppliedUnderlyingProv = (coords: MoonwellMarketCoords): Provenance => ({
+const mwSuppliedUnderlyingProvUnstamped = (coords: MoonwellMarketCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: coords.blockNumber },
@@ -107,7 +115,7 @@ export const mwSuppliedUnderlyingProv = (coords: MoonwellMarketCoords): Provenan
 /** Supplied or borrowed VALUE in USD — the underlying amount × the Comptroller's
  *  own oracle price for it (getUnderlyingPrice), the price its liquidation math
  *  uses. Chain-derived, oracle-class. */
-export const mwValueUsdProv = (side: "supplied" | "borrowed", coords: MoonwellMarketCoords): Provenance => ({
+const mwValueUsdProvUnstamped = (side: "supplied" | "borrowed", coords: MoonwellMarketCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
   source: { block: coords.blockNumber },
@@ -135,7 +143,7 @@ export const mwValueUsdProv = (side: "supplied" | "borrowed", coords: MoonwellMa
 
 /** The rate model's kink — the utilisation the interest curve turns steep at,
  *  read off THIS market's own model (the four roster models do not share one). */
-export const mwKinkProv = (coords: MoonwellMarketCoords): Provenance => ({
+const mwKinkProvUnstamped = (coords: MoonwellMarketCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
@@ -147,7 +155,7 @@ export const mwKinkProv = (coords: MoonwellMarketCoords): Provenance => ({
 
 /** A live annualised rate — supply/borrowRatePerTimestamp (Moonwell's per-SECOND
  *  accrual) × the model's own timestampsPerYear. Chain-derived, state-class. */
-export const mwRateProv = (side: "supply" | "borrow", coords: MoonwellMarketCoords): Provenance => {
+const mwRateProvUnstamped = (side: "supply" | "borrow", coords: MoonwellMarketCoords): Provenance => {
   const method = side === "supply" ? "supplyRatePerTimestamp" : "borrowRatePerTimestamp";
   return {
     kind: "chain-derived",
@@ -168,7 +176,7 @@ export const mwRateProv = (side: "supply" | "borrow", coords: MoonwellMarketCoor
 
 /** A market's collateral factor — the Comptroller's markets(mToken) second
  *  return, the share of this collateral's value that backs borrowing. */
-export const mwCollateralFactorProv = (coords: MoonwellMarketCoords): Provenance => ({
+const mwCollateralFactorProvUnstamped = (coords: MoonwellMarketCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
@@ -180,7 +188,7 @@ export const mwCollateralFactorProv = (coords: MoonwellMarketCoords): Provenance
 
 /** A governance ceiling in the market's own underlying token — the Comptroller's
  *  supplyCaps / borrowCaps slot (0 means uncapped in the fork's convention). */
-export const mwCapProv = (side: "supply" | "borrow", coords: MoonwellMarketCoords): Provenance => {
+const mwCapProvUnstamped = (side: "supply" | "borrow", coords: MoonwellMarketCoords): Provenance => {
   const method = side === "supply" ? "supplyCaps" : "borrowCaps";
   return {
     kind: "chain",
@@ -195,7 +203,7 @@ export const mwCapProv = (side: "supply" | "borrow", coords: MoonwellMarketCoord
 
 /** Share of a cap in use — the market's own amount ÷ its cap, both in the
  *  underlying token. Chain-derived, state-class. */
-export const mwCapUsedProv = (side: "supply" | "borrow", coords: MoonwellMarketCoords): Provenance => {
+const mwCapUsedProvUnstamped = (side: "supply" | "borrow", coords: MoonwellMarketCoords): Provenance => {
   const method = side === "supply" ? "supplyCaps" : "borrowCaps";
   const amount = side === "supply" ? "supplied" : "borrowed";
   const amountNote = side === "supply" ? "totalSupply × exchangeRateStored @ head" : "mToken.totalBorrows @ head";
@@ -218,7 +226,7 @@ export const mwCapUsedProv = (side: "supply" | "borrow", coords: MoonwellMarketC
 
 /** The market count — the length of the Comptroller's OWN getAllMarkets(), read
  *  live, not a stated catalog roster. Moonwell enumerates its markets on-chain. */
-export const mwRosterCountProv = (coords: MoonwellMarketCoords): Provenance => ({
+const mwRosterCountProvUnstamped = (coords: MoonwellMarketCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
@@ -230,7 +238,7 @@ export const mwRosterCountProv = (coords: MoonwellMarketCoords): Provenance => (
 
 /** A USD total across the priced roster — Σ of each market's own supplied or
  *  borrowed value (base underlying × its oracle price). Chain-derived, oracle. */
-export const mwSummaryValueProv = (side: "supplied" | "borrowed", coords: MoonwellMarketCoords): Provenance => ({
+const mwSummaryValueProvUnstamped = (side: "supplied" | "borrowed", coords: MoonwellMarketCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
   source: { block: coords.blockNumber },
@@ -241,7 +249,7 @@ export const mwSummaryValueProv = (side: "supplied" | "borrowed", coords: Moonwe
 
 /** The fullest market's share of its own supply cap — the max over the roster of
  *  supplied ÷ supplyCaps. Chain-derived, state-class (no oracle in it). */
-export const mwSummaryCapMaxProv = (coords: MoonwellMarketCoords): Provenance => ({
+const mwSummaryCapMaxProvUnstamped = (coords: MoonwellMarketCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: coords.blockNumber },
@@ -251,7 +259,7 @@ export const mwSummaryCapMaxProv = (coords: MoonwellMarketCoords): Provenance =>
 
 /** The close factor — the Comptroller's protocol-wide closeFactorMantissa, the
  *  share of a shortfallen borrow one liquidation may repay. */
-export const mwCloseFactorProv = (coords: MoonwellMarketCoords): Provenance => ({
+const mwCloseFactorProvUnstamped = (coords: MoonwellMarketCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
@@ -263,7 +271,7 @@ export const mwCloseFactorProv = (coords: MoonwellMarketCoords): Provenance => (
 
 /** The liquidation incentive — the Comptroller's liquidationIncentiveMantissa,
  *  the multiple of repaid value a liquidator seizes in collateral. */
-export const mwLiquidationIncentiveProv = (coords: MoonwellMarketCoords): Provenance => ({
+const mwLiquidationIncentiveProvUnstamped = (coords: MoonwellMarketCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
   source: { block: coords.blockNumber },
@@ -272,3 +280,29 @@ export const mwLiquidationIncentiveProv = (coords: MoonwellMarketCoords): Proven
   contract: comptrollerContract(coords),
   via: `${LANE} · Comptroller.liquidationIncentiveMantissa @ head`,
 });
+
+// ── the exported builders, stamped with who read the block ──────────────────
+
+const STORED_LANE = "Moonwell reads (/moonwell/markets)";
+
+/** A builder's receipt, stamped with the read its coordinates (the last argument) carry. */
+const stamped =
+  <A extends unknown[]>(build: (...a: A) => Provenance) =>
+  (...a: A): Provenance => {
+    const readBy = (a[a.length - 1] as MoonwellMarketCoords | undefined)?.readBy;
+    const p = stampHeadRead(build(...a), readBy);
+    return readBy?.stored && p.via ? { ...p, via: p.via.replace(LANE, STORED_LANE) } : p;
+  };
+
+export const mwSuppliedUnderlyingProv = stamped(mwSuppliedUnderlyingProvUnstamped);
+export const mwValueUsdProv = stamped(mwValueUsdProvUnstamped);
+export const mwKinkProv = stamped(mwKinkProvUnstamped);
+export const mwRateProv = stamped(mwRateProvUnstamped);
+export const mwCollateralFactorProv = stamped(mwCollateralFactorProvUnstamped);
+export const mwCapProv = stamped(mwCapProvUnstamped);
+export const mwCapUsedProv = stamped(mwCapUsedProvUnstamped);
+export const mwRosterCountProv = stamped(mwRosterCountProvUnstamped);
+export const mwSummaryValueProv = stamped(mwSummaryValueProvUnstamped);
+export const mwSummaryCapMaxProv = stamped(mwSummaryCapMaxProvUnstamped);
+export const mwCloseFactorProv = stamped(mwCloseFactorProvUnstamped);
+export const mwLiquidationIncentiveProv = stamped(mwLiquidationIncentiveProvUnstamped);

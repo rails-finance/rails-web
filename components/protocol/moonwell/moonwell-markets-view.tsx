@@ -54,6 +54,7 @@ import {
 } from "@/lib/moonwell/markets-provenance";
 import type { MoonwellMarketRow, MoonwellMarketsResponse } from "@/lib/sources/chain/moonwell-market-state";
 import { BlockRef } from "@/components/shared/block-ref";
+import { headReadOf, serverReadVia, type ServerRead } from "@/lib/shared/server-head-read";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 // A one-base-unit cap is the fork's closed door (see MoonwellMarketRow's
@@ -93,7 +94,10 @@ function MarketCard({
   listingBasePath,
   listingFilterKey,
   mLabel,
+  readBy,
 }: {
+  /** rails-server's read of `block`; unset where the web read the chain. */
+  readBy?: ServerRead;
   /** The mToken's name on screen: its symbol(), with the underlying's added
    *  where two markets share it (Base's USDC and USDbC are both "mUSDC"). */
   mLabel: string;
@@ -122,6 +126,7 @@ function MarketCard({
       ? listingHref("borrow")
       : null;
   const coords: MoonwellMarketCoords = {
+    readBy,
     blockNumber: block,
     mToken: m.mToken,
     mTokenSymbol: m.mTokenSymbol,
@@ -341,7 +346,8 @@ export function MoonwellMarketsStamp({
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
-      Chain snapshot · <BlockRef block={data.blockNumber} chainId={chainId} /> · roster from the{" "}
+      {data.stored ? "Stored snapshot" : "Chain snapshot"} · <BlockRef block={data.blockNumber} chainId={chainId} /> ·
+      roster from the{" "}
       <a
         href={explorerUrl(chainId, "address", comptroller)}
         target="_blank"
@@ -366,6 +372,7 @@ export function MoonwellMarketsStamp({
           </a>
         </>
       )}
+      {serverReadVia(headReadOf(data.head, data.blockNumber, data.stored))}
     </p>
   );
 }
@@ -400,7 +407,9 @@ export function MoonwellMarketsView({
   }
 
   const s = data.summary;
+  const readBy = headReadOf(data.head, data.blockNumber, data.stored);
   const summaryCoords: MoonwellMarketCoords = {
+    readBy,
     blockNumber: data.blockNumber,
     comptroller,
     oracle: data.oracle ?? undefined,
@@ -527,6 +536,7 @@ export function MoonwellMarketsView({
             comptroller={comptroller}
             listingBasePath={listingBasePath}
             listingFilterKey={listingFilterKey}
+            readBy={readBy}
             mLabel={
               data.markets.filter((x) => x.mTokenSymbol === m.mTokenSymbol).length > 1
                 ? `${m.mTokenSymbol} (${m.underlyingSymbol})`
