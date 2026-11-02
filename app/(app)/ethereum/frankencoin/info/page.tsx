@@ -17,30 +17,34 @@ export default function InfoPage() {
     <ProtocolInfoPage
       session="frankencoin"
       name="Frankencoin"
-      tracks="Every Frankencoin minting position on Ethereum, open or ended, with its history, and the system's capital and challenge record. Savings, FCS governance and ZCHF on other chains are not shown."
+      tracks="The Rails Frankencoin explorer shows every position that has minted Frankencoin (ZCHF) on Ethereum, whether still open or closed, and the full history of each one. It also shows the system as a whole: its equity reserve and every challenge raised against a position."
+      notCovered="Frankencoin savings, governance and ZCHF on other chains aren't covered here."
       glossary={frankencoinGlossary()}
       howItWorks={[
-        "There is no price oracle. Each owner declares a liquidation price, and anyone who thinks it too high can post collateral and force a challenge.",
-        "No dollar figure or health factor appears, because neither exists on chain; collateral is shown in its token and debt in ZCHF.",
-        "A position can mint ZCHF while its collateral, valued at the liquidation price, covers the debt, up to its family's minting limit.",
-        "A position ends by repayment, a challenge sale, a veto or a forced sale after expiry.",
+        "Frankencoin has no price oracle, so no outside service tells it what collateral is worth. Each position's owner declares a liquidation price, and anyone who thinks that price is too high can start a challenge by putting up collateral.",
+        "Rails shows no dollar value and no health factor, which is a single score of how close a position is to liquidation, because the protocol has neither. Collateral appears in its own token and debt in ZCHF.",
+        "A position can mint ZCHF up to the value of its collateral at its liquidation price. A minting limit also caps the total that an original and its clones can mint.",
+        "A position ends when its owner repays it, when a challenge sells its collateral, when it is vetoed, or when a forced sale follows its expiry.",
       ]}
-      search="Search takes an owner address. Filters: status, collateral, hub, history, debt, transactions. Sort: recent activity, debt, collateral."
+      search="You can search by owner address. The listing filters by status, collateral, hub, history, debt and transactions, and sorts by recent activity, debt or collateral."
       views={[
         {
           heading: "Listing",
           body: (
             <ul className={UL}>
               <li>
-                One card per position: its owner, its hub, original or clone, and a triangle with a count if challenged.
+                Each card shows one position: its owner, its hub, whether it is an original or a clone, and a triangle
+                showing how many challenges the position has faced.
               </li>
-              <li>Collateral, in the position&apos;s token.</li>
               <li>
-                Debt, the gross ZCHF minted. The wallet received less, because the reserve share and the interest for
-                the remaining term are taken at minting.
+                The card also shows the position&apos;s collateral in its own token and its debt in ZCHF. The debt is
+                the full amount minted. The wallet received less, because the reserve share and the interest for the
+                remaining term are taken when the ZCHF is minted.
               </li>
-              <li>An ended position shows its highest recorded collateral and debt, and how it ended.</li>
-              <li>Open positions show by default. Searching an owner shows every status.</li>
+              <li>A position that has ended shows its highest recorded collateral and debt, and how it ended.</li>
+              <li>
+                The listing shows open positions by default. Searching for an owner shows positions of every status.
+              </li>
             </ul>
           ),
         },
@@ -49,13 +53,16 @@ export default function InfoPage() {
           body: (
             <ul className={UL}>
               <li>
-                The card shows collateral, debt, liquidation price, interest, expiry and any running challenge, read
-                from the chain now.
+                The top card shows the position&apos;s collateral, debt, liquidation price, interest, expiry and any
+                running challenge, read from the chain now.
               </li>
               <li>
-                Lifetime flows show the ZCHF minted and repaid and the collateral deposited and withdrawn, day by day.
+                Lifetime flows show, day by day, how much ZCHF was minted and repaid and how much collateral was
+                deposited and withdrawn.
               </li>
-              <li>The timeline lists each event of the position, newest first. One transaction can record several.</li>
+              <li>
+                The timeline lists the position&apos;s events, newest first. One transaction can record several events.
+              </li>
             </ul>
           ),
         },
@@ -63,8 +70,8 @@ export default function InfoPage() {
           heading: "System page",
           body: (
             <p>
-              The ZCHF supply, the equity and reserve behind it, the base rate and opening fee, and the minting book
-              with every challenge and forced sale.{" "}
+              The system page shows the ZCHF supply, the equity and reserve behind it, the base rate and the opening
+              fee, and the list of minting positions, with every challenge and forced sale.{" "}
               <Link href="/ethereum/frankencoin/system" className={INLINE_LINK}>
                 See the system view
               </Link>
