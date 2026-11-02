@@ -107,8 +107,8 @@ export interface ProtocolInfoPageProps {
   search?: ReactNode;
   /** One sentence naming what a reader might expect here and will not find, shown beside the coverage door. Omit it when nothing is expected and missing. */
   notCovered?: string;
-  /** The protocol's name as the pointer line spells it. */
-  name: string;
+  /** Unused since the pointer line stopped naming the protocol (2 Nov 2026); each page still passes it until a later sweep removes it. */
+  name?: string;
   /** Slot 6: the official documentation, the page's final line. */
   docs: InfoDocLink;
 }
@@ -121,7 +121,6 @@ export function ProtocolInfoPage({
   views,
   search,
   notCovered,
-  name,
   docs,
 }: ProtocolInfoPageProps) {
   const chainId = protocolForSession(session)?.chainId ?? MAINNET_CHAIN_ID;
@@ -180,8 +179,8 @@ export function ProtocolInfoPage({
         )}
 
         <p className="mt-5" data-anatomy="I6">
-          An (i) on a card, panel or event explains its figures; the ? at the bottom right of the (i) panel opens what
-          that kind of event means in {name}, with sources.
+          Tap the (i) beside any figure to see where it comes from. Inside, the ? explains that kind of event in
+          general.
         </p>
       </div>
       <p className="mt-4 text-sm text-rb-500" data-anatomy="I3">
