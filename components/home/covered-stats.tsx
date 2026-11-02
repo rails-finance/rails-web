@@ -20,10 +20,10 @@ const COUNTED_SCOPE = launchedProductionChainNames();
  *
  * The all-time sum leads because it is the strongest claim in the band: it
  * counts every position each explorer has ever indexed, and no argument about
- * what is live today can move it. The value held in open positions (ui-jobs
- * 476) is the second block, right-aligned, and appears only when the whole
- * roster answered (value-held.ts). The open/closed split and the wallet clause
- * ride in the (i) note, not under the figures.
+ * what is live today can move it. The value held in open positions is the
+ * second block, right-aligned, and appears only when the whole roster answered
+ * (value-held.ts). The open/closed split and the wallet clause ride in the (i)
+ * note.
  *
  * The split was withheld until 2026-07-15 (server migrations 115/116 made
  * openness chain-rooted); CoveredPositions.openPositions carries that history and
@@ -111,13 +111,13 @@ export function CoveredStats({
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-      {/* Two blocks on one band (Miles, ui-jobs 476): the count on the left, the
+      {/* Two blocks on one band (Miles, 2 Nov 2026): the count on the left, the
           value on the right (stacked and left-aligned below `sm`). Each is a
           big figure with its own label in the hero subhead's voice (light,
           rb-500). The caption line that used to sit under the count now opens
-          from the (i) — see covered-stats-note.tsx. Each block wraps as a
-          unit rather than breaking mid-phrase. */}
-      <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1" data-anatomy="S3.1">
+          from the (i) — see covered-stats-note.tsx. Each block sets its label
+          under its figure. */}
+      <p className="flex flex-col items-start gap-y-1" data-anatomy="S3.1">
         <span className="text-foreground font-semibold leading-none tracking-tighter tabular-nums text-[clamp(36px,5.2vw,58px)]">
           {covered.totalPositions.toLocaleString("en-US")}
         </span>
@@ -128,7 +128,7 @@ export function CoveredStats({
       </p>
 
       {valueHeld && (
-        <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 sm:justify-end sm:text-right" data-anatomy="S3.2">
+        <p className="flex flex-col items-start gap-y-1 sm:items-end sm:text-right" data-anatomy="S3.2">
           <span
             className="text-foreground font-semibold leading-none tracking-tighter tabular-nums text-[clamp(36px,5.2vw,58px)]"
             aria-label={spokenUsd(valueHeld.totalUsd)}

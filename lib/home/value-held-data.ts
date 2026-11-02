@@ -26,6 +26,7 @@ type ValueHeldEnvelope = { success?: boolean; data?: ValueHeldData };
 
 const ROSTER = LAUNCHED_PROTOCOLS.map((p) => ({
   id: p.id,
+  slug: p.slug,
   protocolKey: p.protocolKey,
   chainId: p.chainId,
   label: p.label,

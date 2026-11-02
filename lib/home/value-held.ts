@@ -38,7 +38,14 @@ export type ValueHeldData = {
 };
 
 /** A launched explorer, as the settle rule needs it. */
-export type ValueHeldRoster = { id: string; protocolKey?: string; chainId: number; label: string; chainName: string }[];
+export type ValueHeldRoster = {
+  id: string;
+  slug: string;
+  protocolKey?: string;
+  chainId: number;
+  label: string;
+  chainName: string;
+}[];
 
 export type ValueHeldRow = {
   key: string;
@@ -62,7 +69,7 @@ export type ValueHeld = {
   /** Explorers left out of the figure, each with its reason. */
   notCounted: { label: string; chainName: string; reason: string }[];
   /** Counted explorers' notable left-out items. */
-  leftOut: { label: string; chainName: string; what: string; reason: string }[];
+  leftOut: { label: string; chainName: string; what: string; usd: number | null; reason: string }[];
   overlaps: string[];
 };
 
@@ -77,6 +84,36 @@ function inWords(source: string | null): string {
   return source.replace(/_/g, " ");
 }
 
+/** The server states each stale asset with its own age; the note reads them as one line. */
+const STALE = /older than the positions' block/;
+const STALE_REASON = "a stored price more than 24 hours older than the positions";
+
+/**
+ * One line per explorer and reason: "44 assets ($70.6M): a stored price more than
+ * 24 hours older than the positions". A single item keeps its own name.
+ */
+export function groupLeftOut(
+  label: string,
+  chainName: string,
+  items: ValueHeldExplorer["leftOut"],
+): ValueHeld["leftOut"] {
+  const groups = new Map<string, { whats: string[]; usd: number; priced: boolean }>();
+  for (const item of items) {
+    const reason = STALE.test(item.reason) ? STALE_REASON : item.reason;
+    const g = groups.get(reason) ?? { whats: [], usd: 0, priced: false };
+    g.whats.push(item.what);
+    if (isFiniteNumber(item.usd)) {
+      g.usd += item.usd;
+      g.priced = true;
+    }
+    groups.set(reason, g);
+  }
+  return [...groups].map(([reason, g]) => {
+    const what = g.whats.length === 1 ? g.whats[0] : `${g.whats.length} assets`;
+    return { label, chainName, what, usd: g.priced ? g.usd : null, reason };
+  });
+}
+
 /**
  * Settle the server's rows into the figure, or return null (with the reason
  * logged) when the response cannot back the claim.
@@ -87,11 +124,13 @@ export function settleValueHeld(data: ValueHeldData | null | undefined, roster: 
     return null;
   }
 
-  const rowsFor = (id: string, chainId: number) =>
-    data.explorers.filter((e) => e.protocol === id && e.chainId === chainId);
+  // The server names an explorer by its route slug and chain ("aave-v3" on 8453),
+  // the pair that is unique across the roster.
+  const rowsFor = (slug: string, chainId: number) =>
+    data.explorers.filter((e) => e.protocol === slug && e.chainId === chainId);
 
   // Every launched explorer must have an answer.
-  const missing = roster.filter((r) => rowsFor(r.id, r.chainId).length === 0);
+  const missing = roster.filter((r) => rowsFor(r.slug, r.chainId).length === 0);
   if (missing.length > 0) {
     console.error(`value-held: no row for ${missing.map((m) => `${m.id}@${m.chainId}`).join(", ")}`);
     return null;
@@ -103,28 +142,31 @@ export function settleValueHeld(data: ValueHeldData | null | undefined, roster: 
 
   const labelOfOwner = (owner: string | null): string | null => {
     if (!owner || owner === "own") return null;
-    const hit = roster.find((r) => r.id === owner) ?? roster.find((r) => r.protocolKey === owner);
+    const hit =
+      roster.find((r) => r.slug === owner && r.chainId === 1) ??
+      roster.find((r) => r.id === owner) ??
+      roster.find((r) => r.protocolKey === owner);
     return `${hit?.label ?? owner}'s oracle`;
   };
 
   for (const entry of roster) {
-    for (const row of rowsFor(entry.id, entry.chainId)) {
-      const label = row.surface === "vaults" && !/vault/i.test(entry.label) ? `${entry.label} vaults` : entry.label;
+    for (const row of rowsFor(entry.slug, entry.chainId)) {
+      const label = entry.label;
+      // "Morpho Blue Base vaults": the surface reads after the chain.
+      const chainName = row.surface === "vaults" ? `${entry.chainName} vaults` : entry.chainName;
       if (row.counted && isFiniteNumber(row.usd)) {
         counted.push({
           key: `${entry.id}:${row.surface ?? ""}`,
           label,
-          chainName: entry.chainName,
+          chainName,
           usd: row.usd,
           block: row.block,
           prices: inWords(row.priceSource),
           oracleOf: labelOfOwner(row.priceOracleOwner),
         });
-        for (const item of row.leftOut ?? []) {
-          leftOut.push({ label, chainName: entry.chainName, what: item.what, reason: item.reason });
-        }
+        leftOut.push(...groupLeftOut(label, chainName, row.leftOut ?? []));
       } else {
-        notCounted.push({ label, chainName: entry.chainName, reason: row.reason ?? "no figure stated" });
+        notCounted.push({ label, chainName, reason: row.reason ?? "no figure stated" });
       }
     }
   }

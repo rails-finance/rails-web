@@ -4,12 +4,12 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { settleValueHeld } from "../../lib/home/value-held.ts";
+import { groupLeftOut, settleValueHeld } from "../../lib/home/value-held.ts";
 
 const roster = [
-  { id: "aave-v3", chainId: 1, label: "Aave V3", chainName: "Ethereum" },
-  { id: "maple", chainId: 1, label: "Maple", chainName: "Ethereum" },
-  { id: "fluid", chainId: 1, label: "Fluid", chainName: "Ethereum" },
+  { id: "aave-v3", slug: "aave-v3", chainId: 1, label: "Aave V3", chainName: "Ethereum" },
+  { id: "maple", slug: "maple", chainId: 1, label: "Maple", chainName: "Ethereum" },
+  { id: "fluid", slug: "fluid", chainId: 1, label: "Fluid", chainName: "Ethereum" },
 ];
 const row = (protocol, o = {}) => ({
   protocol,
@@ -79,4 +79,40 @@ test("a counted row without a finite figure is not counted", () => {
   restore();
   assert.equal(v.rows.length, 1);
   assert.equal(v.notCounted[0].label, "Maple");
+});
+
+test("rows match on slug and chain; the vaults surface reads after the chain", () => {
+  const r = [{ id: "morpho-base", slug: "morpho", chainId: 8453, label: "Morpho Blue", chainName: "Base" }];
+  const v = settleValueHeld(
+    {
+      computedAt: "2026-11-02T00:00:00Z",
+      totalUsd: 50,
+      overlaps: [],
+      explorers: [
+        { ...row("morpho", { chainId: 8453, counted: false, usd: null, reason: "no price" }) },
+        { ...row("morpho", { chainId: 8453, surface: "vaults", usd: 50 }) },
+      ],
+    },
+    r,
+  );
+  assert.equal(v.rows[0].chainName, "Base vaults");
+  assert.deepEqual(v.notCounted, [{ label: "Morpho Blue", chainName: "Base", reason: "no price" }]);
+});
+
+test("stale assets read as one line per explorer", () => {
+  const lines = groupLeftOut("Spark", "Ethereum", [
+    { what: "LBTC", reason: "its price is 4.0 days older than the positions' block (the limit is 24 hours)", usd: 98 },
+    { what: "sDAI", reason: "its price is 4.3 days older than the positions' block (the limit is 24 hours)", usd: 2 },
+    { what: "SEAM", reason: "a constant", usd: null },
+  ]);
+  assert.deepEqual(lines, [
+    {
+      label: "Spark",
+      chainName: "Ethereum",
+      what: "2 assets",
+      usd: 100,
+      reason: "a stored price more than 24 hours older than the positions",
+    },
+    { label: "Spark", chainName: "Ethereum", what: "SEAM", usd: null, reason: "a constant" },
+  ]);
 });

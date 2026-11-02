@@ -125,11 +125,14 @@ function NoteBody({ value, caption }: { value: ValueHeld | null; caption: ReactN
               <Heading>Left out of counted explorers</Heading>
               <ul className="space-y-1 text-xs">
                 {value.leftOut.map((l) => (
-                  <li key={`${l.label}:${l.chainName}:${l.what}`}>
+                  <li key={`${l.label}:${l.chainName}:${l.reason}`}>
                     <span className="text-foreground">
                       {l.label} {l.chainName}
                     </span>
-                    : {l.what}. {l.reason}
+                    : {l.what}
+                    {l.usd !== null && l.usd >= 0.5 && (
+                      <span className="tabular-nums"> ({formatFlowUsd(l.usd)})</span>
+                    )}: {l.reason}
                   </li>
                 ))}
               </ul>
