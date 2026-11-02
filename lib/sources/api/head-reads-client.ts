@@ -29,6 +29,11 @@
 // (`route-gate.ts`). The head waits 3 s so that a slow api leaves a server
 // render's 8 s budget (`position-tail-page-data.ts`) time for the chain read.
 //
+// A build or an ISR render asks each round with `wait: 6000`: rails-server's
+// keyless gate holds the round up to 6 s for a slot before the paid leg, so a
+// build's burst of prerenders queues on the gateway. A request render sends no
+// `wait` (the server's 2 s). The round's 8 s timeout stays above the 6 s.
+//
 // SERVER-ONLY.
 
 import { decodeFunctionResult, encodeFunctionData, type Abi, type Hex, type PublicClient } from "viem";
@@ -38,6 +43,11 @@ import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { noteChainRead, noteServerHead } from "./server-head-stamps";
 import { ROUTE_WAIT_MS, routeGate } from "./route-gate";
+// Next's internal work store (not a public API; next 15.5.7). A Next upgrade that moves this
+// module fails the build at this import. One that keeps the module but drops
+// `isStaticGeneration` leaves it undefined: renderWait() then sends no wait and rails-server
+// keeps its 2 s default, so builds and ISR renders overflow to the paid leg sooner, as before.
+import { workAsyncStorage } from "next/dist/server/app-render/work-async-storage.external.js";
 
 const TIMEOUT_MS = 8_000;
 /** The head is one small cached answer: past this, the api is taken as down. */
@@ -50,6 +60,15 @@ const HEAD_REUSE_MS = 5_000;
 const MAX_ROUND_READS = 1_500;
 /** Under the route's 512 kb body limit, with room for the envelope. */
 const MAX_ROUND_CHARS = 480_000;
+/** A build's or ISR render's gate wait on rails-server (its clamp's top). */
+const STATIC_RENDER_WAIT_MS = 6_000;
+
+/** `{ wait }` for a build or an ISR render, else nothing. Next's work store marks both as static generation
+ *  (`isStaticGeneration`, next 15.5); the build phase covers a read outside a render's store. */
+function renderWait(): { wait?: number } {
+  if (process.env.NEXT_PHASE === "phase-production-build") return { wait: STATIC_RENDER_WAIT_MS };
+  return workAsyncStorage.getStore()?.isStaticGeneration ? { wait: STATIC_RENDER_WAIT_MS } : {};
+}
 
 type RawRead =
   | { kind: "call"; to: string; data: Hex; from?: string }
@@ -178,6 +197,7 @@ async function askRound(chainId: number, block: bigint, q: Pending[]) {
     chain: chainId,
     block: Number(block),
     reads,
+    ...renderWait(),
   });
   const ok =
     r != null &&
