@@ -19,6 +19,7 @@ import { BetaStrip } from "@/components/shared/beta-strip";
 import { WorkInProgressStrip } from "@/components/shared/work-in-progress-strip";
 import { StructuredData } from "@/components/StructuredData";
 import { SITE_URL, TWITTER_HANDLE } from "@/lib/shared/page-metadata";
+import { SITE_LEAD, SITE_METHOD } from "@/lib/shared/site-copy";
 import { Analytics } from "@vercel/analytics/next";
 
 const dmSans = DM_Sans({
@@ -88,7 +89,9 @@ const COVERAGE_PATHS = launchedProductionChains()
 // the share card say the door; the brand leads.
 const SITE_TITLE = "Rails - Look up a wallet";
 const OG_DESCRIPTION = `Look up a wallet by address or ENS name and see its DeFi positions. Rails explores ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia — every position replayed from the protocol's own on-chain events, with a receipt on every number.`;
-const SITE_DESCRIPTION = `Look up a wallet by address or ENS name and see its DeFi positions. Rails builds a dedicated explorer for each of ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia — browse every open position, not just your own. Every number is replayed from the protocol's own on-chain events, with a receipt showing where it came from. How deep each explorer goes is stated per protocol at ${COVERAGE_PATHS}.`;
+// Opens on /about's first two sentences (`lib/shared/site-copy.ts`, ui-jobs
+// 475), so a search summary built from it says what /about says.
+const SITE_DESCRIPTION = `${SITE_LEAD} ${SITE_METHOD} Look up any wallet by address or ENS name, or browse every open position. How deep each explorer goes is stated per protocol at ${COVERAGE_PATHS}.`;
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

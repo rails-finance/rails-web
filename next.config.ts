@@ -291,18 +291,11 @@ const nextConfig: NextConfig = {
         destination: "/ethereum/compound-v3?q=:slug",
         permanent: true,
       },
-      // "How It Works" merged into About, and About in turn merged into the
-      // home page ("What Rails Does" panel; the Technical Architecture tab
-      // became /about/architecture, which stays). Preserve inbound bookmarks
-      // for both retired pages by sending them home.
+      // "How It Works" merged into About. /about is a page again (ui-jobs 475),
+      // so the retired page's bookmarks land there.
       {
         source: "/how-it-works",
-        destination: "/",
-        permanent: true,
-      },
-      {
-        source: "/about",
-        destination: "/",
+        destination: "/about",
         permanent: true,
       },
       // Compound V3's Ethereum markets page is /markets; Base's is /market
