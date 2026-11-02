@@ -1,45 +1,11 @@
-// About this explorer — the intro prose that lived behind the listing's (i)
-// drawer, now a page of its own on the rail's sub-nav. The copy is the swept
-// intro (charter §8a), reframed for a standalone page; the anatomy lives in ProtocolInfoShell.
+// About this explorer — Compound V3 on Base. The page is the shared Compound V3 info
+// component (components/protocol/compound-v3/compound-v3-info.tsx).
 
-import Link from "next/link";
-import { ProtocolInfoShell } from "@/components/shared/protocol-info-page";
+import { CompoundV3InfoPage } from "@/components/protocol/compound-v3/compound-v3-info";
 import { infoMetadata } from "@/lib/shared/page-metadata";
-import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("compound-base");
 
-const intro = (
-  <>
-    <p>
-      Compound V3&rsquo;s Base deployment runs each of its five markets as its own world: one base asset that is both
-      the lending side and the borrowing side, backed by a short roster of collateral assets, nothing shared between
-      markets — and nothing shared with the Ethereum markets of the same names.
-    </p>
-    <p>
-      Each row of the listing is one position: one wallet&apos;s account in one market (Compound calls each market a
-      Comet), with base supplied or borrowed and collateral posted, every figure read from that market&rsquo;s contract
-      at the block the row names, with dollar values from the feeds the market liquidates with. Opening a row shows that
-      position with its whole history; the wallet&rsquo;s own page holds one card per market it has touched. Or{" "}
-      <Link href="/base/compound-v3/market" className={INLINE_LINK}>
-        see each market and how heavily it is lent out
-      </Link>
-      .
-    </p>
-    <BaseLendingCoverageNote
-      route="/api/compound-base/coverage"
-      unreadListed={false}
-      subject="these five markets"
-      subjectPossessive="the earliest market’s"
-      noun="position"
-    />
-    <p>
-      The listing&rsquo;s filters narrow that count; its footer states how many positions the current filters match.
-    </p>
-  </>
-);
-
 export default function InfoPage() {
-  return <ProtocolInfoShell session="compound-base">{intro}</ProtocolInfoShell>;
+  return <CompoundV3InfoPage deployment="base" />;
 }
