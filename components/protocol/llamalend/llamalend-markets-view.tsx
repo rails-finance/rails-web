@@ -42,7 +42,7 @@ import {
   type LlamalendMarketCoords,
 } from "@/lib/llamalend/markets-provenance";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { serverReadAt, type ServerRead } from "@/lib/shared/server-head-read";
+import { serverReadAt, serverReadVia, type ServerRead } from "@/lib/shared/server-head-read";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { VitalsBand } from "@/components/shared/vitals-band";
 import { shortAddress, FACTORY_LABEL, LLAMALEND_ADDRESSES } from "@/lib/llamalend/asset-catalog";
@@ -307,6 +307,7 @@ export function LlamalendMarketsStamp({ data }: { data: LlamalendMarketsResponse
         V2
       </a>
       ) · prices from each market&rsquo;s own oracle
+      {serverReadVia(data.head)}
     </p>
   );
 }

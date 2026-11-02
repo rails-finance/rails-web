@@ -48,7 +48,7 @@ import { ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { shortAddress, DOLOMITE_ADDRESSES, formatDolomitePrice } from "@/lib/dolomite/asset-catalog";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { serverReadAt, type ServerRead } from "@/lib/shared/server-head-read";
+import { serverReadAt, serverReadVia, type ServerRead } from "@/lib/shared/server-head-read";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { VitalsBand } from "@/components/shared/vitals-band";
 import {
@@ -279,6 +279,7 @@ export function DolomiteMarketsStamp({ data }: { data: DolomiteMarketsResponse }
         DolomiteMargin
       </a>{" "}
       itself
+      {serverReadVia(data.head)}
       {data.risk.overrideSetter && (
         <>
           {" "}
