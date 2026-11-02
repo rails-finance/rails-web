@@ -9,7 +9,7 @@
 
 import type { ReactNode } from "react";
 import { RevealTip } from "./reveal-tip";
-import { formatExact, formatNumber, formatTinyNonZero, isFloorText } from "@/lib/utils/format";
+import { formatExact, formatNumber, formatTinyNonZero, groupDigits, isFloorText } from "@/lib/utils/format";
 import { formatCompact, formatHeadlineAmount } from "@/lib/shared/format-compact";
 
 type AmountFormat = "number" | "compact" | "headline" | "tiny";
@@ -48,7 +48,7 @@ export function ExactTip({
   label?: string;
 }) {
   if (!always && !(typeof text === "string" && isFloorText(text))) return <>{text}</>;
-  const full = symbol ? `${exact} ${symbol}` : exact;
+  const full = groupDigits(symbol ? `${exact} ${symbol}` : exact);
   return (
     <RevealTip tip={full} label={label ?? full} className={className}>
       {text}
@@ -79,7 +79,7 @@ export function AmountText({
  *  decimal in the tooltip on every line, and on the provenance capture
  *  (data-prov-exact / data-prov-symbol). */
 export function ExactSpan({ exact, symbol, children }: { exact: string; symbol: string; children: ReactNode }) {
-  const full = `${exact} ${symbol}`;
+  const full = groupDigits(`${exact} ${symbol}`);
   return (
     <RevealTip tip={full} label={full}>
       <span data-prov-exact={exact} data-prov-symbol={symbol}>

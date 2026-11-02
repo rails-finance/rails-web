@@ -113,7 +113,7 @@ export const DOLOMITE_SORT_OPTIONS: SortOption[] = [
 const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "open", label: "Open" },
   { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
+  { value: "liquidated", label: "Liquidated and closed" },
 ];
 
 const ACCOUNT_KIND_OPTIONS: FilterOptionDef[] = [
