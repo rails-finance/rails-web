@@ -6,6 +6,7 @@
 // string the prose writer cannot see (`pnpm check:prose` fails on one).
 
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
+import type { InfoTerm } from "@/components/shared/protocol-info-page";
 import { eventProseEngine } from "@/lib/shared/event-prose/engine";
 import type { ModalData, ModalLink, ProseFile, Words } from "@/lib/shared/event-prose/types";
 import type { LiquityV1EchoKey } from "@/lib/liquity-v1/event-prose";
@@ -29,7 +30,7 @@ interface LiquityV1ProseFile extends ProseFile<LiquityV1L5Key> {
   words: Words;
   position_words: Words;
   doc_urls: Words;
-  info: ModalData;
+  glossary: { bold: string; text: string; sources: ModalLink[] }[];
   claim_links: ModalLink[];
 }
 
@@ -69,9 +70,13 @@ export function liquityV1PositionModal(status: "open" | "closed" | "liquidated",
   return liquityV1Modal("position_open");
 }
 
-/** The info page's "About Liquity V1". */
-export function liquityV1InfoModal(): LearnMoreContent {
-  return PROSE.modal(FILE.info);
+/** The info page's glossary: each term with its definition and the FAQ pages it rests on. */
+export function liquityV1Glossary(): [InfoTerm, ...InfoTerm[]] {
+  const terms = FILE.glossary.map((d): InfoTerm => {
+    const [first, ...rest] = d.sources.map((l) => ({ label: l.label, href: PROSE.linkUrl(l) }));
+    return { term: d.bold, definition: d.text, sources: [first, ...rest] };
+  });
+  return terms as [InfoTerm, ...InfoTerm[]];
 }
 
 /** The Quick Links of the shared "Claim collateral" modal on a Liquity V1

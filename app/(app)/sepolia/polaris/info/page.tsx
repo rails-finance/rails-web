@@ -1,10 +1,10 @@
 // About this explorer — the intro prose on the rail's sub-nav. The anatomy
-// lives in ProtocolInfoPage; this file is the copy (Miles's text, 16 Oct 2026,
+// lives in ProtocolInfoShell; this file is the copy (Miles's text, 16 Oct 2026,
 // in the Liquity V2 page's shape). It is also where the assets are explained:
 // the card's tooltips no longer carry it (ui-jobs 356).
 
 import Link from "next/link";
-import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
+import { ProtocolInfoShell } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { POLARIS_MARKETS_PATH } from "@/lib/polaris/routes";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -98,5 +98,5 @@ const intro = (
 );
 
 export default function InfoPage() {
-  return <ProtocolInfoPage session="polaris">{intro}</ProtocolInfoPage>;
+  return <ProtocolInfoShell session="polaris">{intro}</ProtocolInfoShell>;
 }

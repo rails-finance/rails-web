@@ -1,7 +1,7 @@
 // About this explorer — the rail's (i) page.
 
 import Link from "next/link";
-import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
+import { ProtocolInfoShell } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -32,5 +32,5 @@ const intro = (
 );
 
 export default function InfoPage() {
-  return <ProtocolInfoPage session="aave-v3-arbitrum">{intro}</ProtocolInfoPage>;
+  return <ProtocolInfoShell session="aave-v3-arbitrum">{intro}</ProtocolInfoShell>;
 }

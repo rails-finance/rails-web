@@ -2,7 +2,7 @@
 // page, in the shape of the other Base explorers' (charter §8a).
 
 import Link from "next/link";
-import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
+import { ProtocolInfoShell } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -37,5 +37,5 @@ const intro = (
 );
 
 export default function InfoPage() {
-  return <ProtocolInfoPage session="aave-v4-base">{intro}</ProtocolInfoPage>;
+  return <ProtocolInfoShell session="aave-v4-base">{intro}</ProtocolInfoShell>;
 }

@@ -1235,65 +1235,45 @@ claim_links:
       How much collateral can a Recovery Mode liquidation take?
     doc: RECOVERY_CAP
 
-# ── The info page (/ethereum/liquity-v1/info, zone Z5): the protocol and its terms ──
-info:
-  title: |-
-    About Liquity V1
-  intro: |-
-    Liquity V1 is a borrowing protocol on Ethereum, launched in 2021 and not upgradeable. Borrowers lock ETH and mint LUSD against it, with no interest. Four mechanisms keep LUSD backed: a minimum collateral ratio, liquidation into the Stability Pool, redemptions, and Recovery Mode.
-  detailsHeading: |-
-    Terms:
-  details:
-    - bold: |-
-        Trove
-      text: |-
-        one borrower's loan: the ETH they deposited and the LUSD debt against it. One address holds one Trove at a time; each Trove it opens after closing one is a new life on this explorer.
-      sources: [{ label: "Borrowing FAQ", doc: FAQ_BORROWING }]
-    - bold: |-
-        LUSD
-      text: |-
-        the dollar stablecoin a Trove mints. Anyone can redeem LUSD for $1 of ETH from the Troves, which keeps its price near a dollar.
-      sources: [{ label: "Liquity V1 FAQ", doc: FAQ_GENERAL }]
-    - bold: |-
-        Collateral ratio
-      text: |-
-        the ETH's dollar value at the protocol's price, divided by the LUSD debt. Below 110% a Trove can be liquidated.
-      sources: [{ label: "Borrowing FAQ", doc: FAQ_BORROWING }]
-    - bold: |-
-        Stability Pool
-      text: |-
-        a pool of LUSD deposited by anyone. When a Trove is liquidated, the pool's LUSD clears its debt and the depositors receive its ETH, worth up to 10% more than the LUSD they gave up.
-      sources: [{ label: "Stability Pool and liquidations FAQ", doc: FAQ_LIQUIDATIONS }]
-    - bold: |-
-        Redemption
-      text: |-
-        swapping LUSD for ETH at $1 per LUSD. The LUSD cancels debt in the lowest-ratio Troves first, and ETH of equal value leaves them to the redeemer.
-      sources: [{ label: "Redemptions FAQ", doc: FAQ_REDEMPTIONS }]
-    - bold: |-
-        Recovery Mode
-      text: |-
-        the state the system enters when the total collateral ratio of all Troves falls below 150%. Troves below the system ratio can then be liquidated, and withdrawals and new debt are restricted until the ratio recovers.
-      sources: [{ label: "Recovery Mode FAQ", doc: FAQ_RECOVERY }]
-    - bold: |-
-        Fees
-      text: |-
-        a one-time borrowing fee on each draw (0.5% to 5%) and a redemption fee paid by redeemers. Both rise after redemptions and fall back over time.
-      sources: [{ label: "Borrowing FAQ", doc: FAQ_BORROWING }, { label: "Redemptions FAQ", doc: FAQ_REDEMPTIONS }]
-    - bold: |-
-        Liquidation reserve
-      text: |-
-        200 LUSD of every Trove's debt is minted to the reserve pool (Liquity's gas pool) when it opens. It stays part of the debt: closing repays the debt less 200 LUSD and the reserve is burned; a full redemption burns it too; a liquidation pays it to the liquidator.
-      sources: [{ label: "Borrowing FAQ", doc: FAQ_BORROWING }]
-  links:
-    - label: |-
-        Liquity V1 FAQ
-      doc: FAQ_GENERAL
-    - label: |-
-        Borrowing FAQ
-      doc: FAQ_BORROWING
-    - label: |-
-        Stability Pool and liquidations FAQ
-      doc: FAQ_LIQUIDATIONS
-    - label: |-
-        Recovery Mode FAQ
-      doc: FAQ_RECOVERY
+# ── The info page (/ethereum/liquity-v1/info, zone Z5): the glossary under its opening ──
+glossary:
+  - bold: |-
+      Trove
+    text: |-
+      one borrower's loan, made of the ETH they deposited and the LUSD debt against it. One address holds one Trove at a time; each Trove it opens after closing one is a new life on this explorer.
+    sources: [{ label: "Borrowing FAQ", doc: FAQ_BORROWING }]
+  - bold: |-
+      LUSD
+    text: |-
+      the dollar stablecoin a Trove mints. Anyone can redeem LUSD for $1 of ETH from the Troves, which keeps its price near a dollar.
+    sources: [{ label: "Liquity V1 FAQ", doc: FAQ_GENERAL }]
+  - bold: |-
+      Collateral ratio
+    text: |-
+      the ETH's dollar value at the protocol's price, divided by the LUSD debt. Below 110% a Trove can be liquidated.
+    sources: [{ label: "Borrowing FAQ", doc: FAQ_BORROWING }]
+  - bold: |-
+      Stability Pool
+    text: |-
+      a pool of LUSD deposited by anyone. When a Trove is liquidated, the pool's LUSD clears its debt and the depositors receive its ETH, worth up to 10% more than the LUSD they gave up.
+    sources: [{ label: "Stability Pool and liquidations FAQ", doc: FAQ_LIQUIDATIONS }]
+  - bold: |-
+      Redemption
+    text: |-
+      swapping LUSD for ETH at $1 per LUSD. The LUSD cancels debt in the lowest-ratio Troves first, and ETH of equal value leaves them to the redeemer.
+    sources: [{ label: "Redemptions FAQ", doc: FAQ_REDEMPTIONS }]
+  - bold: |-
+      Recovery Mode
+    text: |-
+      the state the system enters when the total collateral ratio of all Troves falls below 150%. Troves below the system ratio can then be liquidated, and withdrawals and new debt are restricted until the ratio recovers.
+    sources: [{ label: "Recovery Mode FAQ", doc: FAQ_RECOVERY }]
+  - bold: |-
+      Fees
+    text: |-
+      a one-time borrowing fee on each draw (0.5% to 5%) and a redemption fee paid by redeemers. Both rise after redemptions and fall back over time.
+    sources: [{ label: "Borrowing FAQ", doc: FAQ_BORROWING }, { label: "Redemptions FAQ", doc: FAQ_REDEMPTIONS }]
+  - bold: |-
+      Liquidation reserve
+    text: |-
+      200 LUSD of every Trove's debt is minted to the reserve pool (Liquity's gas pool) when it opens. It stays part of the debt: closing repays the debt less 200 LUSD and the reserve is burned; a full redemption burns it too; a liquidation pays it to the liquidator.
+    sources: [{ label: "Borrowing FAQ", doc: FAQ_BORROWING }]
