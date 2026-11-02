@@ -31,6 +31,8 @@ import { protocolsForChain, protocolForPathname, type ProtocolEntry } from "@/li
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
+import { HomeOnlyChainGlyph } from "@/components/icons/chain-glyphs";
+import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-soon";
 
 // Row state grammar, same as the nav menu's:
 //   rest    → text-foreground; hover → blue-500 ("this goes somewhere")
@@ -99,6 +101,13 @@ export function ChainSwitcher({ variant }: { variant: "chain" | "cta" }) {
   const [selectedId, setSelectedId] = useState<ChainId>(activeChain?.id ?? MAINNET_CHAIN_ID);
   const selectedChain = CHAINS[selectedId] ?? CHAINS[MAINNET_CHAIN_ID];
   const selectedEntries = protocolsForChain(selectedChain.id);
+  // Robinhood: a chain row with no explorers yet. Selecting it shows the
+  // coming-soon line in place of the roster (components/shared/robinhood-soon).
+  const [robinhood, setRobinhood] = useState(false);
+  const selectChain = (id: ChainId) => {
+    setSelectedId(id);
+    setRobinhood(false);
+  };
 
   useEffect(() => {
     const checkMobile = () => {
@@ -134,7 +143,10 @@ export function ChainSwitcher({ variant }: { variant: "chain" | "cta" }) {
       const next = !v;
       // Opening re-anchors the selection to where the reader is; a selection
       // left over from browsing the panel earlier would be stale context.
-      if (next) setSelectedId(activeChain?.id ?? MAINNET_CHAIN_ID);
+      if (next) {
+        setSelectedId(activeChain?.id ?? MAINNET_CHAIN_ID);
+        setRobinhood(false);
+      }
       return next;
     });
   const close = () => setIsOpen(false);
@@ -190,11 +202,11 @@ export function ChainSwitcher({ variant }: { variant: "chain" | "cta" }) {
           <div className="w-[185px] shrink-0 space-y-0.5 border-r border-rb-200 pr-3 dark:border-rb-800">
             {chains.map((chain) => {
               const count = protocolsForChain(chain.id).length;
-              const selected = chain.id === selectedChain.id;
+              const selected = !robinhood && chain.id === selectedChain.id;
               return (
                 <button
                   key={chain.id}
-                  onClick={() => setSelectedId(chain.id)}
+                  onClick={() => selectChain(chain.id)}
                   aria-pressed={selected}
                   className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm transition-colors ${
                     selected
@@ -210,22 +222,48 @@ export function ChainSwitcher({ variant }: { variant: "chain" | "cta" }) {
                 </button>
               );
             })}
+            <button
+              onClick={() => setRobinhood(true)}
+              aria-pressed={robinhood}
+              data-switcher-robinhood=""
+              className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+                robinhood
+                  ? "bg-rb-100 font-semibold text-foreground dark:bg-rb-800"
+                  : "font-medium text-foreground hover:text-blue-500"
+              }`}
+            >
+              <HomeOnlyChainGlyph id="robinhood" className="h-5 w-5" />
+              <span>{ROBINHOOD_LABEL}</span>
+            </button>
           </div>
           <div className="min-w-0 flex-1 pl-3">
-            <div className="grid grid-cols-2 gap-x-3">
-              {selectedEntries.map((entry) => (
-                <ExplorerRow key={entry.id} entry={entry} isActive={activeEntry?.id === entry.id} onNavigate={close} />
-              ))}
-            </div>
-            <div className="mt-2 border-t border-rb-200 px-2 pt-2.5 dark:border-rb-800">
-              <Link
-                href={`/coverage/${selectedChain.slug}`}
-                onClick={close}
-                className="text-xs text-rb-500 transition-colors hover:text-blue-500"
-              >
-                See detailed {selectedChain.name} coverage →
-              </Link>
-            </div>
+            {robinhood ? (
+              <p className="px-2 py-2 text-sm leading-relaxed text-rb-500">
+                <RobinhoodSoon />
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-x-3">
+                  {selectedEntries.map((entry) => (
+                    <ExplorerRow
+                      key={entry.id}
+                      entry={entry}
+                      isActive={activeEntry?.id === entry.id}
+                      onNavigate={close}
+                    />
+                  ))}
+                </div>
+                <div className="mt-2 border-t border-rb-200 px-2 pt-2.5 dark:border-rb-800">
+                  <Link
+                    href={`/coverage/${selectedChain.slug}`}
+                    onClick={close}
+                    className="text-xs text-rb-500 transition-colors hover:text-blue-500"
+                  >
+                    See detailed {selectedChain.name} coverage →
+                  </Link>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -243,39 +281,58 @@ export function ChainSwitcher({ variant }: { variant: "chain" | "cta" }) {
               className="mb-3 flex shrink-0 rounded-md bg-sunken p-0.5 text-xs font-semibold"
               data-switcher-tabs=""
             >
+              {/* Five tabs: below 430px the glyphs drop so every label fits. */}
               {chains.map((chain) => {
-                const selected = chain.id === selectedChain.id;
+                const selected = !robinhood && chain.id === selectedChain.id;
                 return (
                   <button
                     key={chain.id}
                     type="button"
                     role="tab"
                     aria-selected={selected}
-                    onClick={() => setSelectedId(chain.id)}
+                    onClick={() => selectChain(chain.id)}
                     className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded px-2 ${
                       selected ? "bg-background text-foreground" : "text-rb-500"
                     }`}
                   >
-                    <ChainGlyph chainId={chain.id} className="h-4 w-4" />
+                    <ChainGlyph chainId={chain.id} className="h-4 w-4 max-[430px]:hidden" />
                     {chain.name}
                   </button>
                 );
               })}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={robinhood}
+                onClick={() => setRobinhood(true)}
+                className={`flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded px-2 ${
+                  robinhood ? "bg-background text-foreground" : "text-rb-500"
+                }`}
+              >
+                <HomeOnlyChainGlyph id="robinhood" className="h-4 w-4 max-[430px]:hidden" />
+                {ROBINHOOD_LABEL}
+              </button>
             </div>
           }
         >
-          <nav role="tabpanel" aria-label={selectedChain.name} className="space-y-0.5">
-            {selectedEntries.map((entry) => (
-              <ExplorerRow key={entry.id} entry={entry} isActive={activeEntry?.id === entry.id} onNavigate={close} />
-            ))}
-            <Link
-              href={`/coverage/${selectedChain.slug}`}
-              onClick={close}
-              className="mt-1.5 inline-block px-2 pt-1 text-xs text-rb-500 transition-colors hover:text-blue-500"
-            >
-              See detailed {selectedChain.name} coverage →
-            </Link>
-          </nav>
+          {robinhood ? (
+            <p role="tabpanel" aria-label={ROBINHOOD_LABEL} className="px-2 py-2 text-sm leading-relaxed text-rb-500">
+              <RobinhoodSoon />
+            </p>
+          ) : (
+            <nav role="tabpanel" aria-label={selectedChain.name} className="space-y-0.5">
+              {selectedEntries.map((entry) => (
+                <ExplorerRow key={entry.id} entry={entry} isActive={activeEntry?.id === entry.id} onNavigate={close} />
+              ))}
+              <Link
+                href={`/coverage/${selectedChain.slug}`}
+                onClick={close}
+                className="mt-1.5 inline-block px-2 pt-1 text-xs text-rb-500 transition-colors hover:text-blue-500"
+              >
+                See detailed {selectedChain.name} coverage →
+              </Link>
+            </nav>
+          )}
         </MobileSheet>
       )}
     </div>

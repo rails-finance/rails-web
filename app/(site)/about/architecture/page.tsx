@@ -11,7 +11,7 @@ const SHARE = {
 export const metadata: Metadata = {
   title: "Technical Architecture",
   description:
-    "The multi-layer architecture behind Rails — Sieve indexer, RabbitMQ, processors and materialized views, the chain-state refresher, and the API and frontend that serve it.",
+    "The multi-layer architecture behind Rails: the Sieve indexer, RabbitMQ, processors and materialized views, the chain-state refresher, the API and frontend, and the vault position census.",
   openGraph: {
     ...SHARE,
     url: `${SITE_URL}/about/architecture`,

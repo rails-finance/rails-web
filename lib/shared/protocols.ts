@@ -715,11 +715,16 @@ export const LAUNCHED_PROTOCOL_VERSIONS: ProtocolEntry[] = (() => {
   return versions;
 })();
 
-/** "23" — the number of distinct DeFi protocol versions Rails has a launched
- *  explorer for, which is what the home/SEO/share copy states. NOT
- *  `LAUNCHED_PROTOCOLS.length` (29): that counts one row per chain deployment,
- *  so it double-counts a version on two chains — see `LAUNCHED_PROTOCOL_VERSIONS`. */
-export const LAUNCHED_PROTOCOL_VERSION_COUNT = LAUNCHED_PROTOCOL_VERSIONS.length;
+/** The distinct DeFi protocol versions Rails has a launched explorer for on a
+ *  PRODUCTION chain (24 on 2 Nov 2026): the count the home/SEO/share copy
+ *  states as "N DeFi protocols on Ethereum, Base, and Arbitrum, plus Polaris
+ *  on Sepolia". Testnet explorers are left out because that sentence names
+ *  Polaris in words; counting it too would count it twice (ui-jobs 475). One
+ *  row per version (see `LAUNCHED_PROTOCOL_VERSIONS`), so a version on two
+ *  chains counts once. */
+export const LAUNCHED_PRODUCTION_PROTOCOL_VERSION_COUNT = LAUNCHED_PROTOCOL_VERSIONS.filter(
+  (p) => !CHAINS[p.chainId].testnet,
+).length;
 
 /** Is this route inside an unlaunched explorer? Takes any path under one — the
  *  listing, a sub-page, a vault, a position, an event — so a surface that has

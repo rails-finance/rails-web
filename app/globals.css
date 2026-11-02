@@ -1350,6 +1350,18 @@ label[for] {
   stroke-dashoffset: 1;
   animation: line-draw 5s ease-out forwards;
   animation-delay: var(--hero-line-delay, 0s);
+  animation-play-state: paused;
+}
+/* TrackLines sets data-playing when the graphic first scrolls into view; with
+   scripting off nothing would ever set it, so those visitors get the draw-on
+   from load. */
+.track-lines[data-playing] .hero-track-line {
+  animation-play-state: running;
+}
+@media (scripting: none) {
+  .hero-track-line {
+    animation-play-state: running;
+  }
 }
 [data-hero-seen="1"] .animate-hero-fade-up {
   opacity: 1;

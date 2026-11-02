@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { GraduationCap, Wallet, Code2, ShieldAlert } from "lucide-react";
 import { CoveredStats } from "@/components/home/covered-stats";
 import { HomeHero } from "@/components/home/home-hero";
 import { LiveExampleFrame } from "@/components/home/live-example-frame";
@@ -7,10 +6,12 @@ import { ProtocolRow } from "@/components/home/protocol-row";
 import { StageRail } from "@/components/home/stage-rail";
 import { TrackLines } from "@/components/home/track-lines";
 import { TeamSection } from "@/components/shared/team-section";
+import { AudienceGrid } from "@/components/shared/audience";
 import { getLiveExampleData } from "@/lib/home/live-example-data";
 import { packLiveExample } from "@/lib/home/live-example-wire";
 import { getCoveredPositions } from "@/lib/home/covered-positions-data";
 import { getHomeStats } from "@/lib/home/home-stats-data";
+import { getValueHeld } from "@/lib/home/value-held-data";
 
 // ISR — the page (and the live-example trove data fetched below) regenerates
 // in the background at most hourly; every visitor gets the static render.
@@ -24,10 +25,11 @@ export default async function Home() {
   // Independent legs — the hero count, the live-example trove, and the
   // overview stats each hit a different roster/endpoint, so fetch them
   // concurrently rather than stacking their latency.
-  const [liveExample, covered, stats] = await Promise.all([
+  const [liveExample, covered, stats, valueHeld] = await Promise.all([
     getLiveExampleData(),
     getCoveredPositions(),
     getHomeStats(),
+    getValueHeld(),
   ]);
   return (
     <div className="min-h-screen">
@@ -60,7 +62,7 @@ export default async function Home() {
             it reads off both: the position above was one of these, the tiles
             below are the protocols named. */}
         <section className="pb-12" data-anatomy="S3">
-          <CoveredStats covered={covered} stats={stats} />
+          <CoveredStats covered={covered} stats={stats} valueHeld={valueHeld} />
         </section>
 
         {/* Track lines graphic — the animated stripes bridge the counted
@@ -103,48 +105,7 @@ export default async function Home() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 mb-5">
-                <GraduationCap className="h-[18px] w-[18px] text-rb-500 shrink-0" aria-hidden="true" />
-                <p className="text-xs font-medium tracking-[0.12em] uppercase text-rb-500">The DeFi Curious</p>
-              </div>
-              <p className="body-text flex-1 mb-6">
-                <span className="font-semibold text-foreground">Learn by example.</span> See how DeFi works through real
-                positions, before you risk any of your own money.
-              </p>
-            </div>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 mb-5">
-                <Wallet className="h-[18px] w-[18px] text-rb-500 shrink-0" aria-hidden="true" />
-                <p className="text-xs font-medium tracking-[0.12em] uppercase text-rb-500">The Active DeFi User</p>
-              </div>
-              <p className="body-text flex-1 mb-6">
-                <span className="font-semibold text-foreground">Stay on top of positions.</span> Collateral, debt and
-                liquidation risk, explained in plain language so you know exactly where you stand.
-              </p>
-            </div>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 mb-5">
-                <Code2 className="h-[18px] w-[18px] text-rb-500 shrink-0" aria-hidden="true" />
-                <p className="text-xs font-medium tracking-[0.12em] uppercase text-rb-500">DeFi Teams</p>
-              </div>
-              <p className="body-text flex-1 mb-6">
-                <span className="font-semibold text-foreground">Support your users.</span> Give them an independent,
-                verifiable view of their positions, with full coverage of your protocol.
-              </p>
-            </div>
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2 mb-5">
-                <ShieldAlert className="h-[18px] w-[18px] text-rb-500 shrink-0" aria-hidden="true" />
-                <p className="text-xs font-medium tracking-[0.12em] uppercase text-rb-500">Crisis Support</p>
-              </div>
-              <p className="body-text flex-1 mb-6">
-                <span className="font-semibold text-foreground">When frontends fail.</span> Your position lives on the
-                chain, not on a protocol&apos;s servers, so Rails can still show it when their site goes dark.
-              </p>
-            </div>
-          </div>
+          <AudienceGrid />
         </div>
       </div>
 
@@ -219,7 +180,7 @@ function GetInTouch() {
             Arbitrary value rather than max-w-prose: that's Tailwind's 65ch
             default and this repo's @theme doesn't override --container-prose. */}
         <p className="body-text max-w-[55ch]">
-          Rails is open infrastructure for DeFi. Built as a public good. If you&apos;re a protocol team or a funder,
+          Rails is open infrastructure for DeFi. If you&apos;re a protocol team or interested in learning more,
           we&apos;d love to hear from you.
         </p>
         <p className="body-text max-w-[55ch] mt-2">
