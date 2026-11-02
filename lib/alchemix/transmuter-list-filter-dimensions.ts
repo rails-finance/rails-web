@@ -60,7 +60,7 @@ const ANY_LINE: SortOption[] = [
   { value: "created", label: "Created" },
   { value: "nftId", label: "Position id" },
 ];
-const ONE_LINE: SortOption[] = [...ANY_LINE, { value: "amount", label: "Amount staked" }];
+const ONE_LINE: SortOption[] = [...ANY_LINE, { value: "amount", label: "Amount deposited" }];
 
 export function transmuterSortOptions(f: TransmuterListFilters): SortOption[] {
   return f.line.length === 1 ? ONE_LINE : ANY_LINE;
