@@ -3,7 +3,7 @@
 // content/frankencoin/event-prose.yaml.
 
 import Link from "next/link";
-import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
+import { GlossaryLink, ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { frankencoinGlossary } from "@/lib/frankencoin/event-templates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -17,14 +17,34 @@ export default function InfoPage() {
     <ProtocolInfoPage
       session="frankencoin"
       name="Frankencoin"
-      tracks="The Rails Frankencoin explorer shows every position that has minted Frankencoin (ZCHF) on Ethereum, whether still open or closed, and the full history of each one. It also shows the system as a whole: its equity reserve and every challenge raised against a position."
+      tracks={
+        <>
+          The Rails Frankencoin explorer shows every position that has minted Frankencoin (ZCHF) on Ethereum, whether
+          still open or closed, and the full history of each one. It also shows{" "}
+          <Link href="/ethereum/frankencoin/system" className={INLINE_LINK}>
+            the system as a whole
+          </Link>
+          : its equity reserve and every challenge raised against a position.
+        </>
+      }
       notCovered="Frankencoin savings, governance and ZCHF on other chains aren't covered here."
       glossary={frankencoinGlossary()}
       howItWorks={[
-        "Frankencoin has no price oracle, so no outside service tells it what collateral is worth. Each position's owner declares a liquidation price, and anyone who thinks that price is too high can start a challenge by putting up collateral.",
+        <>
+          Frankencoin has no price oracle, so no outside service tells it what collateral is worth. Each position&apos;s
+          owner declares a <GlossaryLink term="Liquidation price">liquidation price</GlossaryLink>, and anyone who
+          thinks that price is too high can start a <GlossaryLink term="Challenge">challenge</GlossaryLink> by putting
+          up collateral.
+        </>,
         "Rails shows no dollar value and no health factor, which is a single score of how close a position is to liquidation, because the protocol has neither. Collateral appears in its own token and debt in ZCHF.",
-        "A position can mint ZCHF up to the value of its collateral at its liquidation price. A minting limit also caps the total that an original and its clones can mint.",
-        "A position ends when its owner repays it, when a challenge sells its collateral, when it is vetoed, or when a forced sale follows its expiry.",
+        <>
+          A position can mint ZCHF up to the value of its collateral at its liquidation price. A minting limit also caps
+          the total that an <GlossaryLink term="Original and clone">original and its clones</GlossaryLink> can mint.
+        </>,
+        <>
+          A position ends when its owner repays it, when a challenge sells its collateral, when it is vetoed, or when a{" "}
+          <GlossaryLink term="Forced sale">forced sale</GlossaryLink> follows its expiry.
+        </>,
       ]}
       search="You can search by owner address. The listing filters by status, collateral, hub, history, debt and transactions, and sorts by recent activity, debt or collateral."
       views={[
