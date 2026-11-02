@@ -45,7 +45,7 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Vow",
     definition:
-      "The Vow is Sky's surplus account. Borrowers pay their stability fees into it, and the interest Sky mints for savers is booked there as debt, so the two settle against each other.",
+      "The Vow is Sky's balance sheet, the account that receives its surplus and its debt. Borrowers pay their stability fees into it, and the interest Sky mints for savers is booked there as debt, so the two settle against each other.",
     sources: [VOW],
   },
   {
