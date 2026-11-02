@@ -1,9 +1,11 @@
 import type { CoveredPositions } from "@/lib/home/covered-positions";
 import type { HomeStats } from "@/lib/home/home-stats";
+import type { ValueHeld } from "@/lib/home/value-held";
 import { CoveredStatsNote } from "@/components/home/covered-stats-note";
 import { IndexNotice } from "@/components/shared/index-notice";
 import { launchedProductionChainNames } from "@/lib/shared/protocols";
 import { formatMonthDay } from "@/lib/date";
+import { formatFlowUsd, spokenUsd } from "@/lib/shared/flows-timeline";
 
 /** The production chains the count is drawn from — the same set the loader
  *  sums over. */
@@ -18,15 +20,15 @@ const COUNTED_SCOPE = launchedProductionChainNames();
  *
  * The all-time sum leads because it is the strongest claim in the band: it
  * counts every position each explorer has ever indexed, and no argument about
- * what is live today can move it. The split rides underneath at a quieter weight
- * — it is the more interesting number and the more fragile one, and the
- * typography should say so rather than let them compete.
+ * what is live today can move it. The value held in open positions is the
+ * second block, right-aligned, and appears only when the whole roster answered
+ * (value-held.ts). The open/closed split and the wallet clause ride in the (i)
+ * note.
  *
  * The split was withheld until 2026-07-15 (server migrations 115/116 made
  * openness chain-rooted); CoveredPositions.openPositions carries that history and
  * the condition under which this stays renderable. If it ever has to come out
- * again, drop the caption sentence below — the headline above stands on its own,
- * which is exactly why it was built to.
+ * again, drop the caption sentence passed to the note below.
  *
  * `protocolCount` stays carried but unstated — the strip of explorer tiles
  * directly below says which protocols better than a number does.
@@ -65,7 +67,15 @@ function walletClauseIsInScope(covered: CoveredPositions, stats: HomeStats | nul
   return stats !== null && stats.walletCountProtocols === covered.protocolCount;
 }
 
-export function CoveredStats({ covered, stats }: { covered: CoveredPositions | null; stats: HomeStats | null }) {
+export function CoveredStats({
+  covered,
+  stats,
+  valueHeld,
+}: {
+  covered: CoveredPositions | null;
+  stats: HomeStats | null;
+  valueHeld: ValueHeld | null;
+}) {
   // Null when the index did not answer for any one roster (ui-jobs 461).
   if (!covered)
     return (
@@ -75,56 +85,62 @@ export function CoveredStats({ covered, stats }: { covered: CoveredPositions | n
     );
   const walletClause = walletClauseIsInScope(covered, stats) ? stats : null;
 
+  // The (i) closes the last label in the band: the value's, or the count's
+  // when the value block is omitted.
+  const note = (
+    <CoveredStatsNote
+      value={valueHeld}
+      caption={
+        <>
+          <span className="tabular-nums text-foreground">{covered.openPositions.toLocaleString("en-US")}</span> open and{" "}
+          <span className="tabular-nums text-foreground">{covered.closedPositions.toLocaleString("en-US")}</span>{" "}
+          closed, replayed from chain events in each protocol&rsquo;s own model of a position
+          {walletClause && (
+            <>
+              , across{" "}
+              <span className="tabular-nums text-foreground">{walletClause.walletCount.toLocaleString("en-US")}</span>{" "}
+              wallets reaching back to{" "}
+              <span className="text-foreground">{formatEarliestDate(walletClause.earliestTransactionAt)}</span>
+            </>
+          )}
+          .
+        </>
+      }
+    />
+  );
+
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 text-center">
-      {/* Centre-aligned pair: the count carries the weight, the scope rides
-          alongside it in the hero subhead's voice (light, rb-500). Wraps as a
-          unit on narrow viewports rather than breaking mid-phrase. */}
-      <p className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
+    <div className="w-full max-w-7xl mx-auto px-4 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+      {/* Two blocks on one band (Miles, 2 Nov 2026): the count on the left, the
+          value on the right (stacked and left-aligned below `sm`). Each is a
+          big figure with its own label in the hero subhead's voice (light,
+          rb-500). The caption line that used to sit under the count now opens
+          from the (i) — see covered-stats-note.tsx. Each block sets its label
+          under its figure. */}
+      <p className="flex flex-col items-start gap-y-1" data-anatomy="S3.1">
         <span className="text-foreground font-semibold leading-none tracking-tighter tabular-nums text-[clamp(36px,5.2vw,58px)]">
           {covered.totalPositions.toLocaleString("en-US")}
         </span>
         <span className="font-sans font-light tracking-tight text-rb-500 text-[clamp(17px,2.1vw,26px)]">
           positions across {COUNTED_SCOPE} DeFi
+          {!valueHeld && <span className="ml-2 align-[-0.05em]">{note}</span>}
         </span>
       </p>
 
-      {/* The split, the qualifier, and the roster's reach, as one quiet
-          sentence. The counts sit in the foreground colour (rb-900 blended into
-          the dark canvas) so the numbers carry and the words recede;
-          `tabular-nums` matches the headline so the digits share a grid.
-          Prose does the separating — a middot between clauses read as two
-          fragments to the eye and as nothing to a screen reader.
-          "in each protocol's own model of a position" is load-bearing, not
-          throat-clearing: the grain genuinely differs (Aave V3 and Morpho
-          count one row per wallet-market pair, Spark/Moonwell/Maple/Compound
-          V2 one per wallet, the Liquity family one per trove), and "closed"
-          carries every protocol's own word for the ending — liquidated,
-          repaid, defaulted. The note behind the help icon spells that out in full.
-          The wallet clause is conditional: the sentence closes cleanly on
-          "…own model of a position." when the wallet stats fail to resolve, or
-          when they are counted over a different set of explorers than the
-          figures before them — see `walletClauseIsInScope`. */}
-      <p className="mt-2 text-xs text-rb-500">
-        <span className="tabular-nums text-foreground">{covered.openPositions.toLocaleString("en-US")}</span> open and{" "}
-        <span className="tabular-nums text-foreground">{covered.closedPositions.toLocaleString("en-US")}</span> closed,
-        replayed from chain events in each protocol&rsquo;s own model of a position
-        {walletClause && (
-          <>
-            , across{" "}
-            <span className="tabular-nums text-foreground">{walletClause.walletCount.toLocaleString("en-US")}</span>{" "}
-            wallets reaching back to{" "}
-            <span className="text-foreground">{formatEarliestDate(walletClause.earliestTransactionAt)}</span>
-          </>
-        )}
-        .
-        {/* The help icon closes the sentence and opens the small print
-             (popover under the icon on desktop, sheet on phones) that says how
-             the figure is counted — it sits where the reader finishes the
-             claim, not on the headline figure above it. It carries its own
-             popover, so it needs nothing from this band but a place to sit. */}
-        <CoveredStatsNote />
-      </p>
+      {valueHeld && (
+        <p className="flex flex-col items-start gap-y-1 sm:items-end sm:text-right" data-anatomy="S3.2">
+          <span
+            className="text-foreground font-semibold leading-none tracking-tighter tabular-nums text-[clamp(36px,5.2vw,58px)]"
+            aria-label={spokenUsd(valueHeld.totalUsd)}
+          >
+            {formatFlowUsd(valueHeld.totalUsd)}
+          </span>
+          <span className="font-sans font-light tracking-tight text-rb-500 text-[clamp(17px,2.1vw,26px)]">
+            held in open positions
+            <span className="ml-2 align-[-0.05em]">{note}</span>
+          </span>
+        </p>
+      )}
     </div>
   );
 }
