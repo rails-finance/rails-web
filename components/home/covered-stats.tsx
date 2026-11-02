@@ -21,7 +21,7 @@ const COUNTED_SCOPE = launchedProductionChainNames();
  * The all-time sum leads because it is the strongest claim in the band: it
  * counts every position each explorer has ever indexed, and no argument about
  * what is live today can move it. The value held in open positions is the
- * second block, right-aligned, and appears only when the whole roster answered
+ * second line, and appears only when the whole roster answered
  * (value-held.ts). The open/closed split and the wallet clause ride in the (i)
  * note.
  *
@@ -110,40 +110,44 @@ export function CoveredStats({
   );
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-      {/* Two blocks on one band (Miles, 2 Nov 2026): the count on the left, the
-          value on the right (stacked and left-aligned below `sm`). Each is a
-          big figure with its own label in the hero subhead's voice (light,
-          rb-500). The caption line that used to sit under the count now opens
-          from the (i) — see covered-stats-note.tsx. Each block sets its label
-          under its figure. */}
-      <p className="flex flex-col items-start gap-y-1" data-anatomy="S3.1">
-        <span className="text-foreground font-semibold leading-none tracking-tighter tabular-nums text-[clamp(36px,5.2vw,58px)]">
-          {covered.totalPositions.toLocaleString("en-US")}
-        </span>
-        <span className="font-sans font-light tracking-tight text-rb-500 text-[clamp(17px,2.1vw,26px)]">
+    <div className="w-full max-w-7xl mx-auto px-4 flex flex-col items-center gap-6 text-center sm:gap-4">
+      {/* Two centred lines (Miles, 2 Nov 2026): the count, then the value held
+          in open positions. From `sm` each line runs inline, the label
+          vertically centred on its figure; below `sm` each stacks, label above
+          figure. Sizes step at breakpoints and never scale with the viewport.
+          The caption line that used to sit under the count opens from the (i)
+          (covered-stats-note.tsx). */}
+      <p className={LINE} data-anatomy="S3.1">
+        <span className={LABEL}>Explore</span>
+        <span className={FIGURE}>{covered.totalPositions.toLocaleString("en-US")}</span>
+        <span className={LABEL}>
           positions across {COUNTED_SCOPE} DeFi
           {!valueHeld && <span className="ml-2 align-[-0.05em]">{note}</span>}
         </span>
       </p>
 
       {valueHeld && (
-        <p className="flex flex-col items-start gap-y-1 sm:items-end sm:text-right" data-anatomy="S3.2">
-          <span
-            className="text-foreground font-semibold leading-none tracking-tighter tabular-nums text-[clamp(36px,5.2vw,58px)]"
-            aria-label={spokenUsd(valueHeld.totalUsd)}
-          >
-            {formatFlowUsd(valueHeld.totalUsd)}
-          </span>
-          <span className="font-sans font-light tracking-tight text-rb-500 text-[clamp(17px,2.1vw,26px)]">
-            held in open positions
-            <span className="ml-2 align-[-0.05em]">{note}</span>
+        <p className={LINE} data-anatomy="S3.2">
+          <span className={LABEL}>Together, the open positions on Rails hold</span>
+          <span className="inline-flex items-center gap-x-2">
+            <span className={FIGURE} aria-label={spokenUsd(valueHeld.totalUsd)}>
+              {formatFlowUsd(valueHeld.totalUsd)}
+            </span>
+            <span className={`${LABEL} inline-flex items-center [&_button]:align-middle`}>{note}</span>
           </span>
         </p>
       )}
     </div>
   );
 }
+
+/** One line of the band: stacked and centred below `sm`, inline from `sm`
+ *  (wrapping between `sm` and `lg`, one row from `lg`). */
+const LINE = "flex flex-col items-center gap-y-1 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-4";
+/** Both figures name the face: the count and the value read in one font. */
+const FIGURE =
+  "font-sans text-foreground font-semibold leading-none tracking-tighter tabular-nums text-5xl lg:text-6xl";
+const LABEL = "font-sans font-light tracking-tight text-rb-500 text-lg sm:text-xl lg:text-[28px]";
 
 /**
  * UTC-fixed so the server (ISR regeneration) and client render identical text
