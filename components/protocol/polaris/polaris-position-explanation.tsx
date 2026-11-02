@@ -23,9 +23,11 @@ import {
   livePendingProv,
   livePethInDebtProv,
   liveRecordedDebtProv,
+  polarisAnnualCostProv,
 } from "@/lib/polaris/live-provenance";
 import { PETH } from "@/lib/polaris/asset-catalog";
 import { Prov, type Provenance } from "@/components/shared/provenance";
+import { formatCompact } from "@/lib/shared/format-compact";
 import { formatExact, formatNumber, formatUnitsExact, withRealMinus } from "@/lib/utils/format";
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { AmountText } from "@/components/shared/amount-text";
@@ -247,6 +249,27 @@ export function PolarisPositionExplanation({
         secondary: <H>{pct2(chain.secondaryRate)}</H>,
       }),
     );
+
+  if (chain.isOpen && chain.recordedDebt > 0 && chain.interestRate != null) {
+    const annualCost = chain.recordedDebt * chain.interestRate;
+    add(
+      "rate",
+      "rate_cost",
+      positionNodes("rate_cost", {
+        cost: (
+          <Prov info={polarisAnnualCostProv(chain.market)} value={String(annualCost)} symbol={stableSymbol}>
+            <H>
+              <span data-polaris-annual-cost="" data-prov-exact={formatExact(annualCost)}>
+                {formatCompact(annualCost)}
+              </span>
+            </H>
+          </Prov>
+        ),
+        stable: stableSymbol,
+        rate: <H>{pct2(chain.interestRate)}</H>,
+      }),
+    );
+  }
 
   if (chain.isOpen && chain.owner) {
     const moved = transferCount ?? 0;

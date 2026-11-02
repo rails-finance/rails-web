@@ -296,6 +296,18 @@ for (const [market, id] of [
     recordedWords?.[0] ?? explText.slice(0, 160),
   );
 
+  const costWords = /costs about ([\d,.]+\w?) \w+ a year/.exec(explText);
+  const costExact = await card(page)
+    .locator("[data-polaris-annual-cost]")
+    .first()
+    .getAttribute("data-prov-exact")
+    .catch(() => null);
+  check(
+    `c5b. ${market}/${id} — the explanation's cost sentence states debt × rate (${fmtNum(onRecorded)})`,
+    costWords != null && costExact != null && near(parseFig(costExact), onRecorded),
+    `${costWords?.[0] ?? "sentence absent"} · exact ${costExact}`,
+  );
+
   // The LLM export carries it too.
   await page
     .getByRole("button", { name: /Export this (position|loan|trove)|Copy for LLM/i })
