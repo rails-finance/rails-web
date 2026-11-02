@@ -85,7 +85,7 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Funding",
     definition:
-      "A yearly charge on collateral that follows Aave's USDC borrow rate. It leaves the collateral with no event.",
+      "A yearly charge on collateral, taken with no event. The funding rate Rails reads from each pool follows Aave's USDC borrow rate; the docs say Funding Level I applies under peg conditions.",
     sources: [{ label: "Fees", href: `${DOCS}/f-x-protocol-mechanisms/fees` }],
   },
 ];
