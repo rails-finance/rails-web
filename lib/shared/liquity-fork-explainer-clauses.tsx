@@ -114,7 +114,7 @@ import {
 } from "@/lib/shared/liquity-fork-ops";
 import { formatDate } from "@/lib/date";
 import { clause, eventClauses, splitLead, type ClauseInput, type EventProseSlots } from "@/lib/shared/explainer-prose";
-import { formatNumber, formatUsdValue, formatPrice, indefiniteArticle } from "@/lib/utils/format";
+import { formatExact, formatNumber, formatUsdValue, formatPrice, indefiniteArticle } from "@/lib/utils/format";
 import { forkLiquidationCleared } from "@/components/protocol/liquity-fork/liquity-fork-forensics";
 import {
   liquityForkStateFigures,
@@ -1133,7 +1133,7 @@ function eventSlots(
                 On its {fmtNum(f.costDebt)} {debt} of debt, a year at this rate costs about{" "}
                 <Fig
                   info={b.costPerYearProv(coords, { debt: f.costDebt, rate: String(f.rate) })}
-                  value={formatNumber(f.costPerYear)}
+                  value={formatExact(f.costPerYear)}
                 >
                   <AmountText value={f.costPerYear} /> {debt}
                 </Fig>
