@@ -19,8 +19,11 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Trove",
     definition:
-      "A Trove is one loan. It holds the collateral a borrower locked and the BOLD the borrower owes. One wallet can hold several Troves, and each is adjusted on its own.",
-    sources: [{ label: "What is a Trove", href: BORROWING + "#what-is-a-trove" }],
+      "A Trove is one loan. It holds the collateral a borrower locked and the BOLD the borrower owes. One wallet can hold several Troves, and each is adjusted on its own. Each Trove is an NFT, a unique token, so it can be transferred to another wallet.",
+    sources: [
+      { label: "What is a Trove", href: BORROWING + "#what-is-a-trove" },
+      { label: "Are Troves transferable", href: BORROWING + "#are-troves-transferable" },
+    ],
   },
   {
     term: "BOLD",
@@ -37,7 +40,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Interest rate",
     definition:
-      "Each borrower sets the interest rate on a Trove and can change it. A low rate costs less but puts the Trove earlier in the redemption queue.",
+      "Each borrower sets the interest rate on a Trove and can change it. A change within 7 days of the last change adds an upfront fee. A low rate costs less but puts the Trove earlier in the redemption queue.",
     sources: [{ label: "User-set rates", href: BORROWING + "#what-are-user-set-rates" }],
   },
   {
@@ -55,7 +58,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Batch manager",
     definition:
-      "A batch manager sets one interest rate for all the Troves in its batch and charges a management fee. A manager can change the rate only within a range set in advance.",
+      "A batch manager sets one interest rate for all the Troves in its batch and charges a yearly management fee, which is added to the debt on top of the interest. A manager can change the rate only within a range set in advance. A Trove that leaves a batch sets its own interest rate again.",
     sources: [{ label: "Delegation of interest rates", href: REDEMPTIONS + "#what-is-delegation-of-interest-rates" }],
   },
   {
@@ -158,8 +161,12 @@ const views: readonly [InfoView, ...InfoView[]] = [
           The wallet chip names the Trove&apos;s latest owner, and the history belongs to the Trove whoever held it.
         </li>
         <li>
-          A Trove can change without its owner acting: interest accrues, a redemption repays part of it, and a
-          redistribution adds debt and collateral.
+          A Trove can change without its owner acting: interest accrues, a batch manager changes the batch&apos;s rate,
+          a redemption repays part of it, and a redistribution adds debt and collateral.
+        </li>
+        <li>
+          A Trove&apos;s NFT can be transferred to another wallet, which changes the owner and leaves the loan as it
+          was.
         </li>
         <li>The lifetime flows panel totals every borrow, repayment, fee and redemption, with the net result.</li>
         <li>
