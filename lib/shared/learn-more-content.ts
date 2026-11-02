@@ -537,7 +537,7 @@ export function dolomiteEventFallbackContent(): LearnMoreContent {
 // bands (a state, no event; the swaps reverse and their losses stay) — then
 // HARD — a Liquidate, in full or in part, once health goes negative.
 
-const LLAMALEND_DOC_URL = "https://docs.curve.finance/lending/overview/";
+const LLAMALEND_DOC_URL = "https://docs.curve.finance/user/llamalend/overview";
 
 export function llamalendBorrowContent(kind: "borrow" | "add_collateral"): LearnMoreContent {
   const borrowing = kind === "borrow";
