@@ -61,7 +61,7 @@ export function AaveV4InfoPage({ deployment }: { deployment: "ethereum" | "base"
           HUBS_AND_SPOKES,
           "Base has one hub, Equities, and one spoke, Mag7. Coinbase's tokenized stocks are its collateral, and USDC is the one asset it lends.",
           "A wallet's collateral on Mag7 backs its USDC debt under one health factor. The deployment is separate from Aave V4 on Ethereum, with its own contracts and risk settings.",
-          "Dollar values use the spoke's oracle prices, the same ones it liquidates with. The stock feeds publish from Sunday 20:00 to Friday 20:00 ET and hold their last value otherwise.",
+          "Dollar values use the spoke's oracle prices, the same ones it liquidates with.",
         ]}
         search={`Search takes a wallet address. Filters: status, liquidatable, liquidated before, supplying, borrowing, debt and supply size, transactions, hide dust. ${SORT}`}
         views={[
