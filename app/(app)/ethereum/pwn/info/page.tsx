@@ -35,7 +35,7 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Default",
     definition:
-      "A loan is in default when it is still unpaid after its deadline. The contract then refuses repayment, and the lender can claim the collateral.",
+      "A loan is in default when it is still unpaid after its deadline. The contract then refuses repayment, and the lender can claim the collateral. Until the lender claims, the two sides can still sign an extension that moves the deadline.",
     sources: [
       { label: "Repaying loans", href: REPAY },
       { label: "Claiming defaulted collateral", href: CLAIM },
