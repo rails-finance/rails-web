@@ -31,11 +31,17 @@ export const toLocaleStringHelper = (value: number, options: FormatOptions = {})
   return `${prefix}${formatted}${suffix}`;
 };
 
+/** Two decimals from 1 up; below 1, four significant digits (0.9998, 0.0000312),
+ *  never fewer than two decimals and never more than eight. Under 1e-8 the
+ *  tiny-amount floor text stands in. */
 export const formatPrice = (value: number): string => {
-  return toLocaleStringHelper(value, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  const a = Math.abs(value);
+  if (a === 0 || a >= 1 || !Number.isFinite(a)) {
+    return toLocaleStringHelper(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  if (a < 1e-8) return value < 0 ? "-<0.00000001" : "<0.00000001";
+  const decimals = Math.min(8, Math.max(2, 3 - Math.floor(Math.log10(a))));
+  return toLocaleStringHelper(value, { minimumFractionDigits: 2, maximumFractionDigits: decimals });
 };
 
 // Cents, grouped: "$2,725,629.68". A positive amount under a cent reads
@@ -100,6 +106,13 @@ export const formatUnitsExact = (raw: string | null | undefined, decimals: numbe
   if (out === "" || out === "-") out = "0";
   return (neg && out !== "0" ? "-" : "") + out;
 };
+
+/** Thousands separators in every plain digit run of four or more in a figure's
+ *  integer part: "1234567.123456789 USDC" reads "1,234,567.123456789 USDC".
+ *  A fraction, an already grouped number and shorter runs are left as they are.
+ *  The face for an exact decimal; the raw string stays on the data attribute. */
+export const groupDigits = (text: string): string =>
+  text.replace(/(?<![\d.,])\d{4,}(?![\d,])/g, (run) => run.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 
 // Full-precision float rendering for the provenance trace: every decimal the
 // pipeline actually delivered — String(n) is the shortest round-trip form, so
