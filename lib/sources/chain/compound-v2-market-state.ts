@@ -17,14 +17,23 @@
 //     while the rest say 2,102,400, so one hardcoded constant would misstate
 //     the biggest market by 25%.
 //
-// Degrades to an empty map when RPC is unset/down — callers must treat an
-// absent market as "unpriced/unrated" and fall back to amounts-only (never
-// assert a partial total).
+// Every catalog market is read at one block, through rails-server's head
+// routes and, when the latest read fails, its stored snapshot (surface
+// `compound-v2:ethereum:market-state`, lib/sources/api/head-snapshot.ts); the
+// map names its block and who answered (`read`).
 //
-// SERVER-ONLY — imported from /api/* route handlers only (alchemy via rpc.ts).
+// Degrades to an empty map when no read and no snapshot answer — callers must
+// treat an absent market as "unpriced/unrated" and fall back to amounts-only
+// (never assert a partial total).
+//
+// SERVER-ONLY — imported from /api/* route handlers only.
 
-import { parseAbi, type ContractFunctionParameters } from "viem";
-import { alchemyClient } from "./rpc";
+import { parseAbi, type ContractFunctionParameters, type PublicClient } from "viem";
+import { withHeadSnapshot } from "@/lib/sources/api/head-snapshot";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import type { StoredHeadRead } from "@/lib/shared/server-head-read";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { COMPOUND_V2_MARKETS, COMPOUND_V2_ADDRESSES, CTOKEN_DECIMALS } from "@/lib/compound-v2/asset-catalog";
 
 const CTOKEN_ABI = parseAbi([
@@ -65,23 +74,58 @@ export interface CompoundV2MarketState {
   blocksPerYear: number | null;
 }
 
-/** Keyed by market key. Empty when RPC is unavailable. */
-export type CompoundV2MarketStateMap = Map<string, CompoundV2MarketState>;
+/** The block a market-state map was read at and who answered: rails-server
+ *  live (`head`), its stored snapshot (`stored`), or neither (the chain). */
+export interface CompoundV2MarketRead {
+  blockNumber: number;
+  head?: PositionHeadStamp;
+  stored?: StoredHeadRead;
+}
 
+/** Keyed by market key. Empty when no read and no snapshot answered; `read`
+ *  names the block of a filled map. */
+export type CompoundV2MarketStateMap = Map<string, CompoundV2MarketState> & { read?: CompoundV2MarketRead };
+
+/** The head-snapshot surface this loader's reads are stored under. */
+const MARKET_STATE_SURFACE = "compound-v2:ethereum:market-state";
+
+/** Every catalog market's state at one block, through rails-server's head
+ *  routes and, when the latest read fails, its stored snapshot. */
 export async function resolveCompoundV2MarketState(): Promise<CompoundV2MarketStateMap> {
-  const out: CompoundV2MarketStateMap = new Map();
-  let client: ReturnType<typeof alchemyClient>;
   try {
-    client = alchemyClient();
+    const { value, stored } = await withHeadSnapshot(
+      { surface: MARKET_STATE_SURFACE, chainId: MAINNET_CHAIN_ID },
+      readMarketState,
+      (map) => map.size > 0,
+    );
+    const block = value.read?.blockNumber;
+    if (block != null && value.size > 0) {
+      const head = stored ? undefined : serverHeadStampAt(MAINNET_CHAIN_ID, block);
+      value.read = {
+        blockNumber: stored?.blockNumber ?? block,
+        ...(head ? { head } : {}),
+        ...(stored ? { stored } : {}),
+      };
+    } else delete value.read;
+    return value;
   } catch {
-    return out; // ALCHEMY_URL unset — amounts-only.
+    return new Map(); // No read and no snapshot (or ALCHEMY_URL unset): amounts-only.
   }
+}
+
+/** The twenty catalog markets, whichever rows a page holds, at one block, so
+ *  that a stored snapshot answers any page. Throws where the block cannot be read. */
+async function readMarketState(client: PublicClient): Promise<CompoundV2MarketStateMap> {
+  const out: CompoundV2MarketStateMap = new Map();
+  const blockNumber = await client.getBlockNumber();
+  const at = { blockNumber };
 
   const PER_MARKET = 4;
   let first: Res[] = [];
   try {
     first = (await client.multicall({
       allowFailure: true,
+      ...at,
       contracts: [
         {
           address: COMPOUND_V2_ADDRESSES.COMPTROLLER as `0x${string}`,
@@ -110,6 +154,7 @@ export async function resolveCompoundV2MarketState(): Promise<CompoundV2MarketSt
   try {
     second = (await client.multicall({
       allowFailure: true,
+      ...at,
       contracts: COMPOUND_V2_MARKETS.flatMap((m, i): ContractFunctionParameters[] => {
         const irm = (irmOf[i] && !isZeroAddr(irmOf[i]) ? irmOf[i]! : m.ctoken) as `0x${string}`;
         return [
@@ -163,5 +208,6 @@ export async function resolveCompoundV2MarketState(): Promise<CompoundV2MarketSt
     });
   });
 
+  if (out.size > 0) out.read = { blockNumber: Number(blockNumber) };
   return out;
 }

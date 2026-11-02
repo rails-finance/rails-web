@@ -11,14 +11,24 @@
 //   • borrow/supplyRatePerTimestamp — per-SECOND rates (Moonwell's Base/
 //     Moonbeam accrual convention), annualized here (× 31,536,000).
 //
-// Degrades to an empty map when RPC is unset/down — callers must treat an
-// absent market as "unpriced/unrated" and fall back to amounts-only (never
-// assert a partial total).
+// The four markets are read at one block, through rails-server's head routes
+// and, when the latest read fails, its stored snapshot (surface
+// `moonwell:ethereum:market-state`, lib/sources/api/head-snapshot.ts); the map
+// names its block and who answered (`read`).
 //
-// SERVER-ONLY — imported from /api/* route handlers only (alchemy via rpc.ts).
+// Degrades to an empty map when no read and no snapshot answer — callers must
+// treat an absent market as "unpriced/unrated" and fall back to amounts-only
+// (never assert a partial total).
+//
+// SERVER-ONLY — imported from /api/* route handlers only.
 
-import { getAddress, parseAbi } from "viem";
-import { alchemyClient, chainClient } from "./rpc";
+import { getAddress, parseAbi, type PublicClient } from "viem";
+import { chainClient } from "./rpc";
+import { withHeadSnapshot } from "@/lib/sources/api/head-snapshot";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import type { StoredHeadRead } from "@/lib/shared/server-head-read";
+import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import {
   MOONWELL_MARKETS,
@@ -58,17 +68,50 @@ export interface MoonwellMarketState {
   supplyApr: number | null;
 }
 
-/** Keyed by market key. Empty when RPC is unavailable. */
-export type MoonwellMarketStateMap = Map<string, MoonwellMarketState>;
+/** The block a market-state map was read at and who answered: rails-server
+ *  live (`head`), its stored snapshot (`stored`), or neither (the chain). */
+export interface MoonwellMarketRead {
+  blockNumber: number;
+  head?: PositionHeadStamp;
+  stored?: StoredHeadRead;
+}
 
+/** Keyed by market key. Empty when no read and no snapshot answered; `read`
+ *  names the block of a filled map. */
+export type MoonwellMarketStateMap = Map<string, MoonwellMarketState> & { read?: MoonwellMarketRead };
+
+/** The head-snapshot surface this loader's reads are stored under. */
+const MARKET_STATE_SURFACE = "moonwell:ethereum:market-state";
+
+/** The four markets' state at one block, through rails-server's head routes
+ *  and, when the latest read fails, its stored snapshot. */
 export async function resolveMoonwellMarketState(): Promise<MoonwellMarketStateMap> {
-  const out: MoonwellMarketStateMap = new Map();
-  let client: ReturnType<typeof alchemyClient>;
   try {
-    client = alchemyClient();
+    const { value, stored } = await withHeadSnapshot(
+      { surface: MARKET_STATE_SURFACE, chainId: MAINNET_CHAIN_ID },
+      readMarketState,
+      (map) => map.size > 0,
+    );
+    const block = value.read?.blockNumber;
+    if (block != null && value.size > 0) {
+      const head = stored ? undefined : serverHeadStampAt(MAINNET_CHAIN_ID, block);
+      value.read = {
+        blockNumber: stored?.blockNumber ?? block,
+        ...(head ? { head } : {}),
+        ...(stored ? { stored } : {}),
+      };
+    } else delete value.read;
+    return value;
   } catch {
-    return out; // ALCHEMY_URL unset — amounts-only.
+    return new Map(); // No read and no snapshot (or ALCHEMY_URL unset): amounts-only.
   }
+}
+
+/** The four catalog markets, whichever rows a page holds, at one block, so
+ *  that a stored snapshot answers any page. Throws where the block cannot be read. */
+async function readMarketState(client: PublicClient): Promise<MoonwellMarketStateMap> {
+  const out: MoonwellMarketStateMap = new Map();
+  const blockNumber = await client.getBlockNumber();
 
   const calls = MOONWELL_MARKETS.flatMap(
     (m) =>
@@ -87,7 +130,7 @@ export async function resolveMoonwellMarketState(): Promise<MoonwellMarketStateM
 
   let results: { status: string; result?: unknown }[] = [];
   try {
-    results = (await client.multicall({ allowFailure: true, contracts: calls })) as {
+    results = (await client.multicall({ allowFailure: true, blockNumber, contracts: calls })) as {
       status: string;
       result?: unknown;
     }[];
@@ -117,6 +160,7 @@ export async function resolveMoonwellMarketState(): Promise<MoonwellMarketStateM
     });
   });
 
+  if (out.size > 0) out.read = { blockNumber: Number(blockNumber) };
   return out;
 }
 
@@ -162,6 +206,10 @@ export async function resolveMoonwellMarketState(): Promise<MoonwellMarketStateM
 // Every mToken names its own rate model, and a roster does not agree on a
 // kink — 90% on Ethereum's three larger markets and 60% on cbBTC, and a wider
 // spread again across Base's twenty-one. Read per market, never assumed.
+//
+// The reads go through rails-server's head routes and, when the latest read
+// fails, its stored snapshot of them (lib/sources/api/head-snapshot.ts,
+// surfaces `moonwell:ethereum:markets` and `moonwell:base:markets`).
 //
 // SERVER-ONLY — imported from /api/chain/* route handlers and the SSR page only.
 
@@ -276,6 +324,10 @@ export interface MoonwellMarketRow {
 
 export interface MoonwellMarketsResponse {
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read live. */
+  head?: PositionHeadStamp;
+  /** rails-server's stored snapshot the figures were computed over, when the latest read failed. */
+  stored?: StoredHeadRead;
   /** The oracle the Comptroller itself reads — read from it, not hardcoded. */
   oracle: string | null;
   markets: MoonwellMarketRow[];
@@ -339,221 +391,254 @@ const isZeroAddr = (a: string | undefined | null) => !a || BigInt(a) === ZERO;
 type Res = { status: string; result?: unknown };
 const ok = <T>(r: Res | undefined): T | null => (r?.status === "success" && r.result != null ? (r.result as T) : null);
 
+/** The head-snapshot surface's chain segment, for the deployments read through rails-server. */
+const SURFACE_CHAIN: Partial<Record<number, string>> = { [MAINNET_CHAIN_ID]: "ethereum", [BASE_CHAIN_ID]: "base" };
+
 export async function loadMoonwellMarkets(
   deployment: MoonwellDeployment = MOONWELL_DEPLOYMENT,
 ): Promise<MoonwellMarketsResponse> {
   try {
-    const client = chainClient(deployment.chainId);
-    const comptroller = deployment.comptroller as `0x${string}`;
-
-    // The Comptroller states its own roster, its own oracle and its own
-    // liquidation constants — none of the four is hardcoded here.
-    const [blockNumber, mTokens, oracle, closeFactorRaw, liqIncentiveRaw] = await Promise.all([
-      client.getBlockNumber().then(Number),
-      client.readContract({ address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "getAllMarkets" }),
-      client.readContract({ address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "oracle" }),
-      client.readContract({ address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "closeFactorMantissa" }),
-      client.readContract({
-        address: comptroller,
-        abi: ROSTER_COMPTROLLER_ABI,
-        functionName: "liquidationIncentiveMantissa",
-      }),
-    ]);
-
-    const PER_MARKET = 16;
-    const results = (await client.multicall({
-      allowFailure: true,
-      contracts: mTokens.flatMap(
-        (c) =>
-          [
-            { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "underlying" },
-            { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "totalSupply" },
-            { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "totalBorrows" },
-            { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "exchangeRateStored" },
-            { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "getCash" },
-            { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "totalReserves" },
-            { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "borrowRatePerTimestamp" },
-            { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "supplyRatePerTimestamp" },
-            { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "reserveFactorMantissa" },
-            { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "interestRateModel" },
-            { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "markets", args: [c] },
-            { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "supplyCaps", args: [c] },
-            { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "borrowCaps", args: [c] },
-            { address: oracle, abi: ORACLE_ABI, functionName: "getUnderlyingPrice", args: [c] },
-            { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "mintGuardianPaused", args: [c] },
-            { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "borrowGuardianPaused", args: [c] },
-          ] as const,
-      ),
-    })) as Res[];
-
-    // Each market's own rate model: its per-second annualization constant and
-    // its kink. Per-model reads — the four models do not share a kink.
-    const irmOf = mTokens.map((_, i) => ok<string>(results[i * PER_MARKET + 9]));
-    const irmRes = (await client.multicall({
-      allowFailure: true,
-      contracts: irmOf.flatMap((irm) => {
-        const addr = (irm && !isZeroAddr(irm) ? irm : comptroller) as `0x${string}`;
-        return [
-          { address: addr, abi: ROSTER_IRM_ABI, functionName: "kink" },
-          { address: addr, abi: ROSTER_IRM_ABI, functionName: "timestampsPerYear" },
-        ] as const;
-      }),
-    })) as Res[];
-
-    // Name the mTokens and their underlyings in one resolver call (the api's
-    // token_meta first, the chain for what it lacks). Every one answers a
-    // string symbol() — Moonwell has no cETH-style native market and no
-    // bytes32-symbol legacy tokens, so no hand-resolution lane exists.
-    const wanted: string[] = [];
-    mTokens.forEach((c, i) => {
-      const und = ok<string>(results[i * PER_MARKET]);
-      if (und && !isZeroAddr(und)) wanted.push(und);
-    });
-    const meta = await resolveErc20Meta([...mTokens, ...wanted], deployment.chainId);
-    // Every market figure scales by its underlying's decimals: without them the
-    // read fails whole rather than state amounts scaled by the 18 stand-in.
-    assertDecimalsRead(meta, wanted);
-
-    const markets: MoonwellMarketRow[] = mTokens.map((c, i) => {
-      const base = i * PER_MARKET;
-      const mToken = getAddress(c).toLowerCase();
-      const und = ok<string>(results[base]);
-      const underlying = und && !isZeroAddr(und) ? getAddress(und).toLowerCase() : null;
-      const m = underlying ? meta.get(underlying) : undefined;
-      const mMeta = meta.get(mToken);
-      const underlyingSymbol = m?.symbol ?? "—";
-      const underlyingDecimals = m?.decimals ?? 18;
-
-      const totalSupplyMTokens = ok<bigint>(results[base + 1]);
-      const totalBorrowsRaw = ok<bigint>(results[base + 2]);
-      const exchangeRate = ok<bigint>(results[base + 3]);
-      const cashRaw = ok<bigint>(results[base + 4]);
-      const reservesRaw = ok<bigint>(results[base + 5]);
-
-      // Supplied underlying = mTokens × exchangeRateStored / 1e18, where the
-      // rate is scaled 1e(18 + ud − 8): the mToken's 8dp and the rate's excess
-      // decimals cancel, leaving underlying at its own scale.
-      const totalSupplyUnderlying =
-        totalSupplyMTokens != null && exchangeRate != null
-          ? scaleRaw((totalSupplyMTokens * exchangeRate) / BigInt("1000000000000000000"), underlyingDecimals)
-          : 0;
-      const totalBorrowsUnderlying = totalBorrowsRaw != null ? scaleRaw(totalBorrowsRaw, underlyingDecimals) : 0;
-      const cashUnderlying = cashRaw != null ? scaleRaw(cashRaw, underlyingDecimals) : 0;
-      const totalReservesUnderlying = reservesRaw != null ? scaleRaw(reservesRaw, underlyingDecimals) : 0;
-
-      // Oracle scale is the fork's own convention: 1e(36 − underlyingDecimals).
-      const priceRaw = ok<bigint>(results[base + 13]);
-      const priceUsd = priceRaw != null && priceRaw > ZERO ? Number(priceRaw) / 10 ** (36 - underlyingDecimals) : null;
-
-      const mkt = ok<readonly [boolean, bigint]>(results[base + 10]);
-      const cfMantissa = mkt ? mkt[1] : null;
-      const collateralDisabled = cfMantissa != null && cfMantissa === ZERO;
-      const collateralFactor = cfMantissa != null && cfMantissa > ZERO ? Number(cfMantissa) / 1e18 : null;
-
-      // Caps are stored in underlying units; 0 means UNCAPPED, so it becomes
-      // null rather than a ceiling of nothing.
-      const capOf = (r: Res | undefined): number | null => {
-        const v = ok<bigint>(r);
-        return v != null && v > ZERO ? scaleRaw(v, underlyingDecimals) : null;
-      };
-      const supplyCap = capOf(results[base + 11]);
-      const borrowCap = capOf(results[base + 12]);
-      // Judged on the raw slot, before scaling: exactly 1 base unit.
-      const oneUnit = (r: Res | undefined): boolean => ok<bigint>(r) === ONE;
-      const supplyCapOneUnit = oneUnit(results[base + 11]);
-      const borrowCapOneUnit = oneUnit(results[base + 12]);
-
-      // Annualize the per-SECOND rates on the model's own timestampsPerYear;
-      // fall back to the file's
-      // SECONDS_PER_YEAR when a model won't answer — per-timestamp is
-      // wall-clock seconds by definition, so the constant is the convention
-      // itself, not a guess about block cadence.
-      const kinkRaw = ok<bigint>(irmRes[i * 2]);
-      const tpyRaw = ok<bigint>(irmRes[i * 2 + 1]);
-      const timestampsPerYear = tpyRaw != null && tpyRaw > ZERO ? Number(tpyRaw) : null;
-      const apr = (r: Res | undefined): number | null => {
-        const v = ok<bigint>(r);
-        return v != null ? (Number(v) / 1e18) * (timestampsPerYear ?? SECONDS_PER_YEAR) * 100 : null;
-      };
-
-      return {
-        mToken,
-        mTokenSymbol: mMeta?.named ? mMeta.symbol : "—",
-        underlying,
-        underlyingSymbol,
-        underlyingDecimals,
-
-        totalSupplyUnderlying,
-        totalBorrowsUnderlying,
-        cashUnderlying,
-        totalReservesUnderlying,
-
-        priceUsd,
-        totalSupplyUsd: priceUsd != null ? totalSupplyUnderlying * priceUsd : null,
-        totalBorrowsUsd: priceUsd != null ? totalBorrowsUnderlying * priceUsd : null,
-
-        utilisation: totalSupplyUnderlying > 0 ? totalBorrowsUnderlying / totalSupplyUnderlying : null,
-
-        collateralFactor,
-        collateralDisabled,
-        isListed: mkt ? mkt[0] : false,
-
-        supplyCap,
-        borrowCap,
-        supplyCapUsed: supplyCap != null && supplyCap > 0 ? totalSupplyUnderlying / supplyCap : null,
-        borrowCapUsed: borrowCap != null && borrowCap > 0 ? totalBorrowsUnderlying / borrowCap : null,
-        supplyCapOneUnit,
-        borrowCapOneUnit,
-        mintPaused: ok<boolean>(results[base + 14]) === true,
-        borrowPaused: ok<boolean>(results[base + 15]) === true,
-
-        supplyApr: apr(results[base + 7]),
-        borrowApr: apr(results[base + 6]),
-        reserveFactor: (() => {
-          const v = ok<bigint>(results[base + 8]);
-          return v != null ? Number(v) / 1e18 : null;
-        })(),
-
-        interestRateModel: irmOf[i] && !isZeroAddr(irmOf[i]) ? getAddress(irmOf[i]!).toLowerCase() : null,
-        timestampsPerYear,
-        kink: kinkRaw != null && kinkRaw > ZERO ? Number(kinkRaw) / 1e18 : null,
-      };
-    });
-
-    // Largest first — the roster's own order is listing sequence.
-    markets.sort((a, b) => (b.totalSupplyUsd ?? 0) - (a.totalSupplyUsd ?? 0));
-
-    const priced = markets.filter((m) => m.totalSupplyUsd != null);
-    const supplied = priced.length > 0 ? priced.reduce((t, r) => t + (r.totalSupplyUsd ?? 0), 0) : null;
-    const borrowed = priced.length > 0 ? priced.reduce((t, r) => t + (r.totalBorrowsUsd ?? 0), 0) : null;
-    // The fullest real cap: one-base-unit caps are closed doors, not headroom,
-    // so they sit in the closed counts and out of the max.
-    const capUses = markets
-      .filter((m) => !m.supplyCapOneUnit)
-      .map((m) => m.supplyCapUsed)
-      .filter((v): v is number => v != null);
-    const closedToSupply = markets.filter((m) => m.supplyCapOneUnit || (m.supplyCapUsed ?? 0) >= 1).length;
-    const closedToBorrow = markets.filter((m) => m.borrowCapOneUnit || (m.borrowCapUsed ?? 0) >= 1).length;
-
-    return {
-      blockNumber,
-      oracle: getAddress(oracle).toLowerCase(),
-      markets,
-      summary: {
-        total: markets.length,
-        totalSuppliedUsd: supplied,
-        totalBorrowedUsd: borrowed,
-        utilisation: supplied != null && borrowed != null && supplied > 0 ? borrowed / supplied : null,
-        supplyCapMaxUsed: capUses.length > 0 ? Math.max(...capUses) : null,
-        closedToSupply,
-        closedToBorrow,
-        closeFactor: closeFactorRaw > ZERO ? Number(closeFactorRaw) / 1e18 : null,
-        liquidationIncentive: liqIncentiveRaw > ZERO ? Number(liqIncentiveRaw) / 1e18 : null,
-      },
-      chainStale: false,
-    };
+    const chain = SURFACE_CHAIN[deployment.chainId];
+    if (!chain) return await readMarkets(chainClient(deployment.chainId), deployment);
+    const { value, stored } = await withHeadSnapshot(
+      { surface: `moonwell:${chain}:markets`, chainId: deployment.chainId },
+      (client) => readMarkets(client, deployment),
+      () => true,
+    );
+    if (stored) return { ...value, stored };
+    const head = serverHeadStampAt(deployment.chainId, value.blockNumber);
+    return head ? { ...value, head } : value;
   } catch (error) {
     console.error("Moonwell markets chain read failed:", error);
     return emptyMarkets();
   }
+}
+
+/** Every market the Comptroller lists, at one block; throws where a read fails. */
+async function readMarkets(client: PublicClient, deployment: MoonwellDeployment): Promise<MoonwellMarketsResponse> {
+  const comptroller = deployment.comptroller as `0x${string}`;
+
+  // The block is taken first and every read below is pinned to it, so the
+  // block the response names is the block every figure was read at.
+  const blockNumber = Number(await client.getBlockNumber());
+  const atBlock = { blockNumber: BigInt(blockNumber) };
+
+  // The Comptroller states its own roster, its own oracle and its own
+  // liquidation constants — none of the four is hardcoded here.
+  const [mTokens, oracle, closeFactorRaw, liqIncentiveRaw] = await Promise.all([
+    client.readContract({
+      address: comptroller,
+      abi: ROSTER_COMPTROLLER_ABI,
+      functionName: "getAllMarkets",
+      ...atBlock,
+    }),
+    client.readContract({ address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "oracle", ...atBlock }),
+    client.readContract({
+      address: comptroller,
+      abi: ROSTER_COMPTROLLER_ABI,
+      functionName: "closeFactorMantissa",
+      ...atBlock,
+    }),
+    client.readContract({
+      address: comptroller,
+      abi: ROSTER_COMPTROLLER_ABI,
+      functionName: "liquidationIncentiveMantissa",
+      ...atBlock,
+    }),
+  ]);
+
+  const PER_MARKET = 16;
+  const results = (await client.multicall({
+    allowFailure: true,
+    ...atBlock,
+    contracts: mTokens.flatMap(
+      (c) =>
+        [
+          { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "underlying" },
+          { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "totalSupply" },
+          { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "totalBorrows" },
+          { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "exchangeRateStored" },
+          { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "getCash" },
+          { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "totalReserves" },
+          { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "borrowRatePerTimestamp" },
+          { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "supplyRatePerTimestamp" },
+          { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "reserveFactorMantissa" },
+          { address: c, abi: ROSTER_MTOKEN_ABI, functionName: "interestRateModel" },
+          { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "markets", args: [c] },
+          { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "supplyCaps", args: [c] },
+          { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "borrowCaps", args: [c] },
+          { address: oracle, abi: ORACLE_ABI, functionName: "getUnderlyingPrice", args: [c] },
+          { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "mintGuardianPaused", args: [c] },
+          { address: comptroller, abi: ROSTER_COMPTROLLER_ABI, functionName: "borrowGuardianPaused", args: [c] },
+        ] as const,
+    ),
+  })) as Res[];
+
+  // Each market's own rate model: its per-second annualization constant and
+  // its kink. Per-model reads — the four models do not share a kink.
+  const irmOf = mTokens.map((_, i) => ok<string>(results[i * PER_MARKET + 9]));
+  const irmRes = (await client.multicall({
+    allowFailure: true,
+    ...atBlock,
+    contracts: irmOf.flatMap((irm) => {
+      const addr = (irm && !isZeroAddr(irm) ? irm : comptroller) as `0x${string}`;
+      return [
+        { address: addr, abi: ROSTER_IRM_ABI, functionName: "kink" },
+        { address: addr, abi: ROSTER_IRM_ABI, functionName: "timestampsPerYear" },
+      ] as const;
+    }),
+  })) as Res[];
+
+  // Name the mTokens and their underlyings in one resolver call (the api's
+  // token_meta first, the chain for what it lacks). Every one answers a
+  // string symbol() — Moonwell has no cETH-style native market and no
+  // bytes32-symbol legacy tokens, so no hand-resolution lane exists.
+  const wanted: string[] = [];
+  mTokens.forEach((c, i) => {
+    const und = ok<string>(results[i * PER_MARKET]);
+    if (und && !isZeroAddr(und)) wanted.push(und);
+  });
+  const meta = await resolveErc20Meta([...mTokens, ...wanted], deployment.chainId);
+  // Every market figure scales by its underlying's decimals: without them the
+  // read fails whole rather than state amounts scaled by the 18 stand-in.
+  assertDecimalsRead(meta, wanted);
+
+  const markets: MoonwellMarketRow[] = mTokens.map((c, i) => {
+    const base = i * PER_MARKET;
+    const mToken = getAddress(c).toLowerCase();
+    const und = ok<string>(results[base]);
+    const underlying = und && !isZeroAddr(und) ? getAddress(und).toLowerCase() : null;
+    const m = underlying ? meta.get(underlying) : undefined;
+    const mMeta = meta.get(mToken);
+    const underlyingSymbol = m?.symbol ?? "—";
+    const underlyingDecimals = m?.decimals ?? 18;
+
+    const totalSupplyMTokens = ok<bigint>(results[base + 1]);
+    const totalBorrowsRaw = ok<bigint>(results[base + 2]);
+    const exchangeRate = ok<bigint>(results[base + 3]);
+    const cashRaw = ok<bigint>(results[base + 4]);
+    const reservesRaw = ok<bigint>(results[base + 5]);
+
+    // Supplied underlying = mTokens × exchangeRateStored / 1e18, where the
+    // rate is scaled 1e(18 + ud − 8): the mToken's 8dp and the rate's excess
+    // decimals cancel, leaving underlying at its own scale.
+    const totalSupplyUnderlying =
+      totalSupplyMTokens != null && exchangeRate != null
+        ? scaleRaw((totalSupplyMTokens * exchangeRate) / BigInt("1000000000000000000"), underlyingDecimals)
+        : 0;
+    const totalBorrowsUnderlying = totalBorrowsRaw != null ? scaleRaw(totalBorrowsRaw, underlyingDecimals) : 0;
+    const cashUnderlying = cashRaw != null ? scaleRaw(cashRaw, underlyingDecimals) : 0;
+    const totalReservesUnderlying = reservesRaw != null ? scaleRaw(reservesRaw, underlyingDecimals) : 0;
+
+    // Oracle scale is the fork's own convention: 1e(36 − underlyingDecimals).
+    const priceRaw = ok<bigint>(results[base + 13]);
+    const priceUsd = priceRaw != null && priceRaw > ZERO ? Number(priceRaw) / 10 ** (36 - underlyingDecimals) : null;
+
+    const mkt = ok<readonly [boolean, bigint]>(results[base + 10]);
+    const cfMantissa = mkt ? mkt[1] : null;
+    const collateralDisabled = cfMantissa != null && cfMantissa === ZERO;
+    const collateralFactor = cfMantissa != null && cfMantissa > ZERO ? Number(cfMantissa) / 1e18 : null;
+
+    // Caps are stored in underlying units; 0 means UNCAPPED, so it becomes
+    // null rather than a ceiling of nothing.
+    const capOf = (r: Res | undefined): number | null => {
+      const v = ok<bigint>(r);
+      return v != null && v > ZERO ? scaleRaw(v, underlyingDecimals) : null;
+    };
+    const supplyCap = capOf(results[base + 11]);
+    const borrowCap = capOf(results[base + 12]);
+    // Judged on the raw slot, before scaling: exactly 1 base unit.
+    const oneUnit = (r: Res | undefined): boolean => ok<bigint>(r) === ONE;
+    const supplyCapOneUnit = oneUnit(results[base + 11]);
+    const borrowCapOneUnit = oneUnit(results[base + 12]);
+
+    // Annualize the per-SECOND rates on the model's own timestampsPerYear;
+    // fall back to the file's
+    // SECONDS_PER_YEAR when a model won't answer — per-timestamp is
+    // wall-clock seconds by definition, so the constant is the convention
+    // itself, not a guess about block cadence.
+    const kinkRaw = ok<bigint>(irmRes[i * 2]);
+    const tpyRaw = ok<bigint>(irmRes[i * 2 + 1]);
+    const timestampsPerYear = tpyRaw != null && tpyRaw > ZERO ? Number(tpyRaw) : null;
+    const apr = (r: Res | undefined): number | null => {
+      const v = ok<bigint>(r);
+      return v != null ? (Number(v) / 1e18) * (timestampsPerYear ?? SECONDS_PER_YEAR) * 100 : null;
+    };
+
+    return {
+      mToken,
+      mTokenSymbol: mMeta?.named ? mMeta.symbol : "—",
+      underlying,
+      underlyingSymbol,
+      underlyingDecimals,
+
+      totalSupplyUnderlying,
+      totalBorrowsUnderlying,
+      cashUnderlying,
+      totalReservesUnderlying,
+
+      priceUsd,
+      totalSupplyUsd: priceUsd != null ? totalSupplyUnderlying * priceUsd : null,
+      totalBorrowsUsd: priceUsd != null ? totalBorrowsUnderlying * priceUsd : null,
+
+      utilisation: totalSupplyUnderlying > 0 ? totalBorrowsUnderlying / totalSupplyUnderlying : null,
+
+      collateralFactor,
+      collateralDisabled,
+      isListed: mkt ? mkt[0] : false,
+
+      supplyCap,
+      borrowCap,
+      supplyCapUsed: supplyCap != null && supplyCap > 0 ? totalSupplyUnderlying / supplyCap : null,
+      borrowCapUsed: borrowCap != null && borrowCap > 0 ? totalBorrowsUnderlying / borrowCap : null,
+      supplyCapOneUnit,
+      borrowCapOneUnit,
+      mintPaused: ok<boolean>(results[base + 14]) === true,
+      borrowPaused: ok<boolean>(results[base + 15]) === true,
+
+      supplyApr: apr(results[base + 7]),
+      borrowApr: apr(results[base + 6]),
+      reserveFactor: (() => {
+        const v = ok<bigint>(results[base + 8]);
+        return v != null ? Number(v) / 1e18 : null;
+      })(),
+
+      interestRateModel: irmOf[i] && !isZeroAddr(irmOf[i]) ? getAddress(irmOf[i]!).toLowerCase() : null,
+      timestampsPerYear,
+      kink: kinkRaw != null && kinkRaw > ZERO ? Number(kinkRaw) / 1e18 : null,
+    };
+  });
+
+  // Largest first — the roster's own order is listing sequence.
+  markets.sort((a, b) => (b.totalSupplyUsd ?? 0) - (a.totalSupplyUsd ?? 0));
+
+  const priced = markets.filter((m) => m.totalSupplyUsd != null);
+  const supplied = priced.length > 0 ? priced.reduce((t, r) => t + (r.totalSupplyUsd ?? 0), 0) : null;
+  const borrowed = priced.length > 0 ? priced.reduce((t, r) => t + (r.totalBorrowsUsd ?? 0), 0) : null;
+  // The fullest real cap: one-base-unit caps are closed doors, not headroom,
+  // so they sit in the closed counts and out of the max.
+  const capUses = markets
+    .filter((m) => !m.supplyCapOneUnit)
+    .map((m) => m.supplyCapUsed)
+    .filter((v): v is number => v != null);
+  const closedToSupply = markets.filter((m) => m.supplyCapOneUnit || (m.supplyCapUsed ?? 0) >= 1).length;
+  const closedToBorrow = markets.filter((m) => m.borrowCapOneUnit || (m.borrowCapUsed ?? 0) >= 1).length;
+
+  return {
+    blockNumber,
+    oracle: getAddress(oracle).toLowerCase(),
+    markets,
+    summary: {
+      total: markets.length,
+      totalSuppliedUsd: supplied,
+      totalBorrowedUsd: borrowed,
+      utilisation: supplied != null && borrowed != null && supplied > 0 ? borrowed / supplied : null,
+      supplyCapMaxUsed: capUses.length > 0 ? Math.max(...capUses) : null,
+      closedToSupply,
+      closedToBorrow,
+      closeFactor: closeFactorRaw > ZERO ? Number(closeFactorRaw) / 1e18 : null,
+      liquidationIncentive: liqIncentiveRaw > ZERO ? Number(liqIncentiveRaw) / 1e18 : null,
+    },
+    chainStale: false,
+  };
 }

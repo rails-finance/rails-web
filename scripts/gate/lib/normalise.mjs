@@ -93,6 +93,10 @@ export const JSON_DROPPED_PATHS = [
     re: /^stored(\.|$)/,
     why: "rails-server's stored snapshot, present only when a host's live read failed (ui-jobs 467)",
   },
+  {
+    re: /(^|\.)marketRead$/,
+    why: "the block a Compound V2 or Moonwell listing row's market state was read at, and who answered it (ui-jobs 467)",
+  },
   { re: /^data\.cache$/, why: "rails-server's state cache answering this request (miss / fresh)" },
   { re: /^timeline\.reconcile\.(toBlock|lane|refetched|refetchDiffered)$/, why: "the read's own span and RPC lane" },
   { re: /^timeline\.history$/, why: "the cache state: how much of the history this request read from the store" },
@@ -267,7 +271,10 @@ export function normaliseJson(value, origins) {
       for (const k of Object.keys(v).sort()) {
         const p = path ? `${path}.${k}` : k;
         if (JSON_DROPPED_PATHS.some((r) => r.re.test(p))) continue;
-        out[k] = walk(v[k], p);
+        const w = walk(v[k], p);
+        // A head stamp left empty by the drops above: a host whose read went to the chain carries no `head` key at all.
+        if (k === "head" && w && typeof w === "object" && !Array.isArray(w) && Object.keys(w).length === 0) continue;
+        out[k] = w;
       }
       return out;
     }

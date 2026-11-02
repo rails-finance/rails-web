@@ -51,10 +51,18 @@
 //     it, and reports the supplied total both with and without those markets so
 //     the headline never leans silently on a frozen constant.
 //
+// The reads go through rails-server's head routes and, when the latest read
+// fails, its stored snapshot of them (lib/sources/api/head-snapshot.ts,
+// surface `compound-v2:ethereum:markets`).
+//
 // SERVER-ONLY — imported from /api/chain/* route handlers and the SSR page only.
 
-import { getAddress, parseAbi } from "viem";
-import { alchemyClient } from "./rpc";
+import { getAddress, parseAbi, type PublicClient } from "viem";
+import { withHeadSnapshot } from "@/lib/sources/api/head-snapshot";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import type { StoredHeadRead } from "@/lib/shared/server-head-read";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import {
   COMPOUND_V2_ADDRESSES,
@@ -171,6 +179,10 @@ export interface CompoundV2MarketRow {
 
 export interface CompoundV2MarketsResponse {
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read live. */
+  head?: PositionHeadStamp;
+  /** rails-server's stored snapshot the figures were computed over, when the latest read failed. */
+  stored?: StoredHeadRead;
   /** The oracle the Comptroller itself reads — read from it, not hardcoded. */
   oracle: string | null;
   markets: CompoundV2MarketRow[];
@@ -221,234 +233,255 @@ const isZeroAddr = (a: string | undefined | null) => !a || BigInt(a) === ZERO;
 type Res = { status: string; result?: unknown };
 const ok = <T>(r: Res | undefined): T | null => (r?.status === "success" && r.result != null ? (r.result as T) : null);
 
+/** The head-snapshot surface this loader's reads are stored under. */
+const MARKETS_SURFACE = "compound-v2:ethereum:markets";
+
 export async function loadCompoundV2Markets(): Promise<CompoundV2MarketsResponse> {
   try {
-    const client = alchemyClient();
-
-    // The Comptroller states its own roster and its own oracle. Neither is
-    // hardcoded: a view that hardcoded the market list would be asserting a
-    // roster rather than reading one.
-    const [blockNumber, cTokens, oracle] = await Promise.all([
-      client.getBlockNumber().then(Number),
-      client.readContract({
-        address: COMPOUND_V2_ADDRESSES.COMPTROLLER as `0x${string}`,
-        abi: COMPTROLLER_ABI,
-        functionName: "getAllMarkets",
-      }),
-      client.readContract({
-        address: COMPOUND_V2_ADDRESSES.COMPTROLLER as `0x${string}`,
-        abi: COMPTROLLER_ABI,
-        functionName: "oracle",
-      }),
-    ]);
-
-    const PER_MARKET = 11;
-    const results = (await client.multicall({
-      allowFailure: true,
-      contracts: cTokens.flatMap(
-        (c) =>
-          [
-            { address: c, abi: CTOKEN_ABI, functionName: "underlying" },
-            { address: c, abi: CTOKEN_ABI, functionName: "totalSupply" },
-            { address: c, abi: CTOKEN_ABI, functionName: "totalBorrows" },
-            { address: c, abi: CTOKEN_ABI, functionName: "exchangeRateStored" },
-            { address: c, abi: CTOKEN_ABI, functionName: "getCash" },
-            { address: c, abi: CTOKEN_ABI, functionName: "totalReserves" },
-            { address: c, abi: CTOKEN_ABI, functionName: "borrowRatePerBlock" },
-            { address: c, abi: CTOKEN_ABI, functionName: "supplyRatePerBlock" },
-            { address: c, abi: CTOKEN_ABI, functionName: "reserveFactorMantissa" },
-            { address: COMPOUND_V2_ADDRESSES.COMPTROLLER, abi: COMPTROLLER_ABI, functionName: "markets", args: [c] },
-            { address: c, abi: CTOKEN_ABI, functionName: "interestRateModel" },
-          ] as const,
-      ),
-    })) as Res[];
-
-    // Each market's own rate model: its annualization constant and its kink.
-    // Both are per-model, and the roster runs several models — see IRM_ABI.
-    const irmOf = cTokens.map((_, i) => ok<string>(results[i * PER_MARKET + 10]));
-    const irmRes = (await client.multicall({
-      allowFailure: true,
-      contracts: irmOf.flatMap((irm) => {
-        const addr = (irm && !isZeroAddr(irm) ? irm : COMPOUND_V2_ADDRESSES.COMPTROLLER) as `0x${string}`;
-        return [
-          { address: addr, abi: IRM_ABI, functionName: "kink" },
-          { address: addr, abi: IRM_ABI, functionName: "blocksPerYear" },
-        ] as const;
-      }),
-    })) as Res[];
-
-    // Name the cTokens and their underlyings in one resolver call (the api's
-    // token_meta first, the chain for what it lacks). cETH's underlying is
-    // skipped (no contract to ask), but the bytes32-symbol tokens are NOT: only
-    // their symbol() is undecodable — decimals() answers fine, and the resolver
-    // is already making that call. Overriding just the symbol below keeps SAI's
-    // and MKR's scale the token's answer rather than a catalog assumption.
-    const wanted: string[] = [];
-    cTokens.forEach((c, i) => {
-      const und = ok<string>(results[i * PER_MARKET]);
-      if (und && !isZeroAddr(und)) wanted.push(und);
-    });
-    const meta = await resolveErc20Meta([...cTokens, ...wanted]);
-    // Every market figure scales by its underlying's decimals: without them the
-    // read fails whole rather than state amounts scaled by the 18 stand-in.
-    assertDecimalsRead(meta, wanted);
-
-    // The oracle lane: the price the Comptroller would use, and whether a live
-    // feed stands behind it at all.
-    const oracleRes = (await client.multicall({
-      allowFailure: true,
-      contracts: cTokens.flatMap(
-        (c) =>
-          [
-            { address: oracle, abi: ORACLE_ABI, functionName: "getUnderlyingPrice", args: [c] },
-            { address: oracle, abi: ORACLE_ABI, functionName: "getConfig", args: [c] },
-          ] as const,
-      ),
-    })) as Res[];
-
-    const markets: CompoundV2MarketRow[] = cTokens.map((c, i) => {
-      const base = i * PER_MARKET;
-      const cToken = getAddress(c).toLowerCase();
-      const und = ok<string>(results[base]);
-      const underlying = und && !isZeroAddr(und) ? getAddress(und).toLowerCase() : null;
-      const cMeta = meta.get(cToken);
-
-      // Identity, in the order of who can actually answer: the native-ETH
-      // market has no contract to ask; SAI and MKR answer in bytes32 the shared
-      // resolver can't decode; everything else names itself.
-      let underlyingSymbol: string;
-      let underlyingDecimals: number;
-      let identityNote: string | null = null;
-      const hand = underlying ? handResolvedUnderlying(underlying) : null;
-      const m = underlying ? meta.get(underlying) : undefined;
-      if (isCEth(cToken)) {
-        underlyingSymbol = "ETH";
-        underlyingDecimals = 18;
-        identityNote = "native ETH — this market has no underlying() to read, so its identity is stated, not resolved";
-      } else if (hand) {
-        // Symbol from the catalog (bytes32, undecodable); decimals still the
-        // token's own answer.
-        underlyingSymbol = hand.symbol;
-        underlyingDecimals = m?.decimals ?? 18;
-        identityNote = hand.note;
-      } else {
-        underlyingSymbol = m?.named ? m.symbol : (m?.symbol ?? "—");
-        underlyingDecimals = m?.decimals ?? 18;
-      }
-
-      const exchangeRate = ok<bigint>(results[base + 3]);
-      const totalSupplyCTokens = ok<bigint>(results[base + 1]);
-      const totalBorrowsRaw = ok<bigint>(results[base + 2]);
-      const cashRaw = ok<bigint>(results[base + 4]);
-      const reservesRaw = ok<bigint>(results[base + 5]);
-
-      // Supplied underlying = cTokens × exchangeRateStored / 1e18, where the
-      // rate is scaled 1e(18 + ud − 8): the cToken's 8dp and the rate's excess
-      // decimals cancel, leaving underlying at its own scale.
-      const totalSupplyUnderlying =
-        totalSupplyCTokens != null && exchangeRate != null
-          ? scaleRaw((totalSupplyCTokens * exchangeRate) / BigInt("1000000000000000000"), underlyingDecimals)
-          : 0;
-      const totalBorrowsUnderlying = totalBorrowsRaw != null ? scaleRaw(totalBorrowsRaw, underlyingDecimals) : 0;
-      const cashUnderlying = cashRaw != null ? scaleRaw(cashRaw, underlyingDecimals) : 0;
-      const totalReservesUnderlying = reservesRaw != null ? scaleRaw(reservesRaw, underlyingDecimals) : 0;
-
-      const priceRaw = ok<bigint>(oracleRes[i * 2]);
-      const cfg = ok<{ underlyingAssetDecimals: number; priceFeed: string; fixedPrice: bigint }>(oracleRes[i * 2 + 1]);
-      // Oracle scale is the protocol's own: 1e(36 − underlyingDecimals).
-      const priceUsd = priceRaw != null && priceRaw > ZERO ? Number(priceRaw) / 10 ** (36 - underlyingDecimals) : null;
-      // No feed ⇒ the price is a constant governance stored and nothing keeps
-      // current. Read from the oracle's own config, not inferred from the value.
-      const priceHasFeed = cfg != null ? !isZeroAddr(cfg.priceFeed) : true;
-      const priceFeed = cfg != null && !isZeroAddr(cfg.priceFeed) ? getAddress(cfg.priceFeed).toLowerCase() : null;
-
-      const mkt = ok<readonly [boolean, bigint, boolean]>(results[base + 9]);
-      const cfMantissa = mkt ? mkt[1] : null;
-      // collateralFactor == 0 is not a 0% rung — it is "disabled as collateral".
-      // Null the value so no surface can render the parameter as if it existed.
-      const collateralDisabled = cfMantissa != null && cfMantissa === ZERO;
-      const collateralFactor = cfMantissa != null && cfMantissa > ZERO ? Number(cfMantissa) / 1e18 : null;
-
-      // Annualize on THIS market's model's own constant. Without a readable
-      // model there is no constant to annualize with and no honest number to
-      // print — so the rate is null rather than guessed at 2,102,400, which is
-      // exactly the assumption that would misstate cETH by 25%.
-      const kinkRaw = ok<bigint>(irmRes[i * 2]);
-      const bpyRaw = ok<bigint>(irmRes[i * 2 + 1]);
-      const blocksPerYear = bpyRaw != null && bpyRaw > ZERO ? Number(bpyRaw) : null;
-      const apr = (r: Res | undefined): number | null => {
-        const v = ok<bigint>(r);
-        return v != null && blocksPerYear != null ? (Number(v) / 1e18) * blocksPerYear * 100 : null;
-      };
-
-      return {
-        cToken,
-        cTokenSymbol: cMeta?.named ? cMeta.symbol : "—",
-        underlying,
-        underlyingSymbol,
-        underlyingDecimals,
-        identityNote,
-
-        totalSupplyUnderlying,
-        totalBorrowsUnderlying,
-        cashUnderlying,
-        totalReservesUnderlying,
-
-        priceUsd,
-        priceHasFeed,
-        priceFeed,
-        totalSupplyUsd: priceUsd != null ? totalSupplyUnderlying * priceUsd : null,
-        totalBorrowsUsd: priceUsd != null ? totalBorrowsUnderlying * priceUsd : null,
-
-        utilisation: totalSupplyUnderlying > 0 ? totalBorrowsUnderlying / totalSupplyUnderlying : null,
-
-        collateralFactor,
-        collateralDisabled,
-        isListed: mkt ? mkt[0] : false,
-
-        supplyApr: apr(results[base + 7]),
-        borrowApr: apr(results[base + 6]),
-        reserveFactor: (() => {
-          const v = ok<bigint>(results[base + 8]);
-          return v != null ? Number(v) / 1e18 : null;
-        })(),
-
-        interestRateModel: irmOf[i] && !isZeroAddr(irmOf[i]) ? getAddress(irmOf[i]!).toLowerCase() : null,
-        blocksPerYear,
-        kink: kinkRaw != null && kinkRaw > ZERO ? Number(kinkRaw) / 1e18 : null,
-      };
-    });
-
-    // Largest first: the view's claim is about where the money is, and the
-    // roster's own order (listing sequence) buries the answer.
-    markets.sort((a, b) => (b.totalSupplyUsd ?? 0) - (a.totalSupplyUsd ?? 0));
-
-    const sum = (rows: CompoundV2MarketRow[], k: "totalSupplyUsd" | "totalBorrowsUsd") =>
-      rows.reduce((t, r) => t + (r[k] ?? 0), 0);
-    const priced = markets.filter((m) => m.totalSupplyUsd != null);
-    const withFeed = priced.filter((m) => m.priceHasFeed);
-    const supplied = priced.length > 0 ? sum(priced, "totalSupplyUsd") : null;
-    const borrowed = priced.length > 0 ? sum(priced, "totalBorrowsUsd") : null;
-
-    return {
-      blockNumber,
-      oracle: getAddress(oracle).toLowerCase(),
-      markets,
-      summary: {
-        total: markets.length,
-        collateralDisabled: markets.filter((m) => m.collateralDisabled).length,
-        fixedPrice: markets.filter((m) => !m.priceHasFeed).length,
-        distinctSymbols: new Set(markets.map((m) => m.cTokenSymbol)).size,
-        totalSuppliedUsd: supplied,
-        totalBorrowedUsd: borrowed,
-        utilisation: supplied != null && borrowed != null && supplied > 0 ? borrowed / supplied : null,
-        totalSuppliedUsdWithFeed: withFeed.length > 0 ? sum(withFeed, "totalSupplyUsd") : null,
-        totalBorrowedUsdWithFeed: withFeed.length > 0 ? sum(withFeed, "totalBorrowsUsd") : null,
-      },
-      chainStale: false,
-    };
+    const { value, stored } = await withHeadSnapshot(
+      { surface: MARKETS_SURFACE, chainId: MAINNET_CHAIN_ID },
+      readMarkets,
+      () => true,
+    );
+    if (stored) return { ...value, stored };
+    const head = serverHeadStampAt(MAINNET_CHAIN_ID, value.blockNumber);
+    return head ? { ...value, head } : value;
   } catch (error) {
     console.error("Compound V2 markets chain read failed:", error);
     return empty();
   }
+}
+
+/** Every market the Comptroller lists, at one block; throws where a read fails. */
+async function readMarkets(client: PublicClient): Promise<CompoundV2MarketsResponse> {
+  // The block is taken first and every read below is pinned to it, so the
+  // block the response names is the block every figure was read at.
+  const blockNumber = Number(await client.getBlockNumber());
+  const atBlock = { blockNumber: BigInt(blockNumber) };
+
+  // The Comptroller states its own roster and its own oracle. Neither is
+  // hardcoded: a view that hardcoded the market list would be asserting a
+  // roster rather than reading one.
+  const [cTokens, oracle] = await Promise.all([
+    client.readContract({
+      address: COMPOUND_V2_ADDRESSES.COMPTROLLER as `0x${string}`,
+      abi: COMPTROLLER_ABI,
+      functionName: "getAllMarkets",
+      ...atBlock,
+    }),
+    client.readContract({
+      address: COMPOUND_V2_ADDRESSES.COMPTROLLER as `0x${string}`,
+      abi: COMPTROLLER_ABI,
+      functionName: "oracle",
+      ...atBlock,
+    }),
+  ]);
+
+  const PER_MARKET = 11;
+  const results = (await client.multicall({
+    allowFailure: true,
+    ...atBlock,
+    contracts: cTokens.flatMap(
+      (c) =>
+        [
+          { address: c, abi: CTOKEN_ABI, functionName: "underlying" },
+          { address: c, abi: CTOKEN_ABI, functionName: "totalSupply" },
+          { address: c, abi: CTOKEN_ABI, functionName: "totalBorrows" },
+          { address: c, abi: CTOKEN_ABI, functionName: "exchangeRateStored" },
+          { address: c, abi: CTOKEN_ABI, functionName: "getCash" },
+          { address: c, abi: CTOKEN_ABI, functionName: "totalReserves" },
+          { address: c, abi: CTOKEN_ABI, functionName: "borrowRatePerBlock" },
+          { address: c, abi: CTOKEN_ABI, functionName: "supplyRatePerBlock" },
+          { address: c, abi: CTOKEN_ABI, functionName: "reserveFactorMantissa" },
+          { address: COMPOUND_V2_ADDRESSES.COMPTROLLER, abi: COMPTROLLER_ABI, functionName: "markets", args: [c] },
+          { address: c, abi: CTOKEN_ABI, functionName: "interestRateModel" },
+        ] as const,
+    ),
+  })) as Res[];
+
+  // Each market's own rate model: its annualization constant and its kink.
+  // Both are per-model, and the roster runs several models — see IRM_ABI.
+  const irmOf = cTokens.map((_, i) => ok<string>(results[i * PER_MARKET + 10]));
+  const irmRes = (await client.multicall({
+    allowFailure: true,
+    ...atBlock,
+    contracts: irmOf.flatMap((irm) => {
+      const addr = (irm && !isZeroAddr(irm) ? irm : COMPOUND_V2_ADDRESSES.COMPTROLLER) as `0x${string}`;
+      return [
+        { address: addr, abi: IRM_ABI, functionName: "kink" },
+        { address: addr, abi: IRM_ABI, functionName: "blocksPerYear" },
+      ] as const;
+    }),
+  })) as Res[];
+
+  // Name the cTokens and their underlyings in one resolver call (the api's
+  // token_meta first, the chain for what it lacks). cETH's underlying is
+  // skipped (no contract to ask), but the bytes32-symbol tokens are NOT: only
+  // their symbol() is undecodable — decimals() answers fine, and the resolver
+  // is already making that call. Overriding just the symbol below keeps SAI's
+  // and MKR's scale the token's answer rather than a catalog assumption.
+  const wanted: string[] = [];
+  cTokens.forEach((c, i) => {
+    const und = ok<string>(results[i * PER_MARKET]);
+    if (und && !isZeroAddr(und)) wanted.push(und);
+  });
+  const meta = await resolveErc20Meta([...cTokens, ...wanted]);
+  // Every market figure scales by its underlying's decimals: without them the
+  // read fails whole rather than state amounts scaled by the 18 stand-in.
+  assertDecimalsRead(meta, wanted);
+
+  // The oracle lane: the price the Comptroller would use, and whether a live
+  // feed stands behind it at all.
+  const oracleRes = (await client.multicall({
+    allowFailure: true,
+    ...atBlock,
+    contracts: cTokens.flatMap(
+      (c) =>
+        [
+          { address: oracle, abi: ORACLE_ABI, functionName: "getUnderlyingPrice", args: [c] },
+          { address: oracle, abi: ORACLE_ABI, functionName: "getConfig", args: [c] },
+        ] as const,
+    ),
+  })) as Res[];
+
+  const markets: CompoundV2MarketRow[] = cTokens.map((c, i) => {
+    const base = i * PER_MARKET;
+    const cToken = getAddress(c).toLowerCase();
+    const und = ok<string>(results[base]);
+    const underlying = und && !isZeroAddr(und) ? getAddress(und).toLowerCase() : null;
+    const cMeta = meta.get(cToken);
+
+    // Identity, in the order of who can actually answer: the native-ETH
+    // market has no contract to ask; SAI and MKR answer in bytes32 the shared
+    // resolver can't decode; everything else names itself.
+    let underlyingSymbol: string;
+    let underlyingDecimals: number;
+    let identityNote: string | null = null;
+    const hand = underlying ? handResolvedUnderlying(underlying) : null;
+    const m = underlying ? meta.get(underlying) : undefined;
+    if (isCEth(cToken)) {
+      underlyingSymbol = "ETH";
+      underlyingDecimals = 18;
+      identityNote = "native ETH — this market has no underlying() to read, so its identity is stated, not resolved";
+    } else if (hand) {
+      // Symbol from the catalog (bytes32, undecodable); decimals still the
+      // token's own answer.
+      underlyingSymbol = hand.symbol;
+      underlyingDecimals = m?.decimals ?? 18;
+      identityNote = hand.note;
+    } else {
+      underlyingSymbol = m?.named ? m.symbol : (m?.symbol ?? "—");
+      underlyingDecimals = m?.decimals ?? 18;
+    }
+
+    const exchangeRate = ok<bigint>(results[base + 3]);
+    const totalSupplyCTokens = ok<bigint>(results[base + 1]);
+    const totalBorrowsRaw = ok<bigint>(results[base + 2]);
+    const cashRaw = ok<bigint>(results[base + 4]);
+    const reservesRaw = ok<bigint>(results[base + 5]);
+
+    // Supplied underlying = cTokens × exchangeRateStored / 1e18, where the
+    // rate is scaled 1e(18 + ud − 8): the cToken's 8dp and the rate's excess
+    // decimals cancel, leaving underlying at its own scale.
+    const totalSupplyUnderlying =
+      totalSupplyCTokens != null && exchangeRate != null
+        ? scaleRaw((totalSupplyCTokens * exchangeRate) / BigInt("1000000000000000000"), underlyingDecimals)
+        : 0;
+    const totalBorrowsUnderlying = totalBorrowsRaw != null ? scaleRaw(totalBorrowsRaw, underlyingDecimals) : 0;
+    const cashUnderlying = cashRaw != null ? scaleRaw(cashRaw, underlyingDecimals) : 0;
+    const totalReservesUnderlying = reservesRaw != null ? scaleRaw(reservesRaw, underlyingDecimals) : 0;
+
+    const priceRaw = ok<bigint>(oracleRes[i * 2]);
+    const cfg = ok<{ underlyingAssetDecimals: number; priceFeed: string; fixedPrice: bigint }>(oracleRes[i * 2 + 1]);
+    // Oracle scale is the protocol's own: 1e(36 − underlyingDecimals).
+    const priceUsd = priceRaw != null && priceRaw > ZERO ? Number(priceRaw) / 10 ** (36 - underlyingDecimals) : null;
+    // No feed ⇒ the price is a constant governance stored and nothing keeps
+    // current. Read from the oracle's own config, not inferred from the value.
+    const priceHasFeed = cfg != null ? !isZeroAddr(cfg.priceFeed) : true;
+    const priceFeed = cfg != null && !isZeroAddr(cfg.priceFeed) ? getAddress(cfg.priceFeed).toLowerCase() : null;
+
+    const mkt = ok<readonly [boolean, bigint, boolean]>(results[base + 9]);
+    const cfMantissa = mkt ? mkt[1] : null;
+    // collateralFactor == 0 is not a 0% rung — it is "disabled as collateral".
+    // Null the value so no surface can render the parameter as if it existed.
+    const collateralDisabled = cfMantissa != null && cfMantissa === ZERO;
+    const collateralFactor = cfMantissa != null && cfMantissa > ZERO ? Number(cfMantissa) / 1e18 : null;
+
+    // Annualize on THIS market's model's own constant. Without a readable
+    // model there is no constant to annualize with, so the rate is null; a
+    // guess of 2,102,400 would misstate cETH by 25%.
+    const kinkRaw = ok<bigint>(irmRes[i * 2]);
+    const bpyRaw = ok<bigint>(irmRes[i * 2 + 1]);
+    const blocksPerYear = bpyRaw != null && bpyRaw > ZERO ? Number(bpyRaw) : null;
+    const apr = (r: Res | undefined): number | null => {
+      const v = ok<bigint>(r);
+      return v != null && blocksPerYear != null ? (Number(v) / 1e18) * blocksPerYear * 100 : null;
+    };
+
+    return {
+      cToken,
+      cTokenSymbol: cMeta?.named ? cMeta.symbol : "—",
+      underlying,
+      underlyingSymbol,
+      underlyingDecimals,
+      identityNote,
+
+      totalSupplyUnderlying,
+      totalBorrowsUnderlying,
+      cashUnderlying,
+      totalReservesUnderlying,
+
+      priceUsd,
+      priceHasFeed,
+      priceFeed,
+      totalSupplyUsd: priceUsd != null ? totalSupplyUnderlying * priceUsd : null,
+      totalBorrowsUsd: priceUsd != null ? totalBorrowsUnderlying * priceUsd : null,
+
+      utilisation: totalSupplyUnderlying > 0 ? totalBorrowsUnderlying / totalSupplyUnderlying : null,
+
+      collateralFactor,
+      collateralDisabled,
+      isListed: mkt ? mkt[0] : false,
+
+      supplyApr: apr(results[base + 7]),
+      borrowApr: apr(results[base + 6]),
+      reserveFactor: (() => {
+        const v = ok<bigint>(results[base + 8]);
+        return v != null ? Number(v) / 1e18 : null;
+      })(),
+
+      interestRateModel: irmOf[i] && !isZeroAddr(irmOf[i]) ? getAddress(irmOf[i]!).toLowerCase() : null,
+      blocksPerYear,
+      kink: kinkRaw != null && kinkRaw > ZERO ? Number(kinkRaw) / 1e18 : null,
+    };
+  });
+
+  // Largest first: the view's claim is about where the money is, and the
+  // roster's own order (listing sequence) buries the answer.
+  markets.sort((a, b) => (b.totalSupplyUsd ?? 0) - (a.totalSupplyUsd ?? 0));
+
+  const sum = (rows: CompoundV2MarketRow[], k: "totalSupplyUsd" | "totalBorrowsUsd") =>
+    rows.reduce((t, r) => t + (r[k] ?? 0), 0);
+  const priced = markets.filter((m) => m.totalSupplyUsd != null);
+  const withFeed = priced.filter((m) => m.priceHasFeed);
+  const supplied = priced.length > 0 ? sum(priced, "totalSupplyUsd") : null;
+  const borrowed = priced.length > 0 ? sum(priced, "totalBorrowsUsd") : null;
+
+  return {
+    blockNumber,
+    oracle: getAddress(oracle).toLowerCase(),
+    markets,
+    summary: {
+      total: markets.length,
+      collateralDisabled: markets.filter((m) => m.collateralDisabled).length,
+      fixedPrice: markets.filter((m) => !m.priceHasFeed).length,
+      distinctSymbols: new Set(markets.map((m) => m.cTokenSymbol)).size,
+      totalSuppliedUsd: supplied,
+      totalBorrowedUsd: borrowed,
+      utilisation: supplied != null && borrowed != null && supplied > 0 ? borrowed / supplied : null,
+      totalSuppliedUsdWithFeed: withFeed.length > 0 ? sum(withFeed, "totalSupplyUsd") : null,
+      totalBorrowedUsdWithFeed: withFeed.length > 0 ? sum(withFeed, "totalBorrowsUsd") : null,
+    },
+    chainStale: false,
+  };
 }

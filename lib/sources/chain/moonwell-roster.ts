@@ -18,10 +18,16 @@
 // A deployment that writes its roster down (Ethereum — see
 // MOONWELL_DEPLOYMENT) skips all of this and costs nothing.
 //
+// Without a `reader`, Base's roster is read at one block through rails-server's
+// head routes and, when the latest read fails, its stored snapshot (surface
+// `moonwell:base:roster`, lib/sources/api/head-snapshot.ts).
+//
 // SERVER-ONLY — imported from /api/chain/* route handlers only.
 
 import { getAddress, parseAbi, type PublicClient } from "viem";
 import { chainClient } from "./rpc";
+import { withHeadSnapshot } from "@/lib/sources/api/head-snapshot";
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import type { MoonwellDeployment, MoonwellRosterMarket } from "@/lib/moonwell/asset-catalog";
 
@@ -43,6 +49,9 @@ const TTL_MS = 60_000;
 
 const cache = new Map<string, { at: number; roster: MoonwellRoster }>();
 
+/** The head-snapshot surface Base's roster reads are stored under. */
+const ROSTER_SURFACE = "moonwell:base:roster";
+
 /**
  * The deployment's markets and its oracle. Returns null when the chain read
  * fails — the caller must treat that as "could not read", never as an empty
@@ -63,56 +72,17 @@ export async function resolveMoonwellRoster(
   if (hit && now - hit.at < TTL_MS) return hit.roster;
 
   try {
-    const client = reader ?? chainClient(deployment.chainId);
-    const comptroller = deployment.comptroller as `0x${string}`;
-    const [mTokens, oracle] = await Promise.all([
-      client.readContract({ address: comptroller, abi: COMPTROLLER_ABI, functionName: "getAllMarkets" }),
-      client.readContract({ address: comptroller, abi: COMPTROLLER_ABI, functionName: "oracle" }),
-    ]);
-
-    // Every Moonwell market is an ERC-20 market on both chains — native ETH
-    // goes through a WETH router rather than a cETH-style market — so each
-    // mToken names an underlying and none of these reverts. A market that DID
-    // revert is dropped rather than guessed at: a market whose underlying
-    // cannot be named cannot be scaled, and an unscaled balance is a wrong
-    // number rather than a missing one.
-    const underlyings = (await client.multicall({
-      allowFailure: true,
-      contracts: mTokens.map((m) => ({ address: m, abi: MTOKEN_ABI, functionName: "underlying" }) as const),
-    })) as { status: string; result?: unknown }[];
-
-    const pairs: { mtoken: string; underlying: string }[] = [];
-    mTokens.forEach((m, i) => {
-      const r = underlyings[i];
-      if (r?.status !== "success" || r.result == null) return;
-      pairs.push({ mtoken: getAddress(m).toLowerCase(), underlying: getAddress(r.result as string).toLowerCase() });
-    });
-
-    const meta = await resolveErc20Meta(
-      pairs.map((p) => p.underlying),
-      deployment.chainId,
-    );
-
-    // An underlying whose decimals did not load would scale every balance in
-    // its market by the 18 stand-in, and the roster is cached: the read fails
-    // instead, and the catch below keeps the last good roster.
-    assertDecimalsRead(
-      meta,
-      pairs.map((p) => p.underlying),
-    );
-
-    const markets: MoonwellRosterMarket[] = pairs.flatMap((p) => {
-      const m = meta.get(p.underlying);
-      if (!m) return [];
-      // The mToken address IS the key: two Base markets both answer
-      // `symbol()` = "mUSDC" (bridged and native USDC), so a symbol does not
-      // identify a market here.
-      return [{ key: p.mtoken, symbol: m.symbol, mtoken: p.mtoken, underlying: p.underlying, decimals: m.decimals }];
-    });
-
-    if (markets.length === 0) return null;
-
-    const roster: MoonwellRoster = { oracle: getAddress(oracle).toLowerCase(), markets };
+    const roster =
+      reader || deployment.chainId !== BASE_CHAIN_ID
+        ? await readRoster(reader ?? chainClient(deployment.chainId), deployment, !reader)
+        : (
+            await withHeadSnapshot(
+              { surface: ROSTER_SURFACE, chainId: BASE_CHAIN_ID },
+              (client) => readRoster(client, deployment, true),
+              (r) => r != null,
+            )
+          ).value;
+    if (!roster) return null;
     cache.set(key, { at: now, roster });
     return roster;
   } catch (error) {
@@ -122,4 +92,65 @@ export async function resolveMoonwellRoster(
     // none when the chain is briefly unreachable.
     return hit?.roster ?? null;
   }
+}
+
+/** The roster through `client`; null where no market can be named. `pin`
+ *  takes the block first and reads every call at it (left off for an injected
+ *  reader, which names its own block). */
+async function readRoster(
+  client: PublicClient,
+  deployment: MoonwellDeployment,
+  pin: boolean,
+): Promise<MoonwellRoster | null> {
+  const atBlock = pin ? { blockNumber: await client.getBlockNumber() } : {};
+  const comptroller = deployment.comptroller as `0x${string}`;
+  const [mTokens, oracle] = await Promise.all([
+    client.readContract({ address: comptroller, abi: COMPTROLLER_ABI, functionName: "getAllMarkets", ...atBlock }),
+    client.readContract({ address: comptroller, abi: COMPTROLLER_ABI, functionName: "oracle", ...atBlock }),
+  ]);
+
+  // Every Moonwell market is an ERC-20 market on both chains — native ETH
+  // goes through a WETH router rather than a cETH-style market — so each
+  // mToken names an underlying and none of these reverts. A market that DID
+  // revert is dropped rather than guessed at: a market whose underlying
+  // cannot be named cannot be scaled, and an unscaled balance is a wrong
+  // number rather than a missing one.
+  const underlyings = (await client.multicall({
+    allowFailure: true,
+    ...atBlock,
+    contracts: mTokens.map((m) => ({ address: m, abi: MTOKEN_ABI, functionName: "underlying" }) as const),
+  })) as { status: string; result?: unknown }[];
+
+  const pairs: { mtoken: string; underlying: string }[] = [];
+  mTokens.forEach((m, i) => {
+    const r = underlyings[i];
+    if (r?.status !== "success" || r.result == null) return;
+    pairs.push({ mtoken: getAddress(m).toLowerCase(), underlying: getAddress(r.result as string).toLowerCase() });
+  });
+
+  const meta = await resolveErc20Meta(
+    pairs.map((p) => p.underlying),
+    deployment.chainId,
+  );
+
+  // An underlying whose decimals did not load would scale every balance in
+  // its market by the 18 stand-in, and the roster is cached: the read fails
+  // instead, and the catch below keeps the last good roster.
+  assertDecimalsRead(
+    meta,
+    pairs.map((p) => p.underlying),
+  );
+
+  const markets: MoonwellRosterMarket[] = pairs.flatMap((p) => {
+    const m = meta.get(p.underlying);
+    if (!m) return [];
+    // The mToken address IS the key: two Base markets both answer
+    // `symbol()` = "mUSDC" (bridged and native USDC), so a symbol does not
+    // identify a market here.
+    return [{ key: p.mtoken, symbol: m.symbol, mtoken: p.mtoken, underlying: p.underlying, decimals: m.decimals }];
+  });
+
+  if (markets.length === 0) return null;
+
+  return { oracle: getAddress(oracle).toLowerCase(), markets };
 }
