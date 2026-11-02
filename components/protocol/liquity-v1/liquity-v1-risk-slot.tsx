@@ -14,6 +14,7 @@
 // The redemption fees and the system ratio are protocol-wide context and live
 // on the system view and in the Explanation.
 
+import { formatExact } from "@/lib/utils/format";
 import { AlertTriangle } from "lucide-react";
 import { Prov } from "@/components/shared/provenance";
 import { pct } from "@/components/shared/ratio-bar";
@@ -83,7 +84,10 @@ export function liquityV1Panel(chain: LiquityV1PositionChainResponse): PositionP
               value: (
                 <>
                   <TokenFigure symbol={DEBT_SYMBOL} figure={`${fmtLusd(chain.debtInFront)} ${DEBT_SYMBOL}`}>
-                    <Prov info={stampServerRead(debtInFrontProv(), serverReadOf(chain))}>
+                    <Prov
+                      value={formatExact(chain.debtInFront)}
+                      info={stampServerRead(debtInFrontProv(), serverReadOf(chain))}
+                    >
                       <AmountText value={chain.debtInFront} format="compact" />
                     </Prov>
                   </TokenFigure>
@@ -145,7 +149,10 @@ export function liquityV1Panel(chain: LiquityV1PositionChainResponse): PositionP
         label: "Room to borrow",
         tip: `The LUSD this Trove could still owe before its ratio falls to the ${activeLabel} minimum${chain.recoveryMode ? " that Recovery Mode applies" : ""}, from its collateral at the PriceFeed price at the latest block.`,
         value: (
-          <Prov info={stampServerRead(borrowHeadroomProv(activeLabel), serverReadOf(chain))}>
+          <Prov
+            value={formatExact(headroomLusd)}
+            info={stampServerRead(borrowHeadroomProv(activeLabel), serverReadOf(chain))}
+          >
             <AmountText value={headroomLusd} format="compact" />
           </Prov>
         ),

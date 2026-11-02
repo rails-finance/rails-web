@@ -402,7 +402,10 @@ export function fluidCardSlots({
         value: (
           <>
             <TokenFigure symbol={debtSym} figure={`${formatExact(headroom)} ${debtSym}`}>
-              <Prov info={fluidLiqPriceProv(colSym, debtSym, riskLive.vault, pairText, serverReadOf(riskLive))}>
+              <Prov
+                value={formatExact(headroom)}
+                info={fluidLiqPriceProv(colSym, debtSym, riskLive.vault, pairText, serverReadOf(riskLive))}
+              >
                 <AmountText value={headroom} format="compact" />
               </Prov>
             </TokenFigure>{" "}

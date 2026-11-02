@@ -218,7 +218,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
       items.push(
         <span key="reb">
           <PanelToken symbol="fxUSD" value={parts.rebalances.debt}>
-            <Prov info={rebalanceClearedProv(parts.rebalances.rows)}>
+            <Prov value={formatExact(parts.rebalances.debt)} info={rebalanceClearedProv(parts.rebalances.rows)}>
               <AmountText value={parts.rebalances.debt} format="compact" />
             </Prov>
           </PanelToken>{" "}
@@ -229,7 +229,10 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
       items.push(
         <span key="red">
           <PanelToken symbol="fxUSD" value={parts.redemptions.debt}>
-            <Prov info={rebalanceClearedProv(parts.redemptions.rows, "redemption")}>
+            <Prov
+              value={formatExact(parts.redemptions.debt)}
+              info={rebalanceClearedProv(parts.redemptions.rows, "redemption")}
+            >
               <AmountText value={parts.redemptions.debt} format="compact" />
             </Prov>
           </PanelToken>{" "}
@@ -240,7 +243,10 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
       items.push(
         <span key="pliq">
           <PanelToken symbol="fxUSD" value={parts.poolLiquidations.debt}>
-            <Prov info={rebalanceClearedProv(parts.poolLiquidations.rows, "pool-wide liquidation")}>
+            <Prov
+              value={formatExact(parts.poolLiquidations.debt)}
+              info={rebalanceClearedProv(parts.poolLiquidations.rows, "pool-wide liquidation")}
+            >
               <AmountText value={parts.poolLiquidations.debt} format="compact" />
             </Prov>
           </PanelToken>{" "}
@@ -255,7 +261,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
       items.push(
         <span key="unpaid">
           <PanelToken symbol="fxUSD" value={parts.leftUnpaid}>
-            <Prov info={leftUnpaidProv()}>
+            <Prov value={formatExact(parts.leftUnpaid)} info={leftUnpaidProv()}>
               <AmountText value={parts.leftUnpaid} format="compact" />
             </Prov>
           </PanelToken>{" "}
@@ -266,7 +272,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
       items.push(
         <span key="bad">
           <PanelToken symbol="fxUSD" value={parts.badDebt}>
-            <Prov info={badDebtAddedProv()}>
+            <Prov value={`+${formatExact(parts.badDebt)}`} info={badDebtAddedProv()}>
               +<AmountText value={parts.badDebt} format="compact" />
             </Prov>
           </PanelToken>{" "}
@@ -293,7 +299,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
       moved(
         <>
           <PanelToken symbol="fxUSD" value={cleared}>
-            <Prov info={rebalanceClearedProv(n)}>
+            <Prov value={formatExact(cleared)} info={rebalanceClearedProv(n)}>
               <AmountText value={cleared} format="compact" />
             </Prov>
           </PanelToken>{" "}
@@ -302,7 +308,7 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
             <>
               {" and "}
               <PanelToken symbol="fxUSD" value={Math.abs(other)}>
-                <Prov info={otherDebtMovesProv()}>
+                <Prov value={`${other > 0 ? "+" : "−"}${formatExact(Math.abs(other))}`} info={otherDebtMovesProv()}>
                   {other > 0 ? "+" : "−"}
                   <AmountText value={Math.abs(other)} format="compact" />
                 </Prov>
@@ -323,7 +329,10 @@ function debtReconciliationRows(v: FxPositionView, rows?: FxRebalanceRows): Posi
     moved(
       <>
         <PanelToken symbol="fxUSD" value={diff}>
-          <Prov info={socializedDebtProv(diff >= 0 ? "cleared" : "accrued", v.settled.block)}>
+          <Prov
+            value={`${diff >= 0 ? "" : "+"}${formatExact(Math.abs(diff))}`}
+            info={socializedDebtProv(diff >= 0 ? "cleared" : "accrued", v.settled.block)}
+          >
             {diff >= 0 ? "" : "+"}
             <AmountText value={Math.abs(diff)} format="compact" />
           </Prov>
@@ -581,7 +590,7 @@ function collateralDriftRow(
     label: "Collateral moved by the pool",
     value: (
       <PanelToken symbol={sym} value={total}>
-        <Prov info={info}>
+        <Prov value={`${total < -DUST ? "+" : ""}${formatExact(Math.abs(total))}`} info={info}>
           {total < -DUST ? "+" : ""}
           <AmountText value={Math.abs(total)} format="compact" />
         </Prov>
@@ -607,7 +616,7 @@ function collateralDriftRow(
       inside ? lifetimeCollateralMovedProv(sym, drift.headBlock) : prov,
       <>
         {rowsNoun(rows).replace(/^./, (c) => c.toUpperCase())} took{" "}
-        <Prov info={socializedCollTakenProv(sym, n)}>
+        <Prov value={formatExact(Math.abs(taken.coll))} info={socializedCollTakenProv(sym, n)}>
           <AmountText value={Math.abs(taken.coll)} format="compact" />
         </Prov>{" "}
         {sym} and funding took <Prov info={fundingTakenProv(sym)}>{formatCompact(Math.abs(funding))}</Prov> {sym}

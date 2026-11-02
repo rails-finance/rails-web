@@ -95,6 +95,13 @@ export function llamalendRiskRows(
     value: (
       <span className="inline-flex flex-wrap items-baseline gap-x-1.5">
         <Prov
+          value={
+            chain.converted == null
+              ? undefined
+              : chain.convertedRaw != null
+                ? formatUnitsExact(chain.convertedRaw, chain.borrowedDecimals)
+                : formatExact(chain.converted)
+          }
           info={stampServerRead(
             llamalendConvertedProv(chain.borrowedSymbol, chain.convertedCrossCheckExact, chain.controller, chain.amm),
             serverReadOf(chain),

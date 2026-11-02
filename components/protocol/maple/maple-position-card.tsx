@@ -216,7 +216,7 @@ function PeakDepositedLines({ lines }: { lines: MaplePeakAmount[] }) {
     <>
       {deposited.map((p) => (
         <div key={p.pool}>
-          <Prov info={peakDepositedProv(p.assetSymbol)}>
+          <Prov value={formatExact(p.peakDeposited)} info={peakDepositedProv(p.assetSymbol)}>
             <span>
               peak deposited <AmountText value={p.peakDeposited} format="compact" /> {p.assetSymbol}
             </span>
@@ -253,7 +253,7 @@ function interestRows(captions?: MapleCardCaptions, readBy?: ServerRead): Positi
       id: "interest-earned",
       label: "Interest earned",
       value: (
-        <Prov info={stampHeadRead(interestEarnedProv(it.symbol, readBy), readBy)}>
+        <Prov value={formatExact(it.amount)} info={stampHeadRead(interestEarnedProv(it.symbol, readBy), readBy)}>
           <span>
             <AmountText value={it.amount} format="compact" />
           </span>
@@ -269,7 +269,7 @@ function interestRows(captions?: MapleCardCaptions, readBy?: ServerRead): Positi
       value: (
         <>
           <PanelAmount symbol={e.symbol} exact={formatExact(e.amount)}>
-            <Prov info={interestEarnedLifetimeProv(e.symbol)}>
+            <Prov value={formatExact(e.amount)} info={interestEarnedLifetimeProv(e.symbol)}>
               <span>
                 <AmountText value={e.amount} format="compact" />
               </span>
