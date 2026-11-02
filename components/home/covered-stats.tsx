@@ -1,11 +1,10 @@
 import type { CoveredPositions } from "@/lib/home/covered-positions";
 import type { HomeStats } from "@/lib/home/home-stats";
-import type { ValueHeld } from "@/lib/home/value-held";
+import { formatValueHeld, spokenValueHeld, type ValueHeld } from "@/lib/home/value-held";
 import { CoveredStatsNote } from "@/components/home/covered-stats-note";
 import { IndexNotice } from "@/components/shared/index-notice";
 import { launchedProductionChainNames } from "@/lib/shared/protocols";
 import { formatMonthDay } from "@/lib/date";
-import { formatFlowUsd, spokenUsd } from "@/lib/shared/flows-timeline";
 
 /** The production chains the count is drawn from — the same set the loader
  *  sums over. */
@@ -130,8 +129,8 @@ export function CoveredStats({
         <p className={LINE} data-anatomy="S3.2">
           <span className={LABEL}>Together, the open positions on Rails hold</span>
           <span className="inline-flex items-center gap-x-2">
-            <span className={FIGURE} aria-label={spokenUsd(valueHeld.totalUsd)}>
-              {formatFlowUsd(valueHeld.totalUsd)}
+            <span className={FIGURE} aria-label={spokenValueHeld(valueHeld.totalUsd)}>
+              {formatValueHeld(valueHeld.totalUsd)}
             </span>
             <span className={`${LABEL} inline-flex items-center [&_button]:align-middle`}>{note}</span>
           </span>

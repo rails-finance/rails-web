@@ -186,3 +186,20 @@ export function settleValueHeld(data: ValueHeldData | null | undefined, roster: 
     overlaps: Array.isArray(data.overlaps) ? data.overlaps : [],
   };
 }
+
+/**
+ * The headline total: one decimal at every tier ("$38.4B", Miles's "$X.XB"),
+ * where the shared formatFlowUsd keeps a second. Below $1M it is whole dollars.
+ */
+export function formatValueHeld(usd: number): string {
+  if (usd >= 999_950_000) return `$${(usd / 1e9).toFixed(1)}B`;
+  if (usd >= 999_950) return `$${(usd / 1e6).toFixed(1)}M`;
+  return `$${Math.round(usd).toLocaleString("en-US")}`;
+}
+
+/** The same figure for a screen reader: "38.4 billion dollars". */
+export function spokenValueHeld(usd: number): string {
+  if (usd >= 999_950_000) return `${(usd / 1e9).toFixed(1)} billion dollars`;
+  if (usd >= 999_950) return `${(usd / 1e6).toFixed(1)} million dollars`;
+  return `${Math.round(usd).toLocaleString("en-US")} dollars`;
+}

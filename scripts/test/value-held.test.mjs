@@ -4,7 +4,7 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { groupLeftOut, settleValueHeld } from "../../lib/home/value-held.ts";
+import { formatValueHeld, groupLeftOut, settleValueHeld, spokenValueHeld } from "../../lib/home/value-held.ts";
 
 const roster = [
   { id: "aave-v3", slug: "aave-v3", chainId: 1, label: "Aave V3", chainName: "Ethereum" },
@@ -115,4 +115,11 @@ test("stale assets read as one line per explorer", () => {
     },
     { label: "Spark", chainName: "Ethereum", what: "SEAM", usd: null, reason: "a constant" },
   ]);
+});
+
+test("the headline total reads with one decimal, spoken the same", () => {
+  assert.equal(formatValueHeld(38_410_261_859), "$38.4B");
+  assert.equal(formatValueHeld(5_000_000_000), "$5.0B");
+  assert.equal(spokenValueHeld(38_410_261_859), "38.4 billion dollars");
+  assert.equal(formatValueHeld(18_400_000), "$18.4M");
 });
