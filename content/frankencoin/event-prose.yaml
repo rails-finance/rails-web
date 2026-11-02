@@ -2127,7 +2127,7 @@ glossary:
   - bold: |-
       Equity
     text: |-
-      The system's capital, also called its equity reserve. It is held by the owners of FPS, Frankencoin's equity token. It receives the opening fees and the interest, and it covers the losses that a position's reserve share cannot.
+      The system's capital, also called its equity reserve. It is held by the owners of FCS, Frankencoin's share token. Each FCS wraps one FPS, the share the Equity contract counts. It receives the opening fees and the interest, and it covers the losses that a position's reserve share cannot.
     sources: [{ label: "What FCS represents", doc: FCS }, { label: "Losses in a liquidation", doc: RESERVE_LOSSES }]
   - bold: |-
       Hub
@@ -2137,7 +2137,7 @@ glossary:
   - bold: |-
       Original and clone
     text: |-
-      An original position proposes its own terms, pays the opening fee and can be vetoed, which means FPS holders can reject it, during its veto window. A clone copies the terms of an existing position, skips the veto window and mints from the same minting limit, the cap on how much ZCHF the original and its clones can mint together, as the position it copies.
+      An original position proposes its own terms, pays the opening fee and can be vetoed, which means FCS holders can reject it, during its veto window. A clone copies the terms of an existing position, skips the veto window and mints from the same minting limit, the cap on how much ZCHF the original and its clones can mint together, as the position it copies.
     sources: [{ label: "Opening a position", doc: OPEN_TERMS }, { label: "Cloning a position", doc: CLONE }]
   - bold: |-
       Interest

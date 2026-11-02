@@ -248,7 +248,7 @@ export const deniedProv = (coords: FrankencoinCoords): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `This position was DENIED — the Position contract's own PositionDenied log${atBlock(coords)}: a holder of enough FPS vetoed it during its init window (every new original position waits an owner-chosen period, 3 days minimum, before it can mint). Denial disables minting permanently — V1 pins the cooldown to the expiration; V2 closes the position outright. Either way the denial itself is an indexed fact: head state cannot distinguish a V2 denial from an ordinary close.`,
+  summary: `This position was DENIED — the Position contract's own PositionDenied log${atBlock(coords)}: a holder of enough votes vetoed it during its init window (every new original position waits an owner-chosen period, 3 days minimum, before it can mint). Denial disables minting permanently — V1 pins the cooldown to the expiration; V2 closes the position outright. Either way the denial itself is an indexed fact: head state cannot distinguish a V2 denial from an ordinary close.`,
   contract: positionContract(coords),
   via: `${FRANKENCOIN_VIA} · PositionDenied`,
   inputs: eventInputs(coords),
