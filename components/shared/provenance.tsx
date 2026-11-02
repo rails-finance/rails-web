@@ -776,8 +776,8 @@ export function ProvReceipt({
 
   // Self-audit: every identifier the formula names should be traceable to an
   // input row. A named-but-untraced operand is exactly the gap the inspector
-  // exists to expose, so it renders as a visible caution (plus a dev console
-  // warning) rather than a silent, plausible-looking omission. Matching is
+  // exists to expose, so it renders as a visible caution in development builds only
+  // (ui-jobs sky-savings 18; plus a dev console warning) rather than a silent, plausible-looking omission. Matching is
   // lenient (substring, either direction: "shares" ↔ "borrowShares") so only
   // wholly-missing operands flag. Runs only when the vocabulary enumerates
   // inputs at all — a zero-input indexed rollup is a different, visible state.
@@ -960,7 +960,7 @@ export function ProvReceipt({
       {(info.formula || shownLeaves.length > 0 || hasSource) && (
         <div className="prov-eq">
           {info.formula && <div className="prov-formula">= {info.formula}</div>}
-          {untraced.length > 0 && (
+          {untraced.length > 0 && process.env.NODE_ENV !== "production" && (
             <p className="prov-audit">
               <TriangleAlert aria-hidden />
               <span>

@@ -25,7 +25,7 @@ import type {
   AlchemixTransmuterSort,
   FetchAlchemixTransmuterPositionsParams,
 } from "@/lib/sources/api/alchemix-transmuter-backend";
-import { parseAlchemixSearch } from "@/lib/alchemix/search";
+import { parseListingSearch } from "@/lib/shared/listing-search";
 import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 
 export const TRANSMUTER_ITEMS_PER_PAGE = 20;
@@ -60,7 +60,7 @@ const ANY_LINE: SortOption[] = [
   { value: "created", label: "Created" },
   { value: "nftId", label: "Position id" },
 ];
-const ONE_LINE: SortOption[] = [...ANY_LINE, { value: "amount", label: "Amount staked" }];
+const ONE_LINE: SortOption[] = [...ANY_LINE, { value: "amount", label: "Amount deposited" }];
 
 export function transmuterSortOptions(f: TransmuterListFilters): SortOption[] {
   return f.line.length === 1 ? ONE_LINE : ANY_LINE;
@@ -117,7 +117,7 @@ export function transmuterFiltersToFetchParams(
       : sorts.includes(filters.sortBy as AlchemixTransmuterSort)
         ? (filters.sortBy as AlchemixTransmuterSort)
         : "maturity";
-  const q = parseAlchemixSearch(filters.q, true);
+  const q = parseListingSearch(filters.q, true);
   return {
     chainId: deployment.chainId,
     lines,

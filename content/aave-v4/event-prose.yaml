@@ -782,28 +782,29 @@ templates:
 # Every Quick Link's page, with its anchor. A row in rails-ops
 # reference/official-docs/aave-v4.md backs each.
 doc_urls:
-  POSITIONS: https://aave.com/docs/aave-v4/positions#user-positions
+  POSITIONS: https://aave.com/docs/aave-v4/positions
   HF: https://aave.com/docs/aave-v4/positions#health-factor
   RISK_PREMIUM: https://aave.com/docs/aave-v4/positions#user-risk-premium
-  SPOKE_ISOLATION: https://aave.com/docs/aave-v4/positions#cross-spoke-strategies-spoke-isolation
+  SPOKE_ISOLATION: https://aave.com/docs/aave-v4/positions#spoke-isolation
   SUPPLY: https://aave.com/docs/aave-v4/positions/supply#supply-assets
   COLLATERAL: https://aave.com/docs/aave-v4/positions/supply#collateral-management
   WITHDRAW: https://aave.com/docs/aave-v4/positions/withdraw#withdraw-assets
-  WITHDRAW_POSITION: https://aave.com/docs/aave-v4/positions/withdraw#withdrawing-identify-the-supply-position
-  BORROW: https://aave.com/docs/aave-v4/positions/borrow#borrowing
+  WITHDRAW_POSITION: https://aave.com/docs/aave-v4/positions/withdraw#identify-the-supply-position
+  BORROW: https://aave.com/docs/aave-v4/positions/borrow#borrow-assets
   REPAY: https://aave.com/docs/aave-v4/positions/repay#repay-loans
-  LIQUIDATIONS: https://aave.com/docs/aave-v4/positions/liquidations#liquidations
-  LIQ_DEBT: https://aave.com/docs/aave-v4/positions/liquidations#select-liquidation-targets-choose-the-debt-position
-  LIQ_COLLATERAL: https://aave.com/docs/aave-v4/positions/liquidations#select-liquidation-targets-choose-the-collateral-position
+  LIQUIDATIONS: https://aave.com/docs/aave-v4/positions/liquidations
+  LIQ_DEBT: https://aave.com/docs/aave-v4/positions/liquidations#section-1-choose-the-debt-position
+  LIQ_COLLATERAL: https://aave.com/docs/aave-v4/positions/liquidations#section-2-choose-the-collateral-position
   MANAGERS: https://aave.com/docs/aave-v4/positions/managers#how-they-work
-  DELEGATION_MANAGERS: https://aave.com/docs/aave-v4/positions/managers#built-in-position-managers-delegation-managers
+  DELEGATION_MANAGERS: https://aave.com/docs/aave-v4/positions/managers#delegation-managers
   DYNAMIC_CONFIG: https://aave.com/docs/aave-v4/positions/conditions#dynamic-risk-configuration
-  LIQUIDITY_MODEL: https://aave.com/docs/aave-v4/liquidity#liquidity-model
+  LIQUIDITY_MODEL: https://aave.com/docs/aave-v4/liquidity
   HUBS: https://aave.com/docs/aave-v4/liquidity#liquidity-hubs
   SPOKES: https://aave.com/docs/aave-v4/liquidity#spokes
-  RATE_MODEL: https://aave.com/docs/aave-v4/liquidity/hubs#hub-assets-interest-rate-model
+  RATE_MODEL: https://aave.com/docs/aave-v4/liquidity/hubs#interest-rate-model
   HUB_SPOKE_CONFIGS: https://aave.com/docs/aave-v4/liquidity/hubs#hub-spoke-configs
   RESERVE_DATA: https://aave.com/docs/aave-v4/liquidity/reserves#reserve-data-structure
+  OVERVIEW_LIQUIDATIONS: https://aave.com/docs/aave-v4#liquidations
 
 L5:
   supply:
@@ -1095,7 +1096,7 @@ L5:
     intro_stablecoin_correlated: |-
       Stablecoin Correlated sits on the Global Dollar hub. It takes a Pendle principal token on USDG as collateral, borrows stablecoins there, and borrows USDG from Core.
     intro_mag7: |-
-      Mag7 is Aave V4's one market on Base. Seven Coinbase tokenized stocks are its collateral, and USDC from the Equities hub is the one asset it lends.
+      Mag7 is Aave V4's one market on Base. Coinbase tokenized stocks are its collateral, and USDC from the Equities hub is the one asset it lends.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1148,7 +1149,7 @@ L5:
         text_stablecoin_correlated: |-
           the principal token is priced by a discount-rate oracle that rises to par at maturity; later maturities join the same spoke.
         text_mag7: |-
-          stock prices are Chainlink feeds that publish from Sunday 20:00 to Friday 20:00 ET and hold their last value otherwise.
+          stock prices are Chainlink feeds and hold their last value until the feed publishes again.
     links:
       - label: |-
           Hubs and spokes
@@ -1207,7 +1208,7 @@ L5:
     title: |-
       How the Equities hub works
     intro: |-
-      Aave V4 on Base has one hub, Equities, holding one USDC reserve, and one spoke, Mag7. Seven Coinbase tokenized stocks back USDC borrowing there and cannot be borrowed.
+      Aave V4 on Base has one hub, Equities, holding one USDC reserve, and one spoke, Mag7. Coinbase tokenized stocks back USDC borrowing there and cannot be borrowed.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1222,7 +1223,7 @@ L5:
       - bold: |-
           Stock prices
         text: |-
-          Chainlink feeds publish from Sunday 20:00 to Friday 20:00 ET and hold their last value otherwise, so a weekend price can be days old.
+          Chainlink feeds hold their last value until the feed publishes again, so a price can be days old.
       - bold: |-
           Paused reserve
         text: |-
@@ -1241,3 +1242,46 @@ L5:
       - label: |-
           Reserve settings and pauses
         doc: RESERVE_DATA
+
+# ── The info pages (/ethereum/aave-v4/info, /base/aave-v4/info, zone Z5): the glossary under the opening ──
+glossary:
+  - bold: |-
+      Hub
+    text: |-
+      A hub is a pool that holds supplied assets and lends them to spokes. Each hub keeps its liquidity apart from the other hubs and sets the interest rate of each asset.
+    sources: [{ label: "Liquidity hubs", doc: HUBS }]
+  - bold: |-
+      Spoke
+    text: |-
+      A spoke is a market where positions live. It sets which assets count as collateral, how liquidation works and which prices apply, and it draws its liquidity from one hub or more.
+    sources: [{ label: "Spokes", doc: SPOKES }]
+  - bold: |-
+      Credit line
+    text: |-
+      A credit line is the limit a hub sets on how much of an asset one spoke may borrow from it.
+    sources: [{ label: "Liquidity hubs", doc: HUBS }, { label: "Caps per hub and spoke", doc: HUB_SPOKE_CONFIGS }]
+  - bold: |-
+      Collateral
+    text: |-
+      Collateral is a supplied asset that its owner has enabled to back borrowing. A supplied asset that is not enabled still earns interest but backs no debt.
+    sources: [{ label: "Collateral management", doc: COLLATERAL }]
+  - bold: |-
+      Collateral factor
+    text: |-
+      The collateral factor is the share of a collateral asset's value that counts toward the debt it can carry, and each spoke sets it for every asset. The position card calls it the liquidation threshold, which is the same figure under another name.
+    sources: [{ label: "Health factor", doc: HF }, { label: "Reserve settings", doc: RESERVE_DATA }]
+  - bold: |-
+      Health factor
+    text: |-
+      The health factor is a position's collateral value, weighted by its collateral factors, divided by its debt. At 1.0 the weighted collateral only just equals the debt, so a position at 1.0 has no spare room, and below 1.0 the debt is no longer safely covered. The spoke refuses a borrow or withdrawal that would take the health factor below 1.0.
+    sources: [{ label: "Health factor", doc: HF }]
+  - bold: |-
+      Liquidation
+    text: |-
+      Liquidation happens when a position's health factor falls below 1.0: anyone may then repay part of its debt and take its collateral at a bonus. That person is the liquidator, and the bonus is higher when the health factor is lower.
+    sources: [{ label: "Liquidations", doc: OVERVIEW_LIQUIDATIONS }]
+  - bold: |-
+      Position
+    text: |-
+      A position is one wallet's supplied assets and debt on one spoke. Positions on different spokes do not affect each other.
+    sources: [{ label: "User positions", doc: POSITIONS }]

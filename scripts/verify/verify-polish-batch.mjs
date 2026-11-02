@@ -202,7 +202,7 @@ for (let attempt = 0; attempt < 6 && !switcherOpen; attempt++) {
     .catch(() => false);
 }
 check("S panel opens from the chain trigger", switcherOpen);
-const chainButtons = page.locator(`${SWITCHER_PANEL} button[aria-pressed]`);
+const chainButtons = page.locator(`${SWITCHER_PANEL} button[aria-pressed]:not([data-switcher-robinhood])`);
 const chainCount = await chainButtons.count();
 check("S chain column renders multiple chains", chainCount >= 2, `chains: ${chainCount}`);
 // Every chain's count badge equals the explorer rows shown when selected.

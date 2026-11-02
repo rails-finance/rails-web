@@ -399,8 +399,10 @@ function shellHtml(body) {
 }
 
 // `protocols` here is the LAUNCHED roster, deduplicated to one row per
-// protocol VERSION — the same set app/layout.tsx counts for PROTOCOL_COUNT
-// and the same set a reader can reach from the nav. An unlaunched row (the
+// protocol VERSION, testnet included (the card names no chain, so Polaris is
+// one of the count; app/layout.tsx's PROTOCOL_COUNT leaves it out because its
+// sentences name Polaris in words), and the same set a reader can reach from
+// the nav. An unlaunched row (the
 // vault layer — see ProtocolSpec.unlaunched) still gets its own
 // explore-<id>.png (below), but doesn't inflate the home card's coverage
 // claim with a door that isn't open yet, and a second-chain row (a `-base`

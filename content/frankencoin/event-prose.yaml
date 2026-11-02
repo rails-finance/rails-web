@@ -1621,6 +1621,8 @@ doc_urls:
     https://docs.frankencoin.com/governance#fcs-qualification
   EXPIRY: |-
     https://docs.frankencoin.com/risks#missing-maturity-dates
+  VERSIONS: |-
+    https://docs.frankencoin.com/positions#contract-versions
 
 # ── The "?" modals (zone Z4): the event modals, the position card's and the
 # system view's minting book. Each stops at the mechanism and hands it to a
@@ -2090,3 +2092,60 @@ L5:
       - label: |-
           Expiry and the forced sale
         doc: EXPIRY
+
+# ── The info page (/ethereum/frankencoin/info, zone Z5): the glossary under its opening ──
+glossary:
+  - bold: |-
+      ZCHF
+    text: |-
+      The Frankencoin stablecoin. Borrowers mint it, which means creating new ZCHF, by locking collateral, and it is intended to track the Swiss franc.
+    sources: [{ label: "Overview", doc: STRUCTURE }]
+  - bold: |-
+      Position
+    text: |-
+      One borrower's collateral together with the ZCHF minted against it. Each position is its own contract, controlled by its owner, who can transfer it to another wallet.
+    sources: [{ label: "Adjusting a position", doc: ADJUST_OWNER }]
+  - bold: |-
+      Liquidation price
+    text: |-
+      The ZCHF value per collateral token that a position's owner declares. The collateral can back as much ZCHF as its value at this price, and anyone who thinks the price is too high can challenge it.
+    sources: [{ label: "Setting the liquidation price", doc: OPEN_PRICE }]
+  - bold: |-
+      Challenge
+    text: |-
+      An auction that anyone can start against a position they think has a liquidation price that is too high. The challenger puts up collateral of the same kind as the position's, and the auction price falls over time. If bidders pay the liquidation price, the challenger's collateral is sold. Otherwise some of the position's own collateral is sold at the falling price.
+    sources: [{ label: "Challenges and auctions", doc: AUCTION }, { label: "Starting a challenge", doc: AUCTION_START }]
+  - bold: |-
+      Reserve share
+    text: |-
+      The part of each mint that is kept in the system's reserve instead of being paid to the wallet. It counts toward repaying the debt and is the first thing to absorb a loss.
+    sources:
+      [
+        { label: "Reserve and auction duration", doc: OPEN_RESERVE },
+        { label: "Losses in a liquidation", doc: RESERVE_LOSSES },
+      ]
+  - bold: |-
+      Equity
+    text: |-
+      The system's capital, also called its equity reserve. It is held by the owners of FCS, Frankencoin's share token. Each FCS wraps one FPS, the share the Equity contract counts. It receives the opening fees and the interest, and it covers the losses that a position's reserve share cannot.
+    sources: [{ label: "What FCS represents", doc: FCS }, { label: "Losses in a liquidation", doc: RESERVE_LOSSES }]
+  - bold: |-
+      Hub
+    text: |-
+      The minting hub is the contract that opened a position and runs its challenges. It comes in two versions, V1 (2023) and V2 (2024), and each position keeps the rules of the hub that opened it.
+    sources: [{ label: "Contract versions", doc: VERSIONS }]
+  - bold: |-
+      Original and clone
+    text: |-
+      An original position proposes its own terms, pays the opening fee and can be vetoed, which means FCS holders can reject it, during its veto window. A clone copies the terms of an existing position, skips the veto window and mints from the same minting limit, the cap on how much ZCHF the original and its clones can mint together, as the position it copies.
+    sources: [{ label: "Opening a position", doc: OPEN_TERMS }, { label: "Cloning a position", doc: CLONE }]
+  - bold: |-
+      Interest
+    text: |-
+      The fee for the position's remaining term. It is taken up front at each mint and is not returned if the position is repaid early. On Hub V2 it is worked out from a yearly rate: the system's base rate plus the position's risk premium.
+    sources: [{ label: "Interest and minting capacity", doc: OPEN_INTEREST }]
+  - bold: |-
+      Forced sale
+    text: |-
+      After a Hub V2 position reaches its expiry date, anyone can buy its collateral at a price that starts at ten times the liquidation price and then falls. Hub V1 positions have no forced sale.
+    sources: [{ label: "Expiry and the forced sale", doc: EXPIRY }]

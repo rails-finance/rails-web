@@ -171,7 +171,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     views: true,
   }),
   // Aave V4's Base deployment (launched 2026-09-27): the Equities hub and its
-  // one spoke, Mag7, seven Coinbase tokenized stocks as collateral, USDC to
+  // one spoke, Mag7, Coinbase tokenized stocks as collateral, USDC to
   // borrow. The explorer's components are the Ethereum Aave V4 ones, shared
   // rather than forked (`lib/aave-v4/deployment.tsx`): the spoke position
   // page, its event cards, explainers and Copy-for-LLM export are the same

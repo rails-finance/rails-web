@@ -7,8 +7,9 @@
 // prose writer cannot see (`pnpm check:prose` fails on one).
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
+import type { InfoTerm } from "@/components/shared/protocol-info-page";
 import { eventProseEngine } from "@/lib/shared/event-prose/engine";
-import type { ProseFile, Words } from "@/lib/shared/event-prose/types";
+import type { ModalLink, ProseFile, Words } from "@/lib/shared/event-prose/types";
 import type { AaveV4EchoKey } from "@/lib/aave-v4/event-prose";
 import { slugifySpoke } from "@/lib/aave-v4/spoke-meta";
 import raw from "@/content/aave-v4/event-prose.yaml";
@@ -30,6 +31,7 @@ interface AaveV4ProseFile extends ProseFile<AaveV4L5Key> {
   words: Words;
   position_words: Words;
   doc_urls: Words;
+  glossary: { bold: string; text: string; sources: ModalLink[] }[];
 }
 
 const FILE = raw as AaveV4ProseFile;
@@ -80,4 +82,14 @@ export function aaveV4PositionModal(spokeName: string, liquidated = false): Lear
   const slug = slugifySpoke(spokeName);
   const form = slug ? [slug.replace(/-/g, "_")] : [];
   return PROSE.modal(FILE.L5.position, liquidated ? ["liquidated", ...form] : form);
+}
+
+/** The info pages' glossary (both deployments): each term with its definition
+ *  and the docs pages it rests on. */
+export function aaveV4Glossary(): [InfoTerm, ...InfoTerm[]] {
+  const terms = FILE.glossary.map((d): InfoTerm => {
+    const [first, ...rest] = d.sources.map((l) => ({ label: l.label, href: PROSE.linkUrl(l) }));
+    return { term: d.bold, definition: d.text, sources: [first, ...rest] };
+  });
+  return terms as [InfoTerm, ...InfoTerm[]];
 }

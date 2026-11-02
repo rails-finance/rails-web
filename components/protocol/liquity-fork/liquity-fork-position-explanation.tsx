@@ -15,6 +15,7 @@
 // plain words: a figure that includes pending interest, a price that didn't
 // refresh this load.
 
+import { formatExact } from "@/lib/utils/format";
 import { SurplusBullet } from "@/components/protocol/liquity-family/surplus-bullet";
 import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/types";
 import { formatUsd } from "@/lib/shared/format-event";
@@ -374,7 +375,7 @@ export function LiquityForkPositionExplanation({
   } else if (hasDebt && chain.debtInFront != null) {
     bullets.push(
       <span key="queue">
-        <Prov info={vocab.debtInFrontProv(sym)}>
+        <Prov value={formatExact(chain.debtInFront)} info={vocab.debtInFrontProv(sym)}>
           <AmountText value={chain.debtInFront} />
         </Prov>{" "}
         {debtSymbol} of this branch&rsquo;s debt sits at the same or lower interest rate, redeemed before this Trove

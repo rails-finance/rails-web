@@ -106,7 +106,7 @@ export function mapleFlowsContent(): LearnMoreContent {
     details: [
       {
         bold: "Pool shares",
-        text: "a lender holds shares of the pool, a standard vault token (ERC-4626) whose value in USDC or USDT rises as the pool's borrowers pay interest. It falls only if the pool delegate, the manager that runs the pool's lending, marks a loan as impaired.",
+        text: "a lender holds shares of the pool, a standard vault token (ERC-4626) whose value in USDC or USDT rises as the pool's borrowers pay interest. It falls when a loan loses value: the pool delegate, the manager that runs the pool's lending, marks it as impaired, or it defaults.",
       },
       {
         bold: "Withdrawal queue",

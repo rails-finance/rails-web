@@ -65,6 +65,8 @@ export interface MaplePeakAmount {
   assetSymbol: string;
   /** Peak deposited principal (assets). */
   peakDeposited: number;
+  /** The funds asset's decimals, for an exact print of `peakDeposited`. */
+  assetDecimals: number;
   /** Peak share balance. */
   peakShares: number;
 }
@@ -200,6 +202,7 @@ export async function buildMaplePositionRows(
           symbol: p.symbol,
           assetSymbol: p.assetSymbol,
           peakDeposited: scale(dep, p.decimals),
+          assetDecimals: p.decimals,
           peakShares: scale(shs, MAPLE_SHARE_DECIMALS),
         });
       }

@@ -20,7 +20,7 @@
 // tripwire sweeps the panel like any other receipted surface.
 
 import { formatDate } from "@/lib/date";
-import { formatNumber } from "@/lib/utils/format";
+import { formatExact } from "@/lib/utils/format";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import {
   driftIntervalProv,
@@ -38,7 +38,7 @@ const DUST = 1e-9;
 function DriftCell({ value, symbol, prov }: { value: number; symbol: string; prov: Provenance }) {
   if (Math.abs(value) <= DUST) return <span className="text-rb-500">—</span>;
   return (
-    <Prov info={prov} value={`${value > 0 ? "+" : "−"}${formatNumber(Math.abs(value))} ${symbol}`}>
+    <Prov info={prov} value={`${value > 0 ? "+" : "−"}${formatExact(Math.abs(value))} ${symbol}`}>
       <span className="tabular-nums text-foreground/80">
         {value > 0 ? "+" : "−"}
         {symbol === "fxUSD" ? <AmountText value={Math.abs(value)} /> : fxFundingText(value)} {symbol}

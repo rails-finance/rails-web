@@ -28,7 +28,7 @@ import {
   type AlchemixListFilters,
 } from "@/lib/alchemix/list-filter-dimensions";
 import type { AlchemixPositionSummary } from "@/types/api/alchemix";
-import { alchemixSearchNote, searchedAlchemixPage } from "@/lib/alchemix/search";
+import { searchedListingPage } from "@/lib/shared/listing-search";
 
 export interface AlchemixListingProps {
   deployment: AlchemixDeployment;
@@ -56,7 +56,6 @@ export function AlchemixListing({
       defaults={ALCHEMIX_LIST_DEFAULTS}
       sortOptions={alchemixSortOptions(deployment.chainId)}
       searchPlaceholder="Address, ENS name or position id"
-      emptyNote={(f) => alchemixSearchNote(f.q, true)}
       renderCard={(p) => <AlchemixPositionCard p={p} session={deployment.session} />}
       // Both halves of the key, always: a token id is unique only inside its
       // line, and the line is unique only on its chain. The position route
@@ -66,9 +65,10 @@ export function AlchemixListing({
       keyFor={(p) => `${p.lineKey}:${p.tokenId}`}
       strategy={serverStrategy<AlchemixPositionSummary, AlchemixListFilters>({
         dimensions: alchemixListDimensions(deployment.chainId),
+        search: { takesId: true },
         itemsPerPage: ALCHEMIX_ITEMS_PER_PAGE,
         fetchPage: (filters, page) =>
-          searchedAlchemixPage(filters.q, true, alchemixFiltersToFetchParams(deployment, filters, page), (p) =>
+          searchedListingPage(filters.q, true, alchemixFiltersToFetchParams(deployment, filters, page), (p) =>
             fetchAlchemixPositions(p).then((res) => ({ data: res.data, total: res.pagination.total })),
           ),
       })}

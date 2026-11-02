@@ -282,7 +282,7 @@ const CAPTION_FLOOR = 0.01;
  *  doesn't render. */
 export interface MapleCardCaptions {
   /** Interest earned, in the pool's own asset (single-pool positions only). */
-  interestEarned: { amount: number; symbol: string; pool?: string } | null;
+  interestEarned: { amount: number; symbol: string; decimals?: number; pool?: string } | null;
   /** The position earned interest and its claim holds none of it: every pool
    *  it earned in holds less than a cent now (wallet 0x1601…347e). The card
    *  says so and leaves the figure to the Lifetime flows panel. Never set
@@ -291,7 +291,7 @@ export interface MapleCardCaptions {
   /** Interest earned in pools the claim no longer holds any of (a pool the
    *  wallet has left), one line per asset, so the card's interest figure
    *  covers every token the position earned in. */
-  earnedElsewhere: { amount: number; symbol: string }[];
+  earnedElsewhere: { amount: number; symbol: string; decimals?: number }[];
 }
 
 /** One pool's lifetime flows as the Lifetime flows explanation states them,
@@ -356,7 +356,7 @@ export function computeMapleCardCaptions(
     const f = lifetime.get(cur.pool);
     if (f && !f.sharesMoved) {
       const amt = legInterest(cur.currentValue, netPrincipal(f), grossIn(f));
-      if (amt > 0) interestEarned = { amount: amt, symbol: cur.assetSymbol, pool: cur.pool };
+      if (amt > 0) interestEarned = { amount: amt, symbol: cur.assetSymbol, decimals: cur.decimals, pool: cur.pool };
     }
   }
   const interestWithdrawn =
@@ -369,7 +369,11 @@ export function computeMapleCardCaptions(
     interestEarned != null && lifetime != null
       ? lifetimeInterest(view, lifetime)
           .filter((i) => i.held < CAPTION_FLOOR && i.earned >= CAPTION_FLOOR && i.pool !== live[0]?.pool)
-          .map((i) => ({ amount: i.earned, symbol: i.symbol }))
+          .map((i) => ({
+            amount: i.earned,
+            symbol: i.symbol,
+            decimals: view.pools.find((p) => p.pool === i.pool)?.decimals,
+          }))
       : [];
   return { interestEarned, interestWithdrawn, earnedElsewhere };
 }

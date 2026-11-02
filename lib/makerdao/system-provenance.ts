@@ -356,7 +356,7 @@ export const systemAuctionStopProv = (ilk: string, stopped: number): Provenance 
 export const systemOsmPriceProv = (ilk: string, collSym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `The ${collSym} price Maker itself acts on for ${ilk} — the OSM (Oracle Security Module) price, recovered by inverting Spotter.poke: price = spot × par × mat ÷ RAY². The OSM delays feeds by an hour by design, so this is the protocol's operative price, not the spot market's.`,
+  summary: `The ${collSym} price Maker itself acts on for ${ilk} — the OSM (Oracle Security Module) price, recovered by inverting Spotter.poke: price = spot × par × mat ÷ RAY². The OSM passes each price on an hour after it is set, so the price in use is one to two hours behind the market, and this is the protocol's operative price, not the spot market's.`,
   contract: SPOTTER,
   via: `${SYSTEM_VIA} · Vat.ilks(ilk).spot × Spotter.par × Spotter.ilks(ilk).mat ÷ RAY² @ head`,
   formula: "spot × par × mat ÷ RAY²",

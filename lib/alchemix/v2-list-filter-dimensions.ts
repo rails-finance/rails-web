@@ -19,7 +19,7 @@ import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { ChainId } from "@/lib/shared/chains";
 import { isV2LineOnChain, v2LinesForChain, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import type { AlchemixV2Sort, FetchAlchemixV2PositionsParams } from "@/lib/sources/api/alchemix-v2-backend";
-import { parseAlchemixSearch } from "@/lib/alchemix/search";
+import { parseListingSearch } from "@/lib/shared/listing-search";
 import { sizeBounds, sizeDimensions } from "@/lib/shared/size-dimensions";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 
@@ -123,7 +123,7 @@ export function v2FiltersToFetchParams(
       : sorts.includes(filters.sortBy as AlchemixV2Sort)
         ? (filters.sortBy as AlchemixV2Sort)
         : "lastActivity";
-  const q = parseAlchemixSearch(filters.q, false);
+  const q = parseListingSearch(filters.q, false);
   return {
     lines,
     owner: q.kind === "address" ? q.address : undefined,

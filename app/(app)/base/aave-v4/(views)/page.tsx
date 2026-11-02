@@ -24,7 +24,7 @@ export const metadata = listingMetadata({
   title: "Explore Aave V4 Positions on Base",
   canonicalPath: "/base/aave-v4",
   description:
-    "Aave V4 on Base: every account on the Equities hub's Mag7 spoke, where seven Coinbase tokenized stocks back USDC loans, read from the spoke's own contracts.",
+    "Aave V4 on Base: every account on the Equities hub's Mag7 spoke, where Coinbase tokenized stocks back USDC loans, read from the spoke's own contracts.",
 });
 
 async function AaveV4BaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

@@ -15,6 +15,7 @@
 // Every figure is in base-token terms, unit-safe in every market (the WETH
 // market quotes in ETH). The verdict in words is the Explanation's.
 
+import { formatExact } from "@/lib/utils/format";
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { Prov } from "@/components/shared/provenance";
 import { AmountText } from "@/components/shared/amount-text";
@@ -67,6 +68,7 @@ export function compoundRiskSlots(
       tip: "How much more of the base the account can borrow before it reaches its borrowing limit, from the Comet's collateral balances, prices and borrow factors.",
       value: (
         <Prov
+          value={formatExact(headroom)}
           info={capacityProv(
             "Available to borrow",
             "(Σ collateral × price × borrow factor − debt value) ÷ base price",
@@ -91,6 +93,7 @@ export function compoundRiskSlots(
             figure={`${toBase(chain, chain.liquidationCapacity)} ${chain.baseSymbol}`}
           >
             <Prov
+              value={formatExact(toBase(chain, chain.liquidationCapacity))}
               info={capacityProv(
                 "Liquidation line",
                 "Σ collateral × price × liquidate factor ÷ base price",

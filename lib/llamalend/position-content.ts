@@ -4,7 +4,7 @@
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 
-const LLAMALEND_DOC_URL = "https://docs.curve.finance/lending/overview/";
+const LLAMALEND_DOC_URL = "https://docs.curve.finance/user/llamalend/overview";
 
 const LINKS: LearnMoreContent["links"] = [{ label: "Curve lending docs", url: LLAMALEND_DOC_URL }];
 

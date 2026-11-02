@@ -27,6 +27,9 @@ export function ArticleLayout({ article, nextArticle, prevArticle, children }: A
 
       {/* Article Header */}
       <header className="mb-12">
+        <time dateTime={article.publishedAt} className="block text-sm text-rb-500 mb-3">
+          {formattedDate}
+        </time>
         <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4 leading-tight">{article.title}</h1>
         <h2 className="text-xl md:text-2xl text-rb-500 mb-8 leading-relaxed">{article.subtitle}</h2>
 

@@ -7,6 +7,7 @@
 // account's last event (rails-ops decision 0018), valued at the lane's latest
 // oracle prices.
 
+import { useEffect, useState } from "react";
 import { AaveV4PositionListingCard } from "@/components/aave-v4/AaveV4PositionListingCard";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import { fetchAaveV4SpokePositions, type AaveV4SpokePositionRow } from "@/lib/api/fetch-aave-v4-spoke-positions";
@@ -17,7 +18,13 @@ import {
   AAVE_V4_BASE_LIST_DEFAULTS,
   AAVE_V4_BASE_SORT_OPTIONS,
 } from "@/lib/aave-v4-base/list-filter-dimensions";
-import { AAVE_V4_ITEMS_PER_PAGE, type AaveV4ListFilters } from "@/lib/aave-v4/list-filter-dimensions";
+import {
+  AAVE_V4_ITEMS_PER_PAGE,
+  reconcileAaveV4Assets,
+  type AaveV4ListFilters,
+} from "@/lib/aave-v4/list-filter-dimensions";
+import type { AaveV4AssetUniverseEntry } from "@/lib/api/fetch-aave-v4-asset-universe";
+import { fetchAaveV4BaseAssetUniverse } from "@/lib/api/fetch-aave-v4-base-asset-universe";
 
 export interface AaveV4BaseListingProps {
   initialItems?: AaveV4SpokePositionRow[];
@@ -26,9 +33,29 @@ export interface AaveV4BaseListingProps {
   initialSearch?: string;
 }
 
+/** The Equities hub's roster, fetched once. A failure is non-fatal: the asset
+ *  facets stay empty and the listing still loads. */
+function useAaveV4BaseAssetUniverse(): AaveV4AssetUniverseEntry[] {
+  const [universe, setUniverse] = useState<AaveV4AssetUniverseEntry[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetchAaveV4BaseAssetUniverse()
+      .then((u) => {
+        if (!cancelled) setUniverse(u);
+      })
+      .catch(() => {
+        /* non-fatal: leave the asset dimensions empty */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return universe;
+}
+
 export function AaveV4BaseListing({ initialItems, initialTotal, initialKey, initialSearch }: AaveV4BaseListingProps) {
   return (
-    <ChainTruthListingPage<AaveV4SpokePositionRow, AaveV4ListFilters>
+    <ChainTruthListingPage<AaveV4SpokePositionRow, AaveV4ListFilters, AaveV4AssetUniverseEntry[]>
       title="Aave V4 Positions"
       noun="positions"
       basePath="/base/aave-v4"
@@ -40,8 +67,10 @@ export function AaveV4BaseListing({ initialItems, initialTotal, initialKey, init
         `/base/aave-v4/spoke/${slugifySpoke(row.spokeName) ?? encodeURIComponent(row.spokeName)}/${row.wallet}`
       }
       keyFor={(row) => `${row.wallet}:${row.spoke}`}
-      strategy={serverStrategy<AaveV4SpokePositionRow, AaveV4ListFilters>({
-        dimensions: aaveV4BaseListDimensions(),
+      strategy={serverStrategy<AaveV4SpokePositionRow, AaveV4ListFilters, AaveV4AssetUniverseEntry[]>({
+        dimensions: (_filters, universe) => aaveV4BaseListDimensions(universe),
+        useExternalState: useAaveV4BaseAssetUniverse,
+        reconcile: reconcileAaveV4Assets,
         itemsPerPage: AAVE_V4_ITEMS_PER_PAGE,
         fetchPage: (filters, page) =>
           fetchAaveV4SpokePositions(aaveV4BaseFiltersToFetchParams(filters, page)).then((r) => ({

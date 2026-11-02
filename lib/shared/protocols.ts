@@ -233,7 +233,7 @@ const SPECS: ProtocolSpec[] = [
   },
   {
     // Aave V4's Base deployment — the Equities hub and its one spoke, Mag7:
-    // seven Coinbase tokenized stocks as collateral, USDC to borrow. A second
+    // Coinbase tokenized stocks as collateral, USDC to borrow. A second
     // roster row rather than a chain switch, for the reason aave-v3 /
     // aave-v3-base are two: separate contracts, separate accounts. The
     // seventh Base explorer, launched 2026-09-27.
@@ -244,7 +244,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "aave-v4",
     protocolKey: "aave-v4",
     tags: ["Lend", "Borrow"],
-    desc: "Aave V4's Base deployment — the Equities hub's Mag7 spoke, where seven Coinbase tokenized stocks back USDC loans, each account read from the spoke and each stock price stated with the time it was published",
+    desc: "Aave V4's Base deployment — the Equities hub's Mag7 spoke, where Coinbase tokenized stocks back USDC loans, each account read from the spoke and each stock price stated with the time it was published",
     subPages: [{ segment: "hubs", label: "Equities hub", tab: "Hub" }],
   },
   {
@@ -715,11 +715,16 @@ export const LAUNCHED_PROTOCOL_VERSIONS: ProtocolEntry[] = (() => {
   return versions;
 })();
 
-/** "23" — the number of distinct DeFi protocol versions Rails has a launched
- *  explorer for, which is what the home/SEO/share copy states. NOT
- *  `LAUNCHED_PROTOCOLS.length` (29): that counts one row per chain deployment,
- *  so it double-counts a version on two chains — see `LAUNCHED_PROTOCOL_VERSIONS`. */
-export const LAUNCHED_PROTOCOL_VERSION_COUNT = LAUNCHED_PROTOCOL_VERSIONS.length;
+/** The distinct DeFi protocol versions Rails has a launched explorer for on a
+ *  PRODUCTION chain (24 on 2 Nov 2026): the count the home/SEO/share copy
+ *  states as "N DeFi protocols on Ethereum, Base, and Arbitrum, plus Polaris
+ *  on Sepolia". Testnet explorers are left out because that sentence names
+ *  Polaris in words; counting it too would count it twice (ui-jobs 475). One
+ *  row per version (see `LAUNCHED_PROTOCOL_VERSIONS`), so a version on two
+ *  chains counts once. */
+export const LAUNCHED_PRODUCTION_PROTOCOL_VERSION_COUNT = LAUNCHED_PROTOCOL_VERSIONS.filter(
+  (p) => !CHAINS[p.chainId].testnet,
+).length;
 
 /** Is this route inside an unlaunched explorer? Takes any path under one — the
  *  listing, a sub-page, a vault, a position, an event — so a surface that has

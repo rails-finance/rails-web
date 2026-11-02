@@ -20,7 +20,7 @@ import {
 } from "@/lib/alchemix/list-filter-dimensions";
 import { ssrDecode, ssrInitial, toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import type { AlchemixPositionSummary } from "@/types/api/alchemix";
-import { searchedAlchemixPage } from "@/lib/alchemix/search";
+import { searchedListingPage } from "@/lib/shared/listing-search";
 
 export interface AlchemixListingPageData {
   initialItems?: AlchemixPositionSummary[];
@@ -44,7 +44,7 @@ export async function alchemixListingPageData(
     page,
     label: `Alchemix (chain ${deployment.chainId})`,
     fetchPage: (baseUrl, signal, headers) =>
-      searchedAlchemixPage(
+      searchedListingPage(
         filters.q,
         true,
         alchemixFiltersToFetchParams(deployment, filters, page),

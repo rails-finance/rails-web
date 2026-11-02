@@ -20,7 +20,9 @@ export function BlogCard({ article }: BlogCardProps) {
           />
         </div>
         <div className="p-6 flex-1 flex flex-col">
-          <time className="text-sm text-rb-500">{formattedDate}</time>
+          <time dateTime={article.publishedAt} className="text-sm text-rb-500">
+            {formattedDate}
+          </time>
           <h2 className="text-2xl font-semibold text-foreground mt-2 mb-3 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
             {article.title}
           </h2>

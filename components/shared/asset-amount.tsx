@@ -10,7 +10,7 @@
 
 import { TokenChipIcon } from "./token-chip-icon";
 import { AssetPopover } from "./asset-popover";
-import { formatExact, withRealMinus } from "@/lib/utils/format";
+import { formatExact, groupDigits, withRealMinus } from "@/lib/utils/format";
 import { formatCompact } from "@/lib/shared/format-compact";
 
 export interface AssetAmountProps {
@@ -64,7 +64,7 @@ export function AssetAmount({
   const full = signed ? withRealMinus(exact ?? formatExact(value)) : (exact ?? formatExact(value));
   const shown = display ?? formatCompact(value);
   const compact = signed ? withRealMinus(shown) : shown;
-  const exactLine = `${full} ${exactUnit ?? symbol}`;
+  const exactLine = groupDigits(`${full} ${exactUnit ?? symbol}`);
   return (
     <span className="relative inline-flex items-center gap-2">
       {/* data-prov-exact: the provenance inspector reads the exact figure from

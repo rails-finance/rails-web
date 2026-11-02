@@ -45,8 +45,8 @@ export const SKY_DOCS = {
     href: "https://github.com/sky-ecosystem/sdai/tree/susds#referral-code",
   },
   psm: {
-    label: "DssLitePsm.sol, the PSM contract source",
-    href: "https://github.com/sky-ecosystem/dss-lite-psm/blob/main/src/DssLitePsm.sol",
+    label: "Sky developer docs: LitePSM",
+    href: "https://developers.skyeco.com/protocol/liquidity/litepsm/",
   },
   vat: {
     label: "vat.sol: suck, the debt booked for new USDS",
@@ -57,8 +57,8 @@ export const SKY_DOCS = {
     href: "https://github.com/sky-ecosystem/dss/blob/master/src/jug.sol",
   },
   vow: {
-    label: "vow.sol: the surplus buffer, where debt and surplus settle",
-    href: "https://github.com/sky-ecosystem/dss/blob/master/src/vow.sol",
+    label: "Sky developer docs: Vow",
+    href: "https://developers.skyeco.com/protocol/core/vow/",
   },
   wrapper: {
     label: "UsdsPsmWrapper.sol, the USDS side of the PSM",

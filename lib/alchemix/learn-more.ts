@@ -33,8 +33,14 @@ export const ALCHEMIX_DOCS = {
   fees: { label: "Fees", url: `${DOCS}/user/concepts/fees` },
   transmuter: { label: "The Transmuter", url: `${DOCS}/user/concepts/transmuter` },
   redemptionRate: { label: "Redemption rate", url: `${DOCS}/user/concepts/redemption-rate` },
-  earmarking: { label: "Earmarking (developer docs)", url: `${DOCS}/dev/alchemist/earmarking` },
-  redemptions: { label: "Redemptions (developer docs)", url: `${DOCS}/dev/architecture/redemptions` },
+  transmuterFlow: {
+    label: "The Transmuter: how transmutations flow",
+    url: `${DOCS}/user/concepts/transmuter#how-transmutations-flow`,
+  },
+  redemptionFlow: {
+    label: "Redemption rate: how redemptions settle",
+    url: `${DOCS}/user/concepts/redemption-rate#the-redemption-rate`,
+  },
   router: { label: "The AlchemistRouter contract", url: `${DOCS}/dev/alchemist/alchemist-router-contract` },
   positionNft: { label: "The position NFT contract", url: `${DOCS}/dev/alchemist/alchemist-v3-position-contract` },
   v3Migration: { label: "The V2 to V3 migration", url: `${DOCS}/user/v3-migration` },
@@ -53,7 +59,7 @@ const CORE_COLLATERAL = {
 
 const CORE_SET_ASIDE = {
   bold: "Set aside for repayment",
-  text: "the part of the debt the Transmuter has claimed as its stakers' deposits matured. It grows block by block. A line redemption clears it, and so does the holder repaying with vault shares (the set-aside part is paid first, with the line's protocol fee) or closing the position with its collateral.",
+  text: "the part of the debt the Transmuter has claimed as its depositors' deposits matured. It grows block by block. A line redemption clears it, and so does the holder repaying with vault shares (the set-aside part is paid first, with the line's protocol fee) or closing the position with its collateral.",
 };
 
 const CORE_RATIO = {
@@ -139,7 +145,7 @@ export const ALCHEMIX_BURN_REPAY: LearnMoreContent = {
     },
     CORE_SET_ASIDE,
   ],
-  links: [ALCHEMIX_DOCS.repay, ALCHEMIX_DOCS.borrowerFee, ALCHEMIX_DOCS.earmarking],
+  links: [ALCHEMIX_DOCS.repay, ALCHEMIX_DOCS.borrowerFee, ALCHEMIX_DOCS.transmuterFlow],
 };
 
 export const ALCHEMIX_WITHDRAW: LearnMoreContent = {
@@ -179,7 +185,7 @@ export const ALCHEMIX_SELF_LIQUIDATE: LearnMoreContent = {
 };
 
 /** The protocol's central idea, the one a reader has to own to read an
- *  Alchemix timeline: Transmuter stakes maturing are what set debt aside and
+ *  Alchemix timeline: Transmuter deposits maturing are what set debt aside and
  *  what redemptions clear. Opened from every redemption card. */
 export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
   title: "How Alchemix repays a loan",
@@ -189,13 +195,13 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
   steps: [
     "Someone holding alUSD deposits it in the line's Transmuter, where it matures over a period measured in blocks.",
     "As those deposits mature, the Alchemist sets aside a matching amount of debt across every open position on the line, in proportion to what each position owes. That is each position's Set aside for repayment figure, and it grows block by block.",
-    "When a staker claims, the Transmuter redeems: every open position's set-aside debt is cleared by the same ratio, and the Alchemist takes collateral for it. Vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared go to the Transmuter, and the line's redemption fee, 0.25% on top of those shares on Ethereum and 0.1% on Base, goes to Alchemix's fee receiver.",
-    "The Transmuter pays the staker in those vault shares (mixUSDC on the alUSD line) for the part of the deposit that has matured, and hands back the rest as alUSD.",
+    "When a depositor claims, the Transmuter redeems: every open position's set-aside debt is cleared by the same ratio, and the Alchemist takes collateral for it. Vault shares worth one unit of the asset underneath (USDC, or WETH on alETH) for each unit of debt cleared go to the Transmuter, and the line's redemption fee, 0.25% on top of those shares on Ethereum and 0.1% on Base, goes to Alchemix's fee receiver.",
+    "The Transmuter pays the depositor in those vault shares (mixUSDC on the alUSD line) for the part of the deposit that has matured, and hands back the rest as alUSD.",
   ],
-  // The staker's side, which a borrower reading a redemption also needs: a
+  // The depositor's side, which a borrower reading a redemption also needs: a
   // claim can come before maturity, and what that costs.
   extraParagraphs: [
-    "A stake converts a little every block, in equal parts from the block it is made to its maturity block. The staker can claim at any time. A claim before maturity converts only the part whose blocks have passed, hands the rest back as alUSD and keeps an early exit fee on that rest (1% on every early claim so far). So claiming early gives up converting the rest and pays the fee; to convert it, the staker stakes it again and waits a new full term.",
+    "A deposit converts a little every block, in equal parts from the block it is made to its maturity block. The depositor can claim at any time. A claim before maturity converts only the part whose blocks have passed, hands the rest back as alUSD and keeps an early exit fee on that rest (1% on every early claim so far). So claiming early gives up converting the rest and pays the fee; to convert it, the depositor deposits it again and waits a new full term.",
   ],
   detailsHeading: "What it means for a borrower",
   details: [
@@ -224,7 +230,6 @@ export const ALCHEMIX_HOW_IT_WORKS: LearnMoreContent = {
     ALCHEMIX_DOCS.selfRepayingLoans,
     ALCHEMIX_DOCS.transmuter,
     ALCHEMIX_DOCS.redemptionRate,
-    ALCHEMIX_DOCS.earmarking,
     ALCHEMIX_DOCS.borrowerFee,
     ALCHEMIX_DOCS.liquidations,
   ],
@@ -262,7 +267,7 @@ export const ALCHEMIX_LINE_WIDE: LearnMoreContent = {
     },
     { bold: "Fee shortfall", text: "records a liquidator being paid less than they were owed." },
   ],
-  links: [ALCHEMIX_DOCS.redemptions, ALCHEMIX_DOCS.liquidations],
+  links: [ALCHEMIX_DOCS.redemptionFlow, ALCHEMIX_DOCS.liquidations],
 };
 
 export const ALCHEMIX_CUSTODY: LearnMoreContent = {
@@ -300,7 +305,7 @@ export function alchemixPositionContent(status: string, infoHref: string): Learn
       },
       {
         bold: "Set aside for repayment",
-        text: "the part of the debt the line's Transmuter has claimed. Holders of the synthetic stake it in the Transmuter, and as those stakes mature the Alchemist sets aside a matching amount of debt across every open position on the line, in proportion to what each owes. The figure grows block by block, so a reading holds at its block. A line redemption clears set-aside debt and takes vault shares worth it from the collateral, plus the line's redemption fee. The holder can also clear it: a repay with vault shares pays the set-aside part first, with the same fee, and closing the position with its collateral pays all of it. The explorer's Info page, linked below, walks through the whole cycle.",
+        text: "the part of the debt the line's Transmuter has claimed. Holders of the synthetic deposit it in the Transmuter, and as those deposits mature the Alchemist sets aside a matching amount of debt across every open position on the line, in proportion to what each owes. The figure grows block by block, so a reading holds at its block. A line redemption clears set-aside debt and takes vault shares worth it from the collateral, plus the line's redemption fee. The holder can also clear it: a repay with vault shares pays the set-aside part first, with the same fee, and closing the position with its collateral pays all of it. The explorer's Info page, linked below, walks through the whole cycle.",
       },
       {
         bold: "Collateralisation",
@@ -329,7 +334,6 @@ export function alchemixPositionContent(status: string, infoHref: string): Learn
       ALCHEMIX_DOCS.myt,
       ALCHEMIX_DOCS.alAssets,
       ALCHEMIX_DOCS.transmuter,
-      ALCHEMIX_DOCS.earmarking,
       ALCHEMIX_DOCS.liquidations,
       ALCHEMIX_DOCS.liquidatorFee,
       ALCHEMIX_DOCS.positionNft,
@@ -402,16 +406,16 @@ export const ALCHEMIX_V2: LearnMoreContent = {
 export const ALCHEMIX_TRANSMUTER: LearnMoreContent = {
   title: "How the Transmuter works",
   intro:
-    "The Transmuter takes an alAsset and converts it into vault shares over a fixed term. A stake opens a position, held as an NFT, that converts a little every block until it matures.",
+    "The Transmuter takes an alAsset and converts it into vault shares over a fixed term. A deposit opens a position, held as an NFT, that converts a little every block until it matures.",
   detailsHeading: "Key concepts:",
   details: [
     {
-      bold: "Stake",
+      bold: "Deposit",
       text: "the alAsset sent in when the position opens. The Transmuter holds it until the claim.",
     },
     {
       bold: "Maturity",
-      text: "the block by which the whole stake has converted. Before it, only the part of the term that has passed has converted.",
+      text: "the block by which the whole deposit has converted. Before it, only the part of the term that has passed has converted.",
     },
     {
       bold: "Claim",
