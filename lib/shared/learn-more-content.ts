@@ -954,7 +954,7 @@ export function mapleQueueContent(
       { label: "Maple docs: withdrawals", url: `${MAPLE_DOC_URL}/syrupusdc-usdt-usdg-for-lenders/risk` },
       {
         label: "Maple docs: the queue",
-        url: `${MAPLE_DOC_URL}/technical-resources/withdrawal-managers/withdrawal-manager-queue`,
+        url: `${MAPLE_DOC_URL}/technical-resources/pools/withdrawal-manager#withdrawal-queue-fifo`,
       },
     ],
   };
