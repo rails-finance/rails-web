@@ -85,6 +85,8 @@ export interface ProtocolInfoPageProps {
   views: readonly [InfoView, ...InfoView[]];
   /** Slot 5: the search and filter line, only where the listing has them. */
   search?: ReactNode;
+  /** One sentence naming what a reader might expect here and will not find, shown beside the coverage door. Omit it when nothing is expected and missing. */
+  notCovered?: string;
   /** The protocol's name as the pointer line spells it. */
   name: string;
   /** Slot 6: the official documentation, the page's final line. */
@@ -98,6 +100,7 @@ export function ProtocolInfoPage({
   howItWorks,
   views,
   search,
+  notCovered,
   name,
   docs,
 }: ProtocolInfoPageProps) {
@@ -122,7 +125,7 @@ export function ProtocolInfoPage({
               <dt className="inline font-semibold text-foreground">{t.term}</dt>
               <dd className="inline">
                 {": "}
-                {t.definition}{" "}
+                {t.definition} <span className="text-rb-400">Docs:</span>{" "}
                 {t.sources.map((l, i) => (
                   <span key={l.href}>
                     {i > 0 && ", "}
@@ -162,6 +165,7 @@ export function ProtocolInfoPage({
         </p>
       </div>
       <p className="mt-4 text-sm text-rb-500" data-anatomy="I3">
+        {notCovered && <span className="block">{notCovered}</span>}
         <Link href={`/coverage/${CHAINS[chainId].slug}`} className={INLINE_LINK}>
           See what Rails covers on each {CHAINS[chainId].name} explorer
         </Link>
