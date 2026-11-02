@@ -150,7 +150,7 @@ export default async function Home() {
           two are far apart, so the page reads as three alternating tones rather
           than five arbitrary ones. From here the close settles: sheet → band →
           the footer's canvas, each step its own tone. */}
-      <div id="team" className="scroll-mt-20 bg-rb-50 dark:bg-rb-600" data-anatomy="S8">
+      <div className="bg-rb-50 dark:bg-rb-600" data-anatomy="S8">
         <div className="max-w-7xl mx-auto px-4 py-16">
           <TeamSection />
         </div>
@@ -178,7 +178,7 @@ function GetInTouch() {
             Arbitrary value rather than max-w-prose: that's Tailwind's 65ch
             default and this repo's @theme doesn't override --container-prose. */}
         <p className="body-text max-w-[55ch]">
-          Rails is open infrastructure for DeFi. Built as a public good. If you&apos;re a protocol team or a funder,
+          Rails is open infrastructure for DeFi. If you&apos;re a protocol team or interested in learning more,
           we&apos;d love to hear from you.
         </p>
         <p className="body-text max-w-[55ch] mt-2">

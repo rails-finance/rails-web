@@ -8,7 +8,7 @@ import { CHAINS, MAINNET_CHAIN_ID, BASE_CHAIN_ID, SEPOLIA_CHAIN_ID, type ChainId
 import { ProtocolGlyph, hasProtocolGlyph } from "@/components/icons/protocol-glyphs";
 import { ChainToggleButtons } from "@/components/shared/chain-toggle";
 import { HomeOnlyChainGlyph } from "@/components/icons/chain-glyphs";
-import { RAILS_X_URL } from "@/lib/shared/social";
+import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-soon";
 import { PILL_CTA } from "@/lib/shared/ui-grammar";
 
 /** Explorers surfaced on the home page — a chain's roster minus a small omit
@@ -40,12 +40,9 @@ function tileWidthClassesFor(count: number): string {
 
 const STORAGE_KEY = "home-chain-toggle";
 
-/** Stored value for the home-only Robinhood Chain choice. It has no ChainId and
+/** Stored value for the home-only Robinhood choice. It has no ChainId and
  *  no explorers; selecting it swaps the tiles for a coming-soon message. */
 const ROBINHOOD_STORED = "robinhood";
-
-/** Anchor id on the home page's team band (app/(site)/page.tsx). */
-const TEAM_ANCHOR = "#team";
 
 // Ethereum is the default — both the server render and the client's first
 // render show it, so there is nothing for hydration to disagree about; a
@@ -122,7 +119,7 @@ export function ProtocolRow() {
           chainId={chainId}
           onChange={handleChange}
           extra={{
-            label: "Robinhood Chain",
+            label: ROBINHOOD_LABEL,
             active: robinhood,
             onSelect: handleRobinhood,
             glyph: <HomeOnlyChainGlyph id="robinhood" className="h-3.5 w-3.5 shrink-0 max-[380px]:hidden" />,
@@ -137,22 +134,7 @@ export function ProtocolRow() {
           data-testid="home-robinhood-soon"
           className="body-text mx-auto flex min-h-[8.5rem] max-w-xl items-center justify-center text-center"
         >
-          <span>
-            Coming soon,{" "}
-            <a
-              href={RAILS_X_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-500 transition-colors hover:underline"
-            >
-              follow us on X
-            </a>{" "}
-            for announcements or{" "}
-            <a href={TEAM_ANCHOR} className="text-blue-500 transition-colors hover:underline">
-              contact the team
-            </a>{" "}
-            for more details.
-          </span>
+          <RobinhoodSoon />
         </p>
       ) : (
         <>
