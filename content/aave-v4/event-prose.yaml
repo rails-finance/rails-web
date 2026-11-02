@@ -1096,7 +1096,7 @@ L5:
     intro_stablecoin_correlated: |-
       Stablecoin Correlated sits on the Global Dollar hub. It takes a Pendle principal token on USDG as collateral, borrows stablecoins there, and borrows USDG from Core.
     intro_mag7: |-
-      Mag7 is Aave V4's one market on Base. Seven Coinbase tokenized stocks are its collateral, and USDC from the Equities hub is the one asset it lends.
+      Mag7 is Aave V4's one market on Base. Coinbase tokenized stocks are its collateral, and USDC from the Equities hub is the one asset it lends.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1149,7 +1149,7 @@ L5:
         text_stablecoin_correlated: |-
           the principal token is priced by a discount-rate oracle that rises to par at maturity; later maturities join the same spoke.
         text_mag7: |-
-          stock prices are Chainlink feeds that publish from Sunday 20:00 to Friday 20:00 ET and hold their last value otherwise.
+          stock prices are Chainlink feeds and hold their last value until the feed publishes again.
     links:
       - label: |-
           Hubs and spokes
@@ -1208,7 +1208,7 @@ L5:
     title: |-
       How the Equities hub works
     intro: |-
-      Aave V4 on Base has one hub, Equities, holding one USDC reserve, and one spoke, Mag7. Seven Coinbase tokenized stocks back USDC borrowing there and cannot be borrowed.
+      Aave V4 on Base has one hub, Equities, holding one USDC reserve, and one spoke, Mag7. Coinbase tokenized stocks back USDC borrowing there and cannot be borrowed.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1223,7 +1223,7 @@ L5:
       - bold: |-
           Stock prices
         text: |-
-          Chainlink feeds publish from Sunday 20:00 to Friday 20:00 ET and hold their last value otherwise, so a weekend price can be days old.
+          Chainlink feeds hold their last value until the feed publishes again, so a price can be days old.
       - bold: |-
           Paused reserve
         text: |-
