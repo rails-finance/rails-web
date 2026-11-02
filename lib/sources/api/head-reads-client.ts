@@ -34,6 +34,11 @@
 // build's burst of prerenders queues on the gateway. A request render sends no
 // `wait` (the server's 2 s). The round's 8 s timeout stays above the 6 s.
 //
+// `recordingHeadClient` is `headReadsClient` that also collects the `round`
+// ids rails-server gave the rounds one loader's reads went in, and
+// `snapshotClient` answers the same calls from a surface's stored snapshot
+// (both for lib/sources/api/head-snapshot.ts, ui-jobs 467).
+//
 // SERVER-ONLY.
 
 import { decodeFunctionResult, encodeFunctionData, type Abi, type Hex, type PublicClient } from "viem";
@@ -141,14 +146,20 @@ function serverHead(chainId: number, finalized = false): Promise<HeadAnswer | nu
 
 // ── rounds: the reads asked at one block in one turn go as one request ──────
 
+/** A round's answers to one reader's reads, and the id rails-server gave the round. */
+interface Served {
+  answers: RawAnswer[];
+  round?: string;
+}
+
 interface Pending {
   reads: RawRead[];
-  resolve: (answers: RawAnswer[] | null) => void;
+  resolve: (served: Served | null) => void;
 }
 
 const queues = new Map<string, Pending[]>();
 
-function serverReads(chainId: number, block: bigint, reads: RawRead[]): Promise<RawAnswer[] | null> {
+function serverReads(chainId: number, block: bigint, reads: RawRead[]): Promise<Served | null> {
   const key = `${chainId}:${block}`;
   return new Promise((resolve) => {
     let q = queues.get(key);
@@ -193,7 +204,7 @@ async function flush(chainId: number, block: bigint, key: string) {
 
 async function askRound(chainId: number, block: bigint, q: Pending[]) {
   const reads = q.flatMap((p) => p.reads);
-  const r = await ask<{ blockNumber?: unknown; answers?: unknown }>(chainId, "reads", {
+  const r = await ask<{ blockNumber?: unknown; answers?: unknown; round?: unknown }>(chainId, "reads", {
     chain: chainId,
     block: Number(block),
     reads,
@@ -205,10 +216,11 @@ async function askRound(chainId: number, block: bigint, q: Pending[]) {
     Array.isArray(r.answers) &&
     r.answers.length === reads.length &&
     r.answers.every((a, i) => answers(reads[i], a));
+  const round = typeof r?.round === "string" && r.round !== "" ? r.round : undefined;
   let i = 0;
   for (const p of q) {
     const n = p.reads.length;
-    p.resolve(ok ? (r!.answers as RawAnswer[]).slice(i, i + n) : null);
+    p.resolve(ok ? { answers: (r!.answers as RawAnswer[]).slice(i, i + n), round } : null);
     i += n;
   }
 }
@@ -249,14 +261,6 @@ type MulticallArgs = { contracts: readonly Contract[]; allowFailure?: boolean } 
 
 const fromOf = (account: Account) => (typeof account === "string" ? account : account?.address);
 
-/** The block a read stands at: its own, or rails-server's when it names none. Null for a tag other than latest. */
-async function blockFor(chainId: number, args: At): Promise<bigint | null> {
-  if (args.blockNumber != null) return args.blockNumber;
-  if (args.blockTag != null && args.blockTag !== "latest") return null;
-  const h = await serverHead(chainId);
-  return h ? BigInt(h.blockNumber) : null;
-}
-
 /** The chain read's arguments, pinned to the block the read stands at. */
 const pin = <T extends At>(args: T, block: bigint | null): T =>
   block != null ? { ...args, blockNumber: block, blockTag: undefined } : args;
@@ -274,63 +278,75 @@ export async function lastServerHead(chainId: ChainId = MAINNET_CHAIN_ID): Promi
   return (await heads.get(headKey(chainId, false))?.p)?.blockNumber ?? null;
 }
 
+/** Where a client's head and reads come from before its fallback: rails-server's
+ *  live routes, or a snapshot it stored (`snapshotClient`). */
+interface ReadSource {
+  head(finalized: boolean): Promise<HeadAnswer | null>;
+  /** True for a block this source answers reads at. */
+  answersAt(block: bigint | null): block is bigint;
+  reads(block: bigint, reads: RawRead[]): Promise<RawAnswer[] | null>;
+  /** A read (or the head) went to the fallback, at `block` where it had one. */
+  fellBack(block: bigint | null): void;
+}
+
 /**
- * The chain client a head reader reads through: rails-server's head and reads
- * where it answers, `fallback(chainId)` everywhere else.
+ * The chain client a head reader reads through: `source`'s head and reads
+ * where it answers, `chain` everywhere else.
  */
-function apiFirstClient(chainId: ChainId, fallback: (chainId: ChainId) => PublicClient): PublicClient {
-  if (override) return override(chainId);
-  const chain = fallback(chainId);
+function sourcedClient(source: ReadSource, chain: PublicClient): PublicClient {
   const own = {
     async getBlockNumber(): Promise<bigint> {
-      const h = await serverHead(chainId);
-      return h ? BigInt(h.blockNumber) : chain.getBlockNumber();
+      const h = await source.head(false);
+      if (h) return BigInt(h.blockNumber);
+      source.fellBack(null);
+      return chain.getBlockNumber();
     },
     async getBlock(args?: At) {
       if (args?.blockNumber == null && (args?.blockTag == null || args.blockTag === "latest")) {
-        const h = await serverHead(chainId);
+        const h = await source.head(false);
         if (h) return { number: BigInt(h.blockNumber), timestamp: BigInt(h.blockTimestamp) };
       } else if (args?.blockNumber == null && args?.blockTag === "finalized") {
-        const h = await serverHead(chainId, true);
+        const h = await source.head(true);
         if (h?.finalizedBlock != null) return { number: BigInt(h.finalizedBlock) };
       }
+      // A block's header from the chain leaves the block's stamp alone.
+      source.fellBack(null);
       return chain.getBlock(args as never);
     },
     async readContract(args: ReadContractArgs) {
-      const block = await blockFor(chainId, args);
-      if (isNamed(chainId, block)) {
-        const a = await serverReads(chainId, block, [rawCall(args, fromOf(args.account))]);
+      const block = await blockFor(source, args);
+      if (source.answersAt(block)) {
+        const a = await source.reads(block, [rawCall(args, fromOf(args.account))]);
         if (a) {
           const s = settle(args, a[0] as CallAnswer);
           if (s.status === "failure") throw s.error;
           return s.result;
         }
       }
-      noteChainRead(chainId, block);
+      source.fellBack(block);
       return chain.readContract(pin(args, block) as never);
     },
     async call(args: { to: string; data?: Hex; account?: Account } & At) {
-      const block = await blockFor(chainId, args);
-      if (isNamed(chainId, block) && args.to && args.data) {
+      const block = await blockFor(source, args);
+      if (source.answersAt(block) && args.to && args.data) {
         const from = fromOf(args.account);
         const read: RawRead = from
           ? { kind: "call", to: args.to.toLowerCase(), data: args.data, from: from.toLowerCase() }
           : { kind: "call", to: args.to.toLowerCase(), data: args.data };
-        const a = await serverReads(chainId, block, [read]);
+        const a = await source.reads(block, [read]);
         if (a) {
           const c = a[0] as CallAnswer;
           if (!c.success) throw new Error("execution reverted");
           return { data: c.returnData === "0x" ? undefined : c.returnData };
         }
       }
-      noteChainRead(chainId, block);
+      source.fellBack(block);
       return chain.call(pin(args, block) as never);
     },
     async multicall(args: MulticallArgs) {
-      const block = await blockFor(chainId, args);
-      if (isNamed(chainId, block) && args.contracts.length > 0) {
-        const a = await serverReads(
-          chainId,
+      const block = await blockFor(source, args);
+      if (source.answersAt(block) && args.contracts.length > 0) {
+        const a = await source.reads(
           block,
           args.contracts.map((c) => rawCall(c)),
         );
@@ -342,30 +358,30 @@ function apiFirstClient(chainId: ChainId, fallback: (chainId: ChainId) => Public
           return settled.map((s) => s.result);
         }
       }
-      noteChainRead(chainId, block);
+      source.fellBack(block);
       return chain.multicall(pin(args, block) as never);
     },
     async getCode(args: { address: string } & At) {
-      const block = await blockFor(chainId, args);
-      if (isNamed(chainId, block)) {
-        const a = await serverReads(chainId, block, [{ kind: "code", address: args.address.toLowerCase() }]);
+      const block = await blockFor(source, args);
+      if (source.answersAt(block)) {
+        const a = await source.reads(block, [{ kind: "code", address: args.address.toLowerCase() }]);
         if (a) {
           const { hex } = a[0] as { hex: Hex };
           return hex === "0x" ? undefined : hex;
         }
       }
-      noteChainRead(chainId, block);
+      source.fellBack(block);
       return chain.getCode(pin(args, block) as never);
     },
     async getStorageAt(args: { address: string; slot: Hex } & At) {
-      const block = await blockFor(chainId, args);
-      if (isNamed(chainId, block)) {
-        const a = await serverReads(chainId, block, [
+      const block = await blockFor(source, args);
+      if (source.answersAt(block)) {
+        const a = await source.reads(block, [
           { kind: "storage", address: args.address.toLowerCase(), slot: args.slot },
         ]);
         if (a) return (a[0] as { hex: Hex }).hex;
       }
-      noteChainRead(chainId, block);
+      source.fellBack(block);
       return chain.getStorageAt(pin(args, block) as never);
     },
   };
@@ -377,6 +393,52 @@ function apiFirstClient(chainId: ChainId, fallback: (chainId: ChainId) => Public
   }) as PublicClient;
 }
 
+/** What one loader's reads on a recording client were answered by: the
+ *  rounds rails-server served them in, at which blocks, and whether any read
+ *  went to the chain or came back without a round id. */
+export interface HeadRecord {
+  rounds: Set<string>;
+  blocks: Set<number>;
+  /** A served read whose answer carried no `round` (a server without the snapshot route). */
+  unnamed: boolean;
+  /** A read (or the head) went to the chain. */
+  chain: boolean;
+}
+
+/** rails-server's live routes as a source; `record` collects what answered. */
+function liveSource(chainId: ChainId, record?: HeadRecord): ReadSource {
+  return {
+    head: (finalized) => serverHead(chainId, finalized),
+    answersAt: (block): block is bigint => isNamed(chainId, block),
+    async reads(block, reads) {
+      const r = await serverReads(chainId, block, reads);
+      if (r && record) {
+        if (r.round) record.rounds.add(r.round);
+        else record.unnamed = true;
+        record.blocks.add(Number(block));
+      }
+      return r?.answers ?? null;
+    },
+    fellBack(block) {
+      noteChainRead(chainId, block);
+      if (record) record.chain = true;
+    },
+  };
+}
+
+/** The block a read stands at: its own, or the source's head when it names none. Null for a tag other than latest. */
+async function blockFor(source: ReadSource, args: At): Promise<bigint | null> {
+  if (args.blockNumber != null) return args.blockNumber;
+  if (args.blockTag != null && args.blockTag !== "latest") return null;
+  const h = await source.head(false);
+  return h ? BigInt(h.blockNumber) : null;
+}
+
+function apiFirstClient(chainId: ChainId, fallback: (chainId: ChainId) => PublicClient): PublicClient {
+  if (override) return override(chainId);
+  return sourcedClient(liveSource(chainId), fallback(chainId));
+}
+
 /** A single-page family's head reader's client; the chain through `chainClient`. */
 export function headReadsClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClient {
   return apiFirstClient(chainId, chainClient);
@@ -385,4 +447,90 @@ export function headReadsClient(chainId: ChainId = MAINNET_CHAIN_ID): PublicClie
 /** A vault reader's client (pages, directories, holders, the listing overlay); the chain through `chainBatchClient`. */
 export function vaultHeadClient(chainId: ChainId): PublicClient {
   return apiFirstClient(chainId, chainBatchClient);
+}
+
+/** `headReadsClient(chainId)` that records what answered one loader's reads
+ *  (`lib/sources/api/head-snapshot.ts`). */
+export function recordingHeadClient(chainId: ChainId): { client: PublicClient; record: HeadRecord } {
+  const record: HeadRecord = { rounds: new Set(), blocks: new Set(), unnamed: false, chain: false };
+  if (override) return { client: override(chainId), record: { ...record, chain: true } };
+  return { client: sourcedClient(liveSource(chainId, record), chainClient(chainId)), record };
+}
+
+// ── a stored snapshot as a source ───────────────────────────────────────────
+
+/** `GET /api/at-block/head/snapshot`: the reads one surface made at one block, and their answers. */
+export interface HeadSnapshot {
+  chainId: number;
+  surface: string;
+  blockNumber: number;
+  blockTimestamp: number | null;
+  readAt: string;
+  provider: string;
+  reads: RawRead[];
+  answers: RawAnswer[];
+}
+
+const readKey = (r: RawRead): string =>
+  r.kind === "call"
+    ? `call:${r.to.toLowerCase()}:${r.data.toLowerCase()}:${(r.from ?? "").toLowerCase()}`
+    : r.kind === "code"
+      ? `code:${r.address.toLowerCase()}`
+      : `storage:${r.address.toLowerCase()}:${r.slot.toLowerCase()}`;
+
+/** A snapshot's shape checked; null where it is not one. */
+export function parseHeadSnapshot(body: unknown): HeadSnapshot | null {
+  const b = body as Partial<HeadSnapshot> | null;
+  if (
+    !b ||
+    typeof b !== "object" ||
+    typeof b.blockNumber !== "number" ||
+    typeof b.readAt !== "string" ||
+    typeof b.provider !== "string" ||
+    !Array.isArray(b.reads) ||
+    !Array.isArray(b.answers) ||
+    b.reads.length !== b.answers.length ||
+    !b.reads.every((r, i) => r != null && typeof r === "object" && answers(r, b.answers![i]))
+  )
+    return null;
+  return { ...b, blockTimestamp: typeof b.blockTimestamp === "number" ? b.blockTimestamp : null } as HeadSnapshot;
+}
+
+const noChain = new Proxy({} as PublicClient, {
+  get(_, prop) {
+    if (prop === "then") return undefined;
+    return () => {
+      throw new Error(`replay: the snapshot does not answer ${String(prop)}`);
+    };
+  },
+});
+
+/** A client that answers a reader's reads from a stored snapshot at its block.
+ *  A read the snapshot does not hold throws and marks the replay `missed`. */
+export function snapshotClient(snapshot: HeadSnapshot): { client: PublicClient; missed(): boolean } {
+  const B = BigInt(snapshot.blockNumber);
+  const held = new Map<string, RawAnswer>();
+  snapshot.reads.forEach((r, i) => held.set(readKey(r), snapshot.answers[i]));
+  let missed = false;
+  const head: HeadAnswer = {
+    blockNumber: snapshot.blockNumber,
+    blockTimestamp: snapshot.blockTimestamp ?? 0,
+  };
+  const source: ReadSource = {
+    head: async (finalized) => (finalized ? null : head),
+    answersAt: (block): block is bigint => block === B,
+    async reads(_, reads) {
+      const out: RawAnswer[] = [];
+      for (const r of reads) {
+        const a = held.get(readKey(r));
+        if (!a) return null;
+        out.push(a);
+      }
+      return out;
+    },
+    fellBack() {
+      missed = true;
+    },
+  };
+  return { client: sourcedClient(source, noChain), missed: () => missed };
 }

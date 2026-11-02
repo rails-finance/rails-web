@@ -13,6 +13,7 @@
 // is the price and its age without the strip's label, and the card's figure is
 // that inside a RiskFigure.
 
+import { formatExact } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { RiskFigure } from "@/components/shared/risk-footer-strip";
 import { useChainId } from "@/lib/shared/chain-context";
@@ -65,6 +66,7 @@ export function MorphoOraclePrice({
   return (
     <>
       <Prov
+        value={formatExact(chain.oraclePrice)}
         info={oraclePriceProv(
           {
             collSym: chain.collateralSymbol,

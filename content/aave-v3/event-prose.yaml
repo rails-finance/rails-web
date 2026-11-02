@@ -1585,6 +1585,7 @@ doc_urls:
   FAQ_SUPPLY_LIMITS: https://aave.com/faq#supplying-earning-are-there-limitations-to-supply
   UMBRELLA: https://aave.com/help/umbrella/umbrella#what-is-umbrella
   UMBRELLA_DEFICIT: https://aave.com/docs/aave-v3/umbrella#slashing-risk-and-deficit-protection
+  POOL: https://aave.com/docs/aave-v3/concepts/liquidity-pool
 
 L5:
   supply:
@@ -2258,3 +2259,40 @@ L5:
       - label: |-
           Supply limits
         doc: FAQ_SUPPLY_LIMITS
+
+glossary:
+  - bold: |-
+      Market
+    text: |-
+      A market is one Aave V3 lending pool with its own reserves, risk settings and prices. A wallet's account in each market is separate, so one wallet can have an account in several.
+    sources: [{ label: "Liquidity pool", doc: POOL }]
+  - bold: |-
+      Reserve
+    text: |-
+      A reserve is one asset inside a market. It has its own interest rates and its own supply and borrow caps, which are the most that can be supplied or borrowed. Its risk settings include the liquidation threshold, which caps the share of the asset's value that can be borrowed against before the account is unsafe. The same token can have different settings in different markets.
+    sources: [{ label: "Reserves", doc: RESERVE }]
+  - bold: |-
+      Supplied
+    text: |-
+      Supplied assets are the assets a wallet has deposited to earn interest. In return, Aave gives the wallet an interest-bearing token (an aToken) whose balance grows with interest and can be exchanged back for the supplied asset.
+    sources: [{ label: "Supply", doc: OVERVIEW_SUPPLY }]
+  - bold: |-
+      Collateral
+    text: |-
+      Collateral is the supplied assets that a wallet has chosen to count toward its borrowing. Only those assets count toward its health factor, and the wallet can borrow only against them.
+    sources: [{ label: "Collateral status", doc: TOGGLE_COLLATERAL }]
+  - bold: |-
+      Debt
+    text: |-
+      Debt is what a wallet has borrowed plus the interest on it. The wallet must keep its collateral worth more than its debt.
+    sources: [{ label: "Borrow", doc: OVERVIEW_BORROW }]
+  - bold: |-
+      Health factor
+    text: |-
+      The health factor is a score for the safety of one account in one market. It is the value of the collateral, weighted by each asset's liquidation threshold, divided by the debt. Below 1 the account can be liquidated.
+    sources: [{ label: "Health factor", doc: HF }]
+  - bold: |-
+      Liquidation
+    text: |-
+      Liquidation happens when an account's health factor falls below 1. Anyone may then repay part of its debt and take collateral worth that amount. This outside party, the liquidator, also receives a bonus.
+    sources: [{ label: "Liquidation process", doc: LIQ_PROCESS }, { label: "Liquidation penalty", doc: FAQ_PENALTY }]

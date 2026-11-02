@@ -8,7 +8,7 @@ import type { LlamalendFlowFacts } from "@/lib/llamalend/flows";
 import { formatNumber } from "@/lib/utils/format";
 import { ExplainBullet, ExplainGroup, ExplainMore } from "@/components/shared/explain-groups";
 
-const DOCS = "https://docs.curve.finance/lending/overview/";
+const DOCS = "https://docs.curve.finance/user/llamalend/overview";
 
 export interface LlamalendFlowsNoteProps {
   facts: LlamalendFlowFacts | null;

@@ -9,7 +9,8 @@
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import type { CTokenHeadTable } from "@/lib/compound-v2/head-words";
 import { eventProseEngine } from "@/lib/shared/event-prose/engine";
-import type { ProseFile, Words } from "@/lib/shared/event-prose/types";
+import type { InfoTerm } from "@/components/shared/protocol-info-page";
+import type { ModalLink, ProseFile, Words } from "@/lib/shared/event-prose/types";
 import type { MoonwellEchoKey } from "@/lib/moonwell/event-prose";
 import raw from "@/content/moonwell/event-prose.yaml";
 
@@ -32,6 +33,7 @@ interface MoonwellProseFile extends ProseFile<MoonwellL5Key> {
   words: Words;
   position_words: Words;
   doc_urls: Words;
+  glossary: { bold: string; text: string; sources: ModalLink[] }[];
 }
 
 const FILE = raw as MoonwellProseFile;
@@ -84,4 +86,13 @@ export function moonwellPositionModal(status: "open" | "closed" | "liquidated" |
   if (status === "liquidated") return moonwellModal("position_liquidated");
   if (status === "closed") return moonwellModal("position_closed");
   return moonwellModal(hasDebt ? "position_open" : "position_supply");
+}
+
+/** The info page's glossary: each term with its definition and the docs pages it rests on. */
+export function moonwellGlossary(): [InfoTerm, ...InfoTerm[]] {
+  const terms = FILE.glossary.map((d): InfoTerm => {
+    const [first, ...rest] = d.sources.map((l) => ({ label: l.label, href: PROSE.linkUrl(l) }));
+    return { term: d.bold, definition: d.text, sources: [first, ...rest] };
+  });
+  return terms as [InfoTerm, ...InfoTerm[]];
 }

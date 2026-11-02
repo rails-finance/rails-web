@@ -427,7 +427,16 @@ async function rpcCountLines() {
       .slice(0, 5)
       .map(([m, n]) => `${m} ${n}`)
       .join(", ");
-    lines.push(`  ${name}: ${c.calls} calls, ${c.upstream} upstream${top ? ` (${top})` : ""}`);
+    // A lane with errors says what the upstream answered and from which host
+    // (the host only: the URL carries the key).
+    const outcomes = Object.entries(c.outcomes ?? {})
+      .sort((x, y) => y[1] - x[1])
+      .map(([k, n]) => `${k} ×${n}`);
+    const errs =
+      c.errors > 0 || outcomes.length
+        ? `, ${c.errors} errors [${status.hosts?.[name] ?? "?"}]${outcomes.length ? ` (${outcomes.join("; ")})` : ""}`
+        : "";
+    lines.push(`  ${name}: ${c.calls} calls, ${c.upstream} upstream${top ? ` (${top})` : ""}${errs}`);
   }
   const pins = Object.entries(status.pins ?? {}).map(([c, h]) => `${c} ${parseInt(h, 16)}`);
   if (pins.length) lines.push(`  pinned: ${pins.join(", ")}`);

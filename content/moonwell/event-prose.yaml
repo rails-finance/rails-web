@@ -985,3 +985,46 @@ L5:
       - label: |-
           Close factor
         doc: CLOSE_FACTOR
+
+# ── The /info page's glossary: each term the page uses, defined once, with the
+# documentation pages it rests on (rails-ops standards/info-page-template.md). ──
+glossary:
+  - bold: |-
+      Market
+    text: |-
+      A market is the shared pool of one asset, such as USDC, that suppliers lend into and borrowers draw from. Each market has its own interest rates, which move with how much of the pool is borrowed.
+    sources: [{ label: "Moonwell Core", doc: CORE }, { label: "Are interest rates stable?", doc: BORROW_RATES }]
+  - bold: |-
+      mToken
+    text: |-
+      An mToken is the receipt a market gives a supplier in exchange for the asset. It can be transferred like any token, and it redeems for a growing amount of the asset as borrowers pay interest.
+    sources: [{ label: "mTokens", doc: MTOKENS }]
+  - bold: |-
+      Comptroller
+    text: |-
+      The Comptroller is the contract that checks every supply, borrow, repayment and liquidation. It also works out how much each wallet may borrow against what it supplied.
+    sources: [{ label: "Comptroller", doc: COMPTROLLER }]
+  - bold: |-
+      Collateral
+    text: |-
+      Collateral is the supplied assets a wallet has switched on to back its borrowing. A supply that is not switched on still earns interest but backs no borrowing. The collateral factor is the share of an asset's value that counts toward borrowing.
+    sources: [{ label: "How to borrow", doc: BORROW_HOW }, { label: "Collateral factor", doc: COLLATERAL_FACTOR }]
+  - bold: |-
+      Health factor
+    text: |-
+      The health factor scores how safe an account is. It is the credit limit, the most the account may borrow, divided by what it owes. Below 1 the account owes more than its credit limit allows, so it can be liquidated.
+    sources: [{ label: "Credit limit", doc: CREDIT_LIMIT }]
+  - bold: |-
+      Liquidation
+    text: |-
+      A liquidation happens when an account's health factor falls below 1. A liquidator repays part of the debt and receives some of the account's collateral as a bonus, which the borrower bears.
+    sources:
+      [
+        { label: "Avoiding liquidation", doc: AVOID_LIQUIDATION },
+        { label: "Liquidation incentive", doc: LIQUIDATION_INCENTIVE },
+      ]
+  - bold: |-
+      Oracle
+    text: |-
+      An oracle is a contract that reports asset prices. The Comptroller reads the oracle's prices to value collateral and debt, and to decide when to liquidate.
+    sources: [{ label: "Comptroller", doc: COMPTROLLER }]

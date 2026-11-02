@@ -203,6 +203,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readStoreSeries, readVaultStrip, vaultStripChecks } from "./lib/vault-strip.mjs";
+import { pageBlockRecent, serverHeadBlock } from "./lib/server-head.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3611";
@@ -337,10 +338,17 @@ const res0 = await openRoster();
 check(`0a GET ${ROSTER} answers 200`, res0?.status() === 200, `status ${res0?.status()}`);
 const statedBlock = Number(await page.locator("[data-directory-block]").getAttribute("data-directory-block"));
 const head = await client.getBlockNumber();
+// The page reads at rails-server's head (TO-DO-infra 55), or at the pin where it fell back to the chain.
+const b0 = pageBlockRecent({
+  page: statedBlock,
+  server: await serverHeadBlock(env, 1),
+  own: Number(head),
+  tolerance: 200,
+});
 check(
-  "0b the page states the block it read at, and it is within 200 blocks of this script's own head",
-  Number.isInteger(statedBlock) && statedBlock > 0 && Number(head) - statedBlock < 200 && statedBlock <= Number(head),
-  `page ${statedBlock}, own head ${head}`,
+  "0b the page states the block it read at, and it is within 200 blocks of the head it read from",
+  b0.ok,
+  b0.detail,
 );
 const blockNumber = BigInt(statedBlock);
 

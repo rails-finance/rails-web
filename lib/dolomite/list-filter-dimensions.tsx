@@ -24,11 +24,19 @@
 //   • Owner search (the `q` box → the `owner` param — "this owner's
 //     accounts", plural on purpose: the grain is the pair) + recency sort.
 //
-// There are deliberately NO per-asset facets: the roster is read from the
-// core at head (admin can list markets), and a hardcoded symbol chip list
-// would assert a roster — revisit when the backend exposes the market table
-// to build chips from.
+//   • Assets   — Supplied and Borrowed, one chip per market the core holds,
+//     from the market ROSTER (lib/api/fetch-dolomite-market-roster, rails-server
+//     `/api/dolomite/market-roster`), fetched once and independent of any
+//     filter. The registry is a function of that roster, consumed through the
+//     shared driver's dynamic-dimensions seam (decision 0009), the shape the
+//     MakerDAO and Morpho listings use. A chip's value is the core's numeric
+//     market id (`supplyMarkets` / `borrowMarkets`: par above / below zero),
+//     its label the symbol, and the panel's trailing figure the accounts
+//     holding the market on that side now (`supplyOpen` / `borrowOpen`), the
+//     count the one-sided filter returns for an open account.
 
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import type { DolomiteMarketRosterResponse } from "@/lib/api/fetch-dolomite-market-roster";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
@@ -69,6 +77,10 @@ export interface DolomiteListFilters extends BaseListFilters {
   liquidations: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
+  /** Market ids the account supplies (par above zero) — multi (OR). URL param `supply`. */
+  supply: string[];
+  /** Market ids the account borrows (par below zero) — multi (OR). URL param `borrow`. */
+  borrow: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -86,6 +98,8 @@ export const DOLOMITE_LIST_DEFAULTS: DolomiteListFilters = {
   accountKind: [],
   liquidations: [],
   tx: [],
+  supply: [],
+  borrow: [],
 };
 
 // Values match Liquity V2's (lib/liquity-v2/list-filter-dimensions.tsx) so the
@@ -99,7 +113,7 @@ export const DOLOMITE_SORT_OPTIONS: SortOption[] = [
 const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "open", label: "Open" },
   { value: "closed", label: "Closed" },
-  { value: "liquidated", label: "Liquidated" },
+  { value: "liquidated", label: "Liquidated and closed" },
 ];
 
 const ACCOUNT_KIND_OPTIONS: FilterOptionDef[] = [
@@ -109,7 +123,38 @@ const ACCOUNT_KIND_OPTIONS: FilterOptionDef[] = [
 
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: "liquidated", label: "Liquidated before" }];
 
-export function dolomiteListDimensions(): SerializableDimension<DolomiteListFilters>[] {
+/** What the driver hands the registry: the roster once it has settled, and
+ *  whether it ever will. `loading` and `unavailable` are kept apart because they
+ *  call for opposite things: never prune a URL-provided selection while the
+ *  answer is still in flight. */
+export interface DolomiteRosterState {
+  status: "loading" | "ready" | "unavailable";
+  roster: DolomiteMarketRosterResponse | null;
+}
+
+export const DOLOMITE_ROSTER_LOADING: DolomiteRosterState = { status: "loading", roster: null };
+
+/** Options standing in for a selection made before the roster landed (or made
+ *  against a deployment that has none), so an active chip always has a row to
+ *  un-tick. */
+function selectionOptions(values: string[]): FilterOptionDef[] {
+  return values.map((id) => ({ value: id, label: `Market ${id}` }));
+}
+
+export function dolomiteListDimensions(
+  filters: DolomiteListFilters = DOLOMITE_LIST_DEFAULTS,
+  state?: DolomiteRosterState,
+): SerializableDimension<DolomiteListFilters>[] {
+  const roster = state?.status === "ready" ? state.roster : null;
+  const offered = roster != null;
+  const marketOptions = (side: "supplyOpen" | "borrowOpen"): FilterOptionDef[] =>
+    (roster?.markets ?? []).map((m) => ({
+      value: m.marketId,
+      label: m.symbol,
+      icon: <TokenChipIcon symbol={m.symbol} address={m.token} size={16} filterable={false} />,
+      // Panel-only trailing figure, not part of the chip text.
+      meta: m[side].toLocaleString("en-US"),
+    }));
   return [
     {
       id: "status",
@@ -135,6 +180,28 @@ export function dolomiteListDimensions(): SerializableDimension<DolomiteListFilt
       panelNote: DOLOMITE_SIZE_NOTE,
       debtAliases: ["state"],
     }),
+    {
+      id: "supply",
+      label: "Supplied",
+      group: "Assets",
+      cardinality: "multi",
+      param: "supply",
+      options: offered ? marketOptions("supplyOpen") : selectionOptions(filters.supply),
+      get: (f) => f.supply,
+      set: (f, v) => ({ ...f, supply: v }),
+      available: (f) => offered || f.supply.length > 0,
+    },
+    {
+      id: "borrow",
+      label: "Borrowed",
+      group: "Assets",
+      cardinality: "multi",
+      param: "borrow",
+      options: offered ? marketOptions("borrowOpen") : selectionOptions(filters.borrow),
+      get: (f) => f.borrow,
+      set: (f, v) => ({ ...f, borrow: v }),
+      available: (f) => offered || f.borrow.length > 0,
+    },
     {
       id: "accountKind",
       label: "Account",
@@ -179,10 +246,29 @@ export function dolomiteFiltersToFetchParams(filters: DolomiteListFilters, page:
     ...usdBounds(filters),
     kind: kind === "dolomite-balance" ? "balance" : kind === "borrow-position" ? "borrow" : undefined,
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
+    supplyMarkets: filters.supply.length > 0 ? filters.supply : undefined,
+    borrowMarkets: filters.borrow.length > 0 ? filters.borrow : undefined,
     ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as DolomitePositionSort,
     sortOrder: filters.sortOrder,
     limit: DOLOMITE_ITEMS_PER_PAGE,
     offset: (page - 1) * DOLOMITE_ITEMS_PER_PAGE,
   };
+}
+
+/** Drop any market id the loaded roster does not offer, else it would sit in the
+ *  URL as an invisible predicate no chip can clear. Only ever runs against a
+ *  READY roster: pruning while the fetch is in flight, or because it failed,
+ *  would wipe a selection a shared link legitimately carried. */
+export function reconcileDolomiteMarkets(
+  filters: DolomiteListFilters,
+  state: DolomiteRosterState | undefined,
+): DolomiteListFilters | null {
+  if (state?.status !== "ready" || !state.roster) return null;
+  const known = new Set(state.roster.markets.map((m) => m.marketId));
+  const supply = filters.supply.filter((i) => known.has(i));
+  const borrow = filters.borrow.filter((i) => known.has(i));
+  return supply.length === filters.supply.length && borrow.length === filters.borrow.length
+    ? null
+    : { ...filters, supply, borrow };
 }

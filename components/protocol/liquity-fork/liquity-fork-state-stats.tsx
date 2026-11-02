@@ -32,7 +32,7 @@ import {
   type ChainTruthStat,
   type ChainTruthTransition,
 } from "@/components/shared/chain-truth-event";
-import { formatNumber } from "@/lib/utils/format";
+import { formatExact } from "@/lib/utils/format";
 import { forkAmount, forkCollAmount, forkDebtMove, forkRedistArrival } from "@/lib/shared/liquity-fork-ops";
 import { AmountText } from "@/components/shared/amount-text";
 import { faceUsdProv } from "@/lib/shared/flows-timeline-provenance";
@@ -226,7 +226,7 @@ export function liquityForkStateStats(
               <>
                 <Figure
                   info={p.costPerYearProv(coords, { debt: f.costDebt, rate: String(f.rate) })}
-                  value={formatNumber(f.costPerYear)}
+                  value={formatExact(f.costPerYear)}
                 >
                   <AmountText value={f.costPerYear} />
                 </Figure>{" "}

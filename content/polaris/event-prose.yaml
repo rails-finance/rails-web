@@ -585,6 +585,8 @@ position_words:
     The market is in defensive mode, which has raised the minimum to {defensive}.
   rate: |-
     Interest is a primary rate of {primary} plus a secondary rate of {secondary}, both set by the market.
+  rate_cost: |-
+    At the current {rate} rate, the debt recorded at the last touch costs about {cost} {stable} a year.
   holder: |-
     The position is an NFT held by the address on the card.
   holder_one: |-

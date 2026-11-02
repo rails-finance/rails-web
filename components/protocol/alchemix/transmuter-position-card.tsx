@@ -202,7 +202,7 @@ export function transmuterPanel(
     [
       {
         id: "staked-at",
-        label: "Staked at",
+        label: "Deposited at",
         value: <BlockRef block={p.maturity.startBlock} />,
         tip: "The block the stake was made at, from the Transmuter's PositionCreated log.",
       },

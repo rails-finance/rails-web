@@ -31,11 +31,17 @@ export const toLocaleStringHelper = (value: number, options: FormatOptions = {})
   return `${prefix}${formatted}${suffix}`;
 };
 
+/** Two decimals from 1 up; below 1, four significant digits (0.9998, 0.0000312),
+ *  never fewer than two decimals and never more than eight. Under 1e-8 the
+ *  tiny-amount floor text stands in. */
 export const formatPrice = (value: number): string => {
-  return toLocaleStringHelper(value, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  const a = Math.abs(value);
+  if (a === 0 || a >= 1 || !Number.isFinite(a)) {
+    return toLocaleStringHelper(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  if (a < 1e-8) return value < 0 ? "-<0.00000001" : "<0.00000001";
+  const decimals = Math.min(8, Math.max(2, 3 - Math.floor(Math.log10(a))));
+  return toLocaleStringHelper(value, { minimumFractionDigits: 2, maximumFractionDigits: decimals });
 };
 
 // Cents, grouped: "$2,725,629.68". A positive amount under a cent reads
@@ -101,21 +107,62 @@ export const formatUnitsExact = (raw: string | null | undefined, decimals: numbe
   return (neg && out !== "0" ? "-" : "") + out;
 };
 
-// Full-precision float rendering for the provenance trace: every decimal the
-// pipeline actually delivered — String(n) is the shortest round-trip form, so
-// there's no invented 3-dp rounding and no float noise — regrouped with
-// thousands separators. Where the source is an integer-wei string, prefer
+/** Thousands separators in every plain digit run of four or more in a figure's
+ *  integer part: "1234567.123456789 USDC" reads "1,234,567.123456789 USDC".
+ *  A fraction, an already grouped number and shorter runs are left as they are.
+ *  The face for an exact decimal; the raw string stays on the data attribute. */
+export const groupDigits = (text: string): string =>
+  text.replace(/(?<![\d.,])\d{4,}(?![\d,])/g, (run) => run.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+
+/** A before and an after figure that print alike although their exact values
+ *  differ, widened to the fewest fixed decimals, two at least and ten at most,
+ *  that tell them apart ("55,258.49 → 55,258.29"). Null where the pair already
+ *  differs, is equal, or is a million or more (the compact form stands). */
+export const widenPair = (
+  shownBefore: string,
+  shownAfter: string,
+  beforeExact: string,
+  afterExact: string,
+): { before: string; after: string } | null => {
+  if (shownBefore !== shownAfter) return null;
+  const num = (e: string) =>
+    Number(
+      e
+        .trim()
+        .replace(/,/g, "")
+        .replace(/^\u2212/, "-"),
+    );
+  const b = num(beforeExact);
+  const a = num(afterExact);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a === b || Math.abs(a) >= 1e6 || Math.abs(b) >= 1e6) return null;
+  for (let d = 2; d <= 10; d++) {
+    const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+    if (fmt(b) !== fmt(a)) return { before: fmt(b), after: fmt(a) };
+  }
+  return null;
+};
+
+// Float rendering for the provenance trace: the 15 significant digits a double
+// holds, to the token's decimals, so there's no invented 3-dp rounding and no
+// float noise, regrouped with thousands separators. Where the source is an integer-wei string, prefer
 // formatUnitsExact (no float in the path at all).
-export const formatExact = (value: number): string => {
+export const formatExact = (value: number, decimals = 18): string => {
   if (!Number.isFinite(value)) return String(value);
   const neg = value < 0;
-  const s = String(Math.abs(value));
-  // Off the plain-decimal range (≥1e21 or <1e-6) String() goes exponential;
-  // hand those to Intl at max precision instead of parsing the exponent.
-  if (s.includes("e")) return value.toLocaleString("en-US", { maximumFractionDigits: 20 });
-  const [int, frac] = s.split(".");
+  // A double holds 15 significant digits for certain; digits 16 and 17 are the
+  // residue of the arithmetic that produced it (133.47050099999979 for
+  // 133.470501). Round to 15, then to the token's decimals (18 for a ratio or
+  // a price), and let Intl drop the trailing zeros.
+  // exponent-safe: the string is parsed back to a number and printed by Intl, never shown
+  const clean = Number(Math.abs(value).toPrecision(15));
+  const body = clean.toLocaleString("en-US", {
+    useGrouping: false,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: Math.min(Math.max(decimals, 0), 20),
+  });
+  const [int, frac] = body.split(".");
   const grouped = BigInt(int).toLocaleString("en-US");
-  return `${neg ? "-" : ""}${grouped}${frac ? `.${frac}` : ""}`;
+  return `${neg && body !== "0" ? "-" : ""}${grouped}${frac ? `.${frac}` : ""}`;
 };
 
 /** BTC-class, ETH-class and gold tokens: a unit is worth thousands of

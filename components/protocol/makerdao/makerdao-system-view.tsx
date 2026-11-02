@@ -391,6 +391,7 @@ function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null 
         {row.ceilingState !== "dormant" && row.ceilingState !== "closed" && (
           <div className="mt-0.5 text-[11px] tabular-nums text-rb-500">
             <Prov
+              value={formatExact(row.availableDai)}
               info={stampHeadRead(availableProv(row.ilk, formatExact(row.lineDai), formatExact(row.debtDai)), readBy)}
             >
               <AmountText value={row.availableDai} format="compact" />
@@ -399,7 +400,11 @@ function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null 
             {row.maxLineDai != null && (
               <>
                 {" · "}
-                <Prov info={stampHeadRead(ceilingProv(row.ilk, "auto"), readBy)} echo>
+                <Prov
+                  value={formatExact(row.maxLineDai)}
+                  info={stampHeadRead(ceilingProv(row.ilk, "auto"), readBy)}
+                  echo
+                >
                   <span>
                     up to <AmountText value={row.maxLineDai} format="compact" />
                   </span>

@@ -126,7 +126,9 @@ export function makerVaultToMarkdown(args: MakerVaultMarkdownArgs): string {
       );
     }
     if (view.priceUsd != null && view.priceUsd > 0) {
-      lines.push(`- **OSM price:** ${usd(view.priceUsd)} / ${sym} (Maker's own oracle security module, 1-hour delay)`);
+      lines.push(
+        `- **OSM price:** ${usd(view.priceUsd)} / ${sym} (Maker's own oracle security module, one to two hours behind the market)`,
+      );
     }
     if (view.debtDai != null && view.debtDai > 0 && view.collateralUsd != null && view.collateralUsd > 0) {
       const ratio = view.collateralUsd / view.debtDai;

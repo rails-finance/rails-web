@@ -15,6 +15,7 @@
 // registry (the api's registryPaused): the spoke does not read that flag, so
 // the reserve stays open at the price the paused feed holds.
 
+import { formatExact } from "@/lib/utils/format";
 import { useEffect, useState } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { publishedText, ageClauseText } from "@/lib/morpho/oracle-age";
@@ -73,7 +74,7 @@ export function AaveV4BaseReserveNotice({ reserves }: { reserves: AaveV4SpokeCha
     };
     return [
       <li key={r.reserveId}>
-        <Prov info={prov}>
+        <Prov value={formatExact(p.usd)} info={prov}>
           {r.symbol} <AmountText value={p.usd} /> USD
         </Prov>
         , published {publishedText(p.updatedAt, readTs)} {ageClauseText(p.updatedAt, readTs, oracle.blockNumber)}

@@ -1094,7 +1094,7 @@ L5:
       - bold: |-
           Oracle price
         text: |-
-          Maker values the collateral at its oracle price, which reaches the vault an hour after the market.
+          Maker values the collateral at its oracle price, which reaches the vault one to two hours after the market.
       - bold: |-
           Stability fee
         text: |-
@@ -1133,7 +1133,7 @@ L5:
       - bold: |-
           Oracle price
         text: |-
-          the added collateral counts at Maker's oracle price, an hour behind the market.
+          the added collateral counts at Maker's oracle price, one to two hours behind the market.
       - bold: |-
           Who can deposit
         text: |-
@@ -1387,7 +1387,7 @@ L5:
       - bold: |-
           Oracle delay
         text: |-
-          Maker acts on its oracle price, an hour behind the market, so owners see a fall before it counts.
+          Maker acts on its oracle price, one to two hours behind the market, so owners see a fall before it counts.
       - bold: |-
           Liquidation penalty
         text: |-
@@ -1425,9 +1425,9 @@ L5:
       - bold: |-
           Oracle price
         text: |-
-          Maker judges the vault at its oracle price, which passes each price on an hour late.
+          Maker judges the vault at its oracle price, which passes each price on one to two hours after the market.
         text_usds: |-
-          Maker values SKY at the lower of its oracle price, an hour late, and a cap governance sets.
+          Maker values SKY at the lower of its oracle price, one to two hours late, and a cap governance sets.
       - bold: |-
           Stability fee
         text: |-

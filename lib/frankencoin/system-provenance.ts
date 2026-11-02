@@ -45,7 +45,7 @@ export const equityProv = (): Provenance => ({
   pclass: "state",
   verify: headCall("Frankencoin.equity()"),
   summary:
-    "The equity capital standing behind ZCHF — the Frankencoin contract's own equity() at the stamped block: the reserve's ZCHF that belongs to FPS holders. It is the junior tranche of the system — a challenge shortfall is absorbed here after the borrower's own reserve contribution.",
+    "The equity capital standing behind ZCHF — the Frankencoin contract's own equity() at the stamped block: the reserve's ZCHF that belongs to FCS holders. It is the junior tranche of the system — a challenge shortfall is absorbed here after the borrower's own reserve contribution.",
   contract: zchfContract,
   via: "eth_call · equity() @ head",
 });

@@ -1,4 +1,8 @@
-// ProtocolInfoPage — the one shell for every explorer's /info page: the rail
+// ProtocolInfoPage is the typed template every /info page follows (rails-ops
+// standards/info-page-template.md). ProtocolInfoShell below is the untyped shell
+// that only the exempt testnet page (Polaris on Sepolia) still uses.
+//
+// ProtocolInfoShell — the one shell for every explorer's /info page: the rail
 // header with the (i) lit, then the intro prose that used to live behind the
 // listing's (i) drawer (the intro slot grammar, charter §8a — the copy moved
 // here, reframed for a standalone page), then the standing door to /coverage.
@@ -16,7 +20,49 @@ import { protocolForSession } from "@/lib/shared/protocols";
 import { CHAINS, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
-export function ProtocolInfoPage({ session, children }: { session: SessionProtocol; children: ReactNode }) {
+export interface InfoDocLink {
+  label: string;
+  href: string;
+}
+
+export interface InfoTerm {
+  term: string;
+  /** One or two sentences, plain English, the practical figure before the formula. */
+  definition: string;
+  /** The protocol's official docs or FAQ, at least one. */
+  sources: readonly [InfoDocLink, ...InfoDocLink[]];
+}
+
+export interface InfoView {
+  /** "Listing", "Position page", "System page": the view as the rail names it. */
+  heading: string;
+  body: ReactNode;
+}
+
+/** The glossary's heading: one word, one place to change it. */
+export const GLOSSARY_HEADING = "Glossary";
+
+/** The anchor of a glossary entry; `GlossaryLink` and the entry's id share it. */
+export function glossaryId(term: string): string {
+  return `glossary-${term
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")}`;
+}
+
+/** A link from running text to a glossary entry on the same page. Use it at the first use of a term. */
+export function GlossaryLink({ term, children }: { term: string; children?: ReactNode }) {
+  return (
+    <a href={`#${glossaryId(term)}`} className={INLINE_LINK}>
+      {children ?? term}
+    </a>
+  );
+}
+
+const H = "mt-5 text-sm font-semibold text-foreground";
+const UL = "mt-1.5 list-disc space-y-1 pl-5";
+
+export function ProtocolInfoShell({ session, children }: { session: SessionProtocol; children: ReactNode }) {
   // Coverage is per-chain routes; the door leads to the matrix that actually
   // contains this explorer's row.
   const chainId = protocolForSession(session)?.chainId ?? MAINNET_CHAIN_ID;
@@ -41,6 +87,110 @@ export function ProtocolInfoPage({ session, children }: { session: SessionProtoc
         <Link href={`/coverage/${CHAINS[chainId].slug}`} className={INLINE_LINK}>
           See what Rails covers on each {CHAINS[chainId].name} explorer
         </Link>
+      </p>
+    </div>
+  );
+}
+
+export interface ProtocolInfoPageProps {
+  session: SessionProtocol;
+  /** Slot 1: what the explorer tracks, one or two sentences, with what it does not cover. */
+  tracks: ReactNode;
+  /** Slot 2: each term defined once, linked to the protocol's official docs or FAQ. */
+  glossary: readonly [InfoTerm, ...InfoTerm[]];
+  /** Slot 3: how the protocol works, three or four items, the distinguishing feature first. */
+  howItWorks: readonly [ReactNode, ...ReactNode[]];
+  /** Slot 4: one section per view, each a few lines. */
+  views: readonly [InfoView, ...InfoView[]];
+  /** Slot 5: the search and filter line, only where the listing has them. */
+  search?: ReactNode;
+  /** One sentence naming what a reader might expect here and will not find, shown beside the coverage door. Omit it when nothing is expected and missing. */
+  notCovered?: string;
+  /** Slot 6: the official documentation, the page's final line. */
+  docs: InfoDocLink;
+}
+
+export function ProtocolInfoPage({
+  session,
+  tracks,
+  glossary,
+  howItWorks,
+  views,
+  search,
+  notCovered,
+  docs,
+}: ProtocolInfoPageProps) {
+  const chainId = protocolForSession(session)?.chainId ?? MAINNET_CHAIN_ID;
+  return (
+    <div className="py-8">
+      <div className="mb-6">
+        <RailHeader session={session} venue="info" />
+      </div>
+      <h1 className="text-2xl font-semibold text-foreground" data-anatomy="I1">
+        About this explorer
+      </h1>
+      <div className="mt-3 max-w-3xl space-y-2 text-sm text-rb-500" data-anatomy="I2">
+        <p>{tracks}</p>
+
+        <h2 className={H}>How it works</h2>
+        <ul className={UL}>
+          {howItWorks.map((item, i) => (
+            <li key={i}>{item}</li>
+          ))}
+        </ul>
+
+        <h2 id="glossary" className={`${H} scroll-mt-20`}>
+          {GLOSSARY_HEADING}
+        </h2>
+        <dl className="mt-1.5 space-y-2" data-anatomy="I4">
+          {glossary.map((t) => (
+            <div key={t.term} id={glossaryId(t.term)} className="scroll-mt-20">
+              <dt className="inline font-semibold text-foreground">{t.term}</dt>
+              <dd className="inline">
+                {": "}
+                {t.definition} <span className="text-rb-400">Docs:</span>{" "}
+                {t.sources.map((l, i) => (
+                  <span key={l.href}>
+                    {i > 0 && ", "}
+                    <a href={l.href} className={INLINE_LINK} target="_blank" rel="noopener noreferrer">
+                      {l.label}
+                    </a>
+                  </span>
+                ))}
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        {views.map((v) => (
+          <section key={v.heading}>
+            <h2 className={H}>{v.heading}</h2>
+            <div className="mt-1.5">{v.body}</div>
+          </section>
+        ))}
+
+        {search && (
+          <p className="mt-5" data-anatomy="I5">
+            {search}
+          </p>
+        )}
+
+        <p className="mt-5" data-anatomy="I6">
+          Tap the (i) beside any figure to see where it comes from. Inside, the ? explains that kind of event in
+          general.
+        </p>
+      </div>
+      <p className="mt-4 text-sm text-rb-500" data-anatomy="I3">
+        {notCovered && <span className="block">{notCovered}</span>}
+        <Link href={`/coverage/${CHAINS[chainId].slug}`} className={INLINE_LINK}>
+          See what Rails covers on each {CHAINS[chainId].name} explorer
+        </Link>
+      </p>
+      <p className="mt-2 text-sm text-rb-500" data-anatomy="I7">
+        Official documentation:{" "}
+        <a href={docs.href} className={INLINE_LINK} target="_blank" rel="noopener noreferrer">
+          {docs.label}
+        </a>
       </p>
     </div>
   );

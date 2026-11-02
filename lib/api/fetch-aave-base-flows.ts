@@ -31,7 +31,10 @@ export type AaveBaseFlowAnswer =
    *  transfers), it holds more rows than the route replays, or the server
    *  has no such route. */
   | { wallet: string; refused: "coverage" | "unavailable" }
-  | { wallet: string; refused: "rows"; rows: number; cap: number };
+  | { wallet: string; refused: "rows"; rows: number; cap: number }
+  /** The server is replaying a heavy wallet's history in the background:
+   *  `storedRows` of its `rows` are in. Asking again answers once it is built. */
+  | { wallet: string; refused: "building"; rows: number; storedRows: number };
 
 export const isAaveBaseSummaryAnswer = (a: AaveBaseFlowAnswer): a is Extract<AaveBaseFlowAnswer, { days: unknown }> =>
   !("refused" in a);
@@ -45,4 +48,29 @@ export async function fetchAaveBaseFlows(
   const res = await fetch(`/api/${lane}/flows?wallet=${wallet.toLowerCase()}`, { signal });
   if (!res.ok) throw new Error(`fetchAaveBaseFlows ${lane} failed: ${res.status} ${res.statusText}`);
   return (await res.json()) as AaveBaseFlowAnswer;
+}
+
+/** A page of the cards' flows older than the summary's newest events
+ *  (rails-server GET /api/{aave-v3-base,seamless}/flows/events): the `limit`
+ *  events just older than `before`, oldest first, with the summary's ids;
+ *  `next` is the `before` of the page after, null at the first event. */
+export type AaveBaseFlowEventsAnswer =
+  | { wallet: string; totalEvents: number; older: number; next: string | null; events: FocusEvent[] }
+  | { wallet: string; refused: "coverage" | "unavailable" | "rows" | "building" }
+  /** No event has the cursor: the history changed since the summary. */
+  | { wallet: string; unknownBefore: true };
+
+/** GET a page; `before` is an event id from the summary or an earlier page. */
+export async function fetchAaveBaseFlowEvents(
+  lane: "aave-v3-base" | "seamless",
+  wallet: string,
+  before: string,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<AaveBaseFlowEventsAnswer> {
+  const q = new URLSearchParams({ wallet: wallet.toLowerCase(), before, limit: String(limit) });
+  const res = await fetch(`/api/${lane}/flows/events?${q}`, { signal });
+  if (res.status === 404) return (await res.json()) as AaveBaseFlowEventsAnswer;
+  if (!res.ok) throw new Error(`fetchAaveBaseFlowEvents ${lane} failed: ${res.status} ${res.statusText}`);
+  return (await res.json()) as AaveBaseFlowEventsAnswer;
 }

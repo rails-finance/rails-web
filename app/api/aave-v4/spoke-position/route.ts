@@ -10,7 +10,9 @@ const RAILS_API_URL = process.env.RAILS_API_URL;
  * Proxy to rails-server-onboarding's `/api/aave-v4/spoke-position` (singular)
  * endpoint. Returns the live on-chain state for a single (wallet, spoke):
  * HF + CF + per-reserve supply/debt balances + collateral toggle status.
- * Backed by Multicall3 against the spoke contract, cached per-block server-side.
+ * rails-server serves the refresher worker's row for the pair; with no row it
+ * reads the spoke at the shared head block, keyless gateways first and the paid
+ * leg last, keeps the answer 30 s and writes the row for the next visit.
  */
 export async function GET(request: NextRequest) {
   const readerIp = readerIpFromRequest(request);

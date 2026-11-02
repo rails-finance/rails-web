@@ -817,19 +817,24 @@ export const poolStrategiesAumProv = (assetSym: string, atBlockNum?: number): Pr
 // multicall block; the receipts say exactly that.
 
 /** Shares sitting in the escrow contract — a direct balance slot read. */
-export const custodySharesProv = (poolSym: string, atBlockNum?: number): Provenance => ({
+export const custodySharesProv = (poolSym: string, atBlockNum?: number, readBy?: ServerRead | null): Provenance => ({
   kind: "chain",
   source: { block: atBlockNum },
   pclass: "state",
   verify: stateVerify("pool.balanceOf(escrow)", atBlockNum ?? null),
-  summary: `${poolSym} locked in this escrow contract${atBlockNum ? ` at block ${atBlockNum}` : ""} — the pool token's own \`balanceOf\` on the escrow address, a plain slot read at head. No event replay stands behind this figure by design: the index keeps escrow rows off the lender surfaces, so the slot read is the whole claim. The locked shares back bridged ${poolSym} balances on other networks.`,
+  summary: `${poolSym} locked in this escrow contract${atBlockNum ? ` at block ${atBlockNum}` : ""} — the pool token's own \`balanceOf\` on the escrow address, a plain slot read${readBy ? "" : " at head"}. No event replay stands behind this figure by design: the index keeps escrow rows off the lender surfaces, so the slot read is the whole claim. The locked shares back bridged ${poolSym} balances on other networks.`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
   via: "pool.balanceOf(escrow) — eth_call at head",
 });
 
 /** What the escrowed shares redeem for at the pool's exit price —
  *  the same integer derivation the lender card's current value uses. */
-export const custodyValueProv = (assetSym: string, poolSym: string, atBlockNum?: number): Provenance => ({
+export const custodyValueProv = (
+  assetSym: string,
+  poolSym: string,
+  atBlockNum?: number,
+  readBy?: ServerRead | null,
+): Provenance => ({
   kind: "chain-derived",
   source: { block: atBlockNum },
   pclass: "state",
@@ -837,7 +842,7 @@ export const custodyValueProv = (assetSym: string, poolSym: string, atBlockNum?:
     kind: "recompute",
     text: `Re-run the pool's convertToExitAssets eth_call on the escrow's ${poolSym} balance${atBlockNum ? ` at block ${atBlockNum}` : ""} — it reproduces this figure`,
   },
-  summary: `${assetSym} the locked shares redeem for at the pool's exit price — the pool's own \`convertToExitAssets\` on the escrow's exact share balance, in the pool's own integer math: shares × (totalAssets − unrealizedLosses) ÷ totalSupply, every leg read at the same head block. The claim on this value lives with the bridged holders on other networks; the escrow only custodies it. ${CUSTODY_NOTE}`,
+  summary: `${assetSym} the locked shares redeem for at the pool's exit price — the pool's own \`convertToExitAssets\` on the escrow's exact share balance, in the pool's own integer math: shares × (totalAssets − unrealizedLosses) ÷ totalSupply, every leg read ${readBy ? headWords(readBy) : "at the same head block"}. The claim on this value lives with the bridged holders on other networks; the escrow only custodies it. ${CUSTODY_NOTE}`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
   via: "shares × convertToExitAssets (eth_call at head)",
   formula: "shares × (totalAssets − unrealizedLosses) ÷ totalSupply",
@@ -850,7 +855,11 @@ export const custodyValueProv = (assetSym: string, poolSym: string, atBlockNum?:
 });
 
 /** The escrow's fraction of the whole pool share supply. */
-export const custodySupplyShareProv = (poolSym: string, atBlockNum?: number): Provenance => ({
+export const custodySupplyShareProv = (
+  poolSym: string,
+  atBlockNum?: number,
+  readBy?: ServerRead | null,
+): Provenance => ({
   kind: "chain-derived",
   source: { block: atBlockNum },
   pclass: "state",
@@ -858,7 +867,7 @@ export const custodySupplyShareProv = (poolSym: string, atBlockNum?: number): Pr
     kind: "recompute",
     text: `Re-run the pool's balanceOf(escrow) and totalSupply eth_calls${atBlockNum ? ` at block ${atBlockNum}` : ""} — one division reproduces this figure`,
   },
-  summary: `The escrow's slice of all ${poolSym} in existence — its share balance divided by the pool token's \`totalSupply\`, two slot reads from the same head block, one division. This is the fraction of the whole pool whose shares sit on Ethereum backing bridged balances elsewhere.`,
+  summary: `The escrow's slice of all ${poolSym} in existence — its share balance divided by the pool token's \`totalSupply\`, two slot reads from ${readBy ? `block ${readBy.block.toLocaleString("en-US")}` : "the same head block"}, one division. This is the fraction of the whole pool whose shares sit on Ethereum backing bridged balances elsewhere.`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
   via: "pool.balanceOf(escrow) ÷ pool.totalSupply — eth_calls at head",
   formula: "locked shares ÷ totalSupply",

@@ -1380,3 +1380,51 @@ L5:
       - label: |-
           Variable and transparent rates
         doc: BORROW_RATE
+
+# ── The info page (/ethereum/spark/info, zone Z5): the glossary under How it works ──
+glossary:
+  - bold: |-
+      Wallet
+    text: |-
+      A wallet is an account address on Ethereum, which holds tokens and signs the transactions that supply, borrow, repay or withdraw on SparkLend. Each wallet has one SparkLend account on this explorer.
+    sources: [{ label: "SparkLend overview", doc: SPARKLEND }]
+  - bold: |-
+      Supply
+    text: |-
+      To supply is to deposit an asset into SparkLend so that it earns interest. Borrowers pay that interest, and it rises as more of the asset is lent out.
+    sources: [{ label: "Supplying assets", doc: SUPPLYING }]
+  - bold: |-
+      spToken
+    text: |-
+      An spToken is the receipt a wallet gets for supplying an asset, such as spWETH for WETH. Its balance grows with interest, and the wallet needs it to withdraw the asset.
+    sources: [{ label: "spToken", doc: SPTOKEN }]
+  - bold: |-
+      Collateral
+    text: |-
+      Collateral is a supplied asset that backs a wallet's borrowing. A wallet can switch an asset's collateral setting off, and then the asset no longer backs any loan.
+    sources: [{ label: "Collateral switch", doc: SUPPLY_OPT_OUT }]
+  - bold: |-
+      Borrow
+    text: |-
+      To borrow is to take an asset out of SparkLend against the collateral a wallet has supplied. The loan grows with interest until the wallet repays it, and the most it can borrow depends on its collateral.
+    sources: [{ label: "Borrowing assets", doc: BORROWING }]
+  - bold: |-
+      Health factor
+    text: |-
+      The health factor is one number for a whole account: the value of its collateral, each asset counted up to its liquidation threshold, divided by its debt. The liquidation threshold is the share of an asset's value that counts as collateral, and SparkLend sets it for each asset. Below 1, the collateral no longer covers the debt and a liquidation can start.
+    sources: [{ label: "Health factor", doc: BORROW_HEALTH }]
+  - bold: |-
+      Liquidation
+    text: |-
+      A liquidation happens when an account's health factor falls below 1. A liquidator is anyone who repays part of that debt, and in return takes collateral worth slightly more, which is the liquidator's bonus.
+    sources: [{ label: "What is a liquidation", doc: LIQUIDATIONS }, { label: "Liquidation penalty", doc: PENALTY }]
+  - bold: |-
+      Oracle price
+    text: |-
+      An oracle price is the dollar price of an asset that SparkLend reads from an oracle, a service that reports each asset's price. It values collateral and debt, and it decides how much a wallet can borrow and when a liquidation can start.
+    sources: [{ label: "Oracles", doc: ORACLES }]
+  - bold: |-
+      E-mode
+    text: |-
+      E-mode is a setting for assets whose prices move together, such as two dollar stablecoins. A category is a group of assets with similar prices. A wallet in E-mode can borrow more against its collateral, and the docs say it can then borrow only assets from that category.
+    sources: [{ label: "E-Mode", doc: EMODE }]

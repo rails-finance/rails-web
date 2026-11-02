@@ -20,7 +20,7 @@ import { useEnsName } from "@/lib/ens/use-ens-names";
 import type { ExternalActorSummary } from "@/lib/shared/external-actor";
 import { AmountText } from "@/components/shared/amount-text";
 import { Prov } from "@/components/shared/provenance";
-import { formatNumber } from "@/lib/utils/format";
+import { formatNumber, formatExact } from "@/lib/utils/format";
 import {
   collateralRatioProv,
   collateralUsdProv,
@@ -138,7 +138,7 @@ export function MakerdaoPositionExplanation({
 
   // Each figure the card also shows carries the card's receipt.
   const coll = (
-    <Prov info={vaultInkProv(sym, v.atBlock, false, v.source)}>
+    <Prov value={formatExact(v.ink)} info={vaultInkProv(sym, v.atBlock, false, v.source)}>
       <H>
         <AmountText value={v.ink} />
       </H>
@@ -153,7 +153,13 @@ export function MakerdaoPositionExplanation({
     ? positionNodes("lead_debt", {
         coll,
         coll_symbol: sym,
-        debt: v.rate ? <Prov info={daiDebtProv(formatNumber(v.art), v.rate, dsym)}>{debtFigure}</Prov> : debtFigure,
+        debt: v.rate ? (
+          <Prov value={formatExact(v.debtDai as number)} info={daiDebtProv(formatNumber(v.art), v.rate, dsym)}>
+            {debtFigure}
+          </Prov>
+        ) : (
+          debtFigure
+        ),
         debt_symbol: dsym,
       })
     : positionNodes("lead_no_debt", { coll, coll_symbol: sym });

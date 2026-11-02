@@ -17,11 +17,23 @@
 // wrong unit. This is the read that lets Compound's USD layer light up
 // (lib/compound/economics.ts VALUED_USD).
 //
+// On Ethereum and Base the prices are read through rails-server's head routes
+// (surface `compound-v3:<chain>:prices`, lib/sources/api/head-snapshot.ts):
+// every Comet's roster, feeds and prices at one block, whatever was asked, so
+// that the stored snapshot answers any page's request when the live read
+// fails. The map then names its block and who answered (`read`). Arbitrum
+// reads the chain as before.
+//
 // SERVER-ONLY — imported from /api/* route handlers only (it calls Alchemy via
 // lib/sources/chain/rpc). Mirrors the batched-multicall shape of erc20-meta.ts.
 
-import { parseAbi } from "viem";
+import { parseAbi, type PublicClient } from "viem";
 import { chainClient } from "./rpc";
+import { cometSurface } from "./compound-markets";
+import { withHeadSnapshot } from "@/lib/sources/api/head-snapshot";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import type { StoredHeadRead } from "@/lib/shared/server-head-read";
 import { COMPOUND_DEPLOYMENT, type CometDeployment, type CometMarket } from "@/lib/compound/asset-catalog";
 import { cometUsdOf } from "@/lib/compound/at-block-prices";
 
@@ -116,9 +128,18 @@ async function readRosters(client: ReturnType<typeof chainClient>, comets: strin
   }
 }
 
+/** The block a price map was read at and who answered: rails-server live
+ *  (`head`), its stored snapshot (`stored`), or neither (the chain). */
+export interface CometPriceRead {
+  blockNumber: number;
+  head?: PositionHeadStamp;
+  stored?: StoredHeadRead;
+}
+
 /** Keyed by `${comet}:${token}` (both lowercased) → USD price per whole token.
- *  Keyed per-market because each Comet reads its own feeds. */
-export type CometPriceMap = Map<string, number>;
+ *  Keyed per-market because each Comet reads its own feeds. `read` is set on
+ *  the Ethereum and Base maps. */
+export type CometPriceMap = Map<string, number> & { read?: CometPriceRead };
 
 const priceKey = (comet: string, token: string) => `${comet.toLowerCase()}:${token.toLowerCase()}`;
 
@@ -145,8 +166,119 @@ export async function resolveCometPrices(
   reqs: CometPriceRequest[],
   deployment: CometDeployment = COMPOUND_DEPLOYMENT,
 ): Promise<CometPriceMap> {
+  if (reqs.length === 0) return new Map();
+  const surface = cometSurface(deployment, "prices");
+  if (!surface) return resolveFromChain(reqs, deployment);
+  try {
+    const { value, stored } = await withHeadSnapshot(
+      { surface, chainId: deployment.chainId },
+      (client) => readDeploymentPrices(client, deployment),
+      (map) => map.size > 0,
+    );
+    const block = value.read?.blockNumber;
+    if (block != null) {
+      const head = stored ? undefined : serverHeadStampAt(deployment.chainId, block);
+      value.read = {
+        blockNumber: stored?.blockNumber ?? block,
+        ...(head ? { head } : {}),
+        ...(stored ? { stored } : {}),
+      };
+    }
+    return value;
+  } catch {
+    return new Map(); // No read and no snapshot: callers stay token-only.
+  }
+}
+
+/** Every Comet's base and collateral price in the deployment, at one block:
+ *  the roster (numAssets, baseTokenPriceFeed), each asset's feed
+ *  (getAssetInfo), then getPrice on every feed. Fills the roster and feed
+ *  caches. Throws where the block or a round cannot be read. */
+async function readDeploymentPrices(client: PublicClient, deployment: CometDeployment): Promise<CometPriceMap> {
+  const blockNumber = await client.getBlockNumber();
+  const at = { blockNumber };
+  const comets = deployment.markets.map((m) => m.comet.toLowerCase());
+  const baseOf = new Map(deployment.markets.map((m) => [m.comet.toLowerCase(), m.baseToken.toLowerCase()]));
+  type Res = { status: string; result?: unknown };
+
+  const r1 = (await client.multicall({
+    allowFailure: true,
+    ...at,
+    contracts: comets.flatMap((c) => [
+      { address: c as `0x${string}`, abi: COMET_ABI, functionName: "numAssets" } as const,
+      { address: c as `0x${string}`, abi: COMET_ABI, functionName: "baseTokenPriceFeed" } as const,
+    ]),
+  })) as Res[];
+  const calls: { comet: string; i: number }[] = [];
+  const pairs: { comet: string; token: string; feed: string }[] = [];
+  comets.forEach((c, k) => {
+    const n = r1[k * 2]?.status === "success" ? Number(r1[k * 2].result) : 0;
+    for (let i = 0; i < n; i++) calls.push({ comet: c, i });
+    const feed = r1[k * 2 + 1]?.status === "success" ? String(r1[k * 2 + 1].result).toLowerCase() : null;
+    if (feed && feed !== ZERO_ADDR) pairs.push({ comet: c, token: baseOf.get(c)!, feed });
+  });
+
+  const r2 = (await client.multicall({
+    allowFailure: true,
+    ...at,
+    contracts: calls.map(
+      (x) =>
+        ({ address: x.comet as `0x${string}`, abi: COMET_ABI, functionName: "getAssetInfo", args: [x.i] }) as const,
+    ),
+  })) as { status: string; result?: { asset?: string; priceFeed?: string } }[];
+  const byComet = new Map<string, string[]>(comets.map((c) => [c, []]));
+  calls.forEach((x, k) => {
+    const r = r2[k];
+    if (r?.status !== "success" || !r.result?.asset) return;
+    const token = r.result.asset.toLowerCase();
+    byComet.get(x.comet)!.push(token);
+    const feed = r.result.priceFeed?.toLowerCase();
+    if (feed && feed !== ZERO_ADDR) pairs.push({ comet: x.comet, token, feed });
+  });
+  comets.forEach((c, k) => {
+    if (r1[k * 2]?.status === "success") rosterCache.set(c, { at: Date.now(), assets: byComet.get(c) ?? [] });
+  });
+  for (const p of pairs) feedCache.set(priceKey(p.comet, p.token), p.feed);
+
   const out: CometPriceMap = new Map();
-  if (reqs.length === 0) return out;
+  out.read = { blockNumber: Number(blockNumber) };
+  if (pairs.length === 0) return out;
+  const r3 = (await client.multicall({
+    allowFailure: true,
+    ...at,
+    contracts: pairs.map(
+      (p) =>
+        ({
+          address: p.comet as `0x${string}`,
+          abi: COMET_ABI,
+          functionName: "getPrice",
+          args: [p.feed as `0x${string}`],
+        }) as const,
+    ),
+  })) as Res[];
+  pairs.forEach((p, k) => {
+    const r = r3[k];
+    if (r?.status !== "success" || r.result == null) return;
+    const usd = Number(r.result as bigint) / PRICE_SCALE;
+    if (usd > 0) out.set(priceKey(p.comet, p.token), usd);
+  });
+
+  // The ETH-quoted market in dollars at Comet's own WETH/USD price, or dropped.
+  const conv = ethConversion(deployment);
+  if (conv) {
+    const ethUsd = out.get(priceKey(conv.usdComet, conv.wethToken));
+    for (const [k, v] of [...out.entries()]) {
+      if (!k.startsWith(`${conv.wethComet}:`)) continue;
+      if (ethUsd != null && ethUsd > 0) out.set(k, v * ethUsd);
+      else out.delete(k);
+    }
+  }
+  return out;
+}
+
+/** The chain read for a deployment rails-server does not answer (Arbitrum). */
+async function resolveFromChain(reqs: CometPriceRequest[], deployment: CometDeployment): Promise<CometPriceMap> {
+  const out: CometPriceMap = new Map();
 
   let client: ReturnType<typeof chainClient>;
   try {

@@ -325,7 +325,7 @@ const noDollar = (name, text) => {
   check("system: the franc renders (supply in ZCHF)", /ZCHF on Ethereum\s*\n\s*[\d.,]+[KMB]? ZCHF/.test(t));
   check(
     "system: the capital's two accounts + the pool render",
-    /Equity \(FPS holders\)/.test(t) && /Borrowers' reserve/.test(t) && /Reserve pool, total/.test(t),
+    /Equity \(FCS holders\)/.test(t) && /Borrowers' reserve/.test(t) && /Reserve pool, total/.test(t),
   );
   check(
     "system: FCS wrapping FPS one to one is stated",

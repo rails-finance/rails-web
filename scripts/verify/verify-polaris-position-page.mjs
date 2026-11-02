@@ -138,36 +138,50 @@ const context = await browser.newContext({
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForTimeout(1500);
 
-  const copyBtn = card(page).getByRole("button", { name: "Copy position number" }).first();
+  // The position's number, its NFT and a link sit at the head of the card's ⋮
+  // ("Position menu"; ui-jobs 405 took the identity-row buttons out).
+  const menuBtn = card(page)
+    .getByRole("button", { name: /Position menu/ })
+    .first();
+  const item = (name) => page.getByRole("menuitem", { name }).first();
+  const ensureMenu = async () => {
+    if ((await item(/^Position #8/).count()) === 0) {
+      await menuBtn.click();
+      await page.waitForTimeout(250);
+    }
+  };
+  await ensureMenu();
   check(
-    "a1. usdp/8 detail card — a 'Copy position number' button sits in the identity row",
-    (await copyBtn.count()) > 0,
+    "a1. usdp/8 detail card — the position menu offers 'Position #8 · Copy the position number'",
+    (await item(/^Position #8.*Copy the position number/).count()) > 0,
   );
-  if ((await copyBtn.count()) > 0) {
-    await copyBtn.click();
-    await page.waitForTimeout(200);
-    const copiedLabel = await card(page).getByRole("button", { name: "Copied" }).count();
+  if ((await item(/^Position #8/).count()) > 0) {
+    await item(/^Position #8/).click();
+    await page.waitForTimeout(150);
     const clip = await page.evaluate(() => navigator.clipboard.readText());
+    await ensureMenu();
+    const copiedLabel = await item(/^Position #8.*Copied/).count();
     check(
       "a2. clicking it says 'Copied' and puts the bare number on the clipboard",
       copiedLabel > 0 && clip === "8",
       `label=${copiedLabel} clipboard=${JSON.stringify(clip)}`,
     );
-    // 1.5 s later the glyph is back to "copy".
+    // 1.5 s later the row is back to "Copy the position number".
     await page.waitForTimeout(1800);
+    await ensureMenu();
     check(
-      "a3. the 'Copied' state expires and the copy button returns",
-      (await card(page).getByRole("button", { name: "Copy position number" }).count()) > 0,
+      "a3. the 'Copied' state expires and the copy row returns",
+      (await item(/^Position #8.*Copy the position number/).count()) > 0,
     );
   }
 
-  const nftBtn = card(page).getByRole("button", { name: "View the position NFT on Etherscan" }).first();
+  await ensureMenu();
   check(
-    "a4. usdp/8 detail card — a 'View the position NFT on Etherscan' button sits beside it",
-    (await nftBtn.count()) > 0,
+    "a4. usdp/8 detail card — the position menu offers 'Position NFT · Open it on Etherscan'",
+    (await item(/^Position NFT.*Open it on Etherscan/).count()) > 0,
   );
-  if ((await nftBtn.count()) > 0) {
-    await nftBtn.click();
+  if ((await item(/^Position NFT/).count()) > 0) {
+    await item(/^Position NFT/).click();
     await page.waitForTimeout(300);
     const opened = await page.evaluate(() => window.__opened ?? []);
     check(
@@ -202,21 +216,17 @@ const context = await browser.newContext({
   // fails the check for a reason that has nothing to do with the card.
   await page.waitForLoadState("load").catch(() => {});
   await page.waitForTimeout(3000);
-  const urlBefore = page.url();
-  const listCopy = row.getByRole("button", { name: "Copy position number" }).first();
-  const listNft = row.getByRole("button", { name: "View the position NFT on Etherscan" }).first();
-  check("a6. the listing card carries both buttons too", (await listCopy.count()) > 0 && (await listNft.count()) > 0);
-  if ((await listCopy.count()) > 0) {
-    await listCopy.click();
-    await page.waitForTimeout(700);
-    check(
-      "a7. clicking copy on a listing card does not navigate",
-      page.url() === urlBefore,
-      `${urlBefore} → ${page.url()}`,
-    );
-    const clip = await page.evaluate(() => navigator.clipboard.readText());
-    check("a8. and it copied a bare CDP number", /^\d+$/.test(clip), JSON.stringify(clip));
-  }
+  // A listing card carries its market and position number as a tag at the right
+  // end of the heading row (986e39a1) and no menu, so no copy or NFT button
+  // sits in the row's <Link>.
+  const rowText = (await row.innerText().catch(() => "")).replace(/\s+/g, " ");
+  check(
+    "a6. the listing card names its market and position number, and carries no copy or NFT button",
+    /\b(USDp|GOLDp) ID \d+/.test(rowText) &&
+      (await row.getByRole("button", { name: "Copy position number" }).count()) === 0 &&
+      (await row.getByRole("button", { name: "View the position NFT on Etherscan" }).count()) === 0,
+    rowText.slice(0, 120),
+  );
   await page.close();
 }
 
@@ -251,7 +261,13 @@ for (const [market, id] of [
   const m = m0 ? [m0[0], m0[1], STABLE[market]] : null;
   check(`c1. ${market}/${id} — the card states a "Costs per year" stat`, m != null, stripText.slice(0, 200));
   if (m) {
-    const shown = parseFig(m[1]);
+    // The face is the compact form ("~461.3K", ui-jobs 377); the exact decimal rides `data-prov-exact`.
+    const exactAttr = await stat
+      .locator("[data-prov-exact]")
+      .first()
+      .getAttribute("data-prov-exact")
+      .catch(() => null);
+    const shown = exactAttr != null ? parseFig(exactAttr) : parseFig(m[1]);
     check(
       `c2. ${market}/${id} — it is the RECORDED debt × the rate in force (${fmtNum(onRecorded)})`,
       near(shown, onRecorded),
@@ -266,17 +282,30 @@ for (const [market, id] of [
       );
     check(`c4. ${market}/${id} — the stat states no "$"`, !stripText.includes("$"), stripText);
   }
-  // The explanation says the same figure in words, on the same base.
+  // The explanation says the debt the cost is charged on in words: the figure
+  // "recorded at the last touch" is the recorded debt the stat multiplies by the
+  // rate (the cost sentence itself left the explanation with the glance summary).
   const explBtn = card(page).locator('button[aria-label*="explanation" i]').first();
   if ((await explBtn.count()) > 0 && (await explBtn.getAttribute("aria-expanded")) !== "true") await explBtn.click();
   await page.waitForTimeout(400);
   const explText = (await card(page).innerText()).replace(/\s+/g, " ");
+  const recordedWords = /The debt is ([\d,.]+) \w+ recorded at the last\s+touch/.exec(explText);
   check(
-    `c5. ${market}/${id} — the explanation's rate bullet carries the same figure "on the … recorded at the last touch"`,
-    /recorded at the last\s+touch/.test(explText) &&
-      near(parseFig(/about ([\d,.]+)/.exec(explText)?.[1] ?? ""), onRecorded),
-    /about [\d,.]+ \w+ a year on the [\d,.]+ \w+ recorded at the last\s+touch/.exec(explText)?.[0] ??
-      explText.slice(0, 160),
+    `c5. ${market}/${id} — the explanation's debt bullet carries the recorded debt the cost is charged on ("recorded at the last touch")`,
+    recordedWords != null && near(parseFig(recordedWords[1]), live.recordedDebt),
+    recordedWords?.[0] ?? explText.slice(0, 160),
+  );
+
+  const costWords = /costs about ([\d,.]+\w?) \w+ a year/.exec(explText);
+  const costExact = await card(page)
+    .locator("[data-polaris-annual-cost]")
+    .first()
+    .getAttribute("data-prov-exact")
+    .catch(() => null);
+  check(
+    `c5b. ${market}/${id} — the explanation's cost sentence states debt × rate (${fmtNum(onRecorded)})`,
+    costWords != null && costExact != null && near(parseFig(costExact), onRecorded),
+    `${costWords?.[0] ?? "sentence absent"} · exact ${costExact}`,
   );
 
   // The LLM export carries it too.
@@ -326,7 +355,11 @@ for (const [market, id] of [
   const pulsingLate = await card(page).locator(".animate-pulse").count();
   const settled = (await card(page).innerText()).replace(/\s+/g, " ");
   check("d2. once it lands, nothing on the card pulses", pulsingLate === 0, `${pulsingLate} pulsing`);
-  check("d3. and the slots carry their values", /%/.test(settled) && /per year, set by the market/.test(settled));
+  check(
+    "d3. and the slots carry their values (the rate with its primary and safety parts)",
+    /\d%/.test(settled) && /[\d.]+% primary \+ [\d.]+% safety/.test(settled),
+    settled.slice(0, 160),
+  );
   await page.close();
 }
 {
@@ -443,10 +476,21 @@ for (const [path, want, what] of [
     /\s+/g,
     " ",
   );
+  // ui-jobs 405 (3873b835) took the NFT paragraph out of the modal: "CDP stays only
+  // where it teaches". The modal teaches the position's concepts; the NFT is a
+  // History bullet in the explanation behind it.
   check(
-    "g. the '?' modal says the CDP is an ERC-721 whose holder holds the position",
-    /The position is an NFT/.test(modal) && /ERC-721/.test(modal) && /never reused/.test(modal),
-    modal.slice(modal.indexOf("The position is an NFT"), modal.indexOf("The position is an NFT") + 200),
+    "g. the '?' modal teaches the pending legs and the two rates",
+    /Pending legs/.test(modal) && /Two rates/.test(modal) && /Collateral ratio/.test(modal),
+    modal.slice(0, 160),
+  );
+  await heading.page().keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  const explBody = (await card(page).innerText()).replace(/\s+/g, " ");
+  check(
+    "g2. the explanation's History bullet says the position is an NFT held by the address on the card",
+    /The position is an NFT held by the address/.test(explBody),
+    /History.{0,120}/.exec(explBody)?.[0] ?? "no History",
   );
   await page.close();
 }
@@ -462,10 +506,45 @@ const parseSigned = (t) => {
  *  face's compact form hides a 1% error on a small CDP. */
 const close = (got, want) => Number.isFinite(got) && Math.abs(got - want) <= Math.max(Math.abs(want) * 0.005, 1e-6);
 check("h0. the comparison rejects a figure 1% off", !close(386745.35 * 1.01, 386745.35) && close(386745.35, 386745.35));
-for (const [market, id] of [
+const hFixtures = [];
+/** A CDP the h checks can read: open, with live legs, a PSM share and stability
+ *  gains that are all non-zero. A fixed id goes stale when someone closes a
+ *  testnet position (goldp/1763 closed on 25 Oct 2026), so the preferred id is
+ *  tried first and the open CDPs follow, most events first. The checks that
+ *  follow pin the shape (the rows exist, their signs and labels, the page equal
+ *  to the routes), not the figures. */
+async function liveCdp(market, preferred) {
+  const readable = async (id) => {
+    const live = await api(`/api/chain/polaris/position?market=${market}&id=${id}`).catch(() => null);
+    if (!live?.isOpen) return false;
+    const tl = await api(`/api/polaris/timeline?market=${market}&id=${id}`).catch(() => null);
+    const rows = (tl?.events ?? []).map((e) => e.context?.data ?? {});
+    const sum = (f) => rows.reduce((a, d) => a + Number(d[f] ?? 0), 0);
+    const p = live.price.pethInDebt;
+    const pending =
+      live.accruedStables -
+      live.accruedInterest +
+      live.mintRedeemCollChange * p -
+      live.mintRedeemDebtChange +
+      live.bcTokenGain * p;
+    const psm = sum("mintRedeemCollGain") * p - sum("mintRedeemDebtGain");
+    return pending !== 0 && psm !== 0 && sum("stableGain") > 0;
+  };
+  if (await readable(preferred)) return preferred;
+  const list = await api(`/api/polaris/positions?market=${market}&status=open&limit=100&sortBy=recent`);
+  const ids = [...(list.data ?? [])].sort((x, y) => y.eventCount - x.eventCount).map((r) => r.cdpId);
+  for (const id of ids.slice(0, 15)) if (await readable(id)) return id;
+  return preferred;
+}
+for (const [market, preferred] of [
   ["usdp", "9"],
   ["goldp", "1763"],
 ]) {
+  const id = await liveCdp(market, preferred);
+  hFixtures.push(`${market}/${id}`);
+  console.log(
+    `      h fixture ${market}/${id}${id === preferred ? "" : ` (the preferred ${preferred} is closed or has no live legs)`}`,
+  );
   const page = await open(context, polarisUrl(market, id));
   await card(page)
     .locator('[data-panel-row="pending-to-settle"]')
@@ -548,9 +627,11 @@ for (const [market, id] of [
 await context.close();
 await browser.close();
 
+// run-all reads this line as the row's detail, so the h fixtures ride first on it.
+const fixturesNote = hFixtures.length ? ` [h fixtures ${hFixtures.join(", ")}]` : "";
 console.log(
   failures
-    ? `\n${failures} CHECK(S) FAILED of ${checked}`
-    : `\nALL ${checked} CHECKS PASS — the Polaris CDP page's identity row, cost line, pulses, remembered pane and 404 hold`,
+    ? `\n${failures} CHECK(S) FAILED of ${checked}${fixturesNote}`
+    : `\nALL ${checked} CHECKS PASS${fixturesNote} — the Polaris CDP page's identity row, cost line, pulses, remembered pane and 404 hold`,
 );
 process.exit(failures ? 1 : 0);

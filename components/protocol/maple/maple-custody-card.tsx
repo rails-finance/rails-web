@@ -38,8 +38,10 @@ import { serverReadAt, stampHeadRead } from "@/lib/shared/server-head-read";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 
 /** A custody receipt, stamped with rails-server's read when it answered. */
-const stamped = (h: MapleCustodyHolding, p: Provenance): Provenance =>
-  stampHeadRead(p, serverReadAt(h.head, h.blockNumber));
+const stamped = (h: MapleCustodyHolding, p: Provenance): Provenance => stampHeadRead(p, readOf(h));
+
+/** rails-server's read of the holding, when it answered. */
+const readOf = (h: MapleCustodyHolding) => serverReadAt(h.head, h.blockNumber);
 
 /** The first headline: what the locked shares redeem for, in the pool's own
  *  asset, or shares alone when the value derivation degraded. */
@@ -51,8 +53,8 @@ function CustodyLines({ holdings }: { holdings: MapleCustodyHolding[] }) {
           <Prov
             info={
               h.exitValue != null
-                ? stamped(h, custodyValueProv(h.assetSymbol, h.symbol, h.blockNumber))
-                : stamped(h, custodySharesProv(h.symbol, h.blockNumber))
+                ? stamped(h, custodyValueProv(h.assetSymbol, h.symbol, h.blockNumber, readOf(h)))
+                : stamped(h, custodySharesProv(h.symbol, h.blockNumber, readOf(h)))
             }
           >
             <AssetAmount
@@ -73,7 +75,7 @@ function SupplyShareLines({ holdings }: { holdings: MapleCustodyHolding[] }) {
     <div className="flex flex-col gap-1">
       {holdings.map((h) => (
         <div key={h.pool}>
-          <Prov info={stamped(h, custodySupplyShareProv(h.symbol, h.blockNumber))}>
+          <Prov info={stamped(h, custodySupplyShareProv(h.symbol, h.blockNumber, readOf(h)))}>
             <span data-prov-exact={`${((h.supplyShare ?? 0) * 100).toFixed(4)}% of ${h.symbol} supply`}>
               {((h.supplyShare ?? 0) * 100).toFixed(2)}%
             </span>
@@ -169,7 +171,7 @@ export function MapleCustodyCard({
     label: `${h.symbol} locked`,
     value: (
       <span className="tabular-nums">
-        <Prov info={stamped(h, custodySharesProv(h.symbol, h.blockNumber))}>
+        <Prov info={stamped(h, custodySharesProv(h.symbol, h.blockNumber, readOf(h)))}>
           <ExactSpan exact={`${formatUnitsExact(h.raw.shares, 6)} ${h.symbol}`} symbol={h.symbol}>
             <PanelFigure>{formatCompact(h.shares)}</PanelFigure> {h.symbol}
           </ExactSpan>

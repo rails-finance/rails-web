@@ -29,7 +29,9 @@ import type { FlowsLife } from "@/lib/shared/flows-combined";
 import { FlowsTotalsBullets } from "@/components/shared/lifetime-flows-busy";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import {
+  flowsBuildingLine,
   flowsWaitingLine,
+  type FlowsBuilding,
   LifetimeFlowsSkeleton,
   LifetimeFlowsWaiting,
 } from "@/components/shared/lifetime-flows-skeleton";
@@ -74,6 +76,9 @@ export interface LifetimeFlowsPanelProps {
   /** The timeline read. Done or withheld with no scrubber: nothing to draw,
    *  and the panel renders nothing. */
   read: FlowsRead;
+  /** The server is building the history in the background: the waiting cue
+   *  says so, with the rows stored so far. */
+  building?: FlowsBuilding | null;
   /** The Explanation's prose; the scrubber's Key follows it. */
   explanation?: ReactNode;
   /** The "?" FAQ at the foot of the Explanation. */
@@ -116,6 +121,7 @@ function HeaderHelp({ flowsKey }: { flowsKey: FlowsKeyItems | null }) {
 export function LifetimeFlowsPanel({
   scrubber,
   read,
+  building,
   explanation,
   learnMore,
   title = "Lifetime flows",
@@ -281,10 +287,10 @@ export function LifetimeFlowsPanel({
             ) : (
               <div className="relative" data-flows-read={read}>
                 <p className="sr-only" role="status">
-                  {flowsWaitingLine(lifeCount)}
+                  {building ? flowsBuildingLine(building) : flowsWaitingLine(lifeCount)}
                 </p>
                 <LifetimeFlowsSkeleton compact={compact} />
-                <LifetimeFlowsWaiting count={lifeCount} />
+                <LifetimeFlowsWaiting count={lifeCount} line={building ? flowsBuildingLine(building) : undefined} />
               </div>
             )}
             <ProvenanceInfoTabs

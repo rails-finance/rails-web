@@ -25,7 +25,8 @@ export interface FlowSeries {
   /** [UTC day, events through it, tick, cum per bucket, balances stated
    *  [side, asset, amount, the side's index at the event that recorded it?],
    *  prices carried, transactions through it, the running USD of each
-   *  [bucket index, symbol] the day moved] */
+   *  [bucket index, symbol] the day moved, the most the collateral side held
+   *  after any event that day in USD (null or absent where unknown)] */
   days: [
     number,
     number,
@@ -35,6 +36,7 @@ export interface FlowSeries {
     [string, number, number][],
     number?,
     [number, string, number][]?,
+    (number | null)?,
   ][];
   assets: Record<string, { symbol: string; decimals: number }>;
   /** Per held asset: [day, usd, block] on each day a new price was recorded

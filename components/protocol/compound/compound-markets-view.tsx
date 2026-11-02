@@ -71,6 +71,7 @@ import type {
   CompoundV3MarketsResponse,
 } from "@/lib/sources/chain/compound-markets";
 import { BlockRef } from "@/components/shared/block-ref";
+import { headReadOf, type ServerRead } from "@/lib/shared/server-head-read";
 
 const pctText = (f: number | null, dp = 1) => (f == null ? "—" : `${(f * 100).toFixed(dp)}%`);
 
@@ -266,8 +267,19 @@ function CollateralRow({
   );
 }
 
-function MarketCard({ m, block, chainId }: { m: CompoundV3MarketRow; block: number; chainId: ChainId }) {
+function MarketCard({
+  m,
+  block,
+  chainId,
+  readBy,
+}: {
+  m: CompoundV3MarketRow;
+  block: number;
+  chainId: ChainId;
+  readBy?: ServerRead;
+}) {
   const coords: CompoundMarketCoords = {
+    readBy,
     blockNumber: block,
     comet: m.comet,
     baseSymbol: m.baseSymbol,
@@ -467,6 +479,17 @@ function MarketCard({ m, block, chainId }: { m: CompoundV3MarketRow; block: numb
   );
 }
 
+/** Who read the block: rails-server live, its stored read, or the web's own chain read. */
+function readerOf(data: CompoundV3MarketsResponse): string {
+  if (data.stored) {
+    const t = data.stored.readAt;
+    return `each market\u2019s state as rails-server read it from its contract at ${t.slice(0, 10)} ${t.slice(11, 19)} UTC, shown because the latest read failed`;
+  }
+  if (data.head)
+    return `each market\u2019s state read from its contract by rails-server at ${data.head.readAt.slice(11, 19)} UTC through ${data.head.provider}`;
+  return "each market\u2019s state read from its contract";
+}
+
 export function CompoundMarketsStamp({
   data,
   chainId = MAINNET_CHAIN_ID,
@@ -484,8 +507,8 @@ export function CompoundMarketsStamp({
   return (
     <div className="mt-2">
       <p className="text-[13px] text-rb-500">
-        Chain snapshot · <BlockRef block={data.blockNumber} chainId={chainId} /> · each market&rsquo;s state read from
-        its contract
+        {data.stored ? "Stored snapshot" : "Chain snapshot"} · <BlockRef block={data.blockNumber} chainId={chainId} /> ·{" "}
+        {readerOf(data)}
       </p>
       <InfoDisclosure className="mt-1" label="where the market roster comes from" surface="raised">
         <p className="text-[13px] leading-relaxed text-rb-500">
@@ -518,7 +541,8 @@ export function CompoundMarketsView({
   }
 
   const s = data.summary;
-  const summaryCoords: CompoundMarketCoords = { blockNumber: data.blockNumber };
+  const readBy = headReadOf(data.head, data.blockNumber, data.stored);
+  const summaryCoords: CompoundMarketCoords = { blockNumber: data.blockNumber, readBy };
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -616,7 +640,7 @@ export function CompoundMarketsView({
       </InfoDisclosure>
       <div className="grid gap-3">
         {data.markets.map((m) => (
-          <MarketCard key={m.comet} m={m} block={data.blockNumber} chainId={chainId} />
+          <MarketCard key={m.comet} m={m} block={data.blockNumber} chainId={chainId} readBy={readBy} />
         ))}
       </div>
 

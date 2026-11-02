@@ -214,6 +214,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readPositionsRoute, retriedReads } from "../lib/read-positions-route.mjs";
 import { expectedRoster } from "./lib/served-vault-roster.mjs";
+import { pageBlockRecent, serverHeadBlock } from "./lib/server-head.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3801";
@@ -489,11 +490,16 @@ check(
 // 200 blocks, not 30: Base runs at 2s/block, so the same wall-clock tolerance
 // the Ethereum sibling allows is about 200 blocks here. A number chosen from
 // the chain's own cadence rather than copied across.
-check(
-  "L0d the route's overlay block is within 200 blocks of this script's own head",
-  route0.blockNumber != null && Math.abs(head - route0.blockNumber) <= 200,
-  `route ${route0.blockNumber} vs own head ${head} (${Math.abs(head - (route0.blockNumber ?? 0))} blocks)`,
-);
+// The overlay reads at rails-server's head (TO-DO-infra 55): a row stamped with
+// rails-server's read is held against that head, an unstamped one against the pin.
+const l0d = pageBlockRecent({
+  page: route0.blockNumber,
+  server: await serverHeadBlock(env, 8453),
+  own: head,
+  tolerance: 200,
+  stamped: route0.data.some((r) => r.live?.head),
+});
+check("L0d the route's overlay block is within 200 blocks of the head it read from", l0d.ok, l0d.detail);
 
 const censusRows = route0.census;
 const censusBlock = censusRows[0]?.censusBlock;

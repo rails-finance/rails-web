@@ -35,7 +35,7 @@ export interface PwnPositionMarkdownArgs {
 const STATUS_LINE: Record<ReturnType<typeof pwnLoanState>, string> = {
   running: "Open — collateral escrowed, repayment outstanding",
   unclaimed:
-    "Defaulted, not yet claimed — the deadline passed unpaid, the contract refuses repayment, and the collateral waits in escrow for the lender's claim",
+    "Defaulted, not yet claimed — the deadline passed unpaid, the contract refuses repayment, and the collateral waits in escrow for the lender's claim (an extension both sides sign can still move the deadline until then)",
   repaid: "Repaid — the borrower repaid in full and the collateral was released",
   defaulted: "Defaulted — the loan expired unpaid and the lender claimed the collateral",
 };

@@ -581,7 +581,7 @@ export function flowSeriesTimeline(
 ): FlowTimeline | null {
   if (series.days.length === 0) return null;
   const symbolOf = (a: string) => series.assets[a]?.symbol ?? a.slice(0, 8);
-  const days: FlowDayRow[] = series.days.map(([day, events, tick, cum, balances, prices, txs, cells]) => ({
+  const days: FlowDayRow[] = series.days.map(([day, events, tick, cum, balances, prices, txs, cells, high]) => ({
     day,
     events,
     tick,
@@ -596,6 +596,7 @@ export function flowSeriesTimeline(
     prices: prices.map(([asset, usd, ts]) => ({ asset, usd, ts })),
     ...(txs != null ? { txs } : {}),
     ...(cells ? { cumAsset: cells.map(([i, symbol, usd]) => ({ bucket: series.buckets[i], symbol, usd })) } : {}),
+    ...(high != null ? { collateralHigh: high } : {}),
   }));
   const used = new Set<string>(series.buckets);
   return {

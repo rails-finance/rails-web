@@ -19,7 +19,6 @@ import type { AaveV3PositionRow, AaveV3ReserveSummary } from "@/lib/api/fetch-aa
 import { MARKET_NAME, POOL_BY_MARKET, asV3Market } from "@/lib/aave-v3/asset-catalog";
 import { AAVE_V3_BASE_CHAIN_ID, AAVE_V3_BASE_ORACLE, AAVE_V3_BASE_POOL } from "@/lib/aave-v3-base/asset-catalog";
 import { SPARK_ADDRESSES } from "@/lib/spark/asset-catalog";
-import { isSparkTreasury } from "@/lib/spark/liquidation-fee";
 import { hfLabelV3 } from "@/lib/aave-v3/position-state";
 import { chainClient } from "@/lib/sources/chain/rpc";
 import {
@@ -355,11 +354,8 @@ export const spark: FamilyModule = {
   summaryChain: "ethereum",
   summaryFamily: "spark",
   async shape(rows) {
-    // SparkLend's treasury is not a position: the listing leaves it out
-    // (lib/spark/proxy-reads.ts), and so does this.
-    const kept = rows.filter((r) => !isSparkTreasury((r.card as RawSparkWalletRow).wallet));
-    const cards = await buildSparkPositionRows(kept.map((r) => r.card as RawSparkWalletRow));
-    return kept.map((r, i): WalletPosition => {
+    const cards = await buildSparkPositionRows(rows.map((r) => r.card as RawSparkWalletRow));
+    return rows.map((r, i): WalletPosition => {
       const row = cards[i];
       const status = asStatus(r.status);
       const base: WalletPosition = {

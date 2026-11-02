@@ -103,7 +103,7 @@ function CapitalCard({ data, readBy }: { data: FrankencoinSystemChainResponse; r
       <div className="text-xs font-semibold text-foreground">The capital behind it</div>
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
-        <Stat label="Equity (FPS holders)">
+        <Stat label="Equity (FCS holders)">
           <Prov info={stampHeadRead(equityProv(), readBy)} value={formatExact(data.equity)}>
             <AmountText value={data.equity} format="compact" /> ZCHF
           </Prov>
@@ -135,7 +135,8 @@ function CapitalCard({ data, readBy }: { data: FrankencoinSystemChainResponse; r
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
         One pool, two accounts — the reserve&rsquo;s balance equals equity plus the borrowers&rsquo; contributions by
         the contract&rsquo;s own accounting, and this page reads all three sides at one block. A challenge shortfall
-        lands on the position&rsquo;s own contribution first, then on the equity: FPS capital is the junior tranche.
+        lands on the position&rsquo;s own contribution first, then on the equity: the FCS holders&rsquo; capital is the
+        junior tranche.
       </p>
     </div>
   );

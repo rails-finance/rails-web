@@ -22,7 +22,7 @@ import {
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { formatNumber } from "@/lib/utils/format";
+import { formatNumber, formatExact } from "@/lib/utils/format";
 import {
   type ChainTruthTowerData,
   type TowerLine,
@@ -928,7 +928,7 @@ function ReserveList({ lines }: { lines: TowerLine[] }) {
             <TokenChipIcon symbol={l.symbol} address={l.address} size={14} filterable={false} />
             {l.symbol}
           </span>
-          <Prov info={l.prov}>
+          <Prov value={formatExact(l.amount)} info={l.prov}>
             <span className="text-sm tabular-nums text-foreground">
               <AmountText value={l.amount} format="compact" />
             </span>
@@ -961,7 +961,7 @@ export function GatedEconomics({ data }: { data: ChainTruthTowerData }) {
           {collInterest != null && collInterest.amount > 0 && (
             <div className="text-[11px] text-rb-500">
               incl.{" "}
-              <Prov info={collInterest.prov}>
+              <Prov value={formatExact(collInterest.amount)} info={collInterest.prov}>
                 <span className="tabular-nums">
                   <AmountText value={collInterest.amount} format="compact" /> {collInterest.symbol}
                 </span>
@@ -971,7 +971,7 @@ export function GatedEconomics({ data }: { data: ChainTruthTowerData }) {
           )}
           {(data.collateral.earned ?? []).map((line) => (
             <div key={line.key} className="text-[11px] text-rb-500">
-              <Prov info={line.prov}>
+              <Prov value={formatExact(line.amount)} info={line.prov}>
                 <span className="tabular-nums">
                   <AmountText value={line.amount} format="compact" /> {line.symbol}
                 </span>
