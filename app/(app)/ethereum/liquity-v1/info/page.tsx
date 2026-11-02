@@ -32,9 +32,6 @@ export default function InfoPage() {
             <ul className={UL}>
               <li>One card per Trove: its ETH collateral, its LUSD debt and its status.</li>
               <li>Open Troves show by default. Searching a wallet shows every status.</li>
-              <li>
-                Filters: status, liquidated before, redeemed before. Sort by recent activity, collateral, debt or ratio.
-              </li>
             </ul>
           ),
         },
