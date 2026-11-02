@@ -150,7 +150,7 @@ export default async function Home() {
           two are far apart, so the page reads as three alternating tones rather
           than five arbitrary ones. From here the close settles: sheet → band →
           the footer's canvas, each step its own tone. */}
-      <div className="bg-rb-50 dark:bg-rb-600" data-anatomy="S8">
+      <div id="team" className="scroll-mt-20 bg-rb-50 dark:bg-rb-600" data-anatomy="S8">
         <div className="max-w-7xl mx-auto px-4 py-16">
           <TeamSection />
         </div>

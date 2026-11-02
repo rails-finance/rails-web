@@ -7,6 +7,7 @@
 // Both render the same pill shell so the affordance reads identically
 // wherever a surface offers the two chains.
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ARBITRUM_CHAIN_ID, CHAINS, SEPOLIA_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { ARBITRUM_MARK_PATH } from "@/components/shared/explorer-mark";
@@ -90,12 +91,25 @@ const TOGGLE_CHAINS: ChainId[] = launchedChains().map((c) => c.id);
 /** Button form — in-place state flip (`aria-pressed` per the house Chip
  *  idiom). Wakes with hydration: a pre-hydration click would be lost, so the
  *  shell signals liveness the way every other in-place control does. */
-export function ChainToggleButtons({ chainId, onChange }: { chainId: ChainId; onChange: (id: ChainId) => void }) {
+export function ChainToggleButtons({
+  chainId,
+  onChange,
+  extra,
+}: {
+  chainId: ChainId;
+  onChange: (id: ChainId) => void;
+  /** A trailing choice outside CHAINS (the home page's "coming soon" chain).
+   *  While it is active no chain segment is. */
+  extra?: { label: string; active: boolean; onSelect: () => void; glyph?: ReactNode };
+}) {
   const hydrated = useHydrated();
   return (
-    <div className={SEGMENT_SHELL} {...ctrlWaking(hydrated)}>
+    <div
+      className={extra ? `${SEGMENT_SHELL} max-w-full flex-wrap justify-center max-sm:rounded-3xl` : SEGMENT_SHELL}
+      {...ctrlWaking(hydrated)}
+    >
       {TOGGLE_CHAINS.map((id) => {
-        const active = chainId === id;
+        const active = chainId === id && !extra?.active;
         return (
           <button
             key={id}
@@ -109,6 +123,17 @@ export function ChainToggleButtons({ chainId, onChange }: { chainId: ChainId; on
           </button>
         );
       })}
+      {extra && (
+        <button
+          type="button"
+          aria-pressed={extra.active}
+          onClick={extra.onSelect}
+          className={`${segmentClass(extra.active)} whitespace-nowrap`}
+        >
+          {extra.glyph}
+          {extra.label}
+        </button>
+      )}
     </div>
   );
 }

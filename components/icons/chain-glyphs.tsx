@@ -64,3 +64,33 @@ export function ChainGlyph({ id, className = "" }: { id: ChainId; className?: st
     </svg>
   );
 }
+
+/**
+ * Home-page-only chain entries: choices on the home explorer toggle that have
+ * no ChainId, no explorers and no place in CHAINS. Drop a mark in by replacing
+ * `null` with a `Glyph` (monochrome paths, no baked-in colour), the same shape
+ * as the marks above. A key with `null` renders no glyph.
+ */
+export type HomeOnlyChainKey = "robinhood";
+
+const HOME_ONLY_GLYPHS: Record<HomeOnlyChainKey, Glyph | null> = {
+  robinhood: null,
+};
+
+export function HomeOnlyChainGlyph({ id, className = "" }: { id: HomeOnlyChainKey; className?: string }): ReactNode {
+  const glyph = HOME_ONLY_GLYPHS[id];
+  if (!glyph) return null;
+  return (
+    <svg
+      viewBox={glyph.viewBox}
+      className={className}
+      fill="currentColor"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      {glyph.paths?.map((p, i) => (
+        <path key={i} d={p.d} fillRule={p.fillRule} />
+      ))}
+    </svg>
+  );
+}
