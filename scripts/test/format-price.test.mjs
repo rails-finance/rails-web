@@ -36,3 +36,17 @@ test("widenPair: a before/after pair that prints alike widens to the decimals th
   assert.equal(widenPair("5", "5", "5", "5"), null);
   assert.equal(widenPair("10.97M", "10.97M", "10967283.7", "10967284.1"), null);
 });
+
+import { formatExact } from "../../lib/utils/format.ts";
+
+test("formatExact: float residue never prints; the token's decimals bound the fraction", () => {
+  assert.equal(formatExact(133.47050099999979, 6), "133.470501");
+  assert.equal(formatExact(133.47050099999979), "133.470501");
+  assert.equal(formatExact(1713.0442325307367), "1,713.04423253074");
+  assert.equal(formatExact(10133.465572, 6), "10,133.465572");
+  assert.equal(formatExact(0.1 + 0.2), "0.3");
+  assert.equal(formatExact(1.23456789, 4), "1.2346");
+  assert.equal(formatExact(-1234.5), "-1,234.5");
+  assert.equal(formatExact(0), "0");
+  assert.equal(formatExact(1e-7), "0.0000001");
+});

@@ -216,7 +216,7 @@ function PeakDepositedLines({ lines }: { lines: MaplePeakAmount[] }) {
     <>
       {deposited.map((p) => (
         <div key={p.pool}>
-          <Prov value={formatExact(p.peakDeposited)} info={peakDepositedProv(p.assetSymbol)}>
+          <Prov value={formatExact(p.peakDeposited, p.assetDecimals)} info={peakDepositedProv(p.assetSymbol)}>
             <span>
               peak deposited <AmountText value={p.peakDeposited} format="compact" /> {p.assetSymbol}
             </span>
@@ -253,13 +253,16 @@ function interestRows(captions?: MapleCardCaptions, readBy?: ServerRead): Positi
       id: "interest-earned",
       label: "Interest earned",
       value: (
-        <Prov value={formatExact(it.amount)} info={stampHeadRead(interestEarnedProv(it.symbol, readBy), readBy)}>
+        <Prov
+          value={formatExact(it.amount, it.decimals)}
+          info={stampHeadRead(interestEarnedProv(it.symbol, readBy), readBy)}
+        >
           <span>
             <AmountText value={it.amount} format="compact" />
           </span>
         </Prov>
       ),
-      asset: { symbol: it.symbol, figure: `${formatExact(it.amount)} ${it.symbol}` },
+      asset: { symbol: it.symbol, figure: `${formatExact(it.amount, it.decimals)} ${it.symbol}` },
       tip: "What the claim holds beyond the principal the wallet put in, replayed from the wallet's events and the pool's exit rate now.",
     },
     // A pool the wallet has left: its interest is not in the claim.
@@ -268,8 +271,8 @@ function interestRows(captions?: MapleCardCaptions, readBy?: ServerRead): Positi
       label: `Interest earned, ${e.symbol} pool`,
       value: (
         <>
-          <PanelAmount symbol={e.symbol} exact={formatExact(e.amount)}>
-            <Prov value={formatExact(e.amount)} info={interestEarnedLifetimeProv(e.symbol)}>
+          <PanelAmount symbol={e.symbol} exact={formatExact(e.amount, e.decimals)}>
+            <Prov value={formatExact(e.amount, e.decimals)} info={interestEarnedLifetimeProv(e.symbol)}>
               <span>
                 <AmountText value={e.amount} format="compact" />
               </span>

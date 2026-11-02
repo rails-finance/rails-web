@@ -142,21 +142,26 @@ export const widenPair = (
   return null;
 };
 
-// Full-precision float rendering for the provenance trace: every decimal the
-// pipeline actually delivered — String(n) is the shortest round-trip form, so
-// there's no invented 3-dp rounding and no float noise — regrouped with
-// thousands separators. Where the source is an integer-wei string, prefer
+// Float rendering for the provenance trace: the 15 significant digits a double
+// holds, to the token's decimals, so there's no invented 3-dp rounding and no
+// float noise, regrouped with thousands separators. Where the source is an integer-wei string, prefer
 // formatUnitsExact (no float in the path at all).
-export const formatExact = (value: number): string => {
+export const formatExact = (value: number, decimals = 18): string => {
   if (!Number.isFinite(value)) return String(value);
   const neg = value < 0;
-  const s = String(Math.abs(value));
-  // Off the plain-decimal range (≥1e21 or <1e-6) String() goes exponential;
-  // hand those to Intl at max precision instead of parsing the exponent.
-  if (s.includes("e")) return value.toLocaleString("en-US", { maximumFractionDigits: 20 });
-  const [int, frac] = s.split(".");
+  // A double holds 15 significant digits for certain; digits 16 and 17 are the
+  // residue of the arithmetic that produced it (133.47050099999979 for
+  // 133.470501). Round to 15, then to the token's decimals (18 for a ratio or
+  // a price), and let Intl drop the trailing zeros.
+  const clean = Number(Math.abs(value).toPrecision(15));
+  const body = clean.toLocaleString("en-US", {
+    useGrouping: false,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: Math.min(Math.max(decimals, 0), 20),
+  });
+  const [int, frac] = body.split(".");
   const grouped = BigInt(int).toLocaleString("en-US");
-  return `${neg ? "-" : ""}${grouped}${frac ? `.${frac}` : ""}`;
+  return `${neg && body !== "0" ? "-" : ""}${grouped}${frac ? `.${frac}` : ""}`;
 };
 
 /** BTC-class, ETH-class and gold tokens: a unit is worth thousands of
