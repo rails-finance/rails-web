@@ -1,45 +1,79 @@
-// About this explorer — the intro prose that lived behind the listing's (i)
-// drawer, now a page of its own on the rail's sub-nav. The copy is the swept
-// intro (charter §8a), reframed for a standalone page; the anatomy lives in ProtocolInfoShell.
+// About this explorer — the page on the rail's sub-nav, drawn on the typed
+// template (rails-ops standards/info-page-template.md). The glossary text lives in
+// content/frankencoin/event-prose.yaml.
 
 import Link from "next/link";
-import { ProtocolInfoShell } from "@/components/shared/protocol-info-page";
+import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import { frankencoinGlossary } from "@/lib/frankencoin/event-templates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("frankencoin");
 
-const intro = (
-  <>
-    <p>
-      Frankencoin is a Swiss-franc stablecoin (ZCHF) minted against collateral, with no price oracle anywhere in the
-      system. Each minting position is its own small contract that the borrower owns. The one price a position carries
-      is the liquidation price its owner declared, and challenge auctions test it: anyone who thinks a declared price is
-      too high can post collateral and force an auction.
-    </p>
-    <p>
-      Each row of the listing is one position: its ZCHF debt, its collateral in the position&apos;s own token, its
-      declared liquidation price, and any challenge currently running against it. No dollar figure or health factor
-      appears because neither exists on chain. Or{" "}
-      <Link href="/ethereum/frankencoin/system" className={INLINE_LINK}>
-        see the system view
-      </Link>
-      : the franc&apos;s supply, the equity and reserve capital behind it, the base rate, and the whole challenge
-      record.
-    </p>
-    <p>
-      A position&apos;s own page opens on a card: what the position holds and owes now, its declared price, its interest
-      rate and its expiry, with a plain-language explanation behind the info button. Lifetime flows add up the ZCHF it
-      has minted and repaid and the collateral it has deposited and withdrawn. The timeline lists every event, newest
-      first; one transaction can record several. Open an event for its figures before and after; for a mint or a
-      repayment, the ZCHF the wallet received or paid; for a challenge sale or a forced sale, the buyer, the price and
-      where the ZCHF went. Its info button says what happened in words, and its ? explains that kind of event, with the
-      Frankencoin docs pages it rests on. The debt is always the gross amount minted: the wallet receives less, because
-      the reserve share and the interest for the remaining term are taken at minting.
-    </p>
-  </>
-);
+const UL = "list-disc space-y-1 pl-5";
 
 export default function InfoPage() {
-  return <ProtocolInfoShell session="frankencoin">{intro}</ProtocolInfoShell>;
+  return (
+    <ProtocolInfoPage
+      session="frankencoin"
+      name="Frankencoin"
+      tracks="Every Frankencoin minting position on Ethereum, open or ended, with its history, and the system's capital and challenge record. Savings, FCS governance and ZCHF on other chains are not shown."
+      glossary={frankencoinGlossary()}
+      howItWorks={[
+        "There is no price oracle. Each owner declares a liquidation price, and anyone who thinks it too high can post collateral and force a challenge.",
+        "No dollar figure or health factor appears, because neither exists on chain; collateral is shown in its token and debt in ZCHF.",
+        "A position can mint ZCHF while its collateral, valued at the liquidation price, covers the debt, up to its family's minting limit.",
+        "A position ends by repayment, a challenge sale, a veto or a forced sale after expiry.",
+      ]}
+      search="Search takes an owner address. Filters: status, collateral, hub, history, debt, transactions. Sort: recent activity, debt, collateral."
+      views={[
+        {
+          heading: "Listing",
+          body: (
+            <ul className={UL}>
+              <li>
+                One card per position: its owner, its hub, original or clone, and a triangle with a count if challenged.
+              </li>
+              <li>Collateral, in the position&apos;s token.</li>
+              <li>
+                Debt, the gross ZCHF minted. The wallet received less, because the reserve share and the interest for
+                the remaining term are taken at minting.
+              </li>
+              <li>An ended position shows its highest recorded collateral and debt, and how it ended.</li>
+              <li>Open positions show by default. Searching an owner shows every status.</li>
+            </ul>
+          ),
+        },
+        {
+          heading: "Position page",
+          body: (
+            <ul className={UL}>
+              <li>
+                The card shows collateral, debt, liquidation price, interest, expiry and any running challenge, read
+                from the chain now.
+              </li>
+              <li>
+                Lifetime flows show the ZCHF minted and repaid and the collateral deposited and withdrawn, day by day.
+              </li>
+              <li>The timeline lists each event of the position, newest first. One transaction can record several.</li>
+            </ul>
+          ),
+        },
+        {
+          heading: "System page",
+          body: (
+            <p>
+              The ZCHF supply, the equity and reserve behind it, the base rate and opening fee, and the minting book
+              with every challenge and forced sale.{" "}
+              <Link href="/ethereum/frankencoin/system" className={INLINE_LINK}>
+                See the system view
+              </Link>
+              .
+            </p>
+          ),
+        },
+      ]}
+      docs={{ label: "Frankencoin documentation", href: "https://docs.frankencoin.com/" }}
+    />
+  );
 }

@@ -7,7 +7,8 @@
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { eventProseEngine } from "@/lib/shared/event-prose/engine";
-import type { ModalData, ProseFile, Words } from "@/lib/shared/event-prose/types";
+import type { InfoTerm } from "@/components/shared/protocol-info-page";
+import type { ModalData, ModalLink, ProseFile, Words } from "@/lib/shared/event-prose/types";
 import type { FrankencoinEchoKey } from "@/lib/frankencoin/event-prose";
 import type { FrankencoinContext } from "@/lib/shared/types/event-shape";
 import raw from "@/content/frankencoin/event-prose.yaml";
@@ -38,6 +39,7 @@ interface FrankencoinProseFile extends Omit<ProseFile<FrankencoinL5Key>, "L5"> {
   words: Words;
   position_words: Words;
   doc_urls: Words;
+  glossary: { bold: string; text: string; sources: ModalLink[] }[];
 }
 
 const FILE = raw as FrankencoinProseFile;
@@ -50,6 +52,15 @@ export const PROSE = eventProseEngine<FrankencoinL5Key, FrankencoinEchoKey>(
 
 /** Words the generator and the position explanation put into a sentence. */
 export const FRANKENCOIN_WORDS = FILE.words;
+
+/** The info page's glossary: each term with its definition and the docs sections it rests on. */
+export function frankencoinGlossary(): [InfoTerm, ...InfoTerm[]] {
+  const terms = FILE.glossary.map((d): InfoTerm => {
+    const [first, ...rest] = d.sources.map((l) => ({ label: l.label, href: PROSE.linkUrl(l) }));
+    return { term: d.bold, definition: d.text, sources: [first, ...rest] };
+  });
+  return terms as [InfoTerm, ...InfoTerm[]];
+}
 
 const POSITION = PROSE.words(FILE.position_words, "position_words");
 
