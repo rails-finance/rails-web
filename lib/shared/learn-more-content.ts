@@ -911,7 +911,7 @@ export function mapleDepositWithdrawContent(eventType: "deposit" | "withdraw"): 
     details: [
       {
         bold: "Shares & the exit rate",
-        text: "the share is a claim on the pool. The exit rate is what one share pays out on withdrawal, so shares × the exit rate = what a withdrawal pays. It rises as borrowers pay interest, and falls only when the pool delegate, the manager that runs the pool's lending, marks a loan as impaired; a lender who exits while that mark stands takes the loss for good.",
+        text: "the share is a claim on the pool. The exit rate is what one share pays out on withdrawal, so shares × the exit rate = what a withdrawal pays. It rises as borrowers pay interest, and falls when a loan loses value: the pool delegate, the manager that runs the pool's lending, marks it as impaired, or it defaults. A lender who exits while the loss stands takes it for good.",
       },
       {
         bold: "Where the money actually is",
@@ -947,7 +947,7 @@ export function mapleQueueContent(
       },
       {
         bold: "Who processes",
-        text: "the pool delegate or Maple's admins process requests as cash allows, earliest first; if the cash does not cover every request, only the earliest are paid and the rest wait. The pool band shows the queue against the pool's liquid cash.",
+        text: "the pool delegate or Maple's admins process requests as cash allows, earliest first. A processing call for more than the cash covers is refused, so the rest of the queue waits for more cash. The pool band shows the queue against the pool's liquid cash.",
       },
     ],
     links: [
