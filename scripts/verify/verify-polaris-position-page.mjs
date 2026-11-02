@@ -462,10 +462,43 @@ const parseSigned = (t) => {
  *  face's compact form hides a 1% error on a small CDP. */
 const close = (got, want) => Number.isFinite(got) && Math.abs(got - want) <= Math.max(Math.abs(want) * 0.005, 1e-6);
 check("h0. the comparison rejects a figure 1% off", !close(386745.35 * 1.01, 386745.35) && close(386745.35, 386745.35));
-for (const [market, id] of [
+/** A CDP the h checks can read: open, with live legs, a PSM share and stability
+ *  gains that are all non-zero. A fixed id goes stale when someone closes a
+ *  testnet position (goldp/1763 closed on 25 Oct 2026), so the preferred id is
+ *  tried first and the open CDPs follow, most events first. The checks that
+ *  follow pin the shape (the rows exist, their signs and labels, the page equal
+ *  to the routes), not the figures. */
+async function liveCdp(market, preferred) {
+  const readable = async (id) => {
+    const live = await api(`/api/chain/polaris/position?market=${market}&id=${id}`).catch(() => null);
+    if (!live?.isOpen) return false;
+    const tl = await api(`/api/polaris/timeline?market=${market}&id=${id}`).catch(() => null);
+    const rows = (tl?.events ?? []).map((e) => e.context?.data ?? {});
+    const sum = (f) => rows.reduce((a, d) => a + Number(d[f] ?? 0), 0);
+    const p = live.price.pethInDebt;
+    const pending =
+      live.accruedStables -
+      live.accruedInterest +
+      live.mintRedeemCollChange * p -
+      live.mintRedeemDebtChange +
+      live.bcTokenGain * p;
+    const psm = sum("mintRedeemCollGain") * p - sum("mintRedeemDebtGain");
+    return pending !== 0 && psm !== 0 && sum("stableGain") > 0;
+  };
+  if (await readable(preferred)) return preferred;
+  const list = await api(`/api/polaris/positions?market=${market}&status=open&limit=100&sortBy=recent`);
+  const ids = [...(list.data ?? [])].sort((x, y) => y.eventCount - x.eventCount).map((r) => r.cdpId);
+  for (const id of ids.slice(0, 15)) if (await readable(id)) return id;
+  return preferred;
+}
+for (const [market, preferred] of [
   ["usdp", "9"],
   ["goldp", "1763"],
 ]) {
+  const id = await liveCdp(market, preferred);
+  console.log(
+    `      h fixture ${market}/${id}${id === preferred ? "" : ` (the preferred ${preferred} is closed or has no live legs)`}`,
+  );
   const page = await open(context, polarisUrl(market, id));
   await card(page)
     .locator('[data-panel-row="pending-to-settle"]')
