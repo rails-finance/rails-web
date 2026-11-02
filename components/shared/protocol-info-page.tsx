@@ -40,6 +40,26 @@ export interface InfoView {
   body: ReactNode;
 }
 
+/** The glossary's heading: one word, one place to change it. */
+export const GLOSSARY_HEADING = "Glossary";
+
+/** The anchor of a glossary entry; `GlossaryLink` and the entry's id share it. */
+export function glossaryId(term: string): string {
+  return `glossary-${term
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")}`;
+}
+
+/** A link from running text to a glossary entry on the same page. Use it at the first use of a term. */
+export function GlossaryLink({ term, children }: { term: string; children?: ReactNode }) {
+  return (
+    <a href={`#${glossaryId(term)}`} className={INLINE_LINK}>
+      {children ?? term}
+    </a>
+  );
+}
+
 const H = "mt-5 text-sm font-semibold text-foreground";
 const UL = "mt-1.5 list-disc space-y-1 pl-5";
 
@@ -116,12 +136,19 @@ export function ProtocolInfoPage({
       <div className="mt-3 max-w-3xl space-y-2 text-sm text-rb-500" data-anatomy="I2">
         <p>{tracks}</p>
 
+        <h2 className={H}>How it works</h2>
+        <ul className={UL}>
+          {howItWorks.map((item, i) => (
+            <li key={i}>{item}</li>
+          ))}
+        </ul>
+
         <h2 id="glossary" className={`${H} scroll-mt-20`}>
-          Terms
+          {GLOSSARY_HEADING}
         </h2>
         <dl className="mt-1.5 space-y-2" data-anatomy="I4">
           {glossary.map((t) => (
-            <div key={t.term}>
+            <div key={t.term} id={glossaryId(t.term)} className="scroll-mt-20">
               <dt className="inline font-semibold text-foreground">{t.term}</dt>
               <dd className="inline">
                 {": "}
@@ -138,13 +165,6 @@ export function ProtocolInfoPage({
             </div>
           ))}
         </dl>
-
-        <h2 className={H}>How it works</h2>
-        <ul className={UL}>
-          {howItWorks.map((item, i) => (
-            <li key={i}>{item}</li>
-          ))}
-        </ul>
 
         {views.map((v) => (
           <section key={v.heading}>
