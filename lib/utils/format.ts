@@ -114,6 +114,34 @@ export const formatUnitsExact = (raw: string | null | undefined, decimals: numbe
 export const groupDigits = (text: string): string =>
   text.replace(/(?<![\d.,])\d{4,}(?![\d,])/g, (run) => run.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
 
+/** A before and an after figure that print alike although their exact values
+ *  differ, widened to the fewest fixed decimals, two at least and ten at most,
+ *  that tell them apart ("55,258.49 → 55,258.29"). Null where the pair already
+ *  differs, is equal, or is a million or more (the compact form stands). */
+export const widenPair = (
+  shownBefore: string,
+  shownAfter: string,
+  beforeExact: string,
+  afterExact: string,
+): { before: string; after: string } | null => {
+  if (shownBefore !== shownAfter) return null;
+  const num = (e: string) =>
+    Number(
+      e
+        .trim()
+        .replace(/,/g, "")
+        .replace(/^\u2212/, "-"),
+    );
+  const b = num(beforeExact);
+  const a = num(afterExact);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a === b || Math.abs(a) >= 1e6 || Math.abs(b) >= 1e6) return null;
+  for (let d = 2; d <= 10; d++) {
+    const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+    if (fmt(b) !== fmt(a)) return { before: fmt(b), after: fmt(a) };
+  }
+  return null;
+};
+
 // Full-precision float rendering for the provenance trace: every decimal the
 // pipeline actually delivered — String(n) is the shortest round-trip form, so
 // there's no invented 3-dp rounding and no float noise — regrouped with

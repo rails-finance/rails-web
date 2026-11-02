@@ -303,6 +303,15 @@ export default function FluidPositionView({
   const vaultType = fluidEvents[0]?.context.data.vaultType ?? chain?.vaultType ?? null;
   const flowsOn = vaultType === 10000;
 
+  // "21 events in 11 transactions": the count line names the cards' unit
+  // beside the logs it counts, where transactions draw fewer rows than logs.
+  const countDetail = useMemo(() => {
+    const txs = new Set(fluidEvents.map((e) => e.txHash)).size;
+    return txs > 0 && txs < fluidEvents.length
+      ? ` in ${txs.toLocaleString("en-US")} ${txs === 1 ? "transaction" : "transactions"}`
+      : undefined;
+  }, [fluidEvents]);
+
   const tl = useTimelineEvents(fluidEvents, {
     storageKey: `fluid-${nftId}`,
     protocolKey: "fluid",
@@ -543,6 +552,7 @@ export default function FluidPositionView({
               })()}
             <FluidSheetProvider value={sheetFacts}>
               <ChainTruthTimeline
+                countDetail={countDetail}
                 emptyLabel={
                   tailFailed ? <IndexNotice className="" onRetry={() => setTailTry((n) => n + 1)} /> : undefined
                 }

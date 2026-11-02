@@ -10,6 +10,7 @@
 // interest earned, last activity, events. Search: an address, or an ENS name
 // resolved through this deployment's resolver.
 
+import { resolveEnsViaApi } from "@/lib/shared/listing-search";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import { RECENT_ACTIVITY_LABEL } from "@/components/shared/filter-bar/sort-control";
@@ -119,20 +120,6 @@ export function skyListDimensions(): SerializableDimension<SkyListFilters>[] {
   ];
 }
 
-async function resolveEns(name: string, baseUrl?: string, signal?: AbortSignal): Promise<string | null> {
-  try {
-    const res = await fetch(`${baseUrl ?? ""}/api/ens/resolve?name=${encodeURIComponent(name)}`, {
-      cache: "no-store",
-      signal,
-    });
-    if (!res.ok) return null;
-    const { address } = (await res.json()) as { address: string | null };
-    return address ?? null;
-  } catch {
-    return null;
-  }
-}
-
 /** The listing refuses to state figures when the gate has not passed. */
 export class SkyGateError extends Error {
   constructor(readonly reason: "failed" | "missing") {
@@ -162,7 +149,7 @@ export async function fetchSkyListingPage(
   if (maxTx != null) qs.set("maxTx", String(maxTx));
   const search = parseSkySearch(filters.q);
   if (search.ens) {
-    const address = await resolveEns(search.ens, baseUrl, signal);
+    const address = await resolveEnsViaApi(search.ens, baseUrl, signal);
     if (!address) return { data: [], total: 0 };
     qs.set("owner", address.toLowerCase());
   } else if (search.address) qs.set("owner", search.address);
