@@ -1,9 +1,9 @@
 // About this explorer — the intro prose that lived behind the listing's (i)
 // drawer, now a page of its own on the rail's sub-nav. The copy is the swept
-// intro (charter §8a), reframed for a standalone page; the anatomy lives in ProtocolInfoPage.
+// intro (charter §8a), reframed for a standalone page; the anatomy lives in ProtocolInfoShell.
 
 import Link from "next/link";
-import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
+import { ProtocolInfoShell } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -70,5 +70,5 @@ const intro = (
 );
 
 export default function InfoPage() {
-  return <ProtocolInfoPage session="makerdao">{intro}</ProtocolInfoPage>;
+  return <ProtocolInfoShell session="makerdao">{intro}</ProtocolInfoShell>;
 }

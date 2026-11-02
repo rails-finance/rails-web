@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ProtocolInfoPage } from "@/components/shared/protocol-info-page";
+import { ProtocolInfoShell } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { SKY_RATES_PATH } from "@/lib/sky-savings/constants";
 import { protocolForSession } from "@/lib/shared/protocols";
@@ -48,5 +48,5 @@ const intro = (
 );
 
 export default function InfoPage() {
-  return <ProtocolInfoPage session="sky-savings">{intro}</ProtocolInfoPage>;
+  return <ProtocolInfoShell session="sky-savings">{intro}</ProtocolInfoShell>;
 }
