@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 
 // Same before-paint mirror as HomeHero: the inline blocking script in
 // app/layout.tsx handles hard loads; this covers App Router soft navigations.
@@ -19,6 +19,11 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
  * loads; the layout effect below replays the gate on soft navigations and
  * stores the flag after the genuine first play.
  *
+ * The draw-on starts when the graphic scrolls into view: the lines are paused
+ * in CSS until the wrapper carries `data-playing`, which an IntersectionObserver
+ * sets on first intersection. Without it the 5s draw (plus delays) would run
+ * from page load, finished before a visitor scrolls down to it.
+ *
  * Casing strokes must match the surface behind the graphic to read as gaps
  * where lines cross: they use --track-casing with --surface-raised as the
  * fallback. Its current home sits on the home gradient's constant floor, so
@@ -28,6 +33,28 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
  * follow them — would land on the wrong tone there).
  */
 export function TrackLines() {
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      el.dataset.playing = "1";
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          el.dataset.playing = "1";
+          io.disconnect();
+        }
+      },
+      { threshold: 0.2 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   useIsomorphicLayoutEffect(() => {
     try {
       if (sessionStorage.getItem("rails-tracks-seen")) {
@@ -45,7 +72,7 @@ export function TrackLines() {
     // frame's column rather than filling it; below that width the svg keeps
     // its 1100px floor and the overflow clip + edge masks absorb the
     // difference.
-    <div className="w-full max-w-5xl mx-auto overflow-hidden flex justify-center">
+    <div ref={wrapRef} className="track-lines w-full max-w-5xl mx-auto overflow-hidden flex justify-center">
       <svg
         viewBox="0 0 1100 300"
         xmlns="http://www.w3.org/2000/svg"

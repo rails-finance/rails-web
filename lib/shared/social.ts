@@ -19,3 +19,6 @@ export const RAILS_X_AT = `@${RAILS_X_HANDLE}`;
 
 /** The X account's page. */
 export const RAILS_X_URL = `https://x.com/${RAILS_X_HANDLE}`;
+
+/** The Telegram group's page; its handle is `@railsfinance`. */
+export const RAILS_TELEGRAM_URL = "https://t.me/railsfinance";
