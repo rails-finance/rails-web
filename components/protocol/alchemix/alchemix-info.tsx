@@ -4,7 +4,12 @@
 // Every link is docs.alchemix.fi, checked 200 with its anchor on 2026-11-02.
 
 import Link from "next/link";
-import { ProtocolInfoPage, type InfoDocLink, type InfoTerm } from "@/components/shared/protocol-info-page";
+import {
+  GlossaryLink,
+  ProtocolInfoPage,
+  type InfoDocLink,
+  type InfoTerm,
+} from "@/components/shared/protocol-info-page";
 import { transmuterListingPath, v2LinesForChain, v2ListingPath, type AlchemixDeployment } from "@/lib/alchemix/lines";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -38,54 +43,57 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
   const feePct = `${(lines[0].protocolFeeBps / 100).toString()}%`;
   const alusdb = lines.some((l) => l.key === "base-alusdb");
   const vaults = and([...new Set(lines.map((l) => `${l.myt} holds ${l.underlying}`))]);
+  const synthKinds = lines.some((l) => l.underlying === "WETH")
+    ? "alETH tracks the price of ETH, and the dollar tokens track the dollar."
+    : "It tracks the dollar.";
   const synthetics = and(lines.map((l) => `${l.displayName} against ${l.underlying}`));
 
   const glossary: [InfoTerm, ...InfoTerm[]] = [
     {
-      term: "MYT",
-      definition: `The collateral: a share in a Morpho vault that lends out an asset and earns on it (${vaults}). Its value rises as the vault earns and falls if it loses.`,
-      sources: [D.myt],
-    },
-    {
-      term: "Synthetic",
-      definition: alusdb
-        ? `The token a loan mints, one for one against its debt: ${synthetics}. alUSDb is Base's synthetic dollar, a separate token from alUSD on Ethereum.`
-        : `The token a loan mints, one for one against its debt: ${synthetics}.`,
-      sources: alusdb ? [D.alAssets, D.alUSDb] : [D.alAssets],
-    },
-    {
-      term: "Alchemist",
-      definition:
-        "The contract that holds a line's loans. Each loan is an NFT, so the wallet holding it may not be the one that opened it.",
-      sources: [D.borrow],
+      term: "Line",
+      definition: `A line is one synthetic together with its collateral, and it has its own Alchemist and Transmuter. This explorer covers the ${lineNames} ${many ? "lines" : "line"}.`,
+      sources: [D.selfRepaying],
     },
     {
       term: "Transmuter",
       definition:
-        "The contract where any holder of the synthetic deposits it to turn it back into MYT. A deposit converts a little every block until its term ends.",
+        "The Transmuter is the contract where any holder of the synthetic can deposit that token to exchange it for MYT. A deposit converts a little every block, the chain's unit of time, until its term ends.",
       sources: [D.transmuter],
     },
     {
       term: "Set aside for repayment",
       definition:
-        "The debt matched to Transmuter deposits as they convert, spread across every open loan by what each owes. Alchemix calls it earmarked debt.",
+        "Set-aside debt is the part of the debt that converting Transmuter deposits have repaid, shared across every open loan in proportion to what each owes.",
       sources: [D.transmuter, D.repays],
     },
     {
       term: "Redemption",
       definition:
-        "A Transmuter claim clearing the set-aside debt on every open loan of the line, paid with MYT taken from each loan's collateral.",
+        "A redemption is a depositor's claim in the Transmuter. It swaps the depositor's tokens for MYT taken from the collateral of the line's open loans, which repays the set-aside debt on all of them.",
       sources: [D.selfRepaying, D.transmuter],
     },
     {
-      term: "Line",
-      definition: `A synthetic and its collateral, with their own Alchemist and Transmuter. This explorer covers the ${lineNames} ${many ? "lines" : "line"}.`,
-      sources: [D.selfRepaying],
+      term: "MYT",
+      definition: `An MYT is a token that stands for a share of a pool of one asset, which a Morpho vault lends out to earn a return (${vaults}). It is the collateral of a loan, and each line has its own. Its value rises as the pool earns and falls if the pool loses money.`,
+      sources: [D.myt],
+    },
+    {
+      term: "Alchemist",
+      definition:
+        "The Alchemist is the contract that holds a line's loans. Each loan is an NFT, so it can be transferred, and the wallet holding it may not be the one that opened it.",
+      sources: [D.borrow],
+    },
+    {
+      term: "Synthetic",
+      definition: alusdb
+        ? `A synthetic is the token a loan creates when it is opened, one for each unit of its debt: ${synthetics}. ${synthKinds} alUSDb is Base's synthetic dollar, a separate token from alUSD on Ethereum.`
+        : `A synthetic is the token a loan creates when it is opened, one for each unit of its debt: ${synthetics}. ${synthKinds}`,
+      sources: alusdb ? [D.alAssets, D.alUSDb] : [D.alAssets],
     },
     {
       term: "Collateralisation",
       definition:
-        "The collateral's value in the asset underneath divided by the debt. If a falling share price takes it below the line's liquidation line, anyone can liquidate the loan.",
+        "Collateralisation is the collateral's value in the asset underneath, divided by the debt. If a falling share price takes it below the minimum the line requires, anyone can liquidate the loan, which takes enough of the holder's collateral to bring the loan back under its maximum. The rest of the collateral stays.",
       sources: [D.liquidation],
     },
   ];
@@ -94,23 +102,62 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
     <ProtocolInfoPage
       session={deployment.session}
       name="Alchemix"
-      tracks={`Every Alchemix V3 loan on ${chain}, on the ${lineNames} ${many ? "lines" : "line"}, and the Transmuter deposits that repay them.${hasV2 ? " The closed V2 accounts are kept as a final record." : ""} Alchemix on other chains is not shown here.`}
+      tracks={
+        <>
+          The Rails Alchemix explorer shows every self-repaying Alchemix V3 loan on {chain}, on the {lineNames}{" "}
+          {many ? "lines" : "line"}, and the history of each one. It also shows{" "}
+          <Link href={transmuterListingPath(deployment)} className={INLINE_LINK}>
+            the Transmuter
+          </Link>
+          , where deposits convert into collateral and repay those loans
+          {hasV2 && (
+            <>
+              , and the{" "}
+              <Link href={v2ListingPath(deployment)} className={INLINE_LINK}>
+                closed V2 accounts
+              </Link>
+              , which are kept as a final record
+            </>
+          )}
+          .
+        </>
+      }
+      notCovered="Alchemix on other chains isn't covered here."
       glossary={glossary}
       howItWorks={[
-        "The Transmuter repays the loans. As deposits in it convert, debt is set aside across every open loan, and each claim clears it in a redemption.",
+        <>
+          <GlossaryLink term="Line">A line</GlossaryLink> pairs a synthetic token with its collateral, the asset locked
+          to back a loan. A loan on a line lets you borrow that token against the collateral, and it repays itself over
+          time with no payments from the borrower. The repayment comes from the{" "}
+          <GlossaryLink term="Transmuter">Transmuter</GlossaryLink>, where any holder of the token can deposit it to
+          exchange it for collateral.
+        </>,
+        <>
+          As deposits convert, the matching debt is{" "}
+          <GlossaryLink term="Set aside for repayment">set aside</GlossaryLink> across every open loan, so each borrower
+          shares the repayment in proportion to what they owe. When a depositor claims, a{" "}
+          <GlossaryLink term="Redemption">redemption</GlossaryLink> swaps the depositor's tokens for collateral taken
+          from the loans, which repays debt on all of them.
+        </>,
         <>
           A loan has three parts, shown here on the {example.displayName} line:
           <ul className={`mt-1 ${UL}`}>
-            <li>Collateral: {example.myt} deposited in the Alchemist.</li>
-            <li>Loan: {example.displayName} minted against it, up to 90% of the deposit&apos;s value.</li>
+            <li>
+              Collateral: {example.myt} (this line&apos;s <GlossaryLink term="MYT">MYT</GlossaryLink> token) deposited
+              in the <GlossaryLink term="Alchemist">Alchemist</GlossaryLink>.
+            </li>
+            <li>
+              Loan: {example.displayName} (the <GlossaryLink term="Synthetic">synthetic</GlossaryLink>) created against
+              the collateral. You can borrow up to 90% of the deposit&apos;s value, the loan-to-value limit.
+            </li>
             <li>
               Repayment: redemptions over time, or the holder paying back {example.displayName} or {example.myt} at any
               time.
             </li>
           </ul>
         </>,
-        "The loan charges no interest. Its debt changes only when the holder mints or repays, or a redemption clears part of it.",
-        `Each redemption takes the line's fee from the collateral on top of the debt it clears: ${feePct} on ${chain}.`,
+        "The loan charges no interest. Its debt changes only when the holder borrows more or repays, or when a redemption clears part of it.",
+        `Each redemption also charges a protocol fee of ${feePct} of the collateral that pays off the debt, taken from the borrowers' collateral and sent to Alchemix's fee receiver.`,
       ]}
       views={[
         {
@@ -121,22 +168,24 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
                 <Link href={deployment.basePath} className={INLINE_LINK}>
                   Alchemist positions
                 </Link>{" "}
-                are the loans: one row each, with the debt and collateral the Alchemist states at a block.
+                are the loans. Each loan has one row, with the debt and collateral the Alchemist states at a block, the
+                chain's unit of time.
               </li>
               <li>
                 <Link href={transmuterListingPath(deployment)} className={INLINE_LINK}>
                   Transmuter positions
                 </Link>{" "}
-                are the repayments: one row per deposit, with the amount, the block it matures at and what its claim
-                paid. A claim before then converts the matured part and hands the rest back, less an early exit fee.
+                list the deposits that repay the loans. Each deposit has one row, with its amount, the block at which it
+                finishes converting (its term ends) and what its claim paid. Claiming earlier pays out only the part
+                converted so far, returns the unconverted tokens and charges an early exit fee.
               </li>
               {hasV2 && (
                 <li>
                   <Link href={v2ListingPath(deployment)} className={INLINE_LINK}>
                     V2 positions
                   </Link>{" "}
-                  are accounts on Alchemix V2, which closed on 2 April 2026 when its loans moved to V3. Each shows its
-                  final figures.
+                  are accounts on Alchemix V2, which closed on 2 April 2026 when its loans moved to V3. Each account
+                  shows its final figures.
                 </li>
               )}
             </ul>
@@ -146,8 +195,8 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
           heading: "Position page",
           body: (
             <p>
-              The card states the position&apos;s figures read from the chain. The timeline lists each of its events,
-              including every redemption that moved it.
+              The card shows the loan&apos;s figures, read from the chain. The timeline lists each of its events,
+              including every redemption that changed it.
             </p>
           ),
         },
@@ -155,18 +204,18 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
           heading: "Lines page",
           body: (
             <p>
-              For each line, the number of redemptions it has had and how the explorer gets its figures. A line with
-              none is replayed from each loan&apos;s events; from the first redemption on, figures are read from the
-              contract at a block.{" "}
+              This page shows how many redemptions each line has had. A redemption changes every open loan of the line
+              at once, so after a line&apos;s first redemption the explorer reads each loan&apos;s figures from the
+              contract, because after a redemption a loan&apos;s own events no longer add up to its figures.
               <Link href={`${deployment.basePath}/lines`} className={INLINE_LINK}>
                 See the lines
-              </Link>
-              .
+              </Link>{" "}
+              to check how many redemptions each has had.
             </p>
           ),
         },
       ]}
-      search={`Search takes a wallet address, an ENS name or a position id${hasV2 ? "; the V2 tab takes no id" : ""}. Each tab has its own filters and sorts.`}
+      search={`You can search by wallet address, ENS name or loan id${hasV2 ? ", except on the V2 tab, which takes no id" : ""}. Each tab has its own filters and sorts.`}
       docs={{ label: "Alchemix documentation", href: DOCS }}
     />
   );

@@ -3,7 +3,7 @@
 // file: PWN keeps no content/pwn/event-prose.yaml.
 
 import Link from "next/link";
-import { ProtocolInfoPage, type InfoTerm } from "@/components/shared/protocol-info-page";
+import { GlossaryLink, ProtocolInfoPage, type InfoTerm } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -21,15 +21,21 @@ const EXTEND = `${DOCS}/Guides/borrowing-on-pwn/requesting-a-loan-extension`;
 
 const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
+    term: "Collateral",
+    definition:
+      "Collateral is the asset a borrower locks up to secure a loan. The lender can claim it if the loan is not repaid in time.",
+    sources: [{ label: "PWN FAQ", href: `${FAQ}#how-can-i-use-pwn-as-a-lender-` }],
+  },
+  {
     term: "Escrow",
     definition:
-      "The contract that holds the borrower's collateral from origination until repayment or the lender's claim.",
+      "The escrow is the contract that holds the borrower's collateral from the start of the loan until it is repaid or the lender claims it.",
     sources: [{ label: "PWN FAQ", href: `${FAQ}#how-can-i-use-pwn-as-a-lender-` }],
   },
   {
     term: "Default",
     definition:
-      "A loan unpaid past its deadline. The contract then refuses repayment, and the lender can claim the collateral.",
+      "A loan is in default when it is still unpaid after its deadline. The contract then refuses repayment, and the lender can claim the collateral.",
     sources: [
       { label: "Repaying loans", href: REPAY },
       { label: "Claiming defaulted collateral", href: CLAIM },
@@ -37,19 +43,19 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   },
   {
     term: "Extension",
-    definition: "A later deadline for a loan, agreed after origination.",
+    definition: "An extension is a later deadline for a loan, agreed after the loan has started.",
     sources: [{ label: "Requesting a loan extension", href: EXTEND }],
   },
   {
     term: "Repayment total",
     definition:
-      "On the older contract, the one amount fixed at origination: principal plus interest, in the credit token.",
+      "On the older contract, the repayment total is the single amount fixed at the start of the loan: the amount borrowed (the principal) plus the interest, paid in the credit token, which is the asset that was lent.",
     sources: [{ label: "Repaying loans", href: REPAY }],
   },
   {
     term: "Yearly rate",
     definition:
-      "On the newer contracts, the interest rate per year. Interest accrues by the minute, so repaying early costs less.",
+      "On the newer contracts, the yearly rate is the interest rate per year. Interest builds up by the minute, so repaying early costs less.",
     sources: [{ label: "Repaying loans", href: REPAY }],
   },
 ];
@@ -59,31 +65,55 @@ export default function InfoPage() {
     <ProtocolInfoPage
       session="pwn"
       name="PWN"
-      tracks="Every peer-to-peer loan struck on PWN's SimpleLoan contracts on Ethereum, open or settled, with its history. Off-chain loan proposals are not shown until a lender funds one."
+      tracks={
+        <>
+          The Rails PWN explorer shows every peer-to-peer loan funded through PWN&apos;s SimpleLoan contracts (the
+          contracts that hold the loans) on Ethereum, whether still running or settled, and the full history of each
+          one. It also gives{" "}
+          <Link href="/ethereum/pwn/book" className={INLINE_LINK}>
+            the loan book
+          </Link>
+          , a page that lists the loans in escrow and shows how the settled loans ended.
+        </>
+      }
+      notCovered="Loan offers that no lender has funded yet aren't covered here."
       glossary={GLOSSARY}
       howItWorks={[
-        "A loan is one lender, one borrower and escrowed collateral, with every term struck between them at origination.",
-        "There is no oracle, health factor or liquidation. The parties set the price, and a loan unpaid past its deadline defaults to the lender's claim on the collateral.",
         <>
-          Only an extension moves a deadline, by one of two rules depending on the contract generation:
+          PWN is a protocol where one person lends to another directly. A loan starts when a lender funds a loan
+          proposal. It is made of a lender, a borrower and the borrower&apos;s{" "}
+          <GlossaryLink term="Collateral">collateral</GlossaryLink>, an asset locked as security. The collateral is held
+          in <GlossaryLink term="Escrow">escrow</GlossaryLink> until the loan ends, and every term is agreed between the
+          two at the start.
+        </>,
+        <>
+          The lender is protected by the collateral held in escrow. No price feed values the collateral, no score warns
+          of risk, and no one sells the collateral early. A loan that is unpaid after its deadline is in{" "}
+          <GlossaryLink term="Default">default</GlossaryLink>, which lets the lender claim the collateral.
+        </>,
+        <>
+          A deadline changes only through an <GlossaryLink term="Extension">extension</GlossaryLink>. PWN has an older
+          set of contracts, v1.1, and a newer set, v1.2 and v1.3, and each set has its own extension rule. The older
+          contract fixes a <GlossaryLink term="Repayment total">repayment total</GlossaryLink>, and the newer ones
+          charge a <GlossaryLink term="Yearly rate">yearly rate</GlossaryLink>.
           <table className="mt-2 w-full text-left text-[13px]">
             <thead>
               <tr>
                 <th className={TH}>Contract</th>
-                <th className={TH}>Cost of the loan</th>
+                <th className={TH}>Interest</th>
                 <th className={TH}>Extension</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td className={TD}>v1.1</td>
-                <td className={TD}>A repayment total</td>
-                <td className={TD}>The lender extends alone, up to 30 days each time, free.</td>
+                <td className={TD}>A repayment total, fixed at the start.</td>
+                <td className={TD}>The lender extends alone, up to 30 days each time, at no cost.</td>
               </tr>
               <tr>
                 <td className={TD}>v1.2 and v1.3</td>
-                <td className={TD}>A yearly rate, accruing by the minute</td>
-                <td className={TD}>One party proposes 1 to 90 days and the other accepts.</td>
+                <td className={TD}>A yearly rate that builds up by the minute.</td>
+                <td className={TD}>One party proposes 1 to 90 days, and the other party accepts.</td>
               </tr>
             </tbody>
           </table>
@@ -94,27 +124,31 @@ export default function InfoPage() {
           heading: "Listing",
           body: (
             <ul className={UL}>
-              <li>One card per loan: its collateral, principal, amount owed and status.</li>
+              <li>The listing shows one card for each loan, with its collateral, principal, amount owed and status.</li>
               <li>
-                Status is running, defaulted and not yet claimed, repaid, or defaulted and claimed. The bare listing
-                shows the first two, the loans still in escrow.
+                A loan&apos;s status is Running, Defaulted not yet claimed, Repaid, or Defaulted and claimed. Without a
+                filter, the listing shows the first two, which are the loans still in escrow.
               </li>
-              <li>No dollar value appears because none exists in the protocol.</li>
+              <li>No dollar value appears, because the protocol holds no price for the assets.</li>
             </ul>
           ),
         },
         {
           heading: "Loan page",
           body: (
-            <p>The loan&rsquo;s terms as struck, its deadline, and a timeline of each event, extensions included.</p>
+            <p>
+              The loan page shows the terms agreed at the start, the deadline, and a timeline of every event, including
+              extensions.
+            </p>
           ),
         },
         {
           heading: "Loan book",
           body: (
             <p>
-              The loans in escrow, what secures them, what they owe, the terms the parties fixed, and how the settled
-              loans ended.{" "}
+              The loan book lists the loans still in escrow (those that are Running, or Defaulted and not yet claimed),
+              the collateral that secures them, the amounts they owe and the terms the parties fixed. It also shows how
+              the settled loans, which are those Repaid or Defaulted and claimed, ended.{" "}
               <Link href="/ethereum/pwn/book" className={INLINE_LINK}>
                 See the whole loan book
               </Link>
@@ -123,7 +157,7 @@ export default function InfoPage() {
           ),
         },
       ]}
-      search="Search takes a loan number, a lender address or a borrower address. Filters: status, credit asset, collateral asset, debt, transactions. Sort: created, due, settled, events."
+      search="You can search by loan number, or by the account address of a lender or a borrower. The listing filters by Status, Credit (the asset lent), Collateral (the asset locked), Debt (credit asset) (a range for the amount owed) and Transactions (the number of transactions in the loan), and sorts by Created, Due, Settled or Events."
       docs={{ label: "PWN documentation", href: DOCS }}
     />
   );

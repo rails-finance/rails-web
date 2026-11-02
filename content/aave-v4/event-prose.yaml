@@ -1248,35 +1248,40 @@ glossary:
   - bold: |-
       Hub
     text: |-
-      a pool that holds supplied assets and lends them to spokes. Each hub keeps its liquidity apart and sets each asset's interest rate.
+      A hub is a pool that holds supplied assets and lends them to spokes. Each hub keeps its liquidity apart from the other hubs and sets the interest rate of each asset.
     sources: [{ label: "Liquidity hubs", doc: HUBS }]
   - bold: |-
       Spoke
     text: |-
-      a market where positions live. It sets which assets count as collateral, how liquidation works and which prices apply, and draws its liquidity from one hub or more.
+      A spoke is a market where positions live. It sets which assets count as collateral, how liquidation works and which prices apply, and it draws its liquidity from one hub or more.
     sources: [{ label: "Spokes", doc: SPOKES }]
   - bold: |-
       Credit line
     text: |-
-      the limit a hub sets on how much of an asset one spoke may borrow from it.
+      A credit line is the limit a hub sets on how much of an asset one spoke may borrow from it.
     sources: [{ label: "Liquidity hubs", doc: HUBS }, { label: "Caps per hub and spoke", doc: HUB_SPOKE_CONFIGS }]
   - bold: |-
       Collateral
     text: |-
-      a supplied asset its owner has enabled to back borrowing. A supply left off still earns interest and backs no debt.
+      Collateral is a supplied asset that its owner has enabled to back borrowing. A supplied asset that is not enabled still earns interest but backs no debt.
     sources: [{ label: "Collateral management", doc: COLLATERAL }]
   - bold: |-
       Collateral factor
     text: |-
-      the share of a collateral asset's value that counts toward the debt it can carry, set per asset on each spoke. The position card calls it the liquidation threshold.
+      The collateral factor is the share of a collateral asset's value that counts toward the debt it can carry, and each spoke sets it for every asset. The position card calls it the liquidation threshold, which is the same figure under another name.
     sources: [{ label: "Health factor", doc: HF }, { label: "Reserve settings", doc: RESERVE_DATA }]
   - bold: |-
       Health factor
     text: |-
-      collateral value weighted by its collateral factors, divided by debt. The spoke refuses a borrow or withdrawal that would take it below 1.0.
+      The health factor is a position's collateral value, weighted by its collateral factors, divided by its debt. At 1.0 the weighted collateral only just equals the debt, so a position at 1.0 has no spare room, and below 1.0 the debt is no longer safely covered. The spoke refuses a borrow or withdrawal that would take the health factor below 1.0.
     sources: [{ label: "Health factor", doc: HF }]
   - bold: |-
       Liquidation
     text: |-
-      below a health factor of 1.0, anyone may repay part of a position's debt and take its collateral at a bonus. Lower health factors pay higher bonuses.
+      Liquidation happens when a position's health factor falls below 1.0: anyone may then repay part of its debt and take its collateral at a bonus. That person is the liquidator, and the bonus is higher when the health factor is lower.
     sources: [{ label: "Liquidations", doc: OVERVIEW_LIQUIDATIONS }]
+  - bold: |-
+      Position
+    text: |-
+      A position is one wallet's supplied assets and debt on one spoke. Positions on different spokes do not affect each other.
+    sources: [{ label: "User positions", doc: POSITIONS }]
