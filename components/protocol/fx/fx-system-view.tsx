@@ -735,7 +735,7 @@ function TickTable({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | null 
 
 function PoolSection({ p, blockTs, readBy }: { p: FxPoolSystem; blockTs: number; readBy?: ServerRead | null }) {
   return (
-    <section className="mt-8">
+    <section className="mt-8 scroll-mt-20" id={p.key}>
       <div className="flex items-baseline gap-2">
         <h2 className="text-sm font-semibold text-foreground">{poolLabel(p)}</h2>
         <a

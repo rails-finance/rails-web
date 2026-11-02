@@ -4,7 +4,7 @@
 // fxprotocol.gitbook.io, the host content/official-docs.json lists for fx.
 
 import Link from "next/link";
-import { ProtocolInfoPage, type InfoTerm } from "@/components/shared/protocol-info-page";
+import { GlossaryLink, ProtocolInfoPage, type InfoTerm } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -103,12 +103,36 @@ export default function InfoPage() {
     <ProtocolInfoPage
       session="fx"
       name="f(x)"
-      tracks="The Rails f(x) explorer shows every long position that has borrowed fxUSD against wstETH or WBTC in f(x) Protocol V2 on Ethereum, whether still open or closed, and the full history of each one. It also shows each of the two pools, one for wstETH and one for WBTC, as a whole: its totals and the ticks that group its positions."
+      tracks={
+        <>
+          The Rails f(x) explorer shows every long position that has borrowed fxUSD against wstETH or WBTC in f(x)
+          Protocol V2 on Ethereum, whether still open or closed, and the full history of each one. It also shows each of
+          the two pools,{" "}
+          <Link href="/ethereum/fx/pools#wsteth" className={INLINE_LINK}>
+            one for wstETH
+          </Link>{" "}
+          and{" "}
+          <Link href="/ethereum/fx/pools#wbtc" className={INLINE_LINK}>
+            one for WBTC
+          </Link>
+          , as a whole: its totals and the ticks that group its positions.
+        </>
+      }
       notCovered="f(x) short positions live in a separate part of the protocol and aren't covered here."
       glossary={GLOSSARY}
       howItWorks={[
-        "f(x) acts on whole ticks. A rebalance, a liquidation or a redemption changes every position in a tick at once and in proportion, so the position has no transaction of its own that shows the change.",
-        "Funding is charged across the whole pool: it lowers every position's collateral in proportion, and no transaction records it. When a liquidation cannot cover all of a tick's debt, the shortfall is spread over every other position in the pool.",
+        <>
+          f(x) acts on whole <GlossaryLink term="Tick">ticks</GlossaryLink>. A{" "}
+          <GlossaryLink term="Rebalance">rebalance</GlossaryLink>, a{" "}
+          <GlossaryLink term="Liquidation">liquidation</GlossaryLink> or a{" "}
+          <GlossaryLink term="Redemption">redemption</GlossaryLink> changes every position in a tick at once and in
+          proportion, so the position has no transaction of its own that shows the change.
+        </>,
+        <>
+          <GlossaryLink term="Funding" /> is charged across the whole pool: it lowers every position&apos;s collateral
+          in proportion, and no transaction records it. When a liquidation cannot cover all of a tick&apos;s debt, the
+          shortfall is spread over every other position in the pool.
+        </>,
         "A rebalance or a liquidation repays debt from the position's collateral. The owner keeps the fxUSD that was borrowed. The position's NFT also stays with its owner after the position closes, and the owner can add collateral to it again.",
       ]}
       search="You can search by holder address or position number. The listing filters by status, pool, size and transactions, and sorts by recent activity, collateral, debt, debt ratio, event count or creation."
