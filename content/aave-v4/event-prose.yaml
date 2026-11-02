@@ -804,6 +804,7 @@ doc_urls:
   RATE_MODEL: https://aave.com/docs/aave-v4/liquidity/hubs#hub-assets-interest-rate-model
   HUB_SPOKE_CONFIGS: https://aave.com/docs/aave-v4/liquidity/hubs#hub-spoke-configs
   RESERVE_DATA: https://aave.com/docs/aave-v4/liquidity/reserves#reserve-data-structure
+  OVERVIEW_LIQUIDATIONS: https://aave.com/docs/aave-v4#liquidations
 
 L5:
   supply:
@@ -1241,3 +1242,41 @@ L5:
       - label: |-
           Reserve settings and pauses
         doc: RESERVE_DATA
+
+# ── The info pages (/ethereum/aave-v4/info, /base/aave-v4/info, zone Z5): the glossary under the opening ──
+glossary:
+  - bold: |-
+      Hub
+    text: |-
+      a pool that holds supplied assets and lends them to spokes. Each hub keeps its liquidity apart and sets each asset's interest rate.
+    sources: [{ label: "Liquidity hubs", doc: HUBS }]
+  - bold: |-
+      Spoke
+    text: |-
+      a market where positions live. It sets which assets count as collateral, how liquidation works and which prices apply, and draws its liquidity from one hub or more.
+    sources: [{ label: "Spokes", doc: SPOKES }]
+  - bold: |-
+      Credit line
+    text: |-
+      the limit a hub sets on how much of an asset one spoke may borrow from it.
+    sources: [{ label: "Liquidity hubs", doc: HUBS }, { label: "Caps per hub and spoke", doc: HUB_SPOKE_CONFIGS }]
+  - bold: |-
+      Collateral
+    text: |-
+      a supplied asset its owner has enabled to back borrowing. A supply left off still earns interest and backs no debt.
+    sources: [{ label: "Collateral management", doc: COLLATERAL }]
+  - bold: |-
+      Collateral factor
+    text: |-
+      the share of a collateral asset's value that counts toward the debt it can carry, set per asset on each spoke. The position card calls it the liquidation threshold.
+    sources: [{ label: "Health factor", doc: HF }, { label: "Reserve settings", doc: RESERVE_DATA }]
+  - bold: |-
+      Health factor
+    text: |-
+      collateral value weighted by its collateral factors, divided by debt. The spoke refuses a borrow or withdrawal that would take it below 1.0.
+    sources: [{ label: "Health factor", doc: HF }]
+  - bold: |-
+      Liquidation
+    text: |-
+      below a health factor of 1.0, anyone may repay part of a position's debt and take its collateral at a bonus. Lower health factors pay higher bonuses.
+    sources: [{ label: "Liquidations", doc: OVERVIEW_LIQUIDATIONS }]
