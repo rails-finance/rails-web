@@ -782,26 +782,26 @@ templates:
 # Every Quick Link's page, with its anchor. A row in rails-ops
 # reference/official-docs/aave-v4.md backs each.
 doc_urls:
-  POSITIONS: https://aave.com/docs/aave-v4/positions#user-positions
+  POSITIONS: https://aave.com/docs/aave-v4/positions
   HF: https://aave.com/docs/aave-v4/positions#health-factor
   RISK_PREMIUM: https://aave.com/docs/aave-v4/positions#user-risk-premium
-  SPOKE_ISOLATION: https://aave.com/docs/aave-v4/positions#cross-spoke-strategies-spoke-isolation
+  SPOKE_ISOLATION: https://aave.com/docs/aave-v4/positions#spoke-isolation
   SUPPLY: https://aave.com/docs/aave-v4/positions/supply#supply-assets
   COLLATERAL: https://aave.com/docs/aave-v4/positions/supply#collateral-management
   WITHDRAW: https://aave.com/docs/aave-v4/positions/withdraw#withdraw-assets
-  WITHDRAW_POSITION: https://aave.com/docs/aave-v4/positions/withdraw#withdrawing-identify-the-supply-position
-  BORROW: https://aave.com/docs/aave-v4/positions/borrow#borrowing
+  WITHDRAW_POSITION: https://aave.com/docs/aave-v4/positions/withdraw#identify-the-supply-position
+  BORROW: https://aave.com/docs/aave-v4/positions/borrow#borrow-assets
   REPAY: https://aave.com/docs/aave-v4/positions/repay#repay-loans
-  LIQUIDATIONS: https://aave.com/docs/aave-v4/positions/liquidations#liquidations
-  LIQ_DEBT: https://aave.com/docs/aave-v4/positions/liquidations#select-liquidation-targets-choose-the-debt-position
-  LIQ_COLLATERAL: https://aave.com/docs/aave-v4/positions/liquidations#select-liquidation-targets-choose-the-collateral-position
+  LIQUIDATIONS: https://aave.com/docs/aave-v4/positions/liquidations
+  LIQ_DEBT: https://aave.com/docs/aave-v4/positions/liquidations#section-1-choose-the-debt-position
+  LIQ_COLLATERAL: https://aave.com/docs/aave-v4/positions/liquidations#section-2-choose-the-collateral-position
   MANAGERS: https://aave.com/docs/aave-v4/positions/managers#how-they-work
-  DELEGATION_MANAGERS: https://aave.com/docs/aave-v4/positions/managers#built-in-position-managers-delegation-managers
+  DELEGATION_MANAGERS: https://aave.com/docs/aave-v4/positions/managers#delegation-managers
   DYNAMIC_CONFIG: https://aave.com/docs/aave-v4/positions/conditions#dynamic-risk-configuration
-  LIQUIDITY_MODEL: https://aave.com/docs/aave-v4/liquidity#liquidity-model
+  LIQUIDITY_MODEL: https://aave.com/docs/aave-v4/liquidity
   HUBS: https://aave.com/docs/aave-v4/liquidity#liquidity-hubs
   SPOKES: https://aave.com/docs/aave-v4/liquidity#spokes
-  RATE_MODEL: https://aave.com/docs/aave-v4/liquidity/hubs#hub-assets-interest-rate-model
+  RATE_MODEL: https://aave.com/docs/aave-v4/liquidity/hubs#interest-rate-model
   HUB_SPOKE_CONFIGS: https://aave.com/docs/aave-v4/liquidity/hubs#hub-spoke-configs
   RESERVE_DATA: https://aave.com/docs/aave-v4/liquidity/reserves#reserve-data-structure
   OVERVIEW_LIQUIDATIONS: https://aave.com/docs/aave-v4#liquidations
