@@ -113,7 +113,9 @@ export function ProtocolInfoPage({
       <div className="mt-3 max-w-3xl space-y-2 text-sm text-rb-500" data-anatomy="I2">
         <p>{tracks}</p>
 
-        <h2 className={H}>Terms</h2>
+        <h2 id="glossary" className={`${H} scroll-mt-20`}>
+          Terms
+        </h2>
         <dl className="mt-1.5 space-y-2" data-anatomy="I4">
           {glossary.map((t) => (
             <div key={t.term}>
