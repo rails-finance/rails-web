@@ -15,9 +15,17 @@ const UL = "list-disc space-y-1 pl-5";
 
 const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
+    term: "Pool",
+    definition:
+      "One of the two f(x) markets for long positions: one takes wstETH as collateral and the other takes WBTC. Each pool holds its own positions, totals and ticks.",
+    sources: [
+      { label: "xPOSITION", href: `${DOCS}/f-x-protocol-mechanisms/creating-a-leveraged-long-position-xposition` },
+    ],
+  },
+  {
     term: "Position",
     definition:
-      "A leveraged long on wstETH or WBTC, which the docs call an xPOSITION. It is an NFT the pool mints, with fxUSD debt drawn against its collateral.",
+      "A leveraged long on wstETH (wrapped staked ETH) or WBTC (wrapped bitcoin), which the docs call an xPOSITION. The owner locks that token as collateral and borrows fxUSD against it, so the position gains or loses more than the collateral alone when its price moves. The pool mints each position as an NFT.",
     sources: [
       { label: "xPOSITION", href: `${DOCS}/f-x-protocol-mechanisms/creating-a-leveraged-long-position-xposition` },
     ],
@@ -25,19 +33,19 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "fxUSD",
     definition:
-      "The stablecoin a position borrows. It aims at $1 and can trade off it, so Rails states debt as a count of fxUSD tokens.",
+      "The stablecoin that a position borrows. It aims to be worth $1 but can trade away from that price, so Rails shows debt as an amount of fxUSD and never converts it into dollars.",
     sources: [{ label: "Peg protection", href: `${DOCS}/risk-management/advanced-peg-protection-mechanisms` }],
   },
   {
     term: "Debt ratio",
     definition:
-      "A position's fxUSD debt divided by its collateral's value at the oracle price; the docs call it LTV. The pool's rebalance and liquidation lines are set on it.",
+      "A position's fxUSD debt divided by the value of its collateral at the oracle price, which is the collateral price that the pool reads from an outside price feed. The docs call this ratio LTV, short for loan-to-value. It rises when the collateral's price falls.",
     sources: [{ label: "Risk parameters", href: `${DOCS}/risk-management/risk-parameters` }],
   },
   {
     term: "Tick",
     definition:
-      "A bucket of positions whose debt ratios sit within 0.15% of each other. The pool records a position as a share of its tick.",
+      "A group of positions whose debt ratios sit within 0.15% of each other. The pool records each position as a share of its tick, and it rebalances or liquidates a whole tick at once.",
     sources: [
       { label: "Ticks", href: `${DOCS}/developers/processing-the-rebalances-and-liquidations/ticks` },
       {
@@ -49,13 +57,13 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Keeper",
     definition:
-      "Any address that calls a rebalance or a liquidation. A bonus in collateral pays it, and the protocol keeps a share of the bonus.",
+      "Any address that calls a rebalance or a liquidation. It is paid a bonus in collateral for doing so, and the protocol keeps a share of that bonus.",
     sources: [{ label: "Risk parameters", href: `${DOCS}/risk-management/risk-parameters` }],
   },
   {
     term: "Rebalance",
     definition:
-      "From the rebalance line, a keeper repays part of a tick's debt and takes collateral worth that debt plus the bonus. The tick's positions stay open, back at the line.",
+      "The rebalance line is a debt ratio that the pool sets. Once a tick reaches it, a keeper repays part of the tick's debt and takes collateral worth that debt plus the bonus. The positions in the tick stay open, and their owners keep the fxUSD they borrowed. Each position loses some collateral and some debt, in proportion, and the tick's debt ratio is brought back down to the line.",
     sources: [
       { label: "Rebalancing", href: `${DOCS}/f-x-protocol-mechanisms/rebalancing-the-position-liquidation-brake` },
     ],
@@ -63,7 +71,7 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Liquidation",
     definition:
-      "From the higher liquidation line, a keeper repays a tick's whole debt and takes collateral worth it plus the bonus. Collateral left over stays with each owner.",
+      "The liquidation line is a second, higher debt ratio that the pool sets. Once a tick reaches it, a keeper repays the tick's whole debt and takes collateral worth that debt plus the bonus. Any collateral left over stays with each owner.",
     sources: [
       {
         label: "Liquidation process",
@@ -74,7 +82,7 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Redemption",
     definition:
-      "While fxUSD trades below its peg, anyone may pay fxUSD for collateral at the oracle price. It takes from the highest-ratio ticks first, at most 20% of a tick per pass.",
+      "While fxUSD trades below its peg, anyone may pay fxUSD to receive collateral at the oracle price. A redemption takes from the ticks with the highest debt ratio first, and at most 20% of a tick in one redemption. It helps bring fxUSD back toward $1.",
     sources: [
       {
         label: "Redemption",
@@ -85,7 +93,7 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Funding",
     definition:
-      "A yearly charge on collateral, taken with no event. The funding rate Rails reads from each pool follows Aave's USDC borrow rate; the docs say Funding Level I applies under peg conditions.",
+      "A yearly charge on collateral. It is taken continuously, so no transaction records it. The funding rate that Rails reads from each pool follows Aave's USDC borrow rate, and the docs say Funding Level I applies under peg conditions.",
     sources: [{ label: "Fees", href: `${DOCS}/f-x-protocol-mechanisms/fees` }],
   },
 ];
@@ -95,25 +103,29 @@ export default function InfoPage() {
     <ProtocolInfoPage
       session="fx"
       name="f(x)"
-      tracks="Every f(x) Protocol V2 long position on Ethereum, in the wstETH and WBTC pools, open or closed, with its history, and the ticks of both pools. Short positions sit on a separate manager and are not shown."
+      tracks="The Rails f(x) explorer shows every long position that has borrowed fxUSD against wstETH or WBTC in f(x) Protocol V2 on Ethereum, whether still open or closed, and the full history of each one. It also shows each of the two pools, one for wstETH and one for WBTC, as a whole: its totals and the ticks that group its positions."
+      notCovered="f(x) short positions live in a separate part of the protocol and aren't covered here."
       glossary={GLOSSARY}
       howItWorks={[
-        "f(x) acts on whole ticks. A rebalance, liquidation or redemption changes every position in the tick at once, in proportion, and the position logs no event of its own.",
-        "Funding works across the whole pool. So does debt a liquidation could not cover, which is added to every other position in the pool.",
-        "The owner keeps the fxUSD borrowed through a rebalance or a liquidation. The NFT stays with its owner after closing, and can be funded again.",
+        "f(x) acts on whole ticks. A rebalance, a liquidation or a redemption changes every position in a tick at once and in proportion, so the position has no transaction of its own that shows the change.",
+        "Funding is charged across the whole pool: it lowers every position's collateral in proportion, and no transaction records it. When a liquidation cannot cover all of a tick's debt, the shortfall is spread over every other position in the pool.",
+        "A rebalance or a liquidation repays debt from the position's collateral. The owner keeps the fxUSD that was borrowed. The position's NFT also stays with its owner after the position closes, and the owner can add collateral to it again.",
       ]}
-      search="Search takes a holder address or a position number. Filters: status, pool, size, transactions. Sort: recent activity, collateral, debt, debt ratio, event count, created."
+      search="You can search by holder address or position number. The listing filters by status, pool, size and transactions, and sorts by recent activity, collateral, debt, debt ratio, event count or creation."
       views={[
         {
           heading: "Listing",
           body: (
             <ul className={UL}>
-              <li>A band at the top gives each pool&rsquo;s open positions, collateral and fxUSD debt.</li>
+              <li>A summary at the top gives each pool&apos;s number of open positions, collateral and fxUSD debt.</li>
               <li>
-                One card per position: its holder, its collateral and dollar value, its fxUSD debt, its debt ratio and
-                status.
+                Each card shows one position: its holder, its collateral and the dollar value of that collateral, its
+                fxUSD debt, its debt ratio and its status.
               </li>
-              <li>Open positions show by default. Searching a holder or a position shows every status.</li>
+              <li>
+                A position's status is open, closed or ever liquidated. The listing shows open positions by default, and
+                searching for a holder or a position shows every status.
+              </li>
             </ul>
           ),
         },
@@ -122,14 +134,18 @@ export default function InfoPage() {
           body: (
             <ul className={UL}>
               <li>
-                The top card reads collateral, debt and debt ratio from the pool, with the prices at which the tick
-                would be rebalanced or liquidated.
+                The top card shows the collateral, the debt and the debt ratio as the pool reports them, with the prices
+                at which the tick would be rebalanced or liquidated.
               </li>
               <li>
-                Beside the pool&rsquo;s reading it sets what the position&rsquo;s transactions add up to. The gap is
-                what funding and tick-wide events changed, split by stretch between transactions in a table below.
+                Beside the pool&apos;s figures, the page shows what the position&apos;s own transactions add up to. The
+                difference between the two figures is what funding and tick-wide events changed, and a table below
+                splits it by the period between two transactions.
               </li>
-              <li>The timeline lists each transaction and places the tick-wide events that reached the position.</li>
+              <li>
+                The timeline lists each of the position&apos;s transactions and places the tick-wide events that reached
+                the position between them.
+              </li>
             </ul>
           ),
         },
@@ -137,9 +153,10 @@ export default function InfoPage() {
           heading: "Pools page",
           body: (
             <p>
-              Each pool&rsquo;s totals, funding rate and oracle prices, then its tick ladder: a drawing of each
-              tick&rsquo;s debt along the debt ratio, against the borrow cap, rebalance and liquidation lines. A table
-              lists every tick, and the ticks&rsquo; debt adds up exactly to the pool&rsquo;s total.{" "}
+              The pools page shows each pool&apos;s totals, funding rate and oracle prices. Under them is the
+              pool&apos;s tick ladder, a drawing of each tick&apos;s debt along the debt ratio, set against the pool's
+              borrow cap, which limits how much can be borrowed, and the rebalance and liquidation lines. A table lists
+              every tick, and the debt of the ticks adds up to the pool&apos;s total.{" "}
               <Link href="/ethereum/fx/pools" className={INLINE_LINK}>
                 See the pools and their tick ladders
               </Link>
