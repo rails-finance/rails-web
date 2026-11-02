@@ -95,7 +95,7 @@ export const JSON_DROPPED_PATHS = [
   },
   {
     re: /(^|\.)marketRead$/,
-    why: "the block a Compound V2 listing row's market state was read at, and who answered it (ui-jobs 467)",
+    why: "the block a Compound V2 or Moonwell listing row's market state was read at, and who answered it (ui-jobs 467)",
   },
   { re: /^data\.cache$/, why: "rails-server's state cache answering this request (miss / fresh)" },
   { re: /^timeline\.reconcile\.(toBlock|lane|refetched|refetchDiffered)$/, why: "the read's own span and RPC lane" },
