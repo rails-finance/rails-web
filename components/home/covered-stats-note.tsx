@@ -1,40 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { CircleQuestionMark } from "lucide-react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { Info, X } from "lucide-react";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
+import { formatFlowUsd, spokenUsd } from "@/lib/shared/flows-timeline";
+import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
+import type { ValueHeld } from "@/lib/home/value-held";
 
 /**
- * The small print for the headline position count — how "positions" is
- * counted — opened from the help icon that closes the caption sentence, rather
- * than parked at the foot of the page (Miles, 2026-09-03: the paragraph reads
- * better as a note you summon than as a footer the eye has to travel to).
+ * The band's small print, opened from the (i) after the last label: what the
+ * figures are and how they are counted. One note for the band. Desktop opens a
+ * centred dialog (the learn-more modal's shell: portal, backdrop, surface);
+ * below `sm` the shared MobileSheet, since a table and a list have nowhere to
+ * sit on a phone.
  *
- * Two surfaces, one text, following the coverage matrix's grammar for "a
- * definition to read": on desktop a click-pinned popover (the CellNote
- * treatment — dark tile, always mounted so the copy ships in the HTML and
- * `aria-controls` has a target); below `sm` the shared modal MobileSheet,
- * since a 60-word popover has nowhere to sit on a phone.
+ * In order: the lead (when a value is stated), the caption line moved out of
+ * the band (open and closed, wallets), the per-explorer breakdown, what is not
+ * counted, the overlaps and the floor sentence, then the long-standing text on
+ * how positions are counted.
  *
- * The popover is anchored to the ICON, not to the band (Miles, 2026-09-12).
- * It used to hang centred under the whole stats band — which, the band being
- * page-centred, could never clip a viewport edge — but that was chosen when
- * the trigger was a dagger on the 58px headline figure, which wandered a long
- * way off centre once the headline pair wrapped. The trigger now sits at the
- * end of the caption sentence, so a popover in the middle of the page read as
- * unrelated to the thing that opened it. Anchoring to the icon costs the free
- * clipping immunity, which `clampShift` below buys back.
- *
- * The text states the rule the loader applies (covered-positions-data.ts):
- * each explorer's own listing total, all-time, summed hourly; the grain each
- * protocol counts in, and the Arbitrum census grain (census-leg.ts); that "closed" absorbs every protocol's own ending; and
- * that the wallet figure is distinct across explorers (stats.ts counts
+ * The "how positions are counted" text states the rule the loader applies
+ * (covered-positions-data.ts): each explorer's own listing total, all-time,
+ * summed hourly; the grain each protocol counts in, and the Arbitrum census
+ * grain (census-leg.ts); that "closed" absorbs every protocol's own ending;
+ * and that the wallet figure is distinct across explorers (stats.ts counts
  * DISTINCT lower(wallet) over every listing). Nothing about Base backfill
  * completeness on purpose: that gate closes the day Morpho Base's history
  * lands and would then describe nothing.
  */
-function NoteText() {
+function CountedText() {
   return (
     <>
       Positions are the sum of each explorer&rsquo;s own listing total, counted all-time and refreshed hourly. A
@@ -46,113 +42,219 @@ function NoteText() {
   );
 }
 
-const NOTE_LABEL = "How positions are counted";
+const NOTE_LABEL = "How the figures are counted";
 
-/** Gutter the popover keeps from either viewport edge, in px. */
-const EDGE_GUTTER = 16;
+const fmtBlock = (b: { from: number; to: number }) =>
+  b.from === b.to ? b.to.toLocaleString("en-US") : `${b.from.toLocaleString("en-US")}–${b.to.toLocaleString("en-US")}`;
 
-/**
- * The trigger and its note, as one inline unit: a `relative inline-block`
- * wrapper so the popover hangs off the icon, carrying the button, the desktop
- * popover and the phone sheet. One component rather than the old
- * scope/trigger/panel trio — the trigger and the panel now share a parent, so
- * the context that used to reach across the band has nothing left to do, and
- * the wrapper is also the outside-click boundary.
- */
-export function CoveredStatsNote() {
-  const [open, setOpen] = useState(false);
-  const isPhone = useMediaQuery(PHONE_QUERY);
-  const wrapRef = useRef<HTMLSpanElement>(null);
-  const panelRef = useRef<HTMLSpanElement>(null);
-  const noteId = useId();
-  const popoverOpen = open && !isPhone;
+const fmtShare = (share: number) => (share < 0.001 ? "<0.1%" : `${(share * 100).toFixed(1)}%`);
 
-  /**
-   * How far to slide the popover off the icon's centre to keep it on screen.
-   * Computed from the anchor's centre and the panel's own width — never from
-   * the panel's current (already shifted) position — so it settles in one pass
-   * instead of chasing itself.
-   */
-  const [shift, setShift] = useState(0);
-  const clampShift = useCallback(() => {
-    const anchor = wrapRef.current;
-    const panel = panelRef.current;
-    if (!anchor || !panel) return;
-    const rect = anchor.getBoundingClientRect();
-    const width = panel.offsetWidth;
-    const wanted = rect.left + rect.width / 2 - width / 2;
-    const max = Math.max(EDGE_GUTTER, window.innerWidth - EDGE_GUTTER - width);
-    setShift(Math.min(Math.max(wanted, EDGE_GUTTER), max) - wanted);
-  }, []);
+function Heading({ children }: { children: ReactNode }) {
+  return <h3 className={`${OVERLAY_HEADING} mt-5 mb-2`}>{children}</h3>;
+}
 
-  // Measured before paint, so the popover never shows at the unclamped spot
-  // first. `offsetWidth` reads 0 while the panel is `hidden`, which is why
-  // this runs only once it is open.
-  useLayoutEffect(() => {
-    if (!popoverOpen) return;
-    clampShift();
-  }, [popoverOpen, clampShift]);
+function NoteBody({ value, caption }: { value: ValueHeld | null; caption: ReactNode }) {
+  return (
+    <div className="space-y-2 text-sm leading-relaxed">
+      {value && (
+        <p className="text-foreground">
+          From the smallest position to the largest, Rails shows each in the same detail. Together, the open positions
+          hold{" "}
+          <span className="font-semibold tabular-nums" aria-label={spokenUsd(value.totalUsd)}>
+            {formatFlowUsd(value.totalUsd)}
+          </span>
+          .
+        </p>
+      )}
+      <p className="text-rb-500">{caption}</p>
+
+      {value && (
+        <>
+          <Heading>Held, by explorer</Heading>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs tabular-nums">
+              <thead className="text-rb-500">
+                <tr>
+                  <th scope="col" className="py-1 pr-3 font-medium">
+                    Explorer
+                  </th>
+                  <th scope="col" className="py-1 pr-3 text-right font-medium">
+                    Share
+                  </th>
+                  <th scope="col" className="py-1 pr-3 font-medium">
+                    Block
+                  </th>
+                  <th scope="col" className="py-1 font-medium">
+                    Prices
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {value.rows.map((r) => (
+                  <tr key={r.key} className="border-t border-rb-200 align-top dark:border-rb-700">
+                    <td className="py-1 pr-3 text-foreground">
+                      {r.label} <span className="text-rb-500">{r.chainName}</span>
+                    </td>
+                    <td className="py-1 pr-3 text-right">{fmtShare(r.share)}</td>
+                    <td className="py-1 pr-3">{r.block ? fmtBlock(r.block) : "—"}</td>
+                    <td className="py-1">{r.oracleOf ?? r.prices}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {value.notCounted.length > 0 && (
+            <>
+              <Heading>Not counted</Heading>
+              <ul className="space-y-1 text-xs">
+                {value.notCounted.map((n) => (
+                  <li key={`${n.label}:${n.chainName}:${n.reason}`}>
+                    <span className="text-foreground">
+                      {n.label} {n.chainName}
+                    </span>
+                    : {n.reason}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {value.leftOut.length > 0 && (
+            <>
+              <Heading>Left out of counted explorers</Heading>
+              <ul className="space-y-1 text-xs">
+                {value.leftOut.map((l) => (
+                  <li key={`${l.label}:${l.chainName}:${l.what}`}>
+                    <span className="text-foreground">
+                      {l.label} {l.chainName}
+                    </span>
+                    : {l.what}. {l.reason}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          <div className="mt-4 space-y-1 text-xs">
+            {value.overlaps.map((o) => (
+              <p key={o}>{o}</p>
+            ))}
+            <p>The figure is a floor: debt is neither added nor subtracted, and what is not counted is named above.</p>
+          </div>
+        </>
+      )}
+
+      <Heading>How positions are counted</Heading>
+      <p className="text-xs">
+        <CountedText />
+      </p>
+    </div>
+  );
+}
+
+/** The desktop dialog: the learn-more modal's shell, wider for the table. */
+function NoteDialog({ id, onClose, children }: { id: string; onClose: () => void; children: ReactNode }) {
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!popoverOpen) return;
+    panelRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") onClose();
     };
-    const onDoc = (e: PointerEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener("resize", clampShift);
     document.addEventListener("keydown", onKey);
-    document.addEventListener("pointerdown", onDoc);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     return () => {
-      window.removeEventListener("resize", clampShift);
       document.removeEventListener("keydown", onKey);
-      document.removeEventListener("pointerdown", onDoc);
+      document.body.style.overflow = prev;
     };
-  }, [popoverOpen, clampShift]);
+  }, [onClose]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[var(--z-modal)] overflow-y-auto" onClick={onClose}>
+      <div
+        className="pointer-events-none fixed inset-0 backdrop-blur-sm"
+        style={{ background: "var(--backdrop-bg)" }}
+      />
+      <div className="relative flex min-h-full items-center justify-center p-4">
+        <div
+          ref={panelRef}
+          id={id}
+          role="dialog"
+          aria-modal="true"
+          aria-label={NOTE_LABEL}
+          tabIndex={-1}
+          data-anatomy="S3.4"
+          className="relative my-8 w-full max-w-2xl rounded-2xl p-6 shadow-xl focus:outline-none"
+          style={{ background: "var(--surface-overlay)" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="btn-ghost absolute right-4 top-4 cursor-pointer"
+          >
+            <X size={20} aria-hidden="true" />
+          </button>
+          <h2 className="mb-3 pr-8 text-lg font-bold">{NOTE_LABEL}</h2>
+          {children}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * The (i) trigger and the note it opens, as one inline unit. `value` is null
+ * while the value block is omitted; the note then holds the caption and the
+ * counting text alone. `caption` is the moved caption line, drawn by the server
+ * component so its wallet-clause rule (`walletClauseIsInScope`) stays there.
+ */
+export function CoveredStatsNote({ value, caption }: { value: ValueHeld | null; caption: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const isPhone = useMediaQuery(PHONE_QUERY);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const noteId = useId();
+  const dialogOpen = open && !isPhone;
+
+  const close = () => {
+    setOpen(false);
+    triggerRef.current?.focus();
+  };
 
   return (
-    <span ref={wrapRef} className="relative inline-block">
-      {/* The help icon. An icon rather than a footnote marker: it sits in the
-          small caption, not on the headline figure, where a dagger reads as a
-          typo and the circled question mark reads as "the answer is here".
-          Sized in `em` so it tracks the caption's 12px, and pulled onto the
-          text baseline rather than raised as a superscript. */}
+    <span className="inline-flex">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-expanded={popoverOpen}
-        aria-controls={noteId}
-        aria-haspopup={isPhone ? "dialog" : undefined}
+        aria-expanded={open}
+        aria-controls={open ? noteId : undefined}
+        aria-haspopup="dialog"
         aria-label={open ? `Hide ${NOTE_LABEL.toLowerCase()}` : `Show ${NOTE_LABEL.toLowerCase()}`}
-        className={`ml-1 inline-flex cursor-pointer align-[-0.18em] transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-          popoverOpen ? "text-foreground" : "text-rb-500"
+        data-anatomy="S3.3"
+        className={`inline-flex cursor-pointer items-center transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+          open ? "text-foreground" : "text-rb-500"
         }`}
       >
-        <CircleQuestionMark className="size-[1.15em]" strokeWidth={1.75} aria-hidden="true" />
+        <Info className="size-[1.1em]" strokeWidth={1.75} aria-hidden="true" />
       </button>
 
-      {/* The popover, hanging under the icon. The width clamp keeps it inside
-          the viewport on its own between `sm` and the note's natural width;
-          `shift` handles the rest. */}
-      <span
-        ref={panelRef}
-        id={noteId}
-        role="tooltip"
-        style={{ transform: `translateX(calc(-50% + ${shift}px))` }}
-        className={`absolute left-1/2 top-full z-[var(--z-dropdown)] mt-2 w-max max-w-[min(56ch,calc(100vw-2rem))] rounded-md bg-foreground px-3 py-2 text-left text-xs leading-relaxed text-background shadow-lg ${
-          popoverOpen ? "" : "hidden"
-        }`}
-      >
-        <NoteText />
-      </span>
+      {dialogOpen && (
+        <NoteDialog id={noteId} onClose={close}>
+          <NoteBody value={value} caption={caption} />
+        </NoteDialog>
+      )}
 
       {open && isPhone && (
         <MobileSheet label={NOTE_LABEL} onClose={() => setOpen(false)}>
           <p className="font-semibold text-foreground">{NOTE_LABEL}</p>
-          <p className="body-text mt-2 text-sm">
-            <NoteText />
-          </p>
+          <div className="mt-2" id={noteId}>
+            <NoteBody value={value} caption={caption} />
+          </div>
         </MobileSheet>
       )}
     </span>

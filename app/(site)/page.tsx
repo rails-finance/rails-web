@@ -11,6 +11,7 @@ import { getLiveExampleData } from "@/lib/home/live-example-data";
 import { packLiveExample } from "@/lib/home/live-example-wire";
 import { getCoveredPositions } from "@/lib/home/covered-positions-data";
 import { getHomeStats } from "@/lib/home/home-stats-data";
+import { getValueHeld } from "@/lib/home/value-held-data";
 
 // ISR — the page (and the live-example trove data fetched below) regenerates
 // in the background at most hourly; every visitor gets the static render.
@@ -24,10 +25,11 @@ export default async function Home() {
   // Independent legs — the hero count, the live-example trove, and the
   // overview stats each hit a different roster/endpoint, so fetch them
   // concurrently rather than stacking their latency.
-  const [liveExample, covered, stats] = await Promise.all([
+  const [liveExample, covered, stats, valueHeld] = await Promise.all([
     getLiveExampleData(),
     getCoveredPositions(),
     getHomeStats(),
+    getValueHeld(),
   ]);
   return (
     <div className="min-h-screen">
@@ -60,7 +62,7 @@ export default async function Home() {
             it reads off both: the position above was one of these, the tiles
             below are the protocols named. */}
         <section className="pb-12" data-anatomy="S3">
-          <CoveredStats covered={covered} stats={stats} />
+          <CoveredStats covered={covered} stats={stats} valueHeld={valueHeld} />
         </section>
 
         {/* Track lines graphic — the animated stripes bridge the counted
