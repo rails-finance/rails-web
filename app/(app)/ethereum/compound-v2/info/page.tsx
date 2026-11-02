@@ -1,45 +1,189 @@
-// About this explorer — the intro prose that lived behind the listing's (i)
-// drawer, now a page of its own on the rail's sub-nav. The copy is the swept
-// intro (charter §8a), reframed for a standalone page; the anatomy lives in ProtocolInfoShell.
+// About this explorer — Compound V2 on Ethereum, drawn on the typed template
+// (rails-ops standards/info-page-template.md). Every link is Compound's official
+// documentation (rails-ops reference/official-docs/compound-v2.md).
 
 import Link from "next/link";
-import { ProtocolInfoShell } from "@/components/shared/protocol-info-page";
+import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("compound-v2");
 
-const intro = (
-  <>
-    <p>
-      Compound V2 is the original pooled-lending protocol, running since 2019. Suppliers deposit a token into a shared
-      market and receive cTokens, receipts whose exchange rate for the token rises as borrowers pay interest. Borrowers
-      draw from those markets against their deposits in the others.
-    </p>
-    <p>
-      Governance has since set every market&apos;s reserve factor to 100%: all the interest borrowers pay goes to the
-      market&apos;s reserves, suppliers earn nothing, and the exchange rate no longer rises. Sixteen markets moved to
-      100% in one governance transaction on 8 Dec 2025 (block 23,969,453); SAI, REP, the older WBTC market and FEI got
-      there earlier.
-    </p>
-    <p>
-      Each row of the listing is one wallet&apos;s full history: what it supplied and borrowed across every market, and
-      where it stands now. A liquidation repays at most half of one debt at a time, so a liquidated account often
-      survives it; every seizure is shown leg by leg. The listing&apos;s &ldquo;Liquidated before&rdquo; filter finds
-      every wallet liquidated at least once, open or closed, and its &ldquo;Liquidated&rdquo; status the ones that have
-      since closed. Or{" "}
-      <Link href="/ethereum/compound-v2/markets" className={INLINE_LINK}>
-        see all twenty markets and how little of them is borrowed today
-      </Link>
-      .
-    </p>
-    <p>
-      Three markets have a fixed price set by governance: the oracle stores a number with no live feed behind it (the
-      legacy SAI market&apos;s says $14.43 for a token that targeted a dollar). They are flagged wherever they appear.
-    </p>
-  </>
-);
+const DOCS = "https://docs.compound.xyz/v2";
+const CTOKENS = `${DOCS}/ctokens`;
+const COMPTROLLER = `${DOCS}/comptroller`;
+
+const UL = "list-disc space-y-1 pl-5";
+
+const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
+  {
+    term: "cToken",
+    definition:
+      "A cToken is the receipt a supplier gets for a token placed in a market. Its exchange rate rises when the market's suppliers earn interest, and the receipt then redeems for more of the token.",
+    sources: [{ label: "cTokens", href: CTOKENS + "/#introduction" }],
+  },
+  {
+    term: "Exchange rate",
+    definition:
+      "The exchange rate is the amount of the market's token that one cToken can be redeemed for. It rises when the market's suppliers earn interest.",
+    sources: [{ label: "Exchange rate", href: CTOKENS + "/#exchange-rate" }],
+  },
+  {
+    term: "Comptroller",
+    definition:
+      "The Comptroller is the contract that sets the risk rules for every market. It decides how much a wallet may borrow and when a wallet can be liquidated.",
+    sources: [{ label: "Comptroller", href: COMPTROLLER + "/#introduction" }],
+  },
+  {
+    term: "Entering a market",
+    definition:
+      "A wallet enters a market to let its supply there count as collateral. A market that has not been entered adds nothing to what the wallet may borrow.",
+    sources: [{ label: "Enter markets", href: COMPTROLLER + "/#enter-markets" }],
+  },
+  {
+    term: "Collateral factor",
+    definition:
+      "The collateral factor is the share of a supplied asset's value that counts towards borrowing. Governance sets it for each market, from 0% to 90%. At 0% the asset cannot back a loan.",
+    sources: [{ label: "Collateral factor", href: COMPTROLLER + "/#collateral-factor" }],
+  },
+  {
+    term: "Account liquidity",
+    definition:
+      "Account liquidity is a wallet's borrowing room: its entered supply times each collateral factor, minus what it owes. A negative result is a shortfall, and the wallet can be liquidated.",
+    sources: [{ label: "Account liquidity", href: COMPTROLLER + "/#account-liquidity" }],
+  },
+  {
+    term: "Liquidation",
+    definition:
+      "A liquidation happens to a wallet whose debt passes its borrowing limit. A liquidator repays part of the debt and takes collateral at a discount.",
+    sources: [{ label: "Liquidate borrow", href: CTOKENS + "/#liquidate-borrow" }],
+  },
+  {
+    term: "Liquidator",
+    definition: "A liquidator is anyone who repays part of a wallet's debt in return for the liquidation incentive.",
+    sources: [{ label: "Liquidate borrow", href: CTOKENS + "/#liquidate-borrow" }],
+  },
+  {
+    term: "Close factor",
+    definition:
+      "The close factor is the share of one debt that a single liquidation may repay. That is why a liquidated wallet often keeps part of its debt.",
+    sources: [{ label: "Close factor", href: COMPTROLLER + "/#close-factor" }],
+  },
+  {
+    term: "Liquidation incentive",
+    definition:
+      "The liquidation incentive is the extra collateral a liquidator receives for repaying a wallet's debt. Part of that extra collateral goes to the reserves of the seized collateral's market.",
+    sources: [{ label: "Liquidation incentive", href: COMPTROLLER + "/#liquidation-incentive" }],
+  },
+  {
+    term: "Reserve factor",
+    definition:
+      "The reserve factor is the share of the interest borrowers pay that goes to the market's reserves. Suppliers receive the rest, so at 100% suppliers receive nothing.",
+    sources: [{ label: "Reserve factor", href: CTOKENS + "/#reserve-factor" }],
+  },
+  {
+    term: "Fixed price",
+    definition:
+      "A fixed price is a number governance stores in the price oracle for a token that has no live price feed. Governance can change it.",
+    sources: [{ label: "Price Feed", href: DOCS + "/prices/#introduction" }],
+  },
+];
+
+const views: readonly [InfoView, ...InfoView[]] = [
+  {
+    heading: "Listing",
+    body: (
+      <ul className={UL}>
+        <li>Each row is one wallet&apos;s full history in the protocol, open or closed.</li>
+        <li>A row shows what the wallet supplied, what it borrowed across every market, and where it stands now.</li>
+        <li>
+          A closed wallet that was liquidated is marked Liquidated. An open wallet that was liquidated stays open, and
+          the row shows how many liquidations it has had.
+        </li>
+      </ul>
+    ),
+  },
+  {
+    heading: "Wallet page",
+    body: (
+      <ul className={UL}>
+        <li>The top card shows the wallet&apos;s supply, borrows and account liquidity as read from the chain now.</li>
+        <li>
+          The timeline lists each event on the wallet, and shows each seizure, the collateral a liquidator takes, in a
+          liquidation leg by leg.
+        </li>
+      </ul>
+    ),
+  },
+  {
+    heading: "Markets page",
+    body: (
+      <p>
+        The markets page lists every market the Comptroller holds, with how much is supplied and borrowed in each, and
+        flags the markets with a fixed price.{" "}
+        <Link href="/ethereum/compound-v2/markets" className={INLINE_LINK}>
+          See every market
+        </Link>
+        .
+      </p>
+    ),
+  },
+];
 
 export default function InfoPage() {
-  return <ProtocolInfoShell session="compound-v2">{intro}</ProtocolInfoShell>;
+  return (
+    <ProtocolInfoPage
+      session="compound-v2"
+      name="Compound V2"
+      tracks={
+        <>
+          The Rails Compound V2 explorer shows the full history of every wallet that has supplied to or borrowed from
+          Compound V2 on Ethereum, whether still open or closed, with every liquidation it went through. It also shows{" "}
+          <Link href="/ethereum/compound-v2/markets" className={INLINE_LINK}>
+            the markets
+          </Link>{" "}
+          themselves and how much of each is borrowed.
+        </>
+      }
+      glossary={glossary}
+      howItWorks={[
+        <>
+          Compound V2 is a pooled lending protocol. A market is a pool of one token that people supply and borrow. A
+          wallet (an account address) supplies a token to a market and receives{" "}
+          <GlossaryLink term="cToken">cTokens</GlossaryLink>. One row on this page is one wallet.
+        </>,
+        <>
+          A wallet supplies a token and <GlossaryLink term="Entering a market">enters the market</GlossaryLink>, so the
+          supply counts as collateral (the assets that back a loan). It can then borrow up to its{" "}
+          <GlossaryLink term="Account liquidity">account liquidity</GlossaryLink>, its borrowing room: each entered
+          supply times its <GlossaryLink term="Collateral factor">collateral factor</GlossaryLink>, minus its debt. If
+          the room turns negative, a <GlossaryLink term="Liquidator">liquidator</GlossaryLink> steps in.
+        </>,
+        <>
+          Every market sits under one <GlossaryLink term="Comptroller">Comptroller</GlossaryLink>, which sets these
+          rules. A <GlossaryLink term="Liquidation">liquidation</GlossaryLink> repays part of the debt, capped by the{" "}
+          <GlossaryLink term="Close factor">close factor</GlossaryLink>. The liquidator then receives a{" "}
+          <GlossaryLink term="Liquidation incentive">liquidation incentive</GlossaryLink>.
+        </>,
+        <>
+          Suppliers currently earn no interest. Governance, the process by which holders of Compound&apos;s COMP token
+          vote on its rules, has set every market&apos;s{" "}
+          <GlossaryLink term="Reserve factor">reserve factor</GlossaryLink> to 100%, as the markets page reads from the
+          chain. All the interest borrowers pay goes to the reserves, which the market holds for the protocol, so the{" "}
+          <GlossaryLink term="Exchange rate">exchange rate</GlossaryLink> no longer rises. A few markets use a{" "}
+          <GlossaryLink term="Fixed price">fixed price</GlossaryLink>, and the explorer flags them wherever they appear.
+        </>,
+      ]}
+      views={views}
+      search={
+        <>
+          You can search by wallet address. Status keeps open, closed or liquidated wallets. Debt (USD) and Collateral
+          (USD) keep wallets within a size range. Supplying and Borrowing keep wallets holding a chosen token.
+          Liquidated before keeps wallets that were liquidated at least once. Transactions keeps wallets within a range
+          of transaction counts. The listing sorts by Recent activity, Debt or Collateral.
+        </>
+      }
+      docs={{ label: "Compound V2 documentation", href: DOCS + "/" }}
+    />
+  );
 }
