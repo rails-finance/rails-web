@@ -50,10 +50,9 @@ import {
 
 /** What the field takes, said on the field (Arbitrum item 31). */
 export const SEARCH_PLACEHOLDER = "Wallet address or ENS name";
-/** The placeholder where the search suggests (ui-jobs 482), and its form
- *  below sm and in the wallet panel, where the long one clips. */
+/** The placeholder where the search suggests (ui-jobs 482); with no button
+ *  beside it, it fits the field down to 360px and in the wallet panel. */
 export const SUGGEST_PLACEHOLDER = "Search a wallet, protocol or vault";
-const SUGGEST_PLACEHOLDER_SHORT = "Wallet, protocol or vault";
 /** The verb, everywhere the search appears (Arbitrum item 31). */
 export const LOOK_UP = "Look up";
 
@@ -277,7 +276,7 @@ export interface FrontDoorSearchProps {
 }
 
 /** The search as a form: field, "Look up", and the reason a value was
- *  refused; with `suggest`, the suggestions under the field. */
+ *  refused; with `suggest`, the suggestions under the field and no button. */
 export function FrontDoorSearch({
   href = walletHref,
   placeholder,
@@ -297,10 +296,7 @@ export function FrontDoorSearch({
   const [value, setValue] = useState("");
   const { lookUp, go, problem, setProblem, resolving } = useLookup(href, onDone);
   const s = useSuggestions(value, suggesting);
-  // The wallet panel is 400px wide at every size, so it takes the short form.
-  const narrow = useNarrow(suggesting) || surface === "raised";
-  const shownPlaceholder =
-    placeholder ?? (suggesting ? (narrow ? SUGGEST_PLACEHOLDER_SHORT : SUGGEST_PLACEHOLDER) : SEARCH_PLACEHOLDER);
+  const shownPlaceholder = placeholder ?? (suggesting ? SUGGEST_PLACEHOLDER : SEARCH_PLACEHOLDER);
 
   const choose = (row: Suggestion) => {
     s.close();
@@ -312,7 +308,7 @@ export function FrontDoorSearch({
     else if (row.ens) void lookUp(row.ens);
   };
 
-  // Enter and "Look up" do one thing: the highlighted row, else the top row,
+  // Enter (and "Look up" where it is drawn) does one thing: the highlighted row, else the top row,
   // else the plain lookup (which says why a value was refused).
   const commit = () => {
     const row = s.active ?? s.rows.find(isOpenable);
@@ -333,7 +329,7 @@ export function FrontDoorSearch({
     } else if (e.key === "Tab") s.close();
   };
 
-  const ready = lookable(value) != null || (suggesting && s.rows.some(isOpenable));
+  const ready = lookable(value) != null;
 
   return (
     <form
@@ -376,23 +372,32 @@ export function FrontDoorSearch({
                 : undefined
             }
           />
-          <button
-            type="submit"
-            className={
-              size === "lg"
-                ? `${HERO_BUTTON} ${ready ? HERO_BUTTON_READY : `${HERO_BUTTON_IDLE} ${SURFACE[surface].button}`}`
-                : `${NAV_BUTTON} shrink-0`
-            }
-            disabled={resolving}
-          >
-            {resolving ? "Looking up…" : LOOK_UP}
-          </button>
+          {/* With suggestions the field has no button (Miles, 3 Nov 2026): Enter
+              or a row opens; a form with one field submits on Enter alone. */}
+          {!suggesting && (
+            <button
+              type="submit"
+              className={
+                size === "lg"
+                  ? `${HERO_BUTTON} ${ready ? HERO_BUTTON_READY : `${HERO_BUTTON_IDLE} ${SURFACE[surface].button}`}`
+                  : `${NAV_BUTTON} shrink-0`
+              }
+              disabled={resolving}
+            >
+              {resolving ? "Looking up…" : LOOK_UP}
+            </button>
+          )}
         </div>
         {after}
         {suggesting && s.expanded && (
           <SuggestionList listId={listId} rows={s.rows} active={s.active} onChoose={choose} onHover={s.hover} />
         )}
       </div>
+      {suggesting && resolving && !problem && (
+        <p role="status" className="text-xs text-rb-500">
+          Looking up…
+        </p>
+      )}
       {problem && (
         <p id={problemId} role="alert" className="text-xs text-rb-500" data-wallet-lookup-problem="">
           {problem}
@@ -434,20 +439,6 @@ const readBookmarks = (): SuggestBookmark[] =>
       names: [b.customName, ...ensNames].filter((n): n is string => !!n),
     };
   });
-
-/** Below sm the placeholder is the short one. */
-function useNarrow(on: boolean): boolean {
-  const [narrow, setNarrow] = useState(false);
-  useEffect(() => {
-    if (!on) return;
-    const mq = window.matchMedia("(max-width: 639px)");
-    const set = () => setNarrow(mq.matches);
-    set();
-    mq.addEventListener("change", set);
-    return () => mq.removeEventListener("change", set);
-  }, [on]);
-  return narrow;
-}
 
 function useSuggestions(value: string, on: boolean) {
   const [index, setIndex] = useState<SearchIndex | null>(null);
