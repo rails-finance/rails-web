@@ -24,11 +24,11 @@ export function bookmarkName(session: WalletSession): string {
   return session.customName || session.ensNames[primary] || `${primary.slice(0, 6)}…${primary.slice(-4)}`;
 }
 
-export function FirstQuestion({ heading = true }: { heading?: boolean }) {
+export function FirstQuestion() {
   const node = TREE.nodes.start;
   return (
     <div className="w-full" data-anatomy="S11">
-      {heading && <p className="mb-3 text-center text-sm text-rb-500">{node.question}</p>}
+      <p className="mb-3 text-center text-sm text-rb-500">{node.question}</p>
       <div className="start-first-row grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="start-wallet-slot">
           <WalletsCard />

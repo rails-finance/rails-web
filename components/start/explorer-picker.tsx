@@ -64,7 +64,7 @@ export function ExplorerPicker({ mode }: { mode: RosterKey }) {
                     <Link
                       href={hrefFor(entry, mode)}
                       data-start-explorer={entry.id}
-                      className="flex items-center gap-2.5 rounded-lg border border-rb-200 bg-raised px-3 py-2.5 text-sm text-foreground transition-colors duration-150 hover:border-[var(--marketing)] dark:border-rb-600"
+                      className="flex items-center gap-2.5 rounded-lg border border-rb-200 bg-raised px-3 py-2.5 text-sm text-foreground transition-colors duration-150 hover:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-rb-600"
                     >
                       <ProtocolIcon id={entry.id} className="h-5 w-5 shrink-0" />
                       <span className="truncate">{entry.label}</span>

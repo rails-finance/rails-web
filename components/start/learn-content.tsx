@@ -1,20 +1,9 @@
-// /start/learn — "New to DeFi?" (G6; rails-ops ui-jobs 478): five short
-// sections, ending on the search and the way into browsing.
+// The learn leaf of the /start stack (G6; rails-ops ui-jobs 478): "New to
+// DeFi?" in five short sections, ending on the search and the way into browsing.
 
-import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
-import { SkipToSearch, StartCrumbs } from "@/components/start/start-chrome";
-import { LEARN_HREF, TREE } from "@/lib/start/tree";
-
-const DESCRIPTION = "DeFi, wallets and positions in plain words, and how Rails reads them from the chain.";
-
-export const metadata: Metadata = {
-  title: "New to DeFi",
-  description: DESCRIPTION,
-  alternates: { canonical: LEARN_HREF },
-};
 
 const H2 = "text-2xl font-semibold tracking-tight text-foreground mb-3";
 
@@ -53,15 +42,10 @@ const SECTIONS: { id: string; heading: string; body: string[] }[] = [
   },
 ];
 
-export default function LearnPage() {
-  const crumb = TREE.nodes.start.options.find((o) => o.slug === "learn");
+export function LearnContent() {
   return (
-    <div className="mx-auto max-w-3xl px-4 pt-28 pb-16 md:px-6" data-anatomy="G6" data-start-step={LEARN_HREF}>
-      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
-        <StartCrumbs crumbs={[{ label: crumb?.crumb ?? "New to DeFi", href: LEARN_HREF }]} />
-        <SkipToSearch />
-      </div>
-      <h1 className="mb-10 font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,48px)]">
+    <div className="max-w-3xl" data-anatomy="G6">
+      <h1 className="mb-10 font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,44px)]">
         New to DeFi?
       </h1>
       <div className="flex flex-col gap-10">
@@ -87,7 +71,7 @@ export default function LearnPage() {
           </div>
           <Link
             href="/start/browse"
-            className="mt-6 inline-flex items-center gap-1 text-sm text-rb-500 hover:text-[var(--marketing)]"
+            className="mt-6 inline-flex items-center gap-1 text-sm font-medium text-blue-500 hover:underline"
             data-start-browse=""
           >
             Or start browsing

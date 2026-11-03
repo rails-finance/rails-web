@@ -60,7 +60,6 @@ interface Tree {
 export const TREE = raw as unknown as Tree;
 
 export const START_HREF = "/start";
-export const LEARN_HREF = "/start/learn";
 
 /** Does `symbol` belong to the group? Matched without case. */
 export function inGroup(group: GroupKey, symbol: string): boolean {
@@ -82,58 +81,65 @@ export function vaultsHref(group: GroupKey): string {
   return `/vaults?asset=${symbols.map(encodeURIComponent).join(",")}`;
 }
 
-/** One step of the path walked so far: what the reader picked and where it lives. */
-export interface Crumb {
-  label: string;
-  href: string;
+/** One question in the stack: the node, the path it is drawn at, and the
+ *  answer given there (absent on the current question). */
+export interface Level {
+  node: StartNode;
+  base: string;
+  chosen?: string;
 }
 
-export type Step =
-  | { kind: "node"; node: StartNode }
+/** What sits under the last answered level when the path ends on a leaf. */
+export type Leaf =
   | { kind: "roster"; roster: RosterKey }
-  | { kind: "results"; results: ResultsKey; group?: GroupKey };
+  | { kind: "results"; results: ResultsKey; group?: GroupKey }
+  | { kind: "learn" };
 
 export interface Resolved {
-  step: Step;
-  /** The answers given, oldest first; the last is the current step. */
-  crumbs: Crumb[];
-  /** The page's title. */
-  title: string;
+  /** Every level from the top of the tree down; with no leaf, the last one is
+   *  the current question. */
+  levels: Level[];
+  leaf: Leaf | null;
+  /** The answers given, oldest first: the page title. */
+  answers: string[];
 }
 
-/** Where an option leads when pressed, from the path it is drawn on. */
+/** Does pressing this option leave /start? */
+export function leavesStart(option: StartOption): boolean {
+  return "vaults" in option.to;
+}
+
+/** Where an option leads when pressed, from the level it is drawn on. */
 export function optionHref(basePath: string, option: StartOption): string {
-  if ("learn" in option.to) return LEARN_HREF;
   if ("vaults" in option.to) return vaultsHref(option.to.vaults);
   return `${basePath}/${option.slug}`;
 }
 
 /** Walk a /start path (the segments after `/start`) through the tree. Null for
- *  a path the tree does not hold, which the page answers with a 404. A step
- *  whose option leaves /start (the learn page, a vault list) is not a path. */
+ *  a path the tree does not hold, which the page answers with a 404. */
 export function resolveStartPath(segments: string[]): Resolved | null {
-  let node = TREE.nodes.start;
-  let href = START_HREF;
-  const crumbs: Crumb[] = [];
+  const levels: Level[] = [{ node: TREE.nodes.start, base: START_HREF }];
+  const answers: string[] = [];
   for (let i = 0; i < segments.length; i += 1) {
-    const option = node.options.find((o) => o.slug === segments[i]);
-    if (!option) return null;
-    href = `${href}/${option.slug}`;
-    const label = option.crumb ?? option.label;
-    crumbs.push({ label, href });
+    const level = levels[levels.length - 1];
+    const option = level.node.options.find((o) => o.slug === segments[i]);
+    if (!option || leavesStart(option)) return null;
+    level.chosen = option.slug;
+    answers.push(option.crumb ?? option.label);
+    const href = `${level.base}/${option.slug}`;
     const last = i === segments.length - 1;
     const to = option.to;
     if ("node" in to) {
       const next = TREE.nodes[to.node];
       if (!next) return null;
-      node = next;
+      levels.push({ node: next, base: href });
       continue;
     }
     if (!last) return null;
-    if ("roster" in to) return { step: { kind: "roster", roster: to.roster }, crumbs, title: label };
-    if ("results" in to)
-      return { step: { kind: "results", results: to.results, group: to.group }, crumbs, title: label };
+    if ("roster" in to) return { levels, leaf: { kind: "roster", roster: to.roster }, answers };
+    if ("results" in to) return { levels, leaf: { kind: "results", results: to.results, group: to.group }, answers };
+    if ("learn" in to) return { levels, leaf: { kind: "learn" }, answers };
     return null;
   }
-  return { step: { kind: "node", node }, crumbs, title: crumbs.at(-1)?.label ?? node.title };
+  return { levels, leaf: null, answers };
 }
