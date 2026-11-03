@@ -85,6 +85,7 @@ export function AaveVaultDirectoryView({
     <ProvReceiptsScope registry={registry}>
       <VaultRoster
         initialSearch={initialSearch}
+        readTime={readBy?.blockTime}
         vaults={vaults}
         yields={yields}
         chainId={MAINNET_CHAIN_ID}

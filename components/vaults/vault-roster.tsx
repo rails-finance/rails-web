@@ -34,7 +34,7 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { BlockRef } from "@/components/shared/block-ref";
+import { isoSeconds, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import { InfoDisclosureTrigger } from "@/components/shared/info-disclosure";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
@@ -190,6 +190,7 @@ export function VaultRoster({
   head,
   initialFilters,
   initialSearch = "",
+  readTime,
 }: {
   vaults: readonly VaultSummary[];
   /** Decision 0047's figure per lowercased vault address (or `yieldKeyOf`). */
@@ -220,6 +221,9 @@ export function VaultRoster({
   /** The query string the page was served with: the preset and the sort on
    *  first paint, before the roster reads the live URL. */
   initialSearch?: string;
+  /** The read block's time, seconds (rails-server's stamp); else the loader's
+   *  read time. */
+  readTime?: number | null;
 }) {
   const [introOpen, setIntroOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(initialFilters ?? {});
@@ -417,7 +421,7 @@ export function VaultRoster({
   const intro = (
     <section className="mb-5" data-skel-section={`${skel}-denominator`}>
       {head.readAt ? (
-        <div className="flex items-start gap-1 text-[11px] text-rb-500">
+        <div className="flex items-center gap-1 text-[11px] text-rb-500">
           {head.readAt}
           <InfoDisclosureTrigger
             open={introOpen}
@@ -430,21 +434,27 @@ export function VaultRoster({
         !chainStale && (
           // The block is the anchor every receipt below names, so the line
           // carries the coverage exemption the tripwire reads.
-          <p
+          <div
             className="flex items-center gap-1 text-[11px] text-rb-500"
             data-directory-block={blockNumber}
             data-prov-exempt
           >
-            <span>
-              Read at <BlockRef block={blockNumber} chainId={chainId} />
-            </span>
+            <RosterReadStamp
+              reads={[
+                {
+                  label: "this roster",
+                  block: blockNumber,
+                  at: readTime ?? isoSeconds(vaults.find((v) => v.readAt.block === blockNumber)?.readAt.timestamp),
+                },
+              ]}
+            />
             <InfoDisclosureTrigger
               open={introOpen}
               onToggle={() => setIntroOpen((o) => !o)}
               label="about these vaults"
               ariaControls="vault-roster-intro"
             />
-          </p>
+          </div>
         )
       )}
       <div

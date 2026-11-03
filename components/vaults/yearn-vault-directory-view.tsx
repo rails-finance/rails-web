@@ -95,6 +95,7 @@ export function YearnVaultDirectoryView({
     <ProvReceiptsScope registry={registry}>
       <VaultRoster
         initialSearch={initialSearch}
+        readTime={readBy?.blockTime}
         vaults={vaults}
         yields={yields}
         chainId={CHAIN_ID}

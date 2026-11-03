@@ -79,6 +79,7 @@ export function VaultDirectoryView({
     <ProvReceiptsScope registry={registry}>
       <VaultRoster
         initialSearch={initialSearch}
+        readTime={readBy?.blockTime}
         vaults={vaults}
         yields={yields}
         chainId={MORPHO_BASE_CHAIN_ID}

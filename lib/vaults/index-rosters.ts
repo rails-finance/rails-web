@@ -39,6 +39,8 @@ export interface VaultIndexRoster {
   /** rails-server's read of `blockNumber`, when it answered every read. */
   readBy?: ServerRead;
   chainStale: boolean;
+  /** When the roster's loader took its read, ISO-8601 UTC. */
+  readAt: string;
   /** The rows the index holds from this roster. */
   count: number;
   catalog: {
