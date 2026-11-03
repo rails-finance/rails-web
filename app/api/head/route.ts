@@ -15,10 +15,10 @@
 // the newest block the index has captured, from Sieve's checkpoint, with no RPC
 // in the path. That block is what every index-served figure is stated at, so
 // the stamp says "indexed to" (`source: "index"`), and a stalled capture shows
-// as an old stamp. Arbitrum has no Sieve head: the api answers its `latest`
-// header, read on its keyless leg and kept 2 s (`source: "rpc"`, a chain head
-// rather than an index one). Sepolia reads `latest` over RPC here, and so does
-// any chain when the api does not answer.
+// as an old stamp. Arbitrum and Sepolia have no Sieve head: the api answers
+// their `latest` header, read on a keyless leg and kept 2 s on Arbitrum and
+// 12 s on Sepolia (`source: "rpc"`, a chain head rather than an index one).
+// Any chain reads `latest` over RPC here when the api does not answer.
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
@@ -43,9 +43,9 @@ interface ChainHead {
   source: "index" | "rpc";
 }
 
-/** The chains whose head the api serves: from Sieve's checkpoint, or (Arbitrum) the chain's latest header. */
-const API_HEADS: ReadonlySet<ChainId> = new Set([MAINNET_CHAIN_ID, BASE_CHAIN_ID, ARBITRUM_CHAIN_ID]);
-/** The api caches an index head for 5 s and a chain head for 2 s; asking more often re-reads its cache. */
+/** The chains whose head the api serves: from Sieve's checkpoint, or (Arbitrum, Sepolia) the chain's latest header. */
+const API_HEADS: ReadonlySet<ChainId> = new Set([MAINNET_CHAIN_ID, BASE_CHAIN_ID, ARBITRUM_CHAIN_ID, SEPOLIA_CHAIN_ID]);
+/** The api caches an index head for 5 s and a chain head for at least 2 s; asking more often re-reads its cache. */
 const INDEX_TTL_FLOOR_MS = 5_000;
 const API_CHAIN_HEAD_TTL_FLOOR_MS = 2_000;
 /** Past this the RPC read answers instead. */
