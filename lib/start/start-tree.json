@@ -1,0 +1,238 @@
+{
+  "$comment": "The guided way in (rails-ops ui-jobs 478): every question, option and destination of /start. Read through lib/start/tree.ts. A node is a question; an option leads to another node, a results page, the explorer roster, a learn page or a route. At most three questions deep from the home hero.",
+  "groups": {
+    "eth": {
+      "label": "ETH",
+      "note": "Written here: ETH, wrapped ETH and the staked and restaked forms of ETH the explorers list.",
+      "symbols": ["ETH", "WETH", "stETH", "wstETH", "rETH", "cbETH", "weETH", "ETHx", "osETH", "ezETH", "rsETH", "tETH"]
+    },
+    "btc": {
+      "label": "BTC",
+      "note": "Written here: the wrapped and bridged forms of bitcoin the explorers list.",
+      "symbols": ["BTC", "WBTC", "cbBTC", "tBTC", "LBTC", "WBTC18", "cbBTC18", "wcbBTC"]
+    },
+    "stablecoins": {
+      "label": "Stablecoins",
+      "phrase": "stablecoins",
+      "note": "Derived: every symbol lib/shared/asset-categories.ts files as Stablecoin or Yield-bearing Stable.",
+      "categories": ["stablecoin", "yield-stable"]
+    }
+  },
+  "nodes": {
+    "start": {
+      "title": "Not sure where to start?",
+      "question": "Not sure where to start?",
+      "options": [
+        {
+          "slug": "browse",
+          "label": "Just browsing?",
+          "crumb": "Just browsing",
+          "line": "Find loans, savings and liquidations across the explorers.",
+          "to": { "node": "browse" }
+        },
+        {
+          "slug": "site-down",
+          "label": "Is a protocol's site down?",
+          "crumb": "Site down",
+          "line": "Look up your position when the protocol's app won't load.",
+          "to": { "roster": "find" }
+        },
+        {
+          "slug": "learn",
+          "label": "New to DeFi?",
+          "crumb": "New to DeFi",
+          "line": "Wallets, positions and how Rails reads them, in five short parts.",
+          "to": { "learn": true }
+        }
+      ]
+    },
+    "browse": {
+      "title": "Just browsing",
+      "question": "What interests you?",
+      "options": [
+        {
+          "slug": "borrowing",
+          "label": "Borrowing",
+          "line": "Loans taken against a deposit.",
+          "to": { "node": "borrowing" }
+        },
+        {
+          "slug": "earning",
+          "label": "Earning",
+          "line": "Vaults that pay on a deposit.",
+          "to": { "node": "earning" }
+        },
+        {
+          "slug": "risk",
+          "label": "What can go wrong",
+          "line": "Positions near liquidation, and ones already liquidated.",
+          "to": { "node": "risk" }
+        },
+        {
+          "slug": "protocol",
+          "label": "A protocol I've heard of",
+          "crumb": "A protocol",
+          "line": "Pick it from the list of explorers.",
+          "to": { "roster": "browse" }
+        }
+      ]
+    },
+    "borrowing": {
+      "title": "Borrowing",
+      "question": "Borrowing against what?",
+      "options": [
+        {
+          "slug": "eth",
+          "label": "ETH",
+          "line": "ETH and its staked forms.",
+          "to": { "results": "borrow", "group": "eth" }
+        },
+        {
+          "slug": "btc",
+          "label": "BTC",
+          "line": "Wrapped and bridged bitcoin.",
+          "to": { "results": "borrow", "group": "btc" }
+        },
+        {
+          "slug": "stablecoins",
+          "label": "Stablecoins",
+          "line": "Dollar tokens and their savings forms.",
+          "to": { "results": "borrow", "group": "stablecoins" }
+        }
+      ]
+    },
+    "earning": {
+      "title": "Earning",
+      "question": "Earning in what?",
+      "options": [
+        {
+          "slug": "stablecoins",
+          "label": "Stablecoins",
+          "line": "Vaults that hold dollar tokens.",
+          "to": { "vaults": "stablecoins" }
+        },
+        {
+          "slug": "eth",
+          "label": "ETH",
+          "line": "Vaults that hold ETH or staked ETH.",
+          "to": { "vaults": "eth" }
+        },
+        {
+          "slug": "btc",
+          "label": "BTC",
+          "line": "Vaults that hold wrapped bitcoin.",
+          "to": { "vaults": "btc" }
+        }
+      ]
+    },
+    "risk": {
+      "title": "What can go wrong",
+      "question": "Which?",
+      "options": [
+        {
+          "slug": "near-liquidation",
+          "label": "Positions close to liquidation",
+          "crumb": "Close to liquidation",
+          "line": "Loans whose collateral sits nearest the line.",
+          "to": { "results": "near-liquidation" }
+        },
+        {
+          "slug": "liquidations",
+          "label": "Recent liquidations",
+          "crumb": "Liquidations",
+          "line": "Positions the protocol has liquidated.",
+          "to": { "results": "liquidated" }
+        }
+      ]
+    }
+  },
+  "rosters": {
+    "browse": {
+      "question": "Which protocol?",
+      "line": "Type to narrow the list. Each opens on that explorer."
+    },
+    "find": {
+      "question": "Which protocol?",
+      "line": "Each opens on that explorer with its wallet search ready. Rails reads the chain, so it answers while the protocol's app is down."
+    }
+  },
+  "results": {
+    "borrow": {
+      "heading": "Explorers whose loans can hold {group}",
+      "line": "Each opens on its list of positions, filtered to that collateral where the list takes a filter.",
+      "$comment": "Which explorers qualify is derived from the asset catalogs in lib/start/results.ts where a catalog states the collateral; the explorers below have no such catalog, so their answer is written here with its source."
+    },
+    "near-liquidation": {
+      "heading": "Explorers that sort positions by how close they are to liquidation",
+      "line": "Each list opens with the positions closest to liquidation first.",
+      "sorts": [
+        { "sortBy": "ratio", "sortOrder": "asc" },
+        { "sortBy": "healthFactor", "sortOrder": "asc" },
+        { "sortBy": "debtRatio", "sortOrder": "desc" }
+      ]
+    },
+    "liquidated": {
+      "heading": "Explorers that list liquidated positions",
+      "line": "Each list opens on positions that have been liquidated, latest activity first.",
+      "history": [
+        { "param": "liq", "value": "liquidated" },
+        { "param": "liq", "value": "with" },
+        { "param": "liquidations", "value": "with" }
+      ],
+      "status": "liquidated"
+    }
+  },
+  "collateral": {
+    "liquity-v1": {
+      "groups": ["eth"],
+      "note": "Liquity V1 takes one collateral, ETH. Its listing has no collateral filter."
+    },
+    "morpho": {
+      "groups": ["eth", "btc", "stablecoins"],
+      "note": "Morpho Blue markets are permissionless; the market catalog (lib/morpho/market-catalog.ts) holds markets on ETH, BTC and stablecoin collateral but names tokens by address."
+    },
+    "morpho-base": {
+      "groups": ["eth", "btc", "stablecoins"],
+      "note": "As Morpho on Ethereum; the Base catalog names tokens by address and the listing's collateral filter takes addresses."
+    },
+    "fluid": {
+      "groups": ["eth", "btc", "stablecoins"],
+      "note": "Fluid's vaults pair ETH, BTC and stablecoin collateral with a debt token; the vault roster is read from the chain, so it is written here."
+    },
+    "llamalend": {
+      "groups": ["eth", "btc"],
+      "note": "LlamaLend's crvUSD markets take ETH and BTC collateral among others; the market roster is read from the chain, so it is written here."
+    },
+    "makerdao": {
+      "groups": ["eth", "btc"],
+      "note": "MakerDAO's vault types (ilks) include ETH and WBTC ones; the ilk roster is read from the chain, so it is written here."
+    },
+    "compound": {
+      "groups": ["eth", "btc"],
+      "note": "Compound V3's Comets on Ethereum take WETH, staked ETH and WBTC as collateral; the collateral roster is read from the chain, so it is written here."
+    },
+    "compound-base": {
+      "groups": ["eth", "btc"],
+      "note": "Compound V3's Comets on Base take WETH, cbETH, wstETH and cbBTC as collateral; the roster is read from the chain, so it is written here."
+    },
+    "aave-v3-base": {
+      "groups": ["eth", "btc", "stablecoins"],
+      "note": "Aave V3 on Base lists WETH, cbETH, wstETH, cbBTC and USDC as collateral; the reserves are read from the chain, so it is written here."
+    },
+    "moonwell-base": {
+      "groups": ["eth", "btc", "stablecoins"],
+      "note": "Moonwell on Base lists WETH, cbETH, wstETH, cbBTC and USDC markets; the roster is read from the chain, so it is written here."
+    }
+  },
+  "notAnswered": {
+    "aave-v4": "Aave V4's hubs and spokes are read from the chain; which collateral each spoke takes is not stated in the code. Left out of the Borrowing pages this round.",
+    "aave-v4-base": "As Aave V4 on Ethereum.",
+    "seamless": "Seamless's reserves are read from the chain. Left out of the Borrowing pages this round.",
+    "dolomite": "Dolomite's markets are read from the chain. Left out of the Borrowing pages this round.",
+    "frankencoin": "Frankencoin positions name their collateral per position. Left out of the Borrowing pages this round.",
+    "pwn": "PWN loans take any token as collateral, per loan. Left out of the Borrowing pages this round.",
+    "alchemix": "Alchemix loans repay themselves from the deposit's yield. Left out of the Borrowing pages this round.",
+    "alchemix-base": "As Alchemix on Ethereum.",
+    "testnets": "Explorers on a testnet (Polaris on Sepolia) are left out of every results page."
+  }
+}

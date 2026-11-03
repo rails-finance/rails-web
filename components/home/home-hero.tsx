@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect } from "react";
 import { Check } from "lucide-react";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
+import { FirstQuestion } from "@/components/start/first-question";
 
 // The inline blocking script in app/layout.tsx flips `data-hero-seen` on <html>
 // before paint on hard loads, but it can't run on App Router soft navigations.
@@ -14,7 +15,8 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
  * Home hero — the site's front door (rails-ops decision 0051): the headline
  * names the place ("Destination DeFi"), the Rails line states the promise, then
  * the search (H15) landing on the wallet view, and the ticked terms
- * (independent / verifiable / read-only / no login) under it. The explorer
+ * (independent / verifiable / read-only / no login) under it, then the first
+ * question of the guided way in (S11, rails-ops ui-jobs 478). The explorer
  * directory lives further down the page
  * (ProtocolRow), and the header's "Open an explorer" menu reaches it too.
  *
@@ -86,6 +88,11 @@ export function HomeHero() {
           </span>
         ))}
       </p>
+      {/* The first question (S11, ui-jobs 478): a way in for a reader with no
+          address, under the ticks. */}
+      <div className="relative w-full max-w-5xl px-4 animate-hero-fade-up" style={{ animationDelay: "0.35s" }}>
+        <FirstQuestion />
+      </div>
     </section>
   );
 }

@@ -7,6 +7,7 @@
 // object and the toolbar reads/writes it. Holds no state of its own — the param
 // object (URL-backed) is the source of truth.
 
+import { useEffect, useRef } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { SearchBox } from "@/components/shared/front-door-search";
 import { FilterSections } from "@/components/shared/filter-bar/filter-sections";
@@ -40,6 +41,14 @@ export function ListToolbar<F extends BaseListFilters>({
   // its own empty state. A swallowed query is the same bug as a swallowed click.
   const hydrated = useHydrated();
 
+  // `?find=1` (the guided way in's "Is a protocol's site down?", ui-jobs 478)
+  // lands with the cursor in the search, once the field answers typing.
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!hydrated) return;
+    if (new URLSearchParams(window.location.search).get("find") === "1") searchRef.current?.focus();
+  }, [hydrated]);
+
   return (
     <div
       className="mb-6 flex flex-col gap-3"
@@ -56,6 +65,7 @@ export function ListToolbar<F extends BaseListFilters>({
           placeholder={searchPlaceholder}
           size="sm"
           anatomy="N1.1 H15"
+          inputRef={searchRef}
           className="flex-1 min-w-[200px]"
         />
         <FilterSections dimensions={dimensions} filters={filters} onChange={onChange} />
