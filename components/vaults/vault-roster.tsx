@@ -42,6 +42,7 @@ import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
 import { DisclosureChevron } from "@/components/shared/expand-chevron";
 import { VaultRow, type VaultRowReceipts } from "@/components/vaults/vault-row";
+import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
@@ -191,6 +192,7 @@ export function VaultRoster({
   initialFilters,
   initialSearch = "",
   readTime,
+  edgeOf,
 }: {
   vaults: readonly VaultSummary[];
   /** Decision 0047's figure per lowercased vault address (or `yieldKeyOf`). */
@@ -224,6 +226,9 @@ export function VaultRoster({
   /** The read block's time, seconds (rails-server's stamp); else the loader's
    *  read time. */
   readTime?: number | null;
+  /** The row's sidebar (C20) where the page is on no roster's route: the
+   *  index names each row's protocol and chain. */
+  edgeOf?: (v: VaultSummary) => PositionCardEdge | null;
 }) {
   const [introOpen, setIntroOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(initialFilters ?? {});
@@ -401,18 +406,28 @@ export function VaultRoster({
     </span>
   );
 
-  const row = (v: VaultSummary) => (
-    <VaultRow
-      key={v.address}
-      vault={v}
-      yieldFigure={yields[yieldKeyOf ? yieldKeyOf(v) : v.address]}
-      href={hrefOf(v)}
-      holdersHref={holdersHrefOf ? holdersHrefOf(v) : null}
-      receipts={receiptsOf(v)}
-      chain={chainOf?.(v)}
-      hooks={hooksOf?.(v)}
-    />
-  );
+  const row = (v: VaultSummary) => {
+    const drawn = (
+      <VaultRow
+        key={v.address}
+        vault={v}
+        yieldFigure={yields[yieldKeyOf ? yieldKeyOf(v) : v.address]}
+        href={hrefOf(v)}
+        holdersHref={holdersHrefOf ? holdersHrefOf(v) : null}
+        receipts={receiptsOf(v)}
+        chain={chainOf?.(v)}
+        hooks={hooksOf?.(v)}
+      />
+    );
+    const edge = edgeOf?.(v);
+    return edge ? (
+      <PositionCardEdgeContext.Provider key={v.address} value={edge}>
+        {drawn}
+      </PositionCardEdgeContext.Provider>
+    ) : (
+      drawn
+    );
+  };
 
   // On the index every roster has its own block, so a group says "at its block".
   const atBlock = blockNumber > 0 ? "at this block" : "at its roster’s block";

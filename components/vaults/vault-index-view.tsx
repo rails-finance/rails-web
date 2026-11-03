@@ -15,7 +15,9 @@ import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { isoSeconds, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import type { VaultRowReceipts } from "@/components/vaults/vault-row";
-import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { chainMeta, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { protocolForPathname } from "@/lib/shared/protocols";
+import type { PositionCardEdge } from "@/components/shared/position-card-edge";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import {
   vaultDirectoryCensusProv,
@@ -57,6 +59,21 @@ import {
 import { maplePoolCountProv, vaultIndexEmptyCountProv, vaultIndexGroupCountProv } from "@/lib/vaults/index-provenance";
 
 const n = (v: number) => v.toLocaleString("en-US");
+
+/** Each row's sidebar (C20): the roster entry whose route holds the vault's
+ *  family directory, as on that directory (Maple: its pools page). */
+const EDGES = Object.fromEntries(
+  VAULT_INDEX_PROTOCOLS.map((p) => {
+    const entry = protocolForPathname(vaultIndexRosterHref(p));
+    const edge: PositionCardEdge | null = entry
+      ? {
+          protocol: { id: entry.id, name: entry.label },
+          chain: { id: entry.chainId, name: chainMeta(entry.chainId).name },
+        }
+      : null;
+    return [p, edge];
+  }),
+) as Record<string, PositionCardEdge | null>;
 
 const FACETS: VaultRosterFacet[] = [
   {
@@ -238,6 +255,7 @@ export function VaultIndexView({
         facets={FACETS}
         assetFacet={TOKEN_FACET}
         initialFilters={assetValue ? { [TOKEN_FACET.id]: [assetValue] } : undefined}
+        edgeOf={(v) => EDGES[vaultIndexProtocol(v)] ?? null}
         hrefOf={vaultIndexHref}
         holdersHrefOf={vaultIndexHoldersHref}
         receiptsOf={receiptsOf}
