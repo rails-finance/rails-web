@@ -75,7 +75,7 @@ export function HomeHero() {
       </div>
       {/* The terms, ticked — under the search; the checks carry the separation. */}
       <p
-        className="relative mb-12 mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 px-4 text-xs font-medium uppercase tracking-[0.14em] text-rb-500 animate-hero-fade-up"
+        className="relative mx-auto mb-12 mt-4 grid w-fit grid-cols-2 items-center justify-items-start gap-x-5 gap-y-1 px-4 min-[520px]:flex min-[520px]:w-auto min-[520px]:flex-wrap min-[520px]:justify-center text-xs font-medium uppercase tracking-[0.14em] text-rb-500 animate-hero-fade-up"
         style={{ animationDelay: "0.3s" }}
       >
         {TERMS.map((term) => (
