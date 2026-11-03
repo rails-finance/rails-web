@@ -551,8 +551,8 @@ const VOCABS: Record<string, LiquityForkLiveVocab> = {
 
 /** The live-lane vocabulary for a fork explorer, keyed by protocol id. With
  *  `readBy` (a read rails-server made, lib/sources/api/liquity-fork-head.ts),
- *  each receipt's via line names the block for "@ head", when rails-server
- *  read it and the leg that answered. */
+ *  each receipt's via line names the block for "@ head" and the time it was
+ *  read (provenance-receipts-grammar.md §3: the reader stays out). */
 export function forkLiveVocab(
   protocolId: string,
   readBy?: (PositionHeadStamp & { block: number }) | null,
@@ -560,7 +560,7 @@ export function forkLiveVocab(
   const vocab = VOCABS[protocolId] ?? VOCABS.ebisu;
   if (!readBy) return vocab;
   const at = `@ block ${readBy.block.toLocaleString("en-US")}`;
-  const tail = ` · read by rails-server at ${readBy.readAt.slice(11, 19)} UTC through ${readBy.provider}`;
+  const tail = ` · read at ${readBy.readAt.slice(11, 19)} UTC`;
   const stamp = (p: Provenance): Provenance =>
     p && typeof p.via === "string" ? { ...p, via: `${p.via.replaceAll("@ head", at)}${tail}` } : p;
   return Object.fromEntries(
