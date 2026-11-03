@@ -3,7 +3,9 @@
 // rails-server's `/api/at-block/compound/{factors,rates}`, `/tx/user-op` and
 // `/dolomite/liquidation` read what the web's event-panel routes read
 // (app/api/chain/compound/{absorb-factors,rates,tx-sender},
-// app/api/chain/dolomite/liq-price) through its at-block store, keyless
+// app/api/chain/dolomite/liq-price) through its at-block store, and
+// `/tx/log-address` the log a legacy Base Compound event URL names
+// (app/(app)/base/compound-v3/[market]/event/[eventId]), keyless
 // gateways first (rails-ops decisions/0056); `/api/compound/prices-at` answers
 // Comet prices it stored at every event block (mig 372). Each answers the
 // body of the web route it replaces.
@@ -128,6 +130,22 @@ export async function serverUserOpSender(
   );
   if (!body || !(body.userOpSender === null || typeof body.userOpSender === "string")) return undefined;
   return { userOpSender: body.userOpSender };
+}
+
+/** The address of the receipt's log at that block-wide index; null where the
+ *  route cannot answer or the receipt holds no such log. */
+export async function serverLogAddress(chainId: number, tx: string, logIndex: number): Promise<string | null> {
+  const body = await ask<{ tx?: unknown; logIndex?: unknown; address?: unknown }>(
+    "tx",
+    "/api/at-block/tx/log-address",
+    {
+      chain: String(chainId),
+      tx: tx.toLowerCase(),
+      logIndex: String(logIndex),
+    },
+  );
+  if (!body || body.logIndex !== logIndex || typeof body.address !== "string") return null;
+  return body.address.toLowerCase();
 }
 
 /** Where a liquidation's two prices came from: the core's LogOraclePrice in
