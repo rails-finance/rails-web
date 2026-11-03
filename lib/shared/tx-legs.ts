@@ -28,7 +28,8 @@ export interface TxLeg {
   /** The other side of the movement, lowercase. */
   counterparty: string;
   /** Where the leg was read: a Transfer log in the receipt, or (native coin,
-   *  which leaves no log) Alchemy's asset-transfers index. */
+   *  which leaves no log) a value transfer inside the transaction, read from
+   *  the stored call tree or Alchemy's asset-transfers index. */
   source: "log" | "asset-transfers";
   /** The Transfer log's index in the block; absent on a native leg. */
   logIndex?: number;
@@ -59,7 +60,8 @@ export interface TxLegs {
    *  interest as it moves (Aave's aToken does this on every transfer), and no
    *  payment. */
   back: TxLeg[];
-  /** Upstream RPC calls this request spent: 0 on a cache hit. */
+  /** Upstream chain calls this web process spent for the request (the
+   *  at-block store's own reads are not counted): 0 on a cache hit. */
   rpcCalls: number;
   cached: boolean;
 }

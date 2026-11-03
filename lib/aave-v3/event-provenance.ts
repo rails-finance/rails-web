@@ -327,8 +327,8 @@ export const poolCallerProv = (eventType: string, coords: V3Coords, caller: stri
  *  router or settlement (lib/shared/tx-legs.ts, rails-ops TO-DO-ui-jobs 438):
  *  the other leg, read from the transaction's receipt. An ERC-20 leg is its
  *  Transfer log; the chain's native coin leaves no log, and its leg is the
- *  value transfer the transaction's internal transfers list (read through
- *  Alchemy's alchemy_getAssetTransfers).
+ *  value transfer the transaction's internal transfers list (read from the
+ *  stored call tree, or Alchemy's alchemy_getAssetTransfers).
  *  The `paired` leaf states the pairing as Rails' inference. */
 export const saleLegProv = (sale: RouterSale, sentSymbol: string, coords: V3Coords): Provenance => {
   const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
