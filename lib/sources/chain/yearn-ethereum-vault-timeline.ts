@@ -71,8 +71,16 @@
 // `YEARN_VAULT_TAIL_VERSION` beside the other two; adding the constant before a
 // fixture needs it would be a version number for a store nothing writes to.
 //
+// ── WHERE THE READS GO ───────────────────────────────────────────────────────
+// The four sweeps are asked of rails-server's `/api/at-block/vault/holder-logs`
+// (family `yearn-v3`, `createdBlock` to the page's block), which answers them
+// from its at-block store and halves its own reads; `balanceOf` goes through
+// the vault reads route and the block's timestamp through the blocks route.
+// Where a route cannot answer, the chain is read as below. The re-fetch after a
+// failed gate reads the chain.
+//
 // ── WHEN THE LANE REFUSES A SWEEP ON RESPONSE SIZE ───────────────────────────
-// Chain 1's logs lane refuses a one-direction `eth_getLogs` past 10,000 logs. A
+// On the chain path, chain 1's logs lane refuses a one-direction `eth_getLogs` past 10,000 logs. A
 // refusal there is not an unread history: it is evidence the history is LARGE.
 // So each sweep catches to null, and a refused TRANSFER direction falls back to
 // the chunked counting walk in ./vault-sweep-walk.ts, shared with the other two
@@ -84,7 +92,7 @@
 // about size.
 
 import { parseAbi, type PublicClient } from "viem";
-import { chainBatchClient, chainLogsClient } from "./rpc";
+import { chainLogsClient } from "./rpc";
 import {
   ERC4626_TOPIC,
   addressOfTopic as addrOf,
@@ -99,7 +107,9 @@ import {
   type RawLog,
 } from "./vault-holder-logs";
 import { countRefusedSweeps } from "./vault-sweep-walk";
-import { emptyBlockReads, readBlockWave } from "./vault-block-reads";
+import { emptyBlockReads, pinnedBlockTimestamp, readBlockWave } from "./vault-block-reads";
+import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
+import { fetchHolderLogs } from "@/lib/sources/api/vault-holder-logs-client";
 import { chainMeta } from "@/lib/shared/chains";
 import { YEARN_CHAIN_ID } from "./yearn-ethereum-vault-directory";
 import {
@@ -185,7 +195,9 @@ export async function loadYearnEthereumVaultTimeline(
 
   try {
     const logs = chainLogsClient(YEARN_CHAIN_ID);
-    const state = chainBatchClient(YEARN_CHAIN_ID);
+    // `balanceOf` at the page's block through rails-server's vault reads, the
+    // chain where they cannot answer (head-reads-client.ts).
+    const state = vaultHeadClient(YEARN_CHAIN_ID);
 
     const sweep: LogSweep = (topics) =>
       logs.request({
@@ -200,7 +212,7 @@ export async function loadYearnEthereumVaultTimeline(
      *  to the outer catch and make every refusal an unread history, which is
      *  what the counting walk below exists to stop. Null is "this direction did
      *  not come back", never "this direction is empty". */
-    const readAll = async () => {
+    const readChain = async () => {
       const [outLogs, inLogs, depositLogs, withdrawLogs] = await Promise.all([
         sweep([ERC4626_TOPIC.transfer, topicOf(who), null]).catch(() => null),
         sweep([ERC4626_TOPIC.transfer, null, topicOf(who)]).catch(() => null),
@@ -210,6 +222,25 @@ export async function loadYearnEthereumVaultTimeline(
         sweep([ERC4626_TOPIC.withdraw, null, null, topicOf(who)]).catch(() => null),
       ]);
       return { outLogs, inLogs, depositLogs, withdrawLogs };
+    };
+    /** The same four sweeps from rails-server's at-block store, the chain where
+     *  the route cannot answer. */
+    const readAll = async () => {
+      const served = await fetchHolderLogs({
+        chainId: YEARN_CHAIN_ID,
+        vault: address,
+        holder: who,
+        family: "yearn-v3",
+        from,
+        to: opts.blockNumber,
+      });
+      if (!served) return readChain();
+      return {
+        outLogs: served.transferOut,
+        inLogs: served.transferIn,
+        depositLogs: served.deposit,
+        withdrawLogs: served.withdraw,
+      };
     };
 
     let { outLogs, inLogs, depositLogs, withdrawLogs } = await readAll();
@@ -265,13 +296,12 @@ export async function loadYearnEthereumVaultTimeline(
     let refetchDiffered = false;
 
     if (replayed !== onChain) {
-      // ONE re-fetch, on the same lane, after a pause — never a third attempt,
-      // never a silent hop to another lane, never a narrowed range. If the
-      // second answer differs in COUNT that fact is itself the finding, and it
-      // is stated on the page.
+      // ONE re-fetch, after a pause and from the chain — never a third
+      // attempt, never a narrowed range. If the second answer differs in COUNT
+      // that fact is itself the finding, and it is stated on the page.
       refetched = true;
       await new Promise((r) => setTimeout(r, 250));
-      const again = await readAll();
+      const again = await readChain();
       // A SECOND READING IS TAKEN WHOLE OR NOT AT ALL. One of its sweeps
       // refusing leaves the first reading standing — the gate then states the
       // mismatch it already found, which is a fact, rather than one computed
@@ -302,7 +332,7 @@ export async function loadYearnEthereumVaultTimeline(
       toBlock: opts.blockNumber,
     };
 
-    const blockTimestamp = Number((await state.getBlock({ blockNumber })).timestamp);
+    const blockTimestamp = await pinnedBlockTimestamp(YEARN_CHAIN_ID, blockNumber, state);
     const base: VaultHolderTimeline = {
       vault: address,
       holder: who,
