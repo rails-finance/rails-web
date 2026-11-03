@@ -130,7 +130,9 @@ const stampPlacement = await page.evaluate(() => {
   const identity = document.querySelector("[data-rail-identity]");
   // The stamp is a button that reads "3 min", the block number in
   // its peek, so it is found by its accessible name.
-  const stamp = document.querySelector("button[aria-label^='Chain head']");
+  const stamp = document.querySelector(
+    "button[aria-label^='Chain head'], button[aria-label^='Indexed to block']",
+  );
   if (!identity) return "no identity link in rail header";
   if (!stamp) return "no recency stamp in rail header";
   // The stamp's peek (RevealTip) wraps the button; the row holds the wrapper.
