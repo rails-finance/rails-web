@@ -1,6 +1,7 @@
 import { createPublicClient, fallback, http, getAddress } from "viem";
 import { mainnet } from "viem/chains";
 import { normalize } from "viem/ens";
+import { serverEnsNames, serverNameAddress } from "@/lib/sources/api/names-at-block";
 
 /**
  * Forward ENS resolution (name → address) for the listing pages' wallet
@@ -13,8 +14,11 @@ import { normalize } from "viem/ens";
  * primary name differs from what was typed. Resolving the name to an address
  * here and filtering by address is reliable for any wallet on chain.
  *
- * RPC: prefers `ENS_RPC_URL`, then falls back across public endpoints. ENS
- * lookups go through mainnet's Universal Resolver, which all of these support.
+ * Source: rails-server's `/api/at-block/names` first; its answer is used only
+ * where it found one (lib/sources/api/names-at-block.ts). Every other result,
+ * and a route that cannot answer, reads the chain as below: `ENS_RPC_URL`, then
+ * public endpoints, through mainnet's Universal Resolver. The caches sit in
+ * front of both.
  */
 const transports = [
   process.env.ENS_RPC_URL,
@@ -74,7 +78,11 @@ export async function lookUpEnsAddress(name: string): Promise<{ address: string 
     return { address: null, failed: false };
   }
 
-  let address: string | null;
+  let address: string | null = await serverNameAddress(1, normalized);
+  if (address) {
+    cache.set(key, { address, expires: Date.now() + HIT_TTL_MS });
+    return { address, failed: false };
+  }
   try {
     const resolved = await client.getEnsAddress({ name: normalized });
     address = resolved ? getAddress(resolved) : null;
@@ -95,18 +103,22 @@ export async function lookUpEnsAddress(name: string): Promise<{ address: string 
 // The rails-server backend leaves `ownerEns` null (it only reverse-resolves the
 // wallets it has indexed); the owner pills fill it web-side. viem's getEnsName
 // goes through the mainnet Universal Resolver, which round-trips the name back to
-// the address, so a name only renders when it forward-resolves to the same owner.
-// Same TTL cache + fallback client as forward resolution; the `batch.multicall`
+// the address, so a name only renders when it forward-resolves to the same owner;
+// rails-server's at-block names route checks the same round trip and is asked
+// first. Same TTL cache + fallback client as forward resolution; the `batch.multicall`
 // on the client coalesces a page of concurrent lookups into few RPC calls.
 
 const nameCache = new Map<string, { name: string | null; expires: number }>();
 const ADDR_RE = /^0x[0-9a-fA-F]{40}$/;
 
+function cachedName(key: string): { name: string | null } | null {
+  const cached = nameCache.get(key);
+  return cached && cached.expires > Date.now() ? { name: cached.name } : null;
+}
+
+/** The chain read for one address the server did not find. */
 async function resolveOne(addr: string): Promise<string | null> {
   const key = addr.toLowerCase();
-  const cached = nameCache.get(key);
-  if (cached && cached.expires > Date.now()) return cached.name;
-
   let name: string | null = null;
   try {
     name = await client.getEnsName({ address: getAddress(addr) });
@@ -125,13 +137,30 @@ async function resolveOne(addr: string): Promise<string | null> {
  * Reverse-resolve a batch of addresses to their primary ENS names. Returns a
  * map keyed by the lower-cased input address; a value is the `.eth` name or
  * null (no primary name, malformed input, or RPC failure). Never throws.
- * Deduplicates and skips malformed inputs before hitting RPC; resolved names
- * are cached in-process so repeat pages don't re-resolve.
+ * Deduplicates and skips malformed inputs; the uncached addresses go to
+ * rails-server in one request per 50, and the chain is read only for those it
+ * did not find. Names are cached in-process so repeat pages don't re-resolve.
  */
 export async function resolveEnsNames(addresses: string[]): Promise<Record<string, string | null>> {
   const unique = Array.from(
     new Set(addresses.filter((a) => ADDR_RE.test(a.trim())).map((a) => a.trim().toLowerCase())),
   );
-  const entries = await Promise.all(unique.map(async (addr) => [addr, await resolveOne(addr)] as const));
-  return Object.fromEntries(entries);
+  const out: Record<string, string | null> = {};
+  const ask: string[] = [];
+  for (const addr of unique) {
+    const hit = cachedName(addr);
+    if (hit) out[addr] = hit.name;
+    else ask.push(addr);
+  }
+  const served = ask.length ? await serverEnsNames(ask) : new Map<string, string>();
+  await Promise.all(
+    ask.map(async (addr) => {
+      const name = served.get(addr);
+      if (name) {
+        nameCache.set(addr, { name, expires: Date.now() + HIT_TTL_MS });
+        out[addr] = name;
+      } else out[addr] = await resolveOne(addr);
+    }),
+  );
+  return out;
 }
