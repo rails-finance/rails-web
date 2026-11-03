@@ -27,7 +27,6 @@
 import Link from "next/link";
 
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
-import { StartHereLink } from "@/components/nav/start-here-link";
 import { SearchLauncher } from "@/components/shared/front-door-search";
 
 /** The Rails glyph, linking home — the same mark and the same link the top bar
@@ -93,7 +92,6 @@ export function BrandRail() {
         <div className="flex flex-col items-center gap-3">
           <RailsGlyph />
           <SearchLauncher placement="rail" />
-          <StartHereLink placement="rail" />
         </div>
         {/* Toggle, then the pill flush to the left edge. `w-full` is what
             lets the pill sit at x=0 while the toggle stays centred in the

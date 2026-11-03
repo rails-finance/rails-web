@@ -1367,26 +1367,6 @@ label[for] {
   opacity: 1;
   animation: none;
 }
-/* The hero's first question (S11, ui-jobs 478): the wallets card's slot is
-   drawn only while <html> carries data-has-bookmarks (set before paint by the
-   inline script in app/layout.tsx), and the row takes a fourth column for it.
-   Unlayered, so it wins over the row's grid utilities. */
-.start-wallet-slot {
-  display: none;
-}
-[data-has-bookmarks="1"] .start-wallet-slot {
-  display: flex;
-}
-@media (min-width: 640px) {
-  [data-has-bookmarks="1"] .start-first-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1024px) {
-  [data-has-bookmarks="1"] .start-first-row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
 /* Track lines gate is its own flag — session-scoped (see TrackLines), so the
    draw-on replays on the first load of each visit while the hero fade stays
    once-per-browser. */

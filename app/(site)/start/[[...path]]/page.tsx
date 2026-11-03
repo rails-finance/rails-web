@@ -1,7 +1,7 @@
 // /start and every step under it (rails-ops ui-jobs 478). The question stack
 // is the layout's (app/(site)/start/layout.tsx); this page names the step's
 // title, answers an unknown path with a 404, and at a leaf (results, the
-// explorer roster, the learn page) draws its content under the stack.
+// explorer roster) draws its content under the stack.
 
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -10,7 +10,6 @@ import { notFound } from "next/navigation";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { ExplorerPicker } from "@/components/start/explorer-picker";
-import { LearnContent } from "@/components/start/learn-content";
 import { CHAINS } from "@/lib/shared/chains";
 import { resultRows } from "@/lib/start/results";
 import { TREE, groupPhrase, resolveStartPath, type GroupKey, type Leaf, type ResultsKey } from "@/lib/start/tree";
@@ -30,8 +29,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const r = resolveStartPath(path);
   if (!r) return {};
   return {
-    // Absolute: the site template would print "Rails | Rails Pathfinder".
-    title: { absolute: r.answers.length ? `Rails Pathfinder · ${r.answers.join(" › ")}` : "Rails Pathfinder" },
+    // Absolute: the site template would print "Rails | Start Here".
+    title: { absolute: r.answers.length ? `Start Here · ${r.answers.join(" › ")}` : "Start Here" },
     description: r.leaf ? leafHeading(r.leaf) : r.levels[r.levels.length - 1].node.question,
     alternates: { canonical: `/start${path.length ? `/${path.join("/")}` : ""}` },
   };
@@ -39,7 +38,6 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 function leafHeading(leaf: Leaf): string {
   if (leaf.kind === "roster") return TREE.rosters[leaf.roster].question;
-  if (leaf.kind === "learn") return "New to DeFi?";
   return TREE.results[leaf.results].heading.replace("{group}", leaf.group ? groupPhrase(leaf.group) : "");
 }
 
@@ -52,7 +50,6 @@ export default async function StartPage({ params }: Params) {
 }
 
 function LeafContent({ leaf }: { leaf: Leaf }) {
-  if (leaf.kind === "learn") return <LearnContent />;
   if (leaf.kind === "results") return <Results results={leaf.results} group={leaf.group} />;
   return (
     <>

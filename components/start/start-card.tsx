@@ -1,27 +1,21 @@
 // The question card of the guided way in (rails-ops ui-jobs 478): a title, one
-// plain line and an arrow, the whole card one link. The home hero's first
-// question (S11) and the current question of the /start stack (G1) draw it.
+// plain line and an arrow, the whole card one link, on the current question
+// of the /start stack (G1).
 //
 // Its hover and arrow follow what a press does (color-grammar.md §4c): on
 // /start an answer that opens the next question in the stack is teal with a
 // down arrow centred at its foot (`answer`), one that lands on another page
-// takes NAV_BUTTON's blue border and a blue right arrow (`page`). The home
-// hero keeps the marketing blue and its right arrow (`hero`).
+// takes NAV_BUTTON's blue border and a blue right arrow (`page`).
 
 import Link from "next/link";
 import { ArrowDown, ArrowRight } from "lucide-react";
 
-/** The card's frame, shared with the wallets card (S11.1) and the stack's answered cards. */
-export const START_CARD_FRAME =
+const START_CARD_FRAME =
   "rounded-xl border border-rb-200 bg-raised text-left dark:border-rb-600 transition-colors duration-150";
 
-export type StartCardTone = "hero" | "answer" | "page";
+type StartCardTone = "answer" | "page";
 
 const TONE: Record<StartCardTone, { card: string; arrow: string }> = {
-  hero: {
-    card: "hover:border-[var(--marketing)] focus-visible:border-[var(--marketing)] focus-visible:outline-none",
-    arrow: "self-end text-rb-500 group-hover:translate-x-0.5 group-hover:text-[var(--marketing)]",
-  },
   answer: {
     card: "hover:border-teal-600 dark:hover:border-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 dark:focus-visible:ring-teal-400",
     arrow:
@@ -37,12 +31,12 @@ export function StartCard({
   href,
   title,
   line,
-  tone = "hero",
+  tone,
 }: {
   href: string;
   title: string;
   line: string;
-  tone?: StartCardTone;
+  tone: StartCardTone;
 }) {
   const t = TONE[tone];
   return (

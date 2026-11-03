@@ -22,6 +22,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowDown } from "lucide-react";
 import { StartCard, startGridCols } from "@/components/start/start-card";
+import { LearnContent } from "@/components/start/learn-content";
 import { START_HREF, leavesStart, optionHref, resolveStartPath, type Level } from "@/lib/start/tree";
 
 const TEAL_TEXT = "text-teal-600 dark:text-teal-400";
@@ -70,9 +71,24 @@ function useScrollToCurrent(path: string) {
 }
 
 function CurrentLevel({ level }: { level: Level }) {
+  const { intro } = level;
+  return (
+    <>
+      {/* An intro takes the scroll target, so the reader lands on it first. */}
+      {intro === "learn" && (
+        <div className="mb-14 scroll-mt-24" data-start-current="">
+          <LearnContent />
+        </div>
+      )}
+      <CurrentQuestion level={level} target={!intro} />
+    </>
+  );
+}
+
+function CurrentQuestion({ level, target }: { level: Level; target: boolean }) {
   const { node } = level;
   return (
-    <section className="scroll-mt-24" data-start-current="" data-start-level={level.base}>
+    <section className="scroll-mt-24" data-start-current={target ? "" : undefined} data-start-level={level.base}>
       <h2 className="mb-8 font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,44px)]">
         {node.question}
       </h2>

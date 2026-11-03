@@ -182,12 +182,11 @@ export default function RootLayout({
             visits without a hydration flicker. The hero flag persists across
             tabs/sessions via localStorage (plays once per browser); the track
             lines flag is sessionStorage (replays on the first load of each
-            visit, static within the session). The bookmarks flag reserves the
-            home hero's wallets card slot (S11.1) before paint. */}
+            visit, static within the session). */}
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var d=document.documentElement.dataset;if(localStorage.getItem('rails-hero-seen'))d.heroSeen='1';if(sessionStorage.getItem('rails-tracks-seen'))d.tracksSeen='1';var b=localStorage.getItem('rails-bookmarks');if(b&&b.length>2)d.hasBookmarks='1'}catch(e){}})()",
+              "(function(){try{var d=document.documentElement.dataset;if(localStorage.getItem('rails-hero-seen'))d.heroSeen='1';if(sessionStorage.getItem('rails-tracks-seen'))d.tracksSeen='1'}catch(e){}})()",
           }}
         />
         <StructuredData />

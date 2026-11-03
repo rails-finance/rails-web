@@ -1,5 +1,5 @@
 {
-  "$comment": "The guided way in (rails-ops ui-jobs 478): every question, option and destination of /start. Read through lib/start/tree.ts. A node is a question; an option leads to another node, a results page, the explorer roster, a learn page or a route. At most three questions deep from the home hero.",
+  "$comment": "The guided way in (rails-ops ui-jobs 478): every question, option and destination of /start. Read through lib/start/tree.ts. A node is a question; an option leads to another node (with an intro drawn above it while it is the current question), a results page, the explorer roster or a route. The browse node is reached from both Just browsing? and New to DeFi?. At most three questions deep from the home hero.",
   "groups": {
     "eth": {
       "label": "ETH",
@@ -42,7 +42,7 @@
           "label": "New to DeFi?",
           "crumb": "New to DeFi",
           "line": "Wallets, positions and how Rails reads them, in five short parts.",
-          "to": { "learn": true }
+          "to": { "node": "browse", "intro": "learn" }
         }
       ]
     },

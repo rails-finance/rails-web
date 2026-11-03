@@ -1,8 +1,6 @@
-// The learn leaf of the /start stack (G6; rails-ops ui-jobs 478): "New to
-// DeFi?" in four short sections, then the stack goes on with the browse question.
-
-import { StartCard, startGridCols } from "@/components/start/start-card";
-import { TREE, optionHref } from "@/lib/start/tree";
+// The learn intro of the /start stack (G6; rails-ops ui-jobs 478): "New to
+// DeFi?" in four short sections, drawn above the browse question while it is
+// the current level under /start/learn, and left out once it is answered.
 
 const H2 = "text-2xl font-semibold tracking-tight text-foreground mb-3";
 
@@ -61,20 +59,6 @@ export function LearnContent() {
           </section>
         ))}
       </div>
-      {/* The stack goes on: the browse question, its answers opening under /start/browse. */}
-      <section className="mt-14" aria-labelledby="learn-next" data-start-learn-next="">
-        <h2
-          id="learn-next"
-          className="mb-8 font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,44px)]"
-        >
-          {TREE.nodes.browse.question}
-        </h2>
-        <div className={`grid grid-cols-1 gap-3 ${startGridCols(TREE.nodes.browse.options.length)}`}>
-          {TREE.nodes.browse.options.map((o) => (
-            <StartCard key={o.slug} href={optionHref("/start/browse", o)} title={o.label} line={o.line} tone="answer" />
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

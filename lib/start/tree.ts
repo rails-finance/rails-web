@@ -9,12 +9,14 @@ export type GroupKey = "eth" | "btc" | "stablecoins";
 export type ResultsKey = "borrow" | "near-liquidation" | "liquidated";
 export type RosterKey = "browse" | "find";
 
+/** Content drawn above a node while it is the current question. */
+export type Intro = "learn";
+
 export type Destination =
-  | { node: string }
+  | { node: string; intro?: Intro }
   | { results: ResultsKey; group?: GroupKey }
   | { roster: RosterKey }
-  | { vaults: GroupKey }
-  | { learn: true };
+  | { vaults: GroupKey };
 
 export interface StartOption {
   slug: string;
@@ -87,13 +89,13 @@ export interface Level {
   node: StartNode;
   base: string;
   chosen?: string;
+  /** Drawn above the question while it is current (the learn sections under
+   *  "New to DeFi?"); left out once the level is answered. */
+  intro?: Intro;
 }
 
 /** What sits under the last answered level when the path ends on a leaf. */
-export type Leaf =
-  | { kind: "roster"; roster: RosterKey }
-  | { kind: "results"; results: ResultsKey; group?: GroupKey }
-  | { kind: "learn" };
+export type Leaf = { kind: "roster"; roster: RosterKey } | { kind: "results"; results: ResultsKey; group?: GroupKey };
 
 export interface Resolved {
   /** Every level from the top of the tree down; with no leaf, the last one is
@@ -132,13 +134,12 @@ export function resolveStartPath(segments: string[]): Resolved | null {
     if ("node" in to) {
       const next = TREE.nodes[to.node];
       if (!next) return null;
-      levels.push({ node: next, base: href });
+      levels.push({ node: next, base: href, intro: to.intro });
       continue;
     }
     if (!last) return null;
     if ("roster" in to) return { levels, leaf: { kind: "roster", roster: to.roster }, answers };
     if ("results" in to) return { levels, leaf: { kind: "results", results: to.results, group: to.group }, answers };
-    if ("learn" in to) return { levels, leaf: { kind: "learn" }, answers };
     return null;
   }
   return { levels, leaf: null, answers };
