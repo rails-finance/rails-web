@@ -5,6 +5,7 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { notFound } from "next/navigation";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
@@ -16,7 +17,8 @@ import { TREE, groupPhrase, resolveStartPath, type GroupKey, type Leaf, type Res
 
 type Params = { params: Promise<{ path?: string[] }> };
 
-const H1 = "mb-2 font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,44px)]";
+const QUESTION =
+  "mb-2 font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,44px)]";
 
 /** A link to another page resting on a card: NAV_BUTTON's blue border on hover
  *  (color-grammar.md §4a). */
@@ -28,7 +30,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const r = resolveStartPath(path);
   if (!r) return {};
   return {
-    title: r.answers.join(" › ") || "Start here",
+    // Absolute: the site template would print "Rails | Rails Pathfinder".
+    title: { absolute: r.answers.length ? `Rails Pathfinder · ${r.answers.join(" › ")}` : "Rails Pathfinder" },
     description: r.leaf ? leafHeading(r.leaf) : r.levels[r.levels.length - 1].node.question,
     alternates: { canonical: `/start${path.length ? `/${path.join("/")}` : ""}` },
   };
@@ -53,7 +56,7 @@ function LeafContent({ leaf }: { leaf: Leaf }) {
   if (leaf.kind === "results") return <Results results={leaf.results} group={leaf.group} />;
   return (
     <>
-      <h1 className={H1}>{TREE.rosters[leaf.roster].question}</h1>
+      <h2 className={QUESTION}>{TREE.rosters[leaf.roster].question}</h2>
       <p className="mb-8 max-w-2xl text-lg text-rb-500">{TREE.rosters[leaf.roster].line}</p>
       <ExplorerPicker mode={leaf.roster} />
     </>
@@ -64,7 +67,7 @@ function Results({ results, group }: { results: ResultsKey; group?: GroupKey }) 
   const rows = resultRows(results, group);
   return (
     <div data-anatomy="G5" data-start-results={results}>
-      <h1 className={H1}>{leafHeading({ kind: "results", results, group })}</h1>
+      <h2 className={QUESTION}>{leafHeading({ kind: "results", results, group })}</h2>
       <p className="mb-8 max-w-2xl text-lg text-rb-500">{TREE.results[results].line}</p>
       <ul className="flex flex-col gap-2">
         {rows.map((row) => (
@@ -90,6 +93,7 @@ function Results({ results, group }: { results: ResultsKey; group?: GroupKey }) 
                   </span>
                 )}
               </span>
+              <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-500" aria-hidden="true" />
             </Link>
           </li>
         ))}

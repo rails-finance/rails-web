@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { ChainSwitcher } from "@/components/nav/chain-switcher";
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
+import { StartHereLink } from "@/components/nav/start-here-link";
 import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
 
 /** Marketing routes — everything under app/(site). Group names don't appear in
@@ -12,7 +13,7 @@ import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door
  *  restated here by prefix. Keep in sync with app/(site)/. (The old top-level
  *  chain directories are gone — the per-chain coverage pages are the
  *  directory now, and /coverage's prefix already covers them.) */
-const SITE_PREFIXES = ["/about", "/blog", "/coverage", "/privacy", "/pulse", "/terms"];
+const SITE_PREFIXES = ["/about", "/blog", "/coverage", "/privacy", "/pulse", "/start", "/terms"];
 
 function isSiteRoute(pathname: string | null) {
   if (!pathname) return false;
@@ -124,6 +125,9 @@ export function HeaderBar() {
               the search. It opens the wallet panel, where the bookmarks are
               listed; the separate bookmarks button (H11) went on 1 Nov 2026.
               A sheet from the top on a phone. */}
+          {/* "Start here" (H19, ui-jobs 478): the way to /start; the words go
+              below 640px on marketing pages, where "Open an explorer" takes the room. */}
+          <StartHereLink placement="header" compact={isMarketing} />
           {!isHome && <SearchLauncher placement="header" />}
           <HeaderThemeToggle />
           <ChainSwitcher variant={isMarketing ? "cta" : "chain"} />

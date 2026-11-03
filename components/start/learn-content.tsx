@@ -1,9 +1,8 @@
 // The learn leaf of the /start stack (G6; rails-ops ui-jobs 478): "New to
-// DeFi?" in five short sections, ending on the search and the way into browsing.
+// DeFi?" in four short sections, then the stack goes on with the browse question.
 
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-import { FrontDoorSearch } from "@/components/shared/front-door-search";
+import { StartCard, startGridCols } from "@/components/start/start-card";
+import { TREE, optionHref } from "@/lib/start/tree";
 
 const H2 = "text-2xl font-semibold tracking-tight text-foreground mb-3";
 
@@ -44,16 +43,16 @@ const SECTIONS: { id: string; heading: string; body: string[] }[] = [
 
 export function LearnContent() {
   return (
-    <div className="max-w-3xl" data-anatomy="G6">
-      <h1 className="mb-10 font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,44px)]">
+    <div data-anatomy="G6">
+      <h2 className="mb-10 font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,44px)]">
         New to DeFi?
-      </h1>
-      <div className="flex flex-col gap-10">
+      </h2>
+      <div className="flex max-w-3xl flex-col gap-10">
         {SECTIONS.map((s) => (
           <section key={s.id} aria-labelledby={`learn-${s.id}`}>
-            <h2 id={`learn-${s.id}`} className={H2}>
+            <h3 id={`learn-${s.id}`} className={H2}>
               {s.heading}
-            </h2>
+            </h3>
             {s.body.map((p, i) => (
               <p key={i} className={`body-text ${i > 0 ? "mt-3" : ""}`}>
                 {p}
@@ -61,24 +60,21 @@ export function LearnContent() {
             ))}
           </section>
         ))}
-        <section aria-labelledby="learn-try">
-          <h2 id="learn-try" className={H2}>
-            Try it
-          </h2>
-          <p className="body-text mb-4">Type a wallet address or an ENS name, or the name of a protocol.</p>
-          <div className="relative z-20">
-            <FrontDoorSearch size="lg" suggest />
-          </div>
-          <Link
-            href="/start/browse"
-            className="mt-6 inline-flex items-center gap-1 text-sm font-medium text-blue-500 hover:underline"
-            data-start-browse=""
-          >
-            Or start browsing
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
-        </section>
       </div>
+      {/* The stack goes on: the browse question, its answers opening under /start/browse. */}
+      <section className="mt-14" aria-labelledby="learn-next" data-start-learn-next="">
+        <h2
+          id="learn-next"
+          className="mb-8 font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,44px)]"
+        >
+          {TREE.nodes.browse.question}
+        </h2>
+        <div className={`grid grid-cols-1 gap-3 ${startGridCols(TREE.nodes.browse.options.length)}`}>
+          {TREE.nodes.browse.options.map((o) => (
+            <StartCard key={o.slug} href={optionHref("/start/browse", o)} title={o.label} line={o.line} tone="answer" />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

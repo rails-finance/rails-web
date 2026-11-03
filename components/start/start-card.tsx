@@ -2,13 +2,14 @@
 // plain line and an arrow, the whole card one link. The home hero's first
 // question (S11) and the current question of the /start stack (G1) draw it.
 //
-// Its hover follows what a press does (color-grammar.md §4c): on /start an
-// answer that opens the next question in the stack is teal (`answer`), one
-// that lands on another page takes NAV_BUTTON's blue border (`page`). The home
-// hero keeps the marketing blue (`hero`).
+// Its hover and arrow follow what a press does (color-grammar.md §4c): on
+// /start an answer that opens the next question in the stack is teal with a
+// down arrow centred at its foot (`answer`), one that lands on another page
+// takes NAV_BUTTON's blue border and a blue right arrow (`page`). The home
+// hero keeps the marketing blue and its right arrow (`hero`).
 
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowDown, ArrowRight } from "lucide-react";
 
 /** The card's frame, shared with the wallets card (S11.1) and the stack's answered cards. */
 export const START_CARD_FRAME =
@@ -19,15 +20,16 @@ export type StartCardTone = "hero" | "answer" | "page";
 const TONE: Record<StartCardTone, { card: string; arrow: string }> = {
   hero: {
     card: "hover:border-[var(--marketing)] focus-visible:border-[var(--marketing)] focus-visible:outline-none",
-    arrow: "group-hover:text-[var(--marketing)]",
+    arrow: "self-end text-rb-500 group-hover:translate-x-0.5 group-hover:text-[var(--marketing)]",
   },
   answer: {
     card: "hover:border-teal-600 dark:hover:border-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 dark:focus-visible:ring-teal-400",
-    arrow: "group-hover:text-teal-600 dark:group-hover:text-teal-400",
+    arrow:
+      "self-center text-rb-500 group-hover:translate-y-0.5 group-hover:text-teal-600 group-focus-visible:text-teal-600 dark:group-hover:text-teal-400 dark:group-focus-visible:text-teal-400",
   },
   page: {
     card: "hover:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
-    arrow: "group-hover:text-blue-500",
+    arrow: "self-end text-blue-500 group-hover:translate-x-0.5",
   },
 };
 
@@ -53,10 +55,11 @@ export function StartCard({
     >
       <span className="text-base font-semibold text-foreground">{title}</span>
       <span className="mt-1 text-sm text-rb-500">{line}</span>
-      <ArrowRight
-        className={`mt-auto h-4 w-4 self-end text-rb-500 transition-transform duration-150 group-hover:translate-x-0.5 ${t.arrow}`}
-        aria-hidden="true"
-      />
+      {tone === "answer" ? (
+        <ArrowDown className={`mt-auto h-4 w-4 transition-transform duration-150 ${t.arrow}`} aria-hidden="true" />
+      ) : (
+        <ArrowRight className={`mt-auto h-4 w-4 transition-transform duration-150 ${t.arrow}`} aria-hidden="true" />
+      )}
     </Link>
   );
 }

@@ -73,9 +73,9 @@ function CurrentLevel({ level }: { level: Level }) {
   const { node } = level;
   return (
     <section className="scroll-mt-24" data-start-current="" data-start-level={level.base}>
-      <h1 className="mb-8 font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,44px)]">
+      <h2 className="mb-8 font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,44px)]">
         {node.question}
-      </h1>
+      </h2>
       <div className={`grid grid-cols-1 gap-3 ${startGridCols(node.options.length)}`}>
         {node.options.map((o) => (
           <StartCard
@@ -100,7 +100,7 @@ function AnsweredLevel({ level }: { level: Level }) {
     <section aria-label={node.question} data-start-answered={level.base}>
       {/* From 640px: the muted question over title-only cards. */}
       <div className="mb-10 hidden sm:block">
-        <h2 className="mb-3 text-lg text-rb-500">{node.question}</h2>
+        <h3 className="mb-3 text-lg font-normal text-rb-500">{node.question}</h3>
         <div className={`grid grid-cols-1 gap-3 ${startGridCols(node.options.length)}`}>
           {node.options.map((o) => (
             <AnswerCard key={o.slug} href={optionHref(level.base, o)} label={o.label} chosen={o.slug === chosen} />
@@ -138,19 +138,15 @@ function AnsweredLevel({ level }: { level: Level }) {
             ))}
           </div>
         )}
-        <span
-          className="mt-1.5 grid h-5 w-5 place-items-center rounded-full bg-teal-600 text-white dark:bg-teal-500"
-          aria-hidden="true"
-        >
-          <ArrowDown className="h-3 w-3" strokeWidth={2.5} />
-        </span>
+        <ArrowDown className={`mt-1 h-4 w-4 ${TEAL_TEXT}`} strokeWidth={2.5} aria-hidden="true" />
       </div>
     </section>
   );
 }
 
 /** An answered level's card: the title alone. The chosen one is teal with the
- *  down-arrow badge on its bottom edge; a sibling rests muted and lifts on hover. */
+ *  down-arrow badge on its bottom edge, joining it to the level below; a
+ *  sibling rests muted, with no arrow, and lifts on hover. */
 function AnswerCard({
   href,
   label,
@@ -176,7 +172,7 @@ function AnswerCard({
       {label}
       {chosen && !compact && (
         <span
-          className="absolute left-1/2 -bottom-3.5 grid h-7 w-7 -translate-x-1/2 place-items-center rounded-full bg-teal-600 text-white ring-4 ring-background dark:bg-teal-500"
+          className="absolute left-1/2 -bottom-3 grid h-6 w-6 -translate-x-1/2 place-items-center rounded-full bg-teal-600 text-white ring-4 ring-background dark:bg-teal-500"
           aria-hidden="true"
         >
           <ArrowDown className="h-3.5 w-3.5" strokeWidth={2.5} />
