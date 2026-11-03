@@ -68,10 +68,10 @@ export function HomeHero() {
         Explore any DeFi position, verified directly from the chain.
       </p>
       <div
-        className="relative w-full max-w-2xl px-4 text-left animate-hero-fade-up"
+        className="relative z-20 w-full max-w-2xl px-4 text-left animate-hero-fade-up"
         style={{ animationDelay: "0.25s" }}
       >
-        <FrontDoorSearch size="lg" />
+        <FrontDoorSearch size="lg" suggest />
       </div>
       {/* The terms, ticked — under the search; the checks carry the separation. */}
       <p
