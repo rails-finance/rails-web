@@ -13,9 +13,11 @@
 // (`start`): the state at block − 1 read with the block's number and time
 // (eth_call block overrides), so health and the oracle price are what the
 // block's first transaction saw. The oracle price moves with time, so health
-// can cross 0 between the end of one block and the next. The store keys a call
-// by its block alone, so this read stays on the chain: one block-header read
-// and one eth_call (Multicall3 aggregate3), kept in process memory.
+// can cross 0 between the end of one block and the next. The same route
+// answers it with `start=1` (server mig 457). Where it answers `start: null`
+// (its read failed) or a start that does not parse, the read is the chain's:
+// one block-header read and one eth_call (Multicall3 aggregate3). Either
+// answer is kept in process memory.
 //
 // SERVER-ONLY.
 
@@ -79,23 +81,41 @@ export interface LlamalendEventState {
 const CACHE_MAX = 4000;
 const RAILS_API_URL = process.env.RAILS_API_URL;
 
-/** Both blocks from the server's store; an unlisted controller is its 404. */
+const INT = /^-?\d+$/;
+const UINT = /^\d+$/;
+
+/** The server's start of `block`, or null where it is absent or does not parse. */
+function storedStart(v: unknown, block: number): LlamalendStartOfBlock | null {
+  const r = v as Record<string, unknown> | null | undefined;
+  if (r == null || r.block !== block || !Number.isInteger(r.timestamp)) return null;
+  const h = r.healthRaw;
+  const p = r.priceOracleRaw;
+  if (h !== null && (typeof h !== "string" || !INT.test(h))) return null;
+  if (p !== null && (typeof p !== "string" || !UINT.test(p))) return null;
+  return { block, timestamp: r.timestamp as number, healthRaw: h, priceOracleRaw: p };
+}
+
+/** Both blocks from the server's store, and with `withStart` the start of
+ *  the block (null where the server's read failed); an unlisted controller is
+ *  its 404. */
 async function storedStates(
   controller: string,
   user: string,
   block: number,
+  withStart: boolean,
   readerIp?: string,
-): Promise<{ before: LlamalendStateAt; after: LlamalendStateAt }> {
+): Promise<{ before: LlamalendStateAt; after: LlamalendStateAt; start: LlamalendStartOfBlock | null }> {
   if (!RAILS_API_URL) throw new Error("RAILS_API_URL is not set");
   const qs = new URLSearchParams({ controller, user, block: String(block) });
+  if (withStart) qs.set("start", "1");
   const res = await fetch(
     `${RAILS_API_URL}/api/at-block/llamalend/event-state?${qs.toString()}`,
     createAuthFetchOptions(undefined, readerIp),
   );
   if (res.status === 404) throw new UnknownLlamalendMarketError(controller);
   if (!res.ok) throw new Error(`the at-block store answered ${res.status}`);
-  const body = (await res.json()) as { before: LlamalendStateAt; after: LlamalendStateAt };
-  return { before: body.before, after: body.after };
+  const body = (await res.json()) as { before: LlamalendStateAt; after: LlamalendStateAt; start?: unknown };
+  return { before: body.before, after: body.after, start: withStart ? storedStart(body.start, block) : null };
 }
 
 const MULTICALL3 = "0xcA11bde05977b3631167028862bE2a173976CA11" as const;
@@ -158,27 +178,32 @@ export async function readLlamalendEventState(
 ): Promise<LlamalendEventState> {
   const controller = getAddress(controllerRaw).toLowerCase();
   const user = getAddress(userRaw);
-  const startOf = async () => {
-    const market = (await discoverLlamalendMarkets()).get(controller);
-    if (!market) throw new UnknownLlamalendMarketError(controller);
-    const key = `${controller}:${user.toLowerCase()}:${block}`;
-    let p = startCache.get(key);
-    if (!p) {
-      if (startCache.size >= CACHE_MAX) {
-        const oldest = startCache.keys().next().value;
-        if (oldest != null) startCache.delete(oldest);
-      }
-      p = readStart(controller as `0x${string}`, market.amm as `0x${string}`, user, block).catch(() => null);
-      p.then((v) => {
-        if (v == null) startCache.delete(key);
-      });
-      startCache.set(key, p);
+  const key = `${controller}:${user.toLowerCase()}:${block}`;
+  const keep = (p: Promise<LlamalendStartOfBlock | null>) => {
+    if (startCache.size >= CACHE_MAX) {
+      const oldest = startCache.keys().next().value;
+      if (oldest != null) startCache.delete(oldest);
     }
+    p.then((v) => {
+      if (v == null) startCache.delete(key);
+    });
+    startCache.set(key, p);
     return p;
   };
-  const [{ before, after }, start] = await Promise.all([
-    storedStates(controller, user.toLowerCase(), block, readerIp),
-    withStart ? startOf() : Promise.resolve(undefined),
-  ]);
+  /** The chain's start read, where the server answered none. */
+  const chainStart = async () => {
+    const market = (await discoverLlamalendMarkets()).get(controller);
+    if (!market) throw new UnknownLlamalendMarketError(controller);
+    return keep(readStart(controller as `0x${string}`, market.amm as `0x${string}`, user, block).catch(() => null));
+  };
+  const kept = withStart ? startCache.get(key) : undefined;
+  const stored = await storedStates(controller, user.toLowerCase(), block, withStart && !kept, readerIp);
+  let start: LlamalendStartOfBlock | null | undefined;
+  if (withStart) {
+    if (kept) start = await kept;
+    else if (stored.start) start = await keep(Promise.resolve(stored.start));
+    else start = await chainStart();
+  }
+  const { before, after } = stored;
   return { controller, user: user.toLowerCase(), before, after, ...(start !== undefined ? { start } : {}) };
 }

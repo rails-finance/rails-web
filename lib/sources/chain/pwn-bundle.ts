@@ -6,13 +6,16 @@
 // structs (category enum, address, id, amount). The read is pinned to the
 // loan's CREATION block: the bundle is emptied when unwrapped after the loan
 // closes, so the head state of a closed loan's bundle is empty — the
-// creation-block state is the loan's truth (an archive read; Alchemy serves it).
+// creation-block state is the loan's truth (an archive read). rails-server's
+// at-block route answers the contents first (lib/sources/api/pwn-at-block.ts);
+// the read below is the fallback where it cannot.
 
 import { parseAbi } from "viem";
 import { alchemyClient } from "./rpc";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
 import { PWN_ADDRESSES } from "@/lib/pwn/asset-catalog";
 import type { PwnBundleAsset, PwnBundleContentsResponse } from "@/lib/api/fetch-pwn-bundle";
+import { fetchPwnBundleAssets, type RawBundleAsset } from "@/lib/sources/api/pwn-at-block";
 
 const BUNDLER_ABI = parseAbi([
   "function tokensInBundle(uint256 _bundleId) view returns ((uint8 category, address assetAddress, uint256 id, uint256 amount)[])",
@@ -25,15 +28,18 @@ function categoryOf(cat: number): PwnBundleAsset["category"] {
   return cat === 0 ? "ERC20" : cat === 1 ? "ERC721" : cat === 2 ? "ERC1155" : "unknown";
 }
 
-export async function loadPwnBundleContents(bundleId: string, atBlock: number): Promise<PwnBundleContentsResponse> {
-  const client = alchemyClient();
-  const raw = await client.readContract({
+async function readBundleFromChain(bundleId: string, atBlock: number): Promise<readonly RawBundleAsset[]> {
+  return alchemyClient().readContract({
     address: PWN_ADDRESSES.TOKEN_BUNDLER as `0x${string}`,
     abi: BUNDLER_ABI,
     functionName: "tokensInBundle",
     args: [BigInt(bundleId)],
     blockNumber: BigInt(atBlock),
   });
+}
+
+export async function loadPwnBundleContents(bundleId: string, atBlock: number): Promise<PwnBundleContentsResponse> {
+  const raw = (await fetchPwnBundleAssets(bundleId, atBlock)) ?? (await readBundleFromChain(bundleId, atBlock));
 
   const metas = await resolveErc20Meta(raw.map((t) => t.assetAddress.toLowerCase()));
   // An ERC20 in the bundle scales by its decimals: without them the read fails

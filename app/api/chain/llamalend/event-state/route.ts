@@ -9,8 +9,8 @@ import { readerIpFromRequest } from "@/lib/api/reader-ip";
 // event's block (lib/sources/chain/llamalend-event-state.ts): collateral,
 // converted, debt, ticks, band prices, health and the stored discount, from
 // rails-server's at-block store; with `start=1` (a liquidation row) the
-// position at the start of the block, read from the chain (one block-header
-// read and one eth_call). A mined block never changes, so the answer is cached
+// position at the start of the block, from the same route, or from the chain
+// (one block-header read and one eth_call) where the server read none. A mined block never changes, so the answer is cached
 // hard at the edge. Node runtime.
 
 export const runtime = "nodejs";

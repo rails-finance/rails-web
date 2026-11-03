@@ -3,13 +3,16 @@
 // rails-server's `/api/at-block/compound/{factors,rates}`, `/tx/user-op` and
 // `/dolomite/liquidation` read what the web's event-panel routes read
 // (app/api/chain/compound/{absorb-factors,rates,tx-sender},
-// app/api/chain/dolomite/liq-price) through its at-block store, keyless
+// app/api/chain/dolomite/liq-price) through its at-block store, and
+// `/tx/log-address` the log a legacy Base Compound event URL names
+// (app/(app)/base/compound-v3/[market]/event/[eventId]), keyless
 // gateways first (rails-ops decisions/0056); `/api/compound/prices-at` answers
 // Comet prices it stored at every event block (mig 372). Each answers the
 // body of the web route it replaces.
 //
 // Null when the route cannot answer: no RAILS_API_URL, a refused connection, a
-// non-2xx answer or 3 s without one; after a failure the chain is read for 30 s
+// non-2xx answer or 3 s without one (log-address alone tells its 404, the
+// answer "no such log", from the route not answering); after a failure the chain is read for 30 s
 // without asking (route-gate.ts). The caller then reads the chain as before.
 //
 // SERVER-ONLY.
@@ -128,6 +131,27 @@ export async function serverUserOpSender(
   );
   if (!body || !(body.userOpSender === null || typeof body.userOpSender === "string")) return undefined;
   return { userOpSender: body.userOpSender };
+}
+
+/** The address of the receipt's log at that block-wide index; null where the
+ *  route answers 404 (the receipt holds no such log), undefined where it cannot
+ *  answer. */
+export async function serverLogAddress(
+  chainId: number,
+  tx: string,
+  logIndex: number,
+): Promise<string | null | undefined> {
+  const qs = new URLSearchParams({ chain: String(chainId), tx: tx.toLowerCase(), logIndex: String(logIndex) });
+  const got = await gate.answer<{ logIndex?: unknown; address?: unknown }>(
+    "tx",
+    `${process.env.RAILS_API_URL}/api/at-block/tx/log-address?${qs.toString()}`,
+    createAuthFetchOptions(),
+  );
+  if (!got) return undefined;
+  if (!("body" in got)) return got.status === 404 ? null : undefined;
+  const body = got.body;
+  if (body?.logIndex !== logIndex || typeof body.address !== "string") return undefined;
+  return body.address.toLowerCase();
 }
 
 /** Where a liquidation's two prices came from: the core's LogOraclePrice in
