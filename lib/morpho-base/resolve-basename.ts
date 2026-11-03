@@ -27,10 +27,17 @@
 // (`this-name-should-not-exist-zzz-9182736.base.eth`) returned the zero
 // resolver, as expected. See `scripts/verify/verify-morpho-base-holder-basename.mjs`
 // for the repeatable version of this check.
+//
+// rails-server's `/api/at-block/names?chain=8453` is asked first and its
+// answer used only where it found one (lib/sources/api/names-at-block.ts, a
+// fetch through createAuthFetchOptions, so the import boundary above holds);
+// every other result, and a route that cannot answer, reads the chain below.
+// The cache sits in front of both.
 
 import { createPublicClient, http, namehash, getAddress, type Address, type Chain, type PublicClient } from "viem";
 import { base } from "viem/chains";
 import { normalize } from "viem/ens";
+import { serverNameAddress } from "@/lib/sources/api/names-at-block";
 
 // Widened to the generic `Chain` type, matching lib/sources/chain/rpc.ts's own
 // pattern: `base`'s OP-stack-specific transaction shape otherwise infers a
@@ -95,9 +102,19 @@ export async function resolveBasenameAddress(name: string): Promise<string | nul
   const cached = cache.get(key);
   if (cached && cached.expires > Date.now()) return cached.address;
 
-  let address: string | null = null;
+  let normalized: string | null = null;
   try {
-    const node = namehash(normalize(key));
+    normalized = normalize(key);
+  } catch {
+    // Left to the chain read below, which fails the same way and caches the miss.
+  }
+  let address: string | null = normalized ? await serverNameAddress(8453, normalized) : null;
+  if (address) {
+    cache.set(key, { address, expires: Date.now() + HIT_TTL_MS });
+    return address;
+  }
+  try {
+    const node = namehash(normalized ?? normalize(key));
     const resolverAddr = await client().readContract({
       address: BASENAMES_REGISTRY,
       abi: REGISTRY_ABI,
