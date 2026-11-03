@@ -27,11 +27,20 @@
 // two read one endpoint; the explicit name stays as the lane the page states
 // (`MORPHO_BASE_TIMELINE_LANE`).
 //
-// `balanceOf` at the page's block goes through `chainBatchClient(8453)`, the
-// client the vault reading uses. The timestamp and `convertToAssets` at each
-// DISTINCT row block come from rails-server's at-block store
-// (./vault-block-reads). The allocation read beside them posts its own
-// batches on the same named lane, for the reason its own header gives.
+// THE SWEEPS AND THE NOTES ARE ASKED OF RAILS-SERVER FIRST: the four holder
+// sweeps over one range from `/api/at-block/vault/holder-logs` and the vault's
+// notes from `/api/at-block/vault/notes` (../api/morpho-base-vault-logs.ts;
+// rails-ops decisions/0056 step 2), in the shape this lane answers. Where the
+// route cannot answer, the sweep is this lane's, as before; the gate's one
+// re-fetch is always this lane's.
+//
+// `balanceOf` at the page's block and the lane's `finalized` block go through
+// `vaultHeadClient(8453)`, the client the vault reading uses (rails-server's
+// head reads first, `chainBatchClient(8453)` behind them). The page block's
+// timestamp, and the timestamp and `convertToAssets` at each DISTINCT row
+// block, come from rails-server's at-block store (./vault-block-reads). The
+// allocation read beside them is rails-server's, for the reason its own header
+// gives.
 //
 // ── WHEN THE LANE REFUSES ON RESPONSE SIZE ───────────────────────────────────
 // One address on this vault does that: its fee recipient, which holds 12.7% of
@@ -130,7 +139,12 @@ import {
   type PublicClient,
 } from "viem";
 import { base } from "viem/chains";
-import { chainBatchClient } from "./rpc";
+import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
+import {
+  fetchMorphoBaseHolderLogs,
+  fetchMorphoBaseVaultNotes,
+  type HolderSweeps,
+} from "@/lib/sources/api/morpho-base-vault-logs";
 import { loadMorphoBaseVaultAllocationAt } from "./morpho-base-vault-allocation-at";
 import {
   ERC4626_TOPIC,
@@ -145,7 +159,14 @@ import {
   type RawLog,
 } from "./vault-holder-logs";
 import { countRefusedSweeps } from "./vault-sweep-walk";
-import { emptyBlockReads, firstUnreadBlock, priceFields, readBlockWave, type BlockReads } from "./vault-block-reads";
+import {
+  emptyBlockReads,
+  firstUnreadBlock,
+  priceFields,
+  readBlockTimes,
+  readBlockWave,
+  type BlockReads,
+} from "./vault-block-reads";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import {
   BUILD_BLOCKS_INLINE,
@@ -421,7 +442,7 @@ export async function loadMorphoBaseVaultTimelineWithTail(
     };
 
   try {
-    const state = chainBatchClient(BASE_CHAIN_ID);
+    const state = vaultHeadClient(BASE_CHAIN_ID);
 
     /** One `eth_getLogs`, over an explicit range on the backfill lane. */
     const sweepRange = (topics: (string | null)[], from: number, to: bigint | number): Promise<RawLog[]> =>
@@ -430,13 +451,33 @@ export async function loadMorphoBaseVaultTimelineWithTail(
         params: [{ address, topics, fromBlock: hexBlock(from), toBlock: hexBlock(to) }],
       } as never) as Promise<RawLog[]>;
 
-    const sweepFrom = (from: number) => (topics: (string | null)[]) => sweepRange(topics, from, blockNumber);
+    // rails-server's four sweeps over `[from, page block]`, asked once per range.
+    // The whole life is asked from block 0, which holds the same logs as the
+    // vault's creation block.
+    const served = new Map<number, Promise<HolderSweeps | null>>();
+    const servedFrom = (from: number): Promise<HolderSweeps | null> => {
+      const lo = from === opts.fromBlock ? 0 : from;
+      let p = served.get(lo);
+      if (!p) served.set(lo, (p = fetchMorphoBaseHolderLogs(address, who, lo, opts.blockNumber)));
+      return p;
+    };
+    const holderTopic = topicOfAddress(who).toLowerCase();
+
+    /** One sweep over `[from, page block]`: rails-server's answer to it, or the lane's. */
+    const sweepFrom =
+      (from: number) =>
+      async (topics: (string | null)[]): Promise<RawLog[]> => {
+        const s = await servedFrom(from);
+        const hit = s ? servedSweep(s, topics, holderTopic) : null;
+        return hit ?? sweepRange(topics, from, blockNumber);
+      };
+    const laneSweepFrom = (from: number) => (topics: (string | null)[]) => sweepRange(topics, from, blockNumber);
 
     let tail = tailsAllowed ? usableTail(opts.tail, address, who, opts.blockNumber) : null;
 
-    /** The two transfer directions over one range. */
-    const readRange = async (from: number) => {
-      const sweep = sweepFrom(from);
+    /** The two transfer directions over one range; `lane` asks the lane only. */
+    const readRange = async (from: number, lane = false) => {
+      const sweep = lane ? laneSweepFrom(from) : sweepFrom(from);
       const [outLogs, inLogs] = await Promise.all([
         sweep([TOPIC.transfer, topicOfAddress(who), null]).catch(() => null),
         sweep([TOPIC.transfer, null, topicOfAddress(who)]).catch(() => null),
@@ -447,7 +488,15 @@ export async function loadMorphoBaseVaultTimelineWithTail(
     // The vault-wide notes are read over the WHOLE life whatever the tail says:
     // they are not this holder's events, they are never stored, and there are
     // one or two of them in a vault's life.
-    const notesPromise = readNotes(sweepFrom(opts.fromBlock));
+    // rails-server's notes run to its last stored block; those above the page's
+    // block are not this page's.
+    const notesPromise = fetchMorphoBaseVaultNotes(address).then((served) =>
+      served
+        ? readNotes(async (topics) =>
+            served.logs.filter((l) => l.topics[0]?.toLowerCase() === topics[0] && BigInt(l.blockNumber) <= blockNumber),
+          )
+        : readNotes(laneSweepFrom(opts.fromBlock)),
+    );
 
     // ⚠️ THE ROW FLOOR IS DERIVED, NEVER BOUND ONCE. It is `tail.cut + 1` while
     // a tail is trusted and the vault's own creation block the moment one is
@@ -542,7 +591,7 @@ export async function loadMorphoBaseVaultTimelineWithTail(
       // reading it again would return the same bytes.
       refetched = true;
       await new Promise((r) => setTimeout(r, 250));
-      const again = await readRange(rowFloor());
+      const again = await readRange(rowFloor(), true);
       if (again.outLogs && again.inLogs) {
         const second = mergeTransfers(again.outLogs, again.inLogs);
         refetchDiffered = second.length !== transfers.length;
@@ -590,7 +639,9 @@ export async function loadMorphoBaseVaultTimelineWithTail(
       cutBalance: tail ? tail.cutBalance : null,
     };
 
-    const blockTimestamp = Number((await state.getBlock({ blockNumber })).timestamp);
+    const blockTimestamp =
+      (await readBlockTimes(BASE_CHAIN_ID, [opts.blockNumber])).get(opts.blockNumber) ??
+      Number((await state.getBlock({ blockNumber })).timestamp);
     const notes = await notesPromise;
     const history: VaultHistorySource = {
       source: tail ? "stored+head" : "chain",
@@ -745,6 +796,20 @@ export async function loadMorphoBaseVaultTimelineWithTail(
       continueBuild: null,
     };
   }
+}
+
+// ── rails-server's answer to one sweep ───────────────────────────────────────
+
+/** The served logs for one of the four holder filters this file sweeps with,
+ *  or null for any other filter. */
+function servedSweep(s: HolderSweeps, topics: (string | null)[], holderTopic: string): RawLog[] | null {
+  const t = topics.map((x) => (x == null ? null : x.toLowerCase()));
+  const is = (want: (string | null)[]) => t.length === want.length && want.every((w, i) => w === t[i]);
+  if (is([TOPIC.transfer, holderTopic, null])) return s.transferOut;
+  if (is([TOPIC.transfer, null, holderTopic])) return s.transferIn;
+  if (is([TOPIC.deposit, null, holderTopic])) return s.deposit;
+  if (is([TOPIC.withdraw, null, null, holderTopic])) return s.withdraw;
+  return null;
 }
 
 // ── the gate's own read ──────────────────────────────────────────────────────

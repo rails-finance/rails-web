@@ -41,16 +41,23 @@ export async function vaultBlocksAnswer(url, answer) {
       const i = next++;
       const block = blocks[i];
       const hex = `0x${block.toString(16)}`;
+      // Without `vault` the route reads timestamps only (`readBlockTimes`).
       const [ts, price] = await Promise.all([
         ask(answer, { jsonrpc: "2.0", id: 1, method: "eth_getBlockByNumber", params: [hex, false] }),
-        ask(answer, {
-          jsonrpc: "2.0",
-          id: 2,
-          method: "eth_call",
-          params: [{ to: vault, data: `0x07a2d13a${arg}` }, hex],
-        }),
+        vault
+          ? ask(answer, {
+              jsonrpc: "2.0",
+              id: 2,
+              method: "eth_call",
+              params: [{ to: vault, data: `0x07a2d13a${arg}` }, hex],
+            })
+          : null,
       ]);
       const timestamp = ts.result?.timestamp != null ? Number(BigInt(ts.result.timestamp)) : null;
+      if (!price) {
+        reads[i] = { block, timestamp };
+        continue;
+      }
       if (price.error && isRevert(price.error)) reads[i] = { block, timestamp, sharePrice: null, reverted: true };
       else if (typeof price.result === "string" && price.result !== "0x")
         reads[i] = { block, timestamp, sharePrice: BigInt(price.result).toString() };

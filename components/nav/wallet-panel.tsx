@@ -252,7 +252,7 @@ export function WalletPanel() {
             12px gap and half the 38px launcher put its centre at 77px, so the
             48px field starts at 53px. */}
         <div className="shrink-0 px-5 pb-4 pt-4 md:pt-[53px]">
-          <FrontDoorSearch size="lg" surface="raised" onDone={close} />
+          <FrontDoorSearch size="lg" surface="raised" onDone={close} suggest />
         </div>
 
         {/* The bookmarks: one list, scrolling between the search and the foot. */}

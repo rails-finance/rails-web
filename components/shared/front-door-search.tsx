@@ -10,21 +10,50 @@
 // - `FrontDoorSearch` is the lookup: an address or an ENS name, resolved
 //   through /api/ens/resolve, landing on the wallet view `/wallet/<address>`
 //   unless the surface names its own page (N5 opens that family's position).
+//   With `suggest` (the home hero and the wallet panel, ui-jobs 482) the field
+//   is a combobox over suggestions (H15.2) matched in the browser against
+//   /api/search/index (lib/search/suggest.ts).
 // - `SearchLauncher` is the glyph that opens it from the chrome (H15.1): the
 //   wallet panel (components/nav/wallet-panel.tsx), from the brand rail or the
 //   header bar.
 // - `useSlashToSearch` puts `/` on it from any page: the page's own search
 //   where one is drawn, else the wallet panel.
 
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { NAV_BUTTON, ctrlWaking } from "@/lib/shared/ui-grammar";
 import { useHydrated } from "@/hooks/useHydrated";
 import { toggleWalletPanel, useWalletPanelOpen } from "@/components/nav/wallet-panel";
+import { loadBookmarks, SESSIONS_CHANGED_EVENT } from "@/lib/shared/sessions";
+import {
+  ADDRESS_RE,
+  ENS_RE,
+  expandIndex,
+  isOpenable,
+  suggest,
+  type SearchIndex,
+  type SearchIndexWire,
+  type Suggestion,
+  type SuggestBookmark,
+} from "@/lib/search/suggest";
 
 /** What the field takes, said on the field (Arbitrum item 31). */
 export const SEARCH_PLACEHOLDER = "Wallet address or ENS name";
+/** The placeholder where the search suggests (ui-jobs 482), and its form
+ *  below sm and in the wallet panel, where the long one clips. */
+export const SUGGEST_PLACEHOLDER = "Search a wallet, protocol or vault";
+const SUGGEST_PLACEHOLDER_SHORT = "Wallet, protocol or vault";
 /** The verb, everywhere the search appears (Arbitrum item 31). */
 export const LOOK_UP = "Look up";
 
@@ -107,6 +136,10 @@ export interface SearchBoxProps {
   autoFocus?: boolean;
   invalid?: boolean;
   describedBy?: string;
+  onKeyDown?: (e: ReactKeyboardEvent<HTMLInputElement>) => void;
+  onBlur?: () => void;
+  /** The field as an ARIA combobox over a listbox of suggestions (ui-jobs 482). */
+  combobox?: { expanded: boolean; listId: string; activeId?: string };
 }
 
 /** The shared look of the search field. */
@@ -123,6 +156,9 @@ export function SearchBox({
   autoFocus,
   invalid,
   describedBy,
+  onKeyDown,
+  onBlur,
+  combobox,
 }: SearchBoxProps) {
   const glyph = GLYPH[size];
   return (
@@ -145,8 +181,19 @@ export function SearchBox({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={onFocus}
+        onKeyDown={onKeyDown}
+        onBlur={onBlur}
         placeholder={placeholder}
-        aria-label={placeholder}
+        aria-label={combobox ? SUGGEST_PLACEHOLDER : placeholder}
+        {...(combobox
+          ? {
+              role: "combobox",
+              "aria-expanded": combobox.expanded,
+              "aria-controls": combobox.listId,
+              "aria-autocomplete": "list" as const,
+              "aria-activedescendant": combobox.activeId,
+            }
+          : {})}
         aria-invalid={invalid || undefined}
         aria-describedby={describedBy}
         aria-keyshortcuts="/"
@@ -192,9 +239,10 @@ function useLookup(href: (address: string) => string, onDone?: () => void) {
       setResolving(true);
       try {
         const res = await fetch(`/api/ens/resolve?name=${encodeURIComponent(typed.toLowerCase())}`);
-        const body = res.ok ? ((await res.json()) as { address?: string | null }) : null;
+        const body = res.ok ? ((await res.json()) as { address?: string | null; failed?: boolean }) : null;
         if (body?.address && ADDRESS.test(body.address)) go(body.address);
-        else setProblem(`${typed} does not name an address on ENS.`);
+        else if (!body || body.failed) setProblem("Couldn't reach ENS. Try again, or paste the address.");
+        else setProblem(`${typed} has no address set on ENS.`);
       } catch {
         setProblem("The ENS lookup did not answer. Try again, or paste the address.");
       } finally {
@@ -221,13 +269,18 @@ export interface FrontDoorSearchProps {
   /** Drawn to the right of "Look up" on the same line (the home page's sample
    *  wallet); below sm it wraps under the row, right-aligned. */
   after?: ReactNode;
+  /** Suggest as the reader types (ui-jobs 482): wallets, bookmarks, explorers,
+   *  vaults and tokens in a dropdown under the field. The home hero and the
+   *  wallet panel only; N5 and the wallet view's empty state keep the plain
+   *  lookup. */
+  suggest?: boolean;
 }
 
 /** The search as a form: field, "Look up", and the reason a value was
- *  refused. */
+ *  refused; with `suggest`, the suggestions under the field. */
 export function FrontDoorSearch({
   href = walletHref,
-  placeholder = SEARCH_PLACEHOLDER,
+  placeholder,
   size = "md",
   surface = "canvas",
   autoFocus,
@@ -235,17 +288,58 @@ export function FrontDoorSearch({
   anatomy = "H15",
   className = "",
   after,
+  suggest: suggesting = false,
 }: FrontDoorSearchProps) {
   const hydrated = useHydrated();
   const problemId = useId();
+  const listId = useId();
+  const router = useRouter();
   const [value, setValue] = useState("");
-  const { lookUp, problem, setProblem, resolving } = useLookup(href, onDone);
+  const { lookUp, go, problem, setProblem, resolving } = useLookup(href, onDone);
+  const s = useSuggestions(value, suggesting);
+  // The wallet panel is 400px wide at every size, so it takes the short form.
+  const narrow = useNarrow(suggesting) || surface === "raised";
+  const shownPlaceholder =
+    placeholder ?? (suggesting ? (narrow ? SUGGEST_PLACEHOLDER_SHORT : SUGGEST_PLACEHOLDER) : SEARCH_PLACEHOLDER);
+
+  const choose = (row: Suggestion) => {
+    s.close();
+    if (row.href) {
+      setProblem(null);
+      onDone?.();
+      router.push(row.href);
+    } else if (row.address) go(row.address);
+    else if (row.ens) void lookUp(row.ens);
+  };
+
+  // Enter and "Look up" do one thing: the highlighted row, else the top row,
+  // else the plain lookup (which says why a value was refused).
+  const commit = () => {
+    const row = s.active ?? s.rows.find(isOpenable);
+    if (suggesting && row && isOpenable(row)) choose(row);
+    else void lookUp(value);
+  };
+
+  const onKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (!suggesting) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      s.move(e.key === "ArrowDown" ? 1 : -1);
+    } else if (e.key === "Escape" && s.expanded) {
+      // The dropdown closes first; a second Escape reaches the wallet panel.
+      e.preventDefault();
+      e.stopPropagation();
+      s.close();
+    } else if (e.key === "Tab") s.close();
+  };
+
+  const ready = lookable(value) != null || (suggesting && s.rows.some(isOpenable));
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        void lookUp(value);
+        commit();
       }}
       className={`flex flex-col gap-1.5 ${className}`}
       data-wallet-lookup=""
@@ -254,15 +348,21 @@ export function FrontDoorSearch({
       role="search"
       {...ctrlWaking(hydrated)}
     >
-      <div className={after ? "flex flex-wrap items-center justify-end gap-2" : "flex items-center gap-2"}>
+      <div
+        className={`${after ? "flex flex-wrap items-center justify-end gap-2" : "flex items-center gap-2"} ${suggesting ? "relative z-30" : ""}`}
+      >
         <div className={after ? "flex min-w-0 flex-1 items-center gap-2 max-sm:basis-full" : "contents"}>
           <SearchBox
             value={value}
             onChange={(v) => {
               setValue(v);
+              s.reopen();
               if (problem) setProblem(null);
             }}
-            placeholder={placeholder}
+            onFocus={suggesting ? s.focus : undefined}
+            onBlur={suggesting ? s.blur : undefined}
+            onKeyDown={onKeyDown}
+            placeholder={shownPlaceholder}
             size={size}
             surface={surface}
             anatomy=""
@@ -270,12 +370,17 @@ export function FrontDoorSearch({
             autoFocus={autoFocus}
             invalid={problem != null}
             describedBy={problem ? problemId : undefined}
+            combobox={
+              suggesting
+                ? { expanded: s.expanded, listId, activeId: s.active ? optionId(listId, s.active) : undefined }
+                : undefined
+            }
           />
           <button
             type="submit"
             className={
               size === "lg"
-                ? `${HERO_BUTTON} ${lookable(value) ? HERO_BUTTON_READY : `${HERO_BUTTON_IDLE} ${SURFACE[surface].button}`}`
+                ? `${HERO_BUTTON} ${ready ? HERO_BUTTON_READY : `${HERO_BUTTON_IDLE} ${SURFACE[surface].button}`}`
                 : `${NAV_BUTTON} shrink-0`
             }
             disabled={resolving}
@@ -284,6 +389,9 @@ export function FrontDoorSearch({
           </button>
         </div>
         {after}
+        {suggesting && s.expanded && (
+          <SuggestionList listId={listId} rows={s.rows} active={s.active} onChoose={choose} onHover={s.hover} />
+        )}
       </div>
       {problem && (
         <p id={problemId} role="alert" className="text-xs text-rb-500" data-wallet-lookup-problem="">
@@ -291,6 +399,200 @@ export function FrontDoorSearch({
         </p>
       )}
     </form>
+  );
+}
+
+// ── Suggestions (ui-jobs 482) ───────────────────────────────────────────────
+
+/** The index, fetched once per page load on the first focus and kept. */
+let indexPromise: Promise<SearchIndex | null> | null = null;
+function loadSearchIndex(): Promise<SearchIndex | null> {
+  indexPromise ??= fetch("/api/search/index")
+    .then((r) => (r.ok ? (r.json() as Promise<SearchIndexWire>) : null))
+    .then((wire) => (wire?.v === 2 ? expandIndex(wire) : null))
+    .catch(() => null)
+    .then((index) => {
+      // A failed read is asked again on the next focus.
+      if (index == null) indexPromise = null;
+      return index;
+    });
+  return indexPromise;
+}
+
+/** ENS answers by name, for the page's life: an address, or null for none. */
+const ensAnswers = new Map<string, string | null>();
+/** Names whose lookup did not answer; asked again when the name is typed again. */
+const ensUnreachable = new Set<string>();
+
+const readBookmarks = (): SuggestBookmark[] =>
+  loadBookmarks().map((b) => {
+    const address = b.addresses[0].toLowerCase();
+    const ensNames = Object.values(b.ensNames).filter((n): n is string => !!n);
+    return {
+      address,
+      label: b.customName || b.ensNames[b.addresses[0]] || null,
+      names: [b.customName, ...ensNames].filter((n): n is string => !!n),
+    };
+  });
+
+/** Below sm the placeholder is the short one. */
+function useNarrow(on: boolean): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    if (!on) return;
+    const mq = window.matchMedia("(max-width: 639px)");
+    const set = () => setNarrow(mq.matches);
+    set();
+    mq.addEventListener("change", set);
+    return () => mq.removeEventListener("change", set);
+  }, [on]);
+  return narrow;
+}
+
+function useSuggestions(value: string, on: boolean) {
+  const [index, setIndex] = useState<SearchIndex | null>(null);
+  const [bookmarks, setBookmarks] = useState<SuggestBookmark[]>([]);
+  const [open, setOpen] = useState(false);
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [, setEnsTick] = useState(0);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!on) return;
+    const sync = () => setBookmarks(readBookmarks());
+    sync();
+    window.addEventListener(SESSIONS_CHANGED_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(SESSIONS_CHANGED_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, [on]);
+
+  // A complete ENS name is resolved once the reader pauses.
+  const typed = value.trim().toLowerCase();
+  const ensName = on && ENS_RE.test(typed) && typed.length >= 7 ? typed : null;
+  useEffect(() => {
+    if (!ensName || ensAnswers.has(ensName)) return;
+    const t = setTimeout(() => {
+      if (ensUnreachable.delete(ensName)) setEnsTick((n) => n + 1);
+      fetch(`/api/ens/resolve?name=${encodeURIComponent(ensName)}`)
+        .then((r) => (r.ok ? (r.json() as Promise<{ address?: string | null; failed?: boolean }>) : null))
+        .then((body) => {
+          if (!body || body.failed) {
+            ensUnreachable.add(ensName);
+          } else {
+            const a = body.address;
+            ensUnreachable.delete(ensName);
+            ensAnswers.set(ensName, a && ADDRESS_RE.test(a) ? a.toLowerCase() : null);
+          }
+          setEnsTick((n) => n + 1);
+        })
+        .catch(() => {
+          ensUnreachable.add(ensName);
+          setEnsTick((n) => n + 1);
+        });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [ensName]);
+
+  const ens = ensName ? (ensUnreachable.has(ensName) ? "unreachable" : ensAnswers.get(ensName)) : undefined;
+  const rows = useMemo(() => (on ? suggest(value, index, bookmarks, ens) : []), [on, value, index, bookmarks, ens]);
+  const noMatch = rows.length === 0 && typed !== "";
+  const display: Suggestion[] = noMatch ? [{ key: "none", kind: "Wallet", name: "No match" }] : rows;
+  const openable = rows.filter(isOpenable);
+  const active = openable.find((r) => r.key === activeKey) ?? null;
+
+  return {
+    rows: display,
+    active,
+    expanded: on && open && display.length > 0,
+    focus: () => {
+      if (blurTimer.current) clearTimeout(blurTimer.current);
+      setOpen(true);
+      if (!index) void loadSearchIndex().then(setIndex);
+    },
+    // A press on a row lands after the field's blur on some phones, so the
+    // list stays a moment.
+    blur: () => {
+      blurTimer.current = setTimeout(() => setOpen(false), 150);
+    },
+    reopen: () => {
+      setOpen(true);
+      setActiveKey(null);
+    },
+    close: () => {
+      setOpen(false);
+      setActiveKey(null);
+    },
+    hover: (key: string) => setActiveKey(key),
+    move: (step: 1 | -1) => {
+      setOpen(true);
+      if (openable.length === 0) return;
+      const at = openable.findIndex((r) => r.key === activeKey);
+      const next = at < 0 ? (step === 1 ? 0 : openable.length - 1) : (at + step + openable.length) % openable.length;
+      setActiveKey(openable[next].key);
+    },
+  };
+}
+
+const optionId = (listId: string, row: Suggestion) => `${listId}-${row.key.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+
+/** The dropdown under the field (H15.2): one flat list, each row a name, a
+ *  muted line after it, and its kind on the right. */
+function SuggestionList({
+  listId,
+  rows,
+  active,
+  onChoose,
+  onHover,
+}: {
+  listId: string;
+  rows: Suggestion[];
+  active: Suggestion | null;
+  onChoose: (row: Suggestion) => void;
+  onHover: (key: string) => void;
+}) {
+  return (
+    <ul
+      id={listId}
+      role="listbox"
+      aria-label="Suggestions"
+      data-anatomy="H15.2"
+      data-search-suggestions=""
+      className="absolute left-0 right-0 top-full mt-2 overflow-hidden rounded-2xl border border-rb-300 bg-raised py-1.5 text-left shadow-lg dark:border-rb-600"
+    >
+      {rows.map((row) => {
+        const openable = isOpenable(row);
+        const on = active?.key === row.key;
+        return (
+          <li
+            key={row.key}
+            id={optionId(listId, row)}
+            role="option"
+            aria-selected={on}
+            aria-disabled={!openable || undefined}
+            data-suggestion-kind={openable ? row.kind : "none"}
+            // Keep the field focused through the press so the list stays.
+            onMouseDown={(e) => e.preventDefault()}
+            onMouseMove={() => openable && !on && onHover(row.key)}
+            onClick={() => openable && onChoose(row)}
+            className={`flex items-center gap-3 px-4 py-2 ${openable ? "cursor-pointer" : "cursor-default"} ${
+              on ? "bg-rb-100 dark:bg-rb-800" : ""
+            }`}
+          >
+            <span className="flex min-w-0 flex-1 items-baseline gap-2">
+              {/* The name keeps its room; the muted line gives way first. */}
+              <span className={`min-w-0 truncate text-sm ${openable ? "text-foreground" : "text-rb-500"}`}>
+                {row.name}
+              </span>
+              {row.detail && <span className="min-w-0 shrink-[8] truncate text-xs text-rb-500">{row.detail}</span>}
+            </span>
+            {openable && <span className="shrink-0 text-xs text-rb-500">{row.kind}</span>}
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
