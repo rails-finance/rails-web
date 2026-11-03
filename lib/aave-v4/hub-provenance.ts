@@ -157,8 +157,8 @@ export const hubLtRangeProv = (
     contract: s.address ? { name: "spoke contract", address: s.address } : undefined,
     note:
       s.ltBlock != null
-        ? `getDynamicReserveConfig at the reserve's current config key, read by rails-server's Aave V4 refresher at block ${s.ltBlock}`
-        : "getDynamicReserveConfig at the reserve's current config key, stored by rails-server's Aave V4 refresher; its read block is not recorded yet",
+        ? `getDynamicReserveConfig at the reserve's current config key, read at block ${s.ltBlock}`
+        : "getDynamicReserveConfig at the reserve's current config key, stored; its read block is not recorded yet",
   }));
   // Every leaf read from the spoke: the receipt is a chain read. Otherwise it
   // rests on at least one indexed figure.
@@ -166,9 +166,9 @@ export const hubLtRangeProv = (
   const pclass = allRead ? ("state" as const) : ("indexed" as const);
   const block = allRead ? withLt[0].ltBlock : coords.blockNumber;
   const what = allRead
-    ? "the collateral factor the spoke set for the asset at that block, read from each spoke's getDynamicReserveConfig by rails-server's Aave V4 refresher. A position keeps the factor it last took, so one opened before a change can carry an earlier figure"
-    : "the collateral factor the spoke sets for the asset, as rails-server's Aave V4 refresher stored it from each spoke's getDynamicReserveConfig. A position keeps the factor it last took, so one opened before a change can carry an earlier figure";
-  const via = `${LANE} · aave_v4_reserves · the refresher's spoke getReserve · getDynamicReserveConfig(reserveId, dynamicConfigKey).collateralFactor`;
+    ? "the collateral factor the spoke set for the asset at that block, read from each spoke's getDynamicReserveConfig. A position keeps the factor it last took, so one opened before a change can carry an earlier figure"
+    : "the collateral factor the spoke sets for the asset, as stored from each spoke's getDynamicReserveConfig. A position keeps the factor it last took, so one opened before a change can carry an earlier figure";
+  const via = `${LANE} · aave_v4_reserves · spoke getReserve · getDynamicReserveConfig(reserveId, dynamicConfigKey).collateralFactor`;
 
   if (uniform) {
     const value = n > 0 ? withLt[0].lt!.toFixed(2) : "—";

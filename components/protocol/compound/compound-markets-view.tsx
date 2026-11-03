@@ -479,14 +479,13 @@ function MarketCard({
   );
 }
 
-/** Who read the block: rails-server live, its stored read, or the web's own chain read. */
+/** When the block was read: live, a stored read, or the web's chain read (no time). */
 function readerOf(data: CompoundV3MarketsResponse): string {
   if (data.stored) {
     const t = data.stored.readAt;
-    return `each market\u2019s state as rails-server read it from its contract at ${t.slice(0, 10)} ${t.slice(11, 19)} UTC, shown because the latest read failed`;
+    return `each market\u2019s state read from its contract at ${t.slice(0, 10)} ${t.slice(11, 19)} UTC, shown because the latest read failed`;
   }
-  if (data.head)
-    return `each market\u2019s state read from its contract by rails-server at ${data.head.readAt.slice(11, 19)} UTC through ${data.head.provider}`;
+  if (data.head) return `each market\u2019s state read from its contract at ${data.head.readAt.slice(11, 19)} UTC`;
   return "each market\u2019s state read from its contract";
 }
 

@@ -745,19 +745,16 @@ export const absorbFactorProv = (
   sym: string,
   which: "liquidate factor" | "liquidation factor",
   coords: CompoundCoords,
-  vals: { value: string; readBlock: number; readBy?: "rails-server" },
+  vals: { value: string; readBlock: number },
 ): Provenance => ({
   kind: "chain",
   pclass: "state",
   verify: stateVerify("getAssetInfoByAddress", vals.readBlock),
   summary: `${sym}'s ${which} in this market, ${vals.value}, read from the Comet's asset settings at block ${vals.readBlock}, the block before the absorb. ${which === "liquidate factor" ? "The share of the asset's value that counts toward the liquidation line." : "The share of the asset's value the account is credited when it is absorbed."}`,
   contract: cometContract(coords),
-  via: `Comet.getAssetInfoByAddress(${sym}) · block ${vals.readBlock}${serverReadTail(vals.readBy)}`,
+  via: `Comet.getAssetInfoByAddress(${sym}) · block ${vals.readBlock}`,
   inputs: eventInputs(coords),
 });
-
-/** The via line's tail for an at-block read rails-server made. */
-export const serverReadTail = (readBy?: "rails-server"): string => (readBy ? " · read by rails-server" : "");
 
 /** The liquidation line at the absorb: Σ seized value × liquidate factor. */
 export const absorbLineProv = (coords: CompoundCoords, vals: { terms: string; readBlock: number }): Provenance => ({
