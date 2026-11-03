@@ -17,7 +17,7 @@
 // draws only the leaf. Answers navigate without scrolling to the top, and the
 // stack brings the new level into view (smoothly, or at once with reduced motion).
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ArrowDown } from "lucide-react";
@@ -31,14 +31,15 @@ const TEAL_RING =
 
 export function StartStack({ children }: { children: ReactNode }) {
   const path = (usePathname() ?? START_HREF).replace(/\/$/, "");
-  useScrollToCurrent(path);
+  const root = useRef<HTMLDivElement>(null);
+  useScrollToCurrent(path, root);
   const r = resolveStartPath(path.split("/").slice(2).filter(Boolean));
   // A path the tree does not hold: the page answers it with a 404.
   if (!r) return <>{children}</>;
   const { levels } = r;
   const hasLeaf = r.leaf != null;
   return (
-    <div data-anatomy="G1" data-start-step={path}>
+    <div ref={root} data-anatomy="G1" data-start-step={path}>
       {levels.map((level, i) =>
         !hasLeaf && i === levels.length - 1 ? (
           <CurrentLevel key={level.base} level={level} />
@@ -46,29 +47,48 @@ export function StartStack({ children }: { children: ReactNode }) {
           <AnsweredLevel key={`${level.base}|${level.chosen}`} level={level} />
         ),
       )}
-      {hasLeaf && (
-        <section className="scroll-mt-24" data-start-current="">
-          {children}
-        </section>
-      )}
+      {hasLeaf && <section data-start-current="">{children}</section>}
     </div>
   );
 }
 
-/** Bring the current level into view when the path changes (not on the first draw). */
-function useScrollToCurrent(path: string) {
+/** The gap left above a scrolled-to heading: a little air, plus the header
+ *  bar's height where it stays on screen (fixed or sticky). */
+const SCROLL_AIR = 16;
+
+function stickyHeaderHeight(): number {
+  const header = document.querySelector<HTMLElement>('header[data-anatomy~="H2"]');
+  if (!header) return 0;
+  const { position } = getComputedStyle(header);
+  return position === "fixed" || position === "sticky" ? header.getBoundingClientRect().height : 0;
+}
+
+/** When the path changes (not on the first draw or a refresh), settle with the
+ *  top of the new current step (its question heading, the learn sections or
+ *  the results heading) at the top of the view. */
+function useScrollToCurrent(path: string, root: RefObject<HTMLDivElement | null>) {
   const first = useRef(true);
   useEffect(() => {
     if (first.current) {
       first.current = false;
       return;
     }
+    const stack = root.current;
     const el = document.querySelector<HTMLElement>("[data-start-current]");
-    if (!el) return;
+    if (!stack || !el) return;
+    // A short step cannot scroll its heading to the top; the stack takes the
+    // room it lacks as bottom padding, until the next step is drawn.
+    stack.style.paddingBottom = "";
+    const top = el.getBoundingClientRect().top + window.scrollY - stickyHeaderHeight() - SCROLL_AIR;
+    const lacking = top - (document.documentElement.scrollHeight - window.innerHeight);
+    if (lacking > 0) stack.style.paddingBottom = `${Math.ceil(lacking)}px`;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
-  }, [path]);
+    window.scrollTo({ top: Math.max(0, top), behavior: still ? "auto" : "smooth" });
+  }, [path, root]);
 }
+
+/** The top of the tree ("Not sure where to start?"), drawn without its question. */
+const isTop = (level: Level) => level.base === START_HREF;
 
 function CurrentLevel({ level }: { level: Level }) {
   const { intro } = level;
@@ -76,7 +96,7 @@ function CurrentLevel({ level }: { level: Level }) {
     <>
       {/* An intro takes the scroll target, so the reader lands on it first. */}
       {intro === "learn" && (
-        <div className="mb-14 scroll-mt-24" data-start-current="">
+        <div className="mb-14" data-start-current="">
           <LearnContent />
         </div>
       )}
@@ -88,8 +108,16 @@ function CurrentLevel({ level }: { level: Level }) {
 function CurrentQuestion({ level, target }: { level: Level; target: boolean }) {
   const { node } = level;
   return (
-    <section className="scroll-mt-24" data-start-current={target ? "" : undefined} data-start-level={level.base}>
-      <h2 className="mb-8 font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,44px)]">
+    <section data-start-current={target ? "" : undefined} data-start-level={level.base}>
+      {/* The top level draws no question: its cards sit under the page's
+          intro (G7), and the home link carries the phrase. */}
+      <h2
+        className={
+          isTop(level)
+            ? "sr-only"
+            : "mb-8 font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,44px)]"
+        }
+      >
         {node.question}
       </h2>
       <div className={`grid grid-cols-1 gap-3 ${startGridCols(node.options.length)}`}>
@@ -116,7 +144,7 @@ function AnsweredLevel({ level }: { level: Level }) {
     <section aria-label={node.question} data-start-answered={level.base}>
       {/* From 640px: the muted question over title-only cards. */}
       <div className="mb-10 hidden sm:block">
-        <h3 className="mb-3 text-lg font-normal text-rb-500">{node.question}</h3>
+        {!isTop(level) && <h3 className="mb-3 text-lg font-normal text-rb-500">{node.question}</h3>}
         <div className={`grid grid-cols-1 gap-3 ${startGridCols(node.options.length)}`}>
           {node.options.map((o) => (
             <AnswerCard key={o.slug} href={optionHref(level.base, o)} label={o.label} chosen={o.slug === chosen} />
@@ -126,7 +154,7 @@ function AnsweredLevel({ level }: { level: Level }) {
       {/* Below 640px: one line, the answer in teal and "Change". */}
       <div className="mb-3 flex flex-col items-center sm:hidden">
         <div className="flex w-full flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
-          <span className="text-rb-500">{node.question}</span>
+          {!isTop(level) && <span className="text-rb-500">{node.question}</span>}
           <span className={`font-medium ${TEAL_TEXT}`} aria-current="step">
             {picked?.label}
           </span>
