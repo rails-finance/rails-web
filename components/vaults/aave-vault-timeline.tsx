@@ -72,7 +72,7 @@ import { utcInstant } from "@/components/vaults/aave-vault-format";
 import { vaultExplorer } from "@/lib/vaults/explorer";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromVaultDrawn } from "@/lib/shared/timeline-boundary";
-import { chainMeta, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { vaultTermsNotes, type MarketNote } from "@/lib/shared/market-note";
 import { AAVE_VAULT_TIMELINE_KEY, aaveVaultTimelineRuns, vaultEventToActivity } from "@/lib/aave-vaults/timeline-runs";
 import type { AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
@@ -221,8 +221,6 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
               withheld,
               tailMaxRows(MAINNET_CHAIN_ID),
               timeline.coverage.logCountIsLowerBound,
-              // On the floor path no gate ran, so the lane is the chain's own logs lane by name.
-              reconcile?.lane ?? chainMeta(MAINNET_CHAIN_ID).logsRpcEnv,
             )}
           >
             This address has {timeline.coverage.logCountIsLowerBound ? "at least " : ""}
@@ -364,14 +362,13 @@ export function AaveVaultTimeline({ timeline, family, vaultName, shareSymbol, as
  *  the block the two were reconciled at. */
 function HistoryLine({ coords, timeline }: { coords: VaultTimelineCoords; timeline: VaultHolderTimeline }) {
   const h = timeline.history;
-  const lane = timeline.reconcile?.lane ?? "";
   if (!h || timeline.unread || !timeline.reconcile) return null;
   // The line is about the rows this page DREW. A gate that failed, a life above
   // what the store holds, and a life still being built all draw none, and each
   // already states its own reason — saying "N rows came from the store" over an
   // empty list would name a set the reader cannot see.
   if (!timeline.reconcile.reconciled || timeline.coverage.withheldAbove != null || h.building) return null;
-  const prov = vaultStoredRowsProv(coords, h, lane, "");
+  const prov = vaultStoredRowsProv(coords, h, "");
   return (
     <p
       className="mt-2 max-w-3xl text-[11px] leading-relaxed text-rb-500"
@@ -383,7 +380,7 @@ function HistoryLine({ coords, timeline }: { coords: VaultTimelineCoords; timeli
       <Prov info={prov}>
         {h.source === "stored+head"
           ? `${n(h.tailRows)} rows at or below block ${n(h.cut ?? 0)} from Rails's store of chain readings, ${n(h.headRows)} rows above it read now`
-          : `Every row read from the chain on this request`}
+          : `Every row read on this request`}
       </Prov>
       ; reconciled at block {n(timeline.blockNumber)}.
     </p>

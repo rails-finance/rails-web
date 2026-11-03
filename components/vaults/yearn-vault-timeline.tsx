@@ -49,7 +49,6 @@ import { VaultTimelineRow, rawAmount as raw, type VaultTimelineProvKit } from "@
 import { vaultExplorer } from "@/lib/vaults/explorer";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromVaultDrawn } from "@/lib/shared/timeline-boundary";
-import { chainMeta } from "@/lib/shared/chains";
 import { AAVE_VAULT_TIMELINE_KEY, aaveVaultTimelineRuns, vaultEventToActivity } from "@/lib/aave-vaults/timeline-runs";
 import { YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import { YEARN_VAULT_TIMELINE_CEILING } from "@/lib/sources/chain/yearn-ethereum-vault-timeline";
@@ -154,7 +153,6 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
               withheld,
               YEARN_VAULT_TIMELINE_CEILING,
               timeline.coverage.logCountIsLowerBound,
-              reconcile?.lane ?? chainMeta(YEARN_CHAIN_ID).logsRpcEnv,
             )}
           >
             This address has {timeline.coverage.logCountIsLowerBound ? "at least " : ""}

@@ -170,7 +170,6 @@ export function CompoundAbsorbBreakdown({
           info={absorbFactorProv(l.symbol, which === "liquidate" ? "liquidate factor" : "liquidation factor", coords, {
             value: pct(v),
             readBlock: factors!.readBlock,
-            readBy: factors!.readBy,
           })}
           value={pct(v)}
         >

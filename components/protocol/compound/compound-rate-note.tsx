@@ -24,8 +24,6 @@ export interface CompoundRates {
   now: Rate;
   /** The block before this event, where `now` is read. */
   readBlock: number;
-  /** rails-server answered both reads. */
-  readBy?: "rails-server";
 }
 
 const store = createReadStore<CompoundRates>();
@@ -60,7 +58,6 @@ export function CompoundRateNote({
   block: number;
 }) {
   const [rates, setRates] = useState<Record<number, Rate> | null>(null);
-  const [readBy, setReadBy] = useState<"rails-server" | undefined>(undefined);
   const readBlock = block - 1;
 
   useEffect(() => {
@@ -71,10 +68,9 @@ export function CompoundRateNote({
       signal: ac.signal,
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: { rates?: Record<number, Rate>; readBy?: string } | null) => {
+      .then((d: { rates?: Record<number, Rate> } | null) => {
         if (!d?.rates) return;
         setRates(d.rates);
-        setReadBy(d.readBy === "rails-server" ? "rails-server" : undefined);
       })
       .catch(() => {});
     return () => ac.abort();
@@ -83,8 +79,8 @@ export function CompoundRateNote({
   const then = rates?.[prevBlock];
   const now = rates?.[readBlock];
   useEffect(() => {
-    if (then && now) store.set(keyOf(chainId, marketKey, prevBlock, block), { then, now, readBlock, readBy });
-  }, [then, now, chainId, marketKey, prevBlock, block, readBlock, readBy]);
+    if (then && now) store.set(keyOf(chainId, marketKey, prevBlock, block), { then, now, readBlock });
+  }, [then, now, chainId, marketKey, prevBlock, block, readBlock]);
   if (!then || !now) return null;
   return (
     <p className="px-5 pb-2 text-xs leading-relaxed text-rb-500" data-rate-note="">

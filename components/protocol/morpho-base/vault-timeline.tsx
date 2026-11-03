@@ -432,7 +432,7 @@ function HistoryLine({ coords, timeline }: { coords: VaultTimelineCoords; timeli
       <Prov info={morphoVaultTimelineStoredRowsProv(coords, h, lane)}>
         {h.source === "stored+head"
           ? `${n(h.tailRows)} rows at or below block ${n(h.cut ?? 0)} from Rails's store of chain readings, ${n(h.headRows)} rows above it read now`
-          : `Every row read from the chain on this request`}
+          : `Every row read on this request`}
       </Prov>
       ; reconciled at block {n(timeline.blockNumber)}.
     </p>

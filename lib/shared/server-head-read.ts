@@ -3,12 +3,13 @@
 // The head routes (`/api/at-block/aave-v3/position`, `/compound/position`,
 // `/morpho/position`, …) answer with `head`: the block's time, when
 // rails-server read it and the leg that answered. A receipt over such an
-// answer names the block for "@ head" and ends its via line with who read it:
-// "@ block 26,311,357 · read by rails-server at 07:51:02 UTC through <leg>".
-// A receipt over a read the web made itself keeps "@ head". A figure computed
-// over rails-server's stored snapshot (lib/sources/api/head-snapshot.ts) says
-// so: "@ block N · rails-server's stored read, taken 2026-11-01 07:51:02 UTC
-// through <leg>, because the latest read failed".
+// answer names the block for "@ head" and ends its via line with the time of
+// the read: "@ block 26,311,357 · read at 07:51:02 UTC". Who read it and
+// through which leg stay out of the receipt (rails-ops
+// standards/provenance-receipts-grammar.md §3). A receipt over a read the web
+// made itself keeps "@ head". A figure computed over the stored snapshot
+// (lib/sources/api/head-snapshot.ts) says so: "@ block N · stored read, taken
+// 2026-11-01 07:51:02 UTC, because the latest read failed".
 
 import type { Provenance } from "@/components/shared/provenance";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
@@ -67,13 +68,13 @@ export function serverReadAt(
   return head && block != null ? { ...head, block } : undefined;
 }
 
-/** The via line's tail for a read rails-server made: when it read it and the
- *  leg that answered. Empty where the web read the chain. */
+/** The via line's tail for a read rails-server made: when it was read, and
+ *  for a stored read that the latest read failed. Empty where the web read the chain. */
 export function serverReadVia(readBy?: (PositionHeadStamp & { stored?: true }) | null): string {
   if (!readBy) return "";
   if (readBy.stored)
-    return ` · rails-server's stored read, taken ${readBy.readAt.slice(0, 10)} ${readBy.readAt.slice(11, 19)} UTC through ${readBy.provider}, because the latest read failed`;
-  return ` · read by rails-server at ${readBy.readAt.slice(11, 19)} UTC through ${readBy.provider}`;
+    return ` · stored read, taken ${readBy.readAt.slice(0, 10)} ${readBy.readAt.slice(11, 19)} UTC, because the latest read failed`;
+  return ` · read at ${readBy.readAt.slice(11, 19)} UTC`;
 }
 
 /** A receipt over rails-server's read: "@ head" or "at head" in the via line and the

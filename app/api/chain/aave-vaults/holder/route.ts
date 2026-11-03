@@ -29,7 +29,12 @@ import { publicErrorMessage } from "@/lib/api/public-error";
 // hash; this route answers questions about ONE
 // address and says so rather than reading nothing.
 //
-// Node runtime, no edge caching: every figure is a call at the head.
+// THE CENSUS FIRST: the reading is the daily census's rows for the address, at
+// the census block, with `census.stamp` stating it; the chain read at the head
+// is the fallback where rails-server does not answer
+// (lib/sources/chain/aave-ethereum-holder-sweep.ts).
+//
+// Node runtime, no edge caching.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

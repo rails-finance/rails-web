@@ -2,11 +2,12 @@
 // carry: its e-mode changes (Pool UserEModeSet) and the reserves it ever turned
 // on as collateral (Pool ReserveUsedAsCollateralEnabled), read from the Pool's
 // logs by the wallet's topic over the Pool's whole life. Each e-mode change
-// carries the category's limits read at its block. SparkLend
-// (/api/chain/spark/account-switches) answers through here; a route keeps an
-// answer a few minutes per wallet, since a new switch can land at any block.
-// Aave V3 Base and Seamless read rails-server instead
-// (lib/api/aave-base-account-switches.ts).
+// carries the category's limits read at its block. Aave V3 Arbitrum
+// (/api/chain/aave-v3-arbitrum/account-switches) answers through here; Aave V3
+// Core, Prime and EtherFi and SparkLend read rails-server first and come here
+// where it cannot answer (lib/api/aave-family-account-switches.ts); Aave V3
+// Base and Seamless read rails-server only. A route keeps an answer a few
+// minutes per wallet, since a new switch can land at any block.
 //
 // SERVER-ONLY.
 

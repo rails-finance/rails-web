@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { accountSwitchesRoute } from "@/lib/sources/chain/aave-family-account-switches";
+import { proxyAccountSwitches, type AccountSwitchesLane } from "@/lib/api/aave-family-account-switches";
 import { AAVE_V3_MARKETS, type AaveV3MarketKey } from "@/lib/aave-v3/asset-catalog";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 // An Aave V3 Ethereum account's e-mode changes and the reserves it ever turned
-// on as collateral, per market (?market=core|prime|etherfi), from that
-// market's Pool logs (lib/sources/chain/aave-family-account-switches.ts); the
+// on as collateral, per market (?market=core|prime|etherfi), from rails-server
+// (lib/api/aave-family-account-switches.ts: the mainnet Sieve's rows to its
+// checkpoint, the chain past it); where rails-server cannot answer, from that
+// market's Pool logs (lib/sources/chain/aave-family-account-switches.ts). The
 // index's timeline rows carry neither.
 //
 // Node runtime.
@@ -21,7 +24,13 @@ const FIRST_BLOCK: Record<AaveV3MarketKey, bigint> = {
   etherfi: BigInt(20_625_000),
 };
 
-const answers = new Map(
+const LANE: Record<AaveV3MarketKey, AccountSwitchesLane> = {
+  core: "aave-v3-core",
+  prime: "aave-v3-prime",
+  etherfi: "aave-v3-etherfi",
+};
+
+const chainReads = new Map(
   AAVE_V3_MARKETS.map((m) => [
     m.key,
     accountSwitchesRoute(
@@ -32,7 +41,8 @@ const answers = new Map(
 );
 
 export async function GET(request: NextRequest) {
-  const answer = answers.get((request.nextUrl.searchParams.get("market") ?? "core") as AaveV3MarketKey);
-  if (!answer) return NextResponse.json({ error: "unknown market", code: "bad_request" }, { status: 400 });
-  return answer(request.nextUrl.searchParams.get("wallet"));
+  const market = (request.nextUrl.searchParams.get("market") ?? "core") as AaveV3MarketKey;
+  const chainRead = chainReads.get(market);
+  if (!chainRead) return NextResponse.json({ error: "unknown market", code: "bad_request" }, { status: 400 });
+  return proxyAccountSwitches(request, LANE[market], chainRead);
 }

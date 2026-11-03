@@ -150,3 +150,15 @@ export async function readBlockTimes(
   for (const r of answers.flat()) if (r.timestamp != null) out.set(r.block, r.timestamp);
   return out;
 }
+
+/** The timestamp of the block a holder page pins: the same store first, the
+ *  chain's header where it does not answer. */
+export async function pinnedBlockTimestamp(
+  chainId: VaultBlockChain,
+  block: bigint,
+  chain: { getBlock(args: { blockNumber: bigint }): Promise<{ timestamp: bigint }> },
+): Promise<number> {
+  const stored = (await readBlockTimes(chainId, [Number(block)])).get(Number(block));
+  if (stored != null) return stored;
+  return Number((await chain.getBlock({ blockNumber: block })).timestamp);
+}
