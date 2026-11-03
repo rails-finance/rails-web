@@ -29,11 +29,16 @@
 //   8  the four rosters' heads link the index
 //   9  the dev provenance tripwire reports no uncovered figure (SKIP on a
 //      production build)
+//  10  the default view (ui-jobs 485): the preset's rows against ?show=all,
+//      its chip, the counts line, its removal and Reset, the three sorts
+//  11  ?asset=ETH,WETH keeps the preset; a token it would empty lifts it
+// Sections 0 to 9 read /vaults?show=all and the rosters' ?show=all pages.
 
 import { chromium } from "playwright";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkRosterView, presetKeeps, readRosterRows } from "./lib/vault-roster-view.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3033";
@@ -103,7 +108,8 @@ function rosterRows(html) {
 const rosterPages = {};
 const expected = {};
 for (const p of PROTOCOLS) {
-  const r = await get(ROSTER[p].href);
+  // Every row of the roster (ui-jobs 485: the default view is the preset).
+  const r = await get(`${ROSTER[p].href}?show=all`);
   rosterPages[p] = { status: r.status, html: r.html, ...rosterRows(r.html) };
   if (ROSTER[p].figure) {
     const text = figureText(r.html, ROSTER[p].figure) ?? "";
@@ -121,7 +127,8 @@ console.log(`rosters state: ${PROTOCOLS.map((p) => `${p} ${expected[p]}`).join("
 // ── 0: the route ────────────────────────────────────────────────────────────
 const browser = await chromium.launch();
 const page = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
-const res = await page.goto(`${BASE}/vaults`, { waitUntil: "networkidle", timeout: 300_000 });
+// ui-jobs 485: every row; section 10 checks the default view against it.
+const res = await page.goto(`${BASE}/vaults?show=all`, { waitUntil: "networkidle", timeout: 300_000 });
 check("0a /vaults answers 200", res?.status() === 200, String(res?.status()));
 await page.waitForSelector("[data-vault-index] [data-vault-row]", { timeout: 120_000 });
 const blocks = await page
@@ -336,6 +343,57 @@ if ((await page.locator("[data-prov-tripwire]").count()) > 0) {
   check("9  the dev provenance tripwire reports no uncovered figure", uncovered === 0, `${uncovered} uncovered`);
 } else {
   skip("9  the dev provenance tripwire", "no tripwire bookends on this build (production renders none)");
+}
+
+// ── 10: the default view (ui-jobs 485) ──────────────────────────────────────
+await checkRosterView({ page, base: BASE, route: "/vaults", scope: "[data-vault-index]", check, tag: "10" });
+
+// ── 11: a token link keeps the preset, and lifts it where it would empty ───
+{
+  const open = async (q) => {
+    await page.goto(`${BASE}/vaults${q}`, { waitUntil: "networkidle", timeout: 300_000 });
+    await page.waitForSelector("[data-vault-index] [data-figure='shown-count']", { timeout: 120_000 });
+    return {
+      rows: await readRosterRows(page, "[data-vault-index]"),
+      chip: await page.locator("[data-vault-index] [data-default-chip='show']").count(),
+    };
+  };
+  const all = (await open("?asset=ETH,WETH&show=all")).rows.filter((r) => r.group === "funded");
+  const kept = await open("?asset=ETH,WETH");
+  const keptFunded = kept.rows.filter((r) => r.group === "funded");
+  check(
+    "11a ?asset=ETH,WETH keeps the preset: the WETH vaults it keeps, under the chip",
+    kept.chip === 1 &&
+      all.length > 0 &&
+      keptFunded.length === all.filter(presetKeeps).length &&
+      keptFunded.every((r) => all.some((a) => a.address === r.address) && presetKeeps(r)),
+    `${keptFunded.length} of ${all.length}, chip ${kept.chip}`,
+  );
+  // A token every vault of which the preset hides: the link opens on all of them.
+  const full = (await open("?show=all")).rows.filter((r) => r.group === "funded");
+  const bySymbol = new Map();
+  for (const g of await page.locator("[data-vault-index] [data-asset-group]").evaluateAll((els) =>
+    els.map((el) => ({
+      symbol: el.querySelector("h2 a")?.textContent?.trim(),
+      rows: [...el.querySelectorAll("[data-vault-row]")].map((r) => r.getAttribute("data-vault-row")),
+    })),
+  ))
+    bySymbol.set(g.symbol, [...(bySymbol.get(g.symbol) ?? []), ...g.rows]);
+  // A symbol that did not decode is an option by address, so it is left out.
+  const hidden = [...bySymbol].find(
+    ([symbol, addrs]) =>
+      symbol != null && !symbol.startsWith("0x") && addrs.every((a) => !presetKeeps(full.find((r) => r.address === a))),
+  );
+  if (!hidden) skip("11b a link whose token the preset would empty opens without it", "no such token today");
+  else {
+    const lifted = await open(`?asset=${encodeURIComponent(hidden[0])}`);
+    const n = lifted.rows.filter((r) => r.group === "funded").length;
+    check(
+      "11b a link whose token the preset would empty opens without it",
+      lifted.chip === 0 && n === hidden[1].length,
+      `${hidden[0]}: ${n} of ${hidden[1].length} drawn, chip ${lifted.chip}`,
+    );
+  }
 }
 
 await browser.close();

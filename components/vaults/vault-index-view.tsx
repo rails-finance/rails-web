@@ -13,7 +13,7 @@
 import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
-import { isoSeconds, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
+import { isoSeconds, RosterBlock, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import type { VaultRowReceipts } from "@/components/vaults/vault-row";
 import { chainMeta, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { protocolForPathname } from "@/lib/shared/protocols";
@@ -210,42 +210,35 @@ export function VaultIndexView({
   const registry = useReceiptRegistry();
   const total = vaults.length;
 
-  // One stamp for the oldest roster's read; its receipt names every roster's
-  // block and time. Each roster's block stays on a hook the verifiers read.
-  const readAt = (
-    <RosterReadStamp
-      reads={rosters
-        .filter((r) => !r.chainStale)
-        .map((r) => ({
-          label: `${VAULT_INDEX_PROTOCOL_LABEL[r.protocol]} on ${chainName(r.chainId)}`,
-          block: r.blockNumber,
-          at: r.readBy?.blockTime ?? isoSeconds(r.readAt),
-        }))}
-    >
-      {rosters.map((r) => (
-        <span
-          key={r.protocol}
-          hidden
-          data-index-roster={r.protocol}
-          data-index-chain={r.chainId}
-          data-index-block={r.blockNumber}
-          data-directory-block={r.chainStale ? undefined : r.blockNumber}
-        />
-      ))}
-    </RosterReadStamp>
-  );
-
+  const readOf = (r: VaultIndexRoster) => ({
+    label: `${VAULT_INDEX_PROTOCOL_LABEL[r.protocol]} on ${chainName(r.chainId)}`,
+    block: r.blockNumber,
+    at: r.readBy?.blockTime ?? isoSeconds(r.readAt),
+  });
   const counts = rosters.filter((r) => !r.chainStale);
+
+  // One stamp for the oldest roster's read; its receipt names every roster's
+  // block and time, and the panel names each.
+  const readAt = <RosterReadStamp reads={counts.map(readOf)} />;
+
   const drawer = (
     <p data-index-counts={total}>
       Every vault the rosters list:{" "}
       {counts.map((r, i) => (
-        <span key={r.protocol} data-index-count={r.protocol} data-count={r.count}>
+        <span
+          key={r.protocol}
+          data-index-count={r.protocol}
+          data-count={r.count}
+          data-index-roster={r.protocol}
+          data-index-chain={r.chainId}
+          data-index-block={r.blockNumber}
+        >
           {i > 0 && ", "}
           <Link href={vaultIndexRosterHref(r.protocol)} className={PAGE_LINK} prefetch={false}>
             {VAULT_INDEX_PROTOCOL_LABEL[r.protocol]}
           </Link>{" "}
-          <Prov info={rosterCountProv(r)}>{n(r.count)}</Prov>
+          <Prov info={rosterCountProv(r)}>{n(r.count)}</Prov> at <RosterBlock read={readOf(r)} chainId={r.chainId} />
+          {r.chainId !== MAINNET_CHAIN_ID && ` on ${chainName(r.chainId)}`}
         </span>
       ))}
       ; each row opens under its protocol.

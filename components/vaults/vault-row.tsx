@@ -83,6 +83,10 @@ export function VaultRow({
       data-asset={v.asset.address}
       data-total-assets-raw={raw}
       data-share-price-raw={v.sharePrice?.raw ?? ""}
+      data-vault-family={v.family}
+      data-holders-live={v.census?.live ?? ""}
+      data-standing={v.standing.join(" ")}
+      data-created-block={v.createdBlock ?? ""}
       {...hooks}
     >
       <Link

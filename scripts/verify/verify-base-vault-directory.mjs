@@ -105,6 +105,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readStoreSeries, readVaultStrip, vaultStripChecks } from "./lib/vault-strip.mjs";
 import { expectedRoster } from "./lib/served-vault-roster.mjs";
+import { checkRosterView } from "./lib/vault-roster-view.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3022";
@@ -237,7 +238,9 @@ const page = await context.newPage();
 // vault. Every roster check below reads inside `[data-roster-panel]`, the
 // wrapper the rows have carried since they were a drawer, so nothing under it
 // changed with the move.
-const res0 = await page.goto(`${BASE}/base/morpho/vaults`, { waitUntil: "networkidle" });
+// ui-jobs 485: every row, by size, which is what the roster checks below read;
+// section 16 checks the default view (the preset, Holders) against it.
+const res0 = await page.goto(`${BASE}/base/morpho/vaults?show=all&sortBy=size`, { waitUntil: "networkidle" });
 check("0a GET /base/morpho/vaults answers 200", res0?.status() === 200, `status ${res0?.status()}`);
 await page.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 120_000 });
 
@@ -257,9 +260,13 @@ await page.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 12
 // the call went to the intro drawer, so the line is what is read.
 // Pinned (ui-jobs 407 step 5): the printed block is the BlockRef inside the
 // read-at line, read by its hook, then held against the line's attribute.
+// ui-jobs 485: the read-at line became the read stamp (its block on
+// `data-roster-read-block`), and the block is printed in the "about these
+// vaults" panel, linked; the panel's BlockRef is what is read (textContent: the
+// panel is closed at rest), held against the attribute and the stamp.
 const statedBlock = Number(
   (
-    (await page.locator("[data-roster-panel] [data-directory-block] [data-block-ref]").first().innerText()) ?? ""
+    (await page.locator("[data-roster-panel] [data-intro-drawer] [data-block-ref]").first().textContent()) ?? ""
   ).replace(/[^\d]/g, "") || NaN,
 );
 // The page's own header states the same block in `[data-directory-block]`, and
@@ -271,7 +278,11 @@ const headerBlockAttr = (await page.locator("[data-directory-block]").count())
   : null;
 check(
   "0b the roster page states the block it read at, in its header attribute and in its own prose, and the two agree",
-  Number.isInteger(statedBlock) && statedBlock > 0 && headerBlockAttr === statedBlock,
+  Number.isInteger(statedBlock) &&
+    statedBlock > 0 &&
+    headerBlockAttr === statedBlock &&
+    Number(await page.locator("[data-roster-read-block]").first().getAttribute("data-roster-read-block")) ===
+      statedBlock,
   `prose block ${statedBlock}, header attribute ${headerBlockAttr}`,
 );
 const blockNumber = BigInt(statedBlock);
@@ -440,13 +451,16 @@ check(
   facetRows.length === ownV10Funded && facetRows.every((r) => r.family === "v1.0"),
   `${facetRows.length} shown, ${ownV10Funded} expected`,
 );
-await rosterPanel
-  .locator("button", { hasText: /^Reset$/ })
-  .first()
-  .click();
+// ui-jobs 485: the chip row's Reset also returns the preset (section 16), so
+// the Family chip's own remove is what clears the facet here.
+await rosterPanel.locator('button[aria-label="Remove Family filter"]').click();
 await page.waitForTimeout(200);
 const afterReset = (await readRows()).filter((r) => r.group === "funded").length;
-check("7b Reset restores every funded row", afterReset === funded.length, `${afterReset} of ${funded.length}`);
+check(
+  "7b removing the Family chip restores every funded row",
+  afterReset === funded.length,
+  `${afterReset} of ${funded.length}`,
+);
 
 // ── 8: the dev provenance tripwire ──────────────────────────────────────────
 if ((await page.locator("[data-prov-tripwire]").count()) > 0) {
@@ -608,6 +622,16 @@ check(
   const store = await readStoreSeries(BASE, 8453, stripVault);
   vaultStripChecks(check, "17", strip, store, { chain: 8453, vault: stripVault, censusFamily: true });
 }
+
+// ── 16: the default view (ui-jobs 485) ──────────────────────────────────────
+await checkRosterView({
+  page,
+  base: BASE,
+  route: "/base/morpho/vaults",
+  scope: "[data-roster-panel]",
+  check,
+  tag: "16",
+});
 
 await browser.close();
 console.log(`\n${passes} passed, ${failures} failed${skipped ? `, ${skipped} skipped` : ""}`);

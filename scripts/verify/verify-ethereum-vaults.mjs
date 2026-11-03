@@ -204,6 +204,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readStoreSeries, readVaultStrip, vaultStripChecks } from "./lib/vault-strip.mjs";
 import { pageBlockRecent, serverHeadBlock } from "./lib/server-head.mjs";
+import { checkRosterView } from "./lib/vault-roster-view.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 const BASE = process.env.BASE ?? "http://localhost:3611";
@@ -328,7 +329,9 @@ const page = await context.newPage();
  *  and the run stops with the wait's own message. */
 const ROSTER = "/ethereum/aave/vaults";
 async function openRoster(target = page) {
-  const res = await target.goto(`${BASE}${ROSTER}`, { waitUntil: "networkidle" });
+  // ui-jobs 485: every row, by size, which is what the roster checks read; the
+  // last section checks the default view (the preset, Holders) against it.
+  const res = await target.goto(`${BASE}${ROSTER}?show=all&sortBy=size`, { waitUntil: "networkidle" });
   await target.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 90000 });
   return res;
 }
@@ -685,7 +688,10 @@ check(
 // script's own read, so a runtime-locale format would already have gone red on
 // 6 and 7c. This check names the one figure those do not cover — the block —
 // so the assertion is explicit rather than a side effect.
-const blockText = ((await page.locator("[data-directory-block]").innerText()) ?? "").replace(/\s+/g, " ");
+// ui-jobs 485: the block is printed in the "about these vaults" panel.
+const blockText = (
+  (await page.locator("[data-roster-panel] [data-intro-drawer] [data-block-ref]").first().textContent()) ?? ""
+).replace(/\s+/g, " ");
 check(
   "9  the block is printed in en-US, not in the runtime's locale",
   blockText.includes(statedBlock.toLocaleString("en-US")),
@@ -981,6 +987,9 @@ check(
   const store = await readStoreSeries(BASE, 1, stripVault);
   vaultStripChecks(check, "17", strip, store, { chain: 1, vault: stripVault, censusFamily: true });
 }
+
+// ── the default view (ui-jobs 485) ──────────────────────────────────────────
+await checkRosterView({ page, base: BASE, route: ROSTER, scope: "[data-roster-panel]", check, tag: "20" });
 
 await browser.close();
 console.log(`\n${passes}/${passes + failures} checks passed${skipped ? ` · ${skipped} SKIP` : ""}`);
