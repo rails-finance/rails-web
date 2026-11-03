@@ -138,8 +138,9 @@ async function resolveOne(addr: string): Promise<string | null> {
  * map keyed by the lower-cased input address; a value is the `.eth` name or
  * null (no primary name, malformed input, or RPC failure). Never throws.
  * Deduplicates and skips malformed inputs; the uncached addresses go to
- * rails-server in one request per 50, and the chain is read only for those it
- * did not find. Names are cached in-process so repeat pages don't re-resolve.
+ * rails-server in one request per 50; its found and none answers stand, and
+ * the chain is read only for the rest (offchain, failed, a route that cannot
+ * answer). Names are cached in-process so repeat pages don't re-resolve.
  */
 export async function resolveEnsNames(addresses: string[]): Promise<Record<string, string | null>> {
   const unique = Array.from(
@@ -152,12 +153,12 @@ export async function resolveEnsNames(addresses: string[]): Promise<Record<strin
     if (hit) out[addr] = hit.name;
     else ask.push(addr);
   }
-  const served = ask.length ? await serverEnsNames(ask) : new Map<string, string>();
+  const served = ask.length ? await serverEnsNames(ask) : new Map<string, string | null>();
   await Promise.all(
     ask.map(async (addr) => {
-      const name = served.get(addr);
-      if (name) {
-        nameCache.set(addr, { name, expires: Date.now() + HIT_TTL_MS });
+      if (served.has(addr)) {
+        const name = served.get(addr) ?? null;
+        nameCache.set(addr, { name, expires: Date.now() + (name ? HIT_TTL_MS : MISS_TTL_MS) });
         out[addr] = name;
       } else out[addr] = await resolveOne(addr);
     }),

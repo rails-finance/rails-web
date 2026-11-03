@@ -3,9 +3,10 @@
 // `/api/at-block/names` reads a name (forward) or an address's primary name
 // (reverse) at the finalized block floored to an hourly grid, through the
 // at-block store (rails-server routes/atBlockNames.ts; rails-ops decisions/0056).
-// Only a `found` result is an answer: `none` at the grid block may be a name set
-// since, `offchain` a resolver the server does not follow, `failed` a read that
-// did not answer. The callers (lib/ens/resolve-ens.ts,
+// A forward name is taken only on `found`: `none` at the grid block may be a
+// name set since. A reverse name is taken on `found` and on `none` (a pill may
+// lag a new primary name by up to an hour). `offchain` is a resolver the server
+// does not follow, `failed` a read that did not answer. The callers (lib/ens/resolve-ens.ts,
 // lib/morpho-base/resolve-basename.ts) read the chain for every other result,
 // and for all of them where the route cannot answer (`route-gate.ts`).
 
@@ -45,11 +46,13 @@ export async function serverNameAddress(chainId: 1 | 8453, name: string): Promis
   return r.answer;
 }
 
-/** Each address's primary ENS name the server found, keyed by lower-cased
- *  address; an address it did not find (or a batch the route could not answer)
- *  is absent. One request per 50 addresses. */
-export async function serverEnsNames(addresses: readonly string[]): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
+/** Each address's primary ENS name as the server read it, keyed by lower-cased
+ *  address: the name where it found one, null where it read none at the grid
+ *  block (final for a reverse name: a primary name set within the hour shows at
+ *  the next grid block). An address answered offchain or failed, or in a batch
+ *  the route could not answer, is absent. One request per 50 addresses. */
+export async function serverEnsNames(addresses: readonly string[]): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>();
   const chunks: string[][] = [];
   for (let i = 0; i < addresses.length; i += NAMES_MAX_ADDRESSES)
     chunks.push(addresses.slice(i, i + NAMES_MAX_ADDRESSES));
@@ -57,9 +60,10 @@ export async function serverEnsNames(addresses: readonly string[]): Promise<Map<
     chunks.map(async (chunk) => {
       const got = await ask(1, { addresses: chunk.join(",") });
       for (const r of got ?? []) {
-        if (r.status !== "found" || typeof r.address !== "string" || typeof r.answer !== "string" || !r.answer)
-          continue;
-        out.set(r.address.toLowerCase(), r.answer);
+        if (typeof r.address !== "string") continue;
+        if (r.status === "none") out.set(r.address.toLowerCase(), null);
+        else if (r.status === "found" && typeof r.answer === "string" && r.answer)
+          out.set(r.address.toLowerCase(), r.answer);
       }
     }),
   );

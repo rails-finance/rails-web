@@ -1,7 +1,8 @@
 // rails-server's `/api/at-block/names` and `/api/at-block/tx/log-address`
 // clients (lib/sources/api/names-at-block.ts, event-panels-at-block.ts): a
-// name is taken from the server only where it found one, a reverse batch asks
-// once per 50 addresses, and a log-address 404 is the answer "no such log"
+// forward name is taken from the server only where it found one, a reverse
+// name where it found one or read none (the chain is read for the rest), a
+// reverse batch asks once per 50 addresses, and a log-address 404 is the answer "no such log"
 // without marking the route down.
 // Run: npm test
 import test from "node:test";
@@ -96,7 +97,9 @@ test("lookUpEnsAddress: a found name reads no chain, and the second ask reads no
 
 const addr = (i) => "0x" + i.toString(16).padStart(40, "0");
 
-test("reverse: one request per 50 addresses; only found names kept", async () => {
+const STATUSES = ["found", "none", "offchain", "failed"];
+
+test("reverse: one request per 50 addresses; found and none kept, offchain and failed absent", async () => {
   const seen = stubFetch((u) => {
     const asked = u.searchParams.get("addresses").split(",");
     return json({
@@ -105,17 +108,75 @@ test("reverse: one request per 50 addresses; only found names kept", async () =>
       blockTimestamp: 1,
       results: asked.map((a, i) => ({
         address: a,
-        answer: i % 2 ? null : `n${a.slice(-3)}.eth`,
-        status: i % 2 ? "none" : "found",
+        answer: i % 4 === 0 ? `n${a.slice(-3)}.eth` : null,
+        status: STATUSES[i % 4],
       })),
     });
   });
   const list = Array.from({ length: 120 }, (_, i) => addr(i + 1));
   const got = await serverEnsNames(list);
   assert.equal(seen.length, 3);
-  assert.equal(got.size, 60);
+  assert.equal(got.size, 62); // 26 + 26 + 10: the statuses cycle within each 50
   assert.equal(got.get(addr(1)), `n${addr(1).slice(-3)}.eth`);
-  assert.equal(got.has(addr(2)), false);
+  assert.equal(got.get(addr(2)), null);
+  assert.equal(got.has(addr(3)), false);
+  assert.equal(got.has(addr(4)), false);
+});
+
+/** The names route answers every address with `status`; any other URL is a
+ *  chain read, answered with a JSON-RPC error. */
+const reverseThen = (status) => (u) =>
+  u.href.startsWith(API)
+    ? json({
+        chainId: 1,
+        block: 300,
+        blockTimestamp: 1,
+        results: u.searchParams
+          .get("addresses")
+          .split(",")
+          .map((a) => ({ address: a, answer: null, status })),
+      })
+    : json({ jsonrpc: "2.0", id: 1, error: { code: -32000, message: "no chain in tests" } });
+const chainCalls = (seen) => seen.filter((u) => !u.startsWith(API)).length;
+
+test("resolveEnsNames: none is null, cached as a miss, with no chain read", async () => {
+  const list = [addr(7001)];
+  const seen = stubFetch(reverseThen("none"));
+  assert.deepEqual(await resolveEnsNames(list), { [list[0]]: null });
+  assert.deepEqual(await resolveEnsNames(list), { [list[0]]: null });
+  assert.equal(seen.length, 1);
+  assert.equal(chainCalls(seen), 0);
+  skew += 5 * 60 * 1000 + 1_000; // past the miss TTL
+  await resolveEnsNames(list);
+  assert.equal(seen.length, 2);
+  assert.equal(chainCalls(seen), 0);
+});
+
+for (const status of ["failed", "offchain"]) {
+  test(`resolveEnsNames: ${status} reads the chain`, async () => {
+    const seen = stubFetch(reverseThen(status));
+    assert.deepEqual(await resolveEnsNames([addr(7100 + status.length)]), { [addr(7100 + status.length)]: null });
+    assert.ok(chainCalls(seen) > 0, "fell back to getEnsName");
+  });
+}
+
+test("resolveEnsNames: a 5xx reads the chain", async () => {
+  const seen = stubFetch((u) =>
+    u.href.startsWith(API) ? json({ error: "proxy_error" }, 502) : reverseThen("none")(u),
+  );
+  await resolveEnsNames([addr(7200)]);
+  assert.ok(chainCalls(seen) > 0, "fell back to getEnsName");
+});
+
+test("lookUpEnsAddress: forward none still reads the chain", async () => {
+  const seen = stubFetch((u) =>
+    u.href.startsWith(API)
+      ? forward("none", null)()
+      : json({ jsonrpc: "2.0", id: 1, error: { code: -32000, message: "no chain in tests" } }),
+  );
+  const got = await lookUpEnsAddress("forward-none.eth");
+  assert.ok(chainCalls(seen) > 0, "fell back to getEnsAddress");
+  assert.equal(got.address, null);
 });
 
 test("resolveEnsNames: all found asks the server once and no chain", async () => {
