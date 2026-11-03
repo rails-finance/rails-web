@@ -324,42 +324,107 @@ export const dolomiteEventPriceProv = (sym: string, coords: DolomiteCoords, pric
   inputs: eventInputs(coords),
 });
 
-/** The core's own oracle price for one market, read back AT the event's
- *  block — an archive eth_call, not a captured series. */
-export const dolomiteLiqAtBlockPriceProv = (sym: string, coords: DolomiteCoords, priceRaw?: string): Provenance => ({
-  kind: "chain",
-  pclass: "oracle",
-  verify: {
-    kind: "recompute",
-    text:
-      coords.blockNumber != null
-        ? `Re-run the core's getMarketPrice eth_call at block ${coords.blockNumber} against an archive node — the same read the risk engine valued accounts with in that block.`
-        : "Re-run the core's getMarketPrice eth_call at the event's block against an archive node.",
-  },
-  summary: `${sym}'s USD price AT the block this liquidation fired — the margin core's own \`getMarketPrice\` read back at that block (scale 1e(36 − decimals)). This is the figure the risk engine judged the account with when it fired: the core routes every margin check and every seizure through this oracle read, so valuing the legs at it reproduces the engine's own arithmetic.`,
-  contract: MARGIN,
-  via: `archive eth_call @ event block · getMarketPrice${priceRaw ? ` · raw: ${priceRaw}` : ""}`,
-  inputs: eventInputs(coords),
-});
+/** Where one leg's liquidation price came from: the core's LogOraclePrice in
+ *  the liquidation's transaction, getMarketPrice at the block read by
+ *  rails-server ("server-chain") or by the web ("chain"), or one of the two
+ *  where rails-server's answer does not say which ("unnamed"). */
+export type DolomiteLiqPriceSource = "transaction" | "server-chain" | "chain" | "unnamed";
 
-/** One leg of the liquidation valued at the block's own oracle read —
- *  seized collateral or cleared debt. */
+const blockOf = (coords: DolomiteCoords): string =>
+  coords.blockNumber != null ? `block ${coords.blockNumber}` : "the event's block";
+
+/** The price's source in words, for a leg's receipt. */
+const liqPriceWords = (src: DolomiteLiqPriceSource, sym: string, coords: DolomiteCoords): string =>
+  src === "transaction"
+    ? `the price Dolomite's core logged for ${sym} in this transaction`
+    : src === "unnamed"
+      ? `${sym}'s price in this liquidation, which is either the price Dolomite's core logged in this transaction or getMarketPrice at ${blockOf(coords)}, read by rails-server (its answer does not say which)`
+      : `the core's \`getMarketPrice\` for ${sym} read back at the same block${src === "server-chain" ? " by rails-server" : ""}`;
+
+/** One market's price in the liquidation: the core's LogOraclePrice in the
+ *  transaction, or its getMarketPrice read back at the event's block. */
+export const dolomiteLiqAtBlockPriceProv = (
+  sym: string,
+  coords: DolomiteCoords,
+  priceRaw?: string,
+  src: DolomiteLiqPriceSource = "chain",
+): Provenance => {
+  const raw = priceRaw ? ` · raw: ${priceRaw}` : "";
+  if (src === "transaction")
+    return {
+      kind: "chain",
+      pclass: "oracle",
+      verify: txVerify(coords),
+      summary: `${sym}'s USD price in this liquidation — the price Dolomite's core logged in this transaction before it ran the liquidation, per whole token (scale 1e(36 − decimals)). The core values the margin check and the seizure in this operation at that price, so valuing the legs at it reproduces the engine's arithmetic.`,
+      contract: MARGIN,
+      via: `LogOraclePrice in the liquidation's transaction${raw}`,
+      inputs: eventInputs(coords),
+    };
+  if (src === "unnamed")
+    return {
+      kind: "chain",
+      pclass: "oracle",
+      verify: txVerify(coords),
+      summary: `${sym}'s USD price in this liquidation, per whole token (scale 1e(36 − decimals)). Of the two legs' prices, one is the price Dolomite's core logged in this transaction and the other is getMarketPrice at ${blockOf(coords)}, read by rails-server; its answer does not say which leg is which.`,
+      contract: MARGIN,
+      via: `LogOraclePrice in the transaction, or getMarketPrice @ event block · read by rails-server${raw}`,
+      inputs: eventInputs(coords),
+    };
+  return {
+    kind: "chain",
+    pclass: "oracle",
+    verify: {
+      kind: "recompute",
+      text:
+        coords.blockNumber != null
+          ? `Re-run the core's getMarketPrice eth_call at block ${coords.blockNumber} against an archive node — the same read the risk engine valued accounts with in that block.`
+          : "Re-run the core's getMarketPrice eth_call at the event's block against an archive node.",
+    },
+    summary: `${sym}'s USD price AT the block this liquidation fired — the margin core's own \`getMarketPrice\` read back at that block (scale 1e(36 − decimals)). This is the figure the risk engine judged the account with when it fired: the core routes every margin check and every seizure through this oracle read, so valuing the legs at it reproduces the engine's own arithmetic.`,
+    contract: MARGIN,
+    via: `archive eth_call @ event block · getMarketPrice${src === "server-chain" ? " · read by rails-server" : ""}${raw}`,
+    inputs: eventInputs(coords),
+  };
+};
+
+/** One leg of the liquidation valued at its price — seized collateral or
+ *  cleared debt. */
 export const dolomiteLiqLegValueProv = (
   leg: "seized collateral" | "cleared debt",
   sym: string,
   coords: DolomiteCoords,
   vals: { amount: string; price: string },
+  src: DolomiteLiqPriceSource = "chain",
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
   verify: txVerify(coords),
-  summary: `What the ${leg} was worth when the liquidation fired — the LogLiquidate's own emitted \`deltaWei\` for this leg (${vals.amount}) × the core's \`getMarketPrice\` for ${sym} read back at the same block ($${vals.price}). Amount from the log, price from the block's own archive read: the product is the value the risk engine itself was seeing.`,
+  summary:
+    src === "chain"
+      ? `What the ${leg} was worth when the liquidation fired — the LogLiquidate's own emitted \`deltaWei\` for this leg (${vals.amount}) × the core's \`getMarketPrice\` for ${sym} read back at the same block ($${vals.price}). Amount from the log, price from the block's own archive read: the product is the value the risk engine itself was seeing.`
+      : `What the ${leg} was worth when the liquidation fired — the LogLiquidate's emitted \`deltaWei\` for this leg (${vals.amount}) × ${liqPriceWords(src, sym, coords)} ($${vals.price}).`,
   contract: MARGIN,
-  via: `LogLiquidate deltaWei × getMarketPrice @ event block`,
-  formula: "emitted amount × oracle price at block",
+  via:
+    src === "transaction"
+      ? "LogLiquidate deltaWei × LogOraclePrice in the transaction"
+      : src === "unnamed"
+        ? "LogLiquidate deltaWei × (LogOraclePrice in the transaction, or getMarketPrice @ event block) · read by rails-server"
+        : `LogLiquidate deltaWei × getMarketPrice @ event block${src === "server-chain" ? " · read by rails-server" : ""}`,
+  formula: src === "transaction" ? "emitted amount × logged oracle price" : "emitted amount × oracle price at block",
   inputs: eventInputs(coords, [
     { label: "amount", value: vals.amount, kind: "chain", pclass: "emitted", note: "the leg's emitted deltaWei" },
-    { label: "price", value: `$${vals.price}`, kind: "chain", pclass: "oracle", note: "getMarketPrice at the block" },
+    {
+      label: "price",
+      value: `$${vals.price}`,
+      kind: "chain",
+      pclass: "oracle",
+      note:
+        src === "transaction"
+          ? "logged in this transaction"
+          : src === "unnamed"
+            ? "logged in this transaction, or getMarketPrice at the block"
+            : `getMarketPrice at the block${src === "server-chain" ? ", read by rails-server" : ""}`,
+    },
   ]),
 });
 

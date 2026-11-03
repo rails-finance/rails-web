@@ -3,6 +3,8 @@ import { getAddress, parseAbi } from "viem";
 import { alchemyClient } from "@/lib/sources/chain/rpc";
 import { DOLOMITE_ADDRESSES } from "@/lib/dolomite/asset-catalog";
 import { publicErrorMessage } from "@/lib/api/public-error";
+import { readerIpFromRequest } from "@/lib/api/reader-ip";
+import { serverDolomiteLiquidation } from "@/lib/sources/api/event-panels-at-block";
 
 // The liquidation-forensics read: the margin core's own oracle prices AND the
 // liquidation spread AT the event's block — one archive multicall, the
@@ -22,6 +24,14 @@ import { publicErrorMessage } from "@/lib/api/public-error";
 // carries at most a handful of liquidations, and the detail panel fetches
 // lazily on expand. Block-pinned facts are immutable, so the response is
 // cached hard at the edge.
+//
+// rails-server's `/api/at-block/dolomite/liquidation` is asked first: it
+// answers the same body, with the prices the core logged in the liquidation's
+// transaction (LogOraclePrice, from its Sieve tables) where it has them and
+// getMarketPrice at the block for a leg without, and names which in
+// `priceSource` ("transaction" | "chain" | "mixed"); `readBy: "rails-server"`
+// marks its answer. Where it cannot answer, the multicalls below read the
+// chain, and `priceSource` is "chain".
 
 export const runtime = "nodejs";
 
@@ -60,6 +70,18 @@ export async function GET(request: NextRequest) {
     /^0x[0-9a-f]{40}$/.test(ownerParam) && /^\d+$/.test(acctParam)
       ? { owner: getAddress(ownerParam), number: BigInt(acctParam) }
       : null;
+
+  const immutable = { headers: { "Cache-Control": "public, max-age=31536000, immutable" } };
+  const served = await serverDolomiteLiquidation(
+    {
+      block: Number(blockNumber),
+      held: Number(held),
+      owed: Number(owed),
+      ...(liquidAccount ? { owner: ownerParam, account: acctParam } : {}),
+    },
+    readerIpFromRequest(request),
+  );
+  if (served) return NextResponse.json({ ...served, readBy: "rails-server" }, immutable);
 
   try {
     const [heldPrice, owedPrice, pairSpread] = await alchemyClient().multicall({
@@ -152,6 +174,7 @@ export async function GET(request: NextRequest) {
         // caller values legs as wei × price ÷ 1e36 (decimals cancel).
         heldPriceRaw: heldRaw.toString(),
         owedPriceRaw: owedRaw.toString(),
+        priceSource: "chain",
         // Decimal.D256 (1e18 = 1.0): the account-aware spread when the
         // liquidated account was named (override-aware, collapsing to base ×
         // (1 + held premium) × (1 + owed premium) on plain accounts), the
@@ -169,7 +192,7 @@ export async function GET(request: NextRequest) {
         // null when the account was not named or the read missed.
         healthBefore,
       },
-      { headers: { "Cache-Control": "public, max-age=31536000, immutable" } },
+      immutable,
     );
   } catch (error) {
     console.error("Error reading Dolomite prices at block:", error);
