@@ -59,6 +59,9 @@ export type ValueHeldRow = {
   prices: string;
   /** Whose oracle priced it, where it is not the explorer's own ("Aave V3's oracle"). */
   oracleOf: string | null;
+  /** A price the server exempts from the 24-hour limit, as it words it ("crvUSD's Aave
+   *  price is exempt from the 24-hour limit"), read from the end of its price source. */
+  exemption: string | null;
 };
 
 export type ValueHeld = {
@@ -79,6 +82,13 @@ const TOTAL_TOLERANCE_USD = 1;
 const isFiniteNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
 /** "on-chain_oracle" -> "on-chain oracle": the server's tag, read as words. */
+const EXEMPTION = /;\s*([^;]*exempt from the 24-hour limit)\s*$/;
+
+/** The exemption clause the server appends to a price source, if any. */
+export function exemptionOf(source: string | null): string | null {
+  return source?.match(EXEMPTION)?.[1] ?? null;
+}
+
 function inWords(source: string | null): string {
   if (!source) return "not stated";
   return source.replace(/_/g, " ");
@@ -163,6 +173,7 @@ export function settleValueHeld(data: ValueHeldData | null | undefined, roster: 
           block: row.block,
           prices: inWords(row.priceSource),
           oracleOf: labelOfOwner(row.priceOracleOwner),
+          exemption: exemptionOf(row.priceSource),
         });
         leftOut.push(...groupLeftOut(label, chainName, row.leftOut ?? []));
       } else {

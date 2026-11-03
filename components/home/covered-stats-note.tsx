@@ -97,7 +97,10 @@ function NoteBody({ value, caption }: { value: ValueHeld | null; caption: ReactN
                     </td>
                     <td className="py-1 pr-3 text-right">{fmtShare(r.share)}</td>
                     <td className="py-1 pr-3">{r.block ? fmtBlock(r.block) : "—"}</td>
-                    <td className="py-1">{r.oracleOf ?? r.prices}</td>
+                    <td className="py-1">
+                      {r.oracleOf ?? r.prices}
+                      {r.exemption && `; ${r.exemption}`}
+                    </td>
                   </tr>
                 ))}
               </tbody>
