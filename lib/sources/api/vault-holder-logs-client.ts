@@ -24,10 +24,36 @@ export interface HolderLogSweeps {
   cooldown: RawLog[];
 }
 
-/** A cold holder's logs may be read from the chain on the server first. */
+/** A cold holder's logs may be read from the chain on the server first: a
+ *  64,000-log life took 52 s cold and 2.4 s once stored (measured 2026-11-03).
+ *  The server keeps reading after the web stops waiting. */
 const HOLDER_LOGS_WAIT_MS = 20_000;
+/** After the route fails (a 5xx, a 429, a refused connection), how long the
+ *  chain is read without asking it. A timeout is one heavy holder read cold,
+ *  so it marks nothing down. */
+const DOWN_MS = 30_000;
+const NOTES_WAIT_MS = 8_000;
 
 const gate = routeGate();
+const holderDownUntil = new Map<number, number>();
+
+/** The holder-logs answer, or null where the route cannot answer. */
+async function askHolderLogs<T>(chainId: number, url: string): Promise<T | null> {
+  if (!process.env.RAILS_API_URL || (holderDownUntil.get(chainId) ?? 0) > Date.now()) return null;
+  const markDown = () => holderDownUntil.set(chainId, Date.now() + DOWN_MS);
+  try {
+    const res = await fetch(url, { ...createAuthFetchOptions(), signal: AbortSignal.timeout(HOLDER_LOGS_WAIT_MS) });
+    if (!res.ok) {
+      void res.body?.cancel().catch(() => undefined);
+      if (res.status >= 500 || res.status === 429) markDown();
+      return null;
+    }
+    return (await res.json()) as T;
+  } catch (error) {
+    if ((error as Error)?.name !== "TimeoutError") markDown();
+    return null;
+  }
+}
 
 const isLogs = (v: unknown): v is RawLog[] =>
   Array.isArray(v) &&
@@ -61,22 +87,35 @@ export async function fetchHolderLogs(q: {
     from: String(q.from),
     to: String(q.to),
   });
-  const r = await gate.json<{
+  const r = await askHolderLogs<{
     vault?: string;
     holder?: string;
     fromBlock?: number;
     toBlock?: number;
     sweeps?: Record<string, unknown>;
-  }>(
-    `holder-logs:${q.chainId}`,
-    `${process.env.RAILS_API_URL}/api/at-block/vault/holder-logs?${qs.toString()}`,
-    createAuthFetchOptions(),
-    { timeoutMs: HOLDER_LOGS_WAIT_MS },
-  );
+  }>(q.chainId, `${process.env.RAILS_API_URL}/api/at-block/vault/holder-logs?${qs.toString()}`);
   if (!r || r.vault !== vault || r.holder !== holder || r.fromBlock !== q.from || r.toBlock !== q.to) return null;
   const s = r.sweeps ?? {};
   const cooldown = q.family === "aave-umbrella" ? s.cooldown : [];
   if (!isLogs(s.transferOut) || !isLogs(s.transferIn) || !isLogs(s.deposit) || !isLogs(s.withdraw) || !isLogs(cooldown))
     return null;
   return { transferOut: s.transferOut, transferIn: s.transferIn, deposit: s.deposit, withdraw: s.withdraw, cooldown };
+}
+
+/** The vault's note logs from block 0 to `toBlock`, the store's last stored block. */
+export async function fetchVaultNoteLogs(q: {
+  chainId: 1 | 8453;
+  vault: string;
+  family: VaultLogFamily;
+}): Promise<{ toBlock: number; logs: RawLog[] } | null> {
+  const vault = q.vault.toLowerCase();
+  const qs = new URLSearchParams({ chain: String(q.chainId), vault, family: q.family });
+  const r = await gate.json<{ vault?: string; toBlock?: number | null; logs?: unknown }>(
+    `notes:${q.chainId}`,
+    `${process.env.RAILS_API_URL}/api/at-block/vault/notes?${qs.toString()}`,
+    createAuthFetchOptions(),
+    { timeoutMs: NOTES_WAIT_MS },
+  );
+  if (!r || r.vault !== vault || typeof r.toBlock !== "number" || !isLogs(r.logs)) return null;
+  return { toBlock: r.toBlock, logs: r.logs };
 }

@@ -16,7 +16,8 @@
 //     there. A summary that said "the price rose from X to Y" would be
 //     asserting a path through blocks nobody chose, which is the sampled series
 //     decision `0017` §6 refuses.
-//   • THE LANE IS NAMED BY ITS ENV VAR, NEVER ITS URL. The URL carries a key.
+//   • NO RECEIPT NAMES WHO READ A VALUE OR THROUGH WHICH PROVIDER
+//     (provenance-receipts-grammar §3): the block and the time, never the lane.
 //
 // Distance classes: `state` for a call at a block, `emitted` for a value decoded
 // out of a log. The replayed running balance is `chain-derived` — every leaf is
@@ -73,7 +74,7 @@ export const vaultTimelineGateProv = (c: VaultTimelineCoords, r: VaultHolderReco
     kind: "recompute",
     text: `Re-run both eth_getLogs on the vault for the Transfer topic with this address in topic1 and then in topic2, blocks ${r.fromBlock}–${r.toBlock}, sum the values signed, and compare against balanceOf(${c.holder ?? "the address"}) at block ${r.toBlock}`,
   },
-  summary: `The history check — every \`Transfer\` this address sent or received on this vault, replayed into a balance and compared against the vault's own \`balanceOf\` at block ${r.toBlock}. Two \`eth_getLogs\` answered ${r.logsOut} outgoing and ${r.logsIn} incoming logs over blocks ${r.fromBlock}–${r.toBlock}; their signed sum is ${r.replayed} and \`balanceOf\` reads ${r.onChain}.${r.cutBalance != null ? ` The replay is in two halves: ${r.cutBalance} came from Rails's store of chain readings as the signed sum of every row at or below the stored cut, and the rest was swept from that cut to block ${r.toBlock} on this request. The sum of the two is what \`balanceOf\` was compared against, so a stored half that had gone wrong fails this check rather than reaching the page.` : ""} ${r.reconciled ? "The two agree wei-exact, which is why the rows below are drawn at all." : "The two do not agree, so no history is drawn: a lane that answers part of a question with an HTTP 200 has been observed on this chain, and no status code, timing or count tells that apart from a genuinely empty history."}${r.refetched ? ` Both sweeps were run a second time on the same lane after a pause, and the second answer ${r.refetchDiffered ? "returned a DIFFERENT log count from the first — direct evidence of a lane answering one question two ways" : "returned the same log count"}.` : ""} The sweeps ran on the endpoint named by \`${r.lane}\`; the URL is not stated because it carries a key.`,
+  summary: `The history check — every \`Transfer\` this address sent or received on this vault, replayed into a balance and compared against the vault's own \`balanceOf\` at block ${r.toBlock}. Two \`eth_getLogs\` answered ${r.logsOut} outgoing and ${r.logsIn} incoming logs over blocks ${r.fromBlock}–${r.toBlock}; their signed sum is ${r.replayed} and \`balanceOf\` reads ${r.onChain}.${r.cutBalance != null ? ` The replay is in two halves: ${r.cutBalance} came from Rails's store of chain readings as the signed sum of every row at or below the stored cut, and the rest is this address's logs from that cut to block ${r.toBlock}, read on this request. The sum of the two is what \`balanceOf\` was compared against, so a stored half that had gone wrong fails this check rather than reaching the page.` : ""} ${r.reconciled ? "The two agree wei-exact, which is why the rows below are drawn at all." : "The two do not agree, so no history is drawn: a lane that answers part of a question with an HTTP 200 has been observed on this chain, and no status code, timing or count tells that apart from a genuinely empty history."}${r.refetched ? ` Both sweeps were run a second time after a pause, and the second answer ${r.refetchDiffered ? "returned a DIFFERENT log count from the first — direct evidence of a lane answering one question two ways" : "returned the same log count"}.` : ""}`,
   contract: vaultContract(c),
   via: `${LANE} · eth_getLogs (Transfer, both directions) + balanceOf(holder) @ the pinned block`,
   formula: "Σ (value where to == holder) − Σ (value where from == holder) == balanceOf(holder)",
@@ -101,14 +102,13 @@ export const vaultTimelineHorizonProv = (
   count: number,
   ceiling: number,
   lowerBound: boolean,
-  lane: string,
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "emitted",
   source: { block: c.blockNumber },
   summary: `Rows withheld — this address has ${lowerBound ? "at least " : ""}${count.toLocaleString("en-US")} of its own \`Transfer\` logs on this vault, above the ${ceiling.toLocaleString("en-US")} Rails keeps a stored history for. That bound is the store's own 8 MB body limit divided by a measured row, so it says the life is larger than Rails STORES rather than larger than a page can draw. The newest few are not drawn instead: a partial walk shown as a life is the one failure this gate exists to prevent, and the history check sums every row, so a page of rows could not be reconciled in any case. ${
     lowerBound
-      ? `The count is a FLOOR, not a census: the endpoint named by \`${lane}\` refused the whole-range sweep on response size — it will not answer one direction past 10,000 logs — so the range was walked in chunks of 1,000,000 blocks from block 0 and the walk stopped the moment the running count passed the horizon. Every chunk counted answered; a chunk that had refused would have been halved rather than skipped, and a count with a hole in it would have been reported as unread instead. Because the logs were never handed over whole, the balance check above could not be run on this address at all — which is why nothing is drawn rather than drawn with a caveat.`
+      ? `The count is a FLOOR, not a census: the node refused the whole-range sweep on response size — it will not answer one direction past 10,000 logs — so the range was walked in chunks of 1,000,000 blocks from block 0 and the walk stopped the moment the running count passed the horizon. Every chunk counted answered; a chunk that had refused would have been halved rather than skipped, and a count with a hole in it would have been reported as unread instead. Because the logs were never handed over whole, the balance check above could not be run on this address at all — which is why nothing is drawn rather than drawn with a caveat.`
       : "The count itself is exact — both sweeps returned, and the balance check ran and agreed, before this decision was made."
   }`,
   contract: vaultContract(c),
@@ -265,12 +265,7 @@ export const vaultTimelineAccrualProv = (
 // read and when, and — on the gate — which half of the replay each figure is.
 
 /** The split under the timeline heading: N rows from the store, M read now. */
-export const vaultStoredRowsProv = (
-  c: VaultTimelineCoords,
-  h: VaultHistorySource,
-  lane: string,
-  storedAt: string,
-): Provenance => ({
+export const vaultStoredRowsProv = (c: VaultTimelineCoords, h: VaultHistorySource, storedAt: string): Provenance => ({
   kind: "chain",
   pclass: "emitted",
   source: { block: c.blockNumber },
@@ -280,8 +275,8 @@ export const vaultStoredRowsProv = (
   },
   summary:
     h.source === "stored+head"
-      ? `Where these rows came from — ${h.tailRows.toLocaleString("en-US")} of them were read at or below block ${(h.cut ?? 0).toLocaleString("en-US")} and kept in Rails's store of chain readings; ${h.headRows.toLocaleString("en-US")} above that block were swept from the chain on this request. Block ${(h.cut ?? 0).toLocaleString("en-US")} was the lane's own \`finalized\` answer at the moment the rows were stored${storedAt ? `, ${storedAt}` : ""} — a chain answer read in that request, never a fixed distance behind the head. The store holds the logs' own words and the signed sum of them and nothing else: no claim, no share of the vault, no figure in any other unit. The check below then ran on the stored rows and the swept ones together, as it does on every request, so a stored row that had gone wrong would be caught here rather than drawn. The rows were read on the endpoint named by \`${lane}\`; the URL is not stated because it carries a key.`
-      : `Where these rows came from — every one of them was swept from the chain on this request, from the chain's own first block to block ${(c.blockNumber ?? 0).toLocaleString("en-US")}. Nothing was taken from the store: either nothing had been stored for this address in this vault, or this request refused the store outright. The sweeps ran on the endpoint named by \`${lane}\`; the URL is not stated because it carries a key.`,
+      ? `Where these rows came from — ${h.tailRows.toLocaleString("en-US")} of them were read at or below block ${(h.cut ?? 0).toLocaleString("en-US")} and kept in Rails's store of chain readings; ${h.headRows.toLocaleString("en-US")} above that block were read on this request. Block ${(h.cut ?? 0).toLocaleString("en-US")} was the chain's \`finalized\` block at the moment the rows were stored${storedAt ? `, ${storedAt}` : ""} — a chain answer read in that request, never a fixed distance behind the head. The store holds the logs' own words and the signed sum of them and nothing else: no claim, no share of the vault, no figure in any other unit. The check below then ran on the stored rows and the swept ones together, as it does on every request, so a stored row that had gone wrong would be caught here rather than drawn.`
+      : `Where these rows came from — every one of them was read on this request, from the chain's own first block to block ${(c.blockNumber ?? 0).toLocaleString("en-US")}. Nothing was taken from the store: either nothing had been stored for this address in this vault, or this request refused the store outright.`,
   contract: vaultContract(c),
   via: `${LANE} · eth_getLogs (Transfer, both directions) + the stored tail at its own cut`,
 });

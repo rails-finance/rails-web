@@ -8,18 +8,25 @@
 //
 // ── THE READS, AND WHY EACH LANE ─────────────────────────────────────────────
 //
-//   the sweeps        `chainLogsClient(1)` — four `eth_getLogs`, each address-
-//                     and topic-filtered, each over the whole chain in ONE
-//                     call. On chain 1 that client resolves `ALCHEMY_URL` (the
-//                     chain's `logsRpcEnv` and `rpcEnv` name the same var), and
-//                     an address-filtered whole-range sweep answers there in
-//                     170–450 ms on every fixture measured. No chunking on the
-//                     ordinary path: a filter this narrow keeps the response
-//                     small, and the limit on this lane is response size rather
-//                     than range. The handful of addresses that pass that limit
-//                     are the section below.
+//   the sweeps        rails-server's `/api/at-block/vault/holder-logs` (family
+//                     aave-stata, aave-sgho or aave-umbrella), from the stored
+//                     tail's cut + 1 or block 0 to the page's block, answered
+//                     from its at-block store; the server halves its own reads,
+//                     so none comes back refused. Where the route cannot
+//                     answer, `chainLogsClient(1)` — four `eth_getLogs` (five
+//                     on Umbrella), each address- and topic-filtered, each over
+//                     the range in ONE call. The limit on that lane is response
+//                     size rather than range; the handful of addresses that
+//                     pass it are the section below. The re-fetch after a
+//                     failed gate reads the chain.
 //
-//   the state         `chainBatchClient(1)` — `balanceOf` at the page's block.
+//   the notes         `/api/at-block/vault/notes`, to rails-server's last
+//                     stored block, kept to the page's block; the chain where
+//                     the route cannot answer.
+//
+//   the state         `vaultHeadClient(1)` — `balanceOf` at the page's block and
+//                     the `finalized` block through the vault reads and head
+//                     routes, the chain where they cannot answer.
 //
 //   the row blocks    rails-server's `/api/at-block/vault/blocks` — the
 //                     timestamp and `convertToAssets` at each DISTINCT row
@@ -66,7 +73,7 @@
 // curve through blocks nobody chose that decision `0017` §6 refuses.
 //
 // ── WHEN THE LANE REFUSES A SWEEP ON RESPONSE SIZE ───────────────────────────
-// This lane refuses a one-direction `eth_getLogs` past 10,000 logs. A few
+// On the chain path, the logs lane refuses a one-direction `eth_getLogs` past 10,000 logs. A few
 // addresses on this layer pass that — 0xba13…9ba9 holds 63,180 of its own
 // transfers on waEthUSDC and 59,489 on waEthUSDT, measured 2026-09-09 — and a
 // refusal there is not an unread history: it is evidence the history is LARGE.
@@ -104,8 +111,8 @@
 // the whole life is swept from block 0 exactly as it is today. So the worst a
 // wrong or stale tail can do is make one page slow.
 //
-// THE CUT IS A CHAIN ANSWER. `eth_getBlockByNumber("finalized")` on the state
-// lane, read in this request — never `latest − 64`, never a constant. The tag
+// THE CUT IS A CHAIN ANSWER. The `finalized` block as the vault head route (or
+// the chain) answers it in this request — never `latest − 64`, never a constant. The tag
 // means different things on different chains (rails-ops head-tail §3), and the
 // only place it is defined is the node's own answer.
 //
@@ -142,7 +149,7 @@
 // a window's arithmetic.
 
 import { decodeAbiParameters, parseAbi, parseAbiItem, toEventSelector, type PublicClient } from "viem";
-import { chainBatchClient, chainLogsClient, isRateLimited } from "./rpc";
+import { chainLogsClient, isRateLimited } from "./rpc";
 import {
   ERC4626_TOPIC,
   ZERO_ADDRESS as ZERO_ADDR,
@@ -158,7 +165,16 @@ import {
   type RawLog,
 } from "./vault-holder-logs";
 import { countRefusedSweeps } from "./vault-sweep-walk";
-import { emptyBlockReads, firstUnreadBlock, priceFields, readBlockWave, type BlockReads } from "./vault-block-reads";
+import {
+  emptyBlockReads,
+  firstUnreadBlock,
+  pinnedBlockTimestamp,
+  priceFields,
+  readBlockWave,
+  type BlockReads,
+} from "./vault-block-reads";
+import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
+import { fetchHolderLogs, fetchVaultNoteLogs, type VaultLogFamily } from "@/lib/sources/api/vault-holder-logs-client";
 import { MAINNET_CHAIN_ID, chainMeta } from "@/lib/shared/chains";
 import type { AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
 import {
@@ -199,6 +215,13 @@ const TOPIC = {
   cooldownChanged: toEventSelector(COOLDOWN_CHANGED_EVENT),
   unstakeWindow: toEventSelector(UNSTAKE_WINDOW_EVENT),
 } as const;
+
+/** The holder-logs route's family for each catalogue family. */
+const LOG_FAMILY: Record<AaveVaultFamily, VaultLogFamily> = {
+  stata: "aave-stata",
+  sgho: "aave-sgho",
+  "umbrella-stake": "aave-umbrella",
+};
 
 const VAULT_ABI = parseAbi([
   "function balanceOf(address) view returns (uint256)",
@@ -379,7 +402,9 @@ export async function loadAaveEthereumVaultTimelineWithTail(
 
   try {
     const logs = chainLogsClient(MAINNET_CHAIN_ID);
-    const state = chainBatchClient(MAINNET_CHAIN_ID);
+    // `balanceOf`, the finalized block and the pinned block's time through
+    // rails-server's vault routes, the chain where they cannot answer.
+    const state = vaultHeadClient(MAINNET_CHAIN_ID);
 
     // ── the sweeps: each one narrowly filtered, over the range this request
     //    still has to read. Without a tail that is the whole chain, as before;
@@ -412,7 +437,7 @@ export async function loadAaveEthereumVaultTimelineWithTail(
      *  still refuses says the lane is busy, not that this life is large: read
      *  as a size refusal it would send the counting walk below into the same
      *  busy lane and state a floor it never counted. */
-    const readRange = async (from: number) => {
+    const readChainRange = async (from: number) => {
       const sweep = sweepFrom(from);
       const [outLogs, inLogs, depositLogs, withdrawLogs, cooldownLogs] = await Promise.all([
         sweep([TOPIC.transfer, topicOf(who), null]).catch(refusedOnSize),
@@ -427,6 +452,27 @@ export async function loadAaveEthereumVaultTimelineWithTail(
       ]);
       return { outLogs, inLogs, depositLogs, withdrawLogs, cooldownLogs };
     };
+    /** The same sweeps from rails-server's at-block store, which halves its own
+     *  reads, so none comes back refused; the chain where the route cannot
+     *  answer. */
+    const readRange = async (from: number) => {
+      const served = await fetchHolderLogs({
+        chainId: MAINNET_CHAIN_ID,
+        vault: address,
+        holder: who,
+        family: LOG_FAMILY[opts.family],
+        from,
+        to: opts.blockNumber,
+      });
+      if (!served) return readChainRange(from);
+      return {
+        outLogs: served.transferOut as RawLog[] | null,
+        inLogs: served.transferIn as RawLog[] | null,
+        depositLogs: served.deposit as RawLog[] | null,
+        withdrawLogs: served.withdraw as RawLog[] | null,
+        cooldownLogs: served.cooldown as RawLog[] | null,
+      };
+    };
 
     // The vault-wide notes are read over the WHOLE chain whatever the tail
     // says: they are not this holder's events, they are never stored, and
@@ -436,7 +482,7 @@ export async function loadAaveEthereumVaultTimelineWithTail(
       // Only read when a store could follow. `?tail=0` buys the cold path a
       // call as well as a sweep.
       tailsAllowed ? finalizedBlock(state) : Promise.resolve(null),
-      readNotes(sweepFrom(0), opts.family),
+      readNotes(sweepFrom(0), address, opts.family, opts.blockNumber),
     ]);
     let { outLogs, inLogs, depositLogs, withdrawLogs, cooldownLogs } = head;
 
@@ -520,14 +566,14 @@ export async function loadAaveEthereumVaultTimelineWithTail(
     let refetchDiffered = false;
 
     if (replayed !== onChain) {
-      // ONE re-fetch, on the same lane, after a pause — never a third attempt,
-      // never a silent hop to another lane, never a narrowed range. If the
-      // second answer differs in COUNT that fact is itself the finding. With a
-      // tail the re-fetch covers the HEAD only: the tail is a value, and
-      // reading it again would return the same bytes.
+      // ONE re-fetch, after a pause and from the chain — never a third
+      // attempt, never a narrowed range. If the second answer differs in COUNT
+      // that fact is itself the finding. With a tail the re-fetch covers the
+      // HEAD only: the tail is a value, and reading it again would return the
+      // same bytes.
       refetched = true;
       await new Promise((r) => setTimeout(r, 250));
-      const again = await readRange(tail ? tail.cut + 1 : 0);
+      const again = await readChainRange(tail ? tail.cut + 1 : 0);
       // A SECOND READING IS TAKEN WHOLE OR NOT AT ALL. One of its sweeps
       // refusing leaves the first reading standing — the gate then states the
       // mismatch it already found, which is a fact, rather than a mismatch
@@ -585,7 +631,7 @@ export async function loadAaveEthereumVaultTimelineWithTail(
       cutBalance: tail ? tail.cutBalance : null,
     };
 
-    const blockTimestamp = Number((await state.getBlock({ blockNumber })).timestamp);
+    const blockTimestamp = await pinnedBlockTimestamp(MAINNET_CHAIN_ID, blockNumber, state);
     const history: VaultHistorySource = {
       source: tail ? "stored+head" : "chain",
       cut: tail ? tail.cut : null,
@@ -1125,7 +1171,12 @@ function umbrellaExtra(logs: RawLog[]): UmbrellaEventExtra {
  *  once, and so are notes rather than rows. Each fires once or twice in a
  *  vault's whole life, which is why they can be swept per request; the accrual
  *  events, which fire thousands of times, are not read at all. */
-async function readNotes(sweep: LogSweep, family: AaveVaultFamily): Promise<VaultNote[]> {
+async function readNotes(
+  sweep: LogSweep,
+  vault: string,
+  family: AaveVaultFamily,
+  blockNumber: number,
+): Promise<VaultNote[]> {
   const wanted: { topic: string; kind: VaultNote["kind"]; fields: string[] }[] =
     family === "sgho"
       ? [{ topic: TOPIC.targetRate, kind: "target-rate", fields: ["newRate"] }]
@@ -1141,9 +1192,21 @@ async function readNotes(sweep: LogSweep, family: AaveVaultFamily): Promise<Vaul
         : [];
   if (!wanted.length) return [];
 
+  // rails-server's note logs run to its last stored block; the ones above the
+  // page's block are not this page's. The chain where the route cannot answer.
+  const served = await fetchVaultNoteLogs({ chainId: MAINNET_CHAIN_ID, vault, family: LOG_FAMILY[family] });
+  const notesFor = (topic: string): Promise<RawLog[]> =>
+    served
+      ? Promise.resolve(
+          served.logs.filter(
+            (l) => l.topics[0]?.toLowerCase() === topic && Number(BigInt(l.blockNumber)) <= blockNumber,
+          ),
+        )
+      : sweep([topic]);
+
   const answers = await Promise.all(
     wanted.map((w) =>
-      sweep([w.topic]).then(
+      notesFor(w.topic).then(
         (logs) =>
           logs.map((log) => {
             const words = decodeAbiParameters(

@@ -25,7 +25,7 @@ import { publicErrorMessage } from "@/lib/api/public-error";
 // `chainStale: true` and no figures, because a bad minute on the RPC has not
 // established that an address is not a vault.
 //
-// THE HISTORY MAY COME HALF FROM THE STORE. Rows at or below the lane's own
+// THE HISTORY MAY COME HALF FROM THE STORE. Rows at or below the chain's
 // `finalized` block never change, so they are kept and only the head is swept;
 // `timeline.history` says which of the two this response is and what the cut
 // was, and the gate runs on the merged rows every time. `?tail=0` refuses BOTH
@@ -118,13 +118,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ...data,
       timeline,
-      // Which lane the timeline's sweeps run on, BY NAME, and whether the
+      // The chain lane the timeline's sweeps fall back to where rails-server's
+      // holder-logs route cannot answer, BY NAME, and whether the
       // wide-range lane is configured on this deployment at all. A boolean
       // about configuration and never a value. Moving chain 1's sweeps onto
       // that lane was measured and declined (2026-09-08): it would buy one
       // sentence on holders above the horizon and bring a gateway that has
       // answered a whole-life query with an empty array and a 200. The
-      // statement stays so a future reader can see which lane drew the page.
+      // statement stays so a future reader can see which lane that is.
       lanes: {
         ethereumLogs: {
           serving: chainMeta(MAINNET_CHAIN_ID).logsRpcEnv,
