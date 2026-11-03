@@ -51,25 +51,42 @@ function isEnsName(name: string): boolean {
  * resolve to null so callers can fall back gracefully.
  */
 export async function resolveEnsAddress(name: string): Promise<string | null> {
+  return (await lookUpEnsAddress(name)).address;
+}
+
+/**
+ * The same lookup, telling a name with no address (`failed: false`) from a
+ * lookup that did not answer (`failed: true`: every RPC endpoint errored).
+ * A failure is not cached, so the next ask tries again.
+ */
+export async function lookUpEnsAddress(name: string): Promise<{ address: string | null; failed: boolean }> {
   const key = name.trim().toLowerCase();
-  if (!isEnsName(key)) return null;
+  if (!isEnsName(key)) return { address: null, failed: false };
 
   const cached = cache.get(key);
-  if (cached && cached.expires > Date.now()) return cached.address;
+  if (cached && cached.expires > Date.now()) return { address: cached.address, failed: false };
 
-  let address: string | null = null;
+  let normalized: string;
   try {
-    const resolved = await client.getEnsAddress({ name: normalize(key) });
+    normalized = normalize(key);
+  } catch {
+    // Not a valid ENS name (a disallowed character): it names nothing.
+    return { address: null, failed: false };
+  }
+
+  let address: string | null;
+  try {
+    const resolved = await client.getEnsAddress({ name: normalized });
     address = resolved ? getAddress(resolved) : null;
   } catch {
-    address = null;
+    return { address: null, failed: true };
   }
 
   cache.set(key, {
     address,
     expires: Date.now() + (address ? HIT_TTL_MS : MISS_TTL_MS),
   });
-  return address;
+  return { address, failed: false };
 }
 
 // ---------------------------------------------------------------------------

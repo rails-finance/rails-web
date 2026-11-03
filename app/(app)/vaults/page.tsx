@@ -24,8 +24,8 @@ export const metadata = {
   ...(vaultIndexLaunched() ? {} : { robots: { index: false, follow: false } }),
 };
 
-export default async function VaultIndexPage() {
-  const { vaults, yields, rosters, indexDown } = await loadVaultIndex();
+export default async function VaultIndexPage({ searchParams }: { searchParams: Promise<{ asset?: string }> }) {
+  const [{ vaults, yields, rosters, indexDown }, { asset }] = await Promise.all([loadVaultIndex(), searchParams]);
   return (
     <div className="min-h-screen">
       <div className="py-8">
@@ -34,7 +34,12 @@ export default async function VaultIndexPage() {
         </header>
         {indexDown && <IndexNotice chainFilled={vaults.length > 0} className="mb-4 text-sm text-rb-500" />}
         <div data-roster-panel data-vault-index>
-          <VaultIndexView vaults={vaults} yields={yields} rosters={rosters} />
+          <VaultIndexView
+            vaults={vaults}
+            yields={yields}
+            rosters={rosters}
+            asset={typeof asset === "string" ? asset : undefined}
+          />
         </div>
         <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
