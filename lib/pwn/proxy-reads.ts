@@ -15,7 +15,6 @@ import { pwnAssetSymbolOverride } from "@/lib/pwn/asset-catalog";
 import { resolveOpeningAssetKeys, type UpstreamOpeningBalance } from "@/lib/shared/timeline-opening-balance-wire";
 import { proxyFail, proxyOk, type ProxyAnswer } from "@/lib/shared/proxy-answer";
 import type { SsrHop } from "@/lib/shared/listing-ssr";
-import { readPwnV11Extensions } from "@/lib/sources/chain/pwn-extensions";
 
 interface PositionsRawResponse {
   rows: RawPwnPositionRow[];
@@ -88,10 +87,8 @@ export async function readPwnTimeline(sp: URLSearchParams, hop: SsrHop): Promise
     return proxyFail(response.status, { error: `Backend error: ${response.statusText}` });
   }
   const served = (await response.json()) as TimelineRowsResponse;
-  const { truncated, cutoffBlock } = served;
-  const rows = await withChainExtensions(served.rows);
-  const totalEvents = served.totalEvents + (rows.length - served.rows.length);
-  const data = await buildPwnTimeline(rows, wallet);
+  const { truncated, cutoffBlock, totalEvents } = served;
+  const data = await buildPwnTimeline(served.rows, wallet);
   // The ceiling and the window are different claims and both can be absent. A
   // windowed fetch is never truncated — it asked for a window and got one —
   // so `withRowCeiling` stays exactly as it was and simply never fires.
@@ -100,49 +97,6 @@ export async function readPwnTimeline(sp: URLSearchParams, hop: SsrHop): Promise
     toTimelineWire(windowed, MAINNET_CHAIN_ID),
     timelineCacheHeaders(data.events, proxyCacheControl(response, LISTING_CACHE_CONTROL)),
   );
-}
-
-/** The v1.1 deadline extensions the index does not carry yet, read from the
- *  chain and shaped as index rows (lib/sources/chain/pwn-extensions.ts). Asked
- *  only for v1.1 loans with no `extended` row, so once rails-server mig 370 is
- *  on the box this is a no-op. A failed read leaves the rows as served: the
- *  page then states the struck deadline, as it did before. */
-async function withChainExtensions(rows: MvRow[]): Promise<MvRow[]> {
-  const extended = new Set(rows.filter((r) => r.action === "extended").map((r) => r.loan_id));
-  const template = new Map<string, MvRow>();
-  const struck = new Map<string, number>();
-  for (const r of rows) {
-    if (r.due_kind !== "expiration" || extended.has(r.loan_id)) continue;
-    if (!template.has(r.loan_id) || r.action === "created") template.set(r.loan_id, r);
-    if (r.due_value != null) struck.set(r.loan_id, Number(r.due_value));
-  }
-  if (template.size === 0) return rows;
-  let found;
-  try {
-    found = await readPwnV11Extensions([...template.keys()], struck);
-  } catch (err) {
-    console.error("PWN v1.1 extension read failed:", err instanceof Error ? err.message : err);
-    return rows;
-  }
-  if (found.length === 0) return rows;
-  const added: MvRow[] = found.map((x) => ({
-    ...template.get(x.loanId)!,
-    event_key: `extended:${x.txHash.replace(/^0x/, "")}:${x.logIndex}`,
-    action: "extended",
-    version: "v11",
-    block_timestamp: String(x.timestamp),
-    block_number: String(x.blockNumber),
-    tx_index: null,
-    log_index: x.logIndex,
-    tx_hash: x.txHash,
-    tx_from: x.from,
-    tx_gas_used: null,
-    tx_gas_price: null,
-    defaulted: null,
-    original_default_timestamp: x.previousDeadline != null ? String(x.previousDeadline) : null,
-    extended_default_timestamp: String(x.newDeadline),
-  }));
-  return [...rows, ...added];
 }
 
 /** Answers `/api/pwn/timeline/summary`. */
