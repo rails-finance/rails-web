@@ -1,6 +1,8 @@
 // What an Aave V3-family page reads beside its timeline: the account's e-mode
 // changes and the reserves it ever turned on as collateral, from the Pool's
-// logs (/api/chain/{spark,seamless}/account-switches). An e-mode change becomes
+// logs (/api/chain/<explorer>/account-switches: rails-server's read, or the
+// chain's for Arbitrum and where rails-server cannot answer,
+// lib/api/aave-family-account-switches.ts). An e-mode change becomes
 // a timeline row of its own, placed among the served rows and counted by
 // nothing else on the page; the collateral set tells a closed SparkLend card
 // what backed borrowing.
