@@ -127,6 +127,7 @@ export function VaultRoster({
   groupCountProv,
   emptyCountProv,
   head,
+  initialFilters,
 }: {
   vaults: readonly VaultSummary[];
   /** Decision 0047's figure per lowercased vault address (or `yieldKeyOf`). */
@@ -152,9 +153,11 @@ export function VaultRoster({
   groupCountProv: (assetSymbol: string, count: number, chainId: number) => Provenance;
   emptyCountProv: (count: number) => Provenance;
   head: VaultRosterHead;
+  /** The facets chosen on arrival (the index's `?asset=`, ui-jobs 482). */
+  initialFilters?: Filters;
 }) {
   const [introOpen, setIntroOpen] = useState(false);
-  const [filters, setFilters] = useState<Filters>({});
+  const [filters, setFilters] = useState<Filters>(initialFilters ?? {});
   const [emptyOpen, setEmptyOpen] = useState(false);
   const [query, setQuery] = useState("");
 

@@ -107,11 +107,18 @@ export function VaultIndexView({
   vaults,
   yields,
   rosters,
+  asset,
 }: {
   vaults: VaultSummary[];
   yields: Record<string, VaultYield>;
   rosters: VaultIndexRoster[];
+  /** `?asset=`: the Token facet chosen on arrival, matched without case
+   *  (the search's "USDC vaults" row, ui-jobs 482). */
+  asset?: string;
 }) {
+  const assetValue = asset
+    ? vaults.map(TOKEN_FACET.valueOf).find((value) => value.toLowerCase() === asset.toLowerCase())
+    : undefined;
   const rosterOf = (v: VaultSummary) => rosters.find((r) => r.protocol === vaultIndexProtocol(v));
 
   const receiptsOf = (v: VaultSummary): VaultRowReceipts => {
@@ -228,6 +235,7 @@ export function VaultIndexView({
         skel="index"
         facets={FACETS}
         assetFacet={TOKEN_FACET}
+        initialFilters={assetValue ? { [TOKEN_FACET.id]: [assetValue] } : undefined}
         hrefOf={vaultIndexHref}
         holdersHrefOf={vaultIndexHoldersHref}
         receiptsOf={receiptsOf}
