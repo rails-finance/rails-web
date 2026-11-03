@@ -70,6 +70,9 @@ if (!process.execArgv.includes("--experimental-strip-types")) {
     const ROOT = ${JSON.stringify(new URL("file://" + ROOT + "/").href)};
     const EXT = [".ts", ".tsx", "/index.ts", "/index.tsx", ".mjs", ".js"];
     export async function resolve(spec, ctx, next) {
+      // lib/sources/api/head-snapshot.ts imports "next/server", which Node's ESM
+      // resolver wants with its extension (Next resolves it itself).
+      if (spec === "next/server") return next("next/server.js", ctx);
       let s = spec;
       if (s.startsWith("@/")) s = new URL(s.slice(2), ROOT).href;
       if (s.startsWith(".") || s.startsWith("file:")) {
