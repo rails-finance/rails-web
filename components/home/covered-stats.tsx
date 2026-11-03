@@ -129,48 +129,37 @@ export function CoveredStats({
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 flex flex-col items-center text-center">
-      {/* One sentence over two centred lines (Miles, 3 Nov 2026): the count and
-          the value on the first, the chains on the second. One <p>, so a screen
-          reader reads it as one sentence. Line 1 is two groups that never
-          break, "Explore N positions," and "holding $X", so a wrap moves a
-          whole group and no label is left alone on a row; every row is
-          centred, each label vertically centred on its figure. "on Rails" is
-          left out because "Explore N positions on Rails," is 352 px wide at
-          text-4xl, past the 328 px a 360 px phone gives it. Sizes step at breakpoints and never scale with the viewport.
-          The caption line that used to sit under the count opens from the (i)
-          (covered-stats-note.tsx). */}
-      <p className="flex flex-col items-center gap-1 sm:gap-4">
-        <span className={LINE} data-anatomy="S3.1">
-          <span className={GROUP}>
-            <span className={LABEL}>Explore</span>
-            {count}
-            <span className={LABEL}>positions,</span>
-          </span>
-          <span className={GROUP}>
-            <span className={LABEL}>holding</span>
-            <span className={FIGURE} data-anatomy="S3.2">
-              <span aria-hidden="true">{formatValueHeld(valueHeld.totalUsd)}</span>
-              <span className="sr-only">{spokenValueHeld(valueHeld.totalUsd)}</span>
-            </span>
-          </span>
-        </span>
-        <span className={LABEL}>
-          across {COUNTED_SCOPE} <DeFiAndNote note={note} />
-        </span>
+      {/* One sentence (Miles, 3 Nov 2026): the count is the one figure; the
+          value runs in the text at the labels' size. "Explore N positions," is
+          a group that never breaks, so does "DeFi (i)", and the value never
+          splits; everything else wraps as ordinary centred text. One <p>, so a
+          screen reader reads it as one sentence. Sizes step at breakpoints and
+          never scale with the viewport. The caption line that used to sit
+          under the count opens from the (i) (covered-stats-note.tsx). */}
+      <p className={`${LABEL} text-balance`} data-anatomy="S3.1">
+        <span className={GROUP}>
+          <span>Explore</span>
+          {count}
+          <span>positions,</span>
+        </span>{" "}
+        holding{" "}
+        <span className="whitespace-nowrap tabular-nums" data-anatomy="S3.2">
+          <span aria-hidden="true">{formatValueHeld(valueHeld.totalUsd)}</span>
+          <span className="sr-only">{spokenValueHeld(valueHeld.totalUsd)}</span>
+        </span>{" "}
+        across {COUNTED_SCOPE} <DeFiAndNote note={note} />
       </p>
     </div>
   );
 }
 
-/** Line 1 of the band: its groups on centred rows, wrapping between groups. */
+/** The count's line when the value is omitted: label, figure, label on centred rows. */
 const LINE = "flex flex-wrap items-center justify-center gap-x-2 gap-y-1 sm:gap-x-4";
-/** Labels and their figure that never break apart. */
+/** "Explore", the count and the label after it, never broken apart. */
 const GROUP = "inline-flex flex-nowrap items-center gap-x-2 whitespace-nowrap sm:gap-x-4";
-/** Both figures name the face: the count and the value read in one font.
- *  `text-3xl` below `sm`: DM Sans digits differ in width, and "holding
- *  $39,000,000,000" at `text-4xl` is 351 px, past the 328 px of a 360 px phone. */
+/** The count, the band's one figure. */
 const FIGURE =
-  "font-sans text-foreground font-semibold leading-none tracking-tighter tabular-nums text-3xl sm:text-5xl";
+  "font-sans text-foreground font-semibold leading-none tracking-tighter tabular-nums text-4xl sm:text-5xl";
 const LABEL = "font-sans font-light tracking-tight text-rb-500 text-lg sm:text-xl lg:text-[28px]";
 /** The last word and the (i) never break apart, so the (i) is never alone on a row. */
 function DeFiAndNote({ note }: { note: ReactNode }) {
