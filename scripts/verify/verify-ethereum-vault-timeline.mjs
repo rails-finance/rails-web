@@ -1821,16 +1821,15 @@ const chain1Callers = [...sourceFiles("lib"), ...sourceFiles("app")]
   .map((file) => path.relative(ROOT, file))
   .sort();
 // The set is named in full so a new caller goes red here before anyone moves the
-// lane. The two PWN sweeps joined the timeline's loader when PWN's deadline
-// extensions and collateral transfers were added (web `4de7d15f`), and a flip of
-// chain 1's lane would reach them as well.
+// lane. PWN's collateral-transfer sweep joined the timeline's loader in web
+// `4de7d15f` and stays as the fallback to rails-server's route, so a flip of
+// chain 1's lane would reach it as well.
 const CHAIN1_LOG_CALLERS = [
   "lib/sources/chain/aave-ethereum-vault-timeline.ts",
   "lib/sources/chain/pwn-collateral-transfer.ts",
-  "lib/sources/chain/pwn-extensions.ts",
 ];
 check(
-  "13c the serving-path callers of chainLogsClient on chain 1 are this timeline's loader and the two PWN sweeps, and no other",
+  "13c the serving-path callers of chainLogsClient on chain 1 are this timeline's loader and PWN's collateral-transfer sweep, and no other",
   JSON.stringify(chain1Callers) === JSON.stringify(CHAIN1_LOG_CALLERS),
   chain1Callers.join(", ") || "no caller at all",
 );

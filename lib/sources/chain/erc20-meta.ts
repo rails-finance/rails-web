@@ -199,9 +199,30 @@ export async function resolveErc20Meta(
     );
   if (todo.length === 0) return out;
 
-  for (const [addr, meta] of await readChain(todo, chainId)) out.set(addr, meta);
+  // A token another caller is already reading joins that read: two loaders of
+  // one page asking at once make one multicall between them.
+  const fresh = todo.filter((addr) => !reading.has(cacheKey(chainId, addr)));
+  if (fresh.length) {
+    const p = readChain(fresh, chainId);
+    for (const addr of fresh) reading.set(cacheKey(chainId, addr), p);
+    void p
+      .finally(() => {
+        for (const addr of fresh)
+          if (reading.get(cacheKey(chainId, addr)) === p) reading.delete(cacheKey(chainId, addr));
+      })
+      .catch(() => undefined);
+  }
+  const reads = [...new Set(todo.map((addr) => reading.get(cacheKey(chainId, addr))!))];
+  for (const got of await Promise.all(reads))
+    for (const addr of todo) {
+      const meta = got.get(addr);
+      if (meta) out.set(addr, meta);
+    }
   return out;
 }
+
+/** Chain reads in flight, per token: the promise of the read that holds it. */
+const reading = new Map<string, Promise<Map<string, Erc20Meta>>>();
 
 /** The chain path: `symbol()` + `decimals()` in one multicall, `name()` over the
  *  symbol-less ones. Caches what the RPC answered, never a transport failure. */

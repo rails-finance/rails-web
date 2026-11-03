@@ -4,14 +4,17 @@ import { saleVenue } from "@/lib/shared/tx-legs";
 import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
 // What a transaction moved to and from a wallet, read from its receipt
-// (lib/sources/chain/tx-legs.ts), for a position token's transfer out to a
-// registry router or settlement contract (rails-ops TO-DO-ui-jobs 438). A live
-// chain read rendered as primary truth: decision 0006's carve-out.
+// (lib/sources/chain/tx-legs.ts: rails-server's at-block store first on
+// Ethereum and Base, the chain where it cannot answer), for a position token's
+// transfer out to a registry router or settlement contract (rails-ops
+// TO-DO-ui-jobs 438). A receipt rendered as primary truth: decision 0006's
+// carve-out.
 //
 // `?chain=1|8453|42161&hash=<tx>&wallet=<address>&via=<counterparty>` answers
 // TxLegs. `via` must be a router or settlement in the registry, which keeps
 // the read to the rows that qualify. `rpcCalls` (and the `x-rails-rpc-calls`
-// header) counts the upstream calls this request spent: 0 on a cache hit.
+// header) counts the upstream chain calls this process spent for the request (the
+// store's reads are not counted): 0 on a cache hit.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

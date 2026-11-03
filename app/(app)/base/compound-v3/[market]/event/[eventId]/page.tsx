@@ -15,6 +15,7 @@ import {
 } from "@/lib/compound-base/asset-catalog";
 import { compoundBaseMarketHref, compoundBaseWalletHref } from "@/lib/compound-base/routes";
 import { chainClient } from "@/lib/sources/chain/rpc";
+import { serverLogAddress } from "@/lib/sources/api/event-panels-at-block";
 import { rehydrateChainTimelineWire } from "@/lib/shared/timeline-wire";
 import { isCompoundEvent } from "@/lib/shared/types/event-shape";
 import type { CometChainTimelineResult } from "@/lib/sources/chain/compound-v3-events";
@@ -28,17 +29,22 @@ export const dynamic = "force-dynamic";
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const EVENT_ID = /^(0x[0-9a-fA-F]{64})-(\d+)-/;
 
-/** The Comet whose log the event id names, read from the transaction's
- *  receipt; null where the id has another shape, the read fails, or the log
- *  is no Comet of the roster. */
+/** The Comet whose log the event id names: rails-server's
+ *  `/api/at-block/tx/log-address` first, the transaction's receipt where it
+ *  cannot answer; null where the id has another shape, the server answers
+ *  that the receipt holds no such log, both fail, or the log is no Comet of
+ *  the roster. */
 async function cometOfLog(decoded: string): Promise<string | null> {
   const m = EVENT_ID.exec(decoded);
   if (!m) return null;
+  const logIndex = Number(m[2]);
+  const keyOf = (comet: string | undefined) =>
+    COMPOUND_BASE_DEPLOYMENT.markets.find((c) => c.comet === comet)?.key ?? null;
+  const served = await serverLogAddress(COMPOUND_BASE_CHAIN_ID, m[1], logIndex);
+  if (served !== undefined) return served ? keyOf(served) : null;
   try {
     const receipt = await chainClient(COMPOUND_BASE_CHAIN_ID).getTransactionReceipt({ hash: m[1] as `0x${string}` });
-    const log = receipt.logs.find((l) => l.logIndex === Number(m[2]));
-    const comet = log?.address.toLowerCase();
-    return COMPOUND_BASE_DEPLOYMENT.markets.find((c) => c.comet === comet)?.key ?? null;
+    return keyOf(receipt.logs.find((l) => l.logIndex === logIndex)?.address.toLowerCase());
   } catch (err) {
     console.error("compound-v3-base legacy event route: receipt read failed", err);
     return null;

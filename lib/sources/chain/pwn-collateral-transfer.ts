@@ -8,11 +8,13 @@
 //
 // ERC-721 `Transfer(from, to, tokenId)` and ERC-1155 `TransferSingle(operator,
 // from, to, id, value)`, two eth_getLogs each (from = lender, to = borrower),
-// then one block read per match for its time. Cached for ten minutes.
-// SERVER-ONLY.
+// then one block read per match for its time. rails-server's at-block route
+// answers first (lib/sources/api/pwn-at-block.ts); the sweep is the fallback
+// where it cannot. Cached for ten minutes. SERVER-ONLY.
 
 import { parseAbiItem, type Hex } from "viem";
 import { chainClient, chainLogsClient } from "./rpc";
+import { fetchPwnCollateralTransfers } from "@/lib/sources/api/pwn-at-block";
 
 const ERC721_TRANSFER = parseAbiItem(
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
@@ -46,6 +48,12 @@ export async function readPwnCollateralTransfers(p: {
   const key = JSON.stringify(p);
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < TTL_MS) return hit.rows;
+
+  const served = await fetchPwnCollateralTransfers(p);
+  if (served) {
+    cache.set(key, { at: Date.now(), rows: served });
+    return served;
+  }
 
   const logs = chainLogsClient();
   const range = { fromBlock: BigInt(p.fromBlock), toBlock: BigInt(p.toBlock) };
