@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, type ReactNode } from "react";
 import { Check } from "lucide-react";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
 
@@ -33,7 +33,7 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
  * The roster-wide position count is NOT here — it reads as evidence rather than
  * headline, so it lives in CoveredStats, below the live example.
  */
-export function HomeHero() {
+export function HomeHero({ subline }: { subline?: ReactNode } = {}) {
   useIsomorphicLayoutEffect(() => {
     try {
       if (localStorage.getItem("rails-hero-seen")) {
@@ -61,13 +61,19 @@ export function HomeHero() {
       >
         Destination <span className="marketing">DeFi</span>
       </h1>
-      <p
-        className="relative font-sans font-light text-rb-500 tracking-tight mb-12 px-4 text-lg sm:mb-20 sm:text-xl animate-hero-fade-up"
-        style={{ animationDelay: "0.2s" }}
-      >
-        Any DeFi position, <br className="min-[480px]:hidden" />
-        read from the chain.
-      </p>
+      {subline ? (
+        <div className="relative mb-12 w-full sm:mb-16 animate-hero-fade-up" style={{ animationDelay: "0.2s" }}>
+          {subline}
+        </div>
+      ) : (
+        <p
+          className="relative font-sans font-light text-rb-500 tracking-tight mb-12 px-4 text-lg sm:mb-20 sm:text-xl animate-hero-fade-up"
+          style={{ animationDelay: "0.2s" }}
+        >
+          Any DeFi position, <br className="min-[480px]:hidden" />
+          read from the chain.
+        </p>
+      )}
       <div
         className="relative z-20 w-full max-w-2xl px-4 text-left animate-hero-fade-up"
         style={{ animationDelay: "0.25s" }}
