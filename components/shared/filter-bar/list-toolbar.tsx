@@ -7,6 +7,7 @@
 // object and the toolbar reads/writes it. Holds no state of its own — the param
 // object (URL-backed) is the source of truth.
 
+import type { ReactNode } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { SearchBox } from "@/components/shared/front-door-search";
 import { FilterSections } from "@/components/shared/filter-bar/filter-sections";
@@ -25,6 +26,12 @@ export interface ListToolbarProps<F extends BaseListFilters> {
   searchPlaceholder?: string;
   /** Result count, drawn at the far right of the chip row. */
   count?: { total: number; noun: string };
+  /** In place of `count`, a count line the page writes (the vault roster's
+   *  "N of M funded vaults", with its receipt). */
+  countNode?: ReactNode;
+  /** The search box's skeleton anchor (`data-skel-section`); "listing-toolbar"
+   *  by default. */
+  skel?: string;
 }
 
 export function ListToolbar<F extends BaseListFilters>({
@@ -34,6 +41,8 @@ export function ListToolbar<F extends BaseListFilters>({
   sortOptions,
   searchPlaceholder = "Search wallet or id",
   count,
+  countNode,
+  skel = "listing-toolbar",
 }: ListToolbarProps<F>) {
   // Inert until this strip's handlers are attached — including the search box,
   // which pre-hydration accepts typing into a value React then overwrites from
@@ -41,12 +50,7 @@ export function ListToolbar<F extends BaseListFilters>({
   const hydrated = useHydrated();
 
   return (
-    <div
-      className="mb-6 flex flex-col gap-3"
-      data-skel-section="listing-toolbar"
-      data-anatomy="N1"
-      {...ctrlWaking(hydrated)}
-    >
+    <div className="mb-6 flex flex-col gap-3" data-skel-section={skel} data-anatomy="N1" {...ctrlWaking(hydrated)}>
       <div className="flex flex-wrap items-center gap-2">
         {/* The shared search's look (H15); the listing's own behaviour: the
             query filters this explorer, family identifiers included. */}
@@ -66,7 +70,7 @@ export function ListToolbar<F extends BaseListFilters>({
           onChange={(sortBy, sortOrder) => onChange({ ...filters, sortBy, sortOrder })}
         />
       </div>
-      <FilterChips dimensions={dimensions} filters={filters} onChange={onChange} count={count} />
+      <FilterChips dimensions={dimensions} filters={filters} onChange={onChange} count={count} countNode={countNode} />
     </div>
   );
 }

@@ -5,37 +5,49 @@
 // index (ui-jobs 39) is the same roster over the union, with a chain pill on
 // each row and a read-at line per roster.
 // ----------------------------------------------------------------------------
-// Every roster draws the same thing: an Asset facet and the family's own
-// facets, a search over name, symbol and address, one group per asset with
-// its heading, the vaults that hold nothing behind one disclosure, and the
-// vaults the read did not answer for listed by name. A family supplies its
-// summaries, its facets, its routes and its receipts, and the receipts scope
-// this renders inside.
+// Every roster draws the same thing: the listings' toolbar (search, the Asset
+// facet and the family's own facets, the preset, the sort), one group per
+// asset with its heading, the vaults that hold nothing behind one disclosure,
+// and the vaults the read did not answer for listed by name. A family supplies
+// its summaries, its facets, its routes and its receipts, and the receipts
+// scope this renders inside.
+//
+// THE PRESET (ui-jobs 485). The roster opens on the vaults people use: a vault
+// with a census when it counts 100+ current holders, a Yearn vault when the
+// Registry endorses it, any other vault always (Maple's pools). A removable
+// default chip; `?show=all` lifts it, and a link whose facets it would empty
+// opens without it. A roster with neither signal has no preset.
 //
 // THREE RULES THE LAYOUT KEEPS:
-//  1. NO CROSS-ASSET ORDER, NO USD. Groups are ordered by how many funded
-//     vaults they hold, then by symbol; rows inside a group by `totalAssets`
-//     raw, largest first, two quantities of one token being the only kind
-//     compared.
+//  1. NO CROSS-ASSET ORDER, NO USD. Rows inside a group sort by the chosen key:
+//     Holders (census current holders, most first; vaults with no census
+//     after), Size (`totalAssets` raw) or Newest (`createdBlock`), size the
+//     tie-break inside a group. Groups follow their first row under Holders
+//     and Newest, compared on that key alone, and by vault count under Size;
+//     then by symbol. Two quantities of one token are the only amounts compared.
 //  2. AN EMPTY VAULT IS A READING, AN UNREAD ONE IS AN ABSENCE. A vault whose
 //     `totalAssets()` answered zero sits behind the trailing disclosure; one
 //     whose call did not answer is named as unread, never drawn as a zero.
-//  3. THE COUNTS ARE THE READING'S. The facets and the search narrow which rows
-//     are shown; a group says "shown" while they do.
+//  3. THE COUNTS ARE THE READING'S. The facets, the search and the preset narrow
+//     which rows are shown; a group says "shown" while they do, and the counts
+//     line says how many of the funded vaults are shown.
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { BlockRef } from "@/components/shared/block-ref";
 import { InfoDisclosureTrigger } from "@/components/shared/info-disclosure";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { FilterSections } from "@/components/shared/filter-bar/filter-sections";
-import { FilterChips } from "@/components/shared/filter-bar/filter-chips";
+import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
+import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
 import { DisclosureChevron } from "@/components/shared/expand-chevron";
 import { VaultRow, type VaultRowReceipts } from "@/components/vaults/vault-row";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
+import type { BaseListFilters } from "@/lib/shared/list-filter";
+import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
+import { vaultRosterShownProv } from "@/lib/vaults/roster-provenance";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
 import type { VaultYield } from "@/lib/vaults/yield";
@@ -76,6 +88,50 @@ export interface VaultRosterHead {
 
 const rawOf = (v: VaultSummary) => BigInt(v.totalAssets?.raw ?? "0");
 
+/** The preset's holder threshold: census current holders at least this. */
+export const ROSTER_HOLDERS_MIN = 100;
+
+/** Has the vault a signal the preset reads: a census, or Yearn's endorsement. */
+const hasSignal = (v: VaultSummary) => v.census != null || v.family === "yearn-v3";
+
+/** The preset: 100+ current holders where the vault has a census, endorsed
+ *  where it is a Yearn vault, every other vault kept. */
+export function inRosterPreset(v: VaultSummary): boolean {
+  if (v.census != null) return v.census.live >= ROSTER_HOLDERS_MIN;
+  if (v.family === "yearn-v3") return v.standing.includes("endorsed");
+  return true;
+}
+
+type SortKey = "holders" | "size" | "newest";
+const SORT_KEYS: readonly SortKey[] = ["holders", "size", "newest"];
+
+const bigCmp = (a: bigint, b: bigint) => (a < b ? -1 : a > b ? 1 : 0);
+
+/** The sort's own key, comparable across assets; 0 where it does not decide.
+ *  `dir` is 1 for most/newest first, -1 for the flip. A vault with no census
+ *  (or no created block) sorts after every vault with one, both ways. */
+function primaryCmp(sort: SortKey, dir: number) {
+  return (a: VaultSummary, b: VaultSummary): number => {
+    if (sort === "holders") {
+      if (a.census == null || b.census == null) return a.census == null ? (b.census == null ? 0 : 1) : -1;
+      return dir * (b.census.live - a.census.live);
+    }
+    if (sort === "newest") {
+      if (a.createdBlock == null || b.createdBlock == null)
+        return a.createdBlock == null ? (b.createdBlock == null ? 0 : 1) : -1;
+      return dir * (b.createdBlock - a.createdBlock);
+    }
+    return 0;
+  };
+}
+
+/** Rows inside one asset group: the sort's key, then size, then address. */
+function rowCmp(sort: SortKey, dir: number) {
+  const primary = primaryCmp(sort, dir);
+  return (a: VaultSummary, b: VaultSummary) =>
+    primary(a, b) || dir * bigCmp(rawOf(b), rawOf(a)) || a.address.localeCompare(b.address);
+}
+
 interface AssetGroup {
   chainId: number;
   asset: VaultSummary["asset"];
@@ -83,7 +139,7 @@ interface AssetGroup {
 }
 
 // One group per asset on one chain: the same address on two chains is two tokens.
-function groupByAsset(rows: VaultSummary[]): AssetGroup[] {
+function groupByAsset(rows: VaultSummary[], sort: SortKey, dir: number): AssetGroup[] {
   const by = new Map<string, AssetGroup>();
   for (const row of rows) {
     const key = `${row.chainId}:${row.asset.address}`;
@@ -92,21 +148,26 @@ function groupByAsset(rows: VaultSummary[]): AssetGroup[] {
     else by.set(key, { chainId: row.chainId, asset: row.asset, rows: [row] });
   }
   const groups = [...by.values()];
-  for (const g of groups) {
-    g.rows.sort((a, b) => {
-      const av = rawOf(a);
-      const bv = rawOf(b);
-      return av < bv ? 1 : av > bv ? -1 : a.address.localeCompare(b.address);
-    });
-  }
+  const inGroup = rowCmp(sort, dir);
+  for (const g of groups) g.rows.sort(inGroup);
+  // Across groups only the sort's own key compares (rule 1): never size.
+  const primary = primaryCmp(sort, dir);
   groups.sort(
     (a, b) =>
+      primary(a.rows[0], b.rows[0]) ||
       b.rows.length - a.rows.length ||
       a.asset.symbol.localeCompare(b.asset.symbol, "en-US") ||
       a.asset.address.localeCompare(b.asset.address) ||
       a.chainId - b.chainId,
   );
   return groups;
+}
+
+/** The toolbar's state: the facets and the search held here, the preset and
+ *  the sort read from the URL. */
+interface RosterFilters extends BaseListFilters {
+  facets: Filters;
+  show: string[];
 }
 
 export function VaultRoster({
@@ -128,6 +189,7 @@ export function VaultRoster({
   emptyCountProv,
   head,
   initialFilters,
+  initialSearch = "",
 }: {
   vaults: readonly VaultSummary[];
   /** Decision 0047's figure per lowercased vault address (or `yieldKeyOf`). */
@@ -155,6 +217,9 @@ export function VaultRoster({
   head: VaultRosterHead;
   /** The facets chosen on arrival (the index's `?asset=`, ui-jobs 482). */
   initialFilters?: Filters;
+  /** The query string the page was served with: the preset and the sort on
+   *  first paint, before the roster reads the live URL. */
+  initialSearch?: string;
 }) {
   const [introOpen, setIntroOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(initialFilters ?? {});
@@ -179,41 +244,128 @@ export function VaultRoster({
     ],
     [vaults, facets, assetFacet],
   );
-  const dimensions = useMemo<FilterDimension<Filters>[]>(
-    () =>
-      all.map((f) => {
-        const counts = new Map<string, number>();
-        for (const v of vaults) counts.set(f.valueOf(v), (counts.get(f.valueOf(v)) ?? 0) + 1);
-        const values = f.order
-          ? f.order.filter((o) => counts.has(o))
-          : [...counts.keys()].sort(
-              (a, b) =>
-                (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || f.labelOf(a).localeCompare(f.labelOf(b), "en-US"),
-            );
-        return {
-          id: f.id,
-          label: f.label,
-          group: f.label,
-          cardinality: "multi" as const,
-          options: values.map((value) => ({ value, label: f.labelOf(value), meta: n(counts.get(value) ?? 0) })),
-          get: (s: Filters) => s[f.id] ?? [],
-          set: (s: Filters, chosen: string[]) => ({ ...s, [f.id]: chosen }),
-        };
-      }),
-    [all, vaults],
+
+  // ── the preset and the sort: what this roster has the signals for ──────────
+  const withCensus = useMemo(() => vaults.some((v) => v.census != null), [vaults]);
+  const withYearn = useMemo(() => vaults.some((v) => v.family === "yearn-v3"), [vaults]);
+  const presetParts = [
+    ...(withCensus ? [`${ROSTER_HOLDERS_MIN}+ holders`] : []),
+    ...(withYearn ? [withCensus || vaults.some((v) => v.family !== "yearn-v3") ? "Yearn endorsed" : "Endorsed"] : []),
+  ];
+  const presetLabel = presetParts.join(" · ");
+  const hasPreset = presetParts.length > 0 && vaults.some(hasSignal);
+  // A link that arrives with facets chosen keeps the preset, unless the preset
+  // would leave one of the values it asked for with no funded vault.
+  const [arrivalShow] = useState<"used" | "all">(() => {
+    for (const [id, values] of Object.entries(initialFilters ?? {})) {
+      const f = all.find((x) => x.id === id);
+      if (!f) continue;
+      for (const value of values) {
+        const asked = funded.filter((v) => f.valueOf(v) === value);
+        if (asked.length > 0 && !asked.some(inRosterPreset)) return "all";
+      }
+    }
+    return "used";
+  });
+  const sortOptions: SortOption[] = [
+    ...(withCensus ? [{ value: "holders", label: "Holders" }] : []),
+    { value: "size", label: "Size" },
+    ...(vaults.some((v) => v.createdBlock != null) ? [{ value: "newest", label: "Newest" }] : []),
+  ];
+  const defaultSort: SortKey = withCensus ? "holders" : "size";
+
+  // The preset and the sort live in the URL (`?show=`, `?sortBy=`, `?sortOrder=`),
+  // each written only off its default; every other param is left as it came.
+  const sp = useUrlSearchParams(initialSearch);
+  const showParam = sp.get("show");
+  const show: "used" | "all" = !hasPreset
+    ? "all"
+    : showParam === "all" || showParam === "used"
+      ? showParam
+      : arrivalShow;
+  const sortParam = sp.get("sortBy") as SortKey | null | undefined;
+  const sort: SortKey =
+    sortParam && SORT_KEYS.includes(sortParam) && sortOptions.some((o) => o.value === sortParam)
+      ? sortParam
+      : defaultSort;
+  const sortOrder: "asc" | "desc" = sp.get("sortOrder") === "asc" ? "asc" : "desc";
+  const dir = sortOrder === "desc" ? 1 : -1;
+  const writeUrl = useCallback(
+    (next: { show: string; sortBy: string; sortOrder: string }) => {
+      const p = new URLSearchParams(window.location.search);
+      const put = (key: string, value: string, def: string) => (value === def ? p.delete(key) : p.set(key, value));
+      put("show", next.show, arrivalShow);
+      put("sortBy", next.sortBy, defaultSort);
+      put("sortOrder", next.sortOrder, "desc");
+      const qs = p.toString().replace(/%2C/gi, ",");
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+      notifyUrlChanged();
+    },
+    [arrivalShow, defaultSort],
   );
+
+  const state: RosterFilters = { q: query, sortBy: sort, sortOrder, facets: filters, show: [show] };
+  const onToolbar = (next: RosterFilters) => {
+    if (next.q !== query) setQuery(next.q);
+    if (next.facets !== filters) setFilters(next.facets);
+    const nextShow = next.show[0] ?? arrivalShow;
+    if (nextShow !== show || next.sortBy !== sort || next.sortOrder !== sortOrder)
+      writeUrl({ show: nextShow, sortBy: next.sortBy, sortOrder: next.sortOrder });
+  };
+
+  const dimensions = useMemo<FilterDimension<RosterFilters>[]>(() => {
+    const facetDims = all.map((f) => {
+      const counts = new Map<string, number>();
+      for (const v of vaults) counts.set(f.valueOf(v), (counts.get(f.valueOf(v)) ?? 0) + 1);
+      const values = f.order
+        ? f.order.filter((o) => counts.has(o))
+        : [...counts.keys()].sort(
+            (a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || f.labelOf(a).localeCompare(f.labelOf(b), "en-US"),
+          );
+      return {
+        id: f.id,
+        label: f.label,
+        group: f.label,
+        cardinality: "multi" as const,
+        options: values.map((value) => ({ value, label: f.labelOf(value), meta: n(counts.get(value) ?? 0) })),
+        get: (s: RosterFilters) => s.facets[f.id] ?? [],
+        set: (s: RosterFilters, chosen: string[]) => ({ ...s, facets: { ...s.facets, [f.id]: chosen } }),
+      };
+    });
+    if (!hasPreset) return facetDims;
+    const preset: FilterDimension<RosterFilters> = {
+      id: "show",
+      label: "Shown",
+      group: "Shown",
+      cardinality: "single",
+      options: [
+        { value: "used", label: presetLabel },
+        { value: "all", label: "Every vault" },
+      ],
+      get: (s) => s.show,
+      set: (s, v) => ({ ...s, show: v.length > 0 ? v : [arrivalShow] }),
+      defaultValues: () => [arrivalShow],
+      defaultChip: (s) => (s.show[0] === "used" ? presetLabel : null),
+      clearDefault: (s) => ({ ...s, show: ["all"] }),
+      chipLabel: (v) => (v[0] === "all" ? "Every vault" : presetLabel),
+    };
+    return [...facetDims, preset];
+  }, [all, vaults, hasPreset, presetLabel, arrivalShow]);
 
   // A substring over what the row prints: the live name, the catalogue's
   // snapshot, the symbol and the address. It narrows the reading already in
   // the document and makes no request.
   const needle = query.trim().toLowerCase();
+  const presetOn = show === "used";
   const passes = (v: VaultSummary) =>
+    (!presetOn || inRosterPreset(v)) &&
     all.every((f) => (filters[f.id]?.length ?? 0) === 0 || filters[f.id].includes(f.valueOf(v))) &&
     (needle === "" ||
       [v.name, v.catalogName, v.symbol, v.address].some((s) => s != null && s.toLowerCase().includes(needle)));
-  const filtering = needle !== "" || Object.values(filters).some((x) => x.length > 0);
+  const filtering = presetOn || needle !== "" || Object.values(filters).some((x) => x.length > 0);
 
-  const groups = useMemo(() => groupByAsset(funded.filter(passes)), [funded, filters, needle]); // eslint-disable-line react-hooks/exhaustive-deps
+  const fundedShown = useMemo(() => funded.filter(passes), [funded, filters, needle, presetOn]); // eslint-disable-line react-hooks/exhaustive-deps
+  const groups = useMemo(() => groupByAsset(fundedShown, sort, dir), [fundedShown, sort, dir]);
   const emptyShown = useMemo(
     () =>
       emptyRows
@@ -224,7 +376,25 @@ export function VaultRoster({
             (vaultDisplayName(a) ?? a.address).localeCompare(vaultDisplayName(b) ?? b.address, "en-US") ||
             a.address.localeCompare(b.address),
         ),
-    [emptyRows, filters, needle], // eslint-disable-line react-hooks/exhaustive-deps
+    [emptyRows, filters, needle, presetOn], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  // The criteria the counts line's receipt names.
+  const criteria = [
+    ...(presetOn ? [presetParts.join(" or ") + " (the preset; a vault with neither signal is kept)"] : []),
+    ...all
+      .filter((f) => (filters[f.id]?.length ?? 0) > 0)
+      .map((f) => `${f.label}: ${filters[f.id].map(f.labelOf).join(", ")}`),
+    ...(needle !== "" ? [`search “${query.trim()}”`] : []),
+  ];
+  const countNode = (
+    <span data-figure="shown-count" data-shown={fundedShown.length} data-funded={funded.length}>
+      <Prov info={vaultRosterShownProv(fundedShown.length, funded.length, criteria)}>
+        {filtering
+          ? `${n(fundedShown.length)} of ${n(funded.length)} funded vaults`
+          : `${n(funded.length)} funded ${funded.length === 1 ? "vault" : "vaults"}`}
+      </Prov>
+    </span>
   );
 
   const row = (v: VaultSummary) => (
@@ -332,22 +502,16 @@ export function VaultRoster({
   return (
     <>
       {intro}
-      {/* ── facets and search: quiet at rest ─────────────────────────────── */}
-      <div className="mb-4 flex flex-col gap-2" data-skel-section={`${skel}-facets`}>
-        <div className="flex flex-wrap items-center gap-2">
-          <FilterSections dimensions={dimensions} filters={filters} onChange={setFilters} />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Vault name, symbol or address"
-            aria-label="Search the roster by vault name, symbol or address"
-            data-roster-search
-            className="w-full min-w-0 rounded-lg border border-rb-200 bg-surface px-2.5 py-1.5 text-base text-foreground sm:text-[12px] placeholder:text-rb-500 sm:w-72 dark:border-rb-500/30"
-          />
-        </div>
-        <FilterChips dimensions={dimensions} filters={filters} onChange={setFilters} />
-      </div>
+      {/* ── the listings' toolbar: search, facets and preset, sort ──────── */}
+      <ListToolbar
+        dimensions={dimensions}
+        filters={state}
+        onChange={onToolbar}
+        sortOptions={sortOptions}
+        searchPlaceholder="Vault name, symbol or address"
+        countNode={countNode}
+        skel={`${skel}-facets`}
+      />
 
       {/* ── one group per asset ──────────────────────────────────────────── */}
       <div data-skel-section={`${skel}-groups`}>
@@ -386,7 +550,7 @@ export function VaultRoster({
       </div>
 
       {/* ── the vaults that hold nothing: a reading, behind one disclosure ── */}
-      {emptyRows.length > 0 && (
+      {emptyRows.length > 0 && (!presetOn || emptyShown.length > 0) && (
         <section className="mb-6" data-skel-section={`${skel}-empty`} data-empty-group>
           <button
             type="button"

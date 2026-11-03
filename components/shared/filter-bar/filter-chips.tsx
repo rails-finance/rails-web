@@ -10,6 +10,7 @@
  * listing's result count at the far right, and is drawn even with no chip.
  */
 
+import type { ReactNode } from "react";
 import { X } from "lucide-react";
 import { RESET_LINK } from "@/lib/shared/ui-grammar";
 import {
@@ -25,9 +26,11 @@ interface FilterChipsProps<F> {
   onChange: (next: F) => void;
   /** The listing's result count, drawn at the far right of the row. */
   count?: { total: number; noun: string };
+  /** In place of `count`: a count line the page writes, drawn in the same spot. */
+  countNode?: ReactNode;
 }
 
-export function FilterChips<F>({ dimensions, filters, onChange, count }: FilterChipsProps<F>) {
+export function FilterChips<F>({ dimensions, filters, onChange, count, countNode }: FilterChipsProps<F>) {
   const activeDims = dimensions.filter((d) => isDimensionActive(d, filters));
   // A dimension resting on a default that constrains the list names it in a
   // fixed chip (FilterDimension.defaultChip).
@@ -35,7 +38,7 @@ export function FilterChips<F>({ dimensions, filters, onChange, count }: FilterC
     .filter((d) => !isDimensionActive(d, filters))
     .map((d) => ({ id: d.id, text: d.defaultChip?.(filters) ?? null, clear: d.clearDefault }))
     .filter((c): c is { id: string; text: string; clear: ((f: F) => F) | undefined } => c.text != null);
-  if (activeDims.length === 0 && defaultChips.length === 0 && !count) return null;
+  if (activeDims.length === 0 && defaultChips.length === 0 && !count && countNode == null) return null;
 
   const chipText = (dim: FilterDimension<F>) => {
     const vals = dim.get(filters);
@@ -96,7 +99,12 @@ export function FilterChips<F>({ dimensions, filters, onChange, count }: FilterC
           Reset
         </button>
       )}
-      {count && (
+      {countNode != null && (
+        <span className="ml-auto text-xs text-rb-500 tabular-nums" data-anatomy="N1.6">
+          {countNode}
+        </span>
+      )}
+      {countNode == null && count && (
         <span className="ml-auto text-xs text-rb-500 tabular-nums" data-anatomy="N1.6" data-result-count={count.total}>
           {count.total.toLocaleString("en-US")} {count.total === 1 ? count.noun.replace(/s$/, "") : count.noun}
         </span>

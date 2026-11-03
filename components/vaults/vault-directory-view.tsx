@@ -42,6 +42,7 @@ const FACETS: VaultRosterFacet[] = [
 ];
 
 export function VaultDirectoryView({
+  initialSearch,
   vaults,
   yields,
   blockNumber,
@@ -51,6 +52,8 @@ export function VaultDirectoryView({
   censusBlock,
   withCensus,
 }: {
+  /** The query string the page was served with (the roster's preset and sort). */
+  initialSearch?: string;
   vaults: VaultSummary[];
   yields: Record<string, VaultYield>;
   blockNumber: number;
@@ -75,6 +78,7 @@ export function VaultDirectoryView({
   return (
     <ProvReceiptsScope registry={registry}>
       <VaultRoster
+        initialSearch={initialSearch}
         vaults={vaults}
         yields={yields}
         chainId={MORPHO_BASE_CHAIN_ID}

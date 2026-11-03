@@ -55,6 +55,7 @@ const FACETS: VaultRosterFacet[] = [
 ];
 
 export function YearnVaultDirectoryView({
+  initialSearch,
   vaults,
   yields,
   blockNumber,
@@ -66,6 +67,8 @@ export function YearnVaultDirectoryView({
    *  pill for them, and the verifier tells unread from false. */
   endorsementUnread,
 }: {
+  /** The query string the page was served with (the roster's preset and sort). */
+  initialSearch?: string;
   vaults: VaultSummary[];
   yields: Record<string, VaultYield>;
   blockNumber: number;
@@ -91,6 +94,7 @@ export function YearnVaultDirectoryView({
   return (
     <ProvReceiptsScope registry={registry}>
       <VaultRoster
+        initialSearch={initialSearch}
         vaults={vaults}
         yields={yields}
         chainId={CHAIN_ID}

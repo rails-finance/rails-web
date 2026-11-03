@@ -104,11 +104,14 @@ function rosterCountProv(r: VaultIndexRoster): Provenance {
 }
 
 export function VaultIndexView({
+  initialSearch,
   vaults,
   yields,
   rosters,
   asset,
 }: {
+  /** The query string the page was served with (the roster's preset and sort). */
+  initialSearch?: string;
   vaults: VaultSummary[];
   yields: Record<string, VaultYield>;
   rosters: VaultIndexRoster[];
@@ -227,6 +230,7 @@ export function VaultIndexView({
   return (
     <ProvReceiptsScope registry={registry}>
       <VaultRoster
+        initialSearch={initialSearch}
         vaults={vaults}
         yields={yields}
         chainId={MAINNET_CHAIN_ID as ChainId}

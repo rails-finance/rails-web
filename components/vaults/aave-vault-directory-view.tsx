@@ -48,6 +48,7 @@ const FACETS: VaultRosterFacet[] = [
 ];
 
 export function AaveVaultDirectoryView({
+  initialSearch,
   vaults,
   yields,
   blockNumber,
@@ -56,6 +57,8 @@ export function AaveVaultDirectoryView({
   counts,
   censusBlock,
 }: {
+  /** The query string the page was served with (the roster's preset and sort). */
+  initialSearch?: string;
   vaults: VaultSummary[];
   yields: Record<string, VaultYield>;
   blockNumber: number;
@@ -81,6 +84,7 @@ export function AaveVaultDirectoryView({
   return (
     <ProvReceiptsScope registry={registry}>
       <VaultRoster
+        initialSearch={initialSearch}
         vaults={vaults}
         yields={yields}
         chainId={MAINNET_CHAIN_ID}

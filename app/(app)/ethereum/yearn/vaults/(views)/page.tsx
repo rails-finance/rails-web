@@ -26,6 +26,7 @@ import { protocolForHref } from "@/lib/shared/protocols";
 import { loadYearnVaultRoster } from "@/lib/yearn/vault-roster";
 import { yearnVaultSummaries } from "@/lib/vaults/summary";
 import { loadVaultYields } from "@/lib/vaults/yield-read";
+import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,8 @@ export async function generateMetadata() {
   });
 }
 
-export default async function YearnVaultRosterPage() {
+export default async function YearnVaultRosterPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+  const initialSearch = toURLSearchParams(await searchParams).toString();
   const data = await loadYearnEthereumVaultDirectory();
   const yields = await loadVaultYields(
     YEARN_CHAIN_ID,
@@ -56,6 +58,7 @@ export default async function YearnVaultRosterPage() {
             the chain, the same marker the two other vault rosters carry. */}
         <div data-roster-panel>
           <YearnVaultDirectoryView
+            initialSearch={initialSearch}
             vaults={yearnVaultSummaries(data)}
             yields={yields}
             blockNumber={data.blockNumber}

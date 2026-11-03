@@ -30,6 +30,7 @@ import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { morphoBaseVaultSummaries } from "@/lib/vaults/summary";
 import { loadVaultYields } from "@/lib/vaults/yield-read";
+import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 
 export const dynamic = "force-dynamic";
 
@@ -56,7 +57,8 @@ async function loadCensus(): Promise<VaultCensusRow[]> {
   }
 }
 
-export default async function BaseVaultRosterPage() {
+export default async function BaseVaultRosterPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+  const initialSearch = toURLSearchParams(await searchParams).toString();
   const data = await loadMorphoBaseVaultDirectory();
   const [census, yields] = await Promise.all([
     loadCensus(),
@@ -76,6 +78,7 @@ export default async function BaseVaultRosterPage() {
             an empty panel. */}
         <div data-roster-panel>
           <VaultDirectoryView
+            initialSearch={initialSearch}
             vaults={morphoBaseVaultSummaries(data, census)}
             yields={yields}
             blockNumber={data.blockNumber}
