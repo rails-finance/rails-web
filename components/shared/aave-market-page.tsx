@@ -17,6 +17,7 @@ import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { BlockRef } from "@/components/shared/block-ref";
+import { headReadOf, serverReadVia } from "@/lib/shared/server-head-read";
 
 export interface AaveMarketPageProps {
   /** This deployment's chain proxy for the market ("/api/chain/spark/market"). */
@@ -68,6 +69,8 @@ export function AaveMarketPage(props: AaveMarketPageProps) {
     };
   }, [props.apiRoute]);
 
+  // Who read the block: rails-server live, its stored snapshot, or (null) the web's chain read.
+  const readBy = data ? (headReadOf(data.head, data.blockNumber, data.stored) ?? null) : null;
   const view =
     data && !data.chainStale
       ? buildAaveMarketView(data.reserves, {
@@ -75,6 +78,7 @@ export function AaveMarketPage(props: AaveMarketPageProps) {
           purpose: props.purpose,
           protocol: props.protocol,
           blockNumber: data.blockNumber,
+          readBy,
           pool: data.pool,
           oracle: data.oracle,
           capAutomator: data.capAutomator,
@@ -104,6 +108,7 @@ export function AaveMarketPage(props: AaveMarketPageProps) {
     data && !data.chainStale && data.blockNumber > 0 ? (
       <p className="mt-2 text-[11px] text-rb-500">
         Chain snapshot · <BlockRef block={data.blockNumber} chainId={props.chainId ?? MAINNET_CHAIN_ID} />
+        {serverReadVia(readBy)}
       </p>
     ) : undefined;
 

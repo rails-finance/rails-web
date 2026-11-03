@@ -23,6 +23,7 @@ export async function GET() {
       pool: AAVE_V3_BASE_POOL,
       oracle: AAVE_V3_BASE_ORACLE,
       chainId: AAVE_V3_BASE_CHAIN_ID,
+      surface: "aave-v3:base:market",
     });
     return NextResponse.json(data, { headers: { "Cache-Control": CHAIN_MARKET_CACHE_CONTROL } });
   } catch (error) {

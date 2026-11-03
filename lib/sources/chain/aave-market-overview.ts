@@ -19,13 +19,21 @@
 // one covers — see EMODE_ABI. Without it a reserve at a zero threshold reads as
 // "can never be collateral" when wallets are in fact borrowing against it.
 //
+// Aave V3 Core, SparkLend, Aave V3 on Base and Seamless read through
+// rails-server's head routes and, when the live read fails, its stored snapshot
+// of them (lib/sources/api/head-snapshot.ts; the source names its `surface`,
+// `aave-v3:ethereum:market` …). Aave V3 on Arbitrum names none and reads the
+// chain.
+//
 // SERVER-ONLY — imported from /api/chain/* route handlers only (it calls
 // Alchemy via lib/sources/chain/rpc).
 
-import { parseAbi, getAddress } from "viem";
+import { parseAbi, getAddress, type PublicClient } from "viem";
 import { chainClient } from "./rpc";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { resolveErc20Meta, scaleRaw } from "./erc20-meta";
+import { withHeadSnapshot } from "@/lib/sources/api/head-snapshot";
+import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { AaveMarketOverviewResponse, AaveMarketReserve } from "@/lib/api/fetch-aave-market-overview";
 
 const POOL_ABI = parseAbi([
@@ -132,7 +140,7 @@ interface EModeCategory {
  * the table said before this existed, rather than a wrong one.
  */
 async function loadEModeMembership(
-  client: ReturnType<typeof chainClient>,
+  client: PublicClient,
   poolAddr: `0x${string}`,
   atBlock: { blockNumber: bigint },
   reserves: { id: number; configuration: bigint }[],
@@ -284,16 +292,35 @@ export interface AaveMarketSource {
   /** SparkLend's CapAutomator, whose per-reserve maximum is the cap the market
    *  is sized to (see CAP_AUTOMATOR_ABI). Absent on every other market. */
   capAutomator?: string;
+  /** The head-snapshot surface (`aave-v3:ethereum:market`): read through
+   *  rails-server, with its stored snapshot behind. Unset reads the chain. */
+  surface?: string;
 }
 
 function stub(pool: string, oracle: string): AaveMarketOverviewResponse {
   return { pool, oracle, blockNumber: 0, chainStale: true, reserves: [] };
 }
 
-/** Read one market's full reserve overview at the live head. Returns a
+/** Read one market's full reserve overview at the head. Returns a
  *  `chainStale` stub on RPC failure so the surface shows a retry state rather
- *  than asserting an empty market. */
+ *  than asserting an empty market. A source with a `surface` reads through
+ *  rails-server: the answer carries `head` when it answered every read, or
+ *  `stored` when the figures are its stored snapshot's. */
 export async function loadAaveMarketOverview(src: AaveMarketSource): Promise<AaveMarketOverviewResponse> {
+  const chainId = src.chainId ?? MAINNET_CHAIN_ID;
+  if (!src.surface) return readMarket(src, () => chainClient(chainId));
+  const { value, stored } = await withHeadSnapshot(
+    { surface: src.surface, chainId },
+    (client) => readMarket(src, () => client),
+    (v) => !v.chainStale && v.reserves.length > 0,
+  );
+  if (stored) return { ...value, stored };
+  const head = serverHeadStampAt(chainId, value.blockNumber);
+  return head ? { ...value, head } : value;
+}
+
+/** The overview read on `clientOf()`'s client; a `chainStale` stub where a read fails. */
+async function readMarket(src: AaveMarketSource, clientOf: () => PublicClient): Promise<AaveMarketOverviewResponse> {
   const poolAddr = getAddress(src.pool);
   const oracleAddr = getAddress(src.oracle);
   const poolLower = poolAddr.toLowerCase();
@@ -303,7 +330,7 @@ export async function loadAaveMarketOverview(src: AaveMarketSource): Promise<Aav
   const automatorAddr = src.capAutomator ? getAddress(src.capAutomator) : null;
 
   try {
-    const client = chainClient(chainId);
+    const client = clientOf();
 
     // Every read below is pinned to the block this response names. Resolving
     // the head FIRST and pinning to it is the difference between a receipt a

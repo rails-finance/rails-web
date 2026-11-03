@@ -11,6 +11,7 @@
 // re-sorts as they like.
 
 import type { AaveMarketReserve } from "@/lib/api/fetch-aave-market-overview";
+import type { ServerRead } from "@/lib/shared/server-head-read";
 import { assetClass, ASSET_CLASS_TITLE, type AssetClass } from "@/lib/aave-v4/asset-class";
 
 export interface MarketReserveRow extends AaveMarketReserve {
@@ -112,8 +113,10 @@ export interface AaveMarketView {
   purpose: string;
   /** Protocol id — selects the market-surface provenance vocabulary. */
   protocol: string;
-  /** The head block the reserves were read at — the receipts' citable coord. */
+  /** The block the reserves were read at — the receipts' citable coord. */
   blockNumber: number;
+  /** rails-server's read of the block (live, or its stored snapshot); null where the web read the chain. */
+  readBy: ServerRead | null;
   /** The live Pool + IAaveOracle addresses the surface read from (the exact
    *  contracts every receipt cites). */
   pool: string;
@@ -136,6 +139,7 @@ export function buildAaveMarketView(
     purpose: string;
     protocol: string;
     blockNumber: number;
+    readBy?: ServerRead | null;
     pool: string;
     oracle: string;
     capAutomator?: string;
@@ -178,6 +182,7 @@ export function buildAaveMarketView(
     purpose: identity.purpose,
     protocol: identity.protocol,
     blockNumber: identity.blockNumber,
+    readBy: identity.readBy ?? null,
     pool: identity.pool,
     oracle: identity.oracle,
     capAutomator: identity.capAutomator,

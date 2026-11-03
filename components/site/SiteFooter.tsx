@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { LwNotice } from "@/components/shared/lw-attribution";
-import { Activity, DraftingCompass, FileText, Home, LayoutGrid, Vault } from "lucide-react";
+import { Activity, DraftingCompass, FileText, Home, Info, LayoutGrid, Vault } from "lucide-react";
 import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
 import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 import { DonateModal } from "@/components/site/DonateModal";
@@ -105,6 +105,15 @@ export function SiteFooter() {
                 >
                   <Home className="w-4 h-4 shrink-0" aria-hidden="true" />
                   <span>Home</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/about"
+                  className="flex items-center gap-2 text-rb-500 hover:text-blue-500 text-sm transition-colors duration-150"
+                >
+                  <Info className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  <span>About</span>
                 </Link>
               </li>
               <li>
