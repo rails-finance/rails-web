@@ -13,15 +13,16 @@
 // event carries it; the read at the block does.
 //
 // Liquidation rows additionally carry the forensics card: the valued two-leg
-// seizure (unconverted collateral at AMM.price_oracle read back AT the
-// event's block — the oracle-at-block overlay walk — plus the
-// already-converted borrowed-token leg at face) against the debt the log
-// says was cleared. The price fetch is lazy (this panel mounts on expand)
-// and a block the archive read can't answer keeps the card token-only — the
-// safe state. A partial liquidation emits no after-image, so the stat grid
-// may be absent while the forensics still renders: the taking is stated.
+// seizure (unconverted collateral at AMM.price_oracle at the event's block,
+// plus the already-converted borrowed-token leg at face) against the debt the
+// log says was cleared. The price is rails-server's stored read at the block:
+// the timeline row's `raw.priceAtBlock` (mig 373), else the event-state
+// read's `after.priceOracleRaw`, which this card makes anyway; the AMM is the
+// page's market roster row. A block with neither keeps the card token-only.
+// A partial liquidation emits no after-image, so the stat grid may be absent
+// while the forensics still renders: the taking is stated.
 
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import type { LlamalendContext } from "@/lib/shared/types/event-shape";
 import type { ChainTruthTransition } from "@/components/shared/chain-truth-event";
 import {
@@ -34,7 +35,12 @@ import type { EventCardOpened } from "@/components/shared/event-card";
 import type { EventCellHead } from "@/components/shared/event-cells";
 import type { EventCardPrice } from "@/components/shared/event-price-row";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { useLlamalendEventState, useLlamalendEventStateRead } from "@/lib/llamalend/use-event-state";
+import {
+  useLlamalendEventState,
+  useLlamalendEventStateRead,
+  type LlamalendEventState,
+} from "@/lib/llamalend/use-event-state";
+import { scale1e18 } from "@/lib/llamalend/band-math";
 import {
   fmtBandPrice,
   fmtColl,
@@ -55,6 +61,7 @@ import {
   llamaLiqPremiumProv,
   stateAtBlockProv,
   stateChangeProv,
+  type LlamaPriceSource,
   type LlamalendCoords,
 } from "@/lib/llamalend/event-provenance";
 import { formatNumber, formatUnitsExact } from "@/lib/utils/format";
@@ -73,6 +80,8 @@ export interface LlamalendCellsProps {
   /** The tokens' contracts, where the event's flows carry them. */
   collateralAddress?: string;
   borrowedAddress?: string;
+  /** The market's AMM, from the page's roster row; null where the page has none. */
+  amm?: string | null;
 }
 
 const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Math.abs(Number(human))));
@@ -80,30 +89,25 @@ const fmt = (human?: string): string => (human == null ? "—" : formatNumber(Ma
 interface AtBlockPrice {
   price: number;
   priceRaw: string;
-  amm: string;
+  amm: string | undefined;
+  /** Which stored read the price came from. */
+  source: LlamaPriceSource;
 }
 
-/** The at-block oracle price for a liquidation row — fetched once on mount
- *  (the detail mounts on expand). `undefined` while loading or after a miss:
- *  the card renders without the priced leg, which is the safe state. */
-function useLiqPriceAtBlock(enabled: boolean, controller: string, blockNumber?: number): AtBlockPrice | undefined {
-  const [price, setPrice] = useState<AtBlockPrice | undefined>(undefined);
-  useEffect(() => {
-    if (!enabled || blockNumber == null) return;
-    let live = true;
-    fetch(`/api/chain/llamalend/liq-price?controller=${controller}&block=${blockNumber}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (live && d && typeof d.price === "number" && d.price > 0) {
-          setPrice({ price: d.price, priceRaw: String(d.priceRaw), amm: String(d.amm) });
-        }
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [enabled, controller, blockNumber]);
-  return price;
+/** The oracle price at the event's block from what the card holds: the
+ *  timeline row's stored price, else the event-state read's. `undefined`
+ *  where neither has it: the card renders without the priced leg. */
+function storedPriceAtBlock(
+  ctx: LlamalendContext,
+  read: LlamalendEventState | null | undefined,
+  amm: string | null | undefined,
+): AtBlockPrice | undefined {
+  const pick = (raw: string | null | undefined, source: LlamaPriceSource): AtBlockPrice | undefined => {
+    if (raw == null || !/^\d+$/.test(raw)) return undefined;
+    const price = scale1e18(BigInt(raw));
+    return price > 0 ? { price, priceRaw: raw, amm: amm ?? undefined, source } : undefined;
+  };
+  return pick(ctx.raw?.priceAtBlock, "timeline") ?? pick(read?.after.priceOracleRaw, "event-state");
 }
 
 /** The valued two-leg breakdown. Undefined until the pieces are in hand:
@@ -169,7 +173,7 @@ function buildLlamalendLiqForensics(
             {
               symbol: cSym,
               priceUsd: price,
-              priceProv: llamaAtBlockPriceProv(cSym, bSym, coords, atBlock.amm, atBlock.priceRaw),
+              priceProv: llamaAtBlockPriceProv(cSym, bSym, coords, atBlock.amm, atBlock.priceRaw, atBlock.source),
               note: "AMM oracle at block",
             },
           ]
@@ -187,18 +191,19 @@ export function useLlamalendOpened({
   previousStated,
   collateralAddress,
   borrowedAddress,
+  amm,
   price: price0,
 }: LlamalendCellsProps & { price?: EventCardPrice }): EventCardOpened {
   const coords: LlamalendCoords = { txHash, blockNumber, controller: ctx.controller, user: wallet };
   const isLiq = ctx.eventType === "liquidation";
-  // Fetch only when a collateral leg exists — a fully-converted seizure is
-  // valued at face and needs no archive read.
-  const needsPrice = isLiq && ctx.collateralDelta != null && Math.abs(Number(ctx.collateralDelta)) > 0;
-  const atBlock = useLiqPriceAtBlock(needsPrice, ctx.controller, blockNumber);
   // The position at block − 1 and at this block: what stood before, what the
   // AMM had converted, and health on each side.
   // undefined while the read is on its way, null after a miss.
   const read = useLlamalendEventStateRead(ctx, blockNumber, wallet);
+  // A collateral leg needs the block's price; a fully-converted seizure is
+  // valued at face.
+  const needsPrice = isLiq && ctx.collateralDelta != null && Math.abs(Number(ctx.collateralDelta)) > 0;
+  const atBlock = needsPrice ? storedPriceAtBlock(ctx, read, amm) : undefined;
   const state = read ?? null;
   const f = state ? llamalendEventFigures(ctx, state) : null;
   const block = blockNumber ?? 0;
@@ -451,7 +456,7 @@ export function useLlamalendOpened({
               usd: atBlock.price,
               unit: { format: (n) => `${fmtPrice(n)} ${bSym}` },
               named: { note: "AMM oracle at block" },
-              info: llamaAtBlockPriceProv(cSym, bSym, coords, atBlock.amm, atBlock.priceRaw),
+              info: llamaAtBlockPriceProv(cSym, bSym, coords, atBlock.amm, atBlock.priceRaw, atBlock.source),
               value: String(atBlock.price),
             },
           ],

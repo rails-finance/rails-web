@@ -8,11 +8,11 @@
 // the wrong lifetime. Each row carries what the server stored at its block
 // (rails-server mig 373: the AMM's oracle price and the position's state,
 // once its filler has reached the block). For a row it has not stored, the
-// price is read from the archive (/api/chain/llamalend/liq-price, six at a
-// time, up to LLAMALEND_PRICE_READS blocks; the route caches each block's
-// answer at the edge), and a row with no after-image (an underwater repay, a
-// partial liquidation) has the position read at its block
-// (/api/chain/llamalend/event-state, the read its card's detail makes).
+// price is the event-state read's `after.priceOracleRaw` at the block
+// (/api/chain/llamalend/event-state, the read its card's detail makes; six at
+// a time, up to LLAMALEND_PRICE_READS blocks), and a row with no after-image
+// (an underwater repay, a partial liquidation) has the position read at its
+// block from the same read.
 // LlamaLend is not in the shared daily price store, so nothing is read
 // between events: the collateral keeps its latest event's price. The same
 // event-state read at the last event of each of the latest HEALTH_READS_MAX
@@ -53,35 +53,18 @@ import {
   type LlamalendConfigLog,
 } from "@/lib/llamalend/config-log";
 import { fetchChangeLog } from "@/lib/shared/change-log-read";
+import { scale1e18 } from "@/lib/llamalend/band-math";
 import { withChanges } from "@/lib/shared/flows-changes";
 
 const DAY_S = 86_400;
-
-const cache = new Map<string, Promise<number | null>>();
-
-/** The AMM's oracle price at one block, cached for the page's life (a past
- *  block's answer never changes); null where the read failed. */
-function loadPriceAt(controller: string, block: number): Promise<number | null> {
-  const url = `/api/chain/llamalend/liq-price?controller=${controller}&block=${block}`;
-  let p = cache.get(url);
-  if (!p) {
-    p = fetch(url)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => (typeof d?.price === "number" && d.price > 0 ? (d.price as number) : null))
-      .catch(() => null);
-    p.then((v) => {
-      if (v == null) cache.delete(url);
-    });
-    cache.set(url, p);
-  }
-  return p;
-}
 
 /** The position at the end of one block: its balances (base units) and
  *  its band and health; null where the read failed. */
 interface StateAt {
   state: LlamalendStateRead | null;
   band: LlamalendBandRead | null;
+  /** AMM.price_oracle at the block's end, borrowed per collateral. */
+  price: number | null;
 }
 const stateCache = new Map<string, Promise<StateAt | null>>();
 
@@ -100,7 +83,9 @@ function loadStateAt(controller: string, user: string, block: number): Promise<S
           : a.collateralRaw == null || a.debtRaw == null
             ? null
             : { coll: BigInt(a.collateralRaw), debt: BigInt(a.debtRaw) };
-        return { state, band: llamalendBandRead(a) };
+        const raw =
+          typeof a.priceOracleRaw === "string" && /^\d+$/.test(a.priceOracleRaw) ? BigInt(a.priceOracleRaw) : null;
+        return { state, band: llamalendBandRead(a), price: raw != null && raw > BigInt(0) ? scale1e18(raw) : null };
       })
       .catch(() => null);
     p.then((v) => {
@@ -109,6 +94,12 @@ function loadStateAt(controller: string, user: string, block: number): Promise<S
     stateCache.set(url, p);
   }
   return p;
+}
+
+/** The AMM's oracle price at one block, from the same read; null where it
+ *  failed or states none. */
+function loadPriceAt(controller: string, user: string, block: number): Promise<number | null> {
+  return loadStateAt(controller, user, block).then((v) => v?.price ?? null);
 }
 
 /** Runs `load` over `items`, six at a time. */
@@ -212,7 +203,7 @@ export function useLlamalendFlows(p: LlamalendFlowsInput): {
     let live = true;
     const alive = () => live;
     Promise.all([
-      sixAtATime(blocks, (b) => loadPriceAt(p.controller, b), alive),
+      sixAtATime(blocks, (b) => loadPriceAt(p.controller, p.user, b), alive),
       sixAtATime(stateBlocks, (b) => loadStateAt(p.controller, p.user, b), alive),
     ]).then(([prices, at]) => {
       if (!live) return;
