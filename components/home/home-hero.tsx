@@ -65,17 +65,18 @@ export function HomeHero() {
         className="relative font-sans font-light text-rb-500 tracking-tight mb-12 px-4 text-lg sm:mb-20 sm:text-xl animate-hero-fade-up"
         style={{ animationDelay: "0.2s" }}
       >
-        Explore any DeFi position, verified directly from the chain.
+        Explore any DeFi position, <br className="min-[480px]:hidden" />
+        verified directly from the chain.
       </p>
       <div
         className="relative z-20 w-full max-w-2xl px-4 text-left animate-hero-fade-up"
         style={{ animationDelay: "0.25s" }}
       >
-        <FrontDoorSearch size="lg" suggest />
+        <FrontDoorSearch size="lg" suggest focusOnLoad />
       </div>
       {/* The terms, ticked — under the search; the checks carry the separation. */}
       <p
-        className="relative mb-12 mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 px-4 text-xs font-medium uppercase tracking-[0.14em] text-rb-500 animate-hero-fade-up"
+        className="relative mx-auto mb-12 mt-4 grid w-fit grid-cols-2 items-center justify-items-center gap-x-5 gap-y-1 px-4 min-[520px]:flex min-[520px]:w-auto min-[520px]:flex-wrap min-[520px]:justify-center text-xs font-medium uppercase tracking-[0.14em] text-rb-500 animate-hero-fade-up"
         style={{ animationDelay: "0.3s" }}
       >
         {TERMS.map((term) => (

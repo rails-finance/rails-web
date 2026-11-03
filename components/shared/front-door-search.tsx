@@ -125,6 +125,8 @@ export interface SearchBoxProps {
   value: string;
   onChange: (value: string) => void;
   onFocus?: () => void;
+  /** A click or tap into the field, including one on a field that already has focus. */
+  onClick?: () => void;
   placeholder: string;
   size?: Size;
   surface?: SearchSurface;
@@ -146,6 +148,7 @@ export function SearchBox({
   value,
   onChange,
   onFocus,
+  onClick,
   placeholder,
   size = "md",
   surface = "canvas",
@@ -180,6 +183,7 @@ export function SearchBox({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={onFocus}
+        onClick={onClick}
         onKeyDown={onKeyDown}
         onBlur={onBlur}
         placeholder={placeholder}
@@ -273,6 +277,10 @@ export interface FrontDoorSearchProps {
    *  wallet panel only; N5 and the wallet view's empty state keep the plain
    *  lookup. */
   suggest?: boolean;
+  /** Put the cursor in the field once the page has loaded, on a desktop (wide
+   *  screen, fine pointer) that has not moved on: no list opens until a key or
+   *  a click. */
+  focusOnLoad?: boolean;
 }
 
 /** The search as a form: field, "Look up", and the reason a value was
@@ -288,14 +296,37 @@ export function FrontDoorSearch({
   className = "",
   after,
   suggest: suggesting = false,
+  focusOnLoad = false,
 }: FrontDoorSearchProps) {
   const hydrated = useHydrated();
+  const inputRef = useRef<HTMLInputElement>(null);
+  // Set around the load-time focus so the focus handler does not open the list.
+  const quietFocus = useRef(false);
+  const walletPanelOpen = useWalletPanelOpen();
   const problemId = useId();
   const listId = useId();
   const router = useRouter();
   const [value, setValue] = useState("");
   const { lookUp, go, problem, setProblem, resolving } = useLookup(href, onDone);
   const s = useSuggestions(value, suggesting);
+
+  // The cursor is ready on load, on a desktop only: a phone's keyboard would
+  // cover the page and iOS zooms. Skipped for a back-navigation, a hash, a
+  // scrolled page, a field already focused elsewhere, or the wallet panel open.
+  const focusTried = useRef(false);
+  useEffect(() => {
+    if (!focusOnLoad || focusTried.current) return;
+    focusTried.current = true;
+    const input = inputRef.current;
+    if (!input || !window.matchMedia("(min-width: 768px) and (pointer: fine)").matches) return;
+    const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined;
+    if (nav?.type === "back_forward" || window.location.hash || window.scrollY > 0) return;
+    const active = document.activeElement;
+    if ((active && active !== document.body) || walletPanelOpen) return;
+    quietFocus.current = true;
+    input.focus({ preventScroll: true });
+    quietFocus.current = false;
+  }, [focusOnLoad, walletPanelOpen]);
   const shownPlaceholder = placeholder ?? (suggesting ? SUGGEST_PLACEHOLDER : SEARCH_PLACEHOLDER);
 
   const choose = (row: Suggestion) => {
@@ -355,7 +386,9 @@ export function FrontDoorSearch({
               s.reopen();
               if (problem) setProblem(null);
             }}
-            onFocus={suggesting ? s.focus : undefined}
+            inputRef={inputRef}
+            onFocus={suggesting ? () => !quietFocus.current && s.focus() : undefined}
+            onClick={suggesting ? s.focus : undefined}
             onBlur={suggesting ? s.blur : undefined}
             onKeyDown={onKeyDown}
             placeholder={shownPlaceholder}
@@ -494,6 +527,10 @@ function useSuggestions(value: string, on: boolean) {
   const openable = rows.filter(isOpenable);
   const active = openable.find((r) => r.key === activeKey) ?? null;
 
+  const ensureIndex = () => {
+    if (!index) void loadSearchIndex().then(setIndex);
+  };
+
   return {
     rows: display,
     active,
@@ -501,7 +538,7 @@ function useSuggestions(value: string, on: boolean) {
     focus: () => {
       if (blurTimer.current) clearTimeout(blurTimer.current);
       setOpen(true);
-      if (!index) void loadSearchIndex().then(setIndex);
+      ensureIndex();
     },
     // A press on a row lands after the field's blur on some phones, so the
     // list stays a moment.
@@ -510,6 +547,7 @@ function useSuggestions(value: string, on: boolean) {
     },
     reopen: () => {
       setOpen(true);
+      ensureIndex();
       setActiveKey(null);
     },
     close: () => {
@@ -519,6 +557,7 @@ function useSuggestions(value: string, on: boolean) {
     hover: (key: string) => setActiveKey(key),
     move: (step: 1 | -1) => {
       setOpen(true);
+      ensureIndex();
       if (openable.length === 0) return;
       const at = openable.findIndex((r) => r.key === activeKey);
       const next = at < 0 ? (step === 1 ? 0 : openable.length - 1) : (at + step + openable.length) % openable.length;
