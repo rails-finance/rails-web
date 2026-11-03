@@ -6,7 +6,8 @@
 // ----------------------------------------------------------------------------
 // Identity: the asset's icon with the venue mark, the vault's name, its short
 // address, and pills for family and release and for what the chain or the
-// venue states about its standing (a chain pill on the index only). Pills are
+// venue states about its standing. On the index the sidebar (C20) names
+// each row's protocol and chain. Pills are
 // neutral (standards/color-grammar.md).
 //
 // Headlines, in this order: Total assets · Share price · Yield · Holders. The
@@ -36,7 +37,6 @@ export function VaultRow({
   href,
   holdersHref,
   receipts,
-  chain,
   hooks,
 }: {
   vault: VaultSummary;
@@ -47,8 +47,6 @@ export function VaultRow({
   /** The positions listing filtered to this vault; null where there is none. */
   holdersHref: string | null;
   receipts: VaultRowReceipts;
-  /** The chain's name, for the pill the cross-protocol index draws. */
-  chain?: string;
   /** The family's `data-*` hooks on the row, which its verifier reads. */
   hooks?: Record<string, string>;
 }) {
@@ -71,7 +69,7 @@ export function VaultRow({
       <span className="font-mono text-[11px] text-rb-500" data-vault-address={v.address}>
         {shortAddress(v.address)}
       </span>
-      <VaultPills vault={v} receipts={receipts} chain={chain} />
+      <VaultPills vault={v} receipts={receipts} />
     </span>
   );
 

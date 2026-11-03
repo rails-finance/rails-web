@@ -20,8 +20,7 @@
 //   2  the Protocol facet narrows the rows to each protocol's count, every
 //      row shown that protocol's, and Reset restores them
 //   3  the Network facet narrows to Base: exactly Morpho's rows
-//   4  a Base row carries the "Base" chain pill and an Ethereum row the
-//      "Ethereum" one; every row carries the pill of its chain
+//   4  every row's sidebar (C20) names its protocol and its chain
 //   5  a Maple row shows the Yield slot's "no daily series yet" state
 //   6  three rows' Total assets (Morpho, Aave, Yearn, the largest each) equal
 //      the protocol roster's raw figure for the same vault at the same block
@@ -165,7 +164,8 @@ const readRows = () =>
       group: el.getAttribute("data-group"),
       raw: el.getAttribute("data-total-assets-raw"),
       href: el.querySelector("[data-vault-link]")?.getAttribute("href") ?? el.querySelector("a")?.getAttribute("href"),
-      chainPill: el.querySelector('[data-pill="chain"]')?.textContent?.trim() ?? null,
+      sidebar: el.querySelector("[data-card-sidebar]")?.getAttribute("data-card-sidebar") ?? null,
+      sidebarChain: el.querySelector("[data-card-sidebar-chain]")?.getAttribute("aria-label") ?? null,
       yieldNone: el.querySelector("[data-yield-none]")?.getAttribute("data-yield-none") ?? null,
       yieldText: el.querySelector("[data-yield-none]")?.textContent?.trim() ?? null,
     })),
@@ -237,22 +237,29 @@ await openEmpty();
 await reset("Network");
 await openEmpty();
 
-// ── 4: the chain pill ───────────────────────────────────────────────────────
+// ── 4: the sidebar names each row's protocol and chain (C20) ─────────────
 const NAME = { 1: "Ethereum", 8453: "Base" };
+const SIDEBAR = { morpho: "morpho-base", aave: "aave-vaults", yearn: "yearn", maple: "maple" };
 const baseRow = rows.find((r) => r.chain === "8453");
 const ethRow = rows.find((r) => r.chain === "1");
 check(
-  "4a a Base row carries the Base pill",
-  baseRow?.chainPill === "Base",
-  `${baseRow?.address} → ${baseRow?.chainPill}`,
+  "4a a Base row's sidebar names Base",
+  baseRow?.sidebarChain === "Base",
+  `${baseRow?.address} → ${baseRow?.sidebarChain}`,
 );
 check(
-  "4b an Ethereum row carries the Ethereum pill",
-  ethRow?.chainPill === "Ethereum",
-  `${ethRow?.address} → ${ethRow?.chainPill}`,
+  "4b an Ethereum row's sidebar names Ethereum",
+  ethRow?.sidebarChain === "Ethereum",
+  `${ethRow?.address} → ${ethRow?.sidebarChain}`,
 );
-const wrongPill = rows.filter((r) => r.group !== "unread" && r.chainPill !== NAME[r.chain]);
-check("4c every drawn row carries its chain's pill", wrongPill.length === 0, `${wrongPill.length} wrong`);
+const wrongSidebar = rows.filter(
+  (r) => r.group !== "unread" && (r.sidebarChain !== NAME[r.chain] || r.sidebar !== SIDEBAR[r.protocol]),
+);
+check(
+  "4c every drawn row's sidebar names its protocol and chain",
+  wrongSidebar.length === 0,
+  `${wrongSidebar.length} wrong`,
+);
 
 // ── 5: Maple's Yield slot ───────────────────────────────────────────────────
 {

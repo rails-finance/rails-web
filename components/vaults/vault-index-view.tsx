@@ -2,7 +2,7 @@
 
 // The cross-protocol vault index (rails-ops ui-jobs 39; decision 0028 point 8):
 // the shared roster (components/vaults/vault-roster.tsx) over the union of the
-// vault rosters, each row the vault row (V1) with a chain pill.
+// vault rosters, each row the vault row (V1) with its protocol's sidebar (C20).
 // ----------------------------------------------------------------------------
 // The index owns no vault page: every row opens the vault's page under its
 // protocol, a Maple pool's opening Maple's pools page. Facets: Token (by

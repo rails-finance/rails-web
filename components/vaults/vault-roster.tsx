@@ -2,8 +2,8 @@
 
 // One vault roster (rails-ops ui-jobs 407, V1): the rows of one family's
 // vaults, grouped by asset, under one set of controls. The cross-protocol
-// index (ui-jobs 39) is the same roster over the union, with a chain pill on
-// each row and a read-at line per roster.
+// index (ui-jobs 39) is the same roster over the union, each row's sidebar
+// naming its protocol and chain, and one read stamp for the oldest roster.
 // ----------------------------------------------------------------------------
 // Every roster draws the same thing: the listings' toolbar (search, the Asset
 // facet and the family's own facets, the preset, the sort), one group per
@@ -209,7 +209,7 @@ export function VaultRoster({
   holdersHrefOf: ((v: VaultSummary) => string | null) | null;
   receiptsOf: (v: VaultSummary) => VaultRowReceipts;
   hooksOf?: (v: VaultSummary) => Record<string, string>;
-  /** The chain pill's word, on the index only. */
+  /** The chain's word after a group's symbol ("on Base"), on the index only. */
   chainOf?: (v: VaultSummary) => string;
   /** The key a vault's Yield is held under; the address where absent. */
   yieldKeyOf?: (v: VaultSummary) => string;
@@ -415,7 +415,6 @@ export function VaultRoster({
         href={hrefOf(v)}
         holdersHref={holdersHrefOf ? holdersHrefOf(v) : null}
         receipts={receiptsOf(v)}
-        chain={chainOf?.(v)}
         hooks={hooksOf?.(v)}
       />
     );
