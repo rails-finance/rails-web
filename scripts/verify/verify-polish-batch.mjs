@@ -24,7 +24,7 @@ const heroOrder = await page.evaluate(() => {
   const texts = [...section.children].map((el) => el.textContent || "");
   const kids = [...section.children].map((el, i) => el.tagName + ":" + texts[i].slice(0, 25));
   const h1i = texts.findIndex((t) => t.includes("Destination DeFi"));
-  const subi = texts.findIndex((t) => t.includes("Explore any DeFi position"));
+  const subi = texts.findIndex((t) => t.includes("Any DeFi position"));
   const badgei = texts.findIndex((t) => t.toLowerCase().includes("read-only"));
   return h1i < subi && subi < badgei ? "ok" : kids.join(" | ");
 });
