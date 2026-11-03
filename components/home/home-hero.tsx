@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
-import { PILL_CTA_BLUE } from "@/lib/shared/ui-grammar";
+import { PILL_CTA } from "@/lib/shared/ui-grammar";
 
 // The inline blocking script in app/layout.tsx flips `data-hero-seen` on <html>
 // before paint on hard loads, but it can't run on App Router soft navigations.
@@ -93,7 +93,7 @@ export function HomeHero() {
           one quiet line under the ticks, blue since it opens another page. */}
       <Link
         href="/start"
-        className={`${PILL_CTA_BLUE} relative -mt-6 transition-colors hover:bg-blue-500/10 animate-hero-fade-up`}
+        className={`${PILL_CTA} relative -mt-6 transition-colors hover:border-blue-500 dark:hover:border-blue-500 animate-hero-fade-up`}
         style={{ animationDelay: "0.35s" }}
         data-anatomy="S12"
         data-start-here-hero=""
