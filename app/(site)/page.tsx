@@ -50,7 +50,7 @@ export default async function Home() {
           the content column; clip it at the section edge instead of letting
           it mint a horizontal scrollbar on narrow viewports. */}
       <div className="overflow-x-clip bg-gradient-to-b from-rb-50 via-background to-background dark:from-rb-600 dark:via-rb-800 dark:to-rb-800">
-        <HomeHero subline={<CoveredStats covered={covered} stats={stats} valueHeld={valueHeld} />} />
+        <HomeHero />
 
         {/* Live example — a real trove in browser chrome; its hover pill
             links to the live position. */}
@@ -62,10 +62,7 @@ export default async function Home() {
             it reads off both: the position above was one of these, the tiles
             below are the protocols named. */}
         <section className="pb-12" data-anatomy="S3">
-          <p className="mx-auto max-w-2xl px-4 text-center font-sans font-light tracking-tight text-rb-500 text-lg sm:text-xl text-balance">
-            This is a real position, read from the chain. Look up any wallet, protocol or position, and every
-            figure shows the block it came from.
-          </p>
+          <CoveredStats covered={covered} stats={stats} valueHeld={valueHeld} />
         </section>
 
         {/* Track lines graphic — the animated stripes bridge the counted
