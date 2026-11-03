@@ -21,6 +21,7 @@ export async function GET() {
       oracle: SPARK_ADDRESSES.ORACLE,
       symbolByAddr: SPARK_SYMBOL_BY_ADDR,
       capAutomator: SPARK_ADDRESSES.CAP_AUTOMATOR,
+      surface: "spark:ethereum:market",
     });
     return NextResponse.json(data, { headers: { "Cache-Control": CHAIN_MARKET_CACHE_CONTROL } });
   } catch (error) {

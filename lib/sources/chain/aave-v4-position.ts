@@ -15,7 +15,7 @@ import { parseAbi, getAddress } from "viem";
 import { alchemyClient } from "./rpc";
 import type { AaveV4SpokePositionChainResponse } from "@/lib/api/fetch-aave-v4-spoke-position";
 import { serverAaveV4SpokePositionAt } from "@/lib/sources/api/aave-v4-at-block";
-import { HUB_KEY_BY_ADDR, settleSpokePosition, type TouchedReserveRead } from "./aave-v4-settle";
+import { settleSpokePosition, type TouchedReserveRead } from "./aave-v4-settle";
 
 // Spoke key → { display name, contract address }. Mirrors rails-server-onboarding
 // api/src/config/aave-v4-spokes.ts SPOKE_BY_KEY. Treasury has no deployed
@@ -35,8 +35,6 @@ export const SPOKES: Record<string, { name: string; address: `0x${string}` }> = 
   lombard: { name: "Lombard BTC", address: "0x7ec68b5695e803e98a21a9a05d744f28b0a7753d" },
   usdg_pendle: { name: "Stablecoin Correlated", address: "0x956d8e0a89cfa3744428c4641b5a53b56167a7f9" },
 };
-
-export { HUB_KEY_BY_ADDR };
 
 const SPOKE_ABI = parseAbi([
   "function getUserAccountData(address user) view returns (uint256 riskPremium, uint256 avgCollateralFactor, uint256 healthFactor, uint256 totalCollateralValue, uint256 totalDebtValueRay, uint256 activeCollateralCount, uint256 borrowCount)",

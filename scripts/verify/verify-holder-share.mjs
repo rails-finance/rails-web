@@ -61,7 +61,7 @@ const REPO = path.resolve(__dirname, "..", "..");
 // in both markets and has closed and liquidated ones; V2's holds one trove on
 // more than one branch, open (picked from the index below). Every number about
 // them is read at run time.
-const POLARIS_WALLET = "0xedb7cca3ba468055b0062d2cd033dfe6c6632959";
+const POLARIS_WALLET = "0xe5189941a0fa16a632a34deadefde4ea1090b724";
 const V2_WALLET = await pickV2Wallet();
 // A CDP number that exists in BOTH Polaris markets — a position-id search, not
 // a holder — and a name nobody has registered.
@@ -183,7 +183,12 @@ async function readImage(url) {
 const shortEdgeCache = (img) =>
   img.vercel
     ? /^public, max-age=0$/.test(img.cacheControl ?? "")
-    : /s-maxage=300/.test(img.cacheControl ?? "") && !/immutable/.test(img.cacheControl ?? "");
+    : // The live card holds for hours since 4dab35fd (`s-maxage=21600`, 25 Oct); the
+      // fallback keeps 300. Any edge window under a day, `max-age=0`, no `immutable`.
+      /max-age=0\b/.test(img.cacheControl ?? "") &&
+      Number(/s-maxage=(\d+)/.exec(img.cacheControl ?? "")?.[1] ?? 0) >= 300 &&
+      Number(/s-maxage=(\d+)/.exec(img.cacheControl ?? "")?.[1] ?? 0) <= 86400 &&
+      !/immutable/.test(img.cacheControl ?? "");
 
 console.log("The wallet view's own share card, and the clean shareable URL\n");
 console.log(`BASE ${BASE}\n`);

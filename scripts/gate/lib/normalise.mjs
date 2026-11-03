@@ -75,7 +75,7 @@ export const JSON_DROPPED_PATHS = [
   },
   {
     re: /(^|\.)ltBlock$/,
-    why: "the head block the Aave V4 hubs route read the liquidation thresholds at",
+    why: "the block an Aave V4 hub line's LT was read at: the web's chain read, or rails-server's refresher since ui-jobs 467",
   },
   {
     re: /(^|\.)accruedToTreasury$/,

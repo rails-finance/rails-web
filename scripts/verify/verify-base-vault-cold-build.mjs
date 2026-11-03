@@ -87,7 +87,10 @@ const ROOT = resolvePath(HERE, "../..");
 
 // The loader is TypeScript with `@/` path aliases. Re-exec once with type
 // stripping and an alias hook, exactly as verify-ethereum-vault-cold-build.mjs does.
-if (!process.execArgv.includes("--experimental-strip-types")) {
+// Type stripping alone refuses a TypeScript parameter property (`constructor(readonly
+// status: number)`, lib/sources/chain/at-block-api.ts), so the child runs with
+// `--experimental-transform-types`.
+if (!process.execArgv.includes("--experimental-transform-types")) {
   const hook = `
     import { existsSync } from "node:fs";
     const ROOT = ${JSON.stringify(new URL("file://" + ROOT + "/").href)};
@@ -115,7 +118,7 @@ if (!process.execArgv.includes("--experimental-strip-types")) {
   const r = spawnSync(
     process.execPath,
     [
-      "--experimental-strip-types",
+      "--experimental-transform-types",
       "--disable-warning=ExperimentalWarning",
       "--disable-warning=MODULE_TYPELESS_PACKAGE_JSON",
       "--import",
@@ -287,6 +290,13 @@ const server = createServer((req, res) => {
     if (blocks) {
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify(blocks));
+      return;
+    }
+    if (body === "") {
+      // A GET this mock does not serve (the stand-in for rails-server answers only
+      // the at-block route): a 404 the caller reads as "not stored", never a throw.
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end("{}");
       return;
     }
     const parsed = JSON.parse(body);

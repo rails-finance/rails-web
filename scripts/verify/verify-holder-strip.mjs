@@ -53,7 +53,7 @@ const REPO = path.resolve(__dirname, "..", "..");
 // holds CDPs in both markets and has a closed and a liquidated one; V2's holds
 // open troves on more than one branch (picked from the index below). Every
 // number about them is read at run time.
-const POLARIS_WALLET = "0xedb7cca3ba468055b0062d2cd033dfe6c6632959";
+const POLARIS_WALLET = "0xe5189941a0fa16a632a34deadefde4ea1090b724";
 const V2_WALLET = await pickV2Wallet();
 // An address no protocol has ever seen — the "nothing to summarise" case.
 const EMPTY_WALLET = "0x00000000000000000000000000000000000dead0";

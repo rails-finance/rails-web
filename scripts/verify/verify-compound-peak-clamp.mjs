@@ -101,7 +101,10 @@ assert(
   /CLOSED[\s\S]{0,60}?cWETHv3/.test(await page.locator("body").innerText()),
   "the control's closed card is cWETHv3",
 );
-assert(new RegExp(`${PEAK_DEBT}\\s*0\\.1\\b`).test(bRaw), "genuine borrow still reads 0.1");
+assert(
+  new RegExp(`${PEAK_DEBT}\\s*0\\.10?\\b`).test(bRaw),
+  "genuine borrow still reads 0.1 (0.10 since the compact figures)",
+);
 assert(bText.includes("Highest recorded collateral"), "a borrower's supply column stays 'collateral'");
 // On Ethereum each row is the chain's balance, interest included, so the
 // principal-only footnote (the Base sweep's caveat) is not drawn here.

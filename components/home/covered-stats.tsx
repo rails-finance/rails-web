@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { CoveredPositions } from "@/lib/home/covered-positions";
 import type { HomeStats } from "@/lib/home/home-stats";
 import { formatValueHeld, spokenValueHeld, type ValueHeld } from "@/lib/home/value-held";
@@ -19,8 +20,8 @@ const COUNTED_SCOPE = launchedProductionChainNames();
  *
  * The all-time sum leads because it is the strongest claim in the band: it
  * counts every position each explorer has ever indexed, and no argument about
- * what is live today can move it. The value held in open positions is the
- * second line, and appears only when the whole roster answered
+ * what is live today can move it. The value held in open positions follows
+ * it in the same sentence, and appears only when the whole roster answered
  * (value-held.ts). The open/closed split and the wallet clause ride in the (i)
  * note.
  *
@@ -108,45 +109,67 @@ export function CoveredStats({
     />
   );
 
-  return (
-    <div className="w-full max-w-7xl mx-auto px-4 flex flex-col items-center gap-6 text-center sm:gap-4">
-      {/* Two centred lines (Miles, 2 Nov 2026): the count, then the value held
-          in open positions. From `sm` each line runs inline, the label
-          vertically centred on its figure; below `sm` each stacks, label above
-          figure. Sizes step at breakpoints and never scale with the viewport.
-          The caption line that used to sit under the count opens from the (i)
-          (covered-stats-note.tsx). */}
-      <p className={LINE} data-anatomy="S3.1">
-        <span className={LABEL}>Explore</span>
-        <span className={FIGURE}>{covered.totalPositions.toLocaleString("en-US")}</span>
-        <span className={LABEL}>
-          positions across {COUNTED_SCOPE} DeFi
-          {!valueHeld && <span className="ml-2 align-[-0.05em]">{note}</span>}
-        </span>
-      </p>
+  const count = <span className={FIGURE}>{covered.totalPositions.toLocaleString("en-US")}</span>;
 
-      {valueHeld && (
-        <p className={LINE} data-anatomy="S3.2">
-          <span className={LABEL}>Together, the open positions on Rails hold</span>
-          <span className="inline-flex items-center gap-x-2">
-            <span className={FIGURE} aria-label={spokenValueHeld(valueHeld.totalUsd)}>
-              {formatValueHeld(valueHeld.totalUsd)}
-            </span>
-            <span className={`${LABEL} inline-flex items-center [&_button]:align-middle`}>{note}</span>
+  // Without the value the band is the count's line alone, as before 476.
+  if (!valueHeld)
+    return (
+      <div className="w-full max-w-7xl mx-auto px-4 flex flex-col items-center text-center">
+        <p className={LINE} data-anatomy="S3.1">
+          <span className={GROUP}>
+            <span className={LABEL}>Explore</span>
+            {count}
+          </span>
+          <span className={LABEL}>
+            positions across {COUNTED_SCOPE} <DeFiAndNote note={note} />
           </span>
         </p>
-      )}
+      </div>
+    );
+
+  return (
+    <div className="w-full max-w-7xl mx-auto px-4 flex flex-col items-center text-center">
+      {/* One sentence (Miles, 3 Nov 2026): the count is the one figure; the
+          value runs in the text at the labels' size. "Explore N positions," is
+          a group that never breaks, so does "DeFi (i)", and the value never
+          splits; everything else wraps as ordinary centred text. One <p>, so a
+          screen reader reads it as one sentence. Sizes step at breakpoints and
+          never scale with the viewport. The caption line that used to sit
+          under the count opens from the (i) (covered-stats-note.tsx). */}
+      <p className={`${LABEL} text-balance`} data-anatomy="S3.1">
+        <span className={GROUP}>
+          <span>Explore</span>
+          {count}
+          <span>positions,</span>
+        </span>{" "}
+        holding{" "}
+        <span className="whitespace-nowrap tabular-nums" data-anatomy="S3.2">
+          <span aria-hidden="true">{formatValueHeld(valueHeld.totalUsd)}</span>
+          <span className="sr-only">{spokenValueHeld(valueHeld.totalUsd)}</span>
+        </span>{" "}
+        across {COUNTED_SCOPE} <DeFiAndNote note={note} />
+      </p>
     </div>
   );
 }
 
-/** One line of the band: stacked and centred below `sm`, inline from `sm`
- *  (wrapping between `sm` and `lg`, one row from `lg`). */
-const LINE = "flex flex-col items-center gap-y-1 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-x-4";
-/** Both figures name the face: the count and the value read in one font. */
+/** The count's line when the value is omitted: label, figure, label on centred rows. */
+const LINE = "flex flex-wrap items-center justify-center gap-x-2 gap-y-1 sm:gap-x-4";
+/** "Explore", the count and the label after it, never broken apart. */
+const GROUP = "inline-flex flex-nowrap items-center gap-x-2 whitespace-nowrap sm:gap-x-4";
+/** The count, the band's one figure. */
 const FIGURE =
   "font-sans text-foreground font-semibold leading-none tracking-tighter tabular-nums text-4xl sm:text-5xl";
 const LABEL = "font-sans font-light tracking-tight text-rb-500 text-lg sm:text-xl lg:text-[28px]";
+/** The last word and the (i) never break apart, so the (i) is never alone on a row. */
+function DeFiAndNote({ note }: { note: ReactNode }) {
+  return (
+    <span className="whitespace-nowrap">
+      DeFi
+      <span className="relative top-[-0.07em] ml-2 inline-flex align-middle">{note}</span>
+    </span>
+  );
+}
 
 /**
  * UTC-fixed so the server (ISR regeneration) and client render identical text
