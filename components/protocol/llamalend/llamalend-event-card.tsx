@@ -43,6 +43,8 @@ export interface LlamalendEventCardProps {
   controllerHasApprovals?: boolean | null;
   /** The loan's next row (llamalendNextRowMap). */
   next?: LlamalendNextRow | null;
+  /** The market's AMM, from the page's roster row. */
+  amm?: string | null;
 }
 
 export function LlamalendEventCard({
@@ -54,6 +56,7 @@ export function LlamalendEventCard({
   marketDiscount,
   controllerHasApprovals,
   next,
+  amm,
 }: LlamalendEventCardProps) {
   const ctx = event.context.data;
   // Only the BORROWER's leg of a third-party liquidation is a passive loss;
@@ -192,6 +195,7 @@ export function LlamalendEventCard({
         previousStated,
         collateralAddress: soleFlowAddress(event.flows, ctx.collateralSymbol),
         borrowedAddress: soleFlowAddress(event.flows, ctx.borrowedSymbol),
+        amm,
         price,
       }),
     explainer: {

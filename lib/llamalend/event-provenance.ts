@@ -244,24 +244,34 @@ export const llamalendUsdProv = (what: string, borrowedSymbol: string, amm?: str
 // oracle price AT the event's block, against the debt the Liquidate log says
 // was cleared.
 
-/** The collateral's price at the liquidation block — AMM.price_oracle, an
- *  archive eth_call at that height (the oracle-at-block overlay walk). */
+/** Which stored read at the block a liquidation's price comes from: the
+ *  timeline row's (rails-server mig 373) or the event-state read's. */
+export type LlamaPriceSource = "timeline" | "event-state";
+
+const PRICE_SOURCE_VIA: Record<LlamaPriceSource, string> = {
+  timeline: "GET /api/llamalend/timeline · price_oracle_at",
+  "event-state": "GET /api/chain/llamalend/event-state · after.priceOracleRaw",
+};
+
+/** The collateral's price at the liquidation block: AMM.price_oracle there,
+ *  as rails-server stored it. */
 export const llamaAtBlockPriceProv = (
   collateralSymbol: string,
   borrowedSymbol: string,
   coords: LlamalendCoords,
   amm: string | undefined,
-  priceRaw?: string,
+  priceRaw: string,
+  source: LlamaPriceSource,
 ): Provenance => ({
   kind: "chain",
   pclass: "oracle",
   verify: {
     kind: "recompute",
-    text: `Re-run AMM.price_oracle() against any archive node at block ${coords.blockNumber ?? "?"} — the read reproduces this figure exactly.`,
+    text: `To check: ask any Ethereum archive node for the AMM's price_oracle() at block ${coords.blockNumber ?? "?"}.`,
   },
-  summary: `${collateralSymbol} priced in ${borrowedSymbol}${atBlock(coords)} — the market's own LLAMMA oracle, read back at the liquidation's block. This is the price the protocol itself was judging the position with when the liquidation landed, never today's price.`,
+  summary: `${collateralSymbol} priced in ${borrowedSymbol}${atBlock(coords)} — the market's LLAMMA oracle at the end of the liquidation's block: the price the protocol judged the position with when the liquidation landed.`,
   contract: { name: "LLAMMA AMM", address: amm ?? "" },
-  via: `GET /api/chain/llamalend/liq-price · price_oracle eth_call at block${priceRaw ? ` · raw: ${priceRaw}` : ""} · ÷10^18`,
+  via: `${PRICE_SOURCE_VIA[source]} · AMM.price_oracle() stored at block ${coords.blockNumber ?? "?"} · raw: ${priceRaw} · ÷10^18`,
 });
 
 /** The seized side, valued: unconverted collateral at the at-block oracle

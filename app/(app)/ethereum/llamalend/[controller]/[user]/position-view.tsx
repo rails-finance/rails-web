@@ -553,6 +553,7 @@ export default function LlamalendPositionView({
                     marketDiscount={chain?.marketLiquidationDiscount ?? null}
                     controllerHasApprovals={chain?.controllerHasApprovals ?? null}
                     next={nextRows.get(event.id) ?? null}
+                    amm={view?.amm ?? null}
                   />
                 ) : null
               }
