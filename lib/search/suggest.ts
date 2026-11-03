@@ -88,6 +88,8 @@ export interface SuggestBookmark {
   address: string;
   /** The custom name, else the ENS name, else null. */
   label: string | null;
+  /** Every name the bookmark answers to: its custom name and each ENS name. */
+  names?: readonly string[];
 }
 
 export const SUGGESTION_LIMIT = 8;
@@ -136,12 +138,13 @@ export function emptySuggestions(bookmarks: readonly SuggestBookmark[]): Suggest
 
 /** The rows for `raw`. `index` is null until it has loaded; `ens` is the
  *  resolver's answer for a complete .eth name (undefined while it is asked,
- *  null when it names no address). */
+ *  null when it has no address set, "unreachable" when the lookup did not
+ *  answer). */
 export function suggest(
   raw: string,
   index: SearchIndex | null,
   bookmarks: readonly SuggestBookmark[],
-  ens?: string | null,
+  ens?: string | null | "unreachable",
 ): Suggestion[] {
   const typed = raw.trim();
   const q = typed.toLowerCase();
@@ -162,7 +165,9 @@ export function suggest(
   }
   if (/^0x[0-9a-f]{64}$/.test(q)) return [];
   if (ENS_RE.test(typed) && typed.length >= 7) {
-    if (ens === null) rows.push({ key: `e:${q}`, kind: "Wallet", name: q, detail: "names no address on ENS" });
+    if (ens === null) rows.push({ key: `e:${q}`, kind: "Wallet", name: q, detail: "has no address set" });
+    else if (ens === "unreachable")
+      rows.push({ key: `e:${q}`, kind: "Wallet", name: q, detail: "Couldn't reach ENS, try again", ens: q });
     else
       rows.push({
         key: `e:${q}`,
@@ -176,17 +181,27 @@ export function suggest(
   // 2. Bookmarks: by name, or by address from its first characters.
   const seen = new Set(rows.map((r) => r.address).filter(Boolean));
   const marks = bookmarks
-    .map((b) => ({
-      b,
-      tier: Math.max(
-        b.label ? matchTier(b.label, q) : 0,
-        q.startsWith("0x") && q.length >= 3 && b.address.startsWith(q) ? 3 : 0,
-      ),
-    }))
+    .map((b) => {
+      // The best-matching name; shown beside the label when it is another
+      // name (an ENS name under a custom one), so the row says why it matched.
+      let tier = q.startsWith("0x") && q.length >= 3 && b.address.startsWith(q) ? 3 : 0;
+      let via: string | undefined;
+      for (const n of b.names ?? (b.label ? [b.label] : [])) {
+        const t = matchTier(n, q);
+        if (t > tier || (t === tier && t > 0 && via === undefined && n === b.label)) {
+          tier = t;
+          via = n;
+        }
+      }
+      return { b, tier, via };
+    })
     .filter((m) => m.tier > 0 && !seen.has(m.b.address))
     .sort((a, b) => b.tier - a.tier)
     .slice(0, BOOKMARK_LIMIT);
-  for (const m of marks) rows.push(bookmarkRow(m.b));
+  for (const m of marks) {
+    const row = bookmarkRow(m.b);
+    rows.push(m.via && m.via !== m.b.label ? { ...row, detail: m.via } : row);
+  }
 
   // 3. Names: explorers, tokens and vaults by match quality; ties keep the
   //    explorers, then the tokens, then the vaults in their stored size order;
@@ -241,5 +256,5 @@ export function suggest(
 }
 
 /** A row Enter or a press can open: every row but the one saying an ENS
- *  name names no address. */
+ *  name has no address set. An unreachable name's row retries the lookup. */
 export const isOpenable = (s: Suggestion) => s.href != null || s.address != null || s.ens != null;

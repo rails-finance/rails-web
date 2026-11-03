@@ -239,9 +239,10 @@ function useLookup(href: (address: string) => string, onDone?: () => void) {
       setResolving(true);
       try {
         const res = await fetch(`/api/ens/resolve?name=${encodeURIComponent(typed.toLowerCase())}`);
-        const body = res.ok ? ((await res.json()) as { address?: string | null }) : null;
+        const body = res.ok ? ((await res.json()) as { address?: string | null; failed?: boolean }) : null;
         if (body?.address && ADDRESS.test(body.address)) go(body.address);
-        else setProblem(`${typed} does not name an address on ENS.`);
+        else if (!body || body.failed) setProblem("Couldn't reach ENS. Try again, or paste the address.");
+        else setProblem(`${typed} has no address set on ENS.`);
       } catch {
         setProblem("The ENS lookup did not answer. Try again, or paste the address.");
       } finally {
@@ -420,11 +421,18 @@ function loadSearchIndex(): Promise<SearchIndex | null> {
 
 /** ENS answers by name, for the page's life: an address, or null for none. */
 const ensAnswers = new Map<string, string | null>();
+/** Names whose lookup did not answer; asked again when the name is typed again. */
+const ensUnreachable = new Set<string>();
 
 const readBookmarks = (): SuggestBookmark[] =>
   loadBookmarks().map((b) => {
     const address = b.addresses[0].toLowerCase();
-    return { address, label: b.customName || b.ensNames[b.addresses[0]] || null };
+    const ensNames = Object.values(b.ensNames).filter((n): n is string => !!n);
+    return {
+      address,
+      label: b.customName || b.ensNames[b.addresses[0]] || null,
+      names: [b.customName, ...ensNames].filter((n): n is string => !!n),
+    };
   });
 
 /** Below sm the placeholder is the short one. */
@@ -467,21 +475,28 @@ function useSuggestions(value: string, on: boolean) {
   useEffect(() => {
     if (!ensName || ensAnswers.has(ensName)) return;
     const t = setTimeout(() => {
+      if (ensUnreachable.delete(ensName)) setEnsTick((n) => n + 1);
       fetch(`/api/ens/resolve?name=${encodeURIComponent(ensName)}`)
-        .then((r) => (r.ok ? (r.json() as Promise<{ address?: string | null }>) : null))
+        .then((r) => (r.ok ? (r.json() as Promise<{ address?: string | null; failed?: boolean }>) : null))
         .then((body) => {
-          const a = body?.address;
-          ensAnswers.set(ensName, a && ADDRESS_RE.test(a) ? a.toLowerCase() : null);
+          if (!body || body.failed) {
+            ensUnreachable.add(ensName);
+          } else {
+            const a = body.address;
+            ensUnreachable.delete(ensName);
+            ensAnswers.set(ensName, a && ADDRESS_RE.test(a) ? a.toLowerCase() : null);
+          }
           setEnsTick((n) => n + 1);
         })
         .catch(() => {
-          /* the row stays "Looking up…", and Enter resolves on the way */
+          ensUnreachable.add(ensName);
+          setEnsTick((n) => n + 1);
         });
     }, 300);
     return () => clearTimeout(t);
   }, [ensName]);
 
-  const ens = ensName ? ensAnswers.get(ensName) : undefined;
+  const ens = ensName ? (ensUnreachable.has(ensName) ? "unreachable" : ensAnswers.get(ensName)) : undefined;
   const rows = useMemo(() => (on ? suggest(value, index, bookmarks, ens) : []), [on, value, index, bookmarks, ens]);
   const noMatch = rows.length === 0 && typed !== "";
   const display: Suggestion[] = noMatch ? [{ key: "none", kind: "Wallet", name: "No match" }] : rows;
