@@ -8,6 +8,7 @@
 // like a search engine's front page; the price strip and the prov inspector
 // sit where every explorer page has them.
 
+import { useEffect } from "react";
 import Link from "next/link";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
@@ -20,6 +21,11 @@ import { TitleRowChooser } from "@/components/shared/rail-header";
 
 export function ProtocolFrontDoor({ session }: { session: SessionProtocol }) {
   const entry = protocolForSession(session);
+  // `?find=1` (the guided way in, ui-jobs 478) lands with the cursor in the search.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("find") !== "1") return;
+    document.querySelector<HTMLInputElement>("[data-front-door] input")?.focus();
+  }, []);
   if (!entry) return null;
   const markets = entry.subPages.find((s) => s.segment === "markets");
   const links = [

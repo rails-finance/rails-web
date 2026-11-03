@@ -18,6 +18,7 @@ import { WalletHeading } from "@/components/shared/wallet-heading";
 import { WalletMenu } from "@/components/shared/wallet-menu";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { WalletLookup } from "@/components/shared/wallet-lookup";
+import { StartHereLine } from "@/components/start/start-here-line";
 import { WalletPositionCard, atRisk, protocolId } from "@/components/wallet/wallet-position-card";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { Icon } from "@/components/icons/icon";
@@ -450,6 +451,7 @@ export function WalletView({
               </p>
             )}
             <WalletLookup positionHref={(w) => `/wallet/${w}`} placeholder="Wallet address or ENS name" />
+            <StartHereLine />
           </section>
         ) : (
           <>

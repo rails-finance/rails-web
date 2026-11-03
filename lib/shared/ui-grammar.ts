@@ -48,6 +48,11 @@ export const NAV_LINK = "text-rb-500 hover:text-blue-500 transition-colors";
 export const PILL_CTA =
   "inline-flex items-center gap-2 whitespace-nowrap text-sm font-medium text-blue-500 bg-background/90 border border-rb-200 dark:border-rb-800 px-4 py-2 rounded-full backdrop-blur-sm";
 
+/** PILL_CTA with its border blue at rest ("View live position"). The neutral border is swapped, not
+ *  appended to: two unconditional border-color utilities tie on specificity and
+ *  Tailwind's stylesheet order, not class order, decides which holds. */
+export const PILL_CTA_BLUE = PILL_CTA.replace("border border-rb-200 dark:border-rb-800", "border border-blue-500");
+
 /**
  * In-place control — structural base only (layout + transition). Pair with
  * exactly one state token (CTRL_OFF / CTRL_ON / CTRL_ON_ACCENT) so a single

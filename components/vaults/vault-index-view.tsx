@@ -132,13 +132,23 @@ export function VaultIndexView({
   vaults: VaultSummary[];
   yields: Record<string, VaultYield>;
   rosters: VaultIndexRoster[];
-  /** `?asset=`: the Token facet chosen on arrival, matched without case
-   *  (the search's "USDC vaults" row, ui-jobs 482). */
+  /** `?asset=`: the Token facet chosen on arrival, one symbol or a comma
+   *  list, matched without case (the search's "USDC vaults" row, ui-jobs 482). */
   asset?: string;
 }) {
-  const assetValue = asset
-    ? vaults.map(TOKEN_FACET.valueOf).find((value) => value.toLowerCase() === asset.toLowerCase())
-    : undefined;
+  // A comma list chooses each named token that has a vault (the guided way
+  // in's "Earning in ETH", ui-jobs 478); a name with none is dropped.
+  const assetValues = asset
+    ? [
+        ...new Set(
+          asset
+            .split(",")
+            .map((a) => a.trim().toLowerCase())
+            .filter(Boolean)
+            .flatMap((a) => vaults.map(TOKEN_FACET.valueOf).filter((value) => value.toLowerCase() === a)),
+        ),
+      ]
+    : [];
   const rosterOf = (v: VaultSummary) => rosters.find((r) => r.protocol === vaultIndexProtocol(v));
 
   const receiptsOf = (v: VaultSummary): VaultRowReceipts => {
@@ -254,7 +264,7 @@ export function VaultIndexView({
         skel="index"
         facets={FACETS}
         assetFacet={TOKEN_FACET}
-        initialFilters={assetValue ? { [TOKEN_FACET.id]: [assetValue] } : undefined}
+        initialFilters={assetValues.length > 0 ? { [TOKEN_FACET.id]: assetValues } : undefined}
         edgeOf={(v) => EDGES[vaultIndexProtocol(v)] ?? null}
         hrefOf={vaultIndexHref}
         holdersHrefOf={vaultIndexHoldersHref}

@@ -340,3 +340,8 @@ const BY_SHAPE: readonly [RegExp, AssetCategory][] = [
 export function assetCategory(symbol: string): AssetCategory {
   return BY_SYMBOL.get(symbol) ?? BY_SHAPE.find(([re]) => re.test(symbol))?.[1] ?? "other";
 }
+
+/** The symbols the table files under a category (none for "other"). */
+export function symbolsInCategory(category: AssetCategory): readonly string[] {
+  return category === "other" ? [] : TABLE[category];
+}

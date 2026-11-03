@@ -20,6 +20,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import type { SessionProtocol } from "@/lib/shared/sessions";
+import { StartHereLine } from "@/components/start/start-here-line";
 
 export function RouteNotFound({
   session,
@@ -46,6 +47,7 @@ export function RouteNotFound({
         <Link href={backHref} className="text-sm text-rb-700 underline underline-offset-4 dark:text-rb-300">
           {backLabel}
         </Link>
+        <StartHereLine className="mt-4" />
       </div>
     </div>
   );
