@@ -29,13 +29,12 @@
 //      contract — so a one-value-to-one-read receipt cannot describe it. The LT
 //      cell is `0.75–0.83`: the lowest and highest per-spoke threshold in the
 //      hub. Each of those is the collateral factor the spoke sets for the
-//      asset now: getDynamicReserveConfig(reserveId, key).collateralFactor at
-//      the reserve's current dynamicConfigKey, read on chain by the hubs route
-//      (lib/sources/chain/aave-v4-reserve-factors.ts) and carried as
+//      asset: getDynamicReserveConfig(reserveId, key).collateralFactor at the
+//      reserve's current dynamicConfigKey, read each cycle by rails-server's
+//      aave-v4-chain-refresher and stored with its block, served as `lt` and
 //      `ltBlock`. A position keeps the key it last took, so an older position
-//      can carry an earlier factor; the receipt says so. A line the chain read
-//      did not cover keeps the indexed figure (harvested from
-//      getUserAccountData.avgCollateralFactor) and its leaf says that instead.
+//      can carry an earlier factor; the receipt says so. A line whose block is
+//      not recorded yet states the stored factor without one.
 //      It renders as a COMPUTED receipt whose leaves are the per-spoke figures
 //      (hubLtRangeProv). The summary BRANCHES: when the spread collapsed to one
 //      figure (ltDisplay < 0.0001), it states uniform-across-N-spokes and never
@@ -158,8 +157,8 @@ export const hubLtRangeProv = (
     contract: s.address ? { name: "spoke contract", address: s.address } : undefined,
     note:
       s.ltBlock != null
-        ? `getDynamicReserveConfig at the reserve's current config key, read at block ${s.ltBlock}`
-        : "the collateral factor the index holds for this spoke, harvested from a position holding the asset alone",
+        ? `getDynamicReserveConfig at the reserve's current config key, read by rails-server's Aave V4 refresher at block ${s.ltBlock}`
+        : "getDynamicReserveConfig at the reserve's current config key, stored by rails-server's Aave V4 refresher; its read block is not recorded yet",
   }));
   // Every leaf read from the spoke: the receipt is a chain read. Otherwise it
   // rests on at least one indexed figure.
@@ -167,11 +166,9 @@ export const hubLtRangeProv = (
   const pclass = allRead ? ("state" as const) : ("indexed" as const);
   const block = allRead ? withLt[0].ltBlock : coords.blockNumber;
   const what = allRead
-    ? "the collateral factor the spoke sets for the asset now, read from each spoke's getDynamicReserveConfig. A position keeps the factor it last took, so one opened before a change can carry an earlier figure"
-    : "the collateral factor a spoke reports for a position holding this asset and nothing else";
-  const via = allRead
-    ? `${LANE} · spoke getReserve · getDynamicReserveConfig(reserveId, dynamicConfigKey).collateralFactor`
-    : `${LANE} · spoke getUserAccountData · avgCollateralFactor`;
+    ? "the collateral factor the spoke set for the asset at that block, read from each spoke's getDynamicReserveConfig by rails-server's Aave V4 refresher. A position keeps the factor it last took, so one opened before a change can carry an earlier figure"
+    : "the collateral factor the spoke sets for the asset, as rails-server's Aave V4 refresher stored it from each spoke's getDynamicReserveConfig. A position keeps the factor it last took, so one opened before a change can carry an earlier figure";
+  const via = `${LANE} · aave_v4_reserves · the refresher's spoke getReserve · getDynamicReserveConfig(reserveId, dynamicConfigKey).collateralFactor`;
 
   if (uniform) {
     const value = n > 0 ? withLt[0].lt!.toFixed(2) : "—";
