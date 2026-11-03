@@ -41,17 +41,30 @@
 // quantities of two different things; nothing here sums or orders them across
 // assets, and no price is read.
 //
+// THE CENSUS FIRST (rails-ops decisions/0054 ruling 2). The reading is served
+// from rails-server's `GET /api/vaults/positions?chain=1&holder=`, the daily
+// census's rows for the address, at the census block and stamped with it: the
+// catalogue is the census's vaults, a balance is the row's, the claim is the
+// balance at the census row's `shareUnitAssets`, `maxRedeem` and the code read
+// are not made (the row's `shape` stands for the code read), and the share
+// tokens' names are one head round through `vaultHeadClient`. A vault created
+// since the last census shows after the next run, and the stamp says so. The
+// chain read below is the fallback, only where the route does not answer.
+//
 // NOT CACHED. The directory's five-minute cache is right for a reading every
-// visitor shares; this one is about one address and stays a read at the head.
+// visitor shares; this one is about one address.
 
 import { parseAbi, type ContractFunctionParameters } from "viem";
 import { chainBatchClient } from "./rpc";
+import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
+import { routeGate } from "@/lib/sources/api/route-gate";
+import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { resolveErc20Meta } from "./erc20-meta";
 import { readAaveEthereumCatalogue } from "./aave-ethereum-catalogue";
 import { readAaveVaultHolderShape, type AaveVaultHolderShape, type AaveVaultRef } from "./aave-ethereum-vault";
 import type { RawAmount } from "./morpho-base-vault";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import type { AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
+import { AAVE_VAULT_FAMILY_ORDER, type AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
 
 const ZERO = BigInt(0);
 
@@ -130,8 +143,11 @@ export interface AaveEthereumHolderSweepResponse {
    *  — Aave's own layer holding its own layer. A chain fact: the address came
    *  back from an enumerator. */
   catalogued: AaveVaultRef | null;
-  /** When this reading was taken, ISO-8601 UTC. */
+  /** When this reading was taken, ISO-8601 UTC: the census run's time on the census path. */
   readAt: string;
+  /** Set when the reading is the census's: its block and time, and the stamp the
+   *  result states. Null on the chain read. */
+  census: { block: number; loadedAt: string; stamp: string } | null;
 }
 
 function empty(holder: string): AaveEthereumHolderSweepResponse {
@@ -148,6 +164,201 @@ function empty(holder: string): AaveEthereumHolderSweepResponse {
     shape: null,
     catalogued: null,
     readAt: new Date().toISOString(),
+    census: null,
+  };
+}
+
+// ── the census path ──────────────────────────────────────────────────────────
+
+interface CensusPosition {
+  vault: string;
+  holder: string;
+  family: string;
+  symbol: string | null;
+  shareDecimals: number | null;
+  balance: string;
+  shape: string | null;
+  shapeDetail: Record<string, unknown> | null;
+  censusBlock: number;
+}
+
+interface CensusVault {
+  vault: string;
+  family: string;
+  symbol: string | null;
+  shareDecimals: number | null;
+  censusBlock: number;
+  loadedAt: string;
+  totalSupply: string | null;
+  asset: string | null;
+  shareUnitAssets: string | null;
+}
+
+const censusGate = routeGate();
+const CENSUS_FAMILIES = new Set<string>(AAVE_VAULT_FAMILY_ORDER);
+
+const NAME_ABI = parseAbi(["function name() view returns (string)"]);
+
+const stampTime = (iso: string) =>
+  new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+  }).format(new Date(iso));
+
+/** The census stamp a census reading states. */
+export function censusStamp(block: number, loadedAt: string): string {
+  return `Census at block ${block.toLocaleString("en-US")}, ${stampTime(loadedAt)} UTC. A vault created since then shows after the next census.`;
+}
+
+/** The census row's `shape` as the code read's answer, kind by kind; null for a
+ *  kind the census classifies differently (`needs-deeper-look`, the proxies,
+ *  `attested`), which the code read alone would name. */
+function shapeOf(p: CensusPosition | undefined): AaveVaultHolderShape | null {
+  if (!p?.shape) return null;
+  const d = p.shapeDetail ?? {};
+  const codeSize = typeof d.codeSize === "number" ? d.codeSize : null;
+  const str = (k: string) => (typeof d[k] === "string" ? (d[k] as string) : null);
+  if (codeSize == null) return null;
+  switch (p.shape) {
+    case "eoa":
+      return { kind: "eoa", codeSize: 0 };
+    case "delegated-account":
+      return str("delegate") ? { kind: "delegated-account", codeSize: 23, delegate: str("delegate")! } : null;
+    case "safe": {
+      const evidence = str("evidence");
+      if (!str("version") || !str("singleton") || (evidence !== "storage slot 0" && evidence !== "EIP-1167 code"))
+        return null;
+      return { kind: "safe", codeSize, version: str("version")!, singleton: str("singleton")!, evidence };
+    }
+    case "aave-vault": {
+      const family = str("catalogueFamily");
+      if (!family || !CENSUS_FAMILIES.has(family)) return null;
+      return {
+        kind: "aave-vault",
+        codeSize,
+        family: family as AaveVaultFamily,
+        symbol: str("catalogueSymbol"),
+        asset: null,
+        assetIsVaultShares: false,
+      };
+    }
+    case "erc4626":
+      return str("asset")
+        ? {
+            kind: "erc4626",
+            codeSize,
+            name: str("name"),
+            symbol: str("symbol"),
+            asset: str("asset")!,
+            assetIsVaultShares: d.assetIsVaultShares === true,
+          }
+        : null;
+    case "contract":
+      return { kind: "contract", codeSize, name: str("name"), symbol: str("symbol") };
+    default:
+      return null;
+  }
+}
+
+/** The address's reading from the census, or null where the route does not answer. */
+async function censusSweep(address: string): Promise<AaveEthereumHolderSweepResponse | null> {
+  const body = await censusGate.json<{ data?: CensusPosition[]; census?: CensusVault[] }>(
+    "positions",
+    `${process.env.RAILS_API_URL}/api/vaults/positions?chain=${MAINNET_CHAIN_ID}&holder=${address}&limit=100`,
+    createAuthFetchOptions(),
+  );
+  if (!body || !Array.isArray(body.data) || !Array.isArray(body.census)) return null;
+  const vaults = body.census
+    .filter((c) => CENSUS_FAMILIES.has(c.family))
+    .sort(
+      (a, b) =>
+        AAVE_VAULT_FAMILY_ORDER.indexOf(a.family as AaveVaultFamily) -
+          AAVE_VAULT_FAMILY_ORDER.indexOf(b.family as AaveVaultFamily) || a.vault.localeCompare(b.vault),
+    );
+  if (vaults.length === 0) return null;
+  const block = Math.max(...vaults.map((c) => c.censusBlock));
+  const loadedAt = vaults
+    .map((c) => c.loadedAt)
+    .sort()
+    .at(-1)!;
+  const byVault = new Map(body.data.map((p) => [p.vault.toLowerCase(), p]));
+  const held = vaults.filter((c) => {
+    const p = byVault.get(c.vault);
+    return p != null && BigInt(p.balance) > ZERO;
+  });
+
+  const assets = [...new Set(held.map((c) => c.asset?.toLowerCase()).filter((a): a is string => Boolean(a)))];
+  const head = vaultHeadClient(MAINNET_CHAIN_ID);
+  const [tokens, names] = await Promise.all([
+    resolveErc20Meta(assets, MAINNET_CHAIN_ID),
+    held.length
+      ? (
+          head.multicall({
+            contracts: held.map((c) => ({ address: c.vault as `0x${string}`, abi: NAME_ABI, functionName: "name" })),
+            allowFailure: true,
+          }) as Promise<Call[]>
+        ).catch(() => [] as Call[])
+      : Promise.resolve([] as Call[]),
+  ]);
+
+  const rows: AaveHolderSweepRow[] = held.map((c, i) => {
+    const p = byVault.get(c.vault)!;
+    const assetAddress = c.asset?.toLowerCase() ?? null;
+    const assetMeta = assetAddress ? tokens.get(assetAddress) : undefined;
+    const assetDecimals = assetMeta?.decimals ?? 18;
+    const dec = p.shareDecimals ?? c.shareDecimals;
+    const sharesRaw = BigInt(p.balance);
+    const totalSupplyRaw = c.totalSupply == null ? undefined : BigInt(c.totalSupply);
+    const fraction = totalSupplyRaw == null || totalSupplyRaw === ZERO ? 0 : Number(sharesRaw) / Number(totalSupplyRaw);
+    const claimRaw =
+      c.shareUnitAssets == null || dec == null
+        ? undefined
+        : (sharesRaw * BigInt(c.shareUnitAssets)) / BigInt(10) ** BigInt(dec);
+    return {
+      address: c.vault,
+      family: c.family as AaveVaultFamily,
+      name: (ok(names[i]) as string | undefined) ?? null,
+      symbol: p.symbol ?? c.symbol,
+      shareDecimals: dec,
+      asset: {
+        address: assetAddress ?? "",
+        symbol: assetMeta?.symbol ?? (assetAddress ? assetAddress.slice(0, 6) : "not read"),
+        decimals: assetDecimals,
+        named: Boolean(assetMeta?.named),
+      },
+      shares: amount(sharesRaw, dec ?? 18),
+      totalSupply: totalSupplyRaw == null || dec == null ? null : amount(totalSupplyRaw, dec),
+      fraction,
+      dust: fraction > 0 && fraction < 0.000001,
+      claim: maybeAmount(assetMeta == null || assetMeta.unresolved ? undefined : claimRaw, assetDecimals),
+      maxRedeem: null,
+    };
+  });
+
+  const self = vaults.find((c) => c.vault === address);
+  // A catalogued holder's `asset()` is its own census row's asset.
+  const read = shapeOf(body.data[0]);
+  const shape = read?.kind === "aave-vault" && self?.asset ? { ...read, asset: self.asset.toLowerCase() } : read;
+  return {
+    holder: address,
+    blockNumber: block,
+    chainStale: false,
+    catalogSize: vaults.length,
+    stataCount: vaults.filter((c) => c.family === "stata").length,
+    stakeCount: vaults.filter((c) => c.family === "umbrella-stake").length,
+    rows,
+    zeroCount: vaults.length - rows.length,
+    unreadCount: 0,
+    shape,
+    catalogued: self
+      ? { address, family: self.family as AaveVaultFamily, symbol: shape?.kind === "aave-vault" ? shape.symbol : null }
+      : null,
+    readAt: loadedAt,
+    census: { block, loadedAt, stamp: censusStamp(block, loadedAt) },
   };
 }
 
@@ -161,6 +372,11 @@ function empty(holder: string): AaveEthereumHolderSweepResponse {
  */
 export async function loadAaveEthereumHolderSweep(holder: string): Promise<AaveEthereumHolderSweepResponse> {
   const address = holder.toLowerCase();
+  const census = await censusSweep(address).catch((error) => {
+    console.error("Aave Ethereum holder sweep: the census read failed —", error);
+    return null;
+  });
+  if (census) return census;
   try {
     const client = chainBatchClient(MAINNET_CHAIN_ID);
     const blockNumber = await client.getBlockNumber();
@@ -269,6 +485,7 @@ export async function loadAaveEthereumHolderSweep(holder: string): Promise<AaveE
       shape,
       catalogued: family ? { address, family, symbol: shape?.kind === "aave-vault" ? shape.symbol : null } : null,
       readAt: new Date().toISOString(),
+      census: null,
     };
   } catch (error) {
     console.error("Aave Ethereum holder sweep chain read failed:", error);
