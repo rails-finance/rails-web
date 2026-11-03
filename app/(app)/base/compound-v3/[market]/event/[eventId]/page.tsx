@@ -31,8 +31,9 @@ const EVENT_ID = /^(0x[0-9a-fA-F]{64})-(\d+)-/;
 
 /** The Comet whose log the event id names: rails-server's
  *  `/api/at-block/tx/log-address` first, the transaction's receipt where it
- *  cannot answer; null where the id has another shape, both fail, or the log
- *  is no Comet of the roster. */
+ *  cannot answer; null where the id has another shape, the server answers
+ *  that the receipt holds no such log, both fail, or the log is no Comet of
+ *  the roster. */
 async function cometOfLog(decoded: string): Promise<string | null> {
   const m = EVENT_ID.exec(decoded);
   if (!m) return null;
@@ -40,7 +41,7 @@ async function cometOfLog(decoded: string): Promise<string | null> {
   const keyOf = (comet: string | undefined) =>
     COMPOUND_BASE_DEPLOYMENT.markets.find((c) => c.comet === comet)?.key ?? null;
   const served = await serverLogAddress(COMPOUND_BASE_CHAIN_ID, m[1], logIndex);
-  if (served) return keyOf(served);
+  if (served !== undefined) return served ? keyOf(served) : null;
   try {
     const receipt = await chainClient(COMPOUND_BASE_CHAIN_ID).getTransactionReceipt({ hash: m[1] as `0x${string}` });
     return keyOf(receipt.logs.find((l) => l.logIndex === logIndex)?.address.toLowerCase());

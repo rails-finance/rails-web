@@ -1,6 +1,8 @@
-// rails-server's `/api/at-block/names`
-// client (lib/sources/api/names-at-block.ts): a name is taken from the server
-// only where it found one, and a reverse batch asks once per 50 addresses.
+// rails-server's `/api/at-block/names` and `/api/at-block/tx/log-address`
+// clients (lib/sources/api/names-at-block.ts, event-panels-at-block.ts): a
+// name is taken from the server only where it found one, a reverse batch asks
+// once per 50 addresses, and a log-address 404 is the answer "no such log"
+// without marking the route down.
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -39,6 +41,7 @@ process.env.RAILS_API_URL = API;
 process.env.ENS_RPC_URL = "http://127.0.0.1:9";
 
 const { serverNameAddress, serverEnsNames } = await import(ROOT + "lib/sources/api/names-at-block.ts");
+const { serverLogAddress } = await import(ROOT + "lib/sources/api/event-panels-at-block.ts");
 const { lookUpEnsAddress, resolveEnsNames } = await import(ROOT + "lib/ens/resolve-ens.ts");
 
 const realNow = Date.now;
@@ -131,4 +134,30 @@ test("resolveEnsNames: all found asks the server once and no chain", async () =>
   assert.deepEqual(await resolveEnsNames(list), { [list[0]]: "2329.eth", [list[1]]: "232a.eth" });
   assert.deepEqual(await resolveEnsNames(list), { [list[0]]: "2329.eth", [list[1]]: "232a.eth" });
   assert.equal(seen.length, 1);
+});
+
+const TX = "0x" + "ab".repeat(32);
+
+test("log-address: an answer is the address", async () => {
+  stubFetch(() => json({ chainId: 8453, tx: TX, logIndex: 7, address: "0xAbC0000000000000000000000000000000000001" }));
+  assert.equal(await serverLogAddress(8453, TX, 7), "0xabc0000000000000000000000000000000000001");
+});
+
+test("log-address: a 404 is null and keeps the route up", async () => {
+  const seen = stubFetch(() => json({ error: "The receipt holds no log at that index" }, 404));
+  assert.equal(await serverLogAddress(8453, TX, 9999), null);
+  assert.equal(await serverLogAddress(8453, TX, 9999), null);
+  assert.equal(seen.length, 2);
+});
+
+test("log-address: a 5xx is undefined and marks the route down", async () => {
+  const seen = stubFetch(() => json({ error: "proxy_error" }, 502));
+  assert.equal(await serverLogAddress(8453, TX, 7), undefined);
+  assert.equal(await serverLogAddress(8453, TX, 7), undefined);
+  assert.equal(seen.length, 1);
+});
+
+test("log-address: a 400 is undefined (the receipt is read)", async () => {
+  stubFetch(() => json({ error: "bad" }, 400));
+  assert.equal(await serverLogAddress(8453, TX, 7), undefined);
 });

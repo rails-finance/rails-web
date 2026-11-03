@@ -11,7 +11,8 @@
 // body of the web route it replaces.
 //
 // Null when the route cannot answer: no RAILS_API_URL, a refused connection, a
-// non-2xx answer or 3 s without one; after a failure the chain is read for 30 s
+// non-2xx answer or 3 s without one (log-address alone tells its 404, the
+// answer "no such log", from the route not answering); after a failure the chain is read for 30 s
 // without asking (route-gate.ts). The caller then reads the chain as before.
 //
 // SERVER-ONLY.
@@ -133,18 +134,23 @@ export async function serverUserOpSender(
 }
 
 /** The address of the receipt's log at that block-wide index; null where the
- *  route cannot answer or the receipt holds no such log. */
-export async function serverLogAddress(chainId: number, tx: string, logIndex: number): Promise<string | null> {
-  const body = await ask<{ tx?: unknown; logIndex?: unknown; address?: unknown }>(
+ *  route answers 404 (the receipt holds no such log), undefined where it cannot
+ *  answer. */
+export async function serverLogAddress(
+  chainId: number,
+  tx: string,
+  logIndex: number,
+): Promise<string | null | undefined> {
+  const qs = new URLSearchParams({ chain: String(chainId), tx: tx.toLowerCase(), logIndex: String(logIndex) });
+  const got = await gate.answer<{ logIndex?: unknown; address?: unknown }>(
     "tx",
-    "/api/at-block/tx/log-address",
-    {
-      chain: String(chainId),
-      tx: tx.toLowerCase(),
-      logIndex: String(logIndex),
-    },
+    `${process.env.RAILS_API_URL}/api/at-block/tx/log-address?${qs.toString()}`,
+    createAuthFetchOptions(),
   );
-  if (!body || body.logIndex !== logIndex || typeof body.address !== "string") return null;
+  if (!got) return undefined;
+  if (!("body" in got)) return got.status === 404 ? null : undefined;
+  const body = got.body;
+  if (body?.logIndex !== logIndex || typeof body.address !== "string") return undefined;
   return body.address.toLowerCase();
 }
 
