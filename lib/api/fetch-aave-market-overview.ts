@@ -15,6 +15,9 @@
 // on-chain-only gate. There is no second source to reconcile: this IS the
 // Pool's own statement of its reserves at the named block.
 
+import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
+import type { StoredHeadRead } from "@/lib/shared/server-head-read";
+
 export interface AaveMarketReserve {
   /** Lowercased underlying token address. */
   address: string;
@@ -92,6 +95,10 @@ export interface AaveMarketOverviewResponse {
   pool: string;
   oracle: string;
   blockNumber: number;
+  /** rails-server's read of `blockNumber`, when it answered every read live. */
+  head?: PositionHeadStamp;
+  /** rails-server's stored snapshot the figures were computed over, when the live read failed. */
+  stored?: StoredHeadRead;
   /** True when the RPC read failed — reserves is empty, show a retry state. */
   chainStale: boolean;
   /** SparkLend's CapAutomator, when the market has one. */

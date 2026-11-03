@@ -237,7 +237,7 @@ function CapText({
         <span
           title={
             c.basis === "automator"
-              ? `${tokens(c.amount)} of a ${tokens(c.cap)} ${r.symbol} maximum (CapAutomator); live cap ${c.liveCap != null ? tokens(c.liveCap) : "—"}`
+              ? `${tokens(c.amount)} of a ${tokens(c.cap)} ${r.symbol} maximum (CapAutomator); Pool cap ${c.liveCap != null ? tokens(c.liveCap) : "—"}`
               : `${tokens(c.amount)} of a ${tokens(c.cap)} ${r.symbol} cap`
           }
         >
@@ -525,7 +525,7 @@ function ReserveRow(props: RowProps) {
         </td>
         <td
           className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80"
-          title="Supply rate / variable borrow rate, read live from the Pool"
+          title="Supply rate / variable borrow rate, read from the Pool at the stamped block"
         >
           {z.rates}
         </td>
@@ -685,10 +685,11 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
   const wide = useWide();
   // One receipts scope for the band — the figures are one block's reading of
   // one Pool. The vocabulary is protocol-parameterised (each market sits on
-  // different Pool/oracle contracts), bound here to the live addresses + block
-  // the payload was read at.
+  // different Pool/oracle contracts), bound here to the addresses + block the
+  // payload was read at, and who read it.
   const registry = useReceiptRegistry();
   const vocab = aaveMarketVocab(view.protocol, {
+    readBy: view.readBy,
     blockNumber: view.blockNumber,
     pool: view.pool,
     oracle: view.oracle,

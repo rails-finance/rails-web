@@ -34,6 +34,7 @@ export async function GET() {
       pool: SEAMLESS_POOL,
       oracle: SEAMLESS_ORACLE,
       chainId: SEAMLESS_CHAIN_ID,
+      surface: "seamless:base:market",
     });
     // A reserve the oracle prices at a fixed $1.00 has no market price: the
     // figure moves to `fixedOraclePrice` and the reserve stays out of the totals.

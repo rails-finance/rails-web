@@ -19,6 +19,7 @@ export async function GET() {
       pool: AAVE_V3_POOL,
       oracle: AAVE_V3_ORACLE,
       symbolByAddr: V3_SYMBOL_BY_ADDR,
+      surface: "aave-v3:ethereum:market",
     });
     return NextResponse.json(data, { headers: { "Cache-Control": CHAIN_MARKET_CACHE_CONTROL } });
   } catch (error) {
