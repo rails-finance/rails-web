@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseAbi } from "viem";
 import { chainClient } from "@/lib/sources/chain/rpc";
 import { cometDeploymentOf, compoundDeploymentParam } from "@/lib/compound/deployments";
+import { readerIpFromRequest } from "@/lib/api/reader-ip";
+import { serverCometRates } from "@/lib/sources/api/event-panels-at-block";
 
 // A Comet market's interest rates at past blocks — what a row's interest line
 // sets its average against. Comet charges and pays at the rate its
@@ -13,6 +15,11 @@ import { cometDeploymentOf, compoundDeploymentParam } from "@/lib/compound/deplo
 // fractions: getUtilization, then getSupplyRate and getBorrowRate at it, each
 // per second × 31,536,000 (Comet's SECONDS_PER_YEAR). A block whose read
 // fails is absent.
+//
+// Ethereum and Base ask rails-server's `/api/at-block/compound/rates` first,
+// which answers the same body from its at-block store; `readBy:
+// "rails-server"` marks its answer. Where it cannot answer, or a block is
+// absent from its answer, and on Arbitrum, the chain is read as below.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +35,8 @@ const SECONDS_PER_YEAR = 31_536_000;
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
-  const deployment = cometDeploymentOf(compoundDeploymentParam(q.get("deployment")));
+  const deploymentKey = compoundDeploymentParam(q.get("deployment"));
+  const deployment = cometDeploymentOf(deploymentKey);
   const market = deployment.markets.find((m) => m.key === (q.get("market") ?? "").toLowerCase());
   const blocks = [
     ...new Set(
@@ -42,12 +50,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "deployment, market and blocks are required" }, { status: 400 });
   }
   const comet = market.comet as `0x${string}`;
+  const served =
+    deploymentKey !== "arbitrum"
+      ? await serverCometRates(deployment.chainId, comet, blocks, readerIpFromRequest(request))
+      : null;
+  if (served && blocks.every((b) => served[String(b)] != null)) {
+    return NextResponse.json(
+      { rates: served, readBy: "rails-server" },
+      { headers: { "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable" } },
+    );
+  }
   const rates: Record<number, { utilization: number; supply: number; borrow: number }> = {};
   let failed = false;
   try {
     const client = chainClient(deployment.chainId);
     await Promise.all(
       blocks.map(async (b) => {
+        const got = served?.[String(b)];
+        if (got) {
+          rates[b] = got;
+          return;
+        }
         try {
           const blockNumber = BigInt(b);
           const u = await client.readContract({

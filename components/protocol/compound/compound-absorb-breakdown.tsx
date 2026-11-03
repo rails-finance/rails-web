@@ -50,6 +50,8 @@ export interface AbsorbFactors {
   prevPrices?: Record<string, number>;
   /** Borrow rate (yearly fraction) at the previous event and the block before the absorb. */
   borrowRate?: { prev: number | null; read: number | null };
+  /** rails-server answered the whole read. */
+  readBy?: "rails-server";
 }
 
 /** The account's previous row, where the page has it. */
@@ -168,6 +170,7 @@ export function CompoundAbsorbBreakdown({
           info={absorbFactorProv(l.symbol, which === "liquidate" ? "liquidate factor" : "liquidation factor", coords, {
             value: pct(v),
             readBlock: factors!.readBlock,
+            readBy: factors!.readBy,
           })}
           value={pct(v)}
         >
