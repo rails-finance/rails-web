@@ -4,7 +4,13 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatValueHeld, groupLeftOut, settleValueHeld, spokenValueHeld } from "../../lib/home/value-held.ts";
+import {
+  exemptionOf,
+  formatValueHeld,
+  groupLeftOut,
+  settleValueHeld,
+  spokenValueHeld,
+} from "../../lib/home/value-held.ts";
 
 const roster = [
   { id: "aave-v3", slug: "aave-v3", chainId: 1, label: "Aave V3", chainName: "Ethereum" },
@@ -52,6 +58,7 @@ test("counted rows add; an uncounted row is named, not added", () => {
   );
   assert.equal(v.rows[1].oracleOf, "Aave V3's oracle");
   assert.equal(v.rows[1].prices, "on-chain oracle");
+  assert.equal(v.rows[1].exemption, null);
   assert.deepEqual(v.notCounted, [{ label: "Fluid", chainName: "Ethereum", reason: "no USD price" }]);
 });
 
@@ -121,4 +128,15 @@ test("the headline total reads in whole dollars, spoken rounded", () => {
   assert.equal(formatValueHeld(38_410_261_859.4), "$38,410,261,859");
   assert.equal(spokenValueHeld(38_410_261_859), "about 38.4 billion dollars");
   assert.equal(spokenValueHeld(18_400_000), "about 18.4 million dollars");
+});
+
+test("the exemption clause is read from the end of the price source", () => {
+  assert.equal(
+    exemptionOf(
+      "Market AMM price_oracle times the borrowed token at the Aave V3 oracle (getAssetPrice); crvUSD's Aave price is exempt from the 24-hour limit",
+    ),
+    "crvUSD's Aave price is exempt from the 24-hour limit",
+  );
+  assert.equal(exemptionOf("Aave V3 oracle (getAssetPrice)"), null);
+  assert.equal(exemptionOf(null), null);
 });
