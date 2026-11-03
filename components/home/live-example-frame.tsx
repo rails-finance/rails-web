@@ -241,16 +241,16 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
               shape (no competing band behind it), and its background + text
               shift together on hover as one unit. */}
           <div className="relative flex items-center gap-2 px-4 py-3 border-b border-rb-200 dark:border-rb-800">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#ec6a5e]" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#f4bf4f]" />
-            <span className="w-2.5 h-2.5 rounded-full bg-[#61c554]" />
-            <span className="absolute left-1/2 -translate-x-1/2 max-w-[65%] truncate font-sans text-xs text-rb-500/40 bg-rb-100 dark:bg-rb-900 group-hover:text-foreground group-hover:bg-background transition-colors duration-300 rounded-md px-3 py-1">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#ec6a5e]" />
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#f4bf4f]" />
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#61c554]" />
+            <span className="min-w-0 flex-1 truncate text-center sm:absolute sm:left-1/2 sm:max-w-[65%] sm:flex-none sm:-translate-x-1/2 sm:text-left font-sans text-xs text-rb-500/40 bg-rb-100 dark:bg-rb-900 group-hover:text-foreground group-hover:bg-background transition-colors duration-300 rounded-md px-3 py-1">
               {EXAMPLE_URL}
             </span>
             {/* Liveness marker — an outlined green pill (border, 20% tint,
                 green bold text) owned by the chrome bar rather than pasted
                 over the render. */}
-            <span className="ml-auto inline-flex items-center rounded-full border border-green-500 bg-green-500/20 px-2 py-0.5 text-[9px] font-bold tracking-widest text-green-500">
+            <span className="ml-auto inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-green-500 bg-green-500/20 px-2 py-0.5 text-[9px] font-bold tracking-widest text-green-500">
               LIVE SAMPLE
             </span>
           </div>

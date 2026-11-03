@@ -65,7 +65,8 @@ export function HomeHero() {
         className="relative font-sans font-light text-rb-500 tracking-tight mb-12 px-4 text-lg sm:mb-20 sm:text-xl animate-hero-fade-up"
         style={{ animationDelay: "0.2s" }}
       >
-        Explore any DeFi position, verified directly from the chain.
+        Explore any DeFi position, <br className="min-[480px]:hidden" />
+        verified directly from the chain.
       </p>
       <div
         className="relative z-20 w-full max-w-2xl px-4 text-left animate-hero-fade-up"
