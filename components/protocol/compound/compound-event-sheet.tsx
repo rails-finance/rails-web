@@ -34,7 +34,7 @@ import type { FlowSide } from "@/lib/shared/flows-timeline";
 import type { CompoundContext } from "@/lib/shared/types/event-shape";
 import { CV3, type CompoundFlowReplay, type CompoundReplayed } from "@/lib/compound/flows";
 import { compoundAmount } from "@/lib/compound/row-facts";
-import { absorbFactorProv, cometContract, type CompoundCoords } from "@/lib/compound/event-provenance";
+import { absorbFactorProv, cometContract, serverReadTail, type CompoundCoords } from "@/lib/compound/event-provenance";
 import { COMPOUND_WORDS, PROSE } from "@/lib/compound/event-templates";
 import type { CompoundRates } from "./compound-rate-note";
 import type { AbsorbFactors, CompoundPreviousRow } from "./compound-absorb-breakdown";
@@ -523,13 +523,14 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
 
   // The borrow rate: the rate note's read at the block before this event,
   // else the absorb breakdown's.
-  const ratePair: { now: number; then: number | null; readBlock: number } | null = rates
-    ? { now: rates.now.borrow, then: rates.then.borrow, readBlock: rates.readBlock }
+  const ratePair: { now: number; then: number | null; readBlock: number; readBy?: "rails-server" } | null = rates
+    ? { now: rates.now.borrow, then: rates.then.borrow, readBlock: rates.readBlock, readBy: rates.readBy }
     : absorb?.borrowRate?.read != null
       ? {
           now: absorb.borrowRate.read,
           then: absorb.borrowRate.prev ?? null,
           readBlock: absorb.readBlock,
+          readBy: absorb.readBy,
         }
       : null;
   const rateFig: SwapFigure | null = ratePair
@@ -541,7 +542,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
           pclass: "state",
           summary: `The market's borrow rate a year just before this event — the Comet's getBorrowRate at its getUtilization, read at block ${ratePair.readBlock.toLocaleString("en-US")}, the block before.`,
           contract: cometContract(coords),
-          via: `Comet · getBorrowRate(getUtilization()) · block ${ratePair.readBlock}`,
+          via: `Comet · getBorrowRate(getUtilization()) · block ${ratePair.readBlock}${serverReadTail(ratePair.readBy)}`,
         },
       }
     : null;
@@ -590,7 +591,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
                     pclass: "state" as const,
                     summary: `Borrow collateral factor — the share of ${h.symbol}'s value that counts toward the borrowing limit in this market, ${factorPct(f.borrow)}, read from the Comet's asset settings at block ${readBlock}, the block before the absorb.`,
                     contract: cometContract(coords),
-                    via: `Comet.getAssetInfoByAddress(${h.symbol}) · block ${readBlock}`,
+                    via: `Comet.getAssetInfoByAddress(${h.symbol}) · block ${readBlock}${serverReadTail(factors?.readBy)}`,
                   },
                 }
               : unread,
@@ -607,6 +608,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
                   info: absorbFactorProv(h.symbol, "liquidate factor", coords, {
                     value: factorPct(f.liquidate),
                     readBlock,
+                    readBy: factors?.readBy,
                   }),
                 }
               : unread,

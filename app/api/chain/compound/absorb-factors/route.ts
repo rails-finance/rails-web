@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { parseAbi } from "viem";
 import { chainClient } from "@/lib/sources/chain/rpc";
 import { cometDeploymentOf, compoundDeploymentParam } from "@/lib/compound/deployments";
+import { readerIpFromRequest } from "@/lib/api/reader-ip";
+import {
+  serverCometFactors,
+  serverCometPricesAt,
+  serverCometRates,
+  type CometFactor,
+} from "@/lib/sources/api/event-panels-at-block";
 
 // The collateral factors a Comet held just before an absorb — what the
 // liquidation row needs to show the line the account crossed and the credit
@@ -18,6 +25,13 @@ import { cometDeploymentOf, compoundDeploymentParam } from "@/lib/compound/deplo
 // price at `prev` (`prevPrices`, keyed by asset, the base under "base"), and
 // the market's borrow rate at `prev` and at `readBlock` (`borrowRate`, yearly
 // fractions, getBorrowRate at getUtilization).
+//
+// Ethereum and Base ask rails-server first: the factors and the two borrow
+// rates from its at-block store (`/api/at-block/compound/{factors,rates}`),
+// the prices at `prev` from the prices it stored at every event block
+// (`/api/compound/prices-at`, mig 372). A part the server cannot answer is
+// read from the chain, as Arbitrum reads all of it. `readBy: "rails-server"`
+// marks an answer rails-server gave whole.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -90,9 +104,64 @@ async function pricesAt(
   return out;
 }
 
+/** The chain read: each asset's factors and price feed at `readBlock`. */
+async function chainFactors(
+  client: Client,
+  comet: `0x${string}`,
+  assets: readonly string[],
+  readBlock: number,
+): Promise<{ factors: Record<string, CometFactor>; feeds: Record<string, `0x${string}`> }> {
+  const results = await client.multicall({
+    allowFailure: true,
+    blockNumber: BigInt(readBlock),
+    contracts: assets.map(
+      (a) =>
+        ({
+          address: comet,
+          abi: ABI,
+          functionName: "getAssetInfoByAddress",
+          args: [a as `0x${string}`],
+        }) as const,
+    ),
+  });
+  const factors: Record<string, CometFactor> = {};
+  const feeds: Record<string, `0x${string}`> = {};
+  results.forEach((r, i) => {
+    if (r.status !== "success") return;
+    const info = r.result;
+    feeds[assets[i]] = info.priceFeed;
+    factors[assets[i]] = {
+      borrow: Number(info.borrowCollateralFactor) / FACTOR_SCALE,
+      liquidate: Number(info.liquidateCollateralFactor) / FACTOR_SCALE,
+      liquidation: Number(info.liquidationFactor) / FACTOR_SCALE,
+    };
+  });
+  return { factors, feeds };
+}
+
+/** The prices at `prev` from rails-server's stored event-block prices: each
+ *  listed asset's and the base's getPrice in the Comet's unit. Null where the
+ *  block is not stored or the route cannot answer. */
+async function storedPricesAt(
+  chainId: number,
+  market: { comet: string; baseToken: string },
+  assets: readonly string[],
+  prev: number,
+  readerIp: string | undefined,
+): Promise<Record<string, number> | null> {
+  const stored = (await serverCometPricesAt(chainId, market.comet, [prev], readerIp))?.[String(prev)];
+  if (!stored) return null;
+  const out: Record<string, number> = {};
+  for (const a of assets) if (stored[a] != null) out[a] = Number(stored[a]) / PRICE_SCALE;
+  const base = stored[market.baseToken.toLowerCase()];
+  if (base != null) out.base = Number(base) / PRICE_SCALE;
+  return out;
+}
+
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
-  const deployment = cometDeploymentOf(compoundDeploymentParam(q.get("deployment")));
+  const deploymentKey = compoundDeploymentParam(q.get("deployment"));
+  const deployment = cometDeploymentOf(deploymentKey);
   const market = deployment.markets.find((m) => m.key === (q.get("market") ?? "").toLowerCase());
   const block = Number(q.get("block"));
   const assets = [
@@ -110,48 +179,42 @@ export async function GET(request: NextRequest) {
   const readBlock = block - 1;
   const prevRaw = Number(q.get("prev"));
   const prev = Number.isInteger(prevRaw) && prevRaw > 0 && prevRaw < block ? prevRaw : null;
+  const comet = market.comet as `0x${string}`;
+  const chainId = deployment.chainId;
+  // Arbitrum reads its chain; Ethereum and Base ask rails-server first.
+  const viaServer = deploymentKey !== "arbitrum";
+  const readerIp = viaServer ? readerIpFromRequest(request) : undefined;
   try {
-    const client = chainClient(deployment.chainId);
-    const results = await client.multicall({
-      allowFailure: true,
-      blockNumber: BigInt(readBlock),
-      contracts: assets.map(
-        (a) =>
-          ({
-            address: market.comet as `0x${string}`,
-            abi: ABI,
-            functionName: "getAssetInfoByAddress",
-            args: [a as `0x${string}`],
-          }) as const,
-      ),
-    });
-    const factors: Record<string, { borrow: number; liquidate: number; liquidation: number }> = {};
-    const feeds: Record<string, `0x${string}`> = {};
-    results.forEach((r, i) => {
-      if (r.status !== "success") return;
-      const info = r.result;
-      feeds[assets[i]] = info.priceFeed;
-      factors[assets[i]] = {
-        borrow: Number(info.borrowCollateralFactor) / FACTOR_SCALE,
-        liquidate: Number(info.liquidateCollateralFactor) / FACTOR_SCALE,
-        liquidation: Number(info.liquidationFactor) / FACTOR_SCALE,
+    const client = chainClient(chainId);
+    const [served, servedRates] = await Promise.all([
+      viaServer ? serverCometFactors(chainId, comet, readBlock, assets, readerIp) : null,
+      viaServer && prev != null ? serverCometRates(chainId, comet, [prev, readBlock], readerIp) : null,
+    ]);
+    let factors: Record<string, CometFactor>;
+    let feeds: Record<string, `0x${string}`> | null = null;
+    if (served) factors = served;
+    else ({ factors, feeds } = await chainFactors(client, comet, assets, readBlock));
+    let fromServer = served != null;
+    let extra = {};
+    if (prev != null) {
+      const rateAt = async (b: number) => {
+        const r = servedRates?.[String(b)];
+        if (r) return r.borrow;
+        fromServer = false;
+        return borrowRateAt(client, comet, BigInt(b));
       };
-    });
-    const comet = market.comet as `0x${string}`;
-    const extra =
-      prev != null
-        ? await Promise.all([
-            pricesAt(client, comet, feeds, BigInt(prev)),
-            borrowRateAt(client, comet, BigInt(prev)),
-            borrowRateAt(client, comet, BigInt(readBlock)),
-          ]).then(([prevPrices, atPrev, atRead]) => ({
-            prevBlock: prev,
-            prevPrices,
-            borrowRate: { prev: atPrev, read: atRead },
-          }))
-        : {};
+      const pricesThen = async () => {
+        const stored = viaServer ? await storedPricesAt(chainId, market, Object.keys(factors), prev, readerIp) : null;
+        if (stored) return stored;
+        fromServer = false;
+        feeds ??= (await chainFactors(client, comet, assets, readBlock)).feeds;
+        return pricesAt(client, comet, feeds, BigInt(prev));
+      };
+      const [prevPrices, atPrev, atRead] = await Promise.all([pricesThen(), rateAt(prev), rateAt(readBlock)]);
+      extra = { prevBlock: prev, prevPrices, borrowRate: { prev: atPrev, read: atRead } };
+    }
     return NextResponse.json(
-      { readBlock, factors, ...extra },
+      { readBlock, factors, ...extra, ...(fromServer ? { readBy: "rails-server" } : {}) },
       // A past block's settings never change.
       { headers: { "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable" } },
     );

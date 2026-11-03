@@ -5,8 +5,8 @@
 // OFFLINE. Fixtures read on 1 Oct 2026 from the page's routes
 // (scripts/verify/fixtures/llamalend-flows.json: /api/llamalend/timeline, the
 // live read /api/chain/llamalend/position, and the AMM's price_oracle at every
-// row's block, /api/chain/llamalend/liq-price, all off victoria and the
-// archive):
+// row's block, all off victoria and the archive; the page now takes that
+// price from /api/chain/llamalend/event-state):
 //
 //   closed-repaid       wstETH / crvUSD 0x1e01…4d71 / 0x1b95…abd5: borrowed,
 //                       repaid and withdrew in full (12 events)

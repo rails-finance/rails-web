@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { decodeEventLog, parseAbi } from "viem";
 import { chainClient } from "@/lib/sources/chain/rpc";
 import { COMPOUND_DEPLOYMENT_CHAIN, compoundDeploymentParam } from "@/lib/compound/deployments";
+import { readerIpFromRequest } from "@/lib/api/reader-ip";
+import { serverUserOpSender } from "@/lib/sources/api/event-panels-at-block";
 
 // Who sent a Comet row's transaction, for the rows where the owner neither
 // signed it nor funded it. A smart-account wallet (ERC-4337) never signs a
@@ -11,8 +13,12 @@ import { COMPOUND_DEPLOYMENT_CHAIN, compoundDeploymentParam } from "@/lib/compou
 // reads from the receipt.
 //
 // `?deployment=ethereum|base|arbitrum&tx=<hash>&account=<address>` answers
-// `{ from, to, userOpSender }`: `userOpSender` is the account when one of the
-// transaction's user operations was the account's own, else null.
+// `{ userOpSender }`: the account when one of the transaction's user
+// operations was the account's, else null.
+//
+// Ethereum and Base ask rails-server's `/api/at-block/tx/user-op` first, which
+// reads the receipt through its at-block store; where it cannot answer, and on
+// Arbitrum, the receipt is read from the chain.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,18 +31,22 @@ const USER_OP_EVENT = parseAbi([
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
-  const chainId = COMPOUND_DEPLOYMENT_CHAIN[compoundDeploymentParam(q.get("deployment"))];
+  const deploymentKey = compoundDeploymentParam(q.get("deployment"));
+  const chainId = COMPOUND_DEPLOYMENT_CHAIN[deploymentKey];
   const tx = (q.get("tx") ?? "").toLowerCase();
   const account = (q.get("account") ?? "").toLowerCase();
   if (!HASH.test(tx) || !ADDRESS.test(account)) {
     return NextResponse.json({ error: "tx and account are required" }, { status: 400 });
   }
+  // A mined transaction never changes.
+  const immutable = { headers: { "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable" } };
+  const served =
+    deploymentKey !== "arbitrum"
+      ? await serverUserOpSender(chainId, tx, account, readerIpFromRequest(request))
+      : undefined;
+  if (served) return NextResponse.json(served, immutable);
   try {
-    const client = chainClient(chainId);
-    const [t, receipt] = await Promise.all([
-      client.getTransaction({ hash: tx as `0x${string}` }),
-      client.getTransactionReceipt({ hash: tx as `0x${string}` }),
-    ]);
+    const receipt = await chainClient(chainId).getTransactionReceipt({ hash: tx as `0x${string}` });
     let userOpSender: string | null = null;
     for (const log of receipt.logs) {
       try {
@@ -49,13 +59,9 @@ export async function GET(request: NextRequest) {
         // Not a UserOperationEvent.
       }
     }
-    return NextResponse.json(
-      { from: t.from.toLowerCase(), to: t.to?.toLowerCase() ?? null, userOpSender },
-      // A mined transaction never changes.
-      { headers: { "Cache-Control": "public, max-age=86400, s-maxage=86400, immutable" } },
-    );
+    return NextResponse.json({ userOpSender }, immutable);
   } catch (error) {
     console.error("Error reading a Comet row's transaction:", error);
-    return NextResponse.json({ from: null, to: null, userOpSender: null });
+    return NextResponse.json({ userOpSender: null });
   }
 }

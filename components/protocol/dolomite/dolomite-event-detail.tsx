@@ -44,6 +44,7 @@ import {
   balanceChangeProv,
   dolomiteInterestSincePreviousProv,
   dolomiteLiqAtBlockPriceProv,
+  type DolomiteLiqPriceSource,
   dolomiteLiqLegValueProv,
   dolomiteLiqPremiumProv,
   dolomiteLiqSpreadRefProv,
@@ -114,6 +115,17 @@ interface AtBlockPrices {
   overrideSpreadRaw: string | null;
   /** The account's health at the end of the previous block. */
   healthBefore: number | null;
+  /** Where each leg's price came from. */
+  heldSource: DolomiteLiqPriceSource;
+  owedSource: DolomiteLiqPriceSource;
+}
+
+/** A leg's price source from the route's answer: rails-server names the
+ *  transaction or the chain, per leg where it says; the web's own read is the chain. */
+function legSourceOf(d: Record<string, unknown>, leg: "held" | "owed"): DolomiteLiqPriceSource {
+  if (d.readBy !== "rails-server") return "chain";
+  const named = d[`${leg}PriceSource`] ?? (d.priceSource === "mixed" ? null : d.priceSource);
+  return named === "transaction" ? "transaction" : named === "chain" ? "server-chain" : "unnamed";
 }
 
 /** The at-block reads for a liquidation row — fetched once on mount (the
@@ -146,6 +158,8 @@ function useLiqPricesAtBlock(
             owedSpreadPremiumRaw: typeof d.owedSpreadPremiumRaw === "string" ? d.owedSpreadPremiumRaw : null,
             overrideSpreadRaw: typeof d.overrideSpreadRaw === "string" ? d.overrideSpreadRaw : null,
             healthBefore: typeof d.healthBefore === "number" ? d.healthBefore : null,
+            heldSource: legSourceOf(d, "held"),
+            owedSource: legSourceOf(d, "owed"),
           });
         }
       })
@@ -168,6 +182,12 @@ function legResolved(ctx: DolomiteContext): boolean {
  *  precision, trailing zeros trimmed: no float in the path. */
 function fullPrice(raw: string, decimals: number): string {
   return formatExactDecimal(formatUnitsExact(raw, 36 - decimals));
+}
+
+/** A price pill's note: where its price came from. */
+function liqPriceNote(src: DolomiteLiqPriceSource, block: number | undefined): string {
+  if (src === "transaction") return "logged in this transaction";
+  return block != null ? `oracle at block ${block.toLocaleString("en-US")}` : "oracle";
 }
 
 /** The valued two-leg breakdown — both legs of one LogLiquidate at the
@@ -198,18 +218,24 @@ function buildDolomiteLiqForensics(
     seized: {
       symbol: held.marketSymbol,
       usd: seizedUsd,
-      usdProv: dolomiteLiqLegValueProv("seized collateral", held.marketSymbol, coords, {
-        amount: `${fmt(held.weiDelta)} ${held.marketSymbol}`,
-        price: heldPriceText,
-      }),
+      usdProv: dolomiteLiqLegValueProv(
+        "seized collateral",
+        held.marketSymbol,
+        coords,
+        { amount: `${fmt(held.weiDelta)} ${held.marketSymbol}`, price: heldPriceText },
+        atBlock.heldSource,
+      ),
     },
     cleared: {
       symbol: owed.marketSymbol,
       usd: clearedUsd,
-      usdProv: dolomiteLiqLegValueProv("cleared debt", owed.marketSymbol, coords, {
-        amount: `${fmt(owed.weiDelta)} ${owed.marketSymbol}`,
-        price: owedPriceText,
-      }),
+      usdProv: dolomiteLiqLegValueProv(
+        "cleared debt",
+        owed.marketSymbol,
+        coords,
+        { amount: `${fmt(owed.weiDelta)} ${owed.marketSymbol}`, price: owedPriceText },
+        atBlock.owedSource,
+      ),
     },
     premium: seizedUsd / clearedUsd - 1,
     premiumLabel: "Seized over cleared",
@@ -235,16 +261,16 @@ function buildDolomiteLiqForensics(
         priceUsd: heldPrice,
         display: heldPriceText,
         address: held.marketToken,
-        priceProv: dolomiteLiqAtBlockPriceProv(held.marketSymbol, coords, atBlock.heldPriceRaw),
-        note: coords.blockNumber != null ? `oracle at block ${coords.blockNumber.toLocaleString("en-US")}` : "oracle",
+        priceProv: dolomiteLiqAtBlockPriceProv(held.marketSymbol, coords, atBlock.heldPriceRaw, atBlock.heldSource),
+        note: liqPriceNote(atBlock.heldSource, coords.blockNumber),
       },
       {
         symbol: owed.marketSymbol,
         priceUsd: owedPrice,
         display: owedPriceText,
         address: owed.marketToken,
-        priceProv: dolomiteLiqAtBlockPriceProv(owed.marketSymbol, coords, atBlock.owedPriceRaw),
-        note: coords.blockNumber != null ? `oracle at block ${coords.blockNumber.toLocaleString("en-US")}` : "oracle",
+        priceProv: dolomiteLiqAtBlockPriceProv(owed.marketSymbol, coords, atBlock.owedPriceRaw, atBlock.owedSource),
+        note: liqPriceNote(atBlock.owedSource, coords.blockNumber),
       },
     ],
     format: { value: formatUsdValue, price: formatDolomitePrice },

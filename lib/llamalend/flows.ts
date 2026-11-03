@@ -52,9 +52,9 @@
 // collateral token alone, as before the store.
 //
 // Prices. The rows carry none: each row's block is priced at the AMM's
-// price_oracle there, stored by the server, else read from the archive per
-// page view (/api/chain/llamalend/liq-price), up to LLAMALEND_PRICE_READS
-// blocks a position; a row with neither takes the nearest priced moment in
+// price_oracle there, stored by the server, else the event-state read's at the
+// block per page view (/api/chain/llamalend/event-state), up to
+// LLAMALEND_PRICE_READS blocks a position; a row with neither takes the nearest priced moment in
 // time (a priced row, or today's live read). LlamaLend is not in the daily
 // price store, so between events the collateral keeps its latest event's
 // price.
