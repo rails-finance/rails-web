@@ -186,3 +186,15 @@ export function settleValueHeld(data: ValueHeldData | null | undefined, roster: 
     overlaps: Array.isArray(data.overlaps) ? data.overlaps : [],
   };
 }
+
+/** The headline total in whole dollars, en-US grouping: "$38,410,261,859". */
+export function formatValueHeld(usd: number): string {
+  return `$${Math.round(usd).toLocaleString("en-US")}`;
+}
+
+/** The same figure for a screen reader, rounded: "about 38.4 billion dollars". */
+export function spokenValueHeld(usd: number): string {
+  if (usd >= 999_950_000) return `about ${(usd / 1e9).toFixed(1)} billion dollars`;
+  if (usd >= 999_950) return `about ${(usd / 1e6).toFixed(1)} million dollars`;
+  return `${Math.round(usd).toLocaleString("en-US")} dollars`;
+}

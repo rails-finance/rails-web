@@ -5,9 +5,9 @@ import { createPortal } from "react-dom";
 import { Info, X } from "lucide-react";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
-import { formatFlowUsd, spokenUsd } from "@/lib/shared/flows-timeline";
+import { formatFlowUsd } from "@/lib/shared/flows-timeline";
 import { OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
-import type { ValueHeld } from "@/lib/home/value-held";
+import { formatValueHeld, spokenValueHeld, type ValueHeld } from "@/lib/home/value-held";
 
 /**
  * The band's small print, opened from the (i) after the last label: what the
@@ -60,8 +60,8 @@ function NoteBody({ value, caption }: { value: ValueHeld | null; caption: ReactN
         <p className="text-foreground">
           From the smallest position to the largest, Rails shows each in the same detail. Together, the open positions
           hold{" "}
-          <span className="font-semibold tabular-nums" aria-label={spokenUsd(value.totalUsd)}>
-            {formatFlowUsd(value.totalUsd)}
+          <span className="font-semibold tabular-nums" aria-label={spokenValueHeld(value.totalUsd)}>
+            {formatValueHeld(value.totalUsd)}
           </span>
           .
         </p>
@@ -243,7 +243,7 @@ export function CoveredStatsNote({ value, caption }: { value: ValueHeld | null; 
           open ? "text-foreground" : "text-rb-500"
         }`}
       >
-        <Info className="size-[1.1em]" strokeWidth={1.75} aria-hidden="true" />
+        <Info className="size-4" strokeWidth={1.75} aria-hidden="true" />
       </button>
 
       {dialogOpen && (
