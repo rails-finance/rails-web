@@ -124,10 +124,14 @@ async function read(chainId: ChainId, hash: string, wallet: string): Promise<{ a
   }
 
   let native: RawNative[];
-  if (stored?.native) native = stored.native.map((n) => ({ from: n.from, value: BigInt(n.raw) }));
-  else {
+  let nativeSource: "trace" | "asset-transfers";
+  if (stored?.native) {
+    native = stored.native.map((n) => ({ from: n.from, value: BigInt(n.raw) }));
+    nativeSource = "trace";
+  } else {
     rpcCalls++;
     native = await assetTransfers(chainId, hash, wallet, blockNumber);
+    nativeSource = "asset-transfers";
   }
 
   // Names and decimals for the tokens paid back, which the sale reading
@@ -158,7 +162,7 @@ async function read(chainId: ChainId, hash: string, wallet: string): Promise<{ a
         decimals: NATIVE.decimals,
         raw: t.value.toString(),
         counterparty: t.from,
-        source: "asset-transfers",
+        source: nativeSource,
       }),
     ),
   ];

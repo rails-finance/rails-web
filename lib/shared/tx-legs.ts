@@ -29,8 +29,8 @@ export interface TxLeg {
   counterparty: string;
   /** Where the leg was read: a Transfer log in the receipt, or (native coin,
    *  which leaves no log) a value transfer inside the transaction, read from
-   *  the stored call tree or Alchemy's asset-transfers index. */
-  source: "log" | "asset-transfers";
+   *  the stored call tree (`trace`) or Alchemy's asset-transfers index. */
+  source: "log" | "trace" | "asset-transfers";
   /** The Transfer log's index in the block; absent on a native leg. */
   logIndex?: number;
 }

@@ -335,7 +335,7 @@ export const saleLegProv = (sale: RouterSale, sentSymbol: string, coords: V3Coor
   const { leg } = sale;
   const venue = getProtocolContract(sale.via, chainId);
   const venueName = venue?.name ?? "the contract";
-  const native = leg.source === "asset-transfers";
+  const native = leg.source === "trace" || leg.source === "asset-transfers";
   const txHref = coords.txHash ? explorerUrl(chainId, native ? "tx" : "tx-logs", coords.txHash) : undefined;
   const legVerify: ProvVerify | undefined = txHref
     ? native
