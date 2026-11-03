@@ -72,7 +72,7 @@ export function HomeHero() {
         className="relative z-20 w-full max-w-2xl px-4 text-left animate-hero-fade-up"
         style={{ animationDelay: "0.25s" }}
       >
-        <FrontDoorSearch size="lg" suggest />
+        <FrontDoorSearch size="lg" suggest focusOnLoad />
       </div>
       {/* The terms, ticked — under the search; the checks carry the separation. */}
       <p
