@@ -109,21 +109,17 @@ export function CoveredStats({
     />
   );
 
-  // "Explore" and the count are one group that never breaks, "Explore" on the
-  // left; so are "holding" and the value. A wrap moves a whole group.
-  const explore = (
-    <span className={GROUP}>
-      <span className={LABEL}>Explore</span>
-      <span className={FIGURE}>{covered.totalPositions.toLocaleString("en-US")}</span>
-    </span>
-  );
+  const count = <span className={FIGURE}>{covered.totalPositions.toLocaleString("en-US")}</span>;
 
   // Without the value the band is the count's line alone, as before 476.
   if (!valueHeld)
     return (
       <div className="w-full max-w-7xl mx-auto px-4 flex flex-col items-center text-center">
         <p className={LINE} data-anatomy="S3.1">
-          {explore}
+          <span className={GROUP}>
+            <span className={LABEL}>Explore</span>
+            {count}
+          </span>
           <span className={LABEL}>
             positions across {COUNTED_SCOPE} <DeFiAndNote note={note} />
           </span>
@@ -135,17 +131,21 @@ export function CoveredStats({
     <div className="w-full max-w-7xl mx-auto px-4 flex flex-col items-center text-center">
       {/* One sentence over two centred lines (Miles, 3 Nov 2026): the count and
           the value on the first, the chains on the second. One <p>, so a screen
-          reader reads it as one sentence. Line 1 wraps between its three parts,
-          and every row is centred with each label vertically centred on its
-          figure. Sizes step at breakpoints and never scale with the viewport.
+          reader reads it as one sentence. Line 1 is two groups that never
+          break, "Explore N positions," and "holding $X", so a wrap moves a
+          whole group and no label is left alone on a row; every row is
+          centred, each label vertically centred on its figure. "on Rails" is
+          left out because "Explore N positions on Rails," is 352 px wide at
+          text-4xl, past the 328 px a 360 px phone gives it. Sizes step at breakpoints and never scale with the viewport.
           The caption line that used to sit under the count opens from the (i)
           (covered-stats-note.tsx). */}
       <p className="flex flex-col items-center gap-1 sm:gap-4">
         <span className={LINE} data-anatomy="S3.1">
-          {explore}
-          {/* Its own row below `sm`, so a phone reads three rows: "Explore N",
-              "positions on Rails,", "holding $X". */}
-          <span className={`${LABEL} max-sm:basis-full`}>positions on Rails,</span>
+          <span className={GROUP}>
+            <span className={LABEL}>Explore</span>
+            {count}
+            <span className={LABEL}>positions,</span>
+          </span>
           <span className={GROUP}>
             <span className={LABEL}>holding</span>
             <span className={FIGURE} data-anatomy="S3.2">
@@ -162,13 +162,15 @@ export function CoveredStats({
   );
 }
 
-/** Line 1 of the band: its parts on centred rows, wrapping between parts. */
+/** Line 1 of the band: its groups on centred rows, wrapping between groups. */
 const LINE = "flex flex-wrap items-center justify-center gap-x-2 gap-y-1 sm:gap-x-4";
-/** A label and its figure that never break apart. */
+/** Labels and their figure that never break apart. */
 const GROUP = "inline-flex flex-nowrap items-center gap-x-2 whitespace-nowrap sm:gap-x-4";
-/** Both figures name the face: the count and the value read in one font. */
+/** Both figures name the face: the count and the value read in one font.
+ *  `text-3xl` below `sm`: DM Sans digits differ in width, and "holding
+ *  $39,000,000,000" at `text-4xl` is 351 px, past the 328 px of a 360 px phone. */
 const FIGURE =
-  "font-sans text-foreground font-semibold leading-none tracking-tighter tabular-nums text-4xl sm:text-5xl";
+  "font-sans text-foreground font-semibold leading-none tracking-tighter tabular-nums text-3xl sm:text-5xl";
 const LABEL = "font-sans font-light tracking-tight text-rb-500 text-lg sm:text-xl lg:text-[28px]";
 /** The last word and the (i) never break apart, so the (i) is never alone on a row. */
 function DeFiAndNote({ note }: { note: ReactNode }) {
