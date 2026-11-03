@@ -19,8 +19,8 @@ const COUNTED_SCOPE = launchedProductionChainNames();
  *
  * The all-time sum leads because it is the strongest claim in the band: it
  * counts every position each explorer has ever indexed, and no argument about
- * what is live today can move it. The value held in open positions is the
- * second line, and appears only when the whole roster answered
+ * what is live today can move it. The value held in open positions follows
+ * it in the same sentence, and appears only when the whole roster answered
  * (value-held.ts). The open/closed split and the wallet clause ride in the (i)
  * note.
  *
@@ -108,34 +108,49 @@ export function CoveredStats({
     />
   );
 
-  return (
-    <div className="w-full max-w-7xl mx-auto px-4 flex flex-col items-center gap-6 text-center sm:gap-4">
-      {/* Two centred lines (Miles, 2 Nov 2026): the count, then the value held
-          in open positions. From `sm` each line runs inline, the label
-          vertically centred on its figure; below `sm` each stacks, label above
-          figure. Sizes step at breakpoints and never scale with the viewport.
-          The caption line that used to sit under the count opens from the (i)
-          (covered-stats-note.tsx). */}
-      <p className={LINE} data-anatomy="S3.1">
-        <span className={LABEL}>Explore</span>
-        <span className={FIGURE}>{covered.totalPositions.toLocaleString("en-US")}</span>
-        <span className={LABEL}>
-          positions across {COUNTED_SCOPE} DeFi
-          {!valueHeld && <span className="ml-2 align-[-0.05em]">{note}</span>}
-        </span>
-      </p>
+  const count = <span className={FIGURE}>{covered.totalPositions.toLocaleString("en-US")}</span>;
 
-      {valueHeld && (
-        <p className={LINE} data-anatomy="S3.2">
-          <span className={LABEL}>Together, the open positions on Rails hold</span>
-          <span className="inline-flex items-center gap-x-2">
-            <span className={FIGURE} aria-label={spokenValueHeld(valueHeld.totalUsd)}>
-              {formatValueHeld(valueHeld.totalUsd)}
-            </span>
-            <span className={`${LABEL} inline-flex items-center [&_button]:align-middle`}>{note}</span>
+  // Without the value the band is the count's line alone, as before 476.
+  if (!valueHeld)
+    return (
+      <div className="w-full max-w-7xl mx-auto px-4 flex flex-col items-center text-center">
+        <p className={LINE} data-anatomy="S3.1">
+          <span className={LABEL}>Explore</span>
+          {count}
+          <span className={LABEL}>
+            positions across {COUNTED_SCOPE} DeFi
+            <span className="ml-2 align-[-0.05em]">{note}</span>
           </span>
         </p>
-      )}
+      </div>
+    );
+
+  return (
+    <div className="w-full max-w-7xl mx-auto px-4 flex flex-col items-center text-center">
+      {/* One sentence over two centred lines (Miles, 3 Nov 2026): the count and
+          the value on the first, the scope on the second. One <p>, so a screen
+          reader reads it as one sentence. From `sm` each line runs inline, the
+          label vertically centred on its figure; below `sm` each stacks. Sizes
+          step at breakpoints and never scale with the viewport. The caption line
+          that used to sit under the count opens from the (i)
+          (covered-stats-note.tsx). */}
+      <p className="flex flex-col items-center gap-1 sm:gap-4">
+        <span className={LINE} data-anatomy="S3.1">
+          <span className={LABEL}>Explore</span>
+          {count}
+          <span className={LABEL}>positions on Rails, holding</span>
+          <span className={FIGURE} data-anatomy="S3.2">
+            <span aria-hidden="true">{formatValueHeld(valueHeld.totalUsd)}</span>
+            <span className="sr-only">{spokenValueHeld(valueHeld.totalUsd)}</span>
+          </span>
+        </span>
+        <span className={LINE}>
+          <span className={LABEL}>
+            in value across {COUNTED_SCOPE} DeFi
+            <span className="relative top-[-0.07em] ml-2 inline-flex align-middle">{note}</span>
+          </span>
+        </span>
+      </p>
     </div>
   );
 }
