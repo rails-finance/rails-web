@@ -75,7 +75,7 @@ export function HomeHero() {
         className="relative z-20 w-full max-w-2xl px-4 text-left animate-hero-fade-up"
         style={{ animationDelay: "0.25s" }}
       >
-        <FrontDoorSearch size="lg" suggest focusOnLoad placeholder={HERO_PLACEHOLDER} />
+        <FrontDoorSearch size="lg" suggest focusOnLoad />
       </div>
       {/* The terms, ticked — under the search; the checks carry the separation. */}
       <p
@@ -107,6 +107,3 @@ export function HomeHero() {
 // Rendered uppercase by the class on the <p>; the Check icon before each one
 // is the separator.
 const TERMS = ["Independent", "Read-only", "No login"];
-
-// The Rails line above names what can be looked up, so the field shows what to type.
-const HERO_PLACEHOLDER = "0x…, name.eth or a protocol";
