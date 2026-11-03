@@ -11,6 +11,12 @@
 // block. Holders is each roster's census where it has one; Yield is the daily
 // store's (decision 0047), which serves no Maple series.
 //
+// CACHED FOR FIVE MINUTES, THE ROSTERS' WINDOW (ui-jobs 479). The index is the
+// same read for every reader, so the whole of it goes through Next's data cache
+// like each roster's loader, and each roster still names the block its figures
+// were read at. A read with a part unanswered (`indexDown`) is served and not
+// reused: the next request reads again, as the loaders do.
+//
 // SERVER-ONLY: the loaders read ALCHEMY_URL, RAILS_API_URL and the bearer token.
 
 import { unstable_cache } from "next/cache";
@@ -27,8 +33,7 @@ import {
   type YearnVaultDirectoryResponse,
 } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import { resolveMaplePoolState, type MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
-import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
-import { ssrHop } from "@/lib/shared/listing-ssr";
+import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import { serverReadAt } from "@/lib/shared/server-head-read";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
@@ -66,13 +71,23 @@ function unread<T>(what: string, stale: T): (error: unknown) => T {
 
 const staleAt = () => ({ blockNumber: 0, chainStale: true as const, readAt: new Date().toISOString(), rows: [] });
 
+/** How long the index is reused before it is read again. */
+const VAULT_INDEX_REVALIDATE_SECONDS = 300;
+const CENSUS_TIMEOUT_MS = 5000;
+
 /** One chain's census header: the rows' Holders. An unanswered census leaves
- *  the figure out. */
+ *  the figure out. Read from rails-server direct, as the positions proxy reads
+ *  it, because a cached read names no reader to sign for. */
 async function loadCensus(chainId: number): Promise<VaultCensusRow[] | null> {
+  const base = process.env.RAILS_API_URL;
+  if (!base) return null;
   try {
-    const hop = await ssrHop();
-    const r = await fetchVaultPositions({ chainId, overlay: false, limit: 1, ...hop });
-    return r.census;
+    const res = await fetch(
+      `${base}/api/vaults/positions?chain=${chainId}&limit=1`,
+      createAuthFetchOptions({ signal: AbortSignal.timeout(CENSUS_TIMEOUT_MS) }),
+    );
+    if (!res.ok) throw new Error(`rails-server answered ${res.status}`);
+    return ((await res.json()) as { census?: VaultCensusRow[] }).census ?? [];
   } catch (error) {
     console.error(`The vault census did not answer for the vault index (chain ${chainId}):`, error);
     return null;
@@ -90,7 +105,7 @@ const loadMaplePools = unstable_cache(
   { revalidate: 300 },
 );
 
-export async function loadVaultIndex(): Promise<VaultIndexRead> {
+async function readVaultIndex(): Promise<VaultIndexRead> {
   const [morphoRead, aaveRead, yearnRead, maple, baseCensusRead, ethCensusRead] = await Promise.all([
     loadMorphoBaseVaultDirectory().catch(
       unread<MorphoBaseVaultDirectoryResponse | null>("Morpho's vault directory", null),
@@ -214,4 +229,16 @@ export async function loadVaultIndex(): Promise<VaultIndexRead> {
       },
     ],
   };
+}
+
+const cachedVaultIndex = unstable_cache(readVaultIndex, ["vault-index"], {
+  revalidate: VAULT_INDEX_REVALIDATE_SECONDS,
+});
+
+/** The index, cached for five minutes; a read with a part unanswered is read
+ *  again on the next request. */
+export async function loadVaultIndex(): Promise<VaultIndexRead> {
+  const cached = await cachedVaultIndex();
+  if (!cached.indexDown) return cached;
+  return readVaultIndex();
 }
