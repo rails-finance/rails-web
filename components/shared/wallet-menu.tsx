@@ -19,7 +19,7 @@ import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { walletHref } from "@/components/shared/front-door-search";
 import { isBookmarked, toggleBookmark, SESSIONS_CHANGED_EVENT } from "@/lib/shared/sessions";
-import { OVERLAY_HEADING, WALLET_HEADING_NAME, WALLET_HEADING_SHORT } from "@/lib/shared/ui-grammar";
+import { OVERLAY_HEADING, WALLET_HEADING_NAME } from "@/lib/shared/ui-grammar";
 
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -35,8 +35,7 @@ export function WalletMenu({
   /** The Bookmark row; false for none. */
   bookmark?: boolean;
   /** The trigger as the page's h1 (the wallet heading, H13): the name or
-   *  address at heading type with no facehash, and a name's short address
-   *  beside the h1. */
+   *  address at heading type with no facehash. */
   heading?: boolean;
   /** The View the wallet row; false on the wallet view. */
   view?: boolean;
@@ -172,7 +171,6 @@ export function WalletMenu({
       {heading ? (
         <>
           <h1 className={`${WALLET_HEADING_NAME} min-w-0`}>{trigger}</h1>
-          {name && <span className={WALLET_HEADING_SHORT}>{short(wallet)}</span>}
         </>
       ) : (
         trigger
