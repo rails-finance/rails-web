@@ -276,7 +276,7 @@ function BookmarkRow({ session, summary }: { session: WalletSession; summary?: B
   return (
     <div className={rowClasses} data-bookmark-row="">
       <div className="min-w-0 flex-1">
-        <Link href={walletHref(primary)} className="flex min-w-0 items-center gap-3">
+        <Link href={walletHref(primary)} className="flex min-w-0 items-center gap-3" data-bookmark-open="">
           {avatar}
           <span className="truncate text-sm font-bold text-foreground" title={primary}>
             {label}

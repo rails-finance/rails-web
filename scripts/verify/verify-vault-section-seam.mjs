@@ -46,9 +46,8 @@
 //       with a body over 10 KB. `twitter:image` likewise.
 //   S4  BOOKMARKS. Bookmarks are one list per browser, keyed by address
 //       (rails-ops TO-DO-ui-jobs 431). The wallet menu's bookmark row writes the
-//       holder into `rails-bookmarks` (S4a/b); the rail's bookmark button opens
-//       the wallet panel, whose list carries a row opening `/wallet/<holder>`
-//       (S4c). A per-explorer list from before 431 (`<explorer>-sessions`) is
+//       holder into `rails-bookmarks` (S4a/b); the bookmarks page (/bookmarks)
+//       lists a row opening `/wallet/<holder>` (S4c). A per-explorer list from before 431 (`<explorer>-sessions`) is
 //       merged into the one list on the first read, keeping its custom name,
 //       and the old key is left in place (S4d). The vault listing filtered to
 //       the holder shows its row bookmarked (S4e/f), and toggling it off
@@ -556,17 +555,15 @@ for (const f of fixtures) {
 const KEY = "rails-bookmarks";
 const MIGRATED = "rails-bookmarks-migrated";
 
-/** Open the wallet panel from the rail's search glyph (H15.1; the separate
- *  bookmarks button went on 1 Nov 2026) and read its rows: each row's link and
- *  its label. */
-async function panelRows(page) {
-  await page
-    .locator('aside[data-anatomy="H1"] button[data-anatomy="H15.1"]')
-    .first()
-    .evaluate((el) => el.click());
-  await page.waitForSelector("[data-bookmark-list] a", { timeout: 15_000 }).catch(() => {});
+/** Open the bookmarks page (/bookmarks, B2; the wallet panel stopped drawing
+ *  a list on 4 Nov 2026, ui-jobs 480) and read its rows: each row's link to
+ *  the wallet view (`data-bookmark-open`, not the protocol links under the
+ *  name) and its label. */
+async function bookmarkRows(page) {
+  await page.goto(`${BASE_URL}/bookmarks`, { waitUntil: "networkidle", timeout: 180_000 });
+  await page.waitForSelector("[data-bookmark-open]", { timeout: 15_000 }).catch(() => {});
   return page.evaluate(() =>
-    [...document.querySelectorAll("[data-bookmark-list] a")].map((a) => ({
+    [...document.querySelectorAll("[data-bookmark-open]")].map((a) => ({
       href: a.getAttribute("href"),
       label: (a.textContent || "").trim(),
     })),
@@ -606,13 +603,12 @@ for (const f of fixtures) {
   );
   await page.keyboard.press("Escape");
 
-  const rows = await panelRows(page);
+  const rows = await bookmarkRows(page);
   check(
-    `S4c·${f.label} the wallet panel lists the holder, opening the wallet view`,
+    `S4c·${f.label} the bookmarks page lists the holder, opening the wallet view`,
     rows.some((r) => r.href === wantedHref),
     JSON.stringify({ rows, wanted: wantedHref }),
   );
-  await page.keyboard.press("Escape");
 
   // THE MIGRATION, which is the half a reader's browser is already holding: a
   // pre-431 per-explorer list, with a custom name, and no one list yet. The
@@ -633,14 +629,13 @@ for (const f of fixtures) {
     [KEY, legacyKey, MIGRATED, holder, legacyName],
   );
   await page.reload({ waitUntil: "networkidle", timeout: 180_000 });
-  const migrated = await panelRows(page);
+  const migrated = await bookmarkRows(page);
   const kept = await page.evaluate((k) => window.localStorage.getItem(k), legacyKey);
   check(
     `S4d·${f.label} a pre-431 list is merged into the one list with its name, and its key is left in place`,
     migrated.some((r) => r.href === wantedHref && r.label === legacyName) && kept != null,
     JSON.stringify({ rows: migrated, legacyKeyKept: kept != null }),
   );
-  await page.keyboard.press("Escape");
 
   // …and the VAULT positions listing, filtered to the same address, shows the
   // row bookmarked.
