@@ -5,32 +5,13 @@
 // the Sieve checkpoint the answer names. No status tag, no risk, no USD.
 
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
-import { Prov, type Provenance } from "@/components/shared/provenance";
+import { Prov } from "@/components/shared/provenance";
 import { BlockRef } from "@/components/shared/block-ref";
 import { formatDate } from "@/lib/date";
-import { COW_CHAIN_ID, GPV2_SETTLEMENT } from "@/lib/cow/trade";
+import { COW_CHAIN_ID, walletCountProv, walletTradeAtProv } from "@/lib/cow/trade";
 import type { CowAsOf, CowWalletSummary } from "@/lib/cow/types";
 
-const SETTLEMENT = { name: "GPv2Settlement (CoW)", address: GPV2_SETTLEMENT };
 const n = (v: number) => v.toLocaleString("en-US");
-
-const countProv = (asOf: CowAsOf, what: string, value: number): Provenance => ({
-  kind: "chain-derived",
-  pclass: "indexed",
-  summary: `${what} — counted over every Trade log of CoW's settlement contract whose owner is this wallet, through block ${n(asOf.block)}: ${n(value)}.`,
-  contract: SETTLEMENT,
-  via: "Trade logs · owner = this wallet",
-  source: { block: asOf.block },
-});
-
-const tradeAtProv = (which: "First" | "Last", block: number): Provenance => ({
-  kind: "chain",
-  pclass: "emitted",
-  summary: `${which} trade — the ${which === "First" ? "earliest" : "latest"} block holding a Trade log whose owner is this wallet, and that block's time.`,
-  contract: SETTLEMENT,
-  via: "Trade log · block",
-  source: { block },
-});
 
 function dateHead(
   id: string,
@@ -43,13 +24,13 @@ function dateHead(
     label,
     value:
       ts != null && block != null ? (
-        <Prov info={tradeAtProv(label === "First trade" ? "First" : "Last", block)} value={String(block)}>
+        <Prov info={walletTradeAtProv(label === "First trade" ? "First" : "Last", block)} value={String(block)}>
           {formatDate(ts)}
         </Prov>
       ) : null,
     sub:
       block != null ? (
-        <Prov info={tradeAtProv(label === "First trade" ? "First" : "Last", block)} value={String(block)} echo>
+        <Prov info={walletTradeAtProv(label === "First trade" ? "First" : "Last", block)} value={String(block)} echo>
           <BlockRef block={block} chainId={COW_CHAIN_ID} size={12} />
         </Prov>
       ) : (
@@ -78,7 +59,7 @@ export function CowAccountCard({
         id: "trades",
         label: "Trades",
         value: (
-          <Prov info={countProv(asOf, "Trades", summary.trades)} value={String(summary.trades)}>
+          <Prov info={walletCountProv(asOf, "Trades", summary.trades)} value={String(summary.trades)}>
             {n(summary.trades)}
           </Prov>
         ),
@@ -87,7 +68,7 @@ export function CowAccountCard({
         id: "tokens",
         label: "Tokens traded",
         value: (
-          <Prov info={countProv(asOf, "Tokens traded", tokenCount)} value={String(tokenCount)}>
+          <Prov info={walletCountProv(asOf, "Tokens traded", tokenCount)} value={String(tokenCount)}>
             {n(tokenCount)}
           </Prov>
         ),

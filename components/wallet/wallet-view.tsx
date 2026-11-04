@@ -3,9 +3,10 @@
 // The wallet view (rails-ops decisions/0050-one-wallet-across-protocols-and-chains.md,
 // steps 2 and 3; the mock-up reference/mockups/wallet-view-milodon-2026-10-21.html):
 // the wallet's header, four tiles over its open positions, the open positions
-// as their families' listing cards sorted by buffer, and the closed ones as a
-// History table. Every figure comes from /api/chain/wallet/<address>
-// (lib/wallet/read-wallet.ts); the view sums, sorts and lays out, and adds
+// as their families' listing cards sorted by buffer, the wallet's CoW trades
+// as one row (W7, from rails-server's CoW tokens route), and the closed
+// positions as a History table. Every position figure comes from
+// /api/chain/wallet/<address> (lib/wallet/read-wallet.ts); the view sums, sorts and lays out, and adds
 // nothing inside a card. The rulings of 21 October: a ten-dollar floor on the
 // risk sort, a tile sums only dollars at the family's own oracle, an unread
 // Aave V3 Base account is shown with a "not read" mark, and every wallet,
@@ -13,11 +14,11 @@
 
 import { IndexNotice } from "@/components/shared/index-notice";
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import { Suspense, use, type CSSProperties } from "react";
 import { WalletHeading } from "@/components/shared/wallet-heading";
 import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
 import { WalletMenu } from "@/components/shared/wallet-menu";
-import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { WalletLookup } from "@/components/shared/wallet-lookup";
 import { StartHereLine } from "@/components/start/start-here-line";
 import { WalletPositionCard, atRisk, protocolId } from "@/components/wallet/wallet-position-card";
@@ -28,7 +29,9 @@ import { protocolBrand } from "@/lib/shared/protocols";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { formatCompactUsd } from "@/lib/shared/format-compact";
 import { formatDate } from "@/lib/date";
-import { chainMeta } from "@/lib/shared/chains";
+import { chainMeta, type ChainId } from "@/lib/shared/chains";
+import { walletCountProv, walletTradeAtProv } from "@/lib/cow/trade";
+import type { CowWalletEntry } from "@/lib/cow/types";
 import type { WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
@@ -171,11 +174,10 @@ function hueStyle(id: string): CSSProperties {
   return { "--brand-hue": hue ?? 0, ...(hue == null ? { "--brand-strength": 0 } : {}) } as CSSProperties;
 }
 
-/** A closed row's lead: the protocol's mark and the chain's glyph on the
- *  protocol's tint, as the card's sidebar draws them (C20). Spans the row's
- *  height from its left edge. */
-function ClosedZone({ p }: { p: WalletPosition }) {
-  const id = protocolId(p);
+/** A row's lead on the History table and the Trades row: the protocol's mark
+ *  and the chain's glyph on the protocol's tint, as the card's sidebar draws
+ *  them (C20). Spans the row's height from its left edge. */
+function RowZone({ id, chain }: { id: string; chain: ChainId }) {
   return (
     <span
       className="flex w-[95px] shrink-0 items-center justify-evenly self-stretch rounded-l-[15px] bg-brand-zone"
@@ -184,8 +186,8 @@ function ClosedZone({ p }: { p: WalletPosition }) {
     >
       <ProtocolIcon id={id} className="h-[18px] w-[18px] shrink-0 text-brand-mark [&:is(img)]:grayscale" />
       <span className="flex items-center text-brand-zone">
-        <ChainGlyph id={p.chain} className="h-[18px] w-[18px] shrink-0" />
-        <span className="sr-only">{chainMeta(p.chain).name}</span>
+        <ChainGlyph id={chain} className="h-[18px] w-[18px] shrink-0" />
+        <span className="sr-only">{chainMeta(chain).name}</span>
       </span>
     </span>
   );
@@ -302,7 +304,7 @@ function History({ closed }: { closed: WalletPosition[] }) {
                   data-family={p.family}
                 >
                   <div role="cell" className="-my-3 flex self-stretch">
-                    <ClosedZone p={p} />
+                    <RowZone id={protocolId(p)} chain={p.chain} />
                   </div>
                   <div role="cell" className="text-foreground/80">
                     {h.closedAt != null ? formatDate(h.closedAt) : "—"}
@@ -346,18 +348,104 @@ function History({ closed }: { closed: WalletPosition[] }) {
   );
 }
 
+/** The CoW row's chain and page. */
+const COW_CHAIN: ChainId = 1;
+const cowHref = (address: string) => `/ethereum/cow/${address}`;
+
+/** The wallet's trades through CoW (W7): one row, drawn as a History row
+ *  (W4), linking to the wallet's CoW page. Streamed: the page passes the read
+ *  unawaited, and a wallet with no trade, or a read that failed or ran past
+ *  its budget, draws nothing. */
+function Trades({ address, cow }: { address: string; cow: Promise<CowWalletEntry | null> }) {
+  const entry = use(cow);
+  if (!entry) return null;
+  const { summary: s, asOf } = entry;
+  const count = (
+    <Prov info={walletCountProv(asOf, "Trades", s.trades)} value={String(s.trades)}>
+      {plural(s.trades, "trade")}
+    </Prov>
+  );
+  const at = (which: "First" | "Last", ts: number | null, block: number | null) =>
+    ts != null && block != null ? (
+      <Prov info={walletTradeAtProv(which, block)} value={String(block)}>
+        {formatDate(ts)}
+      </Prov>
+    ) : null;
+  const first = at("First", s.firstTimestamp, s.firstBlock);
+  const last = s.lastBlock !== s.firstBlock ? at("Last", s.lastTimestamp, s.lastBlock) : null;
+  const dates = first && (
+    <>
+      {first}
+      {last && <> – {last}</>}
+    </>
+  );
+  const label = `CoW on ${chainMeta(COW_CHAIN).name}, ${plural(s.trades, "trade")}`;
+  return (
+    <section aria-labelledby="wallet-trades" data-wallet-trades="cow" data-anatomy="W7">
+      <h2 id="wallet-trades" className={`${H2} mb-3`}>
+        Trades
+      </h2>
+      {/* Below sm the History table's phone form: the hue's 6px edge, the
+          mark and name, the chain's glyph at the right. */}
+      <Link
+        href={cowHref(address)}
+        prefetch={false}
+        aria-label={label}
+        className={`${ROW_LINK} flex overflow-hidden text-sm sm:hidden`}
+        data-wallet-trades-row="cow"
+      >
+        <span className="w-[6px] shrink-0 self-stretch bg-brand-edge" style={hueStyle("cow")} />
+        <span className="flex min-w-0 flex-1 flex-col gap-1 py-3 pl-5 pr-4">
+          <span className="flex items-center gap-2">
+            <span
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-zone"
+              style={hueStyle("cow")}
+            >
+              <ProtocolIcon id="cow" className="h-4 w-4 shrink-0 text-rb-500" />
+              CoW
+            </span>
+            <span className="ml-auto flex items-center text-brand-zone" style={hueStyle("cow")}>
+              <ChainGlyph id={COW_CHAIN} className="h-4 w-4 shrink-0" />
+              <span className="sr-only">{chainMeta(COW_CHAIN).name}</span>
+            </span>
+          </span>
+          <span className="text-xs text-foreground/80">{count}</span>
+          {dates && <span className="text-xs text-rb-500">{dates}</span>}
+        </span>
+      </Link>
+      <Link
+        href={cowHref(address)}
+        prefetch={false}
+        aria-label={label}
+        className={`hidden grid-cols-[95px_170px_minmax(0,1fr)_auto] items-center gap-4 sm:grid ${ROW_LINK} py-3 pr-5 text-sm`}
+        data-wallet-trades-row="cow"
+      >
+        <span className="-my-3 flex self-stretch">
+          <RowZone id="cow" chain={COW_CHAIN} />
+        </span>
+        <span className="font-medium text-foreground">CoW</span>
+        <span>{count}</span>
+        <span className="text-right text-foreground/80">{dates}</span>
+      </Link>
+    </section>
+  );
+}
+
 const familyChain = (r: WalletFamilyRead) => `${r.name} on ${chainMeta(r.chain).name}`;
 
 export function WalletView({
   address,
   ensName,
   read,
+  cow,
   reads,
   back,
 }: {
   address: string;
   ensName: string | null;
   read: WalletRead;
+  /** The wallet's CoW trades, unawaited (`readCowWalletEntry`); W7. */
+  cow: Promise<CowWalletEntry | null>;
   /** The families the page reads, by chain (`walletFamiliesLine`). */
   reads: string;
   /** The explorer the reader came from, for the empty state's link back. */
@@ -376,6 +464,11 @@ export function WalletView({
   const oldest = stamps.length ? Math.min(...stamps) : undefined;
   const atRiskCount = open.filter(atRisk).length;
   const registry = useReceiptRegistry();
+  const trades = (
+    <Suspense fallback={null}>
+      <Trades address={address} cow={cow} />
+    </Suspense>
+  );
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -436,28 +529,34 @@ export function WalletView({
         </header>
 
         {read.error ? (
-          <section className="flex max-w-xl flex-col gap-3" data-wallet-error="">
-            <IndexNotice className="text-sm text-foreground/80" />
-          </section>
+          <>
+            <section className="flex max-w-xl flex-col gap-3" data-wallet-error="">
+              <IndexNotice className="text-sm text-foreground/80" />
+            </section>
+            {trades}
+          </>
         ) : all.length === 0 ? (
-          <section className="flex max-w-xl flex-col gap-3" data-wallet-empty="">
-            <p className="text-sm text-foreground/80" data-wallet-reads="">
-              Rails holds no position for this wallet. This page reads {reads}.
-            </p>
-            {back && (
-              <p className="text-sm">
-                <Link
-                  href={back.href}
-                  className="text-foreground underline underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
-                  data-wallet-back=""
-                >
-                  Back to {back.name}
-                </Link>
+          <>
+            <section className="flex max-w-xl flex-col gap-3" data-wallet-empty="">
+              <p className="text-sm text-foreground/80" data-wallet-reads="">
+                Rails holds no position for this wallet. This page reads {reads}.
               </p>
-            )}
-            <WalletLookup positionHref={(w) => `/wallet/${w}`} placeholder="Wallet address or ENS name" />
-            <StartHereLine />
-          </section>
+              {back && (
+                <p className="text-sm">
+                  <Link
+                    href={back.href}
+                    className="text-foreground underline underline-offset-2 hover:text-rb-700 dark:hover:text-rb-300"
+                    data-wallet-back=""
+                  >
+                    Back to {back.name}
+                  </Link>
+                </p>
+              )}
+              <WalletLookup positionHref={(w) => `/wallet/${w}`} placeholder="Wallet address or ENS name" />
+              <StartHereLine />
+            </section>
+            {trades}
+          </>
         ) : (
           <>
             {open.length > 0 && <Tiles open={open} ranked={ranked} />}
@@ -486,6 +585,7 @@ export function WalletView({
                 </div>
               )}
             </section>
+            {trades}
             {closed.length > 0 && <History closed={closed} />}
           </>
         )}

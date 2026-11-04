@@ -18,7 +18,7 @@ import { BookmarkToggle } from "@/components/shared/bookmark-toggle";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import { PositionCardEdgeContext } from "@/components/shared/position-card-edge";
-import { WALLET_HEADING_NAME, WALLET_HEADING_SHORT } from "@/lib/shared/ui-grammar";
+import { WALLET_HEADING_NAME } from "@/lib/shared/ui-grammar";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 
 function shortAddr(addr: string): string {
@@ -70,7 +70,7 @@ function WalletPillInner({
   href?: string;
   hrefLabel?: string;
   /** The label as the page's h1 (the wallet heading, H13): heading type, no
-   *  facehash, and a name's short address beside it. */
+   *  facehash. */
   heading?: boolean;
 }) {
   const router = useRouter();
@@ -173,7 +173,6 @@ function WalletPillInner({
         {heading ? (
           <>
             <h1 className={`${WALLET_HEADING_NAME} min-w-0`}>{tipped}</h1>
-            {name && <span className={WALLET_HEADING_SHORT}>{shortAddr(wallet)}</span>}
           </>
         ) : (
           tipped

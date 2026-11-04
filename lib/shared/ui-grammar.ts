@@ -214,9 +214,9 @@ export const COUNT_BADGE =
 export const CARD_PAD_X = "px-5";
 export const CARD_INSET_START = "pl-2";
 
-/** The wallet heading's h1 (W1, H13) and the short address beside a name. */
+/** The wallet heading's h1 (W1, H13). A name stands alone; its address is in
+ *  the address menu (Miles, 4 Nov 2026). */
 export const WALLET_HEADING_NAME = "text-xl font-semibold text-foreground";
-export const WALLET_HEADING_SHORT = "shrink-0 font-mono text-sm text-rb-500";
 
 /** The position card's frame: the raised rounded box, with the listing row's
  *  blue hover border (the row <Link> declares the group). */

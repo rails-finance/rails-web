@@ -22,6 +22,7 @@ import { usePathname } from "next/navigation";
 
 import { Facehash } from "@/components/shared/facehash";
 import { useBookmarks } from "@/components/shared/bookmark-list";
+import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
 
 const BOOKMARKS_PATH = "/bookmarks";
@@ -33,8 +34,8 @@ export function BookmarksLink() {
   return (
     <Link
       href={BOOKMARKS_PATH}
-      aria-label="Bookmarks"
-      title="Bookmarks"
+      aria-label={BOOKMARKS_NAME}
+      title={BOOKMARKS_NAME}
       aria-current={current ? "page" : undefined}
       data-anatomy="H20"
       data-profile-face={face ?? undefined}

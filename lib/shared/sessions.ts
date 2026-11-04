@@ -303,17 +303,17 @@ export function bookmarksBackupFilename(at: Date = new Date()): string {
  *  lists, merged by address). Throws with a message fit to show the reader
  *  when the file is not one of ours. */
 export function importBookmarks(source: string): BookmarksImportResult {
-  if (typeof window === "undefined") throw new Error("Bookmarks can only be imported in a browser.");
+  if (typeof window === "undefined") throw new Error("Saved wallets can only be imported in a browser.");
   let parsed: unknown;
   try {
     parsed = JSON.parse(source);
   } catch {
     throw new Error("That file isn't JSON.");
   }
-  if (typeof parsed !== "object" || parsed === null) throw new Error("That file isn't a bookmarks backup.");
+  if (typeof parsed !== "object" || parsed === null) throw new Error("That file isn't a saved wallets backup.");
   const backup = parsed as { version?: unknown; bookmarks?: unknown };
   if (typeof backup.version !== "number" || backup.version < 1) {
-    throw new Error("That file isn't a bookmarks backup: it carries no version.");
+    throw new Error("That file isn't a saved wallets backup: it carries no version.");
   }
   const lists: unknown[] = Array.isArray(backup.bookmarks)
     ? [backup.bookmarks]
@@ -321,13 +321,13 @@ export function importBookmarks(source: string): BookmarksImportResult {
       ? Object.values(backup.bookmarks)
       : [];
   const incoming = lists.flatMap((rows) => (Array.isArray(rows) ? rows.filter(isSessionRow) : []));
-  if (incoming.length === 0) throw new Error("That backup carries no bookmarks.");
+  if (incoming.length === 0) throw new Error("That backup carries no saved wallets.");
   const { rows, added } = mergeRows(loadSessions(), incoming);
   const read = new Set(incoming.map(primaryOf)).size;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
   } catch {
-    throw new Error("This browser wouldn't let the bookmarks be saved. Check that site data is allowed.");
+    throw new Error("This browser wouldn't let the wallets be saved. Check that site data is allowed.");
   }
   queueMicrotask(() => window.dispatchEvent(new Event(SESSIONS_CHANGED_EVENT)));
   return { read, added };

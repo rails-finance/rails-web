@@ -634,7 +634,9 @@ function SuggestionList({
               </span>
               {row.detail && <span className="min-w-0 shrink-[8] truncate text-xs text-rb-500">{row.detail}</span>}
             </span>
-            {openable && <span className="shrink-0 text-xs text-rb-500">{row.kind}</span>}
+            {openable && (
+              <span className="shrink-0 text-xs text-rb-500">{row.kind === "Bookmark" ? "Saved" : row.kind}</span>
+            )}
           </li>
         );
       })}

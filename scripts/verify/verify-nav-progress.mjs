@@ -251,7 +251,7 @@ const browser = await chromium.launch();
     page.locator(`${ROW} button[aria-label="Copy address"]`).first().click(),
   );
   await quietCase("the bookmark star inside a row link", () =>
-    page.locator(`${ROW} button[aria-label="Bookmark this wallet"]`).first().click(),
+    page.locator(`${ROW} button[aria-label="Save wallet"]`).first().click(),
   );
 
   await quietCase("a hash-only link", () => page.click("#vnp-hash"));

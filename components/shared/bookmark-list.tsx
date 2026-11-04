@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 
+import { BookmarkSummary } from "@/components/bookmarks/bookmark-summary";
 import { Facehash } from "@/components/shared/facehash";
 import { walletHref } from "@/components/shared/front-door-search";
 import {
@@ -40,13 +41,22 @@ export function useBookmarks(): WalletSession[] | null {
 }
 
 /** One list of bookmark rows, or `empty` when there are none. A row opens
- *  `/wallet/<address>`. */
-export function BookmarkList({ bookmarks, empty }: { bookmarks: WalletSession[]; empty: ReactNode }) {
+ *  `/wallet/<address>`; with `summary`, the wallet's protocols draw under its
+ *  name (B2.1). */
+export function BookmarkList({
+  bookmarks,
+  empty,
+  summary,
+}: {
+  bookmarks: WalletSession[];
+  empty: ReactNode;
+  summary?: boolean;
+}) {
   if (bookmarks.length === 0) return <>{empty}</>;
   return (
     <div className="flex flex-col gap-1" data-bookmark-list="">
       {bookmarks.map((s) => (
-        <BookmarkRow key={s.key} session={s} />
+        <BookmarkRow key={s.key} session={s} summary={summary} />
       ))}
     </div>
   );
@@ -72,7 +82,7 @@ export function BookmarkBackup({ className = "" }: { className?: string }) {
     const backup = exportBookmarks();
     const count = backup.bookmarks.length;
     if (count === 0) {
-      setNotice("No bookmarks to export yet.");
+      setNotice("No saved wallets to export yet.");
       return;
     }
     const name = bookmarksBackupFilename();
@@ -82,13 +92,13 @@ export function BookmarkBackup({ className = "" }: { className?: string }) {
     a.download = name;
     a.click();
     URL.revokeObjectURL(url);
-    setNotice(`${plural(count, "bookmark")} saved to ${name}.`);
+    setNotice(`${plural(count, "saved wallet")} written to ${name}.`);
   };
 
   const handleImport = async (file: File) => {
     try {
       const result = importBookmarks(await file.text());
-      setNotice(`Read ${plural(result.read, "bookmark")}, ${result.added} new.`);
+      setNotice(`Read ${plural(result.read, "saved wallet")}, ${result.added} new.`);
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "That file couldn't be read.");
     }
@@ -182,7 +192,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function BookmarkRow({ session }: { session: WalletSession }) {
+function BookmarkRow({ session, summary }: { session: WalletSession; summary?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState("");
 
@@ -221,7 +231,7 @@ function BookmarkRow({ session }: { session: WalletSession }) {
         {avatar}
         <input
           autoFocus
-          aria-label="Bookmark name"
+          aria-label="Wallet name"
           value={draftName}
           onChange={(e) => setDraftName(e.target.value)}
           onKeyDown={(e) => {
@@ -265,19 +275,27 @@ function BookmarkRow({ session }: { session: WalletSession }) {
 
   return (
     <div className={rowClasses} data-bookmark-row="">
-      <Link href={walletHref(primary)} className="flex min-w-0 flex-1 items-center gap-3">
-        {avatar}
-        <span className="truncate text-sm font-bold text-foreground" title={primary}>
-          {label}
-        </span>
-      </Link>
+      <div className="min-w-0 flex-1">
+        <Link href={walletHref(primary)} className="flex min-w-0 items-center gap-3" data-bookmark-open="">
+          {avatar}
+          <span className="truncate text-sm font-bold text-foreground" title={primary}>
+            {label}
+          </span>
+        </Link>
+        {/* Under the name, past the facehash's 24px and the 12px gap. */}
+        {summary && (
+          <div className="mt-1 pl-9">
+            <BookmarkSummary address={primary} />
+          </div>
+        )}
+      </div>
       <div className="flex shrink-0 items-center gap-0.5">
         <CopyButton text={primary} />
         <button
           type="button"
           onClick={startEdit}
           title="Rename"
-          aria-label="Rename bookmark"
+          aria-label="Rename saved wallet"
           className={`${ICON_BUTTON} hover:text-foreground`}
         >
           <Glyph>
@@ -288,8 +306,8 @@ function BookmarkRow({ session }: { session: WalletSession }) {
         <button
           type="button"
           onClick={() => removeBookmark(primary)}
-          title="Remove bookmark"
-          aria-label="Remove bookmark"
+          title="Remove from saved wallets"
+          aria-label="Remove from saved wallets"
           className={`${ICON_BUTTON} hover:text-red-400`}
         >
           <Glyph>
