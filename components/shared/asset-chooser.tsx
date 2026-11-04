@@ -3,10 +3,7 @@
 // AssetChooser: an opt-in token filter whose selection is drawn as the tokens.
 // A row of pills (icon, symbol, ×) and a dashed add pill; the add pill opens a
 // picker of the tokens the data holds, each with its count, keyed by address.
-// Two groups, each under a heading with a line that says what it holds: the
-// caller's first group (on CoW, the tokens with a Rails asset page) and
-// "Other tokens" below. Within a group, by count, then by
-// the latest use. A token whose symbol was not read shows its short address,
+// One list, by count, then by the latest use. A token whose symbol was not read shows its short address,
 // the unknown glyph and "Symbol not read". Past OPTION_SEARCH_THRESHOLD the list narrows by symbol or address
 // and renders OPTION_RENDER_CAP rows, chosen tokens always in view
 // (filter-bar/option-search.tsx). Below `sm` the picker is a live bottom sheet
@@ -42,16 +39,8 @@ export interface AssetChooserOption {
   symbol: string | null;
   /** What the option reaches (the wallet's trades in this token). */
   count: number;
-  /** In the first group. */
-  known: boolean;
   /** The latest use (a block), which orders equal counts. */
   last?: number;
-}
-
-/** A group's heading and the line under it. */
-export interface AssetChooserGroup {
-  heading: string;
-  note?: ReactNode;
 }
 
 export interface AssetChooserProps {
@@ -68,8 +57,6 @@ export interface AssetChooserProps {
   countNoun?: string;
   /** The count line, pinned in the phone sheet where the list behind is covered. */
   sheetStatus?: ReactNode;
-  /** The two groups' headings, the `known` options first. */
-  groups?: { known: AssetChooserGroup; other: AssetChooserGroup };
   anatomy?: string;
 }
 
@@ -77,7 +64,6 @@ export interface AssetChooserProps {
  *  counted at least ASSET_CHOOSER_TOP_MIN times. */
 export const ASSET_CHOOSER_TOP = 8;
 export const ASSET_CHOOSER_TOP_MIN = 3;
-const DEFAULT_GROUPS = { known: { heading: "Tokens" }, other: { heading: "Other tokens" } };
 
 const shortAddress = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
@@ -85,27 +71,12 @@ const shortAddress = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 function byCount(a: AssetChooserOption, b: AssetChooserOption): number {
   return b.count - a.count || (b.last ?? 0) - (a.last ?? 0) || a.address.localeCompare(b.address);
 }
-/** The first group, then the other, each by count. */
-const byGroup = (a: AssetChooserOption, b: AssetChooserOption) => Number(b.known) - Number(a.known) || byCount(a, b);
 
 function TokenMark({ o, size = 16 }: { o: AssetChooserOption; size?: number }) {
   return o.symbol ? (
     <TokenChipIcon symbol={o.symbol} address={o.address} size={size} filterable={false} untitled />
   ) : (
     <UnknownTokenSvg size={size} untitled />
-  );
-}
-
-/** A group's heading, and the line under it where the caller gives one. */
-function GroupHeading({ group, rule, kind }: { group: AssetChooserGroup; rule: boolean; kind: string }) {
-  return (
-    <div
-      className={`mx-3 px-1 pb-1 pt-2 ${rule ? "mt-1 border-t border-rb-300 dark:border-rb-700" : ""}`}
-      data-asset-group={kind}
-    >
-      <div className={OVERLAY_SUBHEADING}>{group.heading}</div>
-      {group.note && <p className="mt-0.5 text-[11px] leading-snug text-rb-500">{group.note}</p>}
-    </div>
   );
 }
 
@@ -118,7 +89,6 @@ export function AssetChooser({
   label = "Tokens",
   countNoun = "trades",
   sheetStatus,
-  groups = DEFAULT_GROUPS,
   anatomy,
 }: AssetChooserProps) {
   const [open, setOpen] = useState(false);
@@ -130,7 +100,7 @@ export function AssetChooser({
   const isPhone = useMediaQuery(PHONE_QUERY);
   const listId = useId();
 
-  const sorted = useMemo(() => [...options].sort(byGroup), [options]);
+  const sorted = useMemo(() => [...options].sort(byCount), [options]);
   const byAddress = useMemo(() => new Map(sorted.map((o) => [o.address, o])), [sorted]);
   // A symbol two tokens share: the pill and the row add the short address.
   const shared = useMemo(() => {
@@ -153,8 +123,7 @@ export function AssetChooser({
     const labelled = sorted.map((o) => ({ o, label: `${o.symbol ?? ""} ${o.address}` }));
     const n = narrowOptions(labelled, searchable ? query : "", (x) => chosen.has(x.o.address));
     return {
-      known: n.matched.filter((x) => x.o.known).map((x) => x.o),
-      other: n.matched.filter((x) => !x.o.known).map((x) => x.o),
+      matched: n.matched.map((x) => x.o),
       also: n.alsoSelected.map((x) => x.o),
       hidden: n.hiddenMatches,
       shown: n.matched.length,
@@ -163,7 +132,7 @@ export function AssetChooser({
     // `chosen` is derived from `selected`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sorted, query, searchable, selected]);
-  const flat = [...narrowed.known, ...narrowed.other, ...narrowed.also];
+  const flat = [...narrowed.matched, ...narrowed.also];
 
   useEffect(() => {
     setActive(0);
@@ -234,7 +203,7 @@ export function AssetChooser({
     <div ref={ref} className="relative" data-anatomy={anatomy} data-asset-chooser="">
       <div className="flex flex-wrap items-center gap-2">
         {selected.map((a) => {
-          const o = byAddress.get(a) ?? { address: a, symbol: null, count: 0, known: false };
+          const o = byAddress.get(a) ?? { address: a, symbol: null, count: 0 };
           const name = nameOf(o);
           return (
             <span
@@ -411,12 +380,7 @@ export function AssetChooser({
           aria-multiselectable
           className="overflow-y-auto pb-1"
         >
-          {narrowed.known.length > 0 && <GroupHeading group={groups.known} rule={false} kind="known" />}
-          {narrowed.known.map(row)}
-          {narrowed.other.length > 0 && (
-            <GroupHeading group={groups.other} rule={narrowed.known.length > 0} kind="other" />
-          )}
-          {narrowed.other.map(row)}
+          {narrowed.matched.map(row)}
           {narrowed.also.length > 0 && (
             <div className={`${OVERLAY_SUBHEADING} mx-3 mt-1 border-t border-rb-300 px-1 pb-1 pt-2 dark:border-rb-700`}>
               Chosen

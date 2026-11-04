@@ -349,9 +349,9 @@ const EISEN_BAR: BarSubject = { name: "Eisen", icon: "eisen", hue: 284, shared: 
 const PENDLE_BAR: BarSubject = { name: "Pendle", icon: "pendle", hue: 260, shared: "swap" };
 // Curve: curve.finance's icon, the many-coloured ring.
 const CURVE_BAR: BarSubject = { name: "Curve", icon: "curve", hue: null, shared: "swap" };
-// CoW Protocol: cow.fi's favicon, black and white. Solvers send the
-// transactions that enter its settlement.
-const COW_BAR: BarSubject = { name: "CoW Protocol", icon: "cow", hue: null, shared: "batch" };
+// CoW Protocol: hue 307 read off CoW's brand purple, #490072 (the roster
+// entry's `brand`). Solvers send the transactions that enter its settlement.
+const COW_BAR: BarSubject = { name: "CoW Protocol", icon: "cow", hue: 307, shared: "batch" };
 
 export type KnownInfrastructure = CcipEscrow | ProtocolContract;
 

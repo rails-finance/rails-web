@@ -629,6 +629,10 @@ const SPECS: ProtocolSpec[] = [
     label: "CoW",
     chainId: 1,
     slug: "cow",
+    // Hue 307, read off CoW's brand purple #490072 (its kit pairs it with
+    // #F996EE, hue 331); the zone draws the hue at the site's fixed lightness
+    // and chroma per theme.
+    brand: 307,
     unlaunched: true,
     tags: ["Trades"],
     desc: "Every trade a wallet settled through CoW, read from the settlement contract's logs and chosen by token",

@@ -57,8 +57,6 @@ export interface CowWalletToken {
   symbol: string | null;
   decimals: number | null;
   name: string | null;
-  /** On the asset roster: Rails has an asset page for it. */
-  assetPage: boolean;
   readAtBlock: number | null;
 }
 
