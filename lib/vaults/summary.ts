@@ -260,7 +260,7 @@ export const vaultDisplayName = (v: VaultSummary): string | null => v.name ?? v.
 export function morphoBaseVaultPageSummary(d: MorphoBaseVaultResponse, census: VaultCensusRow | null): VaultSummary {
   const v = d.vault;
   return {
-    chainId: 8453,
+    chainId: d.chainId,
     address: v.address.toLowerCase(),
     family: "metamorpho",
     release: v.factory,

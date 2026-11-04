@@ -23,7 +23,6 @@ import {
   metaMorphoVaultRosterHref,
   type MetaMorphoRouteChain,
 } from "@/lib/vaults/routes";
-import { metaMorphoVaultPagesServed } from "@/lib/vaults/index-rosters";
 import { chainMeta } from "@/lib/shared/chains";
 import {
   vaultDirectoryCensusProv,
@@ -80,10 +79,6 @@ export function VaultDirectoryView({
 }) {
   const coords: MorphoVaultCoords = { chainId, blockNumber: blockNumber || undefined, readBy };
   const chain = chainMeta(chainId).name;
-  // Until a chain's vault pages are served its rows are drawn without links
-  // and its count line names no listing (ui-jobs 486 pass 2).
-  const pages = metaMorphoVaultPagesServed(chainId);
-  const listing = pages && withCensus;
   const rowCoords = (v: VaultSummary): MorphoVaultCoords => ({
     ...coords,
     vault: v.address,
@@ -114,8 +109,8 @@ export function VaultDirectoryView({
         chainStale={chainStale}
         skel="directory"
         facets={FACETS}
-        hrefOf={(v) => (pages ? metaMorphoVaultHref(chainId, v.address) : null)}
-        holdersHrefOf={pages ? (v) => metaMorphoVaultsListingHref(chainId, { vault: v.address }) : null}
+        hrefOf={(v) => metaMorphoVaultHref(chainId, v.address)}
+        holdersHrefOf={(v) => metaMorphoVaultsListingHref(chainId, { vault: v.address })}
         receiptsOf={(v) => ({
           name: vaultDirectoryNameProv(rowCoords(v)),
           totalAssets: vaultDirectoryTotalAssetsProv(rowCoords(v)),
@@ -134,7 +129,7 @@ export function VaultDirectoryView({
               {withCensus ? "; Holders counts every address that has held a share." : "."}
             </>
           ),
-          listingHref: listing ? metaMorphoVaultsListingHref(chainId) : null,
+          listingHref: withCensus ? metaMorphoVaultsListingHref(chainId) : null,
           infoHref: `${metaMorphoVaultRosterHref(chainId)}/info`,
           drawer: <MorphoRosterDrawer block={readBlock} chain={chain} />,
         }}

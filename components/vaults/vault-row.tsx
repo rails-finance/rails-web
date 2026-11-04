@@ -42,9 +42,8 @@ export function VaultRow({
   vault: VaultSummary;
   /** The store's measure for this vault; absent means the store was not read. */
   yieldFigure?: VaultYield;
-  /** The vault's page under its protocol; null where its pages are not
-   *  served yet, and the card is no link. */
-  href: string | null;
+  /** The vault's page under its protocol. */
+  href: string;
   /** The positions listing filtered to this vault; null where there is none. */
   holdersHref: string | null;
   receipts: VaultRowReceipts;
@@ -90,15 +89,13 @@ export function VaultRow({
       data-created-block={v.createdBlock ?? ""}
       {...hooks}
     >
-      {href && (
-        <Link
-          href={href}
-          prefetch={false}
-          className="absolute inset-0 rounded-2xl focus-ring"
-          aria-label={`${name ?? shortAddress(v.address)}, ${v.releaseLabel}`}
-          data-vault-link={v.address}
-        />
-      )}
+      <Link
+        href={href}
+        prefetch={false}
+        className="absolute inset-0 rounded-2xl focus-ring"
+        aria-label={`${name ?? shortAddress(v.address)}, ${v.releaseLabel}`}
+        data-vault-link={v.address}
+      />
       {/* The Yield label keeps its tip: that is how the figure is marked as
           Rails's interpretation. */}
       <div className="pointer-events-none relative [&_[data-card-head='yield']>div:first-child]:pointer-events-auto">

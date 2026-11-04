@@ -92,11 +92,6 @@ export const chainName = (chainId: number): string => CHAINS[chainId as ChainId]
 /** MetaMorpho's chain for a route: Ethereum, else Base. */
 const morphoChain = (chainId: number): 1 | 8453 => (chainId === 1 ? 1 : 8453);
 
-/** MetaMorpho's vault pages and positions listing are served on this chain.
- *  Ethereum's arrive with ui-jobs 486 pass 3; until then its rows are drawn
- *  without a link rather than linking to a 404. */
-export const metaMorphoVaultPagesServed = (chainId: number): boolean => chainId === 8453;
-
 /** The roster page a protocol's rows on a chain come from. */
 export function vaultIndexRosterHref(p: VaultIndexProtocol, chainId: number): string {
   return p === "morpho"
@@ -109,13 +104,11 @@ export function vaultIndexRosterHref(p: VaultIndexProtocol, chainId: number): st
 }
 
 /** The vault's page under its protocol (decision 0028 point 8); a Maple pool's
- *  is the pools page. Null where the vault's pages are not served yet. */
-export function vaultIndexHref(v: VaultSummary): string | null {
+ *  is the pools page. */
+export function vaultIndexHref(v: VaultSummary): string {
   const p = vaultIndexProtocol(v);
   return p === "morpho"
-    ? metaMorphoVaultPagesServed(v.chainId)
-      ? metaMorphoVaultHref(morphoChain(v.chainId), v.address)
-      : null
+    ? metaMorphoVaultHref(morphoChain(v.chainId), v.address)
     : p === "aave"
       ? ethereumVaultHref(v.address)
       : p === "yearn"
@@ -127,9 +120,7 @@ export function vaultIndexHref(v: VaultSummary): string | null {
 export function vaultIndexHoldersHref(v: VaultSummary): string | null {
   const p = vaultIndexProtocol(v);
   return p === "morpho"
-    ? metaMorphoVaultPagesServed(v.chainId)
-      ? metaMorphoVaultsListingHref(morphoChain(v.chainId), { vault: v.address })
-      : null
+    ? metaMorphoVaultsListingHref(morphoChain(v.chainId), { vault: v.address })
     : p === "aave"
       ? ethereumVaultsListingHref({ vault: v.address })
       : null;

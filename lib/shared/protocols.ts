@@ -526,7 +526,7 @@ const SPECS: ProtocolSpec[] = [
     // (decision 0028; rails-ops ui-jobs 486).
     subPages: [
       { segment: "markets", label: "Markets overview", tab: "Markets" },
-      { segment: "vaults", label: "Vaults overview", tab: "Vaults" },
+      { segment: "vaults", label: "Vaults overview", tab: "Vaults", holderListing: true },
     ],
   },
   {

@@ -1,6 +1,6 @@
 "use client";
 
-// One MetaMorpho vault's page on Base (rails-ops ui-jobs 407): the vault card
+// One MetaMorpho vault's page on Base or Ethereum (rails-ops ui-jobs 407, 486): the vault card
 // (V2), the last 30 days (V5), where the assets are (V3) and the holder
 // finder (V4). One block's read
 // of the vault and of Morpho Blue (lib/sources/chain/morpho-base-vault.ts);
@@ -20,8 +20,9 @@ import type { VaultStripSeries } from "@/lib/vaults/yield-read";
 import { explorerUrl } from "@/lib/shared/chains";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { assetText, pctText, shareText, shortAddress, shortId } from "@/lib/shared/vault-amount-text";
-import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { morphoBasePositionHref, morphoBaseWalletHref } from "@/lib/morpho-base/routes";
+import { morphoLoanTokenHref } from "@/lib/morpho/market-routes";
+import { listingHrefForWallet } from "@/lib/shared/protocols";
 import {
   vaultAllocatedProv,
   vaultGapProv,
@@ -36,7 +37,7 @@ import {
 } from "@/lib/morpho-base/vault-provenance";
 import type { MorphoBaseVaultResponse } from "@/lib/sources/chain/morpho-base-vault";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
-import { baseVaultsListingHref } from "@/lib/vaults/routes";
+import { metaMorphoVaultsListingHref } from "@/lib/vaults/routes";
 import { morphoBaseVaultPageSummary } from "@/lib/vaults/summary";
 import { vaultStewardProv } from "@/lib/vaults/card-provenance";
 import {
@@ -49,7 +50,23 @@ import type { VaultYield } from "@/lib/vaults/yield";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const lltvText = (lltv: number) => `${(lltv * 100).toFixed(1)}%`;
-const base = (kind: "address" | "block", v: string | number) => explorerUrl(MORPHO_BASE_CHAIN_ID, kind, v);
+
+/** What differs by chain on the page: the block explorer, Morpho's app slug and
+ *  the Morpho Blue explorer's position routes (ui-jobs 486). */
+const CHAIN_WORDS = {
+  8453: { explorer: "Basescan", app: "base" },
+  1: { explorer: "Etherscan", app: "ethereum" },
+} as const;
+
+/** The vault's own position on one Blue market, on the chain's explorer. */
+const bluePositionHref = (chainId: 1 | 8453, vault: string, marketId: string) =>
+  chainId === 8453
+    ? morphoBasePositionHref(vault, marketId)
+    : `/ethereum/morpho/${marketId.replace(/^0x/, "").toLowerCase()}-${vault.toLowerCase()}`;
+
+/** Every Blue position the vault holds, on the chain's explorer. */
+const blueWalletHref = (chainId: 1 | 8453, vault: string) =>
+  chainId === 8453 ? morphoBaseWalletHref(vault) : (listingHrefForWallet("morpho", vault) ?? "/ethereum/morpho");
 
 export function MorphoBaseVaultPage({
   data,
@@ -67,9 +84,12 @@ export function MorphoBaseVaultPage({
   factory: string | null;
 }) {
   const registry = useReceiptRegistry();
-  const { vault, legs } = data;
+  const { vault, legs, chainId } = data;
+  const words = CHAIN_WORDS[chainId];
+  const base = (kind: "address" | "block", v: string | number) => explorerUrl(chainId, kind, v);
   const v = morphoBaseVaultPageSummary(data, census);
   const coords: MorphoVaultCoords = {
+    chainId,
     readBy: serverReadOf(data),
     blockNumber: data.blockNumber,
     vault: vault.address,
@@ -154,7 +174,7 @@ export function MorphoBaseVaultPage({
     {
       item: "vault-contract",
       title: "Vault contract",
-      subtitle: `${shortAddress(vault.address)} on Basescan`,
+      subtitle: `${shortAddress(vault.address)} on ${words.explorer}`,
       href: base("address", vault.address),
     },
     ...(factory
@@ -170,21 +190,21 @@ export function MorphoBaseVaultPage({
     {
       item: "created",
       title: "Created",
-      subtitle: `Block ${n(vault.createdBlock)} on Basescan`,
+      subtitle: `Block ${n(vault.createdBlock)} on ${words.explorer}`,
       href: base("block", vault.createdBlock),
     },
     {
       item: "own-positions",
       title: "This vault's positions on Morpho Blue",
       subtitle: "The vault as a Morpho Blue lender",
-      href: morphoBaseWalletHref(vault.address),
+      href: blueWalletHref(chainId, vault.address),
       internal: true,
     },
     {
       item: "venue-page",
       title: "On Morpho's app",
       subtitle: "app.morpho.org",
-      href: `https://app.morpho.org/base/vault/${vault.address}`,
+      href: `https://app.morpho.org/${words.app}/vault/${vault.address}`,
     },
     {
       item: "docs",
@@ -216,11 +236,11 @@ export function MorphoBaseVaultPage({
       shareProv: vaultLegShareProv(legCoords),
       links: (
         <span className="whitespace-nowrap">
-          <Link href={`/base/morpho/markets/${leg.loanToken}`} className={PAGE_LINK} prefetch={false}>
+          <Link href={morphoLoanTokenHref(chainId, leg.loanToken)} className={PAGE_LINK} prefetch={false}>
             {unit} markets
           </Link>
           <span className="mx-1.5 text-rb-500">·</span>
-          <Link href={morphoBasePositionHref(vault.address, leg.id)} className={PAGE_LINK} prefetch={false}>
+          <Link href={bluePositionHref(chainId, vault.address, leg.id)} className={PAGE_LINK} prefetch={false}>
             vault&rsquo;s position
           </Link>
         </span>
@@ -286,7 +306,7 @@ export function MorphoBaseVaultPage({
       <VaultCard
         vault={v}
         yieldFigure={yieldFigure}
-        holdersHref={baseVaultsListingHref({ vault: vault.address })}
+        holdersHref={metaMorphoVaultsListingHref(chainId, { vault: vault.address })}
         receipts={{ totalAssets: vaultTotalAssetsProv(coords), sharePrice: vaultSharePriceProv(coords) }}
         status={null}
         stats={stats}
@@ -295,7 +315,7 @@ export function MorphoBaseVaultPage({
         learnMore={morphoVaultCardContent()}
         readAt={
           <>
-            Read at <BlockRef block={data.blockNumber} chainId={MORPHO_BASE_CHAIN_ID} />, on the vault and on the{" "}
+            Read at <BlockRef block={data.blockNumber} chainId={chainId} />, on the vault and on the{" "}
             <a href={base("address", vault.morpho)} target="_blank" rel="noopener noreferrer" className="link-external">
               Morpho Blue singleton
             </a>

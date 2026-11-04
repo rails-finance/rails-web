@@ -20,8 +20,16 @@
 
 import { cache } from "react";
 import { fetchServedRoster } from "@/lib/vaults/served-roster";
-import { MORPHO_BASE_VAULTS, MORPHO_BASE_VAULT_CENSUS_BLOCK } from "@/lib/morpho-base/vault-catalog";
-import { MORPHO_ETHEREUM_VAULTS, MORPHO_ETHEREUM_VAULT_CENSUS_BLOCK } from "@/lib/morpho-ethereum/vault-catalog";
+import {
+  MORPHO_BASE_METAMORPHO_FACTORIES,
+  MORPHO_BASE_VAULTS,
+  MORPHO_BASE_VAULT_CENSUS_BLOCK,
+} from "@/lib/morpho-base/vault-catalog";
+import {
+  MORPHO_ETHEREUM_METAMORPHO_FACTORIES,
+  MORPHO_ETHEREUM_VAULTS,
+  MORPHO_ETHEREUM_VAULT_CENSUS_BLOCK,
+} from "@/lib/morpho-ethereum/vault-catalog";
 
 /** The chains a MetaMorpho roster is served for. */
 export type MetaMorphoChainId = 1 | 8453;
@@ -115,4 +123,10 @@ export async function metaMorphoRosterEntry(
   addr: string,
 ): Promise<MetaMorphoVaultCatalogEntry | undefined> {
   return (await loadMetaMorphoVaultRoster(chainId)).byAddress.get(addr.toLowerCase());
+}
+
+/** The address of the factory that made a vault of this release on `chainId`. */
+export function metaMorphoFactoryAddress(chainId: MetaMorphoChainId, release: MetaMorphoVaultFactory): string | null {
+  const table = chainId === 8453 ? MORPHO_BASE_METAMORPHO_FACTORIES : MORPHO_ETHEREUM_METAMORPHO_FACTORIES;
+  return table.find((f) => f.version === release)?.address ?? null;
 }

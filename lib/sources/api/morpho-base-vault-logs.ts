@@ -47,9 +47,10 @@ export async function fetchMorphoBaseHolderLogs(
   holder: string,
   from: number,
   to: number,
+  chainId: number = BASE_CHAIN_ID,
 ): Promise<HolderSweeps | null> {
   const qs = new URLSearchParams({
-    chain: String(BASE_CHAIN_ID),
+    chain: String(chainId),
     vault: vault.toLowerCase(),
     holder: holder.toLowerCase(),
     family: "metamorpho",
@@ -70,8 +71,11 @@ export async function fetchMorphoBaseHolderLogs(
 
 /** The vault's note logs (SetFee, SetName, SetSymbol) from block 0, and the last
  *  block the answer covers; or null. */
-export async function fetchMorphoBaseVaultNotes(vault: string): Promise<{ toBlock: number; logs: RawLog[] } | null> {
-  const qs = new URLSearchParams({ chain: String(BASE_CHAIN_ID), vault: vault.toLowerCase(), family: "metamorpho" });
+export async function fetchMorphoBaseVaultNotes(
+  vault: string,
+  chainId: number = BASE_CHAIN_ID,
+): Promise<{ toBlock: number; logs: RawLog[] } | null> {
+  const qs = new URLSearchParams({ chain: String(chainId), vault: vault.toLowerCase(), family: "metamorpho" });
   const r = await gate.json<{ toBlock?: unknown; logs?: unknown }>(
     "notes",
     `${process.env.RAILS_API_URL}/api/at-block/vault/notes?${qs}`,

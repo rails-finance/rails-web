@@ -30,7 +30,7 @@ export const MORPHO_ETHEREUM_VAULT_CENSUS_BLOCK = 26339599;
 
 /** The two factories, with the block each factory's own code first appears at (bisected on
  *  eth_getCode) — the floor of the census sweep, and re-derivable against any archive node. */
-const MORPHO_ETHEREUM_METAMORPHO_FACTORIES: readonly {
+export const MORPHO_ETHEREUM_METAMORPHO_FACTORIES: readonly {
   version: MorphoEthereumVaultFactory;
   address: string;
   firstBlock: number;

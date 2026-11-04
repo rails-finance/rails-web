@@ -94,9 +94,11 @@ export interface VaultAllocationAtBlock {
  *  so a row here cannot silently disagree with the chain — but a market created
  *  after the census is simply absent, and wave 3 asks the singleton for it. */
 const CATALOGUE = new Map(MORPHO_MARKETS.map((m) => [m.id.toLowerCase(), m]));
+const EMPTY_CATALOGUE: typeof CATALOGUE = new Map();
 
 /** The server's answer: per block the raw reads, and each market's params. */
 interface ServerAllocation {
+  chainId?: number;
   reads: {
     block: number;
     totalSupply: string | null;
@@ -123,7 +125,11 @@ export async function loadMorphoBaseVaultAllocationAt(
   vault: string,
   holder: string,
   blocks: number[],
+  chainId: 1 | 8453 = MORPHO_BASE_CHAIN_ID,
 ): Promise<Map<number, VaultAllocationAtBlock>> {
+  // Base's market census names the params of its markets; on another chain
+  // every market's params come from the server.
+  const catalogue = chainId === MORPHO_BASE_CHAIN_ID ? CATALOGUE : EMPTY_CATALOGUE;
   const out = new Map<number, VaultAllocationAtBlock>();
   if (!blocks.length) return out;
 
@@ -142,8 +148,17 @@ export async function loadMorphoBaseVaultAllocationAt(
   try {
     served = await atBlockGet<ServerAllocation>(
       "metamorpho/allocation",
-      new URLSearchParams({ vault: vaultAddress, holder: holder.toLowerCase(), blocks: blocks.join(",") }),
+      new URLSearchParams({
+        chain: String(chainId),
+        vault: vaultAddress,
+        holder: holder.toLowerCase(),
+        blocks: blocks.join(","),
+      }),
     );
+    // A server that names another chain read the wrong one (a build that does
+    // not know `chain` reads Base): nothing it says is about this vault.
+    if ((served.chainId ?? MORPHO_BASE_CHAIN_ID) !== chainId)
+      throw new Error(`allocation read on chain ${served.chainId}`);
   } catch {
     // The server did not answer: every block below is unread.
     for (const b of blocks) out.set(b, empty(b));
@@ -163,7 +178,7 @@ export async function loadMorphoBaseVaultAllocationAt(
   });
   /** A market's params from the chain, only where the census does not hold them. */
   const fromChainOf = (id: string): MarketParamsTuple | null => {
-    if (CATALOGUE.has(id.toLowerCase())) return null;
+    if (catalogue.has(id.toLowerCase())) return null;
     const p = served.params[id.toLowerCase()];
     return p ? ([p[0], p[1], p[2], p[3], BigInt(p[4])] as const) : null;
   };
@@ -177,13 +192,13 @@ export async function loadMorphoBaseVaultAllocationAt(
   for (const s of state)
     for (const leg of s.legs) {
       if (!leg.id) continue;
-      const catalogued = CATALOGUE.get(leg.id.toLowerCase());
+      const catalogued = catalogue.get(leg.id.toLowerCase());
       const fromChain = fromChainOf(leg.id);
       const collateral = (catalogued?.collateralToken ?? fromChain?.[1] ?? "").toLowerCase();
       if (collateral && collateral !== ZERO_ADDR) collateralAddresses.add(collateral);
     }
   const meta = collateralAddresses.size
-    ? await resolveErc20Meta([...collateralAddresses], MORPHO_BASE_CHAIN_ID)
+    ? await resolveErc20Meta([...collateralAddresses], chainId)
     : new Map<string, { symbol: string; named: boolean }>();
 
   // ── the attribution ───────────────────────────────────────────────────────
@@ -212,7 +227,7 @@ export async function loadMorphoBaseVaultAllocationAt(
         });
         continue;
       }
-      const catalogued = CATALOGUE.get(span.id.toLowerCase());
+      const catalogued = catalogue.get(span.id.toLowerCase());
       const fromChain = fromChainOf(span.id);
       const collateralToken = (catalogued?.collateralToken ?? fromChain?.[1])?.toLowerCase() ?? null;
       const oracle = (catalogued?.oracle ?? fromChain?.[2])?.toLowerCase() ?? null;

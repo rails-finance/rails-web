@@ -205,9 +205,7 @@ export function VaultRoster({
   /** The `data-skel-section` prefix the family's skeleton records. */
   skel: "directory" | "roster" | "index";
   facets: readonly VaultRosterFacet[];
-  /** The vault's page; null where its pages are not served yet (the row is
-   *  drawn without a link). */
-  hrefOf: (v: VaultSummary) => string | null;
+  hrefOf: (v: VaultSummary) => string;
   holdersHrefOf: ((v: VaultSummary) => string | null) | null;
   receiptsOf: (v: VaultSummary) => VaultRowReceipts;
   hooksOf?: (v: VaultSummary) => Record<string, string>;
@@ -627,22 +625,10 @@ export function VaultRoster({
                 data-share-price-raw={v.sharePrice?.raw ?? ""}
                 {...hooksOf?.(v)}
               >
-                {(() => {
-                  const label = (
-                    <>
-                      {vaultDisplayName(v) ?? shortAddress(v.address)}{" "}
-                      <span className="font-mono font-normal">{shortAddress(v.address)}</span>
-                    </>
-                  );
-                  const href = hrefOf(v);
-                  return href ? (
-                    <Link href={href} className={PAGE_LINK} prefetch={false}>
-                      {label}
-                    </Link>
-                  ) : (
-                    <span className="font-semibold text-foreground">{label}</span>
-                  );
-                })()}
+                <Link href={hrefOf(v)} className={PAGE_LINK} prefetch={false}>
+                  {vaultDisplayName(v) ?? shortAddress(v.address)}{" "}
+                  <span className="font-mono font-normal">{shortAddress(v.address)}</span>
+                </Link>
               </li>
             ))}
           </ul>

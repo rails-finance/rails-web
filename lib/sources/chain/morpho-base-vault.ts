@@ -1,4 +1,4 @@
-// One MetaMorpho vault on Base, and one holder's attributed slice of it — read
+// One MetaMorpho vault on Base or Ethereum, and one holder's attributed slice of it — read
 // at ONE pinned block. SERVER-ONLY.
 // ----------------------------------------------------------------------------
 // A MetaMorpho vault pools depositors' asset (USDC, on the case-study vault) and
@@ -50,7 +50,11 @@ import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
 import { MORPHO_BASE_BLUE, MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { type MorphoBaseVaultCatalogEntry, type MorphoBaseVaultFactory } from "@/lib/morpho-base/vault-catalog";
-import { loadMorphoBaseVaultRoster, type MorphoBaseVaultRoster } from "@/lib/morpho-base/vault-roster";
+import {
+  loadMetaMorphoVaultRoster,
+  type MetaMorphoChainId,
+  type MetaMorphoVaultRoster,
+} from "@/lib/metamorpho/vault-roster";
 
 const ZERO = BigInt(0);
 const TEN = BigInt(10);
@@ -263,6 +267,8 @@ export interface MorphoBaseVaultHolder {
 }
 
 export interface MorphoBaseVaultResponse {
+  /** The chain the vault is on (Base unless the caller asked for Ethereum). */
+  chainId: MetaMorphoChainId;
   /** The block every figure below was read at. */
   blockNumber: number;
   /** rails-server's read of `blockNumber`, when it answered every read. */
@@ -317,10 +323,11 @@ export interface MorphoBaseVaultResponse {
 /** The house stub: every figure zeroed and `chainStale` true, so a caller that
  *  forgets the flag renders zeros rather than a wrong number. The vault identity
  *  it carries is the CENSUS row — the one thing that did not need this read. */
-function empty(vaultAddress: string, roster: MorphoBaseVaultRoster): MorphoBaseVaultResponse {
+function empty(vaultAddress: string, roster: MetaMorphoVaultRoster): MorphoBaseVaultResponse {
   const row: MorphoBaseVaultCatalogEntry | undefined = roster.byAddress.get(vaultAddress.toLowerCase());
   const zero = { raw: "0", value: 0 };
   return {
+    chainId: roster.chainId,
     blockNumber: 0,
     chainStale: true,
     censusBlock: roster.censusBlock,
@@ -383,6 +390,7 @@ async function readHolderShape(
   blockNumber: bigint,
   vaultAddress: string,
   vaultAsset: string,
+  chainId: MetaMorphoChainId,
 ): Promise<MorphoBaseVaultHolderShape | null> {
   const address = holder as `0x${string}`;
   try {
@@ -430,7 +438,7 @@ async function readHolderShape(
     const answeredAsset = (ok(calls[2]) as string | undefined)?.toLowerCase() ?? null;
     const answersSupply = ok(calls[3]) != null;
 
-    const row = (await loadMorphoBaseVaultRoster()).byAddress.get(holder.toLowerCase());
+    const row = (await loadMetaMorphoVaultRoster(chainId)).byAddress.get(holder.toLowerCase());
     if (row)
       return {
         kind: "metamorpho-vault",
@@ -499,6 +507,8 @@ const shapeAssetAddress = (shape: MorphoBaseVaultHolderShape | null): string | n
  *  once for the page instead of once per vault, since what an address IS does
  *  not vary by which vault is being attributed. */
 export interface LoadMorphoBaseVaultOptions {
+  /** The chain the vault is on; Base where omitted. */
+  chainId?: MetaMorphoChainId;
   /** Read at this block instead of asking the node for its head. */
   blockNumber?: bigint;
   /** Leave `holder.shape` null: the caller has already read it, at this block. */
@@ -506,7 +516,7 @@ export interface LoadMorphoBaseVaultOptions {
 }
 
 /**
- * Read one MetaMorpho vault on Base at one pinned block, and — when `holder` is
+ * Read one MetaMorpho vault on Base (or Ethereum, `opts.chainId`) at one pinned block, and — when `holder` is
  * given — that holder's proportional slice of every leg.
  *
  * `holder` must already be an address; ENS resolution belongs to the caller (the
@@ -519,10 +529,11 @@ export async function loadMorphoBaseVault(
   opts: LoadMorphoBaseVaultOptions = {},
 ): Promise<MorphoBaseVaultResponse> {
   const vaultAddress = vault.toLowerCase() as `0x${string}`;
-  const roster = await loadMorphoBaseVaultRoster();
+  const chainId = opts.chainId ?? MORPHO_BASE_CHAIN_ID;
+  const roster = await loadMetaMorphoVaultRoster(chainId);
   const row = roster.byAddress.get(vaultAddress);
   try {
-    const client = vaultHeadClient(MORPHO_BASE_CHAIN_ID);
+    const client = vaultHeadClient(chainId);
     // ONE block read; everything after it is pinned to it. A caller reading
     // several vaults as one page pins the block itself and passes it in, so the
     // vaults it stacks are one reading rather than several.
@@ -608,7 +619,7 @@ export async function loadMorphoBaseVault(
       // several vaults at once states it once.
       holderShape = opts.skipHolderShape
         ? null
-        : await readHolderShape(client, holderAddress, blockNumber, vaultAddress, assetAddress);
+        : await readHolderShape(client, holderAddress, blockNumber, vaultAddress, assetAddress, chainId);
       // `maxWithdraw` rides the balance call rather than opening a request of
       // its own: both are one-argument reads of this vault at this block, and
       // the strip on the card states them side by side. It sits HERE and not in
@@ -670,7 +681,7 @@ export async function loadMorphoBaseVault(
     const shapeAsset = shapeAssetAddress(holderShape);
     const meta = await resolveErc20Meta(
       [assetAddress, ...collateralTokens, ...(shapeAsset && shapeAsset !== vaultAddress ? [shapeAsset] : [])],
-      MORPHO_BASE_CHAIN_ID,
+      chainId,
     );
     // Every figure on the page is in the vault's asset: without its decimals the
     // read fails whole rather than state amounts scaled by the 18 stand-in.
@@ -746,8 +757,9 @@ export async function loadMorphoBaseVault(
         : holderShape;
 
     return {
+      chainId,
       blockNumber: Number(blockNumber),
-      head: serverHeadStampAt(MORPHO_BASE_CHAIN_ID, blockNumber),
+      head: serverHeadStampAt(chainId, blockNumber),
       chainStale: false,
       censusBlock: roster.censusBlock,
       vault: {
@@ -794,7 +806,7 @@ export async function loadMorphoBaseVault(
             },
     };
   } catch (error) {
-    console.error("Morpho Base vault chain read failed:", error);
+    console.error(`MetaMorpho vault chain read failed (chain ${chainId}):`, error);
     return empty(vaultAddress, roster);
   }
 }
@@ -818,15 +830,16 @@ export async function loadMorphoBaseVault(
 export async function loadMorphoBaseHolderShape(
   holder: string,
   blockNumber: bigint,
+  chainId: MetaMorphoChainId = MORPHO_BASE_CHAIN_ID,
 ): Promise<MorphoBaseVaultHolderShape | null> {
-  const client = vaultHeadClient(MORPHO_BASE_CHAIN_ID);
+  const client = vaultHeadClient(chainId);
   // ZERO_ADDR for both vault operands: neither flag can be true against it, and
   // no MetaMorpho or ERC-4626 answers the zero address from `asset()`.
-  const shape = await readHolderShape(client, holder.toLowerCase(), blockNumber, ZERO_ADDR, ZERO_ADDR);
+  const shape = await readHolderShape(client, holder.toLowerCase(), blockNumber, ZERO_ADDR, ZERO_ADDR, chainId);
   if (!shape || (shape.kind !== "erc4626" && shape.kind !== "metamorpho-vault")) return shape;
   const assetAddress = shape.asset;
   if (!assetAddress) return shape;
-  const meta = (await resolveErc20Meta([assetAddress], MORPHO_BASE_CHAIN_ID)).get(assetAddress);
+  const meta = (await resolveErc20Meta([assetAddress], chainId)).get(assetAddress);
   return {
     ...shape,
     assetSymbol: meta?.named ? (meta.symbol ?? null) : null,

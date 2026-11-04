@@ -61,6 +61,7 @@ import { VAULT_SIZE_BRACKETS, VAULT_SIZE_UNPRICED } from "@/lib/aave-vaults/posi
 import { AAVE_VAULT_FAMILY_ORDER } from "@/lib/aave-vaults/vault-catalog";
 import { loadMorphoBaseVaultRoster } from "@/lib/morpho-base/vault-roster";
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
+import { metaMorphoRosterEntry } from "@/lib/metamorpho/vault-roster";
 import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import { readBlockTimes } from "@/lib/sources/chain/vault-block-reads";
@@ -447,7 +448,12 @@ export async function GET(request: NextRequest) {
     const backendParams = new URLSearchParams({ chain });
     if (vault) backendParams.set("vault", vault.toLowerCase());
     if (family) backendParams.set("family", family);
-    if (families) backendParams.set("families", families);
+    // A chain-1 read of one MetaMorpho vault names its family: rails-server
+    // scopes a chain-1 read without `families` to Aave's three, which would
+    // answer no rows for it.
+    const scope =
+      families ?? (chainId === MAINNET_CHAIN_ID && vault && (await metaMorphoRosterEntry(1, vault)) ? "morpho" : null);
+    if (scope) backendParams.set("families", scope);
     if (status) backendParams.set("status", status);
     if (shape) backendParams.set("shape", shape);
     if (q) backendParams.set("q", q.trim().toLowerCase());
