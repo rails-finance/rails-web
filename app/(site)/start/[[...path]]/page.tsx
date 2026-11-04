@@ -13,7 +13,33 @@ import { ExplorerPicker } from "@/components/start/explorer-picker";
 import { CHAINS } from "@/lib/shared/chains";
 import { withoutLiquidations } from "@/lib/start/liquidation-probe";
 import { resultRows } from "@/lib/start/results";
-import { TREE, groupPhrase, resolveStartPath, type GroupKey, type Leaf, type ResultsKey } from "@/lib/start/tree";
+import {
+  TREE,
+  groupPhrase,
+  leavesStart,
+  resolveStartPath,
+  type GroupKey,
+  type Leaf,
+  type ResultsKey,
+} from "@/lib/start/tree";
+
+// Static, rebuilt every ten minutes: the liquidation probe's cache window.
+export const revalidate = 600;
+
+/** Every path the tree holds, so each page is built ahead and revalidated. */
+export function generateStaticParams(): { path: string[] }[] {
+  const out: { path: string[] }[] = [{ path: [] }];
+  const walk = (node: string, prefix: string[]) => {
+    for (const o of TREE.nodes[node].options) {
+      if (leavesStart(o)) continue;
+      const path = [...prefix, o.slug];
+      out.push({ path });
+      if ("node" in o.to) walk(o.to.node, path);
+    }
+  };
+  walk("start", []);
+  return out;
+}
 
 type Params = { params: Promise<{ path?: string[] }> };
 
