@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, type CSSProperties } from "react";
 import { Check } from "lucide-react";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
 import { RailsMark } from "@/components/nav/rails-mark";
@@ -60,21 +60,26 @@ export function HomeHero() {
     >
       <div className="absolute top-22 left-1/2 -translate-x-1/2 w-[500px] h-[220px] bg-[var(--marketing)]/[0.07] rounded-full blur-[80px] pointer-events-none" />
       {/* One line naming the place (Miles's mock, ui-jobs 498): the mark, "Rails",
-          then "DeFi Explorers" in the marketing blue; where the line does not
-          fit, "DeFi Explorers" wraps whole to a second line. The mark is sized
-          in cap units so its right-hand leg spans the cap height,
-          top on the cap line and bottom on the baseline (Miles, 4 Nov 2026), at
-          every size; the long stroke reaches a little past both (MARK_STYLE). */}
-      <h1
-        className="relative mb-6 flex flex-wrap items-baseline justify-center gap-x-[0.25em] gap-y-1 px-4 font-semibold leading-none tracking-tighter text-[clamp(2.5rem,12vw,3.75rem)] sm:text-7xl xl:text-8xl animate-hero-fade-up"
-        data-hero-title=""
-      >
-        <span className="whitespace-nowrap text-foreground">
-          <RailsMark size={60} className="inline-block" style={MARK_STYLE} uniform />
-          Rails
-        </span>{" "}
-        <span className="marketing whitespace-nowrap">DeFi Explorers</span>
-      </h1>
+          then "DeFi Explorers" in the marketing blue, never wrapped. The mark is
+          sized in cap units so its right-hand leg spans the cap height, top on
+          the cap line and bottom on the baseline (Miles, 4 Nov 2026); the long
+          stroke reaches a little past both (MARK_STYLE). At every width the line
+          is a fixed share of the search input's width: the wrapper takes the
+          search wrapper's width and padding, so 100cqw is the input's width, and
+          the h1's size is a share of it (TITLE_CQW below). */}
+      <div className="relative mb-6 w-full max-w-2xl px-4 @container">
+        <h1
+          className="flex flex-nowrap items-baseline justify-center gap-x-[0.25em] whitespace-nowrap font-semibold leading-none tracking-tighter text-[length:var(--hero-title-size)] animate-hero-fade-up"
+          style={{ "--hero-title-size": `${TITLE_CQW}cqw` } as CSSProperties}
+          data-hero-title=""
+        >
+          <span className="whitespace-nowrap text-foreground">
+            <RailsMark size={60} className="inline-block" style={MARK_STYLE} uniform />
+            Rails
+          </span>{" "}
+          <span className="marketing whitespace-nowrap">DeFi Explorers</span>
+        </h1>
+      </div>
       {/* The terms, ticked, under the h1; the checks carry the separation. */}
       <p
         className="relative mx-auto mb-10 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-2 min-[400px]:gap-x-4 min-[400px]:px-4 min-[520px]:gap-x-5 text-xs font-medium uppercase tracking-[0.1em] min-[400px]:tracking-[0.14em] text-rb-500 animate-hero-fade-up"
@@ -108,7 +113,10 @@ export function HomeHero() {
 // 0 0 200 200), from the top of its upper segment (y 47.853) to the foot of the
 // lower step (y 142.388), is one cap height. The negative block margins leave a
 // margin box of exactly that leg, so the line box ignores the rest of the mark
-// and baseline alignment puts the leg's foot on the baseline.
+// and baseline alignment puts the leg's foot on the baseline. The negative left
+// margin starts the box at the long stroke's ink (x 20.295), so the line's
+// measured width runs from ink to ink.
+const STROKE_LEFT = 20.295;
 const STROKE_TOP = 47.853;
 const STROKE_BOTTOM = 142.388;
 const CAP = STROKE_BOTTOM - STROKE_TOP;
@@ -117,9 +125,16 @@ const MARK_STYLE = {
   height: `${200 / CAP}cap`,
   marginTop: `${-STROKE_TOP / CAP}cap`,
   marginBottom: `${-(200 - STROKE_BOTTOM) / CAP}cap`,
+  marginLeft: `${-STROKE_LEFT / CAP}cap`,
   marginRight: "0.16em",
   verticalAlign: "baseline",
 } as const;
+
+// The h1's size at every width, as a share of the search input's width (100cqw),
+// set on the h1 as --hero-title-size so it can be tuned live. The line's width
+// is linear in the size: 10.11cqw spans the input ink to ink; 7.5cqw (Miles,
+// 4 Nov 2026) runs it about 74% of the input.
+const TITLE_CQW = 7.5;
 
 // Rendered uppercase by the class on the <p>; the Check icon before each one
 // is the separator.
