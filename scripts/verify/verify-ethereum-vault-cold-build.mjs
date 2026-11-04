@@ -295,6 +295,12 @@ const server = createServer((req, res) => {
       res.end(JSON.stringify(blocks));
       return;
     }
+    if (body === "") {
+      // A GET this mock does not serve: a 404 the caller reads as "not stored".
+      res.writeHead(404, { "content-type": "application/json" });
+      res.end("{}");
+      return;
+    }
     const parsed = JSON.parse(body);
     if (Array.isArray(parsed)) {
       res.writeHead(200, { "content-type": "application/json" });
