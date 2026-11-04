@@ -15,6 +15,7 @@ import { readWallet, walletFamiliesLine } from "@/lib/wallet/read-wallet";
 import { explorerName, protocolForPathname } from "@/lib/shared/protocols";
 import { readerIpFromHeaders } from "@/lib/api/reader-ip-server";
 import { resolveEnsAddress, resolveEnsNames } from "@/lib/ens/resolve-ens";
+import { readCowWalletEntry } from "@/lib/sources/api/cow";
 
 export const dynamic = "force-dynamic";
 // The read's budget (8 s) sits under it.
@@ -56,8 +57,12 @@ export default async function WalletPage({ params, searchParams }: Props) {
   const entry = protocolForPathname(from?.split("?")[0] ?? null);
   const back = entry ? { href: entry.href, name: explorerName(entry) } : null;
 
+  const ip = await readerIpFromHeaders();
+  // The CoW row (W7) streams in after the page: started here, awaited by the
+  // view under its own Suspense, never by the page.
+  const cow = readCowWalletEntry(address, ip);
   const [read, names] = await Promise.all([
-    readWallet(address, await readerIpFromHeaders()),
+    readWallet(address, ip),
     resolveEnsNames([address]).catch(() => ({}) as Record<string, string | null>),
   ]);
   return (
@@ -65,6 +70,7 @@ export default async function WalletPage({ params, searchParams }: Props) {
       address={address}
       ensName={names[address] ?? null}
       read={read}
+      cow={cow}
       reads={walletFamiliesLine()}
       back={back}
     />

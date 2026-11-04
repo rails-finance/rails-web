@@ -1,8 +1,9 @@
 // Server-side reads of rails-server's CoW wallet routes (api/src/routes/cow.ts),
-// with the bearer token. Imported by the wallet page and the trades proxy only.
+// with the bearer token. Imported by the CoW wallet page, the trades proxy and
+// the wallet view's page (/wallet/<address>) only.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
-import type { CowTradesPage, CowWalletTokens } from "@/lib/cow/types";
+import type { CowTradesPage, CowWalletEntry, CowWalletTokens } from "@/lib/cow/types";
 
 export class CowReadError extends Error {
   constructor(
@@ -69,4 +70,20 @@ export function readCowTrades(
 
 export function readCowTokens(wallet: string, readerIp?: string, signal?: AbortSignal): Promise<CowWalletTokens> {
   return read<CowWalletTokens>(`/${wallet}/tokens`, readerIp, signal);
+}
+
+/** The wallet view's budget for the CoW read (W7). */
+const WALLET_VIEW_COW_MS = 3000;
+
+/** The wallet's CoW summary for the wallet view (W7): its trades and its
+ *  first and last trade, at the checkpoint block. Null when the wallet has
+ *  no trade, or the read fails or runs past its budget; the view then draws
+ *  no CoW row. */
+export async function readCowWalletEntry(wallet: string, readerIp?: string): Promise<CowWalletEntry | null> {
+  try {
+    const { summary, asOf } = await readCowTokens(wallet, readerIp, AbortSignal.timeout(WALLET_VIEW_COW_MS));
+    return summary.trades > 0 ? { summary, asOf } : null;
+  } catch {
+    return null;
+  }
 }
