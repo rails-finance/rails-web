@@ -57,8 +57,10 @@ export interface CowWalletToken {
   symbol: string | null;
   decimals: number | null;
   name: string | null;
-  /** A token Rails knows from a protocol it reads or the asset roster. */
-  known: boolean;
+  /** On the asset roster: Rails has an asset page for it. */
+  assetPage: boolean;
+  /** The protocols the roster has reading it, empty off the roster. */
+  protocols: string[];
   readAtBlock: number | null;
 }
 

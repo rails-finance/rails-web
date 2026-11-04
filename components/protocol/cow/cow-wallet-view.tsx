@@ -20,10 +20,21 @@ import { CowAccountCard } from "@/components/protocol/cow/cow-account-card";
 import { CowTradeCard } from "@/components/protocol/cow/cow-trade-card";
 import { formatDate } from "@/lib/date";
 import { COW_CHAIN_ID, type CowTokenLabel } from "@/lib/cow/trade";
+import { assetHref } from "@/lib/shared/asset-roster";
 import type { CowTrade, CowTradesPage, CowWalletTokens } from "@/lib/cow/types";
 import { SECTION_HEADING, CARD_INSET_START } from "@/lib/shared/ui-grammar";
 
 const PAGE = 50;
+const CHOOSER_GROUPS = {
+  known: {
+    heading: "On Rails",
+    info: "Tokens Rails reads across DeFi. Each has an asset page listing the protocols that use it.",
+  },
+  other: {
+    heading: "Other tokens",
+    info: "Tokens named only by this wallet's CoW trades. Rails has no asset page for them.",
+  },
+};
 const n = (v: number) => v.toLocaleString("en-US");
 
 /** The date once a day: a row names it where the row above is another UTC day. */
@@ -69,7 +80,20 @@ export function CowWalletView({
 
   const options: AssetChooserOption[] = useMemo(
     () =>
-      (tokens?.tokens ?? []).map((t) => ({ address: t.address, symbol: t.symbol, count: t.trades, known: t.known })),
+      (tokens?.tokens ?? []).map((t) => ({
+        address: t.address,
+        symbol: t.symbol,
+        count: t.trades,
+        known: t.assetPage,
+        last: t.lastBlock,
+        href: t.assetPage ? assetHref(COW_CHAIN_ID, t.address) : undefined,
+        hrefText: t.protocols.length
+          ? `in ${t.protocols.length} ${t.protocols.length === 1 ? "protocol" : "protocols"}`
+          : undefined,
+        hrefLabel: t.assetPage
+          ? `${t.symbol ?? t.address} asset page${t.protocols.length ? `: read in ${t.protocols.join(", ")}` : ""}`
+          : undefined,
+      })),
     [tokens],
   );
   const labelOf = useCallback(
@@ -185,6 +209,7 @@ export function CowWalletView({
               label="Tokens"
               countNoun="trades"
               sheetStatus={countLine}
+              groups={CHOOSER_GROUPS}
               anatomy="L1.11"
             />
           </div>

@@ -3,9 +3,11 @@
 // AssetChooser: an opt-in token filter whose selection is drawn as the tokens.
 // A row of pills (icon, symbol, ×) and a dashed add pill; the add pill opens a
 // picker of the tokens the data holds, each with its count, keyed by address.
-// Known tokens come first and "Other tokens" below them; a token whose symbol
-// was not read shows its short address, the unknown glyph and "Symbol not
-// read". Past OPTION_SEARCH_THRESHOLD the list narrows by symbol or address
+// Two groups, each under a heading with an (i) that says what it holds: the
+// caller's first group (on CoW, the tokens with a Rails asset page, each with
+// a link to it) and "Other tokens" below. Within a group, by count, then by
+// the latest use. A token whose symbol was not read shows its short address,
+// the unknown glyph and "Symbol not read". Past OPTION_SEARCH_THRESHOLD the list narrows by symbol or address
 // and renders OPTION_RENDER_CAP rows, chosen tokens always in view
 // (filter-bar/option-search.tsx). Below `sm` the picker is a live bottom sheet
 // (MobileSheet), as FilterDropdown's is. With two tokens chosen the caller may
@@ -20,7 +22,9 @@
 // the timeline's Assets filter and the roster's Token facet is Miles's call.
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import Link from "next/link";
 import { Check, Plus, X } from "lucide-react";
+import { InfoDisclosure } from "@/components/shared/info-disclosure";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { UnknownTokenSvg } from "@/components/shared/unknown-token-svg";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
@@ -40,8 +44,21 @@ export interface AssetChooserOption {
   symbol: string | null;
   /** What the option reaches (the wallet's trades in this token). */
   count: number;
-  /** Rails knows the token from a protocol it reads or the asset roster. */
+  /** In the first group. */
   known: boolean;
+  /** The latest use (a block), which orders equal counts. */
+  last?: number;
+  /** A page about the token: a link of its own beside the row's pick. */
+  href?: string;
+  /** The link's words ("13 protocols") and its fuller name for a screen reader. */
+  hrefText?: string;
+  hrefLabel?: string;
+}
+
+/** A group's heading and what its (i) says. */
+export interface AssetChooserGroup {
+  heading: string;
+  info?: ReactNode;
 }
 
 export interface AssetChooserProps {
@@ -58,24 +75,50 @@ export interface AssetChooserProps {
   countNoun?: string;
   /** The count line, pinned in the phone sheet where the list behind is covered. */
   sheetStatus?: ReactNode;
+  /** The two groups' headings, the `known` options first. */
+  groups?: { known: AssetChooserGroup; other: AssetChooserGroup };
   anatomy?: string;
 }
 
-/** The most counted options offered as chips above the list. */
+/** The most counted options offered as chips above the list, of those
+ *  counted at least ASSET_CHOOSER_TOP_MIN times. */
 export const ASSET_CHOOSER_TOP = 8;
+export const ASSET_CHOOSER_TOP_MIN = 3;
+const DEFAULT_GROUPS = { known: { heading: "Tokens" }, other: { heading: "Other tokens" } };
 
 const shortAddress = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
-/** By count, most first, then by symbol, then by address. */
+/** By count, most first, then by the latest use, then by address (a stable order, never shown as one). */
 function byCount(a: AssetChooserOption, b: AssetChooserOption): number {
-  return b.count - a.count || (a.symbol ?? "￿").localeCompare(b.symbol ?? "￿") || a.address.localeCompare(b.address);
+  return b.count - a.count || (b.last ?? 0) - (a.last ?? 0) || a.address.localeCompare(b.address);
 }
+/** The first group, then the other, each by count. */
+const byGroup = (a: AssetChooserOption, b: AssetChooserOption) => Number(b.known) - Number(a.known) || byCount(a, b);
 
 function TokenMark({ o, size = 16 }: { o: AssetChooserOption; size?: number }) {
   return o.symbol ? (
     <TokenChipIcon symbol={o.symbol} address={o.address} size={size} filterable={false} untitled />
   ) : (
     <UnknownTokenSvg size={size} untitled />
+  );
+}
+
+/** A group's heading, with its (i) where the caller says what the group holds. */
+function GroupHeading({ group, rule, kind }: { group: AssetChooserGroup; rule: boolean; kind: string }) {
+  const name = <span className={OVERLAY_SUBHEADING}>{group.heading}</span>;
+  return (
+    <div
+      className={rule ? "mx-3 mt-1 border-t border-rb-300 pb-1 pt-2 dark:border-rb-700" : "mx-3 pb-1 pt-2"}
+      data-asset-group={kind}
+    >
+      {group.info ? (
+        <InfoDisclosure bare label={`what ${group.heading} are`} rowExtra={name}>
+          <p className="text-xs leading-relaxed text-rb-500">{group.info}</p>
+        </InfoDisclosure>
+      ) : (
+        <div className="px-1">{name}</div>
+      )}
+    </div>
   );
 }
 
@@ -88,6 +131,7 @@ export function AssetChooser({
   label = "Tokens",
   countNoun = "trades",
   sheetStatus,
+  groups = DEFAULT_GROUPS,
   anatomy,
 }: AssetChooserProps) {
   const [open, setOpen] = useState(false);
@@ -99,7 +143,7 @@ export function AssetChooser({
   const isPhone = useMediaQuery(PHONE_QUERY);
   const listId = useId();
 
-  const sorted = useMemo(() => [...options].sort(byCount), [options]);
+  const sorted = useMemo(() => [...options].sort(byGroup), [options]);
   const byAddress = useMemo(() => new Map(sorted.map((o) => [o.address, o])), [sorted]);
   // A symbol two tokens share: the pill and the row add the short address.
   const shared = useMemo(() => {
@@ -108,7 +152,14 @@ export function AssetChooser({
     return new Set([...n].filter(([, c]) => c > 1).map(([s]) => s));
   }, [sorted]);
   const chosen = new Set(selected);
-  const top = sorted.slice(0, ASSET_CHOOSER_TOP);
+  const top = useMemo(
+    () =>
+      options
+        .filter((o) => o.count >= ASSET_CHOOSER_TOP_MIN)
+        .sort(byCount)
+        .slice(0, ASSET_CHOOSER_TOP),
+    [options],
+  );
 
   const searchable = isOptionSearchable(sorted.length);
   const narrowed = useMemo(() => {
@@ -310,6 +361,17 @@ export function AssetChooser({
               <span className="shrink-0 text-rb-500">Symbol not read</span>
             )}
             <span className="shrink-0 font-mono text-[11px] text-rb-500">{shortAddress(o.address)}</span>
+            {o.href && (
+              <Link
+                href={o.href}
+                onClick={(e) => e.stopPropagation()}
+                aria-label={o.hrefLabel}
+                className="shrink-0 truncate text-[11px] text-blue-500 hover:underline"
+                data-asset-page={o.address}
+              >
+                {o.hrefText ?? "Asset page"}
+              </Link>
+            )}
           </span>
           <span
             className="shrink-0 text-xs tabular-nums text-rb-500"
@@ -320,7 +382,7 @@ export function AssetChooser({
         </div>
       );
     };
-    const showTop = query.trim() === "" && sorted.length > ASSET_CHOOSER_TOP;
+    const showTop = query.trim() === "" && top.length > 0 && sorted.length > ASSET_CHOOSER_TOP;
     return (
       <>
         <div className="overlay-search px-4 pb-2 pt-1">
@@ -373,17 +435,10 @@ export function AssetChooser({
           aria-multiselectable
           className="overflow-y-auto pb-1"
         >
-          {narrowed.known.length > 0 && (
-            <div className={`${OVERLAY_SUBHEADING} px-4 pb-1 pt-2`}>{query.trim() ? "Matches" : "All tokens"}</div>
-          )}
+          {narrowed.known.length > 0 && <GroupHeading group={groups.known} rule={false} kind="known" />}
           {narrowed.known.map(row)}
           {narrowed.other.length > 0 && (
-            <div
-              className={`${OVERLAY_SUBHEADING} mx-3 mt-1 border-t border-rb-300 px-1 pb-1 pt-2 dark:border-rb-700`}
-              data-asset-other=""
-            >
-              Other tokens
-            </div>
+            <GroupHeading group={groups.other} rule={narrowed.known.length > 0} kind="other" />
           )}
           {narrowed.other.map(row)}
           {narrowed.also.length > 0 && (
