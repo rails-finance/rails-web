@@ -209,6 +209,14 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   const showTrove = ready && data !== null;
+  // The skeleton unmounts once its fade-out (500ms) has run, so its pulses
+  // stop with it.
+  const [skeletonGone, setSkeletonGone] = useState(false);
+  useEffect(() => {
+    if (!showTrove) return;
+    const t = setTimeout(() => setSkeletonGone(true), 600);
+    return () => clearTimeout(t);
+  }, [showTrove]);
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4">
@@ -311,16 +319,18 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
             {/* Skeleton stand-in until the client paints — the trove layout's
                 silhouette (position card, the Lifetime flows panel, the rows) in
                 the shared skeleton tone, fading out once the real components
-                are ready. */}
-            <div
-              className={`absolute inset-0 flex flex-col gap-4 px-10 pt-8 transition-opacity duration-500 ${
-                showTrove ? "opacity-0" : "opacity-100"
-              }`}
-            >
-              <div className="animate-pulse h-44 bg-skeleton rounded-2xl" />
-              <div className="animate-pulse h-72 bg-rb-100/60 dark:bg-rb-800/40 rounded-2xl" />
-              <div className="animate-pulse h-24 bg-rb-100/30 dark:bg-rb-800/20 rounded-2xl" />
-            </div>
+                are ready, then unmounting. */}
+            {!skeletonGone && (
+              <div
+                className={`absolute inset-0 flex flex-col gap-4 px-10 pt-8 transition-opacity duration-500 ${
+                  showTrove ? "opacity-0" : "opacity-100"
+                }`}
+              >
+                <div className="motion-safe:animate-pulse h-44 bg-skeleton rounded-2xl" />
+                <div className="motion-safe:animate-pulse h-72 bg-rb-100/60 dark:bg-rb-800/40 rounded-2xl" />
+                <div className="motion-safe:animate-pulse h-24 bg-rb-100/30 dark:bg-rb-800/20 rounded-2xl" />
+              </div>
+            )}
 
             {showTrove && (
               <div

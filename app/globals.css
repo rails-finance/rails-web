@@ -1375,6 +1375,15 @@ label[for] {
   animation: hero-fade-up 0.6s ease-out forwards;
 }
 
+/* A live marker's ping (spine-column PulsingDot, the pulse timeline's first
+   group): three pings find the eye, then the ring stays gone, so no animation
+   keeps the page drawing (ui-jobs 500). Unlayered, so it outranks the
+   animate-ping shorthand. */
+.ping-thrice {
+  animation-iteration-count: 3;
+  animation-fill-mode: forwards;
+}
+
 @keyframes track-drift {
   from {
     transform: translateY(0px);
