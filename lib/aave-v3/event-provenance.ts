@@ -488,7 +488,7 @@ const swapWithdrawnProv = (sym: string, coords: V3Coords, paraswap: boolean): Pr
   summary: `The ${sym} this withdraw and swap took out of the position — the aToken's transfer log carries a scaled figure and the reserve's liquidity index at that moment; the two multiplied are the ${sym} the aTokens stood for. ${
     paraswap
       ? `The aTokens went to ParaSwap's withdraw swap adapter, which drew the ${sym} out of the Pool under its name and sold it through ParaSwap.`
-      : `The aTokens went to CoW Protocol's settlement under the order this account signed, and the settlement drew the ${sym} out of the Pool under its name and sold it.`
+      : `The aTokens went to CoW's settlement under the order this account signed, and the settlement drew the ${sym} out of the Pool under its name and sold it.`
   }`,
   contract: poolOf(coords),
   via: `${captureVia(coords)} · BalanceTransfer log · value × index`,
@@ -507,7 +507,7 @@ const swapBoughtProv = (sym: string, coords: V3Coords, raw?: string | null): Pro
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The ${sym} the order bought — the amount CoW Protocol's settlement wrote into its trade log as bought. It went to the order's receiver, so no balance in this position moved by it.`,
+    summary: `The ${sym} the order bought — the amount CoW's settlement wrote into its trade log as bought. It went to the order's receiver, so no balance in this position moved by it.`,
     contract: { name: named?.name ?? "GPv2Settlement", address: GPV2_SETTLEMENT },
     via: `rails-server index of GPv2Settlement Trade logs · Trade log · ${fieldSeg("buyAmount", raw)}`,
     inputs: eventInputs(coords, [
@@ -554,13 +554,13 @@ const swapParaswapBoughtProv = (sym: string, coords: V3Coords, raw?: string | nu
   };
 };
 
-/** A supply from a swap's one row: the aTokens CoW Protocol's settlement sent to
+/** A supply from a swap's one row: the aTokens CoW's settlement sent to
  *  the position under the order its owner signed (server mig 250). */
 const swapSuppliedProv = (sym: string, coords: V3Coords): Provenance => ({
   kind: "chain-derived",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `The ${sym} this supply from a swap put into the position — the aToken's transfer log carries a scaled figure and the reserve's liquidity index at that moment; the two multiplied are the ${sym} the aTokens stood for. CoW Protocol's settlement bought the aTokens under the order this account signed and sent them here.`,
+  summary: `The ${sym} this supply from a swap put into the position — the aToken's transfer log carries a scaled figure and the reserve's liquidity index at that moment; the two multiplied are the ${sym} the aTokens stood for. CoW's settlement bought the aTokens under the order this account signed and sent them here.`,
   contract: poolOf(coords),
   via: `${captureVia(coords)} · BalanceTransfer log · value × index`,
   formula: "scaled value × index at transfer",
@@ -578,7 +578,7 @@ const swapSoldProv = (sym: string, coords: V3Coords, raw?: string | null): Prove
     kind: "chain-derived",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The ${sym} the order sold — the amount CoW Protocol's settlement wrote into its trade log as sold, plus the fee it wrote beside it. It came out of this account's wallet, so no balance in this position moved by it.`,
+    summary: `The ${sym} the order sold — the amount CoW's settlement wrote into its trade log as sold, plus the fee it wrote beside it. It came out of this account's wallet, so no balance in this position moved by it.`,
     contract: { name: named?.name ?? "GPv2Settlement", address: GPV2_SETTLEMENT },
     via: `rails-server index of GPv2Settlement Trade logs · Trade log · sellAmount + feeAmount${raw ? ` = ${raw}` : ""}`,
     formula: "sellAmount + feeAmount",
@@ -625,16 +625,21 @@ const swapAmountRule = (swap: AaveV3SwapDetail): string =>
 /** GPv2Settlement, whose Trade log pairs a CoW position swap's two legs. */
 export const GPV2_SETTLEMENT = "0x9008d19f58aabd9ed0d60971565aa8510560ab41";
 
-/** The party a swap's venue chip names: CoW Protocol's settlement, or on the
+/** The party a swap's venue chip names: CoW's settlement, or on the
  *  ParaSwap route the adapter that made the legs, read as "ParaSwap". */
 export const swapVenueParty = (
   swap: AaveV3SwapDetail,
   chainId: ChainId,
-): { address: string; name: string; protocolIcon?: string } => {
+): { address: string; name: string; protocolIcon?: string; protocolGlyph?: string } => {
   if (swap.route === "paraswap" && swap.adapter)
     return { address: swap.adapter, name: "ParaSwap", protocolIcon: "paraswap" };
   const named = getProtocolContract(GPV2_SETTLEMENT, chainId);
-  return { address: GPV2_SETTLEMENT, name: named?.name ?? "CoW Protocol", protocolIcon: named?.protocolIcon };
+  return {
+    address: GPV2_SETTLEMENT,
+    name: named?.name ?? "CoW",
+    protocolIcon: named?.protocolIcon,
+    protocolGlyph: named?.protocolGlyph ?? "cow",
+  };
 };
 
 /** What a ParaSwap adapter did for the position, per kind (server mig 248). */
@@ -695,7 +700,7 @@ export const swapVenueProv = (coords: V3Coords, swap: AaveV3SwapDetail): Provena
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The CoW Protocol settlement that carried this swap — the settlement's trade log names the order's owner, the tokens sold and bought and both amounts, and this position's ${swap.kind === "withdraw_and_swap" || swap.kind === "supply_from_swap" ? "row is" : "two rows are"} paired to that log: ${
+    summary: `The CoW settlement that carried this swap — the settlement's trade log names the order's owner, the tokens sold and bought and both amounts, and this position's ${swap.kind === "withdraw_and_swap" || swap.kind === "supply_from_swap" ? "row is" : "two rows are"} paired to that log: ${
       swap.route === "cow_adapter"
         ? SWAP_OWNER[swap.kind]
         : "the owner is this position's account, which signed the order"

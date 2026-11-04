@@ -183,7 +183,7 @@ placeholders:
   venue:
     rounding: text
     means: |-
-      How a swap was made: a ParaSwap adapter or a CoW Protocol settlement.
+      How a swap was made: a ParaSwap adapter or a CoW settlement.
   funded:
     rounding: token_pos
     means: |-
@@ -285,7 +285,7 @@ words:
   venue_paraswap: |-
     a ParaSwap adapter
   venue_cow: |-
-    a CoW Protocol settlement
+    a CoW settlement
   and: |-
     and
   assets: |-
@@ -1087,7 +1087,7 @@ templates:
     title: |-
       Swap
     when: |-
-      a swap through a ParaSwap adapter or a CoW Protocol settlement
+      a swap through a ParaSwap adapter or a CoW settlement
     L5: fallback
     variants:
       debt_swap: |-
@@ -1128,7 +1128,7 @@ templates:
           The {r_symbol} went to the wallet, outside the position.
       swap.withdraw_receiver:
         when: |-
-          withdraw_and_swap through a CoW Protocol settlement
+          withdraw_and_swap through a CoW settlement
         text: |-
           The {r_symbol} went to the order's receiver, outside the position.
       swap.collateral:
@@ -1922,7 +1922,7 @@ L5:
     title: |-
       How a Collateral Swap Works
     intro: |-
-      A collateral swap trades one supplied asset for another without either leaving the position. The owner signs a CoW Protocol order, and the settlement makes the trade.
+      A collateral swap trades one supplied asset for another without either leaving the position. The owner signs a CoW order, and the settlement makes the trade.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1987,7 +1987,7 @@ L5:
     title: |-
       How a Debt Swap Works
     intro: |-
-      A debt swap changes which asset the position owes. The owner signs a CoW Protocol order, and one transaction borrows the new asset, sells it and repays the old debt.
+      A debt swap changes which asset the position owes. The owner signs a CoW order, and one transaction borrows the new asset, sells it and repays the old debt.
     detailsHeading: |-
       Key concepts:
     details:

@@ -158,6 +158,7 @@ export function sparkHeadSpec({
             : named?.protocolIcon
               ? protocolIconSrc(named.protocolIcon)
               : undefined,
+          glyph: feeOf ? undefined : named?.protocolGlyph,
           prov: transferCounterpartyProv(transferOut ? "out" : "in", coords, ctx.counterparty),
           ens: true,
         }
