@@ -159,7 +159,18 @@ export function CowTradeCard({
     spine,
     // The head is words (rails-ops decision 0045); the amounts stand on the
     // spine's flanks beside their tokens.
-    head: { label: `Sold ${tokenText(sell)} for ${tokenText(buy)}`, deltas: [] },
+    // Below `sm`, where the spine draws no flanks, the head carries the two
+    // amounts, signed out of and into the wallet.
+    head: {
+      label: `Sold ${tokenText(sell)} for ${tokenText(buy)}`,
+      deltas:
+        sold != null && bought != null
+          ? [
+              { value: -sold, symbol: sell.symbol ?? "", address: sell.address, prov: sellProv },
+              { value: bought, symbol: buy.symbol ?? "", address: buy.address, prov: buyProv },
+            ]
+          : [],
+    },
     caption: "Trade",
     cells,
     ledgers: { none: "A trade holds no balance in CoW Protocol." },
