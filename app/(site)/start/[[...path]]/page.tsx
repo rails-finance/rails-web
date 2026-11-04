@@ -11,6 +11,7 @@ import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { ExplorerPicker } from "@/components/start/explorer-picker";
 import { CHAINS } from "@/lib/shared/chains";
+import { withoutLiquidations } from "@/lib/start/liquidation-probe";
 import { resultRows } from "@/lib/start/results";
 import { TREE, groupPhrase, resolveStartPath, type GroupKey, type Leaf, type ResultsKey } from "@/lib/start/tree";
 
@@ -60,8 +61,13 @@ function LeafContent({ leaf }: { leaf: Leaf }) {
   );
 }
 
-function Results({ results, group }: { results: ResultsKey; group?: GroupKey }) {
-  const rows = resultRows(results, group);
+async function Results({ results, group }: { results: ResultsKey; group?: GroupKey }) {
+  let rows = resultRows(results, group);
+  if (results === "liquidated") {
+    // A row that opens on "0 Troves" is left off (ui-jobs 488).
+    const empty = await withoutLiquidations(rows.map((r) => r.entry.id));
+    rows = rows.filter((r) => !empty.has(r.entry.id));
+  }
   return (
     <div data-anatomy="G5" data-start-results={results}>
       <h2 className={QUESTION}>{leafHeading({ kind: "results", results, group })}</h2>

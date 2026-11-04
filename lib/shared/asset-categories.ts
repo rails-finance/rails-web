@@ -345,3 +345,15 @@ export function assetCategory(symbol: string): AssetCategory {
 export function symbolsInCategory(category: AssetCategory): readonly string[] {
   return category === "other" ? [] : TABLE[category];
 }
+
+/** Keywords `/vaults?asset=` expands in place of a symbol, each to the
+ *  categories whose symbols it stands for (the guided way in's "Earning in
+ *  stablecoins", ui-jobs 488). */
+export const ASSET_KEYWORDS: Record<string, readonly AssetCategory[]> = {
+  stablecoins: ["stablecoin", "yield-stable"],
+};
+
+/** The symbols a keyword stands for; empty when `token` is not a keyword. */
+export function symbolsOfKeyword(token: string): readonly string[] {
+  return (ASSET_KEYWORDS[token.toLowerCase()] ?? []).flatMap((c) => symbolsInCategory(c));
+}

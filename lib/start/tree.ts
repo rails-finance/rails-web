@@ -3,7 +3,7 @@
 // The tree is data; the page draws whichever step the URL names.
 
 import raw from "@/lib/start/start-tree.json";
-import { assetCategory, symbolsInCategory, type AssetCategory } from "@/lib/shared/asset-categories";
+import { assetCategory, type AssetCategory } from "@/lib/shared/asset-categories";
 
 export type GroupKey = "eth" | "btc" | "stablecoins";
 export type ResultsKey = "borrow" | "near-liquidation" | "liquidated";
@@ -37,6 +37,8 @@ interface Group {
   label: string;
   /** The group's word inside a sentence, where it differs from the label. */
   phrase?: string;
+  /** The `/vaults?asset=` keyword for a category group. */
+  keyword?: string;
   note: string;
   symbols?: string[];
   categories?: AssetCategory[];
@@ -75,12 +77,12 @@ export function groupPhrase(group: GroupKey): string {
   return TREE.groups[group].phrase ?? TREE.groups[group].label;
 }
 
-/** The comma list `/vaults?asset=` takes for a group. A category group lists
- *  every symbol the category table names. */
+/** The comma list `/vaults?asset=` takes for a group. A category group is one
+ *  keyword, which the vault roster expands (lib/shared/asset-categories.ts). */
 export function vaultsHref(group: GroupKey): string {
   const g = TREE.groups[group];
-  const symbols = g.symbols ?? (g.categories ?? []).flatMap((c) => symbolsInCategory(c));
-  return `/vaults?asset=${symbols.map(encodeURIComponent).join(",")}`;
+  if (g.keyword) return `/vaults?asset=${g.keyword}`;
+  return `/vaults?asset=${(g.symbols ?? []).map(encodeURIComponent).join(",")}`;
 }
 
 /** One question in the stack: the node, the path it is drawn at, and the

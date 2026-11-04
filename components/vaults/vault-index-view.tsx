@@ -19,6 +19,7 @@ import { chainMeta, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { protocolForPathname } from "@/lib/shared/protocols";
 import type { PositionCardEdge } from "@/components/shared/position-card-edge";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
+import { symbolsOfKeyword } from "@/lib/shared/asset-categories";
 import {
   vaultDirectoryCensusProv,
   vaultDirectoryNameProv,
@@ -140,7 +141,8 @@ export function VaultIndexView({
   yields: Record<string, VaultYield>;
   rosters: VaultIndexRoster[];
   /** `?asset=`: the Token facet chosen on arrival, one symbol or a comma
-   *  list, matched without case (the search's "USDC vaults" row, ui-jobs 482). */
+   *  list, matched without case; a keyword (`stablecoins`) stands for its
+   *  category's symbols (the search's "USDC vaults" row, ui-jobs 482). */
   asset?: string;
 }) {
   // A comma list chooses each named token that has a vault (the guided way
@@ -152,7 +154,10 @@ export function VaultIndexView({
             .split(",")
             .map((a) => a.trim().toLowerCase())
             .filter(Boolean)
-            .flatMap((a) => vaults.map(TOKEN_FACET.valueOf).filter((value) => value.toLowerCase() === a)),
+            .flatMap((a) => {
+              const named = new Set([a, ...symbolsOfKeyword(a).map((s) => s.toLowerCase())]);
+              return vaults.map(TOKEN_FACET.valueOf).filter((value) => named.has(value.toLowerCase()));
+            }),
         ),
       ]
     : [];

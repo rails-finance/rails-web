@@ -14,6 +14,7 @@
     "stablecoins": {
       "label": "Stablecoins",
       "phrase": "stablecoins",
+      "keyword": "stablecoins",
       "note": "Derived: every symbol lib/shared/asset-categories.ts files as Stablecoin or Yield-bearing Stable.",
       "categories": ["stablecoin", "yield-stable"]
     }
@@ -185,43 +186,43 @@
   "collateral": {
     "liquity-v1": {
       "groups": ["eth"],
-      "note": "Liquity V1 takes one collateral, ETH. Its listing has no collateral filter."
+      "note": "Liquity V1 takes one collateral, ETH (docs.liquity.org/liquity-v1/readme: loans against Ether). Its listing has no collateral filter."
     },
     "morpho": {
       "groups": ["eth", "btc", "stablecoins"],
-      "note": "Morpho Blue markets are permissionless; the market catalog (lib/morpho/market-catalog.ts) holds markets on ETH, BTC and stablecoin collateral but names tokens by address."
+      "note": "Morpho Blue markets are permissionless (docs.morpho.org/learn/concepts/market) and the docs name no collateral list. The chain read of Ethereum markets (/api/chain/morpho/markets, 4 Nov 2026) shows ETH, BTC and stablecoin collateral."
     },
     "morpho-base": {
       "groups": ["eth", "btc", "stablecoins"],
-      "note": "As Morpho on Ethereum; the Base catalog names tokens by address and the listing's collateral filter takes addresses."
+      "note": "As Morpho on Ethereum. The chain read of Base markets (/api/chain/morpho-base/markets, 4 Nov 2026) shows ETH, BTC and stablecoin collateral; the listing's collateral filter takes addresses."
     },
     "fluid": {
       "groups": ["eth", "btc", "stablecoins"],
-      "note": "Fluid's vaults pair ETH, BTC and stablecoin collateral with a debt token; the vault roster is read from the chain, so it is written here."
+      "note": "The Fluid docs list no collateral. Rails's vault read (/api/chain/fluid/vaults, 4 Nov 2026, 177 vaults) shows ETH, BTC and stablecoin supply sides."
     },
     "llamalend": {
-      "groups": ["eth", "btc"],
-      "note": "LlamaLend's crvUSD markets take ETH and BTC collateral among others; the market roster is read from the chain, so it is written here."
+      "groups": ["eth", "btc", "stablecoins"],
+      "note": "The Curve docs reachable list no collateral. Rails's market read (/api/chain/llamalend/markets, 4 Nov 2026) shows ETH, BTC and stablecoin collateral (sUSDe, sDOLA, sUSDS and others)."
     },
     "makerdao": {
       "groups": ["eth", "btc"],
-      "note": "MakerDAO's vault types (ilks) include ETH and WBTC ones; the ilk roster is read from the chain, so it is written here."
+      "note": "The Sky docs were not readable. Rails's ilk roster (/api/makerdao/ilk-roster, 4 Nov 2026) holds ETH, WSTETH, RETH and WBTC vault types; the USDC, USDT, TUSD, GUSD and PAXUSD ilks are legacy and left off."
     },
     "compound": {
-      "groups": ["eth", "btc"],
-      "note": "Compound V3's Comets on Ethereum take WETH, staked ETH and WBTC as collateral; the collateral roster is read from the chain, so it is written here."
+      "groups": ["eth", "btc", "stablecoins"],
+      "note": "The Compound docs name no per-market collateral (docs.compound.xyz/collateral-and-borrowing). Rails's market read (/api/chain/compound/markets, 4 Nov 2026) shows WETH and staked ETH, WBTC, cbBTC and tBTC, and USDe, deUSD, sdeUSD, USDC and USDT across the Comets."
     },
     "compound-base": {
-      "groups": ["eth", "btc"],
-      "note": "Compound V3's Comets on Base take WETH, cbETH, wstETH and cbBTC as collateral; the roster is read from the chain, so it is written here."
+      "groups": ["eth", "btc", "stablecoins"],
+      "note": "As Compound on Ethereum. Rails's market read of the Base Comets (/api/chain/compound-base/markets, 4 Nov 2026) shows WETH and staked ETH, cbBTC and tBTC, and USDC and sUSDS."
     },
     "aave-v3-base": {
       "groups": ["eth", "btc", "stablecoins"],
-      "note": "Aave V3 on Base lists WETH, cbETH, wstETH, cbBTC and USDC as collateral; the reserves are read from the chain, so it is written here."
+      "note": "The Aave docs reachable list no Base assets. Rails's Pool read (/api/chain/aave-v3-base/market, 4 Nov 2026) shows WETH, cbETH, wstETH, weETH, cbBTC, LBTC, USDC and EURC with a liquidation threshold above zero."
     },
     "moonwell-base": {
       "groups": ["eth", "btc", "stablecoins"],
-      "note": "Moonwell on Base lists WETH, cbETH, wstETH, cbBTC and USDC markets; the roster is read from the chain, so it is written here."
+      "note": "docs.moonwell.fi/moonwell/protocol-information/contracts lists the 21 Base markets without collateral factors. Rails's read (/api/chain/moonwell-base/markets, 4 Nov 2026) shows ETH and staked ETH, cbBTC, LBTC, tBTC, and USDC, EURC, DAI and USDS with a collateral factor above zero."
     }
   },
   "notAnswered": {
