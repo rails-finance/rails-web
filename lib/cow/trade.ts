@@ -150,3 +150,29 @@ export function settlementWords(t: CowTrade): string {
     ? "Settled alone"
     : `Settled with ${others.toLocaleString("en-US")} other ${others === 1 ? "trade" : "trades"}`;
 }
+
+/** A count over the wallet's `Trade` logs at the checkpoint block: its trades,
+ *  or the tokens it sold or bought. The account card (C1) and the wallet
+ *  view's CoW row (W7) draw it. */
+export function walletCountProv(asOf: { block: number }, what: string, value: number): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "indexed",
+    summary: `${what} — counted over every Trade log of CoW's settlement contract whose owner is this wallet, through block ${asOf.block.toLocaleString("en-US")}: ${value.toLocaleString("en-US")}.`,
+    contract: SETTLEMENT,
+    via: "Trade logs · owner = this wallet",
+    source: { block: asOf.block },
+  };
+}
+
+/** The wallet's first or last trade: the block and its time. */
+export function walletTradeAtProv(which: "First" | "Last", block: number): Provenance {
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    summary: `${which} trade — the ${which === "First" ? "earliest" : "latest"} block holding a Trade log whose owner is this wallet, and that block's time.`,
+    contract: SETTLEMENT,
+    via: "Trade log · block",
+    source: { block },
+  };
+}

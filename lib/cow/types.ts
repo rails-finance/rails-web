@@ -75,3 +75,9 @@ export interface CowWalletTokens {
   summary: CowWalletSummary;
   tokens: CowWalletToken[];
 }
+
+/** What the wallet view draws for CoW (W7): the summary and its block. */
+export interface CowWalletEntry {
+  summary: CowWalletSummary;
+  asOf: CowAsOf;
+}
