@@ -3,6 +3,8 @@
 // The wallet panel (rails-ops TO-DO-ui-jobs 431): a full-height panel that
 // glides in from the left over the page, with the search pinned at its top,
 // the bookmarks as one list under it, and the backup controls at its foot.
+// The list and the backup controls are components/shared/bookmark-list.tsx,
+// which the bookmarks page (/bookmarks, ui-jobs 480) draws too.
 // The rail's magnifier, the header bar's search and bookmark controls, and
 // `/` on a page with no search of its own all open it.
 //
@@ -17,22 +19,11 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { Info, X } from "lucide-react";
 
 import { RailsGlyph } from "@/components/nav/brand-rail";
-import { Facehash } from "@/components/shared/facehash";
-import { FrontDoorSearch, OPEN_SEARCH_EVENT, walletHref } from "@/components/shared/front-door-search";
-import {
-  bookmarksBackupFilename,
-  exportBookmarks,
-  importBookmarks,
-  loadBookmarks,
-  removeBookmark,
-  renameSession,
-  SESSIONS_CHANGED_EVENT,
-  type WalletSession,
-} from "@/lib/shared/sessions";
+import { BookmarkBackup, BookmarkList, useBookmarks } from "@/components/shared/bookmark-list";
+import { FrontDoorSearch, OPEN_SEARCH_EVENT } from "@/components/shared/front-door-search";
 
 let open = false;
 let trigger: HTMLElement | null = null;
@@ -80,10 +71,6 @@ export function useWalletPanelOpen(): boolean {
   );
 }
 
-function plural(n: number, one: string, many = `${one}s`): string {
-  return `${n} ${n === 1 ? one : many}`;
-}
-
 /** The slide and the scrim's fade: a soft ease in, a quicker ease out. */
 const OUT_MS = 220;
 const EASE_IN = "320ms cubic-bezier(0.22, 1, 0.36, 1)";
@@ -94,11 +81,11 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabi
 export function WalletPanel() {
   const isOpen = useWalletPanelOpen();
   const panelRef = useRef<HTMLDivElement>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
   const [still, setStill] = useState(false);
-  const [bookmarks, setBookmarks] = useState<WalletSession[]>([]);
-  const [notice, setNotice] = useState<string | null>(null);
+  const bookmarks = useBookmarks() ?? [];
+  // Bumped on each open, so the backup's report line starts clear.
+  const [openings, setOpenings] = useState(0);
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
@@ -117,19 +104,8 @@ export function WalletPanel() {
   }, []);
 
   useEffect(() => {
-    const sync = () => setBookmarks(loadBookmarks());
-    sync();
-    window.addEventListener(SESSIONS_CHANGED_EVENT, sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener(SESSIONS_CHANGED_EVENT, sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!isOpen) return;
-    setNotice(null);
+    setOpenings((n) => n + 1);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const focusField = requestAnimationFrame(() => panelRef.current?.querySelector<HTMLInputElement>("input")?.focus());
@@ -163,34 +139,6 @@ export function WalletPanel() {
   }, [isOpen]);
 
   const close = useCallback(() => closeWalletPanel(), []);
-
-  // The list as a JSON file the reader keeps: bookmarks live in this
-  // origin's localStorage, so the file is what carries them elsewhere.
-  const handleExport = () => {
-    const backup = exportBookmarks();
-    const count = backup.bookmarks.length;
-    if (count === 0) {
-      setNotice("No bookmarks to export yet.");
-      return;
-    }
-    const name = bookmarksBackupFilename();
-    const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }));
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    a.click();
-    URL.revokeObjectURL(url);
-    setNotice(`${plural(count, "bookmark")} saved to ${name}.`);
-  };
-
-  const handleImport = async (file: File) => {
-    try {
-      const result = importBookmarks(await file.text());
-      setNotice(`Read ${plural(result.read, "bookmark")}, ${result.added} new.`);
-    } catch (e) {
-      setNotice(e instanceof Error ? e.message : "That file couldn't be read.");
-    }
-  };
 
   if (!mounted) return null;
 
@@ -258,49 +206,16 @@ export function WalletPanel() {
         {/* The bookmarks: one list, scrolling between the search and the foot. */}
         <div className="min-h-0 flex-1 overflow-y-auto border-t border-rb-200 px-3 py-3 dark:border-rb-800">
           <p className="mb-1 px-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-rb-500">Bookmarks</p>
-          {bookmarks.length === 0 ? (
-            <p className="px-2.5 py-2 text-sm text-rb-500">No bookmarks yet.</p>
-          ) : (
-            <div className="flex flex-col gap-1" data-bookmark-list="">
-              {bookmarks.map((s) => (
-                <BookmarkRow key={s.key} session={s} onClose={close} />
-              ))}
-            </div>
-          )}
+          <BookmarkList
+            bookmarks={bookmarks}
+            onNavigate={close}
+            empty={<p className="px-2.5 py-2 text-sm text-rb-500">No bookmarks yet.</p>}
+          />
         </div>
 
         {/* Pinned at the foot: the backup and where bookmarks are kept. */}
         <div className="shrink-0 border-t border-rb-200 px-5 py-4 dark:border-rb-800">
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={handleExport}
-              className="cursor-pointer rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-rb-500 transition-colors hover:bg-rb-200 hover:text-foreground focus-ring dark:hover:bg-rb-800"
-            >
-              Export to file
-            </button>
-            <button
-              type="button"
-              onClick={() => fileInput.current?.click()}
-              className="cursor-pointer rounded-lg px-2.5 py-1.5 text-[11px] font-semibold text-rb-500 transition-colors hover:bg-rb-200 hover:text-foreground focus-ring dark:hover:bg-rb-800"
-            >
-              Import from file
-            </button>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="application/json,.json"
-              className="hidden"
-              tabIndex={-1}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                // Clear the input so re-picking the same file fires again.
-                e.target.value = "";
-                if (file) void handleImport(file);
-              }}
-            />
-          </div>
-          {notice && <p className="mt-2 text-[11px] text-rb-500">{notice}</p>}
+          <BookmarkBackup key={openings} />
           {/* The neutral mark: where bookmarks live is a fact about storage,
               and the caution triangle is kept for adverse events
               (standards/color-grammar.md). */}
@@ -315,216 +230,5 @@ export function WalletPanel() {
       </div>
     </div>,
     document.body,
-  );
-}
-
-/** Copy the wallet address to the clipboard, flashing a tick for ~1.2s. */
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1200);
-      }}
-      title="Copy address"
-      aria-label="Copy address"
-      className="cursor-pointer rounded-md p-1.5 text-rb-500 transition-colors hover:bg-rb-200 hover:text-foreground dark:hover:bg-rb-800"
-    >
-      {copied ? (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M20 6 9 17l-5-5" />
-        </svg>
-      ) : (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <rect width="14" height="14" x="8" y="8" rx="2" />
-          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-        </svg>
-      )}
-    </button>
-  );
-}
-
-function BookmarkRow({ session, onClose }: { session: WalletSession; onClose: () => void }) {
-  const [editing, setEditing] = useState(false);
-  const [draftName, setDraftName] = useState("");
-
-  const primary = session.addresses[0];
-  const ens = session.ensNames[primary] || null;
-  const fallback = ens || `${primary.slice(0, 6)}…${primary.slice(-4)}`;
-  const label = session.customName || fallback;
-
-  const startEdit = () => {
-    setDraftName(session.customName ?? "");
-    setEditing(true);
-  };
-  // renameSession persists and dispatches SESSIONS_CHANGED_EVENT, so the
-  // panel's sync reads this row's new label.
-  const commitEdit = () => {
-    renameSession(session.key, draftName);
-    setEditing(false);
-  };
-  const cancelEdit = () => {
-    setEditing(false);
-    setDraftName("");
-  };
-
-  const avatar = (
-    <div style={{ borderRadius: 5, boxShadow: "0 0 0 2px var(--facehash-ring)" }} className="shrink-0">
-      <Facehash address={primary} size={18} />
-    </div>
-  );
-
-  const rowClasses =
-    "group flex items-center gap-2.5 rounded-lg border border-transparent px-2.5 py-2 transition-colors hover:border-blue-500 hover:bg-rb-100 dark:hover:bg-rb-900";
-
-  if (editing) {
-    return (
-      <div className={rowClasses}>
-        {avatar}
-        <input
-          autoFocus
-          value={draftName}
-          onChange={(e) => setDraftName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              commitEdit();
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              cancelEdit();
-            }
-          }}
-          placeholder={fallback}
-          className="min-w-0 flex-1 rounded border border-rb-300 bg-raised px-1.5 py-0.5 text-base font-bold sm:text-xs outline-none dark:border-rb-700"
-        />
-        <div className="flex shrink-0 items-center gap-0.5">
-          <button
-            type="button"
-            onClick={commitEdit}
-            title="Save name"
-            aria-label="Save name"
-            className="cursor-pointer rounded-md p-1.5 text-rb-500 transition-colors hover:bg-rb-200 hover:text-green-500 dark:hover:bg-rb-800"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M20 6 9 17l-5-5" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            onClick={cancelEdit}
-            title="Cancel"
-            aria-label="Cancel rename"
-            className="cursor-pointer rounded-md p-1.5 text-rb-500 transition-colors hover:bg-rb-200 hover:text-foreground dark:hover:bg-rb-800"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="12"
-              height="12"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M18 6 6 18" />
-              <path d="m6 6 12 12" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={rowClasses}>
-      <Link href={walletHref(primary)} onClick={onClose} className="flex min-w-0 flex-1 items-center gap-2.5">
-        {avatar}
-        <span className="truncate text-xs font-bold text-foreground" title={primary}>
-          {label}
-        </span>
-      </Link>
-      <div className="flex shrink-0 items-center gap-0.5">
-        <CopyButton text={primary} />
-        <button
-          type="button"
-          onClick={startEdit}
-          title="Rename"
-          aria-label="Rename bookmark"
-          className="cursor-pointer rounded-md p-1.5 text-rb-500 transition-colors hover:bg-rb-200 hover:text-foreground dark:hover:bg-rb-800"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-          </svg>
-        </button>
-        <button
-          type="button"
-          onClick={() => removeBookmark(primary)}
-          title="Remove bookmark"
-          aria-label="Remove bookmark"
-          className="cursor-pointer rounded-md p-1.5 text-rb-500 transition-colors hover:bg-rb-200 hover:text-red-400 dark:hover:bg-rb-800"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M3 6h18" />
-            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-          </svg>
-        </button>
-      </div>
-    </div>
   );
 }
