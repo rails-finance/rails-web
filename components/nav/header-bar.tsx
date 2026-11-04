@@ -13,7 +13,7 @@ import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door
  *  restated here by prefix. Keep in sync with app/(site)/. (The old top-level
  *  chain directories are gone — the per-chain coverage pages are the
  *  directory now, and /coverage's prefix already covers them.) */
-const SITE_PREFIXES = ["/about", "/blog", "/coverage", "/privacy", "/pulse", "/start", "/terms"];
+const SITE_PREFIXES = ["/about", "/blog", "/coverage", "/privacy", "/pulse", "/terms"];
 
 function isSiteRoute(pathname: string | null) {
   if (!pathname) return false;

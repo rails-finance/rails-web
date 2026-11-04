@@ -80,8 +80,16 @@ function useScrollToCurrent(path: string, root: RefObject<HTMLDivElement | null>
     // room it lacks as bottom padding, until the next step is drawn.
     stack.style.paddingBottom = "";
     const top = el.getBoundingClientRect().top + window.scrollY - stickyHeaderHeight() - SCROLL_AIR;
-    const lacking = top - (document.documentElement.scrollHeight - window.innerHeight);
-    if (lacking > 0) stack.style.paddingBottom = `${Math.ceil(lacking)}px`;
+    // Measured again after each step: the body's min-h-screen takes up the
+    // first of the padding on a page shorter than the view (the app shell's
+    // footer is short; ui-jobs 496), so one pass can leave the step short.
+    let padding = 0;
+    for (let pass = 0; pass < 4; pass++) {
+      const lacking = top - (document.documentElement.scrollHeight - window.innerHeight);
+      if (lacking <= 0) break;
+      padding += Math.ceil(lacking);
+      stack.style.paddingBottom = `${padding}px`;
+    }
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     window.scrollTo({ top: Math.max(0, top), behavior: still ? "auto" : "smooth" });
   }, [path, root]);
