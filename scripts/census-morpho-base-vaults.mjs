@@ -1,8 +1,11 @@
 /**
- * Censuses every MetaMorpho vault deployed by Morpho's two Base factories and writes
- * lib/morpho-base/vault-catalog.ts.
+ * Censuses every MetaMorpho vault deployed by Morpho's two factories on one chain and writes
+ * that chain's catalogue.
  *
- *   node scripts/census-morpho-base-vaults.mjs
+ *   node scripts/census-morpho-base-vaults.mjs              Base → lib/morpho-base/vault-catalog.ts
+ *   node scripts/census-morpho-base-vaults.mjs --chain 1    Ethereum → lib/morpho-ethereum/vault-catalog.ts
+ *
+ * The header below was written for Base, the first chain; Ethereum's lanes are in `CHAINS`.
  *
  * THE BOX KEEPS THIS ROSTER CURRENT; THIS FILE IS THE FALLBACK. Since 2026-09-21
  * rails-server writes the same roster every morning (census-vault-positions.ts
@@ -74,7 +77,7 @@
  * Needs BASE_RPC_URL and BASE_BACKFILL_RPC_URL in .env.local.
  */
 import { createPublicClient, http, parseAbi, decodeAbiParameters } from "viem";
-import { base } from "viem/chains";
+import { base, mainnet } from "viem/chains";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -87,19 +90,58 @@ const env = Object.fromEntries(
     .filter((l) => l.includes("=") && !l.trim().startsWith("#"))
     .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
 );
-if (!env.BASE_RPC_URL) throw new Error("need BASE_RPC_URL in .env.local");
-if (!env.BASE_BACKFILL_RPC_URL) throw new Error("need BASE_BACKFILL_RPC_URL in .env.local — see the header");
+/** One chain's census: its lanes, its two factories and the module it writes. Both
+ *  factories emit the same event; a vault's factory says which implementation it is, which is
+ *  why it rides in the row (V1.0 has no `lostAssets()` ledger, V1.1 does, and the loader must
+ *  not read a revert as a zero). `floor` is the count a factory answered at the survey: a
+ *  creation log cannot be lost, so a sweep that finds fewer is a short answer. */
+const CHAINS = {
+  8453: {
+    name: "Base",
+    viemChain: base,
+    stateEnv: "BASE_RPC_URL",
+    logsEnv: "BASE_BACKFILL_RPC_URL",
+    out: "lib/morpho-base/vault-catalog.ts",
+    prefix: "MORPHO_BASE",
+    typePrefix: "MorphoBase",
+    fnPrefix: "morphoBase",
+    loader: "lib/sources/chain/morpho-base-vault.ts",
+    factories: [
+      { version: "v1.0", address: "0xA9c3D3a366466Fa809d1Ae982Fb2c46E5fC41101", floor: 1 },
+      { version: "v1.1", address: "0xFf62A7c278C62eD665133147129245053Bbf5918", floor: 1 },
+    ],
+  },
+  // Ethereum (rails-ops ui-jobs 486): both lanes are Tenderly's keyless mainnet gateway, which
+  // serves a whole-life getLogs for these factories (88 and 382 results, far under its
+  // 20,000-result cap) and the state calls. Floors from the 3 Nov 2026 survey.
+  1: {
+    name: "Ethereum",
+    viemChain: mainnet,
+    stateEnv: "ETHEREUM_LOGS_RPC_URL",
+    logsEnv: "ETHEREUM_LOGS_RPC_URL",
+    out: "lib/morpho-ethereum/vault-catalog.ts",
+    prefix: "MORPHO_ETHEREUM",
+    typePrefix: "MorphoEthereum",
+    fnPrefix: "morphoEthereum",
+    loader: "lib/sources/chain/morpho-base-vault.ts",
+    factories: [
+      { version: "v1.0", address: "0xA9c3D3a366466Fa809d1Ae982Fb2c46E5fC41101", floor: 88 },
+      { version: "v1.1", address: "0x1897A8997241C1cD4bD0698647e4EB7213535c24", floor: 382 },
+    ],
+  },
+};
+const chainArg = process.argv.indexOf("--chain");
+const CHAIN_ID = chainArg > 0 ? Number(process.argv[chainArg + 1]) : 8453;
+const C = CHAINS[CHAIN_ID];
+if (!C) throw new Error(`--chain must be one of ${Object.keys(CHAINS).join(", ")}`);
+const unquote = (v) => (v ?? "").replace(/^"(.*)"$/, "$1");
+const STATE_URL = unquote(env[C.stateEnv]);
+const LOGS_URL = unquote(env[C.logsEnv]);
+if (!STATE_URL) throw new Error(`need ${C.stateEnv} in .env.local`);
+if (!LOGS_URL) throw new Error(`need ${C.logsEnv} in .env.local — see the header`);
 
-const OUT = "lib/morpho-base/vault-catalog.ts";
-const LOGS_URL = env.BASE_BACKFILL_RPC_URL;
-
-/** The two MetaMorpho factories on Base. Both emit the same event; a vault's factory says
- *  which implementation it is, which is why it rides in the row (V1.0 has no `lostAssets()`
- *  ledger, V1.1 does, and the loader must not read a revert as a zero). */
-const FACTORIES = [
-  { version: "v1.0", address: "0xA9c3D3a366466Fa809d1Ae982Fb2c46E5fC41101" },
-  { version: "v1.1", address: "0xFf62A7c278C62eD665133147129245053Bbf5918" },
-];
+const OUT = C.out;
+const FACTORIES = C.factories;
 
 /** keccak("CreateMetaMorpho(address,address,address,uint256,address,string,string,bytes32)") */
 const CREATE_TOPIC = "0xed8c95d05909b0f217f3e68171ef917df4b278d5addfe4dda888e90279be7d1d";
@@ -118,8 +160,8 @@ const CREATE_DATA = [
 ];
 
 const client = createPublicClient({
-  chain: base,
-  transport: http(env.BASE_RPC_URL, { batch: false, retryCount: 3, retryDelay: 900 }),
+  chain: C.viemChain,
+  transport: http(STATE_URL, { batch: false, retryCount: 3, retryDelay: 900 }),
 });
 
 const sleep = (ms) => new Promise((s) => setTimeout(s, ms));
@@ -162,8 +204,12 @@ async function firstCodeBlock(address, hi) {
   return lo;
 }
 
-const head = Number(await client.getBlockNumber());
-console.error(`Base head ${head.toLocaleString("en-US")}`);
+// `--block N` pins the census to a block (for one at or under the box's served roster, which the
+// pages take only when its block is at or after this one's); the default is the head.
+const blockArg = process.argv.indexOf("--block");
+const head = blockArg > 0 ? Number(process.argv[blockArg + 1]) : Number(await client.getBlockNumber());
+if (!Number.isInteger(head) || head <= 0) throw new Error("--block must be a block number");
+console.error(`${C.name} head ${head.toLocaleString("en-US")}`);
 
 /** Take every CreateMetaMorpho this factory emitted in [from, to], keyed by vault address.
  *  Never trusts the server-side filter: the emitter and topic0 are re-checked in code, and
@@ -222,6 +268,10 @@ for (const f of FACTORIES) {
   // A factory that answers ZERO is a failed read, not an empty factory: both of these have
   // been making vaults for over a year. Refuse to write a roster built on one.
   if (whole.size === 0) throw new Error(`${f.version} factory returned no CreateMetaMorpho logs — refusing to write`);
+  if (whole.size < f.floor)
+    throw new Error(
+      `${f.version} factory returned ${whole.size} vaults, under the ${f.floor} it has made — refusing to write`,
+    );
   vaults.push(...whole.values());
   console.error(`  ${whole.size} vaults — whole-life and chunked sweeps agree`);
   perFactory.push({ ...f, from, count: whole.size });
@@ -253,6 +303,7 @@ async function pacedMulticall(contracts, size = 120, gapMs = 150) {
         contracts: contracts.slice(i, i + size),
         allowFailure: true,
         batchSize: 0,
+        blockNumber: BigInt(head),
       })),
     );
     process.stderr.write(`\r  metadata ${Math.min(i + size, contracts.length)}/${contracts.length}`);
@@ -309,7 +360,8 @@ if (notMember > 0)
   throw new Error(`${notMember}/${sample.length} sampled vaults are not isMetaMorpho on their factory — refusing`);
 console.error(`  ✓ ${sample.length} sampled vaults are isMetaMorpho() on the factory that emitted them`);
 
-const block = Number(await client.getBlockNumber());
+// Every log was swept to `head` and every call answered at it: that is the census block.
+const block = head;
 
 // Assets repeat heavily — a hundred-odd vaults share one USDC. Intern them so the module
 // stays a readable size; the vault addresses themselves are unique and are written out.
@@ -334,9 +386,14 @@ const rows = vaults.map((v) => [
 ]);
 const esc = (s) => JSON.stringify(s);
 
-const out = `// GENERATED by scripts/census-morpho-base-vaults.mjs — do not edit by hand; re-run it.
+const P = C.prefix;
+const T = C.typePrefix;
+// Base's factory table and address lookup have readers (verifiers, the case-study gate);
+// another chain's stay module-private until something reads them (`npm run check:dead`).
+const X = CHAIN_ID === 8453 ? "export " : "";
+const out = `// GENERATED by scripts/census-morpho-base-vaults.mjs${CHAIN_ID === 8453 ? "" : ` --chain ${CHAIN_ID}`} — do not edit by hand; re-run it.
 //
-// Every MetaMorpho vault the two Morpho factories deployed on Base, censused at block
+// Every MetaMorpho vault the two Morpho factories deployed on ${C.name}, censused at block
 // ${block.toLocaleString("en-US")}: ${perFactory.map((f) => `${f.count} from ${f.version}`).join(", ")}.
 //
 // THIS ROSTER IS A FLOOR, NOT A TOTAL. MetaMorpho is a contract, not a registry entry: anyone
@@ -355,19 +412,19 @@ const out = `// GENERATED by scripts/census-morpho-base-vaults.mjs — do not ed
 // ${renamed} vaults answered a different name than their creation log carries and ${resymboled} a different
 // symbol. So those two are a SNAPSHOT at the census block, fit for naming a vault in a roster
 // and not for stating what a vault is called now: a surface that must say a vault's current
-// name reads it at its own pinned block (lib/sources/chain/morpho-base-vault.ts does, and the
+// name reads it at its own pinned block (${C.loader} does, and the
 // vault page's H1 is that read).
 //
 // Everything else MUTABLE — curator, owner, the withdraw queue, totalAssets, a holder's
 // balance — is read at a pinned block by the loader and never lives here.
 
 /** The block this roster was censused at. Vaults created after it are absent until re-run. */
-export const MORPHO_BASE_VAULT_CENSUS_BLOCK = ${block};
+export const ${P}_VAULT_CENSUS_BLOCK = ${block};
 
 /** The two factories, with the block each factory's own code first appears at (bisected on
  *  eth_getCode) — the floor of the census sweep, and re-derivable against any archive node. */
-export const MORPHO_BASE_METAMORPHO_FACTORIES: readonly {
-  version: MorphoBaseVaultFactory;
+${X}const ${P}_METAMORPHO_FACTORIES: readonly {
+  version: ${T}VaultFactory;
   address: string;
   firstBlock: number;
   vaults: number;
@@ -395,12 +452,12 @@ ${rows.map((r) => `  [${esc(r[0])}, ${r[1]}, ${r[2]}, ${esc(r[3])}, ${esc(r[4])}
 /** Which MetaMorpho implementation a vault is. V1.0 has no \`lostAssets()\` ledger and reverts
  *  on the call; V1.1 answers it. The loader must read that revert as "no such ledger", never
  *  as a zero. */
-export type MorphoBaseVaultFactory = "v1.0" | "v1.1";
+export type ${T}VaultFactory = "v1.0" | "v1.1";
 
-export interface MorphoBaseVaultCatalogEntry {
+export interface ${T}VaultCatalogEntry {
   /** Lowercased vault address. */
   address: string;
-  factory: MorphoBaseVaultFactory;
+  factory: ${T}VaultFactory;
   /** The block its CreateMetaMorpho log was emitted at. */
   createdBlock: number;
   /** The ERC20 name and symbol of the vault's share token AS OF THE CENSUS BLOCK. Mutable on
@@ -412,7 +469,7 @@ export interface MorphoBaseVaultCatalogEntry {
 }
 
 /** The roster, in creation order. A FLOOR — see the header. */
-export const MORPHO_BASE_VAULTS: readonly MorphoBaseVaultCatalogEntry[] = ROWS.map((r) => ({
+export const ${P}_VAULTS: readonly ${T}VaultCatalogEntry[] = ROWS.map((r) => ({
   address: r[0],
   factory: r[1] === 1 ? "v1.1" : "v1.0",
   createdBlock: r[2],
@@ -421,11 +478,11 @@ export const MORPHO_BASE_VAULTS: readonly MorphoBaseVaultCatalogEntry[] = ROWS.m
   asset: A[r[5]],
 }));
 
-const BY_ADDRESS = new Map(MORPHO_BASE_VAULTS.map((v) => [v.address, v]));
+const BY_ADDRESS = new Map(${P}_VAULTS.map((v) => [v.address, v]));
 
 /** The catalogued vault at \`addr\`, or undefined. Case-insensitive; a miss means "not in this
  *  census", which is NOT the same as "not a MetaMorpho vault" — the roster is a floor. */
-export function morphoBaseVaultByAddress(addr: string): MorphoBaseVaultCatalogEntry | undefined {
+${X}function ${C.fnPrefix}VaultByAddress(addr: string): ${T}VaultCatalogEntry | undefined {
   return BY_ADDRESS.get(addr.toLowerCase());
 }
 `;

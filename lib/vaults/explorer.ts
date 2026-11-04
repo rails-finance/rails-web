@@ -17,6 +17,7 @@ const FAMILY_NOUN: Record<VaultFamilyKey, string> = {
   "aave-vaults": "Aave vault",
   yearn: "Yearn V3 vault",
   "morpho-base": "MetaMorpho vault",
+  morpho: "MetaMorpho vault",
 };
 
 const DEPLOYMENT_NAME = { ethereum: "Ethereum", base: "Base" } as const;
@@ -84,7 +85,12 @@ export const vaultExplorer: ExplorerAdapter<VaultEventPageInput> = {
         value: short(holder),
         full: holder,
         mono: true,
-        href: listingHrefForWallet(family, holder, family === "morpho-base" ? "vaults" : undefined) ?? undefined,
+        href:
+          listingHrefForWallet(
+            family,
+            holder,
+            family === "morpho-base" || family === "morpho" ? "vaults" : undefined,
+          ) ?? undefined,
       },
     ],
     ...slot,

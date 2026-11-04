@@ -45,9 +45,16 @@ import type { Provenance } from "@/components/shared/provenance";
 import { MORPHO_BASE_BLUE } from "@/lib/morpho-base/asset-catalog";
 import type { MorphoBaseVaultHolderShape } from "@/lib/sources/chain/morpho-base-vault";
 
-const LANE = "live Base chain reads (/base/morpho/vaults)";
+/** The chain a receipt's reads were on: Base unless the coordinates say Ethereum. */
+const chainWord = (c: MorphoVaultCoords) => (c.chainId === 1 ? "Ethereum" : "Base");
+const lane = (c: MorphoVaultCoords) =>
+  c.chainId === 1
+    ? "live Ethereum chain reads (/ethereum/morpho/vaults)"
+    : "live Base chain reads (/base/morpho/vaults)";
 
 export interface MorphoVaultCoords {
+  /** The chain the vault is on; Base where omitted. */
+  chainId?: number;
   /** rails-server's read of `blockNumber`, when it answered every read of the page. */
   readBy?: ServerRead | null;
   /** The block every figure was read at — every receipt's `source` block. */
@@ -81,8 +88,8 @@ const recompute = (call: string, c: MorphoVaultCoords): Provenance["verify"] => 
   kind: "recompute",
   text:
     c.blockNumber != null
-      ? `Re-run the ${call} eth_call at block ${c.blockNumber} against any Base node`
-      : `Re-run the ${call} eth_call against any Base node`,
+      ? `Re-run the ${call} eth_call at block ${c.blockNumber} against any ${chainWord(c)} node`
+      : `Re-run the ${call} eth_call against any ${chainWord(c)} node`,
 });
 
 const asset = (c: MorphoVaultCoords) => c.assetSymbol ?? "the vault's asset";
@@ -100,7 +107,7 @@ const vaultTotalAssetsProv_ = (c: MorphoVaultCoords): Provenance => ({
   verify: recompute("MetaMorpho.totalAssets()", c),
   summary: `Total assets — the vault's own \`totalAssets()\`${atBlock(c)}, in ${asset(c)}. MetaMorpho computes it by walking its supply queue and EXTRAPOLATING each market's interest to this block's timestamp, so it stands ahead of the stored market totals the allocation table sums. Both figures are on the page, and the difference between them is stated as its own number.`,
   contract: vaultContract(c),
-  via: `${LANE} · MetaMorpho.totalAssets() @ the pinned block`,
+  via: `${lane(c)} · MetaMorpho.totalAssets() @ the pinned block`,
 });
 
 // `lastTotalAssets()` travels in the loader's response and has NO builder here,
@@ -117,7 +124,7 @@ const vaultTotalSupplyProv_ = (c: MorphoVaultCoords): Provenance => ({
   verify: recompute("MetaMorpho.totalSupply()", c),
   summary: `Total shares — the ERC-20 \`totalSupply()\` of the vault's own share token${atBlock(c)}. Every share in existence, and the denominator of every proportional figure on this page.`,
   contract: vaultContract(c),
-  via: `${LANE} · MetaMorpho.totalSupply() @ the pinned block`,
+  via: `${lane(c)} · MetaMorpho.totalSupply() @ the pinned block`,
 });
 
 /** `convertToAssets(10^decimals)` — one whole share, priced by the vault itself. */
@@ -128,7 +135,7 @@ const vaultSharePriceProv_ = (c: MorphoVaultCoords): Provenance => ({
   verify: recompute("MetaMorpho.convertToAssets(1 share)", c),
   summary: `Share price — \`convertToAssets(10^decimals)\`${atBlock(c)}: what ONE whole vault share converts to in ${asset(c)}, answered by the vault. It carries the same extrapolation \`totalAssets()\` does.`,
   contract: vaultContract(c),
-  via: `${LANE} · MetaMorpho.convertToAssets(one share) @ the pinned block`,
+  via: `${lane(c)} · MetaMorpho.convertToAssets(one share) @ the pinned block`,
 });
 
 /** `lostAssets()` — V1.1's own ledger of the shortfall it has NOT taken off the share price. Never shown
@@ -140,7 +147,7 @@ const vaultLostAssetsProv_ = (c: MorphoVaultCoords): Provenance => ({
   verify: recompute("MetaMorpho.lostAssets()", c),
   summary: `Lost assets — \`lostAssets()\`${atBlock(c)}, in ${asset(c)}: the part of the vault's stated total that no market holds. When a market loses asset (bad debt, or a market removed by force), a V1.1 vault does not lower its share price; it keeps \`totalAssets()\` where it stood and records the shortfall here. So this much of \`totalAssets()\`, and of the share price, is not backed by anything the vault holds. It is not a fee and not interest owed. This is a MetaMorpho V1.1 ledger; a V1.0 vault reverts on the call and this figure is absent for one rather than shown as zero.`,
   contract: vaultContract(c),
-  via: `${LANE} · MetaMorpho.lostAssets() @ the pinned block`,
+  via: `${lane(c)} · MetaMorpho.lostAssets() @ the pinned block`,
 });
 
 // ── what Blue says the vault holds ───────────────────────────────────────────
@@ -153,7 +160,7 @@ const vaultLegAssetsProv_ = (c: MorphoVaultCoords): Provenance => ({
   source: { block: c.blockNumber },
   summary: `The vault's supplied ${asset(c)} in ${legName(c)} — its \`position(id, vault).supplyShares\` converted at the market's stored totals${atBlock(c)}. STORED state: Blue accrues interest only when a market is TOUCHED, so \`market(id)\` holds what that market last settled at its \`lastUpdate\`, and nothing here projects it forward.`,
   contract: blueContract(),
-  via: `${LANE} · Morpho.position(id, vault) and Morpho.market(id) @ the pinned block`,
+  via: `${lane(c)} · Morpho.position(id, vault) and Morpho.market(id) @ the pinned block`,
   formula: "supplyShares × totalSupplyAssets ÷ totalSupplyShares",
   inputs: [
     {
@@ -188,7 +195,7 @@ const vaultLegShareProv_ = (c: MorphoVaultCoords): Provenance => ({
   source: { block: c.blockNumber },
   summary: `How much of the vault's allocated ${asset(c)} sits in ${legName(c)} — this leg's stored assets over the sum of all of them${atBlock(c)}. A ratio of two amounts in the same token, so it needs no price and no oracle is asked.`,
   contract: blueContract(),
-  via: `${LANE} · one leg ÷ Σ legs @ the pinned block`,
+  via: `${lane(c)} · one leg ÷ Σ legs @ the pinned block`,
   formula: "leg assets ÷ Σ leg assets",
 });
 
@@ -204,7 +211,7 @@ const vaultLegLltvProv_ = (c: MorphoVaultCoords): Provenance => ({
   },
   summary: `Loan-to-value for ${legName(c)} — \`idToMarketParams(id).lltv\`${atBlock(c)}, the market's ONE risk number: the borrow limit and the liquidation line at once. Fixed at creation and immutable, because the market id IS keccak256(abi.encode(params)).`,
   contract: blueContract(),
-  via: `${LANE} · Morpho.idToMarketParams(id).lltv`,
+  via: `${lane(c)} · Morpho.idToMarketParams(id).lltv`,
 });
 
 /** Σ over the withdraw queue of each leg's stored assets — the vault's position
@@ -215,7 +222,7 @@ const vaultAllocatedProv_ = (c: MorphoVaultCoords): Provenance => ({
   source: { block: c.blockNumber },
   summary: `Allocated in Morpho Blue — Σ over every market in the vault's withdraw queue of the ${asset(c)} its supply shares convert to at that market's STORED totals${atBlock(c)}. A sum of amounts in one token, so it is a real quantity. It is not \`totalAssets()\`: this side is Blue's last settled state, and the vault's own figure extrapolates past it.`,
   contract: blueContract(),
-  via: `${LANE} · Σ over MetaMorpho.withdrawQueue of Morpho.position/market @ the pinned block`,
+  via: `${lane(c)} · Σ over MetaMorpho.withdrawQueue of Morpho.position/market @ the pinned block`,
   formula: "Σ (supplyShares × totalSupplyAssets ÷ totalSupplyShares)",
   inputs: [
     {
@@ -241,7 +248,7 @@ const vaultGapProv_ = (c: MorphoVaultCoords): Provenance => ({
   source: { block: c.blockNumber },
   summary: `Unaccrued interest — the vault's own \`totalAssets()\` minus the Σ of its stored Blue legs${atBlock(c)}. Two readings of the same holdings at the same block: MetaMorpho extrapolates each market's interest to this block's timestamp, Blue's \`market(id)\` holds what each market last SETTLED. The difference is stated, and it also carries any asset the vault holds outside its Blue positions.`,
   contract: vaultContract(c),
-  via: `${LANE} · MetaMorpho.totalAssets() − Σ legs @ the pinned block`,
+  via: `${lane(c)} · MetaMorpho.totalAssets() − Σ legs @ the pinned block`,
   formula: "totalAssets − Σ leg assets",
   inputs: [
     {
@@ -278,7 +285,7 @@ const vaultHolderShapeProv_ = (c: MorphoVaultCoords, shape: MorphoBaseVaultHolde
       case "delegated-account":
         return `\`eth_getCode\`${at} returned exactly 23 bytes: \`0xef0100\` followed by ${shape.delegate}. That is the EIP-7702 delegation indicator — the account is still an externally owned account, controlled by a key, and the code it runs is the code at that address. The delegate is stated, not identified: what that contract is takes reading it, and an account can point at a different one, or at none, in a later block.`;
       case "metamorpho-vault":
-        return `\`eth_getCode\`${at} returned ${size}, and the address is one of the MetaMorpho vaults this directory's own Base census recorded, which is where the name comes from. Its \`asset()\` answered ${shape.asset ?? "nothing"}.`;
+        return `\`eth_getCode\`${at} returned ${size}, and the address is one of the MetaMorpho vaults this directory's own ${chainWord(c)} census recorded, which is where the name comes from. Its \`asset()\` answered ${shape.asset ?? "nothing"}.`;
       case "safe":
         return `\`eth_getCode\`${at} returned ${size}, and its ${shape.evidence} names ${shape.singleton} — the released Safe ${shape.version} singleton. The match is exact against a known deployment; no part of it is read off the ABI.`;
       case "erc4626":
@@ -301,12 +308,12 @@ const vaultHolderShapeProv_ = (c: MorphoVaultCoords, shape: MorphoBaseVaultHolde
       kind: "recompute",
       text:
         c.blockNumber != null
-          ? `Re-run eth_getCode on this address at block ${c.blockNumber} against any Base node`
-          : "Re-run eth_getCode on this address against any Base node",
+          ? `Re-run eth_getCode on this address at block ${c.blockNumber} against any ${chainWord(c)} node`
+          : `Re-run eth_getCode on this address against any ${chainWord(c)} node`,
     },
     summary: `What this address is — read from the address itself at the same block as every figure beside it. ${evidence} This says what kind of thing holds the shares; it does not say who controls it.`,
     contract: { name: "the address looked up", address: c.holder },
-    via: `${LANE} · eth_getCode / eth_getStorageAt / asset() on the holder @ the pinned block`,
+    via: `${lane(c)} · eth_getCode / eth_getStorageAt / asset() on the holder @ the pinned block`,
   };
 };
 
@@ -318,7 +325,7 @@ const vaultAttributedProv_ = (c: MorphoVaultCoords): Provenance => ({
   source: { block: c.blockNumber },
   summary: `Attributed ${asset(c)} in ${legName(c)}${atBlock(c)} — this address's share of the vault applied to the vault's own supplied balance in that market, floored to whole units. It is PROPORTIONAL, not fund-tracing: vault shares are fungible and deposits were pooled before the curator allocated them, so no on-chain fact ties a particular deposit to a particular market. Two addresses holding equal shares carry equal figures here, whatever they deposited and whenever.`,
   contract: blueContract(),
-  via: `${LANE} · balanceOf(holder) × leg assets ÷ totalSupply @ the pinned block`,
+  via: `${lane(c)} · balanceOf(holder) × leg assets ÷ totalSupply @ the pinned block`,
   formula: "floor(shares × leg assets ÷ totalSupply)",
   inputs: [
     { label: "shares", kind: "chain", pclass: "state", note: "MetaMorpho.balanceOf(holder) @ the pinned block" },
@@ -340,7 +347,7 @@ const vaultAttributedTotalProv_ = (c: MorphoVaultCoords): Provenance => ({
   source: { block: c.blockNumber },
   summary: `Total attributed ${asset(c)}${atBlock(c)} — Σ over the rows above. This is the address's share of the vault's STORED positions in Blue, each row floored to whole units. The claim figure beside it is the vault's own answer for the same balance, computed against its extrapolated total and against a share count that includes the fee shares its next accrual would mint — so the two differ slightly, and either can be the larger.`,
   contract: blueContract(),
-  via: `${LANE} · Σ floor(shares × leg assets ÷ totalSupply) @ the pinned block`,
+  via: `${lane(c)} · Σ floor(shares × leg assets ÷ totalSupply) @ the pinned block`,
   formula: "Σ floor(shares × leg assets ÷ totalSupply)",
 });
 
@@ -369,10 +376,10 @@ const vaultDirectoryCensusProv_ = (
   source: { block: census.censusBlock },
   verify: {
     kind: "recompute",
-    text: `Sweep CreateMetaMorpho on both MetaMorpho factories on Base from each factory's first block to block ${census.censusBlock} and count the vaults`,
+    text: `Sweep CreateMetaMorpho on both MetaMorpho factories on ${chainWord(c)} from each factory's first block to block ${census.censusBlock} and count the vaults`,
   },
-  summary: `Vaults catalogued — ${census.catalogSize.toLocaleString("en-US")}: every vault the two MetaMorpho factories on Base (v1.0 and v1.1) had deployed at Base block ${census.censusBlock.toLocaleString("en-US")}, each one a \`CreateMetaMorpho\` event on its factory. THE ROSTER IS A FLOOR, not a total: a MetaMorpho compiled and deployed without a factory emits no creation event and is absent from it, a vault created after the census block is absent until the census re-runs, and the Vault V2 family is not catalogued. The directory lists exactly these.`,
-  via: `${LANE} · CreateMetaMorpho on both factories, censused to block ${census.censusBlock}`,
+  summary: `Vaults catalogued — ${census.catalogSize.toLocaleString("en-US")}: every vault the two MetaMorpho factories on ${chainWord(c)} (v1.0 and v1.1) had deployed at ${chainWord(c)} block ${census.censusBlock.toLocaleString("en-US")}, each one a \`CreateMetaMorpho\` event on its factory. THE ROSTER IS A FLOOR, not a total: a MetaMorpho compiled and deployed without a factory emits no creation event and is absent from it, a vault created after the census block is absent until the census re-runs, and the Vault V2 family is not catalogued. The directory lists exactly these.`,
+  via: `${lane(c)} · CreateMetaMorpho on both factories, censused to block ${census.censusBlock}`,
   formula: "count of CreateMetaMorpho events on the v1.0 and v1.1 factories up to the census block",
 });
 
@@ -386,7 +393,7 @@ const vaultDirectoryNameProv_ = (c: MorphoVaultCoords): Provenance => ({
   verify: recompute("MetaMorpho.name()", c),
   summary: `Vault name — the ERC-20 \`name()\` of the vault's share token${atBlock(c)}, read live rather than taken from the census: a MetaMorpho V1.1 owner can rename the vault (\`setName\`), so the name is a reading at this block and not an identity. Two vaults may share a name; the address beside it is what tells them apart.`,
   contract: vaultContract(c),
-  via: `${LANE} · MetaMorpho.name() @ the pinned block`,
+  via: `${lane(c)} · MetaMorpho.name() @ the pinned block`,
 });
 
 /** `totalAssets()` on a directory row — the vault's own figure for what it
@@ -399,7 +406,7 @@ const vaultDirectoryTotalAssetsProv_ = (c: MorphoVaultCoords): Provenance => ({
   verify: recompute("MetaMorpho.totalAssets()", c),
   summary: `Total assets — the vault's own \`totalAssets()\`${atBlock(c)}, in ${asset(c)}. MetaMorpho computes it by walking its supply queue and extrapolating each market's interest to this block's timestamp. It is a quantity of ${asset(c)} and is compared only with other vaults in the same asset: the directory groups by asset and never orders or sums across two of them, because that would take a price this page does not read. A zero here is a reading — the vault holds nothing at this block — not an absence.`,
   contract: vaultContract(c),
-  via: `${LANE} · MetaMorpho.totalAssets() @ the pinned block`,
+  via: `${lane(c)} · MetaMorpho.totalAssets() @ the pinned block`,
 });
 
 /** `convertToAssets(10^18)` on a directory row — one whole share, priced by the
@@ -414,7 +421,7 @@ const vaultDirectorySharePriceProv_ = (c: MorphoVaultCoords): Provenance => ({
   verify: recompute("MetaMorpho.convertToAssets(1 share)", c),
   summary: `Share price — \`convertToAssets(10^18)\`${atBlock(c)}: what ONE whole vault share converts to in ${asset(c)}, answered by the vault. It carries the same extrapolation \`totalAssets()\` does, and is a quantity of ${asset(c)} only — never compared or summed across a group boundary, and never converted to USD.`,
   contract: vaultContract(c),
-  via: `${LANE} · MetaMorpho.convertToAssets(one share) @ the pinned block`,
+  via: `${lane(c)} · MetaMorpho.convertToAssets(one share) @ the pinned block`,
 });
 
 /** How many catalogued vaults in one asset hold something at the block — a
@@ -424,7 +431,7 @@ const vaultDirectoryGroupCountProv_ = (c: MorphoVaultCoords, n: number): Provena
   pclass: "state",
   source: { block: c.blockNumber },
   summary: `${n === 1 ? "One vault" : `${n.toLocaleString("en-US")} vaults`} denominated in ${asset(c)} with a non-zero \`totalAssets()\`${atBlock(c)} — a count over the directory's own reads, one per catalogued vault whose immutable \`asset()\` is ${asset(c)}. Vaults in this asset that read zero are counted in the trailing group instead, not dropped.`,
-  via: `${LANE} · count of catalogued vaults with asset() = ${asset(c)} and totalAssets() > 0 @ the pinned block`,
+  via: `${lane(c)} · count of catalogued vaults with asset() = ${asset(c)} and totalAssets() > 0 @ the pinned block`,
   formula: `count of catalogued vaults where asset() = ${asset(c)} and totalAssets() > 0`,
 });
 
@@ -436,7 +443,7 @@ const vaultDirectoryEmptyCountProv_ = (c: MorphoVaultCoords, n: number, catalogS
   pclass: "state",
   source: { block: c.blockNumber },
   summary: `${n.toLocaleString("en-US")} of the ${catalogSize.toLocaleString("en-US")} catalogued vaults answered zero to \`totalAssets()\`${atBlock(c)} — each holds nothing at this block. That is a reading about each vault, not a gap in the read: a vault whose call did not answer is stated as unread, separately, and is not in this count.`,
-  via: `${LANE} · count of catalogued vaults with totalAssets() = 0 @ the pinned block`,
+  via: `${lane(c)} · count of catalogued vaults with totalAssets() = 0 @ the pinned block`,
   formula: "count of catalogued vaults where totalAssets() = 0",
 });
 

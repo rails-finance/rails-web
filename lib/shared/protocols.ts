@@ -522,7 +522,12 @@ const SPECS: ProtocolSpec[] = [
     brand: 264,
     tags: ["Lend", "Borrow"],
     desc: "Isolated lending markets replayed from events — positions reconstructed with zero modeled state",
-    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+    // MetaMorpho on Ethereum hangs off this explorer as it does on Base
+    // (decision 0028; rails-ops ui-jobs 486).
+    subPages: [
+      { segment: "markets", label: "Markets overview", tab: "Markets" },
+      { segment: "vaults", label: "Vaults overview", tab: "Vaults" },
+    ],
   },
   {
     // Morpho Blue's Base deployment. Blue is a singleton at the SAME address on

@@ -49,11 +49,14 @@ import {
   chainName,
   VAULT_INDEX_PROTOCOL_LABEL,
   VAULT_INDEX_PROTOCOLS,
+  VAULT_INDEX_ROSTERS,
   vaultIndexHoldersHref,
   vaultIndexHref,
   vaultIndexKey,
   vaultIndexProtocol,
   vaultIndexRosterHref,
+  vaultIndexRosterKey,
+  vaultIndexRosterKeyOf,
   type VaultIndexRoster,
 } from "@/lib/vaults/index-rosters";
 import { maplePoolCountProv, vaultIndexEmptyCountProv, vaultIndexGroupCountProv } from "@/lib/vaults/index-provenance";
@@ -61,17 +64,18 @@ import { maplePoolCountProv, vaultIndexEmptyCountProv, vaultIndexGroupCountProv 
 const n = (v: number) => v.toLocaleString("en-US");
 
 /** Each row's sidebar (C20): the roster entry whose route holds the vault's
- *  family directory, as on that directory (Maple: its pools page). */
+ *  family directory, as on that directory (Maple: its pools page), keyed by
+ *  protocol and chain (Morpho is on two). */
 const EDGES = Object.fromEntries(
-  VAULT_INDEX_PROTOCOLS.map((p) => {
-    const entry = protocolForPathname(vaultIndexRosterHref(p));
+  VAULT_INDEX_ROSTERS.map((r) => {
+    const entry = protocolForPathname(vaultIndexRosterHref(r.protocol, r.chainId));
     const edge: PositionCardEdge | null = entry
       ? {
           protocol: { id: entry.id, name: entry.label },
           chain: { id: entry.chainId, name: chainMeta(entry.chainId).name },
         }
       : null;
-    return [p, edge];
+    return [vaultIndexRosterKey(r), edge];
   }),
 ) as Record<string, PositionCardEdge | null>;
 
@@ -106,7 +110,10 @@ function rosterCountProv(r: VaultIndexRoster): Provenance {
   const c = r.catalog;
   switch (r.protocol) {
     case "morpho":
-      return vaultDirectoryCensusProv(coords, { catalogSize: c.catalogSize, censusBlock: c.censusBlock ?? 0 });
+      return vaultDirectoryCensusProv(
+        { ...coords, chainId: r.chainId },
+        { catalogSize: c.catalogSize, censusBlock: c.censusBlock ?? 0 },
+      );
     case "aave":
       return aaveVaultCatalogueProv(coords, {
         catalogSize: c.catalogSize,
@@ -149,7 +156,7 @@ export function VaultIndexView({
         ),
       ]
     : [];
-  const rosterOf = (v: VaultSummary) => rosters.find((r) => r.protocol === vaultIndexProtocol(v));
+  const rosterOf = (v: VaultSummary) => rosters.find((r) => vaultIndexRosterKey(r) === vaultIndexRosterKeyOf(v));
 
   const receiptsOf = (v: VaultSummary): VaultRowReceipts => {
     const roster = rosterOf(v);
@@ -158,7 +165,7 @@ export function VaultIndexView({
     const vaultName = vaultDisplayName(v) ?? undefined;
     switch (vaultIndexProtocol(v)) {
       case "morpho": {
-        const c = { blockNumber, readBy, vault: v.address, vaultName, assetSymbol: v.asset.symbol };
+        const c = { blockNumber, readBy, vault: v.address, vaultName, assetSymbol: v.asset.symbol, chainId: v.chainId };
         return {
           name: vaultDirectoryNameProv(c),
           totalAssets: vaultDirectoryTotalAssetsProv(c),
@@ -226,7 +233,7 @@ export function VaultIndexView({
       Every vault the rosters list:{" "}
       {counts.map((r, i) => (
         <span
-          key={r.protocol}
+          key={vaultIndexRosterKey(r)}
           data-index-count={r.protocol}
           data-count={r.count}
           data-index-roster={r.protocol}
@@ -234,7 +241,7 @@ export function VaultIndexView({
           data-index-block={r.blockNumber}
         >
           {i > 0 && ", "}
-          <Link href={vaultIndexRosterHref(r.protocol)} className={PAGE_LINK} prefetch={false}>
+          <Link href={vaultIndexRosterHref(r.protocol, r.chainId)} className={PAGE_LINK} prefetch={false}>
             {VAULT_INDEX_PROTOCOL_LABEL[r.protocol]}
           </Link>{" "}
           <Prov info={rosterCountProv(r)}>{n(r.count)}</Prov> at <RosterBlock read={readOf(r)} chainId={r.chainId} />
@@ -258,7 +265,7 @@ export function VaultIndexView({
         facets={FACETS}
         assetFacet={TOKEN_FACET}
         initialFilters={assetValues.length > 0 ? { [TOKEN_FACET.id]: assetValues } : undefined}
-        edgeOf={(v) => EDGES[vaultIndexProtocol(v)] ?? null}
+        edgeOf={(v) => EDGES[vaultIndexRosterKeyOf(v)] ?? null}
         hrefOf={vaultIndexHref}
         holdersHrefOf={vaultIndexHoldersHref}
         receiptsOf={receiptsOf}

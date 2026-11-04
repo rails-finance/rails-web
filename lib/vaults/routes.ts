@@ -5,8 +5,8 @@
 // market has. The protocol is the door because the factory that made the
 // contract is what decides whose vault it is, and that is chain-proven.
 //
-// Base's MetaMorpho vaults are Morpho Blue's, so they hang off the `vaults`
-// sub-page of `/base/morpho`:
+// MetaMorpho vaults are Morpho Blue's, so they hang off the `vaults` sub-page
+// of `/base/morpho`, and the same tree under `/ethereum/morpho` (ui-jobs 486):
 //
 //   /base/morpho/vaults                      the roster of vaults, read from chain
 //   /base/morpho/vaults/positions            every (vault, holder) position, as cards
@@ -63,6 +63,8 @@ function vaultsSubPageHref(explorerHref: string): string {
 
 /** Morpho Blue on Base — the vault layer's root. */
 const BASE_VAULTS = vaultsSubPageHref("/base/morpho");
+/** Morpho Blue on Ethereum — MetaMorpho's root there (ui-jobs 486). */
+const ETHEREUM_MORPHO_VAULTS = vaultsSubPageHref("/ethereum/morpho");
 /** Aave's vault layer on Ethereum — its explorer's one sub-page. */
 const ETHEREUM_VAULTS = vaultsSubPageHref("/ethereum/aave");
 /** Yearn V3 on Ethereum — its explorer's one sub-page. */
@@ -123,6 +125,37 @@ export function baseVaultsListingHref(filters?: {
   const qs = p.toString();
   const listing = `${BASE_VAULTS}/positions`;
   return qs ? `${listing}?${qs}` : listing;
+}
+
+// ── MetaMorpho on either chain ───────────────────────────────────────────────
+// The same grammar under `/ethereum/morpho/vaults` as under `/base/morpho/vaults`
+// (ui-jobs 486). The Base helpers above are these with the chain fixed.
+
+/** The chains MetaMorpho's vault layer is served on. */
+export type MetaMorphoRouteChain = 1 | 8453;
+
+const METAMORPHO_VAULTS: Record<MetaMorphoRouteChain, string> = { 8453: BASE_VAULTS, 1: ETHEREUM_MORPHO_VAULTS };
+
+/** MetaMorpho's roster on `chainId` (`/<chain>/morpho/vaults`). */
+export function metaMorphoVaultRosterHref(chainId: MetaMorphoRouteChain): string {
+  return METAMORPHO_VAULTS[chainId];
+}
+
+/** One MetaMorpho vault's page on `chainId`, or given a holder that pair's
+ *  position page; see `baseVaultHref`. */
+export function metaMorphoVaultHref(chainId: MetaMorphoRouteChain, vault: string, holder?: string): string {
+  const path = `${METAMORPHO_VAULTS[chainId]}/${vault.toLowerCase()}`;
+  return holder ? `${path}/${encodeURIComponent(holder.toLowerCase())}` : path;
+}
+
+/** The position listing under MetaMorpho's roster on `chainId`; see
+ *  `baseVaultsListingHref`. */
+export function metaMorphoVaultsListingHref(
+  chainId: MetaMorphoRouteChain,
+  filters?: Parameters<typeof baseVaultsListingHref>[0],
+): string {
+  const base = baseVaultsListingHref(filters);
+  return chainId === 8453 ? base : base.replace(BASE_VAULTS, ETHEREUM_MORPHO_VAULTS);
 }
 
 // ── Ethereum: Aave's own vault layer ─────────────────────────────────────────
