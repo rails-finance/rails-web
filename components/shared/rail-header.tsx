@@ -30,6 +30,7 @@ import { positionNounPlural, protocolForSession, subPageForPathname } from "@/li
 import { ProtocolIdentity } from "@/components/shared/protocol-identity";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { INFO_PATH } from "@/components/shared/info-disclosure";
+import { BookmarksLink } from "@/components/nav/bookmarks-link";
 import { ChainSwitcher } from "@/components/nav/chain-switcher";
 
 /** The chain chooser as it sits on the title row: hidden below `md`, where
@@ -39,10 +40,13 @@ import { ChainSwitcher } from "@/components/nav/chain-switcher";
  *
  *  EXPORTED for the front door (ProtocolFrontDoor, rails-ops
  *  TO-DO-arbitrum-scoping.md item 18), which draws no rail header but takes
- *  the chooser at the top right where every rail page has it. */
+ *  the chooser at the top right where every rail page has it. The profile
+ *  control (H20, ui-jobs 480) rides with it. */
 export function TitleRowChooser() {
   return (
-    <div className="-mr-2.5 hidden shrink-0 md:block">
+    <div className="-mr-2.5 hidden shrink-0 items-center gap-1 md:flex">
+      {/* The profile control (H20) sits beside the chooser wherever it is drawn. */}
+      <BookmarksLink />
       <ChainSwitcher variant="chain" />
     </div>
   );
