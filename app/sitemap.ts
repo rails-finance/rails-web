@@ -147,13 +147,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     })),
     // An explorer with no position listing redirects its route to its first
-    // sub-page, which is listed below; a redirect is no page to crawl.
-    ...LAUNCHED_PROTOCOLS.filter((entry) => entry.positionListing !== false).map((entry) => ({
-      url: `${SITE_URL}${entry.href}`,
-      lastModified: DEPLOYED_AT,
-      changeFrequency: "daily" as const,
-      priority: 0.9,
-    })),
+    // sub-page, which is listed below; a redirect is no page to crawl. One with
+    // no sub-pages (CoW) is a front door at its route, so it is listed.
+    ...LAUNCHED_PROTOCOLS.filter((entry) => entry.positionListing !== false || entry.subPages.length === 0).map(
+      (entry) => ({
+        url: `${SITE_URL}${entry.href}`,
+        lastModified: DEPLOYED_AT,
+        changeFrequency: "daily" as const,
+        priority: 0.9,
+      }),
+    ),
     // Each explorer's protocol-level sub-pages (branch roster, market roster,
     // system state, …) — derived the same way, off each sub-page's `href`
     // rather than a hand-joined path, so it moves when the roster entry moves.
