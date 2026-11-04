@@ -49,8 +49,8 @@ export function BookmarkToggle({
         setFav(toggleBookmark(wallet, ensName));
       }}
       aria-pressed={fav}
-      aria-label={fav ? "Remove wallet bookmark" : "Bookmark this wallet"}
-      title={fav ? "Bookmarked — click to remove" : "Bookmark this wallet"}
+      aria-label={fav ? "Saved" : "Save wallet"}
+      title={fav ? "Saved. Press to remove it from your saved wallets" : "Save wallet"}
       className={`shrink-0 inline-flex items-center cursor-pointer transition-colors ${
         fav ? "text-foreground hover:text-rb-500" : "text-rb-500 hover:text-foreground"
       }`}

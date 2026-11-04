@@ -5,8 +5,7 @@
 // counts, from lib/wallet/wallet-summary.ts. Read when the row first comes
 // into view, from the browser's kept summary while it is under its max age.
 // A protocol holding one position links to that position's page; otherwise
-// its glyph opens the wallet view. `marker` draws a dot for open, a ring for
-// all closed, and no numbers (a dev-only comparison, `?summary=marker`).
+// its glyph opens the wallet view.
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -22,8 +21,6 @@ import {
   type WalletSummaryProtocol,
 } from "@/lib/wallet/wallet-summary";
 
-export type BookmarkSummaryMode = "counts" | "marker";
-
 type State = { kind: "waiting" } | { kind: "failed" } | { kind: "read"; summary: WalletSummary };
 
 /** Open ones first, then the most positions, then by name. */
@@ -37,7 +34,7 @@ const chainOf = (slug: WalletSummaryProtocol["chain"]) => Object.values(CHAINS).
 
 const LINK = "inline-flex items-center gap-1 rounded-sm text-rb-500 transition-colors hover:text-foreground focus-ring";
 
-function Holding({ p, address, mode }: { p: WalletSummaryProtocol; address: string; mode: BookmarkSummaryMode }) {
+function Holding({ p, address }: { p: WalletSummaryProtocol; address: string }) {
   const chain = chainOf(p.chain);
   const counts = [p.open > 0 ? `${p.open} open` : null, p.closed > 0 ? `${p.closed} closed` : null]
     .filter(Boolean)
@@ -55,27 +52,15 @@ function Holding({ p, address, mode }: { p: WalletSummaryProtocol; address: stri
     >
       <ProtocolIcon id={p.protocolId} className="h-4 w-4 shrink-0 [&:is(img)]:grayscale" />
       {chain && chain.slug !== "ethereum" && <ChainGlyph id={chain.id} className="h-3 w-3 shrink-0" />}
-      {mode === "marker" ? (
-        <>
-          <span
-            aria-hidden="true"
-            className={`size-1.5 rounded-full ${p.open > 0 ? "bg-current" : "border border-current"}`}
-          />
-          <span className="sr-only">{label}</span>
-        </>
-      ) : (
-        <>
-          <span className="tabular-nums" aria-hidden="true">
-            {counts}
-          </span>
-          <span className="sr-only">{label}</span>
-        </>
-      )}
+      <span className="tabular-nums" aria-hidden="true">
+        {counts}
+      </span>
+      <span className="sr-only">{label}</span>
     </Link>
   );
 }
 
-export function BookmarkSummary({ address, mode }: { address: string; mode: BookmarkSummaryMode }) {
+export function BookmarkSummary({ address }: { address: string }) {
   const key = address.toLowerCase();
   const ref = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<State>({ kind: "waiting" });
@@ -131,7 +116,7 @@ export function BookmarkSummary({ address, mode }: { address: string; mode: Book
       )}
       {state.kind === "read" && protocols.length === 0 && <span className="text-rb-500">No positions found</span>}
       {protocols.map((p) => (
-        <Holding key={`${p.chain}/${p.family}`} p={p} address={key} mode={mode} />
+        <Holding key={`${p.chain}/${p.family}`} p={p} address={key} />
       ))}
     </div>
   );

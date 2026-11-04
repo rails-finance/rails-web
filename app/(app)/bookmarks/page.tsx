@@ -5,10 +5,11 @@
 
 import type { Metadata } from "next";
 import { BookmarksPage } from "@/components/bookmarks/bookmarks-page";
+import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 
 export const metadata: Metadata = {
-  title: "Bookmarks",
-  description: "The wallets you have bookmarked on Rails, kept in this browser.",
+  title: BOOKMARKS_NAME,
+  description: "The wallets you have saved on Rails, kept in this browser.",
   alternates: { canonical: "/bookmarks" },
   robots: { index: false, follow: true },
 };

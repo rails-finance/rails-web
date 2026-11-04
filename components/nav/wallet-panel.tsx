@@ -22,7 +22,7 @@ import Link from "next/link";
 import { X } from "lucide-react";
 
 import { RailsGlyph } from "@/components/nav/brand-rail";
-import { useBookmarksName } from "@/components/shared/bookmarks-name";
+import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 import { FrontDoorSearch, OPEN_SEARCH_EVENT } from "@/components/shared/front-door-search";
 
 let open = false;
@@ -81,7 +81,6 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabi
 export function WalletPanel() {
   const isOpen = useWalletPanelOpen();
   const panelRef = useRef<HTMLDivElement>(null);
-  const bookmarksName = useBookmarksName();
   const [mounted, setMounted] = useState(false);
   const [still, setStill] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -212,7 +211,7 @@ export function WalletPanel() {
             className="rounded-sm text-sm text-blue-500 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
             data-wallet-panel-bookmarks=""
           >
-            {bookmarksName} →
+            {BOOKMARKS_NAME} →
           </Link>
         </div>
       </div>

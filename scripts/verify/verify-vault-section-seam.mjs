@@ -576,14 +576,14 @@ for (const f of fixtures) {
   const wantedHref = `/wallet/${holder}`;
   const { context, page } = await openFixture(f);
 
-  // The holder page's wallet row carries the bookmark, as the "Bookmark it" row
+  // The holder page's wallet row carries the bookmark, as the "Save wallet" row
   // of its address menu (the card leaves the wallet to that row).
   await page
     .locator('[data-wallet-menu] button[aria-haspopup="menu"]')
     .first()
     .click({ timeout: 10_000 })
     .catch(() => {});
-  const toggle = page.locator("[data-wallet-menu]").getByText("Bookmark it", { exact: true }).first();
+  const toggle = page.locator("[data-wallet-menu]").getByText("Save wallet", { exact: true }).first();
   const found = (await toggle.count()) > 0;
   check(
     `S4a·${f.label} the page's wallet menu carries a bookmark row`,
@@ -648,16 +648,14 @@ for (const f of fixtures) {
       (c) => (c.getAttribute("data-holder") || "").toLowerCase() === addr,
     );
     if (!card) return { card: false };
-    const b = card.querySelector(
-      'button[aria-label="Remove wallet bookmark"], button[aria-label="Bookmark this wallet"]',
-    );
+    const b = card.querySelector('button[aria-label="Saved"], button[aria-label="Save wallet"]');
     return { card: true, pressed: b?.getAttribute("aria-pressed") ?? null };
   }, holder);
   check(`S4e·${f.label} the filtered listing carries this holder's row`, pressed.card, JSON.stringify(pressed));
   check(`S4f·${f.label} that row's toggle reads bookmarked`, pressed.pressed === "true", JSON.stringify(pressed));
 
   if (pressed.card) {
-    await page.locator('[data-position-card] button[aria-label="Remove wallet bookmark"]').first().click();
+    await page.locator('[data-position-card] button[aria-label="Saved"]').first().click();
     const after = await page.evaluate((k) => window.localStorage.getItem(k), KEY);
     check(`S4g·${f.label} toggling it off removes the key entirely`, after === null, `key ${KEY} now ${String(after)}`);
   }

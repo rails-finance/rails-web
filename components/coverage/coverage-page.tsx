@@ -105,7 +105,7 @@ const FOUNDATION: { title: string; detail: string }[] = [
     detail: "the position's flows over its whole life, interest split from principal where the flows reconcile",
   },
   {
-    title: "Bookmarks",
+    title: "Saved wallets",
     detail: "pin wallets and positions across explorers",
   },
 ];
