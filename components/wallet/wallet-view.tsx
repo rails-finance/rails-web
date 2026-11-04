@@ -15,6 +15,7 @@
 import { IndexNotice } from "@/components/shared/index-notice";
 import Link from "next/link";
 import { Suspense, use, type CSSProperties } from "react";
+import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { WalletHeading } from "@/components/shared/wallet-heading";
 import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
 import { WalletMenu } from "@/components/shared/wallet-menu";
@@ -500,12 +501,15 @@ export function WalletView({
         )}
       >
         <header data-anatomy="W1">
-          {/* The page's top row: its right end keeps clear of the profile
-              control (H20) at the column's top right, and from md `-mt-1`
-              centres the 40px facehash on H20's centre. */}
+          {/* Back's row, as a detail page draws it (H7): the column's first
+              line, level with the profile control (H20) at the top right from
+              md. With no history Back opens the home page. */}
+          <div className={`flex min-h-[38px] items-center ${PROFILE_CLEARANCE}`} data-anatomy="H7" data-back-row="">
+            <DetailBackButton fallbackHref="/" />
+          </div>
           <WalletHeading
             address={address}
-            className={`md:-mt-1 ${PROFILE_CLEARANCE}`}
+            className="mt-6"
             // The address menu a position page draws (ui-jobs 430): Copy the
             // address and Bookmark it; no View the wallet on the wallet view.
             title={<WalletMenu wallet={address} ensName={ensName} heading view={false} />}
