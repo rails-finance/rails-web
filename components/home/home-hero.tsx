@@ -60,15 +60,17 @@ export function HomeHero() {
     >
       <div className="absolute top-22 left-1/2 -translate-x-1/2 w-[500px] h-[220px] bg-[var(--marketing)]/[0.07] rounded-full blur-[80px] pointer-events-none" />
       {/* One line naming the place (Miles's mock, ui-jobs 498): the mark, "Rails",
-          then "DeFi Explorers" in the marketing blue. The mark is sized in em so
-          it scales with the type; where the line does not fit, "DeFi Explorers"
-          wraps whole to a second line. */}
+          then "DeFi Explorers" in the marketing blue; where the line does not
+          fit, "DeFi Explorers" wraps whole to a second line. The mark is sized
+          in cap units so its right-hand leg spans the cap height,
+          top on the cap line and bottom on the baseline (Miles, 4 Nov 2026), at
+          every size; the long stroke reaches a little past both (MARK_STYLE). */}
       <h1
-        className="relative mb-6 flex flex-wrap items-center justify-center gap-x-[0.25em] gap-y-1 px-4 font-semibold leading-none tracking-tighter text-[clamp(2.5rem,12vw,3.75rem)] sm:text-7xl lg:text-8xl animate-hero-fade-up"
+        className="relative mb-6 flex flex-wrap items-baseline justify-center gap-x-[0.25em] gap-y-1 px-4 font-semibold leading-none tracking-tighter text-[clamp(2.5rem,12vw,3.75rem)] sm:text-7xl xl:text-8xl animate-hero-fade-up"
         data-hero-title=""
       >
-        <span className="inline-flex items-center gap-[0.12em] text-foreground">
-          <RailsMark size={60} className="size-[0.9em] shrink-0" />
+        <span className="whitespace-nowrap text-foreground">
+          <RailsMark size={60} className="inline-block" style={MARK_STYLE} uniform />
           Rails
         </span>{" "}
         <span className="marketing whitespace-nowrap">DeFi Explorers</span>
@@ -101,6 +103,23 @@ export function HomeHero() {
     </section>
   );
 }
+
+// The mark against the h1's type: the right-hand leg of RailsMark (viewBox
+// 0 0 200 200), from the top of its upper segment (y 47.853) to the foot of the
+// lower step (y 142.388), is one cap height. The negative block margins leave a
+// margin box of exactly that leg, so the line box ignores the rest of the mark
+// and baseline alignment puts the leg's foot on the baseline.
+const STROKE_TOP = 47.853;
+const STROKE_BOTTOM = 142.388;
+const CAP = STROKE_BOTTOM - STROKE_TOP;
+const MARK_STYLE = {
+  width: `${200 / CAP}cap`,
+  height: `${200 / CAP}cap`,
+  marginTop: `${-STROKE_TOP / CAP}cap`,
+  marginBottom: `${-(200 - STROKE_BOTTOM) / CAP}cap`,
+  marginRight: "0.16em",
+  verticalAlign: "baseline",
+} as const;
 
 // Rendered uppercase by the class on the <p>; the Check icon before each one
 // is the separator.

@@ -1,9 +1,30 @@
+import type { CSSProperties } from "react";
+
 /** The Rails mark: three bars, the first two at 85%. Drawn by the rail's glyph
  *  (H1), the header bar's mark (H2) and the home hero's h1 (S1), which
- *  sizes it in em through `className`. */
-export function RailsMark({ size, className }: { size: number; className?: string }) {
+ *  sizes it in cap units through `style` and draws it `uniform`. */
+export function RailsMark({
+  size,
+  className,
+  style,
+  uniform = false,
+}: {
+  size: number;
+  className?: string;
+  style?: CSSProperties;
+  /** All three bars at 85%, one tone (the hero's h1, ui-jobs 498). */
+  uniform?: boolean;
+}) {
   return (
-    <svg width={size} height={size} className={className} viewBox="0 0 200 200" fill="none" aria-hidden="true">
+    <svg
+      width={size}
+      height={size}
+      className={className}
+      style={style}
+      viewBox="0 0 200 200"
+      fill="none"
+      aria-hidden="true"
+    >
       <path
         fill="currentColor"
         style={{ opacity: 0.85 }}
@@ -16,6 +37,7 @@ export function RailsMark({ size, className }: { size: number; className?: strin
       />
       <path
         fill="currentColor"
+        style={uniform ? { opacity: 0.85 } : undefined}
         d="M 148.892 142.388 L 180.766 142.388 L 155.359 93.185 L 123.486 93.185 L 148.892 142.388 Z"
       />
     </svg>
