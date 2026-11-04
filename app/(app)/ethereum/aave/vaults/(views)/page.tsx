@@ -36,6 +36,7 @@ import { aaveVaultAttestation } from "@/lib/aave-vaults/vault-catalog";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { aaveEthereumVaultSummaries } from "@/lib/vaults/summary";
 import { loadVaultYields } from "@/lib/vaults/yield-read";
+import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,8 @@ async function loadCensus(): Promise<VaultCensusRow[]> {
   }
 }
 
-export default async function EthereumVaultRosterPage() {
+export default async function EthereumVaultRosterPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+  const initialSearch = toURLSearchParams(await searchParams).toString();
   // The loader is `unstable_cache`d for five minutes and returns a read that
   // failed as stale rather than caching the failure; the view states which of
   // those it is holding.
@@ -88,6 +90,7 @@ export default async function EthereumVaultRosterPage() {
             the chain. */}
         <div data-roster-panel>
           <AaveVaultDirectoryView
+            initialSearch={initialSearch}
             vaults={vaults}
             yields={yields}
             blockNumber={data.blockNumber}

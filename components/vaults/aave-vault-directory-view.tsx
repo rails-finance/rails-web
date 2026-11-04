@@ -14,8 +14,10 @@
 // THE DENOMINATOR is complete at its block: two enumerator calls answer their
 // whole family in one read, and sGHO is one address Aave's book names.
 
+import type { ReactNode } from "react";
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { isoSeconds, RosterBlock } from "@/components/vaults/roster-read-stamp";
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { AaveFirstPartySources } from "@/components/vaults/aave-first-party-sources";
 import { AAVE_FAMILY_LABEL } from "@/components/vaults/aave-vault-format";
@@ -48,6 +50,7 @@ const FACETS: VaultRosterFacet[] = [
 ];
 
 export function AaveVaultDirectoryView({
+  initialSearch,
   vaults,
   yields,
   blockNumber,
@@ -56,6 +59,8 @@ export function AaveVaultDirectoryView({
   counts,
   censusBlock,
 }: {
+  /** The query string the page was served with (the roster's preset and sort). */
+  initialSearch?: string;
   vaults: VaultSummary[];
   yields: Record<string, VaultYield>;
   blockNumber: number;
@@ -77,10 +82,22 @@ export function AaveVaultDirectoryView({
   });
   const family = (v: VaultSummary) => v.family as AaveVaultFamily;
 
+  const readBlock = (
+    <RosterBlock
+      read={{
+        label: "Aave on Ethereum",
+        block: blockNumber,
+        at: readBy?.blockTime ?? isoSeconds(vaults[0]?.readAt.timestamp),
+      }}
+      chainId={MAINNET_CHAIN_ID}
+    />
+  );
   const registry = useReceiptRegistry();
   return (
     <ProvReceiptsScope registry={registry}>
       <VaultRoster
+        initialSearch={initialSearch}
+        readTime={readBy?.blockTime}
         vaults={vaults}
         yields={yields}
         chainId={MAINNET_CHAIN_ID}
@@ -113,7 +130,7 @@ export function AaveVaultDirectoryView({
           ),
           listingHref: ethereumVaultsListingHref(),
           infoHref: `${ethereumVaultRosterHref()}/info`,
-          drawer: <AaveRosterDrawer counts={counts} />,
+          drawer: <AaveRosterDrawer counts={counts} block={readBlock} />,
         }}
       />
     </ProvReceiptsScope>
@@ -121,7 +138,7 @@ export function AaveVaultDirectoryView({
 }
 
 /** The listing intro drawer (standards/explanation-copy-charter.md §8a). */
-function AaveRosterDrawer({ counts }: { counts: { stataCount: number; stakeCount: number } }) {
+function AaveRosterDrawer({ counts, block }: { counts: { stataCount: number; stakeCount: number }; block: ReactNode }) {
   return (
     <>
       <h3 className="text-[13px] font-semibold text-foreground">What Aave&rsquo;s vaults are</h3>
@@ -137,9 +154,9 @@ function AaveRosterDrawer({ counts }: { counts: { stataCount: number; stakeCount
       <p>
         One row is one vault, grouped by asset: savings GHO, the {n(counts.stataCount)} static aTokens{" "}
         <code>getStataTokens()</code> returns and the {n(counts.stakeCount)} stake tokens <code>getStkTokens()</code>{" "}
-        returns, every one read at the block named above. Both calls answer their whole family, so the list is complete
-        at that block. Outside it: Aave&rsquo;s deployments on other chains, the legacy static-aToken factory, and any
-        ERC-4626 Aave has not published. The census that counts Holders runs on its own block.
+        returns, every one read at {block}. Both calls answer their whole family, so the list is complete at that block.
+        Outside it: Aave&rsquo;s deployments on other chains, the legacy static-aToken factory, and any ERC-4626 Aave
+        has not published. The census that counts Holders runs on its own block.
       </p>
       <h3 className="text-[13px] font-semibold text-foreground">What the figures leave out</h3>
       <p>

@@ -87,22 +87,15 @@ export function VaultLead({ vault: v, size = 28 }: { vault: VaultSummary; size?:
 export function VaultPills({
   vault: v,
   receipts,
-  chain,
   hooks,
 }: {
   vault: VaultSummary;
   receipts: VaultRowReceipts;
-  chain?: string;
   /** `data-*` hooks per standing pill, which a verifier reads. */
   hooks?: Partial<Record<VaultStanding, Record<string, string>>>;
 }) {
   return (
     <>
-      {chain && (
-        <span className={VAULT_PILL} data-pill="chain">
-          {chain}
-        </span>
-      )}
       <span className={VAULT_PILL} data-pill="family">
         {v.releaseLabel}
       </span>

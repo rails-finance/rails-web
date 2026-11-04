@@ -6,7 +6,7 @@ import type { OraclePricesData } from "@/types/api/oracle";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
-import { PILL_CTA } from "@/lib/shared/ui-grammar";
+import { PILL_CTA_BLUE } from "@/lib/shared/ui-grammar";
 import { LIVE_EXAMPLE_TROVE_ID, LIVE_EXAMPLE_TROVE_PATH, type LiveExampleData } from "@/lib/home/live-example";
 import { unpackLiveExample, type WireLiveExample } from "@/lib/home/live-example-wire";
 import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
@@ -305,12 +305,8 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
             aria-label="View this live Liquity V2 trove on Rails"
             className="absolute inset-0 z-10"
           >
-            {/* PILL_CTA's neutral border is swapped (not appended to) at this
-                call site: two unconditional border-color utilities tie on
-                specificity and Tailwind's stylesheet order — not class order —
-                decides, so only one may be present for the blue to hold. */}
             <span
-              className={`${PILL_CTA.replace("border border-rb-200 dark:border-rb-800", "border border-blue-500")} absolute bottom-5 left-1/2 -translate-x-1/2 translate-y-1 opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0`}
+              className={`${PILL_CTA_BLUE} absolute bottom-5 left-1/2 -translate-x-1/2 translate-y-1 opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0`}
             >
               View live position <span>→</span>
             </span>

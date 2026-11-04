@@ -11,9 +11,11 @@
 // SHARE PRICE is `convertToAssets(10^18)` — one whole share, in the vault's
 // own asset. No USD.
 
+import type { ReactNode } from "react";
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
+import { isoSeconds, RosterBlock } from "@/components/vaults/roster-read-stamp";
 import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { baseVaultHref, baseVaultsListingHref, baseVaultRosterHref } from "@/lib/vaults/routes";
 import {
@@ -42,6 +44,7 @@ const FACETS: VaultRosterFacet[] = [
 ];
 
 export function VaultDirectoryView({
+  initialSearch,
   vaults,
   yields,
   blockNumber,
@@ -51,6 +54,8 @@ export function VaultDirectoryView({
   censusBlock,
   withCensus,
 }: {
+  /** The query string the page was served with (the roster's preset and sort). */
+  initialSearch?: string;
   vaults: VaultSummary[];
   yields: Record<string, VaultYield>;
   blockNumber: number;
@@ -71,10 +76,22 @@ export function VaultDirectoryView({
     assetSymbol: v.asset.symbol,
   });
 
+  const readBlock = (
+    <RosterBlock
+      read={{
+        label: "Morpho on Base",
+        block: blockNumber,
+        at: readBy?.blockTime ?? isoSeconds(vaults[0]?.readAt.timestamp),
+      }}
+      chainId={MORPHO_BASE_CHAIN_ID}
+    />
+  );
   const registry = useReceiptRegistry();
   return (
     <ProvReceiptsScope registry={registry}>
       <VaultRoster
+        initialSearch={initialSearch}
+        readTime={readBy?.blockTime}
         vaults={vaults}
         yields={yields}
         chainId={MORPHO_BASE_CHAIN_ID}
@@ -104,7 +121,7 @@ export function VaultDirectoryView({
           ),
           listingHref: withCensus ? baseVaultsListingHref() : null,
           infoHref: `${baseVaultRosterHref()}/info`,
-          drawer: <MorphoRosterDrawer />,
+          drawer: <MorphoRosterDrawer block={readBlock} />,
         }}
       />
     </ProvReceiptsScope>
@@ -112,7 +129,7 @@ export function VaultDirectoryView({
 }
 
 /** The listing intro drawer (standards/explanation-copy-charter.md §8a). */
-function MorphoRosterDrawer() {
+function MorphoRosterDrawer({ block }: { block: ReactNode }) {
   return (
     <>
       <h3 className="text-[13px] font-semibold text-foreground">What a MetaMorpho vault is</h3>
@@ -122,11 +139,10 @@ function MorphoRosterDrawer() {
       </p>
       <h3 className="text-[13px] font-semibold text-foreground">What this page is</h3>
       <p>
-        One row is one vault the two MetaMorpho factories deployed on Base, grouped by asset and ordered by total
-        assets. The list is a floor: a vault deployed without a factory emits no creation event, a vault created since
-        the census block joins when the census runs again, and the Vault V2 family is outside it. Names are read live,
-        because a V1.1 owner can rename a vault. Every figure is a call answered at the block named above, re-read at
-        most every five minutes.
+        One row is one vault the two MetaMorpho factories deployed on Base, grouped by asset. The list is a floor: a
+        vault deployed without a factory emits no creation event, a vault created since the census block joins when the
+        census runs again, and the Vault V2 family is outside it. Names are read live, because a V1.1 owner can rename a
+        vault. Every figure is a call answered at {block}, re-read at most every five minutes.
       </p>
       <h3 className="text-[13px] font-semibold text-foreground">What the figures leave out</h3>
       <p>

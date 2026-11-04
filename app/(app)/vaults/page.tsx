@@ -13,6 +13,7 @@ import { IndexNotice } from "@/components/shared/index-notice";
 import { loadVaultIndex } from "@/lib/vaults/index-read";
 import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
 import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
+import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 
 export const dynamic = "force-dynamic";
 
@@ -24,8 +25,9 @@ export const metadata = {
   ...(vaultIndexLaunched() ? {} : { robots: { index: false, follow: false } }),
 };
 
-export default async function VaultIndexPage({ searchParams }: { searchParams: Promise<{ asset?: string }> }) {
-  const [{ vaults, yields, rosters, indexDown }, { asset }] = await Promise.all([loadVaultIndex(), searchParams]);
+export default async function VaultIndexPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+  const [{ vaults, yields, rosters, indexDown }, sp] = await Promise.all([loadVaultIndex(), searchParams]);
+  const { asset } = sp;
   return (
     <div className="min-h-screen">
       <div className="py-8">
@@ -39,6 +41,7 @@ export default async function VaultIndexPage({ searchParams }: { searchParams: P
             yields={yields}
             rosters={rosters}
             asset={typeof asset === "string" ? asset : undefined}
+            initialSearch={toURLSearchParams(sp).toString()}
           />
         </div>
         <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />

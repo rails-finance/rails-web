@@ -2,7 +2,7 @@
 
 // The cross-protocol vault index (rails-ops ui-jobs 39; decision 0028 point 8):
 // the shared roster (components/vaults/vault-roster.tsx) over the union of the
-// vault rosters, each row the vault row (V1) with a chain pill.
+// vault rosters, each row the vault row (V1) with its protocol's sidebar (C20).
 // ----------------------------------------------------------------------------
 // The index owns no vault page: every row opens the vault's page under its
 // protocol, a Maple pool's opening Maple's pools page. Facets: Token (by
@@ -11,11 +11,13 @@
 // Every figure keeps its roster's receipt. No USD and no cross-asset total.
 
 import Link from "next/link";
-import { BlockRef } from "@/components/shared/block-ref";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
+import { isoSeconds, RosterBlock, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import type { VaultRowReceipts } from "@/components/vaults/vault-row";
-import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { chainMeta, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { protocolForPathname } from "@/lib/shared/protocols";
+import type { PositionCardEdge } from "@/components/shared/position-card-edge";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import {
   vaultDirectoryCensusProv,
@@ -57,6 +59,21 @@ import {
 import { maplePoolCountProv, vaultIndexEmptyCountProv, vaultIndexGroupCountProv } from "@/lib/vaults/index-provenance";
 
 const n = (v: number) => v.toLocaleString("en-US");
+
+/** Each row's sidebar (C20): the roster entry whose route holds the vault's
+ *  family directory, as on that directory (Maple: its pools page). */
+const EDGES = Object.fromEntries(
+  VAULT_INDEX_PROTOCOLS.map((p) => {
+    const entry = protocolForPathname(vaultIndexRosterHref(p));
+    const edge: PositionCardEdge | null = entry
+      ? {
+          protocol: { id: entry.id, name: entry.label },
+          chain: { id: entry.chainId, name: chainMeta(entry.chainId).name },
+        }
+      : null;
+    return [p, edge];
+  }),
+) as Record<string, PositionCardEdge | null>;
 
 const FACETS: VaultRosterFacet[] = [
   {
@@ -104,21 +121,34 @@ function rosterCountProv(r: VaultIndexRoster): Provenance {
 }
 
 export function VaultIndexView({
+  initialSearch,
   vaults,
   yields,
   rosters,
   asset,
 }: {
+  /** The query string the page was served with (the roster's preset and sort). */
+  initialSearch?: string;
   vaults: VaultSummary[];
   yields: Record<string, VaultYield>;
   rosters: VaultIndexRoster[];
-  /** `?asset=`: the Token facet chosen on arrival, matched without case
-   *  (the search's "USDC vaults" row, ui-jobs 482). */
+  /** `?asset=`: the Token facet chosen on arrival, one symbol or a comma
+   *  list, matched without case (the search's "USDC vaults" row, ui-jobs 482). */
   asset?: string;
 }) {
-  const assetValue = asset
-    ? vaults.map(TOKEN_FACET.valueOf).find((value) => value.toLowerCase() === asset.toLowerCase())
-    : undefined;
+  // A comma list chooses each named token that has a vault (the guided way
+  // in's "Earning in ETH", ui-jobs 478); a name with none is dropped.
+  const assetValues = asset
+    ? [
+        ...new Set(
+          asset
+            .split(",")
+            .map((a) => a.trim().toLowerCase())
+            .filter(Boolean)
+            .flatMap((a) => vaults.map(TOKEN_FACET.valueOf).filter((value) => value.toLowerCase() === a)),
+        ),
+      ]
+    : [];
   const rosterOf = (v: VaultSummary) => rosters.find((r) => r.protocol === vaultIndexProtocol(v));
 
   const receiptsOf = (v: VaultSummary): VaultRowReceipts => {
@@ -180,44 +210,35 @@ export function VaultIndexView({
   const registry = useReceiptRegistry();
   const total = vaults.length;
 
-  // One line per roster: its protocol, linked to the roster, its chain and
-  // the block its figures were read at.
-  const readAt = (
-    <p className="flex flex-col gap-0.5" data-prov-exempt>
-      {rosters.map((r) => (
-        <span
-          key={r.protocol}
-          className="flex flex-wrap items-center gap-x-1"
-          data-index-roster={r.protocol}
-          data-index-chain={r.chainId}
-          data-index-block={r.blockNumber}
-          data-directory-block={r.chainStale ? undefined : r.blockNumber}
-        >
-          <Link href={vaultIndexRosterHref(r.protocol)} className={PAGE_LINK} prefetch={false}>
-            {VAULT_INDEX_PROTOCOL_LABEL[r.protocol]}
-          </Link>
-          <span>on {chainName(r.chainId)}</span>
-          {r.chainStale ? (
-            <span>not read</span>
-          ) : (
-            <>
-              <span>at</span>
-              <BlockRef block={r.blockNumber} chainId={r.chainId} />
-            </>
-          )}
-        </span>
-      ))}
-    </p>
-  );
-
+  const readOf = (r: VaultIndexRoster) => ({
+    label: `${VAULT_INDEX_PROTOCOL_LABEL[r.protocol]} on ${chainName(r.chainId)}`,
+    block: r.blockNumber,
+    at: r.readBy?.blockTime ?? isoSeconds(r.readAt),
+  });
   const counts = rosters.filter((r) => !r.chainStale);
+
+  // One stamp for the oldest roster's read; its receipt names every roster's
+  // block and time, and the panel names each.
+  const readAt = <RosterReadStamp reads={counts.map(readOf)} />;
+
   const drawer = (
     <p data-index-counts={total}>
       Every vault the rosters list:{" "}
       {counts.map((r, i) => (
-        <span key={r.protocol} data-index-count={r.protocol} data-count={r.count}>
+        <span
+          key={r.protocol}
+          data-index-count={r.protocol}
+          data-count={r.count}
+          data-index-roster={r.protocol}
+          data-index-chain={r.chainId}
+          data-index-block={r.blockNumber}
+        >
           {i > 0 && ", "}
-          {VAULT_INDEX_PROTOCOL_LABEL[r.protocol]} <Prov info={rosterCountProv(r)}>{n(r.count)}</Prov>
+          <Link href={vaultIndexRosterHref(r.protocol)} className={PAGE_LINK} prefetch={false}>
+            {VAULT_INDEX_PROTOCOL_LABEL[r.protocol]}
+          </Link>{" "}
+          <Prov info={rosterCountProv(r)}>{n(r.count)}</Prov> at <RosterBlock read={readOf(r)} chainId={r.chainId} />
+          {r.chainId !== MAINNET_CHAIN_ID && ` on ${chainName(r.chainId)}`}
         </span>
       ))}
       ; each row opens under its protocol.
@@ -227,6 +248,7 @@ export function VaultIndexView({
   return (
     <ProvReceiptsScope registry={registry}>
       <VaultRoster
+        initialSearch={initialSearch}
         vaults={vaults}
         yields={yields}
         chainId={MAINNET_CHAIN_ID as ChainId}
@@ -235,7 +257,8 @@ export function VaultIndexView({
         skel="index"
         facets={FACETS}
         assetFacet={TOKEN_FACET}
-        initialFilters={assetValue ? { [TOKEN_FACET.id]: [assetValue] } : undefined}
+        initialFilters={assetValues.length > 0 ? { [TOKEN_FACET.id]: assetValues } : undefined}
+        edgeOf={(v) => EDGES[vaultIndexProtocol(v)] ?? null}
         hrefOf={vaultIndexHref}
         holdersHrefOf={vaultIndexHoldersHref}
         receiptsOf={receiptsOf}

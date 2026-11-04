@@ -15,8 +15,10 @@
 //
 // No census: the Holders slot reads "no census" until Yearn has one.
 
+import type { ReactNode } from "react";
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { isoSeconds, RosterBlock } from "@/components/vaults/roster-read-stamp";
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { yearnVaultHref, yearnVaultRosterHref } from "@/lib/vaults/routes";
 import {
@@ -55,6 +57,7 @@ const FACETS: VaultRosterFacet[] = [
 ];
 
 export function YearnVaultDirectoryView({
+  initialSearch,
   vaults,
   yields,
   blockNumber,
@@ -66,6 +69,8 @@ export function YearnVaultDirectoryView({
    *  pill for them, and the verifier tells unread from false. */
   endorsementUnread,
 }: {
+  /** The query string the page was served with (the roster's preset and sort). */
+  initialSearch?: string;
   vaults: VaultSummary[];
   yields: Record<string, VaultYield>;
   blockNumber: number;
@@ -87,10 +92,22 @@ export function YearnVaultDirectoryView({
   const endorsed = vaults.filter((v) => v.standing.includes("endorsed")).length;
   const unread = new Set(endorsementUnread);
 
+  const readBlock = (
+    <RosterBlock
+      read={{
+        label: "Yearn on Ethereum",
+        block: blockNumber,
+        at: readBy?.blockTime ?? isoSeconds(vaults[0]?.readAt.timestamp),
+      }}
+      chainId={CHAIN_ID}
+    />
+  );
   const registry = useReceiptRegistry();
   return (
     <ProvReceiptsScope registry={registry}>
       <VaultRoster
+        initialSearch={initialSearch}
+        readTime={readBy?.blockTime}
         vaults={vaults}
         yields={yields}
         chainId={CHAIN_ID}
@@ -127,7 +144,7 @@ export function YearnVaultDirectoryView({
           ),
           listingHref: null,
           infoHref: `${yearnVaultRosterHref()}/info`,
-          drawer: <YearnRosterDrawer />,
+          drawer: <YearnRosterDrawer block={readBlock} />,
         }}
       />
     </ProvReceiptsScope>
@@ -135,7 +152,7 @@ export function YearnVaultDirectoryView({
 }
 
 /** The listing intro drawer (standards/explanation-copy-charter.md §8a). */
-function YearnRosterDrawer() {
+function YearnRosterDrawer({ block }: { block: ReactNode }) {
   return (
     <>
       <h3 className="text-[13px] font-semibold text-foreground">What a Yearn V3 vault is</h3>
@@ -148,8 +165,7 @@ function YearnRosterDrawer() {
         One row is one vault the five V3 factories deployed on Ethereum, grouped by asset and ordered by total assets.
         The factories are open to anyone, so the list is a floor: a vault deployed without a factory leaves no trace to
         enumerate, and a vault created since the census block joins when the census runs again. Yearn V2 is a separate
-        registry and is outside it. Every figure is a call answered at the block named above, re-read at most every five
-        minutes.
+        registry and is outside it. Every figure is a call answered at {block}, re-read at most every five minutes.
       </p>
       <h3 className="text-[13px] font-semibold text-foreground">What the figures leave out</h3>
       <p>
