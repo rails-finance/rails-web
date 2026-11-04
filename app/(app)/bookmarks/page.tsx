@@ -9,7 +9,7 @@ import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 
 export const metadata: Metadata = {
   title: BOOKMARKS_NAME,
-  description: "The wallets you have saved on Rails, kept in this browser.",
+  description: "The wallets you have saved on Rails, in this browser only.",
   alternates: { canonical: "/bookmarks" },
   robots: { index: false, follow: true },
 };
