@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 
+import { BookmarkSummary, type BookmarkSummaryMode } from "@/components/bookmarks/bookmark-summary";
 import { Facehash } from "@/components/shared/facehash";
 import { walletHref } from "@/components/shared/front-door-search";
 import {
@@ -40,13 +41,22 @@ export function useBookmarks(): WalletSession[] | null {
 }
 
 /** One list of bookmark rows, or `empty` when there are none. A row opens
- *  `/wallet/<address>`. */
-export function BookmarkList({ bookmarks, empty }: { bookmarks: WalletSession[]; empty: ReactNode }) {
+ *  `/wallet/<address>`; with `summary`, the wallet's protocols draw under its
+ *  name (B2.1). */
+export function BookmarkList({
+  bookmarks,
+  empty,
+  summary,
+}: {
+  bookmarks: WalletSession[];
+  empty: ReactNode;
+  summary?: BookmarkSummaryMode;
+}) {
   if (bookmarks.length === 0) return <>{empty}</>;
   return (
     <div className="flex flex-col gap-1" data-bookmark-list="">
       {bookmarks.map((s) => (
-        <BookmarkRow key={s.key} session={s} />
+        <BookmarkRow key={s.key} session={s} summary={summary} />
       ))}
     </div>
   );
@@ -182,7 +192,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function BookmarkRow({ session }: { session: WalletSession }) {
+function BookmarkRow({ session, summary }: { session: WalletSession; summary?: BookmarkSummaryMode }) {
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState("");
 
@@ -265,12 +275,20 @@ function BookmarkRow({ session }: { session: WalletSession }) {
 
   return (
     <div className={rowClasses} data-bookmark-row="">
-      <Link href={walletHref(primary)} className="flex min-w-0 flex-1 items-center gap-3">
-        {avatar}
-        <span className="truncate text-sm font-bold text-foreground" title={primary}>
-          {label}
-        </span>
-      </Link>
+      <div className="min-w-0 flex-1">
+        <Link href={walletHref(primary)} className="flex min-w-0 items-center gap-3">
+          {avatar}
+          <span className="truncate text-sm font-bold text-foreground" title={primary}>
+            {label}
+          </span>
+        </Link>
+        {/* Under the name, past the facehash's 24px and the 12px gap. */}
+        {summary && (
+          <div className="mt-1 pl-9">
+            <BookmarkSummary address={primary} mode={summary} />
+          </div>
+        )}
+      </div>
       <div className="flex shrink-0 items-center gap-0.5">
         <CopyButton text={primary} />
         <button
