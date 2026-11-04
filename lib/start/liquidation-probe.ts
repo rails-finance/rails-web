@@ -4,48 +4,39 @@
 // (Asymmetry and Basedollar on 4 Nov 2026), and a row that opens on nothing is
 // left off (rails-ops ui-jobs 488).
 //
-// Probed only where the listing's own fetcher takes a status filter and a
-// limit. An explorer with no probe, or a probe that fails or times out, keeps
-// its row: unknown is not empty.
+// Read from the box with one limit-1 request per explorer, cached for ten
+// minutes by the fetch cache, so the page stays static and a visit costs no
+// api calls; a liquidation shows within ten minutes. Only the explorers whose
+// box route takes a status filter are probed. An explorer with no probe, or a
+// probe that fails or times out, keeps its row: unknown is not empty.
 
-import { fetchAsymmetryTroves } from "@/lib/api/fetch-asymmetry-troves";
-import { fetchBasedollarTroves } from "@/lib/api/fetch-basedollar-troves";
-import { fetchEbisuTroves } from "@/lib/api/fetch-ebisu-troves";
-import { ssrHop } from "@/lib/shared/listing-ssr";
+import { createAuthHeaders } from "@/lib/api/fetch-with-auth";
 
 const PROBE_TIMEOUT_MS = 4000;
+const REVALIDATE_SECONDS = 600;
 
-type Fetcher = (p: {
-  status: ["liquidated"];
-  limit: number;
-  baseUrl: string;
-  headers: HeadersInit;
-  signal: AbortSignal;
-}) => Promise<{ data: unknown[] }>;
-
-const PROBES: Record<string, Fetcher> = {
-  asymmetry: fetchAsymmetryTroves,
-  basedollar: fetchBasedollarTroves,
-  ebisu: fetchEbisuTroves,
+const BOX_ROUTE: Record<string, string> = {
+  asymmetry: "/api/asymmetry/troves",
+  basedollar: "/api/basedollar/troves",
+  ebisu: "/api/ebisu/troves",
 };
 
 /** The explorer ids among `ids` whose listing was read and holds no liquidated position. */
 export async function withoutLiquidations(ids: string[]): Promise<Set<string>> {
-  const probed = ids.filter((id) => PROBES[id]);
-  if (probed.length === 0) return new Set();
-  const hop = await ssrHop();
-  if (!hop) return new Set();
+  const base = process.env.RAILS_API_URL?.replace(/\/$/, "");
+  const probed = ids.filter((id) => BOX_ROUTE[id]);
+  if (!base || probed.length === 0) return new Set();
   const empty = await Promise.all(
     probed.map(async (id) => {
       try {
-        const r = await PROBES[id]({
-          status: ["liquidated"],
-          limit: 1,
-          baseUrl: hop.baseUrl,
-          headers: hop.headers,
+        const res = await fetch(`${base}${BOX_ROUTE[id]}?status=liquidated&limit=1`, {
+          headers: createAuthHeaders(),
+          next: { revalidate: REVALIDATE_SECONDS },
           signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
         });
-        return r.data.length === 0 ? id : null;
+        if (!res.ok) return null;
+        const json = (await res.json()) as { data?: unknown[] };
+        return Array.isArray(json.data) && json.data.length === 0 ? id : null;
       } catch {
         return null;
       }
