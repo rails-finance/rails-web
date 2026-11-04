@@ -149,7 +149,7 @@ export function lifetimeFlowsStackContent(opts: {
   };
 }
 
-// ── CoW Protocol ─────────────────────────────────────────────────────────────
+// ── CoW ─────────────────────────────────────────────────────────────
 
 // ── Liquity — Live position panel (the trove summary's "?" FAQ) ──────────────
 //

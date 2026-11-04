@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { AssetPopover } from "@/components/shared/asset-popover";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { DelegateRatePillShell, GavelGlyph, RatePillShell, UserGlyph } from "@/components/shared/rate-pill";
 import { ArrowFromDot } from "@/components/shared/timeline-spine";
@@ -145,6 +146,10 @@ export interface SpineTokenRow {
    *  swap mark on a flow: a withdraw and swap, whose value left the position
    *  (rails-ops TO-DO-ui-jobs §15, D3). */
   badge?: "check" | "cross" | "send" | "swap";
+  /** The icon opens the asset's panel (AssetPopover): its contract and, where
+   *  the asset has a Rails page, the price row and the link to it. Opt-in per
+   *  row; unset draws the bare icon. */
+  popover?: boolean;
   /** When set, the flanking value renders as a click-to-edit input. Used by
    *  simulator cards so the spine values are interactive in sim mode. */
   onValueChange?: (v: number) => void;
@@ -1197,14 +1202,25 @@ export function SpineColumn({
   const rateLegBadged = !(rows.length && rowActor !== "owner" && rowActor === rateActor);
   const tokenRows = bottomUp(rows).map((row, i) => {
     const rowBadge: SpineActor = i === 0 ? rowActor : "owner";
-    const chip = (
+    const icon = (
       <TokenChipIcon
         symbol={row.symbol}
         iconOverride={row.iconSymbol}
         address={row.address}
         size={T}
-        filterable={!rowTarget}
+        filterable={!rowTarget && !row.popover}
+        untitled={row.popover}
       />
+    );
+    const chip = row.popover ? (
+      <AssetPopover
+        symbol={row.symbol || (row.address ? `${row.address.slice(0, 6)}…${row.address.slice(-4)}` : "Token")}
+        address={row.address}
+      >
+        {icon}
+      </AssetPopover>
+    ) : (
+      icon
     );
     return (
       <NodeRow

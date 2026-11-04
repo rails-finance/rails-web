@@ -624,6 +624,27 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "rates", label: "Savings Rate history", tab: "Rate" }],
   },
   {
+    // CoW on Ethereum: a wallet's trades through GPv2Settlement, read from
+    // the `Trade` logs victoria's Sieve captures (rails-ops decisions/0058
+    // step 3). The route is a front door; a wallet's trades are at
+    // `/ethereum/cow/<wallet>`. A trade is not a position, so there is no
+    // position listing. Held back until Miles has read it on localhost.
+    id: "cow",
+    session: "cow",
+    label: "CoW",
+    chainId: 1,
+    slug: "cow",
+    // Hue 307, read off CoW's brand purple #490072 (its kit pairs it with
+    // #F996EE, hue 331); the zone draws the hue at the site's fixed lightness
+    // and chroma per theme.
+    brand: 307,
+    unlaunched: true,
+    tags: ["Trades"],
+    desc: "Every trade a wallet settled through CoW, read from the settlement contract's logs and chosen by token",
+    positionListing: false,
+    subPages: [],
+  },
+  {
     id: "spark",
     session: "spark",
     label: "SparkLend",
@@ -834,6 +855,8 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   polaris: "Position",
   // A holder address of sUSDS (rails-ops TO-DO-sky-savings-scoping §1).
   "sky-savings": "Position",
+  // A wallet's trades: the page titles name them, and nothing lists positions.
+  cow: "Trades",
 };
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",
