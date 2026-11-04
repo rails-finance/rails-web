@@ -36,6 +36,7 @@ import { NAV_BUTTON, ctrlWaking } from "@/lib/shared/ui-grammar";
 import { useHydrated } from "@/hooks/useHydrated";
 import { toggleWalletPanel, useWalletPanelOpen } from "@/components/nav/wallet-panel";
 import { loadBookmarks, SESSIONS_CHANGED_EVENT } from "@/lib/shared/sessions";
+import { Facehash } from "@/components/shared/facehash";
 import {
   ADDRESS_RE,
   ENS_RE,
@@ -611,6 +612,21 @@ function SuggestionList({
               on ? "bg-rb-100 dark:bg-rb-800" : ""
             }`}
           >
+            {/* An address row (a wallet, a bookmark) leads with its facehash, as
+                the bookmarks page does; an ENS name still resolving keeps the
+                face's place so the row does not shift when it lands. */}
+            {(row.kind === "Wallet" || row.kind === "Bookmark") &&
+              (row.address ? (
+                <span
+                  className="shrink-0 rounded-[5px]"
+                  style={{ boxShadow: "0 0 0 2px var(--facehash-ring)" }}
+                  data-suggestion-face={row.address}
+                >
+                  <Facehash address={row.address} size={18} />
+                </span>
+              ) : (
+                <span className="block size-[18px] shrink-0 rounded-[5px] bg-rb-300/40 dark:bg-rb-700/40" aria-hidden />
+              ))}
             <span className="flex min-w-0 flex-1 items-baseline gap-2">
               {/* The name keeps its room; the muted line gives way first. */}
               <span className={`min-w-0 truncate text-sm ${openable ? "text-foreground" : "text-rb-500"}`}>

@@ -15,6 +15,7 @@ import { IndexNotice } from "@/components/shared/index-notice";
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { WalletHeading } from "@/components/shared/wallet-heading";
+import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
 import { WalletMenu } from "@/components/shared/wallet-menu";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { WalletLookup } from "@/components/shared/wallet-lookup";
@@ -406,8 +407,12 @@ export function WalletView({
         )}
       >
         <header data-anatomy="W1">
+          {/* The page's top row: its right end keeps clear of the profile
+              control (H20) at the column's top right, and from md `-mt-1`
+              centres the 40px facehash on H20's centre. */}
           <WalletHeading
             address={address}
+            className={`md:-mt-1 ${PROFILE_CLEARANCE}`}
             // The address menu a position page draws (ui-jobs 430): Copy the
             // address and Bookmark it; no View the wallet on the wallet view.
             title={<WalletMenu wallet={address} ensName={ensName} heading view={false} />}

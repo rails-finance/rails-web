@@ -2,6 +2,10 @@
  * Facehash — deterministic face avatar from an Ethereum address.
  * Rounded square with colored background + eyes only (no mouth, no letter).
  * Eyes blink occasionally.
+ *
+ * `mono` draws the same face in one colour (the profile control, H20): the
+ * square filled with the current text colour, the eyes cut in the page's
+ * background colour.
  */
 "use client";
 
@@ -11,6 +15,8 @@ interface FacehashProps {
   address: string;
   size?: number;
   isBot?: boolean;
+  /** The square in `currentColor`, the eyes in `--background`. */
+  mono?: boolean;
 }
 
 // Hash the full address so every character contributes to the visual.
@@ -42,7 +48,7 @@ function hashAddress(addr: string): number[] {
   ];
 }
 
-export function Facehash({ address, size = 20, isBot }: FacehashProps) {
+export function Facehash({ address, size = 20, isBot, mono = false }: FacehashProps) {
   const a = (address || "0x0000000000000000000000000000000000000000").toLowerCase();
   const [blinking, setBlinking] = useState(false);
 
@@ -66,7 +72,7 @@ export function Facehash({ address, size = 20, isBot }: FacehashProps) {
   const hue = (n[0] * 16 + n[1]) * 1.41;
   const sat = 45 + n[2] * 2.5;
   const lum = 35 + n[3] * 1.5;
-  const bg = `hsl(${hue}, ${sat}%, ${lum}%)`;
+  const bg = mono ? "currentColor" : `hsl(${hue}, ${sat}%, ${lum}%)`;
 
   const eyeVariant = n[4] % 6;
   const eyeY = 9 + (n[5] % 3);
@@ -74,23 +80,27 @@ export function Facehash({ address, size = 20, isBot }: FacehashProps) {
   const leftX = 6.5;
   const rightX = 13.5;
 
-  const eyeColor = lum > 45 ? "#1e293b" : "#e2e8f0";
+  const eyeColor = mono ? "var(--background)" : lum > 45 ? "#1e293b" : "#e2e8f0";
+
+  const square = (
+    <rect
+      x={isBot ? 0.5 : 0}
+      y={isBot ? 0.5 : 0}
+      width={isBot ? 19 : 20}
+      height={isBot ? 19 : 20}
+      rx="4.4"
+      ry="4.4"
+      fill={bg}
+      stroke={isBot ? "currentColor" : "none"}
+      strokeWidth={isBot ? 1 : 0}
+      className={isBot ? "text-foreground" : ""}
+    />
+  );
 
   if (blinking) {
     return (
       <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden="true" className="shrink-0 block">
-        <rect
-          x={isBot ? 0.5 : 0}
-          y={isBot ? 0.5 : 0}
-          width={isBot ? 19 : 20}
-          height={isBot ? 19 : 20}
-          rx="4.4"
-          ry="4.4"
-          fill={bg}
-          stroke={isBot ? "currentColor" : "none"}
-          strokeWidth={isBot ? 1 : 0}
-          className={isBot ? "text-foreground" : ""}
-        />
+        {square}
         <line
           x1={leftX - 1.6}
           y1={eyeY}
@@ -182,18 +192,7 @@ export function Facehash({ address, size = 20, isBot }: FacehashProps) {
 
   return (
     <svg width={size} height={size} viewBox="0 0 20 20" aria-hidden="true" className="shrink-0 block">
-      <rect
-        x={isBot ? 0.5 : 0}
-        y={isBot ? 0.5 : 0}
-        width={isBot ? 19 : 20}
-        height={isBot ? 19 : 20}
-        rx="4.4"
-        ry="4.4"
-        fill={bg}
-        stroke={isBot ? "currentColor" : "none"}
-        strokeWidth={isBot ? 1 : 0}
-        className={isBot ? "text-foreground" : ""}
-      />
+      {square}
       {renderEyes()}
     </svg>
   );

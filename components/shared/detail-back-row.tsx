@@ -11,7 +11,7 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { ArrowLeft } from "lucide-react";
-import { NAV_BUTTON } from "@/lib/shared/ui-grammar";
+import { NAV_BUTTON, PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { listingHrefForWallet, protocolForSession } from "@/lib/shared/protocols";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
@@ -65,7 +65,7 @@ export function DetailBackButton({
   };
   return (
     <button type="button" onClick={onBack} aria-label="Back" className={NAV_BUTTON} data-anatomy="H7.1">
-      <ArrowLeft size={14} />
+      <ArrowLeft size={14} aria-hidden="true" />
       <span className={compact ? "hidden sm:inline" : undefined}>Back</span>
     </button>
   );
@@ -94,7 +94,11 @@ export function closingPricesAt<E extends { blockNumber: number; timestamp: numb
 
 /** The top of a position page: Back, then the wallet heading (rails-ops
  *  decisions/0052; ui-jobs 429), which carries the page's h1 and the Tools
- *  menu (`children`). A position page draws no protocol title and no chain
+ *  menu (`children`). Back's row is the page's first, level with the profile
+ *  control (H20) at the column's top right from md (ui-jobs 480, Miles 4 Nov
+ *  2026): `min-h-[38px]` gives the row H20's height, so the two centre on one
+ *  line. The heading's 40px facehash then stands over the cards' 40px
+ *  sidebar bar (C20, P2.1, P3.1). A position page draws no protocol title and no chain
  *  chooser; below md the header bar keeps the chain trigger.
  *
  *  The price strip and the chain's recency stand at the left of the detail
@@ -192,7 +196,7 @@ export function DetailTopRow({
     // the heading reads with the card.
     <div className={owner ? "mb-4" : undefined}>
       <div
-        className="flex flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2"
+        className={`flex min-h-[38px] flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2 ${PROFILE_CLEARANCE}`}
         data-anatomy="H7"
         data-back-row
       >

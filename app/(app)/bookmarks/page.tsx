@@ -1,7 +1,7 @@
-// /bookmarks (rails-ops ui-jobs 480): the reader's bookmarked wallets, the
-// list the wallet panel (H16) shows, reached from the profile control beside
-// the explorer chooser (H20). The list is in this browser's storage, so the
-// page draws in the browser and is kept out of the index.
+// /bookmarks (rails-ops ui-jobs 480): the reader's bookmarked wallets,
+// reached from the profile control (H20). The list is in this browser's storage, so the
+// page draws in the browser and is kept out of the index. It stands in the
+// app shell (the brand rail, the app footer), as the wallet view does.
 
 import type { Metadata } from "next";
 import { BookmarksPage } from "@/components/bookmarks/bookmarks-page";

@@ -1,10 +1,9 @@
 "use client";
 
 // The wallet panel (rails-ops TO-DO-ui-jobs 431): a full-height panel that
-// glides in from the left over the page, with the search pinned at its top,
-// the bookmarks as one list under it, and the backup controls at its foot.
-// The list and the backup controls are components/shared/bookmark-list.tsx,
-// which the bookmarks page (/bookmarks, ui-jobs 480) draws too.
+// glides in from the left over the page, with the search pinned at its top
+// and a link to the bookmarks page (/bookmarks, ui-jobs 480) at its foot. The
+// bookmarks are the search's suggestions on a focused, empty field (H15.2).
 // The rail's magnifier, the header bar's search and bookmark controls, and
 // `/` on a page with no search of its own all open it.
 //
@@ -19,10 +18,10 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { Info, X } from "lucide-react";
+import Link from "next/link";
+import { X } from "lucide-react";
 
 import { RailsGlyph } from "@/components/nav/brand-rail";
-import { BookmarkBackup, BookmarkList, useBookmarks } from "@/components/shared/bookmark-list";
 import { FrontDoorSearch, OPEN_SEARCH_EVENT } from "@/components/shared/front-door-search";
 
 let open = false;
@@ -83,9 +82,6 @@ export function WalletPanel() {
   const panelRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [still, setStill] = useState(false);
-  const bookmarks = useBookmarks() ?? [];
-  // Bumped on each open, so the backup's report line starts clear.
-  const [openings, setOpenings] = useState(0);
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
@@ -105,7 +101,6 @@ export function WalletPanel() {
 
   useEffect(() => {
     if (!isOpen) return;
-    setOpenings((n) => n + 1);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const focusField = requestAnimationFrame(() => panelRef.current?.querySelector<HTMLInputElement>("input")?.focus());
@@ -203,29 +198,20 @@ export function WalletPanel() {
           <FrontDoorSearch size="lg" surface="raised" onDone={close} suggest />
         </div>
 
-        {/* The bookmarks: one list, scrolling between the search and the foot. */}
-        <div className="min-h-0 flex-1 overflow-y-auto border-t border-rb-200 px-3 py-3 dark:border-rb-800">
-          <p className="mb-1 px-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-rb-500">Bookmarks</p>
-          <BookmarkList
-            bookmarks={bookmarks}
-            onNavigate={close}
-            empty={<p className="px-2.5 py-2 text-sm text-rb-500">No bookmarks yet.</p>}
-          />
-        </div>
-
-        {/* Pinned at the foot: the backup and where bookmarks are kept. */}
+        {/* The bookmarks are the suggestions' first rows (H15.2): the list
+            opens on the focused field with them, newest first, and matches
+            them as the reader types. Their page, with rename, remove and the
+            backup, is one link at the foot (ui-jobs 480). */}
+        <div className="min-h-0 flex-1" />
         <div className="shrink-0 border-t border-rb-200 px-5 py-4 dark:border-rb-800">
-          <BookmarkBackup key={openings} />
-          {/* The neutral mark: where bookmarks live is a fact about storage,
-              and the caution triangle is kept for adverse events
-              (standards/color-grammar.md). */}
-          <div className="mt-3 flex items-start gap-1.5 text-[11px] text-rb-500">
-            <Info className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
-            <p>
-              Bookmarks are stored in your browser&apos;s local storage. Nothing is saved to our servers or anywhere
-              else. To keep a copy safe, use Export to file.
-            </p>
-          </div>
+          <Link
+            href="/bookmarks"
+            onClick={close}
+            className="rounded-sm text-sm text-blue-500 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
+            data-wallet-panel-bookmarks=""
+          >
+            Bookmarks →
+          </Link>
         </div>
       </div>
     </div>,
