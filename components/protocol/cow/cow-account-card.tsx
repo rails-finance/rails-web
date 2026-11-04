@@ -11,13 +11,13 @@ import { formatDate } from "@/lib/date";
 import { COW_CHAIN_ID, GPV2_SETTLEMENT } from "@/lib/cow/trade";
 import type { CowAsOf, CowWalletSummary } from "@/lib/cow/types";
 
-const SETTLEMENT = { name: "GPv2Settlement (CoW Protocol)", address: GPV2_SETTLEMENT };
+const SETTLEMENT = { name: "GPv2Settlement (CoW)", address: GPV2_SETTLEMENT };
 const n = (v: number) => v.toLocaleString("en-US");
 
 const countProv = (asOf: CowAsOf, what: string, value: number): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `${what} — counted over every Trade log of CoW Protocol's settlement contract whose owner is this wallet, through block ${n(asOf.block)}: ${n(value)}.`,
+  summary: `${what} — counted over every Trade log of CoW's settlement contract whose owner is this wallet, through block ${n(asOf.block)}: ${n(value)}.`,
   contract: SETTLEMENT,
   via: "Trade logs · owner = this wallet",
   source: { block: asOf.block },

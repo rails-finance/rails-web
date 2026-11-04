@@ -74,7 +74,7 @@ export type SessionProtocol =
   // holder address. A roster explorer outside the home headline (rails-ops
   // TO-DO-sky-savings-scoping §6.1, decision 0027 call 2).
   | "sky-savings"
-  // CoW Swap, at `/ethereum/cow`: a wallet's trades through CoW Protocol's
+  // CoW, at `/ethereum/cow`: a wallet's trades through CoW's
   // settlement, from victoria's Sieve (rails-ops decisions/0058 step 3).
   | "cow";
 

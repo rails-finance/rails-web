@@ -59,8 +59,6 @@ export interface CowWalletToken {
   name: string | null;
   /** On the asset roster: Rails has an asset page for it. */
   assetPage: boolean;
-  /** The protocols the roster has reading it, empty off the roster. */
-  protocols: string[];
   readAtBlock: number | null;
 }
 

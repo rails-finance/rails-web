@@ -1,6 +1,6 @@
 "use client";
 
-// CoW Swap's front door: the mark and name, the shared search (H15) landing on
+// CoW's front door: the mark and name, the shared search (H15) landing on
 // a wallet's trades, and one line on what the page reads. The layout is the
 // position-first explorers' (components/shared/protocol-front-door.tsx).
 
@@ -23,14 +23,13 @@ export function CowFrontDoor() {
       >
         <h1 className="mb-8 flex items-center gap-3">
           <ProtocolIcon id="cow" className="h-11 w-11 shrink-0 text-foreground" />
-          <span className="text-3xl font-semibold leading-none text-foreground">CoW Swap</span>
+          <span className="text-3xl font-semibold leading-none text-foreground">CoW</span>
         </h1>
         <div className="w-full max-w-xl">
           <FrontDoorSearch href={(wallet) => `/ethereum/cow/${wallet}`} />
         </div>
         <p className="mt-6 max-w-xl text-center text-sm text-rb-500">
-          A wallet&rsquo;s trades through CoW Protocol on Ethereum, each read from the settlement contract&rsquo;s Trade
-          log.
+          A wallet&rsquo;s trades through CoW on Ethereum, each read from the settlement contract&rsquo;s Trade log.
         </p>
       </div>
       <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />

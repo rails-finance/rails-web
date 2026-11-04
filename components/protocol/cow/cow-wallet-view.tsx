@@ -6,7 +6,7 @@
 // the first page again through the trades proxy, and "Show more" reads the
 // next page below the last row.
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -20,7 +20,7 @@ import { CowAccountCard } from "@/components/protocol/cow/cow-account-card";
 import { CowTradeCard } from "@/components/protocol/cow/cow-trade-card";
 import { formatDate } from "@/lib/date";
 import { COW_CHAIN_ID, type CowTokenLabel } from "@/lib/cow/trade";
-import { assetHref } from "@/lib/shared/asset-roster";
+import { loadAssetPrices } from "@/lib/api/fetch-asset-prices";
 import type { CowTrade, CowTradesPage, CowWalletTokens } from "@/lib/cow/types";
 import { SECTION_HEADING, CARD_INSET_START } from "@/lib/shared/ui-grammar";
 
@@ -28,11 +28,11 @@ const PAGE = 50;
 const CHOOSER_GROUPS = {
   known: {
     heading: "On Rails",
-    info: "Tokens Rails reads across DeFi. Each has an asset page listing the protocols that use it.",
+    note: "Tokens with a Rails asset page, read across DeFi.",
   },
   other: {
     heading: "Other tokens",
-    info: "Tokens named only by this wallet's CoW trades. Rails has no asset page for them.",
+    note: "Known here only from this wallet's CoW trades.",
   },
 };
 const n = (v: number) => v.toLocaleString("en-US");
@@ -78,23 +78,29 @@ export function CowWalletView({
   // The trade rows' receipts scope; each card holds its own inside it.
   const registry = useReceiptRegistry();
 
+  // The tokens with an asset page and no stored price (every token an explorer
+  // lists that the roster does not price), from the Prices list the icon
+  // panels read: with the roster's tokens, the "On Rails" group.
+  const [unpriced, setUnpriced] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    let live = true;
+    void loadAssetPrices().then((list) => {
+      if (live) setUnpriced(new Set(list?.unpriced ?? []));
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
   const options: AssetChooserOption[] = useMemo(
     () =>
       (tokens?.tokens ?? []).map((t) => ({
         address: t.address,
         symbol: t.symbol,
         count: t.trades,
-        known: t.assetPage,
+        known: t.assetPage || unpriced.has(`${COW_CHAIN_ID}:${t.address}`),
         last: t.lastBlock,
-        href: t.assetPage ? assetHref(COW_CHAIN_ID, t.address) : undefined,
-        hrefText: t.protocols.length
-          ? `in ${t.protocols.length} ${t.protocols.length === 1 ? "protocol" : "protocols"}`
-          : undefined,
-        hrefLabel: t.assetPage
-          ? `${t.symbol ?? t.address} asset page${t.protocols.length ? `: read in ${t.protocols.join(", ")}` : ""}`
-          : undefined,
       })),
-    [tokens],
+    [tokens, unpriced],
   );
   const labelOf = useCallback(
     (address: string): CowTokenLabel => {
@@ -153,8 +159,8 @@ export function CowWalletView({
     summary && summary.trades > 0 && summary.firstTimestamp != null ? (
       <div className="space-y-2 text-sm leading-relaxed">
         <p>
-          This wallet has settled {n(summary.trades)} {summary.trades === 1 ? "trade" : "trades"} through CoW Protocol
-          on Ethereum since {formatDate(summary.firstTimestamp)}, in {n(tokens?.tokens.length ?? 0)} tokens. Each is a
+          This wallet has settled {n(summary.trades)} {summary.trades === 1 ? "trade" : "trades"} through CoW on
+          Ethereum since {formatDate(summary.firstTimestamp)}, in {n(tokens?.tokens.length ?? 0)} tokens. Each is a
           Trade log of the settlement contract naming this wallet as the order&rsquo;s owner.
         </p>
         <p>
@@ -170,7 +176,7 @@ export function CowWalletView({
 
       {asOf && (
         <p className="text-xs text-rb-500" data-cow-asof={asOf.block}>
-          CoW Swap · Ethereum · every figure at <BlockRef block={asOf.block} chainId={COW_CHAIN_ID} />, the newest block
+          CoW · Ethereum · every figure at <BlockRef block={asOf.block} chainId={COW_CHAIN_ID} />, the newest block
           Rails had read when the page loaded
         </p>
       )}

@@ -11,7 +11,7 @@ import type { CowTrade } from "@/lib/cow/types";
 
 export const COW_CHAIN_ID = 1 as const;
 export const GPV2_SETTLEMENT = "0x9008d19f58aabd9ed0d60971565aa8510560ab41";
-const SETTLEMENT = { name: "GPv2Settlement (CoW Protocol)", address: GPV2_SETTLEMENT };
+const SETTLEMENT = { name: "GPv2Settlement (CoW)", address: GPV2_SETTLEMENT };
 
 /** A token as the page names it: the symbol token_meta holds, else none. */
 export interface CowTokenLabel {
@@ -73,7 +73,7 @@ const scaling = (raw: string, tok: CowTokenLabel) =>
 const FIELD = { sell: "sellAmount", buy: "buyAmount", fee: "feeAmount" } as const;
 const WORDS = {
   sell: (s: string) =>
-    `Sold — the ${s} this wallet's order sent to the CoW Protocol settlement contract in this trade, as the contract recorded it in its Trade log.`,
+    `Sold — the ${s} this wallet's order sent to the CoW settlement contract in this trade, as the contract recorded it in its Trade log.`,
   buy: (s: string) =>
     `Bought — the ${s} the settlement contract paid out for this wallet's order in this trade, as its Trade log recorded it.`,
   fee: (s: string) =>
@@ -128,6 +128,18 @@ export function executedPriceProv(
       kind: "recompute",
       text: "To check: divide the two amounts of this trade's Trade log, each by its token's decimals.",
     },
+  };
+}
+
+/** The settlement's block. */
+export function settlementBlockProv(t: CowTrade): Provenance {
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    summary: "Block — the block holding the settlement transaction that carried this trade.",
+    contract: SETTLEMENT,
+    source: coords(t),
+    verify: logsLink(t),
   };
 }
 

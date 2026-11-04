@@ -3,9 +3,9 @@
 // AssetChooser: an opt-in token filter whose selection is drawn as the tokens.
 // A row of pills (icon, symbol, ×) and a dashed add pill; the add pill opens a
 // picker of the tokens the data holds, each with its count, keyed by address.
-// Two groups, each under a heading with an (i) that says what it holds: the
-// caller's first group (on CoW, the tokens with a Rails asset page, each with
-// a link to it) and "Other tokens" below. Within a group, by count, then by
+// Two groups, each under a heading with a line that says what it holds: the
+// caller's first group (on CoW, the tokens with a Rails asset page) and
+// "Other tokens" below. Within a group, by count, then by
 // the latest use. A token whose symbol was not read shows its short address,
 // the unknown glyph and "Symbol not read". Past OPTION_SEARCH_THRESHOLD the list narrows by symbol or address
 // and renders OPTION_RENDER_CAP rows, chosen tokens always in view
@@ -22,9 +22,7 @@
 // the timeline's Assets filter and the roster's Token facet is Miles's call.
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
-import Link from "next/link";
 import { Check, Plus, X } from "lucide-react";
-import { InfoDisclosure } from "@/components/shared/info-disclosure";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { UnknownTokenSvg } from "@/components/shared/unknown-token-svg";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
@@ -48,17 +46,12 @@ export interface AssetChooserOption {
   known: boolean;
   /** The latest use (a block), which orders equal counts. */
   last?: number;
-  /** A page about the token: a link of its own beside the row's pick. */
-  href?: string;
-  /** The link's words ("13 protocols") and its fuller name for a screen reader. */
-  hrefText?: string;
-  hrefLabel?: string;
 }
 
-/** A group's heading and what its (i) says. */
+/** A group's heading and the line under it. */
 export interface AssetChooserGroup {
   heading: string;
-  info?: ReactNode;
+  note?: ReactNode;
 }
 
 export interface AssetChooserProps {
@@ -103,21 +96,15 @@ function TokenMark({ o, size = 16 }: { o: AssetChooserOption; size?: number }) {
   );
 }
 
-/** A group's heading, with its (i) where the caller says what the group holds. */
+/** A group's heading, and the line under it where the caller gives one. */
 function GroupHeading({ group, rule, kind }: { group: AssetChooserGroup; rule: boolean; kind: string }) {
-  const name = <span className={OVERLAY_SUBHEADING}>{group.heading}</span>;
   return (
     <div
-      className={rule ? "mx-3 mt-1 border-t border-rb-300 pb-1 pt-2 dark:border-rb-700" : "mx-3 pb-1 pt-2"}
+      className={`mx-3 px-1 pb-1 pt-2 ${rule ? "mt-1 border-t border-rb-300 dark:border-rb-700" : ""}`}
       data-asset-group={kind}
     >
-      {group.info ? (
-        <InfoDisclosure bare label={`what ${group.heading} are`} rowExtra={name}>
-          <p className="text-xs leading-relaxed text-rb-500">{group.info}</p>
-        </InfoDisclosure>
-      ) : (
-        <div className="px-1">{name}</div>
-      )}
+      <div className={OVERLAY_SUBHEADING}>{group.heading}</div>
+      {group.note && <p className="mt-0.5 text-[11px] leading-snug text-rb-500">{group.note}</p>}
     </div>
   );
 }
@@ -361,17 +348,6 @@ export function AssetChooser({
               <span className="shrink-0 text-rb-500">Symbol not read</span>
             )}
             <span className="shrink-0 font-mono text-[11px] text-rb-500">{shortAddress(o.address)}</span>
-            {o.href && (
-              <Link
-                href={o.href}
-                onClick={(e) => e.stopPropagation()}
-                aria-label={o.hrefLabel}
-                className="shrink-0 truncate text-[11px] text-blue-500 hover:underline"
-                data-asset-page={o.address}
-              >
-                {o.hrefText ?? "Asset page"}
-              </Link>
-            )}
           </span>
           <span
             className="shrink-0 text-xs tabular-nums text-rb-500"
