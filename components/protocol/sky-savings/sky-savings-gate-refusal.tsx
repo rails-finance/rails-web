@@ -49,7 +49,9 @@ export function SkyGateRefusal({
     <div className="py-8 space-y-6">
       {holder ? (
         <div>
-          <DetailBackButton session="sky-savings" wallet={holder} />
+          <div className="flex min-h-[38px] items-center">
+            <DetailBackButton session="sky-savings" wallet={holder} />
+          </div>
           <div className="mt-6">
             <PositionWalletHeading owner={{ wallet: holder }} session="sky-savings" tools={false} />
           </div>

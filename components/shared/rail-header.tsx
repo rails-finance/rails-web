@@ -30,23 +30,20 @@ import { positionNounPlural, protocolForSession, subPageForPathname } from "@/li
 import { ProtocolIdentity } from "@/components/shared/protocol-identity";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { INFO_PATH } from "@/components/shared/info-disclosure";
-import { BookmarksLink } from "@/components/nav/bookmarks-link";
 import { ChainSwitcher } from "@/components/nav/chain-switcher";
 
 /** The chain chooser as it sits on the title row: hidden below `md`, where
- *  HeaderBar still carries it. `-mr-2.5` pulls the trigger's own padding back
- *  so its glyph lines up with the content's right edge rather than the
- *  padding box.
+ *  HeaderBar still carries it. The profile control (H20) stands at the
+ *  column's top right on every app page from md (app/(app)/layout.tsx), so
+ *  `mr-8` leaves its 38px, less the 10px it reaches past the content edge,
+ *  and the 4px gap the bar's cluster keeps.
  *
  *  EXPORTED for the front door (ProtocolFrontDoor, rails-ops
  *  TO-DO-arbitrum-scoping.md item 18), which draws no rail header but takes
- *  the chooser at the top right where every rail page has it. The profile
- *  control (H20, ui-jobs 480) rides with it. */
+ *  the chooser at the top right where every rail page has it. */
 export function TitleRowChooser() {
   return (
-    <div className="-mr-2.5 hidden shrink-0 items-center gap-1 md:flex">
-      {/* The profile control (H20) sits beside the chooser wherever it is drawn. */}
-      <BookmarksLink />
+    <div className="mr-8 hidden shrink-0 items-center md:flex">
       <ChainSwitcher variant="chain" />
     </div>
   );

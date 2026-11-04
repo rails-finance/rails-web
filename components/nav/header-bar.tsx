@@ -13,7 +13,7 @@ import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door
  *  restated here by prefix. Keep in sync with app/(site)/. (The old top-level
  *  chain directories are gone — the per-chain coverage pages are the
  *  directory now, and /coverage's prefix already covers them.) */
-const SITE_PREFIXES = ["/about", "/blog", "/bookmarks", "/coverage", "/privacy", "/pulse", "/start", "/terms"];
+const SITE_PREFIXES = ["/about", "/blog", "/coverage", "/privacy", "/pulse", "/start", "/terms"];
 
 function isSiteRoute(pathname: string | null) {
   if (!pathname) return false;
@@ -122,12 +122,13 @@ export function HeaderBar() {
             quiet Coverage link on app routes). */}
         <div className="ml-auto flex items-center gap-1">
           {/* The search's glyph (H15.1): everywhere but home, whose hero is
-              the search. It opens the wallet panel, where the bookmarks are
-              listed; the separate bookmarks button (H11) went on 1 Nov 2026.
+              the search. It opens the wallet panel, whose suggestions list
+              the bookmarks; the separate bookmarks button (H11) went on 1 Nov 2026.
               A sheet from the top on a phone. */}
           {!isHome && <SearchLauncher placement="header" />}
           <HeaderThemeToggle />
-          {/* The profile control (H20), beside the chooser it travels with. */}
+          {/* The profile control (H20). From md on an app route this bar is
+              gone and app/(app)/layout.tsx draws it at the column's top right. */}
           <BookmarksLink />
           <ChainSwitcher variant={isMarketing ? "cta" : "chain"} />
         </div>

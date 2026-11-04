@@ -1,8 +1,8 @@
 "use client";
 
-// The bookmarks list and its backup controls, drawn by the wallet panel (H16)
-// and by the bookmarks page (/bookmarks, rails-ops ui-jobs 480), so the two
-// show one list with one set of controls. The list lives in this origin's
+// The bookmarks list and its backup controls, drawn by the bookmarks page
+// (/bookmarks, rails-ops ui-jobs 480), and `useBookmarks`, which the profile
+// control (H20) reads for its face. The list lives in this origin's
 // localStorage under `rails-bookmarks` (lib/shared/sessions.ts).
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -39,27 +39,14 @@ export function useBookmarks(): WalletSession[] | null {
   return bookmarks;
 }
 
-/** The row scale: `sm` in the 400px panel, `md` on the page. */
-type RowSize = "sm" | "md";
-
 /** One list of bookmark rows, or `empty` when there are none. A row opens
- *  `/wallet/<address>`; `onNavigate` runs on that press (the panel closes). */
-export function BookmarkList({
-  bookmarks,
-  empty,
-  onNavigate,
-  size = "sm",
-}: {
-  bookmarks: WalletSession[];
-  empty: ReactNode;
-  onNavigate?: () => void;
-  size?: RowSize;
-}) {
+ *  `/wallet/<address>`. */
+export function BookmarkList({ bookmarks, empty }: { bookmarks: WalletSession[]; empty: ReactNode }) {
   if (bookmarks.length === 0) return <>{empty}</>;
   return (
     <div className="flex flex-col gap-1" data-bookmark-list="">
       {bookmarks.map((s) => (
-        <BookmarkRow key={s.key} session={s} onNavigate={onNavigate} size={size} />
+        <BookmarkRow key={s.key} session={s} />
       ))}
     </div>
   );
@@ -195,15 +182,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function BookmarkRow({
-  session,
-  onNavigate,
-  size,
-}: {
-  session: WalletSession;
-  onNavigate?: () => void;
-  size: RowSize;
-}) {
+function BookmarkRow({ session }: { session: WalletSession }) {
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState("");
 
@@ -211,7 +190,6 @@ function BookmarkRow({
   const ens = session.ensNames[primary] || null;
   const fallback = ens || `${primary.slice(0, 6)}…${primary.slice(-4)}`;
   const label = session.customName || fallback;
-  const md = size === "md";
 
   const startEdit = () => {
     setDraftName(session.customName ?? "");
@@ -229,14 +207,13 @@ function BookmarkRow({
   };
 
   const avatar = (
-    <div style={{ borderRadius: md ? 6 : 5, boxShadow: "0 0 0 2px var(--facehash-ring)" }} className="shrink-0">
-      <Facehash address={primary} size={md ? 24 : 18} />
+    <div style={{ borderRadius: 6, boxShadow: "0 0 0 2px var(--facehash-ring)" }} className="shrink-0">
+      <Facehash address={primary} size={24} />
     </div>
   );
 
-  const rowClasses = `group flex items-center rounded-lg border border-transparent transition-colors hover:border-blue-500 hover:bg-rb-100 dark:hover:bg-rb-900 ${
-    md ? "gap-3 px-3 py-2.5" : "gap-2.5 px-2.5 py-2"
-  }`;
+  const rowClasses =
+    "group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-colors hover:border-blue-500 hover:bg-rb-100 dark:hover:bg-rb-900";
 
   if (editing) {
     return (
@@ -257,9 +234,7 @@ function BookmarkRow({
             }
           }}
           placeholder={fallback}
-          className={`min-w-0 flex-1 rounded border border-rb-300 bg-raised px-1.5 py-0.5 text-base font-bold outline-none dark:border-rb-700 ${
-            md ? "sm:text-sm" : "sm:text-xs"
-          }`}
+          className="min-w-0 flex-1 rounded border border-rb-300 bg-raised px-1.5 py-0.5 text-base font-bold outline-none sm:text-sm dark:border-rb-700"
         />
         <div className="flex shrink-0 items-center gap-0.5">
           <button
@@ -290,13 +265,9 @@ function BookmarkRow({
 
   return (
     <div className={rowClasses} data-bookmark-row="">
-      <Link
-        href={walletHref(primary)}
-        onClick={onNavigate}
-        className={`flex min-w-0 flex-1 items-center ${md ? "gap-3" : "gap-2.5"}`}
-      >
+      <Link href={walletHref(primary)} className="flex min-w-0 flex-1 items-center gap-3">
         {avatar}
-        <span className={`truncate font-bold text-foreground ${md ? "text-sm" : "text-xs"}`} title={primary}>
+        <span className="truncate text-sm font-bold text-foreground" title={primary}>
           {label}
         </span>
       </Link>

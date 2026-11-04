@@ -2,9 +2,10 @@
 
 // The wallet heading (rails-ops decisions/0052, points 1 and 2; ui-jobs 429):
 // the heading of the wallet view (W1) and of every position page (H13). The
-// facehash at 40px, matching the card's brand bar, then the name block: the
-// wallet as the page's h1 and, under it, lines the caller fills. The caller's
-// controls take the right end.
+// facehash at 40px on the page edge, the column of the cards' 40px sidebar
+// bar below it (C20, P2.1, P3.1), then the name block: the wallet as the
+// page's h1 and, under it, lines the caller fills. The caller's controls take
+// the right end.
 //
 // On a position page (`PositionWalletHeading`) the h1 is the address menu's
 // trigger, the address kind sits beside it, and the line under it is what
@@ -42,6 +43,7 @@ export function WalletHeading({
   title,
   lines,
   end,
+  className = "",
   ...data
 }: {
   /** The wallet; unset while the page has not read it, which keeps the
@@ -50,10 +52,13 @@ export function WalletHeading({
   title: ReactNode;
   lines?: ReactNode;
   end?: ReactNode;
+  className?: string;
 } & { [k: `data-${string}`]: string | undefined }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5" {...data}>
-      <div className="flex min-w-0 flex-auto basis-0 items-center gap-3 sm:basis-auto">
+    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1.5 ${className}`} {...data}>
+      {/* From md the 21px gap puts the name block on the cards' content edge:
+          the 40px bar, the card's 1px border and its 20px padding. */}
+      <div className="flex min-w-0 flex-auto basis-0 items-center gap-3 sm:basis-auto md:gap-[21px]">
         {address ? (
           <Facehash address={address} size={40} />
         ) : (
