@@ -1,6 +1,7 @@
 // Playwright check for the 10-item polish batch (merry-neumann plan).
 // Run: node scripts/verify/verify-polish-batch.mjs   (dev server on :3000)
-// Repointed (ui-jobs 432): check 8 reads the hero's h1 "Destination DeFi" (43e8fd92).
+// Repointed (ui-jobs 432, 498): check 8 reads the hero's h1 "Rails DeFi Explorers", the ticks under it,
+// then the promise line under the search.
 import { chromium } from "playwright";
 
 const results = [];
@@ -15,7 +16,7 @@ const page = await ctx.newPage();
 // ── Home page items ──────────────────────────────────────────────────────
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 
-// 8. Hero order: h1 → subheading → eyebrow badges
+// 8. Hero order: h1 → ticked terms → subheading
 const heroOrder = await page.evaluate(() => {
   const section = document.querySelector("h1")?.closest("section");
   if (!section) return "no section";
@@ -23,12 +24,12 @@ const heroOrder = await page.evaluate(() => {
   // so "Read-only" sits past a short prefix.
   const texts = [...section.children].map((el) => el.textContent || "");
   const kids = [...section.children].map((el, i) => el.tagName + ":" + texts[i].slice(0, 25));
-  const h1i = texts.findIndex((t) => t.includes("Destination DeFi"));
+  const h1i = texts.findIndex((t) => t.includes("DeFi Explorers"));
   const subi = texts.findIndex((t) => t.includes("Look up any position"));
   const badgei = texts.findIndex((t) => t.toLowerCase().includes("read-only"));
-  return h1i < subi && subi < badgei ? "ok" : kids.join(" | ");
+  return h1i >= 0 && h1i < badgei && badgei < subi ? "ok" : kids.join(" | ");
 });
-check("8 hero: h1 → subheading → badges", heroOrder === "ok", heroOrder === "ok" ? "" : heroOrder);
+check("8 hero: h1 → badges → subheading", heroOrder === "ok", heroOrder === "ok" ? "" : heroOrder);
 
 // 3. URL pill: single pill carries the tint; toolbar row has no bg tint
 const bar = page.locator("span", { hasText: "rails.finance" }).first();

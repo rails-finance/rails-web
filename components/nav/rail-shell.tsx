@@ -19,11 +19,12 @@
 //
 // The site column has no width of its own, so H20 stands in a max-w-7xl frame
 // laid over its top at the same place as on an app page (15px down: the app
-// column's 32px less its 17px pull).
+// column's 32px less its 17px pull). On home, "Start here" (S12) stands left of it.
 
 import type { ReactNode } from "react";
 import { BookmarksLink } from "@/components/nav/bookmarks-link";
 import { BrandRail } from "@/components/nav/brand-rail";
+import { StartHereButton } from "@/components/nav/start-here-button";
 
 export function RailShell({
   column,
@@ -49,7 +50,12 @@ export function RailShell({
           <main className="relative">
             <div className="pointer-events-none absolute inset-x-0 top-0 z-10 hidden md:block">
               <div className="relative mx-auto max-w-7xl px-4 md:px-6">
-                <div className="pointer-events-auto absolute right-3.5 top-[15px]" data-profile-corner="">
+                <div
+                  className="pointer-events-auto absolute right-3.5 top-[15px] flex items-center gap-2"
+                  data-profile-corner=""
+                >
+                  {/* Home's "Start here" (S12) stands left of H20; elsewhere it renders nothing. */}
+                  <StartHereButton />
                   <BookmarksLink />
                 </div>
               </div>

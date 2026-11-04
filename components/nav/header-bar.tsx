@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 
 import { BookmarksLink } from "@/components/nav/bookmarks-link";
 import { ChainSwitcher } from "@/components/nav/chain-switcher";
+import { StartHereButton } from "@/components/nav/start-here-button";
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
 
@@ -83,6 +84,8 @@ export function HeaderBar() {
           {/* The explorer chooser's grid glyph (H4, ui-jobs 497), then the
               profile control (H20), on every page (ui-jobs 498). */}
           <ChainSwitcher variant="header" />
+          {/* Home's "Start here" (S12), left of H20; elsewhere it renders nothing. */}
+          <StartHereButton />
           <BookmarksLink />
         </div>
       </div>

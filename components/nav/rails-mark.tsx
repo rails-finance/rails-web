@@ -1,8 +1,9 @@
 /** The Rails mark: three bars, the first two at 85%. Drawn by the rail's glyph
- *  (H1), the header bar's mark (H2) and the home hero's head (S1). */
-export function RailsMark({ size }: { size: number }) {
+ *  (H1), the header bar's mark (H2) and the home hero's h1 (S1), which
+ *  sizes it in em through `className`. */
+export function RailsMark({ size, className }: { size: number; className?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 200 200" fill="none" aria-hidden="true">
+    <svg width={size} height={size} className={className} viewBox="0 0 200 200" fill="none" aria-hidden="true">
       <path
         fill="currentColor"
         style={{ opacity: 0.85 }}
