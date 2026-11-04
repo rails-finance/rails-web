@@ -628,7 +628,7 @@ const SPECS: ProtocolSpec[] = [
     // the `Trade` logs victoria's Sieve captures (rails-ops decisions/0058
     // step 3). The route is a front door; a wallet's trades are at
     // `/ethereum/cow/<wallet>`. A trade is not a position, so there is no
-    // position listing. Held back until Miles has read it on localhost.
+    // position listing. Launched 4 Nov 2026 (Miles).
     id: "cow",
     session: "cow",
     label: "CoW",
@@ -638,7 +638,6 @@ const SPECS: ProtocolSpec[] = [
     // #F996EE, hue 331); the zone draws the hue at the site's fixed lightness
     // and chroma per theme.
     brand: 307,
-    unlaunched: true,
     tags: ["Trades"],
     desc: "Every trade a wallet settled through CoW, read from the settlement contract's logs and chosen by token",
     positionListing: false,
