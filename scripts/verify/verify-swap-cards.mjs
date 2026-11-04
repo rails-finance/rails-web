@@ -1,10 +1,10 @@
-// A position swap an Aave V3 position made through CoW Protocol or ParaSwap draws
+// A position swap an Aave V3 position made through CoW or ParaSwap draws
 // ONE card: the kind's participle on the head ("Swapped collateral", "Swapped
 // debt", "Repaid with collateral", "Withdrew and swapped", "Supplied from a
 // swap"), a swap mark on the spine, and "via CoW
 // Protocol" or "via ParaSwap" with the venue's mark. The mark sits on the node where both legs stayed in the position,
 // and on the flow (a badge on the withdrawn reserve) for a withdraw and swap. The two legs it
-// merges never draw their own "to/from CoW Protocol" rows, and on the adapter
+// merges never draw their own "to/from CoW" rows, and on the adapter
 // route the one-order contract that owned the Trade is never a party. A ParaSwap
 // swap's leftover row (a repay or supply back) draws no row of its own either: it
 // nets into its leg (D4). rails-ops TO-DO-ui-jobs §15 is the build; the pairing is
@@ -52,8 +52,9 @@ import { PRESS_SHOW_MORE } from "../lib/timeline-draw.mjs";
 
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 import { waitOnFigures } from "./lib/card-tabs.mjs";
-const COW_ICON = "/icons/protocols/cow.png";
-const COW_VENUE = { text: "via CoW Protocol", icon: COW_ICON };
+// CoW's chip draws its mono glyph (data-party-icon="glyph:cow"), no image.
+const COW_ICON = "glyph:cow";
+const COW_VENUE = { text: "via CoW", icon: COW_ICON };
 const PARASWAP_VENUE = { text: "via ParaSwap", icon: "/icons/protocols/paraswap.png" };
 const VENUES = [COW_VENUE, PARASWAP_VENUE];
 const SWAP_NODE = '[role="img"][aria-label="Swap"]';
@@ -251,12 +252,16 @@ for (const fx of FIXTURES) {
             .filter((s) => /^(to|from|via|by)$/.test((s.textContent || "").trim()))
             .map((p) => {
               const chip = p.parentElement;
-              const icon = chip.querySelector("img[data-party-icon]");
+              const icon = chip.querySelector("[data-party-icon]");
               return {
                 prefix: (p.textContent || "").trim(),
                 text: (chip.textContent || "").replace(/\s+/g, " ").trim(),
                 eventId: chip.closest("[data-event-id]")?.getAttribute("data-event-id") ?? "",
-                icon: icon ? new URL(icon.getAttribute("src"), location.href).pathname : null,
+                icon: icon
+                  ? icon.tagName === "IMG"
+                    ? new URL(icon.getAttribute("src"), location.href).pathname
+                    : icon.getAttribute("data-party-icon")
+                  : null,
               };
             });
         // A card is the nearest ancestor of a swap node that holds exactly one
@@ -291,7 +296,7 @@ for (const fx of FIXTURES) {
           // finding from "this fixture's legs still draw their own rows".
           cowTransferChips: pageChips
             .filter((c) => c.eventId.includes(tx))
-            .filter((c) => /^(to|from)\s*(CoW Protocol|ParaSwap .*adapter)$/.test(c.text))
+            .filter((c) => /^(to|from)\s*(CoW|ParaSwap .*adapter)$/.test(c.text))
             .map((c) => c.text),
           // Rendered text only: the page's serialized payload (a <script>) carries
           // the Trade's owner as data, which names nobody to a reader.
@@ -422,7 +427,7 @@ for (const fx of FIXTURES) {
   if (read.cowTransferChips.length > 0) {
     bad(`${fx.label}: a swap leg still draws its own row (${read.cowTransferChips.join(" | ")})`);
   } else {
-    ok(`${fx.label}: no leg draws its own "to/from CoW Protocol" row`);
+    ok(`${fx.label}: no leg draws its own "to/from CoW" row`);
   }
   if (fx.neverNamed) {
     if (read.named) bad(`${fx.label}: the order's adapter ${fx.neverNamed}… is named on the page`);

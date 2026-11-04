@@ -5,8 +5,9 @@ import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
 import { ssrHop } from "@/lib/shared/listing-ssr";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import {
-  baseVaultHref,
   baseVaultRosterHref,
+  metaMorphoVaultHref,
+  metaMorphoVaultRosterHref,
   ethereumVaultHref,
   ethereumVaultRosterHref,
   VAULT_INDEX_HREF,
@@ -54,8 +55,8 @@ async function ethereumVaultPages(): Promise<MetadataRoute.Sitemap> {
   }
 }
 
-/** The Base vault pages — one per catalogued vault the census found at least
- *  one participant in. The roster is 511 vaults and 269 of them have never had
+/** The MetaMorpho vault pages on Base and on Ethereum (ui-jobs 486) — one per
+ *  catalogued vault the census found at least one participant in. The roster is 511 vaults and 269 of them have never had
  *  a single `Transfer`; a market view for one of those is a real page and a
  *  true reading, but there is nothing on it a crawler would want and nothing
  *  linking to it, so the sitemap names the ones with a life.
@@ -69,25 +70,32 @@ async function ethereumVaultPages(): Promise<MetadataRoute.Sitemap> {
  *  The POSITIONS are not listed and never will be: there are about 652,000 of
  *  them on this chain, they change by the minute, and the listing above them is
  *  the page a crawler should find. */
-async function baseVaultPages(): Promise<MetadataRoute.Sitemap> {
-  // As on Ethereum: the explorer this layer hangs off is unlaunched, so the
-  // census read that would name ~240 vault URLs is not made.
-  if (isUnlaunchedPath(baseVaultRosterHref())) return [];
+async function metaMorphoVaultPages(chainId: 1 | 8453): Promise<MetadataRoute.Sitemap> {
+  // As on Aave's layer: where the explorer this layer hangs off is unlaunched,
+  // the census read that would name its vault URLs is not made.
+  if (isUnlaunchedPath(metaMorphoVaultRosterHref(chainId))) return [];
   try {
     // Pointed at this deployment's own origin, the way every other server-side
     // caller of the listing proxy is: one code path, server or client.
     const hop = await ssrHop();
-    const page = await fetchVaultPositions({ chainId: BASE_CHAIN_ID, limit: 1, overlay: false, ...hop });
+    // Chain 1 also holds Aave's families: its MetaMorpho read is scoped.
+    const page = await fetchVaultPositions({
+      chainId,
+      families: chainId === MAINNET_CHAIN_ID ? "morpho" : undefined,
+      limit: 1,
+      overlay: false,
+      ...hop,
+    });
     return page.census
       .filter((c) => c.participants > 0)
       .map((c) => ({
-        url: `${SITE_URL}${baseVaultHref(c.vault)}`,
+        url: `${SITE_URL}${metaMorphoVaultHref(chainId, c.vault)}`,
         lastModified: DEPLOYED_AT,
         changeFrequency: "daily" as const,
         priority: 0.6,
       }));
   } catch (error) {
-    console.error("The Base vault census did not answer for the sitemap:", error);
+    console.error(`The MetaMorpho vault census (chain ${chainId}) did not answer for the sitemap:`, error);
     return [];
   }
 }
@@ -103,7 +111,11 @@ export const dynamic = "force-dynamic";
 // the wording date for the legal pages. `changeFrequency` says how often the
 // figures on a page move: daily for anything reading the chain.
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [vaultPages, baseVaults] = await Promise.all([ethereumVaultPages(), baseVaultPages()]);
+  const [vaultPages, baseVaults, ethMorphoVaults] = await Promise.all([
+    ethereumVaultPages(),
+    metaMorphoVaultPages(BASE_CHAIN_ID),
+    metaMorphoVaultPages(MAINNET_CHAIN_ID),
+  ]);
   return [
     {
       url: SITE_URL,
@@ -172,23 +184,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // The two surfaces under each vault roster — the position listing and the
     // layer's about-prose. The rosters themselves are sub-pages and are already
     // above; these hang off them, so they are formed from their hrefs.
-    ...[baseVaultRosterHref(), ethereumVaultRosterHref()].flatMap((roster) =>
-      isUnlaunchedPath(roster)
-        ? []
-        : [
-            {
-              url: `${SITE_URL}${roster}/positions`,
-              lastModified: DEPLOYED_AT,
-              changeFrequency: "daily" as const,
-              priority: 0.7,
-            },
-            {
-              url: `${SITE_URL}${roster}/info`,
-              lastModified: DEPLOYED_AT,
-              changeFrequency: "monthly" as const,
-              priority: 0.5,
-            },
-          ],
+    ...[baseVaultRosterHref(), metaMorphoVaultRosterHref(MAINNET_CHAIN_ID), ethereumVaultRosterHref()].flatMap(
+      (roster) =>
+        isUnlaunchedPath(roster)
+          ? []
+          : [
+              {
+                url: `${SITE_URL}${roster}/positions`,
+                lastModified: DEPLOYED_AT,
+                changeFrequency: "daily" as const,
+                priority: 0.7,
+              },
+              {
+                url: `${SITE_URL}${roster}/info`,
+                lastModified: DEPLOYED_AT,
+                changeFrequency: "monthly" as const,
+                priority: 0.5,
+              },
+            ],
     ),
     // The cross-protocol vault index, once every roster it reads is launched.
     ...(vaultIndexLaunched()
@@ -203,9 +216,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       : []),
     // Each catalogued vault's own page on Ethereum, under Aave's vault layer.
     ...vaultPages,
-    // …and each Base vault the census has ever seen a holder of, under Morpho.
-    // Neither chain enumerates its positions.
+    // …and each MetaMorpho vault the census has ever seen a holder of, under
+    // Morpho on Base and on Ethereum. No chain enumerates its positions.
     ...baseVaults,
+    ...ethMorphoVaults,
     // The blog index changes when a post is added; each post on its own date.
     {
       url: `${SITE_URL}/blog`,

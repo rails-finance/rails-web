@@ -1,6 +1,6 @@
 "use client";
 
-// One address's own events inside one MetaMorpho vault on Base.
+// One address's own events inside one MetaMorpho vault on Base or Ethereum.
 // ----------------------------------------------------------------------------
 // The attributed-exposure section above this states a READING at the page's
 // block — shares, share of the vault, claim, and a slice of each Blue market
@@ -134,6 +134,8 @@ export interface MorphoBaseVaultTimelineProps {
    *  can be stated rather than assumed. Null where the vault did not answer
    *  `DECIMALS_OFFSET()`. */
   decimalsOffset: number | null;
+  /** The chain the vault is on; Base where omitted (ui-jobs 486). */
+  chainId?: 1 | 8453;
 }
 
 export function MorphoBaseVaultTimeline({
@@ -142,8 +144,10 @@ export function MorphoBaseVaultTimeline({
   shareSymbol,
   assetSymbol,
   decimalsOffset,
+  chainId = MORPHO_BASE_CHAIN_ID,
 }: MorphoBaseVaultTimelineProps) {
   const coords: VaultTimelineCoords = {
+    chainId,
     blockNumber: timeline.blockNumber,
     vault: timeline.vault,
     vaultName: vaultName ?? undefined,
@@ -179,8 +183,8 @@ export function MorphoBaseVaultTimeline({
   // joined, and it is keyed by the id both carry.
   const byId = useMemo(() => new Map(timeline.events.map((e) => [e.id, e])), [timeline.events]);
   const activity = useMemo(
-    () => timeline.events.map((e) => vaultEventToActivity(e, MORPHO_BASE_CHAIN_ID, timeline.holder)),
-    [timeline.events, timeline.holder],
+    () => timeline.events.map((e) => vaultEventToActivity(e, chainId, timeline.holder)),
+    [timeline.events, timeline.holder, chainId],
   );
   // `useTimelineEvents` sorts ascending internally and reverses for display, so
   // the resting order is newest first — the head row at the top, with its dot,
@@ -233,10 +237,11 @@ export function MorphoBaseVaultTimeline({
             info={morphoVaultTimelineHorizonProv(
               coords,
               withheld,
-              tailMaxRows(BASE_CHAIN_ID),
+              tailMaxRows(chainId),
               timeline.coverage.logCountIsLowerBound,
               // On the floor path no gate ran, so the lane is the chain's own logs lane by name.
-              reconcile?.lane ?? chainMeta(BASE_CHAIN_ID).logsRpcEnv,
+              reconcile?.lane ??
+                (chainId === BASE_CHAIN_ID ? chainMeta(BASE_CHAIN_ID).logsRpcEnv : "ETHEREUM_LOGS_RPC_URL"),
             )}
           >
             This address has {timeline.coverage.logCountIsLowerBound ? "at least " : ""}
@@ -332,8 +337,8 @@ export function MorphoBaseVaultTimeline({
             eventPage={(slot) =>
               vaultExplorer.eventPage({
                 ...slot,
-                family: "morpho-base",
-                deployment: "base",
+                family: chainId === 1 ? "morpho" : "morpho-base",
+                deployment: chainId === 1 ? "ethereum" : "base",
                 vaultName,
                 vault: timeline.vault,
                 holder: timeline.holder,
@@ -354,7 +359,7 @@ export function MorphoBaseVaultTimeline({
                 <VaultTimelineRow
                   event={row}
                   coords={coords}
-                  chainId={MORPHO_BASE_CHAIN_ID}
+                  chainId={chainId}
                   shareUnit={shareUnit}
                   assetSymbol={assetSymbol}
                   vaultAddress={timeline.vault}
@@ -538,7 +543,11 @@ function shareOfVaultRow(event: VaultHolderEvent, coords: VaultTimelineCoords, s
 function morphoVaultTermsNotes(coords: VaultTimelineCoords, notes: MorphoVaultNote[], shareUnit: string): MarketNote[] {
   return vaultTermsNotes(
     notes,
-    { address: coords.vault ?? "", shareSymbol: shareUnit, protocolId: "morpho-base" },
+    {
+      address: coords.vault ?? "",
+      shareSymbol: shareUnit,
+      protocolId: coords.chainId === 1 ? "morpho" : "morpho-base",
+    },
     (note) => {
       const prov = morphoVaultTimelineNoteProv(coords, note);
       switch (note.kind) {

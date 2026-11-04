@@ -1,8 +1,9 @@
 "use client";
 
-// The roster: every catalogued MetaMorpho vault on Base, at one block.
+// The roster: every catalogued MetaMorpho vault on one chain, at one block.
 // ----------------------------------------------------------------------------
-// What /base/morpho/vaults shows — the Vaults tab of the Morpho Blue Base rail.
+// What /base/morpho/vaults and /ethereum/morpho/vaults show — the Vaults tab of
+// the Morpho Blue rail on each chain (ui-jobs 486).
 // One vault row (V1, components/vaults/vault-row.tsx) per catalogued vault,
 // grouped by asset, through the shared roster (components/vaults/
 // vault-roster.tsx). What the family supplies: its receipts, its Family facet
@@ -16,8 +17,13 @@ import type { ServerRead } from "@/lib/shared/server-head-read";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { isoSeconds, RosterBlock } from "@/components/vaults/roster-read-stamp";
-import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
-import { baseVaultHref, baseVaultsListingHref, baseVaultRosterHref } from "@/lib/vaults/routes";
+import {
+  metaMorphoVaultHref,
+  metaMorphoVaultsListingHref,
+  metaMorphoVaultRosterHref,
+  type MetaMorphoRouteChain,
+} from "@/lib/vaults/routes";
+import { chainMeta } from "@/lib/shared/chains";
 import {
   vaultDirectoryCensusProv,
   vaultDirectoryEmptyCountProv,
@@ -44,6 +50,7 @@ const FACETS: VaultRosterFacet[] = [
 ];
 
 export function VaultDirectoryView({
+  chainId,
   initialSearch,
   vaults,
   yields,
@@ -54,6 +61,8 @@ export function VaultDirectoryView({
   censusBlock,
   withCensus,
 }: {
+  /** The chain the roster is on. */
+  chainId: MetaMorphoRouteChain;
   /** The query string the page was served with (the roster's preset and sort). */
   initialSearch?: string;
   vaults: VaultSummary[];
@@ -68,7 +77,8 @@ export function VaultDirectoryView({
   /** The position census answered: the rows carry Holders. */
   withCensus: boolean;
 }) {
-  const coords: MorphoVaultCoords = { blockNumber: blockNumber || undefined, readBy };
+  const coords: MorphoVaultCoords = { chainId, blockNumber: blockNumber || undefined, readBy };
+  const chain = chainMeta(chainId).name;
   const rowCoords = (v: VaultSummary): MorphoVaultCoords => ({
     ...coords,
     vault: v.address,
@@ -79,11 +89,11 @@ export function VaultDirectoryView({
   const readBlock = (
     <RosterBlock
       read={{
-        label: "Morpho on Base",
+        label: `Morpho on ${chain}`,
         block: blockNumber,
         at: readBy?.blockTime ?? isoSeconds(vaults[0]?.readAt.timestamp),
       }}
-      chainId={MORPHO_BASE_CHAIN_ID}
+      chainId={chainId}
     />
   );
   const registry = useReceiptRegistry();
@@ -94,13 +104,13 @@ export function VaultDirectoryView({
         readTime={readBy?.blockTime}
         vaults={vaults}
         yields={yields}
-        chainId={MORPHO_BASE_CHAIN_ID}
+        chainId={chainId}
         blockNumber={blockNumber}
         chainStale={chainStale}
         skel="directory"
         facets={FACETS}
-        hrefOf={(v) => baseVaultHref(v.address)}
-        holdersHrefOf={(v) => baseVaultsListingHref({ vault: v.address })}
+        hrefOf={(v) => metaMorphoVaultHref(chainId, v.address)}
+        holdersHrefOf={(v) => metaMorphoVaultsListingHref(chainId, { vault: v.address })}
         receiptsOf={(v) => ({
           name: vaultDirectoryNameProv(rowCoords(v)),
           totalAssets: vaultDirectoryTotalAssetsProv(rowCoords(v)),
@@ -119,9 +129,9 @@ export function VaultDirectoryView({
               {withCensus ? "; Holders counts every address that has held a share." : "."}
             </>
           ),
-          listingHref: withCensus ? baseVaultsListingHref() : null,
-          infoHref: `${baseVaultRosterHref()}/info`,
-          drawer: <MorphoRosterDrawer block={readBlock} />,
+          listingHref: withCensus ? metaMorphoVaultsListingHref(chainId) : null,
+          infoHref: `${metaMorphoVaultRosterHref(chainId)}/info`,
+          drawer: <MorphoRosterDrawer block={readBlock} chain={chain} />,
         }}
       />
     </ProvReceiptsScope>
@@ -129,7 +139,7 @@ export function VaultDirectoryView({
 }
 
 /** The listing intro drawer (standards/explanation-copy-charter.md §8a). */
-function MorphoRosterDrawer({ block }: { block: ReactNode }) {
+function MorphoRosterDrawer({ block, chain }: { block: ReactNode; chain: string }) {
   return (
     <>
       <h3 className="text-[13px] font-semibold text-foreground">What a MetaMorpho vault is</h3>
@@ -139,7 +149,7 @@ function MorphoRosterDrawer({ block }: { block: ReactNode }) {
       </p>
       <h3 className="text-[13px] font-semibold text-foreground">What this page is</h3>
       <p>
-        One row is one vault the two MetaMorpho factories deployed on Base, grouped by asset. The list is a floor: a
+        One row is one vault the two MetaMorpho factories deployed on {chain}, grouped by asset. The list is a floor: a
         vault deployed without a factory emits no creation event, a vault created since the census block joins when the
         census runs again, and the Vault V2 family is outside it. Names are read live, because a V1.1 owner can rename a
         vault. Every figure is a call answered at {block}, re-read at most every five minutes.

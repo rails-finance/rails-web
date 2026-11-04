@@ -27,6 +27,7 @@
 //      it pairs with per-axis delta labels (each axis' own verb) so the CDP
 //      openers read the same as V2 — `Open  Deposit 6 ◊  Borrow 10K ♭`.
 
+import { ProtocolGlyph } from "@/components/icons/protocol-glyphs";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { createContext, Fragment, useContext, useEffect, useId, type ReactNode } from "react";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
@@ -213,6 +214,9 @@ export interface ChainTruthRowSpec {
     /** The named contract's protocol mark (an image src), drawn before the
      *  name. Only alongside a registry `name`. */
     icon?: string;
+    /** The protocol's mono glyph (a key in protocol-glyphs.tsx), drawn in
+     *  place of `icon`. Only alongside a registry `name`. */
+    glyph?: string;
     tone?: "party";
     /** Resolve the address's ENS reverse record and render the name over the
      *  truncated hex where one exists (the same batched lookup the pink "by"
@@ -1064,16 +1068,23 @@ export function PartyChip({ party }: { party: NonNullable<ChainTruthRowSpec["par
       <span className="text-rb-500" data-party-chip={chipId}>
         {party.prefix}
       </span>
-      {party.name && party.icon && (
-        <img
-          src={party.icon}
-          alt=""
-          width={14}
-          height={14}
-          className="size-3.5 shrink-0 rounded-full"
-          data-party-icon=""
-          data-prov-hidden=""
-        />
+      {party.name && party.glyph ? (
+        <span className="inline-flex shrink-0" data-party-icon={`glyph:${party.glyph}`} data-prov-hidden="">
+          <ProtocolGlyph id={party.glyph} className="size-3.5 text-foreground" />
+        </span>
+      ) : (
+        party.name &&
+        party.icon && (
+          <img
+            src={party.icon}
+            alt=""
+            width={14}
+            height={14}
+            className="size-3.5 shrink-0 rounded-full"
+            data-party-icon=""
+            data-prov-hidden=""
+          />
+        )
       )}
       <span
         className={`font-medium ${party.tone === "party" ? "text-pink-600 dark:text-pink-400" : "text-foreground"}`}

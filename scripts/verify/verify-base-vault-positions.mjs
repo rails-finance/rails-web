@@ -1309,7 +1309,7 @@ if (neverHeldCensus.length === 0) {
   );
 
   const rosterPage = await context.newPage();
-  await rosterPage.goto(`${BASE}/base/morpho/vaults`, { waitUntil: "networkidle", timeout: 120_000 });
+  await rosterPage.goto(`${BASE}/base/morpho/vaults?show=all`, { waitUntil: "networkidle", timeout: 120_000 });
   await rosterPage.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 120_000 });
   // Every catalogued vault has a roster row, but the ones holding nothing sit
   // in a collapsed group; opened here so the whole roster is readable.
@@ -1584,7 +1584,7 @@ async function linksOn(url) {
 // so every selector under it is unchanged.
 async function rosterLinks() {
   const page = await context.newPage();
-  await page.goto(`${BASE}/base/morpho/vaults`, { waitUntil: "networkidle", timeout: 120_000 });
+  await page.goto(`${BASE}/base/morpho/vaults?show=all`, { waitUntil: "networkidle", timeout: 120_000 });
   await page.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 120_000 });
   // The vaults that hold nothing at this block sit in a collapsed group, and a
   // vault every holder has left is one of them while its closed positions are

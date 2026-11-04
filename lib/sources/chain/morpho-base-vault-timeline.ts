@@ -138,7 +138,7 @@ import {
   type Chain,
   type PublicClient,
 } from "viem";
-import { base } from "viem/chains";
+import { base, mainnet } from "viem/chains";
 import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import {
   fetchMorphoBaseHolderLogs,
@@ -191,6 +191,17 @@ const ZERO = BigInt(0);
  *  receipt states the NAME because the URL carries a key. */
 export const MORPHO_BASE_TIMELINE_LANE = "BASE_BACKFILL_RPC_URL";
 
+/** Each chain's lane for the sweeps rails-server does not answer. Ethereum's is
+ *  the keyless mainnet gateway, never Alchemy (rails-ops ui-jobs 486); where it
+ *  is not set the server's sweeps are the only ones, and a sweep it cannot
+ *  answer is unread. */
+const LANES: Record<1 | 8453, { env: string; chain: Chain }> = {
+  8453: { env: MORPHO_BASE_TIMELINE_LANE, chain: base as Chain },
+  1: { env: "ETHEREUM_LOGS_RPC_URL", chain: mainnet as Chain },
+};
+
+const chainOf = (opts: { chainId?: 1 | 8453 }): 1 | 8453 => opts.chainId ?? BASE_CHAIN_ID;
+
 // MetaMorpho's own configuration topic0s, COMPUTED from their fragments. The
 // three ERC-4626 ones every vault shares are in ./vault-holder-logs.
 const SET_FEE_EVENT = parseAbiItem("event SetFee(address indexed caller, uint256 newFee)");
@@ -229,22 +240,27 @@ const ALLOCATION_BLOCKS = 80;
 const allocationBlocks = (blocks: bigint[]): number[] =>
   blocks.slice(Math.max(0, blocks.length - ALLOCATION_BLOCKS)).map((b) => Number(b));
 
-const logsClientCache = { client: null as PublicClient | null };
+const logsClientCache = new Map<number, PublicClient>();
 
-/** The sweeps' own client, on the lane this file names. Built here rather than
- *  taken from `chainLogsClient(8453)` for the reason in the header. */
-function backfillLogsClient(): PublicClient | null {
-  const url = process.env[MORPHO_BASE_TIMELINE_LANE];
+/** The sweeps' own client, on the chain's lane (`LANES`). Built here rather
+ *  than taken from `chainLogsClient` for the reason in the header. */
+function backfillLogsClient(chainId: 1 | 8453): PublicClient | null {
+  const url = process.env[LANES[chainId].env]?.replace(/^"(.*)"$/, "$1");
   if (!url) return null;
-  if (!logsClientCache.client)
-    logsClientCache.client = createPublicClient({
-      chain: base as Chain,
+  let client = logsClientCache.get(chainId);
+  if (!client) {
+    client = createPublicClient({
+      chain: LANES[chainId].chain,
       transport: http(url, { batch: false, retryCount: 2, timeout: 60_000 }),
     });
-  return logsClientCache.client;
+    logsClientCache.set(chainId, client);
+  }
+  return client;
 }
 
 export interface MorphoBaseVaultTimelineOptions {
+  /** The chain the vault is on; Base where omitted. */
+  chainId?: 1 | 8453;
   /** THE block, pinned by the vault loader that already read it. */
   blockNumber: number;
   /** The vault's own creation block, from the catalogue. The Base lane refuses
@@ -300,6 +316,8 @@ export interface MorphoBaseVaultTimelineResult {
 export const BASE_TAIL_REFRESH_BLOCKS = 300_000;
 /** …and so is a head that came back with more rows than this. */
 export const BASE_TAIL_REFRESH_ROWS = 200;
+/** Ethereum's: twelve seconds a block, so 50,000 blocks is the same week. */
+const ETHEREUM_TAIL_REFRESH_BLOCKS = 50_000;
 
 /** How long a chunked build waits before asking again for a block that would
  *  not answer. The state lane's client has already backed off for about seven
@@ -317,9 +335,10 @@ function usableTail(
   vault: string,
   holder: string,
   blockNumber: number,
+  chainId: number,
 ): StoredVaultTail | null {
   if (!tail) return null;
-  if (tail.chainId !== BASE_CHAIN_ID) return null;
+  if (tail.chainId !== chainId) return null;
   if (tail.loaderVersion !== MORPHO_BASE_VAULT_TAIL_VERSION) return null;
   if (tail.vault.toLowerCase() !== vault) return null;
   if (tail.holder.toLowerCase() !== holder) return null;
@@ -430,26 +449,32 @@ export async function loadMorphoBaseVaultTimelineWithTail(
     coverage: { fromDeployment: true, logCount: 0, withheldAbove: null, logCountIsLowerBound: false },
   };
 
-  const logs = backfillLogsClient();
+  const chainId = chainOf(opts);
+  const lane = LANES[chainId].env;
+  const logs = backfillLogsClient(chainId);
   // "No endpoint configured" and "this address has no history" must never
   // render the same, so this is stated rather than answered with an empty list.
-  if (!logs)
+  // On Ethereum rails-server's sweeps answer first and the lane is a fallback,
+  // so a missing lane is stated only where a sweep needs it.
+  if (!logs && chainId === BASE_CHAIN_ID)
     return {
-      timeline: { ...base_, unread: `${MORPHO_BASE_TIMELINE_LANE} is not set on this deployment` },
+      timeline: { ...base_, unread: `${lane} is not set on this deployment` },
       store: null,
       allEvents: [],
       continueBuild: null,
     };
 
   try {
-    const state = vaultHeadClient(BASE_CHAIN_ID);
+    const state = vaultHeadClient(chainId);
 
     /** One `eth_getLogs`, over an explicit range on the backfill lane. */
     const sweepRange = (topics: (string | null)[], from: number, to: bigint | number): Promise<RawLog[]> =>
-      logs.request({
-        method: "eth_getLogs",
-        params: [{ address, topics, fromBlock: hexBlock(from), toBlock: hexBlock(to) }],
-      } as never) as Promise<RawLog[]>;
+      !logs
+        ? Promise.reject(new Error(`${lane} is not set on this deployment`))
+        : (logs.request({
+            method: "eth_getLogs",
+            params: [{ address, topics, fromBlock: hexBlock(from), toBlock: hexBlock(to) }],
+          } as never) as Promise<RawLog[]>);
 
     // rails-server's four sweeps over `[from, page block]`, asked once per range.
     // The whole life is asked from block 0, which holds the same logs as the
@@ -458,7 +483,7 @@ export async function loadMorphoBaseVaultTimelineWithTail(
     const servedFrom = (from: number): Promise<HolderSweeps | null> => {
       const lo = from === opts.fromBlock ? 0 : from;
       let p = served.get(lo);
-      if (!p) served.set(lo, (p = fetchMorphoBaseHolderLogs(address, who, lo, opts.blockNumber)));
+      if (!p) served.set(lo, (p = fetchMorphoBaseHolderLogs(address, who, lo, opts.blockNumber, chainId)));
       return p;
     };
     const holderTopic = topicOfAddress(who).toLowerCase();
@@ -473,7 +498,7 @@ export async function loadMorphoBaseVaultTimelineWithTail(
       };
     const laneSweepFrom = (from: number) => (topics: (string | null)[]) => sweepRange(topics, from, blockNumber);
 
-    let tail = tailsAllowed ? usableTail(opts.tail, address, who, opts.blockNumber) : null;
+    let tail = tailsAllowed ? usableTail(opts.tail, address, who, opts.blockNumber, chainId) : null;
 
     /** The two transfer directions over one range; `lane` asks the lane only. */
     const readRange = async (from: number, lane = false) => {
@@ -490,7 +515,7 @@ export async function loadMorphoBaseVaultTimelineWithTail(
     // one or two of them in a vault's life.
     // rails-server's notes run to its last stored block; those above the page's
     // block are not this page's.
-    const notesPromise = fetchMorphoBaseVaultNotes(address).then((served) =>
+    const notesPromise = fetchMorphoBaseVaultNotes(address, chainId).then((served) =>
       served
         ? readNotes(async (topics) =>
             served.logs.filter((l) => l.topics[0]?.toLowerCase() === topics[0] && BigInt(l.blockNumber) <= blockNumber),
@@ -633,14 +658,14 @@ export async function loadMorphoBaseVaultTimelineWithTail(
       logsOut: (tail ? tail.logsOut : 0) + logsOut,
       refetched,
       refetchDiffered,
-      lane: MORPHO_BASE_TIMELINE_LANE,
+      lane,
       fromBlock: opts.fromBlock,
       toBlock: opts.blockNumber,
       cutBalance: tail ? tail.cutBalance : null,
     };
 
     const blockTimestamp =
-      (await readBlockTimes(BASE_CHAIN_ID, [opts.blockNumber])).get(opts.blockNumber) ??
+      (await readBlockTimes(chainId, [opts.blockNumber])).get(opts.blockNumber) ??
       Number((await state.getBlock({ blockNumber })).timestamp);
     const notes = await notesPromise;
     const history: VaultHistorySource = {
@@ -673,7 +698,7 @@ export async function loadMorphoBaseVaultTimelineWithTail(
     // Above what Rails stores, or with nowhere to store it. A count that is
     // only a LOWER BOUND — the refused-sweep path above — never reaches here at
     // all: it returns its own withholding, because a floor may not be built on.
-    if (heavy && (wholeCount > tailMaxRows(BASE_CHAIN_ID) || !storable))
+    if (heavy && (wholeCount > tailMaxRows(chainId) || !storable))
       return {
         timeline: { ...answered, coverage: { ...answered.coverage, withheldAbove: wholeCount } },
         store: null,
@@ -734,7 +759,7 @@ export async function loadMorphoBaseVaultTimelineWithTail(
     // The band, read fresh over the newest rows of the MERGED list — never
     // stored, so a warm page and a cold one draw the same bands at the same
     // blocks.
-    const allEvents = await attachAllocation(address, who, merged);
+    const allEvents = await attachAllocation(address, who, merged, chainId);
 
     // ── the candidate tail, if the rule fires ───────────────────────────────
     // THE STORE IS OFFERED ALL THE ROWS. The window below is taken after this
@@ -748,7 +773,8 @@ export async function loadMorphoBaseVaultTimelineWithTail(
     // price did not answer is refused on the same terms: stored, it would never
     // be asked for again. A price that reverted is an answer (`rowAnswered`).
     const wholeRows = store != null && store.rows.every(rowAnswered);
-    const stale = tail != null && finalized != null && finalized - tail.cut > BASE_TAIL_REFRESH_BLOCKS;
+    const refreshBlocks = chainId === BASE_CHAIN_ID ? BASE_TAIL_REFRESH_BLOCKS : ETHEREUM_TAIL_REFRESH_BLOCKS;
+    const stale = tail != null && finalized != null && finalized - tail.cut > refreshBlocks;
     const shouldStore =
       tailsAllowed &&
       store != null &&
@@ -771,7 +797,7 @@ export async function loadMorphoBaseVaultTimelineWithTail(
       continueBuild: null,
       store: shouldStore
         ? {
-            chainId: BASE_CHAIN_ID,
+            chainId,
             vault: address,
             holder: who,
             loaderVersion: MORPHO_BASE_VAULT_TAIL_VERSION,
@@ -781,7 +807,7 @@ export async function loadMorphoBaseVaultTimelineWithTail(
             // tail's own, plus this head's logs that have finalized since.
             logsIn: (tail ? tail.logsIn : 0) + belowCut(inLogs, finalized as number),
             logsOut: (tail ? tail.logsOut : 0) + belowCut(outLogs, finalized as number),
-            lane: MORPHO_BASE_TIMELINE_LANE,
+            lane,
             storedAt: new Date().toISOString(),
             rows: store!.rows,
           }
@@ -950,7 +976,7 @@ function chunkedBuilder(b: ChunkedBuild) {
 
     const candidate = candidateTail(built.slice().reverse(), cut);
     return {
-      chainId: BASE_CHAIN_ID,
+      chainId: chainOf(b.opts),
       vault: b.address,
       holder: b.who,
       loaderVersion: MORPHO_BASE_VAULT_TAIL_VERSION,
@@ -958,7 +984,7 @@ function chunkedBuilder(b: ChunkedBuild) {
       cutBalance: candidate.cutBalance,
       logsIn: (b.tail ? b.tail.logsIn : 0) + belowCut(b.inLogs, cut),
       logsOut: (b.tail ? b.tail.logsOut : 0) + belowCut(b.outLogs, cut),
-      lane: MORPHO_BASE_TIMELINE_LANE,
+      lane: LANES[chainOf(b.opts)].env,
       storedAt: new Date().toISOString(),
       rows: candidate.rows,
     };
@@ -1032,7 +1058,7 @@ async function buildRows(
   // denominator. Reading it twice would be two calls that could answer two
   // things about one block, and the row's "share of the vault" and its
   // allocation band would then rest on different denominators.
-  await readBlockWave(8453, vault, opts.shareDecimals, blocks, known);
+  await readBlockWave(chainOf(opts), vault, opts.shareDecimals, blocks, known);
   const timestampAt = known.timestamps;
 
   const rows: VaultHolderEvent[] = [];
@@ -1102,6 +1128,7 @@ async function attachAllocation(
   vault: `0x${string}`,
   holder: string,
   eventsNewestFirst: VaultHolderEvent[],
+  chainId: 1 | 8453,
 ): Promise<VaultHolderEvent[]> {
   if (eventsNewestFirst.length === 0) return eventsNewestFirst;
   // The rows arrive newest first; `allocationBlocks` takes the tail of an
@@ -1109,7 +1136,7 @@ async function attachAllocation(
   const ascending = [...new Set(eventsNewestFirst.map((e) => e.blockNumber))]
     .sort((a, b) => a - b)
     .map((b) => BigInt(b));
-  const allocation = await loadMorphoBaseVaultAllocationAt(vault, holder, allocationBlocks(ascending));
+  const allocation = await loadMorphoBaseVaultAllocationAt(vault, holder, allocationBlocks(ascending), chainId);
   return eventsNewestFirst.map((event) => {
     const at = allocation.get(event.blockNumber);
     if (!at) return event;

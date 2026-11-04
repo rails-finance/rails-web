@@ -1223,7 +1223,7 @@ async function linkOn(url) {
 // under it did not change.
 async function rosterLinks() {
   const page = await context.newPage();
-  await page.goto(`${BASE}/ethereum/aave/vaults`, { waitUntil: "networkidle" });
+  await page.goto(`${BASE}/ethereum/aave/vaults?show=all`, { waitUntil: "networkidle" });
   await page.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 60000 });
   const hrefs = await page
     .locator('[data-roster-panel] [data-link="vault-positions"]')

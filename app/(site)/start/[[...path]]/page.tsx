@@ -11,8 +11,35 @@ import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { ExplorerPicker } from "@/components/start/explorer-picker";
 import { CHAINS } from "@/lib/shared/chains";
+import { withoutLiquidations } from "@/lib/start/liquidation-probe";
 import { resultRows } from "@/lib/start/results";
-import { TREE, groupPhrase, resolveStartPath, type GroupKey, type Leaf, type ResultsKey } from "@/lib/start/tree";
+import {
+  TREE,
+  groupPhrase,
+  leavesStart,
+  resolveStartPath,
+  type GroupKey,
+  type Leaf,
+  type ResultsKey,
+} from "@/lib/start/tree";
+
+// Static, rebuilt every ten minutes: the liquidation probe's cache window.
+export const revalidate = 600;
+
+/** Every path the tree holds, so each page is built ahead and revalidated. */
+export function generateStaticParams(): { path: string[] }[] {
+  const out: { path: string[] }[] = [{ path: [] }];
+  const walk = (node: string, prefix: string[]) => {
+    for (const o of TREE.nodes[node].options) {
+      if (leavesStart(o)) continue;
+      const path = [...prefix, o.slug];
+      out.push({ path });
+      if ("node" in o.to) walk(o.to.node, path);
+    }
+  };
+  walk("start", []);
+  return out;
+}
 
 type Params = { params: Promise<{ path?: string[] }> };
 
@@ -60,8 +87,13 @@ function LeafContent({ leaf }: { leaf: Leaf }) {
   );
 }
 
-function Results({ results, group }: { results: ResultsKey; group?: GroupKey }) {
-  const rows = resultRows(results, group);
+async function Results({ results, group }: { results: ResultsKey; group?: GroupKey }) {
+  let rows = resultRows(results, group);
+  if (results === "liquidated") {
+    // A row that opens on "0 Troves" is left off (ui-jobs 488).
+    const empty = await withoutLiquidations(rows.map((r) => r.entry.id));
+    rows = rows.filter((r) => !empty.has(r.entry.id));
+  }
   return (
     <div data-anatomy="G5" data-start-results={results}>
       <h2 className={QUESTION}>{leafHeading({ kind: "results", results, group })}</h2>

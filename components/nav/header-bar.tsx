@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { BookmarksLink } from "@/components/nav/bookmarks-link";
 import { ChainSwitcher } from "@/components/nav/chain-switcher";
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
@@ -12,7 +13,7 @@ import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door
  *  restated here by prefix. Keep in sync with app/(site)/. (The old top-level
  *  chain directories are gone — the per-chain coverage pages are the
  *  directory now, and /coverage's prefix already covers them.) */
-const SITE_PREFIXES = ["/about", "/blog", "/coverage", "/privacy", "/pulse", "/start", "/terms"];
+const SITE_PREFIXES = ["/about", "/blog", "/bookmarks", "/coverage", "/privacy", "/pulse", "/start", "/terms"];
 
 function isSiteRoute(pathname: string | null) {
   if (!pathname) return false;
@@ -126,6 +127,8 @@ export function HeaderBar() {
               A sheet from the top on a phone. */}
           {!isHome && <SearchLauncher placement="header" />}
           <HeaderThemeToggle />
+          {/* The profile control (H20), beside the chooser it travels with. */}
+          <BookmarksLink />
           <ChainSwitcher variant={isMarketing ? "cta" : "chain"} />
         </div>
       </div>

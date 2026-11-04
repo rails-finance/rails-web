@@ -61,6 +61,7 @@ import { VAULT_SIZE_BRACKETS, VAULT_SIZE_UNPRICED } from "@/lib/aave-vaults/posi
 import { AAVE_VAULT_FAMILY_ORDER } from "@/lib/aave-vaults/vault-catalog";
 import { loadMorphoBaseVaultRoster } from "@/lib/morpho-base/vault-roster";
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
+import { metaMorphoRosterEntry } from "@/lib/metamorpho/vault-roster";
 import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import { readBlockTimes } from "@/lib/sources/chain/vault-block-reads";
@@ -77,9 +78,11 @@ const CENSUS_CHAINS: readonly ChainId[] = [MAINNET_CHAIN_ID, BASE_CHAIN_ID];
 
 /** The families each chain's census writes. Base has exactly one — every
  *  catalogued vault there is MetaMorpho — so it is a value the route accepts
- *  and never a menu the listing offers. */
+ *  and never a menu the listing offers. Chain 1 holds Aave's three and
+ *  MetaMorpho's (ui-jobs 486); rails-server scopes a chain-1 read to Aave's
+ *  three unless `families` names others. */
 const FAMILIES_BY_CHAIN: Record<number, readonly string[]> = {
-  [MAINNET_CHAIN_ID]: AAVE_VAULT_FAMILY_ORDER,
+  [MAINNET_CHAIN_ID]: [...AAVE_VAULT_FAMILY_ORDER, "morpho"],
   [BASE_CHAIN_ID]: ["morpho"],
 };
 
@@ -368,6 +371,7 @@ export async function GET(request: NextRequest) {
   const chain = sp.get("chain") ?? "1";
   const vault = sp.get("vault");
   const family = sp.get("family");
+  const families = sp.get("families");
   const status = sp.get("status");
   const shape = sp.get("shape");
   const q = sp.get("q");
@@ -392,6 +396,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error: `Invalid family parameter for chain ${chain}. Valid values: ${(FAMILIES_BY_CHAIN[chainId] ?? []).join(", ")}`,
+      },
+      { status: 400 },
+    );
+  }
+  if (families && !families.split(",").every((f) => isFamilyOn(chainId, f))) {
+    return NextResponse.json(
+      {
+        error: `Invalid families parameter for chain ${chain}: a comma list of ${(FAMILIES_BY_CHAIN[chainId] ?? []).join(", ")}`,
       },
       { status: 400 },
     );
@@ -436,6 +448,12 @@ export async function GET(request: NextRequest) {
     const backendParams = new URLSearchParams({ chain });
     if (vault) backendParams.set("vault", vault.toLowerCase());
     if (family) backendParams.set("family", family);
+    // A chain-1 read of one MetaMorpho vault names its family: rails-server
+    // scopes a chain-1 read without `families` to Aave's three, which would
+    // answer no rows for it.
+    const scope =
+      families ?? (chainId === MAINNET_CHAIN_ID && vault && (await metaMorphoRosterEntry(1, vault)) ? "morpho" : null);
+    if (scope) backendParams.set("families", scope);
     if (status) backendParams.set("status", status);
     if (shape) backendParams.set("shape", shape);
     if (q) backendParams.set("q", q.trim().toLowerCase());

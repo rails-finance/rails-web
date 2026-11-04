@@ -73,7 +73,10 @@ export type SessionProtocol =
   // Sky Savings, at `/ethereum/sky-savings`: sUSDS holders, a position being a
   // holder address. A roster explorer outside the home headline (rails-ops
   // TO-DO-sky-savings-scoping §6.1, decision 0027 call 2).
-  | "sky-savings";
+  | "sky-savings"
+  // CoW, at `/ethereum/cow`: a wallet's trades through CoW's
+  // settlement, from victoria's Sieve (rails-ops decisions/0058 step 3).
+  | "cow";
 
 export interface WalletSession {
   key: string;

@@ -214,7 +214,7 @@ export const GROWTHEPIE_READ = "2026-10-23";
 export const GROWTHEPIE_ATTRIBUTION = { text: "Source: growthepie", href: "https://www.growthepie.com" };
 
 interface KnownContractBase {
-  /** Short display name for party chips, e.g. "CoW Protocol". */
+  /** Short display name for party chips, e.g. "CoW". */
   name: string;
   /** The explorer-verified contract name. */
   contractName: string;
@@ -253,6 +253,9 @@ export interface ProtocolContract extends KnownContractBase {
   role: string;
   /** Basename under public/icons/protocols/, set only where that mark exists. */
   protocolIcon?: string;
+  /** A key in components/icons/protocol-glyphs.tsx: the chip draws the
+   *  protocol's mono glyph in place of a colour mark. */
+  protocolGlyph?: string;
   /** The protocol this contract moves a position here from, where that is all
    *  it does (Aave's V2→V3 helper): a supply or borrow it made reads as a
    *  migration. */
@@ -349,9 +352,9 @@ const EISEN_BAR: BarSubject = { name: "Eisen", icon: "eisen", hue: 284, shared: 
 const PENDLE_BAR: BarSubject = { name: "Pendle", icon: "pendle", hue: 260, shared: "swap" };
 // Curve: curve.finance's icon, the many-coloured ring.
 const CURVE_BAR: BarSubject = { name: "Curve", icon: "curve", hue: null, shared: "swap" };
-// CoW Protocol: cow.fi's favicon, black and white. Solvers send the
-// transactions that enter its settlement.
-const COW_BAR: BarSubject = { name: "CoW Protocol", icon: "cow", hue: null, shared: "batch" };
+// CoW: hue 307 read off CoW's brand purple, #490072 (the roster
+// entry's `brand`). Solvers send the transactions that enter its settlement.
+const COW_BAR: BarSubject = { name: "CoW", icon: "cow", hue: 307, shared: "batch" };
 
 export type KnownInfrastructure = CcipEscrow | ProtocolContract;
 
@@ -367,11 +370,11 @@ const escrow = (poolSymbol: string): CcipEscrow => ({
 });
 
 const COW: ProtocolContract = {
-  name: "CoW Protocol",
+  name: "CoW",
   kind: "settlement",
   contractName: "GPv2Settlement",
-  protocolIcon: "cow",
-  role: "CoW Protocol’s settlement contract, which takes in the tokens a CoW trade sells and pays out the tokens it buys",
+  protocolGlyph: "cow",
+  role: "CoW’s settlement contract, which takes in the tokens a CoW trade sells and pays out the tokens it buys",
   bar: COW_BAR,
 };
 const WETH_GATEWAY: ProtocolContract = {
@@ -1177,7 +1180,7 @@ const BALANCER_FEE_BURNER = known(
   "settlement",
   "Balancer fee burner",
   "ERC4626CowSwapFeeBurner",
-  "Balancer’s fee burner, which redeems protocol-fee vault shares and sells the proceeds through CoW Protocol",
+  "Balancer’s fee burner, which redeems protocol-fee vault shares and sells the proceeds through CoW",
   "balancer",
 );
 

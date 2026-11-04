@@ -1,5 +1,6 @@
-// Every catalogued MetaMorpho vault on Base, read at ONE pinned block — the
-// roster behind /base/morpho/vaults. SERVER-ONLY.
+// Every catalogued MetaMorpho vault on one chain, read at ONE pinned block — the
+// roster behind /base/morpho/vaults and /ethereum/morpho/vaults (rails-ops
+// ui-jobs 486: the same reads, the chain a parameter). SERVER-ONLY.
 // ----------------------------------------------------------------------------
 // The two sibling loaders answer questions about one address (a holder's slice
 // of one vault; a holder's vaults across the census). This one has no address
@@ -59,9 +60,12 @@ import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta } from "./erc20-meta";
 import type { RawAmount } from "./morpho-base-vault";
-import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { type MorphoBaseVaultFactory } from "@/lib/morpho-base/vault-catalog";
-import { loadMorphoBaseVaultRoster, type MorphoBaseVaultRoster } from "@/lib/morpho-base/vault-roster";
+import {
+  loadMetaMorphoVaultRoster,
+  type MetaMorphoChainId,
+  type MetaMorphoVaultRoster,
+} from "@/lib/metamorpho/vault-roster";
 
 const ZERO = BigInt(0);
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
@@ -131,6 +135,8 @@ export interface MorphoBaseVaultDirectoryRow {
 }
 
 export interface MorphoBaseVaultDirectoryResponse {
+  /** The chain the roster is on. */
+  chainId: MetaMorphoChainId;
   /** The block every figure below was read at. */
   blockNumber: number;
   /** rails-server's read of `blockNumber`, when it answered every read. */
@@ -150,8 +156,9 @@ export interface MorphoBaseVaultDirectoryResponse {
   rows: MorphoBaseVaultDirectoryRow[];
 }
 
-function empty(r: MorphoBaseVaultRoster): MorphoBaseVaultDirectoryResponse {
+function empty(r: MetaMorphoVaultRoster): MorphoBaseVaultDirectoryResponse {
   return {
+    chainId: r.chainId,
     blockNumber: 0,
     chainStale: true,
     censusBlock: r.censusBlock,
@@ -161,11 +168,11 @@ function empty(r: MorphoBaseVaultRoster): MorphoBaseVaultDirectoryResponse {
   };
 }
 
-async function readDirectory(): Promise<MorphoBaseVaultDirectoryResponse> {
-  const served = await loadMorphoBaseVaultRoster();
+async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaultDirectoryResponse> {
+  const served = await loadMetaMorphoVaultRoster(chainId);
   const roster = served.vaults;
   try {
-    const client = vaultHeadClient(MORPHO_BASE_CHAIN_ID);
+    const client = vaultHeadClient(chainId);
     // ONE block read; every call below is pinned to it.
     const blockNumber = await client.getBlockNumber();
 
@@ -199,7 +206,7 @@ async function readDirectory(): Promise<MorphoBaseVaultDirectoryResponse> {
     // Name and scale every distinct asset once, through the same resolver the
     // per-vault page uses — so the directory and the page it links to print
     // the same symbol and the same decimals for one token.
-    const meta = await resolveErc20Meta([...new Set(roster.map((v) => v.asset))], MORPHO_BASE_CHAIN_ID);
+    const meta = await resolveErc20Meta([...new Set(roster.map((v) => v.asset))], chainId);
 
     const rows: MorphoBaseVaultDirectoryRow[] = [];
     chunks.forEach((chunk, c) =>
@@ -237,8 +244,9 @@ async function readDirectory(): Promise<MorphoBaseVaultDirectoryResponse> {
     );
 
     return {
+      chainId,
       blockNumber: Number(blockNumber),
-      head: serverHeadStampAt(MORPHO_BASE_CHAIN_ID, blockNumber),
+      head: serverHeadStampAt(chainId, blockNumber),
       chainStale: false,
       censusBlock: served.censusBlock,
       catalogSize: roster.length,
@@ -246,7 +254,7 @@ async function readDirectory(): Promise<MorphoBaseVaultDirectoryResponse> {
       rows,
     };
   } catch (error) {
-    console.error("Morpho Base vault directory chain read failed:", error);
+    console.error(`Morpho vault directory chain read failed (chain ${chainId}):`, error);
     return empty(served);
   }
 }
@@ -256,18 +264,26 @@ async function readDirectory(): Promise<MorphoBaseVaultDirectoryResponse> {
 const isReadable = (d: MorphoBaseVaultDirectoryResponse) =>
   !d.chainStale && d.rows.some((r) => r.totalAssets != null && BigInt(r.totalAssets.raw) >= ZERO);
 
+// The arguments are part of the cache key, so each chain is its own entry; Base
+// keeps the key it had.
 const cachedDirectory = unstable_cache(readDirectory, ["morpho-base-vault-directory"], {
   revalidate: DIRECTORY_REVALIDATE_SECONDS,
 });
 
 /**
- * Every catalogued vault on Base at one pinned block, cached for five minutes.
- * A failed read is returned stale and NOT cached — `unstable_cache` would
- * otherwise serve the failure for the whole window — so a reader after a blip
- * gets a fresh attempt.
+ * Every catalogued vault on `chainId` at one pinned block, cached for five
+ * minutes. A failed read is returned stale and NOT cached — `unstable_cache`
+ * would otherwise serve the failure for the whole window — so a reader after a
+ * blip gets a fresh attempt.
  */
-export async function loadMorphoBaseVaultDirectory(): Promise<MorphoBaseVaultDirectoryResponse> {
-  const cached = await cachedDirectory();
+export async function loadMetaMorphoVaultDirectory(
+  chainId: MetaMorphoChainId,
+): Promise<MorphoBaseVaultDirectoryResponse> {
+  const cached = await cachedDirectory(chainId);
   if (isReadable(cached)) return cached;
-  return readDirectory();
+  return readDirectory(chainId);
 }
+
+/** Base's directory: `loadMetaMorphoVaultDirectory(8453)`. */
+export const loadMorphoBaseVaultDirectory = (): Promise<MorphoBaseVaultDirectoryResponse> =>
+  loadMetaMorphoVaultDirectory(8453);

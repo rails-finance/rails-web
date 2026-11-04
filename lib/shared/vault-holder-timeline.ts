@@ -45,6 +45,9 @@ import type { TimelineCutSummary } from "@/lib/shared/timeline-boundary";
  *  page's row narrows `blockNumber` and `txHash` to the ROW's own, so a receipt
  *  inside a card names the moment that card is about rather than the page's. */
 export interface VaultTimelineCoords {
+  /** The chain the vault is on, where a receipt names it (MetaMorpho: Base
+   *  unless this says Ethereum). */
+  chainId?: number;
   /** The block the figure was read at. On a row, that row's own block. */
   blockNumber?: number;
   /** The vault contract every receipt here names. */

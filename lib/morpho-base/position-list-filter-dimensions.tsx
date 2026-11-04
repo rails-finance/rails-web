@@ -168,9 +168,13 @@ export function baseVaultPositionListDimensions(
 export function baseVaultPositionFiltersToFetchParams(
   filters: BaseVaultPositionListFilters,
   page: number,
+  /** The chain the MetaMorpho listing is on; Base where omitted. Chain 1 also
+   *  holds Aave's vault families, so its read is scoped to `morpho`. */
+  chainId: 1 | 8453 = BASE_CHAIN_ID,
 ): FetchVaultPositionsParams {
   return {
-    chainId: BASE_CHAIN_ID,
+    chainId,
+    families: chainId === 1 ? "morpho" : undefined,
     ...parseVaultPositionSearch(filters.q),
     vault: filters.vault,
     status: filters.status,

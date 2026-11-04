@@ -104,14 +104,15 @@ function censusOf(c: VaultCensusRow | undefined): VaultSummary["census"] {
     : { holders: c.participants, live: c.liveCount, sumMatches: c.sumMatches, atBlock: c.censusBlock };
 }
 
-/** A MetaMorpho vault on Base. The steward is `curator()`, else `owner()`. */
+/** A MetaMorpho vault, on the directory's chain. The steward is `curator()`,
+ *  else `owner()`. */
 export function morphoBaseVaultSummary(
   r: MorphoBaseVaultDirectoryRow,
   d: MorphoBaseVaultDirectoryResponse,
   census?: VaultCensusRow,
 ): VaultSummary {
   return {
-    chainId: 8453,
+    chainId: d.chainId,
     address: r.address,
     family: "metamorpho",
     release: r.factory,
@@ -259,7 +260,7 @@ export const vaultDisplayName = (v: VaultSummary): string | null => v.name ?? v.
 export function morphoBaseVaultPageSummary(d: MorphoBaseVaultResponse, census: VaultCensusRow | null): VaultSummary {
   const v = d.vault;
   return {
-    chainId: 8453,
+    chainId: d.chainId,
     address: v.address.toLowerCase(),
     family: "metamorpho",
     release: v.factory,

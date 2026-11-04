@@ -12,15 +12,16 @@
 // No imports: the shell's client components, the server loaders and the
 // scripts all read it.
 
-/** One vault product. MetaMorpho on Base; savings GHO, static aTokens and
+/** One vault product. MetaMorpho on Base and Ethereum; savings GHO, static aTokens and
  *  Umbrella stake tokens on Ethereum (Aave); Yearn V3 on Ethereum; Maple's
  *  syrup pools on Ethereum, which keep their own pools page and join only the
  *  cross-protocol index (ui-jobs 39; survey 2026-10-20 §7.6). */
 export type VaultFamily = "metamorpho" | "sgho" | "stata" | "umbrella-stake" | "yearn-v3" | "maple-pool";
 
 /** The explorer a vault sits under (decision 0028), which is also the session
- *  key its listing is filed under. */
-export type VaultExplorer = "morpho-base" | "aave-vaults" | "yearn";
+ *  key its listing is filed under. MetaMorpho's is chain-keyed: `morpho-base`
+ *  on Base, `morpho` on Ethereum. */
+export type VaultExplorer = "morpho-base" | "morpho" | "aave-vaults" | "yearn";
 
 /** The census's word for a family. The Base census writes `morpho` for every
  *  MetaMorpho vault; Yearn has no census. */
@@ -28,7 +29,8 @@ export type VaultCensusFamily = "morpho" | "sgho" | "stata" | "umbrella-stake";
 
 export interface VaultFamilyEntry {
   /** Maple's explorer is a lender explorer with no vault holder pages, so it
-   *  is outside `VaultExplorer`. */
+   *  is outside `VaultExplorer`. MetaMorpho's is Base's here; on Ethereum it
+   *  is `morpho`. */
   explorer: VaultExplorer | "maple";
   /** The `ProtocolIcon` id of the venue that deployed it. */
   venue: "morpho" | "aave-v3" | "yearn" | "maple";

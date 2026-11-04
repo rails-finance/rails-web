@@ -19,6 +19,10 @@ export interface FetchVaultPositionsParams {
   /** A vault address — the listing's `vault` facet. */
   vault?: string;
   family?: string;
+  /** The census families the read is scoped to, a comma list. Chain 1 holds
+   *  Aave's three families (the server's default) and MetaMorpho's `morpho`,
+   *  which its readers name here. */
+  families?: string;
   /** "live" | "closed". Omit for both, which is the resting view. */
   status?: string;
   shape?: string;
@@ -46,6 +50,7 @@ export async function fetchVaultPositions(p: FetchVaultPositionsParams): Promise
   qs.set("chain", String(p.chainId ?? 1));
   if (p.vault) qs.set("vault", p.vault);
   if (p.family) qs.set("family", p.family);
+  if (p.families) qs.set("families", p.families);
   if (p.status) qs.set("status", p.status);
   if (p.shape) qs.set("shape", p.shape);
   if (p.q) qs.set("q", p.q);

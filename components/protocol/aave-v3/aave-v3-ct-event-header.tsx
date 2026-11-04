@@ -301,7 +301,7 @@ export function useAaveV3HeadSpec({
   // protocol contract (lib/shared/known-infrastructure.ts) is named with its
   // mark; any other address by ENS where it has a reverse record.
   const transferOut = ctx.eventType === "transfer_out";
-  // A swap names its venue, "via CoW Protocol" or "via ParaSwap" — never a CoW
+  // A swap names its venue, "via CoW" or "via ParaSwap" — never a CoW
   // order's one-order adapter.
   const venue = ctx.swap ? swapVenueParty(ctx.swap, coords.chainId ?? MAINNET_CHAIN_ID) : undefined;
   const party =
@@ -311,6 +311,7 @@ export function useAaveV3HeadSpec({
           address: venue.address,
           name: venue.name,
           icon: venue.protocolIcon ? protocolIconSrc(venue.protocolIcon) : undefined,
+          glyph: venue.protocolGlyph,
           prov: swapVenueProv(coords, ctx.swap),
         }
       : ctx.counterparty != null
@@ -323,6 +324,7 @@ export function useAaveV3HeadSpec({
               : named?.protocolIcon
                 ? protocolIconSrc(named.protocolIcon)
                 : undefined,
+            glyph: feeOf ? undefined : named?.protocolGlyph,
             prov: transferCounterpartyProv(transferOut ? "out" : "in", coords, ctx.counterparty),
             ens: true,
           }
@@ -338,6 +340,7 @@ export function useAaveV3HeadSpec({
           address: ctx.poolCaller,
           name: caller.name,
           icon: caller.protocolIcon ? protocolIconSrc(caller.protocolIcon) : undefined,
+          glyph: caller.protocolGlyph,
           prov: poolCallerProv(ctx.eventType, coords, ctx.poolCaller),
         }
       : undefined;
@@ -352,6 +355,7 @@ export function useAaveV3HeadSpec({
           address: ctx.recipient,
           name: recipient.name,
           icon: recipient.protocolIcon ? protocolIconSrc(recipient.protocolIcon) : undefined,
+          glyph: recipient.protocolGlyph,
           prov: withdrawRecipientProv(coords, ctx.recipient),
         }
       : undefined);

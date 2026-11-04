@@ -1,5 +1,5 @@
 // A transfer to or from a known protocol contract names it on the chip, with
-// the protocol's mark where one exists ("to CoW Protocol"); every other
+// the protocol's mark where one exists ("to CoW"); every other
 // counterparty keeps ENS or hex. The registry is lib/shared/known-infrastructure.ts,
 // keyed by chain and address, and rails-ops TO-DO-ui-jobs §14 is the build.
 //
@@ -18,7 +18,7 @@
 //   0x4950…e61a  tx 0x5bbf6573…637e (block 25,928,040): aDAI from CoW with no
 //     Trade the wallet owns in that tx, so no swap rule pairs it
 //   The earlier Ethereum fixtures 0xfe28, 0x81dbec, 0xbc8c and 0xb0f3 are position
-//   swaps (0xbc8c a withdraw and swap, 0xb0f3's bought aTokens a supply from a swap), which draw one "via CoW Protocol" card since §15
+//   swaps (0xbc8c a withdraw and swap, 0xb0f3's bought aTokens a supply from a swap), which draw one "via CoW" card since §15
 //   (verify-swap-cards.mjs).
 //   Base 0x0750…5556 tx 0x01312813…9192 (block 51,280,115): aUSDC to CoW, aWETH from CoW
 //   control 0x020b73…65be tx 0xb6b6100c…e1cf: transfer_in from EOA 0x1a76…56d5
@@ -37,7 +37,8 @@ import { chromium } from "playwright";
 import { CLOSED_GROUP, GROUP_FRAME, openGroup } from "./lib/group-rows.mjs";
 
 const BASE = process.env.BASE || "http://localhost:3000";
-const COW_ICON = "/icons/protocols/cow.png";
+// CoW's chip draws its mono glyph (data-party-icon="glyph:cow"), no image.
+const COW_ICON = "glyph:cow";
 // The served folder and its read, as verify-served-folders-standard.mjs
 // selects them (a group frame since ui-jobs 250, lib/group-rows.mjs).
 const FOLDER_HEADER = GROUP_FRAME;
@@ -47,19 +48,19 @@ const FIXTURES = [
   {
     label: "aave-v3 core 0x2206 (unpaired transfer, to CoW)",
     path: "/ethereum/aave-v3/0x220690e908d51d564099649469e423568f70e639?market=core",
-    expect: [{ text: "to CoW Protocol", icon: COW_ICON }],
+    expect: [{ text: "to CoW", icon: COW_ICON }],
   },
   {
     label: "aave-v3 core 0x4950 (aToken from CoW, no Trade of its own)",
     path: "/ethereum/aave-v3/0x4950def53a9ef494b3e03d1fd5750a846a7ee61a?market=core",
-    expect: [{ text: "from CoW Protocol", icon: COW_ICON }],
+    expect: [{ text: "from CoW", icon: COW_ICON }],
   },
   {
     label: "aave-v3 base 0x0750 (CoW swap on Base)",
     path: "/base/aave-v3/0x07502bf24fe1a4d81254900a693b7dce64945556",
     expect: [
-      { text: "to CoW Protocol", icon: COW_ICON },
-      { text: "from CoW Protocol", icon: COW_ICON },
+      { text: "to CoW", icon: COW_ICON },
+      { text: "from CoW", icon: COW_ICON },
     ],
   },
   {
@@ -79,7 +80,7 @@ const FIXTURES = [
 
 // Every registry display name the control must NOT show.
 const REGISTRY_NAMES =
-  /CoW Protocol|WETH gateway|ParaSwap|Uniswap|PancakeSwap|1inch|Odos|Magpie|Zerion|Enso|Multicall|CCIP escrow|0x Settler|0x flash wallet|0xbow zap|Aave Clinic Steward|Aave Umbrella|Aave adapter|Aerodrome|Asset pool|Balancer V3|Cross-chain order contract|Curve|DEX aggregator|DODO pool|DZap|Dynamic route|Eisen|Fee collector|Fee vault|Gaslite|Krystal|LI\.FI|Leftover exchanger|Mayan|Merkl|Morpho migration bundler|Oku router|OKX|Omni Exchange|Order fee taker|Pendle|Pool liquidity manager|Portikus|Rainbow|Rango|Revert auto-compound|Socket|Sushi|Swap callback|Swap executor|Swap helper|Swap router|SwapVM router|Underscore|V3 pool adaptor|V3 position utils|Vault rewards module|Superfluid Aave backend|Portals multicall|DCA\.fun|Aave migration helper|Aave Pool Exposure Steward|Aave Collector|Flash-loan action|Operation executor|Aave V3 swap adapter|Enzyme Aave V3 adapter|Aave V3 adapter|Contango|Synthereum lending manager|Auto-repaying manager|Morpho bundler adapter|Clear GSM rebalance adapter|Deposit contract|App contract|Leveraged position|L1 sender|ElfomoFi|Commission contract|Rosetta proxy|Deleverage connector|Zap executor|Relay router|Vault deposit router|Balancer fee burner|Balancer V2|Equalizer pool/;
+  /CoW|WETH gateway|ParaSwap|Uniswap|PancakeSwap|1inch|Odos|Magpie|Zerion|Enso|Multicall|CCIP escrow|0x Settler|0x flash wallet|0xbow zap|Aave Clinic Steward|Aave Umbrella|Aave adapter|Aerodrome|Asset pool|Balancer V3|Cross-chain order contract|Curve|DEX aggregator|DODO pool|DZap|Dynamic route|Eisen|Fee collector|Fee vault|Gaslite|Krystal|LI\.FI|Leftover exchanger|Mayan|Merkl|Morpho migration bundler|Oku router|OKX|Omni Exchange|Order fee taker|Pendle|Pool liquidity manager|Portikus|Rainbow|Rango|Revert auto-compound|Socket|Sushi|Swap callback|Swap executor|Swap helper|Swap router|SwapVM router|Underscore|V3 pool adaptor|V3 position utils|Vault rewards module|Superfluid Aave backend|Portals multicall|DCA\.fun|Aave migration helper|Aave Pool Exposure Steward|Aave Collector|Flash-loan action|Operation executor|Aave V3 swap adapter|Enzyme Aave V3 adapter|Aave V3 adapter|Contango|Synthereum lending manager|Auto-repaying manager|Morpho bundler adapter|Clear GSM rebalance adapter|Deposit contract|App contract|Leveraged position|L1 sender|ElfomoFi|Commission contract|Rosetta proxy|Deleverage connector|Zap executor|Relay router|Vault deposit router|Balancer fee burner|Balancer V2|Equalizer pool/;
 
 const only = process.env.FIXTURES ? new RegExp(process.env.FIXTURES) : null;
 let pass = 0;
@@ -137,11 +138,15 @@ for (const fx of FIXTURES) {
         .filter((s) => /^(to|from)$/.test((s.textContent || "").trim()))
         .map((p) => {
           const chip = p.parentElement;
-          const icon = chip.querySelector("img[data-party-icon]");
+          const icon = chip.querySelector("[data-party-icon]");
           return {
             text: (chip.textContent || "").replace(/\s+/g, " ").trim(),
             prefix: (p.textContent || "").trim(),
-            icon: icon ? new URL(icon.getAttribute("src"), location.href).pathname : null,
+            icon: icon
+              ? icon.tagName === "IMG"
+                ? new URL(icon.getAttribute("src"), location.href).pathname
+                : icon.getAttribute("data-party-icon")
+              : null,
           };
         }),
     );

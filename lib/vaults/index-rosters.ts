@@ -6,9 +6,9 @@ import { isUnlaunchedPath } from "@/lib/shared/protocols";
 import type { VaultSummary } from "@/lib/vaults/summary";
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import {
-  baseVaultHref,
-  baseVaultRosterHref,
-  baseVaultsListingHref,
+  metaMorphoVaultHref,
+  metaMorphoVaultRosterHref,
+  metaMorphoVaultsListingHref,
   ethereumVaultHref,
   ethereumVaultRosterHref,
   ethereumVaultsListingHref,
@@ -28,6 +28,24 @@ export const VAULT_INDEX_PROTOCOL_LABEL: Record<VaultIndexProtocol, string> = {
   yearn: "Yearn",
   maple: "Maple",
 };
+
+/** The rosters the index reads, in its order: a protocol on a chain. Morpho
+ *  has two, MetaMorpho on Base and on Ethereum (ui-jobs 486). */
+export const VAULT_INDEX_ROSTERS: readonly { protocol: VaultIndexProtocol; chainId: ChainId }[] = [
+  { protocol: "morpho", chainId: 8453 },
+  { protocol: "morpho", chainId: 1 },
+  { protocol: "aave", chainId: 1 },
+  { protocol: "yearn", chainId: 1 },
+  { protocol: "maple", chainId: 1 },
+];
+
+/** A roster's key: its protocol and chain. */
+export const vaultIndexRosterKey = (r: { protocol: VaultIndexProtocol; chainId: number }) =>
+  `${r.protocol}:${r.chainId}`;
+
+/** The roster key a vault's row belongs to. */
+export const vaultIndexRosterKeyOf = (v: VaultSummary) =>
+  vaultIndexRosterKey({ protocol: vaultIndexProtocol(v), chainId: v.chainId });
 
 /** One roster as the index read it: its block, its count, and what its
  *  count sentence's receipt needs. */
@@ -71,10 +89,13 @@ export const vaultIndexKey = (v: Pick<VaultSummary, "chainId" | "address">) => `
 
 export const chainName = (chainId: number): string => CHAINS[chainId as ChainId]?.name ?? String(chainId);
 
-/** The roster page a protocol's rows come from. */
-export function vaultIndexRosterHref(p: VaultIndexProtocol): string {
+/** MetaMorpho's chain for a route: Ethereum, else Base. */
+const morphoChain = (chainId: number): 1 | 8453 => (chainId === 1 ? 1 : 8453);
+
+/** The roster page a protocol's rows on a chain come from. */
+export function vaultIndexRosterHref(p: VaultIndexProtocol, chainId: number): string {
   return p === "morpho"
-    ? baseVaultRosterHref()
+    ? metaMorphoVaultRosterHref(morphoChain(chainId))
     : p === "aave"
       ? ethereumVaultRosterHref()
       : p === "yearn"
@@ -87,7 +108,7 @@ export function vaultIndexRosterHref(p: VaultIndexProtocol): string {
 export function vaultIndexHref(v: VaultSummary): string {
   const p = vaultIndexProtocol(v);
   return p === "morpho"
-    ? baseVaultHref(v.address)
+    ? metaMorphoVaultHref(morphoChain(v.chainId), v.address)
     : p === "aave"
       ? ethereumVaultHref(v.address)
       : p === "yearn"
@@ -99,7 +120,7 @@ export function vaultIndexHref(v: VaultSummary): string {
 export function vaultIndexHoldersHref(v: VaultSummary): string | null {
   const p = vaultIndexProtocol(v);
   return p === "morpho"
-    ? baseVaultsListingHref({ vault: v.address })
+    ? metaMorphoVaultsListingHref(morphoChain(v.chainId), { vault: v.address })
     : p === "aave"
       ? ethereumVaultsListingHref({ vault: v.address })
       : null;
@@ -107,7 +128,7 @@ export function vaultIndexHoldersHref(v: VaultSummary): string | null {
 
 /** The index is offered (the site footer, the sitemap, indexing) once every
  *  roster it reads is: while one is flagged `unlaunched` the index serves at
- *  its URL and the four rosters' heads link it, as an unlaunched roster does. */
+ *  its URL and the rosters' heads link it, as an unlaunched roster does. */
 export function vaultIndexLaunched(): boolean {
-  return VAULT_INDEX_PROTOCOLS.every((p) => !isUnlaunchedPath(vaultIndexRosterHref(p)));
+  return VAULT_INDEX_ROSTERS.every((r) => !isUnlaunchedPath(vaultIndexRosterHref(r.protocol, r.chainId)));
 }
