@@ -5,12 +5,12 @@
 // wallet (its wallet view, rails-ops decision 0051). The wallet view's heading
 // draws the same menu without View the wallet (ui-jobs 430). A dropdown on desktop, a sheet below sm. The copy and bookmark
 // icons that sat beside the address on the wallet row are these rows now; a
-// bookmarked address shows a small BookmarkCheck between its label and the
+// bookmarked address shows a small filled Bookmark between its label and the
 // chevron.
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Bookmark, BookmarkCheck, Check, ChevronDown, Copy, Wallet } from "lucide-react";
+import { Bookmark, Check, ChevronDown, Copy, Wallet } from "lucide-react";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { Facehash } from "@/components/shared/facehash";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
@@ -100,7 +100,7 @@ export function WalletMenu({
       />
       {bookmark && (
         <ToolsMenuItem
-          icon={fav ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+          icon={<Bookmark size={16} fill={fav ? "currentColor" : "none"} />}
           title={fav ? "Saved" : "Save wallet"}
           subtitle={fav ? "Press to remove it from your saved wallets" : "Keep it in your saved wallets"}
           onClick={() => setFav(toggleBookmark(wallet, name))}
@@ -144,8 +144,9 @@ export function WalletMenu({
         {label}
       </span>
       {fav && (
-        <BookmarkCheck
+        <Bookmark
           data-wallet-bookmarked=""
+          fill="currentColor"
           className={`${heading ? "h-4 w-4 text-rb-500" : "h-3.5 w-3.5"} shrink-0`}
           aria-hidden="true"
         />
