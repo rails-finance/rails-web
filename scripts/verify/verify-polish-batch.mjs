@@ -175,21 +175,21 @@ await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
 check("L Escape closes the modal", (await page.locator(LIQUITY_DIALOG).count()) === 0);
 
-// ── S. Chain switcher (top-right chrome) ─────────────────────────────────
-// The roster panel: chain trigger on app routes, "Open an explorer" on
-// marketing routes, both opening the same two-column panel. Counts are not
+// ── S. Explorer chooser ─────────────────────────────────────────────────
+// The roster panel: the rail's grid glyph on app routes (ui-jobs 497), the
+// "Open an explorer" pill on marketing routes, both opening the same
+// two-column panel on Ethereum. Counts are not
 // pinned literals — each chain's badge is compared against the rows the
 // panel actually renders for that chain.
 await page.goto(`${BASE}/ethereum/dolomite`, { waitUntil: "networkidle" });
 const SWITCHER_PANEL = 'div[role="menu"][aria-label="Blockchain switcher"]';
-// `:visible` — on an app route from `md` up the chooser sits on the protocol
-// title row and the bar's own copy is in the tree but hidden by a breakpoint
-// class (rails-ops TO-DO-ui-jobs 68), so a bare locator matches two. Its label
-// names the chain first: "Ethereum, switch blockchain".
-const switcherTrigger = page.locator('button[aria-label$=", switch blockchain"]:visible').first();
+// `:visible` — from `md` up the rail's copy is drawn and the header bar's is
+// in the tree but hidden with the bar.
+const switcherTrigger = page.locator("button[data-chooser-trigger]:visible").first();
 check(
-  "S trigger names the active chain",
-  /^Ethereum,/.test((await switcherTrigger.getAttribute("aria-label")) ?? ""),
+  "S trigger is the rail's grid glyph, named for what it opens",
+  (await switcherTrigger.getAttribute("data-chooser-trigger")) === "rail" &&
+    (await switcherTrigger.getAttribute("aria-label")) === "Open an explorer",
   (await switcherTrigger.getAttribute("aria-label")) ?? "",
 );
 // Pre-hydration clicks are lost, not replayed — poll the panel and re-click.
@@ -201,7 +201,7 @@ for (let attempt = 0; attempt < 6 && !switcherOpen; attempt++) {
     .then(() => true)
     .catch(() => false);
 }
-check("S panel opens from the chain trigger", switcherOpen);
+check("S panel opens from the rail's trigger", switcherOpen);
 const chainButtons = page.locator(`${SWITCHER_PANEL} button[aria-pressed]:not([data-switcher-robinhood])`);
 const chainCount = await chainButtons.count();
 check("S chain column renders multiple chains", chainCount >= 2, `chains: ${chainCount}`);

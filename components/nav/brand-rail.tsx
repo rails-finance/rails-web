@@ -28,6 +28,7 @@ import Link from "next/link";
 
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { SearchLauncher } from "@/components/shared/front-door-search";
+import { ChainSwitcher } from "@/components/nav/chain-switcher";
 
 /** The Rails glyph, linking home — the same mark and the same link the top bar
  *  carried, without the wordmark, which will not fit at icon width. The wallet
@@ -92,6 +93,9 @@ export function BrandRail() {
         <div className="flex flex-col items-center gap-3">
           <RailsGlyph />
           <SearchLauncher placement="rail" />
+          {/* The explorer chooser (H4, ui-jobs 497): a plain way to the roster
+              from every app page, its panel opening to the rail's right. */}
+          <ChainSwitcher variant="rail" />
         </div>
         {/* Toggle, then the pill flush to the left edge. `w-full` is what
             lets the pill sit at x=0 while the toggle stays centred in the

@@ -1,8 +1,8 @@
 "use client";
 
 // RailHeader — the two-row header on every explorer surface. The protocol's
-// identity (ProtocolIdentity) takes the left of the first row and the chain
-// chooser the right end of it (rails-ops TO-DO-ui-jobs 68): the two together
+// identity (ProtocolIdentity) takes the left of the first row and the chain's
+// name the right end of it (rails-ops TO-DO-ui-jobs 68, 497): the two together
 // say what you are looking at and which chain it runs on, so they belong on
 // one line rather than one on the page and one in the chrome. The second row
 // carries the recency stamp on the left (the chain head is rail-level
@@ -19,9 +19,8 @@
 // wallet heading is its frame, with a line naming the protocol and linking
 // to its listing (components/shared/wallet-heading.tsx).
 //
-// THE CHOOSER IS `md` AND UP ONLY. Below `md` there is no brand rail and
-// HeaderBar keeps the chain trigger and the theme toggle, so drawing it here
-// too would be a second copy of one control.
+// The chain is named at the right end of the first row (ChainLabel); the
+// chooser that stood there is the brand rail's since ui-jobs 497.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -30,22 +29,28 @@ import { positionNounPlural, protocolForSession, subPageForPathname } from "@/li
 import { ProtocolIdentity } from "@/components/shared/protocol-identity";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { INFO_PATH } from "@/components/shared/info-disclosure";
-import { ChainSwitcher } from "@/components/nav/chain-switcher";
+import { ChainGlyph } from "@/components/shared/chain-toggle";
+import { CHAINS, type ChainId } from "@/lib/shared/chains";
 
-/** The chain chooser as it sits on the title row: hidden below `md`, where
- *  HeaderBar still carries it. The profile control (H20) stands at the
- *  column's top right on every app page from md (app/(app)/layout.tsx), so
- *  `mr-8` leaves its 38px, less the 10px it reaches past the content edge,
- *  and the 4px gap the bar's cluster keeps.
- *
- *  EXPORTED for the front door (ProtocolFrontDoor, rails-ops
- *  TO-DO-arbitrum-scoping.md item 18), which draws no rail header but takes
- *  the chooser at the top right where every rail page has it. */
-export function TitleRowChooser() {
+/** The explorer's chain, named at the right end of the title row: the glyph
+ *  and the name in the rail's small caps, a label and not a control. The
+ *  chooser it replaced moved to the brand rail (ui-jobs 497), where it does
+ *  not follow the page's chain. From md the profile control (H20) stands at
+ *  the column's top right (app/(app)/layout.tsx), so `md:mr-8` leaves its
+ *  38px, less the 10px it reaches past the content edge, and a 4px gap.
+ *  Below md the label stays: the header bar's chooser names no chain either. */
+export function ChainLabel({ chainId, className = "" }: { chainId: ChainId; className?: string }) {
+  const chain = CHAINS[chainId];
+  if (!chain) return null;
   return (
-    <div className="mr-8 hidden shrink-0 items-center md:flex">
-      <ChainSwitcher variant="chain" />
-    </div>
+    <span
+      className={`inline-flex shrink-0 items-center gap-1.5 text-rb-500 ${className}`}
+      data-chain-label={chain.slug}
+      data-anatomy="H3.2"
+    >
+      <ChainGlyph chainId={chain.id} className="h-4 w-4" />
+      <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">{chain.name}</span>
+    </span>
   );
 }
 
@@ -98,14 +103,14 @@ export function RailHeader({
     <div className="flex flex-col gap-2">
       {/* The page's largest type (rails-ops TO-DO-ui-jobs 67). The first thing
           the eye lands on is now what the page is about; the scale lives in
-          ProtocolIdentity, so every explorer wears the same one. The chooser
-          takes the far end of the row, and `min-w-0` lets a long name shrink
+          ProtocolIdentity, so every explorer wears the same one. The chain's
+          label takes the far end of the row, and `min-w-0` lets a long name shrink
           rather than push it off. */}
       <div className="flex items-center justify-between gap-3" data-anatomy="H3">
         <div className="min-w-0">
           <ProtocolIdentity session={session} scale="title" />
         </div>
-        <TitleRowChooser />
+        <ChainLabel chainId={entry.chainId} className="md:mr-8" />
       </div>
       {/* Right-aligned even with the stamp off (the info page): a lone nav
           flush right still reads as one deliberate row, not a stamp-shaped

@@ -111,13 +111,8 @@ export function HeaderBar() {
         {/* Right-hand control cluster. `ml-auto` pushes it hard right — it used
             to yield (`md:ml-0`) to the inline site-links nav that sat here, but
             that nav is retired, so the cluster owns the push outright. The
-            switcher trails it, rightmost: on app routes below `md` a chain
-            trigger ("Ethereum ▾" — the chain, never the protocol; identity
-            lives on the page), on marketing routes the "Open an explorer"
-            pill. Both open the same roster panel. The search's glyph and the
-            toggle lead — the switcher opens a panel, so it anchors the
-            cluster's outer edge rather than sitting in the middle of it. The
-            hamburger is retired with it — the site's own pages and socials
+            search's glyph and the toggle lead; the chooser and H20 close it
+            (the order below). The hamburger is retired — the site's own pages and socials
             live in the footers (SiteFooter on marketing routes, AppFooter's
             quiet Coverage link on app routes). */}
         <div className="ml-auto flex items-center gap-1">
@@ -127,10 +122,15 @@ export function HeaderBar() {
               A sheet from the top on a phone. */}
           {!isHome && <SearchLauncher placement="header" />}
           <HeaderThemeToggle />
-          {/* The profile control (H20). From md on an app route this bar is
-              gone and app/(app)/layout.tsx draws it at the column's top right. */}
+          {/* The explorer chooser (H4) and the profile control (H20). On an
+              app route the chooser is the rail's grid glyph, before H20
+              (ui-jobs 497); from md this bar is gone, the rail carries the
+              chooser and app/(app)/layout.tsx draws H20 at the column's top
+              right. A marketing page has no rail, so the "Open an explorer"
+              pill stays as its way to the roster, at the cluster's end. */}
+          {!isMarketing && <ChainSwitcher variant="header" />}
           <BookmarksLink />
-          <ChainSwitcher variant={isMarketing ? "cta" : "chain"} />
+          {isMarketing && <ChainSwitcher variant="cta" />}
         </div>
       </div>
     </header>

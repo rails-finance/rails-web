@@ -90,6 +90,7 @@ for (const [name, sel] of [
   ["the Rails mark", 'a[href="/"]'],
   ["the search's glyph", 'button[data-anatomy="H15.1"]'],
   ["the theme toggle", 'button[aria-label^="Switch to"]'],
+  ["the explorer chooser", 'button[data-chooser-trigger="rail"][aria-label="Open an explorer"]'],
 ]) {
   const n = await rail.locator(`${sel}:visible`).count();
   check(n === 1, `the brand rail carries ${name} (${n})`);
@@ -145,18 +146,16 @@ if (pill) {
   check(pill.inLowerHalf, "the beta pill sits at the foot of the rail, not under the glyph");
 }
 
-// ── The protocol title row: size, case, tracking, and the chooser on it ──
+// ── The protocol title row: size, case, tracking, and the chain's label on it ──
 console.log("[protocol title row @1280 on /ethereum/liquity-v2]");
 const title = await page.evaluate(() => {
   const link = document.querySelector("[data-rail-identity]");
   const span = link.querySelector("span");
   const icon = link.querySelector("svg, img");
   const cs = getComputedStyle(span);
-  // The bar's own trigger is still in the tree below `md`, hidden by a
-  // breakpoint class, so take the one that is actually drawn.
-  const trigger = [...document.querySelectorAll('button[aria-label$="switch blockchain"]')].find(
-    (b) => b.getBoundingClientRect().width > 0,
-  );
+  // The chain's label (ui-jobs 497) stands where the chooser did; the
+  // chooser is the rail's.
+  const trigger = document.querySelector("[data-anatomy='H3'] [data-chain-label]");
   const lb = link.getBoundingClientRect();
   const tb = trigger?.getBoundingClientRect();
   return {
@@ -179,7 +178,9 @@ check(
 );
 check(title.text === "Liquity V2", `the protocol title reads as written, not shouted (${title.text})`);
 check(title.icon[0] === 32 && title.icon[1] === 32, `the protocol glyph is 32px square (${title.icon.join("x")})`);
-check(title.chooserOnRow, "the chain chooser sits on the protocol title row");
+check(title.chooserOnRow, "the chain's label sits on the protocol title row");
+const rowButtons = await page.locator("[data-anatomy='H3'] button[aria-haspopup='menu']").count();
+check(rowButtons === 0, `the title row draws no chooser; the rail carries it (${rowButtons})`);
 
 // ── ml-auto regression: control cluster stays hard right where the bar exists ──
 // It moved off the app routes with the bar itself (ui-jobs 68) — marketing is
@@ -224,9 +225,14 @@ if (!trovePath) {
 } else {
   await page.goto(BASE + trovePath, { waitUntil: "networkidle" });
   // Decision 0052: the wallet heading frames a position page; the card's
-  // sidebar name links to the explorer, and no chooser is drawn from md up.
-  const posTrigger = await page.locator('button[aria-label$="switch blockchain"]:visible').count();
-  check(posTrigger === 0, `a position view draws no chain chooser at 1280 (${posTrigger})`);
+  // sidebar name links to the explorer. The chooser is the rail's on every
+  // app page (ui-jobs 497), so it is drawn here once, in the rail.
+  const posTrigger = await page.locator("button[data-chooser-trigger]:visible").count();
+  const posRail = await page.locator('aside[data-anatomy="H1"] button[data-chooser-trigger]:visible').count();
+  check(
+    posTrigger === 1 && posRail === 1,
+    `a position view draws the chooser once, in the rail, at 1280 (${posTrigger}, ${posRail})`,
+  );
   await page.waitForSelector("[data-anatomy='C20'] a[data-rail-identity]", { timeout: 15000 }).catch(() => {});
   const posLink = await page
     .locator("[data-anatomy='C20'] a[data-rail-identity]")
@@ -249,8 +255,16 @@ if (!trovePath) {
 // The trigger is located by its label rather than by "inside <header>": since
 // ui-jobs 68 it sits on the protocol title row from `md` up and in the bar
 // below `md`, and this block should hold either one to the same behaviour.
-async function switcherCoverage(target, slug) {
-  await target.locator('button[aria-label$="switch blockchain"]:visible').click();
+// The panel opens on Ethereum whatever the page (ui-jobs 497); another
+// chain's door is one press on its row or tab.
+async function switcherCoverage(target, slug, chainName) {
+  await target.locator("button[data-chooser-trigger]:visible").click();
+  if (chainName) {
+    await target
+      .locator('[role="menu"] button[aria-pressed], [data-switcher-tabs] [role="tab"]', { hasText: chainName })
+      .first()
+      .click();
+  }
   await target.waitForSelector(`a[href="/coverage/${slug}"]`, { timeout: 5000 }).catch(() => {});
   return target.locator(`a[href="/coverage/${slug}"]`).count();
 }
@@ -264,9 +278,11 @@ check(switcherCov >= 1, `chain switcher reaches /coverage/ethereum on an Ethereu
 // there is no work-in-progress strip.
 console.log("[chrome on /base/moonwell — Base is launched]");
 await page.goto(BASE + "/base/moonwell", { waitUntil: "networkidle" });
-const baseChainTrigger = await page.locator('button[aria-label$="switch blockchain"]:visible').count();
-check(baseChainTrigger === 1, `a Base rail names the chain trigger once (${baseChainTrigger})`);
-const switcherCovBase = await switcherCoverage(page, "base");
+const baseChainTrigger = await page.locator("button[data-chooser-trigger]:visible").count();
+check(baseChainTrigger === 1, `a Base rail draws the chooser once (${baseChainTrigger})`);
+const baseLabel = await page.locator("[data-anatomy='H3'] [data-chain-label='base']").count();
+check(baseLabel === 1, `a Base rail names its chain on the title row (${baseLabel})`);
+const switcherCovBase = await switcherCoverage(page, "base", "Base");
 check(switcherCovBase >= 1, `chain switcher reaches /coverage/base on a Base rail (${switcherCovBase})`);
 const baseRows = await page.locator('[role="menu"] a[href^="/base/"]').count();
 check(baseRows >= 1, `the switcher panel lists the Base explorer rows (${baseRows})`);
@@ -296,7 +312,7 @@ console.log("[mobile @390]");
 const mob = await browser.newPage({ viewport: { width: 390, height: 800 } });
 await mob.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
 const mBurger = await mob.locator('header button[aria-label="Toggle menu"]').count();
-const mSwitcher = await mob.locator('header button[aria-label$="switch blockchain"]').count();
+const mSwitcher = await mob.locator('header button[data-chooser-trigger="header"]').count();
 check(mBurger === 0, `mobile header has no hamburger (${mBurger})`);
 check(mSwitcher === 1, `mobile header keeps the chain switcher trigger (${mSwitcher})`);
 // Below `md` the brand rail does not render and the bar carries the lot: mark,
@@ -310,8 +326,14 @@ const mBookmarks = await mob.locator('header button[aria-label="Bookmarks"]').co
 check(mBookmarks === 0, `mobile header carries no bookmarks button, retired 1 Nov 2026 (${mBookmarks})`);
 const mToggle = await mob.locator('header button[aria-label^="Switch to"]:visible').count();
 check(mToggle === 1, `mobile header keeps the theme toggle (${mToggle})`);
-const mSwitcherAll = await mob.locator('button[aria-label$="switch blockchain"]:visible').count();
-check(mSwitcherAll === 1, `mobile draws one chain trigger, not two (${mSwitcherAll})`);
+const mSwitcherAll = await mob.locator("button[data-chooser-trigger]:visible").count();
+check(mSwitcherAll === 1, `mobile draws one chooser trigger, not two (${mSwitcherAll})`);
+const mOrder = await mob.evaluate(() => {
+  const c = document.querySelector('header button[data-chooser-trigger="header"]');
+  const f = document.querySelector('header [data-anatomy="H20"]');
+  return !!c && !!f && c.getBoundingClientRect().right <= f.getBoundingClientRect().left;
+});
+check(mOrder, "mobile header draws the chooser before the profile control");
 // The app header carries the mark alone and the chain glyph without its name
 // (Miles 18 Oct 2026).
 const mHome = await mob.locator('header a[aria-label="Rails home"]:visible').count();
@@ -328,9 +350,7 @@ for (const [w, h] of [
   await p.goto(BASE + "/ethereum/frankencoin", { waitUntil: "networkidle" });
   const t = await p.evaluate(() => {
     const link = document.querySelector("[data-rail-identity]");
-    const trigger = [...document.querySelectorAll('button[aria-label$="switch blockchain"]')].find(
-      (b) => b.getBoundingClientRect().width > 0,
-    );
+    const trigger = document.querySelector("[data-anatomy='H3'] [data-chain-label]");
     const lb = link.getBoundingClientRect();
     const tb = trigger?.getBoundingClientRect();
     return {
@@ -342,7 +362,7 @@ for (const [w, h] of [
   console.log(`    @${w}`, JSON.stringify(t));
   check(t.text === "Frankencoin", `@${w}: the longest name reads as written (${t.text})`);
   check(t.lines === 1, `@${w}: the longest name sits on one line (${t.lines})`);
-  if (w >= 768) check(t.gap !== null && t.gap > 40, `@${w}: the title does not crowd the chooser (gap=${t.gap})`);
+  if (w >= 768) check(t.gap !== null && t.gap > 40, `@${w}: the title does not crowd the chain's label (gap=${t.gap})`);
   await p.close();
 }
 const mCov = await switcherCoverage(mob, "ethereum");
