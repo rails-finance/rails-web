@@ -40,8 +40,8 @@ const SCALE = {
 } as const;
 
 /** The mark and the protocol's name, linking to its listing. No chain mark —
- *  the chooser sits at the right end of the same row and names the chain on
- *  every app page, so the identity says only who the rail is. Renders nothing
+ *  the chain's label (ChainLabel) sits at the right end of the same row, so
+ *  the identity says only who the rail is. Renders nothing
  *  if the session union and the roster ever drift apart, rather than a crash
  *  or a bare label. */
 export function ProtocolIdentity({

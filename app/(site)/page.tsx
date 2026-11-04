@@ -160,6 +160,19 @@ export default async function Home() {
 
       {/* ═══ GET IN TOUCH ═══ */}
       <GetInTouch />
+
+      {/* ═══ FOOT WORDMARK (S10, ui-jobs 498) — "Destination DeFi" at display
+          size on the footer's canvas, in the column SiteFooter's content
+          takes, directly above it. In the raised tone, so faint by intent
+          (Miles, 4 Nov 2026); decorative, so hidden from assistive tech. The
+          size is a share of the column's width (cqw), so the line spans it. ═══ */}
+      <div className="bg-background" aria-hidden="true" data-anatomy="S10">
+        <div className="mx-auto max-w-7xl px-4 pt-16 @container">
+          <p className="whitespace-nowrap font-semibold leading-none tracking-tighter text-[var(--surface-raised)] text-[14cqw] select-none">
+            Destination DeFi
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

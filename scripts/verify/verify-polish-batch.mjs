@@ -1,6 +1,7 @@
 // Playwright check for the 10-item polish batch (merry-neumann plan).
 // Run: node scripts/verify/verify-polish-batch.mjs   (dev server on :3000)
-// Repointed (ui-jobs 432): check 8 reads the hero's h1 "Destination DeFi" (43e8fd92).
+// Repointed (ui-jobs 432, 498): check 8 reads the hero's h1 "Rails DeFi Explorers", the ticks under it,
+// then the search; the line under the search is gone.
 import { chromium } from "playwright";
 
 const results = [];
@@ -15,7 +16,7 @@ const page = await ctx.newPage();
 // ── Home page items ──────────────────────────────────────────────────────
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 
-// 8. Hero order: h1 → subheading → eyebrow badges
+// 8. Hero order: h1 → ticked terms → search, with no line under the search
 const heroOrder = await page.evaluate(() => {
   const section = document.querySelector("h1")?.closest("section");
   if (!section) return "no section";
@@ -23,12 +24,13 @@ const heroOrder = await page.evaluate(() => {
   // so "Read-only" sits past a short prefix.
   const texts = [...section.children].map((el) => el.textContent || "");
   const kids = [...section.children].map((el, i) => el.tagName + ":" + texts[i].slice(0, 25));
-  const h1i = texts.findIndex((t) => t.includes("Destination DeFi"));
-  const subi = texts.findIndex((t) => t.includes("Look up any position"));
+  const h1i = texts.findIndex((t) => t.includes("DeFi Explorers"));
+  const searchi = [...section.children].findIndex((el) => el.querySelector("input"));
+  const tagline = texts.some((t) => t.includes("Look up any position"));
   const badgei = texts.findIndex((t) => t.toLowerCase().includes("read-only"));
-  return h1i < subi && subi < badgei ? "ok" : kids.join(" | ");
+  return h1i >= 0 && h1i < badgei && badgei < searchi && !tagline ? "ok" : kids.join(" | ");
 });
-check("8 hero: h1 → subheading → badges", heroOrder === "ok", heroOrder === "ok" ? "" : heroOrder);
+check("8 hero: h1 → badges → search, no tagline", heroOrder === "ok", heroOrder === "ok" ? "" : heroOrder);
 
 // 3. URL pill: single pill carries the tint; toolbar row has no bg tint
 const bar = page.locator("span", { hasText: "rails.finance" }).first();
@@ -175,21 +177,21 @@ await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
 check("L Escape closes the modal", (await page.locator(LIQUITY_DIALOG).count()) === 0);
 
-// ── S. Chain switcher (top-right chrome) ─────────────────────────────────
-// The roster panel: chain trigger on app routes, "Open an explorer" on
-// marketing routes, both opening the same two-column panel. Counts are not
+// ── S. Explorer chooser ─────────────────────────────────────────────────
+// The roster panel: the rail's grid glyph on app routes (ui-jobs 497), the
+// "Open an explorer" pill on marketing routes, both opening the same
+// two-column panel on Ethereum. Counts are not
 // pinned literals — each chain's badge is compared against the rows the
 // panel actually renders for that chain.
 await page.goto(`${BASE}/ethereum/dolomite`, { waitUntil: "networkidle" });
 const SWITCHER_PANEL = 'div[role="menu"][aria-label="Blockchain switcher"]';
-// `:visible` — on an app route from `md` up the chooser sits on the protocol
-// title row and the bar's own copy is in the tree but hidden by a breakpoint
-// class (rails-ops TO-DO-ui-jobs 68), so a bare locator matches two. Its label
-// names the chain first: "Ethereum, switch blockchain".
-const switcherTrigger = page.locator('button[aria-label$=", switch blockchain"]:visible').first();
+// `:visible` — from `md` up the rail's copy is drawn and the header bar's is
+// in the tree but hidden with the bar.
+const switcherTrigger = page.locator("button[data-chooser-trigger]:visible").first();
 check(
-  "S trigger names the active chain",
-  /^Ethereum,/.test((await switcherTrigger.getAttribute("aria-label")) ?? ""),
+  "S trigger is the rail's grid glyph, named for what it opens",
+  (await switcherTrigger.getAttribute("data-chooser-trigger")) === "rail" &&
+    (await switcherTrigger.getAttribute("aria-label")) === "Open an explorer",
   (await switcherTrigger.getAttribute("aria-label")) ?? "",
 );
 // Pre-hydration clicks are lost, not replayed — poll the panel and re-click.
@@ -201,7 +203,7 @@ for (let attempt = 0; attempt < 6 && !switcherOpen; attempt++) {
     .then(() => true)
     .catch(() => false);
 }
-check("S panel opens from the chain trigger", switcherOpen);
+check("S panel opens from the rail's trigger", switcherOpen);
 const chainButtons = page.locator(`${SWITCHER_PANEL} button[aria-pressed]:not([data-switcher-robinhood])`);
 const chainCount = await chainButtons.count();
 check("S chain column renders multiple chains", chainCount >= 2, `chains: ${chainCount}`);
@@ -232,9 +234,10 @@ const navigated = await page
   .then(() => true)
   .catch(() => false);
 check("S explorer row navigates to its listing", navigated);
-// The marketing CTA opens the SAME panel, defaulting to Ethereum.
+// On the home page the rail's glyph opens the SAME panel, defaulting to
+// Ethereum: the site pages stand in the rail shell (ui-jobs 498).
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
-const cta = page.locator('button[aria-label="Open an explorer"]');
+const cta = page.locator("button[data-chooser-trigger]:visible").first();
 let ctaOpen = false;
 for (let attempt = 0; attempt < 6 && !ctaOpen; attempt++) {
   await cta.click();
@@ -243,9 +246,9 @@ for (let attempt = 0; attempt < 6 && !ctaOpen; attempt++) {
     .then(() => true)
     .catch(() => false);
 }
-check("S marketing CTA opens the switcher panel", ctaOpen);
+check("S home's rail glyph opens the switcher panel", ctaOpen);
 const ctaSelected = await page.locator(`${SWITCHER_PANEL} button[aria-pressed="true"]`).textContent();
-check("S CTA panel defaults to Ethereum", /Ethereum/.test(ctaSelected ?? ""), ctaSelected ?? "none");
+check("S home's panel defaults to Ethereum", /Ethereum/.test(ctaSelected ?? ""), ctaSelected ?? "none");
 
 await browser.close();
 const failed = results.filter((r) => !r.ok);

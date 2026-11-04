@@ -35,6 +35,7 @@ import { Search } from "lucide-react";
 import { NAV_BUTTON, ctrlWaking } from "@/lib/shared/ui-grammar";
 import { useHydrated } from "@/hooks/useHydrated";
 import { toggleWalletPanel, useWalletPanelOpen } from "@/components/nav/wallet-panel";
+import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { loadBookmarks, SESSIONS_CHANGED_EVENT } from "@/lib/shared/sessions";
 import { Facehash } from "@/components/shared/facehash";
 import {
@@ -226,7 +227,10 @@ function useLookup(href: (address: string) => string, onDone?: () => void) {
     (address: string) => {
       setProblem(null);
       onDone?.();
-      router.push(href(address.toLowerCase()));
+      // A push is invisible to the progress bar's link listener (ui-jobs 495).
+      const to = href(address.toLowerCase());
+      startNavigationProgress(to);
+      router.push(to);
     },
     [router, href, onDone],
   );
@@ -335,6 +339,7 @@ export function FrontDoorSearch({
     if (row.href) {
       setProblem(null);
       onDone?.();
+      startNavigationProgress(row.href);
       router.push(row.href);
     } else if (row.address) go(row.address);
     else if (row.ens) void lookUp(row.ens);

@@ -25,9 +25,11 @@
 // toggle and the chain trigger there, as it did before this rail existed.
 
 import Link from "next/link";
+import { RailsMark } from "@/components/nav/rails-mark";
 
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { SearchLauncher } from "@/components/shared/front-door-search";
+import { ChainSwitcher } from "@/components/nav/chain-switcher";
 
 /** The Rails glyph, linking home — the same mark and the same link the top bar
  *  carried, without the wordmark, which will not fit at icon width. The wallet
@@ -40,22 +42,7 @@ export function RailsGlyph({ onClick }: { onClick?: () => void }) {
       onClick={onClick}
       className="text-foreground transition-colors hover:text-blue-500"
     >
-      <svg width={30} height={30} viewBox="0 0 200 200" fill="none" aria-hidden="true">
-        <path
-          fill="currentColor"
-          style={{ opacity: 0.85 }}
-          d="M 79.763 159.671 L 111.637 159.671 L 52.168 41.625 L 20.295 41.625 L 79.763 159.671 Z"
-        />
-        <path
-          fill="currentColor"
-          style={{ opacity: 0.85 }}
-          d="M 98.578 97.056 L 130.451 97.056 L 105.044 47.853 L 73.171 47.853 L 98.578 97.056 Z"
-        />
-        <path
-          fill="currentColor"
-          d="M 148.892 142.388 L 180.766 142.388 L 155.359 93.185 L 123.486 93.185 L 148.892 142.388 Z"
-        />
-      </svg>
+      <RailsMark size={30} />
     </Link>
   );
 }
@@ -92,6 +79,9 @@ export function BrandRail() {
         <div className="flex flex-col items-center gap-3">
           <RailsGlyph />
           <SearchLauncher placement="rail" />
+          {/* The explorer chooser (H4, ui-jobs 497): a plain way to the roster
+              from every app page, its panel opening to the rail's right. */}
+          <ChainSwitcher variant="rail" />
         </div>
         {/* Toggle, then the pill flush to the left edge. `w-full` is what
             lets the pill sit at x=0 while the toggle stays centred in the

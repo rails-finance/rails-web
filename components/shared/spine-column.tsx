@@ -726,11 +726,16 @@ function CrossBadge({ size }: { size: number }) {
   );
 }
 
-/** Pulsing dot for the newest event in an active timeline — color matches spine tint */
+/** Pulsing dot for the newest event in an active timeline — color matches
+ *  spine tint. The ping draws the eye to the live tip: three pings, then the
+ *  dot holds still (`.ping-thrice`, globals.css); no ring under reduced
+ *  motion (globals.css). */
 export function PulsingDot({ dotClass = "bg-green-400", side }: { dotClass?: string; side: SpineTip }) {
   return (
     <div className="relative flex items-center justify-center" style={{ width: 10, height: 10 }} data-spine-tip={side}>
-      <span className={`absolute inline-flex h-full w-full rounded-full ${dotClass} opacity-50 animate-ping`} />
+      <span
+        className={`absolute inline-flex h-full w-full rounded-full ${dotClass} opacity-50 animate-ping ping-thrice`}
+      />
       <span className={`relative inline-flex rounded-full h-2 w-2 ${dotClass}`} />
     </div>
   );

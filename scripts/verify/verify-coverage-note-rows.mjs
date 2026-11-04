@@ -945,15 +945,16 @@ async function mobile(theme) {
 
   assert(/What Rails Covers/.test(await page.locator("h1").first().innerText()), "page loaded");
 
-  // The two sides of `md` must be genuinely different layouts. Only one
-  // section carries `md:hidden` now (the card stack; the old legend section
+  // The two sides of `lg` must be genuinely different layouts (the matrix
+  // moved from md to lg beside the brand rail, ui-jobs 498). Only one
+  // section carries `lg:hidden` now (the card stack; the old legend section
   // retired) — still scoped through a filter rather than a bare
-  // `section.md\\:hidden`, so a stray `md:hidden` section added elsewhere
+  // `section.lg\\:hidden`, so a stray `lg:hidden` section added elsewhere
   // can't silently turn any single-element method below (.innerText() etc)
   // into a strict-mode violation.
   assert(!(await page.locator("table").isVisible()), "desktop matrix is hidden below md");
-  const cardSection = page.locator("section.md\\:hidden").filter({ has: page.locator("div.rounded-2xl.bg-raised") });
-  assert((await cardSection.count()) === 1, "exactly one md:hidden section holds the card stack");
+  const cardSection = page.locator("section.lg\\:hidden").filter({ has: page.locator("div.rounded-2xl.bg-raised") });
+  assert((await cardSection.count()) === 1, "exactly one lg:hidden section holds the card stack");
   const cards = cardSection.locator("div.rounded-2xl.bg-raised");
   assert(await cards.first().isVisible(), "mobile card stack is visible below md");
   assert(
@@ -1027,7 +1028,7 @@ async function mobile(theme) {
   const discs = cardSection.locator("button[aria-label^='Show about']");
   assert((await discs.count()) === DRAWERED.length, `${DRAWERED.length} mobile drawer disclosures`);
   if (HAS_SOON) {
-    const soonDisc = page.locator(`section.md\\:hidden button[aria-label*='${EXPECTED_ROWS[SOON_IDX].label}']`);
+    const soonDisc = page.locator(`section.lg\\:hidden button[aria-label*='${EXPECTED_ROWS[SOON_IDX].label}']`);
     assert((await soonDisc.count()) === 0, "the coming-soon card carries no drawer disclosure trigger");
   }
 
@@ -1035,7 +1036,7 @@ async function mobile(theme) {
   // desktop — both read from the one shared coverageRows() helper, so a drift
   // between the two layouts would show up here.
   const mobileLabels = (
-    await page.locator("section.md\\:hidden div.rounded-2xl.bg-raised span.font-semibold").allTextContents()
+    await page.locator("section.lg\\:hidden div.rounded-2xl.bg-raised span.font-semibold").allTextContents()
   ).map((s) => s.trim());
   assert(mobileLabels.length === TOTAL_ROWS, `${TOTAL_ROWS} mobile card labels found`);
   assert(
@@ -1131,7 +1132,7 @@ async function comingSoon() {
   const noteCell = page.locator("td", { hasText: soonNote });
   assert((await noteCell.count()) === 1, "the note text renders exactly once, inside a table cell");
   // The mobile card carries the SAME note in a `<p>` too, but it's CSS-hidden
-  // at this desktop viewport (`md:hidden`) — `count()` alone would still see
+  // at this desktop viewport (`lg:hidden`) — `count()` alone would still see
   // it in the DOM, so check visibility (offsetParent) per match rather than
   // presence, or the always-mounted mobile copy would false-positive this.
   const noteParagraphs = page.locator("p", { hasText: soonNote });
@@ -1142,7 +1143,7 @@ async function comingSoon() {
   );
 
   // Scoped to the table: the mobile card carries the same link, but it's
-  // CSS-hidden (`md:hidden`) at this desktop viewport — `a[href]` presence
+  // CSS-hidden (`lg:hidden`) at this desktop viewport — `a[href]` presence
   // alone doesn't tell hidden from shown, so this counts only the copy inside
   // the (visible) table.
   const tableLinks = await page.locator(`table a[href='${soonHref}']`).count();

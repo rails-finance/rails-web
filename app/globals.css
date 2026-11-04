@@ -1310,6 +1310,56 @@ label[for] {
   }
 }
 
+/* The live example's dark glow round the colour wheel, and its hover edge in
+   step (ui-jobs 499, components/home/live-example-frame.tsx): fixed-colour
+   layers — the glow's three-shadow stack, the edge's 2px border — cross-faded
+   on opacity alone, so the compositor turns them and nothing is repainted.
+   Glow and edge layers share the keyframes, the lap and the slot delays, so
+   they hold one phase. Each layer rises over one slot and falls over the
+   next, so two neighbours sum to one at every moment; --glow-slot staggers
+   them a sixth of the lap apart, slot 0 (DeFi blue) at its peak when the page
+   opens. The steps hold each value for a tenth of a second: a change too small
+   to see, and between changes the compositor has nothing to redraw. Paused
+   while the frame is off screen (data-offscreen, set by an
+   IntersectionObserver). In light mode and under reduced motion the blue
+   layer holds and the rest are not drawn. */
+.live-glow {
+  --glow-lap: 72s;
+}
+.dark .live-glow-layer {
+  will-change: opacity;
+  animation: live-glow-turn var(--glow-lap) steps(120) infinite;
+  /* Negative, so every layer is mid-lap from the first frame. */
+  animation-delay: calc(var(--glow-lap) * (var(--glow-slot) - 7) / 6);
+}
+.live-glow[data-offscreen] .live-glow-layer {
+  animation-play-state: paused;
+}
+:root:not(.dark) .live-glow-layer:not(:first-child) {
+  display: none;
+}
+@keyframes live-glow-turn {
+  0% {
+    opacity: 0;
+  }
+  16.6667% {
+    opacity: 1;
+  }
+  33.3333%,
+  100% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dark .live-glow-layer {
+    animation: none;
+    will-change: auto;
+  }
+  .live-glow-layer:not(:first-child) {
+    display: none;
+  }
+}
+
 @keyframes hero-fade-up {
   from {
     opacity: 0;
@@ -1325,16 +1375,14 @@ label[for] {
   animation: hero-fade-up 0.6s ease-out forwards;
 }
 
-@keyframes track-drift {
-  from {
-    transform: translateY(0px);
-  }
-  to {
-    transform: translateY(-10px);
-  }
-}
-.animate-track-drift {
-  animation: track-drift 8s ease-in-out infinite alternate;
+/* A live marker's ping (spine-column PulsingDot, the pulse timeline's first
+   group): three pings find the eye, then the ring stays gone, so no animation
+   keeps the page drawing (ui-jobs 500). Unlayered, so it outranks the
+   animate-ping shorthand. Under reduced motion the ring is not drawn (the
+   site-wide rule below). */
+.ping-thrice {
+  animation-iteration-count: 3;
+  animation-fill-mode: forwards;
 }
 
 @keyframes line-draw {
@@ -1374,6 +1422,38 @@ label[for] {
   stroke-dasharray: none;
   stroke-dashoffset: 0;
   animation: none;
+}
+
+/* Reduced motion, site-wide (ui-jobs 500): the looping utilities and the
+   entrances that move hold still at their resting state. A skeleton stays a
+   block at full opacity; the spinner keeps its glyph, still, beside its
+   words; a ping's ring is not drawn, leaving the dot. Entrances land where
+   they end. Unlayered, so it outranks Tailwind's @layer utilities without
+   !important. Targeted, not a blanket `*` rule: state changes on a delay
+   (ctrl-waking, the flows cue) and rules with their own reduced-motion
+   state (the live glow, .ct-row) keep theirs. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
+  .before\:animate-pulse::before,
+  .animate-spin,
+  .animate-bounce,
+  .animate-dropdown-down,
+  .animate-dropdown-up {
+    animation: none;
+  }
+  .animate-ping {
+    animation: none;
+    visibility: hidden;
+  }
+  .animate-hero-fade-up {
+    animation: none;
+    opacity: 1;
+  }
+  .hero-track-line {
+    animation: none;
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+  }
 }
 
 @keyframes demo-float {

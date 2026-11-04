@@ -112,7 +112,7 @@ export function PendingBar({ className = "w-24" }: { className?: string }) {
   return (
     <span
       aria-hidden
-      className={`inline-block h-4 rounded-md bg-skeleton animate-pulse motion-reduce:animate-none ${className}`}
+      className={`inline-block h-4 rounded-md bg-skeleton animate-pulse ${className}`}
       data-pending-bar=""
     />
   );

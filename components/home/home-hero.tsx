@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useLayoutEffect } from "react";
-import Link from "next/link";
+import { useEffect, useLayoutEffect, type CSSProperties } from "react";
 import { Check } from "lucide-react";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
-import { PILL_CTA } from "@/lib/shared/ui-grammar";
+import { RailsMark } from "@/components/nav/rails-mark";
 
 // The inline blocking script in app/layout.tsx flips `data-hero-seen` on <html>
 // before paint on hard loads, but it can't run on App Router soft navigations.
@@ -13,13 +12,15 @@ import { PILL_CTA } from "@/lib/shared/ui-grammar";
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 /**
- * Home hero — the site's front door (rails-ops decision 0051): the headline
- * names the place ("Destination DeFi"), the Rails line states the promise, then
- * the search (H15) landing on the wallet view, and the ticked terms
- * (independent / read-only / no login) under it, then the pill into /start
- * (S12, rails-ops ui-jobs 478). The explorer
- * directory lives further down the page
- * (ProtocolRow), and the header's "Open an explorer" menu reaches it too.
+ * Home hero — the site's front door (rails-ops decision 0051, ui-jobs 498): the
+ * h1 names the place (the mark, "Rails", "DeFi Explorers"), the ticked terms
+ * (independent / read-only / no login) under it, then the search (H15) landing
+ * on the wallet view; its placeholder says what to type, so no line repeats
+ * it underneath (Miles, 4 Nov 2026). The way into /start
+ * (S12) is the "Start here" link at the top right
+ * (components/nav/start-here-link.tsx); "Destination DeFi" closes the page as
+ * its foot wordmark (S10). The explorer directory lives further down the page
+ * (ProtocolRow), and the rail's chooser (H4) reaches it too.
  *
  * Entrance animation runs once per browser via the `data-hero-seen` flag set
  * on <html> by the inline blocking script in app/layout.tsx (matching CSS in
@@ -50,37 +51,40 @@ export function HomeHero() {
   }, []);
 
   return (
-    // pt-32: the header floats absolutely over the home gradient (see
-    // HeaderBar's isHome branch), so the hero reserves its band here.
+    // pt-24: below md the header floats absolutely over the home gradient
+    // (see HeaderBar's isHome branch), so the hero reserves its band here;
+    // from md there is no bar, so the band closes to 64px.
     // overflow-x-clip: the glow is clipped at the sides.
     <section
-      className="flex flex-col items-center text-center pt-24 pb-10 sm:pb-15 overflow-x-clip relative"
+      className="flex flex-col items-center text-center pt-24 pb-16 sm:pb-24 md:pt-16 overflow-x-clip relative"
       data-anatomy="S1"
     >
       <div className="absolute top-22 left-1/2 -translate-x-1/2 w-[500px] h-[220px] bg-[var(--marketing)]/[0.07] rounded-full blur-[80px] pointer-events-none" />
-      <h1
-        className="relative font-semibold leading-none tracking-tighter mb-4 px-4 text-6xl sm:text-7xl lg:text-8xl animate-hero-fade-up"
-        style={{ animationDelay: "0.1s" }}
-      >
-        Destination <span className="marketing">DeFi</span>
-      </h1>
-      <p
-        className="relative font-sans font-light text-rb-500 tracking-tight mb-12 px-4 text-lg sm:mb-20 sm:text-xl animate-hero-fade-up"
-        style={{ animationDelay: "0.2s" }}
-      >
-        Look up any position, wallet and protocol, <br className="min-[640px]:hidden" />
-        verified directly from the chain.
-      </p>
-      <div
-        className="relative z-20 w-full max-w-2xl px-4 text-left animate-hero-fade-up"
-        style={{ animationDelay: "0.25s" }}
-      >
-        <FrontDoorSearch size="lg" suggest focusOnLoad />
+      {/* One line naming the place (Miles's mock, ui-jobs 498): the mark, "Rails",
+          then "DeFi Explorers" in the marketing blue, never wrapped. The mark is
+          sized in cap units so its right-hand leg spans the cap height, top on
+          the cap line and bottom on the baseline (Miles, 4 Nov 2026); the long
+          stroke reaches a little past both (MARK_STYLE). At every width the line
+          is a fixed share of the search input's width: the wrapper takes the
+          search wrapper's width and padding, so 100cqw is the input's width, and
+          the h1's size is a share of it (TITLE_CQW below). */}
+      <div className="relative mb-6 w-full max-w-2xl px-4 @container">
+        <h1
+          className="flex flex-nowrap items-baseline justify-center gap-x-[0.25em] whitespace-nowrap font-semibold leading-none tracking-tighter text-[length:var(--hero-title-size)] animate-hero-fade-up"
+          style={{ "--hero-title-size": `${TITLE_CQW}cqw` } as CSSProperties}
+          data-hero-title=""
+        >
+          <span className="whitespace-nowrap text-foreground">
+            <RailsMark size={60} className="inline-block" style={MARK_STYLE} uniform />
+            Rails
+          </span>{" "}
+          <span className="marketing whitespace-nowrap">DeFi Explorers</span>
+        </h1>
       </div>
-      {/* The terms, ticked — under the search; the checks carry the separation. */}
+      {/* The terms, ticked, under the h1; the checks carry the separation. */}
       <p
-        className="relative mx-auto mb-12 mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-2 min-[400px]:gap-x-4 min-[400px]:px-4 min-[520px]:gap-x-5 text-xs font-medium uppercase tracking-[0.1em] min-[400px]:tracking-[0.14em] text-rb-500 animate-hero-fade-up"
-        style={{ animationDelay: "0.3s" }}
+        className="relative mx-auto mb-10 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-2 min-[400px]:gap-x-4 min-[400px]:px-4 min-[520px]:gap-x-5 text-xs font-medium uppercase tracking-[0.1em] min-[400px]:tracking-[0.14em] text-rb-500 animate-hero-fade-up"
+        style={{ animationDelay: "0.1s" }}
       >
         {TERMS.map((term) => (
           <span key={term} className="inline-flex items-center gap-1.5">
@@ -89,20 +93,42 @@ export function HomeHero() {
           </span>
         ))}
       </p>
-      {/* The way into /start (S12, ui-jobs 478) for a reader with no address:
-          one quiet line under the ticks, blue since it opens another page. */}
-      <Link
-        href="/start"
-        className={`${PILL_CTA} relative -mt-6 transition-colors hover:border-blue-500 dark:hover:border-blue-500 animate-hero-fade-up`}
-        style={{ animationDelay: "0.35s" }}
-        data-anatomy="S12"
-        data-start-here-hero=""
+      <div
+        className="relative z-20 w-full max-w-2xl px-4 text-left animate-hero-fade-up"
+        style={{ animationDelay: "0.2s" }}
       >
-        Not sure where to start? <span aria-hidden="true">→</span>
-      </Link>
+        <FrontDoorSearch size="lg" suggest focusOnLoad />
+      </div>
     </section>
   );
 }
+
+// The mark against the h1's type: the right-hand leg of RailsMark (viewBox
+// 0 0 200 200), from the top of its upper segment (y 47.853) to the foot of the
+// lower step (y 142.388), is one cap height. The negative block margins leave a
+// margin box of exactly that leg, so the line box ignores the rest of the mark
+// and baseline alignment puts the leg's foot on the baseline. The negative left
+// margin starts the box at the long stroke's ink (x 20.295), so the line's
+// measured width runs from ink to ink.
+const STROKE_LEFT = 20.295;
+const STROKE_TOP = 47.853;
+const STROKE_BOTTOM = 142.388;
+const CAP = STROKE_BOTTOM - STROKE_TOP;
+const MARK_STYLE = {
+  width: `${200 / CAP}cap`,
+  height: `${200 / CAP}cap`,
+  marginTop: `${-STROKE_TOP / CAP}cap`,
+  marginBottom: `${-(200 - STROKE_BOTTOM) / CAP}cap`,
+  marginLeft: `${-STROKE_LEFT / CAP}cap`,
+  marginRight: "0.16em",
+  verticalAlign: "baseline",
+} as const;
+
+// The h1's size at every width, as a share of the search input's width (100cqw),
+// set on the h1 as --hero-title-size so it can be tuned live. The line's width
+// is linear in the size: 10.11cqw spans the input ink to ink; 7.5cqw (Miles,
+// 4 Nov 2026) runs it about 74% of the input.
+const TITLE_CQW = 7.5;
 
 // Rendered uppercase by the class on the <p>; the Check icon before each one
 // is the separator.

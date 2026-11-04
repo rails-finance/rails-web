@@ -209,13 +209,15 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [open]);
 
-  // The section below is `hidden md:block`, NOT a `md:` conditional render —
+  // The section below is `hidden lg:block`, NOT a `lg:` conditional render —
   // load-bearing beyond this file. The mobile card stack mounts its notes only
   // when opened, on the grounds that every note already ships once in the HTML
   // from here. Render this table conditionally and the notes leave the source
-  // at every viewport, with nothing in the mobile path to notice.
+  // at every viewport, with nothing in the mobile path to notice. From lg,
+  // not md: beside the brand rail (ui-jobs 498) the nine columns' headers
+  // overlap below 1024px, so the card stack runs to lg.
   return (
-    <section className="max-w-7xl mx-auto px-4 md:px-6 pb-6 hidden md:block">
+    <section className="max-w-7xl mx-auto px-4 md:px-6 pb-6 hidden lg:block">
       {/* Visually silent — no visible section heading here (the copy read as
           filler above a self-explanatory table), kept only for the
           accessibility outline. */}
@@ -239,7 +241,9 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
           cell for the why
         </span>
       </p>
-      {/* table-fixed, or the browser grows column 1 to fit the longest desc and
+      {/* Column 1 is 30% (34% before the brand rail took 56px, ui-jobs 498):
+          at 1280 the capability labels' lines then fit their columns.
+          table-fixed, or the browser grows column 1 to fit the longest desc and
           starves the mark columns unevenly. With it the seven capability
           columns split the remainder equally. Every header label is forced
           onto two lines by splitHeaderLabel (not the browser's own wrap), so
@@ -247,7 +251,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
       <table className="w-full table-fixed border-collapse">
         <thead>
           <tr className="border-b border-rb-200 dark:border-rb-800">
-            <th scope="col" className="w-[34%] text-left align-bottom pb-3 pr-6">
+            <th scope="col" className="w-[30%] text-left align-bottom pb-3 pr-6">
               <span className="sr-only">Explorer</span>
             </th>
             {CAPABILITIES.map((cap, capIndex) => {
