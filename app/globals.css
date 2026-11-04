@@ -1378,22 +1378,11 @@ label[for] {
 /* A live marker's ping (spine-column PulsingDot, the pulse timeline's first
    group): three pings find the eye, then the ring stays gone, so no animation
    keeps the page drawing (ui-jobs 500). Unlayered, so it outranks the
-   animate-ping shorthand. */
+   animate-ping shorthand. Under reduced motion the ring is not drawn (the
+   site-wide rule below). */
 .ping-thrice {
   animation-iteration-count: 3;
   animation-fill-mode: forwards;
-}
-
-@keyframes track-drift {
-  from {
-    transform: translateY(0px);
-  }
-  to {
-    transform: translateY(-10px);
-  }
-}
-.animate-track-drift {
-  animation: track-drift 8s ease-in-out infinite alternate;
 }
 
 @keyframes line-draw {
@@ -1433,6 +1422,38 @@ label[for] {
   stroke-dasharray: none;
   stroke-dashoffset: 0;
   animation: none;
+}
+
+/* Reduced motion, site-wide (ui-jobs 500): the looping utilities and the
+   entrances that move hold still at their resting state. A skeleton stays a
+   block at full opacity; the spinner keeps its glyph, still, beside its
+   words; a ping's ring is not drawn, leaving the dot. Entrances land where
+   they end. Unlayered, so it outranks Tailwind's @layer utilities without
+   !important. Targeted, not a blanket `*` rule: state changes on a delay
+   (ctrl-waking, the flows cue) and rules with their own reduced-motion
+   state (the live glow, .ct-row) keep theirs. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse,
+  .before\:animate-pulse::before,
+  .animate-spin,
+  .animate-bounce,
+  .animate-dropdown-down,
+  .animate-dropdown-up {
+    animation: none;
+  }
+  .animate-ping {
+    animation: none;
+    visibility: hidden;
+  }
+  .animate-hero-fade-up {
+    animation: none;
+    opacity: 1;
+  }
+  .hero-track-line {
+    animation: none;
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+  }
 }
 
 @keyframes demo-float {

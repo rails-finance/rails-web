@@ -326,9 +326,9 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
                   showTrove ? "opacity-0" : "opacity-100"
                 }`}
               >
-                <div className="motion-safe:animate-pulse h-44 bg-skeleton rounded-2xl" />
-                <div className="motion-safe:animate-pulse h-72 bg-rb-100/60 dark:bg-rb-800/40 rounded-2xl" />
-                <div className="motion-safe:animate-pulse h-24 bg-rb-100/30 dark:bg-rb-800/20 rounded-2xl" />
+                <div className="animate-pulse h-44 bg-skeleton rounded-2xl" />
+                <div className="animate-pulse h-72 bg-rb-100/60 dark:bg-rb-800/40 rounded-2xl" />
+                <div className="animate-pulse h-24 bg-rb-100/30 dark:bg-rb-800/20 rounded-2xl" />
               </div>
             )}
 
