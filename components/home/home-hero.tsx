@@ -15,7 +15,8 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
  * Home hero — the site's front door (rails-ops decision 0051, ui-jobs 498): the
  * h1 names the place (the mark, "Rails", "DeFi Explorers"), the ticked terms
  * (independent / read-only / no login) under it, then the search (H15) landing
- * on the wallet view, and the promise line under that. The way into /start
+ * on the wallet view; its placeholder says what to type, so no line repeats
+ * it underneath (Miles, 4 Nov 2026). The way into /start
  * (S12) is the "Start here" button at the top right
  * (components/nav/start-here-button.tsx); "Destination DeFi" closes the page as
  * its foot wordmark (S10). The explorer directory lives further down the page
@@ -55,7 +56,7 @@ export function HomeHero() {
     // from md there is no bar, so the band closes to 64px.
     // overflow-x-clip: the glow is clipped at the sides.
     <section
-      className="flex flex-col items-center text-center pt-24 pb-10 sm:pb-15 md:pt-16 overflow-x-clip relative"
+      className="flex flex-col items-center text-center pt-24 pb-16 sm:pb-24 md:pt-16 overflow-x-clip relative"
       data-anatomy="S1"
     >
       <div className="absolute top-22 left-1/2 -translate-x-1/2 w-[500px] h-[220px] bg-[var(--marketing)]/[0.07] rounded-full blur-[80px] pointer-events-none" />
@@ -98,13 +99,6 @@ export function HomeHero() {
       >
         <FrontDoorSearch size="lg" suggest focusOnLoad />
       </div>
-      <p
-        className="relative font-sans font-light text-rb-500 tracking-tight mt-5 mb-12 px-4 text-lg sm:mb-16 sm:text-xl animate-hero-fade-up"
-        style={{ animationDelay: "0.3s" }}
-      >
-        Look up any position, wallet and protocol, <br className="min-[640px]:hidden" />
-        verified directly from the chain.
-      </p>
     </section>
   );
 }
