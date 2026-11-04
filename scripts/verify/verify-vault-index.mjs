@@ -13,20 +13,24 @@
 // Needs nothing from .env.local: the server makes every read.
 //
 // ── WHAT EACH SECTION ASSERTS ─────────────────────────────────────────
-//   0  /vaults answers 200 and names a block for each of the four rosters
+// A ROSTER IS A PROTOCOL ON A CHAIN (ui-jobs 486): Morpho has two, MetaMorpho on
+// Base and on Ethereum, keyed `morpho:8453` and `morpho:1` (the index's
+// `data-index-key`, a row's `data-protocol` and `data-chain`).
+//
+//   0  /vaults answers 200 and names a block for each of the five rosters
 //   1  each roster's count, as its page states it (Maple: the catalogue),
 //      equals the index's count for it, and the index's rows per protocol
 //      (funded + empty + unread) equal it; the sum equals the union
 //   2  the Protocol facet narrows the rows to each protocol's count, every
 //      row shown that protocol's, and Reset restores them
-//   3  the Network facet narrows to Base: exactly Morpho's rows
+//   3  the Network facet narrows to Base: exactly Morpho on Base's rows
 //   4  every row's sidebar (C20) names its protocol and its chain
 //   5  a Maple row shows the Yield slot's "no daily series yet" state
-//   6  three rows' Total assets (Morpho, Aave, Yearn, the largest each) equal
+//   6  four rows' Total assets (each Morpho, Aave, Yearn, the largest each) equal
 //      the protocol roster's raw figure for the same vault at the same block
 //   7  every row links under its protocol, to a vault its roster lists; two
 //      links per protocol answer 200
-//   8  the four rosters' heads link the index
+//   8  the rosters' heads link the index
 //   9  the dev provenance tripwire reports no uncovered figure (SKIP on a
 //      production build)
 //  10  the default view (ui-jobs 485): the preset's rows against ?show=all,
@@ -57,12 +61,51 @@ const skip = (name, why) => {
 };
 
 const PROTOCOLS = ["morpho", "aave", "yearn", "maple"];
+/** The rosters, by `protocol:chain`; `sidebar` is the roster entry C20 draws. */
 const ROSTER = {
-  morpho: { href: "/base/morpho/vaults", figure: "directory-census", prefix: "/base/morpho/vaults/", chain: "8453" },
-  aave: { href: "/ethereum/aave/vaults", figure: "directory-catalogue", prefix: "/ethereum/aave/vaults/", chain: "1" },
-  yearn: { href: "/ethereum/yearn/vaults", figure: "roster-census", prefix: "/ethereum/yearn/vaults/", chain: "1" },
-  maple: { href: "/ethereum/maple/pools", figure: null, prefix: "/ethereum/maple/pools", chain: "1" },
+  "morpho:8453": {
+    protocol: "morpho",
+    href: "/base/morpho/vaults",
+    figure: "directory-census",
+    prefix: "/base/morpho/vaults/",
+    chain: "8453",
+    sidebar: "morpho-base",
+  },
+  "morpho:1": {
+    protocol: "morpho",
+    href: "/ethereum/morpho/vaults",
+    figure: "directory-census",
+    prefix: "/ethereum/morpho/vaults/",
+    chain: "1",
+    sidebar: "morpho",
+  },
+  "aave:1": {
+    protocol: "aave",
+    href: "/ethereum/aave/vaults",
+    figure: "directory-catalogue",
+    prefix: "/ethereum/aave/vaults/",
+    chain: "1",
+    sidebar: "aave-vaults",
+  },
+  "yearn:1": {
+    protocol: "yearn",
+    href: "/ethereum/yearn/vaults",
+    figure: "roster-census",
+    prefix: "/ethereum/yearn/vaults/",
+    chain: "1",
+    sidebar: "yearn",
+  },
+  "maple:1": {
+    protocol: "maple",
+    href: "/ethereum/maple/pools",
+    figure: null,
+    prefix: "/ethereum/maple/pools",
+    chain: "1",
+    sidebar: "maple",
+  },
 };
+const KEYS = Object.keys(ROSTER);
+const keyOf = (r) => `${r.protocol}:${r.chain}`;
 const LABEL = { morpho: "Morpho", aave: "Aave", yearn: "Yearn", maple: "Maple" };
 
 const strip = (html) =>
@@ -107,22 +150,24 @@ function rosterRows(html) {
 // ── the rosters, as their pages state them ─────────────────────────────────
 const rosterPages = {};
 const expected = {};
-for (const p of PROTOCOLS) {
+for (const k of KEYS) {
   // Every row of the roster (ui-jobs 485: the default view is the preset).
-  const r = await get(`${ROSTER[p].href}?show=all`);
-  rosterPages[p] = { status: r.status, html: r.html, ...rosterRows(r.html) };
-  if (ROSTER[p].figure) {
-    const text = figureText(r.html, ROSTER[p].figure) ?? "";
+  const r = await get(`${ROSTER[k].href}?show=all`);
+  rosterPages[k] = { status: r.status, html: r.html, ...rosterRows(r.html) };
+  if (ROSTER[k].figure) {
+    const text = figureText(r.html, ROSTER[k].figure) ?? "";
     const m = text.match(/([\d,]+) vaults/);
-    expected[p] = m ? Number(m[1].replace(/,/g, "")) : null;
+    expected[k] = m ? Number(m[1].replace(/,/g, "")) : null;
   }
 }
 {
   const src = fs.readFileSync(path.join(ROOT, "lib/maple/asset-catalog.ts"), "utf8");
   const body = src.slice(src.indexOf("export const MAPLE_POOLS"), src.indexOf("/** Pool key → catalog entry"));
-  expected.maple = (body.match(/^\s+key: "/gm) || []).length;
+  expected["maple:1"] = (body.match(/^\s+key: "/gm) || []).length;
 }
-console.log(`rosters state: ${PROTOCOLS.map((p) => `${p} ${expected[p]}`).join(", ")}`);
+console.log(`rosters state: ${KEYS.map((k) => `${k} ${expected[k]}`).join(", ")}`);
+/** A protocol's rows across its rosters. */
+const expectedOf = (p) => KEYS.filter((k) => ROSTER[k].protocol === p).reduce((a, k) => a + (expected[k] ?? 0), 0);
 
 // ── 0: the route ────────────────────────────────────────────────────────────
 const browser = await chromium.launch();
@@ -132,26 +177,26 @@ const res = await page.goto(`${BASE}/vaults?show=all`, { waitUntil: "networkidle
 check("0a /vaults answers 200", res?.status() === 200, String(res?.status()));
 await page.waitForSelector("[data-vault-index] [data-vault-row]", { timeout: 120_000 });
 const blocks = await page
-  .locator("[data-index-roster]")
+  .locator("[data-index-key]")
   .evaluateAll((els) =>
     Object.fromEntries(
       els.map((el) => [
-        el.getAttribute("data-index-roster"),
+        el.getAttribute("data-index-key"),
         { block: Number(el.getAttribute("data-index-block")), chain: el.getAttribute("data-index-chain") },
       ]),
     ),
   );
 check(
   "0b the index names a block for each roster",
-  PROTOCOLS.every((p) => blocks[p]?.block > 0),
-  PROTOCOLS.map((p) => `${p} ${blocks[p]?.block ?? "none"}`).join(", "),
+  KEYS.every((k) => blocks[k]?.block > 0),
+  KEYS.map((k) => `${k} ${blocks[k]?.block ?? "none"}`).join(", "),
 );
 
 // ── 1: the counts ───────────────────────────────────────────────────────────
 const counts = await page
-  .locator("[data-index-count]")
+  .locator("[data-index-key]")
   .evaluateAll((els) =>
-    Object.fromEntries(els.map((el) => [el.getAttribute("data-index-count"), Number(el.getAttribute("data-count"))])),
+    Object.fromEntries(els.map((el) => [el.getAttribute("data-index-key"), Number(el.getAttribute("data-count"))])),
   );
 const union = Number(await page.locator("[data-index-counts]").getAttribute("data-index-counts"));
 const emptyToggle = page.locator("[data-vault-index] [data-empty-group] > button");
@@ -178,15 +223,15 @@ const readRows = () =>
     })),
   );
 const rows = await readRows();
-const byProtocol = Object.fromEntries(PROTOCOLS.map((p) => [p, rows.filter((r) => r.protocol === p)]));
-for (const p of PROTOCOLS) {
+const byRoster = Object.fromEntries(KEYS.map((k) => [k, rows.filter((r) => keyOf(r) === k)]));
+for (const k of KEYS) {
   check(
-    `1a ${p}: the roster's count equals the index's count and its rows`,
-    expected[p] != null && counts[p] === expected[p] && byProtocol[p].length === expected[p],
-    `roster ${expected[p]}, index states ${counts[p]}, index rows ${byProtocol[p].length}`,
+    `1a ${k}: the roster's count equals the index's count and its rows`,
+    expected[k] != null && counts[k] === expected[k] && byRoster[k].length === expected[k],
+    `roster ${expected[k]}, index states ${counts[k]}, index rows ${byRoster[k].length}`,
   );
 }
-const sum = PROTOCOLS.reduce((a, p) => a + (expected[p] ?? 0), 0);
+const sum = KEYS.reduce((a, k) => a + (expected[k] ?? 0), 0);
 check(
   "1b the rosters' counts sum to the union, and the index holds that many rows",
   sum === union && rows.length === union && new Set(rows.map((r) => `${r.chain}:${r.address}`)).size === union,
@@ -221,8 +266,8 @@ for (const p of PROTOCOLS) {
   await openEmpty();
   const shown = await readRows();
   check(
-    `2a Protocol: ${LABEL[p]} narrows to its ${expected[p]} rows`,
-    shown.length === expected[p] && shown.every((r) => r.protocol === p),
+    `2a Protocol: ${LABEL[p]} narrows to its ${expectedOf(p)} rows`,
+    shown.length === expectedOf(p) && shown.every((r) => r.protocol === p),
     `${shown.length} shown, ${shown.filter((r) => r.protocol !== p).length} of another protocol`,
   );
   await reset("Protocol");
@@ -236,9 +281,9 @@ await openEmpty();
 {
   const shown = await readRows();
   check(
-    "3  Network: Base shows exactly Morpho's rows",
-    shown.length === expected.morpho && shown.every((r) => r.chain === "8453" && r.protocol === "morpho"),
-    `${shown.length} shown of ${expected.morpho}`,
+    "3  Network: Base shows exactly Morpho on Base's rows",
+    shown.length === expected["morpho:8453"] && shown.every((r) => keyOf(r) === "morpho:8453"),
+    `${shown.length} shown of ${expected["morpho:8453"]}`,
   );
 }
 await reset("Network");
@@ -246,7 +291,6 @@ await openEmpty();
 
 // ── 4: the sidebar names each row's protocol and chain (C20) ─────────────
 const NAME = { 1: "Ethereum", 8453: "Base" };
-const SIDEBAR = { morpho: "morpho-base", aave: "aave-vaults", yearn: "yearn", maple: "maple" };
 const baseRow = rows.find((r) => r.chain === "8453");
 const ethRow = rows.find((r) => r.chain === "1");
 check(
@@ -260,7 +304,7 @@ check(
   `${ethRow?.address} → ${ethRow?.sidebarChain}`,
 );
 const wrongSidebar = rows.filter(
-  (r) => r.group !== "unread" && (r.sidebarChain !== NAME[r.chain] || r.sidebar !== SIDEBAR[r.protocol]),
+  (r) => r.group !== "unread" && (r.sidebarChain !== NAME[r.chain] || r.sidebar !== ROSTER[keyOf(r)]?.sidebar),
 );
 check(
   "4c every drawn row's sidebar names its protocol and chain",
@@ -270,7 +314,7 @@ check(
 
 // ── 5: Maple's Yield slot ───────────────────────────────────────────────────
 {
-  const maple = byProtocol.maple.filter((r) => r.group === "funded");
+  const maple = byRoster["maple:1"].filter((r) => r.group === "funded");
   check(
     "5  a Maple row shows the no-series state",
     maple.length > 0 && maple.every((r) => r.yieldNone === "no-series" && r.yieldText === "no daily series yet"),
@@ -279,23 +323,23 @@ check(
 }
 
 // ── 6: Total assets against the protocol roster ─────────────────────────────
-for (const p of ["morpho", "aave", "yearn"]) {
-  const funded = byProtocol[p].filter((r) => r.group === "funded");
+for (const k of KEYS.filter((k) => ROSTER[k].protocol !== "maple")) {
+  const funded = byRoster[k].filter((r) => r.group === "funded");
   const top = funded.sort((a, b) => (BigInt(b.raw) > BigInt(a.raw) ? 1 : -1))[0];
-  const roster = rosterPages[p];
+  const roster = rosterPages[k];
   if (!top) {
-    check(`6  ${p}: a funded row to compare`, false, "none");
+    check(`6  ${k}: a funded row to compare`, false, "none");
     continue;
   }
-  if (roster.block !== blocks[p].block) {
+  if (roster.block !== blocks[k].block) {
     skip(
-      `6  ${p}: Total assets against the roster`,
-      `the roster read block ${roster.block}, the index ${blocks[p].block} (a cache boundary between the two loads)`,
+      `6  ${k}: Total assets against the roster`,
+      `the roster read block ${roster.block}, the index ${blocks[k].block} (a cache boundary between the two loads)`,
     );
     continue;
   }
   check(
-    `6  ${p}: ${top.address.slice(0, 10)} Total assets equals the roster's at block ${roster.block}`,
+    `6  ${k}: ${top.address.slice(0, 10)} Total assets equals the roster's at block ${roster.block}`,
     roster.rows.get(top.address) === top.raw,
     `index ${top.raw}, roster ${roster.rows.get(top.address)}`,
   );
@@ -304,7 +348,8 @@ for (const p of ["morpho", "aave", "yearn"]) {
 // ── 7: the links ────────────────────────────────────────────────────────────
 {
   const bad = rows.filter((r) => {
-    const R = ROSTER[r.protocol];
+    const R = ROSTER[keyOf(r)];
+    if (!R) return true;
     if (!r.href) return true;
     if (r.protocol === "maple") return r.href !== R.prefix;
     return r.href !== `${R.prefix}${r.address}`;
@@ -312,7 +357,7 @@ for (const p of ["morpho", "aave", "yearn"]) {
   check("7a every row links to its vault under its protocol", bad.length === 0, `${bad.length} off-pattern`);
   const unlisted = rows.filter((r) => {
     if (r.protocol === "maple") return false;
-    const html = rosterPages[r.protocol].html;
+    const html = rosterPages[keyOf(r)]?.html ?? "";
     return !html.includes(`data-vault-row="${r.address}"`) && !html.includes(r.address);
   });
   check(
@@ -320,7 +365,7 @@ for (const p of ["morpho", "aave", "yearn"]) {
     unlisted.length === 0,
     `${unlisted.length} unlisted`,
   );
-  const sample = PROTOCOLS.flatMap((p) => [...new Set(byProtocol[p].map((r) => r.href))].slice(0, 2));
+  const sample = KEYS.flatMap((k) => [...new Set(byRoster[k].map((r) => r.href))].slice(0, 2));
   for (const href of sample) {
     const r = await fetch(`${BASE}${href}`, { signal: AbortSignal.timeout(300_000) });
     check(`7c ${href} answers 200`, r.status === 200, String(r.status));
@@ -328,11 +373,11 @@ for (const p of ["morpho", "aave", "yearn"]) {
 }
 
 // ── 8: the rosters link the index ───────────────────────────────────────────
-for (const p of PROTOCOLS) {
-  const html = rosterPages[p].html;
+for (const k of KEYS) {
+  const html = rosterPages[k].html;
   check(
-    `8  ${ROSTER[p].href} links the index`,
-    rosterPages[p].status === 200 &&
+    `8  ${ROSTER[k].href} links the index`,
+    rosterPages[k].status === 200 &&
       /data-link="vault-index"[^>]*href="\/vaults"|href="\/vaults"[^>]*data-link="vault-index"/.test(html),
   );
 }

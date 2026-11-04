@@ -234,6 +234,7 @@ export function VaultIndexView({
       {counts.map((r, i) => (
         <span
           key={vaultIndexRosterKey(r)}
+          data-index-key={vaultIndexRosterKey(r)}
           data-index-count={r.protocol}
           data-count={r.count}
           data-index-roster={r.protocol}
