@@ -77,6 +77,27 @@ test("a total that disagrees by more than a dollar omits the value", () => {
   assert.notEqual(settleValueHeld(data(rows, 200.5), roster), null);
 });
 
+test("a counted row outside the roster is checked against the total, not stated", () => {
+  const restore = quiet();
+  const rows = [
+    row("aave-v3"),
+    row("maple"),
+    row("fluid", { counted: false, usd: null }),
+    row("sky-savings", { usd: 50 }),
+  ];
+  const v = settleValueHeld(data(rows, 250), roster);
+  // The server's total leaves the row out: the response disagrees with itself.
+  const short = settleValueHeld(data(rows, 200), roster);
+  restore();
+  assert.equal(v.totalUsd, 200);
+  assert.deepEqual(
+    v.rows.map((r) => r.label),
+    ["Aave V3", "Maple"],
+  );
+  assert.equal(v.rows[0].share, 0.5);
+  assert.equal(short, null);
+});
+
 test("a counted row without a finite figure is not counted", () => {
   const restore = quiet();
   const v = settleValueHeld(
