@@ -7,15 +7,14 @@
 // Until the browser's list is read a faint square with no eyes holds the place,
 // so a reader with bookmarks never sees the sample face first.
 //
-// Where it stands: in the header bar (H2) on every page that draws the bar
-// (marketing at every width, the app below md), and from md on an app route
-// at the column's top right (app/(app)/layout.tsx, `ProfileCorner`).
+// Where it stands: in the header bar (H2) below md, and from md at the
+// column's top right on every page (components/nav/rail-shell.tsx; ui-jobs 498).
 //
 // It goes to another page, so it takes the link hue (color-grammar.md §4a,
 // §4c): ink at rest, the square blue on hover and on /bookmarks (the eyes
 // keep the background), where it carries
-// `aria-current="page"`. The hit area is the search launcher's and the chain
-// trigger's (38px round a 20px face).
+// `aria-current="page"`. The hit area is the search launcher's and the
+// chooser's (38px round a 20px face).
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";

@@ -33,9 +33,9 @@ const browser = await chromium.launch();
 // the footer really carries what the menu used to.
 //
 // THE CONTRACT FROM `md` UP ON AN APP ROUTE (rails-ops TO-DO-ui-jobs 68): the
-// top bar is not drawn at all. BrandRail holds the mark, the search's glyph,
-// the theme toggle and the beta pill; the chain chooser sits at the right end
-// of the protocol title row. Below `md` there is no rail and the bar carries
+// top bar is not drawn at all, on the app and the site pages alike (ui-jobs
+// 498). BrandRail holds the mark, the search's glyph, the chooser, the theme
+// toggle and the beta pill; H20 stands at the column's top right. Below `md` there is no rail and the bar carries
 // every one of those controls, which is what the mobile block at the foot
 // holds. The separate bookmarks button (H11) went on 1 Nov 2026: the glyph
 // opens the wallet panel, where the bookmarks are listed, so its locator stays
@@ -49,7 +49,7 @@ async function chromeState(page, path, expect) {
   check(burger === 0, `${path}: no hamburger (${burger})`);
   if (!expect.bar) return;
 
-  const cta = await header.locator('button[aria-label="Open an explorer"]').count();
+  const cta = await header.locator('button[aria-label="Open an explorer"]:visible').count();
   // `:visible`, not a bare count: a control can be hidden by a breakpoint class
   // rather than dropped from the tree, so a DOM count would assert nothing.
   const bookmarks = await header.locator('button[aria-label="Bookmarks"]:visible').count();
@@ -65,21 +65,25 @@ async function chromeState(page, path, expect) {
 // ── Chrome-state table (wide viewport) ──
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 console.log("[chrome states @1280]");
-await chromeState(page, "/", { bar: true, cta: 1, pos: "absolute" });
-// Every real app/(site) page: marketing chrome, but normal-flow (relative) header.
-// (/about bare 308-redirects to / — the real page is /about/architecture.)
-// Coverage is per-chain routes; both take marketing chrome (their prefix is
-// in SITE_PREFIXES).
+// Every app/(site) page stands in the rail shell from md, as the app pages do
+// (ui-jobs 498): no bar, the rail and H20 drawn, no "Open an explorer" pill.
 for (const p of [
+  "/",
   "/coverage/ethereum",
   "/coverage/base",
+  "/about",
   "/about/architecture",
   "/blog",
   "/pulse",
   "/privacy",
   "/terms",
 ]) {
-  await chromeState(page, p, { bar: true, cta: 1, pos: "relative" });
+  await chromeState(page, p, { bar: false });
+  const siteRail = await page.locator('aside[data-anatomy="H1"] button[data-chooser-trigger="rail"]:visible').count();
+  const siteFace = await page.locator('[data-profile-corner] [data-anatomy="H20"]:visible').count();
+  const pill = await page.locator('button[aria-label="Open an explorer"]:not([data-chooser-trigger]):visible').count();
+  check(siteRail === 1 && siteFace === 1, `${p}: the rail's chooser and H20 drawn (${siteRail}, ${siteFace})`);
+  check(pill === 0, `${p}: no "Open an explorer" pill (${pill})`);
 }
 
 // ── The app surfaces from `md` up: no bar, everything in the rail and the row ──
@@ -183,11 +187,11 @@ const rowButtons = await page.locator("[data-anatomy='H3'] button[aria-haspopup=
 check(rowButtons === 0, `the title row draws no chooser; the rail carries it (${rowButtons})`);
 
 // ── ml-auto regression: control cluster stays hard right where the bar exists ──
-// It moved off the app routes with the bar itself (ui-jobs 68) — marketing is
-// where the cluster still lives at this width.
-console.log("[ml-auto cluster @1280 on /blog]");
-await page.goto(BASE + "/blog", { waitUntil: "networkidle" });
-const geo = await page.evaluate(() => {
+// The bar is drawn below md only, on every page (ui-jobs 68, 498).
+console.log("[ml-auto cluster @390 on /blog]");
+const narrow = await browser.newPage({ viewport: { width: 390, height: 800 } });
+await narrow.goto(BASE + "/blog", { waitUntil: "networkidle" });
+const geo = await narrow.evaluate(() => {
   const header = document.querySelector("header");
   const container = header.querySelector("div");
   const cluster = [...header.querySelectorAll("div")].find((d) => d.className.includes("ml-auto"));
@@ -209,6 +213,7 @@ check(
   Math.abs(geo.clusterRight - geo.contRight) <= 40,
   `cluster right edge hugs the container right (${geo.clusterRight} vs ${geo.contRight})`,
 );
+await narrow.close();
 
 // ── A position view draws the wallet heading and no chooser (decision 0052) ──
 // The chain switch stays on the home page, the listings, the info and markets

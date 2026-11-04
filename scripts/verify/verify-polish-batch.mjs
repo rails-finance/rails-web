@@ -232,9 +232,10 @@ const navigated = await page
   .then(() => true)
   .catch(() => false);
 check("S explorer row navigates to its listing", navigated);
-// The marketing CTA opens the SAME panel, defaulting to Ethereum.
+// On the home page the rail's glyph opens the SAME panel, defaulting to
+// Ethereum: the site pages stand in the rail shell (ui-jobs 498).
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
-const cta = page.locator('button[aria-label="Open an explorer"]');
+const cta = page.locator("button[data-chooser-trigger]:visible").first();
 let ctaOpen = false;
 for (let attempt = 0; attempt < 6 && !ctaOpen; attempt++) {
   await cta.click();
@@ -243,9 +244,9 @@ for (let attempt = 0; attempt < 6 && !ctaOpen; attempt++) {
     .then(() => true)
     .catch(() => false);
 }
-check("S marketing CTA opens the switcher panel", ctaOpen);
+check("S home's rail glyph opens the switcher panel", ctaOpen);
 const ctaSelected = await page.locator(`${SWITCHER_PANEL} button[aria-pressed="true"]`).textContent();
-check("S CTA panel defaults to Ethereum", /Ethereum/.test(ctaSelected ?? ""), ctaSelected ?? "none");
+check("S home's panel defaults to Ethereum", /Ethereum/.test(ctaSelected ?? ""), ctaSelected ?? "none");
 
 await browser.close();
 const failed = results.filter((r) => !r.ok);

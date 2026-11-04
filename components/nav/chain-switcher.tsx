@@ -3,14 +3,12 @@
 // The blockchain switcher — the affordance that owns the roster. Chains on the
 // left with their explorer counts, the selected chain's explorers on the
 // right, click-through to a listing. It replaces the roster sections that
-// lived inside the hamburger menu; the marketing pages' "Open an explorer"
-// pill opens this same panel.
+// lived inside the hamburger menu.
 //
-// WHERE IT SITS (ui-jobs 497): on every app page, a filled grid glyph in the
+// WHERE IT SITS (ui-jobs 497, 498): on every page, a filled grid glyph in the
 // brand rail under the search's glyph (H1, from `md`), its panel flying out to
 // the right of the rail; below `md`, the same glyph in HeaderBar's cluster,
-// before the profile control (H20), opening the bottom sheet. On marketing
-// routes, which have no rail, it is the "Open an explorer" pill. It is a plain
+// before the profile control (H20), opening the bottom sheet. It is a plain
 // navigator to the roster: it does not follow the page's chain, and opens on
 // Ethereum, the first chain, every time (Miles, 4 Nov 2026).
 //
@@ -38,23 +36,6 @@ import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-so
 //   current → muted + semibold, not clickable (you can't navigate to here)
 const ROW_REST = "font-medium text-foreground hover:text-blue-500";
 const ROW_CURRENT = "font-semibold text-rb-500 pointer-events-none";
-
-function Chevron({ open }: { open: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className={`h-3 w-3 shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`}
-    >
-      <path d="M6 9l6 6 6-6" />
-    </svg>
-  );
-}
 
 /** One explorer row — icon chip + label, navigating to the listing. */
 function ExplorerRow({
@@ -106,9 +87,8 @@ function FilledLayoutGrid() {
 /** The panel's gap from the rail's edge, which the triangle spans. */
 const RAIL_GAP = 10;
 
-/** `rail` in the brand rail, `header` in the app header bar below md, `cta`
- *  the marketing header bar's pill. */
-export function ChainSwitcher({ variant }: { variant: "rail" | "header" | "cta" }) {
+/** `rail` in the brand rail from md, `header` in the header bar below it. */
+export function ChainSwitcher({ variant }: { variant: "rail" | "header" }) {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -284,36 +264,23 @@ export function ChainSwitcher({ variant }: { variant: "rail" | "header" | "cta" 
 
   return (
     <div className="relative" ref={rootRef} data-anatomy="H4">
-      {variant === "cta" ? (
-        <button
-          ref={triggerRef}
-          onClick={toggle}
-          aria-label="Open an explorer"
-          aria-haspopup="menu"
-          aria-expanded={isOpen}
-          className="cursor-pointer inline-flex items-center rounded-full bg-foreground text-background font-medium text-sm px-5 py-2.5 transition-opacity hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          Open an explorer
-        </button>
-      ) : (
-        // The search launcher's (H15.1) glyph, hit area and states: ink at
-        // rest, blue on hover and while the panel is open.
-        <button
-          ref={triggerRef}
-          type="button"
-          onClick={toggle}
-          aria-label="Open an explorer"
-          title="Open an explorer"
-          aria-haspopup="menu"
-          aria-expanded={isOpen}
-          data-chooser-trigger={variant}
-          className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-            isOpen ? "text-blue-500" : "text-rb-700 dark:text-rb-300"
-          }`}
-        >
-          <FilledLayoutGrid />
-        </button>
-      )}
+      {/* The search launcher's (H15.1) glyph, hit area and states: ink at
+          rest, blue on hover and while the panel is open. */}
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={toggle}
+        aria-label="Open an explorer"
+        title="Open an explorer"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        data-chooser-trigger={variant}
+        className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          isOpen ? "text-blue-500" : "text-rb-700 dark:text-rb-300"
+        }`}
+      >
+        <FilledLayoutGrid />
+      </button>
 
       {/* Desktop panel — chains left with counts, the selected chain's
           explorers right. From the rail it is portalled to the body, so it

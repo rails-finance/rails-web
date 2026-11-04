@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
 import { PILL_CTA } from "@/lib/shared/ui-grammar";
+import { RailsMark } from "@/components/nav/rails-mark";
 
 // The inline blocking script in app/layout.tsx flips `data-hero-seen` on <html>
 // before paint on hard loads, but it can't run on App Router soft navigations.
@@ -17,9 +18,10 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
  * names the place ("Destination DeFi"), the Rails line states the promise, then
  * the search (H15) landing on the wallet view, and the ticked terms
  * (independent / read-only / no login) under it, then the pill into /start
- * (S12, rails-ops ui-jobs 478). The explorer
- * directory lives further down the page
- * (ProtocolRow), and the header's "Open an explorer" menu reaches it too.
+ * (S12, rails-ops ui-jobs 478). The Rails mark and wordmark head it, centred,
+ * since no header bar names Rails from md (ui-jobs 498). The explorer
+ * directory lives further down the page (ProtocolRow), and the rail's chooser
+ * (H4) reaches it too.
  *
  * Entrance animation runs once per browser via the `data-hero-seen` flag set
  * on <html> by the inline blocking script in app/layout.tsx (matching CSS in
@@ -50,14 +52,20 @@ export function HomeHero() {
   }, []);
 
   return (
-    // pt-32: the header floats absolutely over the home gradient (see
-    // HeaderBar's isHome branch), so the hero reserves its band here.
+    // pt-24: below md the header floats absolutely over the home gradient
+    // (see HeaderBar's isHome branch), so the hero reserves its band here;
+    // from md there is no bar, so the band closes to 64px.
     // overflow-x-clip: the glow is clipped at the sides.
     <section
-      className="flex flex-col items-center text-center pt-24 pb-10 sm:pb-15 overflow-x-clip relative"
+      className="flex flex-col items-center text-center pt-24 pb-10 sm:pb-15 md:pt-16 overflow-x-clip relative"
       data-anatomy="S1"
     >
       <div className="absolute top-22 left-1/2 -translate-x-1/2 w-[500px] h-[220px] bg-[var(--marketing)]/[0.07] rounded-full blur-[80px] pointer-events-none" />
+      {/* The head: the mark and the wordmark, centred (Miles's mock, ui-jobs 498). */}
+      <p className="relative mb-8 flex items-center gap-2 text-foreground animate-hero-fade-up" data-hero-brand="">
+        <RailsMark size={40} />
+        <span className="text-3xl font-semibold tracking-wide">Rails</span>
+      </p>
       <h1
         className="relative font-semibold leading-none tracking-tighter mb-4 px-4 text-6xl sm:text-7xl lg:text-8xl animate-hero-fade-up"
         style={{ animationDelay: "0.1s" }}

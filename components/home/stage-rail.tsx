@@ -102,9 +102,12 @@ function Station({
       {/* lg min-h = one measured floor for ALL five cards: the tallest copy
           (stations 1, 4 and 5, four lines in a 1fr column at the 1280 cap)
           runs to 156.5px, so 157 keeps every card the same height — the
-          rhythm verify-stage-rail-polish.mjs asserts. Grow it if copy grows. */}
+          rhythm verify-stage-rail-polish.mjs asserts. Grow it if copy grows.
+          Beside the brand rail (ui-jobs 498) the cap is reached at 1336px;
+          below it station 1 takes a fifth line (194px at 1280), so the floor
+          is 200 there. */}
       <div
-        className={`relative z-[1] flex h-full flex-col justify-center rounded-xl border bg-raised px-4 py-3 lg:min-h-[157px] ${
+        className={`relative z-[1] flex h-full flex-col justify-center rounded-xl border bg-raised px-4 py-3 lg:min-h-[200px] min-[1336px]:min-h-[157px] ${
           accent
             ? "border-blue-400 shadow-[0_0_0_1px_rgba(96,165,250,0.35),0_0_28px_-2px_rgba(59,130,246,0.35)] dark:border-blue-500 dark:shadow-[0_0_0_1px_rgba(59,130,246,0.4),0_0_32px_-2px_rgba(59,130,246,0.5)]"
             : "border-rb-200 dark:border-rb-800"
