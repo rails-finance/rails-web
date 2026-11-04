@@ -17,8 +17,8 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
  * (independent / read-only / no login) under it, then the search (H15) landing
  * on the wallet view; its placeholder says what to type, so no line repeats
  * it underneath (Miles, 4 Nov 2026). The way into /start
- * (S12) is the "Start here" button at the top right
- * (components/nav/start-here-button.tsx); "Destination DeFi" closes the page as
+ * (S12) is the "Start here" link at the top right
+ * (components/nav/start-here-link.tsx); "Destination DeFi" closes the page as
  * its foot wordmark (S10). The explorer directory lives further down the page
  * (ProtocolRow), and the rail's chooser (H4) reaches it too.
  *

@@ -24,7 +24,7 @@
 import type { ReactNode } from "react";
 import { BookmarksLink } from "@/components/nav/bookmarks-link";
 import { BrandRail } from "@/components/nav/brand-rail";
-import { StartHereButton } from "@/components/nav/start-here-button";
+import { StartHereLink } from "@/components/nav/start-here-link";
 
 export function RailShell({
   column,
@@ -51,11 +51,11 @@ export function RailShell({
             <div className="pointer-events-none absolute inset-x-0 top-0 z-10 hidden md:block">
               <div className="relative mx-auto max-w-7xl px-4 md:px-6">
                 <div
-                  className="pointer-events-auto absolute right-3.5 top-[15px] flex items-center gap-2"
+                  className="pointer-events-auto absolute right-3.5 top-[15px] flex items-center gap-1"
                   data-profile-corner=""
                 >
                   {/* Home's "Start here" (S12) stands left of H20; elsewhere it renders nothing. */}
-                  <StartHereButton />
+                  <StartHereLink />
                   <BookmarksLink />
                 </div>
               </div>
