@@ -1311,56 +1311,6 @@ label[for] {
   }
 }
 
-/* The live example's dark glow round the colour wheel, and its hover edge in
-   step (ui-jobs 499, components/home/live-example-frame.tsx): fixed-colour
-   layers — the glow's three-shadow stack, the edge's 2px border — cross-faded
-   on opacity alone, so the compositor turns them and nothing is repainted.
-   Glow and edge layers share the keyframes, the lap and the slot delays, so
-   they hold one phase. Each layer rises over one slot and falls over the
-   next, so two neighbours sum to one at every moment; --glow-slot staggers
-   them a sixth of the lap apart, slot 0 (DeFi blue) at its peak when the page
-   opens. The steps hold each value for a tenth of a second: a change too small
-   to see, and between changes the compositor has nothing to redraw. Paused
-   while the frame is off screen (data-offscreen, set by an
-   IntersectionObserver). In light mode and under reduced motion the blue
-   layer holds and the rest are not drawn. */
-.live-glow {
-  --glow-lap: 72s;
-}
-.dark .live-glow-layer {
-  will-change: opacity;
-  animation: live-glow-turn var(--glow-lap) steps(120) infinite;
-  /* Negative, so every layer is mid-lap from the first frame. */
-  animation-delay: calc(var(--glow-lap) * (var(--glow-slot) - 7) / 6);
-}
-.live-glow[data-offscreen] .live-glow-layer {
-  animation-play-state: paused;
-}
-:root:not(.dark) .live-glow-layer:not(:first-child) {
-  display: none;
-}
-@keyframes live-glow-turn {
-  0% {
-    opacity: 0;
-  }
-  16.6667% {
-    opacity: 1;
-  }
-  33.3333%,
-  100% {
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dark .live-glow-layer {
-    animation: none;
-    will-change: auto;
-  }
-  .live-glow-layer:not(:first-child) {
-    display: none;
-  }
-}
-
 @keyframes hero-fade-up {
   from {
     opacity: 0;
@@ -2374,6 +2324,22 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
 }
 @media (prefers-reduced-motion: reduce) {
   .station-snake {
+    animation: none;
+  }
+}
+
+/* H20's menu below md: a sheet rising from the foot of the screen
+   (components/nav/profile-menu.tsx, ui-jobs 507); still under reduced motion. */
+.profile-sheet {
+  animation: profile-sheet-rise 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes profile-sheet-rise {
+  from {
+    transform: translateY(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .profile-sheet {
     animation: none;
   }
 }

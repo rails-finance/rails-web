@@ -6,7 +6,8 @@
 // (lib/shared/sessions.ts; /bookmarks orders them), "Manage wallets →" to
 // /bookmarks, then the theme switch. With none saved, one line on how to save
 // one in place of the rows. From md a dropdown under the control, right
-// edges aligned; below md a full-width sheet under it over a dim. Rows show what the
+// edges aligned; below md a sheet from the foot of the screen over a dim (ui-jobs 507), rising
+// over 220ms (globals.css `.profile-sheet`). Rows show what the
 // browser holds (name, ENS, address) and read nothing.
 //
 // The face is the first saved wallet's; with none, the sample wallet's
@@ -17,7 +18,7 @@
 // page wherever the control sits (H2 below md, the column's corner from md;
 // components/nav/rail-shell.tsx). Escape, a press outside and a lookup close
 // it, and focus returns to the control; the arrow keys, Home and End move
-// through its items. No animation.
+// through its items. The dropdown has no animation.
 
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -107,6 +108,10 @@ export function ProfileMenu() {
   const [mounted, setMounted] = useState(false);
   const [place, setPlace] = useState<{ top: number; right: number; phone: boolean } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  // When a press outside closed the menu, the click that ends the same press
+  // can land on the control under the dim and would open it again: a press on
+  // the control's place closes it and leaves it closed (ui-jobs 507).
+  const closedByPress = useRef(0);
   const menu = useRef<HTMLDivElement>(null);
   const menuId = useId();
   useEffect(() => setMounted(true), []);
@@ -140,12 +145,26 @@ export function ProfileMenu() {
     };
   }, [open, measure]);
 
+  // Below md the sheet holds the page still under it, as the wallet panel
+  // does, and scrolls within itself past 85% of the screen (ui-jobs 507).
+  useEffect(() => {
+    if (!open || window.innerWidth >= 768) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const first = requestAnimationFrame(() => menu.current?.querySelector<HTMLElement>(ITEMS)?.focus());
     const onPointer = (e: PointerEvent) => {
       const t = e.target as Node;
-      if (!menu.current?.contains(t) && !trigger.current?.contains(t)) close(false);
+      if (!menu.current?.contains(t) && !trigger.current?.contains(t)) {
+        closedByPress.current = performance.now();
+        close(false);
+      }
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -194,7 +213,10 @@ export function ProfileMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          if (performance.now() - closedByPress.current < 600) return;
+          setOpen((v) => !v);
+        }}
         onKeyDown={(e) => {
           if (e.key === "ArrowDown" && !open) {
             e.preventDefault();
@@ -235,9 +257,11 @@ export function ProfileMenu() {
               aria-label={BOOKMARKS_NAME}
               data-profile-menu=""
               className={`fixed z-[var(--z-popover)] border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 ${
-                place.phone ? "inset-x-0 rounded-b-2xl border-x-0" : "w-80 rounded-xl"
+                place.phone
+                  ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-2xl border-x-0 border-b-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+                  : "w-80 rounded-xl"
               }`}
-              style={place.phone ? { top: place.top } : { top: place.top, right: place.right }}
+              style={place.phone ? undefined : { top: place.top, right: place.right }}
             >
               <p className="flex items-center gap-2 px-3 pb-2 pt-1 text-sm font-semibold text-foreground">
                 <Bookmark className="size-4 shrink-0" fill="currentColor" aria-hidden="true" />

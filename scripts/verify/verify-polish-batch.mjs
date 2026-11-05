@@ -58,13 +58,19 @@ check("3 URL text is one unit (no nested staged span)", nestedSpanCount === 0, `
 const capCount = await page.getByText("Live position, shared with permission.").count();
 check("4 no attribution caption", capCount === 0, `count: ${capCount}`);
 
-// 9. View-live pill: blue border wins (computed style, not class list)
+// 9. View-live pill: the home CTA pill, its border turning blue with the
+// frame's hover (ui-jobs 507; computed style, not class list).
 const pill = page.locator("a >> span", { hasText: "View a live position" }).first();
+await page.locator('a[aria-label="View this live Liquity V2 trove on Rails"]').hover();
+await page.waitForTimeout(500);
 const pillBorder = await pill.evaluate((el) => getComputedStyle(el).borderTopColor);
 // blue-500 = oklch(62.3% 0.214 259.815) ≈ rgb(59, 130, 246)
-check("9 view-live pill computed border is blue", /59, 130, 246|rgb\(59/.test(pillBorder), pillBorder);
-const pillClass = (await pill.getAttribute("class")) || "";
-check("9 no neutral border class remains on pill", !pillClass.includes("border-rb-200"));
+check(
+  "9 view-live pill border is blue on the frame's hover",
+  /59, 130, 246|rgb\(59|oklch\(0\.623 0\.214 259/.test(pillBorder),
+  pillBorder,
+);
+await page.mouse.move(0, 0);
 
 // 6. Four persona paragraphs roughly even (max/min length ratio < 1.6)
 const paras = await page.locator("p.body-text.flex-1").allTextContents();
