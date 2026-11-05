@@ -1,7 +1,7 @@
 // Playwright check for the 10-item polish batch (merry-neumann plan).
 // Run: node scripts/verify/verify-polish-batch.mjs   (dev server on :3000)
-// Repointed (ui-jobs 432, 498; Miles 5 Nov 2026): check 8 reads the hero top down: the ticks,
-// the h1 "Rails Explorers", the promise line, the search.
+// Repointed (ui-jobs 432, 498; Miles 5 Nov 2026): check 8 reads the hero top down: the h1
+// "Rails Explorers", the promise line, the search, the ticks.
 import { chromium } from "playwright";
 
 const results = [];
@@ -16,7 +16,7 @@ const page = await ctx.newPage();
 // ── Home page items ──────────────────────────────────────────────────────
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 
-// 8. Hero order: ticked terms → h1 → promise line → search
+// 8. Hero order: h1 → promise line → search → ticked terms
 const heroOrder = await page.evaluate(() => {
   const section = document.querySelector("h1")?.closest("section");
   if (!section) return "no section";
@@ -32,9 +32,9 @@ const heroOrder = await page.evaluate(() => {
     t.includes("Look up any DeFi position, wallet and protocol, verified directly from the chain."),
   );
   const badgei = texts.findIndex((t) => t.toLowerCase().includes("read-only"));
-  return badgei >= 0 && badgei < h1i && h1i < taglinei && taglinei < searchi ? "ok" : kids.join(" | ");
+  return h1i >= 0 && h1i < taglinei && taglinei < searchi && searchi < badgei ? "ok" : kids.join(" | ");
 });
-check("8 hero: badges → h1 → promise → search", heroOrder === "ok", heroOrder === "ok" ? "" : heroOrder);
+check("8 hero: h1 → promise → search → badges", heroOrder === "ok", heroOrder === "ok" ? "" : heroOrder);
 
 // 3. URL pill: single pill carries the tint; toolbar row has no bg tint
 const bar = page.locator("span", { hasText: "rails.finance" }).first();

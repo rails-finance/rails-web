@@ -13,9 +13,9 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
 
 /**
  * Home hero — the site's front door (rails-ops decision 0051, ui-jobs 498): the
- * ticked terms (independent / read-only / no login) as the eyebrow, the h1
- * naming the place (the mark, "Rails", "Explorers"), the promise line under it,
- * then the search (H15) landing on the wallet view (Miles, 5 Nov 2026). The way into /start
+ * h1 naming the place (the mark, "Rails", "Explorers"), the promise line under
+ * it, the search (H15) landing on the wallet view, then the ticked terms
+ * (independent / read-only / no login) (Miles, 5 Nov 2026). The way into /start
  * (S12) is the "Start here" link at the top right
  * (components/nav/start-here-link.tsx); "Destination DeFi" closes the page as
  * its foot wordmark (S10). The explorer directory lives further down the page
@@ -52,23 +52,14 @@ export function HomeHero() {
   return (
     // pt-24: below md the header floats absolutely over the home gradient
     // (see HeaderBar's isHome branch), so the hero reserves its band here;
-    // from md there is no bar, so the band closes to 64px.
+    // from md there is no bar, and the hero stands in 160px above and below
+    // (Miles, 5 Nov 2026).
     // overflow-x-clip: the glow is clipped at the sides.
     <section
-      className="flex flex-col items-center text-center pt-24 pb-16 sm:pb-24 md:pt-16 overflow-x-clip relative"
+      className="flex flex-col items-center text-center pt-24 pb-24 md:py-40 overflow-x-clip relative"
       data-anatomy="S1"
     >
       <div className="absolute top-22 left-1/2 -translate-x-1/2 w-[500px] h-[220px] bg-[var(--marketing)]/[0.07] rounded-full blur-[80px] pointer-events-none" />
-      {/* The terms, ticked, as the eyebrow over the h1 (Miles, 5 Nov 2026); the
-          checks carry the separation. */}
-      <p className="relative mx-auto mb-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-2 min-[400px]:gap-x-4 min-[400px]:px-4 min-[520px]:gap-x-5 text-xs font-medium uppercase tracking-[0.1em] min-[400px]:tracking-[0.14em] text-rb-500 animate-hero-fade-up">
-        {TERMS.map((term) => (
-          <span key={term} className="inline-flex items-center gap-1.5">
-            <Check className="h-3.5 w-3.5 text-green-500" strokeWidth={3} aria-hidden="true" />
-            {term}
-          </span>
-        ))}
-      </p>
       {/* One line naming the place (Miles's mock, ui-jobs 498): the mark, "Rails",
           then "Explorers" in the marketing blue, never wrapped. The mark is
           sized in cap units so its right-hand leg spans the cap height, top on
@@ -100,13 +91,23 @@ export function HomeHero() {
         verified directly from the chain.
       </p>
       <div
-        className="relative z-20 w-full max-w-2xl px-4 text-left animate-hero-fade-up"
+        className="relative z-20 mb-12 w-full max-w-2xl px-4 text-left animate-hero-fade-up"
         style={{ animationDelay: "0.2s" }}
       >
         {/* No placeholder: the promise line above says what the field is for
             (Miles, 5 Nov 2026). The field keeps its accessible name. */}
         <FrontDoorSearch size="lg" suggest focusOnLoad placeholder="" />
       </div>
+      {/* The terms, ticked, under the search (Miles, 5 Nov 2026); the checks
+          carry the separation. */}
+      <p className="relative mx-auto mb-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 px-2 min-[400px]:gap-x-4 min-[400px]:px-4 min-[520px]:gap-x-5 text-xs font-medium uppercase tracking-[0.1em] min-[400px]:tracking-[0.14em] text-rb-500 animate-hero-fade-up">
+        {TERMS.map((term) => (
+          <span key={term} className="inline-flex items-center gap-1.5">
+            <Check className="h-3.5 w-3.5 text-green-500" strokeWidth={3} aria-hidden="true" />
+            {term}
+          </span>
+        ))}
+      </p>
     </section>
   );
 }
