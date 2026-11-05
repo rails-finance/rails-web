@@ -69,7 +69,7 @@ async function checkHome(theme) {
   );
 
   // The Ethereum station reads the newcomer copy, not the old roster line.
-  const chainCopy = await ol.locator("li").first().textContent();
+  const chainCopy = await page.locator("[data-station-line='chain']").textContent();
   assert(chainCopy.includes("public contracts"), "Ethereum station renders the newcomer chain copy");
   assert(!/\bprotocols'/.test(chainCopy), "no stale roster-count copy on the chain station");
 

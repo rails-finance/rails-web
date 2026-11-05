@@ -58,7 +58,9 @@ async function check(theme) {
   assert(JSON.stringify(eyebrows) === JSON.stringify(EXPECT_EYEBROWS), "eyebrows: " + eyebrows.join(" · "));
 
   // Copy strings, per station body.
-  const bodies = (await ol.locator("li p.body-text").allTextContents()).map((s) => s.replace(/\s+/g, " ").trim());
+  const bodies = (await page.locator("[data-station-line]").allTextContents()).map((s) =>
+    s.replace(/\s+/g, " ").trim(),
+  );
   for (let i = 0; i < EXPECT_COPY.length; i++) {
     assert(bodies[i] === EXPECT_COPY[i], `station ${i + 1} copy exact`);
   }
@@ -70,7 +72,9 @@ async function check(theme) {
   // three single cards align top and bottom. The shut card's lg:min-h-[4.25rem]
   // floor holds the chain station's two-line name; a longer name breaks it.
   const cardHeights = await ol.evaluate((el) =>
-    Array.from(el.querySelectorAll("li > div.rounded-xl")).map((d) => Math.round(d.getBoundingClientRect().height)),
+    Array.from(el.querySelectorAll("li > [data-station-toggle]")).map((d) =>
+      Math.round(d.getBoundingClientRect().height),
+    ),
   );
   assert(cardHeights.length === 5, `five station cards measured (got ${cardHeights.length})`);
   assert(new Set(cardHeights).size === 1, "all station cards share one height: " + cardHeights.join(" · "));
@@ -87,7 +91,7 @@ async function check(theme) {
       (o) => typeof o.className === "string" && /lg:grid/.test(o.className),
     );
     const r = (el) => el.getBoundingClientRect();
-    const centres = Array.from(ol.querySelectorAll("li > div.rounded-xl")).map((d) =>
+    const centres = Array.from(ol.querySelectorAll("li > [data-station-toggle]")).map((d) =>
       Math.round(r(d).top + r(d).height / 2),
     );
     const runs = Array.from(ov.querySelectorAll("div"))
@@ -104,7 +108,7 @@ async function check(theme) {
 
   // Icons — each expected lucide class present inside the rail.
   const iconClasses = await ol.evaluate((el) =>
-    Array.from(el.querySelectorAll("li > div svg")).map((s) => s.getAttribute("class") || ""),
+    Array.from(el.querySelectorAll("li > [data-station-toggle] svg")).map((s) => s.getAttribute("class") || ""),
   );
   for (const want of EXPECT_ICONS) {
     assert(

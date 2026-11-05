@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Box, History, Radio, CircleCheck, LayoutGrid } from "lucide-react";
 import { launchedProductionChains } from "@/lib/shared/protocols";
-import { Station } from "@/components/home/stage-station";
+import { Station, StationGroup } from "@/components/home/stage-station";
 
 /**
  * StageRail — the "What Rails Does" panel as a transit-style rail rather than a
@@ -25,8 +25,9 @@ import { Station } from "@/components/home/stage-station";
  * right — the rotation carries the desktop upper card to the right). Both
  * layouts share one <ol> so the pipeline order reaches a screen reader.
  *
- * Server component; each station (stage-station.tsx) shows its heading at rest
- * and opens its line on a press, on its own (Miles, 5 Nov 2026). The connectors are
+ * Server component; each station (stage-station.tsx) is its heading, one
+ * button, and a press shows its line in the band under the rail, one station
+ * at a time (StationGroup; Miles, 5 Nov 2026). The connectors are
  * built from bordered CSS divs (not SVG: a fluid-width SVG needs
  * preserveAspectRatio="none", which distorts corner radii). The track is BLUE
  * (design decision 2026-07-20, matching the reference mock): the rail is the
@@ -101,216 +102,232 @@ export function StageRail() {
           must contain the <ol> and NOTHING else — the footer claim below used to
           live inside it, which stretched the overlay ~76px taller than the rail
           and dropped every connector below the cards it joins. */}
-      <div className="relative">
-        {/* ═══ DESKTOP connector overlay (lg+) — decorative. Mirrors the grid
+      <StationGroup
+        lines={[
+          {
+            id: "chain",
+            line: <>DeFi protocols run here as public contracts. Every deposit, loan and repayment is on the record.</>,
+          },
+          { id: "historic", line: <>Rails reads every event in order and explains each in plain English.</> },
+          { id: "live", line: <>Rails asks those same contracts what the position holds and owes today.</> },
+          {
+            id: "reconciled",
+            line: (
+              <>Lifetime totals are checked against live state. Anything that doesn&rsquo;t reconcile is left out.</>
+            ),
+          },
+          {
+            id: "page",
+            line: <>Every figure shows its source, so you can check it on a block explorer that isn&rsquo;t ours.</>,
+          },
+        ]}
+      >
+        <div className="relative">
+          {/* ═══ DESKTOP connector overlay (lg+) — decorative. Mirrors the grid
           template so connectors land in the reserved 40px columns. grid-rows-2
           over the full height gives each row-spanning connector the fork
           column's height, so the ROW_1 / ROW_2 arms enter the two stacked fork
           cards. ═══ */}
-        <div
-          aria-hidden="true"
-          className={`pointer-events-none absolute inset-0 hidden ${GRID_COLS} grid-rows-2 lg:grid`}
-        >
-          {/* SPLIT (col 2): trunk in from the chain, forks up + down to the two
+          <div
+            aria-hidden="true"
+            className={`pointer-events-none absolute inset-0 hidden ${GRID_COLS} grid-rows-2 lg:grid`}
+          >
+            {/* SPLIT (col 2): trunk in from the chain, forks up + down to the two
               fork cards. */}
-          <div className="relative col-start-2 row-span-2">
-            {/* incoming trunk — horizontal at centre, left edge → fork axis */}
-            <div className={`absolute left-0 right-1/2 top-1/2 h-px -translate-y-1/2 ${LINE}`} />
-            {/* vertical bar between the two elbows */}
-            <div
-              className={`absolute left-1/2 w-px -translate-x-1/2 ${LINE}`}
-              style={{ top: BAR_INSET, bottom: BAR_INSET }}
-            />
-            {/* upper elbow: down → right, rounded */}
-            <div
-              className={`absolute left-1/2 h-[10px] w-[10px] rounded-tl-[10px] border-l border-t ${BORDER}`}
-              style={{ top: ROW_1 }}
-            />
-            {/* lower elbow: up → right, rounded */}
-            <div
-              className={`absolute left-1/2 h-[10px] w-[10px] -translate-y-full rounded-bl-[10px] border-b border-l ${BORDER}`}
-              style={{ top: ROW_2 }}
-            />
-            {/* upper + lower arms — horizontal into each fork card */}
-            <div
-              className={`absolute left-[calc(50%+10px)] right-0 h-px -translate-y-1/2 ${LINE}`}
-              style={{ top: ROW_1 }}
-            />
-            <div
-              className={`absolute left-[calc(50%+10px)] right-0 h-px -translate-y-1/2 ${LINE}`}
-              style={{ top: ROW_2 }}
-            />
-            {/* Station dots sit where a line ENTERS a station — on each fork
+            <div className="relative col-start-2 row-span-2">
+              {/* incoming trunk — horizontal at centre, left edge → fork axis */}
+              <div className={`absolute left-0 right-1/2 top-1/2 h-px -translate-y-1/2 ${LINE}`} />
+              {/* vertical bar between the two elbows */}
+              <div
+                className={`absolute left-1/2 w-px -translate-x-1/2 ${LINE}`}
+                style={{ top: BAR_INSET, bottom: BAR_INSET }}
+              />
+              {/* upper elbow: down → right, rounded */}
+              <div
+                className={`absolute left-1/2 h-[10px] w-[10px] rounded-tl-[10px] border-l border-t ${BORDER}`}
+                style={{ top: ROW_1 }}
+              />
+              {/* lower elbow: up → right, rounded */}
+              <div
+                className={`absolute left-1/2 h-[10px] w-[10px] -translate-y-full rounded-bl-[10px] border-b border-l ${BORDER}`}
+                style={{ top: ROW_2 }}
+              />
+              {/* upper + lower arms — horizontal into each fork card */}
+              <div
+                className={`absolute left-[calc(50%+10px)] right-0 h-px -translate-y-1/2 ${LINE}`}
+                style={{ top: ROW_1 }}
+              />
+              <div
+                className={`absolute left-[calc(50%+10px)] right-0 h-px -translate-y-1/2 ${LINE}`}
+                style={{ top: ROW_2 }}
+              />
+              {/* Station dots sit where a line ENTERS a station — on each fork
                 card's left border, matching the merge/straight columns' dots on
                 the reconciled and frontend cards. The chain end carries none:
                 it is the origin, not a stop. */}
-            <NodeDot className="right-0 -translate-y-1/2 translate-x-1/2" style={{ top: ROW_1 }} />
-            <NodeDot className="right-0 -translate-y-1/2 translate-x-1/2" style={{ top: ROW_2 }} />
-          </div>
+              <NodeDot className="right-0 -translate-y-1/2 translate-x-1/2" style={{ top: ROW_1 }} />
+              <NodeDot className="right-0 -translate-y-1/2 translate-x-1/2" style={{ top: ROW_2 }} />
+            </div>
 
-          {/* MERGE (col 4): two arms in from the fork cards, rejoin, trunk out to
+            {/* MERGE (col 4): two arms in from the fork cards, rejoin, trunk out to
               the reconciled station. */}
-          <div className="relative col-start-4 row-span-2">
-            <div
-              className={`absolute left-0 right-[calc(50%+10px)] h-px -translate-y-1/2 ${LINE}`}
-              style={{ top: ROW_1 }}
-            />
-            <div
-              className={`absolute left-0 right-[calc(50%+10px)] h-px -translate-y-1/2 ${LINE}`}
-              style={{ top: ROW_2 }}
-            />
-            <div
-              className={`absolute right-1/2 w-px translate-x-1/2 ${LINE}`}
-              style={{ top: BAR_INSET, bottom: BAR_INSET }}
-            />
-            {/* upper elbow: from left → down, rounded top-right */}
-            <div
-              className={`absolute right-1/2 h-[10px] w-[10px] rounded-tr-[10px] border-r border-t ${BORDER}`}
-              style={{ top: ROW_1 }}
-            />
-            {/* lower elbow: up → from left, rounded bottom-right */}
-            <div
-              className={`absolute right-1/2 h-[10px] w-[10px] -translate-y-full rounded-br-[10px] border-b border-r ${BORDER}`}
-              style={{ top: ROW_2 }}
-            />
-            {/* outgoing trunk — horizontal at centre, fork axis → right edge */}
-            <div className={`absolute left-1/2 right-0 top-1/2 h-px -translate-y-1/2 ${LINE}`} />
-            <NodeDot className="right-0 top-1/2 translate-x-1/2 -translate-y-1/2" />
+            <div className="relative col-start-4 row-span-2">
+              <div
+                className={`absolute left-0 right-[calc(50%+10px)] h-px -translate-y-1/2 ${LINE}`}
+                style={{ top: ROW_1 }}
+              />
+              <div
+                className={`absolute left-0 right-[calc(50%+10px)] h-px -translate-y-1/2 ${LINE}`}
+                style={{ top: ROW_2 }}
+              />
+              <div
+                className={`absolute right-1/2 w-px translate-x-1/2 ${LINE}`}
+                style={{ top: BAR_INSET, bottom: BAR_INSET }}
+              />
+              {/* upper elbow: from left → down, rounded top-right */}
+              <div
+                className={`absolute right-1/2 h-[10px] w-[10px] rounded-tr-[10px] border-r border-t ${BORDER}`}
+                style={{ top: ROW_1 }}
+              />
+              {/* lower elbow: up → from left, rounded bottom-right */}
+              <div
+                className={`absolute right-1/2 h-[10px] w-[10px] -translate-y-full rounded-br-[10px] border-b border-r ${BORDER}`}
+                style={{ top: ROW_2 }}
+              />
+              {/* outgoing trunk — horizontal at centre, fork axis → right edge */}
+              <div className={`absolute left-1/2 right-0 top-1/2 h-px -translate-y-1/2 ${LINE}`} />
+              <NodeDot className="right-0 top-1/2 translate-x-1/2 -translate-y-1/2" />
+            </div>
+
+            {/* STRAIGHT (col 6): reconciled → page. */}
+            <div className="relative col-start-6 row-span-2">
+              <div className={`absolute inset-x-0 top-1/2 h-px -translate-y-1/2 ${LINE}`} />
+              <NodeDot className="right-0 top-1/2 translate-x-1/2 -translate-y-1/2" />
+            </div>
           </div>
 
-          {/* STRAIGHT (col 6): reconciled → page. */}
-          <div className="relative col-start-6 row-span-2">
-            <div className={`absolute inset-x-0 top-1/2 h-px -translate-y-1/2 ${LINE}`} />
-            <NodeDot className="right-0 top-1/2 translate-x-1/2 -translate-y-1/2" />
-          </div>
-        </div>
-
-        {/* ═══ The stages — a real <ol> so the pipeline order reaches a screen
+          {/* ═══ The stages — a real <ol> so the pipeline order reaches a screen
           reader, whichever layout is showing. On mobile a two-column grid with
           the fork side by side (the rail rotated 90° CW); on lg the seven-track
           grid with the two fork cards stacked in the fork column. ═══ */}
-        <ol
-          className={`grid grid-cols-2 ${MOBILE_ROWS} gap-x-4 lg:grid ${GRID_COLS} lg:grid-rows-2 lg:auto-rows-fr lg:gap-x-0 lg:gap-y-6`}
-        >
-          <Station
-            icon={glyph(Box)}
-            // The chains the pipeline reads FOR THIS SITE — the launched ones,
-            // so the first station names what the rest of the page offers.
-            eyebrow={launchedProductionChains()
-              .map((c) => c.name)
-              .join(" / ")}
-            className="col-span-2 row-start-1 lg:col-span-1 lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:self-center"
+          <ol
+            className={`grid grid-cols-2 ${MOBILE_ROWS} gap-x-4 lg:grid ${GRID_COLS} lg:grid-rows-2 lg:auto-rows-fr lg:gap-x-0 lg:gap-y-6`}
           >
-            DeFi protocols run here as public contracts. Every deposit, loan and repayment is on the record.
-          </Station>
+            <Station
+              id="chain"
+              icon={glyph(Box)}
+              // The chains the pipeline reads FOR THIS SITE — the launched ones,
+              // so the first station names what the rest of the page offers.
+              eyebrow={launchedProductionChains()
+                .map((c) => c.name)
+                .join(" / ")}
+              className="col-span-2 row-start-1 lg:col-span-1 lg:col-start-1 lg:row-start-1 lg:row-span-2 lg:self-center"
+            />
 
-          {/* DOM order keeps the pipeline reading (indexed → live); on mobile the
+            {/* DOM order keeps the pipeline reading (indexed → live); on mobile the
               grid places live LEFT and indexed RIGHT to match the rotation, on lg
               indexed is the upper fork card. */}
-          <Station
-            icon={glyph(History)}
-            eyebrow="Historic events"
-            className="col-start-2 row-start-3 lg:col-start-3 lg:row-start-1"
-          >
-            Rails reads every event in order and explains each in plain English.
-          </Station>
+            <Station
+              id="historic"
+              icon={glyph(History)}
+              eyebrow="Historic events"
+              className="col-start-2 row-start-3 lg:col-start-3 lg:row-start-1"
+            />
 
-          <Station
-            icon={glyph(Radio)}
-            eyebrow="Live state"
-            className="col-start-1 row-start-3 lg:col-start-3 lg:row-start-2"
-          >
-            Rails asks those same contracts what the position holds and owes today.
-          </Station>
+            <Station
+              id="live"
+              icon={glyph(Radio)}
+              eyebrow="Live state"
+              className="col-start-1 row-start-3 lg:col-start-3 lg:row-start-2"
+            />
 
-          <Station
-            icon={glyph(CircleCheck, true)}
-            eyebrow="Reconciled"
-            accent
-            className="col-span-2 row-start-5 lg:col-span-1 lg:col-start-5 lg:row-start-1 lg:row-span-2 lg:self-center"
-          >
-            Lifetime totals are checked against live state. Anything that doesn&rsquo;t reconcile is left out.
-          </Station>
+            <Station
+              id="reconciled"
+              icon={glyph(CircleCheck, true)}
+              eyebrow="Reconciled"
+              accent
+              className="col-span-2 row-start-5 lg:col-span-1 lg:col-start-5 lg:row-start-1 lg:row-span-2 lg:self-center"
+            />
 
-          <Station
-            icon={glyph(LayoutGrid)}
-            eyebrow="On the page"
-            className="col-span-2 row-start-7 lg:col-span-1 lg:col-start-7 lg:row-start-1 lg:row-span-2 lg:self-center"
-          >
-            Every figure shows its source, so you can check it on a block explorer that isn&rsquo;t ours.
-          </Station>
+            <Station
+              id="page"
+              icon={glyph(LayoutGrid)}
+              eyebrow="On the page"
+              className="col-span-2 row-start-7 lg:col-span-1 lg:col-start-7 lg:row-start-1 lg:row-span-2 lg:self-center"
+            />
 
-          {/* ── MOBILE connector cells (below lg). Decorative <li>s that live in
+            {/* ── MOBILE connector cells (below lg). Decorative <li>s that live in
               the fixed 40px rows between the cards; hidden on lg, where the
               desktop overlay above draws the rail instead. Each is the matching
               desktop piece rotated 90° CW. ── */}
-          {/* SPLIT: trunk down from the chain, forks left + right to the two
+            {/* SPLIT: trunk down from the chain, forks left + right to the two
               branch cards. */}
-          <li aria-hidden="true" className="relative col-span-2 row-start-2 lg:hidden">
-            {/* incoming trunk — vertical at centre, top edge → split bar */}
-            <div className={`absolute left-1/2 top-0 bottom-1/2 w-px -translate-x-1/2 ${LINE}`} />
-            {/* horizontal bar between the two elbows */}
-            <div
-              className={`absolute top-1/2 h-px -translate-y-1/2 ${LINE}`}
-              style={{ left: HBAR_INSET, right: HBAR_INSET }}
-            />
-            {/* left elbow: bar → down, rounded top-left */}
-            <div
-              className={`absolute top-1/2 h-[10px] w-[10px] rounded-tl-[10px] border-l border-t ${BORDER}`}
-              style={{ left: COL_1 }}
-            />
-            {/* right elbow: bar → down, rounded top-right */}
-            <div
-              className={`absolute top-1/2 h-[10px] w-[10px] -translate-x-full rounded-tr-[10px] border-r border-t ${BORDER}`}
-              style={{ left: COL_2 }}
-            />
-            {/* arms — vertical down into each branch card */}
-            <div className={`absolute top-[calc(50%+10px)] bottom-0 w-px ${LINE}`} style={{ left: COL_1 }} />
-            <div
-              className={`absolute top-[calc(50%+10px)] bottom-0 w-px -translate-x-full ${LINE}`}
-              style={{ left: COL_2 }}
-            />
-            {/* dots where each arm enters a branch card's top border */}
-            <NodeDot className="bottom-0 -translate-x-1/2 translate-y-1/2" style={{ left: COL_1 }} />
-            <NodeDot className="bottom-0 -translate-x-1/2 translate-y-1/2" style={{ left: COL_2 }} />
-          </li>
+            <li aria-hidden="true" className="relative col-span-2 row-start-2 lg:hidden">
+              {/* incoming trunk — vertical at centre, top edge → split bar */}
+              <div className={`absolute left-1/2 top-0 bottom-1/2 w-px -translate-x-1/2 ${LINE}`} />
+              {/* horizontal bar between the two elbows */}
+              <div
+                className={`absolute top-1/2 h-px -translate-y-1/2 ${LINE}`}
+                style={{ left: HBAR_INSET, right: HBAR_INSET }}
+              />
+              {/* left elbow: bar → down, rounded top-left */}
+              <div
+                className={`absolute top-1/2 h-[10px] w-[10px] rounded-tl-[10px] border-l border-t ${BORDER}`}
+                style={{ left: COL_1 }}
+              />
+              {/* right elbow: bar → down, rounded top-right */}
+              <div
+                className={`absolute top-1/2 h-[10px] w-[10px] -translate-x-full rounded-tr-[10px] border-r border-t ${BORDER}`}
+                style={{ left: COL_2 }}
+              />
+              {/* arms — vertical down into each branch card */}
+              <div className={`absolute top-[calc(50%+10px)] bottom-0 w-px ${LINE}`} style={{ left: COL_1 }} />
+              <div
+                className={`absolute top-[calc(50%+10px)] bottom-0 w-px -translate-x-full ${LINE}`}
+                style={{ left: COL_2 }}
+              />
+              {/* dots where each arm enters a branch card's top border */}
+              <NodeDot className="bottom-0 -translate-x-1/2 translate-y-1/2" style={{ left: COL_1 }} />
+              <NodeDot className="bottom-0 -translate-x-1/2 translate-y-1/2" style={{ left: COL_2 }} />
+            </li>
 
-          {/* MERGE: two arms in from the branch cards, rejoin, trunk down into
+            {/* MERGE: two arms in from the branch cards, rejoin, trunk down into
               the reconciled station. */}
-          <li aria-hidden="true" className="relative col-span-2 row-start-4 lg:hidden">
-            {/* arms — vertical down from each branch card */}
-            <div className={`absolute top-0 bottom-[calc(50%+10px)] w-px ${LINE}`} style={{ left: COL_1 }} />
-            <div
-              className={`absolute top-0 bottom-[calc(50%+10px)] w-px -translate-x-full ${LINE}`}
-              style={{ left: COL_2 }}
-            />
-            {/* left elbow: down → right, rounded bottom-left */}
-            <div
-              className={`absolute bottom-1/2 h-[10px] w-[10px] rounded-bl-[10px] border-b border-l ${BORDER}`}
-              style={{ left: COL_1 }}
-            />
-            {/* right elbow: down → left, rounded bottom-right */}
-            <div
-              className={`absolute bottom-1/2 h-[10px] w-[10px] -translate-x-full rounded-br-[10px] border-b border-r ${BORDER}`}
-              style={{ left: COL_2 }}
-            />
-            {/* horizontal bar between the two elbows */}
-            <div
-              className={`absolute top-1/2 h-px -translate-y-1/2 ${LINE}`}
-              style={{ left: HBAR_INSET, right: HBAR_INSET }}
-            />
-            {/* outgoing trunk — vertical at centre, bar → bottom edge */}
-            <div className={`absolute left-1/2 top-1/2 bottom-0 w-px -translate-x-1/2 ${LINE}`} />
-            <NodeDot className="bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2" />
-          </li>
+            <li aria-hidden="true" className="relative col-span-2 row-start-4 lg:hidden">
+              {/* arms — vertical down from each branch card */}
+              <div className={`absolute top-0 bottom-[calc(50%+10px)] w-px ${LINE}`} style={{ left: COL_1 }} />
+              <div
+                className={`absolute top-0 bottom-[calc(50%+10px)] w-px -translate-x-full ${LINE}`}
+                style={{ left: COL_2 }}
+              />
+              {/* left elbow: down → right, rounded bottom-left */}
+              <div
+                className={`absolute bottom-1/2 h-[10px] w-[10px] rounded-bl-[10px] border-b border-l ${BORDER}`}
+                style={{ left: COL_1 }}
+              />
+              {/* right elbow: down → left, rounded bottom-right */}
+              <div
+                className={`absolute bottom-1/2 h-[10px] w-[10px] -translate-x-full rounded-br-[10px] border-b border-r ${BORDER}`}
+                style={{ left: COL_2 }}
+              />
+              {/* horizontal bar between the two elbows */}
+              <div
+                className={`absolute top-1/2 h-px -translate-y-1/2 ${LINE}`}
+                style={{ left: HBAR_INSET, right: HBAR_INSET }}
+              />
+              {/* outgoing trunk — vertical at centre, bar → bottom edge */}
+              <div className={`absolute left-1/2 top-1/2 bottom-0 w-px -translate-x-1/2 ${LINE}`} />
+              <NodeDot className="bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2" />
+            </li>
 
-          {/* STRAIGHT: reconciled → page. */}
-          <li aria-hidden="true" className="relative col-span-2 row-start-6 lg:hidden">
-            <div className={`absolute left-1/2 inset-y-0 w-px -translate-x-1/2 ${LINE}`} />
-            <NodeDot className="bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2" />
-          </li>
-        </ol>
-      </div>
+            {/* STRAIGHT: reconciled → page. */}
+            <li aria-hidden="true" className="relative col-span-2 row-start-6 lg:hidden">
+              <div className={`absolute left-1/2 inset-y-0 w-px -translate-x-1/2 ${LINE}`} />
+              <NodeDot className="bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2" />
+            </li>
+          </ol>
+        </div>
+      </StationGroup>
 
       {/* ═══ End-cap — where every number comes from, and the way in to the
           architecture, not a stop on the line.

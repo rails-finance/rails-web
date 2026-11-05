@@ -300,21 +300,37 @@ check(
   JSON.stringify(ground),
 );
 
-// "What Rails Does": each station shows its heading at rest, and its button
-// opens that station alone (Miles, 5 Nov 2026).
+// "What Rails Does": each station shows its heading at rest, its card is one
+// button, one station opens at a time (a second press shuts it), and opening
+// one moves nothing (Miles, 5 Nov 2026).
 const stations = page.locator("[data-station-toggle]");
 const shut = await stations.evaluateAll((bs) =>
   bs.every(
-    (b) =>
-      b.getAttribute("aria-expanded") === "false" && document.getElementById(b.getAttribute("aria-controls"))?.hidden,
+    (b) => b.getAttribute("aria-expanded") === "false" && !!document.getElementById(b.getAttribute("aria-controls")),
   ),
 );
-await stations.nth(3).click();
-const opened = await stations.evaluateAll((bs) => bs.map((b) => b.getAttribute("aria-expanded")).join(","));
+const railBox = () =>
+  page.evaluate(() => {
+    const ol = document.querySelector('[data-anatomy="S7"] ol');
+    const close = document.querySelector("[data-stage-rail-close]");
+    return [Math.round(ol.getBoundingClientRect().height), Math.round(close.getBoundingClientRect().top + scrollY)];
+  });
+const before = await railBox();
+const states = [];
+let still = true;
+for (let i = 0; i < 5; i++) {
+  await stations.nth(i).click();
+  states.push(
+    await stations.evaluateAll((bs) => bs.map((b) => (b.getAttribute("aria-expanded") === "true" ? 1 : 0)).join("")),
+  );
+  still &&= JSON.stringify(await railBox()) === JSON.stringify(before);
+}
+await stations.nth(4).click();
+const allShut = await stations.evaluateAll((bs) => bs.every((b) => b.getAttribute("aria-expanded") === "false"));
 check(
-  "R stations shut at rest; one press opens that station alone",
-  (await stations.count()) === 5 && shut && opened === "false,false,false,true,false",
-  opened,
+  "R stations: shut at rest; each press opens that one alone; a second press shuts it; nothing moves",
+  (await stations.count()) === 5 && shut && states.join() === "10000,01000,00100,00010,00001" && allShut && still,
+  `${states.join()} · still ${still}`,
 );
 
 // The directory lists a chain's most used explorers, as the drawer's chooser
