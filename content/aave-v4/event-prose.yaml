@@ -268,14 +268,22 @@ placeholders:
     rounding: text
     means: |-
       The asset the price is stated in.
+  bought:
+    rounding: spoke_amount
+    means: |-
+      What the CoW order's Trade bought.
+  topup:
+    rounding: spoke_amount
+    means: |-
+      What the supply took beyond what the Trade bought: tokens from the owner's wallet.
   left:
     rounding: spoke_amount
     means: |-
-      What the position gave the order beyond what the Trade sold.
+      What the position withdrew or borrowed beyond what the Trade sold: the flash-loan fee and the refund to the wallet together.
   left_symbol:
     rounding: text
     means: |-
-      The symbol of what the order left unsold.
+      The symbol of what the position withdrew or borrowed.
   supplies:
     rounding: text
     means: |-
@@ -951,6 +959,11 @@ templates:
           collateral_swap
         text: |-
           Swapped {given} {g_symbol} for {received} {r_symbol}.
+      swap.collateral_topped:
+        when: |-
+          collateral_swap, the supply larger than what the order bought
+        text: |-
+          Withdrew {given} {g_symbol} and supplied {received} {r_symbol}.
       swap.debt:
         when: |-
           debt_swap
@@ -966,21 +979,26 @@ templates:
           leverage
         text: |-
           Borrowed {given} {g_symbol} and supplied the {received} {r_symbol} it bought.
+      swap.leverage_topped:
+        when: |-
+          leverage, the supply larger than what the order bought
+        text: |-
+          Borrowed {given} {g_symbol} and supplied {received} {r_symbol}.
       swap.route:
         when: |-
           every swap
         text: |-
           A CoW Protocol settlement sold the {sold_symbol} for {bought_symbol} at {price} {price_quote} per {price_base}.
-      swap.left_withdrawn:
+      swap.route_topped:
         when: |-
-          collateral_swap or repay_with_collateral, the order sold less than the position withdrew for it
+          collateral_swap or leverage, the supply larger than what the order bought
         text: |-
-          The order sold {left} {left_symbol} less than the position withdrew for it.
-      swap.left_borrowed:
+          A CoW Protocol settlement sold the {sold_symbol} for {bought} {bought_symbol}; the other {topup} {bought_symbol} came from the owner's wallet.
+      swap.gap:
         when: |-
-          debt_swap or leverage, the order sold less than the position borrowed for it
+          the position withdrew or borrowed more than the order sold, by over 0.1%
         text: |-
-          The order sold {left} {left_symbol} less than the position borrowed for it.
+          Of the {left} {left_symbol} the order left unsold, Aave V3 took a flash-loan fee and the wallet got the rest.
       swap.supplies:
         when: |-
           collateral_swap
@@ -997,9 +1015,11 @@ templates:
         swap.debt,
         swap.repay,
         swap.leverage,
+        swap.collateral_topped,
+        swap.leverage_topped,
         swap.route,
-        swap.left_withdrawn,
-        swap.left_borrowed,
+        swap.route_topped,
+        swap.gap,
         swap.supplies,
         swap.owes,
         hf.cleared,
@@ -1007,12 +1027,12 @@ templates:
         hf.close,
       ]
     groups:
-      happened: [swap.collateral, swap.debt, swap.repay, swap.leverage]
-      adds_up: [swap.route, swap.left_withdrawn, swap.left_borrowed]
+      happened: [swap.collateral, swap.debt, swap.repay, swap.leverage, swap.collateral_topped, swap.leverage_topped]
+      adds_up: [swap.route, swap.route_topped, swap.gap]
       leaves: [swap.supplies, swap.owes, hf.cleared, hf.at_line, hf.close]
     alternates:
-      - [swap.collateral, swap.debt, swap.repay, swap.leverage]
-      - [swap.left_withdrawn, swap.left_borrowed]
+      - [swap.collateral, swap.debt, swap.repay, swap.leverage, swap.collateral_topped, swap.leverage_topped]
+      - [swap.route, swap.route_topped]
       - [swap.supplies, swap.owes, hf.cleared]
       - [hf.at_line, hf.close]
 

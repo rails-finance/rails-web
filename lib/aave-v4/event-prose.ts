@@ -367,28 +367,46 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
       v.received = num(rec?.amount) ?? 0;
       v.r_symbol = aaveV4DisplaySymbol(rec?.reserveSymbol);
       const legs = { given: "amount" } as const;
-      if (variant === "debt_swap") sp.say("swap.debt", legs);
-      else if (variant === "repay_with_collateral") sp.say("swap.repay", legs);
-      else if (variant === "leverage") sp.say("swap.leverage", legs);
-      else sp.say("swap.collateral", legs);
-      // The Trade: what it sold and bought, at the price that implies.
       const sold = num(s.sell.amount);
       const bought = num(s.buy.amount);
+      // A supply larger than what the order bought: the owner's wallet sent the
+      // rest into the order's contract, which supplied it with the purchase.
+      const received = v.received;
+      const topup =
+        (variant === "collateral_swap" || variant === "leverage") &&
+        bought != null &&
+        received - bought > received * 1e-6
+          ? received - bought
+          : null;
+      if (variant === "debt_swap") sp.say("swap.debt", legs);
+      else if (variant === "repay_with_collateral") sp.say("swap.repay", legs);
+      else if (variant === "leverage") sp.say(topup != null ? "swap.leverage_topped" : "swap.leverage", legs);
+      else sp.say(topup != null ? "swap.collateral_topped" : "swap.collateral", legs);
+      // The Trade: what it sold and bought, at the price that implies.
       if (sold != null && bought != null && sold > 0 && bought > 0 && s.sell.symbol && s.buy.symbol) {
         v.sold_symbol = aaveV4DisplaySymbol(s.sell.symbol);
         v.bought_symbol = aaveV4DisplaySymbol(s.buy.symbol);
-        const up = bought / sold >= 1;
-        v.price = up ? bought / sold : sold / bought;
-        v.price_quote = up ? v.bought_symbol : v.sold_symbol;
-        v.price_base = up ? v.sold_symbol : v.bought_symbol;
-        sp.say("swap.route");
-        // What the position gave the order beyond what it sold: the withdrawn
-        // or borrowed leg, which is the received one on a debt swap.
+        if (topup != null) {
+          v.bought = bought;
+          v.topup = topup;
+          sp.say("swap.route_topped");
+        } else {
+          const up = bought / sold >= 1;
+          v.price = up ? bought / sold : sold / bought;
+          v.price_quote = up ? v.bought_symbol : v.sold_symbol;
+          v.price_base = up ? v.sold_symbol : v.bought_symbol;
+          sp.say("swap.route");
+        }
+        // The withdrawn or borrowed leg (the received one on a debt swap) is a
+        // flash loan the order's contract repays with a fee; what it did not
+        // sell goes back to the owner's wallet. Neither transfer is a spoke
+        // event, so only the gap is stated, and only above 0.1%, where it is
+        // more than the fee.
         const taken = variant === "debt_swap" ? num(rec?.amount) : num(ctx.amount);
-        if (taken != null && taken - sold > taken * 1e-6) {
+        if (taken != null && taken - sold > taken * 0.001) {
           v.left = taken - sold;
           v.left_symbol = v.sold_symbol;
-          sp.say(variant === "debt_swap" || variant === "leverage" ? "swap.left_borrowed" : "swap.left_withdrawn");
+          sp.say("swap.gap");
         }
       }
       if (variant === "collateral_swap") {
