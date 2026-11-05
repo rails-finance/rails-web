@@ -1,9 +1,10 @@
 {
-  "computedAt": "2026-11-05T07:22:14.086Z",
+  "computedAt": "2026-11-05T13:30:21.992Z",
   "byChain": {
     "1": [
       "aave-v3",
       "spark",
+      "sky-savings",
       "compound-v3",
       "makerdao",
       "dolomite",
@@ -11,6 +12,7 @@
       "maple",
       "aave",
       "llamalend",
+      "liquity-v1",
       "compound-v2",
       "liquity-v2",
       "alchemix",
