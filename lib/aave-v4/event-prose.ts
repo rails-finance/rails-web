@@ -122,7 +122,17 @@ function joinWords(parts: string[]): string {
   return `${parts.slice(0, -1).join(", ")} ${V4_WORDS.and} ${parts[parts.length - 1]}`;
 }
 
+/** A position swap's modal, by kind: Aave's swap page for each swap, and the
+ *  borrow and supply pages for a leverage, which Aave does not call a swap. */
+const SWAP_L5: Record<NonNullable<AaveV4Context["swap"]>["kind"], AaveV4L5Key> = {
+  collateral_swap: "swap_supply",
+  debt_swap: "swap_borrow",
+  repay_with_collateral: "swap_repay",
+  leverage: "leverage",
+};
+
 function pick(ctx: AaveV4Context): { id: string; variant: string } {
+  if (ctx.swap) return { id: "aave4.swap", variant: ctx.swap.kind };
   const debtBefore = num(ctx.debtBefore) ?? 0;
   const debtAfter = num(ctx.debtAfter);
   switch (ctx.eventType) {
@@ -346,6 +356,59 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
       } else if (debtAfter != null && debtAfter > EPS) sp.say("liq.again");
       break;
     }
+    case "aave4.swap": {
+      // One event for both legs (lib/aave-v4/swaps.ts): the given leg is this
+      // row, the received leg rides in `swap.received`, and the balances lists
+      // are the position's after the transaction.
+      const s = ctx.swap!;
+      const rec = s.received.context?.data as AaveV4Context;
+      v.given = num(ctx.amount) ?? 0;
+      v.g_symbol = aaveV4DisplaySymbol(ctx.reserveSymbol);
+      v.received = num(rec?.amount) ?? 0;
+      v.r_symbol = aaveV4DisplaySymbol(rec?.reserveSymbol);
+      const legs = { given: "amount" } as const;
+      if (variant === "debt_swap") sp.say("swap.debt", legs);
+      else if (variant === "repay_with_collateral") sp.say("swap.repay", legs);
+      else if (variant === "leverage") sp.say("swap.leverage", legs);
+      else sp.say("swap.collateral", legs);
+      // The Trade: what it sold and bought, at the price that implies.
+      const sold = num(s.sell.amount);
+      const bought = num(s.buy.amount);
+      if (sold != null && bought != null && sold > 0 && bought > 0 && s.sell.symbol && s.buy.symbol) {
+        v.sold_symbol = aaveV4DisplaySymbol(s.sell.symbol);
+        v.bought_symbol = aaveV4DisplaySymbol(s.buy.symbol);
+        const up = bought / sold >= 1;
+        v.price = up ? bought / sold : sold / bought;
+        v.price_quote = up ? v.bought_symbol : v.sold_symbol;
+        v.price_base = up ? v.sold_symbol : v.bought_symbol;
+        sp.say("swap.route");
+        // What the position gave the order beyond what it sold: the withdrawn
+        // or borrowed leg, which is the received one on a debt swap.
+        const taken = variant === "debt_swap" ? num(rec?.amount) : num(ctx.amount);
+        if (taken != null && taken - sold > taken * 1e-6) {
+          v.left = taken - sold;
+          v.left_symbol = v.sold_symbol;
+          sp.say(variant === "debt_swap" || variant === "leverage" ? "swap.left_borrowed" : "swap.left_withdrawn");
+        }
+      }
+      if (variant === "collateral_swap") {
+        const supplies = (ctx.allSupplies ?? [])
+          .filter((r) => (num(r.amount) ?? 0) > EPS)
+          .map((r) => aaveV4DisplaySymbol(r.symbol));
+        if (supplies.length > 0) {
+          v.supplies = joinWords(supplies);
+          sp.say("swap.supplies");
+        }
+      } else if (ctx.allDebts != null) {
+        const debts = ctx.allDebts.filter((d) => (num(d.amount) ?? 0) > EPS).map((d) => aaveV4DisplaySymbol(d.symbol));
+        if (debts.length > 0) {
+          v.other_debt = joinWords(debts);
+          sp.say("swap.owes");
+        } else sp.say("hf.cleared");
+      }
+      hfLine();
+      break;
+    }
     case "aave4.toggle": {
       sp.say(variant === "enabled" ? "toggle.on" : "toggle.off");
       whoLine(false);
@@ -360,7 +423,7 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
 
   // ── The run's sentences ──
   const said = PROSE.finish(run, variant);
-  const key = t.L5;
+  const key = ctx.swap ? SWAP_L5[ctx.swap.kind] : t.L5;
   return { ...said, L5: { key, content: aaveV4Modal(key) } };
 }
 

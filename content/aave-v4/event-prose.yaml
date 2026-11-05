@@ -231,6 +231,55 @@ placeholders:
     rounding: text
     means: |-
       Each collateral with its collateral factor.
+  # ── Z2: a position swap (lib/aave-v4/swaps.ts) ──
+  given:
+    rounding: spoke_amount
+    means: |-
+      What the swap's given leg moved: the supply withdrawn, the debt repaid, or the borrow on a leverage.
+  g_symbol:
+    rounding: text
+    means: |-
+      The given leg's reserve symbol.
+  received:
+    rounding: spoke_amount
+    means: |-
+      What the swap's received leg moved: the supply added, the debt borrowed or repaid.
+  r_symbol:
+    rounding: text
+    means: |-
+      The received leg's reserve symbol.
+  sold_symbol:
+    rounding: text
+    means: |-
+      The symbol of what the Trade sold.
+  bought_symbol:
+    rounding: text
+    means: |-
+      The symbol of what the Trade bought.
+  price:
+    rounding: spoke_amount
+    means: |-
+      The Trade's effective price, what it bought over what it sold, stated per unit of the smaller.
+  price_base:
+    rounding: text
+    means: |-
+      The asset the price is per unit of.
+  price_quote:
+    rounding: text
+    means: |-
+      The asset the price is stated in.
+  left:
+    rounding: spoke_amount
+    means: |-
+      What the position gave the order beyond what the Trade sold.
+  left_symbol:
+    rounding: text
+    means: |-
+      The symbol of what the order left unsold.
+  supplies:
+    rounding: text
+    means: |-
+      The assets supplied after the transaction.
 
 group_words:
   happened: |-
@@ -291,6 +340,15 @@ words:
     Enabled as collateral
   t1_disabled: |-
     Disabled as collateral
+  # A position swap's head, by kind; a leverage is not called a swap.
+  t1_collateral_swap: |-
+    Swapped collateral
+  t1_debt_swap: |-
+    Swapped debt
+  t1_repay_with_collateral: |-
+    Repaid with collateral
+  t1_leverage: |-
+    Borrowed and supplied
   t1_leg_seized: |-
     seized
   t1_leg_repaid: |-
@@ -406,42 +464,42 @@ shared_sentences:
     when: |-
       the owner signed the transaction and a position manager called the spoke
     text: |-
-      The owner sent it through {manager_name} ({manager}), a contract acting for the owner.
+      The owner sent it through {manager_name} ({manager}).
   by_manager_alone:
     when: |-
       a position manager called the spoke and the owner did not sign
     text: |-
-      Another account sent the transaction, and {manager_name} ({manager}) called the spoke for the owner, with the owner's approval.
+      Another account sent the transaction; {manager_name} ({manager}) acted for the owner.
   by_manager_tx:
     when: |-
       as by_manager, and the transaction holds other supplies, withdrawals, borrows or repayments for the owner
     text: |-
-      The owner sent it through {manager_name} ({manager}), a contract acting for the owner, in a transaction that also {sibling_acts}.
+      The owner sent it through {manager_name} ({manager}), in a transaction that also {sibling_acts}.
   by_manager_alone_tx:
     when: |-
       as by_manager_alone, and the transaction holds other supplies, withdrawals, borrows or repayments for the owner
     text: |-
-      Another account sent the transaction, which also {sibling_acts}; {manager_name} ({manager}) called the spoke for the owner.
+      Another account sent the transaction, which also {sibling_acts}; {manager_name} ({manager}) acted for the owner.
   signed.owner:
     when: |-
-      the first sentence named the position manager, and the owner signed the transaction
+      the first sentence named the position manager, and the owner sent the transaction
     text: |-
-      The owner signed the transaction.
+      The owner sent the transaction.
   signed.other:
     when: |-
-      the first sentence named the position manager, and the owner did not sign
+      the first sentence named the position manager, and another account sent the transaction
     text: |-
-      Another account signed the transaction, with the owner's approval of the manager.
+      Another account sent the transaction, with the owner's approval of the manager.
   signed.owner_tx:
     when: |-
       as signed.owner, and the transaction holds other supplies, withdrawals, borrows or repayments for the owner
     text: |-
-      The owner signed the transaction, which also {sibling_acts}.
+      The owner sent the transaction, which also {sibling_acts}.
   signed.other_tx:
     when: |-
       as signed.other, and the transaction holds other supplies, withdrawals, borrows or repayments for the owner
     text: |-
-      Another account signed the transaction, which also {sibling_acts}; the owner had approved the manager.
+      Another account sent the transaction, which also {sibling_acts}; the owner had approved the manager.
   sibling:
     when: |-
       the transaction holds other supplies, withdrawals, borrows or repayments for the owner, and the owner called the spoke
@@ -872,6 +930,92 @@ templates:
       - [by_manager, by_manager_alone]
       - [toggle.backs, toggle.freed]
 
+  - id: aave4.swap
+    title: |-
+      Swap
+    when: |-
+      a position swap through a CoW order, served as one event
+    L5: swap_supply
+    variants:
+      collateral_swap: |-
+        a collateral swap
+      debt_swap: |-
+        a debt swap
+      repay_with_collateral: |-
+        a repay with collateral
+      leverage: |-
+        a borrow whose proceeds were supplied
+    sentences:
+      swap.collateral:
+        when: |-
+          collateral_swap
+        text: |-
+          Swapped {given} {g_symbol} for {received} {r_symbol}.
+      swap.debt:
+        when: |-
+          debt_swap
+        text: |-
+          Moved the debt from {given} {g_symbol} to {received} {r_symbol}.
+      swap.repay:
+        when: |-
+          repay_with_collateral
+        text: |-
+          Repaid {received} {r_symbol} of debt with {given} {g_symbol} of collateral.
+      swap.leverage:
+        when: |-
+          leverage
+        text: |-
+          Borrowed {given} {g_symbol} and supplied the {received} {r_symbol} it bought.
+      swap.route:
+        when: |-
+          every swap
+        text: |-
+          A CoW Protocol settlement sold the {sold_symbol} for {bought_symbol} at {price} {price_quote} per {price_base}.
+      swap.left_withdrawn:
+        when: |-
+          collateral_swap or repay_with_collateral, the order sold less than the position withdrew for it
+        text: |-
+          The order sold {left} {left_symbol} less than the position withdrew for it.
+      swap.left_borrowed:
+        when: |-
+          debt_swap or leverage, the order sold less than the position borrowed for it
+        text: |-
+          The order sold {left} {left_symbol} less than the position borrowed for it.
+      swap.supplies:
+        when: |-
+          collateral_swap
+        text: |-
+          After the transaction the position supplies {supplies}.
+      swap.owes:
+        when: |-
+          debt_swap, repay_with_collateral or leverage, with debt after the transaction
+        text: |-
+          After the transaction the position owes {other_debt}.
+    order:
+      [
+        swap.collateral,
+        swap.debt,
+        swap.repay,
+        swap.leverage,
+        swap.route,
+        swap.left_withdrawn,
+        swap.left_borrowed,
+        swap.supplies,
+        swap.owes,
+        hf.cleared,
+        hf.at_line,
+        hf.close,
+      ]
+    groups:
+      happened: [swap.collateral, swap.debt, swap.repay, swap.leverage]
+      adds_up: [swap.route, swap.left_withdrawn, swap.left_borrowed]
+      leaves: [swap.supplies, swap.owes, hf.cleared, hf.at_line, hf.close]
+    alternates:
+      - [swap.collateral, swap.debt, swap.repay, swap.leverage]
+      - [swap.left_withdrawn, swap.left_borrowed]
+      - [swap.supplies, swap.owes, hf.cleared]
+      - [hf.at_line, hf.close]
+
   - id: aave4.fallback
     title: |-
       Event
@@ -908,6 +1052,9 @@ doc_urls:
   LIQ_DEBT: https://aave.com/docs/aave-v4/positions/liquidations#section-1-choose-the-debt-position
   LIQ_COLLATERAL: https://aave.com/docs/aave-v4/positions/liquidations#section-2-choose-the-collateral-position
   MANAGERS: https://aave.com/docs/aave-v4/positions/managers#how-they-work
+  SWAP_SUPPLY: https://aave.com/docs/aave-v4/positions/swaps/supply
+  SWAP_BORROW: https://aave.com/docs/aave-v4/positions/swaps/borrow
+  SWAP_REPAY: https://aave.com/docs/aave-v4/positions/swaps/repay
   DELEGATION_MANAGERS: https://aave.com/docs/aave-v4/positions/managers#delegation-managers
   DYNAMIC_CONFIG: https://aave.com/docs/aave-v4/positions/conditions#dynamic-risk-configuration
   LIQUIDITY_MODEL: https://aave.com/docs/aave-v4/liquidity
@@ -1177,6 +1324,122 @@ L5:
       - label: |-
           Liquidity model
         doc: LIQUIDITY_MODEL
+
+  # A position swap's modal, by kind (lib/aave-v4/event-prose.ts SWAP_L5).
+  swap_supply:
+    title: |-
+      How swapping supply works
+    intro: |-
+      Swapping supply withdraws one asset, sells it through a CoW Protocol order and supplies what the order bought, in one transaction.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Same spoke
+        text: |-
+          the asset bought is supplied to the spoke the old supply left.
+      - bold: |-
+          CoW Protocol order
+        text: |-
+          solvers fill the signed order in a batch auction; the price is what the order's Trade sold and bought.
+      - bold: |-
+          Position managers
+        text: |-
+          Aave's Taker position manager withdraws for the owner and the Giver position manager supplies, under the owner's approval.
+    links:
+      - label: |-
+          Swapping supply on Aave V4
+        doc: SWAP_SUPPLY
+      - label: |-
+          Position managers
+        doc: MANAGERS
+
+  swap_borrow:
+    title: |-
+      How swapping debt works
+    intro: |-
+      Swapping debt borrows a new asset, sells it through a CoW Protocol order and repays the old debt with what it bought, in one transaction.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Same spoke
+        text: |-
+          the new debt is borrowed on the spoke that held the old one.
+      - bold: |-
+          CoW Protocol order
+        text: |-
+          solvers fill the signed order in a batch auction; the price is what the order's Trade sold and bought.
+      - bold: |-
+          Position managers
+        text: |-
+          Aave's Giver position manager repays for the owner and the Taker position manager borrows, under the owner's approval.
+    links:
+      - label: |-
+          Swapping debt on Aave V4
+        doc: SWAP_BORROW
+      - label: |-
+          Position managers
+        doc: MANAGERS
+
+  swap_repay:
+    title: |-
+      How repaying with supply works
+    intro: |-
+      Repaying with supply withdraws a supplied asset, sells it through a CoW Protocol order and repays debt with what the order bought, in one transaction.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Health factor
+        text: |-
+          the supply falls with the debt, so a position with collateral must stay healthy after the withdrawal.
+      - bold: |-
+          CoW Protocol order
+        text: |-
+          solvers fill the signed order in a batch auction; the price is what the order's Trade sold and bought.
+      - bold: |-
+          Position managers
+        text: |-
+          Aave's Taker position manager withdraws for the owner and the Giver position manager repays, under the owner's approval.
+    links:
+      - label: |-
+          Repaying with supply on Aave V4
+        doc: SWAP_REPAY
+      - label: |-
+          Position managers
+        doc: MANAGERS
+
+  leverage:
+    title: |-
+      How borrowing to supply works
+    intro: |-
+      This transaction borrowed an asset, sold it through a CoW Protocol order and supplied what the order bought to the same position.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Debt and supply rise together
+        text: |-
+          the position owes more and holds more supply, so its health factor moves with both prices.
+      - bold: |-
+          CoW Protocol order
+        text: |-
+          solvers fill the signed order in a batch auction; the price is what the order's Trade sold and bought.
+      - bold: |-
+          Position managers
+        text: |-
+          Aave's Taker position manager borrows for the owner and the Giver position manager supplies, under the owner's approval.
+    links:
+      - label: |-
+          Borrowing on Aave V4
+        doc: BORROW
+      - label: |-
+          Supplying on Aave V4
+        doc: SUPPLY
+      - label: |-
+          Position managers
+        doc: MANAGERS
 
   # The position card's "?": the spoke's modal. The loader passes the spoke's
   # form (its slug), and `liquidated` for a position liquidators touched.

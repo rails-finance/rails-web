@@ -38,6 +38,10 @@ export interface FetchAaveV4TimelineResult {
    *  onward. Null when no window was asked for, and when the wallet holds
    *  fewer events than the window — then the events ARE the history. */
   cutoffBlock?: number | null;
+  /** Under `swaps=1`: the wallet's paired position swaps and how many were
+   *  merged into one event each. Absent when the server could not read the
+   *  pairs, and the legs are then two events as before. */
+  swaps?: { paired: number; merged: number };
 }
 
 export interface AaveV4Position {
@@ -90,7 +94,8 @@ export async function fetchAaveV4Timeline({
   apiRoot = "/api/aave-v4",
 }: FetchAaveV4TimelineParams): Promise<FetchAaveV4TimelineResult> {
   const recentQs = recent ? `&recent=${encodeURIComponent(String(recent))}` : "";
-  const url = `${baseUrl}${apiRoot}/timeline?wallet=${encodeURIComponent(wallet)}${recentQs}`;
+  // `swaps=1`: each position swap is one event (lib/aave-v4/swaps.ts).
+  const url = `${baseUrl}${apiRoot}/timeline?wallet=${encodeURIComponent(wallet)}${recentQs}&swaps=1`;
   const done = settleFetchMark("aave-v4-timeline");
   const res = await fetch(url, { cache: "no-store", headers });
   if (!res.ok) {
@@ -99,6 +104,10 @@ export async function fetchAaveV4Timeline({
   }
   const json = (await res.json()) as FetchAaveV4TimelineResult;
   done(true);
+  if (process.env.NODE_ENV !== "production" && process.env.NEXT_PUBLIC_AAVE_V4_SWAPS_FIXTURE === "1") {
+    const { applyDevSwapsFixture } = await import("@/lib/aave-v4/dev-swaps-fixture");
+    return applyDevSwapsFixture(wallet, json);
+  }
   return json;
 }
 

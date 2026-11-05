@@ -22,6 +22,10 @@ export type AaveV4L5Key =
   | "collateral_toggle"
   | "liquidation"
   | "fallback"
+  | "swap_supply"
+  | "swap_borrow"
+  | "swap_repay"
+  | "leverage"
   | "position"
   | "hubs"
   | "base_hub";
@@ -54,6 +58,12 @@ export const AAVE_V4_HEAD_WORDS = {
   disabled: V4_WORDS.t1_disabled,
   legSeized: V4_WORDS.t1_leg_seized,
   legRepaid: V4_WORDS.t1_leg_repaid,
+  swap: {
+    collateral_swap: V4_WORDS.t1_collateral_swap,
+    debt_swap: V4_WORDS.t1_debt_swap,
+    repay_with_collateral: V4_WORDS.t1_repay_with_collateral,
+    leverage: V4_WORDS.t1_leverage,
+  },
 };
 
 const POSITION = PROSE.words(FILE.position_words, "position_words");
