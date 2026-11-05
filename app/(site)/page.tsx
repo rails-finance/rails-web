@@ -124,10 +124,10 @@ export default async function Home() {
           </div>
         </div>
 
-        {/* ═══ WHAT RAILS DOES — the plain answer to "what is this thing?": two
-          intro paragraphs (what a protocol explorer is, then that every number
-          traces to the contracts) that hand off to the StageRail fork, which
-          draws the path a number travels from the contracts to the page. ═══ */}
+        {/* ═══ WHAT RAILS DOES — the plain answer to "what is this thing?": one
+          intro paragraph (what a protocol explorer is) that hands off to the
+          StageRail fork, which draws the path a number travels from the
+          contracts to the page and closes on where every number comes from. ═══ */}
         <div>
           <section className="max-w-7xl mx-auto px-4 py-16" data-anatomy="S7">
             <h2 className="text-3xl font-semibold tracking-tight text-foreground mb-4">What Rails Does</h2>
@@ -144,10 +144,7 @@ export default async function Home() {
             <p className="body-text max-w-3xl">
               Rails builds a read-only explorer for each DeFi protocol it covers. Look up any position &mdash; yours or
               anyone else&rsquo;s &mdash; and see what it holds, what it owes, and everything that has ever happened to
-              it.
-            </p>
-            <p className="body-text max-w-3xl mt-3">
-              Every number on the page traces back to the contracts it came from. Here is the path it travels:
+              it. Here is the path it travels:
             </p>
 
             {/* The capability list became a transit-style rail: the four

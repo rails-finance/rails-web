@@ -312,18 +312,20 @@ export function StageRail() {
         </ol>
       </div>
 
-      {/* ═══ End-cap — the way in to the architecture, not a stop on the line.
+      {/* ═══ End-cap — where every number comes from, and the way in to the
+          architecture, not a stop on the line.
           The read-only claim that used to sit here is made on the coverage pages,
           /about/architecture, the hero terms and StructuredData, so dropping
           it costs the site nothing. ═══ */}
-      <div className="mt-8 flex flex-col items-center gap-1 text-center">
+      <p className="body-text mt-8 text-center" data-stage-rail-close="">
+        Every number on the page traces back to the contracts it came from.{" "}
         <Link
           href="/about/architecture"
-          className="text-sm font-medium text-blue-600 dark:text-blue-400 transition-colors hover:underline"
+          className="whitespace-nowrap text-sm font-medium text-blue-600 dark:text-blue-400 transition-colors hover:underline"
         >
           Read the technical architecture&nbsp;→
         </Link>
-      </div>
+      </p>
     </div>
   );
 }
