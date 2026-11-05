@@ -2332,3 +2332,14 @@ label[for] {
     animation: none;
   }
 }
+
+/* The wallet panel's scrim blurs the page (H16.1, ui-jobs 503): while the
+   panel is open nothing under the blur animates, so the blur is drawn once
+   and not repainted every frame. The panel is portalled to the body as
+   [data-wallet-panel-root] and keeps its own motion. */
+html[data-wallet-panel-open] body > :not([data-wallet-panel-root]),
+html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *,
+html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::before,
+html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
+  animation-play-state: paused;
+}

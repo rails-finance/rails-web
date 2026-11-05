@@ -1,0 +1,23 @@
+{
+  "computedAt": "2026-11-05T07:22:14.086Z",
+  "byChain": {
+    "1": [
+      "aave-v3",
+      "spark",
+      "compound-v3",
+      "makerdao",
+      "dolomite",
+      "aave-v4",
+      "maple",
+      "aave",
+      "llamalend",
+      "compound-v2",
+      "liquity-v2",
+      "alchemix",
+      "moonwell",
+      "asymmetry",
+      "ebisu"
+    ],
+    "8453": ["morpho", "aave-v3", "compound-v3", "moonwell", "aave-v4", "alchemix", "seamless", "basedollar"]
+  }
+}

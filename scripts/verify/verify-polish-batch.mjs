@@ -178,77 +178,85 @@ await page.waitForTimeout(300);
 check("L Escape closes the modal", (await page.locator(LIQUITY_DIALOG).count()) === 0);
 
 // ── S. Explorer chooser ─────────────────────────────────────────────────
-// The roster panel: the rail's grid glyph on app routes (ui-jobs 497), the
-// "Open an explorer" pill on marketing routes, both opening the same
-// two-column panel on Ethereum. Counts are not
-// pinned literals — each chain's badge is compared against the rows the
-// panel actually renders for that chain.
+// The roster under the search in the wallet panel (ui-jobs 503), opened by
+// the search's glyph on every page and opening on Ethereum. Each chain shows
+// its most used explorers, the rest behind "View all <n> explorers". Counts
+// are not pinned literals: each chain's count is compared against the rows
+// the chooser renders for it with every explorer shown.
 await page.goto(`${BASE}/ethereum/dolomite`, { waitUntil: "networkidle" });
-const SWITCHER_PANEL = 'div[role="menu"][aria-label="Blockchain switcher"]';
-// `:visible` — from `md` up the rail's copy is drawn and the header bar's is
+const CHOOSER = "[data-search-launcher-panel] [data-explorer-chooser]";
+// `:visible`: from `md` up the rail's glyph is drawn and the header bar's is
 // in the tree but hidden with the bar.
-const switcherTrigger = page.locator("button[data-chooser-trigger]:visible").first();
+const switcherTrigger = page.locator("button[data-search-launcher]:visible").first();
 check(
-  "S trigger is the rail's grid glyph, named for what it opens",
-  (await switcherTrigger.getAttribute("data-chooser-trigger")) === "rail" &&
-    (await switcherTrigger.getAttribute("aria-label")) === "Open an explorer",
+  "S the rail's search glyph opens the chooser; no grid glyph",
+  (await switcherTrigger.getAttribute("data-search-launcher")) === "rail" &&
+    (await page.locator("button[data-chooser-trigger]").count()) === 0,
   (await switcherTrigger.getAttribute("aria-label")) ?? "",
 );
 // Pre-hydration clicks are lost, not replayed — poll the panel and re-click.
-let switcherOpen = false;
-for (let attempt = 0; attempt < 6 && !switcherOpen; attempt++) {
-  await switcherTrigger.click();
-  switcherOpen = await page
-    .waitForSelector(SWITCHER_PANEL, { timeout: 2000 })
-    .then(() => true)
-    .catch(() => false);
-}
-check("S panel opens from the rail's trigger", switcherOpen);
-const chainButtons = page.locator(`${SWITCHER_PANEL} button[aria-pressed]:not([data-switcher-robinhood])`);
+const openChooser = async () => {
+  let open = false;
+  for (let attempt = 0; attempt < 6 && !open; attempt++) {
+    await page.locator("button[data-search-launcher]:visible").first().click();
+    open = await page
+      .waitForSelector(CHOOSER, { state: "visible", timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+  return open;
+};
+check("S the panel opens with the chooser under the search", await openChooser());
+check(
+  "S the field has the focus as the panel opens",
+  await page.evaluate(() => document.activeElement?.matches("[data-search-launcher-panel] input") ?? false),
+);
+const chainButtons = page.locator(`${CHOOSER} [data-switcher-tabs] [role="tab"]:not([data-switcher-robinhood])`);
 const chainCount = await chainButtons.count();
-check("S chain column renders multiple chains", chainCount >= 2, `chains: ${chainCount}`);
-// Every chain's count badge equals the explorer rows shown when selected.
+check("S the chain row renders multiple chains", chainCount >= 2, `chains: ${chainCount}`);
+// Every chain's count equals its explorer rows with every explorer shown, and
+// the most used number eight at most.
 let badgesMatch = chainCount >= 2;
 for (let i = 0; i < chainCount; i++) {
   const btn = chainButtons.nth(i);
   await btn.click();
-  const badge = Number((await btn.locator("[data-chain-count]").textContent())?.trim());
-  const rows = await page.locator(`${SWITCHER_PANEL} a[data-switcher-explorer]`).count();
-  if (!(Number.isFinite(badge) && badge > 0 && badge === rows)) {
+  const badge = Number(await btn.getAttribute("data-chain-count"));
+  const shown = await page.locator(`${CHOOSER} a[data-switcher-explorer]`).count();
+  const viewAll = page.locator(`${CHOOSER} [data-chooser-view-all]`);
+  if (await viewAll.count()) await viewAll.click();
+  const rows = await page.locator(`${CHOOSER} a[data-switcher-explorer]`).count();
+  if (!(Number.isFinite(badge) && badge > 0 && badge === rows && shown <= 8)) {
     badgesMatch = false;
-    check(`S chain ${i} badge (${badge}) matches rendered rows (${rows})`, false);
+    check(`S chain ${i} count (${badge}) matches its rows (${rows}), ${shown} shown first`, false);
   }
 }
-check("S every chain's count badge matches its rendered rows", badgesMatch);
-// Back to Ethereum: the active explorer is marked current and unclickable.
+check("S every chain's count matches its rows, eight at most shown first", badgesMatch);
+// Back to Ethereum: the chain is named beside the glyphs, and the active
+// explorer is marked current and unclickable.
 await chainButtons.first().click();
-const currentRow = page.locator(`${SWITCHER_PANEL} a[data-switcher-explorer][aria-current="page"]`);
+check(
+  "S the selected chain is named beside the glyphs",
+  (await page.locator(`${CHOOSER} [data-chooser-chain-name]`).textContent())?.trim() === "Ethereum",
+);
+const currentRow = page.locator(`${CHOOSER} a[data-switcher-explorer][aria-current="page"]`);
 check(
   "S active explorer row carries aria-current",
   (await currentRow.count()) === 1 && (await currentRow.getAttribute("href")) === "/ethereum/dolomite",
 );
-// An explorer row navigates to its listing.
-await page.locator(`${SWITCHER_PANEL} a[href="/ethereum/llamalend"]`).click();
+// "View all" reaches the long tail, and a row there navigates to its listing.
+await page.locator(`${CHOOSER} [data-chooser-view-all]`).click();
+await page.locator(`${CHOOSER} a[href="/ethereum/llamalend"]`).click();
 const navigated = await page
   .waitForURL(/\/ethereum\/llamalend/, { timeout: 8000 })
   .then(() => true)
   .catch(() => false);
 check("S explorer row navigates to its listing", navigated);
-// On the home page the rail's glyph opens the SAME panel, defaulting to
-// Ethereum: the site pages stand in the rail shell (ui-jobs 498).
+// On the home page the rail's glyph opens the SAME panel, on Ethereum: the
+// site pages stand in the rail shell (ui-jobs 498).
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
-const cta = page.locator("button[data-chooser-trigger]:visible").first();
-let ctaOpen = false;
-for (let attempt = 0; attempt < 6 && !ctaOpen; attempt++) {
-  await cta.click();
-  ctaOpen = await page
-    .waitForSelector(SWITCHER_PANEL, { timeout: 2000 })
-    .then(() => true)
-    .catch(() => false);
-}
-check("S home's rail glyph opens the switcher panel", ctaOpen);
-const ctaSelected = await page.locator(`${SWITCHER_PANEL} button[aria-pressed="true"]`).textContent();
-check("S home's panel defaults to Ethereum", /Ethereum/.test(ctaSelected ?? ""), ctaSelected ?? "none");
+check("S home's rail glyph opens the chooser", await openChooser());
+const ctaSelected = await page.locator(`${CHOOSER} [role="tab"][aria-selected="true"]`).getAttribute("aria-label");
+check("S home's chooser opens on Ethereum", ctaSelected === "Ethereum", ctaSelected ?? "none");
 
 await browser.close();
 const failed = results.filter((r) => !r.ok);

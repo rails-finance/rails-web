@@ -5,7 +5,6 @@ import { RailsMark } from "@/components/nav/rails-mark";
 import { usePathname } from "next/navigation";
 
 import { BookmarksLink } from "@/components/nav/bookmarks-link";
-import { ChainSwitcher } from "@/components/nav/chain-switcher";
 import { StartHereLink } from "@/components/nav/start-here-link";
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
@@ -70,20 +69,16 @@ export function HeaderBar() {
         {/* Right-hand control cluster. `ml-auto` pushes it hard right — it used
             to yield (`md:ml-0`) to the inline site-links nav that sat here, but
             that nav is retired, so the cluster owns the push outright. The
-            search's glyph and the toggle lead; the chooser and H20 close it
-            (the order below). The hamburger is retired — the site's own pages and socials
+            search's glyph and the toggle lead; H20 closes it (the order
+            below). The hamburger is retired — the site's own pages and socials
             live in the footers (SiteFooter on site routes, AppFooter's
             quiet Coverage link on app routes). */}
         <div className="ml-auto flex items-center gap-1">
-          {/* The search's glyph (H15.1): everywhere but home, whose hero is
-              the search. It opens the wallet panel, whose suggestions list
-              the bookmarks; the separate bookmarks button (H11) went on 1 Nov 2026.
-              A sheet from the top on a phone. */}
-          {!isHome && <SearchLauncher placement="header" />}
+          {/* The search's glyph (H15.1), on every page: it opens the wallet
+              panel at full width, the search over the explorer chooser
+              (ui-jobs 503). */}
+          <SearchLauncher placement="header" />
           <HeaderThemeToggle />
-          {/* The explorer chooser's grid glyph (H4, ui-jobs 497), then the
-              profile control (H20), on every page (ui-jobs 498). */}
-          <ChainSwitcher variant="header" />
           {/* Home's "Start here" (S12), left of H20; elsewhere it renders nothing. */}
           <StartHereLink />
           <BookmarksLink />

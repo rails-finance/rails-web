@@ -478,10 +478,11 @@ if ((await page.locator("[data-prov-tripwire]").count()) > 0) {
 }
 
 // ── 9: the chain switcher ───────────────────────────────────────────────────
-// The drawn one: the rail's, from `md` (ui-jobs 497).
-await page.locator("button[data-chooser-trigger]:visible").click();
-await page.waitForSelector("[role='menu']");
-const baseSelected = await page.locator("[role='menu'] button[aria-pressed='true']").textContent();
+// The chooser is in the wallet panel, opened by the search's glyph (ui-jobs 503).
+const CHOOSER = "[data-explorer-chooser]";
+await page.locator("button[data-search-launcher]:visible").click();
+await page.waitForSelector(CHOOSER, { state: "visible" });
+const baseSelected = await page.locator(`${CHOOSER} [role='tab'][aria-selected='true']`).getAttribute("aria-label");
 const vaultsRowBase = await page
   .locator("[data-switcher-vaults]")
   .evaluateAll((els) => els.map((e) => e.getAttribute("href")));
@@ -491,7 +492,7 @@ check(
   /Ethereum/.test(baseSelected ?? ""),
   `selected "${baseSelected?.trim()}"`,
 );
-await page.locator("[role='menu'] button[aria-pressed]", { hasText: "Base" }).click();
+await page.locator(`${CHOOSER} [role='tab'][aria-label='Base']`).click();
 const vaultsRowBaseTab = await page
   .locator("[data-switcher-vaults]")
   .evaluateAll((els) => els.map((e) => e.getAttribute("href")));
@@ -503,11 +504,11 @@ check(
 // Ethereum's Vaults section went the same way on 2026-09-20 — Aave's layer is a
 // roster entry at /ethereum/aave now — so no chain draws this row. Sepolia never
 // had one.
-await page.locator("[role='menu'] button", { hasText: "Ethereum" }).click();
+await page.locator(`${CHOOSER} [role='tab'][aria-label='Ethereum']`).click();
 const vaultsRowEth = await page
   .locator("[data-switcher-vaults]")
   .evaluateAll((els) => els.map((e) => e.getAttribute("href")));
-await page.locator("[role='menu'] button", { hasText: "Sepolia" }).click();
+await page.locator(`${CHOOSER} [role='tab'][aria-label='Sepolia']`).click();
 const vaultsRowSep = await page.locator("[data-switcher-vaults]").count();
 check(
   "9b and neither does Ethereum or Sepolia — Aave's vault layer is a roster row, not a section",

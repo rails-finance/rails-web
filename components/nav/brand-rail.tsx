@@ -3,9 +3,10 @@
 // BrandRail — the narrow vertical strip down the left edge of every app/(app)
 // surface (rails-ops TO-DO-ui-jobs 67, 68). The Rails mark sits at the top with
 // the search's glyph under it (H15.1, decision 0051); the theme toggle and the
-// beta pill share the foot. The glyph opens the wallet panel (ui-jobs 431),
-// which glides out from the rail's right edge with the bookmarks listed under
-// the search; the separate bookmarks button (H11) went on 1 Nov 2026.
+// beta pill share the foot. The glyph opens the wallet panel (ui-jobs 431,
+// 503), which glides out from the rail's right edge with the search, the
+// explorer chooser and the bookmarks link; the separate bookmarks button (H11)
+// went on 1 Nov 2026.
 //
 // IT IS A SURFACE, NOT A MARGIN (68): `bg-raised` is the same tone the cards
 // and panels take, so the strip reads as chrome the page sits beside rather
@@ -29,7 +30,6 @@ import { RailsMark } from "@/components/nav/rails-mark";
 
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { SearchLauncher } from "@/components/shared/front-door-search";
-import { ChainSwitcher } from "@/components/nav/chain-switcher";
 
 /** The Rails glyph, linking home — the same mark and the same link the top bar
  *  carried, without the wordmark, which will not fit at icon width. The wallet
@@ -78,10 +78,11 @@ export function BrandRail() {
       >
         <div className="flex flex-col items-center gap-3">
           <RailsGlyph />
+          {/* The search's glyph opens the wallet panel, which holds the
+              search and the explorer chooser (H4, ui-jobs 503). The grid
+              glyph (497) went; a second way in that opens the panel at the
+              chooser is `<SearchLauncher placement="rail" at="chooser" />`. */}
           <SearchLauncher placement="rail" />
-          {/* The explorer chooser (H4, ui-jobs 497): a plain way to the roster
-              from every app page, its panel opening to the rail's right. */}
-          <ChainSwitcher variant="rail" />
         </div>
         {/* Toggle, then the pill flush to the left edge. `w-full` is what
             lets the pill sit at x=0 while the toggle stays centred in the

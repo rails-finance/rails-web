@@ -75,6 +75,8 @@ export const walletHref = (address: string): string => `/wallet/${address.toLowe
 const SLASH_TARGET = "data-search-input";
 /** Asks the wallet panel to open when no search field is on the page. */
 export const OPEN_SEARCH_EVENT = "rails-open-search";
+/** ⌘K: open the wallet panel, or close it when open. */
+export const TOGGLE_SEARCH_EVENT = "rails-toggle-search";
 
 type Size = "sm" | "md" | "lg";
 
@@ -650,10 +652,17 @@ function SuggestionList({
 }
 
 /** `/` focuses the search from any page unless a field has focus: the page's
- *  own search where one is drawn and visible, else the chrome's launcher. */
+ *  own search where one is drawn and visible, else the wallet panel's. ⌘K
+ *  (Ctrl+K off a Mac) opens and closes the wallet panel from anywhere, a
+ *  field included (ui-jobs 503). */
 export function useSlashToSearch() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        window.dispatchEvent(new Event(TOGGLE_SEARCH_EVENT));
+        return;
+      }
       if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
       const active = document.activeElement as HTMLElement | null;
       if (
@@ -679,10 +688,56 @@ export function useSlashToSearch() {
   }, []);
 }
 
+/** lucide's `layout-grid` with its four squares filled (Miles, 4 Nov 2026). */
+function FilledLayoutGrid() {
+  return (
+    <svg
+      width={18}
+      height={18}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect width="7" height="7" x="3" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="14" rx="1" />
+      <rect width="7" height="7" x="3" y="14" rx="1" />
+    </svg>
+  );
+}
+
 /** The glyph in the chrome that opens the wallet panel (H15.1), from the
- *  brand rail or the header bar. It reads as active while the panel is open. */
-export function SearchLauncher({ placement }: { placement: "rail" | "header" }) {
+ *  brand rail or the header bar. It reads as active while the panel is open.
+ *  `at="chooser"` is the grid glyph (ui-jobs 497), a second way in that opens
+ *  the same panel with the focus on the explorer chooser; it is not drawn
+ *  since 503, and putting it back is one more launcher in the rail. */
+export function SearchLauncher({
+  placement,
+  at = "search",
+}: {
+  placement: "rail" | "header";
+  at?: "search" | "chooser";
+}) {
   const open = useWalletPanelOpen();
+  if (at === "chooser")
+    return (
+      <button
+        type="button"
+        onClick={(e) => toggleWalletPanel(e.currentTarget, "chooser")}
+        className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          open ? "text-blue-500" : "text-rb-700 dark:text-rb-300"
+        }`}
+        aria-label="Open an explorer"
+        aria-expanded={open}
+        title="Open an explorer"
+        data-chooser-trigger={placement}
+      >
+        <FilledLayoutGrid />
+      </button>
+    );
   return (
     <button
       type="button"
@@ -690,10 +745,10 @@ export function SearchLauncher({ placement }: { placement: "rail" | "header" }) 
       className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
         open ? "text-blue-500" : "text-rb-700 dark:text-rb-300"
       }`}
-      aria-label="Look up a wallet"
+      aria-label="Search and explorers"
       aria-expanded={open}
-      aria-keyshortcuts="/"
-      title="Look up a wallet (/)"
+      aria-keyshortcuts="/ Meta+K"
+      title="Search and explorers (/ or ⌘K)"
       data-anatomy="H15.1"
       data-search-launcher={placement}
     >

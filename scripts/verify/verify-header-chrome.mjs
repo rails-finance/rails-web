@@ -79,11 +79,11 @@ for (const p of [
   "/terms",
 ]) {
   await chromeState(page, p, { bar: false });
-  const siteRail = await page.locator('aside[data-anatomy="H1"] button[data-chooser-trigger="rail"]:visible').count();
+  const siteRail = await page.locator('aside[data-anatomy="H1"] button[data-search-launcher="rail"]:visible').count();
   const siteFace = await page.locator('[data-profile-corner] [data-anatomy="H20"]:visible').count();
-  const pill = await page.locator('button[aria-label="Open an explorer"]:not([data-chooser-trigger]):visible').count();
-  check(siteRail === 1 && siteFace === 1, `${p}: the rail's chooser and H20 drawn (${siteRail}, ${siteFace})`);
-  check(pill === 0, `${p}: no "Open an explorer" pill (${pill})`);
+  const pill = await page.locator('button[aria-label="Open an explorer"]:visible').count();
+  check(siteRail === 1 && siteFace === 1, `${p}: the rail's search glyph and H20 drawn (${siteRail}, ${siteFace})`);
+  check(pill === 0, `${p}: no "Open an explorer" pill or grid glyph, ui-jobs 503 (${pill})`);
 }
 
 // ── The app surfaces from `md` up: no bar, everything in the rail and the row ──
@@ -94,11 +94,13 @@ for (const [name, sel] of [
   ["the Rails mark", 'a[href="/"]'],
   ["the search's glyph", 'button[data-anatomy="H15.1"]'],
   ["the theme toggle", 'button[aria-label^="Switch to"]'],
-  ["the explorer chooser", 'button[data-chooser-trigger="rail"][aria-label="Open an explorer"]'],
 ]) {
   const n = await rail.locator(`${sel}:visible`).count();
   check(n === 1, `the brand rail carries ${name} (${n})`);
 }
+// The grid glyph (497) went with ui-jobs 503: the chooser is in the wallet panel.
+const railGrid = await rail.locator("button[data-chooser-trigger]").count();
+check(railGrid === 0, `the brand rail carries no grid glyph, ui-jobs 503 (${railGrid})`);
 const railBookmarks = await rail.locator('button[aria-label="Bookmarks"]').count();
 check(railBookmarks === 0, `the brand rail carries no bookmarks button, retired 1 Nov 2026 (${railBookmarks})`);
 // The rail is a surface, not a margin: an opaque background, and the same one
@@ -230,13 +232,13 @@ if (!trovePath) {
 } else {
   await page.goto(BASE + trovePath, { waitUntil: "networkidle" });
   // Decision 0052: the wallet heading frames a position page; the card's
-  // sidebar name links to the explorer. The chooser is the rail's on every
-  // app page (ui-jobs 497), so it is drawn here once, in the rail.
-  const posTrigger = await page.locator("button[data-chooser-trigger]:visible").count();
-  const posRail = await page.locator('aside[data-anatomy="H1"] button[data-chooser-trigger]:visible').count();
+  // sidebar name links to the explorer. The chooser is in the wallet panel
+  // (ui-jobs 503), whose glyph is drawn here once, in the rail.
+  const posTrigger = await page.locator("button[data-search-launcher]:visible").count();
+  const posRail = await page.locator('aside[data-anatomy="H1"] button[data-search-launcher]:visible').count();
   check(
     posTrigger === 1 && posRail === 1,
-    `a position view draws the chooser once, in the rail, at 1280 (${posTrigger}, ${posRail})`,
+    `a position view draws the panel's glyph once, in the rail, at 1280 (${posTrigger}, ${posRail})`,
   );
   await page.waitForSelector("[data-anatomy='C20'] a[data-rail-identity]", { timeout: 15000 }).catch(() => {});
   const posLink = await page
@@ -257,21 +259,16 @@ if (!trovePath) {
 // carries the path now — CHAIN-AWARE, pointing at the coverage page whose
 // matrix contains the explorer the reader is on.
 //
-// The trigger is located by its label rather than by "inside <header>": since
-// ui-jobs 68 it sits on the protocol title row from `md` up and in the bar
-// below `md`, and this block should hold either one to the same behaviour.
-// The panel opens on Ethereum whatever the page (ui-jobs 497); another
-// chain's door is one press on its row or tab.
+// The chooser is in the wallet panel (ui-jobs 503), opened by the search's
+// glyph: in the rail from `md`, in the bar below it. The chooser opens on
+// Ethereum whatever the page (ui-jobs 497); another chain's door is one press
+// on its glyph.
 async function switcherCoverage(target, slug, chainName) {
-  await target.locator("button[data-chooser-trigger]:visible").click();
-  if (chainName) {
-    await target
-      .locator('[role="menu"] button[aria-pressed], [data-switcher-tabs] [role="tab"]', { hasText: chainName })
-      .first()
-      .click();
-  }
-  await target.waitForSelector(`a[href="/coverage/${slug}"]`, { timeout: 5000 }).catch(() => {});
-  return target.locator(`a[href="/coverage/${slug}"]`).count();
+  await target.locator("button[data-search-launcher]:visible").click();
+  await target.waitForSelector("[data-explorer-chooser]", { state: "visible", timeout: 5000 }).catch(() => {});
+  if (chainName) await target.locator(`[data-switcher-tabs] [role="tab"][aria-label="${chainName}"]`).click();
+  await target.waitForSelector(`[data-chooser-coverage][href="/coverage/${slug}"]`, { timeout: 5000 }).catch(() => {});
+  return target.locator(`[data-chooser-coverage][href="/coverage/${slug}"]:visible`).count();
 }
 console.log("[chain switcher on /ethereum/liquity-v2]");
 await page.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
@@ -283,14 +280,14 @@ check(switcherCov >= 1, `chain switcher reaches /coverage/ethereum on an Ethereu
 // there is no work-in-progress strip.
 console.log("[chrome on /base/moonwell — Base is launched]");
 await page.goto(BASE + "/base/moonwell", { waitUntil: "networkidle" });
-const baseChainTrigger = await page.locator("button[data-chooser-trigger]:visible").count();
-check(baseChainTrigger === 1, `a Base rail draws the chooser once (${baseChainTrigger})`);
+const baseChainTrigger = await page.locator("button[data-search-launcher]:visible").count();
+check(baseChainTrigger === 1, `a Base rail draws the panel's glyph once (${baseChainTrigger})`);
 const baseLabel = await page.locator("[data-anatomy='H3'] [data-chain-label='base']").count();
 check(baseLabel === 1, `a Base rail names its chain on the title row (${baseLabel})`);
 const switcherCovBase = await switcherCoverage(page, "base", "Base");
 check(switcherCovBase >= 1, `chain switcher reaches /coverage/base on a Base rail (${switcherCovBase})`);
-const baseRows = await page.locator('[role="menu"] a[href^="/base/"]').count();
-check(baseRows >= 1, `the switcher panel lists the Base explorer rows (${baseRows})`);
+const baseRows = await page.locator('[data-explorer-chooser] a[data-switcher-explorer][href^="/base/"]').count();
+check(baseRows >= 1, `the chooser lists the Base explorer rows (${baseRows})`);
 await page.keyboard.press("Escape");
 const wipStrip = await page.locator("[data-work-in-progress]").count();
 check(wipStrip === 0, `a launched rail carries no work-in-progress strip (${wipStrip})`);
@@ -317,12 +314,10 @@ console.log("[mobile @390]");
 const mob = await browser.newPage({ viewport: { width: 390, height: 800 } });
 await mob.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
 const mBurger = await mob.locator('header button[aria-label="Toggle menu"]').count();
-const mSwitcher = await mob.locator('header button[data-chooser-trigger="header"]').count();
 check(mBurger === 0, `mobile header has no hamburger (${mBurger})`);
-check(mSwitcher === 1, `mobile header keeps the chain switcher trigger (${mSwitcher})`);
 // Below `md` the brand rail does not render and the bar carries the lot: mark,
-// the search's glyph, theme toggle, chain trigger (rails-ops TO-DO-ui-jobs
-// 67, 68). The chooser is drawn ONCE — the title row's copy is `md` and up.
+// the search's glyph, theme toggle (rails-ops TO-DO-ui-jobs 67, 68). The
+// search's glyph opens the panel with the chooser (503).
 const mRail = await mob.locator('aside[aria-label="Rails"]').isVisible();
 check(mRail === false, `mobile draws no brand rail (${mRail})`);
 const mLauncher = await mob.locator('header button[data-anatomy="H15.1"]:visible').count();
@@ -331,14 +326,14 @@ const mBookmarks = await mob.locator('header button[aria-label="Bookmarks"]').co
 check(mBookmarks === 0, `mobile header carries no bookmarks button, retired 1 Nov 2026 (${mBookmarks})`);
 const mToggle = await mob.locator('header button[aria-label^="Switch to"]:visible').count();
 check(mToggle === 1, `mobile header keeps the theme toggle (${mToggle})`);
-const mSwitcherAll = await mob.locator("button[data-chooser-trigger]:visible").count();
-check(mSwitcherAll === 1, `mobile draws one chooser trigger, not two (${mSwitcherAll})`);
+const mSwitcherAll = await mob.locator("button[data-chooser-trigger]").count();
+check(mSwitcherAll === 0, `mobile draws no grid glyph, ui-jobs 503 (${mSwitcherAll})`);
 const mOrder = await mob.evaluate(() => {
-  const c = document.querySelector('header button[data-chooser-trigger="header"]');
+  const c = document.querySelector('header button[data-search-launcher="header"]');
   const f = document.querySelector('header [data-anatomy="H20"]');
   return !!c && !!f && c.getBoundingClientRect().right <= f.getBoundingClientRect().left;
 });
-check(mOrder, "mobile header draws the chooser before the profile control");
+check(mOrder, "mobile header draws the search's glyph before the profile control");
 // The app header carries the mark alone and the chain glyph without its name
 // (Miles 18 Oct 2026).
 const mHome = await mob.locator('header a[aria-label="Rails home"]:visible').count();
