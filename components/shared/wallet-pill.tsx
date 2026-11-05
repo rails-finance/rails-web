@@ -150,7 +150,7 @@ function WalletPillInner({
       // this pill points without navigating — the click itself (via
       // router.push above) is what a viewer actually triggers.
       data-vault-href={vault ? vault.href : undefined}
-      className={`${labelClass} hover:text-blue-500 transition-colors cursor-pointer`}
+      className={`${labelClass} hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer`}
     >
       {label}
     </button>

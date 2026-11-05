@@ -40,7 +40,7 @@ export function RailsGlyph({ onClick }: { onClick?: () => void }) {
       href="/"
       aria-label="Rails home"
       onClick={onClick}
-      className="text-foreground transition-colors hover:text-blue-500"
+      className="text-foreground transition-colors hover:text-blue-600 dark:hover:text-blue-400"
     >
       <RailsMark size={30} />
     </Link>

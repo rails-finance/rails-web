@@ -117,7 +117,7 @@ function Station({
           {/* The accent station's check is BLUE (the mock's treatment) — the
               track's colour arriving at the station it exists to reach. */}
           <Icon
-            className={`h-[18px] w-[18px] shrink-0 ${accent ? "text-blue-500 dark:text-blue-400" : "text-foreground"}`}
+            className={`h-[18px] w-[18px] shrink-0 ${accent ? "text-blue-600 dark:text-blue-400 dark:text-blue-400" : "text-foreground"}`}
             aria-hidden="true"
           />
           <p className="text-[15px] font-semibold text-foreground lg:text-sm">{eyebrow}</p>
@@ -349,7 +349,7 @@ export function StageRail() {
       <div className="mt-8 flex flex-col items-center gap-1 text-center">
         <Link
           href="/about/architecture"
-          className="text-sm font-medium text-blue-500 transition-colors hover:underline"
+          className="text-sm font-medium text-blue-600 dark:text-blue-400 transition-colors hover:underline"
         >
           Read the technical architecture&nbsp;→
         </Link>

@@ -102,7 +102,10 @@ function OpenBookSection({ book }: { book: PwnLoanBook }) {
               The loans themselves are the listing&rsquo;s subject: ordered by deadline, it states each one&rsquo;s
               collateral, principal, what it owes and its due date.
             </p>
-            <Link href={OPEN_BOOK_HREF} className="mt-2 inline-block text-[13px] text-blue-500 hover:underline">
+            <Link
+              href={OPEN_BOOK_HREF}
+              className="mt-2 inline-block text-[13px] text-blue-600 dark:text-blue-400 hover:underline"
+            >
               Loans in escrow, soonest deadline first <span aria-hidden>→</span>
             </Link>
           </>
@@ -375,7 +378,10 @@ function DefaultsSection({ book }: { book: PwnLoanBook }) {
               Which loans lapsed, what each lender took or can still claim, and what repayment went unpaid is the
               listing, filtered to the defaults and ordered by the deadline each one passed.
             </p>
-            <Link href={DEFAULTS_HREF} className="mt-2 inline-block text-[13px] text-blue-500 hover:underline">
+            <Link
+              href={DEFAULTS_HREF}
+              className="mt-2 inline-block text-[13px] text-blue-600 dark:text-blue-400 hover:underline"
+            >
               Defaulted loans, most recent deadline first <span aria-hidden>→</span>
             </Link>
           </>

@@ -150,7 +150,9 @@ function BranchCard({
           className="group/branch flex items-center gap-2"
         >
           <TokenChipIcon symbol={sym} size={20} filterable={false} />
-          <span className="text-sm font-semibold text-foreground group-hover/branch:text-blue-500">{sym}</span>
+          <span className="text-sm font-semibold text-foreground group-hover/branch:text-blue-600 dark:group-hover/branch:text-blue-400">
+            {sym}
+          </span>
         </Link>
         {branch.priceUsd != null && (
           <span className="text-[11px] tabular-nums text-rb-500">
@@ -363,7 +365,7 @@ export function LiquityForkBranchesView({
             <button
               type="button"
               onClick={() => setShowEmpty((v) => !v)}
-              className="text-[11px] font-semibold text-blue-500 hover:underline"
+              className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
             >
               {showEmpty ? "Hide" : "Show"} {emptyCount} branch{emptyCount === 1 ? "" : "es"} with no queued troves
             </button>

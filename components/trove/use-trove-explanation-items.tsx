@@ -170,7 +170,7 @@ function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus 
           owner: (
             <Link
               href={listingHrefForWallet("liquity-v2", trove.lastOwner) ?? "/ethereum/liquity-v2"}
-              className="hover:text-blue-500 transition-colors"
+              className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
             >
               <HighlightableValue type="ownerAddress" state="after">
                 {truncatedOwner}
@@ -646,7 +646,7 @@ function buildOpenItems({
           owner: (
             <Link
               href={listingHrefForWallet("liquity-v2", trove.owner) ?? "/ethereum/liquity-v2"}
-              className="hover:text-blue-500 transition-colors"
+              className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
             >
               <HighlightableValue type="ownerAddress" state="after">
                 {truncatedOwner}
