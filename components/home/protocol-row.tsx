@@ -50,8 +50,8 @@ function isChainId(value: unknown): value is ChainId {
  * chain's most used explorers, the drawer's chooser's selection
  * (chainExplorers), with "View all" opening the rest in place. Counted widths
  * over auto-fill (tileWidthClassesFor), so full rows pack the same as a fixed
- * grid, and a list that doesn't divide evenly centers its last row instead
- * of stranding a tile at the left edge. Quiet at rest — a faint
+ * grid; the directory stands on the page's left edge, as the sections under
+ * it do (Miles, 5 Nov 2026). Quiet at rest — a faint
  * border plus a low-alpha black wash (a touch darker than whichever ground
  * it sits on, so it composites the same over the gradient floor's light and
  * dark ends), blue on hover per the one-meaning-per-colour nav rule. Above
@@ -109,7 +109,7 @@ export function ProtocolRow() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4">
-      <div className="mb-6 flex justify-center">
+      <div className="mb-6 flex">
         <ChainToggleButtons
           chainId={chainId}
           onChange={handleChange}
@@ -125,15 +125,12 @@ export function ProtocolRow() {
       {robinhood ? (
         // Stands where the tiles stand: about a tile row (py-3 + 2rem mark)
         // plus the coverage button's row, so the page holds still on a switch.
-        <p
-          data-testid="home-robinhood-soon"
-          className="body-text mx-auto flex min-h-[8.5rem] max-w-xl items-center justify-center text-center"
-        >
+        <p data-testid="home-robinhood-soon" className="body-text flex min-h-[8.5rem] max-w-xl items-center">
           <RobinhoodSoon />
         </p>
       ) : (
         <>
-          <div className="flex flex-wrap justify-center gap-2">
+          <div className="flex flex-wrap gap-2">
             {protocols.map((p) => (
               <Link
                 key={p.id}
@@ -156,7 +153,7 @@ export function ProtocolRow() {
             ))}
           </div>
           {all.length > featured.length && (
-            <div className="mt-4 flex justify-center">
+            <div className="-mx-2 mt-4 flex">
               <button
                 type="button"
                 onClick={() => setShowAll((v) => !v)}
@@ -173,7 +170,7 @@ export function ProtocolRow() {
           showing (the coverage pages are per-chain routes); the shared CTA
           pill (PILL_CTA), same as the frame's "View a live position" button.
           Free-standing, so it answers hover with the blue border itself. */}
-          <div className="mt-6 flex justify-center">
+          <div className="mt-6 flex">
             <Link
               href={`/coverage/${CHAINS[chainId].slug}`}
               className={`${PILL_CTA} transition-colors hover:border-blue-500 dark:hover:border-blue-500`}

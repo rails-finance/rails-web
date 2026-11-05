@@ -88,10 +88,10 @@ export default async function Home() {
         <section className="pb-16" data-anatomy="S5">
           {/* The directory's heading (S10, Miles 5 Nov 2026): "Destination DeFi" at
               display size, a share of the column's width (cqw) so the line
-              spans it, in a faint tone the floor it stands on can carry. */}
+              spans it, on the column's left edge, in a faint tone the floor it stands on can carry. */}
           <div className="mx-auto max-w-7xl px-4 pb-8 @container" data-anatomy="S10">
             <h2
-              className="whitespace-nowrap text-center font-semibold leading-none tracking-tighter text-rb-200 text-[14cqw] dark:text-rb-700"
+              className="whitespace-nowrap font-semibold leading-none tracking-tighter text-rb-200 text-[14cqw] dark:text-rb-700"
               data-home-directory-heading=""
             >
               Destination DeFi
