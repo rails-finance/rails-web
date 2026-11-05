@@ -375,6 +375,8 @@ check(mFooterBeta, "home @390: the beta pill is in the footer");
 const h20 = mHomePage.locator('header [data-anatomy="H20"]');
 check((await h20.getAttribute("aria-haspopup")) === "menu", "H20 is a menu button");
 await h20.click();
+// The sheet rises over 220ms; read it where it settles.
+await mHomePage.waitForTimeout(400);
 const sheet = await mHomePage.evaluate(() => {
   const m = document.querySelector("[data-profile-menu]");
   const r = m?.getBoundingClientRect();
