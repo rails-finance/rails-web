@@ -50,15 +50,10 @@ export function HomeHero() {
   }, []);
 
   return (
-    // pt-24: below md the header floats absolutely over the home gradient
-    // (see HeaderBar's isHome branch), so the hero reserves its band here;
-    // from md there is no bar, and the hero stands in 160px above and below
-    // (Miles, 5 Nov 2026).
+    // 160px above and below at every width (Miles, 5 Nov 2026); below md the
+    // header bar floats over the top of that band (HeaderBar's isHome branch).
     // overflow-x-clip: the glow is clipped at the sides.
-    <section
-      className="flex flex-col items-center text-center pt-24 pb-24 md:py-40 overflow-x-clip relative"
-      data-anatomy="S1"
-    >
+    <section className="flex flex-col items-center text-center py-40 overflow-x-clip relative" data-anatomy="S1">
       <div className="absolute top-22 left-1/2 -translate-x-1/2 w-[500px] h-[220px] bg-[var(--marketing)]/[0.07] rounded-full blur-[80px] pointer-events-none" />
       {/* One line naming the place (Miles's mock, ui-jobs 498): the mark, "Rails",
           then "Explorers" in the marketing blue, never wrapped. The mark is

@@ -262,6 +262,42 @@ check("S home's rail glyph opens the chooser", await openChooser());
 const ctaSelected = await page.locator(`${CHOOSER} [role="tab"][aria-selected="true"]`).getAttribute("aria-label");
 check("S home's chooser opens on Ethereum", ctaSelected === "Ethereum", ctaSelected ?? "none");
 
+// The live sample on a phone (Miles, 5 Nov 2026): no position card and no
+// browser chrome, the frame starts 48px in and runs off the right edge, and the
+// touch link to the position stays on the screen.
+const phone = await browser.newContext({ viewport: { width: 390, height: 900 }, isMobile: true, hasTouch: true });
+const pp = await phone.newPage();
+await pp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+await pp.waitForSelector("[data-trove-summary]", { state: "attached", timeout: 60000 });
+const sample = await pp.evaluate(() => {
+  const frame = document.querySelector(".live-glow").getBoundingClientRect();
+  const link = [...document.querySelectorAll("a")].find((a) => a.textContent.includes("View this position live"));
+  const lr = link?.getBoundingClientRect();
+  return {
+    card: getComputedStyle(document.querySelector("[data-trove-summary]")).display,
+    chrome: [...document.querySelectorAll("span")].some(
+      (s) => s.textContent === "LIVE SAMPLE" && s.getClientRects().length > 0,
+    ),
+    frameLeft: Math.round(frame.left),
+    frameRight: Math.round(frame.right),
+    link: lr && lr.width > 0 ? [Math.round(lr.left), Math.round(lr.right)] : null,
+    scroll: document.documentElement.scrollWidth,
+  };
+});
+check("P sample @390: no position card", sample.card === "none", sample.card);
+check("P sample @390: no browser chrome", !sample.chrome);
+check(
+  "P sample @390: the frame runs off the right edge, no scroll",
+  sample.frameLeft === 48 && sample.frameRight > 390 && sample.scroll === 390,
+  JSON.stringify(sample),
+);
+check(
+  "P sample @390: the position link is on the screen",
+  !!sample.link && sample.link[0] >= 0 && sample.link[1] <= 390,
+  JSON.stringify(sample.link),
+);
+await phone.close();
+
 await browser.close();
 const failed = results.filter((r) => !r.ok);
 console.log(

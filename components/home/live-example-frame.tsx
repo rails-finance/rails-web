@@ -42,14 +42,19 @@ import { protocolForPathname } from "@/lib/shared/protocols";
  * waiting cue.
  */
 
-/** The "zoomed out" factor: the composition renders at a ~1530px internal
- *  viewport — the full desktop layout, read at a glance. */
-const SCALE = 0.65;
-/** Visible height of the render zone — deep enough that the position card,
- *  the Lifetime flows panel, the toolbar and the first timeline rows show,
- *  with the fade swallowing the rest. A phone's stacked layout reaches the
- *  rows only past a screen's height, so it stops at the flows panel. */
-const VISIBLE_H = "h-[600px] sm:h-[720px]";
+/** The "zoomed out" factor, as `--live-scale`: from sm the composition renders
+ *  at a ~1530px internal viewport, the full desktop layout read at a glance.
+ *  Below sm (Miles, 5 Nov 2026) the frame is PHONE_FRAME wide, starts 48px in
+ *  and runs off the screen's right edge, and draws the same desktop layout
+ *  smaller (~1240px internal) without the position card and the browser chrome:
+ *  Lifetime flows, the toolbar and the first timeline rows. */
+const SCALE = "[--live-scale:0.45] sm:[--live-scale:0.65]";
+const PHONE_FRAME = "max-sm:w-[560px]";
+/** Visible height of the render zone: from sm the position card, the Lifetime
+ *  flows panel, the toolbar and the first timeline rows, with the fade
+ *  swallowing the rest; below sm the flows panel and the rows, to a closed
+ *  frame. */
+const VISIBLE_H = "h-[480px] sm:h-[720px]";
 
 /** The example's explorer, for the card's sidebar and the sections' bars: off
  *  the explorers the roster entry is not found from the page's path. */
@@ -219,8 +224,8 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
   }, [showTrove]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4">
-      <div ref={glowRef} className="live-glow group relative">
+    <div className="w-full max-w-5xl mx-auto px-4 max-sm:pl-12 max-sm:pr-0">
+      <div ref={glowRef} className={`live-glow group relative ${PHONE_FRAME}`}>
         {/* Cast shadow behind the frame — a warm dark shadow on the paper
             canvas, a glow turning round the colour wheel in dark: both hug
             the frame's silhouette (box-shadow on a frame-sized box), so the light falls
@@ -291,12 +296,12 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
         {/* No card shell (border/shadow/surface) — the section gradient runs
             behind, and the bottom fade dissolves the page into it. Only the
             chrome bar keeps a surface; the content below is the app's own. */}
-        <div className="relative rounded-t-2xl overflow-hidden">
+        <div className="relative rounded-t-2xl max-sm:rounded-2xl overflow-hidden">
           {/* Browser chrome — the real URL is part of the pitch. The bar keeps
               only the border-b separator; the URL pill is the single tinted
               shape (no competing band behind it), and its background + text
               shift together on hover as one unit. */}
-          <div className="relative flex items-center gap-2 px-4 py-3 border-b border-rb-200 dark:border-rb-800">
+          <div className="relative flex items-center gap-2 px-4 py-3 border-b border-rb-200 dark:border-rb-800 max-sm:hidden">
             <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#ec6a5e]" />
             <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#f4bf4f]" />
             <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#61c554]" />
@@ -326,7 +331,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
                   showTrove ? "opacity-0" : "opacity-100"
                 }`}
               >
-                <div className="animate-pulse h-44 bg-skeleton rounded-2xl" />
+                <div className="animate-pulse h-44 bg-skeleton rounded-2xl max-sm:hidden" />
                 <div className="animate-pulse h-72 bg-rb-100/60 dark:bg-rb-800/40 rounded-2xl" />
                 <div className="animate-pulse h-24 bg-rb-100/30 dark:bg-rb-800/20 rounded-2xl" />
               </div>
@@ -334,10 +339,10 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
 
             {showTrove && (
               <div
-                className="pointer-events-none origin-top-left"
+                className={`pointer-events-none origin-top-left ${SCALE} max-sm:[&_[data-trove-summary]]:hidden`}
                 style={{
-                  width: `${100 / SCALE}%`,
-                  transform: `scale(${SCALE})`,
+                  width: "calc(100% / var(--live-scale))",
+                  transform: "scale(var(--live-scale))",
                   // Shared entrance keyframe (globals.css) — mounts only once
                   // `ready` flips, so a transition would never fire; the
                   // skeleton above fades out over the same half second.
@@ -350,7 +355,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
             {/* Bottom fade into the top section's gradient floor — the stops
                 MUST match the section gradient's `to-*` colors in
                 app/(site)/page.tsx or the feather shows a seam. */}
-            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-background dark:to-rb-800 pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-background dark:to-rb-800 pointer-events-none max-sm:hidden" />
           </div>
 
           {/* The whole frame is the click target: one overlay link, with the
@@ -370,18 +375,18 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
             </span>
           </Link>
         </div>
-
-        {/* On hover-less pointers the frame's link, since the hover-revealed
-            pill never shows there: a right-aligned pill in the chrome bar's
-            surface pairing. */}
-        <div className="relative mt-4 flex justify-end [@media(hover:hover)]:hidden">
-          <Link
-            href={LIVE_EXAMPLE_TROVE_PATH}
-            className="inline-flex items-center gap-1 rounded-sm bg-rb-100 px-3 py-1 text-xs text-foreground dark:bg-rb-900"
-          >
-            View this position live <span className="text-blue-600 dark:text-blue-400">→</span>
-          </Link>
-        </div>
+      </div>
+      {/* On hover-less pointers the frame's link, since the hover-revealed
+          pill never shows there: a right-aligned pill in the chrome bar's
+          surface pairing. Outside the frame, so on a phone, where the frame
+          runs off the screen, it stays on it. */}
+      <div className="relative mt-4 flex justify-end max-sm:pr-4 [@media(hover:hover)]:hidden">
+        <Link
+          href={LIVE_EXAMPLE_TROVE_PATH}
+          className="inline-flex items-center gap-1 rounded-sm bg-rb-100 px-3 py-1 text-xs text-foreground dark:bg-rb-900"
+        >
+          View this position live <span className="text-blue-600 dark:text-blue-400">→</span>
+        </Link>
       </div>
     </div>
   );
