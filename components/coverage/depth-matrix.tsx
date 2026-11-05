@@ -331,7 +331,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
                         <div className="flex items-center gap-2 flex-wrap">
                           <Link
                             href={soon.href}
-                            className="text-sm font-semibold text-foreground transition-colors hover:text-blue-500"
+                            className="text-sm font-semibold text-foreground transition-colors hover:text-blue-600 dark:hover:text-blue-400"
                           >
                             <span className="whitespace-nowrap">{soon.label}</span>
                           </Link>
@@ -381,7 +381,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
                             desc too would swallow them into the link text. */}
                         <Link
                           href={p.href}
-                          className="text-sm font-semibold text-foreground transition-colors hover:text-blue-500"
+                          className="text-sm font-semibold text-foreground transition-colors hover:text-blue-600 dark:hover:text-blue-400"
                         >
                           <span className="whitespace-nowrap">{p.label}</span>
                         </Link>

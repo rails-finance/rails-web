@@ -96,7 +96,7 @@ export default function ArchitecturePage() {
     <div className="max-w-3xl mx-auto px-4 md:px-6 pt-32 pb-16">
       <Link
         href="/about"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-rb-500 hover:text-blue-500 transition-colors mb-8"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-8"
       >
         <ArrowLeft size={15} aria-hidden="true" />
         About

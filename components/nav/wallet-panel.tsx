@@ -209,7 +209,7 @@ export function WalletPanel() {
           <Link
             href="/bookmarks"
             onClick={close}
-            className="rounded-sm text-sm text-blue-500 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
+            className="rounded-sm text-sm text-blue-600 dark:text-blue-400 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
             data-wallet-panel-bookmarks=""
           >
             {BOOKMARKS_NAME} →

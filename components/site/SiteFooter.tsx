@@ -101,7 +101,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/"
-                  className="flex items-center gap-2 text-rb-500 hover:text-blue-500 text-sm transition-colors duration-150"
+                  className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 text-sm transition-colors duration-150"
                 >
                   <Home className="w-4 h-4 shrink-0" aria-hidden="true" />
                   <span>Home</span>
@@ -110,7 +110,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/start"
-                  className="flex items-center gap-2 text-rb-500 hover:text-blue-500 text-sm transition-colors duration-150"
+                  className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 text-sm transition-colors duration-150"
                   data-footer-start=""
                 >
                   <Signpost className="w-4 h-4 shrink-0" aria-hidden="true" />
@@ -120,7 +120,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/about"
-                  className="flex items-center gap-2 text-rb-500 hover:text-blue-500 text-sm transition-colors duration-150"
+                  className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 text-sm transition-colors duration-150"
                 >
                   <Info className="w-4 h-4 shrink-0" aria-hidden="true" />
                   <span>About</span>
@@ -129,7 +129,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/coverage/ethereum"
-                  className="flex items-center gap-2 text-rb-500 hover:text-blue-500 text-sm transition-colors duration-150"
+                  className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 text-sm transition-colors duration-150"
                 >
                   <LayoutGrid className="w-4 h-4 shrink-0" aria-hidden="true" />
                   <span>Coverage</span>
@@ -140,7 +140,7 @@ export function SiteFooter() {
                 <li>
                   <Link
                     href={VAULT_INDEX_HREF}
-                    className="flex items-center gap-2 text-rb-500 hover:text-blue-500 text-sm transition-colors duration-150"
+                    className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 text-sm transition-colors duration-150"
                   >
                     <Vault className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Vaults</span>
@@ -150,7 +150,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/about/architecture"
-                  className="flex items-center gap-2 text-rb-500 hover:text-blue-500 text-sm transition-colors duration-150"
+                  className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 text-sm transition-colors duration-150"
                 >
                   <DraftingCompass className="w-4 h-4 shrink-0" aria-hidden="true" />
                   <span>Architecture</span>
@@ -159,7 +159,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/pulse"
-                  className="flex items-center gap-2 text-rb-500 hover:text-blue-500 text-sm transition-colors duration-150"
+                  className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 text-sm transition-colors duration-150"
                 >
                   <Activity className="w-4 h-4 shrink-0" aria-hidden="true" />
                   <span>Pulse</span>
@@ -168,7 +168,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/blog"
-                  className="flex items-center gap-2 text-rb-500 hover:text-blue-500 text-sm transition-colors duration-150"
+                  className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 text-sm transition-colors duration-150"
                 >
                   <FileText className="w-4 h-4 shrink-0" aria-hidden="true" />
                   <span>Blog</span>
@@ -208,11 +208,14 @@ export function SiteFooter() {
               <div className="flex gap-4">
                 <Link
                   href="/privacy"
-                  className="text-rb-500 hover:text-blue-500 text-xs transition-colors duration-150"
+                  className="text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 text-xs transition-colors duration-150"
                 >
                   Privacy Policy
                 </Link>
-                <Link href="/terms" className="text-rb-500 hover:text-blue-500 text-xs transition-colors duration-150">
+                <Link
+                  href="/terms"
+                  className="text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 text-xs transition-colors duration-150"
+                >
                   Terms of Service
                 </Link>
               </div>

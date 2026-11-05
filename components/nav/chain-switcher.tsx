@@ -34,7 +34,7 @@ import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-so
 // Row state grammar, same as the nav menu's:
 //   rest    → text-foreground; hover → blue-500 ("this goes somewhere")
 //   current → muted + semibold, not clickable (you can't navigate to here)
-const ROW_REST = "font-medium text-foreground hover:text-blue-500";
+const ROW_REST = "font-medium text-foreground hover:text-blue-600 dark:hover:text-blue-400";
 const ROW_CURRENT = "font-semibold text-rb-500 pointer-events-none";
 
 /** One explorer row — icon chip + label, navigating to the listing. */
@@ -205,7 +205,7 @@ export function ChainSwitcher({ variant }: { variant: "rail" | "header" }) {
                 className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm transition-colors ${
                   selected
                     ? "bg-rb-100 font-semibold text-foreground dark:bg-rb-800"
-                    : "font-medium text-foreground hover:text-blue-500"
+                    : "font-medium text-foreground hover:text-blue-600 dark:hover:text-blue-400"
                 }`}
               >
                 <ChainGlyph chainId={chain.id} className="h-5 w-5" />
@@ -223,7 +223,7 @@ export function ChainSwitcher({ variant }: { variant: "rail" | "header" }) {
             className={`flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm transition-colors ${
               robinhood
                 ? "bg-rb-100 font-semibold text-foreground dark:bg-rb-800"
-                : "font-medium text-foreground hover:text-blue-500"
+                : "font-medium text-foreground hover:text-blue-600 dark:hover:text-blue-400"
             }`}
           >
             <HomeOnlyChainGlyph id="robinhood" className="h-5 w-5" />
@@ -251,7 +251,7 @@ export function ChainSwitcher({ variant }: { variant: "rail" | "header" }) {
                 <Link
                   href={`/coverage/${selectedChain.slug}`}
                   onClick={close}
-                  className="text-xs text-rb-500 transition-colors hover:text-blue-500"
+                  className="text-xs text-rb-500 transition-colors hover:text-blue-600 dark:hover:text-blue-400"
                 >
                   See detailed {selectedChain.name} coverage →
                 </Link>
@@ -275,8 +275,8 @@ export function ChainSwitcher({ variant }: { variant: "rail" | "header" }) {
         aria-haspopup="menu"
         aria-expanded={isOpen}
         data-chooser-trigger={variant}
-        className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-          isOpen ? "text-blue-500" : "text-rb-700 dark:text-rb-300"
+        className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          isOpen ? "text-blue-600 dark:text-blue-400" : "text-rb-700 dark:text-rb-300"
         }`}
       >
         <FilledLayoutGrid />
@@ -346,7 +346,7 @@ export function ChainSwitcher({ variant }: { variant: "rail" | "header" }) {
               <Link
                 href={`/coverage/${selectedChain.slug}`}
                 onClick={close}
-                className="mt-1.5 inline-block px-2 pt-1 text-xs text-rb-500 transition-colors hover:text-blue-500"
+                className="mt-1.5 inline-block px-2 pt-1 text-xs text-rb-500 transition-colors hover:text-blue-600 dark:hover:text-blue-400"
               >
                 See detailed {selectedChain.name} coverage →
               </Link>

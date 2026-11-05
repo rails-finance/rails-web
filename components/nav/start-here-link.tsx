@@ -15,7 +15,7 @@ export function StartHereLink() {
   return (
     <Link
       href="/start"
-      className="inline-flex h-[38px] shrink-0 items-center whitespace-nowrap rounded-sm px-1.5 text-sm font-medium text-blue-500 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
+      className="inline-flex h-[38px] shrink-0 items-center whitespace-nowrap rounded-sm px-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
       data-anatomy="S12"
       data-start-here=""
     >

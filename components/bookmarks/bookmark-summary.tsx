@@ -108,7 +108,7 @@ export function BookmarkSummary({ address }: { address: string }) {
           <button
             type="button"
             onClick={read}
-            className="cursor-pointer rounded-sm text-blue-500 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
+            className="cursor-pointer rounded-sm text-blue-600 dark:text-blue-400 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
           >
             Retry
           </button>

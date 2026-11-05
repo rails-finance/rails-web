@@ -190,7 +190,7 @@
      .link / PAGE_LINK / hub figures) signal hover with an underline, not a
      shade shift; chrome links that rest neutral (NAV_LINK) turn blue-500 on
      hover. No blue-300/400/600 in the link role. See color-grammar.md §4a. */
-  --text-link: var(--color-blue-500);
+  --text-link: var(--color-blue-600);
   --text-external: var(--color-pink-500);
   --text-external-hover: var(--color-pink-400);
   /* Marketing accent — one global hue for decorative/brand emphasis on
@@ -290,6 +290,7 @@
 
 .dark {
   /* Dark mode colors (current theme as dark) */
+  --text-link: var(--color-blue-400);
   --foreground: #ffffff;
 
   /* The sidebar's tint on the dark card (C20): Aave's panel near #3f2238 and
@@ -712,7 +713,8 @@ body {
      (single shade both modes, color-grammar.md §4a). External links in body
      copy should opt into `.link-external` at the call site. */
   .article-content a {
-    @apply text-blue-500 no-underline hover:underline;
+    color: var(--text-link);
+    @apply no-underline hover:underline;
   }
 
   .article-content strong {

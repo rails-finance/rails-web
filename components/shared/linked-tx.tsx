@@ -21,7 +21,7 @@ export function LinkedTx({ txHash, className = "", chainId }: LinkedTxProps) {
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
-      className={`text-blue-500 hover:underline font-mono text-xs ${className}`}
+      className={`text-blue-600 dark:text-blue-400 hover:underline font-mono text-xs ${className}`}
     >
       {`${txHash.slice(0, 8)}…${txHash.slice(-4)}`}
     </a>
