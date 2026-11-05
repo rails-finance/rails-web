@@ -45,6 +45,7 @@
 //       BASE=https://rails-web.vercel.app node scripts/verify/verify-polaris-rate-step.mjs
 
 import { chromium } from "playwright";
+import { copyPositionMarkdown } from "./lib/copy-position.mjs";
 import { showNoteRows } from "./lib/market-notes.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
@@ -434,6 +435,21 @@ for (const f of FIXTURES) {
 // is not on the row at rest.
 
 const page27 = await open(context, polarisUrl("usdp", "27"));
+/** Open one note row: a press before hydration is lost, so the header is
+ *  pressed until the row carries `data-market-note-open`. */
+async function openNote(page, row) {
+  for (let i = 0; i < 6; i += 1) {
+    if ((await row.getAttribute("data-market-note-open").catch(() => null)) !== null) return true;
+    await row
+      .getByRole("button", { expanded: false })
+      .first()
+      .click({ timeout: 5000 })
+      .catch(() => {});
+    await page.waitForTimeout(500);
+  }
+  return (await row.getAttribute("data-market-note-open").catch(() => null)) !== null;
+}
+
 const rowText = async (page, noteId) =>
   ((await page.locator(`[data-market-note="${noteId}"]`).textContent()) ?? "").replace(/\s+/g, " ").trim();
 // `textContent` runs the elements together with no space between them, so the
@@ -536,13 +552,7 @@ check(
 // counts every note.
 
 const copyMarkdown = async (page) => {
-  await page
-    .getByRole("button", { name: /Export this (position|loan|trove)|Copy for LLM/i })
-    .first()
-    .click();
-  await page.getByRole("menuitem", { name: /Copy Position/i }).click();
-  await page.waitForTimeout(500);
-  return page.evaluate(() => navigator.clipboard.readText());
+  return copyPositionMarkdown(page);
 };
 const md = await copyMarkdown(page27);
 const tableRows = (m) => (m.match(/^\| \d+ \| /gm) ?? []).length;
@@ -609,8 +619,7 @@ for (const key of ["usdp/296"]) {
     await (async () => {
       if (historical.length !== 1) return false;
       const row = page.locator(`[data-market-note="${historical[0]}"]`);
-      await row.getByRole("button", { expanded: false }).first().click();
-      await page.waitForTimeout(300);
+      await openNote(page, row);
       const opened = await rowText(page, historical[0]);
       return opened.includes(`${run.steps} of the position's touches`);
     })(),
@@ -648,8 +657,7 @@ for (const key of ["usdp/296"]) {
   let opened = "";
   if (allIds.length === 1) {
     const row = page.locator(`[data-market-note="${allIds[0]}"]`);
-    await row.getByRole("button", { expanded: false }).first().click();
-    await page.waitForTimeout(300);
+    await openNote(page, row);
     // The blocks sit in the (i) since 2026-09-27.
     const trigger = row.getByRole("button", { name: /how this note was derived/i });
     if (await trigger.count()) await trigger.first().click();
