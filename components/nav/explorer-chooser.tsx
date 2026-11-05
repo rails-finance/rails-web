@@ -5,8 +5,8 @@
 // select a chain, each named by its tooltip and the selected one by a muted
 // heading under them; the chain's explorers stand in two columns below, the most
 // used shown and the long tail behind "View all <n> explorers"
-// (lib/shared/explorer-rank.ts); its coverage page is the link at the foot.
-// It opens on Ethereum, the first chain, whatever the page's chain (Miles,
+// (lib/shared/explorer-rank.ts). The coverage pages are reached from the
+// home directory and the site footer, not from here (Miles, 5 Nov 2026). It opens on Ethereum, the first chain, whatever the page's chain (Miles,
 // 4 Nov 2026).
 //
 // Rows are roster-derived (`protocolsForChain`), never hardcoded: a new
@@ -151,16 +151,6 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
               {showAll ? "Show the most used" : `View all ${all.length} explorers`}
             </button>
           )}
-          <div className="mt-4 border-t border-rb-200 pt-3 dark:border-rb-800">
-            <Link
-              href={`/coverage/${chain.slug}`}
-              onClick={onNavigate}
-              className="rounded-sm text-xs text-rb-500 transition-colors hover:text-blue-600 dark:hover:text-blue-400 focus-ring"
-              data-chooser-coverage=""
-            >
-              See detailed {chain.name} coverage →
-            </Link>
-          </div>
         </nav>
       )}
     </div>

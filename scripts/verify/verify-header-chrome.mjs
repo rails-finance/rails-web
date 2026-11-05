@@ -263,17 +263,22 @@ if (!trovePath) {
 // glyph: in the rail from `md`, in the bar below it. The chooser opens on
 // Ethereum whatever the page (ui-jobs 497); another chain's door is one press
 // on its glyph.
-async function switcherCoverage(target, slug, chainName) {
+// The chooser carries no coverage link (Miles, 5 Nov 2026): the count is of
+// the chain's explorer rows, and of coverage links, which must be none.
+async function chooserRows(target, slug, chainName) {
   await target.locator("button[data-search-launcher]:visible").click();
   await target.waitForSelector("[data-explorer-chooser]", { state: "visible", timeout: 5000 }).catch(() => {});
   if (chainName) await target.locator(`[data-switcher-tabs] [role="tab"][aria-label="${chainName}"]`).click();
-  await target.waitForSelector(`[data-chooser-coverage][href="/coverage/${slug}"]`, { timeout: 5000 }).catch(() => {});
-  return target.locator(`[data-chooser-coverage][href="/coverage/${slug}"]:visible`).count();
+  const rows = await target
+    .locator(`[data-explorer-chooser] a[data-switcher-explorer][href^="/${slug}/"]:visible`)
+    .count();
+  const coverage = await target.locator('[data-explorer-chooser] a[href^="/coverage/"]').count();
+  return coverage === 0 ? rows : -coverage;
 }
 console.log("[chain switcher on /ethereum/liquity-v2]");
 await page.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
-const switcherCov = await switcherCoverage(page, "ethereum");
-check(switcherCov >= 1, `chain switcher reaches /coverage/ethereum on an Ethereum rail (${switcherCov})`);
+const switcherCov = await chooserRows(page, "ethereum");
+check(switcherCov >= 1, `chooser lists Ethereum's explorers, no coverage link, on an Ethereum rail (${switcherCov})`);
 // Base is a launched chain (rails-ops decision 0030, 2026-09-23), so a Base
 // rail gets the same chrome as an Ethereum one: the chain trigger names Base,
 // the panel offers the /coverage/base door and lists the Base explorers, and
@@ -284,8 +289,8 @@ const baseChainTrigger = await page.locator("button[data-search-launcher]:visibl
 check(baseChainTrigger === 1, `a Base rail draws the panel's glyph once (${baseChainTrigger})`);
 const baseLabel = await page.locator("[data-anatomy='H3'] [data-chain-label='base']").count();
 check(baseLabel === 1, `a Base rail names its chain on the title row (${baseLabel})`);
-const switcherCovBase = await switcherCoverage(page, "base", "Base");
-check(switcherCovBase >= 1, `chain switcher reaches /coverage/base on a Base rail (${switcherCovBase})`);
+const switcherCovBase = await chooserRows(page, "base", "Base");
+check(switcherCovBase >= 1, `chooser lists Base's explorers, no coverage link, on a Base rail (${switcherCovBase})`);
 const baseRows = await page.locator('[data-explorer-chooser] a[data-switcher-explorer][href^="/base/"]').count();
 check(baseRows >= 1, `the chooser lists the Base explorer rows (${baseRows})`);
 await page.keyboard.press("Escape");
@@ -391,8 +396,8 @@ for (const [w, h] of [
   if (w >= 768) check(t.gap !== null && t.gap > 40, `@${w}: the title does not crowd the chain's label (gap=${t.gap})`);
   await p.close();
 }
-const mCov = await switcherCoverage(mob, "ethereum");
-check(mCov >= 1, `mobile chain switcher reaches /coverage/ethereum (${mCov})`);
+const mCov = await chooserRows(mob, "ethereum");
+check(mCov >= 1, `mobile chooser lists Ethereum's explorers, no coverage link (${mCov})`);
 await shoot(mob, "hdr-mobile");
 
 await browser.close();
