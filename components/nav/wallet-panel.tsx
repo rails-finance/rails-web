@@ -184,7 +184,7 @@ export function WalletPanel() {
         inert={!isOpen}
         data-search-launcher-panel=""
         data-anatomy="H16"
-        className="absolute inset-y-0 left-0 flex w-full flex-col border-r border-rb-200 bg-raised shadow-xl md:w-[400px] dark:border-rb-800"
+        className="absolute inset-y-0 left-0 flex w-full flex-col md:border-r border-rb-200 bg-raised shadow-xl md:w-[400px] dark:border-rb-800"
         style={{
           transform: isOpen ? "translateX(0)" : "translateX(-100%)",
           // Hidden only once the slide out has run.
@@ -199,13 +199,13 @@ export function WalletPanel() {
         {/* Below `md` there is no rail and the header bar is under the panel,
             so the panel's top row restates the bar's furniture as the bar lays
             it out: the Rails mark top left (16px in, 16px down) and a × top
-            right where the bar's controls are (Miles, 1 Nov 2026). */}
+            right where the bar's controls are (Miles, 1 Nov 2026). The × is the search glyph's 38px box at its place, so the tap that opened the panel closes it in the same spot (ui-jobs 507). */}
         <div className="flex shrink-0 items-center justify-between px-4 pt-4 md:hidden">
           <RailsGlyph onClick={close} />
           <button
             type="button"
             onClick={close}
-            className="cursor-pointer rounded-md p-1.5 text-rb-500 transition-colors hover:text-foreground focus-ring"
+            className="cursor-pointer rounded-lg p-2.5 text-rb-500 transition-colors hover:text-foreground focus-ring"
             aria-label="Close"
           >
             <X size={18} aria-hidden="true" />

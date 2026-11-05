@@ -125,11 +125,7 @@ export function ProtocolRow() {
           }}
         />
         {!robinhood && (
-          <Link
-            href={`/coverage/${CHAINS[chainId].slug}`}
-            className={`${PILL_CTA} shrink-0 transition-colors hover:border-blue-500 dark:hover:border-blue-500`}
-            data-home-coverage=""
-          >
+          <Link href={`/coverage/${CHAINS[chainId].slug}`} className={`${PILL_CTA} shrink-0`} data-home-coverage="">
             See detailed coverage <span>→</span>
           </Link>
         )}

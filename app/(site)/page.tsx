@@ -12,6 +12,7 @@ import { packLiveExample } from "@/lib/home/live-example-wire";
 import { getCoveredPositions } from "@/lib/home/covered-positions-data";
 import { getHomeStats } from "@/lib/home/home-stats-data";
 import { getValueHeld } from "@/lib/home/value-held-data";
+import { DirectoryHeading } from "@/components/home/directory-heading";
 
 // ISR — the page (and the live-example trove data fetched below) regenerates
 // in the background at most hourly; every visitor gets the static render.
@@ -86,17 +87,7 @@ export default async function Home() {
         {/* Explorer directory — one uniform row of tiles on the gradient's
             constant floor, directly above the "DeFi for everyone" band. */}
         <section className="pb-16" data-anatomy="S5">
-          {/* The directory's heading (S10, Miles 5 Nov 2026): "Destination DeFi" at
-              display size, a share of the column's width (cqw) so the line
-              spans it, on the column's left edge, in a faint tone the floor it stands on can carry. */}
-          <div className="mx-auto max-w-7xl px-4 pb-8 @container" data-anatomy="S10">
-            <h2
-              className="whitespace-nowrap font-semibold leading-none tracking-tighter text-rb-200 text-[14cqw] dark:text-rb-700"
-              data-home-directory-heading=""
-            >
-              Destination DeFi
-            </h2>
-          </div>
+          <DirectoryHeading />
           <ProtocolRow />
         </section>
       </div>

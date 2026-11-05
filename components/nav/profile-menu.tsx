@@ -140,6 +140,18 @@ export function ProfileMenu() {
     };
   }, [open, measure]);
 
+  // Below md the sheet holds the page still under it, as the wallet panel
+  // does, and scrolls within itself when the list is longer than the screen
+  // (ui-jobs 507), so the header and its control stay where the tap was.
+  useEffect(() => {
+    if (!open || window.innerWidth >= 768) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const first = requestAnimationFrame(() => menu.current?.querySelector<HTMLElement>(ITEMS)?.focus());
@@ -235,9 +247,15 @@ export function ProfileMenu() {
               aria-label={BOOKMARKS_NAME}
               data-profile-menu=""
               className={`fixed z-[var(--z-popover)] border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 ${
-                place.phone ? "inset-x-0 rounded-b-2xl border-x-0" : "w-80 rounded-xl"
+                place.phone
+                  ? "inset-x-0 overflow-y-auto overscroll-contain rounded-b-2xl border-x-0"
+                  : "w-80 rounded-xl"
               }`}
-              style={place.phone ? { top: place.top } : { top: place.top, right: place.right }}
+              style={
+                place.phone
+                  ? { top: place.top, maxHeight: `calc(100dvh - ${place.top + 16}px)` }
+                  : { top: place.top, right: place.right }
+              }
             >
               <p className="flex items-center gap-2 px-3 pb-2 pt-1 text-sm font-semibold text-foreground">
                 <Bookmark className="size-4 shrink-0" fill="currentColor" aria-hidden="true" />

@@ -6,7 +6,8 @@ import type { OraclePricesData } from "@/types/api/oracle";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
-import { PILL_CTA_BLUE } from "@/lib/shared/ui-grammar";
+import { PILL_CTA } from "@/lib/shared/ui-grammar";
+import { joinGlowClock } from "@/components/home/glow-clock";
 import { LIVE_EXAMPLE_TROVE_ID, LIVE_EXAMPLE_TROVE_PATH, type LiveExampleData } from "@/lib/home/live-example";
 import { unpackLiveExample, type WireLiveExample } from "@/lib/home/live-example-wire";
 import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
@@ -187,17 +188,13 @@ function glowShadow(colour: string) {
   ].join(", ");
 }
 
-/** Pauses the glow's turn (and the edge's) while the frame is off screen. */
+/** Joins the frame to the glow clock (components/home/glow-clock.ts): the turn
+ *  pauses while neither the frame nor the directory heading is on screen. */
 function useGlowPause() {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(([entry]) => {
-      el.toggleAttribute("data-offscreen", !entry.isIntersecting);
-    });
-    io.observe(el);
-    return () => io.disconnect();
+    return el ? joinGlowClock(el) : undefined;
   }, []);
   return ref;
 }
@@ -219,7 +216,7 @@ function useFramed(): boolean {
 
 /** The phone's link to the position: the CTA pill as a 54px tap target, a
  *  little narrower than the search. */
-const PHONE_BUTTON = PILL_CTA_BLUE.replace("inline-flex", "flex w-full max-w-[19rem] justify-center")
+const PHONE_BUTTON = PILL_CTA.replace("inline-flex", "flex w-full max-w-[19rem] justify-center")
   .replace("px-4 py-2", "px-4 py-3.5")
   .replace("text-sm", "text-base");
 
@@ -401,7 +398,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
               className="absolute inset-0 z-10"
             >
               <span
-                className={`${PILL_CTA_BLUE} absolute bottom-5 left-1/2 -translate-x-1/2 translate-y-1 opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0`}
+                className={`${PILL_CTA.replace("transition-colors ", "")} absolute bottom-5 left-1/2 -translate-x-1/2 translate-y-1 opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0 group-hover:border-blue-500 dark:group-hover:border-blue-500`}
               >
                 View a live position <span>→</span>
               </span>
@@ -409,14 +406,10 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
           </div>
 
           {/* On hover-less pointers the frame's link, since the hover-revealed
-            pill never shows there: a right-aligned pill in the chrome bar's
-            surface pairing. */}
+            pill never shows there: the home CTA pill, right-aligned. */}
           <div className="relative mt-4 flex justify-end [@media(hover:hover)]:hidden">
-            <Link
-              href={LIVE_EXAMPLE_TROVE_PATH}
-              className="inline-flex items-center gap-1 rounded-sm bg-rb-100 px-3 py-1 text-xs text-foreground dark:bg-rb-900"
-            >
-              View a live position <span className="text-blue-600 dark:text-blue-400">→</span>
+            <Link href={LIVE_EXAMPLE_TROVE_PATH} className={PILL_CTA}>
+              View a live position <span>→</span>
             </Link>
           </div>
         </div>
