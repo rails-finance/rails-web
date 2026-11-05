@@ -157,6 +157,7 @@
 // words can never become one.
 
 import { createPublicClient, http, parseAbi, parseAbiItem, toEventSelector } from "viem";
+import { pageBlockRecent, serverHeadBlock } from "./lib/server-head.mjs";
 import { base } from "viem/chains";
 import { chromium } from "playwright";
 import { openGroup } from "./lib/group-rows.mjs";
@@ -574,16 +575,20 @@ for (const f of SAMPLE) {
 }
 
 // ═══ 0: the pages answer, and the fixtures still have their shapes ═════════
+const serverHead0c = await serverHeadBlock(env, 8453);
 for (const f of SAMPLE) {
   const p = PAGE.get(f.label);
   const a = API.get(f.label);
   check(`0a ${f.label} — the page answers 200`, p.status === 200, `${p.url} → ${p.status}`);
   check(`0b ${f.label} — the API route answers 200 with a timeline`, a.status === 200 && Boolean(a.body?.timeline));
   if (p.status !== 200 || !a.body?.timeline) continue;
+  // The page reads its head through rails-server first: held against that
+  // head, or this script's own where it fell back to the chain (lib/server-head.mjs).
+  const recent = pageBlockRecent({ page: p.blockNumber, server: serverHead0c, own: Number(head), tolerance: 5000 });
   check(
-    `0c ${f.label} — the page's block is within 5,000 of this script's own head`,
-    Math.abs(Number(head) - p.blockNumber) < 5000,
-    `page ${p.blockNumber.toLocaleString("en-US")} vs own ${Number(head).toLocaleString("en-US")}`,
+    `0c ${f.label} — the page's block is within 5,000 of rails-server's head or this script's own`,
+    recent.ok,
+    recent.detail,
   );
   const own = OWN.get(f.label);
   check(
