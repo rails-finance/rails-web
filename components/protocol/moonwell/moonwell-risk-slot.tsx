@@ -93,7 +93,13 @@ export function moonwellRiskRows(chain: MoonwellChainResponse | null): PositionP
       value: <RoomValue chain={chain} />,
     });
   }
-  if (!hasHealth(chain)) return rows;
+  if (!hasHealth(chain)) {
+    // Debt against no capacity at all (the collateral seized or its factor
+    // set to zero) still states where it stands: capacityShare reads the
+    // division past its ceiling as "over 1,000×".
+    if (chain.debtValueUsd > 0 && chain.collateralCapacityUsd === 0) rows.push(liquidationLineRow(chain));
+    return rows;
+  }
   const hf = chain.healthFactor as number;
   if (hf > 1) {
     rows.push({
@@ -103,11 +109,13 @@ export function moonwellRiskRows(chain: MoonwellChainResponse | null): PositionP
       value: `${Math.round((1 - 1 / hf) * 100)}%`,
     });
   }
-  rows.push({
-    id: "liquidation-line",
-    label: "Debt against the liquidation line",
-    tip: "The debt value as a share of the capacity line, the collateral counted up to each market's collateral factor. At 100% the account can be liquidated.",
-    value: <ShareValue chain={chain} />,
-  });
+  rows.push(liquidationLineRow(chain));
   return rows;
 }
+
+const liquidationLineRow = (chain: MoonwellChainResponse): PositionPanelRow => ({
+  id: "liquidation-line",
+  label: "Debt against the liquidation line",
+  tip: "The debt value as a share of the capacity line, the collateral counted up to each market's collateral factor. At 100% the account can be liquidated.",
+  value: <ShareValue chain={chain} />,
+});
