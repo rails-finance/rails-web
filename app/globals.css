@@ -186,10 +186,9 @@
   /* Link/party accents — see color-grammar.md for the full rule.
      blue = stays inside Rails (internal nav + links).
      pink = leaves Rails (external links) OR is an external party (delegates). */
-  /* One link blue, both modes — blue-500. Links that REST blue (in-prose,
-     .link / PAGE_LINK / hub figures) signal hover with an underline, not a
-     shade shift; chrome links that rest neutral (NAV_LINK) turn blue-500 on
-     hover. No blue-300/400/600 in the link role. See color-grammar.md §4a. */
+  /* Link blue: blue-600 light, blue-400 dark (WCAG AA), set again in .dark.
+     Links that rest blue take an underline on hover; links that rest neutral
+     turn link blue. See color-grammar.md §4a. */
   --text-link: var(--color-blue-600);
   --text-external: var(--color-pink-500);
   --text-external-hover: var(--color-pink-400);
