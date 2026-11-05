@@ -619,7 +619,7 @@ function TickRow({
         <Prov info={stampServerRead(tickIdProv(label, p.address, t.tick), readBy)} value={String(t.tick)}>
           {t.tick}
         </Prov>
-        {mine && <span className="ml-1.5 text-[10px] text-blue-500">the position&rsquo;s tick</span>}
+        {mine && <span className="ml-1.5 text-[10px] text-blue-600 dark:text-blue-400">the position&rsquo;s tick</span>}
       </div>
       <div className="text-xs tabular-nums">
         {t.debtRatio != null ? (
@@ -707,7 +707,7 @@ function TickTable({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | null 
           <button
             type="button"
             onClick={() => setShowAll((s) => !s)}
-            className="shrink-0 text-[11px] text-blue-500 hover:underline"
+            className="shrink-0 text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
           >
             {showAll ? "Show major ticks only" : `Show all ${ordered.length} ticks`}
           </button>

@@ -7,6 +7,7 @@
 // wallet (lib/shared/sample-wallet.ts).
 
 import Link from "next/link";
+import { Bookmark } from "lucide-react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { BookmarkBackup, BookmarkList, useBookmarks } from "@/components/shared/bookmark-list";
 import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
@@ -28,8 +29,12 @@ export function BookmarksPage() {
         <DetailBackButton fallbackHref="/" />
       </div>
       <div className="mb-8 mt-6" data-anatomy="B1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{BOOKMARKS_NAME}</h1>
-        <p className="mt-2 text-rb-500">Kept in this browser.</p>
+        {/* The saved-state glyph the wallet menu draws (ui-jobs 493, 494). */}
+        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground">
+          <Bookmark className="size-6 shrink-0" fill="currentColor" aria-hidden="true" />
+          {BOOKMARKS_NAME}
+        </h1>
+        <p className="mt-2 text-rb-500">Saved in this browser only.</p>
       </div>
       {/* Nothing draws until the browser's list is read, so a reader with
           bookmarks never sees the empty state flash first. */}
@@ -49,7 +54,7 @@ export function BookmarksPage() {
                 <p className="mt-4 text-sm">
                   <Link
                     href={walletHref(SAMPLE_WALLET)}
-                    className="rounded-sm text-blue-500 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
+                    className="rounded-sm text-blue-600 dark:text-blue-400 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
                     data-bookmarks-sample=""
                   >
                     See a sample wallet →

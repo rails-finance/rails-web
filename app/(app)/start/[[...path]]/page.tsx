@@ -1,5 +1,5 @@
 // /start and every step under it (rails-ops ui-jobs 478). The question stack
-// is the layout's (app/(site)/start/layout.tsx); this page names the step's
+// is the layout's (app/(app)/start/layout.tsx); this page names the step's
 // title, answers an unknown path with a 404, and at a leaf (results, the
 // explorer roster) draws its content under the stack.
 
@@ -122,7 +122,7 @@ async function Results({ results, group }: { results: ResultsKey; group?: GroupK
                   </span>
                 )}
               </span>
-              <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-500" aria-hidden="true" />
+              <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
             </Link>
           </li>
         ))}

@@ -162,7 +162,7 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
             tap away instead — CapabilityPill (below) turns each included-
             capability pill into a bottom-sheet trigger for its own
             definition. ── */}
-      <section className="max-w-7xl mx-auto px-4 pb-16 md:hidden">
+      <section className="max-w-7xl mx-auto px-4 md:px-6 pb-16 lg:hidden">
         <div className="flex flex-col gap-3">
           {coverageRows(COMING_SOON, chainId).map((row) => {
             // A coming-soon card makes no capability claims — same rule as

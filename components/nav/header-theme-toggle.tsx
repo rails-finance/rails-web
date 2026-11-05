@@ -5,9 +5,8 @@ import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
 /** Icon-only theme toggle. It is drawn once per width: in HeaderBar on the
- *  marketing surfaces and on an app route below `md`, and at the foot of
- *  BrandRail from `md` up, where the app bar is gone (rails-ops TO-DO-ui-jobs
- *  68). No pill/background — only the line art recolours to teal on hover,
+ *  below `md`, and at the foot of BrandRail from `md` up, where the bar is
+ *  gone (rails-ops TO-DO-ui-jobs 68, 498). No pill/background — only the line art recolours to teal on hover,
  *  matching the footer affordance. At rest the icon shares the bookmark's ink
  *  (rb-700 / dark:rb-300) so the two read as one control cluster wherever they
  *  sit. Uses next-themes (the app's canonical theme mechanism); the

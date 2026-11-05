@@ -10,7 +10,9 @@
 // counted stays out and is named, with its reason, in the note. Every launched
 // explorer must have an answer (counted or not): a roster entry the response
 // does not mention means the response cannot vouch for the whole roster, so no
-// value is stated at all and the position count stands alone.
+// value is stated at all and the position count stands alone. A counted row for
+// an explorer outside the roster is checked against the server's total and
+// left out of the figure.
 
 /** One explorer's row as `GET /api/stats/value-held` returns it. */
 export type ValueHeldExplorer = {
@@ -182,9 +184,27 @@ export function settleValueHeld(data: ValueHeldData | null | undefined, roster: 
     }
   }
 
+  // The server's total covers every counted row it sent, including explorers
+  // this build has not launched (the server counts one before the web flag
+  // flips). Check the response against all of them, then state only the
+  // roster's rows.
+  const inRoster = (e: ValueHeldExplorer) => roster.some((r) => r.slug === e.protocol && r.chainId === e.chainId);
+  const sentCounted = data.explorers.filter((e) => e.counted && isFiniteNumber(e.usd));
+  const sentUsd = sentCounted.reduce((sum, e) => sum + (e.usd as number), 0);
+  if (Math.abs(sentUsd - data.totalUsd) > TOTAL_TOLERANCE_USD) {
+    console.error(`value-held: counted rows sum to ${sentUsd}, server states ${data.totalUsd}`);
+    return null;
+  }
+  const unlaunched = sentCounted.filter((e) => !inRoster(e));
+  if (unlaunched.length > 0) {
+    console.error(
+      `value-held: counted rows outside the roster, not stated: ${unlaunched.map((e) => `${e.protocol}@${e.chainId}`).join(", ")}`,
+    );
+  }
+
   const totalUsd = counted.reduce((sum, r) => sum + r.usd, 0);
-  if (counted.length === 0 || Math.abs(totalUsd - data.totalUsd) > TOTAL_TOLERANCE_USD) {
-    console.error(`value-held: counted rows sum to ${totalUsd}, server states ${data.totalUsd}`);
+  if (counted.length === 0) {
+    console.error("value-held: no counted rows");
     return null;
   }
 

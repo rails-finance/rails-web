@@ -478,16 +478,26 @@ if ((await page.locator("[data-prov-tripwire]").count()) > 0) {
 }
 
 // ── 9: the chain switcher ───────────────────────────────────────────────────
-// The drawn one: the bar keeps a hidden copy below `md` (ui-jobs 68).
-await page.locator('button[aria-label$="switch blockchain"]:visible').click();
+// The drawn one: the rail's, from `md` (ui-jobs 497).
+await page.locator("button[data-chooser-trigger]:visible").click();
 await page.waitForSelector("[role='menu']");
 const baseSelected = await page.locator("[role='menu'] button[aria-pressed='true']").textContent();
 const vaultsRowBase = await page
   .locator("[data-switcher-vaults]")
   .evaluateAll((els) => els.map((e) => e.getAttribute("href")));
+// The panel opens on Ethereum on every page (ui-jobs 497); Base is a press away.
 check(
-  "9a on a /base route the switcher opens on Base and shows NO Vaults row — Base's vaults are the Morpho explorer's now",
-  /Base/.test(baseSelected ?? "") && vaultsRowBase.length === 0,
+  "9a on a /base route the switcher opens on Ethereum, not the page's chain",
+  /Ethereum/.test(baseSelected ?? ""),
+  `selected "${baseSelected?.trim()}"`,
+);
+await page.locator("[role='menu'] button[aria-pressed]", { hasText: "Base" }).click();
+const vaultsRowBaseTab = await page
+  .locator("[data-switcher-vaults]")
+  .evaluateAll((els) => els.map((e) => e.getAttribute("href")));
+check(
+  "9a' Base's tab shows NO Vaults row — Base's vaults are the Morpho explorer's now",
+  vaultsRowBase.length === 0 && vaultsRowBaseTab.length === 0,
   `selected "${baseSelected?.trim()}", rows ${JSON.stringify(vaultsRowBase)}`,
 );
 // Ethereum's Vaults section went the same way on 2026-09-20 — Aave's layer is a

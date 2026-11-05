@@ -17,7 +17,7 @@ import { FrontDoorSearch } from "@/components/shared/front-door-search";
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { NAV_PILL } from "@/lib/shared/ui-grammar";
-import { TitleRowChooser } from "@/components/shared/rail-header";
+import { ChainLabel } from "@/components/shared/rail-header";
 
 export function ProtocolFrontDoor({ session }: { session: SessionProtocol }) {
   const entry = protocolForSession(session);
@@ -38,27 +38,18 @@ export function ProtocolFrontDoor({ session }: { session: SessionProtocol }) {
 
   return (
     <>
-      {/* The chain chooser at the top right, the rail header's slot
-          (TitleRowChooser). `pt-8` is the listing page's `py-8` above
-          RailHeader and the 2.5rem under it its title row's height (the floor
-          counts the padding, so 4.5rem in all), so the trigger lands where a
-          reader finds it on the rail pages. `md` and up only: below it
-          HeaderBar carries the chooser. */}
-      <div className="hidden min-h-[4.5rem] items-center justify-end pt-8 md:flex">
-        <TitleRowChooser />
-      </div>
-      {/* The row takes 4.5rem above the door at `md` and up, so the door's
-          floor gives up twice that (9rem) and the centred field stays where
-          it sat without the row. */}
       <div
-        className="flex min-h-[calc(100svh-10rem)] flex-col items-center justify-center py-12 md:min-h-[calc(100svh-19rem)]"
+        className="flex min-h-[calc(100svh-10rem)] flex-col items-center justify-center py-12"
         data-anatomy="N5"
         data-front-door={entry.id}
       >
-        <h1 className="mb-8 flex items-center gap-3">
+        <h1 className="mb-3 flex items-center gap-3">
           <ProtocolIcon id={entry.id} className="h-11 w-11 shrink-0 text-foreground" />
           <span className="text-3xl font-semibold leading-none text-foreground">{entry.label}</span>
         </h1>
+        {/* The chain, named under the name: the chooser that named it moved
+            to the brand rail (ui-jobs 497). */}
+        <ChainLabel chainId={entry.chainId} className="mb-8" />
         <div className="w-full max-w-xl">
           <FrontDoorSearch href={(wallet) => `${entry.href}/${wallet}`} />
         </div>

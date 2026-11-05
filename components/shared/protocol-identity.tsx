@@ -40,8 +40,8 @@ const SCALE = {
 } as const;
 
 /** The mark and the protocol's name, linking to its listing. No chain mark —
- *  the chooser sits at the right end of the same row and names the chain on
- *  every app page, so the identity says only who the rail is. Renders nothing
+ *  the chain's label (ChainLabel) sits at the right end of the same row, so
+ *  the identity says only who the rail is. Renders nothing
  *  if the session union and the roster ever drift apart, rather than a crash
  *  or a bare label. */
 export function ProtocolIdentity({
@@ -58,9 +58,11 @@ export function ProtocolIdentity({
     <Link href={entry.href} data-rail-identity={entry.id} className={`group inline-flex items-center ${s.gap}`}>
       <ProtocolIcon
         id={entry.id}
-        className={`${s.icon} shrink-0 text-foreground transition-colors group-hover:text-blue-500`}
+        className={`${s.icon} shrink-0 text-foreground transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400`}
       />
-      <span className={`${s.text} font-semibold text-foreground transition-colors group-hover:text-blue-500`}>
+      <span
+        className={`${s.text} font-semibold text-foreground transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400`}
+      >
         {entry.label}
       </span>
     </Link>

@@ -63,26 +63,41 @@ function stickyHeaderHeight(): number {
   return position === "fixed" || position === "sticky" ? header.getBoundingClientRect().height : 0;
 }
 
-/** When the path changes (not on the first draw or a refresh), settle with the
- *  top of the new current step (its question heading, the learn sections or
- *  the results heading) at the top of the view. */
+/** When the path changes below the top level, settle with the top of the new
+ *  current step (its question heading, the learn sections or the results
+ *  heading) at the top of the view. The first draw, a refresh and /start
+ *  itself do not scroll: the top level shows the whole page from the top
+ *  (Miles, 4 Nov 2026; ui-jobs 496). */
 function useScrollToCurrent(path: string, root: RefObject<HTMLDivElement | null>) {
-  const first = useRef(true);
+  // The path last settled, not a first-run flag: React's dev double effect
+  // would read a flag as a path change on mount.
+  const settled = useRef(path);
   useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
+    if (settled.current === path) return;
+    settled.current = path;
     const stack = root.current;
-    const el = document.querySelector<HTMLElement>("[data-start-current]");
-    if (!stack || !el) return;
+    if (!stack) return;
     // A short step cannot scroll its heading to the top; the stack takes the
     // room it lacks as bottom padding, until the next step is drawn.
     stack.style.paddingBottom = "";
-    const top = el.getBoundingClientRect().top + window.scrollY - stickyHeaderHeight() - SCROLL_AIR;
-    const lacking = top - (document.documentElement.scrollHeight - window.innerHeight);
-    if (lacking > 0) stack.style.paddingBottom = `${Math.ceil(lacking)}px`;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (path === START_HREF) {
+      window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
+      return;
+    }
+    const el = document.querySelector<HTMLElement>("[data-start-current]");
+    if (!el) return;
+    const top = el.getBoundingClientRect().top + window.scrollY - stickyHeaderHeight() - SCROLL_AIR;
+    // Measured again after each step: the body's min-h-screen takes up the
+    // first of the padding on a page shorter than the view (the app shell's
+    // footer is short; ui-jobs 496), so one pass can leave the step short.
+    let padding = 0;
+    for (let pass = 0; pass < 4; pass++) {
+      const lacking = top - (document.documentElement.scrollHeight - window.innerHeight);
+      if (lacking <= 0) break;
+      padding += Math.ceil(lacking);
+      stack.style.paddingBottom = `${padding}px`;
+    }
     window.scrollTo({ top: Math.max(0, top), behavior: still ? "auto" : "smooth" });
   }, [path, root]);
 }

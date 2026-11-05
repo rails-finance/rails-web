@@ -43,7 +43,7 @@ export function MorphoMarketPair({
       // Where the click goes, restated as data so a check can read it without
       // navigating — the WalletPill's data-vault-href convention.
       data-market-href={href}
-      className="cursor-pointer hover:text-blue-500 transition-colors"
+      className="cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
     >
       {label}
     </button>

@@ -329,7 +329,7 @@ function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null 
             // believing it's this ilk's.
             <Link
               href={`/ethereum/makerdao?ilk=${encodeURIComponent(row.ilk)}`}
-              className="truncate text-xs text-blue-500 hover:underline"
+              className="truncate text-xs text-blue-600 dark:text-blue-400 hover:underline"
             >
               {row.ilk}
             </Link>
@@ -647,7 +647,7 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
           <button
             type="button"
             onClick={() => setShowAll((s) => !s)}
-            className="text-[11px] text-blue-500 hover:underline"
+            className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
           >
             {showAll ? "Show vault types only" : `Show all ${data.ilks.length} ilks`}
           </button>

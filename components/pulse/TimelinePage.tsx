@@ -191,7 +191,7 @@ export function TimelinePage({ title, description, dataSources = DEFAULT_DATA_SO
                   <>
                     {/* Pulsing dot for first group */}
                     <span className="flex size-2 relative z-10 items-center justify-center">
-                      <span className="absolute inline-flex size-3 animate-ping rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="absolute inline-flex size-3 animate-ping ping-thrice rounded-full bg-blue-400 opacity-75"></span>
                       <span className="relative inline-flex size-2 rounded-full bg-blue-500"></span>
                     </span>
                     {/* Vertical line connecting to first event */}

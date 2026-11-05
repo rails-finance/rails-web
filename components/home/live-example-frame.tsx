@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { OraclePricesData } from "@/types/api/oracle";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
@@ -24,7 +24,7 @@ import { protocolForPathname } from "@/lib/shared/protocols";
  * The Trove page renders the same component, so the example draws what the
  * page draws; the data is a server-side fetch of the live position (ISR,
  * refreshed hourly). The whole frame is one link to the live position:
- * hovering draws a marketing-blue edge round its top and sides that dissolves
+ * hovering draws an edge in the glow's colour round its top and sides that dissolves
  * toward the bottom fade, brightens the URL in step with it, and reveals the
  * pill affordance;
  * touch/small viewports get a caption link under the frame instead. The render stays inert
@@ -164,20 +164,66 @@ function HeroTroveComposition({ wire }: { wire: WireLiveExample }) {
   );
 }
 
+/** The glow's stops round the colour wheel, 60° apart from DeFi blue at one
+ *  OKLCH lightness and chroma (the blue's: L 60.65%, C 0.2133), so the glow's
+ *  strength holds as it turns. Slot 0 is the blue, which light mode and
+ *  reduced motion hold. */
+const GLOW_STOPS = [
+  "var(--marketing)",
+  "oklch(60.65% 0.2133 321.8)",
+  "oklch(60.65% 0.2133 21.8)",
+  "oklch(60.65% 0.2133 81.8)",
+  "oklch(60.65% 0.2133 141.8)",
+  "oklch(60.65% 0.2133 201.8)",
+];
+
+/** The three-shadow stack in one colour. */
+function glowShadow(colour: string) {
+  return [
+    `0 0 30px color-mix(in srgb, ${colour} 40%, transparent)`,
+    `0 0 70px 4px color-mix(in srgb, ${colour} 28%, transparent)`,
+    `0 0 140px 16px color-mix(in srgb, ${colour} 16%, transparent)`,
+  ].join(", ");
+}
+
+/** Pauses the glow's turn (and the edge's) while the frame is off screen. */
+function useGlowPause() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => {
+      el.toggleAttribute("data-offscreen", !entry.isIntersecting);
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return ref;
+}
+
 export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
+  const glowRef = useGlowPause();
   // The composition stays behind the skeleton until the client has mounted —
   // see the header comment for why it never server-renders. When the data
   // fetch failed at revalidate time (data null) the skeleton simply holds.
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   const showTrove = ready && data !== null;
+  // The skeleton unmounts once its fade-out (500ms) has run, so its pulses
+  // stop with it.
+  const [skeletonGone, setSkeletonGone] = useState(false);
+  useEffect(() => {
+    if (!showTrove) return;
+    const t = setTimeout(() => setSkeletonGone(true), 600);
+    return () => clearTimeout(t);
+  }, [showTrove]);
 
   return (
     <div className="w-full max-w-5xl mx-auto px-4">
-      <div className="group relative">
+      <div ref={glowRef} className="live-glow group relative">
         {/* Cast shadow behind the frame — a warm dark shadow on the paper
-            canvas, a marketing-blue glow in dark: both hug the frame's
-            silhouette (box-shadow on a frame-sized box), so the light falls
+            canvas, a glow turning round the colour wheel in dark: both hug
+            the frame's silhouette (box-shadow on a frame-sized box), so the light falls
             off from the edges rather than haloing behind it. The wrapper
             (oversized so the blur has room, bottom edge flush with the frame)
             masks the shadow out toward the bottom: the frame's lower edge
@@ -198,39 +244,49 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
               boxShadow: "0 24px 80px -12px rgba(40, 33, 20, 0.24), 0 8px 30px rgba(40, 33, 20, 0.12)",
             }}
           />
-          {/* Dark: the blue glow — centred (emitted light, not a key light),
+          {/* Dark: the glow — centred (emitted light, not a key light),
               layered tight→wide because box-shadow decays from the edge:
-              a single blur reads dim where the halo gradient read bright. */}
-          <div
-            className="absolute inset-x-40 top-40 bottom-0 rounded-t-2xl hidden dark:block"
-            style={{
-              boxShadow: [
-                "0 0 30px color-mix(in srgb, var(--marketing) 40%, transparent)",
-                "0 0 70px 4px color-mix(in srgb, var(--marketing) 28%, transparent)",
-                "0 0 140px 16px color-mix(in srgb, var(--marketing) 16%, transparent)",
-              ].join(", "),
-            }}
-          />
+              a single blur reads dim where the halo gradient read bright.
+              It turns round the colour wheel (GLOW_STOPS, the cross-fade in
+              globals.css `.live-glow`). */}
+          <div className="absolute inset-x-40 top-40 bottom-0 hidden dark:block">
+            {GLOW_STOPS.map((colour, slot) => (
+              <div
+                key={colour}
+                className="live-glow-layer absolute inset-0 rounded-t-2xl"
+                style={{ boxShadow: glowShadow(colour), ["--glow-slot" as string]: slot }}
+              />
+            ))}
+          </div>
         </div>
 
-        {/* Hover edge — a marketing-blue border hugging the OUTSIDE of the
-            frame on its top and sides: a box 2px larger than the frame on
-            those three edges, with a radius 2px wider so the ring stays
-            concentric with the frame's corners. Masked out toward the bottom
-            so it dissolves with the content fade instead of closing a
-            rectangle the fade erased. It fades over the same 300ms as the
-            URL pill's colour shift, so the two arrive together. Tailwind's
-            hover variants are gated on `@media (hover: hover)`, so
-            touch pointers never see it. Pointer-inert, so the click target is
-            unchanged. */}
+        {/* Hover edge — a border hugging the OUTSIDE of the frame on its top
+            and sides, in the glow's colour of the moment (one layer per
+            GLOW_STOPS colour on the glow's timeline; light mode keeps the
+            blue alone): a box 2px larger than the frame on those three
+            edges, with a radius 2px wider so the ring stays concentric with
+            the frame's corners. Masked out toward the bottom so it dissolves
+            with the content fade instead of closing a rectangle the fade
+            erased. It fades over the same 300ms as the URL pill's colour
+            shift, so the two arrive together. Tailwind's hover variants are
+            gated on `@media (hover: hover)`, so touch pointers never see it.
+            Pointer-inert, so the click target is unchanged. */}
         <div
           aria-hidden="true"
-          className="absolute -inset-x-0.5 -top-0.5 bottom-0 rounded-t-[18px] border-2 border-b-0 border-[var(--marketing)] opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none"
+          className="absolute -inset-x-0.5 -top-0.5 bottom-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none"
           style={{
             maskImage: "linear-gradient(to bottom, black 35%, transparent 90%)",
             WebkitMaskImage: "linear-gradient(to bottom, black 35%, transparent 90%)",
           }}
-        />
+        >
+          {GLOW_STOPS.map((colour, slot) => (
+            <div
+              key={colour}
+              className="live-glow-layer absolute inset-0 rounded-t-[18px] border-2 border-b-0"
+              style={{ borderColor: colour, ["--glow-slot" as string]: slot }}
+            />
+          ))}
+        </div>
 
         {/* No card shell (border/shadow/surface) — the section gradient runs
             behind, and the bottom fade dissolves the page into it. Only the
@@ -263,16 +319,18 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
             {/* Skeleton stand-in until the client paints — the trove layout's
                 silhouette (position card, the Lifetime flows panel, the rows) in
                 the shared skeleton tone, fading out once the real components
-                are ready. */}
-            <div
-              className={`absolute inset-0 flex flex-col gap-4 px-10 pt-8 transition-opacity duration-500 ${
-                showTrove ? "opacity-0" : "opacity-100"
-              }`}
-            >
-              <div className="animate-pulse h-44 bg-skeleton rounded-2xl" />
-              <div className="animate-pulse h-72 bg-rb-100/60 dark:bg-rb-800/40 rounded-2xl" />
-              <div className="animate-pulse h-24 bg-rb-100/30 dark:bg-rb-800/20 rounded-2xl" />
-            </div>
+                are ready, then unmounting. */}
+            {!skeletonGone && (
+              <div
+                className={`absolute inset-0 flex flex-col gap-4 px-10 pt-8 transition-opacity duration-500 ${
+                  showTrove ? "opacity-0" : "opacity-100"
+                }`}
+              >
+                <div className="animate-pulse h-44 bg-skeleton rounded-2xl" />
+                <div className="animate-pulse h-72 bg-rb-100/60 dark:bg-rb-800/40 rounded-2xl" />
+                <div className="animate-pulse h-24 bg-rb-100/30 dark:bg-rb-800/20 rounded-2xl" />
+              </div>
+            )}
 
             {showTrove && (
               <div
@@ -321,7 +379,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
             href={LIVE_EXAMPLE_TROVE_PATH}
             className="inline-flex items-center gap-1 rounded-sm bg-rb-100 px-3 py-1 text-xs text-foreground dark:bg-rb-900"
           >
-            View this position live <span className="text-blue-500">→</span>
+            View this position live <span className="text-blue-600 dark:text-blue-400">→</span>
           </Link>
         </div>
       </div>

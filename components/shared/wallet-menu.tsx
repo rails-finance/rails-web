@@ -131,7 +131,9 @@ export function WalletMenu({
       title={name ? `${name} · ${wallet}` : wallet}
       // A 28px row with a 44px press area (after:).
       className={`relative flex h-7 min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-md transition-colors focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-[''] ${
-        heading ? "text-foreground hover:text-blue-500" : "text-xs text-rb-500 hover:text-foreground"
+        heading
+          ? "text-foreground hover:text-blue-600 dark:hover:text-blue-400"
+          : "text-xs text-rb-500 hover:text-foreground"
       }`}
     >
       {!heading && <Facehash address={wallet} size={16} />}

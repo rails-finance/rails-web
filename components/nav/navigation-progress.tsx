@@ -8,10 +8,11 @@
  *  page does.
  *
  *  Why it listens at the document rather than wrapping each link: 91 files
- *  import `next/link` and three navigate with `router.push`
- *  (morpho-market-link, detail-back-row, wallet-pill). A pair of click
- *  listeners covers the 91 (why a pair: at the effect below); the three call
- *  `startNavigationProgress()`.
+ *  import `next/link` and a handful navigate with `router.push`
+ *  (morpho-market-link, detail-back-row, wallet-pill, wallet-menu and the
+ *  search's lookup in front-door-search). A pair of click listeners covers the
+ *  links (why a pair: at the effect below); each push site calls
+ *  `startNavigationProgress()` before it pushes.
  *
  *  Why it is written here and not installed: `nextjs-toploader` and its kind
  *  patch `history.pushState`, which breaks across Next upgrades. Next 15.5.7 /
@@ -49,7 +50,7 @@ function widthAt(elapsed: number): number {
 }
 
 /** Set by the mounted component. The module-level indirection is what lets the
- *  three `router.push` callers start the bar without a context or a prop. */
+ *  `router.push` callers start the bar without a context or a prop. */
 let startFromOutside: () => void = () => {};
 
 /** Start the bar for a navigation this module cannot see — a `router.push`.

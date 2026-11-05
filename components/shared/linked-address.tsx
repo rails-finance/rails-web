@@ -27,7 +27,7 @@ export function LinkedAddress({ address, label, className = "", chainId }: Linke
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
-      className={`text-blue-500 hover:underline font-mono text-xs ${className}`}
+      className={`text-blue-600 dark:text-blue-400 hover:underline font-mono text-xs ${className}`}
     >
       {label || short}
     </a>

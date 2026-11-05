@@ -8,8 +8,9 @@
 // `/` on a page with no search of its own all open it.
 //
 // From md it starts at the brand rail's right edge, so the rail stays in view
-// and the two read as one piece of chrome; below md, and on a marketing page
-// (no rail), it starts at the viewport's edge and takes the full width there.
+// and the two read as one piece of chrome, on every page (the site's too,
+// ui-jobs 498); below md (no rail) it starts at the viewport's edge and takes
+// the full width there.
 // A scrim dims the page behind it and closes it on a press; Escape closes it;
 // focus moves in on open, stays inside while open and returns to the trigger.
 //
@@ -208,7 +209,7 @@ export function WalletPanel() {
           <Link
             href="/bookmarks"
             onClick={close}
-            className="rounded-sm text-sm text-blue-500 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
+            className="rounded-sm text-sm text-blue-600 dark:text-blue-400 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
             data-wallet-panel-bookmarks=""
           >
             {BOOKMARKS_NAME} →
