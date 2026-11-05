@@ -74,6 +74,14 @@ export const CTRL_ON = "bg-rb-100 dark:bg-rb-800 text-foreground";
  *  which is right for a state a click cannot undo and wrong for a toggle. */
 export const CTRL_ON_HOVER = "hover:bg-rb-200 dark:hover:bg-rb-700";
 
+/** A text button that changes this view in place ("View all <n> explorers",
+ *  "Show all ticks"), teal, the utility hue (color-grammar.md §4c), where link
+ *  blue says "opens another page" (Miles, 5 Nov 2026). teal-700 in light (about
+ *  5.5:1 on white; teal-600 fails AA for text), teal-400 in dark; an underline
+ *  on hover, as a link has. A disclosure chevron opening more of the same card
+ *  keeps the foreground (§3). */
+export const INPLACE_TEXT = "text-teal-700 dark:text-teal-400 hover:underline underline-offset-2";
+
 /** Engaged in-place control carrying a semantic accent (e.g. an active date
  *  filter). Teal — it's an in-place control state, which is the utility hue's
  *  job (color-grammar.md §4c); NOT a status, so not a caution/orange. */

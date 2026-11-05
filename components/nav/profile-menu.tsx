@@ -31,6 +31,7 @@ import { useBookmarks } from "@/components/shared/bookmark-list";
 import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
+import { CTRL_OFF, CTRL_ON } from "@/lib/shared/ui-grammar";
 import type { WalletSession } from "@/lib/shared/sessions";
 
 const BOOKMARKS_PATH = "/bookmarks";
@@ -73,12 +74,7 @@ const THEMES = [
 function ThemeSwitch() {
   const { theme, setTheme } = useTheme();
   return (
-    <div
-      role="group"
-      aria-label="Theme"
-      className="flex gap-1 rounded-lg bg-rb-200/70 p-1 dark:bg-rb-900"
-      data-profile-menu-theme=""
-    >
+    <div role="group" aria-label="Theme" className="flex gap-1" data-profile-menu-theme="">
       {THEMES.map(({ value, label, Icon }) => {
         const on = (theme ?? "system") === value;
         return (
@@ -89,7 +85,7 @@ function ThemeSwitch() {
             aria-checked={on}
             onClick={() => setTheme(value)}
             className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-              on ? "bg-background text-foreground shadow-sm" : "text-rb-500 hover:text-foreground"
+              on ? CTRL_ON : CTRL_OFF
             }`}
             data-theme-option={value}
           >
@@ -238,7 +234,7 @@ export function ProfileMenu() {
               role="menu"
               aria-label={BOOKMARKS_NAME}
               data-profile-menu=""
-              className={`fixed z-[var(--z-popover)] border border-rb-200 bg-raised p-2 shadow-xl dark:border-rb-800 ${
+              className={`fixed z-[var(--z-popover)] border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 ${
                 place.phone ? "inset-x-0 rounded-b-2xl border-x-0" : "w-80 rounded-xl"
               }`}
               style={place.phone ? { top: place.top } : { top: place.top, right: place.right }}

@@ -10,7 +10,7 @@ import { ProtocolGlyph, hasProtocolGlyph } from "@/components/icons/protocol-gly
 import { ChainToggleButtons } from "@/components/shared/chain-toggle";
 import { HomeOnlyChainGlyph } from "@/components/icons/chain-glyphs";
 import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-soon";
-import { PILL_CTA } from "@/lib/shared/ui-grammar";
+import { PILL_CTA, INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 
 /** Tile width classes chosen per list size so every breakpoint fills its
  *  rows evenly: a chain's eight most used divide by 2/4/8, a list of 6 by 2/3/6. A new
@@ -161,7 +161,7 @@ export function ProtocolRow() {
                 type="button"
                 onClick={() => setShowAll((v) => !v)}
                 aria-expanded={showAll}
-                className="cursor-pointer rounded-sm px-2 py-1 text-sm text-blue-600 transition-colors hover:text-blue-600 focus-ring dark:text-blue-400 dark:hover:text-blue-400"
+                className={`cursor-pointer rounded-sm px-2 py-1 text-sm transition-colors focus-ring ${INPLACE_TEXT}`}
                 data-home-view-all=""
               >
                 {showAll ? "Show the most used" : `View all ${all.length} explorers`}
