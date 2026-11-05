@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { LwNotice } from "@/components/shared/lw-attribution";
 import { Activity, DraftingCompass, FileText, Home, Info, LayoutGrid, Signpost, Vault } from "lucide-react";
 import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
@@ -12,6 +13,7 @@ import { LiquityModal } from "@/components/site/LiquityModal";
 import { PhoneBeta } from "@/components/nav/phone-beta";
 
 export function SiteFooter() {
+  const home = usePathname() === "/";
   const [donateOpen, setDonateOpen] = useState(false);
   const [liquityOpen, setLiquityOpen] = useState(false);
   // Footer rail links are deliberately dumb — they land on the protocol's
@@ -19,7 +21,9 @@ export function SiteFooter() {
   // entry point (with recent/pinned in its dropdown). The chrome stays
   // simple: one route to discover, one to drill in.
   return (
-    <footer className="bg-background border-rb-200" data-anatomy="H9">
+    // On home the footer is the foot of the page's gradient, in the top's tone
+    // (app/(site)/page.tsx, Miles 5 Nov 2026); elsewhere the canvas.
+    <footer className={`${home ? "bg-rb-50 dark:bg-rb-600" : "bg-background"} border-rb-200`} data-anatomy="H9">
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Rails Info */}

@@ -88,36 +88,38 @@ export default async function Home() {
         </section>
       </div>
 
-      {/* ═══ WHO IS RAILS FOR ═══ */}
-      {/* A flat light sheet: the page alternates light/dark band by band rather
-          than ramping continuously darker, so this steps UP off the hero floor
-          and back DOWN into "What Rails Does". Flat, not a gradient — this band
-          used to deepen into the same tone the hero already ended on, which
-          left its bottom seam invisible and its top edge reading as an upward
-          step in the middle of a downward ramp. The personas lead: the
-          directory says what Rails covers, this says who it's for, and the
-          capability list below answers the "how" for whoever they caught. */}
-      <div className="bg-rb-50 dark:bg-rb-600" data-anatomy="S6">
-        <div className="max-w-7xl mx-auto px-4 pt-16 pb-16">
-          <div className="mb-6">
-            <h2 className="font-sans font-semibold tracking-tight leading-tight mb-10 text-[clamp(24px,3.5vw,38px)]">
-              <span className="marketing">DeFi</span> for everyone
-            </h2>
+      {/* ═══ The page's lower half (Miles, 5 Nov 2026): one gradient, the mirror
+          of the top section's, from the floor S5 stands on back to the top's
+          tone at the foot, and on through the footer (SiteFooter takes the
+          top's tone on home). It starts where the top section ends, so the
+          darkest band stays at S5 however tall the directory opens; the bands
+          below draw no ground of their own. ═══ */}
+      <div className="bg-gradient-to-b from-background to-rb-50 dark:from-rb-800 dark:to-rb-600" data-home-lower="">
+        {/* ═══ WHO IS RAILS FOR ═══ */}
+        {/* The personas lead: the directory says what Rails covers, this says
+            who it's for, and the capability list below answers the "how" for
+            whoever they caught. */}
+        <div data-anatomy="S6">
+          <div className="max-w-7xl mx-auto px-4 pt-16 pb-16">
+            <div className="mb-6">
+              <h2 className="font-sans font-semibold tracking-tight leading-tight mb-10 text-[clamp(24px,3.5vw,38px)]">
+                <span className="marketing">DeFi</span> for everyone
+              </h2>
+            </div>
+
+            <AudienceGrid />
           </div>
-
-          <AudienceGrid />
         </div>
-      </div>
 
-      {/* ═══ WHAT RAILS DOES — the plain answer to "what is this thing?": two
+        {/* ═══ WHAT RAILS DOES — the plain answer to "what is this thing?": two
           intro paragraphs (what a protocol explorer is, then that every number
           traces to the contracts) that hand off to the StageRail fork, which
           draws the path a number travels from the contracts to the page. ═══ */}
-      <div className="bg-background">
-        <section className="max-w-7xl mx-auto px-4 py-16" data-anatomy="S7">
-          <h2 className="text-3xl font-semibold tracking-tight text-foreground mb-4">What Rails Does</h2>
+        <div>
+          <section className="max-w-7xl mx-auto px-4 py-16" data-anatomy="S7">
+            <h2 className="text-3xl font-semibold tracking-tight text-foreground mb-4">What Rails Does</h2>
 
-          {/* Copy constraints (rails-ops decisions 0006/0010) for this intro
+            {/* Copy constraints (rails-ops decisions 0006/0010) for this intro
               and the rail below: (1) for CURRENT state the live chain read
               SUPERSEDES the index — the Reconciled station's "checked against
               live state" is the LIFETIME-flows gate (flowsReconcile), not a
@@ -126,16 +128,16 @@ export default async function Home() {
               state is never withheld; (3) the chain overlay is a second-wave
               fetch that lands AFTER first render — don't imply it runs before
               the page shows anything. */}
-          <p className="body-text max-w-3xl">
-            Rails builds a read-only explorer for each DeFi protocol it covers. Look up any position &mdash; yours or
-            anyone else&rsquo;s &mdash; and see what it holds, what it owes, and everything that has ever happened to
-            it.
-          </p>
-          <p className="body-text max-w-3xl mt-3">
-            Every number on the page traces back to the contracts it came from. Here is the path it travels:
-          </p>
+            <p className="body-text max-w-3xl">
+              Rails builds a read-only explorer for each DeFi protocol it covers. Look up any position &mdash; yours or
+              anyone else&rsquo;s &mdash; and see what it holds, what it owes, and everything that has ever happened to
+              it.
+            </p>
+            <p className="body-text max-w-3xl mt-3">
+              Every number on the page traces back to the contracts it came from. Here is the path it travels:
+            </p>
 
-          {/* The capability list became a transit-style rail: the four
+            {/* The capability list became a transit-style rail: the four
               data-pipeline bullets were unordered, equal claims, but they are
               stages of ONE pipeline (Ethereum → Historic events ∥ Live state →
               Reconciled → On the page). The rail lets the structure carry the
@@ -143,48 +145,41 @@ export default async function Home() {
               meet again, which is the two-sources claim itself (what the
               Reconciled station may and may not claim is pinned by the
               constraints comment above). */}
-          <StageRail />
-        </section>
-      </div>
-
-      {/* ═══ TEAM — shared with the About page (single source of truth) ═══ */}
-      {/* Lifts to the rb-50 sheet, the same tone the persona band takes — the
-          two are far apart, so the page reads as three alternating tones rather
-          than five arbitrary ones. From here the close settles: sheet → band →
-          the footer's canvas, each step its own tone. */}
-      <div className="bg-rb-50 dark:bg-rb-600" data-anatomy="S8">
-        <div className="max-w-7xl mx-auto px-4 py-16">
-          <TeamSection />
+            <StageRail />
+          </section>
         </div>
-      </div>
 
-      {/* ═══ GET IN TOUCH ═══ */}
-      <GetInTouch />
+        {/* ═══ TEAM — shared with the About page (single source of truth) ═══ */}
+        <div data-anatomy="S8">
+          <div className="max-w-7xl mx-auto px-4 py-16">
+            <TeamSection />
+          </div>
+        </div>
 
-      {/* ═══ FOOT WORDMARK (S10, ui-jobs 498) — "Destination DeFi" at display
+        {/* ═══ GET IN TOUCH ═══ */}
+        <GetInTouch />
+
+        {/* ═══ FOOT WORDMARK (S10, ui-jobs 498) — "Destination DeFi" at display
           size on the footer's canvas, in the column SiteFooter's content
           takes, directly above it. In the raised tone, so faint by intent
           (Miles, 4 Nov 2026); decorative, so hidden from assistive tech. The
           size is a share of the column's width (cqw), so the line spans it. ═══ */}
-      <div className="bg-background" aria-hidden="true" data-anatomy="S10">
-        <div className="mx-auto max-w-7xl px-4 pt-16 @container">
-          <p className="whitespace-nowrap font-semibold leading-none tracking-tighter text-[var(--surface-raised)] text-[14cqw] select-none">
-            Destination DeFi
-          </p>
+        <div aria-hidden="true" data-anatomy="S10">
+          <div className="mx-auto max-w-7xl px-4 pt-16 @container">
+            <p className="whitespace-nowrap font-semibold leading-none tracking-tighter text-[var(--surface-raised)] text-[14cqw] select-none">
+              Destination DeFi
+            </p>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-/** Founding-supporter voice + Telegram contact line. Takes `band`, the middle
- *  tone: it sits between the Team sheet above and the footer's canvas below, so
- *  the page's last three surfaces are each distinct. Was `raised` — an
- *  elevation role for panels and inputs, which read as the same sheet as its
- *  neighbours at band scale. */
+/** Founding-supporter voice + Telegram contact line, on the page's gradient. */
 function GetInTouch() {
   return (
-    <div className="bg-band" data-anatomy="S9">
+    <div data-anatomy="S9">
       <div className="max-w-7xl mx-auto px-4 py-16">
         <h2 className="font-semibold tracking-tight leading-tight pb-4 text-[clamp(28px,4vw,42px)]">Get in touch</h2>
 

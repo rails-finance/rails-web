@@ -276,6 +276,30 @@ const ascending = (tops) => tops.every((t, i) => t !== null && (i === 0 || t > t
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 const wideOrder = await homeOrder(page);
 check("O home: hero, track lines, value line, sample, directory", ascending(wideOrder), JSON.stringify(wideOrder));
+// One ground from S5 to the foot (Miles, 5 Nov 2026): the lower sections draw
+// none of their own, the lower wrapper carries the gradient, and the home
+// footer takes its end tone, not the canvas.
+const ground = await page.evaluate(() => {
+  const bg = (el) => (el ? getComputedStyle(el).backgroundColor : "missing");
+  const own = ["S6", "S7", "S8", "S9", "S10"].map((c) => {
+    const el = document.querySelector(`[data-anatomy="${c}"]`);
+    return [c, bg(el), bg(el?.parentElement)];
+  });
+  return {
+    own: own.filter(([, a, b]) => a !== "rgba(0, 0, 0, 0)" || b !== "rgba(0, 0, 0, 0)").map(([c]) => c),
+    gradient: getComputedStyle(document.querySelector("[data-home-lower]")).backgroundImage.startsWith(
+      "linear-gradient",
+    ),
+    footer: bg(document.querySelector('footer[data-anatomy="H9"]')),
+    canvas: getComputedStyle(document.body).backgroundColor,
+  };
+});
+check(
+  "G home: one gradient below S5, no section grounds, footer in its end tone",
+  ground.own.length === 0 && ground.gradient && ground.footer !== "rgb(255, 255, 255)",
+  JSON.stringify(ground),
+);
+
 // The directory lists a chain's most used explorers, as the drawer's chooser
 // does, and "View all <n> explorers" opens the rest in place.
 const dirTiles = () =>
