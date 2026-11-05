@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Box, History, Radio, CircleCheck, LayoutGrid } from "lucide-react";
 import { launchedProductionChains } from "@/lib/shared/protocols";
+import { Station } from "@/components/home/stage-station";
 
 /**
  * StageRail — the "What Rails Does" panel as a transit-style rail rather than a
@@ -24,7 +25,8 @@ import { launchedProductionChains } from "@/lib/shared/protocols";
  * right — the rotation carries the desktop upper card to the right). Both
  * layouts share one <ol> so the pipeline order reaches a screen reader.
  *
- * Server component — no state, no motion, static at rest. The connectors are
+ * Server component; each station (stage-station.tsx) shows its heading at rest
+ * and opens its line on a press, on its own (Miles, 5 Nov 2026). The connectors are
  * built from bordered CSS divs (not SVG: a fluid-width SVG needs
  * preserveAspectRatio="none", which distorts corner radii). The track is BLUE
  * (design decision 2026-07-20, matching the reference mock): the rail is the
@@ -81,50 +83,14 @@ function NodeDot({ className, style }: { className?: string; style?: React.CSSPr
   );
 }
 
-function Station({
-  icon: Icon,
-  eyebrow,
-  children,
-  className,
-  accent,
-}: {
-  icon: typeof Box;
-  eyebrow: string;
-  children: React.ReactNode;
-  className?: string;
-  /** The station the whole rail exists to reach: a blue border + soft blue
-   *  glow (the reference mock's treatment), the same hue as the track that
-   *  runs into it. */
-  accent?: boolean;
-}) {
+/** A station's glyph: the accent station's check is BLUE (the mock's
+ *  treatment), the track's colour arriving at the station it exists to reach. */
+function glyph(Icon: typeof Box, accent?: boolean) {
   return (
-    <li className={`relative ${className ?? ""}`}>
-      {/* lg min-h = one measured floor for ALL five cards: the tallest copy
-          (stations 1, 4 and 5, four lines in a 1fr column at the 1280 cap)
-          runs to 156.5px, so 157 keeps every card the same height — the
-          rhythm verify-stage-rail-polish.mjs asserts. Grow it if copy grows.
-          Beside the brand rail (ui-jobs 498) the cap is reached at 1336px;
-          below it station 1 takes a fifth line (194px at 1280), so the floor
-          is 200 there. */}
-      <div
-        className={`relative z-[1] flex h-full flex-col justify-center rounded-xl border bg-raised px-4 py-3 lg:min-h-[200px] min-[1336px]:min-h-[157px] ${
-          accent
-            ? "border-blue-400 shadow-[0_0_0_1px_rgba(96,165,250,0.35),0_0_28px_-2px_rgba(59,130,246,0.35)] dark:border-blue-500 dark:shadow-[0_0_0_1px_rgba(59,130,246,0.4),0_0_32px_-2px_rgba(59,130,246,0.5)]"
-            : "border-rb-200 dark:border-rb-800"
-        }`}
-      >
-        <div className="mb-1 flex items-center gap-2">
-          {/* The accent station's check is BLUE (the mock's treatment) — the
-              track's colour arriving at the station it exists to reach. */}
-          <Icon
-            className={`h-[18px] w-[18px] shrink-0 ${accent ? "text-blue-600 dark:text-blue-400 dark:text-blue-400" : "text-foreground"}`}
-            aria-hidden="true"
-          />
-          <p className="text-[15px] font-semibold text-foreground lg:text-sm">{eyebrow}</p>
-        </div>
-        <p className="body-text">{children}</p>
-      </div>
-    </li>
+    <Icon
+      className={`h-[18px] w-[18px] shrink-0 ${accent ? "text-blue-600 dark:text-blue-400" : "text-foreground"}`}
+      aria-hidden="true"
+    />
   );
 }
 
@@ -227,7 +193,7 @@ export function StageRail() {
           className={`grid grid-cols-2 ${MOBILE_ROWS} gap-x-4 lg:grid ${GRID_COLS} lg:grid-rows-2 lg:auto-rows-fr lg:gap-x-0 lg:gap-y-6`}
         >
           <Station
-            icon={Box}
+            icon={glyph(Box)}
             // The chains the pipeline reads FOR THIS SITE — the launched ones,
             // so the first station names what the rest of the page offers.
             eyebrow={launchedProductionChains()
@@ -242,19 +208,23 @@ export function StageRail() {
               grid places live LEFT and indexed RIGHT to match the rotation, on lg
               indexed is the upper fork card. */}
           <Station
-            icon={History}
+            icon={glyph(History)}
             eyebrow="Historic events"
             className="col-start-2 row-start-3 lg:col-start-3 lg:row-start-1"
           >
             Rails reads every event in order and explains each in plain English.
           </Station>
 
-          <Station icon={Radio} eyebrow="Live state" className="col-start-1 row-start-3 lg:col-start-3 lg:row-start-2">
+          <Station
+            icon={glyph(Radio)}
+            eyebrow="Live state"
+            className="col-start-1 row-start-3 lg:col-start-3 lg:row-start-2"
+          >
             Rails asks those same contracts what the position holds and owes today.
           </Station>
 
           <Station
-            icon={CircleCheck}
+            icon={glyph(CircleCheck, true)}
             eyebrow="Reconciled"
             accent
             className="col-span-2 row-start-5 lg:col-span-1 lg:col-start-5 lg:row-start-1 lg:row-span-2 lg:self-center"
@@ -263,7 +233,7 @@ export function StageRail() {
           </Station>
 
           <Station
-            icon={LayoutGrid}
+            icon={glyph(LayoutGrid)}
             eyebrow="On the page"
             className="col-span-2 row-start-7 lg:col-span-1 lg:col-start-7 lg:row-start-1 lg:row-span-2 lg:self-center"
           >

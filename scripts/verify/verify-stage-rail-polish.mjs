@@ -50,11 +50,11 @@ async function check(theme) {
   // eyebrows are copy and have churned twice; the heading is stable.
   const ol = page.locator("section", { has: h2 }).locator("ol").first();
   // Station <li>s carry an eyebrow; the mobile connector <li>s are decorative.
-  const stages = ol.locator("> li").filter({ has: page.locator("p.font-semibold") });
+  const stages = ol.locator("> li").filter({ has: page.locator("[data-station-eyebrow]") });
   assert((await stages.count()) === 5, "rail still a 5-stage <ol>");
 
   // Eyebrows (uppercase via CSS; DOM text is the raw string).
-  const eyebrows = (await ol.locator("li p.font-semibold").allTextContents()).map((s) => s.trim());
+  const eyebrows = (await ol.locator("li [data-station-eyebrow]").allTextContents()).map((s) => s.trim());
   assert(JSON.stringify(eyebrows) === JSON.stringify(EXPECT_EYEBROWS), "eyebrows: " + eyebrows.join(" · "));
 
   // Copy strings, per station body.
@@ -65,12 +65,10 @@ async function check(theme) {
   assert(!bodies.join(" ").includes("19 protocols"), "no stale protocol-count copy");
   assert(!bodies.join(" ").includes("or contract read"), "no stale 'or contract read' tail");
 
-  // Vertical rhythm: every station card renders the SAME height, so the fork
-  // column's pair and the three single cards align top and bottom rather than
-  // merely sharing a centre line. The lg:min-h-[184px] floor holds five lines
-  // of body copy in a 1fr column at the 1280 cap; copy that wraps to six
-  // overflows it and the rail goes ragged. This is the assertion that catches
-  // that — copy edits are exactly what breaks it.
+  // Vertical rhythm: at rest (every station shut, Miles 5 Nov 2026) every
+  // station card renders the SAME height, so the fork column's pair and the
+  // three single cards align top and bottom. The shut card's lg:min-h-[4.25rem]
+  // floor holds the chain station's two-line name; a longer name breaks it.
   const cardHeights = await ol.evaluate((el) =>
     Array.from(el.querySelectorAll("li > div.rounded-xl")).map((d) => Math.round(d.getBoundingClientRect().height)),
   );

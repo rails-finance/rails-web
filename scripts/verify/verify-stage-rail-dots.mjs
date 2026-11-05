@@ -30,9 +30,9 @@ const geo = await page.evaluate(() => {
   const rail = document.querySelector("ol");
   // Station <li>s only — skip the decorative mobile connector <li>s (no eyebrow).
   const cards = [...rail.querySelectorAll("li")]
-    .filter((li) => li.querySelector("p.font-semibold"))
+    .filter((li) => li.querySelector("[data-station-eyebrow]"))
     .map((li) => {
-      const eyebrow = li.querySelector("p").textContent.trim();
+      const eyebrow = li.querySelector("[data-station-eyebrow]").textContent.trim();
       return { eyebrow, rect: li.querySelector("div.z-\\[1\\]").getBoundingClientRect().toJSON() };
     });
   // Desktop dots = the rounded spans inside the lg-only overlay (hidden lg:grid).

@@ -300,6 +300,23 @@ check(
   JSON.stringify(ground),
 );
 
+// "What Rails Does": each station shows its heading at rest, and its button
+// opens that station alone (Miles, 5 Nov 2026).
+const stations = page.locator("[data-station-toggle]");
+const shut = await stations.evaluateAll((bs) =>
+  bs.every(
+    (b) =>
+      b.getAttribute("aria-expanded") === "false" && document.getElementById(b.getAttribute("aria-controls"))?.hidden,
+  ),
+);
+await stations.nth(3).click();
+const opened = await stations.evaluateAll((bs) => bs.map((b) => b.getAttribute("aria-expanded")).join(","));
+check(
+  "R stations shut at rest; one press opens that station alone",
+  (await stations.count()) === 5 && shut && opened === "false,false,false,true,false",
+  opened,
+);
+
 // The directory lists a chain's most used explorers, as the drawer's chooser
 // does, and "View all <n> explorers" opens the rest in place.
 const dirTiles = () =>

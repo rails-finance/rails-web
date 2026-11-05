@@ -51,16 +51,16 @@ async function checkHome(theme) {
   // Locate the rail via its section heading, not a station string — the
   // eyebrows are copy and have churned twice; the heading is stable.
   const ol = page.locator("section", { has: h2 }).locator("ol").first();
-  // Station <li>s carry the eyebrow (p.font-semibold); the mobile connector <li>s
+  // Station <li>s carry the eyebrow ([data-station-eyebrow]); the mobile connector <li>s
   // are decorative (aria-hidden, no eyebrow), so filter them out of the count.
-  const stages = ol.locator("> li").filter({ has: page.locator("p.font-semibold") });
+  const stages = ol.locator("> li").filter({ has: page.locator("[data-station-eyebrow]") });
   const count = await stages.count();
   assert(count === 5, `rail is a 5-stage <ol> (got ${count})`);
 
   // Eyebrows present, in pipeline order. The first station names the launched
   // production chains (`launchedProductionChains()`, roster order), so this pin
   // moves when a chain launches: Arbitrum joined it on 20 Oct 2026.
-  const eyebrows = await ol.locator("li p.font-semibold").allTextContents();
+  const eyebrows = await ol.locator("li [data-station-eyebrow]").allTextContents();
   const norm = eyebrows.map((s) => s.trim());
   assert(
     JSON.stringify(norm) ===
@@ -150,10 +150,12 @@ async function checkHome(theme) {
     const dots = Array.from(document.querySelectorAll("ol span")).filter(
       (s) => /rounded-full/.test(s.className || "") && s.getBoundingClientRect().width > 0,
     );
-    const cards = Array.from(document.querySelectorAll("ol > li")).filter((li) => li.querySelector("p.font-semibold"));
+    const cards = Array.from(document.querySelectorAll("ol > li")).filter((li) =>
+      li.querySelector("[data-station-eyebrow]"),
+    );
     const byName = (n) =>
       cards
-        .find((c) => c.querySelector("p.font-semibold").textContent.toLowerCase().includes(n))
+        .find((c) => c.querySelector("[data-station-eyebrow]").textContent.toLowerCase().includes(n))
         .getBoundingClientRect();
     const idx = byName("historic events");
     const live = byName("live state");
