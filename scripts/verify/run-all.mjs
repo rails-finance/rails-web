@@ -147,6 +147,28 @@ const SPLIT = {
       ],
     ],
   },
+  // verify-lifetime-price-chart walks 99 fixtures at about 72 s each (the four
+  // Spark fixtures took 289 s alone, 5 Nov 2026, ui-jobs 506): about two hours
+  // whole, and a part of sixteen ran past the 900 s cap. Its FIXTURES is a
+  // regular expression on the fixture id, so each part is one alternation by
+  // family, ten fixtures at most.
+  "verify-lifetime-price-chart.mjs": {
+    env: "FIXTURES",
+    parts: [
+      ["^aave-v3"],
+      ["^(aave-v4|spark|seamless)"],
+      ["^(moonwell|compound-v2)"],
+      ["^compound-v3"],
+      ["^(makerdao|liquity-v1)"],
+      ["^(dolomite|fluid)"],
+      ["^(sky-savings|morpho)"],
+      ["^(ebisu|asymmetry|basedollar|frankencoin)"],
+      ["^(polaris|fx|maple|pwn)"],
+      ["^llamalend"],
+      ["^(alchemix|aave |yearn)"],
+      ["^liquity-v2"],
+    ],
+  },
   // verify-wallet-links opens up to eight positions per explorer and then the
   // wallet view, which reads the wallet on every chain before its URL moves
   // (67s measured for one morpho owner, 23 Oct 2026); 17 explorers whole hit
