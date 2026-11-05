@@ -16,10 +16,9 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
  * h1 naming the place (the mark, "Rails", "Explorers"), the promise line under
  * it, the search (H15) landing on the wallet view, then the ticked terms
  * (independent / read-only / no login) (Miles, 5 Nov 2026). The way into /start
- * (S12) is the "Start here" link at the top right
- * (components/nav/start-here-link.tsx). The explorer directory lives further
- * down the page under its "Destination DeFi" heading (ProtocolRow), and the
- * rail's chooser (H4) reaches it too.
+ * is in the profile control's menu (H20, ui-jobs 509). The explorer directory
+ * lives further down the page under "Protocols with Rails Explorers"
+ * (ProtocolRow), and the rail's chooser (H4) reaches it too.
  *
  * Entrance animation runs once per browser via the `data-hero-seen` flag set
  * on <html> by the inline blocking script in app/layout.tsx (matching CSS in

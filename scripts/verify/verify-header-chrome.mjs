@@ -321,13 +321,13 @@ const mob = await browser.newPage({ viewport: { width: 390, height: 800 } });
 await mob.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
 const mBurger = await mob.locator('header button[aria-label="Toggle menu"]').count();
 check(mBurger === 0, `mobile header has no hamburger (${mBurger})`);
-// Below `md` the brand rail does not render and the bar carries the lot: mark,
-// H20 and the search's glyph (rails-ops TO-DO-ui-jobs 67, 68, 507). The
-// search's glyph opens the panel with the chooser (503).
+// Below `md` the brand rail does not render: the bar is the Rails mark with a
+// chevron, which opens the panel (H15.1), and H20 (rails-ops TO-DO-ui-jobs 67,
+// 68, 507, 509).
 const mRail = await mob.locator('aside[aria-label="Rails"]').isVisible();
 check(mRail === false, `mobile draws no brand rail (${mRail})`);
 const mLauncher = await mob.locator('header button[data-anatomy="H15.1"]:visible').count();
-check(mLauncher === 1, `mobile header keeps the search's glyph (${mLauncher})`);
+check(mLauncher === 1, `mobile header keeps the panel's launcher (${mLauncher})`);
 const mBookmarks = await mob.locator('header button[aria-label="Bookmarks"]').count();
 check(mBookmarks === 0, `mobile header carries no bookmarks button, retired 1 Nov 2026 (${mBookmarks})`);
 const mToggle = await mob.locator('header button[aria-label^="Switch to"]:visible').count();
@@ -337,33 +337,38 @@ check(mSwitcherAll === 0, `mobile draws no grid glyph, ui-jobs 503 (${mSwitcherA
 const mOrder = await mob.evaluate(() => {
   const c = document.querySelector('header button[data-search-launcher="header"]');
   const f = document.querySelector('header [data-anatomy="H20"]');
-  return !!c && !!f && f.getBoundingClientRect().right <= c.getBoundingClientRect().left;
+  return !!c && !!f && c.getBoundingClientRect().right <= f.getBoundingClientRect().left && !!c.querySelector("svg");
 });
-check(mOrder, "mobile header draws the profile control before the search's glyph, which ends the row (ui-jobs 507)");
-// The app header carries the mark alone and the chain glyph without its name
-// (Miles 18 Oct 2026).
-const mHome = await mob.locator('header a[aria-label="Rails home"]:visible').count();
-check(mHome === 1, `mobile header carries the Rails mark as the home link (${mHome})`);
+check(mOrder, "mobile header: the mark's launcher at the left, H20 at the right (ui-jobs 509)");
+const mHome = await mob.locator('header a[href="/"]:visible').count();
+check(mHome === 0, `mobile header's mark opens the panel, not home (${mHome})`);
 const mWordmark = await mob.locator("header").first().innerText();
 check(!/Rails|Ethereum/i.test(mWordmark), `mobile header shows neither word (${mWordmark.replace(/\s+/g, " ")})`);
-// The phone header on home (Miles, 5 Nov 2026): the mark on the left, then
-// "Start here", H20 and the search's glyph on the right (ui-jobs 507). The
-// beta pill is in the footer below md, and the rail's from md.
+// The phone header on home (ui-jobs 509): the launcher on the left, H20 on the
+// right, no "Start here" (it is in H20's menu). The panel's top row closes it
+// from the launcher's place and links Home. The beta pill is in the footer
+// below md, and the rail's from md.
 const mHomePage = await browser.newPage({ viewport: { width: 390, height: 800 } });
 await mHomePage.goto(BASE + "/", { waitUntil: "networkidle" });
-const mHomeOrder = await mHomePage.evaluate(() => {
-  const at = (sel) => document.querySelector(`header[data-anatomy="H2"] ${sel}`)?.getBoundingClientRect().left ?? null;
-  return [
-    at('a[aria-label="Rails home"]'),
-    at("[data-start-here]"),
-    at('[data-anatomy="H20"]'),
-    at('button[data-search-launcher="header"]'),
-  ];
+const mStart = await mHomePage.locator('header[data-anatomy="H2"] a[href="/start"]').count();
+check(mStart === 0, `home @390: the header carries no Start here (${mStart})`);
+const launcher = mHomePage.locator('header button[data-search-launcher="header"]');
+const lBox = await launcher.boundingBox();
+await launcher.click();
+await mHomePage.waitForTimeout(500);
+const panelRow = await mHomePage.evaluate(() => {
+  const c = document.querySelector("[data-wallet-panel-close]")?.getBoundingClientRect();
+  const h = document.querySelector("[data-wallet-panel-home]");
+  return { x: c ? Math.round(c.x) : null, y: c ? Math.round(c.y) : null, home: h?.getAttribute("href") ?? null };
 });
 check(
-  mHomeOrder.every((x, i) => x !== null && (i === 0 || x > mHomeOrder[i - 1])),
-  `home @390: mark, Start here, H20, search left to right (${mHomeOrder.join(", ")})`,
+  panelRow.x === Math.round(lBox.x) && panelRow.y === Math.round(lBox.y) && panelRow.home === "/",
+  `home @390: the panel's close stands on the launcher's place and Home links / (${JSON.stringify(panelRow)} vs ${Math.round(lBox.x)},${Math.round(lBox.y)})`,
 );
+await mHomePage.mouse.click(lBox.x + lBox.width / 2, lBox.y + lBox.height / 2);
+await mHomePage.waitForTimeout(500);
+const panelShut = await mHomePage.evaluate(() => document.documentElement.hasAttribute("data-wallet-panel-open"));
+check(!panelShut, "home @390: a second press on the launcher's place closes the panel");
 const mHeaderBeta = await mHomePage.locator('header[data-anatomy="H2"]').first().innerText();
 check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
 const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
@@ -387,6 +392,7 @@ const sheet = await mHomePage.evaluate(() => {
     empty: !!m?.querySelector("[data-profile-menu-empty]"),
     themes: [...(m?.querySelectorAll("[data-theme-option]") ?? [])].map((b) => b.textContent.trim()).join(","),
     manage: !!m?.querySelector('[data-profile-menu-manage][href="/bookmarks"]'),
+    start: !!m?.querySelector('[data-profile-menu-empty] a[data-profile-menu-start][href="/start"]'),
     scrim: !!document.querySelector("[data-profile-menu-scrim]"),
   };
 });
@@ -396,9 +402,10 @@ check(
     sheet.bottom === 800 &&
     sheet.empty &&
     sheet.manage &&
+    sheet.start &&
     sheet.scrim &&
     sheet.themes === "Light,Dark,Auto",
-  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: the saving line, Manage wallets, the theme switch (${JSON.stringify(sheet)})`,
+  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: the line with Start here and how to save, Manage wallets, the theme switch (${JSON.stringify(sheet)})`,
 );
 // A press on the dim closes the sheet.
 await mHomePage.waitForTimeout(300);

@@ -24,7 +24,6 @@
 import type { ReactNode } from "react";
 import { ProfileMenu } from "@/components/nav/profile-menu";
 import { BrandRail } from "@/components/nav/brand-rail";
-import { StartHereLink } from "@/components/nav/start-here-link";
 
 export function RailShell({
   column,
@@ -54,8 +53,6 @@ export function RailShell({
                   className="pointer-events-auto absolute right-3.5 top-[15px] flex items-center gap-1"
                   data-profile-corner=""
                 >
-                  {/* Home's "Start here" (S12) stands left of H20; elsewhere it renders nothing. */}
-                  <StartHereLink />
                   <ProfileMenu />
                 </div>
               </div>

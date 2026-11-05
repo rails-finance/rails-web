@@ -24,9 +24,10 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 
-import { RailsGlyph } from "@/components/nav/brand-rail";
+import { RailsMark } from "@/components/nav/rails-mark";
 import { ExplorerChooser } from "@/components/nav/explorer-chooser";
 import { FrontDoorSearch, OPEN_SEARCH_EVENT, TOGGLE_SEARCH_EVENT } from "@/components/shared/front-door-search";
 
@@ -197,19 +198,34 @@ export function WalletPanel() {
         }}
       >
         {/* Below `md` there is no rail and the header bar is under the panel,
-            so the panel's top row restates the bar's furniture as the bar lays
-            it out: the Rails mark top left (16px in, 16px down) and a × top
-            right where the bar's controls are (Miles, 1 Nov 2026). The × is the search glyph's 38px box at its place, so the tap that opened the panel closes it in the same spot (ui-jobs 507). */}
+            so the panel's top row restates the bar's left end: the Rails mark
+            with its chevron pointing left, in the bar's launcher box at its
+            place (16px in, 16px down), so the tap that opened the panel closes
+            it in the same spot; and on the right "Home", since the mark no
+            longer goes home below md (ui-jobs 509). */}
         <div className="flex shrink-0 items-center justify-between px-4 pt-4 md:hidden">
-          <RailsGlyph onClick={close} />
           <button
             type="button"
             onClick={close}
-            className="cursor-pointer rounded-lg p-2.5 text-rb-500 transition-colors hover:text-foreground focus-ring"
-            aria-label="Close"
+            className="group flex h-[38px] shrink-0 cursor-pointer items-center gap-1 rounded-lg text-foreground focus-ring"
+            aria-label="Close search and explorers"
+            data-wallet-panel-close=""
           >
-            <X size={18} aria-hidden="true" />
+            <RailsMark size={30} />
+            <ChevronLeft
+              size={16}
+              className="text-rb-500 transition-colors group-hover:text-foreground"
+              aria-hidden="true"
+            />
           </button>
+          <Link
+            href="/"
+            onClick={close}
+            className="inline-flex h-[38px] items-center rounded-sm px-1.5 text-sm font-medium text-blue-600 underline-offset-4 hover:underline focus-ring dark:text-blue-400"
+            data-wallet-panel-home=""
+          >
+            Home
+          </Link>
         </div>
         {/* Pinned at the top: the search row, no heading (the field names the
             panel; Miles, 1 Nov 2026). From `md` the row sits level with the

@@ -31,7 +31,8 @@ import {
   type RefObject,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
+import { RailsMark } from "@/components/nav/rails-mark";
 import { NAV_BUTTON, ctrlWaking } from "@/lib/shared/ui-grammar";
 import { useHydrated } from "@/hooks/useHydrated";
 import { toggleWalletPanel, useWalletPanelOpen } from "@/components/nav/wallet-panel";
@@ -718,7 +719,11 @@ function FilledLayoutGrid() {
 }
 
 /** The glyph in the chrome that opens the wallet panel (H15.1), from the
- *  brand rail or the header bar. It reads as active while the panel is open.
+ *  brand rail or the header bar. In the rail the search's glyph, blue while
+ *  the panel is open. In the header bar (below md) the Rails mark with a
+ *  chevron pointing right, at the bar's left; the panel opens over it and its
+ *  top row draws the mark with the chevron pointing left in the same place,
+ *  which closes it (ui-jobs 509).
  *  `at="chooser"` is the grid glyph (ui-jobs 497), a second way in that opens
  *  the same panel with the focus on the explorer chooser; it is not drawn
  *  since 503, and putting it back is one more launcher in the rail. */
@@ -744,6 +749,26 @@ export function SearchLauncher({
         data-chooser-trigger={placement}
       >
         <FilledLayoutGrid />
+      </button>
+    );
+  if (placement === "header")
+    return (
+      <button
+        type="button"
+        onClick={(e) => toggleWalletPanel(e.currentTarget)}
+        className="group flex h-[38px] shrink-0 cursor-pointer items-center gap-1 rounded-lg text-foreground focus-ring"
+        aria-label="Search and explorers"
+        aria-expanded={open}
+        aria-keyshortcuts="/ Meta+K"
+        data-anatomy="H15.1"
+        data-search-launcher={placement}
+      >
+        <RailsMark size={30} />
+        <ChevronRight
+          size={16}
+          className="text-rb-500 transition-colors group-hover:text-foreground"
+          aria-hidden="true"
+        />
       </button>
     );
   return (
