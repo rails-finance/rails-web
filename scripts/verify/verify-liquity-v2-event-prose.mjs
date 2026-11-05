@@ -105,6 +105,11 @@ const fixtures = JSON.parse(readFileSync(FIXTURES, "utf8")).fixtures;
 const manifest = new Map(
   JSON.parse(readFileSync(MANIFEST, "utf8")).fixtures.flatMap((f) => f.events.map((e) => [e.id, e.block])),
 );
+/** How many events each trove had when the manifest was written: an event
+ *  numbered past it is new since, and the live fixture troves keep trading. */
+const manifestCount = new Map(
+  JSON.parse(readFileSync(MANIFEST, "utf8")).fixtures.map((f) => [f.troveId, f.events.length]),
+);
 const hash = (s) => createHash("sha256").update(s).digest("hex").slice(0, 16);
 /** Each event block printed in full, by trove and number. */
 function blocks(troveId) {
@@ -342,13 +347,18 @@ try {
     await copied.waitFor({ timeout: 5_000 });
     const copy = await page.evaluate(() => navigator.clipboard.readText());
 
-    // P0
+    // P0. An event numbered past the trove's count in the manifest happened
+    // after it was written: it has no hash to hold, and P1–P3 still read it.
     const want = manifest.get(e.id);
-    check(
-      `${label}: the block's hash = the manifest's`,
-      want === hash(block),
-      want ? `manifest ${want}, generator ${hash(block)}; run pnpm exports:liquity-v2` : "not in the manifest",
-    );
+    if (!want && e.n > (manifestCount.get(f.troveId) ?? Infinity)) {
+      console.log(`  NOTE  ${label}: new since the manifest (${manifestCount.get(f.troveId)} events); P0 not held`);
+    } else {
+      check(
+        `${label}: the block's hash = the manifest's`,
+        want === hash(block),
+        want ? `manifest ${want}, generator ${hash(block)}; run pnpm exports:liquity-v2` : "not in the manifest",
+      );
+    }
 
     // P1
     // The page reads today's price live and the export its pinned one
