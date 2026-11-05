@@ -371,6 +371,50 @@ check(
 );
 await phone.close();
 
+// Saved wallets in the reader's order (ui-jobs 504): a list stored before the
+// order is shown newest first; a move on /bookmarks persists, and the profile
+// menu lists them in that order.
+{
+  const W = [
+    "0xf06016d822943c42e3cb7fc3a6a3b1889c1045f8",
+    "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
+    "0x1111111111111111111111111111111111111111",
+  ];
+  const held = W.map((a, i) => ({
+    key: a,
+    addresses: [a],
+    ensNames: { [a]: null },
+    lastVisited: 1000 + i,
+    pinned: true,
+  }));
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.addInitScript((rows) => {
+    if (!localStorage.getItem("rails-bookmarks")) localStorage.setItem("rails-bookmarks", JSON.stringify(rows));
+  }, held);
+  const bp = await ctx.newPage();
+  await bp.goto(`${BASE}/bookmarks`, { waitUntil: "networkidle" });
+  await bp.waitForSelector("[data-bookmark-row]");
+  const order = () =>
+    bp.locator("[data-bookmark-open]").evaluateAll((as) => as.map((a) => a.getAttribute("href").split("/").pop()));
+  const first = await order();
+  check(
+    "W saved wallets: an unordered list reads newest first",
+    first.join() === [W[2], W[1], W[0]].join(),
+    first.join(),
+  );
+  await bp.locator("[data-bookmark-row]").first().locator('[data-bookmark-move="down"]').click();
+  await bp.reload({ waitUntil: "networkidle" });
+  await bp.waitForSelector("[data-bookmark-row]");
+  const moved = await order();
+  check("W saved wallets: a move persists", moved.join() === [W[1], W[2], W[0]].join(), moved.join());
+  await bp.locator('[data-profile-corner] [data-anatomy="H20"]').click();
+  const menu = await bp
+    .locator("[data-profile-menu-wallet]")
+    .evaluateAll((as) => as.map((a) => a.getAttribute("data-profile-menu-wallet")));
+  check("W profile menu lists them in that order", menu.join() === moved.join(), menu.join());
+  await ctx.close();
+}
+
 await browser.close();
 const failed = results.filter((r) => !r.ok);
 console.log(

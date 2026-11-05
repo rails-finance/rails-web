@@ -22,7 +22,7 @@
 // column's 32px less its 17px pull). On home, "Start here" (S12) stands left of it.
 
 import type { ReactNode } from "react";
-import { BookmarksLink } from "@/components/nav/bookmarks-link";
+import { ProfileMenu } from "@/components/nav/profile-menu";
 import { BrandRail } from "@/components/nav/brand-rail";
 import { StartHereLink } from "@/components/nav/start-here-link";
 
@@ -42,7 +42,7 @@ export function RailShell({
         {column === "app" ? (
           <main className="relative mx-auto max-w-7xl px-4 md:-mt-[17px] md:px-6">
             <div className="absolute right-3.5 top-8 z-10 hidden md:block" data-profile-corner="">
-              <BookmarksLink />
+              <ProfileMenu />
             </div>
             {children}
           </main>
@@ -56,7 +56,7 @@ export function RailShell({
                 >
                   {/* Home's "Start here" (S12) stands left of H20; elsewhere it renders nothing. */}
                   <StartHereLink />
-                  <BookmarksLink />
+                  <ProfileMenu />
                 </div>
               </div>
             </div>

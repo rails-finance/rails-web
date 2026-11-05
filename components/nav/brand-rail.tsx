@@ -28,7 +28,6 @@
 import Link from "next/link";
 import { RailsMark } from "@/components/nav/rails-mark";
 
-import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { SearchLauncher } from "@/components/shared/front-door-search";
 
 /** The Rails glyph, linking home — the same mark and the same link the top bar
@@ -47,7 +46,7 @@ export function RailsGlyph({ onClick }: { onClick?: () => void }) {
   );
 }
 
-/** The release-stage pill at the very foot of the rail, below the theme toggle
+/** The release-stage pill at the very foot of the rail
  *  (Miles, 2026-09-25). Drawn as a label coming out of the browser's left
  *  edge: a full-width strip across the foot of the 56px rail, square on every
  *  corner, the word centred. Under the glyph it read as part of the mark and pulled
@@ -84,11 +83,9 @@ export function BrandRail() {
               chooser is `<SearchLauncher placement="rail" at="chooser" />`. */}
           <SearchLauncher placement="rail" />
         </div>
-        {/* Toggle, then the pill flush to the left edge. `w-full` is what
-            lets the pill sit at x=0 while the toggle stays centred in the
-            56px. */}
-        <div className="flex w-full flex-col items-center gap-1">
-          <HeaderThemeToggle />
+        {/* The pill flush to the left edge. The theme switch is in the
+            profile control's menu (H20, ui-jobs 504). */}
+        <div className="flex w-full flex-col items-center">
           <BetaPill />
         </div>
       </aside>
