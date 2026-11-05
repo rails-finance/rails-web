@@ -329,7 +329,7 @@ export function StageRail() {
           The read-only claim that used to sit here is made on the coverage pages,
           /about/architecture, the hero terms and StructuredData, so dropping
           it costs the site nothing. ═══ */}
-      <p className="body-text mt-8 text-center" data-stage-rail-close="">
+      <p className="body-text mt-8" data-stage-rail-close="">
         Every number on the page traces back to the contracts it came from.{" "}
         <Link
           href="/about/architecture"
