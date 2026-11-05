@@ -19,7 +19,11 @@
 //
 // The site column has no width of its own, so H20 stands in a max-w-7xl frame
 // laid over its top at the same place as on an app page (15px down: the app
-// column's 32px less its 17px pull). On home, "Start here" (S12) stands left of it.
+// column's 32px less its 17px pull).
+//
+// The footer stands at the foot of the viewport on a short page: the body is a
+// flex column (app/layout.tsx), the column fills what the strips and the header
+// bar leave, and the page grows to push the footer down (ui-jobs 509).
 
 import type { ReactNode } from "react";
 import { ProfileMenu } from "@/components/nav/profile-menu";
@@ -37,16 +41,16 @@ export function RailShell({
   return (
     <>
       <BrandRail />
-      <div className="md:pl-14">
+      <div className="flex flex-1 flex-col md:pl-14">
         {column === "app" ? (
-          <main className="relative mx-auto max-w-7xl px-4 md:-mt-[17px] md:px-6">
+          <main className="relative mx-auto w-full max-w-7xl flex-1 px-4 md:-mt-[17px] md:px-6">
             <div className="absolute right-3.5 top-8 z-10 hidden md:block" data-profile-corner="">
               <ProfileMenu />
             </div>
             {children}
           </main>
         ) : (
-          <main className="relative">
+          <main className="relative flex-1">
             <div className="pointer-events-none absolute inset-x-0 top-0 z-10 hidden md:block">
               <div className="relative mx-auto max-w-7xl px-4 md:px-6">
                 <div
