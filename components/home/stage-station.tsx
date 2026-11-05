@@ -67,7 +67,7 @@ function borderPath(w: number, h: number, r: number): string {
 
 /** One station of the StageRail (components/home/stage-rail.tsx), one button.
  *  At rest its heading, centred; a press swaps in what the station does, in
- *  the same box, and a teal line runs the whole border, then withdraws round
+ *  the same box, and a line in the foreground colour runs the whole border, then withdraws round
  *  it into the middle of the left edge (one CSS animation of
  *  stroke-dashoffset over `snakeMs`); when it has gone the heading is back.
  *  Hovering or focusing the box holds the line, and the text. Under reduced
@@ -152,7 +152,7 @@ export function Station({
           <svg
             key={run}
             aria-hidden="true"
-            className="pointer-events-none absolute -inset-px overflow-visible text-teal-700 dark:text-teal-400"
+            className="pointer-events-none absolute -inset-px overflow-visible text-foreground"
             width={size.w + 2}
             height={size.h + 2}
           >
