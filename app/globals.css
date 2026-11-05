@@ -248,6 +248,9 @@
   --backdrop-bg: oklch(0.982 calc(0.0082 * var(--paper-chroma)) var(--paper-hue) / 0.45);
   --panel-shadow: -8px 0 30px oklch(0.2518 calc(0.0251 * var(--paper-chroma)) var(--paper-hue) / 0.15);
   --facehash-ring: oklch(0.967 calc(0.0082 * var(--paper-chroma)) var(--paper-hue));
+  /* The mono facehash (H20): outlined in light, filled in dark (ui-jobs 509). */
+  --facehash-fill: none;
+  --facehash-eye: currentColor;
 
   --rb-text-500: oklch(0.2528 calc(0.0204 * var(--paper-chroma)) var(--paper-hue));
 
@@ -336,6 +339,8 @@
   --backdrop-bg: rgba(0, 0, 0, 0.5);
   --panel-shadow: -8px 0 30px rgba(0, 0, 0, 0.5);
   --facehash-ring: #12131a;
+  --facehash-fill: currentColor;
+  --facehash-eye: var(--background);
 
   --rb-text-500: #dde1e8;
 

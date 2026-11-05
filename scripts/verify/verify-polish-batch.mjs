@@ -20,17 +20,14 @@ await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 const heroOrder = await page.evaluate(() => {
   const section = document.querySelector("h1")?.closest("section");
   if (!section) return "no section";
-  // Read on each child's whole text: the terms line opens "Independent",
-  // so "Read-only" sits past a short prefix.
+  // Read on each child's whole text.
   const texts = [...section.children].map((el) => el.textContent || "");
   const kids = [...section.children].map((el, i) => el.tagName + ":" + texts[i].slice(0, 25));
   const h1i = [...section.children].findIndex(
     (el) => el.querySelector("h1")?.textContent?.trim() === "Rails Explorers",
   );
   const searchi = [...section.children].findIndex((el) => el.querySelector("input"));
-  const taglinei = texts.findIndex((t) =>
-    t.includes("Look up any DeFi position, wallet and protocol, verified directly from the chain."),
-  );
+  const taglinei = texts.findIndex((t) => t.includes("Look up any DeFi position, wallet or protocol."));
   const badgei = texts.findIndex((t) => t.toLowerCase().includes("read-only"));
   return h1i >= 0 && h1i < taglinei && taglinei < searchi && searchi < badgei ? "ok" : kids.join(" | ");
 });
@@ -483,6 +480,9 @@ await phone.close();
     .locator("[data-profile-menu-wallet]")
     .evaluateAll((as) => as.map((a) => a.getAttribute("data-profile-menu-wallet")));
   check("W profile menu lists them in that order", menu.join() === moved.join(), menu.join());
+  // With a wallet saved the menu carries no Start here (ui-jobs 509).
+  const startRows = await bp.locator("[data-profile-menu] [data-profile-menu-start]").count();
+  check("W profile menu with saved wallets has no Start here", startRows === 0, String(startRows));
   await bp.keyboard.press("Escape");
   // The drawer's search (Miles, 5 Nov 2026): focused on open with the list
   // shut and the chooser uncovered; ArrowDown opens the saved wallets; typing

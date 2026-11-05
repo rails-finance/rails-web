@@ -94,11 +94,14 @@ export default async function Home() {
 
       {/* ═══ The page's lower half (Miles, 5 Nov 2026): one gradient, the mirror
           of the top section's, from the floor S5 stands on back to the top's
-          tone at the foot, and on through the footer (SiteFooter takes the
-          top's tone on home). It starts where the top section ends, so the
+          tone at the foot, with 64px more under the last band so the footer
+          (the raised tone, ui-jobs 509) stands clear of it. It starts where the top section ends, so the
           darkest band stays at S5 however tall the directory opens; the bands
           below draw no ground of their own. ═══ */}
-      <div className="bg-gradient-to-b from-background to-rb-50 dark:from-rb-800 dark:to-rb-600" data-home-lower="">
+      <div
+        className="bg-gradient-to-b from-background to-rb-50 pb-16 dark:from-rb-800 dark:to-rb-600"
+        data-home-lower=""
+      >
         {/* ═══ WHO IS RAILS FOR ═══ */}
         {/* The personas lead: the directory says what Rails covers, this says
             who it's for, and the capability list below answers the "how" for

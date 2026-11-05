@@ -192,7 +192,7 @@ export default function RootLayout({
         <StructuredData />
       </head>
       <body
-        className={`${dmSans.className} ${dmSans.variable} antialiased bg-background text-foreground min-h-screen overflow-x-hidden min-w-[320px]`}
+        className={`${dmSans.className} ${dmSans.variable} antialiased bg-background text-foreground min-h-screen flex flex-col overflow-x-hidden min-w-[320px]`}
       >
         <IconSymbols />
         <Providers>

@@ -4,8 +4,9 @@
 // with a chevron, a menu button. The menu, top down: the saved wallets' heading
 // (the filled bookmark, "Saved wallets"), the first ten in the reader's order
 // (lib/shared/sessions.ts; /bookmarks orders them), "Manage wallets →" to
-// /bookmarks, then the theme switch. With none saved, one line on how to save
-// one in place of the rows. From md a dropdown under the control, right
+// /bookmarks, then the theme switch. With none saved, two lines in place of
+// the rows: "New to Rails?" and a signposted "Start here" to /start, then how
+// to save a wallet (ui-jobs 509). From md a dropdown under the control, right
 // edges aligned; below md a sheet from the foot of the screen over a dim (ui-jobs 507), rising
 // over 220ms (globals.css `.profile-sheet`). Rows show what the
 // browser holds (name, ENS, address) and read nothing.
@@ -24,7 +25,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, ChevronDown, Monitor, Moon, Settings, Sun } from "lucide-react";
+import { Bookmark, ChevronDown, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Facehash } from "@/components/shared/facehash";
@@ -36,6 +37,8 @@ import { CTRL_OFF, CTRL_ON } from "@/lib/shared/ui-grammar";
 import type { WalletSession } from "@/lib/shared/sessions";
 
 const BOOKMARKS_PATH = "/bookmarks";
+/** The guided way in (G, /start), reached from this menu (ui-jobs 509). */
+const START_PATH = "/start";
 /** The menu lists this many; the rest are on /bookmarks. */
 const MENU_ROWS = 10;
 
@@ -275,9 +278,22 @@ export function ProfileMenu() {
                   ))}
                 </div>
               ) : (
-                <p className="px-3 pb-1 pt-3 text-sm text-rb-500" data-profile-menu-empty="">
-                  To save a wallet, press the bookmark beside its address on its wallet page.
-                </p>
+                <div className="space-y-2 px-3 pb-1 pt-3 text-sm text-rb-500" data-profile-menu-empty="">
+                  <p>
+                    New to Rails?{" "}
+                    <Link
+                      href={START_PATH}
+                      role="menuitem"
+                      onClick={() => close(false)}
+                      className="inline-flex items-center gap-1 rounded-sm align-bottom font-medium text-blue-600 underline-offset-4 hover:underline focus:outline-none focus-visible:underline dark:text-blue-400"
+                      data-profile-menu-start=""
+                    >
+                      <Signpost className="size-4 shrink-0" aria-hidden="true" />
+                      Start here
+                    </Link>
+                  </p>
+                  <p>To save a wallet, press the bookmark beside its address on its wallet page.</p>
+                </div>
               )}
               {rows.length > 0 && <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />}
               <div className="py-1">
