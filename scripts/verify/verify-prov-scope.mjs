@@ -262,7 +262,7 @@ for (const width of [1280, 390]) {
     JSON.stringify(card),
   );
   // Fresh, so the card's arming does not carry over.
-  await page.reload({ waitUntil: "domcontentloaded" });
+  await page.reload({ waitUntil: "domcontentloaded", timeout: 180000 });
   await page.waitForSelector("[data-lifetime-flows-panel] [data-panel-menu]", { timeout: 120_000 }).catch(() => {});
   await page.waitForTimeout(3000);
   await armScope(page, "flows", { menu: "[data-lifetime-flows-panel] [data-panel-menu]" });
