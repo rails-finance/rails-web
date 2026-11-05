@@ -10,7 +10,7 @@ import { ProtocolGlyph, hasProtocolGlyph } from "@/components/icons/protocol-gly
 import { ChainToggleButtons } from "@/components/shared/chain-toggle";
 import { HomeOnlyChainGlyph } from "@/components/icons/chain-glyphs";
 import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-soon";
-import { PILL_CTA, INPLACE_TEXT } from "@/lib/shared/ui-grammar";
+import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 
 /** Tile width classes chosen per list size so every breakpoint fills its
  *  rows evenly: a chain's eight most used divide by 2/4/8, a list of 6 by 2/3/6. A new
@@ -110,9 +110,9 @@ export function ProtocolRow() {
   return (
     <div className="w-full max-w-7xl mx-auto px-4">
       {/* The chain tabs on the left and, for the chain they show, the coverage
-          pill on the right of the same row from sm; below sm it wraps under
-          the tabs (Miles, 5 Nov 2026). The pill is the shared CTA (PILL_CTA),
-          free-standing, so it answers hover with the blue border itself. */}
+          link on the right of the same row from sm; below sm it wraps under
+          the tabs (Miles, 5 Nov 2026). A text link in the link blue, underlined on
+          hover (ui-jobs 507). */}
       <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <ChainToggleButtons
           chainId={chainId}
@@ -125,7 +125,11 @@ export function ProtocolRow() {
           }}
         />
         {!robinhood && (
-          <Link href={`/coverage/${CHAINS[chainId].slug}`} className={`${PILL_CTA} shrink-0`} data-home-coverage="">
+          <Link
+            href={`/coverage/${CHAINS[chainId].slug}`}
+            className="shrink-0 text-sm font-medium text-blue-600 underline-offset-4 hover:underline dark:text-blue-400"
+            data-home-coverage=""
+          >
             See detailed coverage <span>→</span>
           </Link>
         )}

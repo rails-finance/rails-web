@@ -40,8 +40,7 @@ export const NAV_LINK = "text-rb-500 hover:text-blue-600 dark:hover:text-blue-40
 
 /**
  * Marketing-page CTA pill — the bordered rounded-full navigation button the
- * home page uses ("Start here", "View a live position", "See detailed coverage";
- * ui-jobs 507). Blue text per the one-meaning-per-colour rule (blue =
+ * home page uses for "View a live position" (ui-jobs 507). Blue text per the one-meaning-per-colour rule (blue =
  * navigation); hover turns the border blue. In dark a blue tint and a blue
  * border at rest carry the strength, the text staying the link pair's
  * blue-400 (color-grammar.md §4a).
