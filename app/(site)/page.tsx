@@ -86,6 +86,17 @@ export default async function Home() {
         {/* Explorer directory — one uniform row of tiles on the gradient's
             constant floor, directly above the "DeFi for everyone" band. */}
         <section className="pb-16" data-anatomy="S5">
+          {/* The directory's heading (S10, Miles 5 Nov 2026): "Destination DeFi" at
+              display size, a share of the column's width (cqw) so the line
+              spans it, in a faint tone the floor it stands on can carry. */}
+          <div className="mx-auto max-w-7xl px-4 pb-8 @container" data-anatomy="S10">
+            <h2
+              className="whitespace-nowrap text-center font-semibold leading-none tracking-tighter text-rb-200 text-[14cqw] dark:text-rb-700"
+              data-home-directory-heading=""
+            >
+              Destination DeFi
+            </h2>
+          </div>
           <ProtocolRow />
         </section>
       </div>
@@ -160,19 +171,6 @@ export default async function Home() {
 
         {/* ═══ GET IN TOUCH ═══ */}
         <GetInTouch />
-
-        {/* ═══ FOOT WORDMARK (S10, ui-jobs 498) — "Destination DeFi" at display
-          size on the footer's canvas, in the column SiteFooter's content
-          takes, directly above it. In the raised tone, so faint by intent
-          (Miles, 4 Nov 2026); decorative, so hidden from assistive tech. The
-          size is a share of the column's width (cqw), so the line spans it. ═══ */}
-        <div aria-hidden="true" data-anatomy="S10">
-          <div className="mx-auto max-w-7xl px-4 pt-16 @container">
-            <p className="whitespace-nowrap font-semibold leading-none tracking-tighter text-[var(--surface-raised)] text-[14cqw] select-none">
-              Destination DeFi
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );

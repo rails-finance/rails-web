@@ -281,7 +281,7 @@ check("O home: hero, track lines, value line, sample, directory", ascending(wide
 // footer takes its end tone, not the canvas.
 const ground = await page.evaluate(() => {
   const bg = (el) => (el ? getComputedStyle(el).backgroundColor : "missing");
-  const own = ["S6", "S7", "S8", "S9", "S10"].map((c) => {
+  const own = ["S6", "S7", "S8", "S9"].map((c) => {
     const el = document.querySelector(`[data-anatomy="${c}"]`);
     return [c, bg(el), bg(el?.parentElement)];
   });
