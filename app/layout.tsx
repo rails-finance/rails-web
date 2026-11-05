@@ -132,8 +132,8 @@ export const metadata: Metadata = {
         // image URL, so a regenerated card needs a new URL to be fetched
         // fresh rather than served stale from their cache. Bump the hash
         // (`shasum -a 256 public/og/home.png | cut -c1-8`) whenever
-        // `node scripts/generate-og.mjs` changes this file's bytes.
-        url: "/og/home-eaad142d.png",
+        // `pnpm og` changes this file's bytes.
+        url: "/og/home-3a7eee3f.png",
         width: 1200,
         height: 630,
         alt: `Look up a wallet on Rails: ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia`,
@@ -144,7 +144,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: OG_DESCRIPTION,
-    images: ["/og/home-eaad142d.png"],
+    images: ["/og/home-3a7eee3f.png"],
     creator: TWITTER_HANDLE,
     site: TWITTER_HANDLE,
   },
