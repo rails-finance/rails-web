@@ -42,7 +42,7 @@ async function check(theme) {
   await page.evaluate((t) => document.documentElement.classList.toggle("dark", t === "dark"), theme);
   await page.waitForTimeout(300);
 
-  const h2 = page.getByRole("heading", { name: "What Rails Does" });
+  const h2 = page.getByRole("heading", { name: "What Rails does" });
   await h2.scrollIntoViewIfNeeded();
   await page.waitForTimeout(200);
 
@@ -131,7 +131,7 @@ async function check(theme) {
   const widths = await page.evaluate(() => {
     const bandH2 = Array.from(document.querySelectorAll("h2")).find((h) => /DeFi/.test(h.textContent || ""));
     const railH2 = Array.from(document.querySelectorAll("h2")).find(
-      (h) => (h.textContent || "").trim() === "What Rails Does",
+      (h) => (h.textContent || "").trim() === "What Rails does",
     );
     // persona band inner container = the h2's grandparent (div.max-w-7xl)
     const persona = bandH2?.closest("div.max-w-7xl") || bandH2?.parentElement?.parentElement;

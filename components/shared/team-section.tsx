@@ -49,7 +49,7 @@ const TEAM: readonly Member[] = [
 export function TeamSection({ intro }: { intro?: ReactNode }) {
   return (
     <div>
-      <h2 className={`${H2} mb-6`}>Team</h2>
+      <h2 className={`${H2} mb-6`}>The team</h2>
       {intro}
 
       {/* One column per member (Miles's mock, 5 Nov 2026): the square avatar,

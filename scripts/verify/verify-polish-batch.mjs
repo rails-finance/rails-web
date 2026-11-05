@@ -77,7 +77,7 @@ check(
 );
 
 // 7. Team cards: no card chrome
-const teamCard = page.locator("h2", { hasText: /^Team$/ }).locator("xpath=following-sibling::div[1]/div[1]");
+const teamCard = page.locator("h2", { hasText: /^The team$/ }).locator("xpath=following-sibling::div[1]/div[1]");
 const teamClass = (await teamCard.getAttribute("class")) ?? "";
 check(
   "7 team cards dropped bg-raised/rounded/p-6",
@@ -300,7 +300,7 @@ check(
   JSON.stringify(ground),
 );
 
-// "What Rails Does" (Miles, 5 Nov 2026): each card is one button showing its
+// "What Rails does" (Miles, 5 Nov 2026): each card is one button showing its
 // heading; a press swaps in its text in the same box, which keeps its size;
 // one open at a time; a second press returns it. Under reduced motion the
 // text stays until a press.
@@ -404,7 +404,7 @@ const sample = await pp.evaluate(() => {
     href: link?.getAttribute("href") ?? null,
     box: r ? [Math.round(r.left), Math.round(r.right), Math.round(r.height)] : null,
     framed: [...document.querySelectorAll("span")].some(
-      (s) => s.textContent === "LIVE POSITION" && s.getClientRects().length > 0,
+      (s) => s.textContent === "Live position" && s.getClientRects().length > 0,
     ),
     scroll: document.documentElement.scrollWidth,
   };

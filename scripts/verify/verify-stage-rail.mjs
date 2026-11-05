@@ -43,8 +43,8 @@ async function checkHome(theme) {
   }, theme);
   await page.waitForTimeout(300);
 
-  // Locate the "What Rails Does" section, then the rail's <ol>.
-  const h2 = page.getByRole("heading", { name: "What Rails Does" });
+  // Locate the "What Rails does" section, then the rail's <ol>.
+  const h2 = page.getByRole("heading", { name: "What Rails does" });
   await h2.scrollIntoViewIfNeeded();
   await page.waitForTimeout(200);
 

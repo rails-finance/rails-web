@@ -56,8 +56,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const r = resolveStartPath(path);
   if (!r) return {};
   return {
-    // Absolute: the site template would print "Rails | Start Here".
-    title: { absolute: r.answers.length ? `Start Here · ${r.answers.join(" › ")}` : "Start Here" },
+    // Absolute: the site template would print "Rails | Start here".
+    title: { absolute: r.answers.length ? `Start here · ${r.answers.join(" › ")}` : "Start here" },
     description: r.leaf ? leafHeading(r.leaf) : r.levels[r.levels.length - 1].node.question,
     alternates: { canonical: `/start${path.length ? `/${path.join("/")}` : ""}` },
   };

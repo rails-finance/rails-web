@@ -4,7 +4,7 @@ import { launchedProductionChains } from "@/lib/shared/protocols";
 import { Station, StationGroup } from "@/components/home/stage-station";
 
 /**
- * StageRail — the "What Rails Does" panel as a transit-style rail rather than a
+ * StageRail — the "What Rails does" panel as a transit-style rail rather than a
  * bulleted list. The four data-pipeline bullets were unordered, equal claims;
  * here the structure carries the meaning: Ethereum / Base → (Historic events ∥
  * Live state) → Reconciled → On the page, in the order the data actually moves.

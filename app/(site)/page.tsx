@@ -130,7 +130,7 @@ export default async function Home() {
           contracts to the page and closes on where every number comes from. ═══ */}
         <div>
           <section className="max-w-7xl mx-auto px-4 py-16" data-anatomy="S7">
-            <h2 className="text-3xl font-semibold tracking-tight text-foreground mb-4">What Rails Does</h2>
+            <h2 className="text-3xl font-semibold tracking-tight text-foreground mb-4">What Rails does</h2>
 
             {/* Copy constraints (rails-ops decisions 0006/0010) for this intro
               and the rail below: (1) for CURRENT state the live chain read
