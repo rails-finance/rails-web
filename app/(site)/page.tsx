@@ -71,13 +71,15 @@ export default async function Home() {
         </section>
 
         {/* The roster, counted, then the live position that is one of them. */}
-        <section className="pb-16" data-anatomy="S3">
+        {/* From sm the framed sample stands 128px clear of the value line and of
+            the directory (Miles, 5 Nov 2026); a phone's button keeps 64px. */}
+        <section className="pb-16 sm:pb-32" data-anatomy="S3">
           <CoveredStats covered={covered} stats={stats} valueHeld={valueHeld} />
         </section>
 
         {/* Live example — a real trove in browser chrome; its hover pill
             links to the live position. */}
-        <section className="pb-16" data-anatomy="S2">
+        <section className="pb-16 sm:pb-32" data-anatomy="S2">
           <LiveExampleFrame data={liveExample && packLiveExample(liveExample)} />
         </section>
 
