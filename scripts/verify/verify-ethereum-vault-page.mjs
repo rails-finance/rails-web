@@ -278,7 +278,9 @@ const HOLDERS = [
   // sGho at block 26,018,615 (2.36% of supply, figures worth checking), first
   // Transfer-in at block 25,152,729, and eth_getCode answers 0x.
   { vault: SGHO, holder: "0xc2b7d2aedf1f24d3409788e3a95d021ceb2238f8", shape: "eoa" },
-  { vault: SGHO, holder: "0x1676d23711186076fa74aa53511dda750a1f0d9a", shape: "safe" },
+  // Re-pinned 2026-11-05 (ui-jobs 506): the Safe 0x1676…0d9a exited; this live
+  // Safe from the vault census takes its place.
+  { vault: SGHO, holder: "0x2ea450a8a15d4f5a6535d46a45f4de9dffc33716", shape: "safe" },
   // Re-pinned 2026-10-20 from the vault page's holder roster at census block
   // 26,235,125 (/ethereum/aave/vaults/positions?vault=<stake token>): the two
   // previous fixtures, 0xcbc4…6b25 on stkwaEthUSDC.v1 and 0x3e43…f8ee on stkGHO,
