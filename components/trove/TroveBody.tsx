@@ -238,29 +238,23 @@ export function TroveBody({
     now,
   });
 
-  const summary = (
-    <TroveSummaryStack
-      trove={trove}
-      liveState={liveState}
-      prices={prices}
-      debtInFront={debtInFront}
-      trovesAhead={trovesAhead}
-      queueDebtTotal={queueDebtTotal}
-      debtInFrontLoading={debtInFrontLoading}
-      viewHref={tl.viewHref}
-      surplus={surplus}
-      exports={exports}
-      loadingStatus={{ message: loadingMessage, snapshotDate: lastEventTs ?? undefined }}
-    />
-  );
-
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
         {topRow}
-        {/* The home page's sample drops the card on a phone
-            (live-example-frame.tsx), so there it is wrapped to be named. */}
-        {still ? <div data-trove-summary="">{summary}</div> : summary}
+        <TroveSummaryStack
+          trove={trove}
+          liveState={liveState}
+          prices={prices}
+          debtInFront={debtInFront}
+          trovesAhead={trovesAhead}
+          queueDebtTotal={queueDebtTotal}
+          debtInFrontLoading={debtInFrontLoading}
+          viewHref={tl.viewHref}
+          surplus={surplus}
+          exports={exports}
+          loadingStatus={{ message: loadingMessage, snapshotDate: lastEventTs ?? undefined }}
+        />
 
         {/* Lifetime flows: the bars and the line over the Trove's own event
             replay (lib/shared/liquity-flows.ts). The runway that used to share

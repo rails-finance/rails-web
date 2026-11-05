@@ -262,19 +262,24 @@ check("S home's rail glyph opens the chooser", await openChooser());
 const ctaSelected = await page.locator(`${CHOOSER} [role="tab"][aria-selected="true"]`).getAttribute("aria-label");
 check("S home's chooser opens on Ethereum", ctaSelected === "Ethereum", ctaSelected ?? "none");
 
-// The live sample on a phone (Miles, 5 Nov 2026): no position card and no
-// browser chrome, the frame starts 48px in and runs off the right edge, and the
-// touch link to the position stays on the screen.
+// The live sample on a phone: the browser chrome and the position card show,
+// the frame sits inside the screen with no sideways scroll, and the touch link
+// to the position is on the screen.
 const phone = await browser.newContext({ viewport: { width: 390, height: 900 }, isMobile: true, hasTouch: true });
 const pp = await phone.newPage();
 await pp.goto(`${BASE}/`, { waitUntil: "networkidle" });
-await pp.waitForSelector("[data-trove-summary]", { state: "attached", timeout: 60000 });
+const cardDrawn = await pp
+  .waitForFunction(() => document.querySelector(".live-glow")?.textContent?.includes("Collateral ratio"), null, {
+    timeout: 60000,
+  })
+  .then(() => true)
+  .catch(() => false);
+check("P sample @390: the position card draws", cardDrawn);
 const sample = await pp.evaluate(() => {
   const frame = document.querySelector(".live-glow").getBoundingClientRect();
   const link = [...document.querySelectorAll("a")].find((a) => a.textContent.includes("View this position live"));
   const lr = link?.getBoundingClientRect();
   return {
-    card: getComputedStyle(document.querySelector("[data-trove-summary]")).display,
     chrome: [...document.querySelectorAll("span")].some(
       (s) => s.textContent === "LIVE SAMPLE" && s.getClientRects().length > 0,
     ),
@@ -284,11 +289,10 @@ const sample = await pp.evaluate(() => {
     scroll: document.documentElement.scrollWidth,
   };
 });
-check("P sample @390: no position card", sample.card === "none", sample.card);
-check("P sample @390: no browser chrome", !sample.chrome);
+check("P sample @390: the browser chrome shows", sample.chrome);
 check(
-  "P sample @390: the frame runs off the right edge, no scroll",
-  sample.frameLeft === 48 && sample.frameRight > 390 && sample.scroll === 390,
+  "P sample @390: the frame sits inside the screen, no scroll",
+  sample.frameLeft >= 0 && sample.frameRight <= 390 && sample.scroll === 390,
   JSON.stringify(sample),
 );
 check(
