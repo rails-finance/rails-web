@@ -340,6 +340,32 @@ const mHome = await mob.locator('header a[aria-label="Rails home"]:visible').cou
 check(mHome === 1, `mobile header carries the Rails mark as the home link (${mHome})`);
 const mWordmark = await mob.locator("header").first().innerText();
 check(!/Rails|Ethereum/i.test(mWordmark), `mobile header shows neither word (${mWordmark.replace(/\s+/g, " ")})`);
+// The phone header on home (Miles, 5 Nov 2026): the mark on the left, then
+// "Start here", the search's glyph, the theme toggle and H20 on the right. The
+// beta pill is in the footer below md, and the rail's from md.
+const mHomePage = await browser.newPage({ viewport: { width: 390, height: 800 } });
+await mHomePage.goto(BASE + "/", { waitUntil: "networkidle" });
+const mHomeOrder = await mHomePage.evaluate(() => {
+  const at = (sel) => document.querySelector(`header[data-anatomy="H2"] ${sel}`)?.getBoundingClientRect().left ?? null;
+  return [
+    at('a[aria-label="Rails home"]'),
+    at("[data-start-here]"),
+    at('button[data-search-launcher="header"]'),
+    at('button[aria-label^="Switch to"]'),
+    at('[data-anatomy="H20"]'),
+  ];
+});
+check(
+  mHomeOrder.every((x, i) => x !== null && (i === 0 || x > mHomeOrder[i - 1])),
+  `home @390: mark, Start here, search, theme, H20 left to right (${mHomeOrder.join(", ")})`,
+);
+const mHeaderBeta = await mHomePage.locator('header[data-anatomy="H2"]').first().innerText();
+check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
+const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
+check(mFooterBeta, "home @390: the beta pill is in the footer");
+await mHomePage.close();
+const dFooterBeta = await page.locator("footer [data-phone-beta]:visible").count();
+check(dFooterBeta === 0, `@1280: the footer's beta pill is hidden, the rail carries it (${dFooterBeta})`);
 // FRANKENCOIN is the roster's longest name: at 390 the title must stay on one
 // line, and at 1440 it must not crowd the chooser it now shares a row with.
 for (const [w, h] of [

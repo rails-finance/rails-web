@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePriceStripActive } from "@/components/shared/price-strip";
 import { FeedbackCluster } from "@/components/shared/feedback-cluster";
 import { LwNotice } from "@/components/shared/lw-attribution";
+import { PhoneBeta } from "@/components/nav/phone-beta";
 
 /** Slim app footer used on protocol pages (/liquity-v2, /trove/*).
  *  Single row: copyright + legal on the left, the shared feedback cluster
@@ -23,7 +24,10 @@ export function AppFooter() {
       <div className={`max-w-7xl mx-auto px-4 pt-6 ${priceStripActive ? "pb-20" : "pb-6"}`}>
         <div className="flex flex-col md:flex-row justify-between items-center md:items-start gap-6 md:gap-4">
           <div className="flex flex-col md:flex-row items-center gap-4">
-            <p className="text-xs text-rb-500">© {new Date().getUTCFullYear()} Rails</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-rb-500">© {new Date().getUTCFullYear()} Rails</p>
+              <PhoneBeta />
+            </div>
             <div className="flex gap-4">
               <Link href="/privacy" className="text-rb-500 hover:text-foreground text-xs transition-colors">
                 Privacy Policy

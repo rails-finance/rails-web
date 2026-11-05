@@ -25,19 +25,6 @@ function RailsLogo() {
   );
 }
 
-/** Release-stage pill right of the mark, below `md`. The site is in beta, and the
- *  chrome says so once, site-wide, instead of a per-rail label. It travels
- *  with the mark, so from `md` up BrandRail draws it.
- *  Caution-500 is the house "not settled yet" signal (the anatomy the old
- *  per-rail BETA pill used). */
-function BetaPill() {
-  return (
-    <span className="ml-2 rounded bg-caution-500 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
-      Beta
-    </span>
-  );
-}
-
 export function HeaderBar() {
   const pathname = usePathname();
   // `/` reaches the search from every page; the bar is mounted on all of them.
@@ -61,26 +48,24 @@ export function HeaderBar() {
       className={`${isHome ? "absolute inset-x-0 top-0 z-40" : "relative z-40 mb-2"} md:hidden`}
     >
       <div className="max-w-7xl mx-auto py-4 px-4 md:px-6 flex items-center">
-        {/* The mark and the beta pill, which the rail holds from `md`. */}
-        <div className="flex items-center">
-          <RailsLogo />
-          <BetaPill />
-        </div>
+        {/* The mark alone, which the rail holds from `md`; below md the beta
+            pill is in the footer (components/nav/phone-beta.tsx). */}
+        <RailsLogo />
         {/* Right-hand control cluster. `ml-auto` pushes it hard right — it used
             to yield (`md:ml-0`) to the inline site-links nav that sat here, but
             that nav is retired, so the cluster owns the push outright. The
-            search's glyph and the toggle lead; H20 closes it (the order
-            below). The hamburger is retired — the site's own pages and socials
+            order is home's "Start here", the search's glyph, the toggle, then
+            H20 (Miles, 5 Nov 2026). The hamburger is retired — the site's own pages and socials
             live in the footers (SiteFooter on site routes, AppFooter's
             quiet Coverage link on app routes). */}
         <div className="ml-auto flex items-center gap-1">
+          {/* Home's "Start here" (S12) leads; elsewhere it renders nothing. */}
+          <StartHereLink />
           {/* The search's glyph (H15.1), on every page: it opens the wallet
               panel at full width, the search over the explorer chooser
               (ui-jobs 503). */}
           <SearchLauncher placement="header" />
           <HeaderThemeToggle />
-          {/* Home's "Start here" (S12), left of H20; elsewhere it renders nothing. */}
-          <StartHereLink />
           <BookmarksLink />
         </div>
       </div>

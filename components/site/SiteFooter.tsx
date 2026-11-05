@@ -9,6 +9,7 @@ import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 import { DonateModal } from "@/components/site/DonateModal";
 import { FeedbackCluster } from "@/components/shared/feedback-cluster";
 import { LiquityModal } from "@/components/site/LiquityModal";
+import { PhoneBeta } from "@/components/nav/phone-beta";
 
 export function SiteFooter() {
   const [donateOpen, setDonateOpen] = useState(false);
@@ -204,7 +205,10 @@ export function SiteFooter() {
         <div className="mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex flex-col md:flex-row items-center gap-4 mb-4 md:mb-0">
-              <p className="text-rb-500 text-xs">© {new Date().getUTCFullYear()} Rails</p>
+              <div className="flex items-center gap-2">
+                <p className="text-rb-500 text-xs">© {new Date().getUTCFullYear()} Rails</p>
+                <PhoneBeta />
+              </div>
               <div className="flex gap-4">
                 <Link
                   href="/privacy"
