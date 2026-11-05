@@ -2,8 +2,8 @@
 
 // The explorer chooser (H4, rails-ops TO-DO-ui-jobs 503): the roster, under
 // the search in the wallet panel (H16). The chain glyphs across the top
-// select a chain, each named by its tooltip and the selected one by name
-// beside them; the chain's explorers stand in two columns below, the most
+// select a chain, each named by its tooltip and the selected one by a muted
+// heading under them; the chain's explorers stand in two columns below, the most
 // used shown and the long tail behind "View all <n> explorers"
 // (lib/shared/explorer-rank.ts); its coverage page is the link at the foot.
 // It opens on Ethereum, the first chain, whatever the page's chain (Miles,
@@ -45,7 +45,7 @@ function ExplorerRow({
       data-switcher-explorer=""
       aria-current={isActive ? "page" : undefined}
       onClick={isActive ? undefined : onNavigate}
-      className={`flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-2 text-sm transition-colors focus-ring ${
+      className={`flex min-w-0 items-center gap-2.5 rounded-lg px-2 py-3 text-sm transition-colors focus-ring ${
         isActive ? ROW_CURRENT : ROW_REST
       }`}
     >
@@ -81,7 +81,7 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
   const name = robinhood ? ROBINHOOD_LABEL : chain.name;
 
   return (
-    <div data-anatomy="H4" data-explorer-chooser="">
+    <div className="pt-6" data-anatomy="H4" data-explorer-chooser="">
       <div className="flex items-center gap-1">
         <div role="tablist" aria-label="Blockchain" className="-ml-2 flex items-center gap-1" data-switcher-tabs="">
           {chains.map((c) => {
@@ -117,10 +117,12 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
             <HomeOnlyChainGlyph id="robinhood" className="h-5 w-5" />
           </button>
         </div>
-        <span className="ml-2 truncate text-sm font-semibold text-foreground" data-chooser-chain-name="">
-          {name}
-        </span>
       </div>
+      {/* The selected chain's name, a muted heading over its explorers
+          (Miles, 5 Nov 2026). */}
+      <p className="mt-7 truncate text-sm font-semibold text-rb-500" data-chooser-chain-name="">
+        {name}
+      </p>
 
       {robinhood ? (
         <p role="tabpanel" aria-label={ROBINHOOD_LABEL} className="pt-3 text-sm leading-relaxed text-rb-500">
@@ -143,13 +145,13 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
               type="button"
               onClick={() => setShowAll((v) => !v)}
               aria-expanded={showAll}
-              className="-mx-2 mt-1 cursor-pointer rounded-sm px-2 py-1 text-sm text-blue-600 dark:text-blue-400 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
+              className="-mx-2 mt-3 cursor-pointer rounded-sm px-2 py-1 text-sm text-blue-600 dark:text-blue-400 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
               data-chooser-view-all=""
             >
               {showAll ? "Show the most used" : `View all ${all.length} explorers`}
             </button>
           )}
-          <div className="mt-2 border-t border-rb-200 pt-2.5 dark:border-rb-800">
+          <div className="mt-4 border-t border-rb-200 pt-3 dark:border-rb-800">
             <Link
               href={`/coverage/${chain.slug}`}
               onClick={onNavigate}
