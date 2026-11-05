@@ -144,7 +144,7 @@ export default async function Home() {
             <p className="body-text max-w-3xl">
               Rails builds a read-only explorer for each DeFi protocol it covers. Look up any position &mdash; yours or
               anyone else&rsquo;s &mdash; and see what it holds, what it owes, and everything that has ever happened to
-              it. Here is the path it travels:
+              it. Here is the path the data travels:
             </p>
 
             {/* The capability list became a transit-style rail: the four
