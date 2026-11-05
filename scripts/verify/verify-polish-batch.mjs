@@ -300,38 +300,49 @@ check(
   JSON.stringify(ground),
 );
 
-// "What Rails Does": each station shows its heading at rest, its card is one
-// button, one station opens at a time (a second press shuts it), and opening
-// one moves nothing (Miles, 5 Nov 2026).
+// "What Rails Does" (Miles, 5 Nov 2026): each card is one button showing its
+// heading; a press swaps in its text in the same box, which keeps its size;
+// one open at a time; a second press returns it. Under reduced motion the
+// text stays until a press.
 const stations = page.locator("[data-station-toggle]");
-const shut = await stations.evaluateAll((bs) =>
-  bs.every(
-    (b) => b.getAttribute("aria-expanded") === "false" && !!document.getElementById(b.getAttribute("aria-controls")),
-  ),
+await stations.first().scrollIntoViewIfNeeded();
+await page.mouse.move(0, 0);
+const shown = (i) =>
+  stations.nth(i).evaluate((b) => !b.querySelector("[data-station-line]").classList.contains("invisible"));
+const sizeOf = (i) => stations.nth(i).evaluate((b) => [b.offsetWidth, b.offsetHeight].join("×"));
+const restSize = await sizeOf(3);
+await stations.nth(3).click();
+await page.mouse.move(0, 0);
+const swapped = await shown(3);
+const openSize = await sizeOf(3);
+await stations.nth(1).click();
+await page.mouse.move(0, 0);
+const pressed = await stations.evaluateAll((bs) =>
+  bs.map((b) => (b.getAttribute("aria-pressed") === "true" ? 1 : 0)).join(""),
 );
-const railBox = () =>
-  page.evaluate(() => {
-    const ol = document.querySelector('[data-anatomy="S7"] ol');
-    const close = document.querySelector("[data-stage-rail-close]");
-    return [Math.round(ol.getBoundingClientRect().height), Math.round(close.getBoundingClientRect().top + scrollY)];
-  });
-const before = await railBox();
-const states = [];
-let still = true;
-for (let i = 0; i < 5; i++) {
-  await stations.nth(i).click();
-  states.push(
-    await stations.evaluateAll((bs) => bs.map((b) => (b.getAttribute("aria-expanded") === "true" ? 1 : 0)).join("")),
-  );
-  still &&= JSON.stringify(await railBox()) === JSON.stringify(before);
-}
-await stations.nth(4).click();
-const allShut = await stations.evaluateAll((bs) => bs.every((b) => b.getAttribute("aria-expanded") === "false"));
+await stations.nth(1).click();
+const allBack = await stations.evaluateAll((bs) => bs.every((b) => b.getAttribute("aria-pressed") === "false"));
 check(
-  "R stations: shut at rest; each press opens that one alone; a second press shuts it; nothing moves",
-  (await stations.count()) === 5 && shut && states.join() === "10000,01000,00100,00010,00001" && allShut && still,
-  `${states.join()} · still ${still}`,
+  "R stations: a press swaps in the text, same size; one open at a time; a second press returns it",
+  swapped && restSize === openSize && pressed === "01000" && allBack,
+  JSON.stringify({ swapped, restSize, openSize, pressed, allBack }),
 );
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: "reduce" });
+  const rp = await ctx.newPage();
+  await rp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  const st = rp.locator("[data-station-toggle]").nth(0);
+  await st.scrollIntoViewIfNeeded();
+  await st.click();
+  await rp.mouse.move(0, 0);
+  const ms = Number(await st.getAttribute("data-snake-ms"));
+  await rp.waitForTimeout(ms + 1000);
+  const stays = (await st.getAttribute("aria-pressed")) === "true";
+  await st.click();
+  const back = (await st.getAttribute("aria-pressed")) === "false";
+  check("R stations: under reduced motion the text stays past its time, until a press", stays && back, `${ms}ms`);
+  await ctx.close();
+}
 
 // The directory lists a chain's most used explorers, as the drawer's chooser
 // does, and "View all <n> explorers" opens the rest in place.

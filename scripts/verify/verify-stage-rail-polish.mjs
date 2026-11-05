@@ -67,17 +67,16 @@ async function check(theme) {
   assert(!bodies.join(" ").includes("19 protocols"), "no stale protocol-count copy");
   assert(!bodies.join(" ").includes("or contract read"), "no stale 'or contract read' tail");
 
-  // Vertical rhythm: at rest (every station shut, Miles 5 Nov 2026) every
-  // station card renders the SAME height, so the fork column's pair and the
-  // three single cards align top and bottom. The shut card's lg:min-h-[4.25rem]
-  // floor holds the chain station's two-line name; a longer name breaks it.
+  // Each card is sized to the longer of its heading and its text (Miles, 5
+  // Nov 2026), so heights differ by content; the fork pair shares one row
+  // height, so its two cards match.
   const cardHeights = await ol.evaluate((el) =>
     Array.from(el.querySelectorAll("li > [data-station-toggle]")).map((d) =>
       Math.round(d.getBoundingClientRect().height),
     ),
   );
   assert(cardHeights.length === 5, `five station cards measured (got ${cardHeights.length})`);
-  assert(new Set(cardHeights).size === 1, "all station cards share one height: " + cardHeights.join(" · "));
+  assert(cardHeights[1] === cardHeights[2], "the fork pair share one height: " + cardHeights.join(" · "));
 
   // Connector alignment — the whole point of the rail is that the line meets the
   // card it joins. Two things have broken this before: the overlay being sized

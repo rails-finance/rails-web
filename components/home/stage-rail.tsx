@@ -25,9 +25,9 @@ import { Station, StationGroup } from "@/components/home/stage-station";
  * right — the rotation carries the desktop upper card to the right). Both
  * layouts share one <ol> so the pipeline order reaches a screen reader.
  *
- * Server component; each station (stage-station.tsx) is its heading, one
- * button, and a press shows its line in the band under the rail, one station
- * at a time (StationGroup; Miles, 5 Nov 2026). The connectors are
+ * Server component; each station (stage-station.tsx) is one button showing its
+ * heading, and a press swaps in what it does, for a while, one station at a
+ * time (StationGroup; Miles, 5 Nov 2026). The connectors are
  * built from bordered CSS divs (not SVG: a fluid-width SVG needs
  * preserveAspectRatio="none", which distorts corner radii). The track is BLUE
  * (design decision 2026-07-20, matching the reference mock): the rail is the
@@ -84,6 +84,15 @@ function NodeDot({ className, style }: { className?: string; style?: React.CSSPr
   );
 }
 
+/** What each station does: the text a press swaps in for its heading. */
+const LINES = {
+  chain: "DeFi protocols run here as public contracts. Every deposit, loan and repayment is on the record.",
+  historic: "Rails reads every event in order and explains each in plain English.",
+  live: "Rails asks those same contracts what the position holds and owes today.",
+  reconciled: "Lifetime totals are checked against live state. Anything that doesn’t reconcile is left out.",
+  page: "Every figure shows its source, so you can check it on a block explorer that isn’t ours.",
+};
+
 /** A station's glyph: the accent station's check is BLUE (the mock's
  *  treatment), the track's colour arriving at the station it exists to reach. */
 function glyph(Icon: typeof Box, accent?: boolean) {
@@ -102,26 +111,7 @@ export function StageRail() {
           must contain the <ol> and NOTHING else — the footer claim below used to
           live inside it, which stretched the overlay ~76px taller than the rail
           and dropped every connector below the cards it joins. */}
-      <StationGroup
-        lines={[
-          {
-            id: "chain",
-            line: <>DeFi protocols run here as public contracts. Every deposit, loan and repayment is on the record.</>,
-          },
-          { id: "historic", line: <>Rails reads every event in order and explains each in plain English.</> },
-          { id: "live", line: <>Rails asks those same contracts what the position holds and owes today.</> },
-          {
-            id: "reconciled",
-            line: (
-              <>Lifetime totals are checked against live state. Anything that doesn&rsquo;t reconcile is left out.</>
-            ),
-          },
-          {
-            id: "page",
-            line: <>Every figure shows its source, so you can check it on a block explorer that isn&rsquo;t ours.</>,
-          },
-        ]}
-      >
+      <StationGroup>
         <div className="relative">
           {/* ═══ DESKTOP connector overlay (lg+) — decorative. Mirrors the grid
           template so connectors land in the reserved 40px columns. grid-rows-2
@@ -215,6 +205,7 @@ export function StageRail() {
           >
             <Station
               id="chain"
+              line={LINES.chain}
               icon={glyph(Box)}
               // The chains the pipeline reads FOR THIS SITE — the launched ones,
               // so the first station names what the rest of the page offers.
@@ -229,6 +220,7 @@ export function StageRail() {
               indexed is the upper fork card. */}
             <Station
               id="historic"
+              line={LINES.historic}
               icon={glyph(History)}
               eyebrow="Historic events"
               className="col-start-2 row-start-3 lg:col-start-3 lg:row-start-1"
@@ -236,6 +228,7 @@ export function StageRail() {
 
             <Station
               id="live"
+              line={LINES.live}
               icon={glyph(Radio)}
               eyebrow="Live state"
               className="col-start-1 row-start-3 lg:col-start-3 lg:row-start-2"
@@ -243,6 +236,7 @@ export function StageRail() {
 
             <Station
               id="reconciled"
+              line={LINES.reconciled}
               icon={glyph(CircleCheck, true)}
               eyebrow="Reconciled"
               accent
@@ -251,6 +245,7 @@ export function StageRail() {
 
             <Station
               id="page"
+              line={LINES.page}
               icon={glyph(LayoutGrid)}
               eyebrow="On the page"
               className="col-span-2 row-start-7 lg:col-span-1 lg:col-start-7 lg:row-start-1 lg:row-span-2 lg:self-center"
