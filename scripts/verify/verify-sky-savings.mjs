@@ -40,7 +40,7 @@ import { fileURLToPath } from "node:url";
 import { createPublicClient, http, parseAbi } from "viem";
 import { mainnet } from "viem/chains";
 import { chromium } from "playwright";
-import { armInspector } from "./lib/prov-inspector.mjs";
+import { armInspector, armScope } from "./lib/prov-inspector.mjs";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
@@ -511,31 +511,43 @@ check("rate history lists every change", rows === String(rates.data.ssr.length),
   for (const t of ["chi", "rho", "ssr", "drip", "Vow", "suck", "wei"])
     check(`learn more: defines ${t}`, modal.includes(`Term: ${t}`));
   await p2.keyboard.press("Escape");
+  // Arming is per section since ui-jobs 284, so the receipts are opened a
+  // section at a time: the position card, then Lifetime flows. A timeline
+  // card's figures trace from its own Trace rows, not from an armed scope.
   check("mixed page: the inspector arms", await armInspector(p2));
-  const boxes = p2.locator("span.prov-locate-box");
-  const nb = await boxes.count();
-  let opened = 0;
+  const opened = {};
   const untraced = [];
   let scaling = null;
   let share = null;
-  for (let i = 0; i < nb; i++) {
-    const bx = boxes.nth(i);
-    if (!(await bx.isVisible())) continue;
-    await bx.scrollIntoViewIfNeeded();
-    await bx.click();
-    const pop = await p2.waitForSelector(".prov-inspect-pop", { timeout: 5000 }).catch(() => null);
-    if (!pop) continue;
-    const t = await pop.innerText();
-    opened++;
-    if (/Untraced input/.test(t)) untraced.push(t.split("\n")[0]);
-    if (!scaling && /dividing by/.test(t)) scaling = t.match(/dividing by (\S+)/)[1];
-    if (!share && /^Share price\n1 sUSDS = /.test(t)) share = t;
-    await p2.keyboard.press("Escape");
-    await p2.waitForTimeout(80);
-  }
+  const openLit = async (section) => {
+    opened[section] = 0;
+    const boxes = p2.locator("[data-prov-lit] span.prov-locate-box");
+    const nb = await boxes.count();
+    for (let i = 0; i < nb; i++) {
+      const bx = boxes.nth(i);
+      if (!(await bx.isVisible())) continue;
+      await bx.scrollIntoViewIfNeeded();
+      await bx.click();
+      const pop = await p2.waitForSelector(".prov-inspect-pop", { timeout: 5000 }).catch(() => null);
+      if (!pop) continue;
+      const t = await pop.innerText();
+      opened[section]++;
+      if (/Untraced input/.test(t)) untraced.push(t.split("\n")[0]);
+      if (!scaling && /dividing by/.test(t)) scaling = t.match(/dividing by (\S+)/)[1];
+      if (!share && /^Share price\n1 sUSDS = /.test(t)) share = t;
+      await p2.keyboard.press("Escape");
+      await p2.waitForTimeout(80);
+    }
+  };
+  await openLit("card");
   check(
-    `mixed page: no receipt shows "Untraced input" (${opened} opened)`,
-    opened > 50 && untraced.length === 0,
+    "mixed page: Lifetime flows arms",
+    await armScope(p2, "flows", { menu: "[data-lifetime-flows-panel] [data-panel-menu]" }),
+  );
+  await openLit("flows");
+  check(
+    `mixed page: no receipt shows "Untraced input" (${JSON.stringify(opened)} opened)`,
+    opened.card > 0 && opened.flows > 0 && untraced.length === 0,
     [...new Set(untraced)].join("; "),
   );
   check("mixed page: the scaling line reads 10¹⁸", scaling === "10¹⁸", `${scaling}`);
