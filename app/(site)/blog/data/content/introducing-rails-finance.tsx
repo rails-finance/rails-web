@@ -17,7 +17,7 @@ export default function IntroducingRailsFinance() {
       <h2>A redemption example</h2>
       <p>
         Let's look at{" "}
-        <a href="https://rails.finance/trove/WETH/40095378890324002625149490754668196451863018148182123632866179105523781406581">
+        <a href="/ethereum/liquity-v2/trove/WETH/40095378890324002625149490754668196451863018148182123632866179105523781406581">
           a real event
         </a>
         : a redemption that cleared 27,802 BOLD of debt.
@@ -59,14 +59,14 @@ export default function IntroducingRailsFinance() {
       <p>After the redemption the borrower immediately increased their interest rate from 4.2% to 4.7%.</p>
       <h2>See the patterns</h2>
       <p>
-        Look at the <a href="https://rails.finance/liquity-v2">Trove list</a> view. Notice interest rates with labels
-        like "Summerstone" or "ARM"? That's a batch manager&mdash;a service that actively manages interest rates for
-        you. Being able to judge the performance of these delegates will help you decide if you should manage rates
-        yourself or delegate to a service.
+        Look at the <a href="/ethereum/liquity-v2">Trove list</a> view. Notice interest rates with labels like
+        "Summerstone" or "ARM"? That's a batch manager&mdash;a service that actively manages interest rates for you.
+        Being able to judge the performance of these delegates will help you decide if you should manage rates yourself
+        or delegate to a service.
       </p>
       <p>
         See the closed Trove with 1.46 million BOLD debt?{" "}
-        <a href="https://rails.finance/trove/WETH/86492959577850149240240812252549298434003808930398513838023494031629517707047">
+        <a href="/ethereum/liquity-v2/trove/WETH/86492959577850149240240812252549298434003808930398513838023494031629517707047">
           Check its timeline
         </a>
         . You can view its entire history&mdash;when it borrowed, how it adjusted rates, when it got redeemed, how it
@@ -110,13 +110,13 @@ export default function IntroducingRailsFinance() {
         <li>Understand how the protocol actually works before risking capital</li>
       </ul>
       <p>
-        Start with the <a href="https://rails.finance/liquity-v2">Trove list</a>. Filter by collateral type. Sort by
-        interest rate or debt size. Click into positions and explore their timelines. See the mechanics operate through
-        hundreds of real transactions.
+        Start with the <a href="/ethereum/liquity-v2">Trove list</a>. Filter by collateral type. Sort by interest rate
+        or debt size. Click into positions and explore their timelines. See the mechanics operate through hundreds of
+        real transactions.
       </p>
       <p>Then decide if the protocol is right for you.</p>
       <p>
-        Try it: <a href="https://rails.finance/">rails.finance</a>
+        Try it: <a href="/">rails.finance</a>
       </p>
     </>
   );
