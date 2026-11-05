@@ -203,13 +203,21 @@ function useGlowPause() {
   return ref;
 }
 
-type SampleMode = "pending" | "framed" | "layered" | "single-card" | "single-flows";
+type SampleMode =
+  | "pending"
+  | "framed"
+  | "layered"
+  | "single-card"
+  | "single-flows"
+  | "button-example"
+  | "button-sample";
 
 /** Which sample a reader sees, decided after mount: below sm the layered
  *  slices, from sm the framed page. On a dev server `?sample=` picks another
  *  phone sample for side-by-side review (temporary, Miles 5 Nov 2026):
  *  `classic` the framed page, `single` or `single-flows` the Lifetime flows
- *  panel alone, `single-card` the position card alone. */
+ *  panel alone, `single-card` the position card alone, `button` and
+ *  `button-sample` no sample, a link to the position alone. */
 function useSampleMode(): SampleMode {
   const [mode, setMode] = useState<SampleMode>("pending");
   useEffect(() => {
@@ -223,7 +231,11 @@ function useSampleMode(): SampleMode {
           ? "single-card"
           : asked === "single" || asked === "single-flows"
             ? "single-flows"
-            : "layered";
+            : asked === "button"
+              ? "button-example"
+              : asked === "button-sample"
+                ? "button-sample"
+                : "layered";
     const set = () => setMode(mq.matches ? phone : "framed");
     set();
     mq.addEventListener("change", set);
@@ -286,6 +298,20 @@ function SingleSample({ data, which }: { data: WireLiveExample | null; which: "c
       </div>
       <Link href={LIVE_EXAMPLE_TROVE_PATH} className={`${SINGLE_BUTTON} mt-5`}>
         View live position <span>→</span>
+      </Link>
+    </div>
+  );
+}
+
+/** Below sm, on review: no sample, the link to the position alone, centred
+ *  and a little narrower than the search. It rises 112px into the hero's foot,
+ *  68px under the ticks' text, and keeps 112px to the
+ *  value line. */
+function ButtonSample({ words }: { words: string }) {
+  return (
+    <div className="-mt-28 mb-16 flex justify-center px-4 sm:hidden" data-live-button="">
+      <Link href={LIVE_EXAMPLE_TROVE_PATH} className={`${SINGLE_BUTTON} max-w-[19rem]`}>
+        {words} <span>→</span>
       </Link>
     </div>
   );
@@ -376,6 +402,8 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
       {(mode === "pending" || mode === "layered") && (
         <LayeredSample data={mode === "layered" ? data : null} glowRef={layeredGlowRef} />
       )}
+      {mode === "button-example" && <ButtonSample words="View live example" />}
+      {mode === "button-sample" && <ButtonSample words="View live sample" />}
       {(mode === "single-card" || mode === "single-flows") && (
         <SingleSample data={data} which={mode === "single-card" ? "card" : "flows"} />
       )}
