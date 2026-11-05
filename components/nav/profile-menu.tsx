@@ -5,8 +5,8 @@
 // (the filled bookmark, "Saved wallets"), the first ten in the reader's order
 // (lib/shared/sessions.ts; /bookmarks orders them), "Manage wallets →" to
 // /bookmarks, then the theme switch. With none saved, one line on how to save
-// one, then the theme switch. From md a dropdown under the control, right
-// edges aligned; below md a full-width sheet under it. Rows show what the
+// one in place of the rows. From md a dropdown under the control, right
+// edges aligned; below md a full-width sheet under it over a dim. Rows show what the
 // browser holds (name, ENS, address) and read nothing.
 //
 // The face is the first saved wallet's; with none, the sample wallet's
@@ -222,52 +222,61 @@ export function ProfileMenu() {
         open &&
         place &&
         createPortal(
-          <div
-            ref={menu}
-            id={menuId}
-            role="menu"
-            aria-label={BOOKMARKS_NAME}
-            data-profile-menu=""
-            className={`fixed z-[var(--z-popover)] border border-rb-200 bg-raised p-2 shadow-xl dark:border-rb-800 ${
-              place.phone ? "inset-x-0 rounded-b-2xl border-x-0" : "w-80 rounded-xl"
-            }`}
-            style={place.phone ? { top: place.top } : { top: place.top, right: place.right }}
-          >
-            <p className="flex items-center gap-2 px-3 pb-2 pt-1 text-sm font-semibold text-foreground">
-              <Bookmark className="size-4 shrink-0" fill="currentColor" aria-hidden="true" />
-              {BOOKMARKS_NAME}
-            </p>
-            <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />
-            {rows.length > 0 ? (
-              <>
+          <>
+            {/* Below md the sheet dims the page under it, as the wallet
+                panel's scrim does (H16.1); a press on it closes the sheet. */}
+            {place.phone && (
+              <div
+                aria-hidden="true"
+                className="fixed inset-0 z-[var(--z-popover)] bg-white/60 dark:bg-black/70"
+                data-profile-menu-scrim=""
+              />
+            )}
+            <div
+              ref={menu}
+              id={menuId}
+              role="menu"
+              aria-label={BOOKMARKS_NAME}
+              data-profile-menu=""
+              className={`fixed z-[var(--z-popover)] border border-rb-200 bg-raised p-2 shadow-xl dark:border-rb-800 ${
+                place.phone ? "inset-x-0 rounded-b-2xl border-x-0" : "w-80 rounded-xl"
+              }`}
+              style={place.phone ? { top: place.top } : { top: place.top, right: place.right }}
+            >
+              <p className="flex items-center gap-2 px-3 pb-2 pt-1 text-sm font-semibold text-foreground">
+                <Bookmark className="size-4 shrink-0" fill="currentColor" aria-hidden="true" />
+                {BOOKMARKS_NAME}
+              </p>
+              <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />
+              {rows.length > 0 ? (
                 <div className="py-1" data-profile-menu-wallets="">
                   {rows.map((s) => (
                     <WalletRow key={s.key} session={s} onDone={() => close(false)} />
                   ))}
                 </div>
-                <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />
-                <div className="py-1">
-                  <Link
-                    href={BOOKMARKS_PATH}
-                    role="menuitem"
-                    onClick={() => close(false)}
-                    className={`${ITEM} text-blue-600 dark:text-blue-400`}
-                    data-profile-menu-manage=""
-                  >
-                    <Settings className="size-4 shrink-0" aria-hidden="true" />
-                    Manage wallets →
-                  </Link>
-                </div>
-              </>
-            ) : (
-              <p className="px-3 py-3 text-sm text-rb-500" data-profile-menu-empty="">
-                To save a wallet, press the bookmark beside its address on its wallet page.
-              </p>
-            )}
-            <div className="px-1 pb-1 pt-1">
-              <ThemeSwitch />
+              ) : (
+                <p className="px-3 pb-1 pt-3 text-sm text-rb-500" data-profile-menu-empty="">
+                  To save a wallet, press the bookmark beside its address on its wallet page.
+                </p>
+              )}
+              {rows.length > 0 && <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />}
+              <div className="py-1">
+                <Link
+                  href={BOOKMARKS_PATH}
+                  role="menuitem"
+                  onClick={() => close(false)}
+                  className={`${ITEM} text-blue-600 dark:text-blue-400`}
+                  data-profile-menu-manage=""
+                >
+                  <Settings className="size-4 shrink-0" aria-hidden="true" />
+                  Manage wallets →
+                </Link>
+              </div>
+              <div className="px-1 pb-1 pt-1">
+                <ThemeSwitch />
+              </div>
             </div>
-          </div>,
+          </>,
           document.body,
         )}
     </>

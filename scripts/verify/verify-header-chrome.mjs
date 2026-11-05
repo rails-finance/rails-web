@@ -383,12 +383,24 @@ const sheet = await mHomePage.evaluate(() => {
     width: r ? Math.round(r.width) : 0,
     empty: !!m?.querySelector("[data-profile-menu-empty]"),
     themes: [...(m?.querySelectorAll("[data-theme-option]") ?? [])].map((b) => b.textContent.trim()).join(","),
+    manage: !!m?.querySelector('[data-profile-menu-manage][href="/bookmarks"]'),
+    scrim: !!document.querySelector("[data-profile-menu-scrim]"),
   };
 });
 check(
-  sheet.role === "menu" && sheet.width === 390 && sheet.empty && sheet.themes === "Light,Dark,Auto",
-  `home @390: H20 opens a full-width menu, the saving line and the theme switch (${JSON.stringify(sheet)})`,
+  sheet.role === "menu" &&
+    sheet.width === 390 &&
+    sheet.empty &&
+    sheet.manage &&
+    sheet.scrim &&
+    sheet.themes === "Light,Dark,Auto",
+  `home @390: H20 opens a full-width menu over a dim: the saving line, Manage wallets, the theme switch (${JSON.stringify(sheet)})`,
 );
+// A press on the dim closes the sheet.
+await mHomePage.mouse.click(195, 780);
+const dimClosed = await mHomePage.evaluate(() => !document.querySelector("[data-profile-menu]"));
+check(dimClosed, "home @390: a press on the dim closes the menu");
+await h20.click();
 await mHomePage.keyboard.press("Escape");
 const h20Back = await mHomePage.evaluate(
   () =>
