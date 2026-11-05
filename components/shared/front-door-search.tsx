@@ -191,7 +191,7 @@ export function SearchBox({
         onKeyDown={onKeyDown}
         onBlur={onBlur}
         placeholder={placeholder}
-        aria-label={combobox ? SUGGEST_PLACEHOLDER : placeholder}
+        aria-label={combobox ? SUGGEST_PLACEHOLDER : placeholder || SEARCH_PLACEHOLDER}
         {...(combobox
           ? {
               role: "combobox",
@@ -268,6 +268,8 @@ function useLookup(href: (address: string) => string, onDone?: () => void) {
 export interface FrontDoorSearchProps {
   /** Where an address lands; the wallet view unless the surface names its own. */
   href?: (address: string) => string;
+  /** The field's placeholder; "" for none (the home hero). The accessible
+   *  name stands either way. */
   placeholder?: string;
   size?: Size;
   surface?: SearchSurface;

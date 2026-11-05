@@ -1,7 +1,7 @@
 // Playwright check for the 10-item polish batch (merry-neumann plan).
 // Run: node scripts/verify/verify-polish-batch.mjs   (dev server on :3000)
-// Repointed (ui-jobs 432, 498): check 8 reads the hero's h1 "Rails DeFi Explorers", the ticks under it,
-// then the search; the line under the search is gone.
+// Repointed (ui-jobs 432, 498; Miles 5 Nov 2026): check 8 reads the hero top down: the ticks,
+// the h1 "Rails Explorers", the promise line, the search.
 import { chromium } from "playwright";
 
 const results = [];
@@ -16,7 +16,7 @@ const page = await ctx.newPage();
 // ── Home page items ──────────────────────────────────────────────────────
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 
-// 8. Hero order: h1 → ticked terms → search, with no line under the search
+// 8. Hero order: ticked terms → h1 → promise line → search
 const heroOrder = await page.evaluate(() => {
   const section = document.querySelector("h1")?.closest("section");
   if (!section) return "no section";
@@ -24,13 +24,17 @@ const heroOrder = await page.evaluate(() => {
   // so "Read-only" sits past a short prefix.
   const texts = [...section.children].map((el) => el.textContent || "");
   const kids = [...section.children].map((el, i) => el.tagName + ":" + texts[i].slice(0, 25));
-  const h1i = texts.findIndex((t) => t.includes("DeFi Explorers"));
+  const h1i = [...section.children].findIndex(
+    (el) => el.querySelector("h1")?.textContent?.trim() === "Rails Explorers",
+  );
   const searchi = [...section.children].findIndex((el) => el.querySelector("input"));
-  const tagline = texts.some((t) => t.includes("Look up any position"));
+  const taglinei = texts.findIndex((t) =>
+    t.includes("Look up any DeFi position, wallet and protocol, verified directly from the chain."),
+  );
   const badgei = texts.findIndex((t) => t.toLowerCase().includes("read-only"));
-  return h1i >= 0 && h1i < badgei && badgei < searchi && !tagline ? "ok" : kids.join(" | ");
+  return badgei >= 0 && badgei < h1i && h1i < taglinei && taglinei < searchi ? "ok" : kids.join(" | ");
 });
-check("8 hero: h1 → badges → search, no tagline", heroOrder === "ok", heroOrder === "ok" ? "" : heroOrder);
+check("8 hero: badges → h1 → promise → search", heroOrder === "ok", heroOrder === "ok" ? "" : heroOrder);
 
 // 3. URL pill: single pill carries the tint; toolbar row has no bg tint
 const bar = page.locator("span", { hasText: "rails.finance" }).first();
