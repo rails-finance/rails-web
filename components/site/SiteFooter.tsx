@@ -99,9 +99,9 @@ export function SiteFooter() {
             </div>
           </div>
 
-          {/* Learn About Rails — icon nav moved out of the header hamburger */}
+          {/* Learn about Rails — icon nav moved out of the header hamburger */}
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-3">Learn About Rails</h4>
+            <h4 className="text-sm font-semibold text-foreground mb-3">Learn about Rails</h4>
             <ul className="space-y-2">
               <li>
                 <Link

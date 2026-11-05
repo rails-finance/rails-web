@@ -73,6 +73,7 @@ import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 
 // A percentage with the false-zero guard: a tick holding 1e-12 fxUSD of the
 // pool must never render as "0.0%" — holding something is why it is listed.
@@ -707,7 +708,7 @@ function TickTable({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | null 
           <button
             type="button"
             onClick={() => setShowAll((s) => !s)}
-            className="shrink-0 text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
+            className={`shrink-0 text-[11px] ${INPLACE_TEXT}`}
           >
             {showAll ? "Show major ticks only" : `Show all ${ordered.length} ticks`}
           </button>

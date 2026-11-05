@@ -188,6 +188,12 @@ const STATIC_FILE = {
   basedollar: "explore-basedollar.png",
   "aave-v3": "explore-aave-v3.png",
   "aave-v3-base": "explore-aave-v3-base.png",
+  "aave-v3-arbitrum": "explore-aave-v3-arbitrum.png",
+  "aave-v4-base": "explore-aave-v4-base.png",
+  alchemix: "explore-alchemix.png",
+  "alchemix-base": "explore-alchemix-base.png",
+  "compound-v3-arbitrum": "explore-compound-v3-arbitrum.png",
+  "morpho-arbitrum": "explore-morpho-arbitrum.png",
   "aave-v4": "explore-aave-v4.png",
   "aave-vaults": "explore-aave-vaults.png",
   compound: "explore-compound.png",
@@ -239,19 +245,148 @@ const CENSUS = [
     gate: "route ADDRESS",
     params: { wallet: "hello", eventId: "e" },
   },
+  // The Compound V3 Base path moved to [market]/[wallet] in a94f4109; the
+  // bare [market] segment still takes a wallet (the old link's shape).
+  {
+    id: "compound-v3 base wallet-in-market",
+    file: F("base/compound-v3/[market]"),
+    session: "compound-base",
+    gate: "route ADDRESS on the segment",
+    params: { market: "hello" },
+  },
   {
     id: "compound-v3 base",
-    file: F("base/compound-v3/[wallet]"),
+    file: F("base/compound-v3/[market]/[wallet]"),
     session: "compound-base",
+    gate: "route ADDRESS on the wallet (the market segment must be present)",
+    params: { market: "usdc", wallet: "hello" },
+  },
+  {
+    id: "compound-v3 base event",
+    file: F("base/compound-v3/[market]/[wallet]/event/[eventId]"),
+    session: "compound-base",
+    gate: "route ADDRESS on the wallet",
+    params: { market: "usdc", wallet: "hello", eventId: "e" },
+  },
+  {
+    id: "aave-v4 base spoke",
+    file: F("base/aave-v4/spoke/[spoke]/[wallet]"),
+    session: "aave-v4-base",
+    gate: "route ADDRESS on the wallet",
+    params: { spoke: "core", wallet: "hello" },
+  },
+  {
+    id: "aave-v4 base spoke event",
+    file: F("base/aave-v4/spoke/[spoke]/[wallet]/event/[eventId]"),
+    session: "aave-v4-base",
+    gate: "route ADDRESS on the wallet",
+    params: { spoke: "core", wallet: "hello", eventId: "e" },
+  },
+  // Arbitrum (ui-jobs 423): the same wallet gates, each on its own explorer's card.
+  {
+    id: "aave-v3 arbitrum",
+    file: F("arbitrum/aave-v3/[wallet]"),
+    session: "aave-v3-arbitrum",
     gate: "route ADDRESS",
     params: { wallet: "hello" },
   },
   {
-    id: "compound-v3 base event",
-    file: F("base/compound-v3/[wallet]/event/[eventId]"),
-    session: "compound-base",
+    id: "aave-v3 arbitrum event",
+    file: F("arbitrum/aave-v3/[wallet]/event/[eventId]"),
+    session: "aave-v3-arbitrum",
     gate: "route ADDRESS",
     params: { wallet: "hello", eventId: "e" },
+  },
+  {
+    id: "compound-v3 arbitrum wallet-in-market",
+    file: F("arbitrum/compound-v3/[market]"),
+    session: "compound-v3-arbitrum",
+    gate: "route ADDRESS on the segment",
+    params: { market: "hello" },
+  },
+  {
+    id: "compound-v3 arbitrum",
+    file: F("arbitrum/compound-v3/[market]/[wallet]"),
+    session: "compound-v3-arbitrum",
+    gate: "route ADDRESS on the wallet (the market segment must be present)",
+    params: { market: "usdc", wallet: "hello" },
+  },
+  {
+    id: "compound-v3 arbitrum event",
+    file: F("arbitrum/compound-v3/[market]/[wallet]/event/[eventId]"),
+    session: "compound-v3-arbitrum",
+    gate: "route ADDRESS on the wallet",
+    params: { market: "usdc", wallet: "hello", eventId: "e" },
+  },
+  {
+    id: "morpho arbitrum wallet",
+    file: F("arbitrum/morpho/[wallet]"),
+    session: "morpho-arbitrum",
+    gate: "route ADDRESS",
+    params: { wallet: "hello" },
+  },
+  {
+    id: "morpho arbitrum market",
+    file: F("arbitrum/morpho/[wallet]/[market]"),
+    session: "morpho-arbitrum",
+    gate: "route ADDRESS + isMorphoArbitrumMarketSegment",
+    params: { wallet: "hello", market: "hello" },
+  },
+  {
+    id: "morpho arbitrum market event",
+    file: F("arbitrum/morpho/[wallet]/[market]/event/[eventId]"),
+    session: "morpho-arbitrum",
+    gate: "route ADDRESS + isMorphoArbitrumMarketSegment",
+    params: { wallet: "hello", market: "hello", eventId: "e" },
+  },
+  // Alchemix (lib/alchemix/{position,transmuter,v2}-route.tsx): the line key
+  // must be a line on the chain and the id well-formed, before any read.
+  ...[
+    ["ethereum", "alchemix"],
+    ["base", "alchemix-base"],
+  ].flatMap(([chain, session]) => [
+    {
+      id: `alchemix ${chain}`,
+      file: F(`${chain}/alchemix/[lineKey]/[tokenId]`),
+      session,
+      gate: "isLineOnChain + ALCHEMIX_TOKEN_ID",
+      params: { lineKey: "hello", tokenId: "hello" },
+    },
+    {
+      id: `alchemix ${chain} event`,
+      file: F(`${chain}/alchemix/[lineKey]/[tokenId]/event/[eventId]`),
+      session,
+      gate: "isLineOnChain + ALCHEMIX_TOKEN_ID",
+      params: { lineKey: "hello", tokenId: "hello", eventId: "e" },
+    },
+    {
+      id: `alchemix ${chain} transmuter`,
+      file: F(`${chain}/alchemix/transmuter/[lineKey]/[nftId]`),
+      session,
+      gate: "isLineOnChain + ALCHEMIX_TOKEN_ID on the nft id",
+      params: { lineKey: "hello", nftId: "hello" },
+    },
+    {
+      id: `alchemix ${chain} transmuter event`,
+      file: F(`${chain}/alchemix/transmuter/[lineKey]/[nftId]/event/[eventId]`),
+      session,
+      gate: "isLineOnChain + ALCHEMIX_TOKEN_ID on the nft id",
+      params: { lineKey: "hello", nftId: "hello", eventId: "e" },
+    },
+  ]),
+  {
+    id: "alchemix v2",
+    file: F("ethereum/alchemix/v2/[lineKey]/[account]"),
+    session: "alchemix",
+    gate: "isV2LineOnChain + ALCHEMIX_V2_ACCOUNT",
+    params: { lineKey: "hello", account: "hello" },
+  },
+  {
+    id: "alchemix v2 event",
+    file: F("ethereum/alchemix/v2/[lineKey]/[account]/event/[eventId]"),
+    session: "alchemix",
+    gate: "isV2LineOnChain + ALCHEMIX_V2_ACCOUNT",
+    params: { lineKey: "hello", account: "hello", eventId: "e" },
   },
   {
     id: "moonwell base",
@@ -635,6 +770,7 @@ const CENSUS = [
     file: F("base/morpho/vaults/[vault]/[holder]"),
     session: "morpho-base",
     gate: "route isMorphoBaseServedVault + ADDRESS on the holder, before vaultShareCardModel",
+    allows: ["/api/vaults/roster"],
     params: { vault: "hello", holder: ADDR_OK },
   },
   {
@@ -642,6 +778,7 @@ const CENSUS = [
     file: F("base/morpho/vaults/[vault]/[holder]"),
     session: "morpho-base",
     gate: "route isMorphoBaseServedVault + ADDRESS on the holder, before vaultShareCardModel",
+    allows: ["/api/vaults/roster"],
     params: { vault: MORPHO_BASE_VAULT, holder: "hello" },
   },
   // Base, event — `load()` line 48: the same roster test and the same holder
@@ -652,6 +789,7 @@ const CENSUS = [
     file: F("base/morpho/vaults/[vault]/[holder]/event/[eventId]"),
     session: "morpho-base",
     gate: "route isMorphoBaseServedVault + ADDRESS on the holder, before vaultUnitsFromCensus and vaultEventCardModel",
+    allows: ["/api/vaults/roster"],
     params: { vault: "hello", holder: ADDR_OK, eventId: "e" },
   },
   {
@@ -659,7 +797,26 @@ const CENSUS = [
     file: F("base/morpho/vaults/[vault]/[holder]/event/[eventId]"),
     session: "morpho-base",
     gate: "route isMorphoBaseServedVault + ADDRESS on the holder, before vaultUnitsFromCensus and vaultEventCardModel",
+    allows: ["/api/vaults/roster"],
     params: { vault: MORPHO_BASE_VAULT, holder: "hello", eventId: "e" },
+  },
+  // MetaMorpho on Ethereum (40e97e49): the same roster and holder tests as
+  // Base (components/vaults/metamorpho-share-images.tsx), on Morpho's card.
+  {
+    id: "vaults morpho ethereum · bad vault",
+    file: F("ethereum/morpho/vaults/[vault]/[holder]"),
+    session: "morpho",
+    gate: "metaMorphoRosterEntry + ADDRESS on the holder, before the share card model",
+    allows: ["/api/vaults/roster"],
+    params: { vault: "hello", holder: ADDR_OK },
+  },
+  {
+    id: "vaults morpho ethereum event · bad vault",
+    file: F("ethereum/morpho/vaults/[vault]/[holder]/event/[eventId]"),
+    session: "morpho",
+    gate: "metaMorphoRosterEntry + ADDRESS on the holder, before the event card model",
+    allows: ["/api/vaults/roster"],
+    params: { vault: "hello", holder: ADDR_OK, eventId: "e" },
   },
 ];
 
@@ -748,7 +905,10 @@ const require = createRequire(ROOT + "package.json");
 const ts = require("typescript");
 const STUBS = {
   "next/headers": 'export async function headers(){ return new Headers({ host: "share-probe.invalid", "x-forwarded-proto": "http", "x-real-ip": "198.51.100.7" }); } export async function cookies(){ return { get(){ return undefined; } }; }',
-  "next/navigation": 'export function notFound(){ throw new Error("notFound"); }',
+  // The client hooks a share route can reach through a shared component
+  // (asset-popover.tsx's usePathname) are stubbed beside notFound.
+  "next/navigation":
+    'export function notFound(){ throw new Error("notFound"); } export function usePathname(){ return "/"; } export function useRouter(){ return { push(){}, replace(){}, prefetch(){} }; } export function useSearchParams(){ return new URLSearchParams(); } export function useParams(){ return {}; } export function useSelectedLayoutSegment(){ return null; } export function useSelectedLayoutSegments(){ return []; } export function redirect(){ throw new Error("redirect"); }',
   // server-only (lib/api/reader-ip.ts) throws under plain node; Next maps it to
   // an empty module, and so does this.
   "server-only": "",
@@ -780,6 +940,12 @@ export async function resolve(spec, ctx, next) {
 }
 export async function load(url, ctx, next) {
   if (url.startsWith("stub:")) return { format: "module", source: STUBS[url.slice(5)], shortCircuit: true };
+  // A JSON import, which Next takes without an import attribute.
+  if (url.endsWith(".json") && url.startsWith("file:"))
+    return { format: "module", source: "export default " + readFileSync(fileURLToPath(url), "utf8") + ";", shortCircuit: true };
+  // A content file, as next.config.ts's loader hands it over (scripts/yaml-loader.cjs).
+  if (url.endsWith(".yaml") && url.startsWith("file:"))
+    return { format: "module", source: require(fileURLToPath(ROOT) + "scripts/yaml-loader.cjs").toModule(readFileSync(fileURLToPath(url), "utf8")), shortCircuit: true };
   if (/\.tsx?$/.test(url) && url.startsWith("file:")) {
     const src = readFileSync(fileURLToPath(url), "utf8");
     const out = ts.transpileModule(src, {
@@ -837,6 +1003,13 @@ globalThis.fetch = async (input, init) => {
     kind,
     method,
     put: kind === "self" && method === "PUT" ? bodyText : undefined,
+    // A tail PUT is gzipped bytes since putVaultTail compresses it: kept as
+    // base64 with its encoding, so the replay hands the proxy what it was sent.
+    putB64:
+      kind === "self" && method === "PUT" && (init?.body instanceof ArrayBuffer || ArrayBuffer.isView(init?.body))
+        ? Buffer.from(init.body instanceof ArrayBuffer ? new Uint8Array(init.body) : init.body).toString("base64")
+        : undefined,
+    putEncoding: kind === "self" && method === "PUT" ? headers.get("content-encoding") : undefined,
     query: kind === "self" ? new URL(url, SELF).search : undefined,
     methods: reqs.map((r) => r.method),
     bearer: Boolean(auth && auth.startsWith("Bearer ")),
@@ -1005,9 +1178,13 @@ if (bc) {
     ]) {
       const r = bc.share[key];
       const k = kinds(r.calls);
-      const zero = k.backend.length === 0 && k.self.length === 0 && (rpcAllowed || k.rpc.length === 0);
+      // A name goes to the resolver, which asks rails-server's name store
+      // first (lib/ens/resolve-ens.ts, /api/at-block/names) and the chain after;
+      // that read is the resolver's, and nothing else may reach the backend.
+      const backend = rpcAllowed ? k.backend.filter((c) => !c.path.endsWith("/api/at-block/names")) : k.backend;
+      const zero = backend.length === 0 && k.self.length === 0 && (rpcAllowed || k.rpc.length === 0);
       check(
-        `C${n}. ${label} wallet route, q="${q}" (${why}): 200, the static card byte for byte, ${rpcAllowed ? "no backend or self request (the resolver's RPC allowed)" : "ZERO outbound requests"}`,
+        `C${n}. ${label} wallet route, q="${q}" (${why}): 200, the static card byte for byte, ${rpcAllowed ? "no backend or self request beyond the resolver's (its name read and RPC allowed)" : "ZERO outbound requests"}`,
         r.status === 200 && r.sha === staticSha[session] && zero,
         `${r.status} ${r.type} ${r.len} B, static=${r.sha === staticSha[session]}; ${describe(r.calls)}`,
       );
@@ -1028,7 +1205,10 @@ if (bc) {
     const r = bc.og.find((x) => x.id === row.id);
     if (!r || r.error) continue;
     const k = kinds(r.calls);
-    const ok = r.status === 200 && r.sha === staticSha[row.session] && r.calls.length === 0;
+    // A row whose gate IS a served read (the vault roster) may make that read
+    // and nothing else: `allows` names it by path.
+    const extra = r.calls.filter((c) => !(c.kind === "backend" && (row.allows ?? []).some((a) => c.path.endsWith(a))));
+    const ok = r.status === 200 && r.sha === staticSha[row.session] && extra.length === 0;
     if (!ok)
       bad.push(
         `${row.id} [${row.gate}] → ${r.status}, static=${r.sha === staticSha[row.session]}, ${describe(r.calls)} (${k.rpc.length} rpc)`,
@@ -1077,7 +1257,10 @@ out.listing = snapshot();
 
 // The hop as the proxy receives it: Vercel has stamped x-real-ip with the
 // function's egress address; the signed pair is whatever the render sent.
-const sent = out.tail.find((c) => c.kind === "self" && c.hopIp && c.hopSig);
+// Since a013e465 the tail loaders read the box in the render (boxOnlyHop), so
+// the signed pair is taken off the listing's hop, which still goes through
+// its own /api proxy.
+const sent = out.listing.find((c) => c.kind === "self" && c.hopIp && c.hopSig);
 async function proxied(pair) {
   rec.reset();
   const h = new Headers({ "x-real-ip": EGRESS_IP, ...pair });
@@ -1103,10 +1286,16 @@ if (f) {
     }); hop readers ${JSON.stringify(selfCalls(calls).map((c) => c.hopIp))}; signed ${JSON.stringify(selfCalls(calls).map((c) => Boolean(c.hopSig)))}`;
   const carries = (calls) =>
     selfCalls(calls).length >= 1 && selfCalls(calls).every((c) => c.hopIp === SSR_READER && Boolean(c.hopSig));
+  // Since a013e465 a protocol tail loader reads the box in the render, with no
+  // hop to its own /api proxy: every request it makes goes to the backend
+  // with the bearer token and the page's reader.
+  const tailBackend = f.tail.filter((c) => c.kind === "backend");
   check(
-    "F1. a protocol tail loader (Aave V3) names the page's reader, signed, on every request to its own /api proxy",
-    carries(f.tail),
-    hopDetail(f.tail),
+    "F1. a protocol tail loader (Aave V3) reads the backend directly, with the bearer token and X-Rails-Reader-IP = the page's reader, and no self hop",
+    tailBackend.length >= 1 &&
+      selfCalls(f.tail).length === 0 &&
+      tailBackend.every((c) => c.bearer && c.reader === SSR_READER),
+    `${hopDetail(f.tail)}; backend [bearer, reader] ${JSON.stringify(tailBackend.map((c) => [c.bearer, c.reader]))}`,
   );
   check(
     "F2. a Liquity-fork trove loader (Ebisu) keeps its hop — the proxy values rows at the branch PriceFeed — and names the reader on it",
@@ -1184,7 +1373,11 @@ async function replay(c) {
   if (c.hopIp) h.set("x-rails-ssr-reader-ip", c.hopIp);
   if (c.hopSig) h.set("x-rails-ssr-reader-sig", c.hopSig);
   const init = { method: c.method, headers: h };
-  if (c.method === "PUT") { h.set("content-type", "application/json"); init.body = c.put; }
+  if (c.method === "PUT") {
+    h.set("content-type", "application/json");
+    if (c.putEncoding) h.set("content-encoding", c.putEncoding);
+    init.body = c.putB64 ? Buffer.from(c.putB64, "base64") : c.put;
+  }
   const handler = c.method === "PUT" ? tailProxy.PUT : tailProxy.GET;
   const res = await handler(new NextRequest(SELF + c.path + c.query, init)).catch(() => null);
   return { method: c.method, status: res ? res.status : null, backend: snapshot().filter((x) => x.kind === "backend") };

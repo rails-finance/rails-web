@@ -615,7 +615,15 @@ async function runFixture(f) {
   // same pipeline the route runs: the rows below it must be stated by the
   // replay's own `omitted` — its count, its breakdown and its state — for
   // exactly the events the kept rows do not cover, with no anchor.
-  if (f.shape !== "seeded") {
+  // A plan of fewer than three rows cannot be cut below the two-row floor:
+  // all-folders reads as one folder of every event since 5 Nov 2026, so its
+  // trim is the exploiter's to prove.
+  if (f.shape !== "seeded" && plan.length < 3) {
+    skip(
+      id("T1 a trim states what is below it"),
+      `the plan has ${plan.length} row(s); no cut at 2 rows leaves anything below`,
+    );
+  } else if (f.shape !== "seeded") {
     const prepared = await readMoonwellIndex({
       wallet: f.wallet,
       deployment: MOONWELL_BASE_DEPLOYMENT,

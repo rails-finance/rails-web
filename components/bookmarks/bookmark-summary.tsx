@@ -20,6 +20,7 @@ import {
   type WalletSummary,
   type WalletSummaryProtocol,
 } from "@/lib/wallet/wallet-summary";
+import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 
 type State = { kind: "waiting" } | { kind: "failed" } | { kind: "read"; summary: WalletSummary };
 
@@ -108,7 +109,7 @@ export function BookmarkSummary({ address }: { address: string }) {
           <button
             type="button"
             onClick={read}
-            className="cursor-pointer rounded-sm text-blue-600 dark:text-blue-400 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
+            className={`cursor-pointer rounded-sm transition-colors focus-ring ${INPLACE_TEXT}`}
           >
             Retry
           </button>

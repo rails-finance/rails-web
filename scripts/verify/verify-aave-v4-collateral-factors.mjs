@@ -84,9 +84,12 @@ const HUB_KEY_BY_ADDR = {
   "0x62d63197660c080236193ca60b70e49a08e90368": "paxos",
 };
 // Single-collateral open positions (P), and closed positions (C) with the
-// spoke page slug the card renders on.
+// spoke page slug the card renders on. The Kelp position is re-picked when it
+// closes: the largest open single-collateral rsETH position on the listing
+// (0xabfe… closed between blocks 26,253,664 and 26,254,931; 0xf746… held
+// 2.7M of rsETH at a 0.95 factor on 5 Nov 2026).
 const OPEN = [
-  { spoke: "kelp", wallet: "0xabfe00f81c2b9734c2fecec3f1996e18611ce658" },
+  { spoke: "kelp", wallet: "0xf7462251c14d2fb83c7ab96367a7985423c83010" },
   { spoke: "main", wallet: "0x05453676e8525e4f206950b5e1c6fd380a068ee7" },
 ];
 const CLOSED = [

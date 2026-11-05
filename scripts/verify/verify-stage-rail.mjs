@@ -43,8 +43,8 @@ async function checkHome(theme) {
   }, theme);
   await page.waitForTimeout(300);
 
-  // Locate the "What Rails Does" section, then the rail's <ol>.
-  const h2 = page.getByRole("heading", { name: "What Rails Does" });
+  // Locate the "What Rails does" section, then the rail's <ol>.
+  const h2 = page.getByRole("heading", { name: "What Rails does" });
   await h2.scrollIntoViewIfNeeded();
   await page.waitForTimeout(200);
 
@@ -69,7 +69,7 @@ async function checkHome(theme) {
   );
 
   // The Ethereum station reads the newcomer copy, not the old roster line.
-  const chainCopy = await ol.locator("li").first().textContent();
+  const chainCopy = await page.locator("[data-station-line='chain']").textContent();
   assert(chainCopy.includes("public contracts"), "Ethereum station renders the newcomer chain copy");
   assert(!/\bprotocols'/.test(chainCopy), "no stale roster-count copy on the chain station");
 

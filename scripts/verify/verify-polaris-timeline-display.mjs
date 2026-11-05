@@ -40,6 +40,8 @@
 // Run:  BASE=http://localhost:3103 node scripts/verify/verify-polaris-timeline-display.mjs
 
 import { chromium } from "playwright";
+import { copyPositionMarkdown } from "./lib/copy-position.mjs";
+import { openCardOnFigures } from "./lib/card-tabs.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 
@@ -106,7 +108,8 @@ const pct1 = (pct) => {
 };
 const pct2 = (pct) => `${pct.toFixed(2)}%`;
 // "Timeline values" left Display with its off state (326, `5b5c19b`).
-const MENU_LABELS = ["Transaction hashes"];
+// "Figures first" since ui-jobs 370 (FIGURES_FIRST_ITEM, timeline-toolbar.tsx).
+const MENU_LABELS = ["Transaction hashes", "Figures first"];
 
 // ── the routes, read at run time ────────────────────────────────────────────
 const byTime = (a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp;
@@ -203,9 +206,10 @@ const rowOf = (page, eventId) => page.locator(`[data-event-id="${eventId}"]`).fi
 async function expandRow(page, eventId) {
   const row = rowOf(page, eventId);
   await row.scrollIntoViewIfNeeded();
-  // Open already when its sheet is drawn.
+  // The sheet is on the card's Figures tab (ui-jobs 370); openCardOnFigures
+  // presses the header only while the card is shut, so an open row stays open.
   if ((await row.locator("[data-sheet]").count()) === 0) {
-    await row.locator('[data-anatomy="T1"] [role="button"]').first().click();
+    await openCardOnFigures(row);
     await row
       .locator("[data-sheet]")
       .first()
@@ -238,13 +242,7 @@ async function readRatioStat(page, eventId) {
 }
 
 async function copyMarkdown(page) {
-  await page
-    .getByRole("button", { name: /Export this (position|loan|trove)|Copy for LLM/i })
-    .first()
-    .click();
-  await page.getByRole("menuitem", { name: /Copy Position/i }).click();
-  await page.waitForTimeout(500);
-  return page.evaluate(() => navigator.clipboard.readText());
+  return copyPositionMarkdown(page);
 }
 
 /** The price-less document: every `priceAtBlock` value in the flight data
@@ -283,11 +281,11 @@ try {
   // ── (a) the menu ──────────────────────────────────────────────────────────
   const page8 = await open(context, polarisUrl("usdp", "8"));
   const menu = (await readDisplayMenu(page8)).map((s) => s.toLowerCase());
-  // usdp/8 has market notes, so the menu closes on their two items under a
-  // rule (rails-ops TO-DO-ui-jobs item 118).
-  const NOTE_LABELS = ["market notes", "open all market notes"];
+  // usdp/8 has market notes, so the menu closes on their item under a rule
+  // (ui-jobs 118; "Open all market notes" went with 14499408, ui-jobs 399).
+  const NOTE_LABELS = ["market notes"];
   check(
-    "a. usdp/8's display menu offers Transaction hashes, then the two market-note items, no Collateral Ratio and no collapse item",
+    "a. usdp/8's display menu offers Transaction hashes and Figures first, then Market notes, no Collateral Ratio and no collapse item",
     menu.length === MENU_LABELS.length + NOTE_LABELS.length &&
       MENU_LABELS.every((l, i) => menu[i] === l.toLowerCase()) &&
       NOTE_LABELS.every((l, i) => menu[MENU_LABELS.length + i] === l) &&

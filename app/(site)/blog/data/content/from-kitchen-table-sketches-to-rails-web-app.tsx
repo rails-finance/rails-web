@@ -3,11 +3,8 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
     <>
       <p>
         Rails began with my own struggle to untangle my on-chain activity. That confusion — and a desire to contribute
-        meaningfully to the blockchain space — led me to build{" "}
-        <a href="https://rails.finance" target="_blank" rel="noopener noreferrer">
-          Rails
-        </a>
-        , a web app designed to make DeFi protocols clear and accessible for everyone.
+        meaningfully to the blockchain space — led me to build <a href="/">Rails</a>, a web app designed to make DeFi
+        protocols clear and accessible for everyone.
       </p>
       <h2 id="discovering-digital-truth-20182021">Discovering digital truth (2018–2021)</h2>
       <p>
@@ -33,11 +30,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
         challenge. Given that the blockchain is a public ledger, it seemed like it <em>should</em> be straightforward. I
         found myself sketching lines between the protocol and my wallet across a timeline — a map began to take shape.
         That map helped me decode my transactions and <em>see</em> clearly what was happening. It became the blueprint
-        for{" "}
-        <a href="https://rails.finance" target="_blank" rel="noopener noreferrer">
-          Rails
-        </a>
-        .
+        for <a href="/">Rails</a>.
       </p>
       <figure>
         <img
@@ -202,11 +195,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
         human, and usable. The mission hasn’t changed since those first kitchen table sketches.
       </p>
       <p>
-        We launched the new{" "}
-        <a href="https://rails.finance" target="_blank" rel="noopener noreferrer">
-          rails.finance
-        </a>{" "}
-        in November 2025.
+        We launched the new <a href="/">rails.finance</a> in November 2025.
       </p>
       <figure>
         <img
@@ -224,10 +213,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       <p>
         <strong>Connect with us:</strong>
         <br />
-        <strong>Try Rails:</strong>{" "}
-        <a href="https://rails.finance" target="_blank" rel="noopener noreferrer">
-          rails.finance
-        </a>
+        <strong>Try Rails:</strong> <a href="/">rails.finance</a>
         <br />
         <strong>Follow:</strong>{" "}
         <a href="https://twitter.com/rails_finance" target="_blank" rel="noopener noreferrer">

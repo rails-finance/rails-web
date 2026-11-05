@@ -20,6 +20,8 @@
 // Run:  BASE=http://localhost:3413 node scripts/verify/verify-polaris-at-block-prices.mjs
 
 import { chromium } from "playwright";
+import { copyPositionMarkdown } from "./lib/copy-position.mjs";
+import { openCardOnFigures } from "./lib/card-tabs.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 
@@ -82,14 +84,15 @@ async function open(context, url) {
   return page;
 }
 
-/** Expand one event row (by its `event_key`/`id`) and return its own text,
- *  whitespace-collapsed. Idempotent — clicking an already-open row a second
- *  time is never attempted by this script. */
+/** Open one event row (by its `event_key`/`id`) on its Figures tab, where the
+ *  price pill is drawn since the card's tabs (ui-jobs 370), and return its own
+ *  text, whitespace-collapsed. openCardOnFigures presses only while the card
+ *  is shut, so an open row is never closed. */
 async function expandRow(page, eventId) {
   const row = page.locator(`[data-event-id="${eventId}"]`);
   if ((await row.count()) === 0) return null;
   await row.scrollIntoViewIfNeeded();
-  await row.getByRole("button").first().click();
+  await openCardOnFigures(row);
   await page.waitForTimeout(200);
   return (await row.innerText()).replace(/\s+/g, " ");
 }
@@ -222,13 +225,7 @@ await pageG8.close();
 
 const page8b = await open(context, polarisUrl(PINNED.market, PINNED.id));
 const copyMarkdown = async (page) => {
-  await page
-    .getByRole("button", { name: /Export this (position|loan|trove)|Copy for LLM/i })
-    .first()
-    .click();
-  await page.getByRole("menuitem", { name: /Copy Position/i }).click();
-  await page.waitForTimeout(500);
-  return page.evaluate(() => navigator.clipboard.readText());
+  return copyPositionMarkdown(page);
 };
 const md = await copyMarkdown(page8b);
 check(

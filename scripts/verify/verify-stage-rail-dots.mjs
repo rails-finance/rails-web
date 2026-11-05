@@ -33,7 +33,7 @@ const geo = await page.evaluate(() => {
     .filter((li) => li.querySelector("[data-station-eyebrow]"))
     .map((li) => {
       const eyebrow = li.querySelector("[data-station-eyebrow]").textContent.trim();
-      return { eyebrow, rect: li.querySelector("div.z-\\[1\\]").getBoundingClientRect().toJSON() };
+      return { eyebrow, rect: li.querySelector("[data-station-toggle]").getBoundingClientRect().toJSON() };
     });
   // Desktop dots = the rounded spans inside the lg-only overlay (hidden lg:grid).
   const overlay = rail.parentElement.querySelector('div[aria-hidden="true"].lg\\:grid');

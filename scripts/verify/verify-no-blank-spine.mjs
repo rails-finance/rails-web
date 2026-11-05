@@ -24,7 +24,7 @@ const ROUTES = [
     "morpho",
     "/ethereum/morpho/a4774e3e693fff2ebd1dcbbd69b1b0a5b9bb0ccc753bfda5dd07bdac97c4818a-0x3b3bdaa4462851621818d2cebc835e077587147a",
   ],
-  ["fx (transfer → delegate glyph)", "/ethereum/fx/wsteth-1801"],
+  ["fx (transfer → handover glyph)", "/ethereum/fx/wsteth-1801"],
   ["makerdao", "/ethereum/makerdao/31731"],
   ["maple (shares leg row)", "/ethereum/maple/0x9ec2d8dd95ee25975ba2a5bb4e9d50dd57b7c87a"],
   ["fluid", "/ethereum/fluid/11044"],
@@ -94,15 +94,16 @@ for (const [label, path] of ROUTES.filter(([label]) => label.includes(ROUTE_FILT
         else if (hasSvg) {
           out.glyph++;
           // Which glyph landed, not merely that one did. An ownership handover
-          // must read as the person glyph (delegate), never the generic
+          // must read as the handover glyph, never the generic
           // zero-delta equals sign — the party changing IS the event.
           const label = (card.innerText || "").trim().slice(0, 40).replace(/\s+/g, " ");
           // The timeline head reads "Transferred · to 0x…" since ui-jobs 367.
           if (/Ownership Transferred|Owner set at creation|Transferred( ·)? to/i.test(label)) {
             const svg = well.querySelector("svg");
-            // The one-person `user` glyph since cd9373c4 (20 Oct 2026).
-            const isPeople = !!svg && /circle cx="12" cy="7"|M19 21v-2/.test(svg.innerHTML);
-            out.handovers.push({ label, isPeople });
+            // The handover's own glyph, lucide `key-round`, since 7b431559
+            // (29 Oct 2026; the one-person `user` glyph before it).
+            const isKey = !!svg && svg.classList.contains("lucide-key-round");
+            out.handovers.push({ label, isKey });
           }
         } else {
           out.blank++;
@@ -123,9 +124,9 @@ for (const [label, path] of ROUTES.filter(([label]) => label.includes(ROUTE_FILT
     continue;
   }
   for (const h of r.handovers) {
-    if (h.isPeople) {
+    if (h.isKey) {
       pass++;
-      console.log(`PASS  ${label}: handover "${h.label}" wears the person glyph, not the equals sign`);
+      console.log(`PASS  ${label}: handover "${h.label}" wears the handover key, not the equals sign`);
     } else {
       fail++;
       console.log(`FAIL  ${label}: handover "${h.label}" fell through to the generic zero-delta glyph`);

@@ -164,22 +164,31 @@ try {
       "L3 Show all lines draws every line again",
     );
 
-    // L3 a hidden line leaves the price axis: at 1D, every thin line hidden,
-    // the axis spans the main line alone, narrower than with them all.
-    await page.click('[data-asset-range="1D"]');
-    await page.waitForTimeout(1200);
+    // L3 a hidden line leaves the price axis: every thin line hidden, the axis
+    // spans the main line alone, narrower than with them all. At a span where
+    // the thin lines sit inside the main line's own range the axis cannot
+    // narrow (1D on 5 Nov 2026), so the first of 1D, 7D and 30D where it does
+    // is the evidence; none narrowing is the red.
     const scale = async () =>
       (await page.getAttribute("[data-asset-lw-chart]", "data-asset-lw-scale")).split(",").map(Number);
-    const [a0, a1] = await scale();
-    for (const r of rows.filter((x) => x.button)) await page.click(`[data-asset-lw-line="${r.id}"] button`);
-    await page.waitForTimeout(600);
-    const [b0, b1] = await scale();
-    check(
-      b1 - b0 < a1 - a0,
-      "L3 hidden lines leave the price axis's range",
-      `${a0.toFixed(2)}–${a1.toFixed(2)} → ${b0.toFixed(2)}–${b1.toFixed(2)}`,
-    );
-    await page.click("[data-asset-lw-show-all]");
+    const tried = [];
+    let narrowed = false;
+    for (const span of ["1D", "7D", "30D"]) {
+      await page.click(`[data-asset-range="${span}"]`);
+      await page.waitForTimeout(1200);
+      const [a0, a1] = await scale();
+      for (const r of rows.filter((x) => x.button)) await page.click(`[data-asset-lw-line="${r.id}"] button`);
+      await page.waitForTimeout(600);
+      const [b0, b1] = await scale();
+      tried.push(`${span} ${a0.toFixed(2)}–${a1.toFixed(2)} → ${b0.toFixed(2)}–${b1.toFixed(2)}`);
+      await page.click("[data-asset-lw-show-all]");
+      await page.waitForTimeout(300);
+      if (b1 - b0 < a1 - a0) {
+        narrowed = true;
+        break;
+      }
+    }
+    check(narrowed, "L3 hidden lines leave the price axis's range", tried.join("; "));
     await page.click('[data-asset-range="All"]');
     await page.waitForTimeout(1200);
 

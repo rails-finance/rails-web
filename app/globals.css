@@ -1311,56 +1311,6 @@ label[for] {
   }
 }
 
-/* The live example's dark glow round the colour wheel, and its hover edge in
-   step (ui-jobs 499, components/home/live-example-frame.tsx): fixed-colour
-   layers — the glow's three-shadow stack, the edge's 2px border — cross-faded
-   on opacity alone, so the compositor turns them and nothing is repainted.
-   Glow and edge layers share the keyframes, the lap and the slot delays, so
-   they hold one phase. Each layer rises over one slot and falls over the
-   next, so two neighbours sum to one at every moment; --glow-slot staggers
-   them a sixth of the lap apart, slot 0 (DeFi blue) at its peak when the page
-   opens. The steps hold each value for a tenth of a second: a change too small
-   to see, and between changes the compositor has nothing to redraw. Paused
-   while the frame is off screen (data-offscreen, set by an
-   IntersectionObserver). In light mode and under reduced motion the blue
-   layer holds and the rest are not drawn. */
-.live-glow {
-  --glow-lap: 72s;
-}
-.dark .live-glow-layer {
-  will-change: opacity;
-  animation: live-glow-turn var(--glow-lap) steps(120) infinite;
-  /* Negative, so every layer is mid-lap from the first frame. */
-  animation-delay: calc(var(--glow-lap) * (var(--glow-slot) - 7) / 6);
-}
-.live-glow[data-offscreen] .live-glow-layer {
-  animation-play-state: paused;
-}
-:root:not(.dark) .live-glow-layer:not(:first-child) {
-  display: none;
-}
-@keyframes live-glow-turn {
-  0% {
-    opacity: 0;
-  }
-  16.6667% {
-    opacity: 1;
-  }
-  33.3333%,
-  100% {
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dark .live-glow-layer {
-    animation: none;
-    will-change: auto;
-  }
-  .live-glow-layer:not(:first-child) {
-    display: none;
-  }
-}
-
 @keyframes hero-fade-up {
   from {
     opacity: 0;
@@ -2343,4 +2293,53 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *,
 html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::before,
 html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
   animation-play-state: paused;
+}
+
+/* The StageRail station's line (components/home/stage-station.tsx): the whole
+   border drawn, then withdrawn round it into the middle of the left edge over
+   the station's time; the box returns to its heading when it ends. Held while
+   the box is hovered or focused; under reduced motion it stands still and
+   the box waits for a press. */
+@keyframes station-snake {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -1;
+  }
+}
+.station-snake {
+  animation: station-snake var(--snake-ms, 6000ms) linear forwards;
+}
+/* Held while the reader is on the box: a pointer resting on it (where a
+   pointer can hover, so a phone's sticky tap does not hold it for good), or
+   keyboard focus. */
+@media (hover: hover) {
+  [data-station-toggle]:hover .station-snake {
+    animation-play-state: paused;
+  }
+}
+[data-station-toggle]:focus-visible .station-snake {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .station-snake {
+    animation: none;
+  }
+}
+
+/* H20's menu below md: a sheet rising from the foot of the screen
+   (components/nav/profile-menu.tsx, ui-jobs 507); still under reduced motion. */
+.profile-sheet {
+  animation: profile-sheet-rise 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes profile-sheet-rise {
+  from {
+    transform: translateY(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .profile-sheet {
+    animation: none;
+  }
 }

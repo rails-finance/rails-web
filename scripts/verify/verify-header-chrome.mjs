@@ -93,11 +93,13 @@ const rail = page.locator('aside[aria-label="Rails"]');
 for (const [name, sel] of [
   ["the Rails mark", 'a[href="/"]'],
   ["the search's glyph", 'button[data-anatomy="H15.1"]'],
-  ["the theme toggle", 'button[aria-label^="Switch to"]'],
 ]) {
   const n = await rail.locator(`${sel}:visible`).count();
   check(n === 1, `the brand rail carries ${name} (${n})`);
 }
+// The theme is set in the profile control's menu from md (ui-jobs 504).
+const railToggle = await rail.locator('button[aria-label^="Switch to"]').count();
+check(railToggle === 0, `the brand rail carries no theme toggle, ui-jobs 504 (${railToggle})`);
 // The grid glyph (497) went with ui-jobs 503: the chooser is in the wallet panel.
 const railGrid = await rail.locator("button[data-chooser-trigger]").count();
 check(railGrid === 0, `the brand rail carries no grid glyph, ui-jobs 503 (${railGrid})`);
@@ -117,7 +119,7 @@ const railBg = await rail.evaluate((el) => {
 console.log("   ", JSON.stringify(railBg));
 check(railBg.bg !== "rgba(0, 0, 0, 0)" && railBg.bg !== "transparent", `the rail paints a background (${railBg.bg})`);
 check(railBg.bg === railBg.raised, `the rail takes the raised surface tone (${railBg.bg} vs ${railBg.raised})`);
-// The beta pill: at the FOOT, below the theme toggle, drawn as a full-width
+// The beta pill: at the FOOT, drawn as a full-width
 // strip across the rail from the browser's left edge, square on every corner,
 // x=0 (c0534d67, 13 Oct 2026).
 const pill = await page.evaluate(() => {
@@ -125,7 +127,6 @@ const pill = await page.evaluate(() => {
   const el = [...r.querySelectorAll("span")].find((s) => /^beta$/i.test(s.textContent.trim()));
   if (!el) return null;
   const cs = getComputedStyle(el);
-  const mark = r.querySelector('button[aria-label^="Switch to"]').getBoundingClientRect();
   const b = el.getBoundingClientRect();
   return {
     left: Math.round(b.left),
@@ -134,7 +135,7 @@ const pill = await page.evaluate(() => {
     topRightRadius: cs.borderTopRightRadius,
     width: Math.round(b.width),
     railWidth: Math.round(r.getBoundingClientRect().width),
-    belowToggle: b.top >= mark.bottom,
+    atFoot: Math.round(b.bottom) === Math.round(r.getBoundingClientRect().bottom),
     inLowerHalf: b.top > window.innerHeight / 2,
   };
 });
@@ -148,7 +149,7 @@ if (pill) {
   );
   check(pill.topRightRadius === "0px", `the beta pill is square on its right (${pill.topRightRadius})`);
   check(pill.width === pill.railWidth, `the beta pill spans the rail (${pill.width} of ${pill.railWidth}px)`);
-  check(pill.belowToggle, "the beta pill sits below the theme toggle");
+  check(pill.atFoot, "the beta pill sits at the rail's foot");
   check(pill.inLowerHalf, "the beta pill sits at the foot of the rail, not under the glyph");
 }
 
@@ -321,7 +322,7 @@ await mob.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
 const mBurger = await mob.locator('header button[aria-label="Toggle menu"]').count();
 check(mBurger === 0, `mobile header has no hamburger (${mBurger})`);
 // Below `md` the brand rail does not render and the bar carries the lot: mark,
-// the search's glyph, theme toggle (rails-ops TO-DO-ui-jobs 67, 68). The
+// H20 and the search's glyph (rails-ops TO-DO-ui-jobs 67, 68, 507). The
 // search's glyph opens the panel with the chooser (503).
 const mRail = await mob.locator('aside[aria-label="Rails"]').isVisible();
 check(mRail === false, `mobile draws no brand rail (${mRail})`);
@@ -330,15 +331,15 @@ check(mLauncher === 1, `mobile header keeps the search's glyph (${mLauncher})`);
 const mBookmarks = await mob.locator('header button[aria-label="Bookmarks"]').count();
 check(mBookmarks === 0, `mobile header carries no bookmarks button, retired 1 Nov 2026 (${mBookmarks})`);
 const mToggle = await mob.locator('header button[aria-label^="Switch to"]:visible').count();
-check(mToggle === 1, `mobile header keeps the theme toggle (${mToggle})`);
+check(mToggle === 0, `mobile header carries no theme toggle, its switch is in H20's menu, ui-jobs 507 (${mToggle})`);
 const mSwitcherAll = await mob.locator("button[data-chooser-trigger]").count();
 check(mSwitcherAll === 0, `mobile draws no grid glyph, ui-jobs 503 (${mSwitcherAll})`);
 const mOrder = await mob.evaluate(() => {
   const c = document.querySelector('header button[data-search-launcher="header"]');
   const f = document.querySelector('header [data-anatomy="H20"]');
-  return !!c && !!f && c.getBoundingClientRect().right <= f.getBoundingClientRect().left;
+  return !!c && !!f && f.getBoundingClientRect().right <= c.getBoundingClientRect().left;
 });
-check(mOrder, "mobile header draws the search's glyph before the profile control");
+check(mOrder, "mobile header draws the profile control before the search's glyph, which ends the row (ui-jobs 507)");
 // The app header carries the mark alone and the chain glyph without its name
 // (Miles 18 Oct 2026).
 const mHome = await mob.locator('header a[aria-label="Rails home"]:visible').count();
@@ -346,7 +347,7 @@ check(mHome === 1, `mobile header carries the Rails mark as the home link (${mHo
 const mWordmark = await mob.locator("header").first().innerText();
 check(!/Rails|Ethereum/i.test(mWordmark), `mobile header shows neither word (${mWordmark.replace(/\s+/g, " ")})`);
 // The phone header on home (Miles, 5 Nov 2026): the mark on the left, then
-// "Start here", the search's glyph, the theme toggle and H20 on the right. The
+// "Start here", H20 and the search's glyph on the right (ui-jobs 507). The
 // beta pill is in the footer below md, and the rail's from md.
 const mHomePage = await browser.newPage({ viewport: { width: 390, height: 800 } });
 await mHomePage.goto(BASE + "/", { waitUntil: "networkidle" });
@@ -355,19 +356,70 @@ const mHomeOrder = await mHomePage.evaluate(() => {
   return [
     at('a[aria-label="Rails home"]'),
     at("[data-start-here]"),
-    at('button[data-search-launcher="header"]'),
-    at('button[aria-label^="Switch to"]'),
     at('[data-anatomy="H20"]'),
+    at('button[data-search-launcher="header"]'),
   ];
 });
 check(
   mHomeOrder.every((x, i) => x !== null && (i === 0 || x > mHomeOrder[i - 1])),
-  `home @390: mark, Start here, search, theme, H20 left to right (${mHomeOrder.join(", ")})`,
+  `home @390: mark, Start here, H20, search left to right (${mHomeOrder.join(", ")})`,
 );
 const mHeaderBeta = await mHomePage.locator('header[data-anatomy="H2"]').first().innerText();
 check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
 const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
 check(mFooterBeta, "home @390: the beta pill is in the footer");
+// The profile control's menu (ui-jobs 504): a menu button; with nothing
+// saved, the line on saving one and the theme switch; a full-width sheet at
+// the foot of the screen (ui-jobs 507)
+// below md; Escape closes it and returns focus.
+const h20 = mHomePage.locator('header [data-anatomy="H20"]');
+check((await h20.getAttribute("aria-haspopup")) === "menu", "H20 is a menu button");
+await h20.click();
+// The sheet rises over 220ms; read it where it settles.
+await mHomePage.waitForTimeout(400);
+const sheet = await mHomePage.evaluate(() => {
+  const m = document.querySelector("[data-profile-menu]");
+  const r = m?.getBoundingClientRect();
+  return {
+    role: m?.getAttribute("role"),
+    width: r ? Math.round(r.width) : 0,
+    bottom: r ? Math.round(r.bottom) : 0,
+    empty: !!m?.querySelector("[data-profile-menu-empty]"),
+    themes: [...(m?.querySelectorAll("[data-theme-option]") ?? [])].map((b) => b.textContent.trim()).join(","),
+    manage: !!m?.querySelector('[data-profile-menu-manage][href="/bookmarks"]'),
+    scrim: !!document.querySelector("[data-profile-menu-scrim]"),
+  };
+});
+check(
+  sheet.role === "menu" &&
+    sheet.width === 390 &&
+    sheet.bottom === 800 &&
+    sheet.empty &&
+    sheet.manage &&
+    sheet.scrim &&
+    sheet.themes === "Light,Dark,Auto",
+  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: the saving line, Manage wallets, the theme switch (${JSON.stringify(sheet)})`,
+);
+// A press on the dim closes the sheet.
+await mHomePage.waitForTimeout(300);
+await mHomePage.mouse.click(195, 200);
+const dimClosed = await mHomePage.evaluate(() => !document.querySelector("[data-profile-menu]"));
+check(dimClosed, "home @390: a press on the dim closes the menu");
+await h20.click();
+await mHomePage.keyboard.press("Escape");
+const h20Back = await mHomePage.evaluate(
+  () =>
+    !document.querySelector("[data-profile-menu]") && document.activeElement?.getAttribute("data-anatomy") === "H20",
+);
+check(h20Back, "home @390: Escape closes the menu and focus returns to H20");
+// A second press where the control is closes the sheet and leaves it closed.
+const h20Box = await h20.boundingBox();
+await h20.click();
+await mHomePage.waitForTimeout(300);
+await mHomePage.mouse.click(h20Box.x + h20Box.width / 2, h20Box.y + h20Box.height / 2);
+await mHomePage.waitForTimeout(300);
+const samePlaceClosed = await mHomePage.evaluate(() => !document.querySelector("[data-profile-menu]"));
+check(samePlaceClosed, "home @390: a second press on H20's place closes the sheet");
 await mHomePage.close();
 const dFooterBeta = await page.locator("footer [data-phone-beta]:visible").count();
 check(dFooterBeta === 0, `@1280: the footer's beta pill is hidden, the rail carries it (${dFooterBeta})`);

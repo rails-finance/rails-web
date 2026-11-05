@@ -2,9 +2,10 @@
 
 // The wallet panel (rails-ops TO-DO-ui-jobs 431, 503): a full-height panel
 // that glides in from the left over the page, with the search pinned at its
-// top, the explorer chooser (H4) under it and a link to the bookmarks page
-// (/bookmarks, ui-jobs 480) at its foot. The bookmarks are the search's
-// suggestions on a focused, empty field (H15.2). The rail's magnifier, the
+// top and the explorer chooser (H4) under it. The saved wallets are the
+// suggestions' first rows (H15.2) once the reader types, or on ArrowDown in
+// the empty field; their page is in the profile control's menu (H20, ui-jobs
+// 504). The rail's magnifier, the
 // header bar's, ⌘K, and `/` on a page with no search of its own open it with
 // the field focused; `openWalletPanel(from, "chooser")` opens it with the
 // focus on the chooser's chain row instead.
@@ -23,12 +24,10 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { X } from "lucide-react";
 
 import { RailsGlyph } from "@/components/nav/brand-rail";
 import { ExplorerChooser } from "@/components/nav/explorer-chooser";
-import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 import { FrontDoorSearch, OPEN_SEARCH_EVENT, TOGGLE_SEARCH_EVENT } from "@/components/shared/front-door-search";
 
 let open = false;
@@ -185,7 +184,7 @@ export function WalletPanel() {
         inert={!isOpen}
         data-search-launcher-panel=""
         data-anatomy="H16"
-        className="absolute inset-y-0 left-0 flex w-full flex-col border-r border-rb-200 bg-raised shadow-xl md:w-[400px] dark:border-rb-800"
+        className="absolute inset-y-0 left-0 flex w-full flex-col md:border-r border-rb-200 bg-raised shadow-xl md:w-[400px] dark:border-rb-800"
         style={{
           transform: isOpen ? "translateX(0)" : "translateX(-100%)",
           // Hidden only once the slide out has run.
@@ -200,13 +199,13 @@ export function WalletPanel() {
         {/* Below `md` there is no rail and the header bar is under the panel,
             so the panel's top row restates the bar's furniture as the bar lays
             it out: the Rails mark top left (16px in, 16px down) and a × top
-            right where the bar's controls are (Miles, 1 Nov 2026). */}
+            right where the bar's controls are (Miles, 1 Nov 2026). The × is the search glyph's 38px box at its place, so the tap that opened the panel closes it in the same spot (ui-jobs 507). */}
         <div className="flex shrink-0 items-center justify-between px-4 pt-4 md:hidden">
           <RailsGlyph onClick={close} />
           <button
             type="button"
             onClick={close}
-            className="cursor-pointer rounded-md p-1.5 text-rb-500 transition-colors hover:text-foreground focus-ring"
+            className="cursor-pointer rounded-lg p-2.5 text-rb-500 transition-colors hover:text-foreground focus-ring"
             aria-label="Close"
           >
             <X size={18} aria-hidden="true" />
@@ -226,21 +225,6 @@ export function WalletPanel() {
             (H15.2) opens over it while the reader types. */}
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4">
           <ExplorerChooser key={isOpen ? "open" : "shut"} onNavigate={close} />
-        </div>
-
-        {/* The bookmarks are the suggestions' first rows (H15.2): the list
-            opens on the focused field with them, newest first, and matches
-            them as the reader types. Their page, with rename, remove and the
-            backup, is one link at the foot (ui-jobs 480). */}
-        <div className="shrink-0 border-t border-rb-200 px-5 py-4 dark:border-rb-800">
-          <Link
-            href="/bookmarks"
-            onClick={close}
-            className="rounded-sm text-sm text-blue-600 dark:text-blue-400 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
-            data-wallet-panel-bookmarks=""
-          >
-            {BOOKMARKS_NAME} →
-          </Link>
         </div>
       </div>
     </div>,

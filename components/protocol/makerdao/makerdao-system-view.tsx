@@ -69,7 +69,7 @@ import type { MakerIlkRow, MakerSystemChainResponse, MakerCeilingState } from "@
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK, INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 
 const DEBT_SYMBOL = "DAI";
 
@@ -644,11 +644,7 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
       <section className="mt-8">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="text-sm font-semibold text-foreground">The ilks</h2>
-          <button
-            type="button"
-            onClick={() => setShowAll((s) => !s)}
-            className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline"
-          >
+          <button type="button" onClick={() => setShowAll((s) => !s)} className={`text-[11px] ${INPLACE_TEXT}`}>
             {showAll ? "Show vault types only" : `Show all ${data.ilks.length} ilks`}
           </button>
         </div>

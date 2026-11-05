@@ -824,7 +824,13 @@ const JOBS = Math.max(1, Number(process.env.JOBS ?? 1));
 // configuration each entry below was written to avoid, with no warning at the
 // point of use — the run just starts moving around. Reach for it to re-test an
 // entry, read the entry first, and write down what came back.
-const RUN_ALONE = process.env.MEASURE ? {} : {};
+const RUN_ALONE = process.env.MEASURE
+  ? {}
+  : {
+      "verify-folder-reductions.mjs":
+        "799 s solo on 5 Nov 2026 (ui-jobs 506), within a minute and a half of the 900 s cap: two arms of " +
+        "grouped and flat reads and pages over thousands of events; shared, it runs past the cap.",
+    };
 
 const results = [];
 const queue = scripts.filter((f) => !RUN_ALONE[f]).flatMap(jobsFor);

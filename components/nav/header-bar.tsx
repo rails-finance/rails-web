@@ -4,9 +4,8 @@ import Link from "next/link";
 import { RailsMark } from "@/components/nav/rails-mark";
 import { usePathname } from "next/navigation";
 
-import { BookmarksLink } from "@/components/nav/bookmarks-link";
+import { ProfileMenu } from "@/components/nav/profile-menu";
 import { StartHereLink } from "@/components/nav/start-here-link";
-import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
 
 /** The Rails mark on the left of the bar below `md`, where BrandRail does not
@@ -54,19 +53,14 @@ export function HeaderBar() {
         {/* Right-hand control cluster. `ml-auto` pushes it hard right — it used
             to yield (`md:ml-0`) to the inline site-links nav that sat here, but
             that nav is retired, so the cluster owns the push outright. The
-            order is home's "Start here", the search's glyph, the toggle, then
-            H20 (Miles, 5 Nov 2026). The hamburger is retired — the site's own pages and socials
+            order is home's "Start here", H20, then the search's glyph at the far right, where the wallet panel's × stands when it is open, so a second tap in one place closes it; the theme switch is in H20's menu (ui-jobs 507). The hamburger is retired — the site's own pages and socials
             live in the footers (SiteFooter on site routes, AppFooter's
             quiet Coverage link on app routes). */}
         <div className="ml-auto flex items-center gap-1">
           {/* Home's "Start here" (S12) leads; elsewhere it renders nothing. */}
           <StartHereLink />
-          {/* The search's glyph (H15.1), on every page: it opens the wallet
-              panel at full width, the search over the explorer chooser
-              (ui-jobs 503). */}
+          <ProfileMenu />
           <SearchLauncher placement="header" />
-          <HeaderThemeToggle />
-          <BookmarksLink />
         </div>
       </div>
     </header>
