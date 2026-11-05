@@ -203,21 +203,14 @@ function useGlowPause() {
   return ref;
 }
 
-type SampleMode =
-  | "pending"
-  | "framed"
-  | "layered"
-  | "single-card"
-  | "single-flows"
-  | "button-example"
-  | "button-sample";
+type SampleMode = "pending" | "framed" | "layered" | "single-card" | "single-flows" | "button";
 
 /** Which sample a reader sees, decided after mount: below sm the layered
  *  slices, from sm the framed page. On a dev server `?sample=` picks another
  *  phone sample for side-by-side review (temporary, Miles 5 Nov 2026):
  *  `classic` the framed page, `single` or `single-flows` the Lifetime flows
- *  panel alone, `single-card` the position card alone, `button` and
- *  `button-sample` no sample, a link to the position alone. */
+ *  panel alone, `single-card` the position card alone, `button` no
+ *  sample, a link to the position alone. */
 function useSampleMode(): SampleMode {
   const [mode, setMode] = useState<SampleMode>("pending");
   useEffect(() => {
@@ -232,10 +225,8 @@ function useSampleMode(): SampleMode {
           : asked === "single" || asked === "single-flows"
             ? "single-flows"
             : asked === "button"
-              ? "button-example"
-              : asked === "button-sample"
-                ? "button-sample"
-                : "layered";
+              ? "button"
+              : "layered";
     const set = () => setMode(mq.matches ? phone : "framed");
     set();
     mq.addEventListener("change", set);
@@ -297,7 +288,7 @@ function SingleSample({ data, which }: { data: WireLiveExample | null; which: "c
         {data && <HeroTroveComposition wire={data} only={which} />}
       </div>
       <Link href={LIVE_EXAMPLE_TROVE_PATH} className={`${SINGLE_BUTTON} mt-5`}>
-        View live position <span>→</span>
+        View a live position <span>→</span>
       </Link>
     </div>
   );
@@ -307,11 +298,11 @@ function SingleSample({ data, which }: { data: WireLiveExample | null; which: "c
  *  and a little narrower than the search. It rises 112px into the hero's foot,
  *  68px under the ticks' text, and keeps 112px to the
  *  value line. */
-function ButtonSample({ words }: { words: string }) {
+function ButtonSample() {
   return (
     <div className="-mt-28 mb-16 flex justify-center px-4 sm:hidden" data-live-button="">
       <Link href={LIVE_EXAMPLE_TROVE_PATH} className={`${SINGLE_BUTTON} max-w-[19rem]`}>
-        {words} <span>→</span>
+        View a live position <span>→</span>
       </Link>
     </div>
   );
@@ -371,7 +362,7 @@ function LayeredSample({ data, glowRef }: { data: WireLiveExample | null; glowRe
           aria-label="View this live Liquity V2 trove on Rails"
           className={`${PILL_CTA_BLUE} absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2`}
         >
-          View live position <span>→</span>
+          View a live position <span>→</span>
         </Link>
       </div>
     </div>
@@ -402,8 +393,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
       {(mode === "pending" || mode === "layered") && (
         <LayeredSample data={mode === "layered" ? data : null} glowRef={layeredGlowRef} />
       )}
-      {mode === "button-example" && <ButtonSample words="View live example" />}
-      {mode === "button-sample" && <ButtonSample words="View live sample" />}
+      {mode === "button" && <ButtonSample />}
       {(mode === "single-card" || mode === "single-flows") && (
         <SingleSample data={data} which={mode === "single-card" ? "card" : "flows"} />
       )}
@@ -495,7 +485,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
                 green bold text) owned by the chrome bar rather than pasted
                 over the render. */}
               <span className="ml-auto inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-green-500 bg-green-500/20 px-2 py-0.5 text-[9px] font-bold tracking-widest text-green-500">
-                LIVE SAMPLE
+                LIVE POSITION
               </span>
             </div>
 
@@ -554,7 +544,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
               <span
                 className={`${PILL_CTA_BLUE} absolute bottom-5 left-1/2 -translate-x-1/2 translate-y-1 opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0`}
               >
-                View live position <span>→</span>
+                View a live position <span>→</span>
               </span>
             </Link>
           </div>
@@ -567,7 +557,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
               href={LIVE_EXAMPLE_TROVE_PATH}
               className="inline-flex items-center gap-1 rounded-sm bg-rb-100 px-3 py-1 text-xs text-foreground dark:bg-rb-900"
             >
-              View this position live <span className="text-blue-600 dark:text-blue-400">→</span>
+              View a live position <span className="text-blue-600 dark:text-blue-400">→</span>
             </Link>
           </div>
         </div>

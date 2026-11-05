@@ -40,7 +40,7 @@ export const NAV_LINK = "text-rb-500 hover:text-blue-600 dark:hover:text-blue-40
 
 /**
  * Marketing-page CTA pill — the bordered rounded-full navigation button the
- * home page uses ("View live position", "See detailed coverage"). Blue text per
+ * home page uses ("View a live position", "See detailed coverage"). Blue text per
  * the one-meaning-per-colour rule (blue = navigation). Visual core only:
  * callers add their own reveal/hover behaviour (the hero pill fades in with
  * its frame's hover; a free-standing pill answers hover with a blue border).
@@ -48,7 +48,7 @@ export const NAV_LINK = "text-rb-500 hover:text-blue-600 dark:hover:text-blue-40
 export const PILL_CTA =
   "inline-flex items-center gap-2 whitespace-nowrap text-sm font-medium text-blue-600 dark:text-blue-400 bg-background/90 border border-rb-200 dark:border-rb-800 px-4 py-2 rounded-full backdrop-blur-sm";
 
-/** PILL_CTA with its border blue at rest ("View live position"). The neutral border is swapped, not
+/** PILL_CTA with its border blue at rest ("View a live position"). The neutral border is swapped, not
  *  appended to: two unconditional border-color utilities tie on specificity and
  *  Tailwind's stylesheet order, not class order, decides which holds. */
 export const PILL_CTA_BLUE = PILL_CTA.replace("border border-rb-200 dark:border-rb-800", "border border-blue-500");

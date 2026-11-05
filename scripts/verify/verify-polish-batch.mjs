@@ -59,7 +59,7 @@ const capCount = await page.getByText("Live position, shared with permission.").
 check("4 no attribution caption", capCount === 0, `count: ${capCount}`);
 
 // 9. View-live pill: blue border wins (computed style, not class list)
-const pill = page.locator("a >> span", { hasText: "View live position" }).first();
+const pill = page.locator("a >> span", { hasText: "View a live position" }).first();
 const pillBorder = await pill.evaluate((el) => getComputedStyle(el).borderTopColor);
 // blue-500 = oklch(62.3% 0.214 259.815) ≈ rgb(59, 130, 246)
 check("9 view-live pill computed border is blue", /59, 130, 246|rgb\(59/.test(pillBorder), pillBorder);
@@ -264,7 +264,7 @@ check("S home's chooser opens on Ethereum", ctaSelected === "Ethereum", ctaSelec
 
 // The live sample on a phone (Miles, 5 Nov 2026): the position card and the
 // Lifetime flows panel as two live slices, the flows panel over the card and
-// running off the right edge with no sideways scroll, and "View live position"
+// running off the right edge with no sideways scroll, and "View a live position"
 // as a pill on the screen.
 const phone = await browser.newContext({ viewport: { width: 390, height: 900 }, isMobile: true, hasTouch: true });
 const pp = await phone.newPage();
@@ -286,14 +286,14 @@ const sample = await pp.evaluate(() => {
     return r ? [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)] : null;
   };
   const pill = [...document.querySelectorAll("[data-live-layered] a")].find((a) =>
-    a.textContent.includes("View live position"),
+    a.textContent.includes("View a live position"),
   );
   return {
     card: R(document.querySelector('[data-live-slice="card"]')),
     flows: R(document.querySelector('[data-live-slice="flows"]')),
     pill: R(pill),
     framed: [...document.querySelectorAll("span")].some(
-      (s) => s.textContent === "LIVE SAMPLE" && s.getClientRects().length > 0,
+      (s) => s.textContent === "LIVE POSITION" && s.getClientRects().length > 0,
     ),
     scroll: document.documentElement.scrollWidth,
   };

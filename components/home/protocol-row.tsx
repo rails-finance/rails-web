@@ -163,7 +163,7 @@ export function ProtocolRow() {
 
           {/* Coverage matrix — per-explorer depth for the chain the toggle is
           showing (the coverage pages are per-chain routes); the shared CTA
-          pill (PILL_CTA), same as the frame's "View live position" button.
+          pill (PILL_CTA), same as the frame's "View a live position" button.
           Free-standing, so it answers hover with the blue border itself. */}
           <div className="mt-6 flex justify-center">
             <Link
