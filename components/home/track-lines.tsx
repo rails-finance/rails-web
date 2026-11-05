@@ -8,8 +8,7 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
 
 /**
  * Track lines graphic — the animated retro stripes, extracted from the hero
- * so it can live lower on the page (currently between the covered-positions
- * count and the explorer directory on the home page).
+ * so it can stand on its own (on the home page, right under the hero).
  *
  * The draw-on animation is gated by its own `data-tracks-seen` flag on <html>,
  * SESSION-scoped (sessionStorage) unlike the hero's once-per-browser
@@ -26,8 +25,8 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
  *
  * Casing strokes must match the surface behind the graphic to read as gaps
  * where lines cross: they use --track-casing with --surface-raised as the
- * fallback. Its current home sits on the home gradient's constant floor, so
- * the wrapper there sets --background light / the INLINED rb-800 literal
+ * fallback. On the home page the wrapper sets the gradient's floor tone,
+ * --background light / the INLINED rb-800 literal
  * rgb(20 22 30) dark (a `dark:to-rb-800` gradient stop inlines the @theme
  * value and never sees html.dark overrides, so var(--background) — which does
  * follow them — would land on the wrong tone there).

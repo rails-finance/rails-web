@@ -52,33 +52,33 @@ export default async function Home() {
       <div className="overflow-x-clip bg-gradient-to-b from-rb-50 via-background to-background dark:from-rb-600 dark:via-rb-800 dark:to-rb-800">
         <HomeHero />
 
-        {/* Live example — a real trove in browser chrome; its hover pill
-            links to the live position. */}
-        <section className="pb-12" data-anatomy="S2">
-          <LiveExampleFrame data={liveExample && packLiveExample(liveExample)} />
-        </section>
-
-        {/* The roster, counted — sits between the example and the directory so
-            it reads off both: the position above was one of these, the tiles
-            below are the protocols named. */}
-        <section className="pb-12" data-anatomy="S3">
-          <CoveredStats covered={covered} stats={stats} valueHeld={valueHeld} />
-        </section>
-
-        {/* Track lines graphic — the animated stripes bridge the counted
-            roster above and the explorer tiles below. This stretch of the
-            gradient is the constant floor (via == to), so the casing var
-            matches it: `--background` light, which tracks the `to-background`
-            stop above; dark must be the INLINED @theme rb-800 literal
-            rgb(20 22 30), because the `dark:to-rb-800` gradient stop inlines
-            the @theme value and never sees the html.dark override — and
-            `var(--background)` in dark would resolve to rgb(23 27 36), a
-            different tone from the floor it is meant to disappear into. */}
+        {/* Below the hero, top down (Miles, 5 Nov 2026): the track lines as the
+            way out of the hero, the roster counted, the live sample (a link to
+            it on a phone), the explorer directory. */}
+        {/* Track lines graphic — the animated stripes, risen 80px into the
+            hero's foot. The casing var is the gradient's floor tone:
+            `--background` light, which tracks the `to-background` stop; dark
+            the INLINED @theme rb-800 literal rgb(20 22 30), because the
+            `dark:to-rb-800` stop inlines the @theme value and never sees the
+            html.dark override. This high on the gradient the floor is a few
+            steps darker than the surface in dark, so the crossings read as
+            slightly darker gaps. */}
         <section
-          className="pb-12 [--track-casing:var(--background)] dark:[--track-casing:rgb(20_22_30)]"
+          className="-mt-20 pb-16 [--track-casing:var(--background)] dark:[--track-casing:rgb(20_22_30)]"
           data-anatomy="S4"
         >
           <TrackLines />
+        </section>
+
+        {/* The roster, counted, then the live position that is one of them. */}
+        <section className="pb-16" data-anatomy="S3">
+          <CoveredStats covered={covered} stats={stats} valueHeld={valueHeld} />
+        </section>
+
+        {/* Live example — a real trove in browser chrome; its hover pill
+            links to the live position. */}
+        <section className="pb-16" data-anatomy="S2">
+          <LiveExampleFrame data={liveExample && packLiveExample(liveExample)} />
         </section>
 
         {/* Explorer directory — one uniform row of tiles on the gradient's

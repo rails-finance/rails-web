@@ -223,12 +223,11 @@ const PHONE_BUTTON = PILL_CTA_BLUE.replace("inline-flex", "flex w-full max-w-[19
   .replace("px-4 py-2", "px-4 py-3.5")
   .replace("text-sm", "text-base");
 
-/** Below sm: no sample, the link to the position alone, centred. It rises
- *  112px into the hero's foot, 68px under the ticks' text, and keeps 112px to
- *  the value line. */
+/** Below sm: no sample, the link to the position alone, centred, under the
+ *  value line. */
 function PhoneButton() {
   return (
-    <div className="-mt-28 mb-16 flex justify-center px-4 sm:hidden" data-live-button="">
+    <div className="flex justify-center px-4 sm:hidden" data-live-button="">
       <Link href={LIVE_EXAMPLE_TROVE_PATH} className={PHONE_BUTTON}>
         View a live position <span>→</span>
       </Link>

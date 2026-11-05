@@ -262,6 +262,19 @@ check("S home's rail glyph opens the chooser", await openChooser());
 const ctaSelected = await page.locator(`${CHOOSER} [role="tab"][aria-selected="true"]`).getAttribute("aria-label");
 check("S home's chooser opens on Ethereum", ctaSelected === "Ethereum", ctaSelected ?? "none");
 
+// Home's order below the hero (Miles, 5 Nov 2026): the track lines, the
+// roster counted, the live sample, the directory.
+const homeOrder = async (pg) =>
+  pg.evaluate(() =>
+    ["S1", "S4", "S3", "S2", "S5"].map(
+      (c) => document.querySelector(`[data-anatomy="${c}"]`)?.getBoundingClientRect().top ?? null,
+    ),
+  );
+const ascending = (tops) => tops.every((t, i) => t !== null && (i === 0 || t > tops[i - 1]));
+await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
+const wideOrder = await homeOrder(page);
+check("O home: hero, track lines, value line, sample, directory", ascending(wideOrder), JSON.stringify(wideOrder));
+
 // The live sample on a phone (Miles, 5 Nov 2026): no frame, the link to the
 // position alone, "View a live position", a tap target on the screen.
 const phone = await browser.newContext({ viewport: { width: 390, height: 900 }, isMobile: true, hasTouch: true });
@@ -282,6 +295,12 @@ const sample = await pp.evaluate(() => {
   };
 });
 check("P phone @390: no framed sample", !sample.framed);
+const phoneOrder = await homeOrder(pp);
+check(
+  "O home @390: hero, track lines, value line, button, directory",
+  ascending(phoneOrder),
+  JSON.stringify(phoneOrder),
+);
 check(
   "P phone @390: the link reads View a live position and goes to the Trove",
   sample.text === "View a live position →" && /^\/ethereum\/liquity-v2\/trove\//.test(sample.href ?? ""),
