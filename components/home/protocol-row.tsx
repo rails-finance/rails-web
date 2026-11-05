@@ -109,7 +109,11 @@ export function ProtocolRow() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4">
-      <div className="mb-6 flex">
+      {/* The chain tabs on the left and, for the chain they show, the coverage
+          pill on the right of the same row from sm; below sm it wraps under
+          the tabs (Miles, 5 Nov 2026). The pill is the shared CTA (PILL_CTA),
+          free-standing, so it answers hover with the blue border itself. */}
+      <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <ChainToggleButtons
           chainId={chainId}
           onChange={handleChange}
@@ -120,11 +124,20 @@ export function ProtocolRow() {
             glyph: <HomeOnlyChainGlyph id="robinhood" className="h-3.5 w-3.5 shrink-0 max-[380px]:hidden" />,
           }}
         />
+        {!robinhood && (
+          <Link
+            href={`/coverage/${CHAINS[chainId].slug}`}
+            className={`${PILL_CTA} shrink-0 transition-colors hover:border-blue-500 dark:hover:border-blue-500`}
+            data-home-coverage=""
+          >
+            See detailed coverage <span>→</span>
+          </Link>
+        )}
       </div>
 
       {robinhood ? (
-        // Stands where the tiles stand: about a tile row (py-3 + 2rem mark)
-        // plus the coverage button's row, so the page holds still on a switch.
+        // Stands where the tiles stand, about a tile row (py-3 + 2rem mark)
+        // and View all's line, so the page holds still on a switch.
         <p data-testid="home-robinhood-soon" className="body-text flex min-h-[8.5rem] max-w-xl items-center">
           <RobinhoodSoon />
         </p>
@@ -165,19 +178,6 @@ export function ProtocolRow() {
               </button>
             </div>
           )}
-
-          {/* Coverage matrix — per-explorer depth for the chain the toggle is
-          showing (the coverage pages are per-chain routes); the shared CTA
-          pill (PILL_CTA), same as the frame's "View a live position" button.
-          Free-standing, so it answers hover with the blue border itself. */}
-          <div className="mt-6 flex">
-            <Link
-              href={`/coverage/${CHAINS[chainId].slug}`}
-              className={`${PILL_CTA} transition-colors hover:border-blue-500 dark:hover:border-blue-500`}
-            >
-              See detailed coverage <span>→</span>
-            </Link>
-          </div>
         </>
       )}
     </div>

@@ -344,6 +344,36 @@ check(
   await ctx.close();
 }
 
+const directoryGeo = (pg) =>
+  pg.evaluate(() => {
+    const s5 = document.querySelector('[data-anatomy="S5"]');
+    const R = (el) => el?.getBoundingClientRect();
+    const tabs = R(
+      s5.querySelector(
+        '[data-anatomy="S5"] [role="tablist"], [data-anatomy="S5"] nav, [data-anatomy="S5"] [aria-label]',
+      ),
+    );
+    const heading = R(s5.querySelector("[data-home-directory-heading]"));
+    const tile = R(s5.querySelector('a[href^="/"]:not([href^="/coverage"])'));
+    const pill = R(s5.querySelector("[data-home-coverage]"));
+    const col = s5.querySelector("[data-home-coverage]").parentElement.getBoundingClientRect();
+    return {
+      left: [heading, tile, col].map((r) => Math.round(r.left)),
+      pill: [Math.round(pill.left), Math.round(pill.right), Math.round(pill.top)],
+      colRight: Math.round(col.right),
+      colTop: Math.round(col.top),
+    };
+  });
+// The directory on the page's left edge, the coverage pill on the tab row's
+// right from sm (Miles, 5 Nov 2026).
+{
+  const g = await directoryGeo(page);
+  check(
+    "D home directory: heading, tiles and tab row share one left edge; the pill ends the tab row",
+    new Set(g.left).size === 1 && g.pill[1] === g.colRight && g.pill[2] - g.colTop < 12,
+    JSON.stringify(g),
+  );
+}
 // The directory lists a chain's most used explorers, as the drawer's chooser
 // does, and "View all <n> explorers" opens the rest in place.
 const dirTiles = () =>
@@ -380,6 +410,14 @@ const sample = await pp.evaluate(() => {
   };
 });
 check("P phone @390: no framed sample", !sample.framed);
+{
+  const g = await directoryGeo(pp);
+  check(
+    "D home @390: the coverage pill wraps under the tabs, on the left edge",
+    g.pill[0] === g.left[2] && g.pill[2] - g.colTop > 20,
+    JSON.stringify(g),
+  );
+}
 const phoneOrder = await homeOrder(pp);
 check(
   "O home @390: hero, track lines, value line, button, directory",
