@@ -480,6 +480,9 @@ await phone.close();
     .locator("[data-profile-menu-wallet]")
     .evaluateAll((as) => as.map((a) => a.getAttribute("data-profile-menu-wallet")));
   check("W profile menu lists them in that order", menu.join() === moved.join(), menu.join());
+  // With a wallet saved the menu carries no Start here (ui-jobs 509).
+  const startRows = await bp.locator("[data-profile-menu] [data-profile-menu-start]").count();
+  check("W profile menu with saved wallets has no Start here", startRows === 0, String(startRows));
   await bp.keyboard.press("Escape");
   // The drawer's search (Miles, 5 Nov 2026): focused on open with the list
   // shut and the chooser uncovered; ArrowDown opens the saved wallets; typing

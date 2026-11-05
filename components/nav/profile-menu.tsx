@@ -3,10 +3,10 @@
 // The profile control (H20) and its menu (rails-ops ui-jobs 504): the facehash
 // with a chevron, a menu button. The menu, top down: the saved wallets' heading
 // (the filled bookmark, "Saved wallets"), the first ten in the reader's order
-// (lib/shared/sessions.ts; /bookmarks orders them), "Start here →" to /start,
-// "Manage wallets →" to /bookmarks, then the theme switch. With none saved,
-// one line in place of the rows: "New to Rails? Start here." and how to save
-// a wallet (ui-jobs 509). From md a dropdown under the control, right
+// (lib/shared/sessions.ts; /bookmarks orders them), "Manage wallets →" to
+// /bookmarks, then the theme switch. With none saved, two lines in place of
+// the rows: "New to Rails?" and a signposted "Start here" to /start, then how
+// to save a wallet (ui-jobs 509). From md a dropdown under the control, right
 // edges aligned; below md a sheet from the foot of the screen over a dim (ui-jobs 507), rising
 // over 220ms (globals.css `.profile-sheet`). Rows show what the
 // browser holds (name, ENS, address) and read nothing.
@@ -278,34 +278,25 @@ export function ProfileMenu() {
                   ))}
                 </div>
               ) : (
-                <p className="px-3 pb-1 pt-3 text-sm text-rb-500" data-profile-menu-empty="">
-                  New to Rails?{" "}
-                  <Link
-                    href={START_PATH}
-                    role="menuitem"
-                    onClick={() => close(false)}
-                    className="rounded-sm font-medium text-blue-600 underline-offset-4 hover:underline focus:outline-none focus-visible:underline dark:text-blue-400"
-                    data-profile-menu-start=""
-                  >
-                    Start here
-                  </Link>
-                  . To save a wallet, press the bookmark beside its address on its wallet page.
-                </p>
+                <div className="space-y-2 px-3 pb-1 pt-3 text-sm text-rb-500" data-profile-menu-empty="">
+                  <p>
+                    New to Rails?{" "}
+                    <Link
+                      href={START_PATH}
+                      role="menuitem"
+                      onClick={() => close(false)}
+                      className="inline-flex items-center gap-1 rounded-sm align-bottom font-medium text-blue-600 underline-offset-4 hover:underline focus:outline-none focus-visible:underline dark:text-blue-400"
+                      data-profile-menu-start=""
+                    >
+                      <Signpost className="size-4 shrink-0" aria-hidden="true" />
+                      Start here
+                    </Link>
+                  </p>
+                  <p>To save a wallet, press the bookmark beside its address on its wallet page.</p>
+                </div>
               )}
               {rows.length > 0 && <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />}
               <div className="py-1">
-                {rows.length > 0 && (
-                  <Link
-                    href={START_PATH}
-                    role="menuitem"
-                    onClick={() => close(false)}
-                    className={`${ITEM} text-blue-600 dark:text-blue-400`}
-                    data-profile-menu-start=""
-                  >
-                    <Signpost className="size-4 shrink-0" aria-hidden="true" />
-                    Start here →
-                  </Link>
-                )}
                 <Link
                   href={BOOKMARKS_PATH}
                   role="menuitem"
