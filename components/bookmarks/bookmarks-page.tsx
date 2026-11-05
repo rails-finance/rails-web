@@ -34,7 +34,10 @@ export function BookmarksPage() {
           <Bookmark className="size-6 shrink-0" fill="currentColor" aria-hidden="true" />
           {BOOKMARKS_NAME}
         </h1>
-        <p className="mt-2 text-rb-500">Saved in this browser only.</p>
+        <p className="mt-2 text-rb-500">
+          Saved in this browser only. Drag a wallet, or use its arrows, to change the order; the first ten are in the
+          profile menu.
+        </p>
       </div>
       {/* Nothing draws until the browser's list is read, so a reader with
           bookmarks never sees the empty state flash first. */}
@@ -43,6 +46,7 @@ export function BookmarksPage() {
           <BookmarkList
             bookmarks={bookmarks}
             summary
+            reorder
             empty={
               <div data-anatomy="B3">
                 <p className="font-semibold text-foreground">No saved wallets yet.</p>
