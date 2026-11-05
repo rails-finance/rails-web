@@ -748,6 +748,9 @@ check(
   JSON.stringify(vaultsRowAny),
 );
 await page.locator(`${CHOOSER} [role='tab'][aria-label='Ethereum']`).click();
+// Aave vaults is not among Ethereum's eight most used (explorer-rank.json),
+// so its row is behind "View all".
+await page.locator(`${CHOOSER} [data-chooser-view-all]`).click();
 const aaveVaultsRow = await page
   .locator(`${CHOOSER} a[href='/ethereum/aave']`)
   .evaluateAll((els) => els.map((e) => (e.textContent ?? "").replace(/\s+/g, " ").trim()));
