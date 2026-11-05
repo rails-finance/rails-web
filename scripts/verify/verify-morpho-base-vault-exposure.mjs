@@ -373,9 +373,13 @@ const read = (fn, args, blockNumber) =>
  *  removes the one race between a page that read at the head and a verifier that
  *  re-reads it: a node a block or two behind can answer a pinned call with its
  *  own state instead of an error. */
+// Asks for the block itself rather than the head: under run-all's proxy the
+// head is the run's pin, hours behind the block rails-server read the page at,
+// while a read at a named block passes through to a node that has it.
 async function awaitBlock(target) {
   for (let i = 0; i < 30; i++) {
-    if ((await client.getBlockNumber({ cacheTime: 0 })) >= target) return true;
+    const got = await client.getBlock({ blockNumber: BigInt(target) }).catch(() => null);
+    if (got?.number != null && got.number >= BigInt(target)) return true;
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   return false;

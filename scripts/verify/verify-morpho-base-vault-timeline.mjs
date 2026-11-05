@@ -229,6 +229,7 @@
 //
 import { chromium } from "playwright";
 import { openGroup } from "./lib/group-rows.mjs";
+import { pageBlockRecent, serverHeadBlock } from "./lib/server-head.mjs";
 import { createPublicClient, http, parseAbi, parseAbiItem, toEventSelector, getAddress } from "viem";
 import { base } from "viem/chains";
 import fs from "node:fs";
@@ -955,19 +956,25 @@ if (bad0a.length) {
 
 // Base blocks are two seconds apart, so "near head" is a wider window here than
 // it is on Ethereum for the same wall-clock tolerance: 900 blocks is half an
-// hour, which is longer than this script's own run.
-const bad0b = FIXTURES.filter((f) => {
-  const b = PAGES.get(`${f.vault}:${f.holder}`).blockNumber;
-  return !b || Number(head) - b > 900 || b > Number(head) + 60;
-});
+// hour, which is longer than this script's own run. The page reads its head
+// through rails-server first, so it is held against rails-server's head, or
+// against this script's own head where it fell back to the chain
+// (lib/server-head.mjs; under run-all's proxy the own head is the run's pin).
+const serverHead0b = await serverHeadBlock(env, 8453);
+const recent0b = FIXTURES.map((f) => ({
+  f,
+  r: pageBlockRecent({
+    page: PAGES.get(`${f.vault}:${f.holder}`).blockNumber,
+    server: serverHead0b,
+    own: Number(head),
+    tolerance: 900,
+  }),
+}));
+const bad0b = recent0b.filter((x) => !x.r.ok);
 check(
-  "0b each page states a block near this script's own head",
+  "0b each page states a recent block: near rails-server's head, or this script's own",
   bad0b.length === 0,
-  bad0b.length
-    ? bad0b
-        .map((f) => `${short(f.vault)} page ${PAGES.get(`${f.vault}:${f.holder}`).blockNumber} vs own head ${head}`)
-        .join(", ")
-    : `head ${head}`,
+  (bad0b.length ? bad0b : recent0b.slice(0, 1)).map((x) => `${short(x.f.vault)} ${x.r.detail}`).join(", "),
 );
 
 const bad0c = FIXTURES.filter((f) => {
@@ -1198,6 +1205,31 @@ await getLogs(CASE_STUDY, [TRANSFER, null, pad32(FEE_RECIPIENT)], BigInt(frRoute
 });
 if (frRoute.status !== 200) {
   skip("1g the horizon, floor: the one address the lane refuses outright", `the API route answered ${frRoute.status}`);
+} else if (frRoute.timeline?.coverage.logCountIsLowerBound === false) {
+  // Since 799608c8 the reader takes a holder's sweep from rails-server's
+  // holder-logs route, which answers this address whole where this script's
+  // own single-range read is still refused. The page then holds an EXACT
+  // count above the ceiling: no rows, the count stated without "at least",
+  // and the balance check it could run.
+  const t = frRoute.timeline;
+  check(
+    "1g the fee recipient states an exact horizon above the ceiling: no rows, the whole count, reconciled",
+    t.events.length === 0 &&
+      t.coverage.withheldAbove > CEILING &&
+      t.reconcile?.reconciled === true &&
+      t.reconcile?.logsIn === t.coverage.withheldAbove,
+    `page drew ${t.events.length} rows, withheldAbove ${t.coverage.withheldAbove}, reconcile ${JSON.stringify(t.reconcile)}`,
+  );
+  check(
+    "1h and its face states that count without 'at least', draws no rows, and says the history reconciled",
+    !(frPage.horizonText ?? "").includes("at least") &&
+      (frPage.horizonText ?? "").includes(t.coverage.withheldAbove.toLocaleString("en-US")) &&
+      frPage.domRows === 0 &&
+      /reconcil/i.test(frPage.horizonText ?? ""),
+    frPage.horizonText
+      ? `"${frPage.horizonText.slice(0, 150)}…" · ${frPage.domRows} rows drawn`
+      : "no horizon statement on the page",
+  );
 } else if (!ownFeeRefused) {
   // The premise moved: the lane now answers this address whole, so a lower
   // bound is no longer the right answer and this check would be vacuous.

@@ -10,7 +10,7 @@
 //      "at settle" figures match the pinned sums (compact formatting); the
 //      "today" figure is recomputed from the live overlay (0.5% tolerance,
 //      since the feed moves); the strip carries no "profit" and no "%".
-//   2. usdp/27: +124.509 total; usdp/166: +0.719, no mint clause.
+//   2. usdp/27: +124.51 total; usdp/166: +0.72, no mint clause.
 //   4. A Liquity V2 trove with a redemption: liquityRedemptionOutcome's own
 //      strip still renders (TROVE_B, a WETH trove that has been redeemed).
 //   5. The markdown export carries the outcome line on usdp/8.
@@ -19,12 +19,9 @@
 // Run:  BASE=http://localhost:3415 node scripts/verify/verify-polaris-psm-outcome.mjs
 
 import { chromium } from "playwright";
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import { copyPositionMarkdown } from "./lib/copy-position.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let failures = 0;
 let checked = 0;
@@ -49,25 +46,42 @@ async function api(path_, tries = 4) {
   throw last ?? new Error(`failed ${path_}`);
 }
 
-// ── restated formatting, independent of lib/utils/format.ts ────────────────
-// formatCompact's own rule: |v| >= 1000 → Intl compact (2dp); else the
-// plain-decimal path (Intl default, 3dp).
-const fmtCompact = (n) =>
-  Math.abs(n) >= 1000
-    ? n.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 2 })
-    : n.toLocaleString("en-US", { maximumFractionDigits: 3 });
+// ── restated formatting, independent of lib/shared/format-compact.ts ───────
+// The one compact rule (ui-jobs 377, ec1c6496): from 1,000 one decimal with K,
+// M or B; below 1,000 two decimals; under 0.01 three significant digits.
+const fmtCompact = (n) => {
+  const a = Math.abs(n);
+  for (const [size, suffix] of [
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "K"],
+  ]) {
+    if (a >= size)
+      return `${(a / size).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}${suffix}`;
+  }
+  if (a > 0 && a < 0.01) return a.toPrecision(3);
+  return a.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
 const signedCompact = (n) => `${n >= 0 ? "+" : "−"}${fmtCompact(Math.abs(n))}`;
 
 /** Parse a signed, possibly-compact figure ("+1.68M", "−0.514") back to a
  *  number, for a tolerance comparison against a live-recomputed value the
  *  page's own compact rounding can't be string-matched against exactly. */
 function parseSignedCompact(s) {
-  const m = /([+−-])\s*([\d,.]+)\s*([MK])?/.exec(s);
+  const m = /([+−-])\s*([\d,.]+)\s*([BMK])?/.exec(s);
   if (!m) return NaN;
   const sign = m[1] === "−" || m[1] === "-" ? -1 : 1;
   const base = Number(m[2].replace(/,/g, ""));
-  const mult = m[3] === "M" ? 1_000_000 : m[3] === "K" ? 1_000 : 1;
+  const mult = m[3] === "B" ? 1e9 : m[3] === "M" ? 1_000_000 : m[3] === "K" ? 1_000 : 1;
   return sign * base * mult;
+}
+
+/** Half the place value of a compact figure's last digit: "+1.8M" → 50,000. */
+function compactHalfStep(s) {
+  const m = /([\d,]+)(?:\.(\d+))?\s*([KMB])?/.exec(s);
+  if (!m) return 0;
+  const mult = m[3] === "B" ? 1e9 : m[3] === "M" ? 1e6 : m[3] === "K" ? 1e3 : 1;
+  return (mult * 10 ** -(m[2]?.length ?? 0)) / 2;
 }
 
 const polarisUrl = (market, id) => `${BASE}/sepolia/polaris/${market}/${id}`;
@@ -138,7 +152,7 @@ await strip8
   .catch(() => {});
 const stripText8 = await stripText(strip8);
 check(
-  "1b. the strip states the total at-settle effect (pinned +1.64M)",
+  "1b. the strip states the total at-settle effect (pinned +1.6M)",
   stripText8.includes(signedCompact(PIN_8.effect)),
   `wanted "${signedCompact(PIN_8.effect)}" in: ${stripText8.slice(0, 300)}`,
 );
@@ -158,7 +172,10 @@ if (check("1d. usdp/8's live overlay answers with a price (precondition)", !chai
   const gotToday = m ? parseSignedCompact(m[1]) : NaN;
   check(
     `1e. the strip's "latest block's feed price" figure matches netCollLeg × pethInDebt − netDebtLeg (0.5% tolerance)`,
-    Number.isFinite(gotToday) && Math.abs(gotToday - todayExpected) <= Math.abs(todayExpected) * 0.005 + 1,
+    // Within half the figure's last stated digit (one decimal of M is ±50K),
+    // or 0.5%, whichever is wider.
+    Number.isFinite(gotToday) &&
+      Math.abs(gotToday - todayExpected) <= Math.max(Math.abs(todayExpected) * 0.005 + 1, compactHalfStep(m[1])),
     m
       ? `page states ${m[1]} (${gotToday}) vs expected ${todayExpected}`
       : `no "latest block's feed price" clause in: ${stripText8}`,
@@ -179,7 +196,7 @@ const PIN_166 = { effect: 0.71855454 };
 const page27 = await open(context, polarisUrl("usdp", "27"));
 const strip27Text = await stripText(outcomeStrip(page27));
 check(
-  "2a. usdp/27's strip states the pinned total (+124.509)",
+  "2a. usdp/27's strip states the pinned total (+124.51)",
   strip27Text.includes(signedCompact(PIN_27.effect)),
   strip27Text,
 );
@@ -188,7 +205,7 @@ await page27.close();
 const page166 = await open(context, polarisUrl("usdp", "166"));
 const strip166Text = await stripText(outcomeStrip(page166));
 check(
-  "2b. usdp/166's strip states the pinned total (+0.719) with no mint-share clause",
+  "2b. usdp/166's strip states the pinned total (+0.72) with no mint-share clause",
   strip166Text.includes(signedCompact(PIN_166.effect)) && !/mint shares/i.test(strip166Text),
   strip166Text,
 );
@@ -212,13 +229,7 @@ await pageTrove.close();
 // ── 5. markdown export ───────────────────────────────────────────────────────
 const page8b = await open(context, polarisUrl("usdp", "8"));
 async function copyMarkdown(page) {
-  await page
-    .getByRole("button", { name: /Export this (position|loan|trove)|Copy for LLM/i })
-    .first()
-    .click();
-  await page.getByRole("menuitem", { name: /Copy Position/i }).click();
-  await page.waitForTimeout(500);
-  return page.evaluate(() => navigator.clipboard.readText());
+  return copyPositionMarkdown(page);
 }
 const md8 = await copyMarkdown(page8b);
 const hasOutcomeLine = /\*\*PSM outcome at the feed:\*\*/.test(md8);
@@ -237,39 +248,9 @@ await page8b.close();
 await context.close();
 await browser.close();
 
-// ── siblings ─────────────────────────────────────────────────────────────────
-
-function runSibling(script) {
-  const scriptPath = path.join(__dirname, script);
-  const result = spawnSync(process.execPath, [scriptPath], {
-    env: { ...process.env, BASE },
-    encoding: "utf8",
-    timeout: 300000,
-  });
-  const out = (result.stdout ?? "") + (result.stderr ?? "");
-  const passMatch = /ALL (\d+) CHECKS PASS/.exec(out);
-  const failMatch = /(\d+) CHECK\(S\) FAILED of (\d+)/.exec(out);
-  return {
-    ok: result.status === 0,
-    summary: passMatch
-      ? `${passMatch[1]}/${passMatch[1]} passed`
-      : failMatch
-        ? `${failMatch[2] - failMatch[1]}/${failMatch[2]} passed, ${failMatch[1]} failed`
-        : `exit ${result.status}, no summary line found`,
-  };
-}
-
-for (const sib of [
-  "verify-polaris-psm-share.mjs",
-  "verify-polaris-at-block-prices.mjs",
-  "verify-polaris-rate-step.mjs",
-  "verify-polaris-equity.mjs",
-  "verify-market-note-placement.mjs",
-]) {
-  console.log(`\n--- running sibling verifier: ${sib} ---`);
-  const r = runSibling(sib);
-  check(`6. ${sib} still passes`, r.ok, r.summary);
-}
+// The sibling runs this script used to spawn are retired: run-all.mjs runs
+// every Polaris verifier on its own row, and nested runs only multiplied the
+// time (past their 300 s child cap) and turned one red into several.
 
 console.log(
   failures
