@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { protocolIconSrc, protocolsForChain, type ProtocolEntry } from "@/lib/shared/protocols";
+import { protocolIconSrc } from "@/lib/shared/protocols";
+import { chainExplorers } from "@/lib/shared/explorer-rank";
 import { CHAINS, MAINNET_CHAIN_ID, BASE_CHAIN_ID, SEPOLIA_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { ProtocolGlyph, hasProtocolGlyph } from "@/components/icons/protocol-glyphs";
 import { ChainToggleButtons } from "@/components/shared/chain-toggle";
@@ -11,21 +12,8 @@ import { HomeOnlyChainGlyph } from "@/components/icons/chain-glyphs";
 import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-soon";
 import { PILL_CTA } from "@/lib/shared/ui-grammar";
 
-/** Explorers surfaced on the home page — a chain's roster minus a small omit
- *  list (PWN and the Liquity V2 forks) so the count divides evenly into the
- *  column sets below and no breakpoint strands an orphan tile. The omitted
- *  explorers stay reachable via the chain switcher and the coverage pages.
- *
- *  Ids, not slugs — a slug is only unique within its chain. Applied to every
- *  chain's roster alike. */
-const HOME_OMIT = new Set(["pwn", "ebisu", "asymmetry"]);
-
-function homeProtocolsForChain(chainId: ChainId): ProtocolEntry[] {
-  return protocolsForChain(chainId).filter((p) => !HOME_OMIT.has(p.id));
-}
-
-/** Tile width classes chosen per roster size so every breakpoint fills its
- *  rows evenly: Ethereum's 16 tiles divide by 2/4/8, Base's 6 by 2/3/6. A new
+/** Tile width classes chosen per list size so every breakpoint fills its
+ *  rows evenly: a chain's eight most used divide by 2/4/8, a list of 6 by 2/3/6. A new
  *  roster size that divides by neither set just means picking (or extending)
  *  a set — the map makes the neat-rows contract visible where the count
  *  changes. Paired with a flex-wrap + justify-center container (not grid) so
@@ -58,11 +46,12 @@ function isChainId(value: unknown): value is ChainId {
 /**
  * Protocol row — the home explorer directory as a grid of wide tiles, mark
  * beside name, monochrome glyphs so a colour PNG (the fallback for a roster
- * entry without a glyph yet) is the exception, not the rule. Counted widths
- * over auto-fill: the roster is trimmed to counts that divide evenly (see
- * HOME_OMIT / tileWidthClassesFor), so full rows pack the same as a fixed
- * grid, and the one roster that doesn't divide evenly (Sepolia) centers on
- * its own row instead of stranding an orphan tile at the left edge. Quiet at rest — a faint
+ * entry without a glyph yet) is the exception, not the rule. The tiles are a
+ * chain's most used explorers, the drawer's chooser's selection
+ * (chainExplorers), with "View all" opening the rest in place. Counted widths
+ * over auto-fill (tileWidthClassesFor), so full rows pack the same as a fixed
+ * grid, and a list that doesn't divide evenly centers its last row instead
+ * of stranding a tile at the left edge. Quiet at rest — a faint
  * border plus a low-alpha black wash (a touch darker than whichever ground
  * it sits on, so it composites the same over the gradient floor's light and
  * dark ends), blue on hover per the one-meaning-per-colour nav rule. Above
@@ -76,6 +65,7 @@ export function ProtocolRow() {
   // access must fall back to the Ethereum default, not throw.
   const [chainId, setChainId] = useState<ChainId>(MAINNET_CHAIN_ID);
   const [robinhood, setRobinhood] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     try {
@@ -101,6 +91,7 @@ export function ProtocolRow() {
 
   function handleChange(id: ChainId) {
     setRobinhood(false);
+    setShowAll(false);
     setChainId(id);
     store(String(id));
   }
@@ -110,7 +101,11 @@ export function ProtocolRow() {
     store(ROBINHOOD_STORED);
   }
 
-  const protocols = homeProtocolsForChain(chainId);
+  // The chain's most used explorers and "View all", as the drawer's chooser
+  // lists them (lib/shared/explorer-rank.ts); "View all" opens the rest in
+  // place.
+  const { featured, all } = chainExplorers(chainId);
+  const protocols = showAll ? all : featured;
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4">
@@ -160,6 +155,19 @@ export function ProtocolRow() {
               </Link>
             ))}
           </div>
+          {all.length > featured.length && (
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowAll((v) => !v)}
+                aria-expanded={showAll}
+                className="cursor-pointer rounded-sm px-2 py-1 text-sm text-blue-600 transition-colors hover:text-blue-600 focus-ring dark:text-blue-400 dark:hover:text-blue-400"
+                data-home-view-all=""
+              >
+                {showAll ? "Show the most used" : `View all ${all.length} explorers`}
+              </button>
+            </div>
+          )}
 
           {/* Coverage matrix — per-explorer depth for the chain the toggle is
           showing (the coverage pages are per-chain routes); the shared CTA
@@ -170,11 +178,7 @@ export function ProtocolRow() {
               href={`/coverage/${CHAINS[chainId].slug}`}
               className={`${PILL_CTA} transition-colors hover:border-blue-500 dark:hover:border-blue-500`}
             >
-              {/* Ethereum's grid is trimmed (HOME_OMIT), so its button also
-              promises the protocols the grid left out; Base shows its whole
-              roster, so there is nothing "more" to claim. */}
-              {chainId === MAINNET_CHAIN_ID ? "More protocols and detailed coverage" : "See detailed coverage"}{" "}
-              <span>→</span>
+              See detailed coverage <span>→</span>
             </Link>
           </div>
         </>

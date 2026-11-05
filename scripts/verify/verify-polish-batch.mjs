@@ -90,7 +90,9 @@ const git = await page.locator("text=open infrastructure for DeFi").count();
 const gitTg = await page.locator("text=@railsfinance").count();
 check("10 get-in-touch new copy + @railsfinance", git >= 1 && gitTg >= 1);
 
-// 5. Protocol ordering: Compound V2 before Compound V3 in the home row
+// 5. Protocol ordering: Compound V2 before Compound V3 in the home row, once
+// "View all" has opened the whole roster (Compound V2 is not among the most used).
+await page.locator("[data-home-view-all]").click();
 const protoOrder = await page.evaluate(() => {
   const text = document.body.innerText;
   const v2 = text.indexOf("Compound V2");
@@ -274,6 +276,21 @@ const ascending = (tops) => tops.every((t, i) => t !== null && (i === 0 || t > t
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
 const wideOrder = await homeOrder(page);
 check("O home: hero, track lines, value line, sample, directory", ascending(wideOrder), JSON.stringify(wideOrder));
+// The directory lists a chain's most used explorers, as the drawer's chooser
+// does, and "View all <n> explorers" opens the rest in place.
+const dirTiles = () =>
+  page.locator('[data-anatomy="S5"] a[href^="/"]:not([href^="/coverage"])').evaluateAll((as) => as.length);
+const viewAll = page.locator("[data-home-view-all]");
+const featuredCount = await dirTiles();
+const viewAllText = (await viewAll.textContent())?.trim() ?? "";
+const allCount = Number(viewAllText.match(/View all (\d+) explorers/)?.[1] ?? 0);
+await viewAll.click();
+const expandedCount = await dirTiles();
+check(
+  "D home: eight explorers, View all opens the rest in place",
+  featuredCount === 8 && allCount > 8 && expandedCount === allCount,
+  `${featuredCount} → ${expandedCount} (${viewAllText})`,
+);
 
 // The live sample on a phone (Miles, 5 Nov 2026): no frame, the link to the
 // position alone, "View a live position", a tap target on the screen.
