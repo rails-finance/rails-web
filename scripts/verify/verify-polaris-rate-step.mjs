@@ -540,7 +540,9 @@ check(
 // The unit word, everywhere on the page at once: "pp" is finance's shorthand
 // and no reader outside it writes it (Miles, 2026-09-10). Every note is open
 // at this point, so this reads the panels and the derivation prose too.
-const bodyText = ((await page27.locator("body").textContent()) ?? "").replace(/\s+/g, " ");
+// innerText, not textContent: the body's inline scripts carry the RSC payload,
+// where a chunk boundary can split "app/(app)" into "…a" + "pp)…".
+const bodyText = ((await page27.locator("body").innerText()) ?? "").replace(/\s+/g, " ");
 check(
   '3f. the word "pp" appears nowhere on the position page',
   !/\bpp\b/i.test(bodyText),
