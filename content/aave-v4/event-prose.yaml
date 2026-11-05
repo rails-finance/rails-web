@@ -49,7 +49,11 @@ placeholders:
   manager:
     rounding: address
     means: |-
-      The position manager that called the spoke for the owner.
+      The position manager or gateway that called the spoke for the owner.
+  manager_name:
+    rounding: text
+    means: |-
+      That manager's name where Aave's address book lists it, else words for any position manager.
   sibling_acts:
     rounding: text
     means: |-
@@ -73,7 +77,7 @@ placeholders:
   other_debt:
     rounding: text
     means: |-
-      The debt assets left after this event.
+      The debt assets left after this event, or after the whole transaction where it borrows again.
   cleared:
     rounding: spoke_amount
     means: |-
@@ -252,6 +256,20 @@ words:
     borrowed {symbol}
   act_repay: |-
     repaid {symbol}
+  # The position managers and gateways Aave's address book lists
+  # (lib/aave-v4/position-managers.ts), and the words for any other.
+  manager_giver: |-
+    Aave's Giver position manager
+  manager_taker: |-
+    Aave's Taker position manager
+  manager_config: |-
+    Aave's Config position manager
+  manager_native_gateway: |-
+    Aave's native-token gateway
+  manager_signature_gateway: |-
+    Aave's signature gateway
+  manager_unnamed: |-
+    a position manager
   # The timeline head (rails-ops decision 0045, TO-DO-ui-jobs 367): the kind
   # as a past participle, the legs in order where a supply also turned the
   # reserve on as collateral, each after the middle dot. Read through
@@ -388,15 +406,45 @@ shared_sentences:
     when: |-
       the owner signed the transaction and a position manager called the spoke
     text: |-
-      The owner sent it through position manager {manager}, a contract acting for the owner.
+      The owner sent it through {manager_name} ({manager}), a contract acting for the owner.
   by_manager_alone:
     when: |-
       a position manager called the spoke and the owner did not sign
     text: |-
-      Position manager {manager} sent it on the owner's behalf, with the owner's approval.
+      Another account sent the transaction, and {manager_name} ({manager}) called the spoke for the owner, with the owner's approval.
+  by_manager_tx:
+    when: |-
+      as by_manager, and the transaction holds other supplies, withdrawals, borrows or repayments for the owner
+    text: |-
+      The owner sent it through {manager_name} ({manager}), a contract acting for the owner, in a transaction that also {sibling_acts}.
+  by_manager_alone_tx:
+    when: |-
+      as by_manager_alone, and the transaction holds other supplies, withdrawals, borrows or repayments for the owner
+    text: |-
+      Another account sent the transaction, which also {sibling_acts}; {manager_name} ({manager}) called the spoke for the owner.
+  signed.owner:
+    when: |-
+      the first sentence named the position manager, and the owner signed the transaction
+    text: |-
+      The owner signed the transaction.
+  signed.other:
+    when: |-
+      the first sentence named the position manager, and the owner did not sign
+    text: |-
+      Another account signed the transaction, with the owner's approval of the manager.
+  signed.owner_tx:
+    when: |-
+      as signed.owner, and the transaction holds other supplies, withdrawals, borrows or repayments for the owner
+    text: |-
+      The owner signed the transaction, which also {sibling_acts}.
+  signed.other_tx:
+    when: |-
+      as signed.other, and the transaction holds other supplies, withdrawals, borrows or repayments for the owner
+    text: |-
+      Another account signed the transaction, which also {sibling_acts}; the owner had approved the manager.
   sibling:
     when: |-
-      the transaction holds other supplies, withdrawals, borrows or repayments, and no position manager sent it
+      the transaction holds other supplies, withdrawals, borrows or repayments for the owner, and the owner called the spoke
     text: |-
       The same transaction also {sibling_acts}.
   hf.at_line:
@@ -411,7 +459,7 @@ shared_sentences:
       At {hf_after} the position is close to the liquidation line at 1.
   hf.cleared:
     when: |-
-      the event left no debt where there was some, and supply remains
+      the event left no debt where there was some, supply remains, and nothing is borrowed later in the transaction
     text: |-
       With no debt left, the position cannot be liquidated.
   closed:
@@ -469,6 +517,8 @@ templates:
         supply.enabled,
         by_manager,
         by_manager_alone,
+        by_manager_tx,
+        by_manager_alone_tx,
         sibling,
         coll.on,
         coll.was_on,
@@ -477,11 +527,11 @@ templates:
         hf.close,
       ]
     groups:
-      happened: [supply.what, supply.enabled, by_manager, by_manager_alone, sibling]
+      happened: [supply.what, supply.enabled, by_manager, by_manager_alone, by_manager_tx, by_manager_alone_tx, sibling]
       leaves: [coll.on, coll.was_on, coll.off, hf.at_line, hf.close]
     alternates:
       - [supply.what, supply.enabled]
-      - [by_manager, by_manager_alone, sibling]
+      - [by_manager, by_manager_alone, by_manager_tx, by_manager_alone_tx, sibling]
       - [coll.on, coll.was_on, coll.off]
       - [hf.at_line, hf.close]
 
@@ -497,20 +547,49 @@ templates:
     sentences:
       withdraw.what:
         when: |-
-          every withdrawal
+          the owner called the spoke
         text: |-
           Withdrew {amount} {symbol} to the wallet.
+      withdraw.via:
+        when: |-
+          a position manager or gateway called the spoke, so the tokens went to it
+        text: |-
+          Withdrew {amount} {symbol} through {manager_name} ({manager}).
       withdraw.all:
         when: |-
           the withdrawal took the whole supply of the asset and the position stays open
         text: |-
           That was the whole {symbol} supply on this spoke.
-    order: [withdraw.what, by_manager, by_manager_alone, sibling, withdraw.all, closed, hf.at_line, hf.close]
+    order:
+      [
+        withdraw.what,
+        withdraw.via,
+        signed.owner,
+        signed.other,
+        signed.owner_tx,
+        signed.other_tx,
+        sibling,
+        withdraw.all,
+        closed,
+        hf.at_line,
+        hf.close,
+      ]
     groups:
-      happened: [withdraw.what, by_manager, by_manager_alone, sibling, withdraw.all]
+      happened:
+        [
+          withdraw.what,
+          withdraw.via,
+          signed.owner,
+          signed.other,
+          signed.owner_tx,
+          signed.other_tx,
+          sibling,
+          withdraw.all,
+        ]
       leaves: [closed, hf.at_line, hf.close]
     alternates:
-      - [by_manager, by_manager_alone, sibling]
+      - [withdraw.what, withdraw.via]
+      - [signed.owner, signed.other, signed.owner_tx, signed.other_tx, sibling]
       - [closed, hf.at_line, hf.close]
 
   - id: aave4.borrow
@@ -553,17 +632,30 @@ templates:
         borrow.first_hub,
         by_manager,
         by_manager_alone,
+        by_manager_tx,
+        by_manager_alone_tx,
         sibling,
         hf.at_line,
         hf.close,
         rate.moved,
       ]
     groups:
-      happened: [borrow.what, borrow.what_hub, borrow.first, borrow.first_hub, by_manager, by_manager_alone, sibling]
+      happened:
+        [
+          borrow.what,
+          borrow.what_hub,
+          borrow.first,
+          borrow.first_hub,
+          by_manager,
+          by_manager_alone,
+          by_manager_tx,
+          by_manager_alone_tx,
+          sibling,
+        ]
       leaves: [hf.at_line, hf.close, rate.moved]
     alternates:
       - [borrow.what, borrow.what_hub, borrow.first, borrow.first_hub]
-      - [by_manager, by_manager_alone, sibling]
+      - [by_manager, by_manager_alone, by_manager_tx, by_manager_alone_tx, sibling]
       - [hf.at_line, hf.close]
 
   - id: aave4.repay
@@ -612,9 +704,14 @@ templates:
           Over its life this {symbol} debt accrued {life_interest} {symbol} of interest.
       repay.other:
         when: |-
-          cleared, other debt remains
+          cleared, other debt remains, and nothing is borrowed later in the transaction
         text: |-
           The {other_debt} debt remains.
+      repay.after_tx:
+        when: |-
+          cleared, and the same transaction borrows for the owner after it
+        text: |-
+          After the transaction the position owes {other_debt}.
     order:
       [
         repay.what,
@@ -623,10 +720,13 @@ templates:
         repay.all_hub,
         by_manager,
         by_manager_alone,
+        by_manager_tx,
+        by_manager_alone_tx,
         sibling,
         repay.dust,
         repay.life,
         repay.other,
+        repay.after_tx,
         closed,
         hf.cleared,
         hf.at_line,
@@ -635,13 +735,25 @@ templates:
       ]
     groups:
       happened:
-        [repay.what, repay.what_hub, repay.all, repay.all_hub, by_manager, by_manager_alone, sibling, repay.dust]
+        [
+          repay.what,
+          repay.what_hub,
+          repay.all,
+          repay.all_hub,
+          by_manager,
+          by_manager_alone,
+          by_manager_tx,
+          by_manager_alone_tx,
+          sibling,
+          repay.dust,
+        ]
       adds_up: [repay.life]
-      leaves: [repay.other, closed, hf.cleared, hf.at_line, hf.close, rate.moved]
+      leaves: [repay.other, repay.after_tx, closed, hf.cleared, hf.at_line, hf.close, rate.moved]
     alternates:
       - [repay.what, repay.what_hub, repay.all, repay.all_hub]
-      - [by_manager, by_manager_alone, sibling]
+      - [by_manager, by_manager_alone, by_manager_tx, by_manager_alone_tx, sibling]
       - [repay.dust, repay.life, rate.moved]
+      - [repay.other, repay.after_tx]
       - [closed, hf.cleared, hf.at_line, hf.close]
 
   - id: aave4.liquidation

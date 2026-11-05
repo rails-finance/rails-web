@@ -24,6 +24,7 @@ import { AT_LINE_HF } from "@/lib/aave-v4/format";
 import { getSpokeMeta } from "@/lib/aave-v4/spoke-meta";
 import { debtHubsOf, HUB_TIER_LABEL } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { aaveV4Modal, PROSE, V4_WORDS, type AaveV4L5Key } from "@/lib/aave-v4/event-templates";
+import { aaveV4ManagerKind, type AaveV4ManagerKind } from "@/lib/aave-v4/position-managers";
 
 export type AaveV4Event = BaseActivityEvent & { context: { protocol: "aave-v4"; data: AaveV4Context } };
 
@@ -83,6 +84,31 @@ function act(e: AaveV4Event): string | null {
     default:
       return null;
   }
+}
+
+/** Each listed manager's name. */
+const MANAGER_NAME: Record<AaveV4ManagerKind, string> = {
+  giver: V4_WORDS.manager_giver,
+  taker: V4_WORDS.manager_taker,
+  config: V4_WORDS.manager_config,
+  native_gateway: V4_WORDS.manager_native_gateway,
+  signature_gateway: V4_WORDS.manager_signature_gateway,
+};
+
+/** The transaction's other events for the same owner, each with whether it
+ *  comes after this one. A swap is two such legs (a repay then a borrow, or a
+ *  supply and a withdraw), each through a position manager; a swap card would
+ *  take both legs from here. */
+function txLegs(
+  siblings: readonly AaveV4Event[] | undefined,
+  self: AaveV4Event | undefined,
+  owner: string | undefined,
+): { event: AaveV4Event; later: boolean }[] {
+  const all = siblings ?? [];
+  const at = all.findIndex((s) => s === self || (self != null && s.id === self.id));
+  return all
+    .map((event, i) => ({ event, later: at >= 0 && i > at }))
+    .filter(({ event }, i) => i !== at && (!owner || event.context.data.owner?.toLowerCase() === owner));
 }
 
 export function coordsFor(e: AaveV4Event): EventProvDetail {
@@ -159,23 +185,43 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
   const hub = meta && meta.borrowHubs.length > 1 && tier ? HUB_TIER_LABEL[tier] : null;
   if (hub) v.hub = hub;
 
-  // Who sent it: a caller other than the owner is a position manager (every
-  // spoke entry point is gated on one); else the transaction's other events.
-  const whoLine = (withSiblings = true) => {
-    const owner = ctx.owner?.toLowerCase();
-    const caller = ctx.caller?.toLowerCase();
-    if (owner && caller && caller !== owner) {
-      v.manager = caller;
-      return sp.say(ctx.txFrom?.toLowerCase() === owner ? "by_manager" : "by_manager_alone");
-    }
-    if (!withSiblings) return;
-    const others = (siblings ?? [])
-      .filter((s) => s !== self && s.id !== self?.id)
-      .map(act)
-      .filter((a): a is string => a != null);
-    if ((siblings?.length ?? 0) < 2 || others.length === 0) return;
+  // Who called the spoke: a caller other than the owner is a position manager
+  // or gateway (every spoke entry point is gated on one), named where Aave's
+  // address book lists it.
+  const owner = ctx.owner?.toLowerCase();
+  const caller = ctx.caller?.toLowerCase();
+  const managed = owner != null && caller != null && caller !== owner;
+  const ownerSigned = owner != null && ctx.txFrom?.toLowerCase() === owner;
+  if (managed) {
+    v.manager = caller;
+    const kind = aaveV4ManagerKind(caller);
+    v.manager_name = kind ? MANAGER_NAME[kind] : V4_WORDS.manager_unnamed;
+  }
+  const legs = txLegs(siblings, self, owner);
+  // A borrow later in the transaction: the debt half of a debt swap.
+  const borrowsLater = legs.some((l) => l.later && l.event.context.data.eventType === "borrow");
+
+  // What the transaction's other events for the owner did, set for the line
+  // that names them; false where there are none.
+  const othersSet = () => {
+    const others = legs.map((l) => act(l.event)).filter((a): a is string => a != null);
+    if (others.length === 0) return false;
     v.sibling_acts = joinWords(others);
-    sp.say("sibling");
+    return true;
+  };
+  // Who sent it, with the transaction's other events for the owner.
+  const whoLine = (withSiblings = true) => {
+    const also = withSiblings && othersSet();
+    if (managed)
+      sp.say(ownerSigned ? (also ? "by_manager_tx" : "by_manager") : also ? "by_manager_alone_tx" : "by_manager_alone");
+    else if (also) sp.say("sibling");
+  };
+  // Who signed, where the first sentence named the manager.
+  const signedLine = () => {
+    const also = othersSet();
+    if (managed)
+      sp.say(ownerSigned ? (also ? "signed.owner_tx" : "signed.owner") : also ? "signed.other_tx" : "signed.other");
+    else if (also) sp.say("sibling");
   };
 
   // The health factor after the event, where it means something.
@@ -210,8 +256,8 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
       break;
     }
     case "aave4.withdraw": {
-      sp.say("withdraw.what", amount);
-      whoLine();
+      sp.say(managed ? "withdraw.via" : "withdraw.what", amount);
+      signedLine();
       if (closes) sp.say("closed");
       else {
         if (supplyEmptied) sp.say("withdraw.all");
@@ -237,7 +283,22 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
           v.life_interest = debtLifeInterest;
           sp.say("repay.life");
         }
-        if (closes) sp.say("closed");
+        // A borrow later in the same transaction: the leaves lines read the
+        // debts the transaction's last event lists, and the health factor at
+        // the end of the block.
+        const debtsAfterTx = borrowsLater
+          ? [...legs]
+              .reverse()
+              .find((l) => l.later && l.event.context.data.allDebts != null)
+              ?.event.context.data.allDebts?.filter((d) => (num(d.amount) ?? 0) > EPS)
+              .map((d) => aaveV4DisplaySymbol(d.symbol))
+          : undefined;
+        if (debtsAfterTx && debtsAfterTx.length > 0) {
+          v.other_debt = joinWords(debtsAfterTx);
+          sp.say("repay.after_tx");
+          hfLine();
+        } else if (borrowsLater) hfLine();
+        else if (closes) sp.say("closed");
         else if (otherDebts.length > 0) {
           v.other_debt = joinWords(otherDebts);
           sp.say("repay.other");
