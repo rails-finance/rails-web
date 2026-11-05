@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { OraclePricesData } from "@/types/api/oracle";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
@@ -16,7 +16,6 @@ import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { collateralPriceInfo } from "@/lib/liquity/trove-page-words";
 import { chainMeta } from "@/lib/shared/chains";
 import { protocolForPathname } from "@/lib/shared/protocols";
-import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 
 /**
  * Live example frame — the hero's proof-by-showing: the Trove page's body
@@ -28,7 +27,8 @@ import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
  * hovering draws an edge in the glow's colour round its top and sides that dissolves
  * toward the bottom fade, brightens the URL in step with it, and reveals the
  * pill affordance;
- * touch/small viewports get a caption link under the frame instead. The render stays inert
+ * touch viewports get a caption link under the frame instead. Below sm there is
+ * no frame: the link to the position stands alone (PhoneButton). The render stays inert
  * (pointer-events off, `inert`, aria-hidden) — it's a picture of the app, not a
  * second app — so the body draws without the page's top row, without export
  * shapes, and with a still timeline toolbar (its words and count, no
@@ -88,7 +88,7 @@ function HeroStrip({ data }: { data: LiveExampleData }) {
 }
 
 /** The Trove page's body, fed from the home page's data. */
-function HeroTroveComposition({ wire, only }: { wire: WireLiveExample; only?: "card" | "flows" }) {
+function HeroTroveComposition({ wire }: { wire: WireLiveExample }) {
   const data = useMemo(() => unpackLiveExample(wire), [wire]);
   const {
     trove,
@@ -133,8 +133,8 @@ function HeroTroveComposition({ wire, only }: { wire: WireLiveExample; only?: "c
   return (
     <PositionCardStripProvider>
       <PositionCardEdgeContext.Provider value={EXAMPLE_EDGE}>
-        <div className={only ? "" : "mx-auto max-w-7xl px-4 md:px-6"}>
-          {only !== "flows" && <HeroStrip data={data} />}
+        <div className="mx-auto max-w-7xl px-4 md:px-6">
+          <HeroStrip data={data} />
           <TroveBody
             still
             trove={trove}
@@ -158,7 +158,6 @@ function HeroTroveComposition({ wire, only }: { wire: WireLiveExample; only?: "c
             daily={dailyObs != null}
             surplusState={null}
             troveMeta={troveMeta}
-            only={only}
           />
         </div>
       </PositionCardEdgeContext.Provider>
@@ -203,182 +202,49 @@ function useGlowPause() {
   return ref;
 }
 
-type SampleMode = "pending" | "framed" | "layered" | "single-card" | "single-flows" | "button";
-
-/** Which sample a reader sees, decided after mount: below sm the layered
- *  slices, from sm the framed page. On a dev server `?sample=` picks another
- *  phone sample for side-by-side review (temporary, Miles 5 Nov 2026):
- *  `classic` the framed page, `single` or `single-flows` the Lifetime flows
- *  panel alone, `single-card` the position card alone, `button` no
- *  sample, a link to the position alone. */
-function useSampleMode(): SampleMode {
-  const [mode, setMode] = useState<SampleMode>("pending");
+/** Whether the framed sample is drawn: from sm, decided after mount so a phone
+ *  never mounts the composition. Below sm the home page draws the link to the
+ *  position alone (Miles, 5 Nov 2026). */
+function useFramed(): boolean {
+  const [framed, setFramed] = useState(false);
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 639px)");
-    const asked =
-      process.env.NODE_ENV !== "production" ? new URLSearchParams(window.location.search).get("sample") : null;
-    const phone: SampleMode =
-      asked === "classic"
-        ? "framed"
-        : asked === "single-card"
-          ? "single-card"
-          : asked === "single" || asked === "single-flows"
-            ? "single-flows"
-            : asked === "button"
-              ? "button"
-              : "layered";
-    const set = () => setMode(mq.matches ? phone : "framed");
+    const mq = window.matchMedia("(min-width: 640px)");
+    const set = () => setFramed(mq.matches);
     set();
     mq.addEventListener("change", set);
     return () => mq.removeEventListener("change", set);
   }, []);
-  return mode;
+  return framed;
 }
 
-/** The glow behind a phone sample's card, as the framed sample draws it round
- *  its frame: a warm shadow in light, the turning glow in dark. Fills its
- *  positioned parent, behind it. */
-function CardGlow() {
-  return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 rounded-2xl">
-      <div
-        className="absolute inset-0 rounded-2xl dark:hidden"
-        style={{ boxShadow: "0 24px 80px -12px rgba(40, 33, 20, 0.24), 0 8px 30px rgba(40, 33, 20, 0.12)" }}
-      />
-      <div className="absolute inset-0 hidden dark:block">
-        {GLOW_STOPS.map((colour, slot) => (
-          <div
-            key={colour}
-            className="live-glow-layer absolute inset-0 rounded-2xl"
-            style={{ boxShadow: glowShadow(colour), ["--glow-slot" as string]: slot }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** The full-width link under a single phone sample: the CTA pill, a 48px
- *  tap target across the column. */
-const SINGLE_BUTTON = PILL_CTA_BLUE.replace("inline-flex", "flex w-full justify-center")
+/** The phone's link to the position: the CTA pill as a 54px tap target, a
+ *  little narrower than the search. */
+const PHONE_BUTTON = PILL_CTA_BLUE.replace("inline-flex", "flex w-full max-w-[19rem] justify-center")
   .replace("px-4 py-2", "px-4 py-3.5")
   .replace("text-sm", "text-base");
 
-/** Below sm, on review: one component at its real size, as the position page
- *  draws it at phone width, live and interactive (its receipts and tooltips
- *  answer); a label line over it naming the position, and the link to it under
- *  it. */
-function SingleSample({ data, which }: { data: WireLiveExample | null; which: "card" | "flows" }) {
-  const glowRef = useGlowPause();
-  const collSymbol = useMemo(() => (data ? unpackLiveExample(data).trove.collateralType : null), [data]);
-  return (
-    <div className="px-4 sm:hidden" data-live-single={which}>
-      <p className="mb-3 flex items-center gap-2 text-xs text-rb-500">
-        {EXAMPLE_ENTRY && <ProtocolIcon id={EXAMPLE_ENTRY.id} className="h-4 w-4 shrink-0" />}
-        <span className="font-medium text-foreground">
-          {EXAMPLE_ENTRY?.label ?? "Liquity V2"}
-          {collSymbol && ` · ${collSymbol} trove`}
-        </span>
-        <span className="ml-auto">
-          <RecencyStamp compact />
-        </span>
-      </p>
-      <div ref={glowRef} className="live-glow relative isolate" data-live-slice={which}>
-        <CardGlow />
-        {data && <HeroTroveComposition wire={data} only={which} />}
-      </div>
-      <Link href={LIVE_EXAMPLE_TROVE_PATH} className={`${SINGLE_BUTTON} mt-5`}>
-        View a live position <span>→</span>
-      </Link>
-    </div>
-  );
-}
-
-/** Below sm, on review: no sample, the link to the position alone, centred
- *  and a little narrower than the search. It rises 112px into the hero's foot,
- *  68px under the ticks' text, and keeps 112px to the
- *  value line. */
-function ButtonSample() {
+/** Below sm: no sample, the link to the position alone, centred. It rises
+ *  112px into the hero's foot, 68px under the ticks' text, and keeps 112px to
+ *  the value line. */
+function PhoneButton() {
   return (
     <div className="-mt-28 mb-16 flex justify-center px-4 sm:hidden" data-live-button="">
-      <Link href={LIVE_EXAMPLE_TROVE_PATH} className={`${SINGLE_BUTTON} max-w-[19rem]`}>
+      <Link href={LIVE_EXAMPLE_TROVE_PATH} className={PHONE_BUTTON}>
         View a live position <span>→</span>
       </Link>
-    </div>
-  );
-}
-
-/** The layered sample's geometry at 390px (Miles's mock, 5 Nov 2026), to be
- *  nudged here: each slice lays its component out at an internal width and
- *  draws it at a zoom. The card sits on the left; the flows panel lies over it,
- *  offset right and down, running off the screen's right edge; the pill
- *  overlaps their foot. */
-const LAYERED = {
-  /** The card: internal width (px) and zoom. */
-  cardW: 420,
-  cardZoom: 0.85,
-  /** The flows panel: internal width (px), zoom, and its offset (px) from the
-   *  card's top left. */
-  flowsW: 480,
-  flowsZoom: 0.85,
-  flowsLeft: 142,
-  flowsTop: 86,
-};
-
-/** Below sm: the position card and the Lifetime flows panel as two live
- *  slices, the flows panel layered over the card, and the link to the
- *  position as a pill over their foot. Same data as the framed sample; each
- *  slice is laid out at its own width and zoomed (zoom, not a transform, so
- *  its box takes the drawn height). */
-function LayeredSample({ data, glowRef }: { data: WireLiveExample | null; glowRef: RefObject<HTMLDivElement | null> }) {
-  const L = LAYERED;
-  return (
-    <div className="px-4 pb-8 sm:hidden" data-live-layered="">
-      <div ref={glowRef} className="live-glow relative flow-root min-h-[420px]">
-        <div aria-hidden="true" inert className="pointer-events-none">
-          <div
-            className="absolute left-0 top-0 isolate"
-            style={{ width: L.cardW, zoom: L.cardZoom }}
-            data-live-slice="card"
-          >
-            <CardGlow />
-            {data && <HeroTroveComposition wire={data} only="card" />}
-          </div>
-          <div
-            className="relative rounded-2xl shadow-2xl shadow-black/40"
-            style={{
-              width: L.flowsW,
-              zoom: L.flowsZoom,
-              marginLeft: L.flowsLeft / L.flowsZoom,
-              marginTop: L.flowsTop / L.flowsZoom,
-            }}
-            data-live-slice="flows"
-          >
-            {data && <HeroTroveComposition wire={data} only="flows" />}
-          </div>
-        </div>
-        <Link
-          href={LIVE_EXAMPLE_TROVE_PATH}
-          aria-label="View this live Liquity V2 trove on Rails"
-          className={`${PILL_CTA_BLUE} absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2`}
-        >
-          View a live position <span>→</span>
-        </Link>
-      </div>
     </div>
   );
 }
 
 export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
-  const mode = useSampleMode();
+  const framed = useFramed();
   const glowRef = useGlowPause();
-  const layeredGlowRef = useGlowPause();
   // The composition stays behind the skeleton until the client has mounted —
   // see the header comment for why it never server-renders. When the data
   // fetch failed at revalidate time (data null) the skeleton simply holds.
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
-  const showTrove = ready && data !== null && mode === "framed";
+  const showTrove = ready && data !== null && framed;
   // The skeleton unmounts once its fade-out (500ms) has run, so its pulses
   // stop with it.
   const [skeletonGone, setSkeletonGone] = useState(false);
@@ -390,14 +256,8 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
 
   return (
     <>
-      {(mode === "pending" || mode === "layered") && (
-        <LayeredSample data={mode === "layered" ? data : null} glowRef={layeredGlowRef} />
-      )}
-      {mode === "button" && <ButtonSample />}
-      {(mode === "single-card" || mode === "single-flows") && (
-        <SingleSample data={data} which={mode === "single-card" ? "card" : "flows"} />
-      )}
-      <div className={`w-full max-w-5xl mx-auto px-4 ${mode === "framed" ? "" : "max-sm:hidden"}`}>
+      <PhoneButton />
+      <div className="w-full max-w-5xl mx-auto px-4 max-sm:hidden">
         <div ref={glowRef} className="live-glow group relative">
           {/* Cast shadow behind the frame — a warm dark shadow on the paper
             canvas, a glow turning round the colour wheel in dark: both hug

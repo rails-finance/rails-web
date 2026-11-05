@@ -166,9 +166,6 @@ export interface TroveBodyProps {
   /** The home page's picture of the page: the Lifetime flows panel keeps no
    *  collapse state and the timeline toolbar draws no controls. */
   still?: boolean;
-  /** One piece alone, unwrapped: the position card or the Lifetime flows
-   *  panel (the home page's layered sample on a phone). */
-  only?: "card" | "flows";
 }
 
 export function TroveBody({
@@ -198,7 +195,6 @@ export function TroveBody({
   surplusState,
   troveMeta,
   still,
-  only,
 }: TroveBodyProps) {
   const currentPrice = prices?.[trove.collateralType.toLowerCase() as keyof OraclePricesData];
   const closed = trove.status !== "open";
@@ -242,60 +238,51 @@ export function TroveBody({
     now,
   });
 
-  const summary = (
-    <TroveSummaryStack
-      trove={trove}
-      liveState={liveState}
-      prices={prices}
-      debtInFront={debtInFront}
-      trovesAhead={trovesAhead}
-      queueDebtTotal={queueDebtTotal}
-      debtInFrontLoading={debtInFrontLoading}
-      viewHref={tl.viewHref}
-      surplus={surplus}
-      exports={exports}
-      loadingStatus={{ message: loadingMessage, snapshotDate: lastEventTs ?? undefined }}
-    />
-  );
-  const flowsPanel = economics ? (
-    <LifetimeFlowsPanel
-      scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
-      read={flowsRead}
-      explanation={
-        <LiquityFlowsExplanation
-          economics={economics.economics}
-          meta={economics.economics._meta}
-          now={now}
-          currentPrice={currentPrice}
-          surplusClaimed={surplusClaimed}
-          unpriced={unpricedEvents(flowEvents)}
-          lives={troveLives(flowEvents)}
-          daily={daily}
-        />
-      }
-      learnMore={liquityLifetimeFlowsContent({ isBatched: economics.economics._meta.isInBatch })}
-      // Stated, not left to the route (ui-jobs 61): the home page belongs
-      // to no protocol, so it has no collapse setting of its own to read
-      // and must not borrow the Trove page's.
-      {...(still ? { collapseKey: null } : {})}
-    />
-  ) : null;
-  if (only)
-    return (
-      <FlowFocusContext.Provider value={flowFocus}>{only === "card" ? summary : flowsPanel}</FlowFocusContext.Provider>
-    );
-
   return (
     <FlowFocusContext.Provider value={flowFocus}>
       <div className="py-8 space-y-6">
         {topRow}
-        {summary}
+        <TroveSummaryStack
+          trove={trove}
+          liveState={liveState}
+          prices={prices}
+          debtInFront={debtInFront}
+          trovesAhead={trovesAhead}
+          queueDebtTotal={queueDebtTotal}
+          debtInFrontLoading={debtInFrontLoading}
+          viewHref={tl.viewHref}
+          surplus={surplus}
+          exports={exports}
+          loadingStatus={{ message: loadingMessage, snapshotDate: lastEventTs ?? undefined }}
+        />
 
         {/* Lifetime flows: the bars and the line over the Trove's own event
             replay (lib/shared/liquity-flows.ts). The runway that used to share
             this panel lives in the position card with the current-state
             stats. */}
-        {flowsPanel}
+        {economics && (
+          <LifetimeFlowsPanel
+            scrubber={flowTimeline ? <LifetimeFlowsScrubber timeline={flowTimeline} /> : null}
+            read={flowsRead}
+            explanation={
+              <LiquityFlowsExplanation
+                economics={economics.economics}
+                meta={economics.economics._meta}
+                now={now}
+                currentPrice={currentPrice}
+                surplusClaimed={surplusClaimed}
+                unpriced={unpricedEvents(flowEvents)}
+                lives={troveLives(flowEvents)}
+                daily={daily}
+              />
+            }
+            learnMore={liquityLifetimeFlowsContent({ isBatched: economics.economics._meta.isInBatch })}
+            // Stated, not left to the route (ui-jobs 61): the home page belongs
+            // to no protocol, so it has no collapse setting of its own to read
+            // and must not borrow the Trove page's.
+            {...(still ? { collapseKey: null } : {})}
+          />
+        )}
 
         <CollSurplusCtx.Provider value={surplusState}>
           <LiquityTroveMetaContext.Provider value={troveMeta}>
