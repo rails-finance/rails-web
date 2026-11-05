@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import type { OraclePricesData } from "@/types/api/oracle";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
@@ -87,7 +87,7 @@ function HeroStrip({ data }: { data: LiveExampleData }) {
 }
 
 /** The Trove page's body, fed from the home page's data. */
-function HeroTroveComposition({ wire }: { wire: WireLiveExample }) {
+function HeroTroveComposition({ wire, only }: { wire: WireLiveExample; only?: "card" | "flows" }) {
   const data = useMemo(() => unpackLiveExample(wire), [wire]);
   const {
     trove,
@@ -132,8 +132,8 @@ function HeroTroveComposition({ wire }: { wire: WireLiveExample }) {
   return (
     <PositionCardStripProvider>
       <PositionCardEdgeContext.Provider value={EXAMPLE_EDGE}>
-        <div className="mx-auto max-w-7xl px-4 md:px-6">
-          <HeroStrip data={data} />
+        <div className={only ? "" : "mx-auto max-w-7xl px-4 md:px-6"}>
+          {only !== "flows" && <HeroStrip data={data} />}
           <TroveBody
             still
             trove={trove}
@@ -157,6 +157,7 @@ function HeroTroveComposition({ wire }: { wire: WireLiveExample }) {
             daily={dailyObs != null}
             surplusState={null}
             troveMeta={troveMeta}
+            only={only}
           />
         </div>
       </PositionCardEdgeContext.Provider>
@@ -201,14 +202,110 @@ function useGlowPause() {
   return ref;
 }
 
+/** Which sample a reader sees, decided after mount: below sm the layered
+ *  slices, from sm the framed page. `?sample=classic` on a dev server shows the
+ *  framed page on a phone too, for side-by-side review (temporary, Miles 5 Nov
+ *  2026). */
+function useSampleMode(): "pending" | "framed" | "layered" {
+  const [mode, setMode] = useState<"pending" | "framed" | "layered">("pending");
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const classic =
+      process.env.NODE_ENV !== "production" && new URLSearchParams(window.location.search).get("sample") === "classic";
+    const set = () => setMode(mq.matches && !classic ? "layered" : "framed");
+    set();
+    mq.addEventListener("change", set);
+    return () => mq.removeEventListener("change", set);
+  }, []);
+  return mode;
+}
+
+/** The layered sample's geometry at 390px (Miles's mock, 5 Nov 2026), to be
+ *  nudged here: each slice lays its component out at an internal width and
+ *  draws it at a zoom. The card sits on the left; the flows panel lies over it,
+ *  offset right and down, running off the screen's right edge; the pill
+ *  overlaps their foot. */
+const LAYERED = {
+  /** The card: internal width (px) and zoom. */
+  cardW: 420,
+  cardZoom: 0.85,
+  /** The flows panel: internal width (px), zoom, and its offset (px) from the
+   *  card's top left. */
+  flowsW: 480,
+  flowsZoom: 0.85,
+  flowsLeft: 142,
+  flowsTop: 86,
+};
+
+/** Below sm: the position card and the Lifetime flows panel as two live
+ *  slices, the flows panel layered over the card, and the link to the
+ *  position as a pill over their foot. Same data as the framed sample; each
+ *  slice is laid out at its own width and zoomed (zoom, not a transform, so
+ *  its box takes the drawn height). */
+function LayeredSample({ data, glowRef }: { data: WireLiveExample | null; glowRef: RefObject<HTMLDivElement | null> }) {
+  const L = LAYERED;
+  return (
+    <div className="px-4 pb-8 sm:hidden" data-live-layered="">
+      <div ref={glowRef} className="live-glow relative flow-root min-h-[420px]">
+        <div aria-hidden="true" inert className="pointer-events-none">
+          <div
+            className="absolute left-0 top-0 isolate"
+            style={{ width: L.cardW, zoom: L.cardZoom }}
+            data-live-slice="card"
+          >
+            {/* The glow behind the card, as the framed sample draws it. */}
+            <div className="absolute inset-0 -z-10 rounded-2xl">
+              <div
+                className="absolute inset-0 rounded-2xl dark:hidden"
+                style={{ boxShadow: "0 24px 80px -12px rgba(40, 33, 20, 0.24), 0 8px 30px rgba(40, 33, 20, 0.12)" }}
+              />
+              <div className="absolute inset-0 hidden dark:block">
+                {GLOW_STOPS.map((colour, slot) => (
+                  <div
+                    key={colour}
+                    className="live-glow-layer absolute inset-0 rounded-2xl"
+                    style={{ boxShadow: glowShadow(colour), ["--glow-slot" as string]: slot }}
+                  />
+                ))}
+              </div>
+            </div>
+            {data && <HeroTroveComposition wire={data} only="card" />}
+          </div>
+          <div
+            className="relative rounded-2xl shadow-2xl shadow-black/40"
+            style={{
+              width: L.flowsW,
+              zoom: L.flowsZoom,
+              marginLeft: L.flowsLeft / L.flowsZoom,
+              marginTop: L.flowsTop / L.flowsZoom,
+            }}
+            data-live-slice="flows"
+          >
+            {data && <HeroTroveComposition wire={data} only="flows" />}
+          </div>
+        </div>
+        <Link
+          href={LIVE_EXAMPLE_TROVE_PATH}
+          aria-label="View this live Liquity V2 trove on Rails"
+          className={`${PILL_CTA_BLUE} absolute bottom-0 left-1/2 z-10 -translate-x-1/2 translate-y-1/2`}
+        >
+          View live position <span>→</span>
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
+  const mode = useSampleMode();
   const glowRef = useGlowPause();
+  const layeredGlowRef = useGlowPause();
   // The composition stays behind the skeleton until the client has mounted —
   // see the header comment for why it never server-renders. When the data
   // fetch failed at revalidate time (data null) the skeleton simply holds.
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
-  const showTrove = ready && data !== null;
+  const showTrove = ready && data !== null && mode === "framed";
   // The skeleton unmounts once its fade-out (500ms) has run, so its pulses
   // stop with it.
   const [skeletonGone, setSkeletonGone] = useState(false);
@@ -219,9 +316,11 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
   }, [showTrove]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto px-4">
-      <div ref={glowRef} className="live-glow group relative">
-        {/* Cast shadow behind the frame — a warm dark shadow on the paper
+    <>
+      {mode !== "framed" && <LayeredSample data={mode === "layered" ? data : null} glowRef={layeredGlowRef} />}
+      <div className={`w-full max-w-5xl mx-auto px-4 ${mode === "framed" ? "" : "max-sm:hidden"}`}>
+        <div ref={glowRef} className="live-glow group relative">
+          {/* Cast shadow behind the frame — a warm dark shadow on the paper
             canvas, a glow turning round the colour wheel in dark: both hug
             the frame's silhouette (box-shadow on a frame-sized box), so the light falls
             off from the edges rather than haloing behind it. The wrapper
@@ -229,38 +328,38 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
             masks the shadow out toward the bottom: the frame's lower edge
             dissolves into the section gradient, so no shadow may pool under
             it and redraw the rectangle the fade erased. */}
-        <div
-          aria-hidden="true"
-          className="absolute -inset-x-40 -top-40 bottom-0 pointer-events-none"
-          style={{
-            maskImage: "linear-gradient(to bottom, black 60%, transparent 96%)",
-            WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 96%)",
-          }}
-        >
-          {/* Light: warm dark, offset downward — same tone as --panel-shadow. */}
           <div
-            className="absolute inset-x-40 top-40 bottom-0 rounded-t-2xl dark:hidden"
+            aria-hidden="true"
+            className="absolute -inset-x-40 -top-40 bottom-0 pointer-events-none"
             style={{
-              boxShadow: "0 24px 80px -12px rgba(40, 33, 20, 0.24), 0 8px 30px rgba(40, 33, 20, 0.12)",
+              maskImage: "linear-gradient(to bottom, black 60%, transparent 96%)",
+              WebkitMaskImage: "linear-gradient(to bottom, black 60%, transparent 96%)",
             }}
-          />
-          {/* Dark: the glow — centred (emitted light, not a key light),
+          >
+            {/* Light: warm dark, offset downward — same tone as --panel-shadow. */}
+            <div
+              className="absolute inset-x-40 top-40 bottom-0 rounded-t-2xl dark:hidden"
+              style={{
+                boxShadow: "0 24px 80px -12px rgba(40, 33, 20, 0.24), 0 8px 30px rgba(40, 33, 20, 0.12)",
+              }}
+            />
+            {/* Dark: the glow — centred (emitted light, not a key light),
               layered tight→wide because box-shadow decays from the edge:
               a single blur reads dim where the halo gradient read bright.
               It turns round the colour wheel (GLOW_STOPS, the cross-fade in
               globals.css `.live-glow`). */}
-          <div className="absolute inset-x-40 top-40 bottom-0 hidden dark:block">
-            {GLOW_STOPS.map((colour, slot) => (
-              <div
-                key={colour}
-                className="live-glow-layer absolute inset-0 rounded-t-2xl"
-                style={{ boxShadow: glowShadow(colour), ["--glow-slot" as string]: slot }}
-              />
-            ))}
+            <div className="absolute inset-x-40 top-40 bottom-0 hidden dark:block">
+              {GLOW_STOPS.map((colour, slot) => (
+                <div
+                  key={colour}
+                  className="live-glow-layer absolute inset-0 rounded-t-2xl"
+                  style={{ boxShadow: glowShadow(colour), ["--glow-slot" as string]: slot }}
+                />
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* Hover edge — a border hugging the OUTSIDE of the frame on its top
+          {/* Hover edge — a border hugging the OUTSIDE of the frame on its top
             and sides, in the glow's colour of the moment (one layer per
             GLOW_STOPS colour on the glow's timeline; light mode keeps the
             blue alone): a box 2px larger than the frame on those three
@@ -271,118 +370,119 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
             shift, so the two arrive together. Tailwind's hover variants are
             gated on `@media (hover: hover)`, so touch pointers never see it.
             Pointer-inert, so the click target is unchanged. */}
-        <div
-          aria-hidden="true"
-          className="absolute -inset-x-0.5 -top-0.5 bottom-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none"
-          style={{
-            maskImage: "linear-gradient(to bottom, black 35%, transparent 90%)",
-            WebkitMaskImage: "linear-gradient(to bottom, black 35%, transparent 90%)",
-          }}
-        >
-          {GLOW_STOPS.map((colour, slot) => (
-            <div
-              key={colour}
-              className="live-glow-layer absolute inset-0 rounded-t-[18px] border-2 border-b-0"
-              style={{ borderColor: colour, ["--glow-slot" as string]: slot }}
-            />
-          ))}
-        </div>
+          <div
+            aria-hidden="true"
+            className="absolute -inset-x-0.5 -top-0.5 bottom-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 pointer-events-none"
+            style={{
+              maskImage: "linear-gradient(to bottom, black 35%, transparent 90%)",
+              WebkitMaskImage: "linear-gradient(to bottom, black 35%, transparent 90%)",
+            }}
+          >
+            {GLOW_STOPS.map((colour, slot) => (
+              <div
+                key={colour}
+                className="live-glow-layer absolute inset-0 rounded-t-[18px] border-2 border-b-0"
+                style={{ borderColor: colour, ["--glow-slot" as string]: slot }}
+              />
+            ))}
+          </div>
 
-        {/* No card shell (border/shadow/surface) — the section gradient runs
+          {/* No card shell (border/shadow/surface) — the section gradient runs
             behind, and the bottom fade dissolves the page into it. Only the
             chrome bar keeps a surface; the content below is the app's own. */}
-        <div className="relative rounded-t-2xl overflow-hidden">
-          {/* Browser chrome — the real URL is part of the pitch. The bar keeps
+          <div className="relative rounded-t-2xl overflow-hidden">
+            {/* Browser chrome — the real URL is part of the pitch. The bar keeps
               only the border-b separator; the URL pill is the single tinted
               shape (no competing band behind it), and its background + text
               shift together on hover as one unit. */}
-          <div className="relative flex items-center gap-2 px-4 py-3 border-b border-rb-200 dark:border-rb-800">
-            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#ec6a5e]" />
-            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#f4bf4f]" />
-            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#61c554]" />
-            <span className="min-w-0 flex-1 truncate text-center sm:absolute sm:left-1/2 sm:max-w-[65%] sm:flex-none sm:-translate-x-1/2 sm:text-left font-sans text-xs text-rb-500/40 bg-rb-100 dark:bg-rb-900 group-hover:text-foreground group-hover:bg-background transition-colors duration-300 rounded-md px-3 py-1">
-              {EXAMPLE_URL}
-            </span>
-            {/* Liveness marker — an outlined green pill (border, 20% tint,
+            <div className="relative flex items-center gap-2 px-4 py-3 border-b border-rb-200 dark:border-rb-800">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#ec6a5e]" />
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#f4bf4f]" />
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#61c554]" />
+              <span className="min-w-0 flex-1 truncate text-center sm:absolute sm:left-1/2 sm:max-w-[65%] sm:flex-none sm:-translate-x-1/2 sm:text-left font-sans text-xs text-rb-500/40 bg-rb-100 dark:bg-rb-900 group-hover:text-foreground group-hover:bg-background transition-colors duration-300 rounded-md px-3 py-1">
+                {EXAMPLE_URL}
+              </span>
+              {/* Liveness marker — an outlined green pill (border, 20% tint,
                 green bold text) owned by the chrome bar rather than pasted
                 over the render. */}
-            <span className="ml-auto inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-green-500 bg-green-500/20 px-2 py-0.5 text-[9px] font-bold tracking-widest text-green-500">
-              LIVE SAMPLE
-            </span>
-          </div>
+              <span className="ml-auto inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-green-500 bg-green-500/20 px-2 py-0.5 text-[9px] font-bold tracking-widest text-green-500">
+                LIVE SAMPLE
+              </span>
+            </div>
 
-          {/* The real components, zoomed out. aria-hidden + inert: it's a
+            {/* The real components, zoomed out. aria-hidden + inert: it's a
               picture of the app, not a second app — the Link is the a11y
               surface, and `inert` keeps the composition's links and buttons
               out of the tab order. */}
-          <div className={`relative overflow-hidden bg-background ${VISIBLE_H}`} aria-hidden="true" inert>
-            {/* Skeleton stand-in until the client paints — the trove layout's
+            <div className={`relative overflow-hidden bg-background ${VISIBLE_H}`} aria-hidden="true" inert>
+              {/* Skeleton stand-in until the client paints — the trove layout's
                 silhouette (position card, the Lifetime flows panel, the rows) in
                 the shared skeleton tone, fading out once the real components
                 are ready, then unmounting. */}
-            {!skeletonGone && (
-              <div
-                className={`absolute inset-0 flex flex-col gap-4 px-10 pt-8 transition-opacity duration-500 ${
-                  showTrove ? "opacity-0" : "opacity-100"
-                }`}
-              >
-                <div className="animate-pulse h-44 bg-skeleton rounded-2xl" />
-                <div className="animate-pulse h-72 bg-rb-100/60 dark:bg-rb-800/40 rounded-2xl" />
-                <div className="animate-pulse h-24 bg-rb-100/30 dark:bg-rb-800/20 rounded-2xl" />
-              </div>
-            )}
+              {!skeletonGone && (
+                <div
+                  className={`absolute inset-0 flex flex-col gap-4 px-10 pt-8 transition-opacity duration-500 ${
+                    showTrove ? "opacity-0" : "opacity-100"
+                  }`}
+                >
+                  <div className="animate-pulse h-44 bg-skeleton rounded-2xl" />
+                  <div className="animate-pulse h-72 bg-rb-100/60 dark:bg-rb-800/40 rounded-2xl" />
+                  <div className="animate-pulse h-24 bg-rb-100/30 dark:bg-rb-800/20 rounded-2xl" />
+                </div>
+              )}
 
-            {showTrove && (
-              <div
-                className="pointer-events-none origin-top-left"
-                style={{
-                  width: `${100 / SCALE}%`,
-                  transform: `scale(${SCALE})`,
-                  // Shared entrance keyframe (globals.css) — mounts only once
-                  // `ready` flips, so a transition would never fire; the
-                  // skeleton above fades out over the same half second.
-                  animation: "fade-in 0.5s",
-                }}
-              >
-                <HeroTroveComposition wire={data} />
-              </div>
-            )}
-            {/* Bottom fade into the top section's gradient floor — the stops
+              {showTrove && (
+                <div
+                  className="pointer-events-none origin-top-left"
+                  style={{
+                    width: `${100 / SCALE}%`,
+                    transform: `scale(${SCALE})`,
+                    // Shared entrance keyframe (globals.css) — mounts only once
+                    // `ready` flips, so a transition would never fire; the
+                    // skeleton above fades out over the same half second.
+                    animation: "fade-in 0.5s",
+                  }}
+                >
+                  <HeroTroveComposition wire={data} />
+                </div>
+              )}
+              {/* Bottom fade into the top section's gradient floor — the stops
                 MUST match the section gradient's `to-*` colors in
                 app/(site)/page.tsx or the feather shows a seam. */}
-            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-background dark:to-rb-800 pointer-events-none" />
-          </div>
+              <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-background dark:to-rb-800 pointer-events-none" />
+            </div>
 
-          {/* The whole frame is the click target: one overlay link, with the
+            {/* The whole frame is the click target: one overlay link, with the
               pill inside it as the hover affordance (revealed by hovering
               anywhere on the frame — no separate hover state of its own,
               since the pill isn't a separate target). Hover-less pointers get
               the caption link below the frame instead of a floating pill. */}
-          <Link
-            href={LIVE_EXAMPLE_TROVE_PATH}
-            aria-label="View this live Liquity V2 trove on Rails"
-            className="absolute inset-0 z-10"
-          >
-            <span
-              className={`${PILL_CTA_BLUE} absolute bottom-5 left-1/2 -translate-x-1/2 translate-y-1 opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0`}
+            <Link
+              href={LIVE_EXAMPLE_TROVE_PATH}
+              aria-label="View this live Liquity V2 trove on Rails"
+              className="absolute inset-0 z-10"
             >
-              View live position <span>→</span>
-            </span>
-          </Link>
-        </div>
+              <span
+                className={`${PILL_CTA_BLUE} absolute bottom-5 left-1/2 -translate-x-1/2 translate-y-1 opacity-0 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0`}
+              >
+                View live position <span>→</span>
+              </span>
+            </Link>
+          </div>
 
-        {/* On hover-less pointers the frame's link, since the hover-revealed
+          {/* On hover-less pointers the frame's link, since the hover-revealed
             pill never shows there: a right-aligned pill in the chrome bar's
             surface pairing. */}
-        <div className="relative mt-4 flex justify-end [@media(hover:hover)]:hidden">
-          <Link
-            href={LIVE_EXAMPLE_TROVE_PATH}
-            className="inline-flex items-center gap-1 rounded-sm bg-rb-100 px-3 py-1 text-xs text-foreground dark:bg-rb-900"
-          >
-            View this position live <span className="text-blue-600 dark:text-blue-400">→</span>
-          </Link>
+          <div className="relative mt-4 flex justify-end [@media(hover:hover)]:hidden">
+            <Link
+              href={LIVE_EXAMPLE_TROVE_PATH}
+              className="inline-flex items-center gap-1 rounded-sm bg-rb-100 px-3 py-1 text-xs text-foreground dark:bg-rb-900"
+            >
+              View this position live <span className="text-blue-600 dark:text-blue-400">→</span>
+            </Link>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

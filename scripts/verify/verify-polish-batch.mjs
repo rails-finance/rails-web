@@ -262,43 +262,57 @@ check("S home's rail glyph opens the chooser", await openChooser());
 const ctaSelected = await page.locator(`${CHOOSER} [role="tab"][aria-selected="true"]`).getAttribute("aria-label");
 check("S home's chooser opens on Ethereum", ctaSelected === "Ethereum", ctaSelected ?? "none");
 
-// The live sample on a phone: the browser chrome and the position card show,
-// the frame sits inside the screen with no sideways scroll, and the touch link
-// to the position is on the screen.
+// The live sample on a phone (Miles, 5 Nov 2026): the position card and the
+// Lifetime flows panel as two live slices, the flows panel over the card and
+// running off the right edge with no sideways scroll, and "View live position"
+// as a pill on the screen.
 const phone = await browser.newContext({ viewport: { width: 390, height: 900 }, isMobile: true, hasTouch: true });
 const pp = await phone.newPage();
 await pp.goto(`${BASE}/`, { waitUntil: "networkidle" });
-const cardDrawn = await pp
-  .waitForFunction(() => document.querySelector(".live-glow")?.textContent?.includes("Collateral ratio"), null, {
-    timeout: 60000,
-  })
+const slicesDrawn = await pp
+  .waitForFunction(
+    () =>
+      document.querySelector('[data-live-slice="card"]')?.textContent?.includes("Collateral ratio") &&
+      document.querySelector('[data-live-slice="flows"]')?.textContent?.includes("Lifetime flows"),
+    null,
+    { timeout: 60000 },
+  )
   .then(() => true)
   .catch(() => false);
-check("P sample @390: the position card draws", cardDrawn);
+check("P sample @390: the card and the flows panel draw as slices", slicesDrawn);
 const sample = await pp.evaluate(() => {
-  const frame = document.querySelector(".live-glow").getBoundingClientRect();
-  const link = [...document.querySelectorAll("a")].find((a) => a.textContent.includes("View this position live"));
-  const lr = link?.getBoundingClientRect();
+  const R = (el) => {
+    const r = el?.getBoundingClientRect();
+    return r ? [Math.round(r.left), Math.round(r.top), Math.round(r.right), Math.round(r.bottom)] : null;
+  };
+  const pill = [...document.querySelectorAll("[data-live-layered] a")].find((a) =>
+    a.textContent.includes("View live position"),
+  );
   return {
-    chrome: [...document.querySelectorAll("span")].some(
+    card: R(document.querySelector('[data-live-slice="card"]')),
+    flows: R(document.querySelector('[data-live-slice="flows"]')),
+    pill: R(pill),
+    framed: [...document.querySelectorAll("span")].some(
       (s) => s.textContent === "LIVE SAMPLE" && s.getClientRects().length > 0,
     ),
-    frameLeft: Math.round(frame.left),
-    frameRight: Math.round(frame.right),
-    link: lr && lr.width > 0 ? [Math.round(lr.left), Math.round(lr.right)] : null,
     scroll: document.documentElement.scrollWidth,
   };
 });
-check("P sample @390: the browser chrome shows", sample.chrome);
+check("P sample @390: no framed page on a phone", !sample.framed);
 check(
-  "P sample @390: the frame sits inside the screen, no scroll",
-  sample.frameLeft >= 0 && sample.frameRight <= 390 && sample.scroll === 390,
+  "P sample @390: the flows panel lies right of and below the card's top, off the right edge, no scroll",
+  !!sample.card &&
+    !!sample.flows &&
+    sample.flows[0] > sample.card[0] &&
+    sample.flows[1] > sample.card[1] &&
+    sample.flows[2] > 390 &&
+    sample.scroll === 390,
   JSON.stringify(sample),
 );
 check(
-  "P sample @390: the position link is on the screen",
-  !!sample.link && sample.link[0] >= 0 && sample.link[1] <= 390,
-  JSON.stringify(sample.link),
+  "P sample @390: the pill is on the screen",
+  !!sample.pill && sample.pill[0] >= 0 && sample.pill[2] <= 390,
+  JSON.stringify(sample.pill),
 );
 await phone.close();
 
