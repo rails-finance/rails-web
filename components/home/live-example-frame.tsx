@@ -7,7 +7,6 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { TroveBody, useTroveFlows } from "@/components/trove/TroveBody";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { PILL_CTA } from "@/lib/shared/ui-grammar";
-import { joinGlowClock } from "@/components/home/glow-clock";
 import { LIVE_EXAMPLE_TROVE_ID, LIVE_EXAMPLE_TROVE_PATH, type LiveExampleData } from "@/lib/home/live-example";
 import { unpackLiveExample, type WireLiveExample } from "@/lib/home/live-example-wire";
 import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
@@ -166,18 +165,8 @@ function HeroTroveComposition({ wire }: { wire: WireLiveExample }) {
   );
 }
 
-/** The glow's stops round the colour wheel, 60° apart from DeFi blue at one
- *  OKLCH lightness and chroma (the blue's: L 60.65%, C 0.2133), so the glow's
- *  strength holds as it turns. Slot 0 is the blue, which light mode and
- *  reduced motion hold. */
-const GLOW_STOPS = [
-  "var(--marketing)",
-  "oklch(60.65% 0.2133 321.8)",
-  "oklch(60.65% 0.2133 21.8)",
-  "oklch(60.65% 0.2133 81.8)",
-  "oklch(60.65% 0.2133 141.8)",
-  "oklch(60.65% 0.2133 201.8)",
-];
+/** The dark glow's colour, DeFi blue (ui-jobs 507: one colour, no turn). */
+const GLOW = "var(--marketing)";
 
 /** The three-shadow stack in one colour. */
 function glowShadow(colour: string) {
@@ -186,17 +175,6 @@ function glowShadow(colour: string) {
     `0 0 70px 4px color-mix(in srgb, ${colour} 28%, transparent)`,
     `0 0 140px 16px color-mix(in srgb, ${colour} 16%, transparent)`,
   ].join(", ");
-}
-
-/** Joins the frame to the glow clock (components/home/glow-clock.ts): the turn
- *  pauses while neither the frame nor the directory heading is on screen. */
-function useGlowPause() {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    return el ? joinGlowClock(el) : undefined;
-  }, []);
-  return ref;
 }
 
 /** Whether the framed sample is drawn: from sm, decided after mount so a phone
@@ -234,7 +212,6 @@ function PhoneButton() {
 
 export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
   const framed = useFramed();
-  const glowRef = useGlowPause();
   // The composition stays behind the skeleton until the client has mounted —
   // see the header comment for why it never server-renders. When the data
   // fetch failed at revalidate time (data null) the skeleton simply holds.
@@ -254,7 +231,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
     <>
       <PhoneButton />
       <div className="w-full max-w-5xl mx-auto px-4 max-sm:hidden">
-        <div ref={glowRef} className="live-glow group relative">
+        <div className="group relative">
           {/* Cast shadow behind the frame — a warm dark shadow on the paper
             canvas, a glow turning round the colour wheel in dark: both hug
             the frame's silhouette (box-shadow on a frame-sized box), so the light falls
@@ -280,24 +257,15 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
             />
             {/* Dark: the glow — centred (emitted light, not a key light),
               layered tight→wide because box-shadow decays from the edge:
-              a single blur reads dim where the halo gradient read bright.
-              It turns round the colour wheel (GLOW_STOPS, the cross-fade in
-              globals.css `.live-glow`). */}
-            <div className="absolute inset-x-40 top-40 bottom-0 hidden dark:block">
-              {GLOW_STOPS.map((colour, slot) => (
-                <div
-                  key={colour}
-                  className="live-glow-layer absolute inset-0 rounded-t-2xl"
-                  style={{ boxShadow: glowShadow(colour), ["--glow-slot" as string]: slot }}
-                />
-              ))}
-            </div>
+              a single blur reads dim where the halo gradient read bright. */}
+            <div
+              className="absolute inset-x-40 top-40 bottom-0 hidden rounded-t-2xl dark:block"
+              style={{ boxShadow: glowShadow(GLOW) }}
+            />
           </div>
 
           {/* Hover edge — a border hugging the OUTSIDE of the frame on its top
-            and sides, in the glow's colour of the moment (one layer per
-            GLOW_STOPS colour on the glow's timeline; light mode keeps the
-            blue alone): a box 2px larger than the frame on those three
+            and sides, in the glow's blue: a box 2px larger than the frame on those three
             edges, with a radius 2px wider so the ring stays concentric with
             the frame's corners. Masked out toward the bottom so it dissolves
             with the content fade instead of closing a rectangle the fade
@@ -313,13 +281,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
               WebkitMaskImage: "linear-gradient(to bottom, black 35%, transparent 90%)",
             }}
           >
-            {GLOW_STOPS.map((colour, slot) => (
-              <div
-                key={colour}
-                className="live-glow-layer absolute inset-0 rounded-t-[18px] border-2 border-b-0"
-                style={{ borderColor: colour, ["--glow-slot" as string]: slot }}
-              />
-            ))}
+            <div className="absolute inset-0 rounded-t-[18px] border-2 border-b-0" style={{ borderColor: GLOW }} />
           </div>
 
           {/* No card shell (border/shadow/surface) — the section gradient runs
