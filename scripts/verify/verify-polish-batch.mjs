@@ -27,7 +27,7 @@ const heroOrder = await page.evaluate(() => {
     (el) => el.querySelector("h1")?.textContent?.trim() === "Rails Explorers",
   );
   const searchi = [...section.children].findIndex((el) => el.querySelector("input"));
-  const taglinei = texts.findIndex((t) => t.includes("Look up any DeFi position, wallet and protocol."));
+  const taglinei = texts.findIndex((t) => t.includes("Look up any DeFi position, wallet or protocol."));
   const badgei = texts.findIndex((t) => t.toLowerCase().includes("read-only"));
   return h1i >= 0 && h1i < taglinei && taglinei < searchi && searchi < badgei ? "ok" : kids.join(" | ");
 });

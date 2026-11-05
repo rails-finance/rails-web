@@ -1,12 +1,10 @@
 "use client";
 
-// BrandRail — the narrow vertical strip down the left edge of every app/(app)
-// surface (rails-ops TO-DO-ui-jobs 67, 68). The Rails mark sits at the top with
-// the search's glyph under it (H15.1, decision 0051); the theme toggle and the
-// beta pill share the foot. The glyph opens the wallet panel (ui-jobs 431,
-// 503), which glides out from the rail's right edge with the search, the
-// explorer chooser and the bookmarks link; the separate bookmarks button (H11)
-// went on 1 Nov 2026.
+// BrandRail — the narrow vertical strip down the left edge of every page from
+// md (rails-ops TO-DO-ui-jobs 67, 68, 498), fixed, so the nav holds its place
+// as the page scrolls. The Rails mark at the top opens the wallet panel
+// (H15.1, ui-jobs 509), which glides out from the rail's right edge with the
+// search and the explorer chooser; the beta pill is at the foot.
 //
 // IT IS A SURFACE, NOT A MARGIN (68): `bg-raised` is the same tone the cards
 // and panels take, so the strip reads as chrome the page sits beside rather
@@ -17,34 +15,10 @@
 // at the width its contents need. Widening it later changes the rail;
 // narrowing it later reflows every page.
 //
-// MARKETING KEEPS ITS PRESENT HEADER, its own theme toggle included, at every
-// width. The rail is mounted from app/(app)/layout.tsx and reaches nothing
-// under app/(site).
-//
 // BELOW `md` THERE IS NO RAIL: at phone widths 56px of permanent gutter is a
-// sixth of the page. HeaderBar draws the mark, the search's glyph, the theme
-// toggle and the chain trigger there, as it did before this rail existed.
-
-import Link from "next/link";
-import { RailsMark } from "@/components/nav/rails-mark";
+// sixth of the page. HeaderBar draws the mark and its chevron there.
 
 import { SearchLauncher } from "@/components/shared/front-door-search";
-
-/** The Rails glyph, linking home — the same mark and the same link the top bar
- *  carried, without the wordmark, which will not fit at icon width. The wallet
- *  panel draws it too, at the top of its phone layout. */
-export function RailsGlyph({ onClick }: { onClick?: () => void }) {
-  return (
-    <Link
-      href="/"
-      aria-label="Rails home"
-      onClick={onClick}
-      className="text-foreground transition-colors hover:text-blue-600 dark:hover:text-blue-400"
-    >
-      <RailsMark size={30} />
-    </Link>
-  );
-}
 
 /** The release-stage pill at the very foot of the rail
  *  (Miles, 2026-09-25). Drawn as a label coming out of the browser's left
@@ -75,14 +49,10 @@ export function BrandRail() {
         data-anatomy="H1"
         className="fixed inset-y-0 left-0 z-40 hidden w-14 flex-col items-center justify-between bg-raised pt-4 md:flex"
       >
-        <div className="flex flex-col items-center gap-3">
-          <RailsGlyph />
-          {/* The search's glyph opens the wallet panel, which holds the
-              search and the explorer chooser (H4, ui-jobs 503). The grid
-              glyph (497) went; a second way in that opens the panel at the
-              chooser is `<SearchLauncher placement="rail" at="chooser" />`. */}
-          <SearchLauncher placement="rail" />
-        </div>
+        {/* The Rails mark opens the wallet panel (H15.1, ui-jobs 509): the
+            search and the explorer chooser; a chevron shows beside it on
+            hover. Home is in the panel's top row. */}
+        <SearchLauncher placement="rail" />
         {/* The pill flush to the left edge. The theme switch is in the
             profile control's menu (H20, ui-jobs 504). */}
         <div className="flex w-full flex-col items-center">

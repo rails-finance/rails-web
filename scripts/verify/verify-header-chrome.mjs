@@ -90,13 +90,12 @@ for (const p of [
 console.log("[app chrome @1280 on /ethereum/liquity-v2]");
 await chromeState(page, "/ethereum/liquity-v2", { bar: false });
 const rail = page.locator('aside[aria-label="Rails"]');
-for (const [name, sel] of [
-  ["the Rails mark", 'a[href="/"]'],
-  ["the search's glyph", 'button[data-anatomy="H15.1"]'],
-]) {
-  const n = await rail.locator(`${sel}:visible`).count();
-  check(n === 1, `the brand rail carries ${name} (${n})`);
-}
+// The rail's mark opens the wallet panel (H15.1, ui-jobs 509); Home is in the
+// panel's top row, and the rail draws no separate search glyph.
+const railLauncher = await rail.locator('button[data-anatomy="H15.1"]:visible').count();
+check(railLauncher === 1, `the brand rail carries the mark's launcher (${railLauncher})`);
+const railHome = await rail.locator('a[href="/"]').count();
+check(railHome === 0, `the rail's mark opens the panel, not home (${railHome})`);
 // The theme is set in the profile control's menu from md (ui-jobs 504).
 const railToggle = await rail.locator('button[aria-label^="Switch to"]').count();
 check(railToggle === 0, `the brand rail carries no theme toggle, ui-jobs 504 (${railToggle})`);

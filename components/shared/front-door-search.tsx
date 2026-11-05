@@ -31,7 +31,7 @@ import {
   type RefObject,
 } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { RailsMark } from "@/components/nav/rails-mark";
 import { NAV_BUTTON, ctrlWaking } from "@/lib/shared/ui-grammar";
 import { useHydrated } from "@/hooks/useHydrated";
@@ -112,13 +112,11 @@ const HERO_BUTTON_READY = "border-blue-500 bg-blue-500 text-white hover:bg-blue-
  *  tone, so on the dark canvas they lift on their own and the hairline is
  *  light-mode only; on a raised surface (the wallet panel, H16) they are the
  *  surface's tone, so in dark they keep a hairline (rb-600, the event sheet's)
- *  and the button steps up a tone. The panel's field also draws no magnifier:
- *  the rail's glyph (H15.1), blue while the panel is open and level with the
- *  row, is the row's icon (Miles, 1 Nov 2026). */
+ *  and the button steps up a tone. */
 export type SearchSurface = "canvas" | "raised";
 const SURFACE: Record<SearchSurface, { field: string; button: string; glyph: boolean }> = {
   canvas: { field: "dark:border-transparent", button: "dark:border-transparent", glyph: true },
-  raised: { field: "dark:border-rb-600", button: "dark:border-rb-600 dark:bg-rb-700", glyph: false },
+  raised: { field: "dark:border-rb-600", button: "dark:border-rb-600 dark:bg-rb-700", glyph: true },
 };
 const GLYPH: Record<Size, { size: number; left: string }> = {
   sm: { size: 14, left: "left-3" },
@@ -718,9 +716,9 @@ function FilledLayoutGrid() {
   );
 }
 
-/** The glyph in the chrome that opens the wallet panel (H15.1), from the
- *  brand rail or the header bar. In the rail the search's glyph, blue while
- *  the panel is open. In the header bar (below md) the Rails mark with a
+/** The control in the chrome that opens the wallet panel (H15.1). In the
+ *  brand rail (from md) the Rails mark, a chevron showing beside it on hover
+ *  (ui-jobs 509). In the header bar (below md) the Rails mark with a
  *  chevron pointing right, at the bar's left; the panel opens over it and its
  *  top row draws the mark with the chevron pointing left in the same place,
  *  which closes it (ui-jobs 509).
@@ -771,21 +769,27 @@ export function SearchLauncher({
         />
       </button>
     );
+  // The rail's launcher: the Rails mark alone at rest; on hover or focus a
+  // chevron beside it, pointing at the panel's way (right to open, left to
+  // close).
+  const Chevron = open ? ChevronLeft : ChevronRight;
   return (
     <button
       type="button"
       onClick={(e) => toggleWalletPanel(e.currentTarget)}
-      className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-        open ? "text-blue-600 dark:text-blue-400" : "text-rb-700 dark:text-rb-300"
-      }`}
-      aria-label="Search and explorers"
+      className="group relative flex h-[38px] w-[38px] cursor-pointer items-center justify-center rounded-lg text-foreground focus-ring"
+      aria-label={open ? "Close search and explorers" : "Search and explorers"}
       aria-expanded={open}
       aria-keyshortcuts="/ Meta+K"
-      title="Search and explorers (/ or ⌘K)"
       data-anatomy="H15.1"
       data-search-launcher={placement}
     >
-      <Search size={18} aria-hidden="true" />
+      <RailsMark size={30} />
+      <Chevron
+        size={14}
+        className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 text-rb-500 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+        aria-hidden="true"
+      />
     </button>
   );
 }
