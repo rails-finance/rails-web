@@ -41,9 +41,9 @@ import { createPublicClient, http, parseAbi } from "viem";
 import { mainnet } from "viem/chains";
 import { chromium } from "playwright";
 import { armInspector } from "./lib/prov-inspector.mjs";
+import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const BASE = process.env.BASE ?? "http://localhost:3000";
 const env = Object.fromEntries(
   fs
     .readFileSync(path.join(ROOT, ".env.local"), "utf8")
@@ -187,7 +187,7 @@ check("mixed: the api states its referral codes", mixedCodes.length >= 2, JSON.s
 // ── C. the pages ──
 const rates = await api(`/rates`);
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders(), viewport: { width: 1440, height: 900 } });
 await page.addInitScript(() => {
   try {
     localStorage.setItem("rails-flows-view-v1", "full");
@@ -395,7 +395,7 @@ for (const [name, holder] of Object.entries(HOLDERS)) {
 // Consecutive Savings Rate changes draw as one group row that counts them
 // (ui-jobs 399), at 390px as at every width.
 {
-  const phone = await browser.newPage({ viewport: { width: 390, height: 900 } });
+  const phone = await browser.newPage({ extraHTTPHeaders: bypassHeaders(), viewport: { width: 390, height: 900 } });
   await phone.addInitScript(() => {
     try {
       localStorage.setItem("rails-flows-view-v1", "full");
@@ -456,7 +456,7 @@ check("rate history lists every change", rows === String(rates.data.ssr.length),
 // ── D. the receipts and the transfer explanations (mixed holder) ──
 {
   const pos = positions.mixed;
-  const p2 = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const p2 = await browser.newPage({ extraHTTPHeaders: bypassHeaders(), viewport: { width: 1440, height: 900 } });
   await p2.addInitScript(() => {
     try {
       localStorage.setItem("rails-flows-view-v1", "full");

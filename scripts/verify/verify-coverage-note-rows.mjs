@@ -49,8 +49,7 @@
  */
 import fs from "node:fs";
 import { chromium } from "playwright";
-
-const BASE = process.env.BASE ?? "http://localhost:3000";
+import { BASE, bypassHeaders } from "./lib/host.mjs";
 
 let failures = 0;
 function assert(cond, msg) {
@@ -272,7 +271,11 @@ const browser = await chromium.launch();
 /* ── Desktop ──────────────────────────────────────────────────────────── */
 async function desktop(theme) {
   console.log(`\n== desktop 1280px · ${theme} ==`);
-  const page = await browser.newPage({ viewport: { width: 1280, height: 1800 }, colorScheme: theme });
+  const page = await browser.newPage({
+    extraHTTPHeaders: bypassHeaders(),
+    viewport: { width: 1280, height: 1800 },
+    colorScheme: theme,
+  });
   await page.goto(BASE + "/coverage/ethereum", { waitUntil: "networkidle" });
   await page.evaluate((t) => document.documentElement.classList.toggle("dark", t === "dark"), theme);
   await page.waitForTimeout(250);
@@ -938,7 +941,11 @@ async function desktop(theme) {
 /* ── Mobile ───────────────────────────────────────────────────────────── */
 async function mobile(theme) {
   console.log(`\n== mobile 375px · ${theme} ==`);
-  const page = await browser.newPage({ viewport: { width: 375, height: 1400 }, colorScheme: theme });
+  const page = await browser.newPage({
+    extraHTTPHeaders: bypassHeaders(),
+    viewport: { width: 375, height: 1400 },
+    colorScheme: theme,
+  });
   await page.goto(BASE + "/coverage/ethereum", { waitUntil: "networkidle" });
   await page.evaluate((t) => document.documentElement.classList.toggle("dark", t === "dark"), theme);
   await page.waitForTimeout(250);
@@ -1099,7 +1106,7 @@ async function mobile(theme) {
 // trailing-paragraph phrasing is gone for good.
 async function comingSoon() {
   console.log("\n== /coverage coming-soon row (desktop viewport) ==");
-  const page = await browser.newPage({ viewport: { width: 1280, height: 1800 } });
+  const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders(), viewport: { width: 1280, height: 1800 } });
   await page.goto(BASE + "/coverage/ethereum", { waitUntil: "networkidle" });
   const body = await page.locator("body").innerText();
 
@@ -1158,7 +1165,7 @@ async function comingSoon() {
 // the notes roster has one.
 async function base() {
   console.log("\n== /coverage/base (desktop viewport) ==");
-  const page = await browser.newPage({ viewport: { width: 1280, height: 1800 } });
+  const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders(), viewport: { width: 1280, height: 1800 } });
   await page.goto(BASE + "/coverage/base", { waitUntil: "networkidle" });
   assert(/What Rails Covers/.test(await page.locator("h1").first().innerText()), "base page loaded");
 
