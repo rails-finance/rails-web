@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { LwNotice } from "@/components/shared/lw-attribution";
 import { Activity, DraftingCompass, FileText, Home, Info, LayoutGrid, Signpost, Vault } from "lucide-react";
 import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
@@ -21,9 +21,10 @@ export function SiteFooter() {
   // entry point (with recent/pinned in its dropdown). The chrome stays
   // simple: one route to discover, one to drill in.
   return (
-    // On home the footer is the foot of the page's gradient, in the top's tone
-    // (app/(site)/page.tsx, Miles 5 Nov 2026); elsewhere the canvas.
-    <footer className={`${home ? "bg-rb-50 dark:bg-rb-600" : "bg-background"} border-rb-200`} data-anatomy="H9">
+    // The raised tone on every page (rb-100, rb-800 in dark), 64px clear of
+    // the content above it; on home the page's gradient carries those 64px
+    // (app/(site)/page.tsx) so no canvas band shows (ui-jobs 509).
+    <footer className={`${home ? "" : "mt-16 "}bg-raised`} data-anatomy="H9">
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Rails Info */}

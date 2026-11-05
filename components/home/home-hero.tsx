@@ -81,7 +81,7 @@ export function HomeHero() {
         style={{ animationDelay: "0.1s" }}
         data-hero-subtitle=""
       >
-        Look up any DeFi position, wallet and protocol.
+        Look up any DeFi position, wallet or protocol.
       </p>
       <div
         className="relative z-20 mb-12 w-full max-w-2xl px-4 text-left animate-hero-fade-up"
