@@ -27,7 +27,7 @@ const heroOrder = await page.evaluate(() => {
     (el) => el.querySelector("h1")?.textContent?.trim() === "Rails Explorers",
   );
   const searchi = [...section.children].findIndex((el) => el.querySelector("input"));
-  const taglinei = texts.findIndex((t) => t.includes("Look up any DeFi position, wallet or protocol."));
+  const taglinei = texts.findIndex((t) => t.includes("Look up any DeFi position, wallet and protocol."));
   const badgei = texts.findIndex((t) => t.toLowerCase().includes("read-only"));
   return h1i >= 0 && h1i < taglinei && taglinei < searchi && searchi < badgei ? "ok" : kids.join(" | ");
 });
@@ -194,11 +194,12 @@ check("L Escape closes the modal", (await page.locator(LIQUITY_DIALOG).count()) 
 // the chooser renders for it with every explorer shown.
 await page.goto(`${BASE}/ethereum/dolomite`, { waitUntil: "networkidle" });
 const CHOOSER = "[data-search-launcher-panel] [data-explorer-chooser]";
-// The bar's launcher (the Rails mark and its chevron) at every width (ui-jobs 509).
+// `:visible`: from `md` up the rail's glyph is drawn and the header bar's is
+// in the tree but hidden with the bar.
 const switcherTrigger = page.locator("button[data-search-launcher]:visible").first();
 check(
-  "S the bar's launcher opens the chooser; no grid glyph",
-  (await switcherTrigger.getAttribute("data-search-launcher")) === "header" &&
+  "S the rail's search glyph opens the chooser; no grid glyph",
+  (await switcherTrigger.getAttribute("data-search-launcher")) === "rail" &&
     (await page.locator("button[data-chooser-trigger]").count()) === 0,
   (await switcherTrigger.getAttribute("aria-label")) ?? "",
 );
@@ -259,9 +260,10 @@ const navigated = await page
   .then(() => true)
   .catch(() => false);
 check("S explorer row navigates to its listing", navigated);
-// On the home page the bar's launcher opens the SAME panel, on Ethereum.
+// On the home page the rail's glyph opens the SAME panel, on Ethereum: the
+// site pages stand in the rail shell (ui-jobs 498).
 await page.goto(`${BASE}/`, { waitUntil: "networkidle" });
-check("S home's launcher opens the chooser", await openChooser());
+check("S home's rail glyph opens the chooser", await openChooser());
 const ctaSelected = await page.locator(`${CHOOSER} [role="tab"][aria-selected="true"]`).getAttribute("aria-label");
 check("S home's chooser opens on Ethereum", ctaSelected === "Ethereum", ctaSelected ?? "none");
 
@@ -473,7 +475,7 @@ await phone.close();
   await bp.waitForSelector("[data-bookmark-row]");
   const moved = await order();
   check("W saved wallets: a move persists", moved.join() === [W[1], W[2], W[0]].join(), moved.join());
-  await bp.locator('header [data-anatomy="H20"]').click();
+  await bp.locator('[data-profile-corner] [data-anatomy="H20"]').click();
   const menu = await bp
     .locator("[data-profile-menu-wallet]")
     .evaluateAll((as) => as.map((a) => a.getAttribute("data-profile-menu-wallet")));
@@ -482,7 +484,7 @@ await phone.close();
   // The drawer's search (Miles, 5 Nov 2026): focused on open with the list
   // shut and the chooser uncovered; ArrowDown opens the saved wallets; typing
   // opens the list and clearing the field shuts it. No saved-wallets link.
-  await bp.locator('header button[data-search-launcher="header"]').click();
+  await bp.locator('aside[data-anatomy="H1"] button[data-search-launcher]').click();
   const field = bp.locator("[data-search-launcher-panel] input");
   await field.waitFor();
   await bp.waitForTimeout(300);

@@ -32,12 +32,14 @@ const browser = await chromium.launch();
 // locator stays so a resurrected hamburger turns the table red — and checks
 // the footer really carries what the menu used to.
 //
-// THE CONTRACT AT EVERY WIDTH (rails-ops TO-DO-ui-jobs 509): the brand rail
-// (H1) is retired and the top bar is drawn on every page, the site's and the
-// app's: the Rails mark with its chevron (H15.1) at the left, which opens the
-// wallet panel, and H20 at the right; the theme is in H20's menu and the beta
-// pill in the footers. The separate bookmarks button (H11) went on 1 Nov
-// 2026; its locator stays only to turn the table red if it comes back.
+// THE CONTRACT FROM `md` UP ON AN APP ROUTE (rails-ops TO-DO-ui-jobs 68): the
+// top bar is not drawn at all, on the app and the site pages alike (ui-jobs
+// 498). BrandRail holds the mark, the search's glyph, the chooser, the theme
+// toggle and the beta pill; H20 stands at the column's top right. Below `md` there is no rail and the bar carries
+// every one of those controls, which is what the mobile block at the foot
+// holds. The separate bookmarks button (H11) went on 1 Nov 2026: the glyph
+// opens the wallet panel, where the bookmarks are listed, so its locator stays
+// only to turn the table red if the button comes back.
 async function chromeState(page, path, expect) {
   await page.goto(BASE + path, { waitUntil: "networkidle" });
   const header = page.locator("header").first();
@@ -63,32 +65,93 @@ async function chromeState(page, path, expect) {
 // ── Chrome-state table (wide viewport) ──
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 console.log("[chrome states @1280]");
-// Every page draws the bar at 1280 (ui-jobs 509): absolute over the hero on
-// home, in the flow elsewhere; the launcher and H20 in it, no rail.
-for (const [p, pos] of [
-  ["/", "absolute"],
-  ["/coverage/ethereum", "relative"],
-  ["/coverage/base", "relative"],
-  ["/about", "relative"],
-  ["/about/architecture", "relative"],
-  ["/blog", "relative"],
-  ["/pulse", "relative"],
-  ["/privacy", "relative"],
-  ["/terms", "relative"],
-  ["/ethereum/liquity-v2", "relative"],
+// Every app/(site) page stands in the rail shell from md, as the app pages do
+// (ui-jobs 498): no bar, the rail and H20 drawn, no "Open an explorer" pill.
+for (const p of [
+  "/",
+  "/coverage/ethereum",
+  "/coverage/base",
+  "/about",
+  "/about/architecture",
+  "/blog",
+  "/pulse",
+  "/privacy",
+  "/terms",
 ]) {
-  await chromeState(page, p, { bar: true, cta: 0, pos });
-  const launcher = await page.locator('header button[data-search-launcher="header"]:visible').count();
-  const face = await page.locator('header [data-anatomy="H20"]:visible').count();
-  const rail = await page.locator('aside[data-anatomy="H1"]').count();
-  check(
-    launcher === 1 && face === 1 && rail === 0,
-    `${p}: the bar's launcher and H20, no rail (${launcher}, ${face}, ${rail})`,
-  );
+  await chromeState(page, p, { bar: false });
+  const siteRail = await page.locator('aside[data-anatomy="H1"] button[data-search-launcher="rail"]:visible').count();
+  const siteFace = await page.locator('[data-profile-corner] [data-anatomy="H20"]:visible').count();
+  const pill = await page.locator('button[aria-label="Open an explorer"]:visible').count();
+  check(siteRail === 1 && siteFace === 1, `${p}: the rail's search glyph and H20 drawn (${siteRail}, ${siteFace})`);
+  check(pill === 0, `${p}: no "Open an explorer" pill or grid glyph, ui-jobs 503 (${pill})`);
 }
-// The beta pill is in the footer at every width (ui-jobs 509).
-const deskBeta = await page.locator("footer [data-phone-beta]:visible").count();
-check(deskBeta === 1, `@1280: the footer carries the beta pill (${deskBeta})`);
+
+// ── The app surfaces from `md` up: no bar, everything in the rail and the row ──
+console.log("[app chrome @1280 on /ethereum/liquity-v2]");
+await chromeState(page, "/ethereum/liquity-v2", { bar: false });
+const rail = page.locator('aside[aria-label="Rails"]');
+for (const [name, sel] of [
+  ["the Rails mark", 'a[href="/"]'],
+  ["the search's glyph", 'button[data-anatomy="H15.1"]'],
+]) {
+  const n = await rail.locator(`${sel}:visible`).count();
+  check(n === 1, `the brand rail carries ${name} (${n})`);
+}
+// The theme is set in the profile control's menu from md (ui-jobs 504).
+const railToggle = await rail.locator('button[aria-label^="Switch to"]').count();
+check(railToggle === 0, `the brand rail carries no theme toggle, ui-jobs 504 (${railToggle})`);
+// The grid glyph (497) went with ui-jobs 503: the chooser is in the wallet panel.
+const railGrid = await rail.locator("button[data-chooser-trigger]").count();
+check(railGrid === 0, `the brand rail carries no grid glyph, ui-jobs 503 (${railGrid})`);
+const railBookmarks = await rail.locator('button[aria-label="Bookmarks"]').count();
+check(railBookmarks === 0, `the brand rail carries no bookmarks button, retired 1 Nov 2026 (${railBookmarks})`);
+// The rail is a surface, not a margin: an opaque background, and the same one
+// the cards take (`bg-raised`).
+const railBg = await rail.evaluate((el) => {
+  const want = getComputedStyle(document.documentElement).getPropertyValue("--surface-raised").trim();
+  const probe = document.createElement("div");
+  probe.style.backgroundColor = want;
+  document.body.appendChild(probe);
+  const raised = getComputedStyle(probe).backgroundColor;
+  probe.remove();
+  return { bg: getComputedStyle(el).backgroundColor, raised };
+});
+console.log("   ", JSON.stringify(railBg));
+check(railBg.bg !== "rgba(0, 0, 0, 0)" && railBg.bg !== "transparent", `the rail paints a background (${railBg.bg})`);
+check(railBg.bg === railBg.raised, `the rail takes the raised surface tone (${railBg.bg} vs ${railBg.raised})`);
+// The beta pill: at the FOOT, drawn as a full-width
+// strip across the rail from the browser's left edge, square on every corner,
+// x=0 (c0534d67, 13 Oct 2026).
+const pill = await page.evaluate(() => {
+  const r = document.querySelector('aside[aria-label="Rails"]');
+  const el = [...r.querySelectorAll("span")].find((s) => /^beta$/i.test(s.textContent.trim()));
+  if (!el) return null;
+  const cs = getComputedStyle(el);
+  const b = el.getBoundingClientRect();
+  return {
+    left: Math.round(b.left),
+    topLeftRadius: cs.borderTopLeftRadius,
+    bottomLeftRadius: cs.borderBottomLeftRadius,
+    topRightRadius: cs.borderTopRightRadius,
+    width: Math.round(b.width),
+    railWidth: Math.round(r.getBoundingClientRect().width),
+    atFoot: Math.round(b.bottom) === Math.round(r.getBoundingClientRect().bottom),
+    inLowerHalf: b.top > window.innerHeight / 2,
+  };
+});
+check(pill !== null, "the rail draws the beta pill");
+if (pill) {
+  console.log("   ", JSON.stringify(pill));
+  check(pill.left === 0, `the beta pill starts at the browser's left edge (left=${pill.left})`);
+  check(
+    pill.topLeftRadius === "0px" && pill.bottomLeftRadius === "0px",
+    `the beta pill is square on its left (${pill.topLeftRadius} / ${pill.bottomLeftRadius})`,
+  );
+  check(pill.topRightRadius === "0px", `the beta pill is square on its right (${pill.topRightRadius})`);
+  check(pill.width === pill.railWidth, `the beta pill spans the rail (${pill.width} of ${pill.railWidth}px)`);
+  check(pill.atFoot, "the beta pill sits at the rail's foot");
+  check(pill.inLowerHalf, "the beta pill sits at the foot of the rail, not under the glyph");
+}
 
 // ── The protocol title row: size, case, tracking, and the chain's label on it ──
 console.log("[protocol title row @1280 on /ethereum/liquity-v2]");
@@ -124,10 +187,10 @@ check(title.text === "Liquity V2", `the protocol title reads as written, not sho
 check(title.icon[0] === 32 && title.icon[1] === 32, `the protocol glyph is 32px square (${title.icon.join("x")})`);
 check(title.chooserOnRow, "the chain's label sits on the protocol title row");
 const rowButtons = await page.locator("[data-anatomy='H3'] button[aria-haspopup='menu']").count();
-check(rowButtons === 0, `the title row draws no chooser; the wallet panel carries it (${rowButtons})`);
+check(rowButtons === 0, `the title row draws no chooser; the rail carries it (${rowButtons})`);
 
 // ── ml-auto regression: control cluster stays hard right where the bar exists ──
-// The bar is drawn on every page (ui-jobs 509).
+// The bar is drawn below md only, on every page (ui-jobs 68, 498).
 console.log("[ml-auto cluster @390 on /blog]");
 const narrow = await browser.newPage({ viewport: { width: 390, height: 800 } });
 await narrow.goto(BASE + "/blog", { waitUntil: "networkidle" });
@@ -171,9 +234,13 @@ if (!trovePath) {
   await page.goto(BASE + trovePath, { waitUntil: "networkidle" });
   // Decision 0052: the wallet heading frames a position page; the card's
   // sidebar name links to the explorer. The chooser is in the wallet panel
-  // (ui-jobs 503), whose launcher is drawn here once, in the bar.
-  const posTrigger = await page.locator('header button[data-search-launcher="header"]:visible').count();
-  check(posTrigger === 1, `a position view draws the panel's launcher once, in the bar, at 1280 (${posTrigger})`);
+  // (ui-jobs 503), whose glyph is drawn here once, in the rail.
+  const posTrigger = await page.locator("button[data-search-launcher]:visible").count();
+  const posRail = await page.locator('aside[data-anatomy="H1"] button[data-search-launcher]:visible').count();
+  check(
+    posTrigger === 1 && posRail === 1,
+    `a position view draws the panel's glyph once, in the rail, at 1280 (${posTrigger}, ${posRail})`,
+  );
   await page.waitForSelector("[data-anatomy='C20'] a[data-rail-identity]", { timeout: 15000 }).catch(() => {});
   const posLink = await page
     .locator("[data-anatomy='C20'] a[data-rail-identity]")
@@ -183,6 +250,8 @@ if (!trovePath) {
   check(posLink === "/ethereum/liquity-v2", `a position view's sidebar name links to the explorer (${posLink})`);
   const posLine = await page.locator("[data-position-wallet-row] [data-rail-identity]").count();
   check(posLine === 0, `the wallet heading draws no protocol line (${posLine})`);
+  const posBar = await page.locator("header").first().isVisible();
+  check(posBar === false, `a position view draws no top bar at 1280 (${posBar})`);
 }
 
 // ── Coverage reachability from an explorer ──
@@ -192,7 +261,7 @@ if (!trovePath) {
 // matrix contains the explorer the reader is on.
 //
 // The chooser is in the wallet panel (ui-jobs 503), opened by the search's
-// launcher in the bar (ui-jobs 509). The chooser opens on
+// glyph: in the rail from `md`, in the bar below it. The chooser opens on
 // Ethereum whatever the page (ui-jobs 497); another chain's door is one press
 // on its glyph.
 // The chooser carries no coverage link (Miles, 5 Nov 2026): the count is of
@@ -246,7 +315,7 @@ for (const [name, href] of [
   check(n >= 1, `site footer links ${name} (${n})`);
 }
 
-// ── Mobile (@390): the same bar, the footer still there ──
+// ── Mobile (@390): same header shape, no sheet to open, footer still there ──
 console.log("[mobile @390]");
 const mob = await browser.newPage({ viewport: { width: 390, height: 800 } });
 await mob.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
@@ -359,6 +428,8 @@ await mHomePage.waitForTimeout(300);
 const samePlaceClosed = await mHomePage.evaluate(() => !document.querySelector("[data-profile-menu]"));
 check(samePlaceClosed, "home @390: a second press on H20's place closes the sheet");
 await mHomePage.close();
+const dFooterBeta = await page.locator("footer [data-phone-beta]:visible").count();
+check(dFooterBeta === 0, `@1280: the footer's beta pill is hidden, the rail carries it (${dFooterBeta})`);
 // FRANKENCOIN is the roster's longest name: at 390 the title must stay on one
 // line, and at 1440 it must not crowd the chooser it now shares a row with.
 for (const [w, h] of [

@@ -11,7 +11,7 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { ArrowLeft } from "lucide-react";
-import { NAV_BUTTON } from "@/lib/shared/ui-grammar";
+import { NAV_BUTTON, PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { listingHrefForWallet, protocolForSession } from "@/lib/shared/protocols";
 import { RecencyStamp } from "@/components/shared/recency-stamp";
@@ -196,7 +196,7 @@ export function DetailTopRow({
     // the heading reads with the card.
     <div className={owner ? "mb-4" : undefined}>
       <div
-        className={`flex min-h-[38px] flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2`}
+        className={`flex min-h-[38px] flex-wrap items-center justify-between gap-x-1 gap-y-2 sm:gap-x-2 ${PROFILE_CLEARANCE}`}
         data-anatomy="H7"
         data-back-row
       >

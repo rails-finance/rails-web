@@ -6,6 +6,7 @@
 
 import type { ReactNode } from "react";
 import { StartStack } from "@/components/start/start-stack";
+import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
 
 export default function StartLayout({ children }: { children: ReactNode }) {
   return (
@@ -13,7 +14,7 @@ export default function StartLayout({ children }: { children: ReactNode }) {
     // centred on the rail's glyph and the profile control (H20) from md.
     <div className="mx-auto max-w-5xl pt-8 pb-16">
       {/* The page heading (G7); the questions below are its sections. */}
-      <div className={`mb-10 max-w-2xl`} data-anatomy="G7">
+      <div className={`mb-10 max-w-2xl ${PROFILE_CLEARANCE}`} data-anatomy="G7">
         <h1 className="flex min-h-[38px] items-center text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Start here
         </h1>

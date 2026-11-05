@@ -112,11 +112,13 @@ const HERO_BUTTON_READY = "border-blue-500 bg-blue-500 text-white hover:bg-blue-
  *  tone, so on the dark canvas they lift on their own and the hairline is
  *  light-mode only; on a raised surface (the wallet panel, H16) they are the
  *  surface's tone, so in dark they keep a hairline (rb-600, the event sheet's)
- *  and the button steps up a tone. */
+ *  and the button steps up a tone. The panel's field also draws no magnifier:
+ *  the rail's glyph (H15.1), blue while the panel is open and level with the
+ *  row, is the row's icon (Miles, 1 Nov 2026). */
 export type SearchSurface = "canvas" | "raised";
 const SURFACE: Record<SearchSurface, { field: string; button: string; glyph: boolean }> = {
   canvas: { field: "dark:border-transparent", button: "dark:border-transparent", glyph: true },
-  raised: { field: "dark:border-rb-600", button: "dark:border-rb-600 dark:bg-rb-700", glyph: true },
+  raised: { field: "dark:border-rb-600", button: "dark:border-rb-600 dark:bg-rb-700", glyph: false },
 };
 const GLYPH: Record<Size, { size: number; left: string }> = {
   sm: { size: 14, left: "left-3" },
