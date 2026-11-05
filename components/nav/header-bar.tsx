@@ -4,7 +4,7 @@ import Link from "next/link";
 import { RailsMark } from "@/components/nav/rails-mark";
 import { usePathname } from "next/navigation";
 
-import { BookmarksLink } from "@/components/nav/bookmarks-link";
+import { ProfileMenu } from "@/components/nav/profile-menu";
 import { StartHereLink } from "@/components/nav/start-here-link";
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
@@ -66,7 +66,7 @@ export function HeaderBar() {
               (ui-jobs 503). */}
           <SearchLauncher placement="header" />
           <HeaderThemeToggle />
-          <BookmarksLink />
+          <ProfileMenu />
         </div>
       </div>
     </header>

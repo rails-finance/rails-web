@@ -343,8 +343,8 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
               {/* Liveness marker — an outlined green pill (border, 20% tint,
                 green bold text) owned by the chrome bar rather than pasted
                 over the render. */}
-              <span className="ml-auto inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-green-500 bg-green-500/20 px-2 py-0.5 text-[9px] font-bold tracking-widest text-green-500">
-                LIVE POSITION
+              <span className="ml-auto inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-green-500 bg-green-500/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-green-500">
+                Live position
               </span>
             </div>
 

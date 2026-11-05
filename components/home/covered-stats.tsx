@@ -147,6 +147,9 @@ export function CoveredStats({
           <span aria-hidden="true">{formatValueHeld(valueHeld.totalUsd)}</span>
           <span className="sr-only">{spokenValueHeld(valueHeld.totalUsd)}</span>
         </span>{" "}
+        {/* From lg the sentence breaks before "across", two lines (Miles, 5 Nov
+            2026); below lg it wraps as before. */}
+        <br className="hidden lg:inline" />
         across {COUNTED_SCOPE} <DeFiAndNote note={note} />
       </p>
     </div>

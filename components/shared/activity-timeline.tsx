@@ -13,6 +13,7 @@
 
 import { createContext, useContext, useState, useRef } from "react";
 import { fmtSpine } from "@/lib/shared/spine-format";
+import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 export { fmtSpine };
 
 // ── Timeline scale ─────────────────────────────────────────────────────
@@ -153,7 +154,7 @@ function SpineValEditable({
         e.stopPropagation();
         startEditing();
       }}
-      className="text-base font-semibold whitespace-nowrap px-1 rounded hover:bg-rb-200 dark:hover:bg-rb-900 transition-colors text-blue-600 dark:text-blue-400"
+      className={`text-base font-semibold whitespace-nowrap px-1 rounded hover:bg-rb-200 dark:hover:bg-rb-900 transition-colors ${INPLACE_TEXT}`}
       title="Edit simulated amount"
     >
       {display}

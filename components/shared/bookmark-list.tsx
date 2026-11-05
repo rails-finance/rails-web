@@ -2,11 +2,14 @@
 
 // The bookmarks list and its backup controls, drawn by the bookmarks page
 // (/bookmarks, rails-ops ui-jobs 480), and `useBookmarks`, which the profile
-// control (H20) reads for its face. The list lives in this origin's
-// localStorage under `rails-bookmarks` (lib/shared/sessions.ts).
+// control (H20) reads for its face and its menu. The list lives in this
+// origin's localStorage under `rails-bookmarks` (lib/shared/sessions.ts), in
+// the reader's order: with `reorder`, rows move by drag and drop and by their
+// move-up and move-down buttons (ui-jobs 504).
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import Link from "next/link";
+import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 
 import { BookmarkSummary } from "@/components/bookmarks/bookmark-summary";
 import { Facehash } from "@/components/shared/facehash";
@@ -16,6 +19,7 @@ import {
   exportBookmarks,
   importBookmarks,
   loadBookmarks,
+  moveBookmark,
   removeBookmark,
   renameSession,
   SESSIONS_CHANGED_EVENT,
@@ -47,16 +51,62 @@ export function BookmarkList({
   bookmarks,
   empty,
   summary,
+  reorder,
 }: {
   bookmarks: WalletSession[];
   empty: ReactNode;
   summary?: boolean;
+  /** Rows move: drag and drop, and move-up and move-down buttons. */
+  reorder?: boolean;
 }) {
+  // The row being dragged, and the index it would land at.
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [over, setOver] = useState<number | null>(null);
   if (bookmarks.length === 0) return <>{empty}</>;
+  const drag = reorder
+    ? (i: number, address: string) => ({
+        draggable: true,
+        onDragStart: (e: DragEvent) => {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", address);
+          setDragging(address);
+        },
+        onDragOver: (e: DragEvent) => {
+          if (!dragging) return;
+          e.preventDefault();
+          setOver(i);
+        },
+        onDrop: (e: DragEvent) => {
+          e.preventDefault();
+          if (dragging) moveBookmark(dragging, i);
+          setDragging(null);
+          setOver(null);
+        },
+        onDragEnd: () => {
+          setDragging(null);
+          setOver(null);
+        },
+      })
+    : undefined;
   return (
     <div className="flex flex-col gap-1" data-bookmark-list="">
-      {bookmarks.map((s) => (
-        <BookmarkRow key={s.key} session={s} summary={summary} />
+      {bookmarks.map((s, i) => (
+        <BookmarkRow
+          key={s.key}
+          session={s}
+          summary={summary}
+          move={
+            reorder
+              ? {
+                  index: i,
+                  count: bookmarks.length,
+                  drag: drag!(i, s.addresses[0]),
+                  dragging: dragging === s.addresses[0],
+                  target: over === i && dragging !== s.addresses[0],
+                }
+              : undefined
+          }
+        />
       ))}
     </div>
   );
@@ -192,7 +242,15 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function BookmarkRow({ session, summary }: { session: WalletSession; summary?: boolean }) {
+interface RowMove {
+  index: number;
+  count: number;
+  drag: Record<string, unknown>;
+  dragging: boolean;
+  target: boolean;
+}
+
+function BookmarkRow({ session, summary, move }: { session: WalletSession; summary?: boolean; move?: RowMove }) {
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState("");
 
@@ -274,9 +332,25 @@ function BookmarkRow({ session, summary }: { session: WalletSession; summary?: b
   }
 
   return (
-    <div className={rowClasses} data-bookmark-row="">
+    <div
+      className={`${rowClasses} ${move?.dragging ? "opacity-50" : ""} ${move?.target ? "border-t-blue-500" : ""}`}
+      data-bookmark-row=""
+      {...move?.drag}
+    >
+      {move && (
+        <GripVertical
+          className="size-4 shrink-0 cursor-grab text-rb-400 active:cursor-grabbing"
+          aria-hidden="true"
+          data-bookmark-grip=""
+        />
+      )}
       <div className="min-w-0 flex-1">
-        <Link href={walletHref(primary)} className="flex min-w-0 items-center gap-3" data-bookmark-open="">
+        <Link
+          href={walletHref(primary)}
+          draggable={false}
+          className="flex min-w-0 items-center gap-3"
+          data-bookmark-open=""
+        >
           {avatar}
           <span className="truncate text-sm font-bold text-foreground" title={primary}>
             {label}
@@ -290,6 +364,32 @@ function BookmarkRow({ session, summary }: { session: WalletSession; summary?: b
         )}
       </div>
       <div className="flex shrink-0 items-center gap-0.5">
+        {move && (
+          <>
+            <button
+              type="button"
+              onClick={() => moveBookmark(primary, move.index - 1)}
+              disabled={move.index === 0}
+              title="Move up"
+              aria-label={`Move ${label} up`}
+              className={`${ICON_BUTTON} hover:text-foreground disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent`}
+              data-bookmark-move="up"
+            >
+              <ChevronUp className="size-3" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => moveBookmark(primary, move.index + 1)}
+              disabled={move.index === move.count - 1}
+              title="Move down"
+              aria-label={`Move ${label} down`}
+              className={`${ICON_BUTTON} hover:text-foreground disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent`}
+              data-bookmark-move="down"
+            >
+              <ChevronDown className="size-3" aria-hidden="true" />
+            </button>
+          </>
+        )}
         <CopyButton text={primary} />
         <button
           type="button"

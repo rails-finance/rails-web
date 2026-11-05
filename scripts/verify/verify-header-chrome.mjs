@@ -93,11 +93,13 @@ const rail = page.locator('aside[aria-label="Rails"]');
 for (const [name, sel] of [
   ["the Rails mark", 'a[href="/"]'],
   ["the search's glyph", 'button[data-anatomy="H15.1"]'],
-  ["the theme toggle", 'button[aria-label^="Switch to"]'],
 ]) {
   const n = await rail.locator(`${sel}:visible`).count();
   check(n === 1, `the brand rail carries ${name} (${n})`);
 }
+// The theme is set in the profile control's menu from md (ui-jobs 504).
+const railToggle = await rail.locator('button[aria-label^="Switch to"]').count();
+check(railToggle === 0, `the brand rail carries no theme toggle, ui-jobs 504 (${railToggle})`);
 // The grid glyph (497) went with ui-jobs 503: the chooser is in the wallet panel.
 const railGrid = await rail.locator("button[data-chooser-trigger]").count();
 check(railGrid === 0, `the brand rail carries no grid glyph, ui-jobs 503 (${railGrid})`);
@@ -117,7 +119,7 @@ const railBg = await rail.evaluate((el) => {
 console.log("   ", JSON.stringify(railBg));
 check(railBg.bg !== "rgba(0, 0, 0, 0)" && railBg.bg !== "transparent", `the rail paints a background (${railBg.bg})`);
 check(railBg.bg === railBg.raised, `the rail takes the raised surface tone (${railBg.bg} vs ${railBg.raised})`);
-// The beta pill: at the FOOT, below the theme toggle, drawn as a full-width
+// The beta pill: at the FOOT, drawn as a full-width
 // strip across the rail from the browser's left edge, square on every corner,
 // x=0 (c0534d67, 13 Oct 2026).
 const pill = await page.evaluate(() => {
@@ -125,7 +127,6 @@ const pill = await page.evaluate(() => {
   const el = [...r.querySelectorAll("span")].find((s) => /^beta$/i.test(s.textContent.trim()));
   if (!el) return null;
   const cs = getComputedStyle(el);
-  const mark = r.querySelector('button[aria-label^="Switch to"]').getBoundingClientRect();
   const b = el.getBoundingClientRect();
   return {
     left: Math.round(b.left),
@@ -134,7 +135,7 @@ const pill = await page.evaluate(() => {
     topRightRadius: cs.borderTopRightRadius,
     width: Math.round(b.width),
     railWidth: Math.round(r.getBoundingClientRect().width),
-    belowToggle: b.top >= mark.bottom,
+    atFoot: Math.round(b.bottom) === Math.round(r.getBoundingClientRect().bottom),
     inLowerHalf: b.top > window.innerHeight / 2,
   };
 });
@@ -148,7 +149,7 @@ if (pill) {
   );
   check(pill.topRightRadius === "0px", `the beta pill is square on its right (${pill.topRightRadius})`);
   check(pill.width === pill.railWidth, `the beta pill spans the rail (${pill.width} of ${pill.railWidth}px)`);
-  check(pill.belowToggle, "the beta pill sits below the theme toggle");
+  check(pill.atFoot, "the beta pill sits at the rail's foot");
   check(pill.inLowerHalf, "the beta pill sits at the foot of the rail, not under the glyph");
 }
 
@@ -368,6 +369,44 @@ const mHeaderBeta = await mHomePage.locator('header[data-anatomy="H2"]').first()
 check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
 const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
 check(mFooterBeta, "home @390: the beta pill is in the footer");
+// The profile control's menu (ui-jobs 504): a menu button; with nothing
+// saved, the line on saving one and the theme switch; a full-width sheet
+// below md; Escape closes it and returns focus.
+const h20 = mHomePage.locator('header [data-anatomy="H20"]');
+check((await h20.getAttribute("aria-haspopup")) === "menu", "H20 is a menu button");
+await h20.click();
+const sheet = await mHomePage.evaluate(() => {
+  const m = document.querySelector("[data-profile-menu]");
+  const r = m?.getBoundingClientRect();
+  return {
+    role: m?.getAttribute("role"),
+    width: r ? Math.round(r.width) : 0,
+    empty: !!m?.querySelector("[data-profile-menu-empty]"),
+    themes: [...(m?.querySelectorAll("[data-theme-option]") ?? [])].map((b) => b.textContent.trim()).join(","),
+    manage: !!m?.querySelector('[data-profile-menu-manage][href="/bookmarks"]'),
+    scrim: !!document.querySelector("[data-profile-menu-scrim]"),
+  };
+});
+check(
+  sheet.role === "menu" &&
+    sheet.width === 390 &&
+    sheet.empty &&
+    sheet.manage &&
+    sheet.scrim &&
+    sheet.themes === "Light,Dark,Auto",
+  `home @390: H20 opens a full-width menu over a dim: the saving line, Manage wallets, the theme switch (${JSON.stringify(sheet)})`,
+);
+// A press on the dim closes the sheet.
+await mHomePage.mouse.click(195, 780);
+const dimClosed = await mHomePage.evaluate(() => !document.querySelector("[data-profile-menu]"));
+check(dimClosed, "home @390: a press on the dim closes the menu");
+await h20.click();
+await mHomePage.keyboard.press("Escape");
+const h20Back = await mHomePage.evaluate(
+  () =>
+    !document.querySelector("[data-profile-menu]") && document.activeElement?.getAttribute("data-anatomy") === "H20",
+);
+check(h20Back, "home @390: Escape closes the menu and focus returns to H20");
 await mHomePage.close();
 const dFooterBeta = await page.locator("footer [data-phone-beta]:visible").count();
 check(dFooterBeta === 0, `@1280: the footer's beta pill is hidden, the rail carries it (${dFooterBeta})`);

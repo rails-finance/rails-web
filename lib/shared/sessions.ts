@@ -82,8 +82,9 @@ export interface WalletSession {
   key: string;
   addresses: string[];
   ensNames: Record<string, string | null>;
-  /** When the wallet was last bookmarked or merged in; drives the display
-   *  order, newest first. */
+  /** When the wallet was last bookmarked or merged in. The display order was
+   *  this, newest first, until the list took the reader's order (ui-jobs 504):
+   *  it still orders a list being migrated and the rows an import adds. */
   lastVisited: number;
   /** When the wallet was first bookmarked, across every list it was merged
    *  from. Absent on a row written before 431: `lastVisited` stands for it. */
@@ -104,6 +105,12 @@ export const SESSIONS_CHANGED_EVENT = "rails-sessions-changed";
 const STORAGE_KEY = "rails-bookmarks";
 /** Set once the per-explorer lists have been merged into `STORAGE_KEY`. */
 const MIGRATED_KEY = "rails-bookmarks-migrated";
+/** Set once `STORAGE_KEY`'s array order is the reader's order (ui-jobs 504).
+ *  Before it the array was unordered and the list showed newest first, so
+ *  the migration writes the rows in that order, which the reader then
+ *  rearranges on /bookmarks. The array keeps its shape, so a build from
+ *  before reads the same rows. */
+const ORDERED_KEY = "rails-bookmarks-ordered";
 /** The suffix every pre-431 explorer list's key ends in. */
 const LEGACY_SUFFIX = "-sessions";
 
@@ -184,9 +191,24 @@ function migrateScopedBookmarks(): void {
   }
 }
 
+const newestFirst = (a: WalletSession, b: WalletSession) => (b.lastVisited ?? 0) - (a.lastVisited ?? 0);
+
+/** Write the list in its shown order once per browser (ORDERED_KEY). */
+function migrateToReaderOrder(): void {
+  try {
+    if (localStorage.getItem(ORDERED_KEY)) return;
+    const rows = readRows(STORAGE_KEY);
+    if (rows.length > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify([...rows].sort(newestFirst)));
+    localStorage.setItem(ORDERED_KEY, "1");
+  } catch {
+    /* storage blocked: nothing to order */
+  }
+}
+
 function loadSessions(): WalletSession[] {
   if (typeof window === "undefined") return [];
   migrateScopedBookmarks();
+  migrateToReaderOrder();
   return readRows(STORAGE_KEY);
 }
 
@@ -204,11 +226,23 @@ function saveSessions(sessions: WalletSession[]): void {
   }
 }
 
-/** The bookmarked wallets, most-recently-bookmarked first. */
+/** The bookmarked wallets, in the reader's order: a new bookmark goes first,
+ *  and /bookmarks moves them (`moveBookmark`). */
 export function loadBookmarks(): WalletSession[] {
-  return loadSessions()
-    .filter((s) => s.pinned)
-    .sort((a, b) => b.lastVisited - a.lastVisited);
+  return loadSessions().filter((s) => s.pinned);
+}
+
+/** Move a bookmark to `to` (an index into `loadBookmarks()`, clamped). */
+export function moveBookmark(address: string, to: number): void {
+  const addr = address.toLowerCase();
+  const rows = loadSessions().filter((s) => s.pinned);
+  const from = rows.findIndex((s) => primaryOf(s) === addr);
+  if (from < 0) return;
+  const target = Math.max(0, Math.min(rows.length - 1, to));
+  if (target === from) return;
+  const [row] = rows.splice(from, 1);
+  rows.splice(target, 0, row);
+  saveSessions(rows);
 }
 
 export function renameSession(key: string, customName: string): void {
@@ -322,7 +356,17 @@ export function importBookmarks(source: string): BookmarksImportResult {
       : [];
   const incoming = lists.flatMap((rows) => (Array.isArray(rows) ? rows.filter(isSessionRow) : []));
   if (incoming.length === 0) throw new Error("That backup carries no saved wallets.");
-  const { rows, added } = mergeRows(loadSessions(), incoming);
+  const held = loadSessions();
+  const { rows: merged, added } = mergeRows(held, incoming);
+  // The rows held keep the reader's order; the rows the file adds go first,
+  // newest first, as a new bookmark does.
+  const heldAt = new Map(held.map((r, i) => [primaryOf(r), i]));
+  const rows = [
+    ...merged.filter((r) => !heldAt.has(primaryOf(r))).sort(newestFirst),
+    ...merged
+      .filter((r) => heldAt.has(primaryOf(r)))
+      .sort((a, b) => heldAt.get(primaryOf(a))! - heldAt.get(primaryOf(b))!),
+  ];
   const read = new Set(incoming.map(primaryOf)).size;
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));

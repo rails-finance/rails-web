@@ -77,7 +77,7 @@ check(
 );
 
 // 7. Team cards: no card chrome
-const teamCard = page.locator("h2", { hasText: /^Team$/ }).locator("xpath=following-sibling::div[1]/div[1]");
+const teamCard = page.locator("h2", { hasText: /^The team$/ }).locator("xpath=following-sibling::div[1]/div[1]");
 const teamClass = (await teamCard.getAttribute("class")) ?? "";
 check(
   "7 team cards dropped bg-raised/rounded/p-6",
@@ -300,23 +300,80 @@ check(
   JSON.stringify(ground),
 );
 
-// "What Rails Does": each station shows its heading at rest, and its button
-// opens that station alone (Miles, 5 Nov 2026).
+// "What Rails does" (Miles, 5 Nov 2026): each card is one button showing its
+// heading; a press swaps in its text in the same box, which keeps its size;
+// one open at a time; a second press returns it. Under reduced motion the
+// text stays until a press.
 const stations = page.locator("[data-station-toggle]");
-const shut = await stations.evaluateAll((bs) =>
-  bs.every(
-    (b) =>
-      b.getAttribute("aria-expanded") === "false" && document.getElementById(b.getAttribute("aria-controls"))?.hidden,
-  ),
-);
+await stations.first().scrollIntoViewIfNeeded();
+await page.mouse.move(0, 0);
+const shown = (i) =>
+  stations.nth(i).evaluate((b) => !b.querySelector("[data-station-line]").classList.contains("invisible"));
+const sizeOf = (i) => stations.nth(i).evaluate((b) => [b.offsetWidth, b.offsetHeight].join("×"));
+const restSize = await sizeOf(3);
 await stations.nth(3).click();
-const opened = await stations.evaluateAll((bs) => bs.map((b) => b.getAttribute("aria-expanded")).join(","));
-check(
-  "R stations shut at rest; one press opens that station alone",
-  (await stations.count()) === 5 && shut && opened === "false,false,false,true,false",
-  opened,
+await page.mouse.move(0, 0);
+const swapped = await shown(3);
+const openSize = await sizeOf(3);
+await stations.nth(1).click();
+await page.mouse.move(0, 0);
+const pressed = await stations.evaluateAll((bs) =>
+  bs.map((b) => (b.getAttribute("aria-pressed") === "true" ? 1 : 0)).join(""),
 );
+await stations.nth(1).click();
+const allBack = await stations.evaluateAll((bs) => bs.every((b) => b.getAttribute("aria-pressed") === "false"));
+check(
+  "R stations: a press swaps in the text, same size; one open at a time; a second press returns it",
+  swapped && restSize === openSize && pressed === "01000" && allBack,
+  JSON.stringify({ swapped, restSize, openSize, pressed, allBack }),
+);
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, reducedMotion: "reduce" });
+  const rp = await ctx.newPage();
+  await rp.goto(`${BASE}/`, { waitUntil: "networkidle" });
+  const st = rp.locator("[data-station-toggle]").nth(0);
+  await st.scrollIntoViewIfNeeded();
+  await st.click();
+  await rp.mouse.move(0, 0);
+  const ms = Number(await st.getAttribute("data-snake-ms"));
+  await rp.waitForTimeout(ms + 1000);
+  const stays = (await st.getAttribute("aria-pressed")) === "true";
+  await st.click();
+  const back = (await st.getAttribute("aria-pressed")) === "false";
+  check("R stations: under reduced motion the text stays past its time, until a press", stays && back, `${ms}ms`);
+  await ctx.close();
+}
 
+const directoryGeo = (pg) =>
+  pg.evaluate(() => {
+    const s5 = document.querySelector('[data-anatomy="S5"]');
+    const R = (el) => el?.getBoundingClientRect();
+    const tabs = R(
+      s5.querySelector(
+        '[data-anatomy="S5"] [role="tablist"], [data-anatomy="S5"] nav, [data-anatomy="S5"] [aria-label]',
+      ),
+    );
+    const heading = R(s5.querySelector("[data-home-directory-heading]"));
+    const tile = R(s5.querySelector('a[href^="/"]:not([href^="/coverage"])'));
+    const pill = R(s5.querySelector("[data-home-coverage]"));
+    const col = s5.querySelector("[data-home-coverage]").parentElement.getBoundingClientRect();
+    return {
+      left: [heading, tile, col].map((r) => Math.round(r.left)),
+      pill: [Math.round(pill.left), Math.round(pill.right), Math.round(pill.top)],
+      colRight: Math.round(col.right),
+      colTop: Math.round(col.top),
+    };
+  });
+// The directory on the page's left edge, the coverage pill on the tab row's
+// right from sm (Miles, 5 Nov 2026).
+{
+  const g = await directoryGeo(page);
+  check(
+    "D home directory: heading, tiles and tab row share one left edge; the pill ends the tab row",
+    new Set(g.left).size === 1 && g.pill[1] === g.colRight && g.pill[2] - g.colTop < 12,
+    JSON.stringify(g),
+  );
+}
 // The directory lists a chain's most used explorers, as the drawer's chooser
 // does, and "View all <n> explorers" opens the rest in place.
 const dirTiles = () =>
@@ -347,12 +404,20 @@ const sample = await pp.evaluate(() => {
     href: link?.getAttribute("href") ?? null,
     box: r ? [Math.round(r.left), Math.round(r.right), Math.round(r.height)] : null,
     framed: [...document.querySelectorAll("span")].some(
-      (s) => s.textContent === "LIVE POSITION" && s.getClientRects().length > 0,
+      (s) => s.textContent === "Live position" && s.getClientRects().length > 0,
     ),
     scroll: document.documentElement.scrollWidth,
   };
 });
 check("P phone @390: no framed sample", !sample.framed);
+{
+  const g = await directoryGeo(pp);
+  check(
+    "D home @390: the coverage pill wraps under the tabs, on the left edge",
+    g.pill[0] === g.left[2] && g.pill[2] - g.colTop > 20,
+    JSON.stringify(g),
+  );
+}
 const phoneOrder = await homeOrder(pp);
 check(
   "O home @390: hero, track lines, value line, button, directory",
@@ -370,6 +435,73 @@ check(
   JSON.stringify(sample.box),
 );
 await phone.close();
+
+// Saved wallets in the reader's order (ui-jobs 504): a list stored before the
+// order is shown newest first; a move on /bookmarks persists, and the profile
+// menu lists them in that order.
+{
+  const W = [
+    "0xf06016d822943c42e3cb7fc3a6a3b1889c1045f8",
+    "0xd8da6bf26964af9d7eed9e03e53415d37aa96045",
+    "0x1111111111111111111111111111111111111111",
+  ];
+  const held = W.map((a, i) => ({
+    key: a,
+    addresses: [a],
+    ensNames: { [a]: null },
+    lastVisited: 1000 + i,
+    pinned: true,
+  }));
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.addInitScript((rows) => {
+    if (!localStorage.getItem("rails-bookmarks")) localStorage.setItem("rails-bookmarks", JSON.stringify(rows));
+  }, held);
+  const bp = await ctx.newPage();
+  await bp.goto(`${BASE}/bookmarks`, { waitUntil: "networkidle" });
+  await bp.waitForSelector("[data-bookmark-row]");
+  const order = () =>
+    bp.locator("[data-bookmark-open]").evaluateAll((as) => as.map((a) => a.getAttribute("href").split("/").pop()));
+  const first = await order();
+  check(
+    "W saved wallets: an unordered list reads newest first",
+    first.join() === [W[2], W[1], W[0]].join(),
+    first.join(),
+  );
+  await bp.locator("[data-bookmark-row]").first().locator('[data-bookmark-move="down"]').click();
+  await bp.reload({ waitUntil: "networkidle" });
+  await bp.waitForSelector("[data-bookmark-row]");
+  const moved = await order();
+  check("W saved wallets: a move persists", moved.join() === [W[1], W[2], W[0]].join(), moved.join());
+  await bp.locator('[data-profile-corner] [data-anatomy="H20"]').click();
+  const menu = await bp
+    .locator("[data-profile-menu-wallet]")
+    .evaluateAll((as) => as.map((a) => a.getAttribute("data-profile-menu-wallet")));
+  check("W profile menu lists them in that order", menu.join() === moved.join(), menu.join());
+  await bp.keyboard.press("Escape");
+  // The drawer's search (Miles, 5 Nov 2026): focused on open with the list
+  // shut and the chooser uncovered; ArrowDown opens the saved wallets; typing
+  // opens the list and clearing the field shuts it. No saved-wallets link.
+  await bp.locator('aside[data-anatomy="H1"] button[data-search-launcher]').click();
+  const field = bp.locator("[data-search-launcher-panel] input");
+  await field.waitFor();
+  await bp.waitForTimeout(300);
+  const listShown = () => bp.locator("[data-search-launcher-panel] [role=listbox]").isVisible();
+  const atOpen = { focused: await field.evaluate((el) => el === document.activeElement), list: await listShown() };
+  await field.press("ArrowDown");
+  const onArrow = await listShown();
+  await field.press("Escape");
+  await field.fill("aa");
+  const onType = await listShown();
+  await field.fill("");
+  const onClear = await listShown();
+  const panelLink = await bp.locator("[data-wallet-panel-bookmarks]").count();
+  check(
+    "S drawer search: focused, list shut on open; ArrowDown and typing open it; clearing shuts it; no saved link",
+    atOpen.focused && !atOpen.list && onArrow && onType && !onClear && panelLink === 0,
+    JSON.stringify({ atOpen, onArrow, onType, onClear, panelLink }),
+  );
+  await ctx.close();
+}
 
 await browser.close();
 const failed = results.filter((r) => !r.ok);

@@ -41,7 +41,7 @@ const coverageBlurb = (chainId: ChainId) =>
 export function coverageMetadata(chainId: ChainId): Metadata {
   const blurb = coverageBlurb(chainId);
   const url = `${SITE_URL}${coverageHref(chainId)}`;
-  const share = { title: `Rails Coverage — ${CHAINS[chainId].name}`, description: blurb };
+  const share = { title: `Rails coverage — ${CHAINS[chainId].name}`, description: blurb };
   return {
     title: `Coverage — ${CHAINS[chainId].name}`,
     description: blurb,
@@ -138,7 +138,7 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
       {/* Lead */}
       <section className="max-w-7xl mx-auto px-4 md:px-6 pt-24 pb-10 text-center">
         <h1 className="font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,48px)]">
-          What Rails <span className="marketing">Covers</span>
+          What Rails <span className="marketing">covers</span>
         </h1>
         {/* The chain is the URL: the toggle is a pair of links between the two
             per-chain routes, the same segmented pill the home grid renders in

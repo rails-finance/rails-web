@@ -88,10 +88,10 @@ export default async function Home() {
         <section className="pb-16" data-anatomy="S5">
           {/* The directory's heading (S10, Miles 5 Nov 2026): "Destination DeFi" at
               display size, a share of the column's width (cqw) so the line
-              spans it, in a faint tone the floor it stands on can carry. */}
+              spans it, on the column's left edge, in a faint tone the floor it stands on can carry. */}
           <div className="mx-auto max-w-7xl px-4 pb-8 @container" data-anatomy="S10">
             <h2
-              className="whitespace-nowrap text-center font-semibold leading-none tracking-tighter text-rb-200 text-[14cqw] dark:text-rb-700"
+              className="whitespace-nowrap font-semibold leading-none tracking-tighter text-rb-200 text-[14cqw] dark:text-rb-700"
               data-home-directory-heading=""
             >
               Destination DeFi
@@ -130,7 +130,7 @@ export default async function Home() {
           contracts to the page and closes on where every number comes from. ═══ */}
         <div>
           <section className="max-w-7xl mx-auto px-4 py-16" data-anatomy="S7">
-            <h2 className="text-3xl font-semibold tracking-tight text-foreground mb-4">What Rails Does</h2>
+            <h2 className="text-3xl font-semibold tracking-tight text-foreground mb-4">What Rails does</h2>
 
             {/* Copy constraints (rails-ops decisions 0006/0010) for this intro
               and the rail below: (1) for CURRENT state the live chain read
@@ -142,9 +142,9 @@ export default async function Home() {
               fetch that lands AFTER first render — don't imply it runs before
               the page shows anything. */}
             <p className="body-text max-w-3xl">
-              Rails builds a read-only explorer for each DeFi protocol it covers. Look up any position &mdash; yours or
-              anyone else&rsquo;s &mdash; and see what it holds, what it owes, and everything that has ever happened to
-              it. Here is the path the data travels:
+              Each Rails explorer covers one DeFi protocol, from lending markets and vaults to savings and exchanges.
+              Look up an address to see its positions, what they hold and every transaction behind them. Here is the
+              path the data travels:
             </p>
 
             {/* The capability list became a transit-style rail: the four
@@ -162,46 +162,30 @@ export default async function Home() {
         {/* ═══ TEAM — shared with the About page (single source of truth) ═══ */}
         <div data-anatomy="S8">
           <div className="max-w-7xl mx-auto px-4 py-16">
-            <TeamSection />
+            <TeamSection
+              intro={
+                // Get in touch, under the heading and over the members (S9,
+                // Miles 5 Nov 2026).
+                <p className="body-text mb-10 max-w-[44rem]" data-anatomy="S9">
+                  <strong className="font-semibold text-foreground">Get in touch.</strong> Rails is open infrastructure
+                  for DeFi. If you&apos;re a protocol team or interested in learning more, we&apos;d love to hear from
+                  you. Telegram:{" "}
+                  <a
+                    href="https://t.me/railsfinance"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 align-middle text-pink-500 hover:text-pink-600 transition-colors"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+                    </svg>
+                    @railsfinance
+                  </a>
+                </p>
+              }
+            />
           </div>
         </div>
-
-        {/* ═══ GET IN TOUCH ═══ */}
-        <GetInTouch />
-      </div>
-    </div>
-  );
-}
-
-/** Founding-supporter voice + Telegram contact line, on the page's gradient. */
-function GetInTouch() {
-  return (
-    <div data-anatomy="S9">
-      <div className="max-w-7xl mx-auto px-4 py-16">
-        <h2 className="font-semibold tracking-tight leading-tight pb-4 text-[clamp(28px,4vw,42px)]">Get in touch</h2>
-
-        {/* 55ch — the short end of the classic typographic measure, so line
-            length stays readable instead of running the full container.
-            Arbitrary value rather than max-w-prose: that's Tailwind's 65ch
-            default and this repo's @theme doesn't override --container-prose. */}
-        <p className="body-text max-w-[55ch]">
-          Rails is open infrastructure for DeFi. If you&apos;re a protocol team or interested in learning more,
-          we&apos;d love to hear from you.
-        </p>
-        <p className="body-text max-w-[55ch] mt-2">
-          Telegram:{" "}
-          <a
-            href="https://t.me/railsfinance"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 align-middle text-pink-500 hover:text-pink-600 transition-colors"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
-            </svg>
-            @railsfinance
-          </a>
-        </p>
       </div>
     </div>
   );
