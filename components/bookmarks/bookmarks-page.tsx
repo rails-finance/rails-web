@@ -13,7 +13,6 @@ import { BookmarkBackup, BookmarkList, useBookmarks } from "@/components/shared/
 import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 import { FrontDoorSearch, walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
-import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
 
 export function BookmarksPage() {
   const bookmarks = useBookmarks();
@@ -25,7 +24,7 @@ export function BookmarksPage() {
       {/* Back's row, as a detail page draws it (H7): the column's first line,
           level with the profile control (H20) the app layout draws at the top
           right from md. With no history Back opens the home page. */}
-      <div className={`flex min-h-[38px] items-center ${PROFILE_CLEARANCE}`} data-anatomy="H7" data-back-row="">
+      <div className={`flex min-h-[38px] items-center`} data-anatomy="H7" data-back-row="">
         <DetailBackButton fallbackHref="/" />
       </div>
       <div className="mb-8 mt-6" data-anatomy="B1">

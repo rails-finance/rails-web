@@ -20,14 +20,11 @@ export function HeaderBar() {
   return (
     <header
       data-anatomy="H2"
-      // From `md` up every page has the rail (components/nav/rail-shell.tsx)
-      // and nothing is left for this bar to carry: the mark, the search's
-      // glyph, the theme toggle and the chooser are in BrandRail and H20 is at
-      // the column's top right (ui-jobs 68, 497, 498). Below `md` there is no
-      // rail and the bar is the only chrome.
-      className={`${isHome ? "absolute inset-x-0 top-0 z-40" : "relative z-40 mb-2"} md:hidden`}
+      // The chrome at every width (ui-jobs 509: no rail): the launcher at the
+      // left, H20 at the right, the bar as wide as the viewport.
+      className={isHome ? "absolute inset-x-0 top-0 z-40" : "relative z-40 mb-2"}
     >
-      <div className="max-w-7xl mx-auto py-4 px-4 md:px-6 flex items-center">
+      <div className="flex items-center px-4 py-4 md:px-6">
         {/* Left: the Rails mark with a chevron, which opens the wallet panel
             (H15.1, ui-jobs 509); the panel's top row draws it pointing left in
             the same place, closing it, and links Home. Right: H20 alone, the

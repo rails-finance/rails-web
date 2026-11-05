@@ -5,15 +5,13 @@
 // top and the explorer chooser (H4) under it. The saved wallets are the
 // suggestions' first rows (H15.2) once the reader types, or on ArrowDown in
 // the empty field; their page is in the profile control's menu (H20, ui-jobs
-// 504). The rail's magnifier, the
-// header bar's, ⌘K, and `/` on a page with no search of its own open it with
-// the field focused; `openWalletPanel(from, "chooser")` opens it with the
+// 504). The header bar's launcher (the Rails mark and its chevron, H15.1),
+// ⌘K, and `/` on a page with no search of its own open it with the field
+// focused; `openWalletPanel(from, "chooser")` opens it with the
 // focus on the chooser's chain row instead.
 //
-// From md it starts at the brand rail's right edge, so the rail stays in view
-// and the two read as one piece of chrome, on every page (the site's too,
-// ui-jobs 498); below md (no rail) it starts at the viewport's edge and takes
-// the full width there.
+// It starts at the viewport's left edge on every page: 400px wide from md,
+// the full width below (ui-jobs 509: no rail at any width).
 // A scrim dims the page behind it (no blur, Miles 5 Nov 2026) and closes it on
 // a press; the page's animations hold still under it
 // (`html[data-wallet-panel-open]`, globals.css). Escape closes it;
@@ -35,8 +33,9 @@ let open = false;
 /** Where the focus lands as the panel opens: the field, or the chooser. */
 let openAt: "search" | "chooser" = "search";
 let trigger: HTMLElement | null = null;
-/** The brand rail's right edge, measured as the panel opens; 0 with no rail. */
-let railRight = 0;
+/** The header launcher's top as the panel opens, so the panel's close lands
+ *  on it under the beta strip too; 16px (the bar's padding) otherwise. */
+let launcherTop = 16;
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 
@@ -44,9 +43,8 @@ const notify = () => listeners.forEach((l) => l());
 export function openWalletPanel(from?: HTMLElement | null, at: "search" | "chooser" = "search") {
   trigger = from ?? (document.activeElement as HTMLElement | null);
   openAt = at;
-  // The rail's right edge, where one is drawn (an app route from md).
-  const rail = document.querySelector<HTMLElement>('aside[data-anatomy="H1"]');
-  railRight = rail && rail.getClientRects().length > 0 ? rail.getBoundingClientRect().right : 0;
+  const launcher = trigger?.closest<HTMLElement>('[data-search-launcher="header"]');
+  launcherTop = launcher ? Math.max(0, Math.round(launcher.getBoundingClientRect().top)) : 16;
   open = true;
   notify();
 }
@@ -160,8 +158,7 @@ export function WalletPanel() {
 
   return createPortal(
     <div
-      className={`fixed inset-y-0 right-0 z-[var(--z-modal)] overflow-hidden ${isOpen ? "" : "pointer-events-none"}`}
-      style={{ left: railRight }}
+      className={`fixed inset-0 z-[var(--z-modal)] overflow-hidden ${isOpen ? "" : "pointer-events-none"}`}
       data-wallet-panel-root=""
     >
       {/* The scrim: the page behind the panel lightened (light) or darkened
@@ -197,13 +194,15 @@ export function WalletPanel() {
           visibility: isOpen ? "visible" : "hidden",
         }}
       >
-        {/* Below `md` there is no rail and the header bar is under the panel,
-            so the panel's top row restates the bar's left end: the Rails mark
+        {/* The header bar is under the panel, so the panel's top row restates
+            the bar's left end: the Rails mark
             with its chevron pointing left, in the bar's launcher box at its
-            place (16px in, 16px down), so the tap that opened the panel closes
+            place (16px in, 24px from md; the launcher's height down, measured as
+            the panel opens, under the beta strip too), so the tap that opened the panel closes
             it in the same spot; and on the right "Home", since the mark no
-            longer goes home below md (ui-jobs 509). */}
-        <div className="flex shrink-0 items-center justify-between px-4 pt-4 md:hidden">
+            longer goes home (ui-jobs 509). The bar's padding, so the box
+            lands on the launcher's place at every width. */}
+        <div className="flex shrink-0 items-center justify-between px-4 md:px-6" style={{ paddingTop: launcherTop }}>
           <button
             type="button"
             onClick={close}
@@ -228,12 +227,8 @@ export function WalletPanel() {
           </Link>
         </div>
         {/* Pinned at the top: the search row, no heading (the field names the
-            panel; Miles, 1 Nov 2026). From `md` the row sits level with the
-            rail's glyph (H15.1), blue while the panel is open, which stands as
-            the row's icon: the rail's 16px top padding, the 30px mark, the
-            12px gap and half the 38px launcher put its centre at 77px, so the
-            48px field starts at 53px. */}
-        <div className="relative z-10 shrink-0 px-5 pb-4 pt-4 md:pt-[53px]">
+            panel; Miles, 1 Nov 2026). */}
+        <div className="relative z-10 shrink-0 px-5 pb-4 pt-4">
           <FrontDoorSearch size="lg" surface="raised" onDone={close} suggest />
         </div>
 

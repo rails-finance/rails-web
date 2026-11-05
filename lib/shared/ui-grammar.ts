@@ -228,8 +228,3 @@ export const POSITION_CARD_FRAME_BOX =
 /** The card's content inset inside the frame. */
 export const POSITION_CARD_PAD = `${CARD_PAD_X} py-4`;
 export const POSITION_CARD_FRAME = `${POSITION_CARD_FRAME_BOX} ${POSITION_CARD_PAD}`;
-
-/** Right padding, from md, for an app page's top row whose right end holds
- *  something: the profile control (H20) stands at the column's top right
- *  there (app/(app)/layout.tsx) and takes the last 28px inside the edge. */
-export const PROFILE_CLEARANCE = "md:pr-10";

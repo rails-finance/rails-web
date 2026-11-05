@@ -17,7 +17,6 @@ import Link from "next/link";
 import { Suspense, use, type CSSProperties } from "react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { WalletHeading } from "@/components/shared/wallet-heading";
-import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
 import { WalletMenu } from "@/components/shared/wallet-menu";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { WalletLookup } from "@/components/shared/wallet-lookup";
@@ -504,7 +503,7 @@ export function WalletView({
           {/* Back's row, as a detail page draws it (H7): the column's first
               line, level with the profile control (H20) at the top right from
               md. With no history Back opens the home page. */}
-          <div className={`flex min-h-[38px] items-center ${PROFILE_CLEARANCE}`} data-anatomy="H7" data-back-row="">
+          <div className={`flex min-h-[38px] items-center`} data-anatomy="H7" data-back-row="">
             <DetailBackButton fallbackHref="/" />
           </div>
           <WalletHeading

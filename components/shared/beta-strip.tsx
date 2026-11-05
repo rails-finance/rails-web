@@ -26,8 +26,8 @@ import { unlaunchedSubject } from "@/components/shared/work-in-progress-strip";
 
 const STORAGE_KEY = "rails-beta-strip-dismissed";
 
-/** The explorers live under app/(app) at /ethereum, /base and /sepolia, which
- *  is where BrandRail is mounted. Everything else is marketing, and gets no strip. */
+/** The explorers live under app/(app) at /ethereum, /base and /sepolia.
+ *  Everything else is marketing, and gets no strip. */
 function isExplorerRoute(pathname: string | null): boolean {
   return /^\/(ethereum|base|sepolia)(\/|$)/.test(pathname ?? "");
 }
@@ -64,7 +64,7 @@ export function BetaStrip() {
     // way WorkInProgressStrip does. bg-sunken is the dark recessed tone
     // (--surface-sunken); no rule under it, and no caution colour: this is
     // information.
-    <div data-anatomy="H14" className="bg-sunken md:pl-14">
+    <div data-anatomy="H14" className="bg-sunken">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-2 text-sm leading-5 text-foreground md:px-6">
         <p className="flex min-w-0 flex-1 items-center justify-between gap-3 leading-5">
           <span className="font-semibold">Rails is in beta.</span>
