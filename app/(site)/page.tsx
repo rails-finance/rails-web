@@ -106,7 +106,7 @@ export default async function Home() {
         <div data-anatomy="S6">
           <div className="max-w-7xl mx-auto px-4 pt-16 pb-16">
             <div className="mb-6">
-              <h2 className="font-sans font-semibold tracking-tight leading-tight mb-10 text-[clamp(24px,3.5vw,38px)]">
+              <h2 className="mb-10 text-3xl font-semibold tracking-tight text-foreground">
                 <span className="marketing">DeFi</span> for everyone
               </h2>
             </div>
