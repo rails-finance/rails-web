@@ -729,8 +729,8 @@ export function SearchLauncher({
       <button
         type="button"
         onClick={(e) => toggleWalletPanel(e.currentTarget, "chooser")}
-        className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-          open ? "text-blue-500" : "text-rb-700 dark:text-rb-300"
+        className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          open ? "text-blue-600 dark:text-blue-400" : "text-rb-700 dark:text-rb-300"
         }`}
         aria-label="Open an explorer"
         aria-expanded={open}
@@ -744,8 +744,8 @@ export function SearchLauncher({
     <button
       type="button"
       onClick={(e) => toggleWalletPanel(e.currentTarget)}
-      className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-        open ? "text-blue-500" : "text-rb-700 dark:text-rb-300"
+      className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+        open ? "text-blue-600 dark:text-blue-400" : "text-rb-700 dark:text-rb-300"
       }`}
       aria-label="Search and explorers"
       aria-expanded={open}

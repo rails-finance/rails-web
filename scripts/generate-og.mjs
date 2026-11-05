@@ -5,9 +5,10 @@
 // Two kinds of card, one renderer:
 //
 //   • public/og/home.png — the site card. It makes a coverage claim, so the
-//     protocol count and the icon row are read straight from
-//     `lib/shared/protocols.ts`, the same roster the home directory and the nav
-//     dropdown render. (The previous card was a hand-made PNG that named two
+//     protocol count is the site's (`LAUNCHED_PRODUCTION_PROTOCOL_VERSION_COUNT`,
+//     imported from `lib/shared/protocols.ts`, the number app/layout.tsx
+//     states), and the icon row is read from the same roster the home
+//     directory and the nav dropdown render. (The previous card was a hand-made PNG that named two
 //     protocols and stayed untrue for thirteen more.)
 //
 //   • public/og/explore-<id>.png — one card PER EXPLORER, keyed by the roster
@@ -26,8 +27,9 @@
 // `lib/shared/coverage.ts` / /coverage); what IS true of every one of them is
 // the foundation, so that is what the home subline states.
 //
-// Run:   node scripts/generate-og.mjs            (writes all cards)
-//        node scripts/generate-og.mjs --check    (exits 1 if a roster card is missing)
+// Run:   pnpm og          (writes all cards)
+//        pnpm check:og    (exits 1 if a roster card is missing)
+// Both run under tsx, which resolves the TypeScript import and its `@/` paths.
 // Needs: playwright (devDependency) + network, for the DM Sans webfont.
 // ============================================================================
 
@@ -36,6 +38,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
+import { LAUNCHED_PRODUCTION_PROTOCOL_VERSION_COUNT } from "../lib/shared/protocols.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const OG_DIR = join(ROOT, "public/og");
@@ -399,18 +402,17 @@ function shellHtml(body) {
 }
 
 // `protocols` here is the LAUNCHED roster, deduplicated to one row per
-// protocol VERSION, testnet included (the card names no chain, so Polaris is
-// one of the count; app/layout.tsx's PROTOCOL_COUNT leaves it out because its
-// sentences name Polaris in words), and the same set a reader can reach from
-// the nav. An unlaunched row (the
-// vault layer — see ProtocolSpec.unlaunched) still gets its own
-// explore-<id>.png (below), but doesn't inflate the home card's coverage
-// claim with a door that isn't open yet, and a second-chain row (a `-base`
-// entry) doesn't inflate it with a version already tiled.
+// protocol VERSION: the set a reader can reach from the nav, which the marquee
+// draws from. An unlaunched row (see ProtocolSpec.unlaunched) still gets its
+// own explore-<id>.png (below), and a second-chain row (a `-base` entry) is a
+// version already tiled. The count in the headline and the "+N" chip is the
+// site's, imported, so the card and app/layout.tsx's PROTOCOL_COUNT cannot
+// disagree: production chains only, Polaris on Sepolia left out.
 function homeHtml(protocols, glyphs) {
   const byId = new Map(protocols.map((p) => [p.id, p]));
   const shown = MARQUEE.map((id) => byId.get(id));
-  const moreCount = protocols.length - shown.length;
+  const count = LAUNCHED_PRODUCTION_PROTOCOL_VERSION_COUNT;
+  const moreCount = count - shown.length;
 
   const tiles = (moreCount > 0 ? shown : protocols)
     .map((p) => `<div class="tile" title="${p.label}">${iconMarkup(p.id, glyphs, p.label)}</div>`)
@@ -421,7 +423,7 @@ function homeHtml(protocols, glyphs) {
     <div class="roster">${tiles + chip}</div>
 
     <h1>Look up a <em>wallet</em> on Rails</h1>
-    <p class="sub">${protocols.length} DeFi protocols, every position replayed from the protocol&rsquo;s own on-chain events</p>`);
+    <p class="sub">${count} DeFi protocols, every position replayed from the protocol&rsquo;s own on-chain events</p>`);
 }
 
 function explorerHtml(p, glyphs) {
@@ -443,9 +445,7 @@ console.log(`roster: ${protocols.length} protocols — ${protocols.map((p) => p.
 if (process.argv.includes("--check")) {
   const missing = protocols.filter((p) => !existsSync(cardOut(p.id))).map((p) => p.id);
   if (missing.length > 0) {
-    console.error(
-      `missing share card(s) for: ${missing.join(", ")} — run \`node scripts/generate-og.mjs\` and commit public/og/`,
-    );
+    console.error(`missing share card(s) for: ${missing.join(", ")} — run \`pnpm og\` and commit public/og/`);
     process.exit(1);
   }
   console.log(`ok: ${protocols.length} explorer cards present`);

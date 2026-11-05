@@ -24,9 +24,9 @@ import { HomeOnlyChainGlyph } from "@/components/icons/chain-glyphs";
 import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-soon";
 
 // Row state grammar, same as the nav menu's:
-//   rest    → text-foreground; hover → blue-500 ("this goes somewhere")
+//   rest    → text-foreground; hover → blue-600, blue-400 in dark ("this goes somewhere")
 //   current → muted + semibold, not clickable (you can't navigate to here)
-const ROW_REST = "font-medium text-foreground hover:text-blue-500";
+const ROW_REST = "font-medium text-foreground hover:text-blue-600 dark:hover:text-blue-400";
 const ROW_CURRENT = "font-semibold text-rb-500 pointer-events-none";
 
 /** One explorer row: icon chip and label, navigating to the listing. */
@@ -143,7 +143,7 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
               type="button"
               onClick={() => setShowAll((v) => !v)}
               aria-expanded={showAll}
-              className="-mx-2 mt-1 cursor-pointer rounded-sm px-2 py-1 text-sm text-blue-500 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
+              className="-mx-2 mt-1 cursor-pointer rounded-sm px-2 py-1 text-sm text-blue-600 dark:text-blue-400 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
               data-chooser-view-all=""
             >
               {showAll ? "Show the most used" : `View all ${all.length} explorers`}
@@ -153,7 +153,7 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
             <Link
               href={`/coverage/${chain.slug}`}
               onClick={onNavigate}
-              className="rounded-sm text-xs text-rb-500 transition-colors hover:text-blue-500 focus-ring"
+              className="rounded-sm text-xs text-rb-500 transition-colors hover:text-blue-600 dark:hover:text-blue-400 focus-ring"
               data-chooser-coverage=""
             >
               See detailed {chain.name} coverage →

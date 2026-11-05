@@ -122,7 +122,7 @@ async function Results({ results, group }: { results: ResultsKey; group?: GroupK
                   </span>
                 )}
               </span>
-              <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-500" aria-hidden="true" />
+              <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
             </Link>
           </li>
         ))}

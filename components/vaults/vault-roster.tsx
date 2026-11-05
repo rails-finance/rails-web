@@ -580,7 +580,7 @@ export function VaultRoster({
             type="button"
             onClick={() => setEmptyOpen((o) => !o)}
             aria-expanded={emptyOpen}
-            className="group/empty flex cursor-pointer items-center gap-2 text-left text-sm font-semibold text-foreground hover:text-blue-500"
+            className="group/empty flex cursor-pointer items-center gap-2 text-left text-sm font-semibold text-foreground hover:text-blue-600 dark:hover:text-blue-400"
           >
             <DisclosureChevron isOpen={emptyOpen} />
             <span data-figure="empty-count">

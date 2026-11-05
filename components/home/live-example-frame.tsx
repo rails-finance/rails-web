@@ -379,7 +379,7 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
             href={LIVE_EXAMPLE_TROVE_PATH}
             className="inline-flex items-center gap-1 rounded-sm bg-rb-100 px-3 py-1 text-xs text-foreground dark:bg-rb-900"
           >
-            View this position live <span className="text-blue-500">→</span>
+            View this position live <span className="text-blue-600 dark:text-blue-400">→</span>
           </Link>
         </div>
       </div>

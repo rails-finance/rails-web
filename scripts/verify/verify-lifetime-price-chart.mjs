@@ -1978,7 +1978,9 @@ async function checkChanges(page, tag, pg, width) {
         .join(","),
     );
   }
-  // The tip: the change's name, its values and its block, in a receipt.
+  // The tip: the change's name, its values and its block, in a receipt. A
+  // scoped <Prov> wears `.prov-locate-box` in every build; `data-prov-covered`
+  // is stamped in development only, so a deployment is read by the class.
   const btn = page.locator(`[data-flows-combined] [data-flow-change="${m.days[0]}"] button`).first();
   await btn.scrollIntoViewIfNeeded();
   if (width < 640) await btn.tap();
@@ -1993,7 +1995,7 @@ async function checkChanges(page, tag, pg, width) {
       block: Number(e.getAttribute("data-flow-change-block")),
       text: e.textContent ?? "",
       links: [...e.querySelectorAll("a[data-flow-change-link]")].map((a) => a.getAttribute("href")),
-      prov: !!e.querySelector("[data-prov-covered], [data-prov-inspect], [data-prov-pickable]"),
+      prov: !!e.querySelector(".prov-locate-box, [data-prov-covered], [data-prov-inspect], [data-prov-pickable]"),
     })),
   );
   const it = items.find((i) => i.day === want.day && i.block === want.block && i.name === want.name);
@@ -2172,7 +2174,7 @@ async function checkChangeRows(page, tag, pg, width) {
       to: e.getAttribute("data-flow-change-to"),
       block: Number(e.getAttribute("data-flow-change-block")),
       links: [...e.querySelectorAll("a[data-flow-change-link]")].map((a) => a.getAttribute("href")),
-      prov: !!e.querySelector("[data-prov-covered], [data-prov-inspect], [data-prov-pickable]"),
+      prov: !!e.querySelector(".prov-locate-box, [data-prov-covered], [data-prov-inspect], [data-prov-pickable]"),
     })),
   );
   const labelOf = (day) => st.markers.find((m) => m.days.includes(day))?.label ?? "";
@@ -3307,7 +3309,7 @@ async function checkPace(page, tag, pg, rows, width) {
         bold: Number(e.getAttribute("data-pace-amount")),
         count: Number(e.getAttribute("data-pace-count")),
         text: e.textContent ?? "",
-        prov: !!e.querySelector("[data-prov-covered], [data-prov-inspect], [data-prov-pickable]"),
+        prov: !!e.querySelector(".prov-locate-box, [data-prov-covered], [data-prov-inspect], [data-prov-pickable]"),
       }))
       .catch(() => null);
     read.push(r);
@@ -3442,7 +3444,8 @@ async function checkLevelReadout(page, tag, now, r, rows) {
       runwayBlock: e.getAttribute("data-runway-block"),
       redeemedBlock: e.getAttribute("data-redeemed-block"),
       redeemedPrice: e.getAttribute("data-redeemed-price"),
-      provs: e.querySelectorAll("[data-prov-covered], [data-prov-inspect], [data-prov-pickable]").length,
+      provs: e.querySelectorAll(".prov-locate-box, [data-prov-covered], [data-prov-inspect], [data-prov-pickable]")
+        .length,
       text: e.textContent,
     }))
     .catch(() => null);
@@ -4339,7 +4342,7 @@ for (const pg of PAGES.filter((p) => !only || only.test(p.id))) {
       const r = await page.$eval("[data-price-readout]", (e) => ({
         day: e.getAttribute("data-price-day"),
         block: e.getAttribute("data-price-block"),
-        prov: !!e.querySelector("[data-prov-covered], [data-prov-inspect], [data-prov-pickable]"),
+        prov: !!e.querySelector(".prov-locate-box, [data-prov-covered], [data-prov-inspect], [data-prov-pickable]"),
         text: e.textContent,
       }));
       const now = Number(await sl.getAttribute("aria-valuenow"));

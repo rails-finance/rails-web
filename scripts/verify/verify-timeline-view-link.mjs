@@ -40,8 +40,8 @@
 //   BASE=http://localhost:3100 node scripts/verify/verify-timeline-view-link.mjs
 
 import { chromium } from "playwright";
+import { BASE, bypassHeaders } from "./lib/host.mjs";
 
-const BASE = process.env.BASE ?? "http://localhost:3000";
 const PAGE = process.env.PAGE ?? "/ethereum/sky-savings/0xef42cf85be6adf3081ada73af87e27996046fe63";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
 
@@ -55,6 +55,7 @@ const browser = await chromium.launch();
 
 async function open(width, url) {
   const ctx = await browser.newContext({
+    extraHTTPHeaders: bypassHeaders(),
     viewport: { width, height: 900 },
     permissions: ["clipboard-read", "clipboard-write"],
   });

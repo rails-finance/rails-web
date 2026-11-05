@@ -23,7 +23,7 @@ const TONE: Record<StartCardTone, { card: string; arrow: string }> = {
   },
   page: {
     card: "hover:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
-    arrow: "self-end text-blue-500 group-hover:translate-x-0.5",
+    arrow: "self-end text-blue-600 dark:text-blue-400 group-hover:translate-x-0.5",
   },
 };
 

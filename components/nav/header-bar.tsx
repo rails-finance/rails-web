@@ -18,7 +18,7 @@ function RailsLogo() {
     <Link
       href="/"
       aria-label="Rails home"
-      className="flex shrink-0 items-center text-foreground transition-colors hover:text-blue-500"
+      className="flex shrink-0 items-center text-foreground transition-colors hover:text-blue-600 dark:hover:text-blue-400"
     >
       <RailsMark size={30} />
     </Link>

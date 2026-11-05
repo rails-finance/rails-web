@@ -98,8 +98,8 @@ type ProtocolSpec = {
    *  pages are drawn from them and an unlaunched explorer is a working one.
    *
    *  Per entry rather than per chain because an unlaunched explorer
-   *  (`sky-savings`; the two vault layers until 20 Oct 2026) is a chain-1 row
-   *  sitting beside twenty launched ones — a chain-level flag could not reach it. No chain carries a flag:
+   *  (the two vault layers until 20 Oct 2026, Sky Savings until 5 Nov 2026) is
+   *  a chain-1 row sitting beside twenty launched ones — a chain-level flag could not reach it. No chain carries a flag:
    *  `launchedChains()` below derives the offered chains from the entries, so
    *  a chain is offered exactly while one of its explorers is launched, with
    *  nothing to keep in step. The six Base explorers launched with phase one
@@ -616,9 +616,6 @@ const SPECS: ProtocolSpec[] = [
     chainId: 1,
     slug: "sky-savings",
     brand: 280,
-    // Held back until the newcomer review loop closes (rails-ops
-    // TO-DO-sky-savings-scoping item 4).
-    unlaunched: true,
     tags: ["Savings"],
     desc: "Every sUSDS holder on Ethereum — the balance, its worth in USDS and the interest earned to the wei, replayed from the token's logs and checked against the contract",
     subPages: [{ segment: "rates", label: "Savings Rate history", tab: "Rate" }],
