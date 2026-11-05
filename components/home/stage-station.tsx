@@ -142,7 +142,7 @@ export function Station({
           </span>
         </span>
         <span
-          className={`body-text col-start-1 row-start-1 text-center text-foreground ${open ? "" : "invisible"}`}
+          className={`body-text col-start-1 row-start-1 text-center ${open ? "" : "invisible"}`}
           aria-hidden={!open}
           data-station-line={id}
         >
