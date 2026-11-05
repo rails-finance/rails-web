@@ -72,14 +72,18 @@ const LIVE_FLOOR = 0.001;
 
 const FIXTURES = JSON.parse(readFileSync(new URL("./fixtures/aave-family-rate-step.json", import.meta.url), "utf8"));
 
-/** The five pages the pins cover, plus the control. `key` is the fixture key. */
+/** The five pages the pins cover, plus the control. `key` is the fixture key.
+ *  Every page opens with `?folders=0`: the notes are drawn over the ungrouped
+ *  events, and with folders on (the default since 2026-09-12, one rule of five
+ *  since decision 0039) a note's ends fall on other touches, which moved the
+ *  pinned ids (5 Nov 2026), as verify-makerdao-rate-step already does. */
 const PAGES = [
   {
     key: "aave-v3-core:0xcaab6ff98989fdd4f47e7db6152e6fb47994ec1e",
     proto: "aave-v3",
     wallet: "0xcaab6ff98989fdd4f47e7db6152e6fb47994ec1e",
     market: "core",
-    url: "/ethereum/aave-v3/0xcaab6ff98989fdd4f47e7db6152e6fb47994ec1e?market=core",
+    url: "/ethereum/aave-v3/0xcaab6ff98989fdd4f47e7db6152e6fb47994ec1e?market=core&folders=0",
     pill: 98,
   },
   {
@@ -87,28 +91,28 @@ const PAGES = [
     proto: "aave-v3",
     wallet: "0x763c12108c37e19d3c23d7348daff7af802893fd",
     market: "core",
-    url: "/ethereum/aave-v3/0x763c12108c37e19d3c23d7348daff7af802893fd?market=core",
+    url: "/ethereum/aave-v3/0x763c12108c37e19d3c23d7348daff7af802893fd?market=core&folders=0",
     pill: 20,
   },
   {
     key: "spark:0x4127143a866bf5d8ad2afb6de8e63164b8ad5bf6",
     proto: "spark",
     wallet: "0x4127143a866bf5d8ad2afb6de8e63164b8ad5bf6",
-    url: "/ethereum/spark/0x4127143a866bf5d8ad2afb6de8e63164b8ad5bf6",
+    url: "/ethereum/spark/0x4127143a866bf5d8ad2afb6de8e63164b8ad5bf6?folders=0",
     pill: 6,
   },
   {
     key: "spark:0x070b8d1f8b63eba95db31c8e85ba536b3474b113",
     proto: "spark",
     wallet: "0x070b8d1f8b63eba95db31c8e85ba536b3474b113",
-    url: "/ethereum/spark/0x070b8d1f8b63eba95db31c8e85ba536b3474b113",
+    url: "/ethereum/spark/0x070b8d1f8b63eba95db31c8e85ba536b3474b113?folders=0",
     pill: 3,
   },
   {
     key: "spark:0xbdfa66802a80ddaf9e8f9579c3befcbee0c5e1b0",
     proto: "spark",
     wallet: "0xbdfa66802a80ddaf9e8f9579c3befcbee0c5e1b0",
-    url: "/ethereum/spark/0xbdfa66802a80ddaf9e8f9579c3befcbee0c5e1b0",
+    url: "/ethereum/spark/0xbdfa66802a80ddaf9e8f9579c3befcbee0c5e1b0?folders=0",
     pill: 1,
   },
 ];
@@ -118,7 +122,7 @@ const CONTROL = {
   proto: "aave-v3",
   wallet: "0x69709a1323fd4d0e6acf86a7804174d61792fbfe",
   market: "core",
-  url: "/ethereum/aave-v3/0x69709a1323fd4d0e6acf86a7804174d61792fbfe?market=core",
+  url: "/ethereum/aave-v3/0x69709a1323fd4d0e6acf86a7804174d61792fbfe?market=core&folders=0",
 };
 
 let failures = 0;
