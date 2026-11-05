@@ -81,8 +81,7 @@ export function HomeHero() {
         style={{ animationDelay: "0.1s" }}
         data-hero-subtitle=""
       >
-        Look up any DeFi position, wallet and protocol, <br className="min-[640px]:hidden" />
-        verified directly from the chain.
+        Look up any DeFi position, wallet and protocol.
       </p>
       <div
         className="relative z-20 mb-12 w-full max-w-2xl px-4 text-left animate-hero-fade-up"
@@ -135,4 +134,6 @@ const TITLE_CQW = 9.5;
 
 // Rendered uppercase by the class on the <p>; the Check icon before each one
 // is the separator.
-const TERMS = ["Independent", "Read-only", "No login"];
+/** The ticked terms (ui-jobs 509): "Chain verified" took the promise line's
+ *  "verified directly from the chain" and Independent's place. */
+const TERMS = ["Read-only", "Chain verified", "No login"];
