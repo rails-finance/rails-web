@@ -363,6 +363,9 @@ const WSTETH_B_LAST_TWO = [
 const ETH_A_PIN_BLOCK = 25596295;
 const ETH_A_PIN_SETS = 53;
 
+/** Stretches the old 1 pp rule yields that ended after the plan was written:
+ *  §2c holds today's data to the plan's table plus these. */
+const PLAN_SINCE_28699 = [[26128923, 26247453, 10.25, 11.25, 1.0]];
 /** The plan's own §1b tables (2026-09-06), under the 1 pp rule. §2c applies the
  *  old rule to today's data and requires these exactly, which is what shows the
  *  index has not drifted under the pins below. */
@@ -414,6 +417,10 @@ const STRETCHES_28699 = [
   [23524448, 24392332, 8.5, 8.75, 0.25],
   [24392499, 25255186, 8.75, 9.25, 0.5],
   [25256129, 25917081, 9.25, 10.25, 1.0],
+  // Re-pinned 5 Nov 2026: the vault was touched at 26,247,453, after
+  // governance raised WSTETH-B to 11.25% (the Jug reads 10.25% at
+  // 26,128,923 and 11.25% at 26,247,453).
+  [26128923, 26247453, 10.25, 11.25, 1.0],
 ];
 const STRETCHES_16745 = [
   [11465814, 11631925, 2.0, 2.5, 0.5],
@@ -455,7 +462,7 @@ const MERGED_28699 = [
   { from: 19936166, to: 20323030, fromPct: 9.0, toPct: 8.0, dpp: -1.0, steps: 1, sets: 1, ordinalSpan: 1 },
   { from: 20394878, to: 21374251, fromPct: 8.0, toPct: 13.5, dpp: 5.5, steps: 1, sets: 4, ordinalSpan: 4 },
   { from: 21374251, to: 22158643, fromPct: 13.5, toPct: 6.75, dpp: -6.75, steps: 3, sets: 3, ordinalSpan: 3 },
-  { from: 22676311, to: 25917081, fromPct: 6.75, toPct: 10.25, dpp: 3.5, steps: 4, sets: 10, ordinalSpan: 10 },
+  { from: 22676311, to: 26247453, fromPct: 6.75, toPct: 11.25, dpp: 4.5, steps: 5, sets: 11, ordinalSpan: 11 },
 ];
 const MERGED_16745 = [
   { from: 11465814, to: 12078235, fromPct: 2.0, toPct: 5.5, dpp: 3.5, steps: 3, sets: 4, ordinalSpan: 4 },
@@ -732,7 +739,7 @@ const r16745 = computeNotes(tl16745.events, etha.sets, "ETH-A");
 const r31168 = computeNotes(tl31168.events, wsteth.sets, "WSTETH-B");
 
 check(
-  "2. vault 28699's 15 stretches match the pinned table exactly (from/to/fees/Δ) — every fee change between its touches, two of them at 0%",
+  "2. vault 28699's 16 stretches match the pinned table exactly (from/to/fees/Δ) — every fee change between its touches, two of them at 0%",
   tableMatches(r28699.steps, STRETCHES_28699),
   `${r28699.steps.length} stretches: ${r28699.steps.map((n) => `${n.fromBlock}→${n.toBlock} ${n.deltaPp.toFixed(2)}`).join(", ")}`,
 );
@@ -751,8 +758,9 @@ const old16745 = computeNotes(tl16745.events, etha.sets, "ETH-A", {
   minPp: OLD_RATE_STEP_MIN_PP - OLD_RATE_TRUNCATION_SLACK_PP,
 });
 check(
-  "2c. the old 1 pp rule applied to today's data still yields the plan's 10 stretches on 28699 and 14 on 16745 — the rule moved, not the index",
-  tableMatches(old28699.steps, PLAN_STRETCHES_28699) && tableMatches(old16745.steps, PLAN_STRETCHES_16745),
+  "2c. the old 1 pp rule applied to today's data still yields the plan's 10 stretches on 28699 (and the one since) and 14 on 16745 — the rule moved, not the index",
+  tableMatches(old28699.steps, [...PLAN_STRETCHES_28699, ...PLAN_SINCE_28699]) &&
+    tableMatches(old16745.steps, PLAN_STRETCHES_16745),
   `28699 ${old28699.steps.length}, 16745 ${old16745.steps.length}`,
 );
 const underPoint = (r) => r.steps.filter((n) => Math.abs(n.deltaPp) < 1 - OLD_RATE_TRUNCATION_SLACK_PP);
@@ -764,7 +772,7 @@ check(
 );
 // ── 2e/2f. the collapse, replayed over those same stretches ────────────────
 check(
-  "2e. 28699's 15 stretches merge into the 6 pinned runs (1, 5, 1, 1, 3, 4 steps), each from its first member's earlier touch to its last member's later one",
+  "2e. 28699's 16 stretches merge into the 6 pinned runs (1, 5, 1, 1, 3, 5 steps), each from its first member's earlier touch to its last member's later one",
   mergedMatches(r28699.notes, MERGED_28699) && r28699.notes.reduce((n, x) => n + x.steps, 0) === STRETCHES_28699.length,
   showMerged(r28699.notes),
 );
@@ -796,21 +804,21 @@ const sumVsSpan = (notes, want) =>
   want.every((w, i) => notes[i]?.sets === w.sets && notes[i]?.ordinalSpan === w.ordinalSpan);
 const allSumEqSpan = (r) => r.notes.every((n) => n.sets === n.ordinalSpan);
 check(
-  "2f. setsBetween on a merged note is the MEMBERS' SUM, pinned beside the two ends' ordinal difference — equal on every note now, because every change is a stretch and no run skips a pair (28699's four-step run: 10 and 10; 16745's two-step run: 7 and 7)",
+  "2f. setsBetween on a merged note is the MEMBERS' SUM, pinned beside the two ends' ordinal difference — equal on every note now, because every change is a stretch and no run skips a pair (28699's five-step run: 11 and 11; 16745's two-step run: 7 and 7)",
   sumVsSpan(r28699.notes, MERGED_28699) &&
     sumVsSpan(r16745.notes, MERGED_16745) &&
     allSumEqSpan(r28699) &&
     allSumEqSpan(r16745) &&
-    r28699.notes[5]?.sets === 10 &&
+    r28699.notes[5]?.sets === 11 &&
     r16745.notes[4]?.sets === 7,
-  `28699 run×4 sum ${r28699.notes[5]?.sets} vs span ${r28699.notes[5]?.ordinalSpan}; 16745 run×2 sum ${r16745.notes[4]?.sets} vs span ${r16745.notes[4]?.ordinalSpan}`,
+  `28699 run×5 sum ${r28699.notes[5]?.sets} vs span ${r28699.notes[5]?.ordinalSpan}; 16745 run×2 sum ${r16745.notes[4]?.sets} vs span ${r16745.notes[4]?.ordinalSpan}`,
 );
 // The interest slice on a merged note: the FIRST member's debt, held fixed and
 // priced at the two ENDS' fees — not the last member's debt, and not a sum.
-const run28699 = r28699.notes[5]; // 22,676,311 → 25,917,081, four steps
+const run28699 = r28699.notes[5]; // 22,676,311 → 26,247,453, five steps
 const firstMember28699 = r28699.steps.find((s) => s.fromBlock === run28699?.fromBlock);
 check(
-  "2g. the merged interest slice is the FIRST member's debt priced at the run's two ends (≈155.4K DAI at 6.75% → 10.25%), not the last member's",
+  "2g. the merged interest slice is the FIRST member's debt priced at the run's two ends (≈155.4K DAI at 6.75% → 11.25%), not the last member's",
   run28699?.interest != null &&
     firstMember28699?.interest != null &&
     near(run28699.interest.debt, firstMember28699.interest.debt, 0.01) &&
@@ -870,9 +878,10 @@ const chain28699 = await api("/api/chain/makerdao/vault/28699");
 const live28699 = chain28699.state;
 
 // Whether a live (-head) row is drawn depends on the fee now against the fee at
-// the vault's last event (10.25%): it is not while they are equal, and is the
+// the vault's last event (11.25% since 26,247,453): it is not while they are equal, and is the
 // moment governance moves WSTETH-B's fee. Read from the route before the page.
-const flatLive = near(live28699.stabilityFeeApr * 100, 10.25, 0.01);
+const LAST_EVENT_FEE_28699 = STRETCHES_28699[STRETCHES_28699.length - 1][3];
+const flatLive = near(live28699.stabilityFeeApr * 100, LAST_EVENT_FEE_28699, 0.01);
 const heads28699 = flatLive ? 0 : 1;
 const notes28699 = MERGED_28699.length + heads28699;
 
@@ -886,7 +895,7 @@ const ids28699 = await page
 const hist28699 = ids28699.filter((i) => !i.endsWith("-head"));
 const head28699 = ids28699.filter((i) => i.endsWith("-head"));
 check(
-  `3. 28699 shows the ${MERGED_28699.length} pinned historical rows — its 15 stretches merged — and ${flatLive ? "no -head row (the fee is flat)" : "exactly ONE -head row"}, with every timeline row drawn`,
+  `3. 28699 shows the ${MERGED_28699.length} pinned historical rows — its 16 stretches merged — and ${flatLive ? "no -head row (the fee is flat)" : "exactly ONE -head row"}, with every timeline row drawn`,
   expanded28699 && hist28699.length === MERGED_28699.length && head28699.length === heads28699,
   `${hist28699.length} historical, ${head28699.length} live: ${ids28699.join(", ")}`,
 );
@@ -912,12 +921,12 @@ const headLocator = page.locator(`[data-market-note$="-head"]`).first();
 const headFlat = ((await headLocator.count()) ? ((await headLocator.textContent()) ?? "") : "").replace(/\s+/g, " ");
 // 2026-09-30 (MakerDAO newcomer r4, P5): a live note whose fee equals the fee
 // at the vault's last event states no change, so it is not drawn. 28699's fee
-// is 10.25% at its last event; while the Jug still reads that, no head row —
+// is 11.25% at its last event; while the Jug still reads that, no head row —
 // and once governance moves it, exactly one.
 check(
   flatLive
-    ? "3c. the fee now equals the fee at the last event (10.25%, the vault route's stabilityFeeApr), so no live row is drawn"
-    : "3c. the fee now differs from the fee at the last event (10.25%), so exactly one live row is drawn",
+    ? "3c. the fee now equals the fee at the last event (11.25%, the vault route's stabilityFeeApr), so no live row is drawn"
+    : "3c. the fee now differs from the fee at the last event (11.25%), so exactly one live row is drawn",
   flatLive ? headFlat === "" : headFlat !== "",
   `head row "${headFlat.slice(0, 120)}"; route stabilityFeeApr ${live28699.stabilityFeeApr}`,
 );
@@ -960,10 +969,10 @@ check(
   `elapsed in lead line ${elapsedStated}, blockTimestamp ${live28699.blockTimestamp}`,
 );
 
-const pinned = r28699.notes[r28699.notes.length - 1]; // the four-step run 22,676,311 → 25,917,081
+const pinned = r28699.notes[r28699.notes.length - 1]; // the five-step run 22,676,311 → 26,247,453
 const pinnedText = openTexts.find((t) => t.includes(blk(pinned.fromBlock)) && t.includes(blk(pinned.toBlock)));
 check(
-  "3f. the merged 22,676,311 → 25,917,081 note states 6.75% → 10.25% and the interest slice its FIRST member's debt carries at those two fees (≈10,489 → 15,928 DAI on ≈155,396)",
+  "3f. the merged 22,676,311 → 26,247,453 note states 6.75% → 11.25% and the interest slice its FIRST member's debt carries at those two fees (≈10,489 → 17,482 DAI on ≈155,396)",
   pinnedText != null &&
     pinnedText.includes(ratePct(pinned.rateA)) &&
     pinnedText.includes(ratePct(pinned.rateB)) &&
@@ -972,7 +981,7 @@ check(
     pinnedText.includes(stableAmount(pinned.interest.after)) &&
     near(pinned.interest.debt, 155396, 155396 * 0.005) &&
     near(pinned.interest.before, 10489, 10489 * 0.005) &&
-    near(pinned.interest.after, 15928, 15928 * 0.005),
+    near(pinned.interest.after, 17482, 17482 * 0.005),
   pinnedText
     ? `debt ${pinned.interest.debt.toFixed(0)} before ${pinned.interest.before.toFixed(0)} after ${pinned.interest.after.toFixed(0)}`
     : "note not found once opened",

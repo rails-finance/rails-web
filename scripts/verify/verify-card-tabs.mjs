@@ -393,7 +393,13 @@ for (const s of SUBJECTS.slice(0, 2)) {
         t2: !!t2,
         t3: !!t3,
         sheet: !!sh,
-        strip: document.querySelectorAll('[data-card-tab], [data-card-tab-open], [role="tablist"] [role="tab"]').length,
+        // Scoped to the card: the nav drawer's explorer chooser is a tablist
+        // too (role=tablist aria-label="Blockchain", explorer-chooser.tsx).
+        strip: t2
+          ? t2.querySelectorAll(
+              '[data-card-tab], [data-card-tab-open], [role="tablist"]:not([aria-label="Blockchain"]) [role="tab"]',
+            ).length
+          : -1,
         t3First: !!t3 && !!sh && !!(t3.compareDocumentPosition(sh) & Node.DOCUMENT_POSITION_FOLLOWING),
         t3Above: !!t3 && !!sh && t3.getBoundingClientRect().bottom <= sh.getBoundingClientRect().top + 0.5,
       };

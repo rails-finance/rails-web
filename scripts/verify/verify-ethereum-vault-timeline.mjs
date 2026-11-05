@@ -262,6 +262,7 @@ import { fileURLToPath } from "node:url";
 import { enGb } from "./lib/date.mjs";
 import { showNoteRows } from "./lib/market-notes.mjs";
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
+import { pageBlockRecent, serverHeadBlock } from "./lib/server-head.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 // The lane the timeline's sweeps are EXPECTED to name — the env var's name,
@@ -308,10 +309,12 @@ const FIXTURES = [
   {
     label: "sGHO / a Safe, transfer-heavy",
     vault: SGHO,
-    holder: "0x1676d23711186076fa74aa53511dda750a1f0d9a",
     // The transfer branch's fixture: a timeline that only knows mints and burns
-    // draws this one wrong, and no other fixture would catch it.
-    expect: { mints: true, burns: false, transfers: true, cooldowns: false },
+    // draws this one wrong, and no other fixture would catch it. Replaced
+    // 2026-11-05 (ui-jobs 506): 0x1676…0d9a exited. This Safe holds, and its
+    // ten rows are all transfers, seven out and three in (the vault census).
+    holder: "0x2ea450a8a15d4f5a6535d46a45f4de9dffc33716",
+    expect: { mints: false, burns: false, transfers: true, cooldowns: false },
   },
   {
     label: "waEthUSDC / the 6-decimal share token",
@@ -707,7 +710,7 @@ await showNoteRows(context);
 async function readPage(vault, holder, { expandRows = false } = {}) {
   const page = await context.newPage();
   const url = `${BASE}/ethereum/aave/vaults/${vault}${holder ? `/${holder}` : ""}`;
-  const res = await page.goto(url, { waitUntil: "networkidle" });
+  const res = await page.goto(url, { waitUntil: "networkidle", timeout: 180_000 });
   const status = res?.status() ?? 0;
   if (status !== 200) {
     await page.close();
@@ -756,14 +759,17 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
     els.map((e) => {
       // A note row stands inside its gap's wrapper (`data-note-gap`); the
       // row it sits under is the wrapper's neighbour.
+      // A closed group (decision 0039's run of five) draws no member rows, so
+      // a note under one is anchored to the group itself.
       let prev = (e.closest("[data-note-gap]") ?? e).previousElementSibling;
       const eventIn = (el) => (el.matches("[data-event-id]") ? el : el.querySelector("[data-event-id]"));
-      while (prev && !eventIn(prev)) prev = prev.previousElementSibling;
-      const anchor = (prev && eventIn(prev)) ?? e.parentElement?.querySelector("[data-event-id]");
+      const anchorIn = (el) => eventIn(el) ?? (el.matches("[data-group-frame]") ? el : null);
+      while (prev && !anchorIn(prev)) prev = prev.previousElementSibling;
+      const anchor = (prev && anchorIn(prev)) ?? e.parentElement?.querySelector("[data-event-id]");
       return {
         id: e.getAttribute("data-market-note") ?? "",
         text: e.innerText.replace(/\s+/g, " ").trim(),
-        after: anchor?.getAttribute("data-event-id") ?? null,
+        after: anchor?.getAttribute("data-event-id") ?? (anchor?.matches("[data-group-frame]") ? "group" : null),
       };
     }),
   );
@@ -912,18 +918,24 @@ if (bad0a.length) {
   process.exit(1);
 }
 
-const bad0b = FIXTURES.filter((f) => {
-  const b = PAGES.get(`${f.vault}:${f.holder}`).blockNumber;
-  return !b || Number(head) - b > 40 || b > Number(head) + 4;
-});
+// The page reads its head through rails-server first, so it is held against
+// rails-server's head, or this script's own where it fell back to the chain
+// (lib/server-head.mjs; under run-all's proxy the own head is the run's pin).
+const serverHead0b = await serverHeadBlock(env, 1);
+const recent0b = FIXTURES.map((f) => ({
+  f,
+  r: pageBlockRecent({
+    page: PAGES.get(`${f.vault}:${f.holder}`).blockNumber,
+    server: serverHead0b,
+    own: Number(head),
+    tolerance: 40,
+  }),
+}));
+const bad0b = recent0b.filter((x) => !x.r.ok);
 check(
-  "0b each page states a block near this script's own head",
+  "0b each page states a recent block: near rails-server's head, or this script's own",
   bad0b.length === 0,
-  bad0b.length
-    ? bad0b
-        .map((f) => `${short(f.vault)} page ${PAGES.get(`${f.vault}:${f.holder}`).blockNumber} vs own head ${head}`)
-        .join(", ")
-    : `head ${head}`,
+  (bad0b.length ? bad0b : recent0b.slice(0, 1)).map((x) => `${short(x.f.vault)} ${x.r.detail}`).join(", "),
 );
 
 const bad0c = FIXTURES.filter((f) => {

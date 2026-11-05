@@ -199,6 +199,11 @@ const SKIPS = {
     "dolomite_scratch DB pinned at block 25543616 (rails-server-onboarding). Its " +
     "listing/detail assertions read that pinned index, so a plain dev server " +
     "cannot answer them.",
+  "verify-ctrl-waking.mjs":
+    "needs a production build (next build && next start): under next dev the bundle is unminified and " +
+    "compiled on demand, so B and D read red on main and preview alike. Run it by hand against a local " +
+    "production build: against rails.finance on 5 Nov 2026 A–C passed and D read one grey blink on the " +
+    "timeline toolbar (over the network; whether that is the network or a real blink is unread).",
   "verify-queued-export.mjs":
     "live only: requests queued exports from the deployed site and the onboarding box " +
     "(BASE=https://rails.finance), spends test readers' daily quota, and with " +

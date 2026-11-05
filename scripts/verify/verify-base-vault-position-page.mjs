@@ -250,6 +250,10 @@ const env = Object.fromEntries(
     .filter((l) => l.includes("=") && !l.trim().startsWith("#"))
     .map((l) => [l.slice(0, l.indexOf("=")).trim(), l.slice(l.indexOf("=") + 1).trim()]),
 );
+// The file's own log lane, before the environment overrides it: the chain's
+// `finalized` is read there (ownFinalized), since run-all's proxy pins the tag
+// to the run's start while the page's loader takes it from rails-server's head.
+const FILE_LOGS_LANE = env.BASE_BACKFILL_RPC_URL;
 // A value already set in the environment (run-all's cache lanes) wins; the file is the fallback.
 for (const [k, v] of Object.entries(process.env)) if (v) env[k] = v;
 if (!env.BASE_RPC_URL) throw new Error("need BASE_RPC_URL in .env.local");
@@ -402,12 +406,12 @@ const n = (v) => v.toLocaleString("en-US");
 // ⚠️ A REFUSAL ON RESPONSE SIZE IS A CHAIN ANSWER AND MUST STILL THROW: T12
 // reads it as the finding. It is distinguished from a transport failure by its
 // own JSON-RPC error, which is carried on the thrown error as `rpcCode`.
-async function rpcLogs(method, params, { attempts = 6 } = {}) {
+async function rpcLogs(method, params, { attempts = 6, url = env.BASE_BACKFILL_RPC_URL } = {}) {
   let wait = 1500;
   for (let attempt = 1; ; attempt++) {
     let res;
     try {
-      res = await fetch(env.BASE_BACKFILL_RPC_URL, {
+      res = await fetch(url ?? env.BASE_BACKFILL_RPC_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jsonrpc: "2.0", id: attempt, method, params }),
@@ -440,7 +444,7 @@ const getLogs = (address, topics, fromBlock, toBlock) =>
  *  On Base the tag STEPS rather than creeping, so the distance behind head is
  *  a chain answer and never a constant this script could assume. */
 async function ownFinalized() {
-  const block = await rpcLogs("eth_getBlockByNumber", ["finalized", false]);
+  const block = await rpcLogs("eth_getBlockByNumber", ["finalized", false], { url: FILE_LOGS_LANE });
   return Number(BigInt(block.number));
 }
 
@@ -1389,25 +1393,46 @@ check(
 // ═══ T6 — THE FLOOR PATH ══════════════════════════════════════════════════
 const r6 = await readRoute(routeUrl(F_B4));
 const t6 = r6.json.timeline;
-check(
-  "T6a F-B4 takes the floor path: a lower-bound count, no gate, and no rows",
-  t6.coverage.logCountIsLowerBound === true &&
-    t6.coverage.withheldAbove > HORIZON &&
-    t6.reconcile === null &&
-    t6.events.length === 0,
-  `lowerBound ${t6.coverage.logCountIsLowerBound}, floor ${t6.coverage.withheldAbove}, reconcile ${JSON.stringify(t6.reconcile)}, ${t6.events.length} rows`,
-);
+// Since 799608c8 the sweep comes from rails-server's holder-logs route, which
+// hands F-B4's life over whole where the chain lane refuses it: the page then
+// states the EXACT count above the horizon, reconciled, and draws no rows.
+// Only a sweep that falls to the lane takes the floor path checked below it.
 const p6 = await pageRead(browser, pageUrl(F_B4));
-check(
-  "T6b the page says 'at least' that count and states NO count as a fact",
-  /at least/.test(p6.horizonText) &&
-    p6.horizonText.includes(n(t6.coverage.withheldAbove)) &&
-    /a floor rather than a census/.test(p6.horizonText) &&
-    p6.paintedEvents === 0 &&
-    !p6.towerPresent &&
-    !p6.reconciledText,
-  `"${p6.horizonText.replace(/\s+/g, " ").slice(0, 170)}"`,
-);
+if (t6.coverage.logCountIsLowerBound === false) {
+  check(
+    "T6a F-B4 states an exact count above the horizon, reconciled, with no rows (rails-server's sweep)",
+    t6.coverage.withheldAbove > HORIZON &&
+      t6.reconcile?.reconciled === true &&
+      t6.reconcile.logsIn + t6.reconcile.logsOut === t6.coverage.withheldAbove &&
+      t6.events.length === 0,
+    `withheldAbove ${t6.coverage.withheldAbove}, reconcile ${JSON.stringify(t6.reconcile)}, ${t6.events.length} rows`,
+  );
+  check(
+    "T6b the page states that count without 'at least', draws no rows, and says it reconciles",
+    !/at least/.test(p6.horizonText) &&
+      p6.horizonText.includes(n(t6.coverage.withheldAbove)) &&
+      /reconcil/i.test(p6.horizonText) &&
+      p6.paintedEvents === 0 &&
+      !p6.towerPresent,
+    `"${p6.horizonText.replace(/\s+/g, " ").slice(0, 170)}"`,
+  );
+} else {
+  check(
+    "T6a F-B4 takes the floor path: a lower-bound count, no gate, and no rows",
+    t6.coverage.withheldAbove > HORIZON && t6.reconcile === null && t6.events.length === 0,
+    `lowerBound ${t6.coverage.logCountIsLowerBound}, floor ${t6.coverage.withheldAbove}, reconcile ${JSON.stringify(t6.reconcile)}, ${t6.events.length} rows`,
+  );
+  check(
+    "T6b the page says 'at least' that count and states NO count as a fact",
+    /at least/.test(p6.horizonText) &&
+      p6.horizonText.includes(n(t6.coverage.withheldAbove)) &&
+      /a floor rather than a census/.test(p6.horizonText) &&
+      p6.paintedEvents === 0 &&
+      !p6.towerPresent &&
+      !p6.reconciledText,
+    `"${p6.horizonText.replace(/\s+/g, " ").slice(0, 170)}"`,
+  );
+}
 const t6Tail1 = await readTail(F_B4);
 await pageRead(browser, pageUrl(F_B4));
 await new Promise((r) => setTimeout(r, 4000));
@@ -1738,10 +1763,11 @@ check(
 );
 const r12 = await readRoute(routeUrl(F_B8));
 const t12 = r12.json.timeline;
+// F-B8's count is exact when rails-server's sweep answers it (reconciled) and a
+// floor when the sweep fell to the lane (no gate); either way nothing is stored.
 check(
-  "T12c F-B8 takes the floor path and stores nothing, and F-B5 — not refused — states an EXACT count",
-  t12.coverage.logCountIsLowerBound === true &&
-    t12.reconcile === null &&
+  "T12c F-B8 states its count (exact and reconciled from rails-server, or a floor with no gate) and stores nothing, and F-B5 states an EXACT count",
+  (t12.coverage.logCountIsLowerBound === true ? t12.reconcile === null : t12.reconcile?.reconciled === true) &&
     t12.history.storedThisRequest === false &&
     t5.coverage.logCountIsLowerBound === false,
   `F-B8 floor ${t12.coverage.withheldAbove} lowerBound ${t12.coverage.logCountIsLowerBound}; F-B5 exact ${t5.coverage.logCount}`,

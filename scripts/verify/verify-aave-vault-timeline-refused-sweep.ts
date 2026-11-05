@@ -1,5 +1,6 @@
-// A sweep chain 1's logs lane REFUSES comes back as a stated floor, not as an
-// unread history. Run: `npx tsx scripts/verify/verify-aave-vault-timeline-refused-sweep.ts`
+// A sweep chain 1's logs lane REFUSES comes back as a stated count, never as an
+// unread history: exact when rails-server's holder-logs route hands it over
+// (the usual case since the vault loaders read it first), a floor otherwise. Run: `npx tsx scripts/verify/verify-aave-vault-timeline-refused-sweep.ts`
 // ----------------------------------------------------------------------------
 // The loader is called directly rather than through a page, because what is
 // under test is the loader's own branch: chain 1's logs lane will not answer a
@@ -86,18 +87,26 @@ async function main() {
     t.coverage.withheldAbove != null && t.coverage.withheldAbove > HORIZON,
     `withheldAbove ${t.coverage.withheldAbove}, horizon ${HORIZON}`,
   );
-  check(
-    "the count is marked a LOWER BOUND",
-    t.coverage.logCountIsLowerBound === true,
-    `logCountIsLowerBound ${t.coverage.logCountIsLowerBound}`,
-  );
   check("no rows are drawn", t.events.length === 0, `${t.events.length} rows`);
   check("nothing is offered to the store", refused.store === null, `store ${refused.store === null ? "null" : "set"}`);
-  check(
-    "no gate is claimed to have run",
-    t.reconcile === null,
-    "a floor has no logs to replay, so a reconcile object would be a check that did not happen",
-  );
+  // The sweep comes from rails-server's holder-logs route first (the
+  // loader's header), which hands this life over whole where the chain lane
+  // refuses it. Then the count is EXACT and the balance gate ran on it; only
+  // when that route does not answer does the loader fall to the lane, and the
+  // count is a floor with no gate.
+  if (t.coverage.logCountIsLowerBound) {
+    check(
+      "no gate is claimed to have run (the lane's floor)",
+      t.reconcile === null,
+      "a floor has no logs to replay, so a reconcile object would be a check that did not happen",
+    );
+  } else {
+    check(
+      "the whole life came from rails-server: the count is exact and reconciles wei-exact",
+      t.reconcile?.reconciled === true && t.reconcile.logsIn + t.reconcile.logsOut === t.coverage.withheldAbove,
+      `withheldAbove ${t.coverage.withheldAbove}, reconcile ${JSON.stringify(t.reconcile)}`,
+    );
+  }
 
   const { data: oData, result: ordinary, ms: oMs } = await read(ORDINARY);
   const o = ordinary.timeline;
