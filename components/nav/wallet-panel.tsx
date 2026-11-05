@@ -13,9 +13,9 @@
 // and the two read as one piece of chrome, on every page (the site's too,
 // ui-jobs 498); below md (no rail) it starts at the viewport's edge and takes
 // the full width there.
-// A scrim dims and blurs the page behind it and closes it on a press; the blur
-// is drawn only while the panel is open, and the page's animations hold still
-// under it (`html[data-wallet-panel-open]`, globals.css). Escape closes it;
+// A scrim dims the page behind it (no blur, Miles 5 Nov 2026) and closes it on
+// a press; the page's animations hold still under it
+// (`html[data-wallet-panel-open]`, globals.css). Escape closes it;
 // focus moves in on open, stays inside while open and returns to the trigger.
 //
 // Open state is a small store, so every trigger reads and sets the same panel,
@@ -165,21 +165,15 @@ export function WalletPanel() {
       data-wallet-panel-root=""
     >
       {/* The scrim: the page behind the panel lightened (light) or darkened
-          (dark) and blurred; a press closes it. Hidden once its fade out has
-          run, so the blur costs nothing while the panel is shut. */}
+          (dark); a press closes it. */}
       <div
         aria-hidden="true"
         onClick={close}
         data-anatomy="H16.1"
-        className="absolute inset-0 bg-white/60 backdrop-blur-[4px] dark:bg-black/60"
+        className="absolute inset-0 bg-white/60 dark:bg-black/70"
         style={{
           opacity: isOpen ? 1 : 0,
-          visibility: isOpen ? "visible" : "hidden",
-          transition: still
-            ? "none"
-            : isOpen
-              ? `opacity ${EASE_IN}, visibility 0s`
-              : `opacity ${EASE_OUT}, visibility 0s linear ${OUT_MS}ms`,
+          transition: still ? "none" : `opacity ${isOpen ? EASE_IN : EASE_OUT}`,
         }}
       />
       <div
