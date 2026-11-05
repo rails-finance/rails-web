@@ -16,6 +16,7 @@ import { RecencyStamp } from "@/components/shared/recency-stamp";
 import { collateralPriceInfo } from "@/lib/liquity/trove-page-words";
 import { chainMeta } from "@/lib/shared/chains";
 import { protocolForPathname } from "@/lib/shared/protocols";
+import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 
 /**
  * Live example frame — the hero's proof-by-showing: the Trove page's body
@@ -202,22 +203,92 @@ function useGlowPause() {
   return ref;
 }
 
+type SampleMode = "pending" | "framed" | "layered" | "single-card" | "single-flows";
+
 /** Which sample a reader sees, decided after mount: below sm the layered
- *  slices, from sm the framed page. `?sample=classic` on a dev server shows the
- *  framed page on a phone too, for side-by-side review (temporary, Miles 5 Nov
- *  2026). */
-function useSampleMode(): "pending" | "framed" | "layered" {
-  const [mode, setMode] = useState<"pending" | "framed" | "layered">("pending");
+ *  slices, from sm the framed page. On a dev server `?sample=` picks another
+ *  phone sample for side-by-side review (temporary, Miles 5 Nov 2026):
+ *  `classic` the framed page, `single` or `single-flows` the Lifetime flows
+ *  panel alone, `single-card` the position card alone. */
+function useSampleMode(): SampleMode {
+  const [mode, setMode] = useState<SampleMode>("pending");
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 639px)");
-    const classic =
-      process.env.NODE_ENV !== "production" && new URLSearchParams(window.location.search).get("sample") === "classic";
-    const set = () => setMode(mq.matches && !classic ? "layered" : "framed");
+    const asked =
+      process.env.NODE_ENV !== "production" ? new URLSearchParams(window.location.search).get("sample") : null;
+    const phone: SampleMode =
+      asked === "classic"
+        ? "framed"
+        : asked === "single-card"
+          ? "single-card"
+          : asked === "single" || asked === "single-flows"
+            ? "single-flows"
+            : "layered";
+    const set = () => setMode(mq.matches ? phone : "framed");
     set();
     mq.addEventListener("change", set);
     return () => mq.removeEventListener("change", set);
   }, []);
   return mode;
+}
+
+/** The glow behind a phone sample's card, as the framed sample draws it round
+ *  its frame: a warm shadow in light, the turning glow in dark. Fills its
+ *  positioned parent, behind it. */
+function CardGlow() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 rounded-2xl">
+      <div
+        className="absolute inset-0 rounded-2xl dark:hidden"
+        style={{ boxShadow: "0 24px 80px -12px rgba(40, 33, 20, 0.24), 0 8px 30px rgba(40, 33, 20, 0.12)" }}
+      />
+      <div className="absolute inset-0 hidden dark:block">
+        {GLOW_STOPS.map((colour, slot) => (
+          <div
+            key={colour}
+            className="live-glow-layer absolute inset-0 rounded-2xl"
+            style={{ boxShadow: glowShadow(colour), ["--glow-slot" as string]: slot }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** The full-width link under a single phone sample: the CTA pill, a 48px
+ *  tap target across the column. */
+const SINGLE_BUTTON = PILL_CTA_BLUE.replace("inline-flex", "flex w-full justify-center")
+  .replace("px-4 py-2", "px-4 py-3.5")
+  .replace("text-sm", "text-base");
+
+/** Below sm, on review: one component at its real size, as the position page
+ *  draws it at phone width, live and interactive (its receipts and tooltips
+ *  answer); a label line over it naming the position, and the link to it under
+ *  it. */
+function SingleSample({ data, which }: { data: WireLiveExample | null; which: "card" | "flows" }) {
+  const glowRef = useGlowPause();
+  const collSymbol = useMemo(() => (data ? unpackLiveExample(data).trove.collateralType : null), [data]);
+  return (
+    <div className="px-4 sm:hidden" data-live-single={which}>
+      <p className="mb-3 flex items-center gap-2 text-xs text-rb-500">
+        {EXAMPLE_ENTRY && <ProtocolIcon id={EXAMPLE_ENTRY.id} className="h-4 w-4 shrink-0" />}
+        <span className="font-medium text-foreground">
+          {EXAMPLE_ENTRY?.label ?? "Liquity V2"}
+          {collSymbol && ` · ${collSymbol} trove`}
+        </span>
+        <span className="ml-auto">
+          <RecencyStamp compact />
+        </span>
+      </p>
+      <div ref={glowRef} className="live-glow relative isolate" data-live-slice={which}>
+        <CardGlow />
+        {data && <HeroTroveComposition wire={data} only={which} />}
+      </div>
+      <Link href={LIVE_EXAMPLE_TROVE_PATH} className={`${SINGLE_BUTTON} mt-5`}>
+        View live position <span>→</span>
+      </Link>
+    </div>
+  );
 }
 
 /** The layered sample's geometry at 390px (Miles's mock, 5 Nov 2026), to be
@@ -253,22 +324,7 @@ function LayeredSample({ data, glowRef }: { data: WireLiveExample | null; glowRe
             style={{ width: L.cardW, zoom: L.cardZoom }}
             data-live-slice="card"
           >
-            {/* The glow behind the card, as the framed sample draws it. */}
-            <div className="absolute inset-0 -z-10 rounded-2xl">
-              <div
-                className="absolute inset-0 rounded-2xl dark:hidden"
-                style={{ boxShadow: "0 24px 80px -12px rgba(40, 33, 20, 0.24), 0 8px 30px rgba(40, 33, 20, 0.12)" }}
-              />
-              <div className="absolute inset-0 hidden dark:block">
-                {GLOW_STOPS.map((colour, slot) => (
-                  <div
-                    key={colour}
-                    className="live-glow-layer absolute inset-0 rounded-2xl"
-                    style={{ boxShadow: glowShadow(colour), ["--glow-slot" as string]: slot }}
-                  />
-                ))}
-              </div>
-            </div>
+            <CardGlow />
             {data && <HeroTroveComposition wire={data} only="card" />}
           </div>
           <div
@@ -317,7 +373,12 @@ export function LiveExampleFrame({ data }: { data: WireLiveExample | null }) {
 
   return (
     <>
-      {mode !== "framed" && <LayeredSample data={mode === "layered" ? data : null} glowRef={layeredGlowRef} />}
+      {(mode === "pending" || mode === "layered") && (
+        <LayeredSample data={mode === "layered" ? data : null} glowRef={layeredGlowRef} />
+      )}
+      {(mode === "single-card" || mode === "single-flows") && (
+        <SingleSample data={data} which={mode === "single-card" ? "card" : "flows"} />
+      )}
       <div className={`w-full max-w-5xl mx-auto px-4 ${mode === "framed" ? "" : "max-sm:hidden"}`}>
         <div ref={glowRef} className="live-glow group relative">
           {/* Cast shadow behind the frame — a warm dark shadow on the paper
