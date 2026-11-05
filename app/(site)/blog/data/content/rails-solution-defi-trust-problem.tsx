@@ -13,7 +13,7 @@ export default function RailsSolutionDefiTrustProblem() {
 
       <p>
         <strong>A new project — </strong>
-        <a href="https://rails.finance/" target="_blank" rel="noopener noreferrer">
+        <a href="/">
           <strong>Rails</strong>
         </a>
         <strong> — is on track to address this.</strong>
@@ -116,7 +116,7 @@ export default function RailsSolutionDefiTrustProblem() {
       </p>
 
       <p>
-        <a href="https://rails.finance/" target="_blank" rel="noopener noreferrer">
+        <a href="/">
           <strong>Rails</strong>
         </a>{" "}
         aims to bridge this gap, providing a <em>user-focused </em>analytics platform that provides independent
@@ -127,11 +127,7 @@ export default function RailsSolutionDefiTrustProblem() {
       </p>
 
       <p>
-        Currently in beta,{" "}
-        <a href="https://rails.finance/" target="_blank" rel="noopener noreferrer">
-          Rails
-        </a>{" "}
-        is focused solely on providing deep analytics for the{" "}
+        Currently in beta, <a href="/">Rails</a> is focused solely on providing deep analytics for the{" "}
         <a href="http://liquity.org/" target="_blank" rel="noopener noreferrer">
           Liquity V2 protocol
         </a>{" "}

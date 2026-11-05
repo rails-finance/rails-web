@@ -7,7 +7,7 @@
 //      the live overlay, independently of the page — tolerance 0.5%, the
 //      page may land a block later); the stat carries no "P&L"/"profit"
 //      label and no "%".
-//   2. usdp/8: the bullet contains "not a profit" and "basis".
+//   2. usdp/8: the bullet says the valuation "says nothing of profit".
 //   3. usdp/27 (closed): no equity stat; the lifetime bullet's figures equal
 //      the plan's §1 pins (pinned HERE, never read off the route) and it
 //      contains "realised outcome".
@@ -15,19 +15,14 @@
 //      figures.
 //   5. The markdown export carries the equity line on usdp/8 and the stance
 //      sentence on usdp/27.
-//   6. The three sibling verifiers still pass (run as child processes; their
-//      own PASS/FAIL counts are reported, not re-asserted here).
 //
 // claude-in-chrome cannot reach localhost — this script is the check.
 // Run:  BASE=http://localhost:3414 node scripts/verify/verify-polaris-equity.mjs
 
 import { chromium } from "playwright";
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
+import { copyPositionMarkdown } from "./lib/copy-position.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let failures = 0;
 let checked = 0;
@@ -84,26 +79,20 @@ async function open(context, url) {
 const card = (page) => page.locator('[data-skel-section="detail-card"]').first();
 
 /** Read the "Equity at the feed" stat, if the card has one: its raw exact
- *  string (AssetAmount's data-prov-exact), symbol, and the surrounding
- *  container's collapsed text (to check for stray "P&L"/"profit"/"%"). */
+ *  string (AssetAmount's data-prov-exact), symbol, and the panel row's
+ *  collapsed text (to check for stray "P&L"/"profit"/"%"). The stat is a row
+ *  of the card's panel (`data-panel-row="equity"`, position-card-panel.tsx). */
 async function readEquityStat(page) {
   return page.evaluate(() => {
-    const cards = document.querySelectorAll('[data-skel-section="detail-card"]');
-    for (const c of cards) {
-      for (const el of c.querySelectorAll("div")) {
-        if (el.textContent?.trim() === "Equity at the feed" && el.children.length === 0) {
-          const container = el.parentElement;
-          const exactEl = container?.querySelector("[data-prov-exact]");
-          return {
-            found: true,
-            exact: exactEl?.getAttribute("data-prov-exact") ?? null,
-            symbol: exactEl?.getAttribute("data-prov-symbol") ?? null,
-            containerText: container?.textContent?.replace(/\s+/g, " ").trim() ?? null,
-          };
-        }
-      }
-    }
-    return { found: false };
+    const row = document.querySelector('[data-skel-section="detail-card"] [data-panel-row="equity"]');
+    if (!row) return { found: false };
+    const exactEl = row.querySelector("[data-prov-exact]");
+    return {
+      found: /Equity at the feed/.test(row.textContent ?? ""),
+      exact: exactEl?.getAttribute("data-prov-exact") ?? null,
+      symbol: exactEl?.getAttribute("data-prov-symbol") ?? null,
+      containerText: row.textContent?.replace(/\s+/g, " ").trim() ?? null,
+    };
   });
 }
 
@@ -123,13 +112,7 @@ async function readExplanation(page) {
 }
 
 async function copyMarkdown(page) {
-  await page
-    .getByRole("button", { name: /Export this (position|loan|trove)|Copy for LLM/i })
-    .first()
-    .click();
-  await page.getByRole("menuitem", { name: /Copy Position/i }).click();
-  await page.waitForTimeout(500);
-  return page.evaluate(() => navigator.clipboard.readText());
+  return copyPositionMarkdown(page);
 }
 
 /** Parse a signed decimal (comma-grouped, U+2212 or ASCII minus) to a number. */
@@ -184,7 +167,7 @@ if (chain8.chainStale || !chain8.price) {
   const explanation8 = await readExplanation(page8);
   check("1d. usdp/8's explanation opens", explanation8 != null, explanation8 ? "" : "no Explanation button/pane");
   if (explanation8) {
-    const m = /equity of\s*([−-]?[\d,]+(?:\.\d+)?)\s*USDp/i.exec(explanation8);
+    const m = /equity is\s*([−-]?[\d,]+(?:\.\d+)?)\s*USDp/i.exec(explanation8);
     const bulletValue = m ? parseSigned(m[1]) : NaN;
     check(
       "1e. the bullet states the same equity figure (0.5% tolerance)",
@@ -192,10 +175,12 @@ if (chain8.chainStale || !chain8.price) {
         Math.abs(bulletValue - expectedEquity) <= Math.max(1, Math.abs(expectedEquity) * 0.005),
       m
         ? `bullet says ${m[1]} vs expected ${expectedEquity}`
-        : `no "equity of … USDp" match in: ${explanation8.slice(0, 300)}`,
+        : `no "equity is … USDp" match in: ${explanation8.slice(0, 300)}`,
     );
-    check('2a. the bullet contains "not a profit"', /not a profit/i.test(explanation8));
-    check('2b. the bullet contains "basis"', /\bbasis\b/i.test(explanation8));
+    // The stance in the card's words since f7dfc4c5 (content/polaris/event-prose.yaml
+    // position_words.equity); the basis sentence lives in the stat's receipt and
+    // the markdown export (5a, 5b), not the Explanation.
+    check('2a. the bullet says the valuation "says nothing of profit"', /says nothing of profit/i.test(explanation8));
   }
 
   await page8.close();
@@ -232,7 +217,9 @@ if (explanation27) {
     }
   }
   check("3c. the lifetime bullet states every §1 pin (formatted)", allPinsPresent, missing.join("; "));
-  check('3d. the lifetime bullet contains "realised outcome"', /realised outcome/i.test(explanation27));
+  // 3d retired: since f7dfc4c5 a closed card's Explanation states the life's
+  // figures alone (position_words.life_*); the "realised outcome" stance is
+  // the markdown export's, which 5b reads.
 }
 
 // ── 4. usdp/166 (liquidated) ─────────────────────────────────────────────────
@@ -285,38 +272,9 @@ await page27.close();
 await context.close();
 await browser.close();
 
-// ── 6. sibling verifiers ─────────────────────────────────────────────────────
-
-function runSibling(script) {
-  const scriptPath = path.join(__dirname, script);
-  const result = spawnSync(process.execPath, [scriptPath], {
-    env: { ...process.env, BASE },
-    encoding: "utf8",
-    timeout: 300000,
-  });
-  const out = (result.stdout ?? "") + (result.stderr ?? "");
-  const passMatch = /ALL (\d+) CHECKS PASS/.exec(out);
-  const failMatch = /(\d+) CHECK\(S\) FAILED of (\d+)/.exec(out);
-  return {
-    ok: result.status === 0,
-    summary: passMatch
-      ? `${passMatch[1]}/${passMatch[1]} passed`
-      : failMatch
-        ? `${failMatch[2] - failMatch[1]}/${failMatch[2]} passed, ${failMatch[1]} failed`
-        : `exit ${result.status}, no summary line found`,
-    out,
-  };
-}
-
-for (const sib of [
-  "verify-polaris-psm-share.mjs",
-  "verify-polaris-at-block-prices.mjs",
-  "verify-polaris-rate-step.mjs",
-]) {
-  console.log(`\n--- running sibling verifier: ${sib} ---`);
-  const r = runSibling(sib);
-  check(`6. ${sib} still passes`, r.ok, r.summary);
-}
+// The sibling runs this script used to spawn are retired: run-all.mjs runs
+// every Polaris verifier on its own row, and nested runs only multiplied the
+// time (past their 300 s child cap) and turned one red into several.
 
 console.log(
   failures

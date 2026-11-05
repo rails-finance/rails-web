@@ -48,12 +48,8 @@
 // Run:  BASE=http://localhost:3000 node scripts/verify/verify-polaris-since-last-touch.mjs
 
 import { chromium } from "playwright";
-import { spawnSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import path from "node:path";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let failures = 0;
 let checked = 0;
@@ -64,11 +60,23 @@ const check = (name, cond, detail = "") => {
   return cond;
 };
 
-// ── restated formatting, independent of lib/utils/format.ts ─────────────────
-const fmtCompact = (n) =>
-  Math.abs(n) >= 1000
-    ? n.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 2 })
-    : n.toLocaleString("en-US", { maximumFractionDigits: 3 });
+// ── restated formatting, independent of lib/shared/format-compact.ts ───────
+// The one compact rule (ui-jobs 377, ec1c6496): from 1,000 one decimal with K,
+// M or B; below 1,000 two decimals; under 0.01 three significant digits.
+const fmtCompact = (n) => {
+  const a = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  for (const [size, suffix] of [
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "K"],
+  ]) {
+    if (a >= size)
+      return `${sign}${(a / size).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}${suffix}`;
+  }
+  if (a > 0 && a < 0.01) return `${sign}${a.toPrecision(3)}`;
+  return `${sign}${a.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
 const parseSignedCompact = (s) => {
   const m = /([+−-])\s*([\d,.]+)\s*([MK])?/.exec(s);
   if (!m) return NaN;
@@ -282,7 +290,6 @@ for (const f of FIXTURES) {
     allFigures.length >= 3 && allFigures[0] === allFigures[allFigures.length - 1] && closedFigures[0] === allFigures[0],
     `headline ${allFigures[0] ?? "—"} against total ${allFigures[allFigures.length - 1] ?? "—"} (${allFigures.length} figures in the row)`,
   );
-  const near = (shown, want) => Math.abs(shown - want) <= Math.max(Math.abs(want) * 0.005, 0.002);
   // A leg's line is drawn compact ("+3.0K"), so it is held to half a unit of
   // its last shown digit, plus the 0.5% the page's own rounding allows.
   const legNear = (shown, want) => {
@@ -297,13 +304,13 @@ for (const f of FIXTURES) {
     const t = signed(await line.locator("span.tabular-nums").allInnerTexts());
     return t.length ? { value: parseSignedCompact(t[t.length - 1]), text: t[t.length - 1] } : { value: NaN, text: "" };
   };
-  const lineFigure = async (key) => (await lineShown(key)).value;
-  const feedShown = await lineFigure("feed");
-  const totalShown = await lineFigure("total");
+  // Compact too since ec1c6496 ("1.1K"), so held to the same grain as a leg.
+  const feedLine = await lineShown("feed");
+  const totalLine = await lineShown("total");
   check(
     `${f.n}. ${tag}: the feed line and the total row are the recomputed feed and total`,
-    near(feedShown, w.feed) && near(totalShown, w.total),
-    `shown ${feedShown} / ${totalShown} against ${fmtCompact(w.feed)} / ${fmtCompact(w.total)}`,
+    legNear(feedLine, w.feed) && legNear(totalLine, w.total),
+    `shown ${feedLine.text} / ${totalLine.text} against ${fmtCompact(w.feed)} / ${fmtCompact(w.total)}`,
   );
 
   // One line per leg, largest first, dust left out; each its own figure.
@@ -458,36 +465,9 @@ for (const p of Object.values(pages)) await p.close();
 await context.close();
 await browser.close();
 
-// ── siblings ────────────────────────────────────────────────────────────────
-function runSibling(script) {
-  const scriptPath = path.join(__dirname, script);
-  const result = spawnSync(process.execPath, [scriptPath], {
-    env: { ...process.env, BASE },
-    encoding: "utf8",
-    timeout: 300000,
-  });
-  const out = (result.stdout ?? "") + (result.stderr ?? "");
-  const passMatch = /ALL (\d+) CHECKS PASS/.exec(out);
-  const failMatch = /(\d+) CHECK\(S\) FAILED of (\d+)/.exec(out);
-  return {
-    ok: result.status === 0,
-    summary: passMatch
-      ? `${passMatch[1]}/${passMatch[1]} passed`
-      : failMatch
-        ? `${failMatch[2] - failMatch[1]}/${failMatch[2]} passed, ${failMatch[1]} failed`
-        : `exit ${result.status}, no summary line found`,
-  };
-}
-
-// Only the one adjacent suite is nested. verify-polaris-psm-outcome.mjs spawns
-// five siblings of its own, so calling it from here fans out to seven browser
-// suites against one dev server and one Alchemy key at once — which rate-limits
-// the overlay into `timeline: null` and reds a correct lane. Run it separately.
-for (const sib of ["verify-polaris-equity.mjs"]) {
-  console.log(`\n--- running sibling verifier: ${sib} ---`);
-  const r = runSibling(sib);
-  check(`5. ${sib} still passes`, r.ok, r.summary);
-}
+// The sibling runs this script used to spawn are retired: run-all.mjs runs
+// every Polaris verifier on its own row, and nested runs only multiplied the
+// time (past their 300 s child cap) and turned one red into several.
 
 console.log(
   failures

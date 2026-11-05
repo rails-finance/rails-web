@@ -79,11 +79,11 @@ for (const p of [
   "/terms",
 ]) {
   await chromeState(page, p, { bar: false });
-  const siteRail = await page.locator('aside[data-anatomy="H1"] button[data-chooser-trigger="rail"]:visible').count();
+  const siteRail = await page.locator('aside[data-anatomy="H1"] button[data-search-launcher="rail"]:visible').count();
   const siteFace = await page.locator('[data-profile-corner] [data-anatomy="H20"]:visible').count();
-  const pill = await page.locator('button[aria-label="Open an explorer"]:not([data-chooser-trigger]):visible').count();
-  check(siteRail === 1 && siteFace === 1, `${p}: the rail's chooser and H20 drawn (${siteRail}, ${siteFace})`);
-  check(pill === 0, `${p}: no "Open an explorer" pill (${pill})`);
+  const pill = await page.locator('button[aria-label="Open an explorer"]:visible').count();
+  check(siteRail === 1 && siteFace === 1, `${p}: the rail's search glyph and H20 drawn (${siteRail}, ${siteFace})`);
+  check(pill === 0, `${p}: no "Open an explorer" pill or grid glyph, ui-jobs 503 (${pill})`);
 }
 
 // ── The app surfaces from `md` up: no bar, everything in the rail and the row ──
@@ -93,12 +93,16 @@ const rail = page.locator('aside[aria-label="Rails"]');
 for (const [name, sel] of [
   ["the Rails mark", 'a[href="/"]'],
   ["the search's glyph", 'button[data-anatomy="H15.1"]'],
-  ["the theme toggle", 'button[aria-label^="Switch to"]'],
-  ["the explorer chooser", 'button[data-chooser-trigger="rail"][aria-label="Open an explorer"]'],
 ]) {
   const n = await rail.locator(`${sel}:visible`).count();
   check(n === 1, `the brand rail carries ${name} (${n})`);
 }
+// The theme is set in the profile control's menu from md (ui-jobs 504).
+const railToggle = await rail.locator('button[aria-label^="Switch to"]').count();
+check(railToggle === 0, `the brand rail carries no theme toggle, ui-jobs 504 (${railToggle})`);
+// The grid glyph (497) went with ui-jobs 503: the chooser is in the wallet panel.
+const railGrid = await rail.locator("button[data-chooser-trigger]").count();
+check(railGrid === 0, `the brand rail carries no grid glyph, ui-jobs 503 (${railGrid})`);
 const railBookmarks = await rail.locator('button[aria-label="Bookmarks"]').count();
 check(railBookmarks === 0, `the brand rail carries no bookmarks button, retired 1 Nov 2026 (${railBookmarks})`);
 // The rail is a surface, not a margin: an opaque background, and the same one
@@ -115,7 +119,7 @@ const railBg = await rail.evaluate((el) => {
 console.log("   ", JSON.stringify(railBg));
 check(railBg.bg !== "rgba(0, 0, 0, 0)" && railBg.bg !== "transparent", `the rail paints a background (${railBg.bg})`);
 check(railBg.bg === railBg.raised, `the rail takes the raised surface tone (${railBg.bg} vs ${railBg.raised})`);
-// The beta pill: at the FOOT, below the theme toggle, drawn as a full-width
+// The beta pill: at the FOOT, drawn as a full-width
 // strip across the rail from the browser's left edge, square on every corner,
 // x=0 (c0534d67, 13 Oct 2026).
 const pill = await page.evaluate(() => {
@@ -123,7 +127,6 @@ const pill = await page.evaluate(() => {
   const el = [...r.querySelectorAll("span")].find((s) => /^beta$/i.test(s.textContent.trim()));
   if (!el) return null;
   const cs = getComputedStyle(el);
-  const mark = r.querySelector('button[aria-label^="Switch to"]').getBoundingClientRect();
   const b = el.getBoundingClientRect();
   return {
     left: Math.round(b.left),
@@ -132,7 +135,7 @@ const pill = await page.evaluate(() => {
     topRightRadius: cs.borderTopRightRadius,
     width: Math.round(b.width),
     railWidth: Math.round(r.getBoundingClientRect().width),
-    belowToggle: b.top >= mark.bottom,
+    atFoot: Math.round(b.bottom) === Math.round(r.getBoundingClientRect().bottom),
     inLowerHalf: b.top > window.innerHeight / 2,
   };
 });
@@ -146,7 +149,7 @@ if (pill) {
   );
   check(pill.topRightRadius === "0px", `the beta pill is square on its right (${pill.topRightRadius})`);
   check(pill.width === pill.railWidth, `the beta pill spans the rail (${pill.width} of ${pill.railWidth}px)`);
-  check(pill.belowToggle, "the beta pill sits below the theme toggle");
+  check(pill.atFoot, "the beta pill sits at the rail's foot");
   check(pill.inLowerHalf, "the beta pill sits at the foot of the rail, not under the glyph");
 }
 
@@ -230,13 +233,13 @@ if (!trovePath) {
 } else {
   await page.goto(BASE + trovePath, { waitUntil: "networkidle" });
   // Decision 0052: the wallet heading frames a position page; the card's
-  // sidebar name links to the explorer. The chooser is the rail's on every
-  // app page (ui-jobs 497), so it is drawn here once, in the rail.
-  const posTrigger = await page.locator("button[data-chooser-trigger]:visible").count();
-  const posRail = await page.locator('aside[data-anatomy="H1"] button[data-chooser-trigger]:visible').count();
+  // sidebar name links to the explorer. The chooser is in the wallet panel
+  // (ui-jobs 503), whose glyph is drawn here once, in the rail.
+  const posTrigger = await page.locator("button[data-search-launcher]:visible").count();
+  const posRail = await page.locator('aside[data-anatomy="H1"] button[data-search-launcher]:visible').count();
   check(
     posTrigger === 1 && posRail === 1,
-    `a position view draws the chooser once, in the rail, at 1280 (${posTrigger}, ${posRail})`,
+    `a position view draws the panel's glyph once, in the rail, at 1280 (${posTrigger}, ${posRail})`,
   );
   await page.waitForSelector("[data-anatomy='C20'] a[data-rail-identity]", { timeout: 15000 }).catch(() => {});
   const posLink = await page
@@ -257,40 +260,40 @@ if (!trovePath) {
 // carries the path now — CHAIN-AWARE, pointing at the coverage page whose
 // matrix contains the explorer the reader is on.
 //
-// The trigger is located by its label rather than by "inside <header>": since
-// ui-jobs 68 it sits on the protocol title row from `md` up and in the bar
-// below `md`, and this block should hold either one to the same behaviour.
-// The panel opens on Ethereum whatever the page (ui-jobs 497); another
-// chain's door is one press on its row or tab.
-async function switcherCoverage(target, slug, chainName) {
-  await target.locator("button[data-chooser-trigger]:visible").click();
-  if (chainName) {
-    await target
-      .locator('[role="menu"] button[aria-pressed], [data-switcher-tabs] [role="tab"]', { hasText: chainName })
-      .first()
-      .click();
-  }
-  await target.waitForSelector(`a[href="/coverage/${slug}"]`, { timeout: 5000 }).catch(() => {});
-  return target.locator(`a[href="/coverage/${slug}"]`).count();
+// The chooser is in the wallet panel (ui-jobs 503), opened by the search's
+// glyph: in the rail from `md`, in the bar below it. The chooser opens on
+// Ethereum whatever the page (ui-jobs 497); another chain's door is one press
+// on its glyph.
+// The chooser carries no coverage link (Miles, 5 Nov 2026): the count is of
+// the chain's explorer rows, and of coverage links, which must be none.
+async function chooserRows(target, slug, chainName) {
+  await target.locator("button[data-search-launcher]:visible").click();
+  await target.waitForSelector("[data-explorer-chooser]", { state: "visible", timeout: 5000 }).catch(() => {});
+  if (chainName) await target.locator(`[data-switcher-tabs] [role="tab"][aria-label="${chainName}"]`).click();
+  const rows = await target
+    .locator(`[data-explorer-chooser] a[data-switcher-explorer][href^="/${slug}/"]:visible`)
+    .count();
+  const coverage = await target.locator('[data-explorer-chooser] a[href^="/coverage/"]').count();
+  return coverage === 0 ? rows : -coverage;
 }
 console.log("[chain switcher on /ethereum/liquity-v2]");
 await page.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
-const switcherCov = await switcherCoverage(page, "ethereum");
-check(switcherCov >= 1, `chain switcher reaches /coverage/ethereum on an Ethereum rail (${switcherCov})`);
+const switcherCov = await chooserRows(page, "ethereum");
+check(switcherCov >= 1, `chooser lists Ethereum's explorers, no coverage link, on an Ethereum rail (${switcherCov})`);
 // Base is a launched chain (rails-ops decision 0030, 2026-09-23), so a Base
 // rail gets the same chrome as an Ethereum one: the chain trigger names Base,
 // the panel offers the /coverage/base door and lists the Base explorers, and
 // there is no work-in-progress strip.
 console.log("[chrome on /base/moonwell — Base is launched]");
 await page.goto(BASE + "/base/moonwell", { waitUntil: "networkidle" });
-const baseChainTrigger = await page.locator("button[data-chooser-trigger]:visible").count();
-check(baseChainTrigger === 1, `a Base rail draws the chooser once (${baseChainTrigger})`);
+const baseChainTrigger = await page.locator("button[data-search-launcher]:visible").count();
+check(baseChainTrigger === 1, `a Base rail draws the panel's glyph once (${baseChainTrigger})`);
 const baseLabel = await page.locator("[data-anatomy='H3'] [data-chain-label='base']").count();
 check(baseLabel === 1, `a Base rail names its chain on the title row (${baseLabel})`);
-const switcherCovBase = await switcherCoverage(page, "base", "Base");
-check(switcherCovBase >= 1, `chain switcher reaches /coverage/base on a Base rail (${switcherCovBase})`);
-const baseRows = await page.locator('[role="menu"] a[href^="/base/"]').count();
-check(baseRows >= 1, `the switcher panel lists the Base explorer rows (${baseRows})`);
+const switcherCovBase = await chooserRows(page, "base", "Base");
+check(switcherCovBase >= 1, `chooser lists Base's explorers, no coverage link, on a Base rail (${switcherCovBase})`);
+const baseRows = await page.locator('[data-explorer-chooser] a[data-switcher-explorer][href^="/base/"]').count();
+check(baseRows >= 1, `the chooser lists the Base explorer rows (${baseRows})`);
 await page.keyboard.press("Escape");
 const wipStrip = await page.locator("[data-work-in-progress]").count();
 check(wipStrip === 0, `a launched rail carries no work-in-progress strip (${wipStrip})`);
@@ -317,12 +320,10 @@ console.log("[mobile @390]");
 const mob = await browser.newPage({ viewport: { width: 390, height: 800 } });
 await mob.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
 const mBurger = await mob.locator('header button[aria-label="Toggle menu"]').count();
-const mSwitcher = await mob.locator('header button[data-chooser-trigger="header"]').count();
 check(mBurger === 0, `mobile header has no hamburger (${mBurger})`);
-check(mSwitcher === 1, `mobile header keeps the chain switcher trigger (${mSwitcher})`);
 // Below `md` the brand rail does not render and the bar carries the lot: mark,
-// the search's glyph, theme toggle, chain trigger (rails-ops TO-DO-ui-jobs
-// 67, 68). The chooser is drawn ONCE — the title row's copy is `md` and up.
+// the search's glyph, theme toggle (rails-ops TO-DO-ui-jobs 67, 68). The
+// search's glyph opens the panel with the chooser (503).
 const mRail = await mob.locator('aside[aria-label="Rails"]').isVisible();
 check(mRail === false, `mobile draws no brand rail (${mRail})`);
 const mLauncher = await mob.locator('header button[data-anatomy="H15.1"]:visible').count();
@@ -331,20 +332,84 @@ const mBookmarks = await mob.locator('header button[aria-label="Bookmarks"]').co
 check(mBookmarks === 0, `mobile header carries no bookmarks button, retired 1 Nov 2026 (${mBookmarks})`);
 const mToggle = await mob.locator('header button[aria-label^="Switch to"]:visible').count();
 check(mToggle === 1, `mobile header keeps the theme toggle (${mToggle})`);
-const mSwitcherAll = await mob.locator("button[data-chooser-trigger]:visible").count();
-check(mSwitcherAll === 1, `mobile draws one chooser trigger, not two (${mSwitcherAll})`);
+const mSwitcherAll = await mob.locator("button[data-chooser-trigger]").count();
+check(mSwitcherAll === 0, `mobile draws no grid glyph, ui-jobs 503 (${mSwitcherAll})`);
 const mOrder = await mob.evaluate(() => {
-  const c = document.querySelector('header button[data-chooser-trigger="header"]');
+  const c = document.querySelector('header button[data-search-launcher="header"]');
   const f = document.querySelector('header [data-anatomy="H20"]');
   return !!c && !!f && c.getBoundingClientRect().right <= f.getBoundingClientRect().left;
 });
-check(mOrder, "mobile header draws the chooser before the profile control");
+check(mOrder, "mobile header draws the search's glyph before the profile control");
 // The app header carries the mark alone and the chain glyph without its name
 // (Miles 18 Oct 2026).
 const mHome = await mob.locator('header a[aria-label="Rails home"]:visible').count();
 check(mHome === 1, `mobile header carries the Rails mark as the home link (${mHome})`);
 const mWordmark = await mob.locator("header").first().innerText();
 check(!/Rails|Ethereum/i.test(mWordmark), `mobile header shows neither word (${mWordmark.replace(/\s+/g, " ")})`);
+// The phone header on home (Miles, 5 Nov 2026): the mark on the left, then
+// "Start here", the search's glyph, the theme toggle and H20 on the right. The
+// beta pill is in the footer below md, and the rail's from md.
+const mHomePage = await browser.newPage({ viewport: { width: 390, height: 800 } });
+await mHomePage.goto(BASE + "/", { waitUntil: "networkidle" });
+const mHomeOrder = await mHomePage.evaluate(() => {
+  const at = (sel) => document.querySelector(`header[data-anatomy="H2"] ${sel}`)?.getBoundingClientRect().left ?? null;
+  return [
+    at('a[aria-label="Rails home"]'),
+    at("[data-start-here]"),
+    at('button[data-search-launcher="header"]'),
+    at('button[aria-label^="Switch to"]'),
+    at('[data-anatomy="H20"]'),
+  ];
+});
+check(
+  mHomeOrder.every((x, i) => x !== null && (i === 0 || x > mHomeOrder[i - 1])),
+  `home @390: mark, Start here, search, theme, H20 left to right (${mHomeOrder.join(", ")})`,
+);
+const mHeaderBeta = await mHomePage.locator('header[data-anatomy="H2"]').first().innerText();
+check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
+const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
+check(mFooterBeta, "home @390: the beta pill is in the footer");
+// The profile control's menu (ui-jobs 504): a menu button; with nothing
+// saved, the line on saving one and the theme switch; a full-width sheet
+// below md; Escape closes it and returns focus.
+const h20 = mHomePage.locator('header [data-anatomy="H20"]');
+check((await h20.getAttribute("aria-haspopup")) === "menu", "H20 is a menu button");
+await h20.click();
+const sheet = await mHomePage.evaluate(() => {
+  const m = document.querySelector("[data-profile-menu]");
+  const r = m?.getBoundingClientRect();
+  return {
+    role: m?.getAttribute("role"),
+    width: r ? Math.round(r.width) : 0,
+    empty: !!m?.querySelector("[data-profile-menu-empty]"),
+    themes: [...(m?.querySelectorAll("[data-theme-option]") ?? [])].map((b) => b.textContent.trim()).join(","),
+    manage: !!m?.querySelector('[data-profile-menu-manage][href="/bookmarks"]'),
+    scrim: !!document.querySelector("[data-profile-menu-scrim]"),
+  };
+});
+check(
+  sheet.role === "menu" &&
+    sheet.width === 390 &&
+    sheet.empty &&
+    sheet.manage &&
+    sheet.scrim &&
+    sheet.themes === "Light,Dark,Auto",
+  `home @390: H20 opens a full-width menu over a dim: the saving line, Manage wallets, the theme switch (${JSON.stringify(sheet)})`,
+);
+// A press on the dim closes the sheet.
+await mHomePage.mouse.click(195, 780);
+const dimClosed = await mHomePage.evaluate(() => !document.querySelector("[data-profile-menu]"));
+check(dimClosed, "home @390: a press on the dim closes the menu");
+await h20.click();
+await mHomePage.keyboard.press("Escape");
+const h20Back = await mHomePage.evaluate(
+  () =>
+    !document.querySelector("[data-profile-menu]") && document.activeElement?.getAttribute("data-anatomy") === "H20",
+);
+check(h20Back, "home @390: Escape closes the menu and focus returns to H20");
+await mHomePage.close();
+const dFooterBeta = await page.locator("footer [data-phone-beta]:visible").count();
+check(dFooterBeta === 0, `@1280: the footer's beta pill is hidden, the rail carries it (${dFooterBeta})`);
 // FRANKENCOIN is the roster's longest name: at 390 the title must stay on one
 // line, and at 1440 it must not crowd the chooser it now shares a row with.
 for (const [w, h] of [
@@ -370,8 +435,8 @@ for (const [w, h] of [
   if (w >= 768) check(t.gap !== null && t.gap > 40, `@${w}: the title does not crowd the chain's label (gap=${t.gap})`);
   await p.close();
 }
-const mCov = await switcherCoverage(mob, "ethereum");
-check(mCov >= 1, `mobile chain switcher reaches /coverage/ethereum (${mCov})`);
+const mCov = await chooserRows(mob, "ethereum");
+check(mCov >= 1, `mobile chooser lists Ethereum's explorers, no coverage link (${mCov})`);
 await shoot(mob, "hdr-mobile");
 
 await browser.close();

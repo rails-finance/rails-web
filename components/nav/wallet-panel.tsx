@@ -1,17 +1,22 @@
 "use client";
 
-// The wallet panel (rails-ops TO-DO-ui-jobs 431): a full-height panel that
-// glides in from the left over the page, with the search pinned at its top
-// and a link to the bookmarks page (/bookmarks, ui-jobs 480) at its foot. The
-// bookmarks are the search's suggestions on a focused, empty field (H15.2).
-// The rail's magnifier, the header bar's search and bookmark controls, and
-// `/` on a page with no search of its own all open it.
+// The wallet panel (rails-ops TO-DO-ui-jobs 431, 503): a full-height panel
+// that glides in from the left over the page, with the search pinned at its
+// top and the explorer chooser (H4) under it. The saved wallets are the
+// suggestions' first rows (H15.2) once the reader types, or on ArrowDown in
+// the empty field; their page is in the profile control's menu (H20, ui-jobs
+// 504). The rail's magnifier, the
+// header bar's, ⌘K, and `/` on a page with no search of its own open it with
+// the field focused; `openWalletPanel(from, "chooser")` opens it with the
+// focus on the chooser's chain row instead.
 //
 // From md it starts at the brand rail's right edge, so the rail stays in view
 // and the two read as one piece of chrome, on every page (the site's too,
 // ui-jobs 498); below md (no rail) it starts at the viewport's edge and takes
 // the full width there.
-// A scrim dims the page behind it and closes it on a press; Escape closes it;
+// A scrim dims the page behind it (no blur, Miles 5 Nov 2026) and closes it on
+// a press; the page's animations hold still under it
+// (`html[data-wallet-panel-open]`, globals.css). Escape closes it;
 // focus moves in on open, stays inside while open and returns to the trigger.
 //
 // Open state is a small store, so every trigger reads and sets the same panel,
@@ -19,14 +24,15 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
 import { X } from "lucide-react";
 
 import { RailsGlyph } from "@/components/nav/brand-rail";
-import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
-import { FrontDoorSearch, OPEN_SEARCH_EVENT } from "@/components/shared/front-door-search";
+import { ExplorerChooser } from "@/components/nav/explorer-chooser";
+import { FrontDoorSearch, OPEN_SEARCH_EVENT, TOGGLE_SEARCH_EVENT } from "@/components/shared/front-door-search";
 
 let open = false;
+/** Where the focus lands as the panel opens: the field, or the chooser. */
+let openAt: "search" | "chooser" = "search";
 let trigger: HTMLElement | null = null;
 /** The brand rail's right edge, measured as the panel opens; 0 with no rail. */
 let railRight = 0;
@@ -34,8 +40,9 @@ const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
 
 /** Open the panel; focus returns to `from` (the pressed control) on close. */
-export function openWalletPanel(from?: HTMLElement | null) {
+export function openWalletPanel(from?: HTMLElement | null, at: "search" | "chooser" = "search") {
   trigger = from ?? (document.activeElement as HTMLElement | null);
+  openAt = at;
   // The rail's right edge, where one is drawn (an app route from md).
   const rail = document.querySelector<HTMLElement>('aside[data-anatomy="H1"]');
   railRight = rail && rail.getClientRects().length > 0 ? rail.getBoundingClientRect().right : 0;
@@ -53,9 +60,9 @@ export function closeWalletPanel() {
   requestAnimationFrame(() => back?.focus());
 }
 
-export function toggleWalletPanel(from?: HTMLElement | null) {
+export function toggleWalletPanel(from?: HTMLElement | null, at: "search" | "chooser" = "search") {
   if (open) closeWalletPanel();
-  else openWalletPanel(from);
+  else openWalletPanel(from, at);
 }
 
 /** Whether the panel is open: the triggers read it for their active state. */
@@ -97,15 +104,25 @@ export function WalletPanel() {
   // `/` with no search on the page opens the panel.
   useEffect(() => {
     const onOpen = () => openWalletPanel();
+    const onToggle = () => toggleWalletPanel();
     window.addEventListener(OPEN_SEARCH_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_SEARCH_EVENT, onOpen);
+    window.addEventListener(TOGGLE_SEARCH_EVENT, onToggle);
+    return () => {
+      window.removeEventListener(OPEN_SEARCH_EVENT, onOpen);
+      window.removeEventListener(TOGGLE_SEARCH_EVENT, onToggle);
+    };
   }, []);
 
   useEffect(() => {
     if (!isOpen) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    const focusField = requestAnimationFrame(() => panelRef.current?.querySelector<HTMLInputElement>("input")?.focus());
+    document.documentElement.setAttribute("data-wallet-panel-open", "");
+    const focusField = requestAnimationFrame(() =>
+      panelRef.current
+        ?.querySelector<HTMLElement>(openAt === "chooser" ? '[data-switcher-tabs] [aria-selected="true"]' : "input")
+        ?.focus(),
+    );
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -132,6 +149,7 @@ export function WalletPanel() {
       cancelAnimationFrame(focusField);
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
+      document.documentElement.removeAttribute("data-wallet-panel-open");
     };
   }, [isOpen]);
 
@@ -146,19 +164,22 @@ export function WalletPanel() {
       data-wallet-panel-root=""
     >
       {/* The scrim: the page behind the panel lightened (light) or darkened
-          (dark) and blurred; a press closes it. */}
+          (dark); a press closes it. */}
       <div
         aria-hidden="true"
         onClick={close}
         data-anatomy="H16.1"
-        className="absolute inset-0 bg-white/60 backdrop-blur-[4px] dark:bg-black/60"
-        style={{ opacity: isOpen ? 1 : 0, transition: still ? "none" : `opacity ${isOpen ? EASE_IN : EASE_OUT}` }}
+        className="absolute inset-0 bg-white/60 dark:bg-black/70"
+        style={{
+          opacity: isOpen ? 1 : 0,
+          transition: still ? "none" : `opacity ${isOpen ? EASE_IN : EASE_OUT}`,
+        }}
       />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Look up a wallet"
+        aria-label="Search and explorers"
         aria-hidden={!isOpen}
         inert={!isOpen}
         data-search-launcher-panel=""
@@ -196,24 +217,14 @@ export function WalletPanel() {
             the row's icon: the rail's 16px top padding, the 30px mark, the
             12px gap and half the 38px launcher put its centre at 77px, so the
             48px field starts at 53px. */}
-        <div className="shrink-0 px-5 pb-4 pt-4 md:pt-[53px]">
+        <div className="relative z-10 shrink-0 px-5 pb-4 pt-4 md:pt-[53px]">
           <FrontDoorSearch size="lg" surface="raised" onDone={close} suggest />
         </div>
 
-        {/* The bookmarks are the suggestions' first rows (H15.2): the list
-            opens on the focused field with them, newest first, and matches
-            them as the reader types. Their page, with rename, remove and the
-            backup, is one link at the foot (ui-jobs 480). */}
-        <div className="min-h-0 flex-1" />
-        <div className="shrink-0 border-t border-rb-200 px-5 py-4 dark:border-rb-800">
-          <Link
-            href="/bookmarks"
-            onClick={close}
-            className="rounded-sm text-sm text-blue-600 dark:text-blue-400 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
-            data-wallet-panel-bookmarks=""
-          >
-            {BOOKMARKS_NAME} →
-          </Link>
+        {/* The explorer chooser (H4) under the search; the suggestions list
+            (H15.2) opens over it while the reader types. */}
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4">
+          <ExplorerChooser key={isOpen ? "open" : "shut"} onNavigate={close} />
         </div>
       </div>
     </div>,

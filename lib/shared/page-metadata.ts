@@ -73,11 +73,11 @@ export const TWITTER_HANDLE = RAILS_X_AT;
 // Content-hashed: Discord/X/Telegram/Slack cache a link preview by image URL,
 // so a regenerated card needs a new URL to be fetched fresh rather than served
 // stale from their cache. Bump the hash (`shasum -a 256 public/og/home.png |
-// cut -c1-8`) whenever `node scripts/generate-og.mjs` changes that file's
+// cut -c1-8`) whenever `pnpm og` changes that file's
 // bytes — `public/og/home.png` itself stays at its unhashed path too (kept on
 // disk for scripts/verify/verify-share-abuse.mjs's static-file census), and is
 // regenerated in place alongside this hashed copy.
-export const HOME_SHARE_IMAGE = "/og/home-eaad142d.png";
+export const HOME_SHARE_IMAGE = "/og/home-3a7eee3f.png";
 
 /** The Twitter card for a page that sets its own `openGraph` without
  *  `shareMetadata`: the same title and description, on the home share image.

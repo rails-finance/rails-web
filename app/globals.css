@@ -2333,3 +2333,47 @@ label[for] {
     animation: none;
   }
 }
+
+/* The wallet panel's scrim blurs the page (H16.1, ui-jobs 503): while the
+   panel is open nothing under the blur animates, so the blur is drawn once
+   and not repainted every frame. The panel is portalled to the body as
+   [data-wallet-panel-root] and keeps its own motion. */
+html[data-wallet-panel-open] body > :not([data-wallet-panel-root]),
+html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *,
+html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::before,
+html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
+  animation-play-state: paused;
+}
+
+/* The StageRail station's line (components/home/stage-station.tsx): the whole
+   border drawn, then withdrawn round it into the middle of the left edge over
+   the station's time; the box returns to its heading when it ends. Held while
+   the box is hovered or focused; under reduced motion it stands still and
+   the box waits for a press. */
+@keyframes station-snake {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -1;
+  }
+}
+.station-snake {
+  animation: station-snake var(--snake-ms, 6000ms) linear forwards;
+}
+/* Held while the reader is on the box: a pointer resting on it (where a
+   pointer can hover, so a phone's sticky tap does not hold it for good), or
+   keyboard focus. */
+@media (hover: hover) {
+  [data-station-toggle]:hover .station-snake {
+    animation-play-state: paused;
+  }
+}
+[data-station-toggle]:focus-visible .station-snake {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .station-snake {
+    animation: none;
+  }
+}

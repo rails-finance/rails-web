@@ -42,7 +42,7 @@ async function check(theme) {
   await page.evaluate((t) => document.documentElement.classList.toggle("dark", t === "dark"), theme);
   await page.waitForTimeout(300);
 
-  const h2 = page.getByRole("heading", { name: "What Rails Does" });
+  const h2 = page.getByRole("heading", { name: "What Rails does" });
   await h2.scrollIntoViewIfNeeded();
   await page.waitForTimeout(200);
 
@@ -50,32 +50,33 @@ async function check(theme) {
   // eyebrows are copy and have churned twice; the heading is stable.
   const ol = page.locator("section", { has: h2 }).locator("ol").first();
   // Station <li>s carry an eyebrow; the mobile connector <li>s are decorative.
-  const stages = ol.locator("> li").filter({ has: page.locator("p.font-semibold") });
+  const stages = ol.locator("> li").filter({ has: page.locator("[data-station-eyebrow]") });
   assert((await stages.count()) === 5, "rail still a 5-stage <ol>");
 
   // Eyebrows (uppercase via CSS; DOM text is the raw string).
-  const eyebrows = (await ol.locator("li p.font-semibold").allTextContents()).map((s) => s.trim());
+  const eyebrows = (await ol.locator("li [data-station-eyebrow]").allTextContents()).map((s) => s.trim());
   assert(JSON.stringify(eyebrows) === JSON.stringify(EXPECT_EYEBROWS), "eyebrows: " + eyebrows.join(" · "));
 
   // Copy strings, per station body.
-  const bodies = (await ol.locator("li p.body-text").allTextContents()).map((s) => s.replace(/\s+/g, " ").trim());
+  const bodies = (await page.locator("[data-station-line]").allTextContents()).map((s) =>
+    s.replace(/\s+/g, " ").trim(),
+  );
   for (let i = 0; i < EXPECT_COPY.length; i++) {
     assert(bodies[i] === EXPECT_COPY[i], `station ${i + 1} copy exact`);
   }
   assert(!bodies.join(" ").includes("19 protocols"), "no stale protocol-count copy");
   assert(!bodies.join(" ").includes("or contract read"), "no stale 'or contract read' tail");
 
-  // Vertical rhythm: every station card renders the SAME height, so the fork
-  // column's pair and the three single cards align top and bottom rather than
-  // merely sharing a centre line. The lg:min-h-[184px] floor holds five lines
-  // of body copy in a 1fr column at the 1280 cap; copy that wraps to six
-  // overflows it and the rail goes ragged. This is the assertion that catches
-  // that — copy edits are exactly what breaks it.
+  // Each card is sized to the longer of its heading and its text (Miles, 5
+  // Nov 2026), so heights differ by content; the fork pair shares one row
+  // height, so its two cards match.
   const cardHeights = await ol.evaluate((el) =>
-    Array.from(el.querySelectorAll("li > div.rounded-xl")).map((d) => Math.round(d.getBoundingClientRect().height)),
+    Array.from(el.querySelectorAll("li > [data-station-toggle]")).map((d) =>
+      Math.round(d.getBoundingClientRect().height),
+    ),
   );
   assert(cardHeights.length === 5, `five station cards measured (got ${cardHeights.length})`);
-  assert(new Set(cardHeights).size === 1, "all station cards share one height: " + cardHeights.join(" · "));
+  assert(cardHeights[1] === cardHeights[2], "the fork pair share one height: " + cardHeights.join(" · "));
 
   // Connector alignment — the whole point of the rail is that the line meets the
   // card it joins. Two things have broken this before: the overlay being sized
@@ -89,7 +90,7 @@ async function check(theme) {
       (o) => typeof o.className === "string" && /lg:grid/.test(o.className),
     );
     const r = (el) => el.getBoundingClientRect();
-    const centres = Array.from(ol.querySelectorAll("li > div.rounded-xl")).map((d) =>
+    const centres = Array.from(ol.querySelectorAll("li > [data-station-toggle]")).map((d) =>
       Math.round(r(d).top + r(d).height / 2),
     );
     const runs = Array.from(ov.querySelectorAll("div"))
@@ -106,7 +107,7 @@ async function check(theme) {
 
   // Icons — each expected lucide class present inside the rail.
   const iconClasses = await ol.evaluate((el) =>
-    Array.from(el.querySelectorAll("li > div svg")).map((s) => s.getAttribute("class") || ""),
+    Array.from(el.querySelectorAll("li > [data-station-toggle] svg")).map((s) => s.getAttribute("class") || ""),
   );
   for (const want of EXPECT_ICONS) {
     assert(
@@ -130,7 +131,7 @@ async function check(theme) {
   const widths = await page.evaluate(() => {
     const bandH2 = Array.from(document.querySelectorAll("h2")).find((h) => /DeFi/.test(h.textContent || ""));
     const railH2 = Array.from(document.querySelectorAll("h2")).find(
-      (h) => (h.textContent || "").trim() === "What Rails Does",
+      (h) => (h.textContent || "").trim() === "What Rails does",
     );
     // persona band inner container = the h2's grandparent (div.max-w-7xl)
     const persona = bandH2?.closest("div.max-w-7xl") || bandH2?.parentElement?.parentElement;

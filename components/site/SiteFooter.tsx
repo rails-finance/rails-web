@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { LwNotice } from "@/components/shared/lw-attribution";
 import { Activity, DraftingCompass, FileText, Home, Info, LayoutGrid, Signpost, Vault } from "lucide-react";
 import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
@@ -9,8 +10,10 @@ import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 import { DonateModal } from "@/components/site/DonateModal";
 import { FeedbackCluster } from "@/components/shared/feedback-cluster";
 import { LiquityModal } from "@/components/site/LiquityModal";
+import { PhoneBeta } from "@/components/nav/phone-beta";
 
 export function SiteFooter() {
+  const home = usePathname() === "/";
   const [donateOpen, setDonateOpen] = useState(false);
   const [liquityOpen, setLiquityOpen] = useState(false);
   // Footer rail links are deliberately dumb — they land on the protocol's
@@ -18,7 +21,9 @@ export function SiteFooter() {
   // entry point (with recent/pinned in its dropdown). The chrome stays
   // simple: one route to discover, one to drill in.
   return (
-    <footer className="bg-background border-rb-200" data-anatomy="H9">
+    // On home the footer is the foot of the page's gradient, in the top's tone
+    // (app/(site)/page.tsx, Miles 5 Nov 2026); elsewhere the canvas.
+    <footer className={`${home ? "bg-rb-50 dark:bg-rb-600" : "bg-background"} border-rb-200`} data-anatomy="H9">
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Rails Info */}
@@ -94,9 +99,9 @@ export function SiteFooter() {
             </div>
           </div>
 
-          {/* Learn About Rails — icon nav moved out of the header hamburger */}
+          {/* Learn about Rails — icon nav moved out of the header hamburger */}
           <div>
-            <h4 className="text-sm font-semibold text-foreground mb-3">Learn About Rails</h4>
+            <h4 className="text-sm font-semibold text-foreground mb-3">Learn about Rails</h4>
             <ul className="space-y-2">
               <li>
                 <Link
@@ -204,7 +209,10 @@ export function SiteFooter() {
         <div className="mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="flex flex-col md:flex-row items-center gap-4 mb-4 md:mb-0">
-              <p className="text-rb-500 text-xs">© {new Date().getUTCFullYear()} Rails</p>
+              <div className="flex items-center gap-2">
+                <p className="text-rb-500 text-xs">© {new Date().getUTCFullYear()} Rails</p>
+                <PhoneBeta />
+              </div>
               <div className="flex gap-4">
                 <Link
                   href="/privacy"

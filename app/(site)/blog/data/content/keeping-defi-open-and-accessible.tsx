@@ -29,8 +29,8 @@ export default function KeepingDefiOpenResponseDefi101() {
         >
           Trustless Manifesto
         </a>
-        . We believe <a href="https://rails.finance">Rails</a> can play a meaningful role in re-centring those values by
-        making DeFi more accessible, legible, and empowering for individuals.
+        . We believe <a href="/">Rails</a> can play a meaningful role in re-centring those values by making DeFi more
+        accessible, legible, and empowering for individuals.
       </p>
 
       <h2>Why the dashboard must be independent</h2>
@@ -63,8 +63,8 @@ export default function KeepingDefiOpenResponseDefi101() {
         <a href="https://liquity.org">Liquity</a>. Maple operates permissioned, institution-focused credit markets with
         KYC and whitelisting. Liquity is fully permissionless: anyone can participate without KYC or custodial
         restrictions. The <a href="https://liquity.app">Liquity.app</a> front-end links to independent explorers such as{" "}
-        <a href="https://rails.finance">Rails</a> and <a href="https://defiexplore.com">DeFi Explore</a>, providing
-        external, verifiable transparency.
+        <a href="/">Rails</a> and <a href="https://defiexplore.com">DeFi Explore</a>, providing external, verifiable
+        transparency.
       </p>
 
       <figure>
@@ -83,10 +83,9 @@ export default function KeepingDefiOpenResponseDefi101() {
       <h2>Why supporting independent dashboards matters</h2>
 
       <p>
-        <strong>Rails</strong> is built and operated by a small <a href="https://rails.finance/about">team of two</a>.
-        We aim to provide equal access to verifiable on-chain information, regardless of wallet size. Supporting
-        independent transparency layers helps preserve the spirit of DeFi: open access, equal opportunity, and
-        permissionless participation.
+        <strong>Rails</strong> is built and operated by a small <a href="/about">team of two</a>. We aim to provide
+        equal access to verifiable on-chain information, regardless of wallet size. Supporting independent transparency
+        layers helps preserve the spirit of DeFi: open access, equal opportunity, and permissionless participation.
       </p>
 
       <h2>Conclusion</h2>
@@ -103,8 +102,8 @@ export default function KeepingDefiOpenResponseDefi101() {
       </p>
 
       <p>
-        By supporting independent transparency projects like <a href="https://rails.finance">Rails</a> we help keep DeFi
-        true to its origins.
+        By supporting independent transparency projects like <a href="/">Rails</a> we help keep DeFi true to its
+        origins.
       </p>
     </>
   );

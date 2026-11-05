@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
-/** Icon-only theme toggle. It is drawn once per width: in HeaderBar on the
- *  below `md`, and at the foot of BrandRail from `md` up, where the bar is
- *  gone (rails-ops TO-DO-ui-jobs 68, 498). No pill/background — only the line art recolours to teal on hover,
+/** Icon-only theme toggle, in HeaderBar below `md` (rails-ops TO-DO-ui-jobs
+ *  68, 498). From `md` the theme is set in the profile control's menu (H20,
+ *  ui-jobs 504), which carries the same switch below `md` too. No pill/background — only the line art recolours to teal on hover,
  *  matching the footer affordance. At rest the icon shares the bookmark's ink
  *  (rb-700 / dark:rb-300) so the two read as one control cluster wherever they
  *  sit. Uses next-themes (the app's canonical theme mechanism); the

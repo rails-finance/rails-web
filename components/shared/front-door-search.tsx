@@ -75,6 +75,8 @@ export const walletHref = (address: string): string => `/wallet/${address.toLowe
 const SLASH_TARGET = "data-search-input";
 /** Asks the wallet panel to open when no search field is on the page. */
 export const OPEN_SEARCH_EVENT = "rails-open-search";
+/** ⌘K: open the wallet panel, or close it when open. */
+export const TOGGLE_SEARCH_EVENT = "rails-toggle-search";
 
 type Size = "sm" | "md" | "lg";
 
@@ -189,7 +191,7 @@ export function SearchBox({
         onKeyDown={onKeyDown}
         onBlur={onBlur}
         placeholder={placeholder}
-        aria-label={combobox ? SUGGEST_PLACEHOLDER : placeholder}
+        aria-label={combobox ? SUGGEST_PLACEHOLDER : placeholder || SEARCH_PLACEHOLDER}
         {...(combobox
           ? {
               role: "combobox",
@@ -266,6 +268,8 @@ function useLookup(href: (address: string) => string, onDone?: () => void) {
 export interface FrontDoorSearchProps {
   /** Where an address lands; the wallet view unless the surface names its own. */
   href?: (address: string) => string;
+  /** The field's placeholder; "" for none (the home hero). The accessible
+   *  name stands either way. */
   placeholder?: string;
   size?: Size;
   surface?: SearchSurface;
@@ -389,12 +393,16 @@ export function FrontDoorSearch({
             value={value}
             onChange={(v) => {
               setValue(v);
-              s.reopen();
+              // The list opens on typing and closes when the field is cleared
+              // (Miles, 5 Nov 2026); an empty field leaves what is under it
+              // uncovered. ArrowDown on it still opens the saved wallets.
+              if (v.trim() === "") s.close();
+              else s.reopen();
               if (problem) setProblem(null);
             }}
             inputRef={inputRef}
-            onFocus={suggesting ? () => !quietFocus.current && s.focus() : undefined}
-            onClick={suggesting ? s.focus : undefined}
+            onFocus={suggesting ? () => (value.trim() === "" || quietFocus.current ? s.prime() : s.focus()) : undefined}
+            onClick={suggesting ? () => value.trim() !== "" && s.focus() : undefined}
             onBlur={suggesting ? s.blur : undefined}
             onKeyDown={onKeyDown}
             placeholder={shownPlaceholder}
@@ -546,6 +554,8 @@ function useSuggestions(value: string, on: boolean) {
       setOpen(true);
       ensureIndex();
     },
+    /** Read the index ahead of the first keystroke, the list still shut. */
+    prime: ensureIndex,
     // A press on a row lands after the field's blur on some phones, so the
     // list stays a moment.
     blur: () => {
@@ -650,10 +660,17 @@ function SuggestionList({
 }
 
 /** `/` focuses the search from any page unless a field has focus: the page's
- *  own search where one is drawn and visible, else the chrome's launcher. */
+ *  own search where one is drawn and visible, else the wallet panel's. ⌘K
+ *  (Ctrl+K off a Mac) opens and closes the wallet panel from anywhere, a
+ *  field included (ui-jobs 503). */
 export function useSlashToSearch() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        window.dispatchEvent(new Event(TOGGLE_SEARCH_EVENT));
+        return;
+      }
       if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
       const active = document.activeElement as HTMLElement | null;
       if (
@@ -679,10 +696,56 @@ export function useSlashToSearch() {
   }, []);
 }
 
+/** lucide's `layout-grid` with its four squares filled (Miles, 4 Nov 2026). */
+function FilledLayoutGrid() {
+  return (
+    <svg
+      width={18}
+      height={18}
+      viewBox="0 0 24 24"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect width="7" height="7" x="3" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="3" rx="1" />
+      <rect width="7" height="7" x="14" y="14" rx="1" />
+      <rect width="7" height="7" x="3" y="14" rx="1" />
+    </svg>
+  );
+}
+
 /** The glyph in the chrome that opens the wallet panel (H15.1), from the
- *  brand rail or the header bar. It reads as active while the panel is open. */
-export function SearchLauncher({ placement }: { placement: "rail" | "header" }) {
+ *  brand rail or the header bar. It reads as active while the panel is open.
+ *  `at="chooser"` is the grid glyph (ui-jobs 497), a second way in that opens
+ *  the same panel with the focus on the explorer chooser; it is not drawn
+ *  since 503, and putting it back is one more launcher in the rail. */
+export function SearchLauncher({
+  placement,
+  at = "search",
+}: {
+  placement: "rail" | "header";
+  at?: "search" | "chooser";
+}) {
   const open = useWalletPanelOpen();
+  if (at === "chooser")
+    return (
+      <button
+        type="button"
+        onClick={(e) => toggleWalletPanel(e.currentTarget, "chooser")}
+        className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          open ? "text-blue-600 dark:text-blue-400" : "text-rb-700 dark:text-rb-300"
+        }`}
+        aria-label="Open an explorer"
+        aria-expanded={open}
+        title="Open an explorer"
+        data-chooser-trigger={placement}
+      >
+        <FilledLayoutGrid />
+      </button>
+    );
   return (
     <button
       type="button"
@@ -690,10 +753,10 @@ export function SearchLauncher({ placement }: { placement: "rail" | "header" }) 
       className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
         open ? "text-blue-600 dark:text-blue-400" : "text-rb-700 dark:text-rb-300"
       }`}
-      aria-label="Look up a wallet"
+      aria-label="Search and explorers"
       aria-expanded={open}
-      aria-keyshortcuts="/"
-      title="Look up a wallet (/)"
+      aria-keyshortcuts="/ Meta+K"
+      title="Search and explorers (/ or ⌘K)"
       data-anatomy="H15.1"
       data-search-launcher={placement}
     >

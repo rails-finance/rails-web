@@ -284,7 +284,7 @@ async function desktop(theme) {
   // Guard: the page really rendered. Without this every "does NOT contain"
   // assertion below would pass against an error page or an empty body.
   const h1 = await page.locator("h1").first().innerText();
-  assert(/What Rails Covers/.test(h1), `page loaded (h1 = ${JSON.stringify(h1)})`);
+  assert(/What Rails covers/.test(h1), `page loaded (h1 = ${JSON.stringify(h1)})`);
 
   const table = page.locator("table");
   assert((await table.count()) === 1, "one matrix table");
@@ -950,7 +950,7 @@ async function mobile(theme) {
   await page.evaluate((t) => document.documentElement.classList.toggle("dark", t === "dark"), theme);
   await page.waitForTimeout(250);
 
-  assert(/What Rails Covers/.test(await page.locator("h1").first().innerText()), "page loaded");
+  assert(/What Rails covers/.test(await page.locator("h1").first().innerText()), "page loaded");
 
   // The two sides of `lg` must be genuinely different layouts (the matrix
   // moved from md to lg beside the brand rail, ui-jobs 498). Only one
@@ -1167,7 +1167,7 @@ async function base() {
   console.log("\n== /coverage/base (desktop viewport) ==");
   const page = await browser.newPage({ extraHTTPHeaders: bypassHeaders(), viewport: { width: 1280, height: 1800 } });
   await page.goto(BASE + "/coverage/base", { waitUntil: "networkidle" });
-  assert(/What Rails Covers/.test(await page.locator("h1").first().innerText()), "base page loaded");
+  assert(/What Rails covers/.test(await page.locator("h1").first().innerText()), "base page loaded");
 
   // Base is launched (rails-ops decision 0030, 2026-09-23), so the toggle
   // carries a Base segment marked active, and no work-in-progress strip.

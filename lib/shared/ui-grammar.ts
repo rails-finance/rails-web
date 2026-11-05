@@ -40,7 +40,7 @@ export const NAV_LINK = "text-rb-500 hover:text-blue-600 dark:hover:text-blue-40
 
 /**
  * Marketing-page CTA pill — the bordered rounded-full navigation button the
- * home page uses ("View live position", "See detailed coverage"). Blue text per
+ * home page uses ("View a live position", "See detailed coverage"). Blue text per
  * the one-meaning-per-colour rule (blue = navigation). Visual core only:
  * callers add their own reveal/hover behaviour (the hero pill fades in with
  * its frame's hover; a free-standing pill answers hover with a blue border).
@@ -48,7 +48,7 @@ export const NAV_LINK = "text-rb-500 hover:text-blue-600 dark:hover:text-blue-40
 export const PILL_CTA =
   "inline-flex items-center gap-2 whitespace-nowrap text-sm font-medium text-blue-600 dark:text-blue-400 bg-background/90 border border-rb-200 dark:border-rb-800 px-4 py-2 rounded-full backdrop-blur-sm";
 
-/** PILL_CTA with its border blue at rest ("View live position"). The neutral border is swapped, not
+/** PILL_CTA with its border blue at rest ("View a live position"). The neutral border is swapped, not
  *  appended to: two unconditional border-color utilities tie on specificity and
  *  Tailwind's stylesheet order, not class order, decides which holds. */
 export const PILL_CTA_BLUE = PILL_CTA.replace("border border-rb-200 dark:border-rb-800", "border border-blue-500");
@@ -73,6 +73,14 @@ export const CTRL_ON = "bg-rb-100 dark:bg-rb-800 text-foreground";
  *  an answer. CTRL_ON alone is deliberately inert (it already looks hovered),
  *  which is right for a state a click cannot undo and wrong for a toggle. */
 export const CTRL_ON_HOVER = "hover:bg-rb-200 dark:hover:bg-rb-700";
+
+/** A text button that changes this view in place ("View all <n> explorers",
+ *  "Show all ticks"), teal, the utility hue (color-grammar.md §4c), where link
+ *  blue says "opens another page" (Miles, 5 Nov 2026). teal-700 in light (about
+ *  5.5:1 on white; teal-600 fails AA for text), teal-400 in dark; an underline
+ *  on hover, as a link has. A disclosure chevron opening more of the same card
+ *  keeps the foreground (§3). */
+export const INPLACE_TEXT = "text-teal-700 dark:text-teal-400 hover:underline underline-offset-2";
 
 /** Engaged in-place control carrying a semantic accent (e.g. an active date
  *  filter). Teal — it's an in-place control state, which is the utility hue's

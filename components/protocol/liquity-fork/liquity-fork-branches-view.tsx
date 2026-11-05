@@ -50,7 +50,7 @@ import { explorerUrl } from "@/lib/shared/chains";
 import type { LiquityForkBranchesResponse, LiquityForkBranchState } from "@/lib/api/fetch-liquity-fork-branches";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
-import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK, INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 
 const ratePct = (x: number) => `${x.toFixed(2)}%`;
 const ratio = (x: number) => `${(x * 100).toFixed(1)}%`;
@@ -365,7 +365,7 @@ export function LiquityForkBranchesView({
             <button
               type="button"
               onClick={() => setShowEmpty((v) => !v)}
-              className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+              className={`text-[11px] font-semibold ${INPLACE_TEXT}`}
             >
               {showEmpty ? "Hide" : "Show"} {emptyCount} branch{emptyCount === 1 ? "" : "es"} with no queued troves
             </button>

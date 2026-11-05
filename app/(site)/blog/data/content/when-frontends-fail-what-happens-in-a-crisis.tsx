@@ -8,11 +8,8 @@ export default function WhenFrontendsFailWhatHappensInACrisis() {
       </p>
 
       <p>
-        <a href="https://rails.finance" target="_blank" rel="noopener noreferrer">
-          Rails
-        </a>{" "}
-        provides the solution: an independent, read-only platform for safely checking your positions when frontends
-        fail.
+        <a href="/">Rails</a> provides the solution: an independent, read-only platform for safely checking your
+        positions when frontends fail.
       </p>
       <h2>The 3:24 AM Panic Scenario</h2>
 

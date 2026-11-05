@@ -4,8 +4,7 @@ import Link from "next/link";
 import { RailsMark } from "@/components/nav/rails-mark";
 import { usePathname } from "next/navigation";
 
-import { BookmarksLink } from "@/components/nav/bookmarks-link";
-import { ChainSwitcher } from "@/components/nav/chain-switcher";
+import { ProfileMenu } from "@/components/nav/profile-menu";
 import { StartHereLink } from "@/components/nav/start-here-link";
 import { HeaderThemeToggle } from "@/components/nav/header-theme-toggle";
 import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
@@ -23,19 +22,6 @@ function RailsLogo() {
     >
       <RailsMark size={30} />
     </Link>
-  );
-}
-
-/** Release-stage pill right of the mark, below `md`. The site is in beta, and the
- *  chrome says so once, site-wide, instead of a per-rail label. It travels
- *  with the mark, so from `md` up BrandRail draws it.
- *  Caution-500 is the house "not settled yet" signal (the anatomy the old
- *  per-rail BETA pill used). */
-function BetaPill() {
-  return (
-    <span className="ml-2 rounded bg-caution-500 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">
-      Beta
-    </span>
   );
 }
 
@@ -62,31 +48,25 @@ export function HeaderBar() {
       className={`${isHome ? "absolute inset-x-0 top-0 z-40" : "relative z-40 mb-2"} md:hidden`}
     >
       <div className="max-w-7xl mx-auto py-4 px-4 md:px-6 flex items-center">
-        {/* The mark and the beta pill, which the rail holds from `md`. */}
-        <div className="flex items-center">
-          <RailsLogo />
-          <BetaPill />
-        </div>
+        {/* The mark alone, which the rail holds from `md`; below md the beta
+            pill is in the footer (components/nav/phone-beta.tsx). */}
+        <RailsLogo />
         {/* Right-hand control cluster. `ml-auto` pushes it hard right — it used
             to yield (`md:ml-0`) to the inline site-links nav that sat here, but
             that nav is retired, so the cluster owns the push outright. The
-            search's glyph and the toggle lead; the chooser and H20 close it
-            (the order below). The hamburger is retired — the site's own pages and socials
+            order is home's "Start here", the search's glyph, the toggle, then
+            H20 (Miles, 5 Nov 2026). The hamburger is retired — the site's own pages and socials
             live in the footers (SiteFooter on site routes, AppFooter's
             quiet Coverage link on app routes). */}
         <div className="ml-auto flex items-center gap-1">
-          {/* The search's glyph (H15.1): everywhere but home, whose hero is
-              the search. It opens the wallet panel, whose suggestions list
-              the bookmarks; the separate bookmarks button (H11) went on 1 Nov 2026.
-              A sheet from the top on a phone. */}
-          {!isHome && <SearchLauncher placement="header" />}
-          <HeaderThemeToggle />
-          {/* The explorer chooser's grid glyph (H4, ui-jobs 497), then the
-              profile control (H20), on every page (ui-jobs 498). */}
-          <ChainSwitcher variant="header" />
-          {/* Home's "Start here" (S12), left of H20; elsewhere it renders nothing. */}
+          {/* Home's "Start here" (S12) leads; elsewhere it renders nothing. */}
           <StartHereLink />
-          <BookmarksLink />
+          {/* The search's glyph (H15.1), on every page: it opens the wallet
+              panel at full width, the search over the explorer chooser
+              (ui-jobs 503). */}
+          <SearchLauncher placement="header" />
+          <HeaderThemeToggle />
+          <ProfileMenu />
         </div>
       </div>
     </header>

@@ -719,19 +719,20 @@ if ((await page.locator("[data-prov-tripwire]").count()) > 0) {
 }
 
 // ── 11: the chain switcher ──────────────────────────────────────────────────
-// The drawn one: the rail's, from `md` (ui-jobs 497).
-await page.locator("button[data-chooser-trigger]:visible").click();
-await page.waitForSelector("[role='menu']");
-// The chains the panel OFFERS, read off the panel rather than listed here: it
+// The chooser is in the wallet panel, opened by the search's glyph (ui-jobs 503).
+const CHOOSER = "[data-explorer-chooser]";
+await page.locator("button[data-search-launcher]:visible").click();
+await page.waitForSelector(CHOOSER, { state: "visible" });
+// The chains the chooser OFFERS, read off it rather than listed here: it
 // shows the launched chains (`launchedChains()`), so a hardcoded list here
 // would drift the day one is flagged. Base launched with rails-ops decision
-// 0030 (2026-09-23), so it is a column.
+// 0030 (2026-09-23), so it is a tab.
 const chainButtons = await page
-  .locator("[role='menu'] [data-chain-count]")
-  .evaluateAll((els) => els.map((e) => (e.parentElement?.textContent ?? "").replace(/\s+/g, " ").trim()));
+  .locator(`${CHOOSER} [role='tab'][data-chain-count]`)
+  .evaluateAll((els) => els.map((e) => e.getAttribute("aria-label") ?? ""));
 check(
-  "11a the switcher offers a Base column now that Base is launched",
-  chainButtons.some((t) => /^Base/.test(t)),
+  "11a the switcher offers a Base tab now that Base is launched",
+  chainButtons.includes("Base"),
   JSON.stringify(chainButtons),
 );
 // NO chain has a Vaults row any more: rails-ops decision 0028 moved every vault
@@ -746,9 +747,12 @@ check(
   vaultsRowAny.length === 0,
   JSON.stringify(vaultsRowAny),
 );
-await page.locator("[role='menu'] button", { hasText: "Ethereum" }).click();
+await page.locator(`${CHOOSER} [role='tab'][aria-label='Ethereum']`).click();
+// Aave vaults is not among Ethereum's eight most used (explorer-rank.json),
+// so its row is behind "View all".
+await page.locator(`${CHOOSER} [data-chooser-view-all]`).click();
 const aaveVaultsRow = await page
-  .locator("[role='menu'] a[href='/ethereum/aave']")
+  .locator(`${CHOOSER} a[href='/ethereum/aave']`)
   .evaluateAll((els) => els.map((e) => (e.textContent ?? "").replace(/\s+/g, " ").trim()));
 // Aave's vault layer launched on 20 Oct 2026 (ui-jobs 412; `unlaunched` left
 // its entry in lib/shared/protocols.ts), so the switcher's Ethereum column

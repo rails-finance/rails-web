@@ -188,16 +188,14 @@ export default function BoldSurvivedStreamFinanceChaos() {
       </p>
 
       <p>
-        <a href="https://rails.finance/" target="_blank" rel="noopener noreferrer">
-          Rails
-        </a>{" "}
-        achieves this by transforming raw blockchain transactions into plain language explanations and visual timelines.
-        Instead of parsing Etherscan's technical logs, users see clear narratives of what actually happened. For
-        example, when exploring a Liquity V2 trove (a user's collateralized loan position), Rails shows: "You deposited
-        2.5 ETH as collateral and borrowed 3,000 BOLD at a 4.2% annual interest rate. Your current collateralization
-        ratio is 145%, meaning you're well above the 110% liquidation threshold. Interest payments flow to the ETH
-        Stability Pool depositors." The transaction history displays as a timeline — when the trove opened, interest
-        rate adjustments, any BOLD repayments — making complex protocol interactions immediately understandable.
+        <a href="/">Rails</a> achieves this by transforming raw blockchain transactions into plain language explanations
+        and visual timelines. Instead of parsing Etherscan's technical logs, users see clear narratives of what actually
+        happened. For example, when exploring a Liquity V2 trove (a user's collateralized loan position), Rails shows:
+        "You deposited 2.5 ETH as collateral and borrowed 3,000 BOLD at a 4.2% annual interest rate. Your current
+        collateralization ratio is 145%, meaning you're well above the 110% liquidation threshold. Interest payments
+        flow to the ETH Stability Pool depositors." The transaction history displays as a timeline — when the trove
+        opened, interest rate adjustments, any BOLD repayments — making complex protocol interactions immediately
+        understandable.
       </p>
 
       <p>
