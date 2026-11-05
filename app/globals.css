@@ -2327,3 +2327,19 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
     animation: none;
   }
 }
+
+/* H20's menu below md: a sheet rising from the foot of the screen
+   (components/nav/profile-menu.tsx, ui-jobs 507); still under reduced motion. */
+.profile-sheet {
+  animation: profile-sheet-rise 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes profile-sheet-rise {
+  from {
+    transform: translateY(100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .profile-sheet {
+    animation: none;
+  }
+}

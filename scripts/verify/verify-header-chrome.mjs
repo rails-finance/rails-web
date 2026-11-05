@@ -369,7 +369,8 @@ check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
 const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
 check(mFooterBeta, "home @390: the beta pill is in the footer");
 // The profile control's menu (ui-jobs 504): a menu button; with nothing
-// saved, the line on saving one and the theme switch; a full-width sheet
+// saved, the line on saving one and the theme switch; a full-width sheet at
+// the foot of the screen (ui-jobs 507)
 // below md; Escape closes it and returns focus.
 const h20 = mHomePage.locator('header [data-anatomy="H20"]');
 check((await h20.getAttribute("aria-haspopup")) === "menu", "H20 is a menu button");
@@ -380,6 +381,7 @@ const sheet = await mHomePage.evaluate(() => {
   return {
     role: m?.getAttribute("role"),
     width: r ? Math.round(r.width) : 0,
+    bottom: r ? Math.round(r.bottom) : 0,
     empty: !!m?.querySelector("[data-profile-menu-empty]"),
     themes: [...(m?.querySelectorAll("[data-theme-option]") ?? [])].map((b) => b.textContent.trim()).join(","),
     manage: !!m?.querySelector('[data-profile-menu-manage][href="/bookmarks"]'),
@@ -389,14 +391,16 @@ const sheet = await mHomePage.evaluate(() => {
 check(
   sheet.role === "menu" &&
     sheet.width === 390 &&
+    sheet.bottom === 800 &&
     sheet.empty &&
     sheet.manage &&
     sheet.scrim &&
     sheet.themes === "Light,Dark,Auto",
-  `home @390: H20 opens a full-width menu over a dim: the saving line, Manage wallets, the theme switch (${JSON.stringify(sheet)})`,
+  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: the saving line, Manage wallets, the theme switch (${JSON.stringify(sheet)})`,
 );
 // A press on the dim closes the sheet.
-await mHomePage.mouse.click(195, 780);
+await mHomePage.waitForTimeout(300);
+await mHomePage.mouse.click(195, 200);
 const dimClosed = await mHomePage.evaluate(() => !document.querySelector("[data-profile-menu]"));
 check(dimClosed, "home @390: a press on the dim closes the menu");
 await h20.click();
@@ -406,6 +410,14 @@ const h20Back = await mHomePage.evaluate(
     !document.querySelector("[data-profile-menu]") && document.activeElement?.getAttribute("data-anatomy") === "H20",
 );
 check(h20Back, "home @390: Escape closes the menu and focus returns to H20");
+// A second press where the control is closes the sheet and leaves it closed.
+const h20Box = await h20.boundingBox();
+await h20.click();
+await mHomePage.waitForTimeout(300);
+await mHomePage.mouse.click(h20Box.x + h20Box.width / 2, h20Box.y + h20Box.height / 2);
+await mHomePage.waitForTimeout(300);
+const samePlaceClosed = await mHomePage.evaluate(() => !document.querySelector("[data-profile-menu]"));
+check(samePlaceClosed, "home @390: a second press on H20's place closes the sheet");
 await mHomePage.close();
 const dFooterBeta = await page.locator("footer [data-phone-beta]:visible").count();
 check(dFooterBeta === 0, `@1280: the footer's beta pill is hidden, the rail carries it (${dFooterBeta})`);
