@@ -412,6 +412,29 @@ await phone.close();
     .locator("[data-profile-menu-wallet]")
     .evaluateAll((as) => as.map((a) => a.getAttribute("data-profile-menu-wallet")));
   check("W profile menu lists them in that order", menu.join() === moved.join(), menu.join());
+  await bp.keyboard.press("Escape");
+  // The drawer's search (Miles, 5 Nov 2026): focused on open with the list
+  // shut and the chooser uncovered; ArrowDown opens the saved wallets; typing
+  // opens the list and clearing the field shuts it. No saved-wallets link.
+  await bp.locator('aside[data-anatomy="H1"] button[data-search-launcher]').click();
+  const field = bp.locator("[data-search-launcher-panel] input");
+  await field.waitFor();
+  await bp.waitForTimeout(300);
+  const listShown = () => bp.locator("[data-search-launcher-panel] [role=listbox]").isVisible();
+  const atOpen = { focused: await field.evaluate((el) => el === document.activeElement), list: await listShown() };
+  await field.press("ArrowDown");
+  const onArrow = await listShown();
+  await field.press("Escape");
+  await field.fill("aa");
+  const onType = await listShown();
+  await field.fill("");
+  const onClear = await listShown();
+  const panelLink = await bp.locator("[data-wallet-panel-bookmarks]").count();
+  check(
+    "S drawer search: focused, list shut on open; ArrowDown and typing open it; clearing shuts it; no saved link",
+    atOpen.focused && !atOpen.list && onArrow && onType && !onClear && panelLink === 0,
+    JSON.stringify({ atOpen, onArrow, onType, onClear, panelLink }),
+  );
   await ctx.close();
 }
 

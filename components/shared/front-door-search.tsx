@@ -393,12 +393,16 @@ export function FrontDoorSearch({
             value={value}
             onChange={(v) => {
               setValue(v);
-              s.reopen();
+              // The list opens on typing and closes when the field is cleared
+              // (Miles, 5 Nov 2026); an empty field leaves what is under it
+              // uncovered. ArrowDown on it still opens the saved wallets.
+              if (v.trim() === "") s.close();
+              else s.reopen();
               if (problem) setProblem(null);
             }}
             inputRef={inputRef}
-            onFocus={suggesting ? () => !quietFocus.current && s.focus() : undefined}
-            onClick={suggesting ? s.focus : undefined}
+            onFocus={suggesting ? () => (value.trim() === "" || quietFocus.current ? s.prime() : s.focus()) : undefined}
+            onClick={suggesting ? () => value.trim() !== "" && s.focus() : undefined}
             onBlur={suggesting ? s.blur : undefined}
             onKeyDown={onKeyDown}
             placeholder={shownPlaceholder}
@@ -550,6 +554,8 @@ function useSuggestions(value: string, on: boolean) {
       setOpen(true);
       ensureIndex();
     },
+    /** Read the index ahead of the first keystroke, the list still shut. */
+    prime: ensureIndex,
     // A press on a row lands after the field's blur on some phones, so the
     // list stays a moment.
     blur: () => {
