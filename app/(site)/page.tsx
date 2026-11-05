@@ -142,9 +142,9 @@ export default async function Home() {
               fetch that lands AFTER first render — don't imply it runs before
               the page shows anything. */}
             <p className="body-text max-w-3xl">
-              Rails builds a read-only explorer for each DeFi protocol it covers. Look up any position &mdash; yours or
-              anyone else&rsquo;s &mdash; and see what it holds, what it owes, and everything that has ever happened to
-              it. Here is the path the data travels:
+              Each Rails explorer covers one DeFi protocol, from lending markets and vaults to savings and exchanges.
+              Look up an address to see its positions, what they hold and every transaction behind them. Here is the
+              path the data travels:
             </p>
 
             {/* The capability list became a transit-style rail: the four
