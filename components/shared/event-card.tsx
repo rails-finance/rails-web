@@ -268,6 +268,9 @@ interface EventCardFrame {
   /** The phone control's full name; unset, the spoken caption and the legs
    *  the column reports. */
   label?: string;
+  /** The name a card with no event (a group's summary) builds its DOM ids
+   *  from, in place of `useId` (`groupCardKey`). */
+  nameKey?: string;
   /** What the number column draws in place of the event's number: the
    *  boundary's count. */
   numberSlot?: ReactNode;
@@ -415,6 +418,14 @@ function CollectedEventCard({
   return null;
 }
 
+const domSafe = (s: string) => s.replace(/[^A-Za-z0-9_-]/g, "_");
+
+/** A group summary card's `nameKey`: its kind, its span and its count, which
+ *  name one group on a page. Safe in a DOM id as it stands. */
+export function groupCardKey(kind: string, fromTs: number, toTs: number, count: number): string {
+  return domSafe(`${kind}-${fromTs}-${toTs}-${count}`);
+}
+
 export function EventCard(props: EventCardProps) {
   const collect = useContext(SheetCollectContext);
   return collect ? <CollectedEventCard slots={props.slots} collect={collect} /> : <EventCardView {...props} />;
@@ -429,6 +440,7 @@ function EventCardView(props: EventCardProps) {
     phoneCaption,
     spokenCaption,
     label,
+    nameKey,
     numberSlot,
     detailOpen: detailOpenProp,
     onDetailToggle,
@@ -490,9 +502,11 @@ function EventCardView(props: EventCardProps) {
   // The card's ids name the event where the card has one (its share path's
   // id, one card per event on a page), so they hold whatever the tree above
   // the card looks like: a useId alone differed between server and client on
-  // the timeline and event pages when the page hydrated in pieces.
+  // the timeline and event pages when the page hydrated in pieces. A group's
+  // summary card has no event, so it passes `nameKey` (`groupCardKey`) for the
+  // same reason (rails-ops TO-DO-ui-jobs 508).
   const shareEventId = eventIdFromShareHref(shareHref);
-  const domId = shareEventId ? `evt-${shareEventId.replace(/[^A-Za-z0-9_-]/g, "_")}` : reactId;
+  const domId = shareEventId ? `evt-${domSafe(shareEventId)}` : nameKey ? `grp-${domSafe(nameKey)}` : reactId;
   const cardId = persistKey ?? domId;
   const hasPanel = detail != null;
   // A timeline row: one DOM at both widths (ui-jobs 304). Under 640px it draws
