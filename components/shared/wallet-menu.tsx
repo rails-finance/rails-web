@@ -133,10 +133,13 @@ export function WalletMenu({
       // A 28px row with a 44px press area (after:).
       // The heading's trigger opens a menu in place, so it stays neutral with
       // the chrome's tile on hover and while open (ui-jobs 516).
-      className={`relative flex h-7 min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded-md transition-colors focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-[''] ${
+      // The heading's -mx-1.5 widens the box by 12px past its h1, so its cap is
+      // the h1's width plus those 12px: capped at max-w-full it lost them, and
+      // a name that fitted ("boldlygo.eth") truncated.
+      className={`relative flex h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-md transition-colors focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-[''] ${
         heading
-          ? `-mx-1.5 rounded-lg px-1.5 text-foreground ${open ? CHROME_HOVER_ON : CHROME_HOVER}`
-          : "text-xs text-rb-500 hover:text-foreground"
+          ? `-mx-1.5 max-w-[calc(100%+0.75rem)] rounded-lg px-1.5 text-foreground ${open ? CHROME_HOVER_ON : CHROME_HOVER}`
+          : "max-w-full text-xs text-rb-500 hover:text-foreground"
       }`}
     >
       {!heading && <Facehash address={wallet} size={16} />}

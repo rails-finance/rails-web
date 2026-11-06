@@ -217,6 +217,8 @@ function History({ closed }: { closed: WalletPosition[] }) {
         </h2>
         {counts.length > 0 && <span className="text-xs text-rb-500">{counts.join(" · ")}</span>}
       </div>
+      {/* To remove once Arbitrum's history is indexed like Ethereum's and Base's
+          (Miles, 6 Nov 2026: obsolete soon; ui-jobs 522 notes it). */}
       <p className="mb-3 text-xs text-rb-500">
         On Ethereum and Base, every closed position Rails has indexed for the wallet; on Arbitrum, the positions a visit
         has stored.
@@ -279,7 +281,7 @@ function History({ closed }: { closed: WalletPosition[] }) {
           <div className="flex min-w-[860px] flex-col gap-3" role="table" aria-label="Closed positions">
             <div
               role="row"
-              className={`${HISTORY_GRID} ${ROW_PANEL} py-3 pr-5 text-xs font-semibold uppercase tracking-wide text-rb-500`}
+              className={`${HISTORY_GRID} border border-transparent py-3 pr-5 text-xs font-semibold uppercase tracking-wide text-rb-500`}
             >
               <div role="columnheader" aria-hidden="true" />
               <div role="columnheader">Closed</div>

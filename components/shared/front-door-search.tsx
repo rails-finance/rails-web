@@ -624,8 +624,10 @@ function SuggestionList({
             onMouseDown={(e) => e.preventDefault()}
             onMouseMove={() => openable && !on && onHover(row.key)}
             onClick={() => openable && onChoose(row)}
+            // The highlight one step off the list's raised ground (rb-100 / rb-800):
+            // drawn in the ground's own shade, the arrow keys moved it unseen.
             className={`flex items-center gap-3 px-4 py-2 ${openable ? "cursor-pointer" : "cursor-default"} ${
-              on ? "bg-rb-100 dark:bg-rb-800" : ""
+              on ? "bg-rb-200 dark:bg-rb-600" : ""
             }`}
           >
             {/* An address row (a wallet, a bookmark) leads with its facehash, as
