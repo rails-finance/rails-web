@@ -58,12 +58,13 @@ export const PILL_CTA =
  * "New to Rails? Start here" as a button, in green: the one exception to blue
  * for a link, because green says "new" (Miles, 6 Nov 2026; the marketing green,
  * color-grammar.md §2). Green text on a green-tinted ground with a green
- * border that strengthens on hover; green-700 in light for AA. Add the display
+ * border that strengthens on hover; green-700 in light for AA. The signpost
+ * comes after the words, where a link's arrow sits. Add the display
  * and width where it is drawn (the profile menu's is full width, the saved
  * wallets page's fits its text).
  */
 export const START_CTA =
-  "items-center gap-2 rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 transition-colors hover:border-green-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 dark:border-green-400/40 dark:bg-green-500/10 dark:text-green-400 dark:hover:border-green-500";
+  "items-center gap-2 rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 transition-colors hover:border-green-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 dark:border-green-500/60 dark:bg-green-900/40 dark:text-green-400 dark:hover:border-green-400";
 
 export const CTRL_GHOST = "inline-flex items-center justify-center transition-colors cursor-pointer";
 

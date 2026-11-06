@@ -58,8 +58,8 @@ export function BookmarksPage() {
                   address menu on a position page.
                 </p>
                 <Link href="/start" className={`mt-6 inline-flex ${START_CTA}`} data-bookmarks-start="">
-                  <Signpost className="size-4 shrink-0" aria-hidden="true" />
                   New to Rails? Start here
+                  <Signpost className="size-4 shrink-0" aria-hidden="true" />
                 </Link>
                 <p className="mt-4 text-sm">
                   <Link

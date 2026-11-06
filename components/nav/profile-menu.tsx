@@ -284,8 +284,8 @@ export function ProfileMenu() {
                   className={START_BUTTON}
                   data-profile-menu-start=""
                 >
-                  <Signpost className="size-4 shrink-0" aria-hidden="true" />
                   New to Rails? Start here
+                  <Signpost className="size-4 shrink-0 ml-auto" aria-hidden="true" />
                 </Link>
               )}
               <div role="group" aria-labelledby={`${menuId}-wallets`}>
