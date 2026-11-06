@@ -10,7 +10,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 const H2 = "text-3xl font-semibold tracking-tight text-foreground";
-const LINK = "text-pink-500 hover:text-pink-600 transition-colors";
+const LINK = "text-pink-500 hover:text-pink-600 hover:underline underline-offset-2 transition-colors";
 
 type Member = {
   name: string;
