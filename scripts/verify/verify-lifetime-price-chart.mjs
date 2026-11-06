@@ -1787,11 +1787,13 @@ async function checkBand(page, tag, pg, width) {
     // picked for; a price that has since left it (0x1aa5 sits at its band's
     // top) is noted, and the words are held to the place the page's price
     // gives.
-    const half = 0.5 * 10 ** -((String(lv.text).match(/\.(\d+)/)?.[1].length ?? 0));
+    const half = 0.5 * 10 ** -(String(lv.text).match(/\.(\d+)/)?.[1].length ?? 0);
     const placeAt = (p) => (p < lv.lo ? "below" : p <= lv.hi ? "inside" : null);
     const places = new Set([placeAt(lv.price - half), placeAt(lv.price), placeAt(lv.price + half)]);
     if (lv.place !== (want.place ?? null))
-      console.log(`NOTE  ${tag}: today's price is ${lv.place ?? "above the band"}, not ${want.place ?? "above"} as picked`);
+      console.log(
+        `NOTE  ${tag}: today's price is ${lv.place ?? "above the band"}, not ${want.place ?? "above"} as picked`,
+      );
     check(
       `${tag}: the tip's band words at today (${want.place ?? "above the band: none"})`,
       places.has(lv.place) && (lv.place !== "inside" || /soft liquidation/.test(lv.placeText)),
