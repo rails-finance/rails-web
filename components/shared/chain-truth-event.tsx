@@ -29,7 +29,7 @@
 
 import { ProtocolGlyph } from "@/components/icons/protocol-glyphs";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { createContext, Fragment, useContext, useEffect, useId, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useEffect, type ReactNode } from "react";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { Prov } from "@/components/shared/provenance";
 import { RatePillShell, DelegateRatePillShell } from "@/components/shared/rate-pill";
@@ -1051,7 +1051,9 @@ export const HeadChipContext = createContext<((id: string, words: string | null)
 export function PartyChip({ party }: { party: NonNullable<ChainTruthRowSpec["party"]> }) {
   const ens = useEnsName(party.ens ? party.address : null);
   const shown = party.name ?? ens ?? `${party.address.slice(0, 6)}…${party.address.slice(-4)}`;
-  const chipId = useId();
+  // Named by its words and its address, not its place in the tree, so the
+  // server's and the browser's renders agree (rails-ops TO-DO-ui-jobs 508).
+  const chipId = `${party.prefix}:${party.address}`;
   const offer = useContext(HeadChipContext);
   const words = `${party.prefix} ${shown}`;
   useEffect(() => {

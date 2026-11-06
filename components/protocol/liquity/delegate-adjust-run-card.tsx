@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useContext, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-import { EventCard } from "@/components/shared/event-card";
+import { EventCard, groupCardKey } from "@/components/shared/event-card";
 import { SheetSkeleton, type EventSheet } from "@/components/shared/event-sheet";
 import type { EventCardPrice } from "@/components/shared/event-price-row";
 import { GroupSheetCollector, type CollectedCard } from "@/components/shared/group-sheet";
@@ -272,8 +272,11 @@ export function DelegateAdjustRunCard({
     : `${shortDate(fromTs)} ${shortDateYear(fromTs)} – ${shortDate(toTs)} ${shortDateYear(toTs)}`;
 
   const toggle = () => setOpen((v) => !v);
-  const membersId = useId();
 
+  // The summary card's ids and the members' region name the run, not its
+  // place in the tree (\`groupCardKey\`).
+  const nameKey = groupCardKey("adjusted", fromTs, toTs, count);
+  const membersId = `grp-${nameKey}-members`;
   const rateProv = (which: DelegateRunRateWhich) => delegateRunRateProv(which, [fromTs, toTs], count);
   const rates: DelegateRunRates = { fromRate, toRate, lowRate, highRate };
 
@@ -438,6 +441,7 @@ export function DelegateAdjustRunCard({
           spokenCaption={troveWords("run_spoken", { range: spokenRange })}
           label={troveWords("run_label", { count_text: countText, by, range: spokenRange, movement })}
           group="summary"
+          nameKey={nameKey}
         />
       }
       members={children}
