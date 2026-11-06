@@ -4,9 +4,9 @@
 // decisions/0051 step 3): what else Rails holds for the address, linking to
 // the wallet view. Read after mount from /api/chain/wallet/<address>/summary,
 // so the page's render does not wait on it; nothing is drawn while it loads,
-// when it fails, or when there is nothing else. The page's own position is
-// left out when a row's page is this one; otherwise the line counts every
-// position "across Rails".
+// when it fails, or when the page's position is the wallet's only one. It
+// counts every position, the page's included, in the wallet view's words
+// (W1), so the two read alike (Miles, 6 Nov 2026).
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -45,7 +45,9 @@ export function WalletElsewhereLine({ wallet }: { wallet: string }) {
       const search = window.location.search;
       const rest = c.positions.filter((p) => !rowIsPage(p.href, pathname, search));
       const matched = rest.length < c.positions.length;
-      const text = walletLineText(rest, matched);
+      // Nothing else to open: the page's position is the wallet's only one.
+      if (rest.length === 0) return;
+      const text = walletLineText(c.positions);
       setLine(text ? { text, matched } : null);
     });
     return () => {

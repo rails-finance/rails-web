@@ -30,7 +30,7 @@ import { protocolBrand } from "@/lib/shared/protocols";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { formatCompactUsd } from "@/lib/shared/format-compact";
 import { formatDate } from "@/lib/date";
-import { chainMeta, type ChainId } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, chainMeta, type ChainId } from "@/lib/shared/chains";
 import { walletCountProv, walletTradeAtProv } from "@/lib/cow/trade";
 import type { CowWalletEntry } from "@/lib/cow/types";
 import type { WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
@@ -217,12 +217,6 @@ function History({ closed }: { closed: WalletPosition[] }) {
         </h2>
         {counts.length > 0 && <span className="text-xs text-rb-500">{counts.join(" · ")}</span>}
       </div>
-      {/* To remove once Arbitrum's history is indexed like Ethereum's and Base's
-          (Miles, 6 Nov 2026: obsolete soon; ui-jobs 522 notes it). */}
-      <p className="mb-3 text-xs text-rb-500">
-        On Ethereum and Base, every closed position Rails has indexed for the wallet; on Arbitrum, the positions a visit
-        has stored.
-      </p>
       {/* Below sm each closed position is a short block; the table from sm up. */}
       <ul className="flex flex-col gap-3 sm:hidden" aria-label="Closed positions">
         {rows.map((p) => {
@@ -596,6 +590,8 @@ export function WalletView({
           </>
         )}
 
+        {!read.error && <ArbitrumNote address={address} />}
+
         {unread.length > 0 && (
           <p className="text-xs text-rb-500" data-wallet-unread={unread.map((r) => r.id).join(",")}>
             Not read at head: {unread.map(familyChain).join(", ")}. Their cards show the stored figures.
@@ -603,5 +599,33 @@ export function WalletView({
         )}
       </div>
     </ProvReceiptsScope>
+  );
+}
+
+/** At the page's foot (Miles, 6 Nov 2026): Arbitrum positions are stored when
+ *  the wallet is opened on an Arbitrum explorer, so this says how to bring
+ *  them here. To remove once Arbitrum history is indexed like Ethereum's and
+ *  Base's (ui-jobs 522). */
+function ArbitrumNote({ address }: { address: string }) {
+  const link = "text-blue-600 hover:underline dark:text-blue-400";
+  return (
+    <p className="flex items-start gap-2 text-xs text-rb-500" data-wallet-arbitrum-note="">
+      <ChainGlyph id={ARBITRUM_CHAIN_ID} className="mt-px h-3.5 w-3.5 shrink-0" />
+      <span>
+        Arbitrum positions show here once the wallet has been opened on{" "}
+        <Link href={`/arbitrum/aave-v3/${address}`} prefetch={false} className={link}>
+          Aave V3
+        </Link>
+        ,{" "}
+        <Link href="/arbitrum/compound-v3" prefetch={false} className={link}>
+          Compound V3
+        </Link>{" "}
+        or{" "}
+        <Link href={`/arbitrum/morpho/${address}`} prefetch={false} className={link}>
+          Morpho Blue
+        </Link>{" "}
+        on Arbitrum.
+      </span>
+    </p>
   );
 }

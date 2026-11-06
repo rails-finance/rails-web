@@ -81,16 +81,14 @@ export function rowIsPage(href: string, pathname: string, search: string): boole
 
 const count = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 
-/** The line's words for `positions`, or null when there is nothing to say.
- *  `others` is true when the page's position was found and left out. */
-export function walletLineText(positions: WalletCountsPosition[], others: boolean): string | null {
+/** The line's words for the wallet's positions, in the wallet view's words
+ *  (W1: "2 positions · 1 open · 1 closed"; Miles, 6 Nov 2026), the chains
+ *  named only when there are more than one. Null when there is nothing. */
+export function walletLineText(positions: WalletCountsPosition[]): string | null {
   const n = positions.length;
   if (n === 0) return null;
-  const chains = [...new Set(positions.map((p) => p.chain))];
-  const where = chains.length === 1 ? CHAIN_NAMES[chains[0]] : `${chains.length} chains`;
+  const chains = new Set(positions.map((p) => p.chain)).size;
   const open = positions.filter((p) => p.status === "open").length;
-  const status =
-    open === n ? (n === 1 ? "open" : "all open") : open === 0 ? (n === 1 ? "closed" : "all closed") : `${open} open`;
-  const head = others ? `${count(n, "more position")} on ${where}` : `${count(n, "position")} on ${where} across Rails`;
-  return `${head} · ${status}`;
+  const where = chains > 1 ? ` on ${chains} chains` : "";
+  return `${count(n, "position")}${where} · ${open.toLocaleString("en-US")} open · ${(n - open).toLocaleString("en-US")} closed`;
 }
