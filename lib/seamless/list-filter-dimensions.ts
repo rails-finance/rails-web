@@ -19,7 +19,9 @@ import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filt
 export const SEAMLESS_POSITIONS_ROUTE = "/api/seamless/positions";
 
 export function seamlessListDimensions() {
-  return aaveV3ListDimensions(undefined, BASE_LENDING_SIZE_NOTE).filter((d) => d.id !== "market" && d.id !== "tx");
+  return aaveV3ListDimensions(undefined, BASE_LENDING_SIZE_NOTE).filter(
+    (d) => d.id !== "market" && d.id !== "tx" && d.id !== "supplying",
+  );
 }
 
 export const SEAMLESS_LIST_DEFAULTS: AaveV3ListFilters = { ...AAVE_V3_LIST_DEFAULTS, market: [] };

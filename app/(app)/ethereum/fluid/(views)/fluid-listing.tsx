@@ -38,7 +38,7 @@ export function FluidListing({ initialItems, initialTotal, initialKey, initialSe
       hrefFor={(p) => `/ethereum/fluid/${p.nftId}`}
       keyFor={(p) => p.nftId}
       strategy={serverStrategy<FluidPositionSummary, FluidListFilters>({
-        dimensions: fluidListDimensions(),
+        dimensions: (f) => fluidListDimensions(f),
         itemsPerPage: FLUID_ITEMS_PER_PAGE,
         fetchPage: (filters, page) =>
           fetchFluidPositions(fluidFiltersToFetchParams(filters, page)).then((r) => ({

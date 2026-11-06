@@ -215,19 +215,118 @@
   "collateral": {
     "liquity-v1": {
       "groups": ["eth"],
-      "note": "Liquity V1 takes one collateral, ETH (docs.liquity.org/liquity-v1/readme: loans against Ether). Its listing has no collateral filter."
+      "note": "Liquity V1 takes one collateral, ETH (docs.liquity.org/liquity-v1/readme: loans against Ether).",
+      "only": "ETH"
     },
     "morpho": {
       "groups": ["eth", "btc", "stablecoins"],
-      "note": "Morpho Blue markets are permissionless (docs.morpho.org/learn/concepts/market) and the docs name no collateral list. The chain read of Ethereum markets (/api/chain/morpho/markets, 4 Nov 2026) shows ETH, BTC and stablecoin collateral."
+      "note": "Morpho Blue markets are permissionless and the docs name no collateral list. The collateral tokens are the ones Rails's market roster holds positions in (/api/morpho/market-roster, 6 Nov 2026).",
+      "param": "coll",
+      "values": {
+        "wstETH": ["wstETH"],
+        "WBTC": ["WBTC"],
+        "sUSDe": ["sUSDe"],
+        "USR": ["USR"],
+        "cbBTC": ["cbBTC"],
+        "eUSDe": ["eUSDe"],
+        "USDe": ["USDe"],
+        "LBTC": ["LBTC"],
+        "weETH": ["weETH"],
+        "WETH": ["WETH"],
+        "sUSDf": ["sUSDf"],
+        "srUSD": ["srUSD"],
+        "sUSDS": ["sUSDS"],
+        "syrupUSDC": ["syrupUSDC"],
+        "apyUSD": ["apyUSD"],
+        "ezETH": ["ezETH"],
+        "wstUSR": ["wstUSR"],
+        "siUSD": ["siUSD"],
+        "wsrUSD": ["wsrUSD"],
+        "rsETH": ["rsETH"],
+        "fxSAVE": ["fxSAVE"],
+        "stUSDS": ["stUSDS"],
+        "reUSD": ["reUSD"],
+        "sDAI": ["sDAI"],
+        "tBTC": ["tBTC"],
+        "USDC": ["USDC"],
+        "rETH": ["rETH"],
+        "stcUSD": ["stcUSD"],
+        "deUSD": ["deUSD"],
+        "sUSDai": ["sUSDai"],
+        "msY": ["msY"],
+        "savUSD": ["savUSD"],
+        "sDOLA": ["sDOLA"],
+        "syrupUSDT": ["syrupUSDT"],
+        "sUSN": ["sUSN"],
+        "sdeUSD": ["sdeUSD"],
+        "steakEURCV": ["steakEURCV"],
+        "osETH": ["osETH"],
+        "USDT": ["USDT"],
+        "USDS": ["USDS"],
+        "yvUSDC-1": ["yvUSDC-1"],
+        "sBOLD": ["sBOLD"],
+        "DAI": ["DAI"],
+        "svZCHF": ["svZCHF"],
+        "GHO": ["GHO"],
+        "EURCV": ["EURCV"],
+        "wUSDM": ["wUSDM"],
+        "ysyBOLD": ["ysyBOLD"],
+        "JPYC": ["JPYC"],
+        "tETH": ["tETH"],
+        "sUSDv": ["sUSDv"],
+        "fxUSD": ["fxUSD"],
+        "apxUSD": ["apxUSD"],
+        "crvUSD": ["crvUSD"],
+        "cbETH": ["cbETH"],
+        "GUSD": ["GUSD"],
+        "sFRAX": ["sFRAX"]
+      }
     },
     "morpho-base": {
       "groups": ["eth", "btc", "stablecoins"],
-      "note": "As Morpho on Ethereum. The chain read of Base markets (/api/chain/morpho-base/markets, 4 Nov 2026) shows ETH, BTC and stablecoin collateral; the listing's collateral filter takes addresses."
+      "note": "Morpho Blue markets are permissionless and the docs name no collateral list. The collateral tokens are the ones Rails's Base positions hold (morpho_base_market_state, 6 Nov 2026), named through lib/shared/token-addresses.base.ts; a token that file does not name is left out.",
+      "param": "coll",
+      "values": {
+        "cbBTC": ["0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf"],
+        "WETH": ["0x4200000000000000000000000000000000000006"],
+        "cbETH": ["0x2ae3f1ec7f1f5012cfeab0185bfc7aa3cf0dec22"],
+        "wstETH": ["0xc1cba3fcea344f92d9239c08c0568f6f2f0ee452"],
+        "weETH": ["0x04c0599ae5a44757c0af6f9ec3b93da8976c150a"],
+        "USDC": ["0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"],
+        "ezETH": ["0x2416092f143378750bb29b79ed961ab195cceea5"],
+        "LBTC": ["0xecac9c5f704e954931349da37f60e39f515c11c1"],
+        "rETH": ["0xb6fe221fe9eef5aba221c348ba20a1bf5e73624c"],
+        "USDe": ["0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34"],
+        "syrupUSDC": ["0x660975730059246a68521a3e2fbd4740173100f5"],
+        "USDS": ["0x820c137fa70c8691f0e44dc420a5e53c168921dc"],
+        "EURC": ["0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42"]
+      }
     },
     "fluid": {
       "groups": ["eth", "btc", "stablecoins"],
-      "note": "The Fluid docs list no collateral. Rails's vault read (/api/chain/fluid/vaults, 4 Nov 2026, 177 vaults) shows ETH, BTC and stablecoin supply sides."
+      "note": "Fluid states no collateral list. The supply tokens are the ones Rails's positions hold (mv_fluid_positions, 6 Nov 2026), sent to the listing's Supplying filter.",
+      "param": "supply",
+      "values": {
+        "wstUSR": ["wstUSR"],
+        "ETH": ["ETH"],
+        "weETH": ["weETH"],
+        "sUSDe": ["sUSDe"],
+        "wstETH": ["wstETH"],
+        "WBTC": ["WBTC"],
+        "reUSD": ["reUSD"],
+        "cbBTC": ["cbBTC"],
+        "USDC": ["USDC"],
+        "syrupUSDC": ["syrupUSDC"],
+        "sUSDS": ["sUSDS"],
+        "syrupUSDT": ["syrupUSDT"],
+        "sUSDai": ["sUSDai"],
+        "tBTC": ["tBTC"],
+        "ezETH": ["ezETH"],
+        "LBTC": ["LBTC"],
+        "osETH": ["osETH"],
+        "rsETH": ["rsETH"],
+        "USDe": ["USDe"]
+      }
     },
     "llamalend": {
       "groups": ["eth", "btc", "stablecoins"],
@@ -235,7 +334,14 @@
     },
     "makerdao": {
       "groups": ["eth", "btc"],
-      "note": "The Sky docs were not readable. Rails's ilk roster (/api/makerdao/ilk-roster, 4 Nov 2026) holds ETH, WSTETH, RETH and WBTC vault types; the USDC, USDT, TUSD, GUSD and PAXUSD ilks are legacy and left off."
+      "note": "The Sky docs were not readable. The vault types are Rails's ilk roster (/api/makerdao/ilk-roster, 6 Nov 2026); the USDC, USDT, TUSD and GUSD ilks are legacy and left off.",
+      "param": "ilk",
+      "values": {
+        "ETH": ["ETH-A", "ETH-C", "ETH-B"],
+        "WBTC": ["WBTC-A", "WBTC-C", "WBTC-B"],
+        "wstETH": ["WSTETH-A", "WSTETH-B"],
+        "rETH": ["RETH-A"]
+      }
     },
     "compound": {
       "groups": ["eth", "btc", "stablecoins"],
@@ -247,11 +353,43 @@
     },
     "aave-v3-base": {
       "groups": ["eth", "btc", "stablecoins"],
-      "note": "The Aave docs reachable list no Base assets. Rails's Pool read (/api/chain/aave-v3-base/market, 4 Nov 2026) shows WETH, cbETH, wstETH, weETH, cbBTC, LBTC, USDC and EURC with a liquidation threshold above zero."
+      "note": "The Aave docs reachable list no Base assets. The reserves are the ones Rails's Base positions supply (aave_v3_base_position_chain, 6 Nov 2026), named through lib/shared/token-addresses.base.ts; the listing maps each symbol back to that address.",
+      "param": "supply",
+      "values": {
+        "WETH": ["WETH"],
+        "USDC": ["USDC"],
+        "USDbC": ["USDbC"],
+        "cbBTC": ["cbBTC"],
+        "cbETH": ["cbETH"],
+        "wstETH": ["wstETH"],
+        "weETH": ["weETH"],
+        "EURC": ["EURC"],
+        "GHO": ["GHO"],
+        "tBTC": ["tBTC"],
+        "LBTC": ["LBTC"],
+        "ezETH": ["ezETH"],
+        "syrupUSDC": ["syrupUSDC"]
+      }
     },
     "moonwell-base": {
       "groups": ["eth", "btc", "stablecoins"],
-      "note": "docs.moonwell.fi/moonwell/protocol-information/contracts lists the 21 Base markets without collateral factors. Rails's read (/api/chain/moonwell-base/markets, 4 Nov 2026) shows ETH and staked ETH, cbBTC, LBTC, tBTC, and USDC, EURC, DAI and USDS with a collateral factor above zero."
+      "note": "docs.moonwell.fi lists the Base markets without collateral factors. The markets are the ones the Base sweep captured (/api/moonwell-base/positions marketState, 6 Nov 2026), sent by mToken address.",
+      "param": "supply",
+      "values": {
+        "LBTC": ["0x10ff57877b79e9bd949b3815220ec87b9fc5d2ee"],
+        "cbETH": ["0x3bf93770f2d4a794c3d9ebefbaebae2a8f09a5e5"],
+        "wstETH": ["0x627fe393bc6edda28e99ae648fd6ff362514304b"],
+        "WETH": ["0x628ff693426583d9a7fb391e54366292f509d457"],
+        "USDbC": ["0x703843c3379b52f9ff486c9f5892218d2a065cc8"],
+        "DAI": ["0x73b06d8d18de422e269645eace15400de7462417"],
+        "tBTC": ["0x9a858ebff1beb0d3495bb0e2897c1528ed84a218"],
+        "USDS": ["0xb6419c6c2e60c4025d6d06ee4f913ce89425a357"],
+        "EURC": ["0xb682c840b5f4fc58b20769e691a6fa1305a501a2"],
+        "weETH": ["0xb8051464c8c92209c92f3a4cd9c73746c4c3cfb3"],
+        "rETH": ["0xcb1dacd30638ae38f2b94ea64f066045b7d45f44"],
+        "USDC": ["0xedc817a28e8b93b03976fbd4a3ddbc9f7d176c22"],
+        "cbBTC": ["0xf877acafa28c19b96727966690b2f44d35ad5976"]
+      }
     }
   },
   "notAnswered": {
