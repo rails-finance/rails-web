@@ -1,3 +1,7 @@
+import { ARBITRUM_CHAIN_ID } from "@/lib/shared/chains";
+import { timedRead } from "@/lib/shared/position-read-server";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
+import { PositionReadProvider } from "@/components/shared/position-read";
 import type { Metadata } from "next";
 import { after } from "next/server";
 import { notFound } from "next/navigation";
@@ -35,6 +39,8 @@ export default async function AaveV3ArbitrumPositionPage({ params }: Props) {
   // The Pool read live, and the history from rails-server's store; either
   // that misses its budget is left to the client half.
   const tail = await loadAaveV3ArbitrumTail(wallet);
+  // The chain read the figures stand on, as the card states it (ui-jobs 512).
+  const read = await timedRead(readOfHeadAnswer(tail.position), ARBITRUM_CHAIN_ID);
 
   // One post of this render's Pool read, once the response is sent; a stub
   // (`chainStale`) or a missed read posts nothing.
@@ -44,11 +50,13 @@ export default async function AaveV3ArbitrumPositionPage({ params }: Props) {
   }
 
   return (
-    <AaveV3ArbitrumPositionView
-      key={wallet}
-      wallet={wallet}
-      initialPosition={tail.position}
-      initialTimeline={tail.timeline}
-    />
+    <PositionReadProvider key={wallet} read={tail.position ? read : null}>
+      <AaveV3ArbitrumPositionView
+        key={wallet}
+        wallet={wallet}
+        initialPosition={tail.position}
+        initialTimeline={tail.timeline}
+      />
+    </PositionReadProvider>
   );
 }

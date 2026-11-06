@@ -28,6 +28,8 @@ import type { FlowsRead } from "@/components/shared/lifetime-flows-panel";
 import { liquityV2FlowEvents } from "@/lib/shared/liquity-flows";
 import { liquityDailyBranch, useLiquityDailyPrices } from "@/hooks/useLiquityDailyPrices";
 import { TroveStateData, TroveStateResponse } from "@/types/api/troveState";
+import { useReportPositionRead } from "@/components/shared/position-read";
+import type { PositionRead } from "@/lib/shared/position-read";
 import { OraclePricesData, OraclePricesResponse } from "@/types/api/oracle";
 import { useDebtInFront } from "@/hooks/useDebtInFront";
 import { useLiquityCollSurplus } from "@/hooks/useLiquityCollSurplus";
@@ -97,6 +99,9 @@ export default function TroveView({
 
   // Live blockchain data and prices
   const [liveState, setLiveState] = useState<TroveStateData | undefined>(undefined);
+  // The live state's answer names no block: the card states the chain head and when it arrived (ui-jobs 512).
+  const [liveRead, setLiveRead] = useState<PositionRead | null>(null);
+  useReportPositionRead(liveRead);
   const [prices, setPrices] = useState<OraclePricesData | undefined>(initialPrices ?? undefined);
 
   // Closed / liquidated troves have ownership transferred to the zero address,
@@ -237,6 +242,7 @@ export default function TroveView({
         const stateResponse: TroveStateResponse = await res.json();
         if (stateResponse.success && stateResponse.data) {
           setLiveState(stateResponse.data);
+          setLiveRead({ kind: "latest", block: null, at: Math.floor(Date.now() / 1000) });
         }
       } else {
         console.error("Failed to fetch blockchain state");

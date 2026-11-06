@@ -1,3 +1,7 @@
+import { ARBITRUM_CHAIN_ID } from "@/lib/shared/chains";
+import { timedRead } from "@/lib/shared/position-read-server";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
+import { PositionReadProvider } from "@/components/shared/position-read";
 import type { Metadata } from "next";
 import { after } from "next/server";
 import { notFound } from "next/navigation";
@@ -38,6 +42,8 @@ export default async function MorphoArbitrumPositionPage({ params }: Props) {
   // Both reads are the wallet's: this position's history is a slice of the
   // wallet's, served flat.
   const tail = await loadMorphoArbitrumTail(wallet);
+  // The chain read the figures stand on, as the card states it (ui-jobs 512).
+  const read = await timedRead(readOfHeadAnswer(tail.head), ARBITRUM_CHAIN_ID);
 
   if (tail.head) {
     const read = tail.head;
@@ -46,12 +52,14 @@ export default async function MorphoArbitrumPositionPage({ params }: Props) {
   }
 
   return (
-    <MorphoArbitrumPositionView
-      key={`${wallet}:${market}`}
-      wallet={wallet}
-      market={market}
-      initialSlots={tail.head}
-      initialTimeline={tail.timeline}
-    />
+    <PositionReadProvider key={`${wallet}:${market}`} read={tail.head ? read : null}>
+      <MorphoArbitrumPositionView
+        key={`${wallet}:${market}`}
+        wallet={wallet}
+        market={market}
+        initialSlots={tail.head}
+        initialTimeline={tail.timeline}
+      />
+    </PositionReadProvider>
   );
 }

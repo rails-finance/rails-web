@@ -23,6 +23,8 @@
 // with a DefiLlama fallback only for assets the oracle registry omits), so the
 // live position reads chain-true throughout, not just the headline totals.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { aaveV4Explorer } from "@/lib/aave-v4/explorer";
@@ -190,6 +192,8 @@ function AaveV4SpokePageInner({
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);
   const [positions, setPositions] = useState<AaveV4Position[]>(initialPositions ?? []);
   const [chainPosition, setChainPosition] = useState<AaveV4SpokePositionChainResponse | null>(initialChain);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(chainPosition), [chainPosition]));
   const [loading, setLoading] = useState(!seeded);
   // The POSITION read's failure, and only that one. A rejected roster or chain
   // read leaves nothing to draw, so it still replaces the body.

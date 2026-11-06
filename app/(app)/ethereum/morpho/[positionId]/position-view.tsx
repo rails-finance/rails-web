@@ -12,6 +12,8 @@
 // Provenance: the position card and the Lifetime flows panel are each a
 // receipts scope, read by the page-level inspector.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { morphoExplorer } from "@/lib/morpho/explorer";
@@ -361,6 +363,12 @@ export default function MorphoPositionView({
       },
     };
   }, [view, chain, peakDebtOwed]);
+  // The card's stamp follows the singleton's read once the debt stands on it (ui-jobs 512).
+  const liveRead = useMemo(
+    () => (view?.status === "open" && liveView !== view && chain ? readOfHeadAnswer(chain) : null),
+    [liveView, view, chain],
+  );
+  useReportPositionRead(liveRead);
 
   // The Lifetime flows panel replays the position's whole history
   // (lib/morpho/flows.ts): the page's rows where they are all of it, else the

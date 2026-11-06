@@ -1,3 +1,7 @@
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { timedRead } from "@/lib/shared/position-read-server";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
+import { PositionReadProvider } from "@/components/shared/position-read";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -38,15 +42,19 @@ export default async function MoonwellBasePositionPage({ params }: Props) {
   // Both legs measure well under a second, so they are awaited here; the
   // history sweep is not, and stays in the client half. See the loader.
   const { position, coverage } = await loadMoonwellBaseHead(wallet);
+  // The chain read the figures stand on, as the card states it (ui-jobs 512).
+  const read = await timedRead(readOfHeadAnswer(position), BASE_CHAIN_ID);
 
   return (
-    <MoonwellBaseView
-      // Keyed on the wallet so a client-side navigation to another account
-      // remounts with that account's server read as its initial state.
-      key={wallet}
-      wallet={wallet}
-      initialPosition={position}
-      initialCoverage={coverage}
-    />
+    <PositionReadProvider key={wallet} read={position ? read : null}>
+      <MoonwellBaseView
+        // Keyed on the wallet so a client-side navigation to another account
+        // remounts with that account's server read as its initial state.
+        key={wallet}
+        wallet={wallet}
+        initialPosition={position}
+        initialCoverage={coverage}
+      />
+    </PositionReadProvider>
   );
 }

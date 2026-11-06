@@ -1,3 +1,7 @@
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { timedRead } from "@/lib/shared/position-read-server";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
+import { PositionReadProvider } from "@/components/shared/position-read";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -42,6 +46,8 @@ export default async function MorphoBaseWalletPage({ params }: Props) {
   // otherwise the client half fetches the history and the route sweeps the
   // singleton's logs. See the loader.
   const tail = await loadMorphoBaseTail(wallet);
+  // The chain read the figures stand on, as the card states it (ui-jobs 512).
+  const read = await timedRead(readOfHeadAnswer(tail.head), BASE_CHAIN_ID);
 
   // Some of these addresses are not accounts at all — they are MetaMorpho
   // vaults, and the positions below are a pool's, not a person's. The census
@@ -55,14 +61,16 @@ export default async function MorphoBaseWalletPage({ params }: Props) {
   const vaultNote = morphoBaseVaultOwnerNote(wallet);
 
   return (
-    <MorphoBaseWalletView
-      // Keyed on the wallet so a client-side navigation to another account
-      // remounts with that account's server read as its initial state.
-      key={wallet}
-      wallet={wallet}
-      initialSlots={tail.head}
-      initialTimeline={tail.timeline}
-      vaultNote={vaultNote}
-    />
+    <PositionReadProvider key={wallet} read={tail.head ? read : null}>
+      <MorphoBaseWalletView
+        // Keyed on the wallet so a client-side navigation to another account
+        // remounts with that account's server read as its initial state.
+        key={wallet}
+        wallet={wallet}
+        initialSlots={tail.head}
+        initialTimeline={tail.timeline}
+        vaultNote={vaultNote}
+      />
+    </PositionReadProvider>
   );
 }

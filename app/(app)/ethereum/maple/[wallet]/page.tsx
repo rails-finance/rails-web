@@ -1,3 +1,7 @@
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { indexReadAt, timedRead } from "@/lib/shared/position-read-server";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -45,20 +49,28 @@ export default async function MaplePositionPage({ params, searchParams }: Props)
   // learn nothing.
   // Rows by default; `?folders=0` reads the flat window.
   const grouped = servedFoldersFromParam((await searchParams).folders);
-  const tail = getCcipEscrow(wallet) ? null : await loadMaplePositionTail(wallet, grouped);
+  const [tail, indexRead] = await Promise.all([
+    getCcipEscrow(wallet) ? null : loadMaplePositionTail(wallet, grouped),
+    indexReadAt(MAINNET_CHAIN_ID),
+  ]);
+  // The card states the pools' read where the figures stand on it, else the index head (ui-jobs 512).
+  const poolRead = await timedRead(readOfHeadAnswer(Object.values(tail?.poolState ?? {})[0]), MAINNET_CHAIN_ID);
+  const read = tail?.position ? (poolRead ?? indexRead) : null;
 
   return (
-    <MaplePositionView
-      // Keyed on the wallet so a client-side navigation to another lender
-      // remounts with that lender's server tail as its initial state.
-      key={`${wallet}:${grouped ? "rows" : "events"}`}
-      wallet={wallet}
-      initialPosition={tail?.position ?? null}
-      initialPoolState={tail?.poolState ?? null}
-      initialEvents={tail?.events ?? null}
-      initialCutoffBlock={tail?.cutoffBlock ?? null}
-      initialOpening={tail?.opening ?? null}
-      initialGrouped={tail?.grouped ?? null}
-    />
+    <PositionReadProvider key={`${wallet}:${grouped ? "rows" : "events"}`} read={read}>
+      <MaplePositionView
+        // Keyed on the wallet so a client-side navigation to another lender
+        // remounts with that lender's server tail as its initial state.
+        key={`${wallet}:${grouped ? "rows" : "events"}`}
+        wallet={wallet}
+        initialPosition={tail?.position ?? null}
+        initialPoolState={tail?.poolState ?? null}
+        initialEvents={tail?.events ?? null}
+        initialCutoffBlock={tail?.cutoffBlock ?? null}
+        initialOpening={tail?.opening ?? null}
+        initialGrouped={tail?.grouped ?? null}
+      />
+    </PositionReadProvider>
   );
 }

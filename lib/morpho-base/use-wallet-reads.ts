@@ -27,6 +27,8 @@
 // and state under each list exactly what was not — never a principal or an
 // "all time" over a history that was not finished.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -106,6 +108,8 @@ export function useMorphoBaseWalletReads(
   const timelineRoute = deployment.routes.timeline;
   const slotsSeeded = seedSlots != null;
   const [data, setData] = useState<MorphoWalletChainResponse | null>(seedSlots ?? null);
+  // The card's stamp follows the slot read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(data), [data]));
   const [loading, setLoading] = useState(!slotsSeeded);
   const [error, setError] = useState<string | null>(null);
 

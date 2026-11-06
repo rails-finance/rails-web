@@ -28,6 +28,8 @@
 // history's completeness is a property of the request rather than of the
 // explorer, so it is stated under the last event.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useExportConfigLog } from "@/hooks/useAaveFamilyHealth";
 import { aaveV3CardNotCollateral } from "@/lib/aave-v3/collateral-split";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -190,6 +192,8 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
   const seeded = initialPosition != null;
 
   const [data, setData] = useState<AaveV3PositionChainResponse | null>(initialPosition);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(data), [data]));
   const [loading, setLoading] = useState(!seeded);
   const [error, setError] = useState<string | null>(null);
 

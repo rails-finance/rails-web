@@ -1,3 +1,6 @@
+import { indexReadAt } from "@/lib/shared/position-read-server";
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -36,18 +39,21 @@ export default async function FluidPositionPage({ params }: Props) {
   const { nft } = await params;
   if (!NFT_ID.test(nft)) notFound();
 
-  const tail = await loadFluidPositionTail(nft);
+  // The index head beside the tail: the block the card states (ui-jobs 512).
+  const [tail, read] = await Promise.all([loadFluidPositionTail(nft), indexReadAt(MAINNET_CHAIN_ID)]);
 
   return (
-    <FluidPositionView
-      // Keyed on the id so a client-side navigation to another position
-      // remounts with that position's server tail as its initial state.
-      key={nft}
-      nftId={nft}
-      initialPosition={tail.position}
-      initialEvents={tail.events}
-      initialCutoffBlock={tail.cutoffBlock}
-      initialOpening={tail.opening}
-    />
+    <PositionReadProvider key={nft} read={tail.position ? read : null}>
+      <FluidPositionView
+        // Keyed on the id so a client-side navigation to another position
+        // remounts with that position's server tail as its initial state.
+        key={nft}
+        nftId={nft}
+        initialPosition={tail.position}
+        initialEvents={tail.events}
+        initialCutoffBlock={tail.cutoffBlock}
+        initialOpening={tail.opening}
+      />
+    </PositionReadProvider>
   );
 }

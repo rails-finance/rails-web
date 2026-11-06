@@ -1,9 +1,13 @@
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { timedRead } from "@/lib/shared/position-read-server";
 // One Compound V3 position on Base: a Comet and a wallet. The Comet read and
 // the history are the whole wallet's (every Comet asked in three batched
 // calls, the history from the index or the sweep); the view draws the market
 // this URL names, as Arbitrum's market page does
 // (rails-ops reference/arbitrum-position-first-lane.md).
 
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
+import { PositionReadProvider } from "@/components/shared/position-read";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -53,16 +57,20 @@ export default async function CompoundBaseMarketPage({ params, searchParams }: P
   // the row cap, the rest held by the route for a month read.
   const grouped = servedFoldersFromParam((await searchParams).folders);
   const tail = grouped ? await loadCompoundBaseGroupedTail(wallet) : await loadCompoundBaseTail(wallet);
+  // The chain read the figures stand on, as the card states it (ui-jobs 512).
+  const read = await timedRead(readOfHeadAnswer(tail.head), BASE_CHAIN_ID);
 
   return (
-    <CompoundBaseMarketView
-      // Keyed on the pair so a client-side navigation to another position
-      // remounts with that position's server read as its initial state.
-      key={`${market.key}:${wallet}`}
-      wallet={wallet}
-      market={market.key}
-      initialWallet={tail.head}
-      initialTimeline={tail.timeline}
-    />
+    <PositionReadProvider key={`${market.key}:${wallet}`} read={tail.head ? read : null}>
+      <CompoundBaseMarketView
+        // Keyed on the pair so a client-side navigation to another position
+        // remounts with that position's server read as its initial state.
+        key={`${market.key}:${wallet}`}
+        wallet={wallet}
+        market={market.key}
+        initialWallet={tail.head}
+        initialTimeline={tail.timeline}
+      />
+    </PositionReadProvider>
   );
 }

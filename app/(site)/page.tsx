@@ -13,6 +13,7 @@ import { getCoveredPositions } from "@/lib/home/covered-positions-data";
 import { getHomeStats } from "@/lib/home/home-stats-data";
 import { getValueHeld } from "@/lib/home/value-held-data";
 import { DirectoryHeading } from "@/components/home/directory-heading";
+import { StructuredData } from "@/components/StructuredData";
 
 // ISR — the page (and the live-example trove data fetched below) regenerates
 // in the background at most hourly; every visitor gets the static render.
@@ -34,6 +35,8 @@ export default async function Home() {
   ]);
   return (
     <div className="min-h-screen">
+      {/* The site's WebApplication JSON-LD, on the home page only (ui-jobs 513). */}
+      <StructuredData />
       {/* ═══ TOP SECTION — headline, the explorer directory, and the live
           example, on one gradient that runs light at the top to dark at the
           bottom so the iframe content feathers into it. ═══ */}

@@ -1,3 +1,6 @@
+import { indexReadAt } from "@/lib/shared/position-read-server";
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -38,18 +41,24 @@ export default async function FxPositionPage({ params }: Props) {
   const parsed = parseFxPositionSlug(slug ?? "");
   if (!parsed) notFound();
 
-  const tail = await loadFxPositionTail(parsed.pool, parsed.positionId);
+  // The index head beside the tail: the block the card states (ui-jobs 512).
+  const [tail, read] = await Promise.all([
+    loadFxPositionTail(parsed.pool, parsed.positionId),
+    indexReadAt(MAINNET_CHAIN_ID),
+  ]);
 
   return (
-    <FxPositionView
-      // Keyed on the slug so a client-side navigation to another position
-      // remounts with that position's server tail as its initial state.
-      key={slug}
-      slug={slug}
-      initialPosition={tail.position}
-      initialEvents={tail.events}
-      initialCutoffBlock={tail.cutoffBlock}
-      initialOpening={tail.opening}
-    />
+    <PositionReadProvider key={slug} read={tail.position ? read : null}>
+      <FxPositionView
+        // Keyed on the slug so a client-side navigation to another position
+        // remounts with that position's server tail as its initial state.
+        key={slug}
+        slug={slug}
+        initialPosition={tail.position}
+        initialEvents={tail.events}
+        initialCutoffBlock={tail.cutoffBlock}
+        initialOpening={tail.opening}
+      />
+    </PositionReadProvider>
   );
 }

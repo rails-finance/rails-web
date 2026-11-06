@@ -20,6 +20,8 @@
 // owner-declared liq. price + the expiration countdown + the cooldown. Units
 // are native everywhere; no dollar renders on this page.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -106,6 +108,8 @@ export default function FrankencoinPositionView({
   // is a real answer the server can seed, and its `initialSummary` is null.
   const indexSeeded = initialEvents != null;
   const [chain, setChain] = useState<FrankencoinChainResponse | null>(null);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(chain), [chain]));
   const [chainSettled, setChainSettled] = useState(false);
   const [summary, setSummary] = useState<FrankencoinPositionSummary | null>(initialSummary);
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);

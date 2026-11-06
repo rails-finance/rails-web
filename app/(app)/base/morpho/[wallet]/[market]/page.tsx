@@ -1,3 +1,7 @@
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { timedRead } from "@/lib/shared/position-read-server";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
+import { PositionReadProvider } from "@/components/shared/position-read";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -55,6 +59,8 @@ export default async function MorphoBasePositionPage({ params, searchParams }: P
   // rows up to the row cap, the rest held by the route for a month read.
   const grouped = servedFoldersFromParam((await searchParams).folders);
   const tail = grouped ? await loadMorphoBaseGroupedTail(`${wallet}|${market}`) : await loadMorphoBaseTail(wallet);
+  // The chain read the figures stand on, as the card states it (ui-jobs 512).
+  const read = await timedRead(readOfHeadAnswer(tail.head), BASE_CHAIN_ID);
 
   // Some of these addresses are not accounts at all — they are MetaMorpho
   // vaults; see the wallet page above this one for the full note. Resolved
@@ -63,16 +69,18 @@ export default async function MorphoBasePositionPage({ params, searchParams }: P
   const vaultOwner = morphoBaseVaultOwnerNote(wallet);
 
   return (
-    <MorphoBasePositionView
-      // Keyed on the pair so a client-side navigation to another market or
-      // account remounts with that position's server read as its initial state.
-      key={`${wallet}:${market}`}
-      wallet={wallet}
-      market={market}
-      initialSlots={tail.head}
-      initialTimeline={tail.timeline}
-      grouped={grouped}
-      vaultOwner={vaultOwner}
-    />
+    <PositionReadProvider key={`${wallet}:${market}`} read={tail.head ? read : null}>
+      <MorphoBasePositionView
+        // Keyed on the pair so a client-side navigation to another market or
+        // account remounts with that position's server read as its initial state.
+        key={`${wallet}:${market}`}
+        wallet={wallet}
+        market={market}
+        initialSlots={tail.head}
+        initialTimeline={tail.timeline}
+        grouped={grouped}
+        vaultOwner={vaultOwner}
+      />
+    </PositionReadProvider>
   );
 }
