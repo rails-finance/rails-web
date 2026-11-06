@@ -33,7 +33,7 @@ same change.
 
 ## Commands
 
-- `npm run dev` / `pnpm dev` — dev server (Next.js 15.5, App Router, React 19, TS,
+- `npm run dev` / `pnpm dev` — dev server (Next.js 16, Turbopack, App Router, React 19, TS,
   Tailwind v4). **One per checkout, ever** — two share one `.next` and corrupt it.
   Check `pgrep -fl 'next dev'` before starting another; a second server on a free
   port is not harmlessly separate.

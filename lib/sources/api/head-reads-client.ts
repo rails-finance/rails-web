@@ -48,11 +48,11 @@ import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { noteChainRead, noteServerHead } from "./server-head-stamps";
 import { ROUTE_WAIT_MS, routeGate } from "./route-gate";
-// Next's internal work store (not a public API; next 15.5.7). A Next upgrade that moves this
-// module fails the build at this import. One that keeps the module but drops
-// `isStaticGeneration` leaves it undefined: renderWait() then sends no wait and rails-server
-// keeps its 2 s default, so builds and ISR renders overflow to the paid leg sooner, as before.
-import { workAsyncStorage } from "next/dist/server/app-render/work-async-storage.external.js";
+// Next's internal work-unit store (not a public API; next 16.4.5). A Next upgrade that moves
+// this module fails the build at this import. One that keeps the module but renames the
+// prerender store types leaves renderWait() sending no wait: rails-server then keeps its 2 s
+// default, so builds and ISR renders overflow to the paid leg sooner.
+import { workUnitAsyncStorage } from "next/dist/server/app-render/work-unit-async-storage.external.js";
 
 const TIMEOUT_MS = 8_000;
 /** The head is one small cached answer: past this, the api is taken as down. */
@@ -68,11 +68,14 @@ const MAX_ROUND_CHARS = 480_000;
 /** A build's or ISR render's gate wait on rails-server (its clamp's top). */
 const STATIC_RENDER_WAIT_MS = 6_000;
 
-/** `{ wait }` for a build or an ISR render, else nothing. Next's work store marks both as static generation
- *  (`isStaticGeneration`, next 15.5); the build phase covers a read outside a render's store. */
+/** `{ wait }` for a build or an ISR render, else nothing. Next 16 renders both under a prerender
+ *  work-unit store (`prerender-legacy` without Cache Components); the build phase covers a read
+ *  outside a render's store. A read inside `unstable_cache` sees the cache's own store and sends
+ *  no wait. */
 function renderWait(): { wait?: number } {
   if (process.env.NEXT_PHASE === "phase-production-build") return { wait: STATIC_RENDER_WAIT_MS };
-  return workAsyncStorage.getStore()?.isStaticGeneration ? { wait: STATIC_RENDER_WAIT_MS } : {};
+  const type = workUnitAsyncStorage.getStore()?.type;
+  return type === "prerender-legacy" || type === "prerender" ? { wait: STATIC_RENDER_WAIT_MS } : {};
 }
 
 type RawRead =

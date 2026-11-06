@@ -158,6 +158,9 @@ function deployedAt(): string {
 
 const nextConfig: NextConfig = {
   env: { RAILS_DEPLOYED_AT: deployedAt() },
+  // `next dev` would otherwise write an AGENTS.md into the repo; this repo
+  // keeps only CLAUDE.md and README.md as prose (rails-ops decision 0004).
+  agentRules: false,
   // Next 15.5.7 dev: webpack reports framer-motion's server vendor chunk as
   // compiled but never writes `.next/server/vendor-chunks/framer-motion@….js`,
   // so any route that SSRs a framer-motion component 500s with
@@ -176,7 +179,17 @@ const nextConfig: NextConfig = {
     webpackBuildWorker: true,
   },
   // Content files (content/<protocol>/*.yaml, the strings a prose writer
-  // edits) are parsed at build time into the module's data.
+  // edits) are parsed at build time into the module's data. Turbopack (the
+  // default for dev and build) reads `turbopack.rules`; the `webpack` function
+  // serves `next build --webpack`.
+  turbopack: {
+    rules: {
+      "*.yaml": {
+        loaders: [path.join(process.cwd(), "scripts/yaml-loader.cjs")],
+        as: "*.js",
+      },
+    },
+  },
   webpack(config: { module: { rules: unknown[] } }) {
     config.module.rules.push({
       test: /\.yaml$/,
