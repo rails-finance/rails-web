@@ -13,9 +13,7 @@ import { firstSentenceText } from "@/lib/pwn/sentence-text";
 import type { PwnCoords } from "@/lib/pwn/event-provenance";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this loan's history.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the loan's timeline",
   loan: "Loan",
   copy_loan: "Copy the loan's number",
   role: "Role",
@@ -75,11 +73,6 @@ export const pwnExplorer: ExplorerAdapter<PwnEventPageInput> = {
   eventPage: ({ loanId, wallet, lender, borrower, event, ...slot }) => ({
     heading: pwnEventHeading(event),
     title: pwnEventTitle(event),
-    words: {
-      paragraph: WORDS.paragraph,
-      timelineLink: WORDS.timeline_link,
-      timelineHint: WORDS.timeline_hint,
-    },
     facts: [
       { key: "loan", label: WORDS.loan, value: loanId, mono: true, copy: WORDS.copy_loan },
       ...(wallet === lender || wallet === borrower

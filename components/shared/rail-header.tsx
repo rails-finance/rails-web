@@ -40,10 +40,13 @@ export function ChainLabel({
   chainId,
   className = "",
   named = false,
+  anatomy = "H3.2",
 }: {
   chainId: ChainId;
   className?: string;
   named?: boolean;
+  /** The part it is drawn as: the rail's H3.2; null inside another part (the asset page's h1). */
+  anatomy?: string | null;
 }) {
   const chain = CHAINS[chainId];
   if (!chain) return null;
@@ -52,7 +55,7 @@ export function ChainLabel({
       <span
         className={`inline-flex shrink-0 items-center gap-1.5 text-rb-500 ${className}`}
         data-chain-label={chain.slug}
-        data-anatomy="H3.2"
+        data-anatomy={anatomy ?? undefined}
       >
         <ChainGlyph chainId={chain.id} className="h-4 w-4" />
         <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">{chain.name}</span>
@@ -64,7 +67,7 @@ export function ChainLabel({
       aria-label={chain.name}
       className={`inline-flex shrink-0 items-center text-rb-500 ${className}`}
       data-chain-label={chain.slug}
-      data-anatomy="H3.2"
+      data-anatomy={anatomy ?? undefined}
     >
       <ChainGlyph chainId={chain.id} className="h-5 w-5" />
     </span>

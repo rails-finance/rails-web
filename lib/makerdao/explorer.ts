@@ -11,9 +11,7 @@ import { ilkDebtSymbol } from "@/lib/makerdao/asset-catalog";
 import { makerEventProse, makerExplanationRuns } from "@/lib/makerdao/event-prose";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this vault's history.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the vault's timeline",
   ilk: "Collateral type",
   vault: "Vault",
   copy_vault: "Copy the vault's identifier",
@@ -79,11 +77,6 @@ export const makerdaoExplorer: ExplorerAdapter<MakerdaoEventPageInput> = {
   eventPage: ({ vault, ilk, owner, event, ...slot }) => ({
     heading: makerdaoEventHeading(event),
     title: makerdaoEventTitle(event),
-    words: {
-      paragraph: WORDS.paragraph,
-      timelineLink: WORDS.timeline_link,
-      timelineHint: WORDS.timeline_hint,
-    },
     facts: [
       { key: "ilk", label: WORDS.ilk, value: ilk },
       { key: "vault", label: WORDS.vault, value: short(vault), full: vault, mono: true, copy: WORDS.copy_vault },

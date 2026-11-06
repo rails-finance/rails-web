@@ -52,7 +52,6 @@ import {
   MoonwellPositionExplanation,
 } from "@/components/protocol/moonwell/moonwell-position-explanation";
 import { moonwellExports } from "@/components/protocol/moonwell/moonwell-export-menu";
-import { ExportMenu } from "@/components/shared/export-menu";
 import { MoonwellEventCard } from "@/components/protocol/moonwell/moonwell-event-card";
 import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -483,12 +482,9 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                 owner={{ wallet }}
                 assets={stripAssets}
                 closed={view != null && view.status !== "open"}
-                // The exports ride the card's ⋮; the event route, which draws no card,
-                // keeps them in the wallet row's Tools.
-                tools={pinnedRoute}
-              >
-                {pinnedRoute && exports && <ExportMenu {...exports} />}
-              </DetailTopRow>
+                // The card's ⋮ carries the menu; an event page draws no Tools.
+                tools={false}
+              />
 
               {loading ? (
                 <DetailBodySkeleton />

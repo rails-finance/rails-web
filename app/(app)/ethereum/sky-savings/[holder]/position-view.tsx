@@ -199,9 +199,8 @@ export default function SkySavingsPositionView({
         owner={{ wallet: position.holder }}
         assets={priceAssets}
         priceReason={ORACLE_USD_REASON["sky-savings"]}
-        // The card's ⋮ carries Inspect provenance; the event route, which draws no
-        // card, keeps Tools in the wallet row.
-        tools={onEventPage}
+        // The card's ⋮ carries the menu; an event page draws no Tools.
+        tools={false}
       />
 
       {!onEventPage && (

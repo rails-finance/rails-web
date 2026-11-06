@@ -55,7 +55,6 @@ import {
   type LlamalendPositionView,
 } from "@/components/protocol/llamalend/llamalend-position-card";
 import { LlamalendPositionExplanation } from "@/components/protocol/llamalend/llamalend-position-explanation";
-import { ExportMenu } from "@/components/shared/export-menu";
 import type { PositionCardExports } from "@/components/shared/position-card";
 import { llamalendPositionToMarkdown } from "@/lib/llamalend/position-to-markdown";
 import {
@@ -369,8 +368,7 @@ export default function LlamalendPositionView({
   });
   const flowFocus = flows.read !== "failed" ? flows.focus : null;
 
-  // The card ⋮'s export shapes (ui-jobs 308 point 2). The event route, which
-  // draws no card, keeps them in the wallet row's Tools.
+  // The card ⋮'s export shapes (ui-jobs 308 point 2).
   const exports: PositionCardExports | null = liveView
     ? {
         buildMarkdown: () =>
@@ -426,12 +424,9 @@ export default function LlamalendPositionView({
           owner={{ wallet: user }}
           assets={stripAssets}
           closed={liveView != null && liveView.status !== "open"}
-          // The exports ride the card's ⋮; the event route, which draws no card,
-          // keeps them in the wallet row's Tools.
-          tools={onEventPage}
-        >
-          {onEventPage && exports && <ExportMenu {...exports} />}
-        </DetailTopRow>
+          // The card's ⋮ carries the menu; an event page draws no Tools.
+          tools={false}
+        />
 
         {loading ? (
           <DetailBodySkeleton />

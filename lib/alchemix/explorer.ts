@@ -14,9 +14,7 @@ import { alchemixPositionName, alchemixV2PositionName, type AlchemixPositionKind
 import { alchemixEventHeading } from "@/lib/alchemix/event-label";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this position's history.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the position's timeline",
   line: "Line",
   position: "Position",
   copy_position: "Copy the position's token id",
@@ -116,11 +114,6 @@ export const alchemixExplorer: ExplorerAdapter<AlchemixEventPageInput> = {
       // token, which only the page's live read names, and a transaction's legs
       // combine into one row; the server's tab title cannot state them.
       title: kindTitle(alchemixEventHeading(event, rows)),
-      words: {
-        paragraph: WORDS.paragraph,
-        timelineLink: WORDS.timeline_link,
-        timelineHint: WORDS.timeline_hint,
-      },
       facts: facts(input),
       n,
       total,

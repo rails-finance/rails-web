@@ -74,6 +74,7 @@ export interface CardFigure {
 export interface CardLink {
   symbol: string;
   chain: number;
+  token: string;
   href: string;
   kind: LinkKind;
 }
@@ -101,6 +102,7 @@ export interface AssetCard {
 const link = (r: RosterLinkRef): CardLink => ({
   symbol: r.symbol,
   chain: r.chain,
+  token: r.token,
   href: assetHref(r.chain, r.token),
   kind: r.kind ?? "wraps",
 });

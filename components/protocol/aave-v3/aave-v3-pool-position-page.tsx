@@ -57,7 +57,6 @@ import {
   AaveV3PositionExplanation,
 } from "@/components/protocol/aave-v3/aave-v3-position-explanation";
 import { aaveV3Exports } from "@/components/protocol/aave-v3/aave-v3-export-menu";
-import { ExportMenu } from "@/components/shared/export-menu";
 import { AaveV3CtEventCard } from "@/components/protocol/aave-v3/aave-v3-ct-event-card";
 import { AaveFamilyEmodeSwitchCard } from "@/components/protocol/aave-v3/aave-family-emode-switch-card";
 import {
@@ -686,12 +685,9 @@ export function AaveV3PoolPositionView({
               owner={{ wallet }}
               assets={stripAssets}
               closed={view != null && view.status !== "open"}
-              // The exports ride the card's ⋮; the event route, which draws no
-              // card, keeps them in the wallet row's Tools.
-              tools={pinnedRoute}
-            >
-              {pinnedRoute && exports && <ExportMenu {...exports} />}
-            </DetailTopRow>
+              // The card's ⋮ carries the menu; an event page draws no Tools.
+              tools={false}
+            />
 
             {loading ? (
               <DetailBodySkeleton />

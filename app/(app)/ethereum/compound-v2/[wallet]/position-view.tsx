@@ -62,7 +62,6 @@ import {
   CompoundV2ClosedPositionExplanation,
 } from "@/components/protocol/compound-v2/compound-v2-position-explanation";
 import { compoundV2Exports } from "@/components/protocol/compound-v2/compound-v2-export-menu";
-import { ExportMenu } from "@/components/shared/export-menu";
 import { compoundV2LifetimeWithOpening, computeCompoundV2CardCaptions } from "@/lib/compound-v2/economics";
 import { COMPOUND_V2_MARKET_BY_KEY } from "@/lib/compound-v2/asset-catalog";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
@@ -493,12 +492,9 @@ export default function CompoundV2PositionView({
             owner={{ wallet }}
             assets={stripAssets}
             closed={liveView != null && liveView.status !== "open"}
-            // The exports ride the card's ⋮; the event route, which draws no card,
-            // keeps them in the wallet row's Tools.
-            tools={onEventPage}
-          >
-            {onEventPage && exports && <ExportMenu {...exports} />}
-          </DetailTopRow>
+            // The card's ⋮ carries the menu; an event page draws no Tools.
+            tools={false}
+          />
 
           {loading ? (
             <DetailBodySkeleton />

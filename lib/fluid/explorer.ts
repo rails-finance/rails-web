@@ -9,9 +9,7 @@ import { isFluidEvent, type BaseActivityEvent } from "@/lib/shared/types/event-s
 import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this position's history.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the position's timeline",
   vault: "Vault",
   position: "Position",
   copy_position: "Copy the position's NFT id",
@@ -69,11 +67,6 @@ export const fluidExplorer: ExplorerAdapter<FluidEventPageInput> = {
   eventPage: ({ nftId, pair, vault, owner, event, ...slot }) => ({
     heading: fluidEventHeading(event),
     title: fluidEventTitle(event),
-    words: {
-      paragraph: WORDS.paragraph,
-      timelineLink: WORDS.timeline_link,
-      timelineHint: WORDS.timeline_hint,
-    },
     facts: [
       { key: "vault", label: WORDS.vault, value: pair, full: vault },
       {

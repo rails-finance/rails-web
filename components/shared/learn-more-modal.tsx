@@ -2,6 +2,7 @@
 
 import { createContext, useState, useCallback, useContext, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { sentenceCase } from "@/lib/shared/sentence-case";
 
 // ── Content types ────────────────────────────────────────────────────────────
 
@@ -308,7 +309,7 @@ export function LearnMore({
           data-anatomy={anatomy ?? "T4"}
           data-event-page-learn-more=""
         >
-          {content.title}
+          {sentenceCase(content.title)}
         </button>
         {open && <LearnMoreModal content={content} onClose={close} anatomy={anatomy ?? "T4"} extra={extra} />}
       </>

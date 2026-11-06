@@ -53,11 +53,6 @@ export const sparkExplorer: ExplorerAdapter<SparkEventPageInput> = {
   eventPage: ({ wallet, siblings, event, ...slot }) => ({
     heading: sparkEventHeading(event, siblings),
     title: sparkEventTitle(event, siblings),
-    words: {
-      paragraph: SPARK_PAGE_WORDS.paragraph,
-      timelineLink: SPARK_PAGE_WORDS.timeline_link,
-      timelineHint: SPARK_PAGE_WORDS.timeline_hint,
-    },
     facts: [
       { key: "market", label: SPARK_PAGE_WORDS.market, value: SPARK_PAGE_WORDS.market_value },
       {
