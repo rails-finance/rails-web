@@ -4,9 +4,8 @@ import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { LwNotice } from "@/components/shared/lw-attribution";
-import { Activity, DraftingCompass, FileText, Home, Info, LayoutGrid, Signpost, Vault } from "lucide-react";
-import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
-import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
+import { Activity, DraftingCompass, FileText, Home, Info, LayoutGrid, Signpost } from "lucide-react";
+import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 import { DonateModal } from "@/components/site/DonateModal";
 import { FeedbackCluster } from "@/components/shared/feedback-cluster";
 import { LiquityModal } from "@/components/site/LiquityModal";
@@ -141,18 +140,6 @@ export function SiteFooter() {
                   <span>Coverage</span>
                 </Link>
               </li>
-              {/* The vault index joins the list once every roster it reads is launched. */}
-              {vaultIndexLaunched() && (
-                <li>
-                  <Link
-                    href={VAULT_INDEX_HREF}
-                    className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 text-sm transition-colors duration-150"
-                  >
-                    <Vault className="w-4 h-4 shrink-0" aria-hidden="true" />
-                    <span>Vaults</span>
-                  </Link>
-                </li>
-              )}
               <li>
                 <Link
                   href="/about/architecture"
@@ -183,23 +170,24 @@ export function SiteFooter() {
             </ul>
           </div>
 
-          {/* Support */}
-          <div>
-            <h4 className="text-sm font-semibold text-foreground mb-3">Support Rails</h4>
-            <p className="body-text mb-3">Help us continue building tools for DeFi users</p>
-            <button
-              onClick={() => setDonateOpen(true)}
-              className="inline-block bg-pink-600 hover:bg-pink-700 dark:bg-pink-500 dark:hover:bg-pink-600 text-white text-sm font-bold px-4 py-2 rounded-full transition-colors duration-150 cursor-pointer"
-            >
-              donate.rails.eth
-            </button>
-          </div>
+          {/* The third column stays empty: room in a busy footer (Miles, 6 Nov 2026). */}
+          <div aria-hidden="true" className="max-md:hidden" />
 
-          {/* Feedback — the last column, and the pair's louder half: donating
-              is optional, telling us a number is wrong is the ask. Same CTA
-              weight as donate, in teal rather than pink. */}
+          {/* Feedback, the ask, and under it the donation address, which opens
+              the donate modal in place (teal, the in-place hue). */}
           <div>
             <FeedbackCluster />
+            <p className="body-text mt-4">
+              Support Rails at{" "}
+              <button
+                type="button"
+                onClick={() => setDonateOpen(true)}
+                className={`cursor-pointer rounded-sm font-medium focus-ring ${INPLACE_TEXT}`}
+                data-footer-donate=""
+              >
+                donate.rails.eth
+              </button>
+            </p>
           </div>
 
           {donateOpen && <DonateModal onClose={() => setDonateOpen(false)} />}

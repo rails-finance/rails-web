@@ -361,19 +361,19 @@ const directoryGeo = (pg) =>
     const pill = R(s5.querySelector("[data-home-coverage]"));
     const col = s5.querySelector("[data-home-coverage]").parentElement.getBoundingClientRect();
     return {
-      left: [heading, tile, col].map((r) => Math.round(r.left)),
+      left: [heading, tile].map((r) => Math.round(r.left)),
       pill: [Math.round(pill.left), Math.round(pill.right), Math.round(pill.top)],
       colRight: Math.round(col.right),
-      colTop: Math.round(col.top),
+      tileBottom: Math.round(tile.bottom),
     };
   });
-// The directory on the page's left edge, the coverage pill on the tab row's
-// right from sm (Miles, 5 Nov 2026).
+// The directory on the page's left edge; the coverage link ends the row under
+// the tiles, the row View all starts (Miles, 6 Nov 2026).
 {
   const g = await directoryGeo(page);
   check(
-    "D home directory: heading, tiles and tab row share one left edge; the pill ends the tab row",
-    new Set(g.left).size === 1 && g.pill[1] === g.colRight && g.pill[2] - g.colTop < 12,
+    "D home directory: heading and tiles share one left edge; the coverage link ends the row under the tiles",
+    new Set(g.left).size === 1 && g.pill[1] === g.colRight && g.pill[2] > g.tileBottom,
     JSON.stringify(g),
   );
 }
@@ -388,8 +388,8 @@ const allCount = Number(viewAllText.match(/View all (\d+) explorers/)?.[1] ?? 0)
 await viewAll.click();
 const expandedCount = await dirTiles();
 check(
-  "D home: eight explorers, View all opens the rest in place",
-  featuredCount === 8 && allCount > 8 && expandedCount === allCount,
+  "D home: twelve explorers, View all opens the rest in place",
+  featuredCount === 12 && allCount > 12 && expandedCount === allCount,
   `${featuredCount} → ${expandedCount} (${viewAllText})`,
 );
 

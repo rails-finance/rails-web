@@ -10,7 +10,6 @@ import { ProtocolGlyph, hasProtocolGlyph } from "@/components/icons/protocol-gly
 import { ChainToggleButtons } from "@/components/shared/chain-toggle";
 import { HomeOnlyChainGlyph } from "@/components/icons/chain-glyphs";
 import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-soon";
-import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 
 /** Tile width classes chosen per list size so every breakpoint fills its
  *  rows evenly: a chain's eight most used divide by 2/4/8, a list of 6 by 2/3/6. A new
@@ -20,11 +19,12 @@ import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
  *  a roster that doesn't divide evenly — Sepolia's single Polaris tile — still
  *  centers on its own row instead of sticking to the left edge. Widths are
  *  the row's column count minus its gaps (gap-2 = 0.5rem, (N-1) gaps per row). */
-function tileWidthClassesFor(count: number): string {
-  return count % 8 === 0 || count % 4 === 0
-    ? "w-[calc((100%-0.5rem)/2)] sm:w-[calc((100%-1.5rem)/4)] xl:w-[calc((100%-3.5rem)/8)]"
-    : "w-[calc((100%-0.5rem)/2)] sm:w-[calc((100%-1rem)/3)] xl:w-[calc((100%-2.5rem)/6)]";
-}
+// Two across on a phone, three from sm, six from xl: room for the longest
+// names (Miles, 6 Nov 2026).
+const TILE_WIDTH = "w-[calc((100%-0.5rem)/2)] sm:w-[calc((100%-1rem)/3)] xl:w-[calc((100%-2.5rem)/6)]";
+
+/** The home directory's tiles: a chain's twelve most used, two rows of six on a wide screen (the chooser lists eight). */
+const HOME_FEATURED = 12;
 
 const STORAGE_KEY = "home-chain-toggle";
 
@@ -48,13 +48,10 @@ function isChainId(value: unknown): value is ChainId {
  * beside name, monochrome glyphs so a colour PNG (the fallback for a roster
  * entry without a glyph yet) is the exception, not the rule. The tiles are a
  * chain's most used explorers, the drawer's chooser's selection
- * (chainExplorers), with "View all" opening the rest in place. Counted widths
- * over auto-fill (tileWidthClassesFor), so full rows pack the same as a fixed
- * grid; the directory stands on the page's left edge, as the sections under
- * it do (Miles, 5 Nov 2026). Quiet at rest — a faint
- * border plus a low-alpha black wash (a touch darker than whichever ground
- * it sits on, so it composites the same over the gradient floor's light and
- * dark ends), blue on hover per the one-meaning-per-colour nav rule. Above
+ * (chainExplorers), twelve of them, with "View all" opening the rest in place.
+ * Fixed widths over auto-fill (TILE_WIDTH), so full rows pack as a grid; the directory stands on the page's left edge, as the sections under
+ * it do (Miles, 5 Nov 2026). Quiet at rest — no border,
+ * an rb fill a step off the page (rb-50, rb-850 in dark), blue border on hover per the one-meaning-per-colour nav rule. Above
  * the grid, a chain toggle stands in for what used to be a second directory
  * band underneath (OtherChains): one grid, one roster at a time.
  */
@@ -104,16 +101,12 @@ export function ProtocolRow() {
   // The chain's most used explorers and "View all", as the drawer's chooser
   // lists them (lib/shared/explorer-rank.ts); "View all" opens the rest in
   // place.
-  const { featured, all } = chainExplorers(chainId);
+  const { featured, all } = chainExplorers(chainId, HOME_FEATURED);
   const protocols = showAll ? all : featured;
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4">
-      {/* The chain tabs on the left and, for the chain they show, the coverage
-          link on the right of the same row from sm; below sm it wraps under
-          the tabs (Miles, 5 Nov 2026). A text link in the link blue, underlined on
-          hover (ui-jobs 507). */}
-      <div className="mb-6 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6">
         <ChainToggleButtons
           chainId={chainId}
           onChange={handleChange}
@@ -124,21 +117,13 @@ export function ProtocolRow() {
             glyph: <HomeOnlyChainGlyph id="robinhood" className="h-3.5 w-3.5 shrink-0 max-[380px]:hidden" />,
           }}
         />
-        {!robinhood && (
-          <Link
-            href={`/coverage/${CHAINS[chainId].slug}`}
-            className="shrink-0 text-sm font-medium text-blue-600 underline-offset-4 hover:underline dark:text-blue-400"
-            data-home-coverage=""
-          >
-            See detailed coverage <span>→</span>
-          </Link>
-        )}
       </div>
 
       {robinhood ? (
-        // Stands where the tiles stand, about a tile row (py-3 + 2rem mark)
-        // and View all's line, so the page holds still on a switch.
-        <p data-testid="home-robinhood-soon" className="body-text flex min-h-[8.5rem] max-w-xl items-center">
+        // Starts where the tiles start and holds their height (a tile row,
+        // py-3 + 2rem mark, and the View all row), so the page holds still on
+        // a switch.
+        <p data-testid="home-robinhood-soon" className="body-text min-h-[8.5rem] max-w-xl">
           <RobinhoodSoon />
         </p>
       ) : (
@@ -148,7 +133,7 @@ export function ProtocolRow() {
               <Link
                 key={p.id}
                 href={p.href}
-                className={`flex items-center justify-center gap-2.5 rounded-2xl border border-rb-200 bg-black/[0.04] px-2 py-3 transition-colors hover:border-blue-500 dark:border-rb-800 dark:bg-black/25 ${tileWidthClassesFor(protocols.length)}`}
+                className={`flex items-center justify-center gap-2.5 rounded-lg border border-transparent bg-rb-50 px-2 py-3 transition-colors hover:border-blue-500 dark:bg-rb-850 ${TILE_WIDTH}`}
               >
                 {hasProtocolGlyph(p.id) ? (
                   <ProtocolGlyph id={p.id} className="h-8 w-8 shrink-0" />
@@ -165,19 +150,29 @@ export function ProtocolRow() {
               </Link>
             ))}
           </div>
-          {all.length > featured.length && (
-            <div className="-mx-2 mt-4 flex">
+          {/* Under the tiles: View all on the left, in the muted foreground
+              (show/hide needs no utility hue; Miles, 6 Nov 2026), and the
+              chain's coverage link on the right, in the link blue. */}
+          <div className="-mx-2 mt-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            {all.length > featured.length && (
               <button
                 type="button"
                 onClick={() => setShowAll((v) => !v)}
                 aria-expanded={showAll}
-                className={`cursor-pointer rounded-sm px-2 py-1 text-sm transition-colors focus-ring ${INPLACE_TEXT}`}
+                className="cursor-pointer rounded-sm px-2 py-1 text-sm text-rb-500 transition-colors hover:text-foreground focus-ring"
                 data-home-view-all=""
               >
                 {showAll ? "Show the most used" : `View all ${all.length} explorers`}
               </button>
-            </div>
-          )}
+            )}
+            <Link
+              href={`/coverage/${CHAINS[chainId].slug}`}
+              className="ml-auto shrink-0 rounded-sm px-2 py-1 text-sm font-medium text-blue-600 underline-offset-4 hover:underline focus-ring dark:text-blue-400"
+              data-home-coverage=""
+            >
+              See detailed coverage <span>→</span>
+            </Link>
+          </div>
         </>
       )}
     </div>

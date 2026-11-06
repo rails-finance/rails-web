@@ -250,7 +250,7 @@ export function ProfileMenu() {
             {place.phone && (
               <div
                 aria-hidden="true"
-                className="fixed inset-0 z-[var(--z-popover)] bg-white/60 dark:bg-black/70"
+                className="fixed inset-0 z-[var(--z-popover)] bg-white/60 dark:bg-rb-950/70"
                 data-profile-menu-scrim=""
               />
             )}
@@ -260,7 +260,7 @@ export function ProfileMenu() {
               role="menu"
               aria-label={BOOKMARKS_NAME}
               data-profile-menu=""
-              className={`fixed z-[var(--z-popover)] border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 ${
+              className={`fixed z-[var(--z-popover)] border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
                 place.phone
                   ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-2xl border-x-0 border-b-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
                   : "w-80 rounded-xl"

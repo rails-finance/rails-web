@@ -4,7 +4,7 @@
 // grid flips client state (buttons + localStorage, no URL change), while the
 // coverage pages are two routes and the toggle is a pair of links between
 // them (the URL is the state — the house pattern for anything shareable).
-// Both render the same pill shell so the affordance reads identically
+// Both render the same segmented row so the affordance reads identically
 // wherever a surface offers the two chains.
 
 import type { ReactNode } from "react";
@@ -15,14 +15,20 @@ import { launchedChains } from "@/lib/shared/protocols";
 import { CTRL_GHOST, ctrlWaking } from "@/lib/shared/ui-grammar";
 import { useHydrated } from "@/hooks/useHydrated";
 
-/** The segmented pill's shell and segment, exported so another two-way switch
- *  between routes (the Alchemix position-type tabs) wears the same control. */
-export const SEGMENT_SHELL =
-  "inline-flex items-center gap-0.5 rounded-full border border-rb-200 bg-background/60 p-0.5 dark:border-rb-800";
+/** The segmented control's row and segment, exported so another switch (the
+ *  Alchemix position-type tabs, the Maple pool switch) wears the same control.
+ *  The theme switch's style (profile-menu.tsx; Miles, 6 Nov 2026): no track,
+ *  rounded-md segments, the chosen one holding the soft fill the others show on
+ *  hover. In dark the fill is rb-600 (hover rb-700), a step lighter than the
+ *  page canvas (CTRL_ON's rb-800 is darker than it); tints of white or black
+ *  are off the rb palette (Miles, 6 Nov 2026). */
+export const SEGMENT_SHELL = "inline-flex items-center gap-1";
 
 export const segmentClass = (active: boolean) =>
-  `${CTRL_GHOST} inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm font-medium sm:px-3.5 ${
-    active ? "bg-rb-100 text-foreground dark:bg-rb-800" : "text-rb-500 hover:text-foreground"
+  `${CTRL_GHOST} gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium sm:px-3.5 ${
+    active
+      ? "bg-rb-100 text-foreground dark:bg-rb-600"
+      : "text-rb-500 hover:bg-rb-100 hover:text-foreground dark:hover:bg-rb-700"
   }`;
 
 /** The chain as a small mark for any toggle/switcher segment. Every chain
@@ -105,7 +111,7 @@ export function ChainToggleButtons({
   const hydrated = useHydrated();
   return (
     <div
-      className={extra ? `${SEGMENT_SHELL} max-w-full flex-wrap justify-center max-sm:rounded-3xl` : SEGMENT_SHELL}
+      className={extra ? `${SEGMENT_SHELL} max-w-full flex-wrap justify-center` : SEGMENT_SHELL}
       {...ctrlWaking(hydrated)}
     >
       {TOGGLE_CHAINS.map((id) => {

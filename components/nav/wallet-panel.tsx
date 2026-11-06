@@ -190,7 +190,7 @@ export function WalletPanel() {
         aria-hidden="true"
         onClick={close}
         data-anatomy="H16.1"
-        className="absolute inset-0 bg-white/60 dark:bg-black/70"
+        className="absolute inset-0 bg-white/60 dark:bg-rb-950/70"
         style={{
           opacity: isOpen ? 1 : 0,
           transition: still ? "none" : `opacity ${isOpen ? EASE_IN : EASE_OUT}`,
