@@ -52,6 +52,7 @@ import { vaultRosterShownProv } from "@/lib/vaults/roster-provenance";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
 import type { VaultYield } from "@/lib/vaults/yield";
+import { ROSTER_HOLDERS_MIN, inRosterPreset } from "@/lib/vaults/roster-preset";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const ZERO = BigInt(0);
@@ -89,19 +90,8 @@ export interface VaultRosterHead {
 
 const rawOf = (v: VaultSummary) => BigInt(v.totalAssets?.raw ?? "0");
 
-/** The preset's holder threshold: census current holders at least this. */
-export const ROSTER_HOLDERS_MIN = 100;
-
 /** Has the vault a signal the preset reads: a census, or Yearn's endorsement. */
 const hasSignal = (v: VaultSummary) => v.census != null || v.family === "yearn-v3";
-
-/** The preset: 100+ current holders where the vault has a census, endorsed
- *  where it is a Yearn vault, every other vault kept. */
-export function inRosterPreset(v: VaultSummary): boolean {
-  if (v.census != null) return v.census.live >= ROSTER_HOLDERS_MIN;
-  if (v.family === "yearn-v3") return v.standing.includes("endorsed");
-  return true;
-}
 
 type SortKey = "holders" | "size" | "newest";
 const SORT_KEYS: readonly SortKey[] = ["holders", "size", "newest"];

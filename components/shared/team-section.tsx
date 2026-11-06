@@ -1,20 +1,19 @@
 /**
  * Team — the two-person Rails team, rendered as a pair of profile cards.
  * Shared so the About page and the home page stay in lockstep (one source
- * of truth for names, bios, and handles). Renders the heading, an optional
- * line under it (`intro`: home's "Get in touch."), and the members; each page
- * supplies its own section container / width.
+ * of truth for names, bios, and handles). Renders the heading and the
+ * members, and an optional third column after them (`aside`: home's "Get in
+ * touch", ui-jobs 522); each page supplies its own section container / width.
  */
 
 import type { ReactNode } from "react";
 import Link from "next/link";
 
 const H2 = "text-3xl font-semibold tracking-tight text-foreground";
-const LINK = "text-pink-500 hover:text-pink-600 transition-colors";
+const LINK = "text-pink-500 hover:underline underline-offset-2";
 
 type Member = {
   name: string;
-  role: string;
   handle: string;
   url: string;
   img: string;
@@ -26,7 +25,6 @@ type Member = {
 const TEAM: readonly Member[] = [
   {
     name: "Miles",
-    role: "Designer",
     handle: "@milesessex",
     url: "https://x.com/milesessex",
     img: "/about-team-milesessex.jpg",
@@ -38,7 +36,6 @@ const TEAM: readonly Member[] = [
   },
   {
     name: "Slava",
-    role: "Developer",
     handle: "@slvdev",
     url: "https://x.com/slvdev",
     img: "/about-team-slvdev.jpg",
@@ -46,24 +43,27 @@ const TEAM: readonly Member[] = [
   },
 ];
 
-export function TeamSection({ intro }: { intro?: ReactNode }) {
+/** A column's first line: a member's name and handle, or the aside's heading. */
+export const TEAM_LINE = "text-lg";
+export const TEAM_NAME = "font-medium text-foreground";
+
+export function TeamSection({ aside }: { aside?: ReactNode }) {
   return (
     <div>
       <h2 className={`${H2} mb-6`}>The team</h2>
-      {intro}
 
       {/* One column per member (Miles's mock, 5 Nov 2026): the square avatar,
-          then one line, the name, the role and the handle, then the bio. No
-          card chrome. Stacked below md. */}
-      <div className="grid gap-8 md:grid-cols-2" data-team-members="">
+          then one line, the name and the handle, then the bio; no roles, the
+          bio says what each does (Miles, 6 Nov 2026). No card chrome. With an
+          aside, three columns from lg, the aside last. Stacked below md. */}
+      <div className={`grid gap-8 md:grid-cols-2 ${aside ? "lg:grid-cols-3" : ""}`} data-team-members="">
         {TEAM.map((m) => (
           <div key={m.name} className="flex items-start gap-5 md:gap-8" data-team-member="">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={m.img} alt={m.name} className="size-16 shrink-0 rounded-xl object-cover" />
             <div className="min-w-0">
-              <p className="text-lg">
-                <span className="font-medium text-foreground">{m.name}</span>{" "}
-                <span className="text-rb-500">{m.role}</span>{" "}
+              <p className={TEAM_LINE}>
+                <span className={TEAM_NAME}>{m.name}</span>{" "}
                 <a href={m.url} target="_blank" rel="noopener noreferrer" className={LINK}>
                   {m.handle}
                 </a>
@@ -88,6 +88,7 @@ export function TeamSection({ intro }: { intro?: ReactNode }) {
             </div>
           </div>
         ))}
+        {aside}
       </div>
     </div>
   );

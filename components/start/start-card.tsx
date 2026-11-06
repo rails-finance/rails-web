@@ -9,6 +9,7 @@
 
 import Link from "next/link";
 import { ArrowDown, ArrowRight } from "lucide-react";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 
 const START_CARD_FRAME =
   "rounded-xl border border-rb-200 bg-raised text-left dark:border-rb-600 transition-colors duration-150";
@@ -32,11 +33,14 @@ export function StartCard({
   title,
   line,
   tone,
+  icons = [],
 }: {
   href: string;
   title: string;
   line: string;
   tone: StartCardTone;
+  /** Tokens drawn under the line, overlapping (ui-jobs 525). */
+  icons?: string[];
 }) {
   const t = TONE[tone];
   return (
@@ -49,6 +53,15 @@ export function StartCard({
     >
       <span className="text-base font-semibold text-foreground">{title}</span>
       <span className="mt-1 text-sm text-rb-500">{line}</span>
+      {icons.length > 0 && (
+        <span className="mt-3 flex -space-x-1.5" aria-hidden="true" data-start-card-icons="">
+          {icons.map((sym) => (
+            <span key={sym} className="rounded-full ring-2 ring-[var(--surface-raised)]">
+              <TokenChipIcon symbol={sym} size={24} filterable={false} untitled />
+            </span>
+          ))}
+        </span>
+      )}
       {tone === "answer" ? (
         <ArrowDown className={`mt-auto h-4 w-4 transition-transform duration-150 ${t.arrow}`} aria-hidden="true" />
       ) : (

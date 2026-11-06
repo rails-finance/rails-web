@@ -9,7 +9,8 @@
 
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, GripVertical } from "lucide-react";
+import { ChevronDown, ChevronUp, GripVertical, Upload } from "lucide-react";
+import { NAV_BUTTON } from "@/lib/shared/ui-grammar";
 
 import { BookmarkSummary } from "@/components/bookmarks/bookmark-summary";
 import { Facehash } from "@/components/shared/facehash";
@@ -121,8 +122,10 @@ const BACKUP_BUTTON =
 
 /** Export to file and Import from file, with the line that reports what
  *  either did. The file is a JSON backup (version 2, one list); an import
- *  also takes a version 1 file (per-explorer lists) and merges by address. */
-export function BookmarkBackup({ className = "" }: { className?: string }) {
+ *  also takes a version 1 file (per-explorer lists) and merges by address.
+ *  With nothing saved (`empty`) there is nothing to export: Import stands
+ *  alone, after a line asking for the file (Miles, 6 Nov 2026). */
+export function BookmarkBackup({ className = "", empty = false }: { className?: string; empty?: boolean }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -156,11 +159,24 @@ export function BookmarkBackup({ className = "" }: { className?: string }) {
 
   return (
     <div className={className} data-bookmark-backup="">
-      <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={handleExport} className={BACKUP_BUTTON}>
-          Export to file
-        </button>
-        <button type="button" onClick={() => fileInput.current?.click()} className={BACKUP_BUTTON}>
+      {empty && (
+        <p className="text-sm text-rb-500">
+          Saved wallets in another browser? Export them there, then import the file here.
+        </p>
+      )}
+      <div className={`flex flex-wrap items-center gap-2 ${empty ? "mt-3" : ""}`}>
+        {!empty && (
+          <button type="button" onClick={handleExport} className={BACKUP_BUTTON}>
+            Export to file
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => fileInput.current?.click()}
+          className={empty ? NAV_BUTTON : BACKUP_BUTTON}
+          data-bookmark-import-button=""
+        >
+          {empty && <Upload className="size-4 shrink-0" aria-hidden="true" />}
           Import from file
         </button>
         <input

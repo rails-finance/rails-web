@@ -67,7 +67,7 @@ function borderPath(w: number, h: number, r: number): string {
 
 /** One station of the StageRail (components/home/stage-rail.tsx), one button.
  *  At rest its heading, centred; a press swaps in what the station does, in
- *  the same box, and a line in the foreground colour runs the whole border, then withdraws round
+ *  the same box, and a line in the track's blue runs the whole border, then withdraws round
  *  it into the middle of the left edge (one CSS animation of
  *  stroke-dashoffset over `snakeMs`); when it has gone the heading is back.
  *  Hovering or focusing the box holds the line, and the text. Under reduced
@@ -90,7 +90,7 @@ export function Station({
   /** What the station does, swapped in for the heading. */
   line: string;
   className?: string;
-  /** The station the whole rail exists to reach: a blue border + soft blue
+  /** The station the whole rail exists to reach: a 1px blue border + soft blue
    *  glow (the reference mock's treatment), the same hue as the track that
    *  runs into it. */
   accent?: boolean;
@@ -125,8 +125,8 @@ export function Station({
         onClick={() => group?.toggle(id, line)}
         className={`relative z-[1] grid h-full w-full cursor-pointer place-items-center rounded-xl border bg-raised px-4 py-3 transition-colors focus-ring ${
           accent
-            ? "border-blue-400 shadow-[0_0_0_1px_rgba(96,165,250,0.35),0_0_28px_-2px_rgba(59,130,246,0.35)] dark:border-blue-500 dark:shadow-[0_0_0_1px_rgba(59,130,246,0.4),0_0_32px_-2px_rgba(59,130,246,0.5)]"
-            : "border-rb-200 hover:border-rb-400 dark:border-rb-800 dark:hover:border-rb-600"
+            ? "border-blue-400 shadow-[0_0_28px_-2px_rgba(59,130,246,0.35)] dark:border-blue-500 dark:shadow-[0_0_32px_-2px_rgba(59,130,246,0.5)]"
+            : "border-transparent hover:border-rb-300 dark:hover:border-rb-600"
         }`}
         style={{ "--snake-ms": `${snakeMs(line)}ms` } as CSSProperties}
         data-station-toggle={id}
@@ -152,7 +152,7 @@ export function Station({
           <svg
             key={run}
             aria-hidden="true"
-            className="pointer-events-none absolute -inset-px overflow-visible text-foreground"
+            className="pointer-events-none absolute -inset-px overflow-visible text-blue-400 dark:text-blue-500"
             width={size.w + 2}
             height={size.h + 2}
           >

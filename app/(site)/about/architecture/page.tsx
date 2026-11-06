@@ -1,6 +1,5 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
+import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
 
 const SHARE = {
@@ -94,13 +93,10 @@ const COMPONENTS = [
 export default function ArchitecturePage() {
   return (
     <div className="max-w-3xl mx-auto px-4 md:px-6 pt-32 pb-16">
-      <Link
-        href="/about"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-8"
-      >
-        <ArrowLeft size={15} aria-hidden="true" />
-        About
-      </Link>
+      {/* The standard Back (H7): history, else About. */}
+      <div className="mb-8" data-anatomy="H7" data-back-row="">
+        <DetailBackButton fallbackHref="/about" />
+      </div>
 
       <h1 className="font-sans font-semibold tracking-tight leading-tight text-foreground text-[clamp(28px,4.5vw,48px)] mb-6">
         Technical Architecture

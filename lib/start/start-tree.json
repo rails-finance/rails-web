@@ -4,19 +4,48 @@
     "eth": {
       "label": "ETH",
       "note": "Written here: ETH, wrapped ETH and the staked and restaked forms of ETH the explorers list.",
-      "symbols": ["ETH", "WETH", "stETH", "wstETH", "rETH", "cbETH", "weETH", "ETHx", "osETH", "ezETH", "rsETH", "tETH"]
+      "symbols": [
+        "ETH",
+        "WETH",
+        "stETH",
+        "wstETH",
+        "rETH",
+        "cbETH",
+        "weETH",
+        "ETHx",
+        "osETH",
+        "ezETH",
+        "rsETH",
+        "tETH"
+      ],
+      "icons": ["ETH", "wstETH", "rETH"],
+      "coins": {
+        "question": "Which ETH?",
+        "symbols": ["WETH", "wstETH", "weETH", "rETH", "cbETH", "ezETH", "rsETH", "osETH", "ETHx"]
+      }
     },
     "btc": {
       "label": "BTC",
       "note": "Written here: the wrapped and bridged forms of bitcoin the explorers list.",
-      "symbols": ["BTC", "WBTC", "cbBTC", "tBTC", "LBTC", "WBTC18", "cbBTC18", "wcbBTC"]
+      "symbols": ["BTC", "WBTC", "cbBTC", "tBTC", "LBTC", "WBTC18", "cbBTC18", "wcbBTC"],
+      "icons": ["WBTC", "cbBTC", "tBTC"],
+      "coins": {
+        "question": "Which BTC?",
+        "symbols": ["WBTC", "cbBTC", "tBTC", "LBTC"]
+      }
     },
     "stablecoins": {
       "label": "Stablecoins",
       "phrase": "stablecoins",
       "keyword": "stablecoins",
       "note": "Derived: every symbol lib/shared/asset-categories.ts files as Stablecoin or Yield-bearing Stable.",
-      "categories": ["stablecoin", "yield-stable"]
+      "categories": ["stablecoin", "yield-stable"],
+      "icons": ["USDC", "USDT", "USDS", "BOLD"],
+      "coins": {
+        "question": "Which stablecoin?",
+        "$comment": "One list, drawn by how many vaults in the index hold each coin, most first; a coin none holds is left off (Miles, 6 Nov 2026; ui-jobs 525).",
+        "symbols": ["USDC", "USDT", "USDS", "DAI", "BOLD", "LUSD", "crvUSD", "GHO"]
+      }
     }
   },
   "nodes": {
@@ -110,19 +139,19 @@
           "slug": "stablecoins",
           "label": "Stablecoins",
           "line": "Vaults that hold dollar tokens.",
-          "to": { "vaults": "stablecoins" }
+          "to": { "coins": "stablecoins" }
         },
         {
           "slug": "eth",
           "label": "ETH",
           "line": "Vaults that hold ETH or staked ETH.",
-          "to": { "vaults": "eth" }
+          "to": { "coins": "eth" }
         },
         {
           "slug": "btc",
           "label": "BTC",
           "line": "Vaults that hold wrapped bitcoin.",
-          "to": { "vaults": "btc" }
+          "to": { "coins": "btc" }
         }
       ]
     },
@@ -150,17 +179,17 @@
   "rosters": {
     "browse": {
       "question": "Which protocol?",
-      "line": "Type to narrow the list. Each opens on that explorer."
+      "line": "The explorers by chain. Each link opens that explorer."
     },
     "find": {
       "question": "Which protocol?",
-      "line": "Each opens on that explorer with its wallet search ready. Rails reads the chain, so it answers while the protocol's app is down."
+      "line": "Each link opens that explorer with its wallet search ready. Rails reads the chain, so it answers while the protocol's app is down."
     }
   },
   "results": {
     "borrow": {
       "heading": "Explorers whose loans can hold {group}",
-      "line": "Each opens on its list of positions, filtered to that collateral where the list takes a filter.",
+      "line": "Each link opens its list of positions, filtered to that collateral where the list takes a filter.",
       "$comment": "Which explorers qualify is derived from the asset catalogs in lib/start/results.ts where a catalog states the collateral; the explorers below have no such catalog, so their answer is written here with its source."
     },
     "near-liquidation": {

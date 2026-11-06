@@ -135,6 +135,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly",
       priority: 0.6,
     },
+    {
+      url: `${SITE_URL}/about/figures`,
+      lastModified: DEPLOYED_AT,
+      changeFrequency: "daily",
+      priority: 0.6,
+    },
     // One coverage page per chain (the chain's front door — the old top-level
     // chain directories are retired), then every explorer under its chain.
     // Both are derived: an explorer joins the sitemap the day it joins the

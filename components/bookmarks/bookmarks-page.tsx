@@ -3,17 +3,18 @@
 // The bookmarks page's body (rails-ops ui-jobs 480), drawn in the app shell: Back's row (H7), the heading (B1), then
 // the list and its backup controls (B2), the same components the wallet panel
 // draws (components/shared/bookmark-list.tsx); with no bookmarks, the empty
-// state (B3) says how to make one, carries the search and offers the sample
-// wallet (lib/shared/sample-wallet.ts).
+// state (B3) says how to make one, offers Start here and the sample wallet
+// (lib/shared/sample-wallet.ts), and asks for a backup file to import (Miles,
+// 6 Nov 2026: no search here, no word about ordering until there is an order).
 
 import Link from "next/link";
-import { Bookmark } from "lucide-react";
+import { Bookmark, Signpost } from "lucide-react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { BookmarkBackup, BookmarkList, useBookmarks } from "@/components/shared/bookmark-list";
 import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
-import { FrontDoorSearch, walletHref } from "@/components/shared/front-door-search";
+import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
-import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
+import { PROFILE_CLEARANCE, START_CTA } from "@/lib/shared/ui-grammar";
 
 export function BookmarksPage() {
   const bookmarks = useBookmarks();
@@ -35,8 +36,10 @@ export function BookmarksPage() {
           {BOOKMARKS_NAME}
         </h1>
         <p className="mt-2 text-rb-500">
-          Saved in this browser only. Drag a wallet, or use its arrows, to change the order; the first ten are in the
-          profile menu.
+          Saved in this browser only.
+          {bookmarks && bookmarks.length > 1 && (
+            <> Drag a wallet, or use its arrows, to change the order; the first ten are in the profile menu.</>
+          )}
         </p>
       </div>
       {/* Nothing draws until the browser's list is read, so a reader with
@@ -52,9 +55,12 @@ export function BookmarksPage() {
                 <p className="font-semibold text-foreground">No saved wallets yet.</p>
                 <p className="mt-1 text-sm text-rb-500">
                   To save one, press the bookmark icon beside a wallet&apos;s address, or choose Save wallet in the
-                  address menu on a position page. Or look up a wallet here.
+                  address menu on a position page.
                 </p>
-                <FrontDoorSearch size="lg" suggest className="mt-6" />
+                <Link href="/start" className={`mt-6 inline-flex ${START_CTA}`} data-bookmarks-start="">
+                  New to Rails? Start here
+                  <Signpost className="size-4 shrink-0" aria-hidden="true" />
+                </Link>
                 <p className="mt-4 text-sm">
                   <Link
                     href={walletHref(SAMPLE_WALLET)}
@@ -67,7 +73,12 @@ export function BookmarksPage() {
               </div>
             }
           />
-          <BookmarkBackup className="mt-6 border-t border-rb-200 pt-4 dark:border-rb-800" />
+          {/* One instance through the switch from empty to a list, so an
+              import's report stays on the page. */}
+          <BookmarkBackup
+            empty={bookmarks.length === 0}
+            className={`border-t border-rb-200 dark:border-rb-800 ${bookmarks.length === 0 ? "mt-8 pt-6" : "mt-6 pt-4"}`}
+          />
         </div>
       )}
     </div>

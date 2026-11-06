@@ -23,7 +23,6 @@ import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { HomeOnlyChainGlyph } from "@/components/icons/chain-glyphs";
 import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-soon";
-import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 
 // Row state grammar, same as the nav menu's:
 //   rest    → text-foreground; hover → blue-600, blue-400 in dark ("this goes somewhere")
@@ -151,7 +150,7 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
               type="button"
               onClick={() => setShowAll((v) => !v)}
               aria-expanded={showAll}
-              className={`-mx-2 mt-3 cursor-pointer rounded-sm px-2 py-1 text-sm transition-colors focus-ring ${INPLACE_TEXT}`}
+              className="-mx-2 mt-3 cursor-pointer rounded-sm px-2 py-1 text-sm text-rb-500 transition-colors hover:text-foreground focus-ring"
               data-chooser-view-all=""
             >
               {showAll ? "Show the most used" : `View all ${all.length} explorers`}

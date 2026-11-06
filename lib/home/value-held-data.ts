@@ -31,6 +31,8 @@ const ROSTER = LAUNCHED_PROTOCOLS.map((p) => ({
   chainId: p.chainId,
   label: p.label,
   chainName: CHAINS[p.chainId].name,
+  href: p.listingHref,
+  vaultsHref: p.subPages.find((s) => s.segment === "vaults")?.href,
 }));
 
 export async function getValueHeld(): Promise<ValueHeld | null> {

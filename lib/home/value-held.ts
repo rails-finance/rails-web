@@ -47,9 +47,18 @@ export type ValueHeldRoster = {
   chainId: number;
   label: string;
   chainName: string;
+  /** The explorer's position listing, and its vaults page where it has one:
+   *  where a row on /about/figures links. */
+  href?: string;
+  vaultsHref?: string;
 }[];
 
-export type ValueHeldRow = {
+/** Where a line of the figure sits: its chain, its surface ("vaults" for the
+ *  vault surface of an explorer that also has markets) and the page its
+ *  positions are listed on (the vaults page for a vault surface). */
+export type ValueHeldPlace = { chainId: number; surface: string | null; href: string | null };
+
+export type ValueHeldRow = ValueHeldPlace & {
   key: string;
   label: string;
   chainName: string;
@@ -72,10 +81,18 @@ export type ValueHeld = {
   /** Counted explorers, largest first. */
   rows: ValueHeldRow[];
   /** Explorers left out of the figure, each with its reason. */
-  notCounted: { label: string; chainName: string; reason: string }[];
+  notCounted: (ValueHeldPlace & { label: string; chainName: string; reason: string })[];
   /** Counted explorers' notable left-out items. */
-  leftOut: { label: string; chainName: string; what: string; usd: number | null; reason: string }[];
+  leftOut: LeftOutLine[];
   overlaps: string[];
+};
+
+export type LeftOutLine = ValueHeldPlace & {
+  label: string;
+  chainName: string;
+  what: string;
+  usd: number | null;
+  reason: string;
 };
 
 /** The recomputed total may differ from the server's by at most this, in USD. */
@@ -108,7 +125,7 @@ export function groupLeftOut(
   label: string,
   chainName: string,
   items: ValueHeldExplorer["leftOut"],
-): ValueHeld["leftOut"] {
+): Omit<LeftOutLine, keyof ValueHeldPlace>[] {
   const groups = new Map<string, { whats: string[]; usd: number; priced: boolean }>();
   for (const item of items) {
     const reason = STALE.test(item.reason) ? STALE_REASON : item.reason;
@@ -166,8 +183,14 @@ export function settleValueHeld(data: ValueHeldData | null | undefined, roster: 
       const label = entry.label;
       // "Morpho Blue Base vaults": the surface reads after the chain.
       const chainName = row.surface === "vaults" ? `${entry.chainName} vaults` : entry.chainName;
+      const place: ValueHeldPlace = {
+        chainId: entry.chainId,
+        surface: row.surface ?? null,
+        href: (row.surface === "vaults" ? entry.vaultsHref : undefined) ?? entry.href ?? null,
+      };
       if (row.counted && isFiniteNumber(row.usd)) {
         counted.push({
+          ...place,
           key: `${entry.id}:${row.surface ?? ""}`,
           label,
           chainName,
@@ -177,9 +200,9 @@ export function settleValueHeld(data: ValueHeldData | null | undefined, roster: 
           oracleOf: labelOfOwner(row.priceOracleOwner),
           exemption: exemptionOf(row.priceSource),
         });
-        leftOut.push(...groupLeftOut(label, chainName, row.leftOut ?? []));
+        leftOut.push(...groupLeftOut(label, chainName, row.leftOut ?? []).map((l) => ({ ...l, ...place })));
       } else {
-        notCounted.push({ label, chainName, reason: row.reason ?? "no figure stated" });
+        notCounted.push({ ...place, label, chainName, reason: row.reason ?? "no figure stated" });
       }
     }
   }

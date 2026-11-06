@@ -1,12 +1,13 @@
 "use client";
 
 // The profile control (H20) and its menu (rails-ops ui-jobs 504): the facehash
-// with a chevron, a menu button. The menu, top down: the saved wallets' heading
-// (the filled bookmark, "Saved wallets"), the first ten in the reader's order
-// (lib/shared/sessions.ts; /bookmarks orders them), "Manage wallets →" to
-// /bookmarks, then the theme switch. With none saved, two lines in place of
-// the rows: "New to Rails?" and a signposted "Start here" to /start, then how
-// to save a wallet (ui-jobs 509). From md a dropdown under the control, right
+// with a chevron, a menu button. The menu has no heading of its own: each group
+// carries its own label (ui-jobs 524), so groups can join it (saved searches,
+// ui-jobs 521). Top down: with none saved, "New to Rails? Start here" to /start
+// as a blue button across the top (ui-jobs 509); the filled bookmark and "Saved
+// wallets", then the first ten in the reader's order (lib/shared/sessions.ts;
+// /bookmarks orders them) or, with none, how to save one; "Manage wallets →" to
+// /bookmarks; the theme switch. From md a dropdown under the control, right
 // edges aligned; below md a sheet from the foot of the screen over a dim (ui-jobs 507), rising
 // over 220ms (globals.css `.profile-sheet`). Rows show what the
 // browser holds (name, ENS, address) and read nothing.
@@ -34,10 +35,16 @@ import { useBookmarks } from "@/components/shared/bookmark-list";
 import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
-import { CTRL_OFF, CTRL_ON } from "@/lib/shared/ui-grammar";
+import { CTRL_OFF, CTRL_ON, START_CTA } from "@/lib/shared/ui-grammar";
 import type { WalletSession } from "@/lib/shared/sessions";
 
 const BOOKMARKS_PATH = "/bookmarks";
+/** The control's and the menu's accessible name: what the menu holds as a whole. */
+const MENU_NAME = "Saved and settings";
+/** A group's small label (Saved wallets; Saved searches to come). */
+const GROUP_LABEL = "flex items-center gap-2 px-3 pb-2 pt-2 text-sm font-semibold text-foreground";
+/** "New to Rails? Start here" across the menu's top. */
+const START_BUTTON = `mb-1 flex w-full ${START_CTA}`;
 /** The guided way in (G, /start), reached from this menu (ui-jobs 509). */
 const START_PATH = "/start";
 /** The menu lists this many; the rest are on /bookmarks. */
@@ -210,8 +217,8 @@ export function ProfileMenu() {
       <button
         ref={trigger}
         type="button"
-        aria-label={BOOKMARKS_NAME}
-        title={BOOKMARKS_NAME}
+        aria-label={MENU_NAME}
+        title={MENU_NAME}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -250,7 +257,7 @@ export function ProfileMenu() {
             {place.phone && (
               <div
                 aria-hidden="true"
-                className="fixed inset-0 z-[var(--z-popover)] bg-white/60 dark:bg-black/70"
+                className="fixed inset-0 z-[var(--z-popover)] bg-white/60 dark:bg-rb-950/70"
                 data-profile-menu-scrim=""
               />
             )}
@@ -258,44 +265,46 @@ export function ProfileMenu() {
               ref={menu}
               id={menuId}
               role="menu"
-              aria-label={BOOKMARKS_NAME}
+              aria-label={MENU_NAME}
               data-profile-menu=""
-              className={`fixed z-[var(--z-popover)] border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 ${
+              className={`fixed z-[var(--z-popover)] border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
                 place.phone
                   ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-2xl border-x-0 border-b-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
                   : "w-80 rounded-xl"
               }`}
               style={place.phone ? undefined : { top: place.top, right: place.right }}
             >
-              <p className="flex items-center gap-2 px-3 pb-2 pt-1 text-sm font-semibold text-foreground">
-                <Bookmark className="size-4 shrink-0" fill="currentColor" aria-hidden="true" />
-                {BOOKMARKS_NAME}
-              </p>
-              <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />
-              {rows.length > 0 ? (
-                <div className="py-1" data-profile-menu-wallets="">
-                  {rows.map((s) => (
-                    <WalletRow key={s.key} session={s} onDone={() => close(false)} />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-2 px-3 pb-1 pt-3 text-sm text-rb-500" data-profile-menu-empty="">
-                  <p>
-                    New to Rails?{" "}
-                    <Link
-                      href={START_PATH}
-                      role="menuitem"
-                      onClick={() => close(false)}
-                      className="inline-flex items-center gap-1 rounded-sm align-bottom font-medium text-blue-600 underline-offset-4 hover:underline focus:outline-none focus-visible:underline dark:text-blue-400"
-                      data-profile-menu-start=""
-                    >
-                      <Signpost className="size-4 shrink-0" aria-hidden="true" />
-                      Start here
-                    </Link>
-                  </p>
-                  <p>To save a wallet, press the bookmark beside its address on its wallet page.</p>
-                </div>
+              {/* With none saved, the way in fills the menu's top (Miles, 6 Nov
+                  2026); with a wallet saved there is none (ui-jobs 509). */}
+              {rows.length === 0 && (
+                <Link
+                  href={START_PATH}
+                  role="menuitem"
+                  onClick={() => close(false)}
+                  className={START_BUTTON}
+                  data-profile-menu-start=""
+                >
+                  New to Rails? Start here
+                  <Signpost className="size-4 shrink-0 ml-auto" aria-hidden="true" />
+                </Link>
               )}
+              <div role="group" aria-labelledby={`${menuId}-wallets`}>
+                <p id={`${menuId}-wallets`} className={GROUP_LABEL} data-profile-menu-group="wallets">
+                  <Bookmark className="size-4 shrink-0" fill="currentColor" aria-hidden="true" />
+                  {BOOKMARKS_NAME}
+                </p>
+                {rows.length > 0 ? (
+                  <div className="pb-1" data-profile-menu-wallets="">
+                    {rows.map((s) => (
+                      <WalletRow key={s.key} session={s} onDone={() => close(false)} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="px-3 pb-1 text-sm text-rb-500" data-profile-menu-empty="">
+                    To save a wallet, press the bookmark beside its address on its wallet page.
+                  </p>
+                )}
+              </div>
               {rows.length > 0 && <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />}
               <div className="py-1">
                 <Link

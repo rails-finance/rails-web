@@ -35,11 +35,11 @@
     "framer-motion": "^12.23.24",
     "lightweight-charts": "5.2.1",
     "lucide-react": "^0.541.0",
-    "next": "15.5.7",
+    "next": "16.4.5",
     "next-themes": "^0.4.6",
     "qrcode.react": "^4.2.0",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "server-only": "^0.0.1",
     "viem": "~2.33.2",
     "yaml": "2.9.0"
@@ -48,13 +48,16 @@
     "@playwright/test": "^1.55.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "knip": "^6.29.0",
     "playwright": "^1.55.0",
     "prettier": "^3.6.2",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": "22.x"
   }
 }
