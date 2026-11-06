@@ -17,7 +17,6 @@ import { WalletContextProvider } from "@/components/nav/wallet-context";
 import { ThemeScript } from "@/components/ThemeScript";
 import { BetaStrip } from "@/components/shared/beta-strip";
 import { WorkInProgressStrip } from "@/components/shared/work-in-progress-strip";
-import { StructuredData } from "@/components/StructuredData";
 import { SITE_URL, TWITTER_HANDLE } from "@/lib/shared/page-metadata";
 import { SITE_LEAD, SITE_METHOD } from "@/lib/shared/site-copy";
 import { Analytics } from "@vercel/analytics/next";
@@ -148,12 +147,11 @@ export const metadata: Metadata = {
     creator: TWITTER_HANDLE,
     site: TWITTER_HANDLE,
   },
+  // Indexable is the default, so no page states it: a 404 then carries the
+  // one robots meta Next writes for it, `noindex` (ui-jobs 513). A route that
+  // must stay out sets its own `noindex` (the wallet view).
   robots: {
-    index: true,
-    follow: true,
     googleBot: {
-      index: true,
-      follow: true,
       "max-video-preview": -1,
       "max-image-preview": "large",
       "max-snippet": -1,
@@ -189,7 +187,6 @@ export default function RootLayout({
               "(function(){try{var d=document.documentElement.dataset;if(localStorage.getItem('rails-hero-seen'))d.heroSeen='1';if(sessionStorage.getItem('rails-tracks-seen'))d.tracksSeen='1'}catch(e){}})()",
           }}
         />
-        <StructuredData />
       </head>
       <body
         className={`${dmSans.className} ${dmSans.variable} antialiased bg-background text-foreground min-h-screen flex flex-col overflow-x-hidden min-w-[320px]`}

@@ -69,8 +69,27 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   const ArticleContent = article.content;
 
+  // The post's date and author for search (ui-jobs 513), as the page states them.
+  const blogPosting = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: article.title,
+    description: article.subtitle,
+    datePublished: article.publishedAt,
+    // "Rails Team" is the organisation; a named author is a person.
+    author:
+      article.author.name === "Rails Team"
+        ? { "@type": "Organization", name: "Rails", url: SITE_URL }
+        : { "@type": "Person", name: article.author.name },
+    publisher: { "@type": "Organization", name: "Rails", url: SITE_URL },
+    image: `${SITE_URL}${article.thumbnail}`,
+    url: `${SITE_URL}/blog/${article.slug}`,
+    mainEntityOfPage: `${SITE_URL}/blog/${article.slug}`,
+  };
+
   return (
     <ArticleLayout article={article} nextArticle={nextArticle} prevArticle={prevArticle}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(blogPosting) }} />
       <ArticleContent />
     </ArticleLayout>
   );
