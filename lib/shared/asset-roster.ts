@@ -231,31 +231,3 @@ export function shortAddress(a: string): string {
 export function lineName(l: PageLine): string {
   return `${l.oracle.name} · ${l.protocols.join(", ")}`;
 }
-
-/** The heading's links, one group per relation and chain: "Wraps BTC",
- *  "Wrapped on Ethereum as WBTC, cbBTC, tBTC", "Priced from ETH". */
-export interface PageLinkGroup {
-  id: string;
-  word: string;
-  assets: RosterAssetRef[];
-}
-export function pageLinks(page: AssetPage): PageLinkGroup[] {
-  const groups: PageLinkGroup[] = [];
-  const u = page.underlying;
-  if (u) groups.push({ id: "under", word: u.kind === "rate" ? "Priced from" : "Wraps", assets: [u] });
-  for (const w of page.wrapped) {
-    const rate = w.kind === "rate";
-    const id = `${rate ? "rate" : "wraps"}:${w.chain}`;
-    let g = groups.find((x) => x.id === id);
-    if (!g) {
-      g = {
-        id,
-        word: rate ? `Priced from it on ${chainName(w.chain)}:` : `Wrapped on ${chainName(w.chain)} as`,
-        assets: [],
-      };
-      groups.push(g);
-    }
-    if (!g.assets.some((a) => a.chain === w.chain && a.token === w.token)) g.assets.push(w);
-  }
-  return groups;
-}
