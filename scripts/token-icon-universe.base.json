@@ -418,5 +418,105 @@
     "chainId": 8453,
     "address": "0xfcc9cc1209651ed8867332d6f664cf82743a2584",
     "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0xcb327b99ff831bf8223cced12b1338ff3aa322ff",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0x83db73ef5192de4b6a4c92bd0141ba1a0dc87c65",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0xda1c2c3c8fad503662e41e324fc644dc2c5e0ccd",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0xcc7ff230365bd730ee4b352cc2492cedac49383e",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0x1c2757c1fef1038428b5bef062495ce94bbe92b2",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0x25cb814c094b3ee4b19bfcab4c190c53d7890635",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0x5d746848005507da0b1717c137a10c30ad9ee307",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0xec443e7e0e745348e500084892c89218b3ba4683",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0xa6f0a4d18b6f6ddd408936e81b7b3a8befa18e77",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0xc31389794ffac23331e0d9f611b7953f90aa5fdc",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0x5fede9d65714907381a76aa9bf949219dd1c5023",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0x80c602c2d43b201980a1a6822380b54c5ca80aa6",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0xe66e3a37c3274ac24fe8590f7d84a2427194dc17",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0x0022228a2cc5e7ef0274a7baa600d44da5ab5776",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0x9b8df6e244526ab5f6e6400d331db28c8fdddb55",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0x35e5db674d8e93a03d814fa0ada70731efe8a4b9",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0xb0505e5a99abd03d94a1169e638b78edfed26ea4",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0x7fcd174e80f264448ebee8c88a7c4476aaf58ea6",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0xd95ca61ce9aaf2143e81ef5462c0c2325172e028",
+    "seenIn": ["morpho-blue"]
+  },
+  {
+    "chainId": 8453,
+    "address": "0x0000000f2eb9f69274678c76222b35eec7588a65",
+    "seenIn": ["morpho-blue"]
   }
 ]

@@ -16,7 +16,8 @@
         "osETH",
         "ezETH",
         "rsETH",
-        "tETH"
+        "tETH",
+        "wsuperOETHb"
       ],
       "icons": ["ETH", "wstETH", "rETH"],
       "coins": {
@@ -299,7 +300,9 @@
         "USDe": ["0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34"],
         "syrupUSDC": ["0x660975730059246a68521a3e2fbd4740173100f5"],
         "USDS": ["0x820c137fa70c8691f0e44dc420a5e53c168921dc"],
-        "EURC": ["0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42"]
+        "EURC": ["0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42"],
+        "wsuperOETHb": ["0x7fcd174e80f264448ebee8c88a7c4476aaf58ea6"],
+        "USR": ["0x35e5db674d8e93a03d814fa0ada70731efe8a4b9"]
       }
     },
     "fluid": {
