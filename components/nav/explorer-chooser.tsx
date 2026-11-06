@@ -61,7 +61,7 @@ const TAB_ON = "bg-rb-200 dark:bg-rb-700";
 const TAB_OFF = "hover:bg-rb-100 dark:hover:bg-rb-800";
 
 /** The panel's section heading (ui-jobs 514): the search's and the chooser's. */
-export const PANEL_HEADING = "text-[15px] leading-6 text-rb-500 dark:text-rb-400";
+export const PANEL_HEADING = "text-sm font-semibold text-rb-500";
 
 export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
   const pathname = usePathname();

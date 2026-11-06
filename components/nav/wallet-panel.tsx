@@ -24,12 +24,14 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
-
-import { RailsMark } from "@/components/nav/rails-mark";
+import { HomeBrand } from "@/components/nav/home-brand";
 import { ExplorerChooser, PANEL_HEADING } from "@/components/nav/explorer-chooser";
-import { FrontDoorSearch, OPEN_SEARCH_EVENT, TOGGLE_SEARCH_EVENT } from "@/components/shared/front-door-search";
+import {
+  FrontDoorSearch,
+  OPEN_SEARCH_EVENT,
+  SidebarToggleGlyph,
+  TOGGLE_SEARCH_EVENT,
+} from "@/components/shared/front-door-search";
 
 let open = false;
 /** Where the focus lands as the panel opens: the field, or the chooser. */
@@ -217,42 +219,33 @@ export function WalletPanel() {
           visibility: isOpen ? "visible" : "hidden",
         }}
       >
-        {/* The top row, below `md` only: on the right "Home", since the mark
-            opens this panel there (ui-jobs 509); the header bar is under the
-            panel, so the row also restates the bar's left end: the Rails mark
-            with its chevron pointing left, in the bar's launcher box at its
-            place (16px in; the launcher's top, measured as the panel opens,
-            under the beta strip too), so the tap that opened the panel closes
-            it in the same spot. From md the rail's mark goes home and its
-            toggle closes the panel (ui-jobs 514). */}
-        <div className="flex shrink-0 items-center justify-between px-4 md:hidden" style={{ paddingTop: launcherTop }}>
+        {/* The top row, below `md` only: the header bar is under the panel,
+            so the row restates it (ui-jobs 514): the toggle's open glyph in
+            the toggle's place (16px in; the launcher's top, measured as the
+            panel opens, under the beta strip too), so the tap that opened the
+            panel closes it in the same spot, and the mark and name centred, a
+            link home. From md the rail's mark goes home and its toggle closes
+            the panel. */}
+        <div
+          className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center px-4 md:hidden"
+          style={{ paddingTop: launcherTop }}
+        >
           <button
             type="button"
             onClick={close}
-            className="group flex h-[38px] shrink-0 cursor-pointer items-center gap-1 rounded-lg text-foreground focus-ring md:hidden"
+            className="relative flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center justify-self-start rounded-lg text-foreground focus-ring"
             aria-label="Close search and explorers"
             data-wallet-panel-close=""
           >
-            <RailsMark size={30} />
-            <ChevronLeft
-              size={16}
-              className="text-rb-500 transition-colors group-hover:text-foreground"
-              aria-hidden="true"
-            />
+            <SidebarToggleGlyph open />
           </button>
-          <Link
-            href="/"
-            onClick={close}
-            className="inline-flex h-[38px] items-center rounded-sm px-1.5 text-sm font-medium text-blue-600 underline-offset-4 hover:underline focus-ring dark:text-blue-400"
-            data-wallet-panel-home=""
-          >
-            Home
-          </Link>
+          <HomeBrand onClick={close} panel />
         </div>
         {/* Pinned at the top: the search under its heading, the field with no
             placeholder (ui-jobs 514). From md the heading's line centres on the
-            rail's toggle (its 38px box at 68px, so its middle at 87px). */}
-        <div className="relative z-10 shrink-0 px-5 pb-4 pt-4 md:pt-[75px]">
+            rail's toggle (its 38px box at 68px, so its middle at 87px; the
+            heading's 20px line from 77px). */}
+        <div className="relative z-10 shrink-0 px-5 pb-4 pt-4 md:pt-[77px]">
           <h2 className={PANEL_HEADING}>Search wallet, vault or protocol</h2>
           <div className="-ml-2 mt-5">
             <FrontDoorSearch size="lg" surface="raised" onDone={close} suggest placeholder="" />

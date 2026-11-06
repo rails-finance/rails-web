@@ -31,7 +31,7 @@ import {
   type RefObject,
 } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { RailsMark } from "@/components/nav/rails-mark";
 import { NAV_BUTTON, ctrlWaking } from "@/lib/shared/ui-grammar";
 import { useHydrated } from "@/hooks/useHydrated";
@@ -168,7 +168,8 @@ export function SearchBox({
   const glyph = GLYPH[size];
   return (
     <div className={`relative ${className}`} data-anatomy={anatomy || undefined}>
-      {size === "lg" && (
+      {/* The glow is the canvas's; the wallet panel's field has none (ui-jobs 514). */}
+      {size === "lg" && surface !== "raised" && (
         <span
           aria-hidden="true"
           className="pointer-events-none absolute -inset-x-2 -inset-y-1 hidden rounded-full bg-blue-500/25 blur-2xl dark:block"
@@ -718,7 +719,7 @@ function FilledLayoutGrid() {
 
 /** The two glyphs of the rail's toggle, cross-faded: two lines (shut) and
  *  the sidebar, a rounded square with a bar down its left (open). */
-function SidebarToggleGlyph({ open }: { open: boolean }) {
+export function SidebarToggleGlyph({ open }: { open: boolean }) {
   const glyph = "absolute inset-0 m-auto transition-[opacity,transform] duration-200";
   return (
     <>
@@ -788,24 +789,22 @@ export function SearchLauncher({
         <FilledLayoutGrid />
       </button>
     );
+  // The header's toggle (below md, ui-jobs 514): two lines at the bar's
+  // left; the panel opens over it and its top row draws the open glyph in the
+  // same place, which closes it.
   if (placement === "header")
     return (
       <button
         type="button"
         onClick={(e) => toggleWalletPanel(e.currentTarget)}
-        className="group flex h-[38px] shrink-0 cursor-pointer items-center gap-1 rounded-lg text-foreground focus-ring"
-        aria-label="Search and explorers"
+        className="relative flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground focus-ring"
+        aria-label="Open search and explorers"
         aria-expanded={open}
         aria-keyshortcuts="/ Meta+K"
         data-anatomy="H15.1"
         data-search-launcher={placement}
       >
-        <RailsMark size={30} />
-        <ChevronRight
-          size={16}
-          className="text-rb-500 transition-colors group-hover:text-foreground"
-          aria-hidden="true"
-        />
+        <SidebarToggleGlyph open={false} />
       </button>
     );
   // The rail's toggle (ui-jobs 514): two lines while the panel is shut, the
