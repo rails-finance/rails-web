@@ -1,7 +1,6 @@
 // The export shapes for a Compound V3 position on the position card's ⋮
 // (Copy Position, View as Markdown, Download CSV): the shared card draws them
-// with `ExportMenu`, and the event route, which draws no card, hands the same
-// shapes to the wallet row's Tools.
+// with `ExportMenu`.
 
 import type { WholeHistoryFetch } from "@/components/shared/export-menu";
 import type { PositionCardExports } from "@/components/shared/position-card";

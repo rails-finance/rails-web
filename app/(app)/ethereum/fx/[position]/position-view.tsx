@@ -60,7 +60,6 @@ import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-r
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { ExportMenu } from "@/components/shared/export-menu";
 import type { PositionCardExports } from "@/components/shared/position-card";
 import { fxPositionToMarkdown } from "@/lib/fx/position-to-markdown";
 
@@ -476,8 +475,7 @@ export default function FxPositionView({
   // position page.
   const onEventPage = useParams<{ eventId?: string }>()?.eventId != null;
 
-  // The card ⋮'s export shapes (ui-jobs 308 point 2). The event route, which
-  // draws no card, keeps them in the wallet row's Tools.
+  // The card ⋮'s export shapes (ui-jobs 308 point 2).
   const exports: PositionCardExports | null = view
     ? {
         buildMarkdown: () =>
@@ -506,12 +504,9 @@ export default function FxPositionView({
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
           closing={closing}
-          // The exports ride the card's ⋮; the event route, which draws no card,
-          // keeps them in the wallet row's Tools.
-          tools={onEventPage}
-        >
-          {onEventPage && exports && <ExportMenu {...exports} />}
-        </DetailTopRow>
+          // The card's ⋮ carries the menu; an event page draws no Tools.
+          tools={false}
+        />
 
         {/* An unreadable slug never reaches here: the server route answers 404
           with the not-found body beside it. */}

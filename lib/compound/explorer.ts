@@ -23,10 +23,7 @@ const CHAIN_WORDS: Record<CompoundDeployment, string> = { ethereum: "", base: " 
 const SESSION = { ethereum: "compound", base: "compound-base", arbitrum: "compound-v3-arbitrum" } as const;
 
 const WORDS = {
-  paragraph: (base: string, deployment: CompoundDeployment) =>
-    `This page is one transaction from this account's history in the Compound V3 ${base} market${CHAIN_WORDS[deployment]}.`,
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the account's timeline",
   market: "Market",
   account: "Account",
   copy_account: "Copy the account's address",
@@ -117,11 +114,6 @@ export const compoundExplorer: ExplorerAdapter<CompoundEventPageInput> = {
     return {
       heading: compoundEventHeading(event, deployment),
       title: compoundEventTitle(event, deployment),
-      words: {
-        paragraph: WORDS.paragraph(base ?? "base asset", deployment),
-        timelineLink: WORDS.timeline_link,
-        timelineHint: WORDS.timeline_hint,
-      },
       facts: [
         ...(base ? [{ key: "market", label: WORDS.market, value: base }] : []),
         {

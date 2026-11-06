@@ -189,6 +189,7 @@ export default function EventView({
                 <EventShareProvider href={eventPath(event.id)}>
                   <EventPageContext.Provider
                     value={{
+                      timestamp: event.timestamp,
                       contract: liquityV2Explorer.eventPage({
                         collateralType,
                         troveId,

@@ -80,7 +80,6 @@ import {
   type SparkActivityCounts,
 } from "@/components/protocol/spark/spark-position-explanation";
 import { sparkExports } from "@/components/protocol/spark/spark-export-menu";
-import { ExportMenu } from "@/components/shared/export-menu";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
 import { sparkFlowSeriesTimeline, sparkFocusEvents } from "@/lib/spark/flows-timeline";
@@ -811,12 +810,9 @@ export default function SparkPositionDetail({
           owner={{ wallet }}
           assets={stripAssets}
           closed={liveView != null && liveView.status !== "open"}
-          // The exports ride the card's ⋮; the event route, which draws no card,
-          // keeps them in the wallet row's Tools.
-          tools={onEventPage}
-        >
-          {onEventPage && exports && <ExportMenu {...exports} />}
-        </DetailTopRow>
+          // The card's ⋮ carries the menu; an event page draws no Tools.
+          tools={false}
+        />
 
         {loading ? (
           <DetailBodySkeleton />

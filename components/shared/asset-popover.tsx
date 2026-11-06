@@ -8,12 +8,13 @@
 //
 // The panel states what the data carries and nothing else: the figure the
 // caller passes (its first line), the icon and ticker, the asset's name, its
-// contract on the chain's explorer, its price and where the price comes from.
-// A field the caller cannot fill is left out. It is one component so every
-// icon opens the same panel. Where the asset has a page (the Prices list's
-// row for its chain and contract, rails-ops reference/asset-key-map.md) the
-// panel ends with that row: the last day's price, the 30-day line and change,
-// and the link to the page. Inside an explorer the row is priced by the line
+// price and where the price comes from. A field the caller cannot fill is
+// left out. It is one component so every icon opens the same panel. Where
+// the asset has a page (the Prices list's row for its chain and contract,
+// rails-ops reference/asset-key-map.md) the panel ends with that row: the
+// last day's price, the 30-day line and change, and the link to the page,
+// which carries the contract. Where it has none, the panel ends with the
+// contract on the chain's explorer. Inside an explorer the row is priced by the line
 // that explorer's protocol reads (the page's main line where it reads none),
 // and the link carries the protocol and the path back (`?via=&from=`,
 // lib/shared/asset-via.ts), so the page opens from that protocol's side.
@@ -163,7 +164,6 @@ function AssetPanelBody({
   price?: ReactNode;
   priceSource?: ReactNode;
 }) {
-  const short = contract ? `${contract.slice(0, 6)}…${contract.slice(-4)}` : null;
   return (
     <div className="flex flex-col gap-2 text-xs" data-asset-popover-body="">
       {figure != null && (
@@ -176,24 +176,8 @@ function AssetPanelBody({
         <span className="font-semibold text-foreground">{symbol}</span>
         {name && <span className="text-rb-500">{name}</span>}
       </div>
-      {(contract || price != null || priceSource != null) && (
+      {(price != null || priceSource != null) && (
         <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
-          {contract && short && (
-            <div className="contents" data-asset-popover-line="contract">
-              <dt className="text-rb-500">{WORDS.contract}</dt>
-              <dd className="text-right">
-                <a
-                  href={explorerUrl(chain, "token", contract)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="link-external font-mono"
-                  aria-label={`${WORDS.contract} ${contract}`}
-                >
-                  {short}
-                </a>
-              </dd>
-            </div>
-          )}
           {price != null && (
             <div className="contents" data-asset-popover-line="price">
               <dt className="text-rb-500">{WORDS.price}</dt>
@@ -215,6 +199,35 @@ function AssetPanelBody({
   );
 }
 
+/** The asset's page, with the reader's `via` kept, once the Prices list is
+ *  read: a priced asset's page, or the page of a token with a page and no
+ *  stored price; null where the asset has none (the Prices dropdown's rows,
+ *  ui-jobs 516). */
+export function useAssetPageHref(symbol: string, address?: string): string | null {
+  const pageChain = useChainId();
+  const pathname = usePathname();
+  const contract = address ?? getTokenAddress(symbol, pageChain) ?? (symbol === "ETH" ? NATIVE : null);
+  const [href, setHref] = useState<string | null>(null);
+  useEffect(() => {
+    if (!contract) return;
+    let live = true;
+    loadAssetPrices().then((list) => {
+      if (!live || !list) return;
+      const search = window.location.search;
+      const via = viaForPathname(pathname, search);
+      const value = via ? viaValue(via) : null;
+      const row = rowFor(list, pageChain, contract, value);
+      const unpriced = list.unpriced?.includes(`${pageChain}:${contract.toLowerCase()}`);
+      const token = row ? row.token : unpriced ? contract.toLowerCase() : null;
+      setHref(token ? withVia(assetHref(pageChain, token), value, `${pathname}${search}`) : null);
+    });
+    return () => {
+      live = false;
+    };
+  }, [pageChain, contract, pathname]);
+  return href;
+}
+
 /** The asset's Prices list row and its page link, once the list is read; for
  *  a token with a page and no stored price, the line saying so and the link;
  *  nothing where the asset has no page. */
@@ -226,10 +239,12 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
   const value = via ? viaValue(via) : null;
   const [row, setRow] = useState<ReturnType<typeof rowFor>>(null);
   const [unpriced, setUnpriced] = useState(false);
+  const [listed, setListed] = useState(false);
   useEffect(() => {
     let live = true;
     loadAssetPrices().then((list) => {
       if (!live) return;
+      setListed(true);
       setRow(list ? rowFor(list, chain, contract, value) : null);
       setUnpriced(Boolean(list?.unpriced?.includes(`${chain}:${contract.toLowerCase()}`)));
     });
@@ -253,7 +268,7 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
       </div>
     );
   }
-  if (!row) return null;
+  if (!row) return listed ? <ContractLine chain={chain} contract={contract} /> : null;
   const open = withVia(assetHref(chain, row.token), value, `${pathname}${search}`);
   return (
     <div
@@ -298,6 +313,27 @@ function AssetPageRow({ chain, contract, symbol }: { chain: ChainId; contract: s
         {WORDS.open(row.symbol)}
       </Link>
     </div>
+  );
+}
+
+/** The contract on the chain's explorer, for an asset with no page to carry it. */
+function ContractLine({ chain, contract }: { chain: ChainId; contract: string }) {
+  if (contract === NATIVE) return null;
+  return (
+    <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3" data-asset-popover-line="contract">
+      <dt className="text-rb-500">{WORDS.contract}</dt>
+      <dd className="text-right">
+        <a
+          href={explorerUrl(chain, "token", contract)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="link-external font-mono"
+          aria-label={`${WORDS.contract} ${contract}`}
+        >
+          {`${contract.slice(0, 6)}…${contract.slice(-4)}`}
+        </a>
+      </dd>
+    </dl>
   );
 }
 

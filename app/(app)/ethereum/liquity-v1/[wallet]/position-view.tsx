@@ -49,7 +49,6 @@ import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { LiquityV1EventCard } from "@/components/protocol/liquity-v1/liquity-v1-event-card";
 import { LiquityV1PositionCard, viewFromSummary } from "@/components/protocol/liquity-v1/liquity-v1-position-card";
 import { liquityV1Exports } from "@/components/protocol/liquity-v1/liquity-v1-export-menu";
-import { ExportMenu } from "@/components/shared/export-menu";
 import { redemptionSplit } from "@/lib/liquity-v1/event-figures";
 import {
   LiquityV1PositionExplanation,
@@ -531,9 +530,8 @@ export default function LiquityV1TroveView({
               : []
           }
           closed={view != null && view.status !== "open"}
-          // The exports ride the card's ⋮; the event route, which draws no card,
-          // keeps them in the wallet row's Tools.
-          tools={onEventPage}
+          // The card's ⋮ carries the menu; an event page draws no Tools.
+          tools={false}
           closing={
             // The PriceFeed's lastGoodPrice at the closing block, carried on
             // liquidation and redemption rows only.
@@ -554,9 +552,7 @@ export default function LiquityV1TroveView({
                 })
               : undefined
           }
-        >
-          {onEventPage && exports && <ExportMenu {...exports} />}
-        </DetailTopRow>
+        />
 
         {loading ? (
           <DetailBodySkeleton />

@@ -1977,6 +1977,7 @@ function ChainTruthTimelineBody({
       });
       const shell = {
         contract,
+        timestamp: pinnedEvent.timestamp,
         title: (
           <EventPageTitle
             title={contract.title === "head" ? { kind: contract.heading, amounts: [] } : contract.title}

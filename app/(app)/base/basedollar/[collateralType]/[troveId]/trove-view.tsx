@@ -91,7 +91,6 @@ import {
 } from "@/lib/shared/liquity-fork-economics-explanation";
 import { DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
-import { ExportMenu } from "@/components/shared/export-menu";
 import { liquityForkExports } from "@/components/protocol/liquity-fork/liquity-fork-export-menu";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { forkLiveVocab, forkReadBy } from "@/lib/shared/liquity-fork-live-provenance";
@@ -527,12 +526,9 @@ export default function BasedollarTroveDetail({
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
           closing={closing}
-          // The exports ride the card's ⋮; the event route, which draws no card,
-          // keeps them in the wallet row's Tools.
-          tools={onEventPage}
-        >
-          {onEventPage && exports && <ExportMenu {...exports} />}
-        </DetailTopRow>
+          // The card's ⋮ carries the menu; an event page draws no Tools.
+          tools={false}
+        />
 
         {loading ? (
           <DetailBodySkeleton />

@@ -8,7 +8,7 @@
 // branches) instead of re-rolling the row.
 
 import type { ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { ArrowLeft } from "lucide-react";
 import { NAV_BUTTON, PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
@@ -21,6 +21,7 @@ import { usePublishPositionCardStrip } from "@/components/shared/position-card-s
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { PositionWalletHeading, type PositionOwner } from "@/components/shared/wallet-heading";
+import { usePublishHeadingWallet } from "@/components/shared/event-page-aside";
 
 /** The one back affordance on every detail page. NAV_BUTTON pill + ArrowLeft(14)
  *  + "Back". Smart-back: returns to the listing the viewer actually came from
@@ -123,7 +124,11 @@ export function closingPricesAt<E extends { blockNumber: number; timestamp: numb
  *
  *  `owner` draws the wallet heading under Back: the wallet the page belongs
  *  to, with Tools at its right. The card then leaves the wallet out of its
- *  header. Without `owner`, the strip and Tools share Back's row. */
+ *  header. Without `owner`, the strip and Tools share Back's row.
+ *
+ *  An event page (a route with `eventId`) is about one event: its heading
+ *  draws no prices, no recency stamp and no Tools (ui-jobs 236's design
+ *  round, 6 Nov 2026); the event's ⋮ beside its h1 carries the actions. */
 export function DetailTopRow({
   session,
   wallet,
@@ -158,6 +163,9 @@ export function DetailTopRow({
   fallbackHref?: string;
   children?: ReactNode;
 }) {
+  const eventPage = useParams<{ eventId?: string }>()?.eventId != null;
+  // The event page's facts table leaves out a row repeating this address.
+  usePublishHeadingWallet(eventPage ? (owner?.wallet ?? null) : null);
   const closingPriced = closing != null && closing.assets.some((a) => typeof a.price === "number" && a.price > 0);
   // Its own scope (the towers' and panels' convention) for the strip while it
   // stands in the row: the row is a sibling of the position card (rails-ops
@@ -167,7 +175,7 @@ export function DetailTopRow({
   // The event cards' "today" side reads the prices this chip states.
   usePublishTodayPrices(assets);
   const prices = (bare: boolean) =>
-    !closed ? (
+    eventPage ? null : !closed ? (
       <LatestPrices assets={assets} reason={priceReason} bare={bare} />
     ) : (
       closingPriced && (
@@ -180,7 +188,7 @@ export function DetailTopRow({
       )
     );
   const priced = prices(true);
-  const stamped = showStamp && !closed;
+  const stamped = showStamp && !closed && !eventPage;
   const inCard = usePublishPositionCardStrip(
     // In the card the stamp stands before the price, next to the ⋮.
     owner && (priced || stamped) ? (
@@ -205,7 +213,7 @@ export function DetailTopRow({
           {/* A page without a heading keeps the strip beside Back. */}
           {!owner && (
             <>
-              {showStamp && !closed && <RecencyStamp compact />}
+              {stamped && <RecencyStamp compact />}
               <ProvReceiptsScope registry={registry}>{prices(false)}</ProvReceiptsScope>
             </>
           )}
@@ -216,7 +224,7 @@ export function DetailTopRow({
             be reachable before then and on a view that never resolves — which
             is what the dock used to guarantee. A bare menu carries the
             inspector alone until the shapes arrive. */}
-        {!owner && (children || <ToolsMenu />)}
+        {!owner && !eventPage && (children || <ToolsMenu />)}
       </div>
       {owner && (
         <div className="mt-6">
@@ -228,7 +236,7 @@ export function DetailTopRow({
             <PositionWalletHeading
               owner={owner}
               session={session}
-              tools={tools ? children : false}
+              tools={tools && !eventPage ? children : false}
               strip={
                 !inCard && (priced || stamped) ? (
                   <>

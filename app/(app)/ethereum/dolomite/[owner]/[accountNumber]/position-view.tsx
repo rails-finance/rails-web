@@ -61,7 +61,6 @@ import {
   DolomiteClosedPositionExplanation,
 } from "@/components/protocol/dolomite/dolomite-position-explanation";
 import { dolomiteLiquidationStories, withTokenPeaks } from "@/lib/dolomite/closed-record";
-import { ExportMenu } from "@/components/shared/export-menu";
 import type { PositionCardExports } from "@/components/shared/position-card";
 import { dolomitePositionToMarkdown } from "@/lib/dolomite/position-to-markdown";
 import { computeDolomiteCardCaptions } from "@/lib/dolomite/economics";
@@ -358,8 +357,7 @@ export default function DolomitePositionView({
 
   const captions = liveView ? computeDolomiteCardCaptions(liveView) : null;
 
-  // The card ⋮'s export shapes (ui-jobs 308 point 2). The event route, which
-  // draws no card, keeps them in the wallet row's Tools.
+  // The card ⋮'s export shapes (ui-jobs 308 point 2).
   const exports: PositionCardExports | null = liveView
     ? {
         buildMarkdown: () =>
@@ -412,12 +410,9 @@ export default function DolomitePositionView({
             owner={{ wallet: owner }}
             assets={stripAssets}
             closed={liveView != null && liveView.status !== "open"}
-            // The exports ride the card's ⋮; the event route, which draws no card,
-            // keeps them in the wallet row's Tools.
-            tools={onEventPage}
-          >
-            {onEventPage && exports && <ExportMenu {...exports} />}
-          </DetailTopRow>
+            // The card's ⋮ carries the menu; an event page draws no Tools.
+            tools={false}
+          />
 
           {loading ? (
             <DetailBodySkeleton />
