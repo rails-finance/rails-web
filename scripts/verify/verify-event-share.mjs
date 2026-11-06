@@ -2495,35 +2495,35 @@ async function factsOnPositionPage(positionPath, eventId) {
     .first()
     .click()
     .catch(() => {});
+  // The raw figures ride the row's notes, which are on its Figures tab (370).
+  await showCardTab(page.locator(`[data-event-id="${eventId}"]`).first(), "figures");
   await page.waitForSelector(`[data-event-id="${eventId}"] [data-row-kind]`, { timeout: 15000 }).catch(() => {});
   const facts = await vaultRowFacts(page, eventId);
   await ctx.close();
   return facts;
 }
 
-/** An id the FLATTENED page paints and the GROUPED page does not — i.e. one
- *  swallowed by a collapsed run. Null where this subject's life has no run of
- *  the minimum length, which is a fact about the subject and is reported as
- *  one rather than passed over. */
+/** An id inside a closed group: the grouped page as a reader meets it, then
+ *  its first closed group opened (decision 0039 folders; the old flattened
+ *  view went with `collapseRuns`, 81662167), and an id that the opening drew.
+ *  Null where this subject's life has no group, which is a fact about the
+ *  subject and is reported as one rather than passed over. */
 async function idInsideACollapsedRun(positionPath) {
-  const flat = await open(1280, `${BASE}${positionPath}`);
-  await flat.page.waitForSelector("[data-event-id]", { timeout: 60000 }).catch(() => {});
-  await exhaustPaging(flat.page);
-  const flatIds = await eventIds(flat.page);
-  await flat.ctx.close();
-
-  // Runs ON — the default a reader meets, which is exactly why this case
-  // matters and why the contexts above are not it.
   const grouped = await open(1280, `${BASE}${positionPath}`, { flattenRuns: false });
   await grouped.page.waitForSelector("[data-event-id]", { timeout: 60000 }).catch(() => {});
   await exhaustPaging(grouped.page);
-  const groupedIds = new Set(await eventIds(grouped.page));
+  const shown = new Set(await eventIds(grouped.page));
+  const frame = grouped.page.locator(CLOSED_GROUP).first();
+  let hidden = null;
+  if ((await frame.count()) > 0 && (await openGroup(grouped.page, frame))) {
+    hidden = (await eventIds(grouped.page)).find((id) => !shown.has(id)) ?? null;
+  }
+  const after = (await eventIds(grouped.page)).length;
   await grouped.ctx.close();
-
-  return { hidden: flatIds.find((id) => !groupedIds.has(id)) ?? null, flat: flatIds.length, grouped: groupedIds.size };
+  return { hidden, flat: after, grouped: shown.size };
 }
 
-async function verifyVaultOwn(name, subject) {
+async function verifyVaultOwn(name, subject, { runPath = null } = {}) {
   if (FAMILIES_FILTER && !FAMILIES_FILTER.has(name)) return;
   if (!subject) {
     check(`${name} · own: the generic block found a subject to go on from`, false);
@@ -2535,6 +2535,10 @@ async function verifyVaultOwn(name, subject) {
   // ── V1: the pinned card IS the timeline's card ───────────────────────
   const onPage = await factsOnPositionPage(positionPath, decodedId);
   const pinnedCtx = await open(1280, link);
+  await pinnedCtx.page
+    .waitForSelector(`[data-event-id="${decodedId}"] [data-card-tab-open]`, { timeout: 15000 })
+    .catch(() => {});
+  await showCardTab(pinnedCtx.page.locator(`[data-event-id="${decodedId}"]`).first(), "figures");
   await pinnedCtx.page
     .waitForSelector(`[data-event-id="${decodedId}"] [data-row-kind]`, { timeout: 15000 })
     .catch(() => {});
@@ -2549,16 +2553,24 @@ async function verifyVaultOwn(name, subject) {
   );
 
   // ── V2: a pinned event inside a collapsed run ────────────────────────
-  const run = await idInsideACollapsedRun(positionPath);
+  // A listing's first live subject can be a short life with no group; then
+  // the family's pinned run subject stands in for V2.
+  let run = await idInsideACollapsedRun(positionPath);
+  let runFrom = positionPath;
+  if (!run.hidden && runPath) {
+    console.log(`  ${name}: ${positionPath} has no closed group (${run.grouped} rows); V2 runs on ${runPath}`);
+    run = await idInsideACollapsedRun(runPath);
+    runFrom = runPath;
+  }
   if (
     !check(
       `${name} · own: this subject's life has a collapsed run to pin into`,
       !!run.hidden,
-      `${run.flat} rows flat, ${run.grouped} with runs on${run.hidden ? "" : " — no id is swallowed, so V2 could not be exercised on this subject; re-pin it"}`,
+      `${run.grouped} rows with its groups closed, ${run.flat} with one opened${run.hidden ? "" : " — no closed group, so V2 could not be exercised on this subject; re-pin it"}`,
     )
   )
     return;
-  const runLink = `${BASE}${positionPath}/event/${encodeURIComponent(run.hidden)}`;
+  const runLink = `${BASE}${runFrom}/event/${encodeURIComponent(run.hidden)}`;
   const { ctx: runCtx, page: runPage, errors: runErrors } = await open(1280, runLink, { flattenRuns: false });
   const runIds = await eventIds(runPage);
   check(
@@ -2584,7 +2596,12 @@ const aaveVaultSubject = await verifyFamily("aave-vaults", {
   listingPath: "/ethereum/aave/vaults/positions",
   rowHrefRe: /^\/ethereum\/aave\/vaults\/0x[0-9a-fA-F]{40}\/0x[0-9a-fA-F]{40}$/,
 });
-await verifyVaultOwn("aave-vaults", aaveVaultSubject);
+// V2's stand-in: an sGHO holder (an EOA) whose 23 rows hold a closed group
+// of transfers (6 Nov 2026).
+await verifyVaultOwn("aave-vaults", aaveVaultSubject, {
+  runPath:
+    "/ethereum/aave/vaults/0xe1753f2e00940cc31213dd92013cf019dfe4ca1d/0x756281ae56c3d51bcdb0f46518ba1d148282af18",
+});
 await verifySheet("aave-vaults");
 
 // MetaMorpho on Base, off the same shape of listing.
