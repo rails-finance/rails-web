@@ -24,6 +24,7 @@ import { AT_LINE_HF } from "@/lib/aave-v4/format";
 import { getSpokeMeta } from "@/lib/aave-v4/spoke-meta";
 import { debtHubsOf, HUB_TIER_LABEL } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { aaveV4Modal, PROSE, V4_WORDS, type AaveV4L5Key } from "@/lib/aave-v4/event-templates";
+import { aaveV4ManagerKind, type AaveV4ManagerKind } from "@/lib/aave-v4/position-managers";
 
 export type AaveV4Event = BaseActivityEvent & { context: { protocol: "aave-v4"; data: AaveV4Context } };
 
@@ -85,6 +86,31 @@ function act(e: AaveV4Event): string | null {
   }
 }
 
+/** Each listed manager's name. */
+const MANAGER_NAME: Record<AaveV4ManagerKind, string> = {
+  giver: V4_WORDS.manager_giver,
+  taker: V4_WORDS.manager_taker,
+  config: V4_WORDS.manager_config,
+  native_gateway: V4_WORDS.manager_native_gateway,
+  signature_gateway: V4_WORDS.manager_signature_gateway,
+};
+
+/** The transaction's other events for the same owner, each with whether it
+ *  comes after this one. A swap is two such legs (a repay then a borrow, or a
+ *  supply and a withdraw), each through a position manager; a swap card would
+ *  take both legs from here. */
+function txLegs(
+  siblings: readonly AaveV4Event[] | undefined,
+  self: AaveV4Event | undefined,
+  owner: string | undefined,
+): { event: AaveV4Event; later: boolean }[] {
+  const all = siblings ?? [];
+  const at = all.findIndex((s) => s === self || (self != null && s.id === self.id));
+  return all
+    .map((event, i) => ({ event, later: at >= 0 && i > at }))
+    .filter(({ event }, i) => i !== at && (!owner || event.context.data.owner?.toLowerCase() === owner));
+}
+
 export function coordsFor(e: AaveV4Event): EventProvDetail {
   const c = e.context.data;
   return { spokeName: c.spokeName, spokeAddress: c.spokeAddress, txHash: e.txHash, blockNumber: e.blockNumber };
@@ -96,7 +122,17 @@ function joinWords(parts: string[]): string {
   return `${parts.slice(0, -1).join(", ")} ${V4_WORDS.and} ${parts[parts.length - 1]}`;
 }
 
+/** A position swap's modal, by kind: Aave's swap page for each swap, and the
+ *  borrow and supply pages for a leverage, which Aave does not call a swap. */
+const SWAP_L5: Record<NonNullable<AaveV4Context["swap"]>["kind"], AaveV4L5Key> = {
+  collateral_swap: "swap_supply",
+  debt_swap: "swap_borrow",
+  repay_with_collateral: "swap_repay",
+  leverage: "leverage",
+};
+
 function pick(ctx: AaveV4Context): { id: string; variant: string } {
+  if (ctx.swap) return { id: "aave4.swap", variant: ctx.swap.kind };
   const debtBefore = num(ctx.debtBefore) ?? 0;
   const debtAfter = num(ctx.debtAfter);
   switch (ctx.eventType) {
@@ -159,23 +195,43 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
   const hub = meta && meta.borrowHubs.length > 1 && tier ? HUB_TIER_LABEL[tier] : null;
   if (hub) v.hub = hub;
 
-  // Who sent it: a caller other than the owner is a position manager (every
-  // spoke entry point is gated on one); else the transaction's other events.
-  const whoLine = (withSiblings = true) => {
-    const owner = ctx.owner?.toLowerCase();
-    const caller = ctx.caller?.toLowerCase();
-    if (owner && caller && caller !== owner) {
-      v.manager = caller;
-      return sp.say(ctx.txFrom?.toLowerCase() === owner ? "by_manager" : "by_manager_alone");
-    }
-    if (!withSiblings) return;
-    const others = (siblings ?? [])
-      .filter((s) => s !== self && s.id !== self?.id)
-      .map(act)
-      .filter((a): a is string => a != null);
-    if ((siblings?.length ?? 0) < 2 || others.length === 0) return;
+  // Who called the spoke: a caller other than the owner is a position manager
+  // or gateway (every spoke entry point is gated on one), named where Aave's
+  // address book lists it.
+  const owner = ctx.owner?.toLowerCase();
+  const caller = ctx.caller?.toLowerCase();
+  const managed = owner != null && caller != null && caller !== owner;
+  const ownerSigned = owner != null && ctx.txFrom?.toLowerCase() === owner;
+  if (managed) {
+    v.manager = caller;
+    const kind = aaveV4ManagerKind(caller);
+    v.manager_name = kind ? MANAGER_NAME[kind] : V4_WORDS.manager_unnamed;
+  }
+  const legs = txLegs(siblings, self, owner);
+  // A borrow later in the transaction: the debt half of a debt swap.
+  const borrowsLater = legs.some((l) => l.later && l.event.context.data.eventType === "borrow");
+
+  // What the transaction's other events for the owner did, set for the line
+  // that names them; false where there are none.
+  const othersSet = () => {
+    const others = legs.map((l) => act(l.event)).filter((a): a is string => a != null);
+    if (others.length === 0) return false;
     v.sibling_acts = joinWords(others);
-    sp.say("sibling");
+    return true;
+  };
+  // Who sent it, with the transaction's other events for the owner.
+  const whoLine = (withSiblings = true) => {
+    const also = withSiblings && othersSet();
+    if (managed)
+      sp.say(ownerSigned ? (also ? "by_manager_tx" : "by_manager") : also ? "by_manager_alone_tx" : "by_manager_alone");
+    else if (also) sp.say("sibling");
+  };
+  // Who signed, where the first sentence named the manager.
+  const signedLine = () => {
+    const also = othersSet();
+    if (managed)
+      sp.say(ownerSigned ? (also ? "signed.owner_tx" : "signed.owner") : also ? "signed.other_tx" : "signed.other");
+    else if (also) sp.say("sibling");
   };
 
   // The health factor after the event, where it means something.
@@ -210,8 +266,8 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
       break;
     }
     case "aave4.withdraw": {
-      sp.say("withdraw.what", amount);
-      whoLine();
+      sp.say(managed ? "withdraw.via" : "withdraw.what", amount);
+      signedLine();
       if (closes) sp.say("closed");
       else {
         if (supplyEmptied) sp.say("withdraw.all");
@@ -237,7 +293,22 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
           v.life_interest = debtLifeInterest;
           sp.say("repay.life");
         }
-        if (closes) sp.say("closed");
+        // A borrow later in the same transaction: the leaves lines read the
+        // debts the transaction's last event lists, and the health factor at
+        // the end of the block.
+        const debtsAfterTx = borrowsLater
+          ? [...legs]
+              .reverse()
+              .find((l) => l.later && l.event.context.data.allDebts != null)
+              ?.event.context.data.allDebts?.filter((d) => (num(d.amount) ?? 0) > EPS)
+              .map((d) => aaveV4DisplaySymbol(d.symbol))
+          : undefined;
+        if (debtsAfterTx && debtsAfterTx.length > 0) {
+          v.other_debt = joinWords(debtsAfterTx);
+          sp.say("repay.after_tx");
+          hfLine();
+        } else if (borrowsLater) hfLine();
+        else if (closes) sp.say("closed");
         else if (otherDebts.length > 0) {
           v.other_debt = joinWords(otherDebts);
           sp.say("repay.other");
@@ -285,6 +356,77 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
       } else if (debtAfter != null && debtAfter > EPS) sp.say("liq.again");
       break;
     }
+    case "aave4.swap": {
+      // One event for both legs (lib/aave-v4/swaps.ts): the given leg is this
+      // row, the received leg rides in `swap.received`, and the balances lists
+      // are the position's after the transaction.
+      const s = ctx.swap!;
+      const rec = s.received.context?.data as AaveV4Context;
+      v.given = num(ctx.amount) ?? 0;
+      v.g_symbol = aaveV4DisplaySymbol(ctx.reserveSymbol);
+      v.received = num(rec?.amount) ?? 0;
+      v.r_symbol = aaveV4DisplaySymbol(rec?.reserveSymbol);
+      const legs = { given: "amount" } as const;
+      const sold = num(s.sell.amount);
+      const bought = num(s.buy.amount);
+      // A supply larger than what the order bought: the owner's wallet sent the
+      // rest into the order's contract, which supplied it with the purchase.
+      const received = v.received;
+      const topup =
+        (variant === "collateral_swap" || variant === "leverage") &&
+        bought != null &&
+        received - bought > received * 1e-6
+          ? received - bought
+          : null;
+      if (variant === "debt_swap") sp.say("swap.debt", legs);
+      else if (variant === "repay_with_collateral") sp.say("swap.repay", legs);
+      else if (variant === "leverage") sp.say(topup != null ? "swap.leverage_topped" : "swap.leverage", legs);
+      else sp.say(topup != null ? "swap.collateral_topped" : "swap.collateral", legs);
+      // The Trade: what it sold and bought, at the price that implies.
+      if (sold != null && bought != null && sold > 0 && bought > 0 && s.sell.symbol && s.buy.symbol) {
+        v.sold_symbol = aaveV4DisplaySymbol(s.sell.symbol);
+        v.bought_symbol = aaveV4DisplaySymbol(s.buy.symbol);
+        if (topup != null) {
+          v.bought = bought;
+          v.topup = topup;
+          sp.say("swap.route_topped");
+        } else {
+          const up = bought / sold >= 1;
+          v.price = up ? bought / sold : sold / bought;
+          v.price_quote = up ? v.bought_symbol : v.sold_symbol;
+          v.price_base = up ? v.sold_symbol : v.bought_symbol;
+          sp.say("swap.route");
+        }
+        // The withdrawn or borrowed leg (the received one on a debt swap) is a
+        // flash loan the order's contract repays with a fee; what it did not
+        // sell goes back to the owner's wallet. Neither transfer is a spoke
+        // event, so only the gap is stated, and only above 0.1%, where it is
+        // more than the fee.
+        const taken = variant === "debt_swap" ? num(rec?.amount) : num(ctx.amount);
+        if (taken != null && taken - sold > taken * 0.001) {
+          v.left = taken - sold;
+          v.left_symbol = v.sold_symbol;
+          sp.say("swap.gap");
+        }
+      }
+      if (variant === "collateral_swap") {
+        const supplies = (ctx.allSupplies ?? [])
+          .filter((r) => (num(r.amount) ?? 0) > EPS)
+          .map((r) => aaveV4DisplaySymbol(r.symbol));
+        if (supplies.length > 0) {
+          v.supplies = joinWords(supplies);
+          sp.say("swap.supplies");
+        }
+      } else if (ctx.allDebts != null) {
+        const debts = ctx.allDebts.filter((d) => (num(d.amount) ?? 0) > EPS).map((d) => aaveV4DisplaySymbol(d.symbol));
+        if (debts.length > 0) {
+          v.other_debt = joinWords(debts);
+          sp.say("swap.owes");
+        } else sp.say("hf.cleared");
+      }
+      hfLine();
+      break;
+    }
     case "aave4.toggle": {
       sp.say(variant === "enabled" ? "toggle.on" : "toggle.off");
       whoLine(false);
@@ -299,7 +441,7 @@ export function aaveV4EventProse(input: AaveV4ProseInput): AaveV4EventProse {
 
   // ── The run's sentences ──
   const said = PROSE.finish(run, variant);
-  const key = t.L5;
+  const key = ctx.swap ? SWAP_L5[ctx.swap.kind] : t.L5;
   return { ...said, L5: { key, content: aaveV4Modal(key) } };
 }
 

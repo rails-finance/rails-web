@@ -47,6 +47,7 @@
 import { useContext, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { PositionCardStripSlot } from "@/components/shared/position-card-strip";
+import { PositionReadStamp } from "@/components/shared/position-read";
 import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
@@ -806,6 +807,8 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             <>
               {slots.identity}
               {slots.status && <StatusTag status={slots.status} />}
+              {/* The block and time of the read behind the figures (ui-jobs 512). */}
+              <PositionReadStamp />
             </>
           ) : (
             <>
@@ -858,6 +861,8 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       {/* A listing card is one link: its figures and labels open no tips
           (the position page keeps them). */}
       <QuietTipsContext.Provider value={!detail}>
+        {/* A live card's figures decay: search quotes the stamp and the
+            timeline, and sends readers here for them (ui-jobs 512). */}
         {slots.outcome ? (
           <ClosedGrid
             heads={slots.heads}
@@ -866,10 +871,19 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             detail={detail}
           />
         ) : (
-          <OpenGrid heads={slots.heads} detail={detail} />
+          <div data-nosnippet="">
+            <OpenGrid heads={slots.heads} detail={detail} />
+          </div>
         )}
       </QuietTipsContext.Provider>
-      {panel && <PositionCardPanel columns={panel} />}
+      {panel &&
+        (closed ? (
+          <PositionCardPanel columns={panel} />
+        ) : (
+          <div data-nosnippet="">
+            <PositionCardPanel columns={panel} />
+          </div>
+        ))}
       {/* A listing card's recency and counts, together at its bottom right. */}
       {!detail && counters && (
         <div className="mt-2 flex items-center justify-end gap-2" data-card-foot="">
@@ -928,7 +942,14 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
               rowExtra={
                 counters ? <span className="ml-auto flex items-center gap-2 self-center">{counters}</span> : undefined
               }
-              explanation={slots.explainer.body ?? undefined}
+              // The (i) pane restates the live figures in words.
+              explanation={
+                slots.explainer.body == null ? undefined : closed ? (
+                  slots.explainer.body
+                ) : (
+                  <div data-nosnippet="">{slots.explainer.body}</div>
+                )
+              }
               learnMore={slots.learnMore}
               viewHref={slots.explainer.viewHref}
               explanationDefaultOpen={slots.explainer.defaultOpen}

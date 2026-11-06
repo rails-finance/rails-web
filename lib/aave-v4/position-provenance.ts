@@ -741,3 +741,30 @@ export function liqRatioProv(collSymbol: string, debtSymbol: string): Provenance
 // (interestPnl), a figure the card does not print; these are its receipts.
 export const SUPPLY_INTEREST_PROV = interestProv("Accrued supply interest");
 export const BORROW_INTEREST_PROV = interestProv("Accrued borrow interest");
+
+/** GPv2Settlement, whose Trade log settles a CoW position swap's order. */
+export const GPV2_SETTLEMENT = "0x9008d19f58aabd9ed0d60971565aa8510560ab41";
+
+/** The route of an Aave V4 position swap: the CoW settlement whose Trade log
+ *  the pairing rests on (rails-server mig 462). The one-order contract that
+ *  owned the Trade is described, never named. */
+export function swapRouteProv(
+  swap: { orderUid: string; clone: string; exact: boolean; sell: { raw: string }; buy: { raw: string } },
+  detail?: EventProvDetail,
+): Provenance {
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    verify: txVerify(detail),
+    summary: `The CoW settlement that carried this swap. Its Trade log names the order's owner, the tokens sold and bought and both amounts. The owner is a one-order contract that called Aave's Giver and Taker position managers for this position in the same transaction, and the two spoke rows are paired through it; the legs bound the Trade's amounts${swap.exact ? ", here to the wei" : ""}.`,
+    contract: { name: "GPv2Settlement", address: GPV2_SETTLEMENT },
+    via: "rails-server index of GPv2Settlement Trade logs · paired to the position's rows by the order's owner",
+    inputs: [
+      { label: "orderUid", value: swap.orderUid, kind: "chain", pclass: "emitted", note: "Trade `orderUid`" },
+      { label: "order owner", value: swap.clone, kind: "chain", pclass: "emitted", note: "Trade `owner`" },
+      { label: "sellAmount", value: swap.sell.raw, kind: "chain", pclass: "emitted", note: "Trade `sellAmount`" },
+      { label: "buyAmount", value: swap.buy.raw, kind: "chain", pclass: "emitted", note: "Trade `buyAmount`" },
+      ...eventInputs(detail),
+    ],
+  };
+}

@@ -455,6 +455,42 @@ export interface AaveV4Context {
   /** Origin envelopes for the emitted raw fields (log + param + raw + scale).
    *  Same absence rules as `raw`; absent on pre-envelope API responses. */
   origin?: AaveV4ContextOrigin;
+  /** A CoW position swap, under `/api/aave-v4/timeline?swaps=1`: this row is
+   *  the swap's given leg, placed at the later leg and carrying its
+   *  `allSupplies` / `allDebts`; the received leg rides in `swap.received`. */
+  swap?: AaveV4Swap;
+}
+
+/** One side of an Aave V4 swap's Trade: the token, its symbol and decimal
+ *  amount from the leg's reserve (null when the reserve is unknown), and the
+ *  Trade log's raw integer. */
+export interface AaveV4SwapSide {
+  token: string;
+  symbol: string | null;
+  amount: string | null;
+  raw: string;
+}
+
+/** An Aave V4 position swap made through a CoW order (rails-server mig 462,
+ *  api/src/services/aave-v4-swaps.ts). given → received is the leg order: the
+ *  leg the position gave up, then the one it got (on a debt swap the repaid
+ *  debt, then the new borrow). `sell` / `buy` are the Trade's: it sells the
+ *  withdrawn or borrowed reserve and buys the supplied or repaid one. The legs'
+ *  amounts bound the Trade's; what the order did not use went back to the
+ *  wallet. `exact`: both legs equal the Trade to the wei. */
+export interface AaveV4Swap {
+  kind: "collateral_swap" | "debt_swap" | "repay_with_collateral" | "leverage";
+  route: string;
+  givenEventId: string;
+  receivedEventId: string;
+  clone: string;
+  orderUid: string;
+  exact: boolean;
+  sell: AaveV4SwapSide;
+  buy: AaveV4SwapSide;
+  feeRaw: string;
+  /** The received leg's event, as the timeline serves it without `?swaps=1`. */
+  received: BaseActivityEvent;
 }
 
 /** Provenance of an Aave V4 historic price. Drives the UI's

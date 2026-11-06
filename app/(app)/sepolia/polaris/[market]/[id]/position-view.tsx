@@ -15,6 +15,8 @@
 // Units are native everywhere; the one dollar figure is the protocol's own
 // feed, and the header line says "Sepolia testnet" once.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -105,6 +107,8 @@ export default function PolarisPositionView({
 }: PolarisPositionViewProps) {
   const indexSeeded = initialEvents != null;
   const [chain, setChain] = useState<PolarisChainResponse | null>(null);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(chain), [chain]));
   const [chainSettled, setChainSettled] = useState(false);
   const [summary, setSummary] = useState<PolarisPositionSummary | null>(initialSummary);
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);

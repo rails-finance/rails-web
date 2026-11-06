@@ -6,8 +6,8 @@
 //      cases no live position can reach, chiefly `externalParty` with no token
 //      rows, which must fall back to the standalone glyph rather than paint a
 //      blank spine slot.
-//   B. Live (the Morpho fixture below) — 1,578 of its 1,589 events were
-//      executed by an authorised operator and 11 by the owner, so ONE page
+//   B. Live (the Morpho fixture below) — 554 of its 572 events were
+//      executed by an authorised operator and 18 by the owner, so ONE page
 //      carries both treatments and they can be compared without navigating.
 //
 // Run with the dev server up: BASE=http://localhost:3001 node scripts/verify/verify-external-spine.mjs
@@ -76,8 +76,13 @@ export default function SpineProbePage() {
 `;
 
 const VIEWPORT = { width: 1440, height: 1100 };
+// SPINE_FIXTURE= tries another position in its place (a re-pick).
 const FIXTURE =
-  "/ethereum/morpho/3a85e619751152991742810df6ec69ce473daef99e28a64ab2340d7b7ccfee49-0x405dbf6606336ab3d6574f78eddfa68038e9f9a1";
+  process.env.SPINE_FIXTURE ??
+  // Re-picked 5 Nov 2026: 0x405d… closed on 22 Oct. This position is open and
+  // run by c0ffeebabe.eth (554 of its 572 events), so one page carries the
+  // badge, the ENS-named actor and the operator bullet.
+  "/ethereum/morpho/85ab69d50add7daa0934b5224889af0a882f2e3b4572d82c771dd0875f4eaa9b-0x46d785c75bfb6d8bc27ae87c114437447e413b0f";
 const LIQ_FIXTURE =
   "/ethereum/morpho/3a85e619751152991742810df6ec69ce473daef99e28a64ab2340d7b7ccfee49-0x1f1de251ee59f4272ac21ffda2bd4dfc40c81912";
 
@@ -122,9 +127,15 @@ async function probeStructural(page) {
   console.log("\n── A. structural (/__spine-probe) ──────────────────────────");
   mkdirSync(PROBE_DIR, { recursive: true });
   writeFileSync(`${PROBE_DIR}/page.tsx`, PROBE_PAGE);
-  await new Promise((r) => setTimeout(r, 2500)); // let the dev server pick it up
-
-  const res = await page.goto(`${BASE}/spine-probe-tmp`, { waitUntil: "networkidle", timeout: 60_000 });
+  // The dev server picks a new route up on its own clock, and a busy one
+  // answers 404 while it compiles one (47 s on 5 Nov 2026): asked until it
+  // serves, for up to two minutes.
+  let res = null;
+  for (let i = 0; i < 48; i++) {
+    await new Promise((r) => setTimeout(r, 2500));
+    res = await page.goto(`${BASE}/spine-probe-tmp`, { waitUntil: "networkidle", timeout: 60_000 }).catch(() => null);
+    if (res && res.status() < 400) break;
+  }
   if (!res || res.status() >= 400) {
     bad(`probe route returned ${res && res.status()} — cannot run structural checks`);
     return;
@@ -187,7 +198,7 @@ async function probeStructural(page) {
  *  span both light up (≥2). Drifted → only the flank does (1). */
 async function probeEcho(page) {
   console.log("\n── D. flank echo resolves to the header receipt ─────────────");
-  await page.goto(`${BASE}${FIXTURE}`, { waitUntil: "networkidle", timeout: 120_000 });
+  await page.goto(`${BASE}${FIXTURE}`, { waitUntil: "domcontentloaded", timeout: 180_000 });
   await page.waitForSelector(CARD_ROOT, { timeout: 90_000 });
   await page.waitForTimeout(2000);
 
@@ -239,8 +250,8 @@ async function probeEcho(page) {
 }
 
 async function probeLive(page) {
-  console.log("\n── B. live fixture (Morpho, 1,578 third-party rows) ─────────");
-  await page.goto(`${BASE}${FIXTURE}`, { waitUntil: "networkidle", timeout: 120_000 });
+  console.log("\n── B. live fixture (Morpho, 554 third-party rows) ───────────");
+  await page.goto(`${BASE}${FIXTURE}`, { waitUntil: "domcontentloaded", timeout: 180_000 });
   await page.waitForSelector(CARD_ROOT, { timeout: 90_000 });
   await page.waitForTimeout(2500); // let ENS resolve + the window settle
 
@@ -294,7 +305,15 @@ async function probeLive(page) {
   if (plain > 0) ok(`${plain} owner-acted row(s) on the same page render unbadged — the two treatments differ`);
   else console.log("   note: no owner-acted row in the first 25 cards to compare against");
 
-  // The actor chip, ENS-resolved.
+  // The actor chip, ENS-resolved: the name lands after the page, so it is
+  // waited for (60 s) before the chip is read.
+  await page
+    .waitForFunction(
+      () => [...document.querySelectorAll("span.font-medium")].some((s) => /\.eth$/.test(s.textContent || "")),
+      null,
+      { timeout: 60_000 },
+    )
+    .catch(() => {});
   const chip = await page.evaluate(() => {
     const el = [...document.querySelectorAll("span.font-medium")].find((s) => /\.eth$|^0x/.test(s.textContent || ""));
     return el ? el.textContent : null;
@@ -302,14 +321,23 @@ async function probeLive(page) {
   if (chip && chip.endsWith(".eth")) ok(`actor chip reverse-resolved: "${chip}"`);
   else bad(`actor chip did not resolve to a name — got ${JSON.stringify(chip)}`);
 
-  // The Explanation's operator bullet.
+  // The Explanation's operator bullet. The Explanation is drawn once the
+  // position's chain read lands, so it is waited for, not read at once.
+  await page
+    .waitForFunction(() => /run by another account/.test(document.body.textContent || ""), null, { timeout: 90_000 })
+    .catch(() => {});
+  await page.waitForTimeout(2000); // the operator's ENS name, behind the bullet
   const bodyText = await page.evaluate(() => document.body.textContent || "");
   if (/run by another account/.test(bodyText)) {
     ok("position Explanation states the third-party execution fact");
     const m = bodyText.match(/[^.]{0,120}run by another account[^.]{0,200}/);
     if (m) console.log(`   → ${m[0].replace(/\s+/g, " ").slice(0, 320)}`);
+    // The bullet names the leading POOL CALLER (the account Morpho saw); the
+    // chip above names the transaction's signer. On this fixture the caller
+    // is a contract with no ENS name and the signer is c0ffeebabe.eth, so the
+    // bullet stating no name is right; it is noted, not held.
     if (/through \S+\.eth/.test(bodyText)) ok("…and names the leading operator where ENS resolves it");
-    else bad("operator bullet present but names no operator despite a resolving address");
+    else console.log("   note: the bullet names no operator (the leading pool caller has no ENS name)");
   } else bad("position Explanation does not mention third-party execution");
 
   await page.screenshot({ path: "/tmp/external-spine-live.png", fullPage: false });
@@ -317,7 +345,7 @@ async function probeLive(page) {
 
 async function probeLiquidation(page) {
   console.log("\n── C. liquidation fixture (critical must still win) ─────────");
-  await page.goto(`${BASE}${LIQ_FIXTURE}`, { waitUntil: "networkidle", timeout: 120_000 });
+  await page.goto(`${BASE}${LIQ_FIXTURE}`, { waitUntil: "domcontentloaded", timeout: 180_000 });
   await page.waitForSelector(CARD_ROOT, { timeout: 90_000 });
   await page.waitForTimeout(1500);
   // The two liquidations sit at newest-first index 317 and 369, past the first

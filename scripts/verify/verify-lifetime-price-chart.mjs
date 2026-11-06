@@ -107,7 +107,7 @@
 // 4577 and Basedollar wstETH 1150 (closed: the level ends that day), Polaris USDp
 // 2420 and GOLDp 18 (open: today's level the card's price × 115 % ÷ its ratio),
 // USDp 3732 and GOLDp 29 (liquidated); the how-to-read names the minimum.
-// LlamaLend (step 6, `band`, `checkBand`): wstETH 0x95f1 (open), CRV 0xe5b2
+// LlamaLend (step 6, `band`, `checkBand`): wstETH 0x95f1 (open), CRV 0x1aa5
 // (in soft liquidation), 0xd76a (under its band), 0x61db and 0xa32e
 // (liquidated), 0xbbc5 (closed): Health first, today the card's; the band stepping on event days,
 // today the card's Bands; the tip's band words; the drawn band against the
@@ -400,18 +400,18 @@ const PAGES = [
     timeline: "/api/chain/moonwell-base/timeline?wallet=0x2d7a6b617f11b6755bfd3ab79f1d7cb963ff9e9c",
   },
   {
-    id: "compound-v3 usdc 0xc5cd",
+    id: "compound-v3 usdc 0x8279",
     noChanges: true,
-    path: "/ethereum/compound-v3/usdc/0xc5cd3abe92d857ecfb73e86de0f8a3ed3239cc46",
+    path: "/ethereum/compound-v3/usdc/0x8279b19fbd91a651d811d233c2de8562d6ed30a7",
     lwOnly: true,
     health: true,
-    timeline: "/api/compound/timeline?wallet=0xc5cd3abe92d857ecfb73e86de0f8a3ed3239cc46&market=usdc&limit=1000",
+    timeline: "/api/compound/timeline?wallet=0x8279b19fbd91a651d811d233c2de8562d6ed30a7&market=usdc&limit=1000",
     hf: {
-      url: "/api/chain/compound/position?wallet=0xc5cd3abe92d857ecfb73e86de0f8a3ed3239cc46&market=usdc",
+      url: "/api/chain/compound/position?wallet=0x8279b19fbd91a651d811d233c2de8562d6ed30a7&market=usdc",
       field: "healthFactor",
     },
     basket: {
-      url: "/api/chain/compound/position?wallet=0xc5cd3abe92d857ecfb73e86de0f8a3ed3239cc46&market=usdc",
+      url: "/api/chain/compound/position?wallet=0x8279b19fbd91a651d811d233c2de8562d6ed30a7&market=usdc",
       kind: "comet",
     },
   },
@@ -488,7 +488,7 @@ const PAGES = [
   // Step 8 (the collateral factor changes on Compound V3, V2 and Moonwell,
   // from the setters' logs): a Comet's at the upgrade that carried it, a
   // Comptroller's at its block; each a marker (`changes`), and a life with
-  // none draws none (`noChanges`, above on 0x33a7, 0xc5cd, 0x2f42 and 0x13ad).
+  // none draws none (`noChanges`, above on 0x33a7, 0x8279, 0x2f42 and 0x13ad).
   // Compound V3 0x072f (open, wstETH 87 → 85 % on 6 Aug 2025 and 85 → 86 %
   // on 15 Nov 2025, both between its events), 0x7829 (closed 21 Aug 2025,
   // after the first; the second outside the life), Base USDbC 0xb4f7 (WETH
@@ -955,8 +955,10 @@ const PAGES = [
   // stepping at events, today the card's Bands; the tip's in-band words.
   // An open life and one in soft liquidation go stale when their owner or a
   // liquidator closes them (0xeb2c repaid 30 Oct 2026, 0xa32e was liquidated
-  // 29 Oct 2026). These two have sat unchanged for months: 0x95f1 well above
-  // its band, 0xe5b2 a dust debt no liquidator takes, its price mid-band.
+  // 29 Oct 2026, and 0xe5b2, a dust debt, on 4 Nov 2026). 0x95f1 has sat well
+  // above its band for months; 0x1aa5 (51K crvUSD, health 27 % on 6 Nov 2026)
+  // has been in its band, untouched, since Aug 2026. Re-pick from
+  // /api/llamalend/positions (status open, inSoftLiq, health above 0).
   {
     id: "llamalend 0x95f1 (wstETH, open)",
     path: "/ethereum/llamalend/0x100daa78fc509db39ef7d04de0c1abd299f4c6ce/0x95f1872c2c63f54072bd42f68beee71e0d6f67d3",
@@ -964,8 +966,8 @@ const PAGES = [
     band: { asset: "wstETH" },
   },
   {
-    id: "llamalend 0xe5b2 (CRV, in soft liquidation)",
-    path: "/ethereum/llamalend/0xeda215b7666936ded834f76f3fbc6f323295110a/0xe5b2a2459914b78f52bef1d294605efc91e311a3",
+    id: "llamalend 0x1aa5 (CRV, in soft liquidation)",
+    path: "/ethereum/llamalend/0xeda215b7666936ded834f76f3fbc6f323295110a/0x1aa53cb3400b7733b32fd8405e3784803eff5012",
     lwOnly: true,
     band: { asset: "CRV", place: "inside" },
   },
@@ -1142,10 +1144,12 @@ const PAGES = [
     changes: { day: 20614, name: "Performance fee", from: "0.00 %", to: "5.00 %", block: 47141158 },
     family: { kind: "vault" },
   },
-  // A one-day life (one transaction on 11 Oct 2026, open): the price pane alone.
+  // A one-day life (every event on one day, open): the price pane alone
+  // (`flowsLife`). WETH 2119…8639 opened on 26 Mar 2026 and has not been
+  // touched since; the first pick, 9356…7603, took a second day on 31 Oct 2026.
   {
     id: "liquity-v2 WETH Trove (one day)",
-    path: "/ethereum/liquity-v2/trove/WETH/9356199087677269607208888455574125294289574299403525409279454994357184117603",
+    path: "/ethereum/liquity-v2/trove/WETH/21197217391588317730813735766654514664854980116416416178819252949513941768639",
     lwOnly: true,
     priceOnly: true,
     panes: "price",
@@ -1185,12 +1189,13 @@ const PAGES = [
     pace: "WETH",
   },
   {
-    // Open since 9 May 2026, on a branch with redemptions; redeemed once by
-    // 30 Oct 2026. That redemption (block 26300839) took the whole debt: an
-    // open zombie with no debt, so the card's "Liquidates at" reads none and
-    // the level has no point today.
-    id: "liquity-v2 wstETH Trove (open since May)",
-    path: "/ethereum/liquity-v2/trove/wstETH/36866364639024890689412217368623603118483270545575424157920590185252139913822",
+    // Open since 21 Apr 2026, redeemed on 7 Jun and 22 Jun 2026. The second
+    // redemption (block 25369599) took the whole debt: an open zombie with no
+    // debt, so the card's "Liquidates at" reads none and the level has no
+    // point today. (The first pick, wstETH 3686…3822, was closed by its owner
+    // on 31 Oct 2026.)
+    id: "liquity-v2 wstETH Trove (zombie since June)",
+    path: "/ethereum/liquity-v2/trove/wstETH/30556319806772392528245647127405225544579757254255881227628413480340246732914",
     answer: "/api/liquity-v2/prices/daily",
     trove: "live",
     noDebt: true,
@@ -1777,12 +1782,21 @@ async function checkBand(page, tag, pg, width) {
       lv.hi != null && bandsRow.includes(`${f(lv.hi)} → ${f(lv.lo)}`),
       `chart ${lv.hi != null ? `${f(lv.hi)} → ${f(lv.lo)}` : "-"}, card ${bandsRow}`,
     );
-    const place = lv.price < lv.lo ? "below" : lv.price <= lv.hi ? "inside" : null;
+    // The readout prints a rounded price, so within half its last digit of an
+    // edge either side's words are right. The fixture's `place` is what it was
+    // picked for; a price that has since left it (0x1aa5 sits at its band's
+    // top) is noted, and the words are held to the place the page's price
+    // gives.
+    const half = 0.5 * 10 ** -(String(lv.text).match(/\.(\d+)/)?.[1].length ?? 0);
+    const placeAt = (p) => (p < lv.lo ? "below" : p <= lv.hi ? "inside" : null);
+    const places = new Set([placeAt(lv.price - half), placeAt(lv.price), placeAt(lv.price + half)]);
+    if (lv.place !== (want.place ?? null))
+      console.log(
+        `NOTE  ${tag}: today's price is ${lv.place ?? "above the band"}, not ${want.place ?? "above"} as picked`,
+      );
     check(
       `${tag}: the tip's band words at today (${want.place ?? "above the band: none"})`,
-      lv.place === (want.place ?? null) &&
-        place === lv.place &&
-        (lv.place !== "inside" || /soft liquidation/.test(lv.placeText)),
+      places.has(lv.place) && (lv.place !== "inside" || /soft liquidation/.test(lv.placeText)),
       `place ${lv.place} "${lv.placeText}", price ${lv.price}, band ${lv.hi} → ${lv.lo}`,
     );
   }

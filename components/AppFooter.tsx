@@ -20,7 +20,7 @@ import { PhoneBeta } from "@/components/nav/phone-beta";
 export function AppFooter() {
   const priceStripActive = usePriceStripActive();
   return (
-    <footer className="mt-16" data-anatomy="H8">
+    <footer className="mt-32 bg-raised" data-anatomy="H8">
       <div className={`max-w-7xl mx-auto px-4 pt-6 ${priceStripActive ? "pb-20" : "pb-6"}`}>
         <div className="flex flex-col md:flex-row justify-between items-center md:items-start gap-6 md:gap-4">
           <div className="flex flex-col md:flex-row items-center gap-4">

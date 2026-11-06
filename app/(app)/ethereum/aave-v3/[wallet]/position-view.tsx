@@ -24,6 +24,8 @@
 // stream in when the read lands, and a chainStale response simply leaves them
 // unrendered (the index-derived surfaces are already on screen).
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { aaveV3CardNotCollateral } from "@/lib/aave-v3/collateral-split";
 import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -688,6 +690,9 @@ export default function AaveV3PositionDetail({
     () => (view && chain ? v3ViewWithLiveRead(view, chain) : view),
     [view, chain],
   );
+  // The card's stamp follows the Pool read once the figures stand on it (ui-jobs 512).
+  const liveRead = useMemo(() => (view && chain ? readOfHeadAnswer(chain) : null), [view, chain]);
+  useReportPositionRead(liveRead);
 
   // Stat captions (accrued interest, borrow rate) — the event stream feeds the
   // interest split; the live Pool read feeds the rate and streams in when it

@@ -12,6 +12,8 @@ import { packLiveExample } from "@/lib/home/live-example-wire";
 import { getCoveredPositions } from "@/lib/home/covered-positions-data";
 import { getHomeStats } from "@/lib/home/home-stats-data";
 import { getValueHeld } from "@/lib/home/value-held-data";
+import { DirectoryHeading } from "@/components/home/directory-heading";
+import { StructuredData } from "@/components/StructuredData";
 
 // ISR — the page (and the live-example trove data fetched below) regenerates
 // in the background at most hourly; every visitor gets the static render.
@@ -33,6 +35,8 @@ export default async function Home() {
   ]);
   return (
     <div className="min-h-screen">
+      {/* The site's WebApplication JSON-LD, on the home page only (ui-jobs 513). */}
+      <StructuredData />
       {/* ═══ TOP SECTION — headline, the explorer directory, and the live
           example, on one gradient that runs light at the top to dark at the
           bottom so the iframe content feathers into it. ═══ */}
@@ -86,28 +90,21 @@ export default async function Home() {
         {/* Explorer directory — one uniform row of tiles on the gradient's
             constant floor, directly above the "DeFi for everyone" band. */}
         <section className="pb-16" data-anatomy="S5">
-          {/* The directory's heading (S10, Miles 5 Nov 2026): "Destination DeFi" at
-              display size, a share of the column's width (cqw) so the line
-              spans it, on the column's left edge, in a faint tone the floor it stands on can carry. */}
-          <div className="mx-auto max-w-7xl px-4 pb-8 @container" data-anatomy="S10">
-            <h2
-              className="whitespace-nowrap font-semibold leading-none tracking-tighter text-rb-200 text-[14cqw] dark:text-rb-700"
-              data-home-directory-heading=""
-            >
-              Destination DeFi
-            </h2>
-          </div>
+          <DirectoryHeading />
           <ProtocolRow />
         </section>
       </div>
 
       {/* ═══ The page's lower half (Miles, 5 Nov 2026): one gradient, the mirror
           of the top section's, from the floor S5 stands on back to the top's
-          tone at the foot, and on through the footer (SiteFooter takes the
-          top's tone on home). It starts where the top section ends, so the
+          tone at the foot, with 64px more under the last band so the footer
+          (the raised tone, ui-jobs 509) stands clear of it. It starts where the top section ends, so the
           darkest band stays at S5 however tall the directory opens; the bands
           below draw no ground of their own. ═══ */}
-      <div className="bg-gradient-to-b from-background to-rb-50 dark:from-rb-800 dark:to-rb-600" data-home-lower="">
+      <div
+        className="bg-gradient-to-b from-background to-rb-50 pb-16 dark:from-rb-800 dark:to-rb-600"
+        data-home-lower=""
+      >
         {/* ═══ WHO IS RAILS FOR ═══ */}
         {/* The personas lead: the directory says what Rails covers, this says
             who it's for, and the capability list below answers the "how" for
@@ -115,7 +112,7 @@ export default async function Home() {
         <div data-anatomy="S6">
           <div className="max-w-7xl mx-auto px-4 pt-16 pb-16">
             <div className="mb-6">
-              <h2 className="font-sans font-semibold tracking-tight leading-tight mb-10 text-[clamp(24px,3.5vw,38px)]">
+              <h2 className="mb-10 text-3xl font-semibold tracking-tight text-foreground">
                 <span className="marketing">DeFi</span> for everyone
               </h2>
             </div>
@@ -165,20 +162,29 @@ export default async function Home() {
             <TeamSection
               intro={
                 // Get in touch, under the heading and over the members (S9,
-                // Miles 5 Nov 2026).
+                // Miles 5 Nov 2026); the Telegram glyph muted before the word
+                // (ui-jobs 507).
                 <p className="body-text mb-10 max-w-[44rem]" data-anatomy="S9">
                   <strong className="font-semibold text-foreground">Get in touch.</strong> Rails is open infrastructure
                   for DeFi. If you&apos;re a protocol team or interested in learning more, we&apos;d love to hear from
-                  you. Telegram:{" "}
+                  you.{" "}
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    aria-hidden="true"
+                    className="mr-1 inline-block align-[-2px] text-rb-500"
+                  >
+                    <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+                  </svg>
+                  Telegram:{" "}
                   <a
                     href="https://t.me/railsfinance"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 align-middle text-pink-500 hover:text-pink-600 transition-colors"
+                    className="text-pink-500 hover:text-pink-600 transition-colors"
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
-                    </svg>
                     @railsfinance
                   </a>
                 </p>

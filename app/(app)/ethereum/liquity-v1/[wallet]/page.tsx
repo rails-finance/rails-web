@@ -1,3 +1,6 @@
+import { indexReadAt } from "@/lib/shared/position-read-server";
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -44,19 +47,22 @@ export default async function LiquityV1TrovePage({ params, searchParams }: Props
   const sp = await searchParams;
   const rawEpoch = Array.isArray(sp.epoch) ? sp.epoch[0] : sp.epoch;
 
-  const tail = await loadLiquityV1PositionTail(wallet);
+  // The index head beside the tail: the block the card states (ui-jobs 512).
+  const [tail, read] = await Promise.all([loadLiquityV1PositionTail(wallet), indexReadAt(MAINNET_CHAIN_ID)]);
 
   return (
-    <LiquityV1TroveView
-      // Keyed on the wallet so a client-side navigation to another borrower
-      // remounts with that wallet's server tail as its initial state.
-      key={wallet}
-      wallet={wallet}
-      epochParam={rawEpoch ?? null}
-      initialSummaries={tail.summaries}
-      initialEvents={tail.events}
-      initialCutoffBlock={tail.cutoffBlock}
-      initialOpening={tail.opening}
-    />
+    <PositionReadProvider key={wallet} read={tail.summaries ? read : null}>
+      <LiquityV1TroveView
+        // Keyed on the wallet so a client-side navigation to another borrower
+        // remounts with that wallet's server tail as its initial state.
+        key={wallet}
+        wallet={wallet}
+        epochParam={rawEpoch ?? null}
+        initialSummaries={tail.summaries}
+        initialEvents={tail.events}
+        initialCutoffBlock={tail.cutoffBlock}
+        initialOpening={tail.opening}
+      />
+    </PositionReadProvider>
   );
 }

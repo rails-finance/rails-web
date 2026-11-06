@@ -6,8 +6,8 @@ import {
 } from "@/lib/shared/protocols";
 
 /**
- * The machine-readable half of the home page's coverage claim (JSON-LD in
- * <head>, alongside the OG tags in app/layout.tsx). It says the same thing as
+ * The machine-readable half of the home page's coverage claim (JSON-LD on the
+ * home page only, ui-jobs 513). It says the same thing as
  * the share card, so it is stated off the same source: `LAUNCHED_PROTOCOL_VERSIONS`
  * — one entry per protocol version, not one per chain deployment, so a version
  * on two chains (Aave V3 on Ethereum and Base) is named once, not twice.

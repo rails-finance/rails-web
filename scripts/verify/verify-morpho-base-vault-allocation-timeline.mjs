@@ -185,10 +185,14 @@ if (!env.BASE_BACKFILL_RPC_URL) throw new Error("need BASE_BACKFILL_RPC_URL in .
 // twenty-plus and cannot, so only the second exercises collapse at all. A
 // sample of one would have left the collapse path written and untested.
 const CASE_STUDY = "0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2";
-// Repinned 2026-10-20 (ui-jobs 339): 0xaa3e…0dcb exited the vault. This address
-// minted, burned to nothing and minted again, and holds now — the one row where
-// it held nothing is what §0g and §4 read.
-const CASE_HOLDER = "0xc3840f38c8edc39f65443243aa7399d607e9f599";
+// Repinned 2026-11-05 (ui-jobs 506): 0xc384…f599's three rows never changed
+// the queue and never met the moving market. This address minted, burned to
+// nothing and minted again, holds now, and its four rows (37.8M–46.4M) cross
+// the queue's 5 → 6 and the moving market's one funded row (41,036,374) —
+// what §0f, §0g, §3 and §4 read. Picked from the vault census (live, 3–25
+// transfers, a life spanning 39.3M–41.0M) and the vault route's rows.
+// CASE_HOLDER= tries another holder in its place (a re-pick).
+const CASE_HOLDER = process.env.CASE_HOLDER ?? "0x810b6802cefe4a6c959113fb14a50bbb2c5ec590";
 // Steakhouse High Yield USDC v1.1 — the widest withdraw queue in the catalogue.
 const WIDE_VAULT = "0xbeefa7b88064feef0cee02aaebbd95d30df3878f";
 // Pinned by sweeping that vault's own `Transfer` stream for a party that is

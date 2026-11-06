@@ -886,7 +886,11 @@ async function runArm(arm, ctx) {
   // costs a click rather than a page load.
   const readExport = async (groupedPage) => {
     const page = await openPage(groupedPage, "[data-export-menu] button");
-    await page.click("[data-export-menu] button");
+    // A press before hydration is lost: press until the menu is drawn.
+    for (let i = 0; i < 6 && (await page.locator('[role="menu"]').count()) === 0; i++) {
+      await page.click("[data-export-menu] button");
+      await page.waitForSelector('[role="menu"]', { timeout: 10_000 }).catch(() => {});
+    }
     await page.waitForSelector('[role="menu"]', { timeout: 60_000 });
     // The note is read as OPTIONAL. A page that draws none is making a claim
     // (that `events` is its whole history), and H2 must report that claim as

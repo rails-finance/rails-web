@@ -90,13 +90,12 @@ for (const p of [
 console.log("[app chrome @1280 on /ethereum/liquity-v2]");
 await chromeState(page, "/ethereum/liquity-v2", { bar: false });
 const rail = page.locator('aside[aria-label="Rails"]');
-for (const [name, sel] of [
-  ["the Rails mark", 'a[href="/"]'],
-  ["the search's glyph", 'button[data-anatomy="H15.1"]'],
-]) {
-  const n = await rail.locator(`${sel}:visible`).count();
-  check(n === 1, `the brand rail carries ${name} (${n})`);
-}
+// The rail's mark opens the wallet panel (H15.1, ui-jobs 509); Home is in the
+// panel's top row, and the rail draws no separate search glyph.
+const railLauncher = await rail.locator('button[data-anatomy="H15.1"]:visible').count();
+check(railLauncher === 1, `the brand rail carries the mark's launcher (${railLauncher})`);
+const railHome = await rail.locator('a[href="/"]').count();
+check(railHome === 0, `the rail's mark opens the panel, not home (${railHome})`);
 // The theme is set in the profile control's menu from md (ui-jobs 504).
 const railToggle = await rail.locator('button[aria-label^="Switch to"]').count();
 check(railToggle === 0, `the brand rail carries no theme toggle, ui-jobs 504 (${railToggle})`);
@@ -321,83 +320,95 @@ const mob = await browser.newPage({ viewport: { width: 390, height: 800 } });
 await mob.goto(BASE + "/ethereum/liquity-v2", { waitUntil: "networkidle" });
 const mBurger = await mob.locator('header button[aria-label="Toggle menu"]').count();
 check(mBurger === 0, `mobile header has no hamburger (${mBurger})`);
-// Below `md` the brand rail does not render and the bar carries the lot: mark,
-// the search's glyph, theme toggle (rails-ops TO-DO-ui-jobs 67, 68). The
-// search's glyph opens the panel with the chooser (503).
+// Below `md` the brand rail does not render: the bar is the Rails mark with a
+// chevron, which opens the panel (H15.1), and H20 (rails-ops TO-DO-ui-jobs 67,
+// 68, 507, 509).
 const mRail = await mob.locator('aside[aria-label="Rails"]').isVisible();
 check(mRail === false, `mobile draws no brand rail (${mRail})`);
 const mLauncher = await mob.locator('header button[data-anatomy="H15.1"]:visible').count();
-check(mLauncher === 1, `mobile header keeps the search's glyph (${mLauncher})`);
+check(mLauncher === 1, `mobile header keeps the panel's launcher (${mLauncher})`);
 const mBookmarks = await mob.locator('header button[aria-label="Bookmarks"]').count();
 check(mBookmarks === 0, `mobile header carries no bookmarks button, retired 1 Nov 2026 (${mBookmarks})`);
 const mToggle = await mob.locator('header button[aria-label^="Switch to"]:visible').count();
-check(mToggle === 1, `mobile header keeps the theme toggle (${mToggle})`);
+check(mToggle === 0, `mobile header carries no theme toggle, its switch is in H20's menu, ui-jobs 507 (${mToggle})`);
 const mSwitcherAll = await mob.locator("button[data-chooser-trigger]").count();
 check(mSwitcherAll === 0, `mobile draws no grid glyph, ui-jobs 503 (${mSwitcherAll})`);
 const mOrder = await mob.evaluate(() => {
   const c = document.querySelector('header button[data-search-launcher="header"]');
   const f = document.querySelector('header [data-anatomy="H20"]');
-  return !!c && !!f && c.getBoundingClientRect().right <= f.getBoundingClientRect().left;
+  return !!c && !!f && c.getBoundingClientRect().right <= f.getBoundingClientRect().left && !!c.querySelector("svg");
 });
-check(mOrder, "mobile header draws the search's glyph before the profile control");
-// The app header carries the mark alone and the chain glyph without its name
-// (Miles 18 Oct 2026).
-const mHome = await mob.locator('header a[aria-label="Rails home"]:visible').count();
-check(mHome === 1, `mobile header carries the Rails mark as the home link (${mHome})`);
+check(mOrder, "mobile header: the mark's launcher at the left, H20 at the right (ui-jobs 509)");
+const mHome = await mob.locator('header a[href="/"]:visible').count();
+check(mHome === 0, `mobile header's mark opens the panel, not home (${mHome})`);
 const mWordmark = await mob.locator("header").first().innerText();
 check(!/Rails|Ethereum/i.test(mWordmark), `mobile header shows neither word (${mWordmark.replace(/\s+/g, " ")})`);
-// The phone header on home (Miles, 5 Nov 2026): the mark on the left, then
-// "Start here", the search's glyph, the theme toggle and H20 on the right. The
-// beta pill is in the footer below md, and the rail's from md.
+// The phone header on home (ui-jobs 509): the launcher on the left, H20 on the
+// right, no "Start here" (it is in H20's menu). The panel's top row closes it
+// from the launcher's place and links Home. The beta pill is in the footer
+// below md, and the rail's from md.
 const mHomePage = await browser.newPage({ viewport: { width: 390, height: 800 } });
 await mHomePage.goto(BASE + "/", { waitUntil: "networkidle" });
-const mHomeOrder = await mHomePage.evaluate(() => {
-  const at = (sel) => document.querySelector(`header[data-anatomy="H2"] ${sel}`)?.getBoundingClientRect().left ?? null;
-  return [
-    at('a[aria-label="Rails home"]'),
-    at("[data-start-here]"),
-    at('button[data-search-launcher="header"]'),
-    at('button[aria-label^="Switch to"]'),
-    at('[data-anatomy="H20"]'),
-  ];
+const mStart = await mHomePage.locator('header[data-anatomy="H2"] a[href="/start"]').count();
+check(mStart === 0, `home @390: the header carries no Start here (${mStart})`);
+const launcher = mHomePage.locator('header button[data-search-launcher="header"]');
+const lBox = await launcher.boundingBox();
+await launcher.click();
+await mHomePage.waitForTimeout(500);
+const panelRow = await mHomePage.evaluate(() => {
+  const c = document.querySelector("[data-wallet-panel-close]")?.getBoundingClientRect();
+  const h = document.querySelector("[data-wallet-panel-home]");
+  return { x: c ? Math.round(c.x) : null, y: c ? Math.round(c.y) : null, home: h?.getAttribute("href") ?? null };
 });
 check(
-  mHomeOrder.every((x, i) => x !== null && (i === 0 || x > mHomeOrder[i - 1])),
-  `home @390: mark, Start here, search, theme, H20 left to right (${mHomeOrder.join(", ")})`,
+  panelRow.x === Math.round(lBox.x) && panelRow.y === Math.round(lBox.y) && panelRow.home === "/",
+  `home @390: the panel's close stands on the launcher's place and Home links / (${JSON.stringify(panelRow)} vs ${Math.round(lBox.x)},${Math.round(lBox.y)})`,
 );
+await mHomePage.mouse.click(lBox.x + lBox.width / 2, lBox.y + lBox.height / 2);
+await mHomePage.waitForTimeout(500);
+const panelShut = await mHomePage.evaluate(() => document.documentElement.hasAttribute("data-wallet-panel-open"));
+check(!panelShut, "home @390: a second press on the launcher's place closes the panel");
 const mHeaderBeta = await mHomePage.locator('header[data-anatomy="H2"]').first().innerText();
 check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
 const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
 check(mFooterBeta, "home @390: the beta pill is in the footer");
 // The profile control's menu (ui-jobs 504): a menu button; with nothing
-// saved, the line on saving one and the theme switch; a full-width sheet
+// saved, the line on saving one and the theme switch; a full-width sheet at
+// the foot of the screen (ui-jobs 507)
 // below md; Escape closes it and returns focus.
 const h20 = mHomePage.locator('header [data-anatomy="H20"]');
 check((await h20.getAttribute("aria-haspopup")) === "menu", "H20 is a menu button");
 await h20.click();
+// The sheet rises over 220ms; read it where it settles.
+await mHomePage.waitForTimeout(400);
 const sheet = await mHomePage.evaluate(() => {
   const m = document.querySelector("[data-profile-menu]");
   const r = m?.getBoundingClientRect();
   return {
     role: m?.getAttribute("role"),
     width: r ? Math.round(r.width) : 0,
+    bottom: r ? Math.round(r.bottom) : 0,
     empty: !!m?.querySelector("[data-profile-menu-empty]"),
     themes: [...(m?.querySelectorAll("[data-theme-option]") ?? [])].map((b) => b.textContent.trim()).join(","),
     manage: !!m?.querySelector('[data-profile-menu-manage][href="/bookmarks"]'),
+    start: !!m?.querySelector('[data-profile-menu-empty] a[data-profile-menu-start][href="/start"]'),
     scrim: !!document.querySelector("[data-profile-menu-scrim]"),
   };
 });
 check(
   sheet.role === "menu" &&
     sheet.width === 390 &&
+    sheet.bottom === 800 &&
     sheet.empty &&
     sheet.manage &&
+    sheet.start &&
     sheet.scrim &&
     sheet.themes === "Light,Dark,Auto",
-  `home @390: H20 opens a full-width menu over a dim: the saving line, Manage wallets, the theme switch (${JSON.stringify(sheet)})`,
+  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: the line with Start here and how to save, Manage wallets, the theme switch (${JSON.stringify(sheet)})`,
 );
 // A press on the dim closes the sheet.
-await mHomePage.mouse.click(195, 780);
+await mHomePage.waitForTimeout(300);
+await mHomePage.mouse.click(195, 200);
 const dimClosed = await mHomePage.evaluate(() => !document.querySelector("[data-profile-menu]"));
 check(dimClosed, "home @390: a press on the dim closes the menu");
 await h20.click();
@@ -407,6 +418,14 @@ const h20Back = await mHomePage.evaluate(
     !document.querySelector("[data-profile-menu]") && document.activeElement?.getAttribute("data-anatomy") === "H20",
 );
 check(h20Back, "home @390: Escape closes the menu and focus returns to H20");
+// A second press where the control is closes the sheet and leaves it closed.
+const h20Box = await h20.boundingBox();
+await h20.click();
+await mHomePage.waitForTimeout(300);
+await mHomePage.mouse.click(h20Box.x + h20Box.width / 2, h20Box.y + h20Box.height / 2);
+await mHomePage.waitForTimeout(300);
+const samePlaceClosed = await mHomePage.evaluate(() => !document.querySelector("[data-profile-menu]"));
+check(samePlaceClosed, "home @390: a second press on H20's place closes the sheet");
 await mHomePage.close();
 const dFooterBeta = await page.locator("footer [data-phone-beta]:visible").count();
 check(dFooterBeta === 0, `@1280: the footer's beta pill is hidden, the rail carries it (${dFooterBeta})`);

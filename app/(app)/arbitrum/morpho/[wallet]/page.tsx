@@ -1,3 +1,7 @@
+import { ARBITRUM_CHAIN_ID } from "@/lib/shared/chains";
+import { timedRead } from "@/lib/shared/position-read-server";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
+import { PositionReadProvider } from "@/components/shared/position-read";
 import type { Metadata } from "next";
 import { after } from "next/server";
 import { notFound } from "next/navigation";
@@ -44,7 +48,10 @@ export default async function MorphoArbitrumWalletPage({ params }: Props) {
     after(() => recordMorphoArbitrumVisit(read, markets));
   }
 
+  // The chain read the figures stand on, as the cards state it (ui-jobs 512).
   return (
-    <MorphoArbitrumWalletView key={wallet} wallet={wallet} initialSlots={tail.head} initialTimeline={tail.timeline} />
+    <PositionReadProvider key={wallet} read={await timedRead(readOfHeadAnswer(tail.head), ARBITRUM_CHAIN_ID)}>
+      <MorphoArbitrumWalletView key={wallet} wallet={wallet} initialSlots={tail.head} initialTimeline={tail.timeline} />
+    </PositionReadProvider>
   );
 }

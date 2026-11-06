@@ -1,3 +1,7 @@
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { indexReadAt, timedRead } from "@/lib/shared/position-read-server";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -38,22 +42,27 @@ export default async function AaveV4BaseSpokePage({ params }: Props) {
   if (slug && slug !== rawSpoke) permanentRedirect(canonicalPath);
   const spokeSlug = slug ?? rawSpoke;
 
-  const [tail, prices] = await Promise.all([
+  const [tail, prices, indexRead] = await Promise.all([
     loadAaveV4SpokeTail(wallet, spokeName, AAVE_V4_BASE_API_ROOT),
     loadAaveV4CardPrices(),
+    indexReadAt(BASE_CHAIN_ID),
   ]);
+  // The card states the Spoke read where the figures stand on it, else the index head (ui-jobs 512).
+  const read = await timedRead(tail.spokePositions ? (readOfHeadAnswer(tail.chain) ?? indexRead) : null, BASE_CHAIN_ID);
 
   return (
-    <AaveV4SpokeView
-      key={`${spokeSlug}:${wallet}`}
-      wallet={wallet}
-      spokeName={spokeName}
-      spokeSlug={spokeSlug}
-      initialPositions={tail.spokePositions}
-      initialChain={tail.chain}
-      initialEvents={tail.events}
-      initialSpokeTotalEvents={tail.spokeTotalEvents}
-      initialPrices={prices}
-    />
+    <PositionReadProvider key={`${spokeSlug}:${wallet}`} read={read}>
+      <AaveV4SpokeView
+        key={`${spokeSlug}:${wallet}`}
+        wallet={wallet}
+        spokeName={spokeName}
+        spokeSlug={spokeSlug}
+        initialPositions={tail.spokePositions}
+        initialChain={tail.chain}
+        initialEvents={tail.events}
+        initialSpokeTotalEvents={tail.spokeTotalEvents}
+        initialPrices={prices}
+      />
+    </PositionReadProvider>
   );
 }

@@ -1,3 +1,5 @@
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { timedRead } from "@/lib/shared/position-read-server";
 // ONE SKY SAVINGS POSITION — /ethereum/sky-savings/<holder>.
 // ----------------------------------------------------------------------------
 // A position is a holder address of sUSDS. Four reads of rails-server's
@@ -13,6 +15,8 @@
 // An ENS name in the segment resolves here and redirects to the address, so a
 // position has one URL.
 
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { chainRead } from "@/lib/shared/position-read";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -62,19 +66,25 @@ export default async function SkySavingsPositionPage({ params }: Props) {
   const refusal = gateRefusal(data.position);
   if (refusal) return <SkyGateRefusal reason={refusal} gate={data.position.gate} holder={holder} />;
 
+  // The sealed block the figures were read at (ui-jobs 512).
   return (
-    <SkySavingsPositionView
+    <PositionReadProvider
       key={holder}
-      position={data.position.data}
-      asOf={data.asOf}
-      gate={data.position.gate!}
-      events={data.timeline.events}
-      totalEvents={data.timeline.total}
-      rateNotes={data.timeline.marketNotes}
-      days={data.days ?? skyDaysFromEvents(data.timeline.events, data.timeline.total)}
-      rates={data.rates}
-      firstAt={data.position.data.activity.firstTimestamp ?? data.firstAt}
-      todayDay={Math.floor(Date.now() / 86_400_000)}
-    />
+      read={await timedRead(chainRead(data.asOf.block, data.asOf.timestamp), MAINNET_CHAIN_ID)}
+    >
+      <SkySavingsPositionView
+        key={holder}
+        position={data.position.data}
+        asOf={data.asOf}
+        gate={data.position.gate!}
+        events={data.timeline.events}
+        totalEvents={data.timeline.total}
+        rateNotes={data.timeline.marketNotes}
+        days={data.days ?? skyDaysFromEvents(data.timeline.events, data.timeline.total)}
+        rates={data.rates}
+        firstAt={data.position.data.activity.firstTimestamp ?? data.firstAt}
+        todayDay={Math.floor(Date.now() / 86_400_000)}
+      />
+    </PositionReadProvider>
   );
 }

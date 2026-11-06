@@ -14,9 +14,13 @@ export function GET() {
     "",
     `## ${chain.name} explorers`,
     "",
-    `Coverage: ${SITE_URL}/coverage/${chain.slug}`,
-    "",
-    ...protocolsForChain(chain.id).map((p) => `- [${explorerName(p)}](${SITE_URL}${p.href}): ${p.desc}`),
+    `- [Coverage on ${chain.name}](${SITE_URL}/coverage/${chain.slug}): how deep each explorer goes`,
+    ...protocolsForChain(chain.id).map(
+      (p) =>
+        `- [${explorerName(p)}](${SITE_URL}${p.href}): ${p.desc}` +
+        // The /info page explains the protocol; an explorer with no position listing redirects it.
+        (p.positionListing !== false ? ` [How it works](${SITE_URL}${p.infoHref})` : ""),
+    ),
   ]);
 
   const body = [

@@ -21,6 +21,8 @@
 // data in an effect. Seeded or not, the mount path still works: on an SSR miss
 // `initialPosition` is null and this component fetches the tail itself.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import type { AaveLaneInterest } from "@/lib/aave-v3/lane-interest";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -194,6 +196,8 @@ export default function SparkPositionDetail({
   const [tailFailed, setTailFailed] = useState(false);
   const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<SparkPositionChainResponse | null>(null);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(chain), [chain]));
   // Whether the live Pool read has ANSWERED, separate from whether it gave us
   // anything: a stale read leaves `chain` null, and the market notes have to
   // tell "still waiting" from "asked, and there is nothing".

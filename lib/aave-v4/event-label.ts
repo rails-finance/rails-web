@@ -15,8 +15,17 @@ export const AAVE_V4_LABELS = {
   collateral_toggle: "Collateral Toggle",
 } as const;
 
+/** A position swap's word, by kind; a leverage is not called a swap. */
+export const AAVE_V4_SWAP_LABELS = {
+  collateral_swap: "Collateral swap",
+  debt_swap: "Debt swap",
+  repay_with_collateral: "Repay with collateral",
+  leverage: "Leverage",
+} as const;
+
 /** "Enable Supply" where the supply also enabled the collateral. */
 export function aaveV4Label(ctx: AaveV4Context): string {
+  if (ctx.swap) return AAVE_V4_SWAP_LABELS[ctx.swap.kind];
   if (ctx.alsoToggledCollateral) return "Enable Supply";
   if (ctx.eventType === "collateral_toggle") return ctx.enabled ? "Enable" : "Disable";
   return (AAVE_V4_LABELS as Record<string, string>)[ctx.eventType] ?? ctx.eventType;
@@ -27,6 +36,7 @@ export function aaveV4Label(ctx: AaveV4Context): string {
  *  collateral names both in order ("Supplied · Enabled as collateral"). The
  *  spine carries the figures. */
 export function aaveV4T1Kind(ctx: AaveV4Context): string {
+  if (ctx.swap) return W.swap[ctx.swap.kind];
   if (ctx.alsoToggledCollateral) return `${W.supplied} ${W.sep} ${W.enabled}`;
   switch (ctx.eventType) {
     case "supply":

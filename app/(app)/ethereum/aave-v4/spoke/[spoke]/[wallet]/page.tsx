@@ -1,3 +1,7 @@
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { indexReadAt, timedRead } from "@/lib/shared/position-read-server";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -64,21 +68,32 @@ export default async function AaveV4SpokePage({ params }: Props) {
 
   // Beside the tail, not behind it: the price map covers every address the
   // card can resolve, so it needs nothing the tail returns.
-  const [tail, prices] = await Promise.all([loadAaveV4SpokeTail(wallet, spokeName), loadAaveV4CardPrices()]);
+  const [tail, prices, indexRead] = await Promise.all([
+    loadAaveV4SpokeTail(wallet, spokeName),
+    loadAaveV4CardPrices(),
+    indexReadAt(MAINNET_CHAIN_ID),
+  ]);
+  // The card states the Spoke read where the figures stand on it, else the index head (ui-jobs 512).
+  const read = await timedRead(
+    tail.spokePositions ? (readOfHeadAnswer(tail.chain) ?? indexRead) : null,
+    MAINNET_CHAIN_ID,
+  );
 
   return (
-    <AaveV4SpokeView
-      // Keyed on the pair so a client-side navigation to another spoke or
-      // account remounts with that position's server tail as its initial state.
-      key={`${spokeSlug}:${wallet}`}
-      wallet={wallet}
-      spokeName={spokeName}
-      spokeSlug={spokeSlug}
-      initialPositions={tail.spokePositions}
-      initialChain={tail.chain}
-      initialEvents={tail.events}
-      initialSpokeTotalEvents={tail.spokeTotalEvents}
-      initialPrices={prices}
-    />
+    <PositionReadProvider key={`${spokeSlug}:${wallet}`} read={read}>
+      <AaveV4SpokeView
+        // Keyed on the pair so a client-side navigation to another spoke or
+        // account remounts with that position's server tail as its initial state.
+        key={`${spokeSlug}:${wallet}`}
+        wallet={wallet}
+        spokeName={spokeName}
+        spokeSlug={spokeSlug}
+        initialPositions={tail.spokePositions}
+        initialChain={tail.chain}
+        initialEvents={tail.events}
+        initialSpokeTotalEvents={tail.spokeTotalEvents}
+        initialPrices={prices}
+      />
+    </PositionReadProvider>
   );
 }

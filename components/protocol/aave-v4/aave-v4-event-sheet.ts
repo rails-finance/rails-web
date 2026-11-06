@@ -135,6 +135,18 @@ function movedOn(ctx: AaveV4Context, leg: Side): { symbol: string; before: strin
   return sym ? { symbol: sym, before: ctx.debtBefore ?? "0", after: ctx.debtAfter ?? "0" } : null;
 }
 
+type Moved = { symbol: string; before: string; after: string; src: AaveV4Context };
+
+/** Every asset an event moved on a side: its own, and on a position swap the
+ *  received leg's (lib/aave-v4/swaps.ts). */
+function movesOn(ctx: AaveV4Context, leg: Side): Moved[] {
+  const received = ctx.swap?.received.context?.data as AaveV4Context | undefined;
+  return [ctx, received].flatMap((c) => {
+    const m = c ? movedOn(c, leg) : null;
+    return m && c ? [{ ...m, src: c }] : [];
+  });
+}
+
 /** A side's holdings after an event: the snapshot, or the moved asset alone
  *  where the event carries no snapshot. */
 function holdingsOf(ctx: AaveV4Context, leg: Side): Holding[] {
@@ -233,17 +245,18 @@ function sheetSide({
 }): { side: SheetSide; usd: number | null } {
   const leg: Side = side === "collateral" ? "supply" : "debt";
   const after = holdingsOf(ctx, leg);
-  const moved = movedOn(ctx, leg);
+  const moves = movesOn(ctx, leg);
+  const moved = moves[0] ?? null;
   const chain = ctx.balanceBasis === "chain";
 
-  // The event's row: the asset it moved on this side.
+  // The event's rows: each asset it moved on this side.
   const rows: SheetRow[] = [];
-  if (moved) {
+  for (const moved of moves) {
     const delta = decSub(moved.after, moved.before);
     const n = Number(delta);
     if (n !== 0) {
       const sym = aaveV4DisplaySymbol(moved.symbol);
-      const p = priceOf(ctx, { symbol: moved.symbol, amount: moved.after });
+      const p = priceOf(moved.src, { symbol: moved.symbol, amount: moved.after });
       const abs = delta.replace(/^-/, "");
       rows.push({
         key: `event-${sym}`,
@@ -251,7 +264,7 @@ function sheetSide({
         amount: {
           text: `${n < 0 ? "−" : ""}${fmtV4Amount(abs)}`,
           symbol: moved.symbol,
-          address,
+          address: moved.src === ctx ? address : undefined,
           info: deltaProv({ ...coord, asset: sym }),
           value: `${n < 0 ? "−" : "+"}${abs}`,
         },
@@ -265,13 +278,19 @@ function sheetSide({
 
   // The balances just before this event: the snapshot, with the moved asset
   // at its before-balance.
-  const beforeItems: Holding[] = after.map((h) =>
-    moved && h.symbol === moved.symbol ? { ...h, amount: moved.before } : h,
-  );
-  if (moved && !after.some((h) => h.symbol === moved.symbol) && Number(moved.before) > 0) {
-    const fromSnap = (leg === "supply" ? ctx.allSupplies : ctx.allDebts)?.find((s) => s.symbol === moved.symbol);
-    beforeItems.push({ symbol: moved.symbol, amount: moved.before, price: fromSnap?.price });
-  }
+  const beforeItems: Holding[] = after.map((h) => {
+    const m = moves.find((x) => x.symbol === h.symbol);
+    return m ? { ...h, amount: m.before } : h;
+  });
+  for (const m of moves)
+    if (!after.some((h) => h.symbol === m.symbol) && Number(m.before) > 0) {
+      const fromSnap = (leg === "supply" ? ctx.allSupplies : ctx.allDebts)?.find((s) => s.symbol === m.symbol);
+      beforeItems.push({
+        symbol: m.symbol,
+        amount: m.before,
+        price: fromSnap?.price ?? priceOf(m.src, { symbol: m.symbol, amount: m.before }),
+      });
+    }
 
   // The carry-forward layer, from the previous event's snapshot on this spoke.
   const carry: SheetSide["carry"] = [];
@@ -397,12 +416,14 @@ function sheetSide({
   /** A balance after the event, with its receipt. */
   const amountAfter = (h: Holding): SheetRow["amount"] => {
     const sym = aaveV4DisplaySymbol(h.symbol);
-    const isMoved = moved?.symbol === h.symbol;
+    const mv = moves.find((m) => m.symbol === h.symbol);
+    const isMoved = mv != null;
+    const raw = mv?.src.raw;
     const detail = { ...coord, asset: sym };
     return {
       text: fmtV4Amount(h.amount),
       symbol: h.symbol,
-      address: isMoved ? address : undefined,
+      address: moved?.symbol === h.symbol ? address : undefined,
       info:
         isMoved && chain
           ? chainBalanceProv(
@@ -411,17 +432,17 @@ function sheetSide({
               leg,
               leg === "supply"
                 ? {
-                    value: ctx.raw?.supplyAfter,
-                    shares: ctx.raw?.supplySharesAfter,
-                    a: ctx.raw?.hubAddedAssets,
-                    b: ctx.raw?.hubAddedShares,
+                    value: raw?.supplyAfter,
+                    shares: raw?.supplySharesAfter,
+                    a: raw?.hubAddedAssets,
+                    b: raw?.hubAddedShares,
                   }
-                : { value: ctx.raw?.debtAfter, shares: ctx.raw?.drawnSharesAfter, a: ctx.raw?.hubDrawnIndex },
+                : { value: raw?.debtAfter, shares: raw?.drawnSharesAfter, a: raw?.hubDrawnIndex },
               leg === "debt" ? premiumAt(hf, "after") : undefined,
             )
           : snapshotProv(
               "Balance after this event",
-              { ...detail, raw: isMoved ? ctx.raw?.[leg === "supply" ? "supplyAfter" : "debtAfter"] : undefined },
+              { ...detail, raw: isMoved ? raw?.[leg === "supply" ? "supplyAfter" : "debtAfter"] : undefined },
               leg,
             ),
       value: h.amount,

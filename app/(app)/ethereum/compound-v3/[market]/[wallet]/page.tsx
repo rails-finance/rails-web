@@ -1,3 +1,6 @@
+import { indexReadAt } from "@/lib/shared/position-read-server";
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -52,20 +55,26 @@ export default async function CompoundPositionPage({ params, searchParams }: Pro
 
   // Rows by default; `?folders=0` reads the flat window.
   const grouped = servedFoldersFromParam((await searchParams).folders);
-  const tail = await loadCompoundPositionTail(wallet, market, grouped);
+  // The index head beside the tail: the block the card states (ui-jobs 512).
+  const [tail, read] = await Promise.all([
+    loadCompoundPositionTail(wallet, market, grouped),
+    indexReadAt(MAINNET_CHAIN_ID),
+  ]);
 
   return (
-    <CompoundPositionView
-      // Keyed on the pair so a client-side navigation to another Comet account
-      // remounts with that account's server tail as its initial state.
-      key={`${market}:${wallet}:${grouped ? "rows" : "events"}`}
-      wallet={wallet}
-      market={market}
-      initialPosition={tail.position}
-      initialEvents={tail.events}
-      initialCutoffBlock={tail.cutoffBlock}
-      initialOpening={tail.opening}
-      initialGrouped={tail.grouped}
-    />
+    <PositionReadProvider key={`${market}:${wallet}:${grouped ? "rows" : "events"}`} read={tail.position ? read : null}>
+      <CompoundPositionView
+        // Keyed on the pair so a client-side navigation to another Comet account
+        // remounts with that account's server tail as its initial state.
+        key={`${market}:${wallet}:${grouped ? "rows" : "events"}`}
+        wallet={wallet}
+        market={market}
+        initialPosition={tail.position}
+        initialEvents={tail.events}
+        initialCutoffBlock={tail.cutoffBlock}
+        initialOpening={tail.opening}
+        initialGrouped={tail.grouped}
+      />
+    </PositionReadProvider>
   );
 }

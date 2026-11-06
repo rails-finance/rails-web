@@ -23,6 +23,8 @@
 // with a DefiLlama fallback only for assets the oracle registry omits), so the
 // live position reads chain-true throughout, not just the headline totals.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { aaveV4Explorer } from "@/lib/aave-v4/explorer";
@@ -30,6 +32,7 @@ import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { fetchAaveV4Timeline, fetchAaveV4Positions, type AaveV4Position } from "@/lib/api/fetch-aave-v4";
+import { expandAaveV4Swaps } from "@/lib/aave-v4/swaps";
 import {
   fetchAaveV4SpokePosition,
   parseRiskPremiumFraction,
@@ -189,6 +192,8 @@ function AaveV4SpokePageInner({
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);
   const [positions, setPositions] = useState<AaveV4Position[]>(initialPositions ?? []);
   const [chainPosition, setChainPosition] = useState<AaveV4SpokePositionChainResponse | null>(initialChain);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(chainPosition), [chainPosition]));
   const [loading, setLoading] = useState(!seeded);
   // The POSITION read's failure, and only that one. A rejected roster or chain
   // read leaves nothing to draw, so it still replaces the body.
@@ -289,10 +294,12 @@ function AaveV4SpokePageInner({
     };
   }, [wallet, isValidWallet, spokeName, seeded, apiRoot, tailTry]);
 
-  const sortedEvents = useMemo(
-    () => [...events].sort((a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp),
-    [events],
-  );
+  // The timeline draws each position swap as one event; everything replayed
+  // from the rows reads both legs (lib/aave-v4/swaps.ts).
+  const byTime = (a: BaseActivityEvent, b: BaseActivityEvent) =>
+    a.blockNumber - b.blockNumber || a.timestamp - b.timestamp;
+  const sortedEvents = useMemo(() => [...expandAaveV4Swaps(events)].sort(byTime), [events]);
+  const sortedDisplayEvents = useMemo(() => [...events].sort(byTime), [events]);
 
   const prices = usePrices();
   const oraclePrices = useAaveV4OraclePrices();
@@ -414,6 +421,11 @@ function AaveV4SpokePageInner({
       return (e.context.data.spokeName ?? "Main") === spokeName;
     });
   }, [sortedEvents, spokeName]);
+  // The same, as the timeline draws it: a swap is one event.
+  const spokeDisplayEvents = useMemo(
+    () => sortedDisplayEvents.filter((e) => isAaveV4Event(e) && (e.context.data.spokeName ?? "Main") === spokeName),
+    [sortedDisplayEvents, spokeName],
+  );
 
   // A closed position's collateral factors as they stood while it was open:
   // each collateral asset's state just before its last event on this spoke.
@@ -479,7 +491,7 @@ function AaveV4SpokePageInner({
     // and the group arrays feed the explainer's combined-act / cross-reference
     // seam. spokeScopedEvents is already filtered to Aave V4 events.
     const byTx = new Map<string, AaveV4Event[]>();
-    for (const e of spokeScopedEvents) {
+    for (const e of spokeDisplayEvents) {
       const tx = e.txHash ?? "";
       if (tx) counts.set(tx, (counts.get(tx) ?? 0) + 1);
       const arr = byTx.get(tx);
@@ -488,7 +500,7 @@ function AaveV4SpokePageInner({
     }
     const txGroups = new Map<string, AaveV4TxGroup>();
     const seen = new Map<string, number>();
-    spokeScopedEvents.forEach((e) => {
+    spokeDisplayEvents.forEach((e) => {
       const tx = e.txHash ?? "";
       const total = tx ? (counts.get(tx) ?? 1) : 1;
       if (total > 1) {
@@ -498,7 +510,7 @@ function AaveV4SpokePageInner({
       }
     });
     return { txGroups, txSiblings: byTx };
-  }, [spokeScopedEvents]);
+  }, [spokeDisplayEvents]);
 
   // Each event's previous borrow rate on the asset it moved: the rate the last
   // earlier event on this spoke recorded for that asset. The event explanation
@@ -576,8 +588,8 @@ function AaveV4SpokePageInner({
   // numbers run over the spoke's whole life and the count line states it —
   // not the checkpoint arm, there being no opening balance to bring forward.
   const olderCount = useMemo(
-    () => (spokeTotalEvents == null ? 0 : Math.max(spokeTotalEvents - spokeScopedEvents.length, 0)),
-    [spokeTotalEvents, spokeScopedEvents.length],
+    () => (spokeTotalEvents == null ? 0 : Math.max(spokeTotalEvents - spokeDisplayEvents.length, 0)),
+    [spokeTotalEvents, spokeDisplayEvents.length],
   );
 
   // The CSV is the export whose purpose IS the rows, so on a windowed page it
@@ -591,7 +603,9 @@ function AaveV4SpokePageInner({
     const res = await fetchAaveV4Timeline({ wallet, apiRoot });
     const served = res.events ?? [];
     return {
-      events: served.filter((e) => isAaveV4Event(e) && (e.context.data.spokeName ?? "Main") === spokeName),
+      events: expandAaveV4Swaps(served).filter(
+        (e) => isAaveV4Event(e) && (e.context.data.spokeName ?? "Main") === spokeName,
+      ),
       // The route states no row ceiling of its own — its 5,000-row fetcher cap
       // is unreported, and reporting a short file as whole is what `missing` is
       // there to prevent. Nothing to pass through until the route says.
@@ -628,7 +642,7 @@ function AaveV4SpokePageInner({
   );
   const [focusTimeline, setFocusTimeline] = useState<FlowTimeline | null>(null);
   const flowFocus = useFlowFocusValue(focusRoot, focusTimeline);
-  const tl = useTimelineEvents(spokeScopedEvents, {
+  const tl = useTimelineEvents(spokeDisplayEvents, {
     storageKey: `aave-v4-${rawSpoke}-${wallet}`,
     protocolKey: "aave-v4",
     olderCount,
@@ -835,8 +849,8 @@ function AaveV4SpokePageInner({
             )
           }
           toolbarLeading={
-            spokeScopedEvents.length > 0 ? (
-              <TimelineActivityHeader events={spokeScopedEvents} closed={positionClosed} />
+            spokeDisplayEvents.length > 0 ? (
+              <TimelineActivityHeader events={spokeDisplayEvents} closed={positionClosed} />
             ) : (
               <h2 className="text-sm font-semibold text-foreground">Activity</h2>
             )

@@ -13,6 +13,8 @@
 // the replay summary if the RPC read is unavailable; the risk surfaces then
 // decline rather than guess (the replay can't supply mat/duty/dust).
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { serverReadAt } from "@/lib/shared/server-head-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -212,6 +214,8 @@ export default function MakerVaultDetailView({
   // fields the live note's later end needs (the head block's own timestamp)
   // and because a vault the index has never seen still has one.
   const [chainState, setChainState] = useState<MakerVaultState | null>(initialChain);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(chainState), [chainState]));
   const [chainSettled, setChainSettled] = useState(seeded);
   // Standing display framing (risk view) — a global preference, so the reader's
   // choice on one vault carries to the next.

@@ -19,6 +19,8 @@
 // from the last event's emitted accountBorrows to the live borrowBalanceStored
 // (each row's `live` flag carries the basis into the provenance).
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
@@ -135,6 +137,8 @@ export default function CompoundV2PositionView({
   const [tailFailed, setTailFailed] = useState(false);
   const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<CompoundV2ChainResponse | null>(null);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(chain), [chain]));
   // Standing display framing (risk view) — a global preference, so the
   // reader's choice on one position carries to the next.
 

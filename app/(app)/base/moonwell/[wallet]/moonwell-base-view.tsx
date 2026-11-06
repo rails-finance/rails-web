@@ -40,6 +40,8 @@
 // a server render can wait for, and the state this component paints while it
 // runs is exactly the state the page showed for those 36 seconds anyway.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { moonwellExplorer } from "@/lib/moonwell/explorer";
@@ -165,6 +167,8 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
   const seeded = initialPosition != null;
 
   const [data, setData] = useState<MoonwellChainResponse | null>(initialPosition);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(data), [data]));
   const [loading, setLoading] = useState(!seeded);
   const [error, setError] = useState<string | null>(null);
 

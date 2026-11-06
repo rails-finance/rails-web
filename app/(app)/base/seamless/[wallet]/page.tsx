@@ -1,3 +1,7 @@
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
+import { timedRead } from "@/lib/shared/position-read-server";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
+import { PositionReadProvider } from "@/components/shared/position-read";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { servedFoldersFromParam } from "@/lib/shared/timeline-folder";
@@ -47,16 +51,20 @@ export default async function SeamlessPositionPage({ params, searchParams }: Pro
   // As rows unless the reader asked for `?folders=0`: the newest rows up to
   // the row cap, the rest held by the route for a month read.
   const tail = await loadSeamlessTail(wallet, servedFoldersFromParam((await searchParams).folders));
+  // The chain read the figures stand on, as the card states it (ui-jobs 512).
+  const read = await timedRead(readOfHeadAnswer(tail.position), BASE_CHAIN_ID);
 
   return (
-    <SeamlessPositionView
-      // Keyed on the wallet so a client-side navigation to another account
-      // remounts with that account's server read as its initial state, rather
-      // than holding the previous account's numbers in state under new props.
-      key={wallet}
-      wallet={wallet}
-      initialPosition={tail.position}
-      initialTimeline={tail.timeline}
-    />
+    <PositionReadProvider key={wallet} read={tail.position ? read : null}>
+      <SeamlessPositionView
+        // Keyed on the wallet so a client-side navigation to another account
+        // remounts with that account's server read as its initial state, rather
+        // than holding the previous account's numbers in state under new props.
+        key={wallet}
+        wallet={wallet}
+        initialPosition={tail.position}
+        initialTimeline={tail.timeline}
+      />
+    </PositionReadProvider>
   );
 }

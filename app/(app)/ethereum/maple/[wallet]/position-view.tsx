@@ -9,6 +9,8 @@
 // surface, so no risk gauges are asserted — the card, the pool band, the
 // Lifetime flows panel and the timeline carry the whole page.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { serverReadAt, stampHeadRead } from "@/lib/shared/server-head-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -125,6 +127,8 @@ export default function MaplePositionView({
     initialPosition ? viewFromSummary(initialPosition) : null,
   );
   const [poolState, setPoolState] = useState<Record<string, MaplePoolState>>(initialPoolState ?? {});
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(Object.values(poolState)[0]), [poolState]));
   const [events, setEvents] = useState<BaseActivityEvent[]>(initialEvents ?? []);
   // The same history as ROWS (decision 0019's evening amendment): the index
   // groups this family, because every row carries the wallet's own share,

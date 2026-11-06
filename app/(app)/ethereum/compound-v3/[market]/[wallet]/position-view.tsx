@@ -25,6 +25,8 @@
 // Comet's own oracle price at its block, in place of the tower
 // (rails-ops TO-DO-ui-jobs 206).
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import Link from "next/link";
@@ -275,6 +277,8 @@ export default function CompoundPositionView({
   const [tailFailed, setTailFailed] = useState(false);
   const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<CompoundMarketChainResponse | null>(null);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(chain), [chain]));
 
   // Surface the wallet in the header pill (the Aave V4 treatment), so the nav
   // chrome reads the same on the detail page as on the wallet-filtered chooser.

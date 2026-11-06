@@ -147,6 +147,36 @@ const SPLIT = {
       ],
     ],
   },
+  // verify-lifetime-price-chart walks 99 fixtures at about 72 s each (the four
+  // Spark fixtures took 289 s alone, 5 Nov 2026, ui-jobs 506): about two hours
+  // whole, and a part of sixteen ran past the 900 s cap. Its FIXTURES is a
+  // regular expression on the fixture id, so each part is one alternation by
+  // family. A fixture costs 50 to 110 s, so a part is sized by its measured
+  // time, not its count: ebisu, asymmetry, basedollar and frankencoin (nine)
+  // reached the cap on 6 Nov 2026 with two fixtures left, and llamalend's ten,
+  // alchemix with the vault holders (eight) and liquity-v2's seven reached
+  // it too, so those are halved.
+  "verify-lifetime-price-chart.mjs": {
+    env: "FIXTURES",
+    parts: [
+      ["^aave-v3"],
+      ["^(aave-v4|spark|seamless)"],
+      ["^(moonwell|compound-v2)"],
+      ["^compound-v3"],
+      ["^(makerdao|liquity-v1)"],
+      ["^(dolomite|fluid)"],
+      ["^(sky-savings|morpho)"],
+      ["^(ebisu|asymmetry)"],
+      ["^(basedollar|frankencoin)"],
+      ["^(polaris|fx|maple|pwn)"],
+      ["^llamalend 0x(95f1|1aa5|a32e|d76a)"],
+      ["^llamalend 0x(6bda|3722|1109|61db|bbc5)"],
+      ["^alchemix"],
+      ["^(aave |yearn)"],
+      ["^liquity-v2 (rETH|WETH Trove($| \\((one day|redeemed)\\)))"],
+      ["^liquity-v2 (wstETH|WETH Trove \\((closed|never redeemed)\\))"],
+    ],
+  },
   // verify-wallet-links opens up to eight positions per explorer and then the
   // wallet view, which reads the wallet on every chain before its URL moves
   // (67s measured for one morpho owner, 23 Oct 2026); 17 explorers whole hit
@@ -199,6 +229,11 @@ const SKIPS = {
     "dolomite_scratch DB pinned at block 25543616 (rails-server-onboarding). Its " +
     "listing/detail assertions read that pinned index, so a plain dev server " +
     "cannot answer them.",
+  "verify-ctrl-waking.mjs":
+    "needs a production build (next build && next start): under next dev the bundle is unminified and " +
+    "compiled on demand, so B and D read red on main and preview alike. Run it by hand against a local " +
+    "production build: against rails.finance on 5 Nov 2026 A–C passed and D read one grey blink on the " +
+    "timeline toolbar (over the network; whether that is the network or a real blink is unread).",
   "verify-queued-export.mjs":
     "live only: requests queued exports from the deployed site and the onboarding box " +
     "(BASE=https://rails.finance), spends test readers' daily quota, and with " +
@@ -824,7 +859,13 @@ const JOBS = Math.max(1, Number(process.env.JOBS ?? 1));
 // configuration each entry below was written to avoid, with no warning at the
 // point of use — the run just starts moving around. Reach for it to re-test an
 // entry, read the entry first, and write down what came back.
-const RUN_ALONE = process.env.MEASURE ? {} : {};
+const RUN_ALONE = process.env.MEASURE
+  ? {}
+  : {
+      "verify-folder-reductions.mjs":
+        "799 s solo on 5 Nov 2026 (ui-jobs 506), within a minute and a half of the 900 s cap: two arms of " +
+        "grouped and flat reads and pages over thousands of events; shared, it runs past the cap.",
+    };
 
 const results = [];
 const queue = scripts.filter((f) => !RUN_ALONE[f]).flatMap(jobsFor);

@@ -14,6 +14,8 @@
 // unrendered. They describe the CURRENT Trove, so they mount only on the
 // latest open life — a closed prior epoch shows its replayed history alone.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { liquityV1Explorer } from "@/lib/liquity-v1/explorer";
@@ -122,6 +124,8 @@ export default function LiquityV1TroveView({
   const [tailFailed, setTailFailed] = useState(false);
   const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<LiquityV1PositionChainResponse | null>(null);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(chain), [chain]));
   // The live read has returned or failed: until then the collateral ratio waits.
   const [chainSettled, setChainSettled] = useState(false);
   // Standing display framing (risk view) — a global preference, so the reader's
