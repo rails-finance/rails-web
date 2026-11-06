@@ -106,7 +106,7 @@ function PlaceCells({ place, label }: { place: ValueHeldPlace; label: string }) 
         {place.surface && <span className="text-rb-500"> {place.surface}</span>}
       </td>
       <td className={CELL} title={chain?.name}>
-        <ChainGlyph id={place.chainId as ChainId} className="inline-block h-4 w-4 align-[-3px] text-foreground" />
+        <ChainGlyph id={place.chainId as ChainId} className="inline-block h-4 w-4 align-[-3px] text-rb-500" />
         <span className="sr-only">{chain?.name ?? place.chainId}</span>
       </td>
     </>
