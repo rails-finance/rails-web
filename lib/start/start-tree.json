@@ -21,7 +21,7 @@
       "icons": ["ETH", "wstETH", "rETH"],
       "coins": {
         "question": "Which ETH?",
-        "lists": [{ "symbols": ["WETH", "wstETH", "weETH", "rETH", "cbETH", "ezETH", "rsETH", "osETH", "ETHx"] }]
+        "symbols": ["WETH", "wstETH", "weETH", "rETH", "cbETH", "ezETH", "rsETH", "osETH", "ETHx"]
       }
     },
     "btc": {
@@ -31,7 +31,7 @@
       "icons": ["WBTC", "cbBTC", "tBTC"],
       "coins": {
         "question": "Which BTC?",
-        "lists": [{ "symbols": ["WBTC", "cbBTC", "tBTC", "LBTC"] }]
+        "symbols": ["WBTC", "cbBTC", "tBTC", "LBTC"]
       }
     },
     "stablecoins": {
@@ -43,11 +43,8 @@
       "icons": ["USDC", "USDT", "USDS", "BOLD"],
       "coins": {
         "question": "Which stablecoin?",
-        "$comment": "Grouped by what backs the coin, a fact a reader can check, rather than by a judgement of how decentralised it is (Miles, 6 Nov 2026; ui-jobs 525). DAI is backed partly by USDC and real-world assets and sits with the crypto-backed coins by Miles's default.",
-        "lists": [
-          { "heading": "Most held", "symbols": ["USDC", "USDT", "USDS"] },
-          { "heading": "Backed by crypto on-chain", "symbols": ["BOLD", "LUSD", "crvUSD", "GHO", "DAI"] }
-        ]
+        "$comment": "One list, drawn by how many vaults in the index hold each coin, most first; a coin none holds is left off (Miles, 6 Nov 2026; ui-jobs 525).",
+        "symbols": ["USDC", "USDT", "USDS", "DAI", "BOLD", "LUSD", "crvUSD", "GHO"]
       }
     }
   },
@@ -182,17 +179,17 @@
   "rosters": {
     "browse": {
       "question": "Which protocol?",
-      "line": "The explorers by chain. Each opens on that explorer."
+      "line": "The explorers by chain. Each link opens that explorer."
     },
     "find": {
       "question": "Which protocol?",
-      "line": "Each opens on that explorer with its wallet search ready. Rails reads the chain, so it answers while the protocol's app is down."
+      "line": "Each link opens that explorer with its wallet search ready. Rails reads the chain, so it answers while the protocol's app is down."
     }
   },
   "results": {
     "borrow": {
       "heading": "Explorers whose loans can hold {group}",
-      "line": "Each opens on its list of positions, filtered to that collateral where the list takes a filter.",
+      "line": "Each link opens its list of positions, filtered to that collateral where the list takes a filter.",
       "$comment": "Which explorers qualify is derived from the asset catalogs in lib/start/results.ts where a catalog states the collateral; the explorers below have no such catalog, so their answer is written here with its source."
     },
     "near-liquidation": {

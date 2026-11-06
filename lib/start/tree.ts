@@ -46,9 +46,9 @@ interface Group {
   categories?: AssetCategory[];
   /** The tokens drawn on the group's card, by symbol. */
   icons?: string[];
-  /** The group's coin lists, one level past its card: each list a heading
-   *  (or none) and its symbols, in the order drawn. */
-  coins?: { question: string; lists: { heading?: string; symbols: string[] }[] };
+  /** The group's coins, one level past its card, drawn by how many vaults
+   *  hold each, most first. */
+  coins?: { question: string; symbols: string[] };
 }
 
 interface Tree {
@@ -121,7 +121,7 @@ export interface Resolved {
 /** The tokens an option's card draws: its group's, where it opens one. */
 export function optionIcons(option: StartOption): string[] {
   const to = option.to;
-  const group = "coins" in to ? to.coins : "vaults" in to ? to.vaults : null;
+  const group = "coins" in to ? to.coins : "vaults" in to ? to.vaults : "results" in to ? to.group : undefined;
   return group ? (TREE.groups[group].icons ?? []) : [];
 }
 

@@ -184,6 +184,8 @@ export interface ResultRow {
   applied: boolean;
   /** What the row matched on (the collateral symbols, or the sort's label). */
   detail?: string;
+  /** The collateral symbols matched, drawn as tokens (a borrow row). */
+  symbols?: string[];
   /** Where the answer came from: a file in the code, or the tree's note. */
   source: string;
 }
@@ -274,6 +276,7 @@ function borrow(group: GroupKey): ResultRow[] {
           : entry.listingHref,
         applied: !!canFilter,
         detail: matched.join(", "),
+        symbols: matched,
         source: catalog.source,
       });
       continue;

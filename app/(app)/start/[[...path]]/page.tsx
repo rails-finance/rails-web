@@ -13,8 +13,10 @@ import { ExplorerPicker } from "@/components/start/explorer-picker";
 import { CHAINS } from "@/lib/shared/chains";
 import { withoutLiquidations } from "@/lib/start/liquidation-probe";
 import { loadVaultIndex } from "@/lib/vaults/index-read";
+import { shownOnArrival } from "@/lib/vaults/roster-preset";
+import type { VaultSummary } from "@/lib/vaults/summary";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { resultRows } from "@/lib/start/results";
+import { resultRows, type ResultRow } from "@/lib/start/results";
 import {
   TREE,
   groupPhrase,
@@ -51,6 +53,15 @@ const QUESTION =
 
 /** A link to another page resting on a card: NAV_BUTTON's blue border on hover
  *  (color-grammar.md §4a). */
+/** A row whose listing cannot take the answer's filter or sort: the link opens
+ *  the whole list, and the line says why (was "Opens the full list"; Miles,
+ *  6 Nov 2026). */
+const UNFILTERED: Record<ResultsKey, string> = {
+  borrow: "Every position: this list can't filter by collateral",
+  "near-liquidation": "Every position: this list can't sort by risk",
+  liquidated: "Every position: this list can't filter to liquidations",
+};
+
 const PAGE_ROW =
   "flex items-center gap-3 rounded-xl border border-rb-200 bg-raised px-4 py-3 transition-colors duration-150 hover:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-rb-600";
 
@@ -113,20 +124,25 @@ async function Results({ results, group }: { results: ResultsKey; group?: GroupK
               className={PAGE_ROW}
             >
               <ProtocolIcon id={row.entry.id} className="h-6 w-6 shrink-0" />
-              {/* The name and its line in a fixed column from sm, so the chain,
-                  named in words for a newcomer, lines up down the list as a
-                  column of its own (Miles, 6 Nov 2026). */}
-              <span className="flex min-w-0 flex-1 flex-col sm:w-64 sm:flex-none">
+              {/* Columns from sm (Miles, 6 Nov 2026): the name, the chain named
+                  in words for a newcomer, then what the row matched (the
+                  collateral as tokens) or why the list opens whole. Below sm
+                  the line sits under the name and the chain at the right. */}
+              <span className="flex min-w-0 flex-1 flex-col sm:w-48 sm:flex-none">
                 <span className="truncate text-base font-medium text-foreground">{row.entry.label}</span>
-                {(row.detail || !row.applied) && (
-                  <span className="truncate text-sm text-rb-500">
-                    {[row.detail, row.applied ? null : "Opens the full list"].filter(Boolean).join(" · ")}
-                  </span>
-                )}
+                <span className="sm:hidden">
+                  <ResultLine row={row} results={results} />
+                </span>
               </span>
-              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-rb-500" data-start-chain="">
+              <span
+                className="inline-flex shrink-0 items-center gap-1.5 text-sm text-rb-500 sm:w-28"
+                data-start-chain=""
+              >
                 <ChainGlyph chainId={row.entry.chainId} className="h-3.5 w-3.5" />
                 {CHAINS[row.entry.chainId].name}
+              </span>
+              <span className="hidden min-w-0 flex-1 sm:block">
+                <ResultLine row={row} results={results} />
               </span>
               <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
             </Link>
@@ -137,34 +153,56 @@ async function Results({ results, group }: { results: ResultsKey; group?: GroupK
   );
 }
 
-/** A group's coins (G6; ui-jobs 525): "All <group>" first, then each list
- *  under its heading, a row per coin opening the vaults that hold it. A coin
- *  no vault in the index holds is left off, so no row opens an empty list;
- *  the count is the index's, linked in the vault's own spelling. */
+/** A result row's line: the collateral it matched, as tokens, or the sort's
+ *  label; and, where its listing cannot take the answer, why it opens whole. */
+function ResultLine({ row, results }: { row: ResultRow; results: ResultsKey }) {
+  const whole = row.applied ? null : UNFILTERED[results];
+  if (row.symbols && row.symbols.length > 0)
+    return (
+      <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-rb-500">
+        {row.symbols.map((sym) => (
+          <span key={sym} className="inline-flex items-center gap-1">
+            <TokenChipIcon symbol={sym} size={14} filterable={false} untitled />
+            {sym}
+          </span>
+        ))}
+        {whole && <span className="basis-full">{whole}</span>}
+      </span>
+    );
+  const text = [row.detail, whole].filter(Boolean).join(" · ");
+  return text ? <span className="block text-sm text-rb-500">{text}</span> : null;
+}
+
+/** A group's coins (G6; ui-jobs 525): "All <group>" first, then a row per
+ *  coin opening the vaults that hold it, most held first. The count is the
+ *  rows the link opens on (shownOnArrival), so it matches the roster; a coin
+ *  with none is left off. Linked in the vault's own spelling. */
 async function Coins({ group }: { group: GroupKey }) {
   const g = TREE.groups[group];
   const { vaults } = await loadVaultIndex();
-  const held = new Map<string, { symbol: string; count: number }>();
+  // Counted as the roster counts the rows the link opens on: funded vaults,
+  // under its preset unless that leaves none (lib/vaults/roster-preset.ts).
+  const bySymbol = new Map<string, VaultSummary[]>();
   for (const v of vaults) {
     if (!v.asset.named) continue;
     const key = v.asset.symbol.toLowerCase();
-    const h = held.get(key);
-    if (h) h.count += 1;
-    else held.set(key, { symbol: v.asset.symbol, count: 1 });
+    bySymbol.set(key, [...(bySymbol.get(key) ?? []), v]);
   }
-  const lists = (g.coins?.lists ?? [])
-    .map((l) => ({
-      heading: l.heading,
-      rows: l.symbols.flatMap((s) => {
-        const h = held.get(s.toLowerCase());
-        return h ? [{ label: s, ...h }] : [];
-      }),
-    }))
-    .filter((l) => l.rows.length > 0);
+  const held = new Map<string, { symbol: string; count: number }>();
+  for (const [key, list] of bySymbol) {
+    const count = shownOnArrival(list).length;
+    if (count > 0) held.set(key, { symbol: list[0].asset.symbol, count });
+  }
+  const rows = (g.coins?.symbols ?? [])
+    .flatMap((s) => {
+      const h = held.get(s.toLowerCase());
+      return h ? [{ label: s, ...h }] : [];
+    })
+    .sort((x, y) => y.count - x.count);
   return (
     <div data-anatomy="G6" data-start-coins={group}>
       <h2 className={QUESTION}>{g.coins?.question ?? g.label}</h2>
-      <p className="mb-8 max-w-2xl text-lg text-rb-500">Each opens the vaults that hold it.</p>
+      <p className="mb-8 max-w-2xl text-lg text-rb-500">Each link opens the vaults that hold it.</p>
       <Link href={vaultsHref(group)} className={PAGE_ROW} data-start-coin="all">
         <span className="flex -space-x-1.5" aria-hidden="true">
           {(g.icons ?? []).map((sym) => (
@@ -176,32 +214,24 @@ async function Coins({ group }: { group: GroupKey }) {
         <span className="text-base font-medium text-foreground">All {groupPhrase(group)}</span>
         <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
       </Link>
-      {lists.map((l, i) => (
-        <section key={l.heading ?? i} className="mt-8" aria-label={l.heading ?? g.label}>
-          {l.heading && <h3 className="mb-2 text-sm font-medium text-rb-500">{l.heading}</h3>}
-          <ul className={`grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 ${l.heading ? "" : "mt-2"}`}>
-            {l.rows.map((c) => (
-              <li key={c.symbol}>
-                <Link
-                  href={`/vaults?asset=${encodeURIComponent(c.symbol)}`}
-                  className={PAGE_ROW}
-                  data-start-coin={c.symbol}
-                >
-                  <TokenChipIcon symbol={c.label} size={24} filterable={false} untitled />
-                  <span className="text-base font-medium text-foreground">{c.label}</span>
-                  <span className="text-sm text-rb-500">
-                    {c.count.toLocaleString("en-US")} {c.count === 1 ? "vault" : "vaults"}
-                  </span>
-                  <ArrowRight
-                    className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400"
-                    aria-hidden="true"
-                  />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+      <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {rows.map((c) => (
+          <li key={c.symbol}>
+            <Link
+              href={`/vaults?asset=${encodeURIComponent(c.symbol)}`}
+              className={PAGE_ROW}
+              data-start-coin={c.symbol}
+            >
+              <TokenChipIcon symbol={c.label} size={24} filterable={false} untitled />
+              <span className="text-base font-medium text-foreground">{c.label}</span>
+              <span className="text-sm text-rb-500">
+                {c.count.toLocaleString("en-US")} {c.count === 1 ? "vault" : "vaults"}
+              </span>
+              <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
