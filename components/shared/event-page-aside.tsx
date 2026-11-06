@@ -83,7 +83,7 @@ function Step({ href, label, data }: { href: string | null; label: string; data:
 }
 
 /** A facts row's copy button: a tick for a moment after the copy. */
-function CopyFact({ value, label, name }: { value: string; label: string; name: string }) {
+export function CopyFact({ value, label, name }: { value: string; label: string; name: string }) {
   const [copied, setCopied] = useState(false);
   const words = copied ? W.copied : label;
   return (

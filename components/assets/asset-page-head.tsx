@@ -11,13 +11,14 @@ import { AssetPriceRow } from "@/components/assets/asset-price-row";
 import { CategoryBadge, ExplorerChip, FigureRow } from "@/components/assets/asset-explorer";
 import { ChainLabel } from "@/components/shared/rail-header";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
+import { CopyFact } from "@/components/shared/event-page-aside";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { ChainProvider } from "@/lib/shared/chain-context";
-import { chainName } from "@/lib/shared/asset-roster";
+import { chainName, NATIVE, shortAddress } from "@/lib/shared/asset-roster";
 import { PRICELESS_WHY, type AssetChip, type CardChain, type CardFigure } from "@/lib/shared/asset-explorer";
 import type { AssetCategory } from "@/lib/shared/asset-categories";
 import type { AssetPriceRow as Row } from "@/lib/shared/asset-prices";
-import type { ChainId } from "@/lib/shared/chains";
+import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 
 /** One relation in the line under the band: "Wraps", "Wrapped as", "Priced from it:". */
 export interface RelationGroup {
@@ -88,12 +89,34 @@ export function AssetPageHead({
               </p>
             </>
           )}
+          {token.toLowerCase() !== NATIVE && <ContractLine chain={chain} token={token} />}
         </div>
         <ReadBy chain={chain} token={token} symbol={symbol} chips={chips} chains={chains} />
       </div>
       {relations.length > 0 && <RelationLine chain={chain} groups={relations} />}
       {note}
     </header>
+  );
+}
+
+/** The token's contract: its short address, linking the chain explorer's
+ *  token page, and a copy button; the native asset has none. */
+function ContractLine({ chain, token }: { chain: number; token: string }) {
+  const address = token.toLowerCase();
+  return (
+    <p className="mt-2 flex items-center gap-1.5 text-sm" data-asset-contract={address}>
+      <span className="text-xs text-rb-500">Contract</span>
+      <a
+        href={explorerUrl(chain as ChainId, "token", address)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-mono text-xs text-blue-600 hover:underline dark:text-blue-400"
+        title={address}
+      >
+        {shortAddress(address)}
+      </a>
+      <CopyFact value={address} label="Copy contract address" name="contract" />
+    </p>
   );
 }
 
