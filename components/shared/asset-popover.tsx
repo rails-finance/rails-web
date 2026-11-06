@@ -215,6 +215,35 @@ function AssetPanelBody({
   );
 }
 
+/** The asset's page, with the reader's `via` kept, once the Prices list is
+ *  read: a priced asset's page, or the page of a token with a page and no
+ *  stored price; null where the asset has none (the Prices dropdown's rows,
+ *  ui-jobs 516). */
+export function useAssetPageHref(symbol: string, address?: string): string | null {
+  const pageChain = useChainId();
+  const pathname = usePathname();
+  const contract = address ?? getTokenAddress(symbol, pageChain) ?? (symbol === "ETH" ? NATIVE : null);
+  const [href, setHref] = useState<string | null>(null);
+  useEffect(() => {
+    if (!contract) return;
+    let live = true;
+    loadAssetPrices().then((list) => {
+      if (!live || !list) return;
+      const search = window.location.search;
+      const via = viaForPathname(pathname, search);
+      const value = via ? viaValue(via) : null;
+      const row = rowFor(list, pageChain, contract, value);
+      const unpriced = list.unpriced?.includes(`${pageChain}:${contract.toLowerCase()}`);
+      const token = row ? row.token : unpriced ? contract.toLowerCase() : null;
+      setHref(token ? withVia(assetHref(pageChain, token), value, `${pathname}${search}`) : null);
+    });
+    return () => {
+      live = false;
+    };
+  }, [pageChain, contract, pathname]);
+  return href;
+}
+
 /** The asset's Prices list row and its page link, once the list is read; for
  *  a token with a page and no stored price, the line saying so and the link;
  *  nothing where the asset has no page. */

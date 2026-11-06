@@ -22,11 +22,12 @@
 // (lib/shared/oracle-usd-reasons.ts, the same string the coverage matrix's
 // `oracleUsd: { why }` cell shows) in place of the generic "not yet".
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronDown, Coins } from "lucide-react";
 import { fmtNative, fmtPrice, PricePill } from "@/components/shared/price-pill";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { useAssetPageHref } from "@/components/shared/asset-popover";
 import type { PriceStripAsset } from "@/components/shared/price-strip";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, OVERLAY_HEADING } from "@/lib/shared/ui-grammar";
 import { formatDate } from "@/lib/date";
@@ -222,16 +223,18 @@ export function LatestPrices({
               {assets.map((a) =>
                 priced(a) ? (
                   <li key={a.unit ? `${a.symbol}-${a.unit}` : a.symbol} className="px-2">
-                    <PricePill
-                      symbol={a.symbol}
-                      address={a.address}
-                      price={a.price as number}
-                      unit={a.unit}
-                      filterable={false}
-                      title={a.label ?? a.symbol}
-                      showSymbol
-                      bare
-                    />
+                    <AssetPageLink symbol={a.symbol} address={a.address}>
+                      <PricePill
+                        symbol={a.symbol}
+                        address={a.address}
+                        price={a.price as number}
+                        unit={a.unit}
+                        filterable={false}
+                        title={a.label ?? a.symbol}
+                        showSymbol
+                        bare
+                      />
+                    </AssetPageLink>
                   </li>
                 ) : (
                   // Held, and the protocol states no figure for it. The row
@@ -262,18 +265,25 @@ export function LatestPrices({
               </p>
             )
           )}
-          <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />
-          <Link
-            href="/assets"
-            role="menuitem"
-            className="mx-1 flex min-h-11 items-center rounded-md px-3 text-xs font-medium text-foreground hover:bg-[var(--surface-hover)] sm:min-h-8"
-            data-latest-prices-all=""
-            data-anatomy="H7.2.1"
-          >
-            All prices →
-          </Link>
         </div>
       )}
     </div>
+  );
+}
+
+/** A price row as a link to its asset's page (ui-jobs 516), where the asset
+ *  has one; the row alone otherwise. */
+function AssetPageLink({ symbol, address, children }: { symbol: string; address?: string; children: ReactNode }) {
+  const href = useAssetPageHref(symbol, address);
+  if (!href) return <>{children}</>;
+  return (
+    <Link
+      href={href}
+      role="menuitem"
+      className="flex rounded-md hover:bg-[var(--surface-hover)] focus-ring [&>span]:cursor-pointer"
+      data-latest-prices-asset={symbol}
+    >
+      {children}
+    </Link>
   );
 }
