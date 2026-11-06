@@ -1212,6 +1212,31 @@ label[for] {
   animation: dropdown-bounce-up 240ms cubic-bezier(0.22, 1.4, 0.5, 1) both;
   transform-origin: bottom right;
 }
+/* The profile menu's dropdown (H20, from md): drops from the control and
+   settles with the wallet panel's spring (wallet-panel.tsx SPRING_IN, 300ms,
+   the overshoot at about 55%), over a shorter run: 12px down from above, 3px
+   past, back (Miles, 6 Nov 2026). */
+@keyframes profile-drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(3px);
+  }
+  80% {
+    transform: translateY(-0.5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.profile-drop {
+  animation: profile-drop 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: top right;
+}
 
 /* Pre-hydration control state. A control strip carries [data-ctrl-waking] from
    the server response until React attaches its handlers (hooks/useHydrated +
@@ -1394,7 +1419,8 @@ label[for] {
   .animate-spin,
   .animate-bounce,
   .animate-dropdown-down,
-  .animate-dropdown-up {
+  .animate-dropdown-up,
+  .profile-drop {
     animation: none;
   }
   .animate-ping {
