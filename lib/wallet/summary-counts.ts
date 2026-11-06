@@ -41,12 +41,6 @@ export interface WalletCounts {
   error?: string;
 }
 
-export const CHAIN_NAMES: Record<WalletCountsChain, string> = {
-  ethereum: "Ethereum",
-  base: "Base",
-  arbitrum: "Arbitrum",
-};
-
 /** A page path for comparison: decoded, lowercase, no trailing slash, and an
  *  event page reduced to its position's page. */
 function pagePath(path: string): string {

@@ -175,7 +175,7 @@ export default async function Home() {
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label="railsfinance on Telegram"
-                      className="text-pink-500 hover:text-pink-600 hover:underline underline-offset-2 transition-colors"
+                      className="text-pink-500 hover:underline underline-offset-2"
                     >
                       <svg
                         width="14"
