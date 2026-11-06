@@ -1,8 +1,9 @@
 "use client";
 
 // The profile control (H20) and its menu (rails-ops ui-jobs 504): the facehash
-// with a chevron, a menu button. The menu, top down: the saved wallets' heading
-// (the filled bookmark, "Saved wallets"), the first ten in the reader's order
+// with a chevron, a menu button. The menu has no heading of its own: each group
+// carries its own small label (ui-jobs 524), so groups can join it (saved
+// searches, ui-jobs 521). Top down: "Saved wallets", the first ten in the reader's order
 // (lib/shared/sessions.ts; /bookmarks orders them), "Manage wallets →" to
 // /bookmarks, then the theme switch. With none saved, two lines in place of
 // the rows: "New to Rails?" and a signposted "Start here" to /start, then how
@@ -26,7 +27,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, ChevronDown, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
+import { ChevronDown, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Facehash } from "@/components/shared/facehash";
@@ -38,6 +39,10 @@ import { CTRL_OFF, CTRL_ON } from "@/lib/shared/ui-grammar";
 import type { WalletSession } from "@/lib/shared/sessions";
 
 const BOOKMARKS_PATH = "/bookmarks";
+/** The control's and the menu's accessible name: what the menu holds as a whole. */
+const MENU_NAME = "Saved and settings";
+/** A group's small label (Saved wallets; Saved searches to come). */
+const GROUP_LABEL = "px-3 pb-1 pt-2 text-xs font-medium text-rb-500";
 /** The guided way in (G, /start), reached from this menu (ui-jobs 509). */
 const START_PATH = "/start";
 /** The menu lists this many; the rest are on /bookmarks. */
@@ -210,8 +215,8 @@ export function ProfileMenu() {
       <button
         ref={trigger}
         type="button"
-        aria-label={BOOKMARKS_NAME}
-        title={BOOKMARKS_NAME}
+        aria-label={MENU_NAME}
+        title={MENU_NAME}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -258,7 +263,7 @@ export function ProfileMenu() {
               ref={menu}
               id={menuId}
               role="menu"
-              aria-label={BOOKMARKS_NAME}
+              aria-label={MENU_NAME}
               data-profile-menu=""
               className={`fixed z-[var(--z-popover)] border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
                 place.phone
@@ -267,35 +272,35 @@ export function ProfileMenu() {
               }`}
               style={place.phone ? undefined : { top: place.top, right: place.right }}
             >
-              <p className="flex items-center gap-2 px-3 pb-2 pt-1 text-sm font-semibold text-foreground">
-                <Bookmark className="size-4 shrink-0" fill="currentColor" aria-hidden="true" />
-                {BOOKMARKS_NAME}
-              </p>
-              <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />
-              {rows.length > 0 ? (
-                <div className="py-1" data-profile-menu-wallets="">
-                  {rows.map((s) => (
-                    <WalletRow key={s.key} session={s} onDone={() => close(false)} />
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-2 px-3 pb-1 pt-3 text-sm text-rb-500" data-profile-menu-empty="">
-                  <p>
-                    New to Rails?{" "}
-                    <Link
-                      href={START_PATH}
-                      role="menuitem"
-                      onClick={() => close(false)}
-                      className="inline-flex items-center gap-1 rounded-sm align-bottom font-medium text-blue-600 underline-offset-4 hover:underline focus:outline-none focus-visible:underline dark:text-blue-400"
-                      data-profile-menu-start=""
-                    >
-                      <Signpost className="size-4 shrink-0" aria-hidden="true" />
-                      Start here
-                    </Link>
-                  </p>
-                  <p>To save a wallet, press the bookmark beside its address on its wallet page.</p>
-                </div>
-              )}
+              <div role="group" aria-labelledby={`${menuId}-wallets`}>
+                <p id={`${menuId}-wallets`} className={GROUP_LABEL} data-profile-menu-group="wallets">
+                  {BOOKMARKS_NAME}
+                </p>
+                {rows.length > 0 ? (
+                  <div className="pb-1" data-profile-menu-wallets="">
+                    {rows.map((s) => (
+                      <WalletRow key={s.key} session={s} onDone={() => close(false)} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-2 px-3 pb-1 pt-1 text-sm text-rb-500" data-profile-menu-empty="">
+                    <p>
+                      New to Rails?{" "}
+                      <Link
+                        href={START_PATH}
+                        role="menuitem"
+                        onClick={() => close(false)}
+                        className="inline-flex items-center gap-1 rounded-sm align-bottom font-medium text-blue-600 underline-offset-4 hover:underline focus:outline-none focus-visible:underline dark:text-blue-400"
+                        data-profile-menu-start=""
+                      >
+                        <Signpost className="size-4 shrink-0" aria-hidden="true" />
+                        Start here
+                      </Link>
+                    </p>
+                    <p>To save a wallet, press the bookmark beside its address on its wallet page.</p>
+                  </div>
+                )}
+              </div>
               {rows.length > 0 && <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />}
               <div className="py-1">
                 <Link
