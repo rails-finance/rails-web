@@ -1903,7 +1903,7 @@ async function verifyLiquityMarkdown(subject) {
   const COPY_LINK_BTN = `${MENU} [data-menu-item="copy-link"]`;
   const VIEW_MD = `${MENU} [data-menu-item="view-markdown"]`;
   const COPY_HASH = `${MENU} [data-menu-item="copy-tx-hash"]`;
-  const WANT = ["copy-link", "copy-tx-hash", "view-explorer", "view-markdown", "copy-for-llm"];
+  const WANT = ["copy-link", "copy-tx-hash", "view-explorer", "view-markdown", "copy-for-llm", "show-provenance"];
   const TX_ID = /^(0x[0-9a-f]{64})/i.exec(decodedId)?.[1]?.toLowerCase() ?? null;
   {
     const { ctx, page, errors } = await open(1280, link);
@@ -1925,7 +1925,7 @@ async function verifyLiquityMarkdown(subject) {
       els.map((e) => e.getAttribute("data-menu-item")),
     );
     check(
-      `${name} event page: the ⋮ holds the five rows in order`,
+      `${name} event page: the ⋮ holds its rows in order, Inspect provenance last`,
       JSON.stringify(items) === JSON.stringify(WANT),
       JSON.stringify(items),
     );
