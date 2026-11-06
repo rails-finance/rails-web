@@ -1277,7 +1277,8 @@ const ROSTER = [
     name: "Morpho Blue",
     route: "/ethereum/morpho",
     api: "/api/morpho/positions",
-    rows: 'a[href^="/ethereum/morpho/"]:not([href^="/ethereum/morpho/markets"]):not([href$="/info"])',
+    // The rail (on every page since 498) links "Vaults" under the same prefix, so it is excluded as well.
+    rows: 'a[href^="/ethereum/morpho/"]:not([href^="/ethereum/morpho/markets"]):not([href^="/ethereum/morpho/vaults"]):not([href$="/info"])',
     perPage: 20,
     open: "status=open",
     all: "status=open,closed,liquidated",
