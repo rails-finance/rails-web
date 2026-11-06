@@ -952,9 +952,8 @@ export function AlchemistPositionView({
             assets={priceAssets}
             priceReason={priceReason}
             closed={position.status === "closed"}
-            // The card's ⋮ carries the menu; the event route, which draws no
-            // card, keeps the wallet row's Tools.
-            tools={onEventPage}
+            // The card's ⋮ carries the menu; an event page draws no Tools.
+            tools={false}
           />
 
           {/* ── The position card: the current figures, one reading, one block ── */}

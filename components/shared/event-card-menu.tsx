@@ -7,9 +7,11 @@
 // names a party (a via, to/from or venue chip) Trace that chip, which opens its
 // receipt at the chip (`headChip`, ui-jobs 433). On the event page it holds
 // the event's Inspect provenance (`provScope`). The explorer link is the row's
-// hash under Display's Transaction hashes (ui-jobs 294); copy link is on the
-// event page's actions row (`components/shared/event-page-aside.tsx`), which
-// reuses `useMenuCopied` and `eventMarkdownHref` from here.
+// hash under Display's Transaction hashes (ui-jobs 294). On the event page the
+// menu stands beside the h1 and adds the event's rows (`pageRows`: copy link,
+// copy the transaction hash, the explorer, the Markdown and Copy for LLM;
+// `components/shared/event-page-aside.tsx`, which reuses `useMenuCopied` and
+// `eventMarkdownHref` from here).
 
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
@@ -100,6 +102,7 @@ export function EventCardMenu({
   groupShow,
   provScope,
   headChip,
+  pageRows,
 }: {
   /** A closed group's row: its one item, "Show 48 grouped events", the only
    *  way to open the group (ui-jobs 250, third revision). */
@@ -113,6 +116,8 @@ export function EventCardMenu({
    *  Protocol"): its words, and the open that arms the row and pins the
    *  chip's receipt. One mechanism for every PartyChip (HeadChipContext). */
   headChip?: { words: string; open: () => void };
+  /** The event page's rows, above Inspect provenance. */
+  pageRows?: (close: () => void) => ReactNode;
 }) {
   const pathname = usePathname();
   const group = useContext(GroupHideContext);
@@ -189,6 +194,7 @@ export function EventCardMenu({
               />
             )}
             {hideTypeRow(close)}
+            {pageRows?.(close)}
           </>
         )
       }

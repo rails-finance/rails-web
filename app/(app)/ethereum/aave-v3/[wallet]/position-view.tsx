@@ -89,7 +89,6 @@ import {
   AaveV3ClosedPositionExplanation,
 } from "@/components/protocol/aave-v3/aave-v3-position-explanation";
 import { aaveV3Exports } from "@/components/protocol/aave-v3/aave-v3-export-menu";
-import { ExportMenu } from "@/components/shared/export-menu";
 import {
   computeAaveV3Economics,
   isWethGateway,
@@ -805,12 +804,9 @@ export default function AaveV3PositionDetail({
             owner={{ wallet }}
             assets={stripAssets}
             closed={liveView != null && liveView.status !== "open"}
-            // The exports ride the card's ⋮; the event route, which draws no
-            // card, keeps them in the wallet row's Tools.
-            tools={onEventPage}
-          >
-            {onEventPage && exports && <ExportMenu {...exports} />}
-          </DetailTopRow>
+            // The card's ⋮ carries the menu; an event page draws no Tools.
+            tools={false}
+          />
 
           {loading ? (
             <DetailBodySkeleton />

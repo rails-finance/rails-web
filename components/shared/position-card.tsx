@@ -356,6 +356,18 @@ function SidebarName({ name, id, href }: { name: string; id: string; href?: stri
   );
 }
 
+/** The zone's tint (C20): the frame's shape clipped to its left edge, a border
+ *  below md and the bar's backdrop from md (with the body's rounded corners
+ *  over it). Inside a frame that sets `--brand-hue`. */
+function SidebarTint({ rounded = "rounded-[15px]" }: { rounded?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`pointer-events-none absolute inset-0 ${rounded} bg-brand-edge [clip-path:inset(0_calc(100%_-_6px)_0_0)] md:bg-brand-zone ${SIDEBAR_TINT_CLIP}`}
+    />
+  );
+}
+
 /** The sidebar's bar from md (C20): the protocol's mark at the top, its name
  *  reading upward, the chain's glyph at the foot. Its tint is the frame's
  *  backdrop. */
@@ -917,10 +929,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
           {/* The zone's tint: the card's shape clipped to its left edge, a
               border below md and the panel (with the body's rounded corners
               over it) from md. */}
-          <span
-            aria-hidden="true"
-            className={`pointer-events-none absolute inset-0 rounded-[15px] bg-brand-edge [clip-path:inset(0_calc(100%_-_6px)_0_0)] md:bg-brand-zone ${SIDEBAR_TINT_CLIP}`}
-          />
+          <SidebarTint />
           <SidebarPanel identity={identity} link={detail} />
         </>
       )}
@@ -975,6 +984,66 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
 }
 
 const CARD_ANATOMY = { explanation: "C3", learnMore: "C4" };
+
+/** The card's sidebar (C20) around another surface: the event page's left
+ *  column (P4) names its protocol with the position card's bar, its mark,
+ *  name and chain glyph from md and the 6px border below. `narrow` adds,
+ *  below md, a row naming the protocol and its chain above the content.
+ *  Off the explorers (no roster entry) the content stands alone. */
+export function CardSidebarFrame({
+  children,
+  narrow,
+  className = "",
+}: {
+  children: ReactNode;
+  narrow?: boolean;
+  className?: string;
+}) {
+  const identity = usePositionCardIdentity();
+  if (!identity) return <>{children}</>;
+  return (
+    <div
+      className={`relative flex rounded-xl bg-background ${className}`}
+      style={
+        {
+          "--brand-hue": identity.hue ?? 0,
+          ...(identity.hue == null ? { "--brand-strength": 0 } : {}),
+        } as CSSProperties
+      }
+      data-card-sidebar-frame="event"
+    >
+      <SidebarTint rounded="rounded-xl" />
+      <SidebarPanel identity={identity} link />
+      <div className="relative flex min-w-0 flex-1 flex-col max-md:pl-1.5 md:rounded-xl md:bg-background">
+        {narrow && (
+          <div className="flex items-center gap-2 px-5 pt-4 md:hidden" data-card-protocol={identity.protocol.id}>
+            <ProtocolIcon id={identity.protocol.id} className="h-4 w-4 shrink-0 text-rb-500 [&:is(img)]:grayscale" />
+            {identity.protocol.href ? (
+              <Link
+                href={identity.protocol.href}
+                className="rounded-sm text-xs text-rb-500 hover:text-foreground focus-ring"
+              >
+                {identity.protocol.name}
+              </Link>
+            ) : (
+              <span className="text-xs text-rb-500">{identity.protocol.name}</span>
+            )}
+            <span
+              role="img"
+              aria-label={identity.chain.name}
+              title={identity.chain.name}
+              className="ml-auto flex text-rb-500"
+              data-pill="chain"
+            >
+              <ChainGlyph id={identity.chain.id} className="h-4 w-4 shrink-0" />
+            </span>
+          </div>
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}
 
 /** The (i) toggle's noun from the heading: "Vault summary" → "vault
  *  explanation"; no heading, "position explanation". */

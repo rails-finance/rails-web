@@ -90,7 +90,6 @@ import { useCompoundFlows } from "@/hooks/useCompoundFlows";
 import type { CompoundLive } from "@/lib/compound/flows";
 import { summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
-import { ExportMenu } from "@/components/shared/export-menu";
 import type { PositionCardExports } from "@/components/shared/position-card";
 import { compoundExports } from "@/components/protocol/compound/compound-export-menu";
 
@@ -534,12 +533,9 @@ export default function CompoundPositionView({
             owner={{ wallet }}
             assets={stripAssets}
             closed={view != null && view.status !== "open"}
-            // The exports ride the card's ⋮; the event route, which draws no
-            // card, keeps them in the wallet row's Tools.
-            tools={onEventPage}
-          >
-            {onEventPage && exports && <ExportMenu {...exports} />}
-          </DetailTopRow>
+            // The card's ⋮ carries the menu; an event page draws no Tools.
+            tools={false}
+          />
 
           {loading ? (
             <DetailBodySkeleton />

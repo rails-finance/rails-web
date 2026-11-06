@@ -13,9 +13,7 @@ import { firstSentenceText } from "@/lib/llamalend/sentence-text";
 import type { LlamalendLoanMark } from "@/lib/llamalend/event-figures";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this account's loan in the market.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the account's timeline",
   market: "Market",
   copy_market: "Copy the market's controller address",
   account: "Account",
@@ -78,11 +76,6 @@ export const llamalendExplorer: ExplorerAdapter<LlamalendEventPageInput> = {
   eventPage: ({ controller, user, marketLabel, loanMark, event, ...slot }) => ({
     heading: llamalendEventHeading(event, loanMark),
     title: llamalendEventTitle(event, loanMark),
-    words: {
-      paragraph: WORDS.paragraph,
-      timelineLink: WORDS.timeline_link,
-      timelineHint: WORDS.timeline_hint,
-    },
     facts: [
       {
         key: "market",

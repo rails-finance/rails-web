@@ -473,8 +473,8 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
               // The bookmark the card's wallet pill carried: the position page's
               // card leaves the wallet to this row.
             }}
-            // The card's ⋮ carries the menu; the event route draws no card.
-            tools={onEventPage}
+            // The card's ⋮ carries the menu; an event page draws no Tools.
+            tools={false}
           />
           {!onEventPage && (
             <>

@@ -61,7 +61,6 @@ const AaveV4TowerChart = dynamic(
   { loading: () => null },
 );
 import { aaveV4Exports } from "@/components/protocol/aave-v4/aave-v4-export-menu";
-import { ExportMenu } from "@/components/shared/export-menu";
 import {
   buildAaveV4SpokeCards,
   buildSpokeCards,
@@ -782,12 +781,9 @@ function AaveV4SpokePageInner({
           owner={{ wallet }}
           assets={stripAssets}
           closed={positionClosed}
-          // The exports ride the card's ⋮; the event route, which draws no
-          // card, keeps them in the wallet row's Tools.
-          tools={onEventPage}
-        >
-          {onEventPage && exports && <ExportMenu {...exports} />}
-        </DetailTopRow>
+          // The card's ⋮ carries the menu; an event page draws no Tools.
+          tools={false}
+        />
 
         {/* The position card: the shared shell inside the spoke chooser, with
             its receipts scope. No wallet: the page's wallet row above the

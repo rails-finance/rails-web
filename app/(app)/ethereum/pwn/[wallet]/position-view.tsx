@@ -39,7 +39,6 @@ import { groupEventsByTx } from "@/lib/shared/explainer-prose";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { pwnExports } from "@/components/protocol/pwn/pwn-export-menu";
-import { ExportMenu } from "@/components/shared/export-menu";
 import { PwnEventCard } from "@/components/protocol/pwn/pwn-event-card";
 import { PwnPositionCard, viewFromSummary } from "@/components/protocol/pwn/pwn-position-card";
 import { PwnPositionExplanation } from "@/components/protocol/pwn/pwn-position-explanation";
@@ -486,15 +485,12 @@ export default function PwnLoanView({
               ) : undefined,
           }}
           showStamp={false}
-          tools={onEventPage}
+          // The card's ⋮ carries the menu; an event page draws no Tools.
+          tools={false}
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON.pwn}
           closed={view != null && view.status !== "open"}
-        >
-          {/* The exports ride the card's ⋮; the event route, which draws no card,
-            keeps them in the wallet row's Tools. */}
-          {onEventPage && exports && <ExportMenu {...exports} />}
-        </DetailTopRow>
+        ></DetailTopRow>
 
         {loading ? (
           <DetailBodySkeleton />

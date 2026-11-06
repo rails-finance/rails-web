@@ -64,7 +64,6 @@ import { MorphoFlowsNote, morphoFlowsContent } from "@/components/protocol/morph
 import { morphoRisk, useMorphoFlows } from "@/hooks/useMorphoFlows";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { morphoExports } from "@/components/protocol/morpho/morpho-export-menu";
-import { ExportMenu } from "@/components/shared/export-menu";
 import {
   MorphoPositionExplanation,
   MorphoClosedPositionExplanation,
@@ -473,12 +472,9 @@ export default function MorphoPositionView({
           priceReason={ORACLE_USD_REASON.morpho}
           closed={liveView != null && liveView.status !== "open"}
           closing={closing}
-          // The exports ride the card's ⋮; the event route, which draws no card,
-          // keeps them in the wallet row's Tools.
-          tools={onEventPage}
-        >
-          {onEventPage && exports && <ExportMenu {...exports} />}
-        </DetailTopRow>
+          // The card's ⋮ carries the menu; an event page draws no Tools.
+          tools={false}
+        />
 
         {loading ? (
           <DetailBodySkeleton />

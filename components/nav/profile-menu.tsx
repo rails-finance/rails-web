@@ -21,6 +21,7 @@
 // it, and focus returns to the control; the arrow keys, Home and End move
 // through its items. The dropdown has no animation.
 
+import { CHROME_HOVER, CHROME_HOVER_ON } from "@/components/nav/chrome-hover";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
@@ -204,8 +205,6 @@ export function ProfileMenu() {
     };
   }, [open, close]);
 
-  const onBookmarks = pathname === BOOKMARKS_PATH;
-
   return (
     <>
       <button
@@ -228,8 +227,10 @@ export function ProfileMenu() {
         }}
         data-anatomy="H20"
         data-profile-face={face ?? undefined}
-        className={`flex shrink-0 cursor-pointer items-center gap-0.5 rounded-lg py-[9px] pl-[9px] pr-1 transition-colors duration-150 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-          open || onBookmarks ? "text-blue-600 dark:text-blue-400" : "text-rb-700 dark:text-rb-300"
+        // Neutral, with the chrome's tile on hover and while open (ui-jobs
+        // 516): the menu opens in place.
+        className={`flex shrink-0 cursor-pointer items-center gap-0.5 rounded-lg py-[9px] pl-[9px] pr-1 text-foreground transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          open ? CHROME_HOVER_ON : CHROME_HOVER
         }`}
       >
         {face ? (
