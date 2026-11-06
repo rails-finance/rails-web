@@ -39,7 +39,7 @@ export function StartCard({
   title: string;
   line: string;
   tone: StartCardTone;
-  /** Tokens drawn over the title, overlapping (ui-jobs 525). */
+  /** Tokens drawn under the line, overlapping (ui-jobs 525). */
   icons?: string[];
 }) {
   const t = TONE[tone];
@@ -51,8 +51,10 @@ export function StartCard({
       data-start-card=""
       className={`group flex min-h-[9.5rem] flex-col p-4 ${START_CARD_FRAME} ${t.card}`}
     >
+      <span className="text-base font-semibold text-foreground">{title}</span>
+      <span className="mt-1 text-sm text-rb-500">{line}</span>
       {icons.length > 0 && (
-        <span className="mb-3 flex -space-x-1.5" aria-hidden="true" data-start-card-icons="">
+        <span className="mt-3 flex -space-x-1.5" aria-hidden="true" data-start-card-icons="">
           {icons.map((sym) => (
             <span key={sym} className="rounded-full ring-2 ring-[var(--surface-raised)]">
               <TokenChipIcon symbol={sym} size={24} filterable={false} untitled />
@@ -60,8 +62,6 @@ export function StartCard({
           ))}
         </span>
       )}
-      <span className="text-base font-semibold text-foreground">{title}</span>
-      <span className="mt-1 text-sm text-rb-500">{line}</span>
       {tone === "answer" ? (
         <ArrowDown className={`mt-auto h-4 w-4 transition-transform duration-150 ${t.arrow}`} aria-hidden="true" />
       ) : (
