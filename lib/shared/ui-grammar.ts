@@ -55,13 +55,15 @@ export const PILL_CTA =
  * rounded-md`, `h-7 px-2.5 rounded-md text-xs`).
  */
 /**
- * "New to Rails? Start here" as a button: link blue on a blue-tinted ground
- * with a blue border that strengthens on hover, PILL_CTA's dark treatment
- * (Miles, 6 Nov 2026). Add the display and width where it is drawn (the
- * profile menu's is full width, the saved-wallets page's fits its text).
+ * "New to Rails? Start here" as a button, in green: the one exception to blue
+ * for a link, because green says "new" (Miles, 6 Nov 2026; the marketing green,
+ * color-grammar.md §2). Green text on a green-tinted ground with a green
+ * border that strengthens on hover; green-700 in light for AA. Add the display
+ * and width where it is drawn (the profile menu's is full width, the saved
+ * wallets page's fits its text).
  */
 export const START_CTA =
-  "items-center gap-2 rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-blue-400/40 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:border-blue-500";
+  "items-center gap-2 rounded-lg border border-green-300 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 transition-colors hover:border-green-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500 dark:border-green-400/40 dark:bg-green-500/10 dark:text-green-400 dark:hover:border-green-500";
 
 export const CTRL_GHOST = "inline-flex items-center justify-center transition-colors cursor-pointer";
 
