@@ -144,6 +144,9 @@ const SHEET_FAMILIES = new Set([
   "liquity-v2",
   "aave-v3",
   "aave-v3-base",
+  // Seamless draws the Aave family's card (aave-v3-ct-event-card), so its T2
+  // is a sheet, as aave-v3-base's is. It has no SHEET_SUBJECTS entry yet.
+  "seamless",
   "spark",
   "moonwell",
   "moonwell-base",
@@ -2568,7 +2571,10 @@ async function verifyVaultOwn(name, subject, { runPath = null } = {}) {
     JSON.stringify(runIds),
   );
   check(`${name} · own: and it is that event`, runIds[0] === run.hidden, `${runIds[0]} vs ${run.hidden}`);
-  const runPanel = runPage.locator(`[data-event-id="${run.hidden}"] .rounded-b-xl.bg-raised`);
+  // The event page draws the opened card's detail as a T2 panel of its own
+  // (`data-event-page-card`, 517), not the timeline's `.rounded-b-xl` foot, so
+  // the panel is read by its anatomy hook.
+  const runPanel = runPage.locator(`[data-event-id="${run.hidden}"] [data-anatomy~="T2"]`);
   await runPanel
     .first()
     .waitFor({ state: "attached", timeout: 5000 })
