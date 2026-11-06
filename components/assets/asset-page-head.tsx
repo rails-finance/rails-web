@@ -77,6 +77,7 @@ export function AssetPageHead({
       <div
         className="mt-4 grid gap-x-6 gap-y-4 rounded-xl bg-raised p-3 sm:p-4 md:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]"
         data-asset-band=""
+        data-anatomy="A1.4"
       >
         <div className="min-w-0 self-center">
           {row ? (
@@ -142,6 +143,7 @@ function ReadBy({
     <section
       className="min-w-0 md:border-l md:border-rb-200 md:pl-6 dark:md:border-rb-700"
       aria-labelledby="asset-read-by"
+      data-anatomy="A1.5"
     >
       <h2 id="asset-read-by" className="mb-2 text-sm text-rb-500">
         Read by
@@ -189,7 +191,7 @@ function ReadBy({
  *  card's words; a token on another chain carries that chain's glyph. */
 function RelationLine({ chain, groups }: { chain: number; groups: RelationGroup[] }) {
   return (
-    <p className="mt-3 flex flex-wrap gap-x-1.5 gap-y-1 text-sm text-rb-500" data-asset-links="">
+    <p className="mt-3 flex flex-wrap gap-x-1.5 gap-y-1 text-sm text-rb-500" data-asset-links="" data-anatomy="A1.6">
       {groups.map((g, gi) => (
         <span key={g.word}>
           {gi > 0 && <span aria-hidden="true">· </span>}
