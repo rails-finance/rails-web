@@ -34,7 +34,7 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 export const revalidate = 600;
 
 export const metadata = {
-  title: "LlamaLend Markets",
+  title: "LlamaLend markets",
   description:
     "Every LlamaLend market across Curve's factories — amplification, discounts, live rates, utilisation and each AMM's own oracle.",
 };

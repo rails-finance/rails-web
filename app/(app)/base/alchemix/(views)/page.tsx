@@ -19,7 +19,7 @@ export const maxDuration = 30;
 
 export function generateMetadata(): Metadata {
   return listingMetadata({
-    title: "Explore Alchemix Positions",
+    title: "Explore Alchemix positions",
     canonicalPath: ALCHEMIX_BASE.basePath,
     description:
       "Every Alchemix V3 position on the alUSDb line. This line has had no redemption, so each figure here is replayed from the position's own events and is exact to the wei at the block shown beside it.",

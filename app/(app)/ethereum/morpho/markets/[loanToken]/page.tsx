@@ -31,12 +31,12 @@ type Params = { params: Promise<{ loanToken: string }> };
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { loanToken } = await params;
   const token = loanToken.toLowerCase();
-  if (!ADDRESS.test(token)) return { title: "Morpho Blue Markets" };
+  if (!ADDRESS.test(token)) return { title: "Morpho Blue markets" };
   const data = await load();
   const g = data.groups.find((x) => x.loanToken.toLowerCase() === token);
   const name = g?.loanNamed ? g.loanSymbol : `${token.slice(0, 6)}…${token.slice(-4)}`;
   return {
-    title: `${name} Markets · Morpho Blue`,
+    title: `${name} markets · Morpho Blue`,
     description: `Every Morpho Blue market that lends ${name} — what it is lent against, how much, how used, and the one loan-to-value that governs each.`,
     alternates: { canonical: `/ethereum/morpho/markets/${token}` },
   };

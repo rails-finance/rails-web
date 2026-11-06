@@ -53,7 +53,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     canonicalPath: compoundArbitrumWalletHref(wallet),
     image: "dynamic",
   });
-  const title = `Compound V3 on Arbitrum Wallet ${shortSubject(wallet)}`;
+  const title = `Compound V3 on Arbitrum wallet ${shortSubject(wallet)}`;
   const description = `Every Compound V3 market on Arbitrum this wallet has touched, read live from the Comets, one card each.`;
   return {
     ...base,

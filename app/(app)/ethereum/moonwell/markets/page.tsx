@@ -34,7 +34,7 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 export const revalidate = 600;
 
 export const metadata = {
-  title: "Moonwell Markets",
+  title: "Moonwell markets",
   description:
     "Every market on Moonwell's Ethereum deployment — what it holds, how much of it is borrowed, and how far each sits below its cap.",
 };

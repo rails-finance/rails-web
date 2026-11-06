@@ -40,7 +40,7 @@ import { baseVaultHref, baseVaultRosterHref } from "@/lib/vaults/routes";
 export const revalidate = 600;
 
 export const metadata = {
-  title: "Morpho Blue Markets on Base",
+  title: "Morpho Blue markets on Base",
   description:
     "Every Morpho Blue market on Base, one row per loan token — what it is lent against, how much, how used, and the one loan-to-value that governs each market.",
   ...unlaunchedRobotsForPath("/base/morpho/markets"),

@@ -29,7 +29,7 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "PWN Loan Book",
+  title: "PWN loan book",
   description:
     "PWN's whole loan book — every peer-to-peer fixed-term loan ever struck: what stands open, what secures it, what it owes, and how the settled loans ended.",
 };
