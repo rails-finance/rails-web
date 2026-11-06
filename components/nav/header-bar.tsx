@@ -40,7 +40,7 @@ export function HeaderBar() {
           <SearchLauncher placement="header" />
         </div>
         {isHome ? <span /> : <HomeBrand />}
-        <div className="flex items-center justify-self-end">
+        <div className="flex items-center justify-self-end" data-header-cluster="">
           <ProfileMenu />
         </div>
       </div>
