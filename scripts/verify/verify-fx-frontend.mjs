@@ -22,6 +22,8 @@
 
 import { chromium } from "playwright";
 import { openPositionCards } from "./lib/position-card.mjs";
+import { openGroup } from "./lib/group-rows.mjs";
+import { openCardOnFigures } from "./lib/card-tabs.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3903";
 let pass = 0;
@@ -130,14 +132,45 @@ const terms = await json("/api/chain/fx/terms?pool=wsteth");
 
 // ── browser ─────────────────────────────────────────────────────────────────
 const browser = await chromium.launch();
-async function openAndRead(path) {
+// A page as a reader opens it: the card open, its "Collateral moved by the
+// pool" tip read first (ui-jobs 381), then every run group opened (ui-jobs 372:
+// a closed group draws no member rows) and every row opened. `closed` is the
+// text before the groups open (a run's header); `text` is the visible text and
+// then the whole text, so a card's Explanation reads while its Figures tab
+// shows. With `figures`, the Liquidated rows switch to Figures, whose ratio
+// cell reads "dust left".
+async function openAndRead(path, { figures = false } = {}) {
   const pg = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const errors = [];
   pg.on("pageerror", (e) => errors.push(String(e)));
-  await pg.goto(BASE + path, { waitUntil: "domcontentloaded", timeout: 120000 });
+  await pg.goto(BASE + path, { waitUntil: "domcontentloaded", timeout: 180000 });
   await pg.waitForTimeout(9000);
   // The position card draws closed (ui-jobs 209): open it first.
   await openPositionCards(pg);
+  // "Collateral moved by the pool" states one figure; the parts behind it are
+  // the sentence in the row's tip (ui-jobs 381), read by opening it.
+  const moved = { total: null, parts: "" };
+  const row = pg.locator('[data-panel-row="collateral-moved"]').first();
+  if (await row.count()) {
+    moved.total = ((await row.locator("dd").textContent()) ?? "").trim();
+    for (let i = 0; i < 4 && !moved.parts; i++) {
+      try {
+        await row.locator("[data-heading-tip]").first().click({ timeout: 3000 });
+        await pg.waitForSelector("[data-collateral-moved-parts]", { timeout: 3000 });
+        moved.parts = ((await pg.locator("[data-collateral-moved-parts]").first().textContent()) ?? "")
+          .replace(/\s+/g, " ")
+          .trim();
+      } catch {
+        await pg.waitForTimeout(1500);
+      }
+    }
+    await pg.keyboard.press("Escape");
+  }
+  const closed = await pg.evaluate(() => document.body.innerText);
+  for (let i = 0; i < 40; i++) {
+    const frame = pg.locator('[data-group-frame="closed"]').first();
+    if (!(await frame.count()) || !(await openGroup(pg, frame))) break;
+  }
   for (let round = 0; round < 3; round++) {
     for (const h of await pg.$$('[role="button"]:not([data-v])')) {
       try {
@@ -158,53 +191,60 @@ async function openAndRead(path) {
     await pg.waitForTimeout(4000);
   }
   await pg.waitForTimeout(5000);
-  const text = await pg.evaluate(() => document.body.innerText);
-  // "Collateral moved by the pool" states one figure; the parts behind it are
-  // the sentence in the row's tip (ui-jobs 381), read by opening it.
-  const moved = { total: null, parts: "" };
-  const row = pg.locator('[data-panel-row="collateral-moved"]').first();
-  if (await row.count()) {
-    moved.total = ((await row.locator("dd").textContent()) ?? "").trim();
-    try {
-      await row.locator("[data-heading-tip]").first().click({ timeout: 2000 });
-      await pg.waitForSelector("[data-collateral-moved-parts]", { timeout: 3000 });
-      moved.parts = ((await pg.locator("[data-collateral-moved-parts]").first().textContent()) ?? "")
-        .replace(/\s+/g, " ")
-        .trim();
-    } catch {}
-  }
+  // The whole text without the scripts: the page's data payload names fields
+  // ("socializedDebt") that no reader sees.
+  const whole = () =>
+    pg.evaluate(() => {
+      const body = document.body.cloneNode(true);
+      for (const s of body.querySelectorAll("script, style")) s.remove();
+      return body.textContent;
+    });
+  let text = `${await pg.evaluate(() => document.body.innerText)}\n${await whole()}`;
   await pg.close();
-  return { text, errors, moved };
+  // On a page whose rows were all pressed open, a card's tab strip no longer
+  // takes a press ("stuck"), so the Figures read is a fresh page's.
+  const figs = [];
+  if (figures) {
+    const fp = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+    await fp.goto(BASE + path, { waitUntil: "domcontentloaded", timeout: 180000 });
+    await fp.waitForTimeout(9000);
+    const rows = fp.locator("[data-event-id]").filter({ hasText: "Liquidated" });
+    for (let i = 0; i < (await rows.count()); i++) {
+      figs.push(await openCardOnFigures(rows.nth(i)));
+      text += `\n${(await rows.nth(i).textContent()) ?? ""}`;
+    }
+    await fp.close();
+  }
+  return { text, closed, errors, moved, figs };
 }
 
 const p249 = await openAndRead("/ethereum/fx/wsteth-249");
 check("249: no page errors", p249.errors.length === 0, p249.errors.slice(0, 2).join(" | "));
-check("249: the run row says what it holds", /6 tick rebalances/.test(p249.text));
-check(
-  "249: rebalance rows state this position's change",
-  (p249.text.match(/This position · debt\n/g) ?? []).length === 6,
-  `${(p249.text.match(/This position · debt\n/g) ?? []).length}`,
-);
+check("249: the run row says what it holds", /6 tick rebalances/.test(p249.closed));
+// Each member row's Explanation states this position's own change.
+const own249 =
+  p249.text.match(/This position’s debt went from [\d,.]+ to [\d,.]+ fxUSD and its collateral from/g) ?? [];
+check("249: rebalance rows state this position's change", new Set(own249).size === 6, `${new Set(own249).size}`);
 check(
   "249: the first hit's prose states 3,955.557 → 2,873.818 fxUSD and 90.4% → 88.0%",
   /debt went\s+from 3,955\.557 to 2,873\.818 fxUSD[\s\S]{0,120}90\.4% to 88\.0%/.test(p249.text),
 );
-check(
-  "249: the card names the lines and the trigger price",
+// The lines and the prices they trigger at, in the card's Explanation.
+const linesRe = (re, li) =>
   new RegExp(
-    `rebalancing from ${Math.round(terms.rebalanceRatio * 100)}%, liquidation from ${Math.round(terms.liquidateRatio * 100)}%`,
-  ).test(p249.text) &&
-    /88% if the min price falls to \$[\d,]+ \(−\d+\.\d%\), 95% at \$[\d,]+ \(−\d+\.\d%\)/.test(p249.text),
-);
+    `Rebalancing starts at ${re}% and liquidation at ${li}%\\. With today’s collateral and debt the position reaches ${re}% if the min price falls to \\$[\\d,]+, \\d+\\.\\d% below now, and ${li}% at \\$[\\d,]+, \\d+\\.\\d% below`,
+  );
+const LINES = linesRe(Math.round(terms.rebalanceRatio * 100), Math.round(terms.liquidateRatio * 100));
+check("249: the card names the lines and the trigger price", LINES.test(p249.text));
 check(
   "249: the USD figure and the ratio name their prices",
-  /at the min price \$[\d,]+/.test(p249.text) && /at the anchor price \$[\d,]+ per stETH/.test(p249.text),
+  /The pool judges its lines at the oracle’s min price, \$[\d,]+/.test(p249.text) &&
+    /At the oracle’s anchor price, \$[\d,]+ per stETH/.test(p249.text),
 );
 check(
   "249: the debt line splits rebalances from other positions' bad debt",
-  /moved by the pool: 1,713\.04\d? fxUSD cleared by rebalances \(3 Feb 2025\) and \+5\.7\d+ fxUSD of other positions' bad debt/.test(
-    p249.text,
-  ),
+  /1\.7K\s*cleared by rebalances \(3 Feb 2025\) and\s*\+5\.7\d*\s*of other positions' bad debt/.test(p249.text) &&
+    /rebalances cleared 1,713\.04\d? fxUSD and other positions’ bad debt added 5\.7\d+/.test(p249.text),
 );
 check("249: 'socialized' is gone from the card and rows", !/socializ/i.test(p249.text.split("LIFETIME FLOWS")[0]));
 check(
@@ -217,36 +257,43 @@ check("249: a 2026 deposit states the router's 0.3% fee", /0\.3% of the deposit 
 const p484 = await openAndRead("/ethereum/fx/wbtc-484");
 check("484: no page errors", p484.errors.length === 0, p484.errors.slice(0, 2).join(" | "));
 {
-  const m = p484.text.match(/([\d.]+) WBTC\n\$([\d,]+) at the anchor price/);
-  const a = p484.text.match(/at the anchor price \$([\d,]+) per WBTC · settled @/);
+  // The card's collateral (full figure, then USD) against the Explanation's
+  // anchor price; the card's Anchor price row names the settled block.
+  const m = p484.text.match(/\n([\d.]+) WBTC\n\$([\d,.]+)\n/);
+  const a = p484.text.match(/At the oracle’s anchor price, \$([\d,]+) per WBTC/);
   const usd = m ? Number(m[2].replace(/,/g, "")) : NaN;
   const anchor = a ? Number(a[1].replace(/,/g, "")) : NaN;
   check(
     "484: the collateral's USD is at the settled block's anchor price, the ratio's price",
-    m != null && a != null && near(usd / anchor, Number(m[1]), 0.001),
+    m != null && a != null && near(usd / anchor, Number(m[1]), 0.001) && /per WBTC · settled @/.test(p484.text),
     `${m?.[2]} ÷ ${a?.[1]} vs ${m?.[1]}`,
   );
 }
 check(
   "484: the min price is named where the lines are judged",
-  /[\d.]+% at the min price \$[\d,]+, the price the pool's lines are judged at/.test(p484.text),
+  /The pool judges its lines at the oracle’s min price, \$[\d,]+, where the ratio is [\d.]+%/.test(p484.text),
 );
-check(
-  "484: the rebalance and liquidation prices with their falls",
-  /88% if the min price falls to \$[\d,]+ \(−\d+\.\d%\), 95% at \$[\d,]+ \(−\d+\.\d%\)/.test(p484.text),
-);
+check("484: the rebalance and liquidation prices with their falls", LINES.test(p484.text));
 check(
   "484: funding apart from the rebalances, in the collateral row's tip",
   /Rebalances took 3\.5\d* WBTC and funding took 0\.\d+ WBTC/.test(p484.moved.parts),
   p484.moved.parts,
 );
-check(
-  "484: yearly funding in the card's explanation",
-  /takes about [\d.]+ WBTC a year from this collateral/.test(p484.text),
-);
+{
+  // The Explanation states the yearly funding only while the pool charges it
+  // (`terms.fundingRatio`, 0 on both pools on 6 Nov 2026).
+  const wbtc = await json("/api/chain/fx/terms?pool=wbtc");
+  const said = /takes about [\d.]+ WBTC a year from this collateral/.test(p484.text);
+  check(
+    "484: yearly funding in the card's explanation while the pool charges it",
+    wbtc.fundingRatio > 0 ? said : !said,
+    `fundingRatio ${wbtc.fundingRatio}, stated ${said}`,
+  );
+}
 check(
   "484: the run header states this position's total",
-  /7 pool-wide rebalances\nThis position lost\n3\.54\d*\nDebt repaid\n279K/.test(p484.text),
+  /279K\n3\.54\d*\n7 pool-wide rebalances/.test(p484.closed),
+  (p484.closed.match(/.*\n.*\n7 pool-wide rebalances/) ?? [""])[0].replace(/\n/g, " | "),
 );
 check(
   "484: the 6 Feb borrow names the limit order and who held the NFT",
@@ -285,11 +332,14 @@ check(
   }
   check("the pool-wide Liquidate is a row on its twelve positions", got.length === 12, got.join(","));
 }
-const p154 = await openAndRead("/ethereum/fx/wsteth-154");
+const p154 = await openAndRead("/ethereum/fx/wsteth-154", { figures: true });
 check("154: no page errors", p154.errors.length === 0, p154.errors.slice(0, 2).join(" | "));
 check(
   "154: the 19 Mar 2025 pool-wide liquidation wrote off 287.882 fxUSD",
-  /Pool-wide liquidation · liquidated this position's tick/.test(p154.text) &&
+  /Liquidated · Debt written off, 19 Mar 2025/.test(p154.text) &&
+    /ran a liquidation of the wstETH pool from its top tick down, including tick #\d+ where this position’s shares sat/.test(
+      p154.text,
+    ) &&
     /debt went from 287\.882 to 0 fxUSD/.test(p154.text),
 );
 check("154: counted among its liquidations; the call that took nothing is not", /Liquidated 3 times/.test(p154.text));
@@ -302,19 +352,22 @@ check(
 );
 check(
   "154 r3: the card names each part moved by the pool",
-  /22,667\.08\d fxUSD cleared by rebalances \(2 Feb 2025 – 3 Feb 2025\), 287\.882 fxUSD by a pool-wide liquidation that repaid 0\.028 fxUSD across the pool and wrote off the rest \(19 Mar 2025\) and \+1\.88\d fxUSD of other positions' bad debt/.test(
+  /22\.7K cleared by rebalances \(2 Feb 2025 – 3 Feb 2025\), 287\.88 by a pool-wide liquidation that repaid 0\.03\s*across the pool and wrote off the rest \(19 Mar 2025\) and \+1\.88 of other positions' bad debt/.test(
     p154.text,
-  ),
+  ) &&
+    /rebalances cleared 22,667\.08\d fxUSD, a pool-wide liquidation 287\.882, of which its keeper repaid at most 0\.028 across the pool and the rest was written off and other positions’ bad debt added 1\.88\d/.test(
+      p154.text,
+    ),
 );
 check(
   "154 r3: the empty liquidation keeps its row and says so",
   /reached position #154 with nothing left to take/.test(p154.text) &&
     /Its debt of 287\.882 fxUSD stayed/.test(p154.text),
 );
-check("154 r3: dust after the first liquidation reads 'dust left'", /dust left/.test(p154.text));
+check("154 r3: dust after the first liquidation reads 'dust left'", /dust left/.test(p154.text), p154.figs.join(","));
 
 // ── round 3: wsteth-243 ─────────────────────────────────────────────────────
-const p243 = await openAndRead("/ethereum/fx/wsteth-243");
+const p243 = await openAndRead("/ethereum/fx/wsteth-243", { figures: true });
 check("243: no page errors", p243.errors.length === 0, p243.errors.slice(0, 2).join(" | "));
 check(
   "243 r3: two liquidations counted, the rule in the tip",
@@ -326,7 +379,7 @@ check(
 );
 check(
   "243 r3: the card's debt line names each part",
-  /moved by the pool: 5,568\.94\d fxUSD cleared by rebalances \(3 Feb 2025 – 22 Jun 2025\), 355\.05\d fxUSD by redemptions \(28 Mar 2025\), 5\.54\d fxUSD written off at this position's liquidation and \+0\.16\d fxUSD of other positions' bad debt/.test(
+  /rebalances cleared 5,568\.94\d fxUSD, redemptions 355\.05\d, 5\.54\d was written off at its liquidation and other positions’ bad debt added 0\.16\d/.test(
     p243.text,
   ),
 );
@@ -336,18 +389,18 @@ check(
     p243.text,
   ),
 );
-// The Lifetime flows panel (in place of the tower since web 5052626) names each
-// part the card's debt line names, where the tower had one "Moved by the pool".
+// The Lifetime flows panel names each part the card's debt line names; its
+// how-to-read carries the segment names.
 check(
   "243 r3: the flows segments have the card's names",
-  /Cleared by rebalances\n/.test(p243.text) && /Cleared by redemptions\n/.test(p243.text),
+  /cleared debt \(Cleared by rebalances\)/.test(p243.text) && /cleared debt \(Cleared by redemptions\)/.test(p243.text),
 );
 check(
   "243 r3: same-block rebalances state the change once",
   /both in this block/.test(p243.text) && /included above/.test(p243.text),
 );
-check("243 r3: dust after liquidation 1", /dust left/.test(p243.text));
-check("243 r3: the card names the position's tick", /in tick #\d+ · find it on the pools page/.test(p243.text));
+check("243 r3: dust after liquidation 1", /dust left/.test(p243.text), p243.figs.join(","));
+check("243 r3: the card names the position's tick", /\n#\d+ · find it on the pools page/.test(p243.text));
 // The head is words (decision 0045): a tick's or the pool's totals are in the
 // Explanation, none on the row.
 check(
@@ -357,10 +410,27 @@ check(
 
 // ── round 3: listing price, path, pools highlight ───────────────────────────
 const pList = await openAndRead("/ethereum/fx");
-check(
-  "listing r3: rows value collateral at the anchor price, block named",
-  /at the anchor price \$[\d,]+ · oracle @/.test(pList.text) && /stETH \$[\d,]+ anchor @ [\d,]+/.test(pList.text),
-);
+{
+  // The pool header names its anchor price and block; a row's USD is its
+  // collateral at that price.
+  const anchors = Object.fromEntries(
+    [...pList.text.matchAll(/(stETH|WBTC) \$([\d,]+) anchor @ [\d,]+/g)].map((m) => [
+      m[1],
+      Number(m[2].replace(/,/g, "")),
+    ]),
+  );
+  const rows = [...pList.text.matchAll(/\n([\d.]+) (WBTC|stETH)\n\$([\d,.]+)\n/g)].slice(0, 6);
+  const off = rows.filter((m) => {
+    const px = anchors[m[2]];
+    const usd = Number(m[3].replace(/,/g, ""));
+    return !(px > 0) || Math.abs(Number(m[1]) * px - usd) > Math.max(0.01, usd * 0.0005);
+  });
+  check(
+    "listing r3: rows value collateral at the anchor price, block named",
+    anchors.stETH > 0 && anchors.WBTC > 0 && rows.length > 0 && off.length === 0,
+    `anchors ${JSON.stringify(anchors)}; ${rows.length} rows, off: ${off.map((m) => `${m[1]} ${m[2]} $${m[3]}`).join("; ")}`,
+  );
+}
 {
   const r = await fetch(BASE + "/ethereum/fx/positions/wsteth-243", { redirect: "manual" });
   check(
@@ -396,7 +466,7 @@ check(
 {
   // wsteth-243's tick as its card states it today; a rebalance of the tick
   // moves the position to another one.
-  const tick243 = p243.text.match(/in tick\s*#(\d+)/)?.[1];
+  const tick243 = p243.text.match(/\n#(\d+) · find it on the pools page/)?.[1];
   check("pools r3: wsteth-243's card names its tick", tick243 != null);
   const pg = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
   await pg.goto(BASE + `/ethereum/fx/pools?pool=wsteth&tick=${tick243}`, { waitUntil: "networkidle", timeout: 120000 });
@@ -495,9 +565,12 @@ check(
     "1801 r4 P2: the card names the holder once",
     /Held by 0xc32b…5fa3 since 4 Aug 2026; opened by 0xc563…b9cd\./.test(p.text),
   );
+  // The position closed on 16 Oct 2026 (block 26,204,855): its card is the
+  // closed card, which states the holder line and the row counts, and none of
+  // the redemption line; the transfer row names both holders.
   check(
-    "1801 r4 P2: the ownership row names the previous holder's span",
-    /held it from 19 Feb 2026 to 4 Aug 2026/.test(p.text),
+    "1801 r4 P2: the ownership row names the previous holder and the new one",
+    /Position #1801 changed hands: it moved from 0xc563…b9cd to 0xc32b…5fa3\./.test(p.text),
   );
   check(
     "1801 r4 P3: rows name the caller as the f(x) router and the holder who called it",
@@ -514,22 +587,24 @@ check(
         p.text,
       ),
   );
-  check("1801 r4 P5: row counts by kind", /carries 18 rows: 17 transactions and 1 ownership transfer\./.test(p.text));
-  check(
-    "1801 r4 P7: redemption line",
-    /redemption is (closed|open) now[^\n]*highest-ratio ticks first, and \d+ debt ticks? sits? above the position's tick/.test(
-      p.text,
-    ),
-  );
+  {
+    const rows = 1 + ops.length;
+    check(
+      "1801 r4 P5: row counts by kind",
+      new RegExp(`carries ${rows} rows: ${ops.length} transactions and 1 ownership transfer\\.`).test(p.text),
+      `${ops.length} operate rows`,
+    );
+  }
+  check("1801 r4 P7: a closed card states no redemption line", !/highest-ratio ticks first/.test(p.text));
   check(
     "1801 r4 P9: one name for the transfer",
     /Transferred\s*·\s*to\s*0x/.test(p.text) && !/Ownership Transfer/.test(p.text),
   );
-  // The flows panel's key: funding is the pool's one move here (the tower's
-  // note said "Moved by the pool: none" of rebalances and redemptions).
+  // The flows panel's how-to-read: funding is the pool's one move here.
   check(
     "1801 r4 P9: the flows key names funding and no rebalance or redemption",
-    /\nFunding\n/.test(p.text) && !/Taken by rebalances|Taken by redemptions/.test(p.text),
+    /Funding, the collateral the pool takes as its funding charge/.test(p.text) &&
+      !/Taken by rebalances|Taken by redemptions/.test(p.text),
   );
 
   const t1 = await json("/api/fx/position/wsteth/1/timeline");
