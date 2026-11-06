@@ -31,14 +31,15 @@ export function HeaderBar() {
       <div className="max-w-7xl mx-auto grid grid-cols-[1fr_auto_1fr] items-center py-4 px-4 md:px-6">
         {/* Left: the sidebar toggle, which opens the wallet panel (H15.1,
             ui-jobs 514); the panel's top row draws its open glyph in the same
-            place, closing it. Centre: the Rails mark and name, a link home.
+            place, closing it. Centre: the Rails mark and name, a link home, on
+            every page but home, whose hero carries them.
             Right: H20 alone, the theme switch and the way into /start being in
             its menu. Below md the beta pill is in the footer
             (components/nav/phone-beta.tsx). */}
         <div className="justify-self-start">
           <SearchLauncher placement="header" />
         </div>
-        <HomeBrand />
+        {isHome ? <span /> : <HomeBrand />}
         <div className="flex items-center justify-self-end">
           <ProfileMenu />
         </div>

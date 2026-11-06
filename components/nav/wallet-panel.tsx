@@ -24,7 +24,6 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { HomeBrand } from "@/components/nav/home-brand";
 import { ExplorerChooser, PANEL_HEADING } from "@/components/nav/explorer-chooser";
 import {
   FrontDoorSearch,
@@ -223,23 +222,18 @@ export function WalletPanel() {
             so the row restates it (ui-jobs 514): the toggle's open glyph in
             the toggle's place (16px in; the launcher's top, measured as the
             panel opens, under the beta strip too), so the tap that opened the
-            panel closes it in the same spot, and the mark and name centred, a
-            link home. From md the rail's mark goes home and its toggle closes
+            panel closes it in the same spot. From md the rail's mark goes home and its toggle closes
             the panel. */}
-        <div
-          className="grid shrink-0 grid-cols-[1fr_auto_1fr] items-center px-4 md:hidden"
-          style={{ paddingTop: launcherTop }}
-        >
+        <div className="flex shrink-0 items-center px-4 md:hidden" style={{ paddingTop: launcherTop }}>
           <button
             type="button"
             onClick={close}
-            className="relative flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center justify-self-start rounded-lg text-foreground focus-ring"
+            className="relative flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground focus-ring"
             aria-label="Close search and explorers"
             data-wallet-panel-close=""
           >
             <SidebarToggleGlyph open />
           </button>
-          <HomeBrand onClick={close} panel />
         </div>
         {/* Pinned at the top: the search under its heading, the field with no
             placeholder (ui-jobs 514). From md the heading's line centres on the

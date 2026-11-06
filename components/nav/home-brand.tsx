@@ -1,24 +1,26 @@
 "use client";
 
-// The Rails mark and name, centred in the phone header bar (H2) and in the
-// wallet panel's top row over it, a link home (ui-jobs 514).
+// The Rails mark and name, centred in the phone header bar (H2) on every page
+// but home, a link home (ui-jobs 514). Drawn as the hero's h1 is: the mark in
+// cap units on the name's baseline, all bars and the name at 85%, so the two
+// line up at any zoom.
 
 import Link from "next/link";
 
-import { RailsMark } from "@/components/nav/rails-mark";
+import { MARK_CAP_STYLE, RailsMark } from "@/components/nav/rails-mark";
 
-export function HomeBrand({ onClick, panel }: { onClick?: () => void; panel?: boolean }) {
+export function HomeBrand() {
   return (
     <Link
       href="/"
-      onClick={onClick}
-      className="flex h-[38px] items-center gap-2 rounded-lg px-1 text-foreground focus-ring"
+      className="flex h-[38px] items-center rounded-lg px-1 text-foreground focus-ring"
       aria-label="Rails home"
       data-home-brand=""
-      data-wallet-panel-home={panel ? "" : undefined}
     >
-      <RailsMark size={26} />
-      <span className="text-xl font-medium tracking-tight">Rails</span>
+      <span className="whitespace-nowrap text-[22px] font-semibold leading-none tracking-tighter">
+        <RailsMark size={22} className="inline-block" style={MARK_CAP_STYLE} uniform />
+        <span className="opacity-[0.85]">Rails</span>
+      </span>
     </Link>
   );
 }
