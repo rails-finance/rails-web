@@ -150,7 +150,7 @@
   "rosters": {
     "browse": {
       "question": "Which protocol?",
-      "line": "Type to narrow the list. Each opens on that explorer."
+      "line": "The explorers by chain. Each opens on that explorer."
     },
     "find": {
       "question": "Which protocol?",
