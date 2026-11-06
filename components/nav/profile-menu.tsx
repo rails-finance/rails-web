@@ -205,7 +205,6 @@ export function ProfileMenu() {
     };
   }, [open, close]);
 
-
   return (
     <>
       <button
