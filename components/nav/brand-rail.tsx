@@ -5,7 +5,10 @@
 // as the page scrolls. The Rails mark at the top goes home; under it the
 // sidebar toggle (H15.1, ui-jobs 514) opens the wallet panel, which slides out
 // from beneath the rail with the search and the explorer chooser, and closes it
-// from the same place. The beta pill is at the foot.
+// from the same place. The beta pill is at the foot. A press anywhere else on
+// the rail does what the toggle does, the cursor an arrow pointing the way the
+// panel will move (e-resize to open, w-resize to close; Miles, 6 Nov 2026):
+// a pointer convenience, the toggle stays the keyboard's control.
 //
 // IT IS A SURFACE, NOT A MARGIN (68): `bg-raised` is the same tone the cards
 // and panels take, so the strip reads as chrome the page sits beside rather
@@ -20,9 +23,11 @@
 // sixth of the page. HeaderBar draws the mark and its chevron there.
 
 import Link from "next/link";
+import type { MouseEvent } from "react";
 
 import { RailsMark } from "@/components/nav/rails-mark";
 import { SearchLauncher } from "@/components/shared/front-door-search";
+import { toggleWalletPanel, useWalletPanelOpen } from "@/components/nav/wallet-panel";
 
 /** The release-stage pill at the very foot of the rail
  *  (Miles, 2026-09-25). Drawn as a label coming out of the browser's left
@@ -40,6 +45,13 @@ function BetaPill() {
 }
 
 export function BrandRail() {
+  const panelOpen = useWalletPanelOpen();
+  // The rail's own surface toggles the panel; its links and buttons keep
+  // their own presses.
+  const onRail = (e: MouseEvent<HTMLElement>) => {
+    if ((e.target as HTMLElement).closest("a, button")) return;
+    toggleWalletPanel(e.currentTarget.querySelector<HTMLElement>('[data-anatomy="H15.1"]'));
+  };
   return (
     <>
       {/* Fixed, so the mark holds the top of the viewport and the foot cluster
@@ -51,7 +63,10 @@ export function BrandRail() {
       <aside
         aria-label="Rails"
         data-anatomy="H1"
-        className="fixed inset-y-0 left-0 z-40 hidden w-14 flex-col items-center justify-between bg-raised pt-4 md:flex"
+        onClick={onRail}
+        className={`fixed inset-y-0 left-0 z-40 hidden w-14 flex-col items-center justify-between bg-raised pt-4 md:flex ${
+          panelOpen ? "cursor-w-resize" : "cursor-e-resize"
+        }`}
       >
         {/* The Rails mark goes home and holds its place while the panel opens
             beside it; the toggle under it opens and closes the panel

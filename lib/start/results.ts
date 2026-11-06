@@ -7,15 +7,16 @@
 // options carry it; a liquidation filter when the family's listing dimensions
 // carry that param and value; a collateral when the family's asset catalog
 // states it. Where no catalog states the collateral, the answer is written in
-// start-tree.json with its note, and an explorer neither source names is left
-// out. Names explorers only: no counts, no ranking (chain-truth charter).
+// start-tree.json with its note: the facet values per symbol read from Rails's
+// index on a stated date, the one collateral an explorer takes, or neither (the
+// row opens the whole listing). An explorer neither source names is left out. Names explorers only: no counts, no ranking (chain-truth charter).
 // Rows run in chain order, then roster order.
 
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
 import { LAUNCHED_PROTOCOLS, type ProtocolEntry } from "@/lib/shared/protocols";
-import { TREE, inGroup, type GroupKey, type ResultsKey } from "@/lib/start/tree";
+import { TREE, inGroup, type GroupKey, type ResultsKey, type WrittenCollateral } from "@/lib/start/tree";
 
 import { AAVE_V3_SORT_OPTIONS, aaveV3ListDimensions } from "@/lib/aave-v3/list-filter-dimensions";
 import { AAVE_V3_BASE_SORT_OPTIONS, aaveV3BaseListDimensions } from "@/lib/aave-v3-base/list-filter-dimensions";
@@ -65,6 +66,7 @@ import { COMPOUND_V2_FILTER_SYMBOLS } from "@/lib/compound-v2/asset-catalog";
 import { FX_POOLS, FX_POOL_KEYS } from "@/lib/fx/asset-catalog";
 import { AAVE_V3_ARBITRUM_SYMBOL_BY_ADDR } from "@/lib/aave-v3-arbitrum/asset-catalog";
 import { COMPOUND_ARBITRUM_DEPLOYMENT } from "@/lib/compound-arbitrum/asset-catalog";
+import { COLLATERAL_PARAM as COMPOUND_ARBITRUM_COLLATERAL_PARAM } from "@/lib/compound-arbitrum/comet-cards";
 import { MORPHO_ARBITRUM_MARKETS } from "@/lib/morpho-arbitrum/market-catalog";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,13 +107,19 @@ const LISTINGS: Record<string, { dims: () => AnyDims; sorts: SortOption[] }> = {
   spark: { dims: () => sparkListDimensions(), sorts: SPARK_SORT_OPTIONS },
 };
 
+/** The facet params of the in-memory listings LISTINGS leaves out (their
+ *  dimensions live in a client component): the Arbitrum positions pages. */
+const MEMORY_FACETS: Record<string, string[]> = {
+  "compound-v3-arbitrum": [COMPOUND_ARBITRUM_COLLATERAL_PARAM],
+};
+
 /** The collateral an explorer's catalog states, and the listing facet that
- *  takes it (`param`, with `value` mapping a symbol to the facet's value). */
+ *  takes it (`param`, with `values` mapping a symbol to the facet's values). */
 interface CatalogCollateral {
   symbols: string[];
   source: string;
   param?: string;
-  value?: (symbol: string) => string;
+  values?: (symbol: string) => string[];
 }
 
 const symbolsOf = (rows: { symbol: string }[]) => rows.map((r) => r.symbol);
@@ -140,6 +148,7 @@ const CATALOGS: Record<string, CatalogCollateral> = {
   "aave-v3": {
     symbols: symbolsOf(AAVE_V3_CATALOG.filter((a) => (a.lt ?? 0) > 0)),
     source: "lib/aave-v3/asset-catalog.ts, the reserves with a liquidation threshold above zero",
+    param: "supply",
   },
   spark: {
     symbols: symbolsOf(SPARK_CATALOG.filter((a) => (a.lt ?? 0) > 0 && !a.frozen)),
@@ -160,7 +169,7 @@ const CATALOGS: Record<string, CatalogCollateral> = {
     symbols: FX_POOL_KEYS.map((k) => FX_POOLS[k].tokenSymbol),
     source: "lib/fx/asset-catalog.ts, the pools",
     param: "pool",
-    value: (symbol) => FX_POOL_KEYS.find((k) => FX_POOLS[k].tokenSymbol === symbol) ?? symbol,
+    values: (symbol) => [FX_POOL_KEYS.find((k) => FX_POOLS[k].tokenSymbol === symbol) ?? symbol],
   },
   "aave-v3-arbitrum": {
     symbols: Object.values(AAVE_V3_ARBITRUM_SYMBOL_BY_ADDR),
@@ -169,6 +178,7 @@ const CATALOGS: Record<string, CatalogCollateral> = {
   "compound-v3-arbitrum": {
     symbols: COMPOUND_ARBITRUM_DEPLOYMENT.markets.flatMap((m) => (m.collateral ?? []).map((c) => c.symbol)),
     source: "lib/compound-arbitrum/asset-catalog.ts, each Comet's stated collateral",
+    param: COMPOUND_ARBITRUM_COLLATERAL_PARAM,
   },
   "morpho-arbitrum": {
     symbols: MORPHO_ARBITRUM_MARKETS.map((m) => m.collateralSymbol).filter((s): s is string => !!s),
@@ -186,6 +196,8 @@ export interface ResultRow {
   detail?: string;
   /** The collateral symbols matched, drawn as tokens (a borrow row). */
   symbols?: string[];
+  /** The explorer takes this one collateral, so its whole listing answers. */
+  only?: boolean;
   /** Where the answer came from: a file in the code, or the tree's note. */
   source: string;
 }
@@ -260,31 +272,59 @@ function liquidated(): ResultRow[] {
   return rows;
 }
 
+/** A start-tree.json entry read as a catalog: its symbols, and the facet
+ *  values each one sends. No symbols when the entry names no facet. */
+function writtenCatalog(written: WrittenCollateral): CatalogCollateral {
+  const values = written.values ?? {};
+  return {
+    symbols: Object.keys(values),
+    source: written.note,
+    param: written.param,
+    values: (symbol) => values[symbol] ?? [symbol],
+  };
+}
+
 function borrow(group: GroupKey): ResultRow[] {
   const rows: ResultRow[] = [];
   for (const entry of candidates()) {
-    const catalog = CATALOGS[entry.id];
-    if (catalog) {
-      const matched = [...new Set(catalog.symbols.filter((s) => inGroup(group, s)))];
-      if (matched.length === 0) continue;
-      const canFilter = catalog.param && LISTINGS[entry.id] && dimsOf(entry.id).some((d) => d.param === catalog.param);
-      const value = catalog.value ?? ((s: string) => s);
+    const written = TREE.collateral[entry.id];
+    if (written && !written.groups.includes(group)) continue;
+    if (written?.only) {
       rows.push({
         entry,
-        href: canFilter
-          ? withParams(entry, { [catalog.param!]: [...new Set(matched.map(value))].join(",") })
-          : entry.listingHref,
-        applied: !!canFilter,
-        detail: matched.join(", "),
-        symbols: matched,
-        source: catalog.source,
+        href: entry.listingHref,
+        applied: true,
+        detail: written.only,
+        symbols: [written.only],
+        only: true,
+        source: written.note,
       });
       continue;
     }
-    const written = TREE.collateral[entry.id];
-    if (written?.groups.includes(group)) {
-      rows.push({ entry, href: entry.listingHref, applied: false, source: written.note });
+    const catalog = CATALOGS[entry.id] ?? (written ? writtenCatalog(written) : null);
+    if (!catalog) continue;
+    const matched = [...new Set(catalog.symbols.filter((s) => inGroup(group, s)))];
+    if (matched.length === 0) {
+      // A note that names the group without a value for it: the whole listing.
+      if (written) rows.push({ entry, href: entry.listingHref, applied: false, source: written.note });
+      continue;
     }
+    const canFilter =
+      catalog.param &&
+      (LISTINGS[entry.id]
+        ? dimsOf(entry.id).some((d) => d.param === catalog.param)
+        : MEMORY_FACETS[entry.id]?.includes(catalog.param));
+    const values = catalog.values ?? ((s: string) => [s]);
+    rows.push({
+      entry,
+      href: canFilter
+        ? withParams(entry, { [catalog.param!]: [...new Set(matched.flatMap(values))].join(",") })
+        : entry.listingHref,
+      applied: !!canFilter,
+      detail: matched.join(", "),
+      symbols: matched,
+      source: catalog.source,
+    });
   }
   return rows;
 }

@@ -17,6 +17,10 @@
 //     thing to a server that predates the unit bounds.
 //   • History    — Liquidated before / Never liquidated (wasLiquidated).
 //   • Vault kind — Standard pairs (T1) / Smart vaults (DEX-share legs).
+//   • Supplying  — the vault's supply token by symbol (`supply` → supplyAssets,
+//     matched without case). Fluid has no fixed vault list, so the facet offers
+//     only what the URL selected (/start's Borrowing results link here) and
+//     shows only while something is.
 //   • Transactions — a range over the position's distinct transactions
 //     (`minTx` / `maxTx`, inclusive; lib/shared/transactions-dimension.ts).
 //   • Owner search (address → the `wallet` param; a bare integer → the `nft`
@@ -63,6 +67,8 @@ export interface FluidListFilters extends BaseListFilters {
   vaultKind: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
+  /** Supply-token symbols (multi, OR). URL param `supply`. */
+  supplying: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -79,6 +85,7 @@ export const FLUID_LIST_DEFAULTS: FluidListFilters = {
   liquidations: [],
   vaultKind: [],
   tx: [],
+  supplying: [],
 };
 
 export const FLUID_SORT_OPTIONS: SortOption[] = [
@@ -103,7 +110,9 @@ const VAULT_KIND_OPTIONS: FilterOptionDef[] = [
   { value: "smart", label: "Smart vaults" },
 ];
 
-export function fluidListDimensions(): SerializableDimension<FluidListFilters>[] {
+export function fluidListDimensions(
+  filters: FluidListFilters = FLUID_LIST_DEFAULTS,
+): SerializableDimension<FluidListFilters>[] {
   return [
     {
       id: "status",
@@ -141,6 +150,17 @@ export function fluidListDimensions(): SerializableDimension<FluidListFilters>[]
       options: VAULT_KIND_OPTIONS,
       get: (f) => f.vaultKind,
       set: (f, v) => ({ ...f, vaultKind: v }),
+    },
+    {
+      id: "supplying",
+      label: "Supplying",
+      group: "Assets",
+      cardinality: "multi",
+      param: "supply",
+      options: filters.supplying.map((s) => ({ value: s, label: s })),
+      get: (f) => f.supplying,
+      set: (f, v) => ({ ...f, supplying: v }),
+      available: (f) => f.supplying.length > 0,
     },
     {
       id: "liquidations",
@@ -181,6 +201,7 @@ export function fluidFiltersToFetchParams(filters: FluidListFilters, page: numbe
     ...sizeBounds(filters, { debt: "unit" }),
     wasLiquidated: liq === "liquidated" ? true : liq === "never" ? false : undefined,
     vaultKind: kind === "t1" || kind === "smart" ? kind : undefined,
+    supplyAssets: filters.supplying.length > 0 ? filters.supplying : undefined,
     ...transactionBounds(filters.tx),
     sortBy: SORT_VALUES.has(filters.sortBy)
       ? (filters.sortBy as NonNullable<FetchFluidPositionsParams["sortBy"]>)

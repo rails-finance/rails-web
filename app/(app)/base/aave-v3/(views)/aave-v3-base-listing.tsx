@@ -52,7 +52,7 @@ export function AaveV3BaseListing({ initialItems, initialTotal, initialKey, init
       hrefFor={(p) => `/base/aave-v3/${p.wallet}`}
       keyFor={(p) => p.wallet}
       strategy={serverStrategy<AaveV3PositionRow, AaveV3ListFilters>({
-        dimensions: aaveV3BaseListDimensions(),
+        dimensions: (f) => aaveV3BaseListDimensions(f),
         itemsPerPage: AAVE_V3_ITEMS_PER_PAGE,
         fetchPage: (filters, page) =>
           fetchAaveV3Positions(aaveV3BaseFiltersToFetchParams(filters, page)).then((r) => ({

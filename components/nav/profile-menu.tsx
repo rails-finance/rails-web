@@ -20,7 +20,8 @@
 // page wherever the control sits (H2 below md, the column's corner from md;
 // components/nav/rail-shell.tsx). Escape, a press outside and a lookup close
 // it, and focus returns to the control; the arrow keys, Home and End move
-// through its items. The dropdown has no animation.
+// through its items. The dropdown drops in with a small bounce
+// (globals.css `.profile-drop`, the wallet panel's spring timing).
 
 import { CHROME_HOVER, CHROME_HOVER_ON } from "@/components/nav/chrome-hover";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
@@ -270,7 +271,7 @@ export function ProfileMenu() {
               className={`fixed z-[var(--z-popover)] border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
                 place.phone
                   ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-2xl border-x-0 border-b-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
-                  : "w-80 rounded-xl"
+                  : "profile-drop w-80 rounded-xl"
               }`}
               style={place.phone ? undefined : { top: place.top, right: place.right }}
             >
