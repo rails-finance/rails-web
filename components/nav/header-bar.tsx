@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
+import { HomeBrand } from "@/components/nav/home-brand";
 import { ProfileMenu } from "@/components/nav/profile-menu";
 import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
 
@@ -27,14 +28,19 @@ export function HeaderBar() {
       // rail and the bar is the only chrome.
       className={`${isHome ? "absolute inset-x-0 top-0 z-40" : "relative z-40 mb-2"} md:hidden`}
     >
-      <div className="max-w-7xl mx-auto py-4 px-4 md:px-6 flex items-center">
-        {/* Left: the Rails mark with a chevron, which opens the wallet panel
-            (H15.1, ui-jobs 509); the panel's top row draws it pointing left in
-            the same place, closing it, and links Home. Right: H20 alone, the
-            theme switch and the way into /start being in its menu. Below md
-            the beta pill is in the footer (components/nav/phone-beta.tsx). */}
-        <SearchLauncher placement="header" />
-        <div className="ml-auto flex items-center">
+      <div className="max-w-7xl mx-auto grid grid-cols-[1fr_auto_1fr] items-center py-4 px-4 md:px-6">
+        {/* Left: the sidebar toggle, which opens the wallet panel (H15.1,
+            ui-jobs 514); the panel's top row draws its open glyph in the same
+            place, closing it. Centre: the Rails mark and name, a link home, on
+            every page but home, whose hero carries them.
+            Right: H20 alone, the theme switch and the way into /start being in
+            its menu. Below md the beta pill is in the footer
+            (components/nav/phone-beta.tsx). */}
+        <div className="justify-self-start">
+          <SearchLauncher placement="header" />
+        </div>
+        {isHome ? <span /> : <HomeBrand />}
+        <div className="flex items-center justify-self-end" data-header-cluster="">
           <ProfileMenu />
         </div>
       </div>

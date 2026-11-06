@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, type CSSProperties } from "react";
 import { Check } from "lucide-react";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
-import { RailsMark } from "@/components/nav/rails-mark";
+import { MARK_CAP_STYLE, RailsMark } from "@/components/nav/rails-mark";
 
 // The inline blocking script in app/layout.tsx flips `data-hero-seen` on <html>
 // before paint on hard loads, but it can't run on App Router soft navigations.
@@ -61,7 +61,7 @@ export function HomeHero() {
           opacity. The mark is
           sized in cap units so its right-hand leg spans the cap height, top on
           the cap line and bottom on the baseline (Miles, 4 Nov 2026); the long
-          stroke reaches a little past both (MARK_STYLE). At every width the line
+          stroke reaches a little past both (MARK_CAP_STYLE). At every width the line
           is a fixed share of the search input's width: the wrapper takes the
           search wrapper's width and padding, so 100cqw is the input's width, and
           the h1's size is a share of it (TITLE_CQW below). */}
@@ -72,7 +72,7 @@ export function HomeHero() {
           data-hero-title=""
         >
           <span className="whitespace-nowrap text-foreground">
-            <RailsMark size={60} className="inline-block" style={MARK_STYLE} uniform />
+            <RailsMark size={60} className="inline-block" style={MARK_CAP_STYLE} uniform />
             <span className="opacity-[0.85]">Rails</span>
           </span>{" "}
           <span className="whitespace-nowrap text-[var(--marketing)] dark:text-rb-500">Explorers</span>
@@ -107,27 +107,6 @@ export function HomeHero() {
     </section>
   );
 }
-
-// The mark against the h1's type: the right-hand leg of RailsMark (viewBox
-// 0 0 200 200), from the top of its upper segment (y 47.853) to the foot of the
-// lower step (y 142.388), is one cap height. The negative block margins leave a
-// margin box of exactly that leg, so the line box ignores the rest of the mark
-// and baseline alignment puts the leg's foot on the baseline. The negative left
-// margin starts the box at the long stroke's ink (x 20.295), so the line's
-// measured width runs from ink to ink.
-const STROKE_LEFT = 20.295;
-const STROKE_TOP = 47.853;
-const STROKE_BOTTOM = 142.388;
-const CAP = STROKE_BOTTOM - STROKE_TOP;
-const MARK_STYLE = {
-  width: `${200 / CAP}cap`,
-  height: `${200 / CAP}cap`,
-  marginTop: `${-STROKE_TOP / CAP}cap`,
-  marginBottom: `${-(200 - STROKE_BOTTOM) / CAP}cap`,
-  marginLeft: `${-STROKE_LEFT / CAP}cap`,
-  marginRight: "0.16em",
-  verticalAlign: "baseline",
-} as const;
 
 // The h1's size at every width, as a share of the search input's width (100cqw),
 // set on the h1 as --hero-title-size so it can be tuned live. The line's width
