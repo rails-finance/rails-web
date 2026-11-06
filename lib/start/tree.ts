@@ -51,6 +51,18 @@ interface Group {
   coins?: { question: string; symbols: string[] };
 }
 
+/** An explorer's collateral where no code catalog states it: the groups it
+ *  answers, the note saying where the answer was read, and either the one
+ *  collateral it takes (`only`) or the listing facet (`param`) with the values
+ *  it takes per symbol. */
+export interface WrittenCollateral {
+  groups: GroupKey[];
+  note: string;
+  only?: string;
+  param?: string;
+  values?: Record<string, string[]>;
+}
+
 interface Tree {
   groups: Record<GroupKey, Group>;
   nodes: Record<string, StartNode>;
@@ -64,7 +76,7 @@ interface Tree {
     };
     liquidated: { heading: string; line: string; history: { param: string; value: string }[]; status: string };
   };
-  collateral: Record<string, { groups: GroupKey[]; note: string }>;
+  collateral: Record<string, WrittenCollateral>;
   notAnswered: Record<string, string>;
 }
 

@@ -153,8 +153,9 @@ async function Results({ results, group }: { results: ResultsKey; group?: GroupK
   );
 }
 
-/** A result row's line: the collateral it matched, as tokens, or the sort's
- *  label; and, where its listing cannot take the answer, why it opens whole. */
+/** A result row's line: the collateral it matched, as tokens ("ETH only" where
+ *  the explorer takes one), or the sort's label; and, where its listing cannot
+ *  take the answer, why it opens whole. */
 function ResultLine({ row, results }: { row: ResultRow; results: ResultsKey }) {
   const whole = row.applied ? null : UNFILTERED[results];
   if (row.symbols && row.symbols.length > 0)
@@ -163,7 +164,7 @@ function ResultLine({ row, results }: { row: ResultRow; results: ResultsKey }) {
         {row.symbols.map((sym) => (
           <span key={sym} className="inline-flex items-center gap-1">
             <TokenChipIcon symbol={sym} size={14} filterable={false} untitled />
-            {sym}
+            {row.only ? `${sym} only` : sym}
           </span>
         ))}
         {whole && <span className="basis-full">{whole}</span>}

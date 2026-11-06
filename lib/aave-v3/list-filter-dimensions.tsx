@@ -16,6 +16,9 @@
 //     the old hasDebt / noDebt flags, which say the same thing to a server that
 //     predates the USD bounds.
 //   • History — Liquidated before (hasLiquidations).
+//   • Supplying — per-asset facet over the AAVE_V3_CATALOG reserves; chips carry
+//     symbols, the proxy maps them to addresses (supplyAssets) and the backend
+//     matches a supply balance above zero within the position.
 //   • Transactions — a range over tx_count (`minTx` / `maxTx`, inclusive), the
 //     distinct transactions on the position (lib/shared/transactions-dimension.ts).
 // The Status facet arrived with mv_aave_v3_wallets (mig 076), the (wallet,market)-grain
@@ -27,13 +30,13 @@
 // debt_usd/collateral_usd on mv_aave_v3_wallet_markets — a ranking aid, never
 // displayed; the card's HF/USD stays chain-truth/overlay-derived, and is null
 // unless the periodic chain-overlay snapshot covers this wallet).
-// Per-asset Supplying/Borrowing facets are honored server-side (the proxy maps symbols
-// → addresses off AAVE_V3_CATALOG) and can graduate later.
+// A Borrowing facet is honored server-side too (borrowAssets) and can graduate later.
 
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
 import type { SerializableDimension, BaseListFilters } from "@/lib/shared/list-filter";
+import { AAVE_V3_CATALOG } from "@/lib/aave-v3/asset-catalog";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
 import type {
   AaveV3DebtFacet,
@@ -69,6 +72,8 @@ export interface AaveV3ListFilters extends BaseListFilters {
   liquidations: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
+  /** Reserve symbols the position supplies (multi, OR). URL param `supply`. */
+  supplying: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -86,6 +91,7 @@ export const AAVE_V3_LIST_DEFAULTS: AaveV3ListFilters = {
   coll: [],
   liquidations: [],
   tx: [],
+  supplying: [],
 };
 
 // Values match Liquity V2's (lib/liquity-v2/list-filter-dimensions.tsx) so the
@@ -116,6 +122,12 @@ const AAVE_V3_SIZE_NOTE = "At the latest indexed price per asset, as of the list
 export const BASE_LENDING_SIZE_NOTE = "At the Pool's oracle at the pinned block.";
 
 const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: "liquidated", label: "Liquidated before" }];
+
+/** One chip per catalog reserve symbol, across the three Pools. */
+const SUPPLY_OPTIONS: FilterOptionDef[] = [...new Set(AAVE_V3_CATALOG.map((a) => a.symbol))].map((s) => ({
+  value: s,
+  label: s,
+}));
 
 /** `txTop` is the Transactions slider's top and `sizeNote` the Size panel's
  *  price line; the Base lanes pass their own. */
@@ -169,6 +181,16 @@ export function aaveV3ListDimensions(
       set: (f, v) => ({ ...f, liquidations: v }),
       chipLabel: () => "Liquidated before",
     },
+    {
+      id: "supplying",
+      label: "Supplying",
+      group: "Assets",
+      cardinality: "multi",
+      param: "supply",
+      options: SUPPLY_OPTIONS,
+      get: (f) => f.supplying,
+      set: (f, v) => ({ ...f, supplying: v }),
+    },
     transactionsDimension<AaveV3ListFilters>({
       get: (f) => f.tx,
       set: (f, tx) => ({ ...f, tx }),
@@ -196,6 +218,7 @@ export function aaveV3FiltersToFetchParams(filters: AaveV3ListFilters, page: num
     debt: debtFacet(filters.debt),
     ...usdBounds(filters),
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
+    supplyAssets: filters.supplying.length > 0 ? filters.supplying : undefined,
     ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as AaveV3PositionSort,
     sortOrder: filters.sortOrder,

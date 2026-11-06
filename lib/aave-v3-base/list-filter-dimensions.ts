@@ -5,6 +5,12 @@
 // collateral size, liquidation history) is the same question asked of the
 // same Pool interface, so the dimensions are the Aave V3 ones with that one
 // removed, and the fetch params are the Aave V3 ones pointed at the Base route.
+//
+// Supplying keeps Ethereum's `supply` param and symbol chips, but this lane
+// writes no reserve list (lib/aave-v3-base/asset-catalog.ts), so the facet
+// offers only what the URL selected and shows only while something is. The
+// fetch maps each symbol to its Base address (lib/shared/token-addresses.base.ts),
+// which is what the route's `supplyAssets` takes.
 
 import {
   aaveV3ListDimensions,
@@ -15,6 +21,7 @@ import {
 } from "@/lib/aave-v3/list-filter-dimensions";
 import type { FetchAaveV3PositionsParams, AaveV3PositionSort } from "@/lib/api/fetch-aave-v3-positions";
 import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filter-bar/sort-control";
+import { BASE_TOKEN_ADDRESSES } from "@/lib/shared/token-addresses.base";
 
 export const AAVE_V3_BASE_POSITIONS_ROUTE = "/api/aave-v3-base/positions";
 
@@ -22,8 +29,27 @@ export const AAVE_V3_BASE_POSITIONS_ROUTE = "/api/aave-v3-base/positions";
  *  listed account (1,784,177 transactions, 16 Oct 2026). */
 const AAVE_V3_BASE_TX_TOP = 2000000;
 
-export function aaveV3BaseListDimensions() {
-  return aaveV3ListDimensions(AAVE_V3_BASE_TX_TOP, BASE_LENDING_SIZE_NOTE).filter((d) => d.id !== "market");
+export function aaveV3BaseListDimensions(filters: AaveV3ListFilters = AAVE_V3_LIST_DEFAULTS) {
+  return aaveV3ListDimensions(AAVE_V3_BASE_TX_TOP, BASE_LENDING_SIZE_NOTE)
+    .filter((d) => d.id !== "market")
+    .map((d) =>
+      d.id === "supplying"
+        ? {
+            ...d,
+            options: filters.supplying.map((s) => ({ value: s, label: s })),
+            available: (f: AaveV3ListFilters) => f.supplying.length > 0,
+          }
+        : d,
+    );
+}
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+/** A symbol's Base address, matched without case; a bare address passes as is. */
+function baseAddressOf(symbol: string): string | null {
+  if (/^0x[0-9a-fA-F]{40}$/.test(symbol)) return symbol.toLowerCase();
+  const key = Object.keys(BASE_TOKEN_ADDRESSES).find((k) => k.toLowerCase() === symbol.toLowerCase());
+  return key ? BASE_TOKEN_ADDRESSES[key].toLowerCase() : null;
 }
 
 export const AAVE_V3_BASE_LIST_DEFAULTS: AaveV3ListFilters = { ...AAVE_V3_LIST_DEFAULTS, market: [] };
@@ -41,5 +67,14 @@ export const AAVE_V3_BASE_SORT_OPTIONS: SortOption[] = [
 
 export function aaveV3BaseFiltersToFetchParams(filters: AaveV3ListFilters, page: number): FetchAaveV3PositionsParams {
   const p = aaveV3FiltersToFetchParams(filters, page);
-  return { ...p, market: undefined, sortBy: filters.sortBy as AaveV3PositionSort, route: AAVE_V3_BASE_POSITIONS_ROUTE };
+  const supply = filters.supplying.map(baseAddressOf).filter((a): a is string => a !== null);
+  return {
+    ...p,
+    // A selection none of whose symbols has a Base address asks for one no
+    // reserve holds, so the page is empty rather than every row.
+    supplyAssets: filters.supplying.length > 0 ? (supply.length > 0 ? supply : [ZERO_ADDRESS]) : undefined,
+    market: undefined,
+    sortBy: filters.sortBy as AaveV3PositionSort,
+    route: AAVE_V3_BASE_POSITIONS_ROUTE,
+  };
 }

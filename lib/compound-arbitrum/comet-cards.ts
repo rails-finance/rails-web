@@ -138,3 +138,17 @@ export function cometFooterLead(fig: { cards: number; wallets: number }, censusO
     ? lead
     : `${lead}, of ${plural(censusOpen, "wallet", "wallets")} with an open position, counted on the chain`;
 }
+
+/** The listing's collateral facet: its URL param, which /start's Borrowing
+ *  results link into, and the chips carry collateral symbols. */
+export const COLLATERAL_PARAM = "collateral";
+
+/** Does the card hold any of `assets` (lowercase addresses) as collateral? A
+ *  Comet card reads its Comet; a wallet card reads every Comet the row carries. */
+export function cardHoldsCollateral<R extends { markets?: CompoundArbitrumVisitMarket[] }>(
+  card: ListingCard<R>,
+  assets: ReadonlySet<string>,
+): boolean {
+  const markets = card.comet ? [card.comet.market] : (card.row.markets ?? []);
+  return markets.some((m) => m.collateral.some((c) => c.amount !== "0" && assets.has(c.asset)));
+}

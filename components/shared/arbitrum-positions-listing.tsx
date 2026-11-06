@@ -51,6 +51,8 @@ import type { CompoundArbitrumVisitMarket } from "@/lib/compound-arbitrum/api-co
 import { COMPOUND_ARBITRUM_DEPLOYMENT } from "@/lib/compound-arbitrum/asset-catalog";
 import { compoundArbitrumMarketHref } from "@/lib/compound-arbitrum/routes";
 import {
+  COLLATERAL_PARAM,
+  cardHoldsCollateral,
   cometFooterLead,
   expandCards,
   footerFigures,
@@ -168,6 +170,8 @@ interface ArbitrumPositionsFilters extends BaseListFilters {
   coll: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
+  /** Compound only: collateral symbols held (multi, OR). URL param `collateral`. */
+  collateral: string[];
 }
 
 const DEFAULTS: ArbitrumPositionsFilters = {
@@ -177,6 +181,7 @@ const DEFAULTS: ArbitrumPositionsFilters = {
   debt: [],
   coll: [],
   tx: [],
+  collateral: [],
 };
 
 const SORTS: SortOption[] = [
@@ -238,10 +243,34 @@ function dimensions(txTop: number): ListDimension<ArbitrumPositionsFilters, Card
   ];
 }
 
+/** Each Comet's stated collateral, symbol to the lowercase addresses it names. */
+const COMET_COLLATERAL = new Map<string, Set<string>>();
+for (const m of COMPOUND_ARBITRUM_DEPLOYMENT.markets) {
+  for (const c of m.collateral ?? []) {
+    const set = COMET_COLLATERAL.get(c.symbol) ?? new Set<string>();
+    set.add(c.asset.toLowerCase());
+    COMET_COLLATERAL.set(c.symbol, set);
+  }
+}
+
+/** Compound's Collateral facet: a chip per stated collateral symbol, matched
+ *  against the collateral each card holds at its read. */
+const COLLATERAL_DIMENSION: ListDimension<ArbitrumPositionsFilters, Card> = {
+  id: "collateral",
+  label: "Collateral",
+  group: "Assets",
+  cardinality: "multi",
+  param: COLLATERAL_PARAM,
+  options: [...COMET_COLLATERAL.keys()].map((s) => ({ value: s, label: s })),
+  get: (f) => f.collateral,
+  set: (f, v) => ({ ...f, collateral: v }),
+  matches: (c, v) => cardHoldsCollateral(c, new Set(v.flatMap((s) => [...(COMET_COLLATERAL.get(s) ?? [])]))),
+};
+
 /** One registry per family, so each keeps one function across renders. */
 const DIMENSIONS: Record<ArbitrumPositionsFamily, () => ListDimension<ArbitrumPositionsFilters, Card>[]> = {
   "aave-v3": () => dimensions(FAMILIES["aave-v3"].txTop),
-  "compound-v3": () => dimensions(FAMILIES["compound-v3"].txTop),
+  "compound-v3": () => [...dimensions(FAMILIES["compound-v3"].txTop), COLLATERAL_DIMENSION],
   morpho: () => dimensions(FAMILIES.morpho.txTop),
 };
 
