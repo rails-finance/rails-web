@@ -88,6 +88,14 @@ export function useWalletPanelOpen(): boolean {
 /** The slide and the scrim's fade: a soft ease in, a quicker ease out. */
 const OUT_MS = 220;
 const EASE_IN = "320ms cubic-bezier(0.22, 1, 0.36, 1)";
+/** The slide in (ui-jobs 514): a damped spring (damping ratio 0.72, 14 rad/s)
+ *  sampled into `linear()`, overshooting by 3.8% at 330ms and settling by
+ *  600ms. Browsers without `linear()` take EASE_IN. */
+const SPRING_IN =
+  "600ms linear(0, 0.0199, 0.0718, 0.1453, 0.2321, 0.3253, 0.4198, 0.5116, 0.598, 0.6771, 0.7478, 0.8096, 0.8625, 0.9068, 0.9431, 0.972, 0.9945, 1.0113, 1.0233, 1.0313, 1.036, 1.0381, 1.0383, 1.0369, 1.0345, 1.0314, 1.0279, 1.0243, 1.0207, 1.0173, 1.0141, 1.0112, 1.0086, 1.0064, 1.0045, 1.0029, 1.0017, 1.0007, 0.9999, 0.9993, 1)";
+/** How far the panel reaches left of its edge, out of sight under the rail (or
+ *  the viewport's edge) at rest, so the overshoot never opens a gap there. */
+const BLEED = 24;
 const EASE_OUT = `${OUT_MS}ms cubic-bezier(0.4, 0, 1, 1)`;
 
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -97,7 +105,11 @@ export function WalletPanel() {
   const panelRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [still, setStill] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [slideIn, setSlideIn] = useState(EASE_IN);
+  useEffect(() => {
+    setMounted(true);
+    if (CSS.supports("transition-timing-function", "linear(0, 1)")) setSlideIn(SPRING_IN);
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -190,30 +202,30 @@ export function WalletPanel() {
         inert={!isOpen}
         data-search-launcher-panel=""
         data-anatomy="H16"
-        className="absolute inset-y-0 left-0 flex w-full flex-col md:border-r border-rb-200 bg-raised shadow-xl md:w-[400px] dark:border-rb-800"
+        className="absolute inset-y-0 flex flex-col md:border-r border-rb-200 bg-raised shadow-xl dark:border-rb-800"
         style={{
+          left: -BLEED,
+          paddingLeft: BLEED,
+          width: railRight > 0 ? 400 + BLEED : `calc(100% + ${BLEED}px)`,
           transform: isOpen ? "translateX(0)" : "translateX(-100%)",
           // Hidden only once the slide out has run.
           transition: still
             ? "none"
             : isOpen
-              ? `transform ${EASE_IN}, visibility 0s`
+              ? `transform ${slideIn}, visibility 0s`
               : `transform ${EASE_OUT}, visibility 0s linear ${OUT_MS}ms`,
           visibility: isOpen ? "visible" : "hidden",
         }}
       >
-        {/* The top row: on the right "Home", since the mark opens this panel
-            and no longer goes home (ui-jobs 509). Below `md` the header bar is
-            under the panel, so the row also restates the bar's left end: the
-            Rails mark with its chevron pointing left, in the bar's launcher
-            box at its place (16px in; the launcher's top, measured as the
-            panel opens, under the beta strip too), so the tap that opened the
-            panel closes it in the same spot. From md the rail's mark, beside
-            the panel, closes it. */}
-        <div
-          className="flex shrink-0 items-center justify-between px-4 md:justify-end md:px-5"
-          style={{ paddingTop: launcherTop }}
-        >
+        {/* The top row, below `md` only: on the right "Home", since the mark
+            opens this panel there (ui-jobs 509); the header bar is under the
+            panel, so the row also restates the bar's left end: the Rails mark
+            with its chevron pointing left, in the bar's launcher box at its
+            place (16px in; the launcher's top, measured as the panel opens,
+            under the beta strip too), so the tap that opened the panel closes
+            it in the same spot. From md the rail's mark goes home and its
+            toggle closes the panel (ui-jobs 514). */}
+        <div className="flex shrink-0 items-center justify-between px-4 md:hidden" style={{ paddingTop: launcherTop }}>
           <button
             type="button"
             onClick={close}
@@ -239,7 +251,7 @@ export function WalletPanel() {
         </div>
         {/* Pinned at the top: the search row, no heading (the field names the
             panel; Miles, 1 Nov 2026). */}
-        <div className="relative z-10 shrink-0 px-5 pb-4 pt-4">
+        <div className="relative z-10 shrink-0 px-5 pb-4 pt-4 md:pt-[11px]">
           <FrontDoorSearch size="lg" surface="raised" onDone={close} suggest />
         </div>
 

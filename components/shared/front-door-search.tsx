@@ -31,7 +31,7 @@ import {
   type RefObject,
 } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 import { RailsMark } from "@/components/nav/rails-mark";
 import { NAV_BUTTON, ctrlWaking } from "@/lib/shared/ui-grammar";
 import { useHydrated } from "@/hooks/useHydrated";
@@ -716,9 +716,48 @@ function FilledLayoutGrid() {
   );
 }
 
+/** The two glyphs of the rail's toggle, cross-faded: two lines (shut) and
+ *  the sidebar, a rounded square with a bar down its left (open). */
+function SidebarToggleGlyph({ open }: { open: boolean }) {
+  const glyph = "absolute inset-0 m-auto transition-[opacity,transform] duration-200";
+  return (
+    <>
+      <svg
+        width={20}
+        height={20}
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        aria-hidden="true"
+        className={glyph}
+        style={{ opacity: open ? 0 : 1, transform: open ? "scale(0.8)" : "none" }}
+      >
+        <path d="M3.5 7.25h13M3.5 12.75h13" />
+      </svg>
+      <svg
+        width={20}
+        height={20}
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        aria-hidden="true"
+        className={glyph}
+        style={{ opacity: open ? 1 : 0, transform: open ? "none" : "scale(0.8)" }}
+      >
+        <rect x="3" y="3" width="14" height="14" rx="3.5" />
+        <path d="M7 6.5v7" />
+      </svg>
+    </>
+  );
+}
+
 /** The control in the chrome that opens the wallet panel (H15.1). In the
- *  brand rail (from md) the Rails mark, a chevron showing beside it on hover
- *  (ui-jobs 509). In the header bar (below md) the Rails mark with a
+ *  brand rail (from md) the sidebar toggle under the Rails mark, which closes
+ *  the panel from the same place (ui-jobs 514). In the header bar (below md) the Rails mark with a
  *  chevron pointing right, at the bar's left; the panel opens over it and its
  *  top row draws the mark with the chevron pointing left in the same place,
  *  which closes it (ui-jobs 509).
@@ -769,27 +808,21 @@ export function SearchLauncher({
         />
       </button>
     );
-  // The rail's launcher: the Rails mark alone at rest; on hover or focus a
-  // chevron beside it, pointing at the panel's way (right to open, left to
-  // close).
-  const Chevron = open ? ChevronLeft : ChevronRight;
+  // The rail's toggle (ui-jobs 514): two lines while the panel is shut, the
+  // sidebar glyph while it is open, in the same place, so one spot opens and
+  // closes it. No tooltip.
   return (
     <button
       type="button"
       onClick={(e) => toggleWalletPanel(e.currentTarget)}
-      className="group relative flex h-[38px] w-[38px] cursor-pointer items-center justify-center rounded-lg text-foreground focus-ring"
-      aria-label={open ? "Close search and explorers" : "Search and explorers"}
+      className="relative flex h-[38px] w-[38px] cursor-pointer items-center justify-center rounded-lg text-rb-600 transition-colors hover:bg-rb-100 hover:text-foreground focus-ring dark:text-rb-300 dark:hover:bg-rb-800"
+      aria-label={open ? "Close search and explorers" : "Open search and explorers"}
       aria-expanded={open}
       aria-keyshortcuts="/ Meta+K"
       data-anatomy="H15.1"
       data-search-launcher={placement}
     >
-      <RailsMark size={30} />
-      <Chevron
-        size={14}
-        className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 text-rb-500 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-        aria-hidden="true"
-      />
+      <SidebarToggleGlyph open={open} />
     </button>
   );
 }
