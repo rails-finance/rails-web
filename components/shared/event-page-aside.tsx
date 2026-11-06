@@ -3,29 +3,35 @@
 // The event page's side column (rails-ops TO-DO-ui-jobs 236), in the spine's
 // place beside the card, the same on every family: the page's h1 (the card's
 // teaser where it has one, else the family's header in its title form,
-// ui-jobs 286), the Learn more link reading the modal's title (ui-jobs 380),
-// the actions row (the
-// timeline, the explorer, the Markdown, Copy link, Copy transaction hash, Copy
-// for LLM; ui-jobs 291 and 294), the paragraph
-// with the timeline link, the facts table (the family's rows, then the
-// event's place, block and transaction), and the previous and next links.
+// ui-jobs 286) with the event's ⋮ at its right on its first line (Inspect
+// provenance, Copy link, Copy transaction hash, the explorer, View as
+// Markdown, Copy for LLM; the design round of 6 Nov 2026), the Learn more
+// link reading the modal's title (ui-jobs 380), the paragraph with the
+// timeline link, the facts table (the family's rows less the one repeating
+// the wallet heading's address, then the event's place, time, block and
+// transaction), and the previous and next arrows.
 // The family supplies the data and its words (`EventPageContract`); the
 // shared words are `lib/shared/event-page-words.ts`. The table is identity
 // and position, no figure that carries a receipt, so the provenance tripwire
 // passes over it.
 
-import { createContext, Fragment, useContext, useState, type ReactNode } from "react";
+import { createContext, Fragment, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
+import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, FileText, Hash, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { titleFigure, type EventTitle } from "@/lib/shared/event-title";
-import { eventMarkdownHref, useMenuCopied } from "@/components/shared/event-card-menu";
+import { EventCardMenu, eventMarkdownHref, useMenuCopied } from "@/components/shared/event-card-menu";
+import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { useEventShareHref } from "@/components/shared/event-share-context";
 import { useChainId } from "@/lib/shared/chain-context";
 import { chainMeta, explorerUrl } from "@/lib/shared/chains";
+import { formatDate } from "@/lib/date";
+import { formatTimestamp } from "@/lib/shared/format-event";
 import { EVENT_PAGE_WORDS as W } from "@/lib/shared/event-page-words";
 import type { EventPageContract, EventPageFact, EventPageShell } from "@/lib/shared/explorer-adapter";
 import { LearnMoreAsLinkContext } from "@/components/shared/learn-more-modal";
+import { CHROME_HOVER } from "@/components/nav/chrome-hover";
 
 /** The event page's shell, from the route's view: an `EventCard` inside it
  *  draws in page mode with this column. */
@@ -64,20 +70,68 @@ export function EventPageTitle({ title }: { title: EventTitle }) {
   );
 }
 
+// ── The wallet heading's address ───────────────────────────────────────────
+// The heading (H13, `DetailTopRow`) is a sibling of the card, so it hands its
+// address over a small store; the facts table leaves out a row repeating it.
+let headingWallet: string | null = null;
+const headingListeners = new Set<() => void>();
+const notifyHeading = () => headingListeners.forEach((l) => l());
+
+/** The event page's wallet heading publishes its address. */
+export function usePublishHeadingWallet(wallet: string | null | undefined) {
+  const value = wallet ? wallet.toLowerCase() : null;
+  useEffect(() => {
+    if (!value) return;
+    headingWallet = value;
+    notifyHeading();
+    return () => {
+      if (headingWallet !== value) return;
+      headingWallet = null;
+      notifyHeading();
+    };
+  }, [value]);
+}
+
+function useHeadingWallet(): string | null {
+  return useSyncExternalStore(
+    (l) => {
+      headingListeners.add(l);
+      return () => headingListeners.delete(l);
+    },
+    () => headingWallet,
+    () => null,
+  );
+}
+
 const LINK = "text-blue-600 hover:underline dark:text-blue-400";
-const ACTION = `${LINK} cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 rounded-sm`;
 const TH = "w-24 py-1.5 pr-3 text-left align-top font-normal text-rb-500";
 const TD = "min-w-0 py-1.5 align-top text-foreground";
 
-/** A previous or next event link; at the end, a disabled one. */
-function Step({ href, label, data }: { href: string | null; label: string; data: Record<string, string> }) {
+/** A previous or next arrow: a 38px tile; at the end, a disabled one. */
+function Step({ href, dir, data }: { href: string | null; dir: "previous" | "next"; data: Record<string, string> }) {
+  const label = dir === "previous" ? W.previous : W.next;
+  const arrow =
+    dir === "previous" ? <ArrowLeft size={18} aria-hidden="true" /> : <ArrowRight size={18} aria-hidden="true" />;
+  const box = "flex h-[38px] w-[38px] items-center justify-center rounded-lg";
   return href ? (
-    <Link href={href} aria-label={label} className={LINK} {...data}>
-      {label}
+    <Link
+      href={href}
+      aria-label={label}
+      title={label}
+      className={`${box} text-foreground transition-colors focus-ring ${CHROME_HOVER}`}
+      {...data}
+    >
+      {arrow}
     </Link>
   ) : (
-    <span role="link" aria-label={label} aria-disabled="true" className="text-rb-400" {...data}>
-      {label}
+    <span
+      role="link"
+      aria-label={label}
+      aria-disabled="true"
+      className={`${box} text-rb-400 dark:text-rb-600`}
+      {...data}
+    >
+      {arrow}
     </span>
   );
 }
@@ -135,89 +189,78 @@ function FactRow({ fact }: { fact: EventPageFact }) {
   );
 }
 
-/** "Copy for LLM": it copies the event's Markdown route (the page's URL with
- *  `.md`), so a copy taken before the page's replay lands is the whole text;
- *  where the read fails it copies the page's build. */
-function CopyForLlm({ href, build }: { href: string; build: () => string }) {
-  const [copied, copy] = useMenuCopied();
-  const read = () =>
-    fetch(href, { cache: "no-store" })
-      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${r.status}`))))
-      .catch(() => build());
-  return (
-    <button
-      type="button"
-      className={ACTION}
-      title={W.copy_llm_hint}
-      data-menu-item="copy-for-llm"
-      data-copied={copied ? "" : undefined}
-      onClick={() => copy("llm", read())}
-    >
-      {copied ? W.copied : W.copy_llm}
-    </button>
-  );
-}
+const shortHash = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
 
-/** The row under the title: the links, then the copy buttons. Each item
- *  carries `data-menu-item`, the names the row's ⋮ had, for the verifiers. */
-function EventActions({ c }: { c: EventPageContract }) {
+/** The event's rows of its ⋮ on the event page. Each carries
+ *  `data-menu-item`, the names the actions row had, for the verifiers. A copy
+ *  row keeps the menu open and confirms in place, its icon a tick and its
+ *  subtitle "Copied", as the card menu's copy rows do. */
+function EventPageRows({ c, close }: { c: EventPageContract; close: () => void }) {
   const chainId = useChainId();
   const shareHref = useEventShareHref();
   const build = useContext(EventMarkdownContext);
   const [copied, copy] = useMenuCopied();
   const md = build && shareHref ? { href: eventMarkdownHref(shareHref), build } : null;
   const explorer = chainMeta(chainId).explorerName;
+  // Copy for LLM copies the event's Markdown route (the page's URL with
+  // `.md`), so a copy taken before the page's replay lands is the whole text;
+  // where the read fails it copies the page's build.
+  const readMarkdown = (m: { href: string; build: () => string }) =>
+    fetch(m.href, { cache: "no-store" })
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`${r.status}`))))
+      .catch(() => m.build());
+  const tick = <Check size={16} />;
   return (
-    <div role="group" aria-label={W.actions} className="flex flex-wrap gap-x-4 gap-y-1" data-event-page-actions="">
-      <a href={c.timelineHref} className={ACTION} title={c.words.timelineHint} data-menu-item="view-timeline">
-        {W.in_timeline}
-      </a>
-      <a
-        href={explorerUrl(chainId, "tx-logs", c.txHash)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={ACTION}
-        title={W.explorer_hint(explorer)}
-        data-menu-item="view-explorer"
-      >
-        {explorer}
-      </a>
-      {md && (
-        <a
-          href={md.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={ACTION}
-          title={W.view_markdown_hint}
-          data-menu-item="view-markdown"
-        >
-          {W.view_markdown}
-        </a>
-      )}
+    <>
       {shareHref && (
-        <button
-          type="button"
-          className={ACTION}
-          title={W.copy_link_hint}
-          data-menu-item="copy-link"
-          data-copied={copied === "link" ? "" : undefined}
+        <ToolsMenuItem
+          item="copy-link"
+          icon={copied === "link" ? tick : <Link2 size={16} className="-rotate-45" />}
+          title={W.copy_link}
+          subtitle={copied === "link" ? W.copied : W.copy_link_hint}
+          copied={copied === "link"}
           onClick={() => copy("link", `${window.location.origin}${shareHref}`)}
-        >
-          {copied === "link" ? W.copied : W.copy_link}
-        </button>
+        />
       )}
-      <button
-        type="button"
-        className={ACTION}
-        title={W.copy_hash_hint}
-        data-menu-item="copy-tx-hash"
-        data-copied={copied === "hash" ? "" : undefined}
+      <ToolsMenuItem
+        item="copy-tx-hash"
+        icon={copied === "hash" ? tick : <Hash size={16} />}
+        title={W.copy_hash}
+        subtitle={copied === "hash" ? W.copied : shortHash(c.txHash)}
+        copied={copied === "hash"}
         onClick={() => copy("hash", c.txHash)}
-      >
-        {copied === "hash" ? W.copied : W.copy_hash}
-      </button>
-      {md && <CopyForLlm href={md.href} build={md.build} />}
-    </div>
+      />
+      <ToolsMenuItem
+        item="view-explorer"
+        icon={<ExternalLink size={16} />}
+        title={W.view_explorer(explorer)}
+        subtitle={W.view_explorer_hint}
+        href={explorerUrl(chainId, "tx-logs", c.txHash)}
+        external
+        onClick={close}
+      />
+      {md && (
+        <>
+          <ToolsMenuItem
+            item="view-markdown"
+            icon={<FileText size={16} />}
+            title={W.view_markdown}
+            subtitle={W.view_markdown_hint}
+            href={md.href}
+            external
+            onClick={close}
+          />
+          <ToolsMenuItem
+            item="copy-for-llm"
+            icon={copied === "llm" ? tick : <Copy size={16} />}
+            title={W.copy_llm}
+            subtitle={copied === "llm" ? W.copied : W.copy_llm_hint}
+            copied={copied === "llm"}
+            onClick={() => copy("llm", readMarkdown(md))}
+          />
+        </>
+      )}
+    </>
   );
 }
 
@@ -239,31 +282,57 @@ function EventPageSentence({ sentence, beside }: { sentence: ReactNode; beside?:
   );
 }
 
+/** The h1's first line's height, where the ⋮ centres: the sentence's line
+ *  (text-xl or, below sm, text-lg, leading-snug), the title's 40px icons, or
+ *  the title's kind word alone (text-2xl, leading-tight). */
+function firstLine(c: EventPageContract, sentence: boolean): string {
+  if (sentence) return "h-[1.71875rem] max-sm:h-[1.546875rem]";
+  if (c.title !== "head" && c.title.amounts.length === 0) return "h-[1.875rem]";
+  return "h-10";
+}
+
 /** The column. `sentence`: the card's teaser, which stands as the h1 in place
  *  of the route's title; `beside` follows it. `learnMore`: the card's Learn
- *  more slot, drawn as a text link under the h1. */
+ *  more slot, drawn as a text link under the h1. `provScope`: the card's
+ *  receipts scope, which the ⋮'s Inspect provenance arms (ui-jobs 284). */
 export function EventPageAside({
   page,
   sentence,
   beside,
   learnMore,
+  provScope,
 }: {
   page: EventPageShell;
   sentence?: ReactNode;
   beside?: ReactNode;
   learnMore?: ReactNode;
+  provScope: string;
 }) {
   const c = page.contract;
+  const shareHref = useEventShareHref();
+  const heading = useHeadingWallet();
+  // The holder or owner row says what the wallet heading above already says.
+  const facts = heading ? c.facts.filter((f) => (f.full ?? f.value).toLowerCase() !== heading) : c.facts;
   return (
     <div className="space-y-4 pb-4 pt-3 text-sm sm:pb-0 sm:pr-6" data-event-page-side="">
       <div className="space-y-2 pb-2">
-        {sentence ? <EventPageSentence sentence={sentence} beside={beside} /> : page.title}
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            {sentence ? <EventPageSentence sentence={sentence} beside={beside} /> : page.title}
+          </div>
+          <span className={`flex shrink-0 items-center ${firstLine(c, !!sentence)}`} data-event-head-menu="">
+            <EventCardMenu
+              shareHref={shareHref}
+              provScope={{ id: provScope, hint: W.provenance_hint }}
+              pageRows={(close) => <EventPageRows c={c} close={close} />}
+            />
+          </span>
+        </div>
         {learnMore != null && (
           <div>
             <LearnMoreAsLinkContext.Provider value>{learnMore}</LearnMoreAsLinkContext.Provider>
           </div>
         )}
-        <EventActions c={c} />
       </div>
       <p className="leading-relaxed text-rb-500" data-event-page-paragraph="">
         {c.words.paragraph}{" "}
@@ -273,7 +342,7 @@ export function EventPageAside({
       </p>
       <table className="w-full table-fixed border-collapse" data-event-page-facts="" data-prov-exempt="">
         <tbody className="divide-y divide-rb-200 dark:divide-rb-800">
-          {c.facts.map((f) => (
+          {facts.map((f) => (
             <FactRow key={f.key} fact={f} />
           ))}
           <tr data-fact="event">
@@ -281,6 +350,14 @@ export function EventPageAside({
               {W.event}
             </th>
             <td className={TD}>{W.event_of(c.n, c.total)}</td>
+          </tr>
+          <tr data-fact="time">
+            <th scope="row" className={TH}>
+              {W.time}
+            </th>
+            <td className={TD}>
+              {formatDate(page.timestamp)} {formatTimestamp(page.timestamp)} UTC
+            </td>
           </tr>
           <tr data-fact="block">
             <th scope="row" className={TH}>
@@ -293,17 +370,20 @@ export function EventPageAside({
               {W.transaction}
             </th>
             <td className={TD}>
-              <span className="block min-w-0 truncate font-mono text-xs leading-5" title={c.txHash} data-tx-hash="">
-                {c.txHash}
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="block min-w-0 truncate font-mono text-xs leading-5" title={c.txHash} data-tx-hash="">
+                  {c.txHash}
+                </span>
+                <CopyFact value={c.txHash} label={W.copy_hash} name="transaction" />
               </span>
             </td>
           </tr>
         </tbody>
       </table>
-      <div className="flex flex-wrap gap-x-4 gap-y-1" data-event-page-links="">
-        <Step href={c.previousHref} label={W.previous} data={{ "data-event-prev": "" }} />
-        <Step href={c.nextHref} label={W.next} data={{ "data-event-next": "" }} />
-      </div>
+      <nav aria-label={W.steps} className="flex justify-end gap-1" data-event-page-links="">
+        <Step href={c.previousHref} dir="previous" data={{ "data-event-prev": "" }} />
+        <Step href={c.nextHref} dir="next" data={{ "data-event-next": "" }} />
+      </nav>
     </div>
   );
 }

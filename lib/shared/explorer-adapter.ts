@@ -32,6 +32,8 @@ export interface EventPageFact {
 export interface EventPageShell {
   contract: EventPageContract;
   title: ReactNode;
+  /** The event's time (unix seconds), the facts table's Time row. */
+  timestamp: number;
 }
 
 /** What the shell knows of the page's event (`ChainTruthTimeline`'s pinned

@@ -2,7 +2,7 @@
 // ---------------------------------------------------------------------------
 // "Inspect provenance" arms the inspector on one section: the position card (a
 // row of C17's ⋮, Liquity V2), Lifetime flows (a row of its ⋮), one event (a
-// row of the event page card's ⋮ in T1). Only the values inside that section
+// row of the event page's ⋮ beside its h1). Only the values inside that section
 // become targets (`[data-prov-pickable]` inside `[data-prov-scope="<scope>"]`,
 // none outside) and only that section wears the ring (`[data-prov-lit]`, no
 // page-wide halo); the Escape ladder is the page-level tool's, and putting the
@@ -195,16 +195,17 @@ for (const width of [1280, 390]) {
 }
 
 // ── 2. The Repay #148 event page, 1280 and 390 ─────────────────────────────
-// The event's "Inspect provenance" is a row of the card's ⋮ in T1; the actions
-// row carries none.
+// The event's "Inspect provenance" is a row of the event's ⋮ beside the h1,
+// the page's one menu (the design round of 6 Nov 2026; no actions row).
 for (const width of [1280, 390]) {
   const MENU = "[data-event-id] [data-event-menu]";
   const TRIGGER = `${MENU} > button`;
   const ROW = `[data-prov-scope-toggle="${EVENT_ID}"]`;
   const { ctx, page, errors } = await open(width, EVENT_PAGE, TRIGGER);
   const tag = `event page @${width}`;
-  const inActions = await page.locator("[data-event-page-actions] [data-prov-scope-toggle]").count();
-  check(`${tag}: the actions row holds no provenance control`, inActions === 0, `${inActions} found`);
+  const menus = await page.locator("[data-event-id] [data-event-menu]").count();
+  const beside = await page.locator("[data-event-page-side] [data-event-head-menu] [data-event-menu]").count();
+  check(`${tag}: one event menu, beside the h1`, menus === 1 && beside === 1, `${menus} menus, ${beside} beside`);
   const openRow = async () => {
     for (let i = 0; i < 4 && (await page.locator(ROW).count()) === 0; i++) {
       await page

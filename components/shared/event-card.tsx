@@ -21,6 +21,7 @@ import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu, useEventMenuRows } from "@/components/shared/event-card-menu";
 import { EventPageAside, EventPageContext } from "@/components/shared/event-page-aside";
 import { EVENT_PAGE_WORDS } from "@/lib/shared/event-page-words";
+import { CardSidebarFrame } from "@/components/shared/position-card";
 import { SheetCollectContext, type CollectedCard, type GroupLane } from "@/components/shared/group-sheet";
 import { disclosureProps } from "@/components/shared/disclosure";
 import { EventHeadContext, EventTxHashContext, PlainNumber } from "@/components/shared/event-number-pill";
@@ -418,6 +419,10 @@ function CollectedEventCard({
   return null;
 }
 
+/** The event page's section headings, "Explanation" and "Figures": the sheet's
+ *  panel heading (Risk, Limits). */
+const PAGE_SECTION_HEADING = "text-sm font-semibold text-rb-500";
+
 const domSafe = (s: string) => s.replace(/[^A-Za-z0-9_-]/g, "_");
 
 /** A group summary card's `nameKey`: its kind, its span and its count, which
@@ -635,9 +640,16 @@ function EventCardView(props: EventCardProps) {
   const tabbed = !pageMode && hasExplainer && hasFigures;
   // The explanation, with the Learn more "?" at its end on a timeline card. The strip and the
   // explanation start on the head's text (its `pl-5`).
+  // On the event page an explanation whose one sentence became the h1 leaves
+  // the pane empty: the region, heading and all, then draws nothing.
   const explanationRegion = hasExplainer ? (
-    <div className="pb-1 pl-5 pr-4" data-anatomy="T3" data-prov-exempt="">
-      <div className="pb-3 pt-4 text-sm">
+    <div
+      className={`pl-5 pr-4${pageMode ? " [&:has(>[data-explanation-body]:empty)]:hidden" : " pb-1"}`}
+      data-anatomy="T3"
+      data-prov-exempt=""
+    >
+      {pageMode && <h2 className={`pt-4 ${PAGE_SECTION_HEADING}`}>{EVENT_PAGE_WORDS.explanation}</h2>}
+      <div className={`pb-3 text-sm ${pageMode ? "pt-2" : "pt-4"}`} data-explanation-body="">
         <ExplainerLeadOnTitleContext.Provider value={!!pageSentence && leadGrouped}>
           {explanationNode}
         </ExplainerLeadOnTitleContext.Provider>
@@ -647,6 +659,11 @@ function EventCardView(props: EventCardProps) {
   ) : null;
   const figuresNode = hasFigures ? (
     <>
+      {pageMode && (
+        <h2 className={`px-5 pb-1 pt-4 ${PAGE_SECTION_HEADING}`} data-event-page-figures="">
+          {EVENT_PAGE_WORDS.figures}
+        </h2>
+      )}
       {detail}
       {hasPriceRow(price) && <EventPriceRow price={price} />}
     </>
@@ -703,8 +720,9 @@ function EventCardView(props: EventCardProps) {
       }
     : undefined;
   const menuRows = useEventMenuRows(groupMenu ? null : shareHref, !!groupMenu, !!headChip);
+  // On the event page the ⋮ stands beside the h1 (`EventPageAside`).
   const headMenu =
-    pageMode || menuRows ? (
+    !pageMode && menuRows ? (
       <span
         className="inline-flex items-center"
         data-event-head-menu=""
@@ -713,12 +731,7 @@ function EventCardView(props: EventCardProps) {
           if (e.key === "Enter" || e.key === " ") e.stopPropagation();
         }}
       >
-        <EventCardMenu
-          shareHref={groupMenu ? null : shareHref}
-          groupShow={groupMenu}
-          provScope={pageMode ? { id: scopeId, hint: EVENT_PAGE_WORDS.provenance_hint } : undefined}
-          headChip={headChip}
-        />
+        <EventCardMenu shareHref={groupMenu ? null : shareHref} groupShow={groupMenu} headChip={headChip} />
       </span>
     ) : null;
 
@@ -886,11 +899,13 @@ function EventCardView(props: EventCardProps) {
       role={inTimeline ? "region" : undefined}
       aria-labelledby={inTimeline ? labelId : undefined}
       data-spine-card={inTimeline ? cardId : undefined}
-      className={`flow-root rounded-b-xl bg-raised${inTimeline ? " max-sm:rounded-t-xl" : ""}`}
+      className={`flow-root bg-raised ${pageMode ? "rounded-xl" : "rounded-b-xl"}${inTimeline ? " max-sm:rounded-t-xl" : ""}`}
       data-anatomy="T2"
       data-card-tab-open={tabbed ? openTab : undefined}
     >
       {inTimeline && band && <div className="sm:hidden">{band}</div>}
+      {/* The event page draws no T1: the band opens the card. */}
+      {pageMode && band}
 
       {tabbed && (
         <CardTabStrip
@@ -964,6 +979,7 @@ function EventCardView(props: EventCardProps) {
                     sentence={pageSentence}
                     beside={pageSentence && head?.surplus ? <HeadSurplusChip surplus={head.surplus} /> : undefined}
                     learnMore={learnMore}
+                    provScope={scopeId}
                   />
                 </div>
               ) : (
@@ -989,8 +1005,16 @@ function EventCardView(props: EventCardProps) {
               )}
               <div className={pageMode ? "min-w-0 grow" : "spine-content"}>
                 <EventPageContext.Provider value={null}>
-                  {t1}
-                  {body}
+                  {pageMode ? (
+                    // No T1 on the event page: the h1 states the event. The
+                    // card stands beside the protocol's bar (C20).
+                    <CardSidebarFrame>{body}</CardSidebarFrame>
+                  ) : (
+                    <>
+                      {t1}
+                      {body}
+                    </>
+                  )}
                 </EventPageContext.Provider>
               </div>
               {/* The number column, at the row's far left, level with the

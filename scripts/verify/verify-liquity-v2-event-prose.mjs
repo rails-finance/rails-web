@@ -334,14 +334,19 @@ try {
       .first()
       .waitFor({ state: "attached", timeout: 30_000 })
       .catch(() => {});
-    // Copy for LLM is the last button of the actions row under the side
-    // column's title (ui-jobs 291).
-    const copyBtn = page.locator('[data-event-page-actions] [data-menu-item="copy-for-llm"]').first();
-    await copyBtn.waitFor({ timeout: 30_000 });
+    // Copy for LLM is a row of the event's ⋮ beside the h1 (the design round
+    // of 6 Nov 2026); a copy row keeps the menu open and confirms in place.
+    const trigger = page.locator("[data-event-head-menu] [data-event-menu] > button").first();
+    await trigger.waitFor({ timeout: 30_000 });
+    const copyBtn = page.locator('[data-event-menu] [data-menu-item="copy-for-llm"]').first();
     // A press before hydration is lost: pressed until the copy confirms.
     const copied = page.locator('[data-menu-item="copy-for-llm"][data-copied]').first();
     for (let i = 0; i < 6 && !(await copied.count()); i++) {
-      await copyBtn.click();
+      if (!(await copyBtn.isVisible().catch(() => false))) {
+        await trigger.click();
+        await copyBtn.waitFor({ timeout: 5_000 }).catch(() => {});
+      }
+      await copyBtn.click().catch(() => {});
       await copied.waitFor({ timeout: 5_000 }).catch(() => {});
     }
     await copied.waitFor({ timeout: 5_000 });
