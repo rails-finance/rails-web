@@ -22,6 +22,7 @@
 // Open state is a small store, so every trigger reads and sets the same panel,
 // which is mounted once (app/layout.tsx).
 
+import { CHROME_HOVER } from "@/components/nav/chrome-hover";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { ExplorerChooser, PANEL_HEADING } from "@/components/nav/explorer-chooser";
@@ -229,7 +230,7 @@ export function WalletPanel() {
           <button
             type="button"
             onClick={close}
-            className="relative flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground focus-ring"
+            className={`relative flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground transition-colors focus-ring ${CHROME_HOVER}`}
             aria-label="Close search and explorers"
             data-wallet-panel-close=""
           >

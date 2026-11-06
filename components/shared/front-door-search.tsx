@@ -19,6 +19,7 @@
 // - `useSlashToSearch` puts `/` on it from any page: the page's own search
 //   where one is drawn, else the wallet panel.
 
+import { CHROME_HOVER } from "@/components/nav/chrome-hover";
 import {
   useCallback,
   useEffect,
@@ -797,7 +798,7 @@ export function SearchLauncher({
       <button
         type="button"
         onClick={(e) => toggleWalletPanel(e.currentTarget)}
-        className="relative flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground focus-ring"
+        className={`relative flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground transition-colors focus-ring ${CHROME_HOVER}`}
         aria-label="Open search and explorers"
         aria-expanded={open}
         aria-keyshortcuts="/ Meta+K"
@@ -814,7 +815,7 @@ export function SearchLauncher({
     <button
       type="button"
       onClick={(e) => toggleWalletPanel(e.currentTarget)}
-      className="relative flex h-[38px] w-[38px] cursor-pointer items-center justify-center rounded-lg text-rb-600 transition-colors hover:bg-rb-100 hover:text-foreground focus-ring dark:text-rb-300 dark:hover:bg-rb-800"
+      className={`relative flex h-[38px] w-[38px] cursor-pointer items-center justify-center rounded-lg text-rb-600 transition-colors hover:text-foreground focus-ring dark:text-rb-300 ${CHROME_HOVER}`}
       aria-label={open ? "Close search and explorers" : "Open search and explorers"}
       aria-expanded={open}
       aria-keyshortcuts="/ Meta+K"
