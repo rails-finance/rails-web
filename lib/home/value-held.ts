@@ -47,12 +47,18 @@ export type ValueHeldRoster = {
   chainId: number;
   label: string;
   chainName: string;
+  /** The explorer's position listing, and its vaults page where it has one:
+   *  where a row on /about/figures links. */
+  href?: string;
+  vaultsHref?: string;
 }[];
 
 export type ValueHeldRow = {
   key: string;
   label: string;
   chainName: string;
+  /** The page the row's positions are listed on (the vaults page for a vault surface). */
+  href: string | null;
   usd: number;
   /** Share of the total, 0 to 1. */
   share: number;
@@ -171,6 +177,7 @@ export function settleValueHeld(data: ValueHeldData | null | undefined, roster: 
           key: `${entry.id}:${row.surface ?? ""}`,
           label,
           chainName,
+          href: (row.surface === "vaults" ? entry.vaultsHref : undefined) ?? entry.href ?? null,
           usd: row.usd,
           block: row.block,
           prices: inWords(row.priceSource),

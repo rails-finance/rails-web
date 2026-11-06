@@ -1,8 +1,7 @@
-import type { ReactNode } from "react";
+import Link from "next/link";
 import type { CoveredPositions } from "@/lib/home/covered-positions";
 import type { HomeStats } from "@/lib/home/home-stats";
 import { formatValueHeld, spokenValueHeld, type ValueHeld } from "@/lib/home/value-held";
-import { CoveredStatsNote } from "@/components/home/covered-stats-note";
 import { IndexNotice } from "@/components/shared/index-notice";
 import { launchedProductionChainNames } from "@/lib/shared/protocols";
 import { formatMonthDay } from "@/lib/date";
@@ -22,13 +21,14 @@ const COUNTED_SCOPE = launchedProductionChainNames();
  * counts every position each explorer has ever indexed, and no argument about
  * what is live today can move it. The value held in open positions follows
  * it in the same sentence, and appears only when the whole roster answered
- * (value-held.ts). The open/closed split and the wallet clause ride in the (i)
- * note.
+ * (value-held.ts). The open/closed split, the wallet clause and the breakdown
+ * are on /about/figures (CoveredCaption, components/about/figures-body.tsx),
+ * reached from the link under the sentence (ui-jobs 523).
  *
  * The split was withheld until 2026-07-15 (server migrations 115/116 made
  * openness chain-rooted); CoveredPositions.openPositions carries that history and
  * the condition under which this stays renderable. If it ever has to come out
- * again, drop the caption sentence passed to the note below.
+ * again, drop the caption sentence (CoveredCaption below).
  *
  * `protocolCount` stays carried but unstated — the strip of explorer tiles
  * directly below says which protocols better than a number does.
@@ -83,32 +83,6 @@ export function CoveredStats({
         <IndexNotice />
       </div>
     );
-  const walletClause = walletClauseIsInScope(covered, stats) ? stats : null;
-
-  // The (i) closes the last label in the band: the value's, or the count's
-  // when the value block is omitted.
-  const note = (
-    <CoveredStatsNote
-      value={valueHeld}
-      caption={
-        <>
-          <span className="tabular-nums text-foreground">{covered.openPositions.toLocaleString("en-US")}</span> open and{" "}
-          <span className="tabular-nums text-foreground">{covered.closedPositions.toLocaleString("en-US")}</span>{" "}
-          closed, replayed from chain events in each protocol&rsquo;s own model of a position
-          {walletClause && (
-            <>
-              , across{" "}
-              <span className="tabular-nums text-foreground">{walletClause.walletCount.toLocaleString("en-US")}</span>{" "}
-              wallets reaching back to{" "}
-              <span className="text-foreground">{formatEarliestDate(walletClause.earliestTransactionAt)}</span>
-            </>
-          )}
-          .
-        </>
-      }
-    />
-  );
-
   const count = <span className={FIGURE}>{covered.totalPositions.toLocaleString("en-US")}</span>;
 
   // Without the value the band is the count's line alone, as before 476.
@@ -120,10 +94,9 @@ export function CoveredStats({
             <span className={LABEL}>Explore</span>
             {count}
           </span>
-          <span className={LABEL}>
-            positions across {COUNTED_SCOPE} <DeFiAndNote note={note} />
-          </span>
+          <span className={LABEL}>positions across {COUNTED_SCOPE} DeFi</span>
         </p>
+        <FiguresLink />
       </div>
     );
 
@@ -134,8 +107,8 @@ export function CoveredStats({
           a group that never breaks, so does "DeFi (i)", and the value never
           splits; everything else wraps as ordinary centred text. One <p>, so a
           screen reader reads it as one sentence. Sizes step at breakpoints and
-          never scale with the viewport. The caption line that used to sit
-          under the count opens from the (i) (covered-stats-note.tsx). */}
+          never scale with the viewport. Under it, the link to how the figures
+          are counted (ui-jobs 523). */}
       <p className={`${LABEL} text-balance`} data-anatomy="S3.1">
         <span className={GROUP}>
           <span>Explore</span>
@@ -150,8 +123,9 @@ export function CoveredStats({
         {/* From lg the sentence breaks before "across", two lines (Miles, 5 Nov
             2026); below lg it wraps as before. */}
         <br className="hidden lg:inline" />
-        across {COUNTED_SCOPE} <DeFiAndNote note={note} />
+        across {COUNTED_SCOPE} DeFi
       </p>
+      <FiguresLink />
     </div>
   );
 }
@@ -164,13 +138,39 @@ const GROUP = "inline-flex flex-nowrap items-center gap-x-2 whitespace-nowrap sm
 const FIGURE =
   "font-sans text-foreground font-semibold leading-none tracking-tighter tabular-nums text-4xl sm:text-5xl";
 const LABEL = "font-sans font-light tracking-tight text-rb-500 text-lg sm:text-xl lg:text-[28px]";
-/** The last word and the (i) never break apart, so the (i) is never alone on a row. */
-function DeFiAndNote({ note }: { note: ReactNode }) {
+/** Under the sentence: the way to how the figures are counted, in the link blue. */
+function FiguresLink() {
   return (
-    <span className="whitespace-nowrap">
-      DeFi
-      <span className="relative top-[-0.07em] ml-2 inline-flex align-middle">{note}</span>
-    </span>
+    <Link
+      href="/about/figures"
+      className="mt-4 text-sm font-medium text-blue-600 underline-offset-4 hover:underline dark:text-blue-400"
+      data-anatomy="S3.3"
+    >
+      How these are counted <span>→</span>
+    </Link>
+  );
+}
+
+/** The open and closed counts, and the wallets where they are in scope: the
+ *  caption /about/figures opens with. Drawn here so the wallet-clause rule
+ *  (`walletClauseIsInScope`) stays beside the figures it guards. */
+export function CoveredCaption({ covered, stats }: { covered: CoveredPositions; stats: HomeStats | null }) {
+  const walletClause = walletClauseIsInScope(covered, stats) ? stats : null;
+  return (
+    <>
+      <span className="tabular-nums text-foreground">{covered.openPositions.toLocaleString("en-US")}</span> open and{" "}
+      <span className="tabular-nums text-foreground">{covered.closedPositions.toLocaleString("en-US")}</span> closed,
+      replayed from chain events in each protocol&rsquo;s own model of a position
+      {walletClause && (
+        <>
+          , across{" "}
+          <span className="tabular-nums text-foreground">{walletClause.walletCount.toLocaleString("en-US")}</span>{" "}
+          wallets reaching back to{" "}
+          <span className="text-foreground">{formatEarliestDate(walletClause.earliestTransactionAt)}</span>
+        </>
+      )}
+      .
+    </>
   );
 }
 
