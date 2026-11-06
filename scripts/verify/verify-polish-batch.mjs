@@ -90,8 +90,8 @@ check(
 
 // 10. Get in touch copy
 const git = await page.locator("text=open infrastructure for DeFi").count();
-const gitTg = await page.locator("text=@railsfinance").count();
-check("10 get-in-touch new copy + @railsfinance", git >= 1 && gitTg >= 1);
+const gitTg = await page.locator('[data-anatomy="S9"] a[href="https://t.me/railsfinance"]').count();
+check("10 get-in-touch new copy + the Telegram handle", git >= 1 && gitTg >= 1);
 
 // 5. Protocol ordering: Compound V2 before Compound V3 in the home row, once
 // "View all" has opened the whole roster (Compound V2 is not among the most used).
