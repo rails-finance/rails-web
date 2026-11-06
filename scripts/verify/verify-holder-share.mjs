@@ -225,8 +225,10 @@ check("A2. …and twitter:image is the same URL", rel(pMeta.twitterImage) === pS
 }
 check(
   "A4. the title names the holder in the explorer's own plural noun",
-  pMeta.ogTitle === `Rails | Polaris Positions held by ${short(POLARIS_WALLET)}` &&
-    pMeta.ogImageAlt === "This wallet's Polaris Positions at a glance",
+  // Case aside: page titles went to sentence case (ui-jobs 510), so the noun
+  // reads "positions" after it and "Positions" before.
+  pMeta.ogTitle?.toLowerCase() === `Rails | Polaris Positions held by ${short(POLARIS_WALLET)}`.toLowerCase() &&
+    pMeta.ogImageAlt?.toLowerCase() === "This wallet's Polaris Positions at a glance".toLowerCase(),
   `"${pMeta.ogTitle}" / alt "${pMeta.ogImageAlt}"`,
 );
 
@@ -287,7 +289,7 @@ check(
 }
 check(
   "A7. …titled in V2's own noun",
-  vMeta.ogTitle === `Rails | Liquity V2 Troves held by ${short(V2_WALLET)}`,
+  vMeta.ogTitle?.toLowerCase() === `Rails | Liquity V2 Troves held by ${short(V2_WALLET)}`.toLowerCase(),
   `"${vMeta.ogTitle}"`,
 );
 const vImage = await readImage(vShareUrl);

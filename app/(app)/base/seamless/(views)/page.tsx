@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export const metadata = listingMetadata({
-  title: "Explore Seamless Positions on Base",
+  title: "Explore Seamless positions on Base",
   canonicalPath: "/base/seamless",
 });
 

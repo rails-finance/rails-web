@@ -35,7 +35,7 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 export const revalidate = 600;
 
 export const metadata = {
-  title: "Frankencoin System",
+  title: "Frankencoin system",
   description:
     "Frankencoin's system state — the ZCHF supply, the equity and reserve capital behind it, the Leadrate, and the challenge-auction enforcement record.",
 };

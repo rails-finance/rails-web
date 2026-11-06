@@ -30,7 +30,7 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 export const dynamic = "force-dynamic";
 
 export const metadata = listingMetadata({
-  title: "Liquity V2 Branches",
+  title: "Liquity V2 branches",
   canonicalPath: "/ethereum/liquity-v2/branches",
   description:
     "Liquity V2's three collateral branches and the order redemption reaches them — each branch with its own oracle, minimum collateral ratio and terms.",

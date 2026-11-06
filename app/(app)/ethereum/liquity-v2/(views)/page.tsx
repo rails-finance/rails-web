@@ -44,7 +44,7 @@ export async function generateMetadata({
   searchParams: Promise<RawSearchParams>;
 }): Promise<Metadata> {
   const directory = listingMetadata({
-    title: "Explore Liquity V2 Troves",
+    title: "Explore Liquity V2 troves",
     canonicalPath: LIQUITY_V2_BASE_PATH,
     description:
       "Explore all Liquity V2 Troves across ETH, wstETH, and rETH collateral types. Filter by owner, status, collateral ratio, and more. View detailed transaction timelines for any trove.",

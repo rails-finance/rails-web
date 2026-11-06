@@ -34,7 +34,7 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 export const revalidate = 600;
 
 export const metadata = {
-  title: "Dolomite Markets",
+  title: "Dolomite markets",
   description:
     "Every Dolomite market and the protocol's own margin ladder over it — premiums, live rates and its own oracle prices.",
 };

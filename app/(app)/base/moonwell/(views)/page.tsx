@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export const metadata = listingMetadata({
-  title: "Explore Moonwell Positions on Base",
+  title: "Explore Moonwell positions on Base",
   canonicalPath: "/base/moonwell",
 });
 

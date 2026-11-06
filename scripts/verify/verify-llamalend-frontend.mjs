@@ -15,6 +15,7 @@
 import { readFileSync } from "node:fs";
 import { chromium } from "playwright";
 import { openPositionCards } from "./lib/position-card.mjs";
+import { openCardOnFigures } from "./lib/card-tabs.mjs";
 
 import { BASE, hostFetch, bypassHeaders } from "./lib/host.mjs";
 // The chain-scoped explorer route (rails-ops decision 0016). `/llamalend` is a
@@ -49,6 +50,15 @@ const WIRE = {};
 
 /** Open every collapsed disclosure on the page (the event rows' (i) panes,
  *  the card's explanation), then read what a reader sees. */
+/** The visible text, then the whole text without scripts: an opened card
+ *  keeps its Explanation and Figures in the DOM behind its tabs (ui-jobs 370). */
+const wholeText = (pg) =>
+  pg.evaluate(() => {
+    const body = document.body.cloneNode(true);
+    for (const s of body.querySelectorAll("script, style")) s.remove();
+    return `${document.body.innerText}\n${body.textContent}`;
+  });
+
 async function openAllAndRead(pg) {
   for (const b of await pg.$$('button[aria-expanded="false"]')) {
     try {
@@ -56,7 +66,7 @@ async function openAllAndRead(pg) {
     } catch {}
   }
   await pg.waitForTimeout(2500);
-  return pg.evaluate(() => document.body.innerText);
+  return wholeText(pg);
 }
 
 let failures = 0;
@@ -451,7 +461,9 @@ try {
     // here — the caption follows "Converting now" and a word boundary between
     // "w" and "4" does not exist. A negative lookbehind on a digit says what is
     // actually meant: this count, not the tail of a longer number.
-    new RegExp(`(?<!\\d)${sl.bands} bands:`).test(body) && /Soft-liquidation: [\d.,]+× the onset price/.test(body),
+    // The onset multiple is the panel's "Price over onset" row (ui-jobs 322).
+    new RegExp(`(?<!\\d)${sl.bands} bands:`).test(body) &&
+      /Price over onset(Price over onset, explain)?\s*[\d.,]+×/.test(body),
   );
   check(
     "detail: REAL timeline events render (borrow rows)",
@@ -478,34 +490,36 @@ try {
     await page.goto(`${BASE}${EXPLORER}?q=${LIQNOW.user}`, { waitUntil: "networkidle", timeout: 180000 });
     await page.waitForSelector("[data-llamalend-liquidatable]", { timeout: 60000 }).catch(() => {});
     body = await page.textContent("body");
+    // The listing row's pill says Liquidatable (llamalend-position-card.tsx:
+    // a listing row has no panel, so its pill says it); the row states no
+    // health since the card of ui-jobs 324, so the health is the detail's.
     check(
-      `listing: liquidatable row reads "Liquidatable" at ${healthText}`,
-      /Liquidatable/.test(body) && body.includes(healthText) && !/In soft-liquidation/.test(body),
+      `listing: liquidatable row reads "Liquidatable"`,
+      /Liquidatable/i.test(body) && !/In soft-liquidation/i.test(body),
     );
     pageErrors.length = 0;
     await page.goto(`${BASE}${EXPLORER}/${LIQNOW.controller}/${LIQNOW.user}`, {
       waitUntil: "networkidle",
       timeout: 180000,
     });
-    await page.waitForSelector('[data-llamalend-mode="liquidatable"]', { timeout: 120000 }).catch(() => {});
-    const pill = await page
-      .$eval("[data-llamalend-mode]", (el) => ({
-        mode: el.getAttribute("data-llamalend-mode"),
-        text: el.textContent,
-        cls: el.className,
-      }))
-      .catch(() => null);
-    check(
-      "detail: liquidatable card's mode pill reads Liquidatable on the critical red",
-      pill?.mode === "liquidatable" && pill.text === "Liquidatable" && /bg-red-500/.test(pill.cls),
-      pill ? `${pill.text} (${pill.mode})` : "no mode pill",
-    );
     await openPositionCards(page);
-    await page.waitForSelector("text=anyone may liquidate it now", { timeout: 60000 }).catch(() => {});
+    await page.waitForSelector("[data-llamalend-liquidatable]", { timeout: 120000 }).catch(() => {});
+    // A detail card names Liquidatable in its panel, in the critical red, and
+    // states the chain read's health.
+    const row = await page
+      .$eval("[data-llamalend-liquidatable]", (el) => ({ text: el.textContent, cls: el.className }))
+      .catch(() => null);
     body = await page.textContent("body");
     check(
-      "detail: opened card leads with the liquidatable line, not soft-liquidation",
-      /Liquidatable: below 0, anyone may liquidate it now/.test(body) && !/is in soft-liquidation right now/.test(body),
+      `detail: liquidatable card's panel names Liquidatable on the critical red, at ${healthText}`,
+      /anyone may liquidate it now/.test(row?.text ?? "") &&
+        /text-red-500/.test(row?.cls ?? "") &&
+        body.includes(healthText),
+      row ? row.text : "no Liquidatable row",
+    );
+    check(
+      "detail: the card's explanation leads with the liquidatable line, not soft-liquidation",
+      /and anyone may liquidate it now/.test(body) && !/is in soft-liquidation right now/.test(body),
     );
     check("detail (liquidatable): no page errors", pageErrors.length === 0, pageErrors.join(" | "));
   }
@@ -528,71 +542,50 @@ try {
     .first()
     .waitFor({ timeout: 120000 });
   body = await page.textContent("body");
-  check("liq detail: closed/liquidated card renders (no false OPEN)", /LIQUIDATED|CLOSED/.test(body));
-  check("liq detail: hard-liquidation row reads Liquidated with the 'by' chip", /Liquidated\s*by 0x/.test(body));
+  check("liq detail: closed/liquidated card renders (no false OPEN)", /Outcome\s*(Liquidated|Closed)/.test(body));
+  check("liq detail: hard-liquidation row reads Liquidated with the 'by' chip", /Liquidated\s*by\s*0x/.test(body));
   check("liq detail: SELF-liquidation renders as its own label", /Self-liquidation/.test(body));
   // Assert absence of the caption open cards DO render — "soft-liquidation
   // begins" no longer renders anywhere, so testing for it was vacuously green.
   check("liq detail: no band figures on a closed position (stale ticks withheld)", !/\d+ bands:/.test(body));
 
-  // The explainer bullets mount only when a card's detail panel and its
-  // icon-only Explanation tab (aria-label "Show … explanation") are opened —
-  // drive the disclosures like a reader would, then assert. Expand every
-  // liquidation-family row so both the partial hard-liq and the self-liq
-  // explainers are in the DOM.
-  {
-    const liqHeaders = page.getByRole("button", { name: /^(Liquidated|(Closed loan|Repaid) · Self-liquidation)/ });
-    const n = await liqHeaders.count();
-    for (let i = 0; i < n; i++) {
-      await liqHeaders
-        .nth(i)
-        .click({ timeout: 5000 })
-        .catch(() => {});
-      await page.waitForTimeout(200);
-    }
-    // Opening a tab flips its aria-label to "Hide … explanation" and reflows the
-    // page — so always click the FIRST remaining "Show … explanation", re-located
-    // fresh each pass, force-clicked (the icon can sit under the fixed strips).
-    for (let pass = 0; pass < 10; pass++) {
-      const tab = page.locator("[aria-label^='Show'][aria-label$='explanation']").first();
-      if ((await tab.count().catch(() => 0)) === 0) break;
-      await tab.scrollIntoViewIfNeeded().catch(() => {});
-      const ok = await tab
-        .click({ timeout: 8000, force: true })
-        .then(() => true)
-        .catch(() => false);
-      if (!ok) break;
-      await page.waitForTimeout(250);
-    }
-    await page.waitForTimeout(400);
+  // Every liquidation-family row opened: an opened card shows its
+  // Explanation (ui-jobs 370), so the bullets are read first, then each row is
+  // switched to Figures for its collateral after.
+  const liqRows = page.locator("[data-event-id]").filter({ hasText: /Liquidated|Self-liquidation/ });
+  const nLiq = await liqRows.count();
+  for (let i = 0; i < nLiq; i++) {
+    const header = liqRows.nth(i).locator('[data-anatomy="T1"] [role="button"]').first();
+    if ((await liqRows.nth(i).locator("[data-card-tab-open]").count()) === 0) await header.click().catch(() => {});
+    await page.waitForTimeout(200);
   }
+  await page.waitForTimeout(600);
   body = await page.textContent("body");
   // A partial liquidation logs no after-state. The row states what the
   // position held from the chain read at its block (event-state), so every
-  // liquidation row carries a Collateral stat, and none prints a zero the
-  // chain never stated: the partial rows' figures are the read's.
+  // liquidation row's Figures carry the collateral after.
   {
-    // The read is two archive calls per row; give it time to land. A card is
-    // its `data-event-id` row.
-    await page
-      .waitForFunction(
-        () =>
-          [...document.querySelectorAll("[data-event-id]")]
-            .filter((c) => /iquidat/.test(c.innerText) && /Position state|Collateral/.test(c.innerText))
-            .every((c) => /Collateral/.test(c.innerText)),
-        null,
-        { timeout: 30000 },
-      )
-      .catch(() => {});
-    const perRow = await page.evaluate(() =>
-      [...document.querySelectorAll("[data-event-id]")]
-        .filter((c) => /iquidat/.test(c.innerText) && /Position state|Collateral/.test(c.innerText))
-        .map((c) => /Collateral/.test(c.innerText)),
-    );
+    const perRow = [];
+    for (let i = 0; i < nLiq; i++) {
+      await openCardOnFigures(liqRows.nth(i));
+      // The read is two archive calls per row; give it time to land.
+      await liqRows
+        .nth(i)
+        .getByText("Collateral total, explain")
+        .first()
+        .waitFor({ timeout: 30000 })
+        .catch(() => {});
+      const t =
+        (await liqRows
+          .nth(i)
+          .textContent()
+          .catch(() => "")) ?? "";
+      perRow.push(/After this event\s*Collateral total(, explain)?\s*[<$\d]/.test(t));
+    }
     check(
       "liq detail: every opened liquidation row states its collateral after (log or chain read)",
       perRow.length > 0 && perRow.every(Boolean),
-      `${perRow.length} opened rows (wire ${WIRE.liqRows}, ${WIRE.liqNoAfterImage} with no after-image)`,
+      `${perRow.filter(Boolean).length} of ${perRow.length} rows (wire ${WIRE.liqRows}, ${WIRE.liqNoAfterImage} with no after-image)`,
     );
   }
   check("liq detail: converted-taken stated (both AMM legs seized)", /the AMM had converted/.test(body));
@@ -645,40 +638,48 @@ try {
       repayIn.before?.healthRaw === "23488142984460246" &&
       repayIn.after?.healthRaw === "50844625291548962",
   );
+  // The position was liquidated on 29 Oct 2026, so the live read has no loan
+  // and the card is the liquidated card: the open card's health, its stored
+  // discount and its "Lost to soft-liquidation" line are gone with the loan.
+  // What the closed card states instead is the owner's outcome.
   const live = await (
     await hostFetch(`${BASE}/api/chain/llamalend/position?controller=${NR.controller}&user=${NR.user}`)
   ).json();
   check(
-    "position: health(user, true) and the stored discount ride the live read",
-    typeof live.healthFull === "number" && live.liquidationDiscount === 0.04,
-    `${live.healthFull} · ${live.liquidationDiscount}`,
+    "position: the liquidated loan reads no loan on the live read",
+    live.hasLoan === false && live.healthFull == null,
+    `hasLoan ${live.hasLoan}, healthFull ${live.healthFull}`,
   );
-  await page.addInitScript(() => {
-    try {
-      localStorage.setItem(
-        "rails-open-cards-v1",
-        JSON.stringify({
-          "llamalend:borrow:413b4e3d3cc6a7c487b619e137e5e5f54d7727ca22e107544921a9defde26c3c:187:self": true,
-        }),
-      );
-    } catch {}
-  });
   await page.goto(`${BASE}${EXPLORER}/${NR.controller}/${NR.user}`, { waitUntil: "networkidle", timeout: 180000 });
-  // The card draws closed (ui-jobs 209); the lost line is in its opened layer.
-  await openPositionCards(page);
-  await page.waitForSelector("text=Lost to soft-liquidation", { timeout: 120000 });
-  await page.waitForSelector("text=fewer than after the 11 Jun event", { timeout: 120000 });
+  await page
+    .locator('[data-event-id*=":187:"]')
+    .first()
+    .waitFor({ timeout: 120000 })
+    .catch(() => {});
   body = await page.textContent("body");
-  check("nr: card states health", /Health:?\s*[\d.]+%/.test(body));
-  // Deposited 7.61413 WETH, held 7.42038 WETH while the collateral is unchanged.
   check(
-    "nr: card states the collateral lost to soft-liquidation",
-    /Lost to soft-liquidation:\s*0\.19375 WETH/.test(body),
+    "nr: the liquidated card states the owner's outcome",
+    /Outcome\s*Liquidated\s*29 Oct 2026/.test(body) &&
+      /kept the 15,916\.479 crvUSD borrowed and not repaid; lost the 7\.6141 WETH deposited/.test(body),
   );
-  check(
-    "nr: the add-collateral row reads its before from the chain",
-    /1\.0472/.test(body) && /0\.0061 WETH fewer/.test(body),
-  );
+  {
+    // The 13 Jun add-collateral row: its before is the chain's read at the
+    // block before (health 2.63%, event-state above).
+    const row = page.locator('[data-event-id*=":187:"]').first();
+    await row
+      .locator('[data-anatomy="T1"] [role="button"]')
+      .first()
+      .click()
+      .catch(() => {});
+    await page.waitForTimeout(800);
+    const t = (await row.textContent().catch(() => "")) ?? "";
+    check(
+      "nr: the add-collateral row reads its before from the chain",
+      /Added 1\.001 WETH of collateral without changing the debt/.test(t) &&
+        /Health rose from 2\.63% to 109\.48%/.test(t),
+      t.slice(0, 160),
+    );
+  }
   check("nr: no 'reversibly' in the page copy", !/reversibl/i.test(body));
   body = await openAllAndRead(page);
   check(
@@ -711,17 +712,24 @@ try {
     waitUntil: "networkidle",
     timeout: 180000,
   });
-  await p2.waitForSelector("text=83,966.3", { timeout: 120000 });
+  // The opening row's Figures name the price to its first band, a closed
+  // block's read (exact forever); the card's band top is today's, higher by
+  // the interest multiplier since. (Since the 7 Oct 2026 liquidation and the
+  // full conversion after it, the position is liquidatable, no longer in its
+  // bands: its live lines read as such below.)
+  const openRow = p2.locator(`[data-event-id="${INBAND.open}"]`).first();
+  await openRow.waitFor({ timeout: 120000 });
+  await openCardOnFigures(openRow);
+  const openText = (await openRow.textContent().catch(() => "")) ?? "";
   await openPositionCards(p2);
-  await p2.waitForSelector("text=Sold by the AMM, net", { timeout: 120000 });
+  await p2.waitForSelector("text=Band state", { timeout: 120000 });
   body = await openAllAndRead(p2);
-  // The opening row's band prices are a closed block's read (exact forever);
-  // the card's are today's, higher by the interest multiplier since.
-  const nowTop = Number((body.match(/10 bands:\s*([\d,.]+)/) ?? [])[1]?.replace(/,/g, ""));
+  const top = body.match(/10 bands:\s*([\d,.]+)(K?)/);
+  const nowTop = top ? Number(top[1].replace(/,/g, "")) * (top[2] ? 1000 : 1) : NaN;
   check(
-    "inband: opening row prices bands −79…−70 at 83,966.3 → 75,937.6; the card prices them higher now",
-    /83,966\.3 → 75,937\.6/.test(body) && nowTop > 83966.3,
-    `now ${nowTop}`,
+    "inband: opening row prices its first band at 83,966.3; the card prices the bands higher now",
+    /Price to the first band(, explain)?\s*83,966\.3 crvUSD/.test(openText) && nowTop > 83966.3,
+    `now ${top?.[0]}`,
   );
   check(
     "inband: the card says band prices rise with interest",
@@ -729,20 +737,27 @@ try {
   );
   check(
     "inband: converted tile is named Converted, with no method note",
-    // The tile states the whole balance and where it came from ("Converted:
-    // 682.643 crvUSD from sold WBTC"), not a compact figure.
-    /Converted:?\s*[\d.,]+K?\s*crvUSD from sold WBTC/.test(body) && !/read live, cross-checked/.test(body),
+    // The panel row states the balance and where it came from ("Converted
+    // 0.07 from sold WBTC").
+    /Converted(\s*Converted, explain)?\s*[\d.,]+K?\s*(crvUSD )?from sold WBTC/.test(body) &&
+      !/read live, cross-checked/.test(body),
   );
   if (inbandLive.healthFull != null && inbandLive.healthFull > 0 && inbandLive.healthFull < 0.05) {
     check("inband: health near 0 carries its plain line", /close to 0; below 0 anyone may liquidate it/.test(body));
   } else {
     console.log(`SKIP  inband: near-0 health line — health is ${inbandLive.healthFull} now`);
   }
-  check(
-    "inband: net sold WBTC stated on the card and in its explanation",
-    /Sold by the AMM, net:\s*0\.0\d+ WBTC/.test(body) &&
-      /Sold by the AMM and not bought back:\s*0\.0\d+ WBTC/.test(body),
-  );
+  if (inbandLive.fullyConverted) {
+    check(
+      "inband: a fully converted position says none remains as WBTC",
+      /Collateral\s*fully converted/.test(body) && /Nothing remains as WBTC/.test(body),
+    );
+  } else {
+    check(
+      "inband: net sold WBTC stated on the card",
+      /Sold by the AMM, net(Sold by the AMM, net, explain)?\s*[<\d.,]+/.test(body),
+    );
+  }
   check(
     "inband: flows put the converted balance on the collateral bar",
     /from those sales is on the collateral bar: received, spent, withdrawn or seized/.test(body),
@@ -778,12 +793,15 @@ try {
     timeout: 180000,
   });
   await p3.waitForSelector("text=Loan 2 of 2", { timeout: 120000 });
-  await p3.waitForSelector("text=74 … 83", { timeout: 120000 });
+  await p3.locator(`[data-event-id="${REOPEN.ids[1]}"]`).first().waitFor({ timeout: 120000 });
   body = await openAllAndRead(p3);
   check("reopen: first borrow of each loan opens it", /Opened loan 1,/.test(body) && /Opened loan 2,/.test(body));
   check("reopen: no top-up wording on loan 2's first borrow", !/Borrowed another 9,000/.test(body));
   check("reopen: band move said in price", /moved the bands 2 up in price, to 74…83/.test(body));
-  check("reopen: the full repay reads Close · Withdraw · Repay", /Close\s*Withdraw\s*Repay/.test(body));
+  check(
+    "reopen: the full repay reads Closed loan and clears the debt",
+    /Closed loan, 12 Jul 2025/.test(body) && /Repaid 18,701\.005 crvUSD of the position’s debt, clearing/.test(body),
+  );
   check("reopen: open again, then first opened", /Open again since[\s\S]{0,40}first opened/.test(body));
   check("reopen: lend market line on the card", /This is a lend market/.test(body));
   await p3.close();
@@ -793,7 +811,11 @@ try {
     user: "0x1d737e0122c270c5fa476dab9038d05363ad3a3c",
   };
   await page.goto(`${BASE}${EXPLORER}/${SPOT.controller}/${SPOT.user}`, { waitUntil: "networkidle", timeout: 180000 });
-  await page.waitForSelector("text=liquidated by", { timeout: 120000 });
+  await page
+    .locator("[data-event-id]")
+    .filter({ hasText: /Liquidated\s*by/ })
+    .first()
+    .waitFor({ timeout: 120000 });
   body = await page.textContent("body");
   check("spot: 4 transactions (two borrows, two liquidations)", /4 transactions/.test(body));
   check(
@@ -830,7 +852,15 @@ try {
       .catch(() => {});
     await page.waitForTimeout(2000);
   }
-  body = await page.evaluate(() => document.body.innerText);
+  body = await wholeText(page);
+  {
+    // The liquidation rows' Figures: the health at the start of the block and
+    // the collateral ledger.
+    const liq = page.locator("[data-event-id]").filter({ hasText: /Liquidated\s*by/ });
+    for (let i = 0; i < (await liq.count()); i++) await openCardOnFigures(liq.nth(i));
+    await page.waitForTimeout(1500);
+    body += `\n${await wholeText(page)}`;
+  }
   check("spot N1: a positive health near 0 keeps its digits", /0\.0019%/.test(body) && !/Health\s*0\.00%/.test(body));
   check(
     "spot N1: liquidation 1 states why it was eligible",
@@ -845,33 +875,20 @@ try {
       /The owner receives nothing from a hard liquidation and keeps the crvUSD they borrowed\./.test(body) &&
       /the liquidator paid the other 39,794\.17\d? crvUSD and received the 16\.323\d? WETH/.test(body),
   );
-  {
-    // Each event's Collateral cell opens into its ledger (anatomy T2.1): open
-    // them all, then read the liquidation whose ledger runs Deposited, Sold in
-    // soft liquidation, This liquidation.
-    for (const t of await page.locator("[data-ledger-toggle]").all()) {
-      await t.click({ force: true }).catch(() => {});
-      await page.waitForTimeout(300);
-    }
-    body = await page.evaluate(() => document.body.innerText);
-    const ledgers = await page.locator('[data-ledger-cell="collateral"]').allInnerTexts();
-    const ledger = ledgers.find((t) => /Sold in soft liquidation\s+[−-][\d.]+\s+WETH\s+This liquidation/.test(t));
-    const m = ledger?.match(
-      /Deposited\s+([\d.]+)\s+WETH[\s\S]*?Sold in soft liquidation\s+[−-]([\d.]+)\s+WETH\s+This liquidation\s+[−-]([\d.]+)\s+WETH/,
-    );
-    const ok =
-      m && Math.abs(Number(m[1]) - Number(m[2]) - Number(m[3])) < 0.0004 && Math.abs(Number(m[1]) - 36.4374) < 0.0001;
-    check(
-      "spot N3: the collateral side adds up in WETH",
-      !!ok,
-      m ? `${m[1]} deposited − ${m[2]} sold − ${m[3]} taken` : "no ledger with sold and taken rows",
-    );
-    check(
-      "spot N3: sold and taken are their own ledger rows, and the converted crvUSD is stated on the row",
-      !!ledger && /converted/.test(body),
-    );
-  }
-  check("spot N4: each liquidation figure is named", /−16\.32\s*taken\s*−57K\s*converted\s*−96K\s*cleared/.test(body));
+  // N3: the row's Figures carry the collateral side as its own lines, the
+  // WETH seized and the converted crvUSD apart (the Deposited / Sold / This
+  // liquidation ledger went with the card's tabs, ui-jobs 370, and no surface
+  // states the WETH sold, so the deposited − sold − taken sum is not read).
+  check(
+    "spot N3: the WETH seized and the converted crvUSD are their own lines on the row",
+    /Seized in liquidation(, explain)?[\s\S]{0,80}−16\.3232[\s\S]{0,80}Converted crvUSD(, explain)?[\s\S]{0,20}−56,527\.083/.test(
+      body,
+    ) && /lost the 36\.4374 WETH deposited/.test(body),
+  );
+  check(
+    "spot N4: each liquidation figure is named",
+    /16\.32 WETH taken, 56,527 crvUSD converted, 96,321 crvUSD cleared/.test(body),
+  );
   check(
     "spot N5: the borrow row states the distance to the bands",
     /the price could fall 24% before the bands/.test(body),
@@ -952,8 +969,9 @@ try {
     await p4
       .waitForFunction(() => /Health fell from/.test(document.body.innerText), null, { timeout: 60000 })
       .catch(() => {});
-    body = await p4.evaluate(() => document.body.innerText);
-    check("r4 P1: the tile reads before then after", /Health\s*29\.18%[\s\S]{0,80}?16\.01%/.test(body));
+    body = await wholeText(p4);
+    // The before → after tile went with the card's tabs (ui-jobs 370): the
+    // Figures state the health after, the Explanation the move.
     check("r4 P1: the row says which way health went", /Health fell from 29\.18% to 16\.01%\./.test(body));
     // The Lifetime flows panel replaced the tower (2fd4a07): the interest tile,
     // the wrapped flow labels and the per-bar tips went with it, and the
@@ -968,10 +986,12 @@ try {
       /It was never hard-liquidated\./.test(body) &&
         /Between 2 Jan 2024 and 26 Jan 2024 the AMM sold 0\.02398 WETH while the price sat in the bands/.test(body),
     );
-    // P4: the panel's key names every segment the position has.
+    // P4: the panel's how-to-read names the soft-liquidation sales on the
+    // collateral bar (its segment key went with the tower).
     check(
-      "r4 P4: the key names the withdrawn, sold and repaid segments",
-      /Key\s*Withdrawn\s*Sold in soft liquidation\s*Repaid/.test(body),
+      "r4 P4: the how-to-read names the AMM's sales on the collateral bar",
+      /The AMM sells WETH as its price falls and buys it back as it rises/.test(body) &&
+        /the collateral bar shows them as sold or bought back/.test(body),
     );
     await p4.close();
 
@@ -992,7 +1012,7 @@ try {
       if (!ok) break;
       await p5.waitForTimeout(250);
     }
-    body = await p5.evaluate(() => document.body.innerText);
+    body = await wholeText(p5);
     check(
       "r4 P4: the shortfall line names the converted crvUSD apart from the collateral left",
       /receive the [\d,.]+ crvUSD the AMM holds and [\d.]+ sDOLA/.test(body),
@@ -1004,15 +1024,28 @@ try {
     await p5.close();
 
     // P5: the V2 market says so beside the pair.
+    // The listing's first page holds no V2 row since its order changed, so
+    // the row is a V2 sDOLA market's holder, searched.
+    const v2 = (
+      await (
+        await hostFetch(`${BASE}/api/llamalend/positions?controller=0xc77d97cf01737eb7ace46cab7cd9f60ec51a40c0&limit=1`)
+      ).json()
+    ).data?.[0];
     const p6 = await browser.newPage({ extraHTTPHeaders: bypassHeaders() });
-    await p6.goto(`${BASE}${EXPLORER}`, { waitUntil: "networkidle", timeout: 180000 });
-    await p6.waitForSelector("text=/crvUSD · /", { timeout: 120000 });
-    const lbody = await p6.evaluate(() => document.body.innerText);
+    await p6.goto(`${BASE}${EXPLORER}?q=${v2?.user ?? ""}`, { waitUntil: "networkidle", timeout: 180000 });
+    await p6.waitForSelector("text=/V2 market/", { timeout: 120000 }).catch(() => {});
+    const lbody = await wholeText(p6);
     check(
-      "r4 P5: a V2 market reads 'pair · V2 market'",
-      /sDOLA \/ crvUSD · V2 market/.test(lbody) && !/crvUSDV2/.test(lbody),
+      "r4 P5: a V2 market says V2 market beside the pair",
+      /V2 market/.test(lbody) && /sDOLA \/ crvUSD/.test(lbody) && !/crvUSDV2/.test(lbody),
+      v2?.user ?? "no V2 holder",
     );
-    check("r4 P5: mint and lend markets keep their kind", /· mint market/.test(lbody) && /· lend market/.test(lbody));
+    await p6.goto(`${BASE}${EXPLORER}`, { waitUntil: "networkidle", timeout: 180000 });
+    await p6.waitForSelector("text=/(mint|lend) market/", { timeout: 120000 }).catch(() => {});
+    {
+      const list = await wholeText(p6);
+      check("r4 P5: mint and lend markets keep their kind", /mint market/.test(list) && /lend market/.test(list));
+    }
     await p6.close();
 
     // P6: an open position above its bands relates health to the price cushion.

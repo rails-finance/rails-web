@@ -12,6 +12,7 @@
 // Rows are roster-derived (`protocolsForChain`), never hardcoded: a new
 // explorer lands here by being added to `lib/shared/protocols`.
 
+import { CHROME_HOVER } from "@/components/nav/chrome-hover";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -27,7 +28,7 @@ import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 // Row state grammar, same as the nav menu's:
 //   rest    → text-foreground; hover → blue-600, blue-400 in dark ("this goes somewhere")
 //   current → muted + semibold, not clickable (you can't navigate to here)
-const ROW_REST = "font-medium text-foreground hover:text-blue-600 dark:hover:text-blue-400";
+const ROW_REST = `font-medium text-foreground ${CHROME_HOVER}`;
 const ROW_CURRENT = "font-semibold text-rb-500 pointer-events-none";
 
 /** One explorer row: icon chip and label, navigating to the listing. */
@@ -58,7 +59,10 @@ function ExplorerRow({
 
 const TAB = "flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg transition-colors focus-ring";
 const TAB_ON = "bg-rb-200 dark:bg-rb-700";
-const TAB_OFF = "hover:bg-rb-100 dark:hover:bg-rb-800";
+const TAB_OFF = CHROME_HOVER;
+
+/** The panel's section heading (ui-jobs 514): the search's and the chooser's. */
+export const PANEL_HEADING = "text-sm font-semibold text-rb-500";
 
 export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
   const pathname = usePathname();
@@ -82,7 +86,8 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
   const name = robinhood ? ROBINHOOD_LABEL : chain.name;
 
   return (
-    <div className="pt-6" data-anatomy="H4" data-explorer-chooser="">
+    <div className="pt-8" data-anatomy="H4" data-explorer-chooser="">
+      <h2 className={`${PANEL_HEADING} mb-3`}>Choose a chain, select a protocol</h2>
       <div className="flex items-center gap-1">
         <div role="tablist" aria-label="Blockchain" className="-ml-2 flex items-center gap-1" data-switcher-tabs="">
           {chains.map((c) => {

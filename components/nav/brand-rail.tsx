@@ -2,9 +2,10 @@
 
 // BrandRail — the narrow vertical strip down the left edge of every page from
 // md (rails-ops TO-DO-ui-jobs 67, 68, 498), fixed, so the nav holds its place
-// as the page scrolls. The Rails mark at the top opens the wallet panel
-// (H15.1, ui-jobs 509), which glides out from the rail's right edge with the
-// search and the explorer chooser; the beta pill is at the foot.
+// as the page scrolls. The Rails mark at the top goes home; under it the
+// sidebar toggle (H15.1, ui-jobs 514) opens the wallet panel, which slides out
+// from beneath the rail with the search and the explorer chooser, and closes it
+// from the same place. The beta pill is at the foot.
 //
 // IT IS A SURFACE, NOT A MARGIN (68): `bg-raised` is the same tone the cards
 // and panels take, so the strip reads as chrome the page sits beside rather
@@ -18,6 +19,9 @@
 // BELOW `md` THERE IS NO RAIL: at phone widths 56px of permanent gutter is a
 // sixth of the page. HeaderBar draws the mark and its chevron there.
 
+import Link from "next/link";
+
+import { RailsMark } from "@/components/nav/rails-mark";
 import { SearchLauncher } from "@/components/shared/front-door-search";
 
 /** The release-stage pill at the very foot of the rail
@@ -49,10 +53,20 @@ export function BrandRail() {
         data-anatomy="H1"
         className="fixed inset-y-0 left-0 z-40 hidden w-14 flex-col items-center justify-between bg-raised pt-4 md:flex"
       >
-        {/* The Rails mark opens the wallet panel (H15.1, ui-jobs 509): the
-            search and the explorer chooser; a chevron shows beside it on
-            hover. Home is in the panel's top row. */}
-        <SearchLauncher placement="rail" />
+        {/* The Rails mark goes home and holds its place while the panel opens
+            beside it; the toggle under it opens and closes the panel
+            (ui-jobs 514). */}
+        <div className="flex flex-col items-center gap-3.5">
+          <Link
+            href="/"
+            className="flex h-[38px] w-[38px] items-center justify-center rounded-lg text-foreground focus-ring"
+            aria-label="Rails home"
+            data-rail-home=""
+          >
+            <RailsMark size={30} />
+          </Link>
+          <SearchLauncher placement="rail" />
+        </div>
         {/* The pill flush to the left edge. The theme switch is in the
             profile control's menu (H20, ui-jobs 504). */}
         <div className="flex w-full flex-col items-center">

@@ -24,7 +24,7 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Basedollar Branches",
+  title: "Basedollar branches",
   description:
     "Basedollar's five collateral branches and the order redemption reaches them — each branch with its own oracle, minimum collateral ratio and terms.",
   ...unlaunchedRobotsForPath("/base/basedollar/branches"),

@@ -5,11 +5,11 @@ import { formatExact } from "@/lib/utils/format";
 import { ExactTip } from "@/components/shared/amount-text";
 import { useUnreadTokenOf } from "@/components/shared/unread-tokens-context";
 import { TokenAmountNotLoaded } from "@/components/shared/not-loaded";
-import { Fragment, createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
+import { Fragment, createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Calculator } from "lucide-react";
 
-import { EventCard } from "@/components/shared/event-card";
+import { EventCard, groupCardKey } from "@/components/shared/event-card";
 import { GroupSheetCollector, type CollectedCard } from "@/components/shared/group-sheet";
 import type { EventSheet, SheetFigure } from "@/components/shared/event-sheet";
 import { ProseExplainer } from "@/lib/shared/explainer-prose";
@@ -248,7 +248,6 @@ export function TimelineRunCard({
     onOpen();
   }, [open, onOpen]);
   const hideVal = useHeaderValueHideClass();
-  const membersId = useId();
   // The summary card's balance sheet, read from the members' own
   // (`group-sheet.tsx`) once it opens; null where they do not read as one.
   // Undefined until the members are read and collected: the summary then
@@ -261,6 +260,10 @@ export function TimelineRunCard({
 
   const [fromTs, toTs] =
     firstTimestamp <= lastTimestamp ? [firstTimestamp, lastTimestamp] : [lastTimestamp, firstTimestamp];
+  // The summary card's ids and the members' region name the run, not its
+  // place in the tree (\`groupCardKey\`).
+  const nameKey = groupCardKey(memberNoun, fromTs, toTs, count);
+  const membersId = `grp-${nameKey}-members`;
   const sameDay = shortDate(fromTs) === shortDate(toTs) && shortDateYear(fromTs) === shortDateYear(toTs);
   const range = sameDay
     ? `${shortDate(fromTs)} ${shortDateYear(fromTs)}`
@@ -665,6 +668,7 @@ export function TimelineRunCard({
           spokenCaption={`${kindWord}, ${spokenRange}`}
           label={`${countText}, ${spokenRange}${spokenSums.length ? `: ${spokenSums.join(", ")}` : ""}`}
           group="summary"
+          nameKey={nameKey}
           muted={muted}
         />
       }

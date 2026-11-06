@@ -72,7 +72,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     canonicalPath: compoundBaseWalletHref(wallet),
     image: "dynamic",
   });
-  const title = `Compound V3 on Base Wallet ${shortSubject(wallet)}`;
+  const title = `Compound V3 on Base wallet ${shortSubject(wallet)}`;
   const description = `Every Compound V3 market on Base this wallet has touched, read live from the Comets, one card each.`;
   return {
     ...base,

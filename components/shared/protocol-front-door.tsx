@@ -49,7 +49,7 @@ export function ProtocolFrontDoor({ session }: { session: SessionProtocol }) {
         </h1>
         {/* The chain, named under the name: the chooser that named it moved
             to the brand rail (ui-jobs 497). */}
-        <ChainLabel chainId={entry.chainId} className="mb-8" />
+        <ChainLabel chainId={entry.chainId} className="mb-8" named />
         <div className="w-full max-w-xl">
           <FrontDoorSearch href={(wallet) => `${entry.href}/${wallet}`} />
         </div>
