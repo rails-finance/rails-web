@@ -8,7 +8,7 @@
 // bookmarked address shows a small filled Bookmark between its label and the
 // chevron.
 
-import { CHROME_HOVER, CHROME_HOVER_ON } from "@/components/nav/chrome-hover";
+import { CANVAS_HOVER, CANVAS_HOVER_ON } from "@/components/nav/chrome-hover";
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Bookmark, Check, ChevronDown, Copy, Wallet } from "lucide-react";
@@ -138,7 +138,7 @@ export function WalletMenu({
       // a name that fitted ("boldlygo.eth") truncated.
       className={`relative flex h-7 min-w-0 cursor-pointer items-center gap-1.5 rounded-md transition-colors focus-ring after:absolute after:-inset-y-2 after:inset-x-0 after:content-[''] ${
         heading
-          ? `-mx-1.5 max-w-[calc(100%+0.75rem)] rounded-lg px-1.5 text-foreground ${open ? CHROME_HOVER_ON : CHROME_HOVER}`
+          ? `-mx-1.5 max-w-[calc(100%+0.75rem)] rounded-lg px-1.5 text-foreground ${open ? CANVAS_HOVER_ON : CANVAS_HOVER}`
           : "max-w-full text-xs text-rb-500 hover:text-foreground"
       }`}
     >
