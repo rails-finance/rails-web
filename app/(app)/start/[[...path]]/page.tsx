@@ -108,19 +108,20 @@ async function Results({ results, group }: { results: ResultsKey; group?: GroupK
               className={PAGE_ROW}
             >
               <ProtocolIcon id={row.entry.id} className="h-6 w-6 shrink-0" />
-              <span className="flex min-w-0 flex-col">
-                <span className="flex items-center gap-2 text-base font-medium text-foreground">
-                  {row.entry.label}
-                  <span className="inline-flex items-center gap-1 text-xs font-normal text-rb-500">
-                    <ChainGlyph chainId={row.entry.chainId} className="h-3.5 w-3.5" />
-                    {CHAINS[row.entry.chainId].name}
-                  </span>
-                </span>
+              {/* The name and its line in a fixed column from sm, so the chain,
+                  named in words for a newcomer, lines up down the list as a
+                  column of its own (Miles, 6 Nov 2026). */}
+              <span className="flex min-w-0 flex-1 flex-col sm:w-64 sm:flex-none">
+                <span className="truncate text-base font-medium text-foreground">{row.entry.label}</span>
                 {(row.detail || !row.applied) && (
                   <span className="truncate text-sm text-rb-500">
                     {[row.detail, row.applied ? null : "Opens the full list"].filter(Boolean).join(" · ")}
                   </span>
                 )}
+              </span>
+              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-rb-500" data-start-chain="">
+                <ChainGlyph chainId={row.entry.chainId} className="h-3.5 w-3.5" />
+                {CHAINS[row.entry.chainId].name}
               </span>
               <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
             </Link>
