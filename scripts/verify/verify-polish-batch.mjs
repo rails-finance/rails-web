@@ -416,8 +416,8 @@ check("P phone @390: no framed sample", !sample.framed);
 {
   const g = await directoryGeo(pp);
   check(
-    "D home @390: the coverage pill wraps under the tabs, on the left edge",
-    g.pill[0] === g.left[2] && g.pill[2] - g.colTop > 20,
+    "D home @390: the coverage link ends the row under the tiles, as at 1280",
+    g.pill[1] === g.colRight && g.pill[2] > g.tileBottom,
     JSON.stringify(g),
   );
 }
