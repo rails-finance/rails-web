@@ -173,7 +173,7 @@ function ResultLine({ row, results }: { row: ResultRow; results: ResultsKey }) {
   return text ? <span className="block text-sm text-rb-500">{text}</span> : null;
 }
 
-/** A group's coins (G6; ui-jobs 525): "All <group>" first, then a row per
+/** A group's coins (G8; ui-jobs 525): "All <group>" first, then a row per
  *  coin opening the vaults that hold it, most held first. The count is the
  *  rows the link opens on (shownOnArrival), so it matches the roster; a coin
  *  with none is left off. Linked in the vault's own spelling. */
@@ -200,7 +200,7 @@ async function Coins({ group }: { group: GroupKey }) {
     })
     .sort((x, y) => y.count - x.count);
   return (
-    <div data-anatomy="G6" data-start-coins={group}>
+    <div data-anatomy="G8" data-start-coins={group}>
       <h2 className={QUESTION}>{g.coins?.question ?? g.label}</h2>
       <p className="mb-8 max-w-2xl text-lg text-rb-500">Each link opens the vaults that hold it.</p>
       <Link href={vaultsHref(group)} className={PAGE_ROW} data-start-coin="all">
