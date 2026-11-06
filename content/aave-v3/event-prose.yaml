@@ -368,15 +368,11 @@ words:
   t1_treasury: |-
     Aave treasury
 
-# The event page (ui-jobs 236, 307): the side column's paragraph, the facts'
+# The event page (ui-jobs 236, 307): the facts'
 # labels and the metadata description. {market} is the Pool's name (Core, Prime,
 # EtherFi, Base), {account} the shortened address and {day} the long date. Read
 # by lib/aave-v3/explorer.ts.
 page_words:
-  paragraph: |-
-    This page is one transaction from this account's history on the Aave V3 {market} Pool.
-  paragraph_seamless: |-
-    This page is one transaction from this account's history on the Seamless Pool, an Aave V3 market on Base.
   timeline_link: |-
     See the whole history in the timeline.
   market: |-

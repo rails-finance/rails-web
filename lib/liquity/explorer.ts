@@ -40,10 +40,6 @@ export const liquityV2Explorer: ExplorerAdapter<LiquityEventPageInput> = {
       // The route draws it from the card's head row, which states the amounts
       // with the receipts' tone and the redemption's P/L.
       title: "head",
-      words: {
-        paragraph: PAGE_WORDS.paragraph,
-        timelineLink: PAGE_WORDS.timeline_link,
-      },
       facts: [
         { key: "branch", label: PAGE_WORDS.branch, value: trove.collateralType },
         { key: "trove", label: PAGE_WORDS.trove, value: troveId, mono: true, copy: PAGE_WORDS.copy_trove },

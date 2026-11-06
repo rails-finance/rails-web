@@ -1003,7 +1003,7 @@ export function CardSidebarFrame({
   if (!identity) return <>{children}</>;
   return (
     <div
-      className={`relative flex rounded-xl bg-raised ${className}`}
+      className={`relative flex rounded-xl bg-background ${className}`}
       style={
         {
           "--brand-hue": identity.hue ?? 0,
@@ -1014,7 +1014,7 @@ export function CardSidebarFrame({
     >
       <SidebarTint rounded="rounded-xl" />
       <SidebarPanel identity={identity} link />
-      <div className="relative flex min-w-0 flex-1 flex-col max-md:pl-1.5 md:rounded-xl md:bg-raised">
+      <div className="relative flex min-w-0 flex-1 flex-col max-md:pl-1.5 md:rounded-xl md:bg-background">
         {narrow && (
           <div className="flex items-center gap-2 px-5 pt-4 md:hidden" data-card-protocol={identity.protocol.id}>
             <ProtocolIcon id={identity.protocol.id} className="h-4 w-4 shrink-0 text-rb-500 [&:is(img)]:grayscale" />

@@ -9,7 +9,6 @@ import { isDolomiteEvent, type BaseActivityEvent } from "@/lib/shared/types/even
 import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/event-title";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this account's history on Dolomite.",
   timeline_link: "See the whole history in the timeline.",
   account_number: "Account number",
   copy_account_number: "Copy the account number",
@@ -51,10 +50,6 @@ export const dolomiteExplorer: ExplorerAdapter<DolomiteEventPageInput> = {
   eventPage: ({ owner, accountNumber, event, ...slot }) => ({
     heading: dolomiteEventHeading(event),
     title: dolomiteEventTitle(event),
-    words: {
-      paragraph: WORDS.paragraph,
-      timelineLink: WORDS.timeline_link,
-    },
     facts: [
       {
         key: "account-number",

@@ -13,7 +13,6 @@ import { SKY_EVENT_LABEL } from "@/lib/sky-savings/event-label";
 import { skyFirstSentence } from "@/lib/sky-savings/explainer-clauses";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this saver's sUSDS history.",
   timeline_link: "See the whole history in the timeline.",
   savings: "Savings",
   savings_value: "sUSDS on Ethereum",
@@ -66,10 +65,6 @@ export const skySavingsExplorer: ExplorerAdapter<SkySavingsEventPageInput> = {
   eventPage: ({ holder, event, ...slot }) => ({
     heading: skySavingsEventHeading(event),
     title: skySavingsEventTitle(event),
-    words: {
-      paragraph: WORDS.paragraph,
-      timelineLink: WORDS.timeline_link,
-    },
     facts: [
       { key: "savings", label: WORDS.savings, value: WORDS.savings_value },
       {

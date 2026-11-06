@@ -30,7 +30,6 @@ const NAMES: Record<LiquityForkDeployment, string> = {
 const BURN = "0x0000000000000000000000000000000000000000";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this Trove's history.",
   timeline_link: "See the whole history in the timeline.",
   branch: "Branch",
   trove: "Trove",
@@ -140,10 +139,6 @@ export const liquityForkExplorer: ExplorerAdapter<LiquityForkEventPageInput> = {
     return {
       heading: liquityForkEventHeading(event, deployment),
       title: liquityForkEventTitle(event, deployment),
-      words: {
-        paragraph: WORDS.paragraph,
-        timelineLink: WORDS.timeline_link,
-      },
       facts: [
         { key: "branch", label: WORDS.branch, value: collateralType },
         { key: "trove", label: WORDS.trove, value: troveId, mono: true, copy: WORDS.copy_trove },

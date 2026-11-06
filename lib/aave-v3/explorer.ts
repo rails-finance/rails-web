@@ -94,13 +94,6 @@ export const aaveV3Explorer: ExplorerAdapter<AaveV3EventPageInput> = {
   eventPage: ({ market, wallet, deployment, siblings, event, ...slot }) => ({
     heading: aaveV3EventHeading(event, deployment, siblings),
     title: aaveV3EventTitle(event, deployment, siblings),
-    words: {
-      paragraph:
-        deployment === "seamless"
-          ? AAVE_V3_PAGE_WORDS.paragraph_seamless
-          : PROSE.fillText(AAVE_V3_PAGE_WORDS.paragraph, { market }),
-      timelineLink: AAVE_V3_PAGE_WORDS.timeline_link,
-    },
     facts: [
       { key: "market", label: AAVE_V3_PAGE_WORDS.market, value: market },
       {

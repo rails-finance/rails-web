@@ -59,7 +59,7 @@ export const CONTEXT_WORDS = FILE.context_words;
 export const FOOTER_WORDS = FILE.footer_words;
 /** The Copy for LLM control and the block's own words. */
 export const COPY_WORDS = FILE.copy_words;
-/** The event page's paragraph and its card's page controls. */
+/** The event page's facts rows and its metadata description. */
 export const PAGE_WORDS = FILE.page_words;
 /** The Trove listing, the Trove page, the run card and the position card's
  *  explanation: the words around the events. Read through troveWords. */

@@ -11,7 +11,6 @@ import { aaveV4Label } from "@/lib/aave-v4/event-label";
 import { aaveV4EventProse, type AaveV4Event } from "@/lib/aave-v4/event-prose";
 
 const WORDS = {
-  paragraph: (spoke: string) => `This page is one transaction from this account's history on the ${spoke} spoke.`,
   timeline_link: "See the whole history in the timeline.",
   spoke: "Spoke",
   account: "Account",
@@ -77,10 +76,6 @@ export const aaveV4Explorer: ExplorerAdapter<AaveV4EventPageInput> = {
   eventPage: ({ spokeName, wallet, deployment, event, ...slot }) => ({
     heading: aaveV4EventHeading(event),
     title: aaveV4EventTitle(event),
-    words: {
-      paragraph: WORDS.paragraph(spokeName),
-      timelineLink: WORDS.timeline_link,
-    },
     facts: [
       { key: "spoke", label: WORDS.spoke, value: spokeName },
       {

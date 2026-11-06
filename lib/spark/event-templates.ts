@@ -76,7 +76,7 @@ export const SPARK_HEAD_WORDS: AaveFamilyHeadTable = {
   gatewayName: SPARK_WORDS.t1_gateway_name,
 };
 
-/** The event page's side column: the paragraph, the facts' labels and the
+/** The event page's side column: the facts' labels and the
  *  metadata description. */
 export const SPARK_PAGE_WORDS = FILE.page_words;
 

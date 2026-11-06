@@ -12,7 +12,6 @@ import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/a
 import { polarisSurplusLabel } from "@/lib/polaris/surplus-claim";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this position's history.",
   timeline_link: "See the whole history in the timeline.",
   market: "Market",
   cdp: "Position",
@@ -98,10 +97,6 @@ export const polarisExplorer: ExplorerAdapter<PolarisEventPageInput> = {
   eventPage: ({ market, cdpId, holder, closed, event, ...slot }) => ({
     heading: polarisEventHeading(event),
     title: polarisEventTitle(event),
-    words: {
-      paragraph: WORDS.paragraph,
-      timelineLink: WORDS.timeline_link,
-    },
     facts: [
       { key: "market", label: WORDS.market, value: `${POLARIS_MARKET_CONFIG[market].stable.symbol} market` },
       { key: "cdp", label: WORDS.cdp, value: cdpId, mono: true, copy: WORDS.copy_cdp },

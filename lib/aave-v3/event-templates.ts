@@ -88,7 +88,7 @@ export const V3_HEAD_WORDS: AaveFamilyHeadTable = {
   treasury: V3_WORDS.t1_treasury,
 };
 
-/** The event page's side column: the paragraph, the facts' labels and the
+/** The event page's side column: the facts' labels and the
  *  metadata description. */
 export const AAVE_V3_PAGE_WORDS = FILE.page_words;
 

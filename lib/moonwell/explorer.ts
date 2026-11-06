@@ -12,7 +12,6 @@ import { externalActor } from "@/lib/shared/external-actor";
 import { moonwellEventProse } from "@/lib/moonwell/event-prose";
 
 const WORDS = {
-  paragraph: (deployment: string) => `This page is one transaction from this account's history in ${deployment}.`,
   timeline_link: "See the whole history in the timeline.",
   market: "Market",
   collateral: "Collateral seized",
@@ -94,10 +93,6 @@ export const moonwellExplorer: ExplorerAdapter<MoonwellEventPageInput> = {
     return {
       heading: moonwellEventHeading(event, deployment),
       title: moonwellEventTitle(event, deployment),
-      words: {
-        paragraph: WORDS.paragraph(DEPLOYMENT_NAME[deployment]),
-        timelineLink: WORDS.timeline_link,
-      },
       facts: [
         ...(ctx ? [{ key: "market", label: WORDS.market, value: ctx.marketSymbol }] : []),
         ...(ctx?.eventType === "liquidation" && ctx.collateralSymbol

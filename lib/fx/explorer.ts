@@ -14,7 +14,6 @@ import type { FxCoords } from "@/lib/fx/event-provenance";
 import { FX_POOLS, isFxPoolKey, type FxPoolKey } from "@/lib/fx/asset-catalog";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this position's history.",
   timeline_link: "See the whole history in the timeline.",
   pool: "Pool",
   position: "Position",
@@ -70,10 +69,6 @@ export const fxExplorer: ExplorerAdapter<FxEventPageInput> = {
   eventPage: ({ pool, positionId, owner, event, ...slot }) => ({
     heading: fxEventHeading(event),
     title: fxEventTitle(event),
-    words: {
-      paragraph: WORDS.paragraph,
-      timelineLink: WORDS.timeline_link,
-    },
     facts: [
       { key: "pool", label: WORDS.pool, value: `${FX_POOLS[pool].tokenSymbol} pool` },
       { key: "position", label: WORDS.position, value: positionId, mono: true, copy: WORDS.copy_position },

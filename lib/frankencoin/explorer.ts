@@ -10,7 +10,6 @@ import { eventTitleWords, makeEventTitle, type EventTitle, type EventTitleAmount
 import { frankencoinEventProse, frankencoinExplanationRuns } from "@/lib/frankencoin/event-prose";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this position's history.",
   timeline_link: "See the whole history in the timeline.",
   market: "Collateral",
   position: "Position",
@@ -131,10 +130,6 @@ export const frankencoinExplorer: ExplorerAdapter<FrankencoinEventPageInput> = {
   eventPage: ({ position, collateralSymbol, owner, event, ...slot }) => ({
     heading: frankencoinEventHeading(event),
     title: frankencoinEventTitle(event),
-    words: {
-      paragraph: WORDS.paragraph,
-      timelineLink: WORDS.timeline_link,
-    },
     facts: [
       { key: "market", label: WORDS.market, value: collateralSymbol },
       { key: "position", label: WORDS.position, value: position, mono: true, copy: WORDS.copy_position },

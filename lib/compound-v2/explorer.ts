@@ -12,7 +12,6 @@ import { externalActor } from "@/lib/shared/external-actor";
 import { compoundV2EventProse, type CompoundV2Event } from "@/lib/compound-v2/event-prose";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this account's history across the Compound V2 markets.",
   timeline_link: "See the whole history in the timeline.",
   market: "Market",
   account: "Account",
@@ -102,10 +101,6 @@ export const compoundV2Explorer: ExplorerAdapter<CompoundV2EventPageInput> = {
     return {
       heading: compoundV2EventHeading(event),
       title: compoundV2EventTitle(event),
-      words: {
-        paragraph: WORDS.paragraph,
-        timelineLink: WORDS.timeline_link,
-      },
       facts: [
         ...(market ? [{ key: "market", label: WORDS.market, value: market }] : []),
         {

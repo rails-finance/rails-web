@@ -19,7 +19,12 @@ import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu, useEventMenuRows } from "@/components/shared/event-card-menu";
-import { EventPageAside, EventPageContext, EventPageMenu, EventPageSteps } from "@/components/shared/event-page-aside";
+import {
+  EventPageAside,
+  EventPageContext,
+  EventPageControls,
+  EventPageSteps,
+} from "@/components/shared/event-page-aside";
 import { EVENT_PAGE_WORDS } from "@/lib/shared/event-page-words";
 import { CardSidebarFrame } from "@/components/shared/position-card";
 import { SheetCollectContext, type CollectedCard, type GroupLane } from "@/components/shared/group-sheet";
@@ -1015,7 +1020,7 @@ function EventCardView(props: EventCardProps) {
                       <div className="relative" data-event-page-card="">
                         {body}
                         <div className="absolute right-3 top-3 flex h-7 items-center">
-                          <EventPageMenu page={page} provScope={scopeId} />
+                          <EventPageControls page={page} provScope={scopeId} />
                         </div>
                       </div>
                       <div className="mt-auto pb-2">

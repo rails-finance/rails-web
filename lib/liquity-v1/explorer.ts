@@ -18,7 +18,6 @@ import {
 } from "@/lib/liquity-v1/event-figures";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this wallet's Trove history.",
   timeline_link: "See the whole history in the timeline.",
   market: "Market",
   market_value: "ETH / LUSD",
@@ -126,10 +125,6 @@ export const liquityV1Explorer: ExplorerAdapter<LiquityV1EventPageInput> = {
   eventPage: ({ wallet, event, ...slot }) => ({
     heading: liquityV1EventHeading(event),
     title: liquityV1EventTitle(event),
-    words: {
-      paragraph: WORDS.paragraph,
-      timelineLink: WORDS.timeline_link,
-    },
     facts: [
       { key: "market", label: WORDS.market, value: WORDS.market_value },
       {

@@ -669,13 +669,11 @@ copy_words:
 
 # ── The event page: the side column beside the card ──
 # The Trove's words in the shared column (components/shared/event-page-aside.tsx):
-# the paragraph and its timeline link, and the facts rows above the shared
-# ones (event, block, transaction). The metadata description is
+# the facts rows above the shared ones (event, time, block, transaction). The
+# metadata description, whose last words are `timeline_link`, is
 # `description`; {holder} is held_by or last_held_by (a closed Trove's owner is
 # its last one).
 page_words:
-  paragraph: |-
-    This page is one transaction; its figures are the Trove's state after it.
   description: |-
     One transaction from the {coll_symbol} Trove {trove}, {holder}: event {n|count} of {total|count}, on {day}. The figures are the Trove's state after it.
   held_by: |-

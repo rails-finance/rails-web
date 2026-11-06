@@ -11,7 +11,6 @@ import { mapleRowLabel } from "@/lib/maple/event-label";
 import { mapleTeaserSentence } from "@/lib/maple/explainer-clauses";
 
 const WORDS = {
-  paragraph: "This page is one transaction from this lender's history in the Maple pools.",
   timeline_link: "See the whole history in the timeline.",
   pool: "Pool",
   account: "Account",
@@ -85,10 +84,6 @@ export const mapleExplorer: ExplorerAdapter<MapleEventPageInput> = {
     return {
       heading: mapleEventHeading(event),
       title: mapleEventTitle(event),
-      words: {
-        paragraph: WORDS.paragraph,
-        timelineLink: WORDS.timeline_link,
-      },
       facts: [
         ...pool,
         {

@@ -12,6 +12,7 @@ export const EVENT_PAGE_WORDS = {
   view_markdown_hint: "This event as plain text, in a new tab",
   copy_link: "Copy link",
   copy_link_hint: "This page's address",
+  in_timeline: "View this event in the position's activity timeline",
   copy_hash: "Copy transaction hash",
   copy_llm: "Copy for LLM",
   copy_llm_hint: "This event as Markdown for an AI assistant",

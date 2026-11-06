@@ -11,8 +11,6 @@ import { shortMarketId } from "@/lib/morpho/asset-catalog";
 import { morphoEventProse, morphoExplanationRuns } from "@/lib/morpho/event-prose";
 
 const WORDS = {
-  paragraph: (deployment: string) =>
-    `This page is one transaction from this account's position in one ${deployment} market.`,
   timeline_link: "See the whole history in the timeline.",
   market: "Market",
   copy_market: "Copy the market id",
@@ -84,10 +82,6 @@ export const morphoExplorer: ExplorerAdapter<MorphoEventPageInput> = {
   eventPage: ({ marketId, marketLabel, wallet, deployment, event, ...slot }) => ({
     heading: morphoEventHeading(event),
     title: morphoEventTitle(event),
-    words: {
-      paragraph: WORDS.paragraph(DEPLOYMENT_NAME[deployment]),
-      timelineLink: WORDS.timeline_link,
-    },
     facts: [
       {
         key: "market",

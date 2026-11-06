@@ -3,14 +3,14 @@
 // The event page's side column (rails-ops TO-DO-ui-jobs 236), in the spine's
 // place beside the card, the same on every family: the page's h1 (the card's
 // teaser where it has one, else the family's header in its title form,
-// ui-jobs 286), the paragraph with the timeline link, the facts table (the
-// family's rows less the one repeating the wallet heading's address, then the
-// event's place, time, block and transaction), and at its foot the Learn more
-// link reading the modal's title (ui-jobs 380). The column stands inside the
-// protocol's bar (C20). The event's ⋮ (Copy link, Copy transaction hash, the
-// explorer, View as Markdown, Copy for LLM, Inspect provenance) sits at the
-// card's top right and the previous and next arrows under the card
-// (`EventPageMenu`, `EventPageSteps`; design rounds of 6 Nov 2026).
+// ui-jobs 286), the facts table (the family's rows less the one repeating the
+// wallet heading's address, then the event's place, time, block and
+// transaction), and at its foot the Learn more link reading the modal's title
+// (ui-jobs 380). The column stands inside the protocol's bar (C20). The card's
+// top right holds View in timeline and the event's ⋮ (Copy link, the
+// explorer, View as Markdown, Copy for LLM, Inspect provenance); the previous
+// and next arrows sit under the card (`EventPageControls`, `EventPageSteps`;
+// design rounds of 6 Nov 2026).
 // The family supplies the data and its words (`EventPageContract`); the
 // shared words are `lib/shared/event-page-words.ts`. The table is identity
 // and position, no figure that carries a receipt, so the provenance tripwire
@@ -18,7 +18,7 @@
 
 import { createContext, Fragment, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, FileText, Hash, Link2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Copy, ExternalLink, FileText, History, Link2 } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { titleFigure, type EventTitle } from "@/lib/shared/event-title";
@@ -190,8 +190,6 @@ function FactRow({ fact }: { fact: EventPageFact }) {
   );
 }
 
-const shortHash = (h: string) => `${h.slice(0, 6)}…${h.slice(-4)}`;
-
 /** The event's rows of its ⋮ on the event page. Each carries
  *  `data-menu-item`, the names the actions row had, for the verifiers. A copy
  *  row keeps the menu open and confirms in place, its icon a tick and its
@@ -223,14 +221,6 @@ function EventPageRows({ c, close }: { c: EventPageContract; close: () => void }
           onClick={() => copy("link", `${window.location.origin}${shareHref}`)}
         />
       )}
-      <ToolsMenuItem
-        item="copy-tx-hash"
-        icon={copied === "hash" ? tick : <Hash size={16} />}
-        title={W.copy_hash}
-        subtitle={copied === "hash" ? W.copied : shortHash(c.txHash)}
-        copied={copied === "hash"}
-        onClick={() => copy("hash", c.txHash)}
-      />
       <ToolsMenuItem
         item="view-explorer"
         icon={<ExternalLink size={16} />}
@@ -283,18 +273,30 @@ function EventPageSentence({ sentence, beside }: { sentence: ReactNode; beside?:
   );
 }
 
-/** The event's ⋮ (`EventCardMenu` with the page's rows), at the card's top
- *  right on the event page. `provScope`: the card's receipts scope, which its
- *  Inspect provenance arms (ui-jobs 284). */
-export function EventPageMenu({ page, provScope }: { page: EventPageShell; provScope: string }) {
+/** The card's top right on the event page: View in timeline, a 28px tile
+ *  to the position's timeline with the event focused (the `?at=` landing),
+ *  then the event's ⋮ (`EventCardMenu` with the page's rows). `provScope`:
+ *  the card's receipts scope, which its Inspect provenance arms (ui-jobs 284). */
+export function EventPageControls({ page, provScope }: { page: EventPageShell; provScope: string }) {
   const shareHref = useEventShareHref();
   return (
-    <span className="flex items-center" data-event-head-menu="">
-      <EventCardMenu
-        shareHref={shareHref}
-        provScope={{ id: provScope, hint: W.provenance_hint }}
-        pageRows={(close) => <EventPageRows c={page.contract} close={close} />}
-      />
+    <span className="flex items-center gap-2">
+      <a
+        href={page.contract.timelineHref}
+        aria-label={W.in_timeline}
+        title={W.in_timeline}
+        className={`relative flex h-7 w-7 items-center justify-center rounded-lg text-rb-500 transition-colors hover:text-foreground focus-ring after:absolute after:-inset-2 after:content-[''] ${CHROME_HOVER}`}
+        data-event-page-timeline=""
+      >
+        <History className="h-4 w-4" aria-hidden="true" />
+      </a>
+      <span className="flex items-center" data-event-head-menu="">
+        <EventCardMenu
+          shareHref={shareHref}
+          provScope={{ id: provScope, hint: W.provenance_hint }}
+          pageRows={(close) => <EventPageRows c={page.contract} close={close} />}
+        />
+      </span>
     </span>
   );
 }
@@ -312,7 +314,7 @@ export function EventPageSteps({ page }: { page: EventPageShell }) {
 
 /** The left column, inside the protocol's bar: the h1 (`sentence`, the card's
  *  teaser, stands in place of the route's title; `beside` follows it), the
- *  paragraph with the timeline link, the facts table, and at the column's foot
+ *  facts table, and at the column's foot
  *  the Learn more slot drawn as a text link (`learnMore`), on the arrows'
  *  line. */
 export function EventPageAside({
@@ -333,12 +335,6 @@ export function EventPageAside({
   return (
     <div className="flex flex-1 flex-col gap-4 px-5 pb-2 pt-4 text-sm" data-event-page-side="">
       {sentence ? <EventPageSentence sentence={sentence} beside={beside} /> : page.title}
-      <p className="leading-relaxed text-rb-500" data-event-page-paragraph="">
-        {c.words.paragraph}{" "}
-        <a href={c.timelineHref} className={LINK}>
-          {c.words.timelineLink}
-        </a>
-      </p>
       <table className="w-full table-fixed border-collapse" data-event-page-facts="" data-prov-exempt="">
         <tbody className="divide-y divide-rb-200 dark:divide-rb-800">
           {facts.map((f) => (

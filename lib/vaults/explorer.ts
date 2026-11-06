@@ -23,7 +23,6 @@ const FAMILY_NOUN: Record<VaultFamilyKey, string> = {
 const DEPLOYMENT_NAME = { ethereum: "Ethereum", base: "Base" } as const;
 
 const WORDS = {
-  paragraph: "This page is one transaction from this address's history in this vault.",
   timeline_link: "See the whole history in the timeline.",
   vault: "Vault",
   copy_vault: "Copy the vault's address",
@@ -65,10 +64,6 @@ export const vaultExplorer: ExplorerAdapter<VaultEventPageInput> = {
     // tokens, whose symbols the server's metadata cannot name without a read,
     // and the tab title must carry the h1's words.
     title: kindTitle(event.actionLabel),
-    words: {
-      paragraph: WORDS.paragraph,
-      timelineLink: WORDS.timeline_link,
-    },
     facts: [
       {
         key: "vault",
