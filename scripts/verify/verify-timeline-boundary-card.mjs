@@ -315,6 +315,11 @@ const FIXTURES = [
     // in folders now (one folder of 25,000 events on 23 Oct 2026), and this
     // arm is checked against the FLAT route.
     path: "/ethereum/maple/0x134ccaaa4f1e4552ec8aecb9e4a2360ddcf8df76?folders=0",
+    // The address is Maple's SyrupRouter: its page is the protocol-contract
+    // page ("It is not a lender position"), with no position card and so no
+    // tenure heading. Its 44,000 rows are what this arm wants; check 10 holds
+    // the dot as on a vault page.
+    noTenure: true,
     route: `/api/maple/timeline?wallet=0x134ccaaa4f1e4552ec8aecb9e4a2360ddcf8df76&${RECENT_QS}`,
   },
   {
@@ -408,8 +413,14 @@ const FIXTURES = [
   {
     // The same wallet on its DEFAULT page, grouped in the web route after the
     // replay: 2,500 rows (2,496 events, 4 folders) of 6,487 events.
+    // Its newest 2,500 rows (cut at block 36,995,749 on 6 Nov 2026, 6,512
+    // events) hold no run of five third-party acts any more: the window has
+    // moved past them, so the grouped answer is cut by rows with no folder in
+    // it (`noFolders`, as on seamless-grouped). A drawn Moonwell Base folder
+    // is verify-moonwell-base-folders.mjs's (the exploiter page).
     id: "moonwell-base-grouped",
     arm: "grouped",
+    noFolders: true,
     path: "/base/moonwell/0xcb6586874cc04b01cc4fdb777de502cea7b3d6c1",
     route: "/api/chain/moonwell-base/timeline?wallet=0xcb6586874cc04b01cc4fdb777de502cea7b3d6c1&group=1",
   },
@@ -1158,7 +1169,7 @@ for (const f of FIXTURES) {
     // nobody has made. It draws no tenure eyebrow either, so "unreadable" is
     // the correct and expected reading there rather than a failure, and the
     // dot is asserted exactly as it was before that fix.
-    const noTenure = f.arm === "vault";
+    const noTenure = f.arm === "vault" || f.noTenure === true;
 
     if (f.control) {
       check(
@@ -1805,8 +1816,14 @@ for (const follow of ONLY && !ONLY.has("rewind") ? [] : [false, true]) {
         after.chip === cut.chip && after.to === cut.to && after.date !== cut.date && after.sync === "off",
         JSON.stringify(after),
       );
+      // The first press re-syncs at the cursor's day and the page scrolls the
+      // cut list into view; a second press sent while that scroll runs lands
+      // off the button. So the second waits for the synced state.
       await sync.click();
-      await page.waitForTimeout(500);
+      await page
+        .waitForFunction(() => document.querySelector("[data-flow-sync]")?.getAttribute("data-flow-sync") === "synced")
+        .catch(() => {});
+      await page.waitForTimeout(800);
       await sync.click();
       await page.waitForTimeout(500);
       const locked = await rewindRead(page);
