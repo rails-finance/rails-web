@@ -1,8 +1,8 @@
 "use client";
 
 // RailHeader — the two-row header on every explorer surface. The protocol's
-// identity (ProtocolIdentity) takes the left of the first row and the chain's
-// name the right end of it (rails-ops TO-DO-ui-jobs 68, 497): the two together
+// identity (ProtocolIdentity) takes the left of the first row, the chain's
+// glyph after the name (rails-ops TO-DO-ui-jobs 68, 497, 514): the two together
 // say what you are looking at and which chain it runs on, so they belong on
 // one line rather than one on the page and one in the chrome. The second row
 // carries the recency stamp on the left (the chain head is rail-level
@@ -19,8 +19,8 @@
 // wallet heading is its frame, with a line naming the protocol and linking
 // to its listing (components/shared/wallet-heading.tsx).
 //
-// The chain is named at the right end of the first row (ChainLabel); the
-// chooser that stood there is the brand rail's since ui-jobs 497.
+// The chain is the muted glyph after the protocol's name (ChainLabel); the
+// chooser that stood at the row's end is the brand rail's since ui-jobs 497.
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -32,24 +32,21 @@ import { INFO_PATH } from "@/components/shared/info-disclosure";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
 
-/** The explorer's chain, named at the right end of the title row: the glyph
- *  and the name in the rail's small caps, a label and not a control. The
- *  chooser it replaced moved to the brand rail (ui-jobs 497), where it does
- *  not follow the page's chain. From md the profile control (H20) stands at
- *  the column's top right (app/(app)/layout.tsx), so `md:mr-8` leaves its
- *  38px, less the 10px it reaches past the content edge, and a 4px gap.
- *  Below md the label stays: the header bar's chooser names no chain either. */
+/** The explorer's chain on the title row: its glyph alone, muted, following
+ *  the protocol's name (Miles, 6 Nov 2026, ui-jobs 514), a label and not a
+ *  control; the chain's name is its accessible name. */
 export function ChainLabel({ chainId, className = "" }: { chainId: ChainId; className?: string }) {
   const chain = CHAINS[chainId];
   if (!chain) return null;
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1.5 text-rb-500 ${className}`}
+      role="img"
+      aria-label={chain.name}
+      className={`inline-flex shrink-0 items-center text-rb-500 ${className}`}
       data-chain-label={chain.slug}
       data-anatomy="H3.2"
     >
-      <ChainGlyph chainId={chain.id} className="h-4 w-4" />
-      <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">{chain.name}</span>
+      <ChainGlyph chainId={chain.id} className="h-5 w-5" />
     </span>
   );
 }
@@ -104,13 +101,13 @@ export function RailHeader({
       {/* The page's largest type (rails-ops TO-DO-ui-jobs 67). The first thing
           the eye lands on is now what the page is about; the scale lives in
           ProtocolIdentity, so every explorer wears the same one. The chain's
-          label takes the far end of the row, and `min-w-0` lets a long name shrink
-          rather than push it off. */}
-      <div className="flex items-center justify-between gap-3" data-anatomy="H3">
-        <div className="min-w-0">
+          glyph follows the name, and `min-w-0` lets a long name shrink rather
+          than push it off. */}
+      <div className="flex items-center gap-3" data-anatomy="H3">
+        <div className="flex min-w-0">
           <ProtocolIdentity session={session} scale="title" />
         </div>
-        <ChainLabel chainId={entry.chainId} className="md:mr-8" />
+        <ChainLabel chainId={entry.chainId} />
       </div>
       {/* Right-aligned even with the stamp off (the info page): a lone nav
           flush right still reads as one deliberate row, not a stamp-shaped

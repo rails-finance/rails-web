@@ -431,7 +431,7 @@ await mHomePage.close();
 const dFooterBeta = await page.locator("footer [data-phone-beta]:visible").count();
 check(dFooterBeta === 0, `@1280: the footer's beta pill is hidden, the rail carries it (${dFooterBeta})`);
 // FRANKENCOIN is the roster's longest name: at 390 the title must stay on one
-// line, and at 1440 it must not crowd the chooser it now shares a row with.
+// line, the chain's glyph following it (ui-jobs 514).
 for (const [w, h] of [
   [390, 800],
   [1440, 900],
@@ -452,7 +452,7 @@ for (const [w, h] of [
   console.log(`    @${w}`, JSON.stringify(t));
   check(t.text === "Frankencoin", `@${w}: the longest name reads as written (${t.text})`);
   check(t.lines === 1, `@${w}: the longest name sits on one line (${t.lines})`);
-  if (w >= 768) check(t.gap !== null && t.gap > 40, `@${w}: the title does not crowd the chain's label (gap=${t.gap})`);
+  check(t.gap !== null && t.gap >= 8 && t.gap <= 16, `@${w}: the chain's glyph follows the name (gap=${t.gap})`);
   await p.close();
 }
 const mCov = await chooserRows(mob, "ethereum");
