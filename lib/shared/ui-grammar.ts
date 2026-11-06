@@ -54,6 +54,15 @@ export const PILL_CTA =
  * hover-fill rule applies, then add size/shape utilities (e.g. `w-7 h-7
  * rounded-md`, `h-7 px-2.5 rounded-md text-xs`).
  */
+/**
+ * "New to Rails? Start here" as a button: link blue on a blue-tinted ground
+ * with a blue border that strengthens on hover, PILL_CTA's dark treatment
+ * (Miles, 6 Nov 2026). Add the display and width where it is drawn (the
+ * profile menu's is full width, the saved-wallets page's fits its text).
+ */
+export const START_CTA =
+  "items-center gap-2 rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-blue-400/40 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:border-blue-500";
+
 export const CTRL_GHOST = "inline-flex items-center justify-center transition-colors cursor-pointer";
 
 /** Idle in-place control: muted, gains a soft fill + foreground on hover. */

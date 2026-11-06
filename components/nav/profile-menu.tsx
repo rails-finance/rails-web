@@ -35,7 +35,7 @@ import { useBookmarks } from "@/components/shared/bookmark-list";
 import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
-import { CTRL_OFF, CTRL_ON } from "@/lib/shared/ui-grammar";
+import { CTRL_OFF, CTRL_ON, START_CTA } from "@/lib/shared/ui-grammar";
 import type { WalletSession } from "@/lib/shared/sessions";
 
 const BOOKMARKS_PATH = "/bookmarks";
@@ -43,10 +43,8 @@ const BOOKMARKS_PATH = "/bookmarks";
 const MENU_NAME = "Saved and settings";
 /** A group's small label (Saved wallets; Saved searches to come). */
 const GROUP_LABEL = "flex items-center gap-2 px-3 pb-2 pt-2 text-sm font-semibold text-foreground";
-/** "New to Rails? Start here" across the menu's top: link blue on a blue-tinted
- *  ground with a blue border, the marketing CTA's dark treatment (PILL_CTA). */
-const START_BUTTON =
-  "mb-1 flex w-full items-center gap-2 rounded-lg border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-600 transition-colors hover:border-blue-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-blue-400/40 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:border-blue-500";
+/** "New to Rails? Start here" across the menu's top. */
+const START_BUTTON = `mb-1 flex w-full ${START_CTA}`;
 /** The guided way in (G, /start), reached from this menu (ui-jobs 509). */
 const START_PATH = "/start";
 /** The menu lists this many; the rest are on /bookmarks. */
