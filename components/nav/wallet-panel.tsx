@@ -28,7 +28,7 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
 import { RailsMark } from "@/components/nav/rails-mark";
-import { ExplorerChooser } from "@/components/nav/explorer-chooser";
+import { ExplorerChooser, PANEL_HEADING } from "@/components/nav/explorer-chooser";
 import { FrontDoorSearch, OPEN_SEARCH_EVENT, TOGGLE_SEARCH_EVENT } from "@/components/shared/front-door-search";
 
 let open = false;
@@ -249,10 +249,14 @@ export function WalletPanel() {
             Home
           </Link>
         </div>
-        {/* Pinned at the top: the search row, no heading (the field names the
-            panel; Miles, 1 Nov 2026). */}
-        <div className="relative z-10 shrink-0 px-5 pb-4 pt-4 md:pt-[11px]">
-          <FrontDoorSearch size="lg" surface="raised" onDone={close} suggest />
+        {/* Pinned at the top: the search under its heading, the field with no
+            placeholder (ui-jobs 514). From md the heading's line centres on the
+            rail's toggle (its 38px box at 68px, so its middle at 87px). */}
+        <div className="relative z-10 shrink-0 px-5 pb-4 pt-4 md:pt-[75px]">
+          <h2 className={PANEL_HEADING}>Search wallet, vault or protocol</h2>
+          <div className="-ml-2 mt-5">
+            <FrontDoorSearch size="lg" surface="raised" onDone={close} suggest placeholder="" />
+          </div>
         </div>
 
         {/* The explorer chooser (H4) under the search; the suggestions list

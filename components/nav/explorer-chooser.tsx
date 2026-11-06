@@ -60,6 +60,9 @@ const TAB = "flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg 
 const TAB_ON = "bg-rb-200 dark:bg-rb-700";
 const TAB_OFF = "hover:bg-rb-100 dark:hover:bg-rb-800";
 
+/** The panel's section heading (ui-jobs 514): the search's and the chooser's. */
+export const PANEL_HEADING = "text-[15px] leading-6 text-rb-500 dark:text-rb-400";
+
 export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
   const pathname = usePathname();
   const activeEntry = protocolForPathname(pathname);
@@ -82,7 +85,8 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
   const name = robinhood ? ROBINHOOD_LABEL : chain.name;
 
   return (
-    <div className="pt-6" data-anatomy="H4" data-explorer-chooser="">
+    <div className="pt-8" data-anatomy="H4" data-explorer-chooser="">
+      <h2 className={`${PANEL_HEADING} mb-3`}>Choose a chain, select a protocol</h2>
       <div className="flex items-center gap-1">
         <div role="tablist" aria-label="Blockchain" className="-ml-2 flex items-center gap-1" data-switcher-tabs="">
           {chains.map((c) => {
