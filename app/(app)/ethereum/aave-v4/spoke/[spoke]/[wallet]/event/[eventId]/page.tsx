@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { spokeFromSlug } from "@/lib/aave-v4/spoke-meta";
 import { loadAaveV4SpokeTail } from "@/lib/aave-v4/spoke-position-page-data";
+import { redirectReceivedLeg } from "@/lib/aave-v4/swap-redirect";
 import { aaveV4EventPageDescription, aaveV4EventTabWords } from "@/lib/aave-v4/explorer";
 import AaveV4SpokePage from "../../page";
 
@@ -43,5 +44,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 // mode with the shared column (`ChainTruthTimeline`'s `eventPage`). The card
 // reads the position's history, so the read is the parent's.
 export default async function AaveV4EventPage({ params }: Props) {
+  // A swap's received leg lands on the swap (lib/aave-v4/swap-redirect.ts).
+  await redirectReceivedLeg("/ethereum/aave-v4", await params);
   return AaveV4SpokePage({ params });
 }

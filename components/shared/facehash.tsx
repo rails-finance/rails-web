@@ -3,9 +3,10 @@
  * Rounded square with colored background + eyes only (no mouth, no letter).
  * Eyes blink occasionally.
  *
- * `mono` draws the same face in one colour (the profile control, H20): the
- * square filled with the current text colour, the eyes cut in the page's
- * background colour.
+ * `mono` draws the same face in one colour (the profile control, H20): in
+ * dark the square filled with the current text colour and the eyes cut in the
+ * page's background; in light the square outlined and the eyes in the text
+ * colour (ui-jobs 509; `--facehash-fill`, `--facehash-eye`, globals.css).
  */
 "use client";
 
@@ -80,9 +81,19 @@ export function Facehash({ address, size = 20, isBot, mono = false }: FacehashPr
   const leftX = 6.5;
   const rightX = 13.5;
 
-  const eyeColor = mono ? "var(--background)" : lum > 45 ? "#1e293b" : "#e2e8f0";
+  const eyeColor = mono ? "var(--facehash-eye)" : lum > 45 ? "#1e293b" : "#e2e8f0";
 
-  const square = (
+  const square = mono ? (
+    <rect
+      x={0.75}
+      y={0.75}
+      width={18.5}
+      height={18.5}
+      rx="3.8"
+      ry="3.8"
+      style={{ fill: "var(--facehash-fill)", stroke: "currentColor", strokeWidth: 1.5 }}
+    />
+  ) : (
     <rect
       x={isBot ? 0.5 : 0}
       y={isBot ? 0.5 : 0}

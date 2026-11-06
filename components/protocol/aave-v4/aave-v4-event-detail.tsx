@@ -255,6 +255,23 @@ export function useAaveV4Cells({
 
   const isSupplySide = ctx.eventType === "supply" || ctx.eventType === "withdraw";
   const isDebtSide = ctx.eventType === "borrow" || ctx.eventType === "repay";
+  // A position swap's received leg (lib/aave-v4/swaps.ts): its row is a
+  // changed row too, read from its own balances.
+  const received = ctx.swap?.received.context?.data as AaveV4Context | undefined;
+  const recSupply =
+    received && (received.eventType === "supply" || received.eventType === "withdraw") ? received : undefined;
+  const recDebt =
+    received && (received.eventType === "borrow" || received.eventType === "repay") ? received : undefined;
+  /** The leg that moved `sym` on a side, if any. */
+  const legOn = (sym: string, side: "supply" | "debt"): AaveV4Context | undefined => {
+    if (side === "supply") {
+      if (isLiq) return sym === ctx.collateralSymbol ? ctx : undefined;
+      if (isSupplySide && sym === token) return ctx;
+      return recSupply?.reserveSymbol === sym ? recSupply : undefined;
+    }
+    if ((isDebtSide || isLiq) && sym === token) return ctx;
+    return recDebt?.reserveSymbol === sym ? recDebt : undefined;
+  };
 
   const supplyBeforeVal = parseFloat(ctx.supplyBefore ?? "0");
   const supplyAfterVal = parseFloat(ctx.supplyAfter ?? "0");
@@ -280,16 +297,31 @@ export function useAaveV4Cells({
     supplyAfterVal <= 0.0001 &&
     supplyBeforeVal > 0.0001 &&
     !baseSupplies.some((s) => s.symbol === supplyChangeSym);
-  const supplies = supplyZeroOut
+  const supplies0 = supplyZeroOut
     ? [...baseSupplies, { symbol: supplyChangeSym!, amount: ctx.supplyAfter ?? "0" }]
     : baseSupplies;
+  // A received leg that emptied its reserve keeps its row at zero.
+  const emptied = (c: AaveV4Context | undefined, before?: string, after?: string) =>
+    c?.reserveSymbol != null && parseFloat(after ?? "0") <= 0.0001 && parseFloat(before ?? "0") > 0.0001;
+  const supplies =
+    recSupply &&
+    emptied(recSupply, recSupply.supplyBefore, recSupply.supplyAfter) &&
+    !supplies0.some((r) => r.symbol === recSupply.reserveSymbol)
+      ? [...supplies0, { symbol: recSupply.reserveSymbol!, amount: recSupply.supplyAfter ?? "0" }]
+      : supplies0;
 
   const debtZeroOut =
     (isDebtSide || isLiq) &&
     debtAfterVal <= 0.0001 &&
     debtBeforeVal > 0.0001 &&
     !baseDebts.some((d) => d.symbol === token);
-  const debts = debtZeroOut ? [...baseDebts, { symbol: token, amount: ctx.debtAfter ?? "0" }] : baseDebts;
+  const debts0 = debtZeroOut ? [...baseDebts, { symbol: token, amount: ctx.debtAfter ?? "0" }] : baseDebts;
+  const debts =
+    recDebt &&
+    emptied(recDebt, recDebt.debtBefore, recDebt.debtAfter) &&
+    !debts0.some((r) => r.symbol === recDebt.reserveSymbol)
+      ? [...debts0, { symbol: recDebt.reserveSymbol!, amount: recDebt.debtAfter ?? "0" }]
+      : debts0;
   const hasSupplies = supplies.length > 0;
   const hasDebts = debts.length > 0;
 
@@ -375,41 +407,43 @@ export function useAaveV4Cells({
       kind: "stat",
       key: "collateral",
       label: "Collateral",
-      changed: isSupplySide || isLiq,
+      changed: isSupplySide || isLiq || recSupply != null,
       value: {
         lines: supplies.map((s) => {
           // The changed asset is the supply side's primary asset for
-          // supply/withdraw, or the collateral asset for liquidations.
-          const isThisChanged = (isSupplySide || isLiq) && s.symbol === (isLiq ? ctx.collateralSymbol : token);
+          // supply/withdraw, or the collateral asset for liquidations, or a
+          // swap's received supply.
+          const leg = legOn(s.symbol, "supply") ?? ctx;
+          const isThisChanged = legOn(s.symbol, "supply") != null;
           // Prefer the per-row price (server enriches every snapshot item with
           // its historic USD price). Fall back to the event's primary price on
           // the changed row so older clients / payloads without per-row prices
           // still render.
           const priceUsd =
-            s.price?.usd ?? (!isThisChanged ? undefined : isLiq ? ctx.collateralPrice?.usd : ctx.price?.usd);
+            s.price?.usd ?? (!isThisChanged ? undefined : isLiq ? ctx.collateralPrice?.usd : leg.price?.usd);
           return (
             <V4PositionRow
               key={s.symbol}
               symbol={s.symbol}
               amount={s.amount}
-              before={isThisChanged ? supplyBefore : undefined}
+              before={isThisChanged ? leg.supplyBefore : undefined}
               isChanged={isThisChanged}
               priceUsd={priceUsd}
               coord={coord}
               side="supply"
-              rawBefore={isThisChanged ? ctx.raw?.supplyBefore : undefined}
-              rawAfter={isThisChanged ? ctx.raw?.supplyAfter : undefined}
+              rawBefore={isThisChanged ? leg.raw?.supplyBefore : undefined}
+              rawAfter={isThisChanged ? leg.raw?.supplyAfter : undefined}
               chain={
-                isThisChanged && ctx.balanceBasis === "chain"
+                isThisChanged && leg.balanceBasis === "chain"
                   ? {
-                      sharesBefore: ctx.raw?.supplySharesBefore,
-                      sharesAfter: ctx.raw?.supplySharesAfter,
-                      a: ctx.raw?.hubAddedAssets,
-                      b: ctx.raw?.hubAddedShares,
+                      sharesBefore: leg.raw?.supplySharesBefore,
+                      sharesAfter: leg.raw?.supplySharesAfter,
+                      a: leg.raw?.hubAddedAssets,
+                      b: leg.raw?.hubAddedShares,
                     }
                   : undefined
               }
-              interest={isThisChanged ? ctx.supplyInterestSincePrevious : undefined}
+              interest={isThisChanged ? leg.supplyInterestSincePrevious : undefined}
             />
           );
         }),
@@ -421,35 +455,36 @@ export function useAaveV4Cells({
       kind: "stat",
       key: "debt",
       label: "Debt",
-      changed: isDebtSide || isLiq,
+      changed: isDebtSide || isLiq || recDebt != null,
       value: {
         lines: debts.map((d) => {
-          const isThisChanged = (isDebtSide || isLiq) && d.symbol === token;
-          const priceUsd = d.price?.usd ?? (!isThisChanged ? undefined : isLiq ? ctx.debtPrice?.usd : ctx.price?.usd);
+          const leg = legOn(d.symbol, "debt") ?? ctx;
+          const isThisChanged = legOn(d.symbol, "debt") != null;
+          const priceUsd = d.price?.usd ?? (!isThisChanged ? undefined : isLiq ? ctx.debtPrice?.usd : leg.price?.usd);
           return (
             <V4PositionRow
               key={d.symbol}
               symbol={d.symbol}
               amount={d.amount}
-              before={isThisChanged ? debtBefore : undefined}
+              before={isThisChanged ? leg.debtBefore : undefined}
               isChanged={isThisChanged}
               priceUsd={priceUsd}
               coord={coord}
               side="debt"
-              rawBefore={isThisChanged ? ctx.raw?.debtBefore : undefined}
-              rawAfter={isThisChanged ? ctx.raw?.debtAfter : undefined}
+              rawBefore={isThisChanged ? leg.raw?.debtBefore : undefined}
+              rawAfter={isThisChanged ? leg.raw?.debtAfter : undefined}
               chain={
-                isThisChanged && ctx.balanceBasis === "chain"
+                isThisChanged && leg.balanceBasis === "chain"
                   ? {
-                      sharesBefore: ctx.raw?.drawnSharesBefore,
-                      sharesAfter: ctx.raw?.drawnSharesAfter,
-                      a: ctx.raw?.hubDrawnIndex,
+                      sharesBefore: leg.raw?.drawnSharesBefore,
+                      sharesAfter: leg.raw?.drawnSharesAfter,
+                      a: leg.raw?.hubDrawnIndex,
                       premiumBefore: premiumAt(hfAround, "before"),
                       premiumAfter: premiumAt(hfAround, "after"),
                     }
                   : undefined
               }
-              interest={isThisChanged ? ctx.debtInterestSincePrevious : undefined}
+              interest={isThisChanged ? leg.debtInterestSincePrevious : undefined}
             />
           );
         }),

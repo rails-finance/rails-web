@@ -24,9 +24,10 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
 
-import { RailsGlyph } from "@/components/nav/brand-rail";
+import { RailsMark } from "@/components/nav/rails-mark";
 import { ExplorerChooser } from "@/components/nav/explorer-chooser";
 import { FrontDoorSearch, OPEN_SEARCH_EVENT, TOGGLE_SEARCH_EVENT } from "@/components/shared/front-door-search";
 
@@ -34,6 +35,9 @@ let open = false;
 /** Where the focus lands as the panel opens: the field, or the chooser. */
 let openAt: "search" | "chooser" = "search";
 let trigger: HTMLElement | null = null;
+/** The header launcher's top as the panel opens, so the panel's close lands
+ *  on it under the beta strip too; 16px (the bar's padding) otherwise. */
+let launcherTop = 16;
 /** The brand rail's right edge, measured as the panel opens; 0 with no rail. */
 let railRight = 0;
 const listeners = new Set<() => void>();
@@ -43,6 +47,8 @@ const notify = () => listeners.forEach((l) => l());
 export function openWalletPanel(from?: HTMLElement | null, at: "search" | "chooser" = "search") {
   trigger = from ?? (document.activeElement as HTMLElement | null);
   openAt = at;
+  const launcher = trigger?.closest<HTMLElement>('[data-search-launcher="header"]');
+  launcherTop = launcher ? Math.max(0, Math.round(launcher.getBoundingClientRect().top)) : 16;
   // The rail's right edge, where one is drawn (an app route from md).
   const rail = document.querySelector<HTMLElement>('aside[data-anatomy="H1"]');
   railRight = rail && rail.getClientRects().length > 0 ? rail.getBoundingClientRect().right : 0;
@@ -196,28 +202,44 @@ export function WalletPanel() {
           visibility: isOpen ? "visible" : "hidden",
         }}
       >
-        {/* Below `md` there is no rail and the header bar is under the panel,
-            so the panel's top row restates the bar's furniture as the bar lays
-            it out: the Rails mark top left (16px in, 16px down) and a × top
-            right where the bar's controls are (Miles, 1 Nov 2026). The × is the search glyph's 38px box at its place, so the tap that opened the panel closes it in the same spot (ui-jobs 507). */}
-        <div className="flex shrink-0 items-center justify-between px-4 pt-4 md:hidden">
-          <RailsGlyph onClick={close} />
+        {/* The top row: on the right "Home", since the mark opens this panel
+            and no longer goes home (ui-jobs 509). Below `md` the header bar is
+            under the panel, so the row also restates the bar's left end: the
+            Rails mark with its chevron pointing left, in the bar's launcher
+            box at its place (16px in; the launcher's top, measured as the
+            panel opens, under the beta strip too), so the tap that opened the
+            panel closes it in the same spot. From md the rail's mark, beside
+            the panel, closes it. */}
+        <div
+          className="flex shrink-0 items-center justify-between px-4 md:justify-end md:px-5"
+          style={{ paddingTop: launcherTop }}
+        >
           <button
             type="button"
             onClick={close}
-            className="cursor-pointer rounded-lg p-2.5 text-rb-500 transition-colors hover:text-foreground focus-ring"
-            aria-label="Close"
+            className="group flex h-[38px] shrink-0 cursor-pointer items-center gap-1 rounded-lg text-foreground focus-ring md:hidden"
+            aria-label="Close search and explorers"
+            data-wallet-panel-close=""
           >
-            <X size={18} aria-hidden="true" />
+            <RailsMark size={30} />
+            <ChevronLeft
+              size={16}
+              className="text-rb-500 transition-colors group-hover:text-foreground"
+              aria-hidden="true"
+            />
           </button>
+          <Link
+            href="/"
+            onClick={close}
+            className="inline-flex h-[38px] items-center rounded-sm px-1.5 text-sm font-medium text-blue-600 underline-offset-4 hover:underline focus-ring dark:text-blue-400"
+            data-wallet-panel-home=""
+          >
+            Home
+          </Link>
         </div>
         {/* Pinned at the top: the search row, no heading (the field names the
-            panel; Miles, 1 Nov 2026). From `md` the row sits level with the
-            rail's glyph (H15.1), blue while the panel is open, which stands as
-            the row's icon: the rail's 16px top padding, the 30px mark, the
-            12px gap and half the 38px launcher put its centre at 77px, so the
-            48px field starts at 53px. */}
-        <div className="relative z-10 shrink-0 px-5 pb-4 pt-4 md:pt-[53px]">
+            panel; Miles, 1 Nov 2026). */}
+        <div className="relative z-10 shrink-0 px-5 pb-4 pt-4">
           <FrontDoorSearch size="lg" surface="raised" onDone={close} suggest />
         </div>
 

@@ -4,11 +4,13 @@
 //
 // The detail page's economics band (tower chart + runway stack + headline
 // card) historically derived "current state" from the event-indexed running
-// balances in ReserveStats. That math is sound but the inputs aren't — our
-// indexer misses events that go through swap-aggregator wrappers, so the
-// running balances can drift 10%+ from actual on-chain state. That drift
-// flipped one wallet's listing HF from 1.02 (safe) to 0.98 (underwater) in
-// the detail UI, contradicting both Aave's site and our own listing page.
+// balances in ReserveStats. Those balances are a replay of the spoke's
+// Supply/Withdraw/Borrow/Repay/liquidation amounts, so they leave out what no
+// event records: the interest accrued since, and any balance the index holds
+// no event for. Swaps through Aave's position managers (CoW orders that call
+// the Giver and Taker managers) emit ordinary spoke events and are indexed in
+// full. The gap once flipped a wallet's detail HF from 1.02 (safe) to 0.98
+// (underwater), against both Aave's site and our own listing page.
 //
 // This module patches those derived numbers with the live chain state
 // fetched from the spoke contract. History-derived fields (peakDebt,

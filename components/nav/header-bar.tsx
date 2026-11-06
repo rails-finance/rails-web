@@ -1,28 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { RailsMark } from "@/components/nav/rails-mark";
 import { usePathname } from "next/navigation";
 
 import { ProfileMenu } from "@/components/nav/profile-menu";
-import { StartHereLink } from "@/components/nav/start-here-link";
 import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
-
-/** The Rails mark on the left of the bar below `md`, where BrandRail does not
- *  render, as the rail draws it (Miles 18 Oct 2026). Rails is the platform; the
- *  active rail's identity lives on the page itself (`ProtocolIdentity`), not in
- *  the chrome. */
-function RailsLogo() {
-  return (
-    <Link
-      href="/"
-      aria-label="Rails home"
-      className="flex shrink-0 items-center text-foreground transition-colors hover:text-blue-600 dark:hover:text-blue-400"
-    >
-      <RailsMark size={30} />
-    </Link>
-  );
-}
 
 export function HeaderBar() {
   const pathname = usePathname();
@@ -43,24 +24,18 @@ export function HeaderBar() {
       // and nothing is left for this bar to carry: the mark, the search's
       // glyph, the theme toggle and the chooser are in BrandRail and H20 is at
       // the column's top right (ui-jobs 68, 497, 498). Below `md` there is no
-      // rail and the bar is the only chrome, so it keeps every control.
+      // rail and the bar is the only chrome.
       className={`${isHome ? "absolute inset-x-0 top-0 z-40" : "relative z-40 mb-2"} md:hidden`}
     >
       <div className="max-w-7xl mx-auto py-4 px-4 md:px-6 flex items-center">
-        {/* The mark alone, which the rail holds from `md`; below md the beta
-            pill is in the footer (components/nav/phone-beta.tsx). */}
-        <RailsLogo />
-        {/* Right-hand control cluster. `ml-auto` pushes it hard right — it used
-            to yield (`md:ml-0`) to the inline site-links nav that sat here, but
-            that nav is retired, so the cluster owns the push outright. The
-            order is home's "Start here", H20, then the search's glyph at the far right, where the wallet panel's × stands when it is open, so a second tap in one place closes it; the theme switch is in H20's menu (ui-jobs 507). The hamburger is retired — the site's own pages and socials
-            live in the footers (SiteFooter on site routes, AppFooter's
-            quiet Coverage link on app routes). */}
-        <div className="ml-auto flex items-center gap-1">
-          {/* Home's "Start here" (S12) leads; elsewhere it renders nothing. */}
-          <StartHereLink />
+        {/* Left: the Rails mark with a chevron, which opens the wallet panel
+            (H15.1, ui-jobs 509); the panel's top row draws it pointing left in
+            the same place, closing it, and links Home. Right: H20 alone, the
+            theme switch and the way into /start being in its menu. Below md
+            the beta pill is in the footer (components/nav/phone-beta.tsx). */}
+        <SearchLauncher placement="header" />
+        <div className="ml-auto flex items-center">
           <ProfileMenu />
-          <SearchLauncher placement="header" />
         </div>
       </div>
     </header>

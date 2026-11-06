@@ -66,7 +66,10 @@ export function AaveV4EventCard({
   // the caller on someone else's position. Such events ride the dotted spine
   // and badge the token icon pink; the header names the actor in a "by …"
   // chip. The flow itself still renders — WHO acted annotates WHAT moved.
-  const extBy = externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.caller }, ctx.owner ?? event.wallet);
+  // A position swap's spine is solid: the owner signed the order, whoever
+  // settled it, and the managers are named in its explanation.
+  const swap = ctx.swap;
+  const extBy = swap ? null : externalActor({ txFrom: ctx.txFrom, poolCaller: ctx.caller }, ctx.owner ?? event.wallet);
 
   const amt = ctx.amount ? parseFloat(ctx.amount) : undefined;
   const sym = ctx.reserveSymbol ?? "?";
@@ -99,28 +102,55 @@ export function AaveV4EventCard({
     return legs;
   })();
 
-  const spine: SpineColumnProps = isLiquidation
-    ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
-    : isCollateralToggle
-      ? // The toggle's check/cross badge is the event's MEANING, so it keeps
-        // the icon corner even when a third party flipped it — the dotted
-        // spine and the header's "by …" chip carry that fact instead.
-        {
-          tokens: [{ symbol: sym, address: symAddress, badge: ctx.enabled ? "check" : "cross" }],
-          externalParty: !!extBy,
-          isLast: !!isLast,
-        }
-      : alsoToggled
-        ? {
-            tokens: [{ symbol: sym, address: symAddress, badge: "check", direction: "right", value: amt }],
+  // A position swap stacks its legs beside the swap node, given then received;
+  // the glyph takes the axis the legs share.
+  const received = swap?.received as AaveV4Event | undefined;
+  const recCtx = received?.context.data;
+  const swapLegs = swap
+    ? [
+        ...(amt && ctx.reserveSymbol ? [{ symbol: ctx.reserveSymbol, address: symAddress, value: amt }] : []),
+        ...(recCtx?.amount && recCtx.reserveSymbol
+          ? [
+              {
+                symbol: recCtx.reserveSymbol,
+                address: soleFlowAddress(received?.flows, recCtx.reserveSymbol),
+                value: parseFloat(recCtx.amount),
+              },
+            ]
+          : []),
+      ]
+    : undefined;
+  const swapAxis =
+    swap?.kind === "collateral_swap"
+      ? ("supply" as const)
+      : swap?.kind === "debt_swap"
+        ? ("debt" as const)
+        : ("mixed" as const);
+
+  const spine: SpineColumnProps = swap
+    ? { icon: "swap", swapLegs, swapAxis, isLast: !!isLast }
+    : isLiquidation
+      ? { icon: "warning", warningTone: "critical", warningLegs, isLast: !!isLast }
+      : isCollateralToggle
+        ? // The toggle's check/cross badge is the event's MEANING, so it keeps
+          // the icon corner even when a third party flipped it — the dotted
+          // spine and the header's "by …" chip carry that fact instead.
+          {
+            tokens: [{ symbol: sym, address: symAddress, badge: ctx.enabled ? "check" : "cross" }],
             externalParty: !!extBy,
             isLast: !!isLast,
           }
-        : {
-            tokens: [{ symbol: sym, address: symAddress, direction: isIncoming ? "left" : "right", value: amt }],
-            externalParty: !!extBy,
-            isLast: !!isLast,
-          };
+        : alsoToggled
+          ? {
+              tokens: [{ symbol: sym, address: symAddress, badge: "check", direction: "right", value: amt }],
+              externalParty: !!extBy,
+              isLast: !!isLast,
+            }
+          : {
+              tokens: [{ symbol: sym, address: symAddress, direction: isIncoming ? "left" : "right", value: amt }],
+              externalParty: !!extBy,
+              isLast: !!isLast,
+            };
 
   // The timeline's head is words (decision 0045); the event page's card keeps
   // the head its title states.

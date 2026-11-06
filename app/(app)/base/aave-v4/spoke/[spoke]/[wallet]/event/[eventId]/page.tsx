@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { eventMetadata, decodeEventId } from "@/lib/shared/page-metadata";
 import { spokeFromSlug } from "@/lib/aave-v4/spoke-meta";
 import { loadAaveV4SpokeTail } from "@/lib/aave-v4/spoke-position-page-data";
+import { redirectReceivedLeg } from "@/lib/aave-v4/swap-redirect";
 import { AAVE_V4_BASE_API_ROOT } from "@/lib/aave-v4/deployment-routes";
 import { aaveV4EventPageDescription, aaveV4EventTabWords } from "@/lib/aave-v4/explorer";
 import AaveV4BaseSpokePage from "../../page";
@@ -37,5 +38,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function AaveV4BaseEventPage({ params }: Props) {
+  // A swap's received leg lands on the swap (lib/aave-v4/swap-redirect.ts).
+  await redirectReceivedLeg("/base/aave-v4", await params, AAVE_V4_BASE_API_ROOT);
   return AaveV4BaseSpokePage({ params });
 }

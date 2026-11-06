@@ -19,10 +19,19 @@ import { useTimelineDisplay } from "@/components/shared/timeline-display-context
 import { aaveV4DisplaySymbol } from "@/lib/aave-v4/pt-tokens";
 import { effectiveBorrowAPR, borrowRatesByDebt } from "@/lib/aave-v4/borrow-rate";
 import type { AaveV4Context } from "@/lib/shared/types/protocols/aave-v4";
-import { AAVE_V4_LABELS, aaveV4T1Kind } from "@/lib/aave-v4/event-label";
+import { AAVE_V4_LABELS, aaveV4Label, aaveV4T1Kind } from "@/lib/aave-v4/event-label";
 import type { Provenance } from "@/components/shared/provenance";
 import type { ChainTruthDelta, ChainTruthRowSpec } from "@/components/shared/chain-truth-event";
-import { eventLogProv, heldDebtRateProv, externalActorProv } from "@/lib/aave-v4/position-provenance";
+import {
+  eventLogProv,
+  heldDebtRateProv,
+  externalActorProv,
+  GPV2_SETTLEMENT,
+  swapRouteProv,
+} from "@/lib/aave-v4/position-provenance";
+import { getProtocolContract } from "@/lib/shared/known-infrastructure";
+import { protocolIconSrc } from "@/lib/shared/protocols";
+import { chainIdForSpokeAddress } from "@/lib/aave-v4/spoke-meta";
 
 /** 1-based position + total within a shared tx_hash. `count > 1` draws the
  *  "X of Y" chip at the head's start. */
@@ -149,7 +158,23 @@ export function useAaveV4HeadSpec({
   const amount = parseFloat(ctx.amount ?? "0") || 0;
 
   const deltas: ChainTruthDelta[] = [];
-  if (isLiq) {
+  const swap = ctx.swap;
+  const recCtx = swap?.received.context?.data as AaveV4Context | undefined;
+  if (swap) {
+    // A position swap's two legs, given then received, each with its row's receipt.
+    for (const leg of [ctx, recCtx]) {
+      const n = parseFloat(leg?.amount ?? "0") || 0;
+      if (!leg || n <= 0) continue;
+      const p = amountProv(leg, coord);
+      deltas.push({
+        value: n,
+        exact: p.value,
+        symbol: leg.reserveSymbol ?? "???",
+        suffix: suffix(leg.reserveSymbol),
+        prov: p.info,
+      });
+    }
+  } else if (isLiq) {
     // A liquidation's two legs, the collateral seized and the debt repaid,
     // each with its receipt; the spine draws them as nodes.
     if (ctx.liquidatedCollateralAmount && ctx.collateralSymbol) {
@@ -193,7 +218,7 @@ export function useAaveV4HeadSpec({
   // Rate row.
   const apr = effectiveBorrowAPR(ctx);
   const ratePill =
-    showInterestRates && (ctx.eventType === "borrow" || ctx.eventType === "repay") && apr
+    showInterestRates && !swap && (ctx.eventType === "borrow" || ctx.eventType === "repay") && apr
       ? {
           pct: parseFloat(apr) * 100,
           prov: heldDebtRateProv({ ...coord, asset: borrowRatesByDebt(ctx)[0]?.symbol ?? ctx.reserveSymbol }),
@@ -210,6 +235,19 @@ export function useAaveV4HeadSpec({
           ),
         }
       : undefined;
+  // A swap names its route: the CoW settlement.
+  const chainId = chainIdForSpokeAddress(ctx.spokeAddress);
+  const cow = swap ? getProtocolContract(GPV2_SETTLEMENT, chainId) : undefined;
+  const party = swap
+    ? {
+        prefix: "via",
+        address: GPV2_SETTLEMENT,
+        name: cow?.name ?? "CoW Protocol",
+        icon: cow?.protocolIcon ? protocolIconSrc(cow.protocolIcon) : undefined,
+        glyph: cow?.protocolGlyph ?? "cow",
+        prov: swapRouteProv(swap, { ...coord, asset: ctx.reserveSymbol }),
+      }
+    : undefined;
   const sameBlock =
     txGroup && txGroup.count > 1
       ? {
@@ -221,10 +259,10 @@ export function useAaveV4HeadSpec({
       : undefined;
 
   if (mode === "row")
-    return { label: aaveV4T1Kind(ctx), critical: isLiq || undefined, deltas: [], externalActor, sameBlock };
+    return { label: aaveV4T1Kind(ctx), critical: isLiq || undefined, deltas: [], externalActor, party, sameBlock };
 
   return {
-    label: ctx.alsoToggledCollateral ? "Enable" : labelOf(ctx),
+    label: swap ? aaveV4Label(ctx) : ctx.alsoToggledCollateral ? "Enable" : labelOf(ctx),
     status: ctx.alsoToggledCollateral ? "open" : undefined,
     critical: isLiq || undefined,
     deltas,
@@ -234,6 +272,7 @@ export function useAaveV4HeadSpec({
         : undefined,
     ratePill,
     externalActor,
+    party,
     sameBlock,
   };
 }
