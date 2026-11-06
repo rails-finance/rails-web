@@ -334,8 +334,8 @@ try {
       .first()
       .waitFor({ state: "attached", timeout: 30_000 })
       .catch(() => {});
-    // Copy for LLM is a row of the event's ⋮ beside the h1 (the design round
-    // of 6 Nov 2026); a copy row keeps the menu open and confirms in place.
+    // Copy for LLM is a row of the event's ⋮ at the card's top right (the
+    // design rounds of 6 Nov 2026); a copy row keeps the menu open and confirms in place.
     const trigger = page.locator("[data-event-head-menu] [data-event-menu] > button").first();
     await trigger.waitFor({ timeout: 30_000 });
     const copyBtn = page.locator('[data-event-menu] [data-menu-item="copy-for-llm"]').first();

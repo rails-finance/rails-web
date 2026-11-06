@@ -12,7 +12,6 @@ import { frankencoinEventProse, frankencoinExplanationRuns } from "@/lib/franken
 const WORDS = {
   paragraph: "This page is one transaction from this position's history.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the position's timeline",
   market: "Collateral",
   position: "Position",
   copy_position: "Copy the position's address",
@@ -135,7 +134,6 @@ export const frankencoinExplorer: ExplorerAdapter<FrankencoinEventPageInput> = {
     words: {
       paragraph: WORDS.paragraph,
       timelineLink: WORDS.timeline_link,
-      timelineHint: WORDS.timeline_hint,
     },
     facts: [
       { key: "market", label: WORDS.market, value: collateralSymbol },

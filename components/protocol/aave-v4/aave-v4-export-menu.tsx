@@ -1,7 +1,6 @@
 // The export shapes for an Aave V4 spoke position on the position card's ⋮
 // (Copy Position, View as Markdown, Download CSV): the shared card draws them
-// with `ExportMenu`, and the event route, which draws no card, passes the same
-// shapes to the wallet row's Tools. The Markdown is the spoke serializer.
+// with `ExportMenu`. The Markdown is the spoke serializer.
 
 import type { WholeHistoryFetch } from "@/components/shared/export-menu";
 import type { PositionCardExports } from "@/components/shared/position-card";

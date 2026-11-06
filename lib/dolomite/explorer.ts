@@ -11,7 +11,6 @@ import { eventTitleWords, makeEventTitle, type EventTitle } from "@/lib/shared/e
 const WORDS = {
   paragraph: "This page is one transaction from this account's history on Dolomite.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the account's timeline",
   account_number: "Account number",
   copy_account_number: "Copy the account number",
   owner: "Owner",
@@ -55,7 +54,6 @@ export const dolomiteExplorer: ExplorerAdapter<DolomiteEventPageInput> = {
     words: {
       paragraph: WORDS.paragraph,
       timelineLink: WORDS.timeline_link,
-      timelineHint: WORDS.timeline_hint,
     },
     facts: [
       {

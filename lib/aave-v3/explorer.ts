@@ -100,7 +100,6 @@ export const aaveV3Explorer: ExplorerAdapter<AaveV3EventPageInput> = {
           ? AAVE_V3_PAGE_WORDS.paragraph_seamless
           : PROSE.fillText(AAVE_V3_PAGE_WORDS.paragraph, { market }),
       timelineLink: AAVE_V3_PAGE_WORDS.timeline_link,
-      timelineHint: AAVE_V3_PAGE_WORDS.timeline_hint,
     },
     facts: [
       { key: "market", label: AAVE_V3_PAGE_WORDS.market, value: market },

@@ -1,7 +1,6 @@
 // SparkLend's export shapes for the position card's ⋮ (Copy Position, View as
 // Markdown, Download CSV): the shared <ExportMenu>'s props with the Spark
-// Markdown serializer. The event route, which draws no card, hands the same
-// object to the wallet row's Tools.
+// Markdown serializer.
 
 import type { WholeHistoryFetch } from "@/components/shared/export-menu";
 import type { PositionCardExports } from "@/components/shared/position-card";

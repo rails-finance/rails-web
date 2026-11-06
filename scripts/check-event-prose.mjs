@@ -67,7 +67,6 @@ const FAMILIES = {
       CONTEXT_WORDS: "context_words",
       FOOTER_WORDS: "footer_words",
       COPY_WORDS: "copy_words",
-      ACTION_WORDS: "action_words",
       PAGE_WORDS: "page_words",
     },
     /** Sections a modal's intro fills from (read as `FILE.<section>.x`). */

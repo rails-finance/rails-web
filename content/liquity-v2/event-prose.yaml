@@ -667,13 +667,6 @@ copy_words:
   footer: |-
     Footer
 
-# ── The event page's actions row: the Trove's words ──
-# The row's shared words are lib/shared/event-page-words.ts; a `_hint` is a
-# control's tooltip.
-action_words:
-  in_timeline_hint: |-
-    Open this event in the Trove's timeline
-
 # ── The event page: the side column beside the card ──
 # The Trove's words in the shared column (components/shared/event-page-aside.tsx):
 # the paragraph and its timeline link, and the facts rows above the shared

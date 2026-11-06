@@ -14,7 +14,6 @@ import { polarisSurplusLabel } from "@/lib/polaris/surplus-claim";
 const WORDS = {
   paragraph: "This page is one transaction from this position's history.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the position's timeline",
   market: "Market",
   cdp: "Position",
   copy_cdp: "Copy the position's number",
@@ -102,7 +101,6 @@ export const polarisExplorer: ExplorerAdapter<PolarisEventPageInput> = {
     words: {
       paragraph: WORDS.paragraph,
       timelineLink: WORDS.timeline_link,
-      timelineHint: WORDS.timeline_hint,
     },
     facts: [
       { key: "market", label: WORDS.market, value: `${POLARIS_MARKET_CONFIG[market].stable.symbol} market` },

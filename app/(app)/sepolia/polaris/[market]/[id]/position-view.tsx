@@ -56,7 +56,6 @@ import { PETH, POLARIS_MARKET_CONFIG, type PolarisMarket } from "@/lib/polaris/a
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { TimelineActivityHeader, CHAIN_TRUTH_DISPLAY_ITEMS } from "@/components/shared/timeline-toolbar";
-import { ExportMenu } from "@/components/shared/export-menu";
 import { polarisExports } from "@/components/protocol/polaris/polaris-export-menu";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { rateStepNotesFor, liveRateStepNote, type MarketNote } from "@/lib/shared/market-note";
@@ -371,12 +370,9 @@ export default function PolarisPositionView({
           assets={stripAssets}
           closed={view != null && view.status !== "open"}
           closing={closing}
-          // The exports ride the card's ⋮; the event route, which draws no card,
-          // keeps them in the wallet row's Tools.
-          tools={onEventPage}
-        >
-          {onEventPage && exports && <ExportMenu {...exports} />}
-        </DetailTopRow>
+          // The card's ⋮ carries the menu; an event page draws no Tools.
+          tools={false}
+        />
 
         {loading ? (
           <DetailBodySkeleton />

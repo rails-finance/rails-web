@@ -14,7 +14,6 @@ const WORDS = {
   paragraph: (deployment: string) =>
     `This page is one transaction from this account's position in one ${deployment} market.`,
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the position's timeline",
   market: "Market",
   copy_market: "Copy the market id",
   account: "Account",
@@ -88,7 +87,6 @@ export const morphoExplorer: ExplorerAdapter<MorphoEventPageInput> = {
     words: {
       paragraph: WORDS.paragraph(DEPLOYMENT_NAME[deployment]),
       timelineLink: WORDS.timeline_link,
-      timelineHint: WORDS.timeline_hint,
     },
     facts: [
       {

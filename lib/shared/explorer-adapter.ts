@@ -58,9 +58,8 @@ export interface EventPageContract {
    *  their token icons; no amounts where the event moves none. "head" where the
    *  route draws it from the card's head row (Liquity V2's own title form). */
   title: EventTitle | "head";
-  /** The family's words: the paragraph, the timeline link after it, and the
-   *  View in timeline control's tooltip. */
-  words: { paragraph: string; timelineLink: string; timelineHint: string };
+  /** The family's words: the paragraph and the timeline link after it. */
+  words: { paragraph: string; timelineLink: string };
   /** The family's rows (the market, the account, its holder), above the
    *  shared rows (event n of N, block, transaction). */
   facts: EventPageFact[];

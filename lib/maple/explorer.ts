@@ -13,7 +13,6 @@ import { mapleTeaserSentence } from "@/lib/maple/explainer-clauses";
 const WORDS = {
   paragraph: "This page is one transaction from this lender's history in the Maple pools.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the lender's timeline",
   pool: "Pool",
   account: "Account",
   copy_account: "Copy the lender's address",
@@ -89,7 +88,6 @@ export const mapleExplorer: ExplorerAdapter<MapleEventPageInput> = {
       words: {
         paragraph: WORDS.paragraph,
         timelineLink: WORDS.timeline_link,
-        timelineHint: WORDS.timeline_hint,
       },
       facts: [
         ...pool,

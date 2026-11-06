@@ -16,7 +16,6 @@ import { alchemixEventHeading } from "@/lib/alchemix/event-label";
 const WORDS = {
   paragraph: "This page is one transaction from this position's history.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the position's timeline",
   line: "Line",
   position: "Position",
   copy_position: "Copy the position's token id",
@@ -119,7 +118,6 @@ export const alchemixExplorer: ExplorerAdapter<AlchemixEventPageInput> = {
       words: {
         paragraph: WORDS.paragraph,
         timelineLink: WORDS.timeline_link,
-        timelineHint: WORDS.timeline_hint,
       },
       facts: facts(input),
       n,

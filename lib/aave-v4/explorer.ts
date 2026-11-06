@@ -13,7 +13,6 @@ import { aaveV4EventProse, type AaveV4Event } from "@/lib/aave-v4/event-prose";
 const WORDS = {
   paragraph: (spoke: string) => `This page is one transaction from this account's history on the ${spoke} spoke.`,
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the account's timeline",
   spoke: "Spoke",
   account: "Account",
   copy_account: "Copy the account's address",
@@ -81,7 +80,6 @@ export const aaveV4Explorer: ExplorerAdapter<AaveV4EventPageInput> = {
     words: {
       paragraph: WORDS.paragraph(spokeName),
       timelineLink: WORDS.timeline_link,
-      timelineHint: WORDS.timeline_hint,
     },
     facts: [
       { key: "spoke", label: WORDS.spoke, value: spokeName },

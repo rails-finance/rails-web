@@ -73,7 +73,6 @@ import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { ExportMenu } from "@/components/shared/export-menu";
 import { frankencoinExports } from "@/components/protocol/frankencoin/frankencoin-export-menu";
 import { FrankencoinPageFactsProvider, frankencoinPageFacts } from "@/lib/frankencoin/page-facts";
 import {
@@ -404,12 +403,9 @@ export default function FrankencoinPositionView({
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON.frankencoin}
           closed={view != null && view.status !== "open"}
-          // The exports ride the card's ⋮; the event route, which draws no card,
-          // keeps them in the wallet row's Tools.
-          tools={onEventPage}
-        >
-          {onEventPage && exports && <ExportMenu {...exports} />}
-        </DetailTopRow>
+          // The card's ⋮ carries the menu; an event page draws no Tools.
+          tools={false}
+        />
 
         {loading ? (
           <DetailBodySkeleton />

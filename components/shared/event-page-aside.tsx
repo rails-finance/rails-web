@@ -3,13 +3,14 @@
 // The event page's side column (rails-ops TO-DO-ui-jobs 236), in the spine's
 // place beside the card, the same on every family: the page's h1 (the card's
 // teaser where it has one, else the family's header in its title form,
-// ui-jobs 286) with the event's ⋮ at its right on its first line (Inspect
-// provenance, Copy link, Copy transaction hash, the explorer, View as
-// Markdown, Copy for LLM; the design round of 6 Nov 2026), the Learn more
-// link reading the modal's title (ui-jobs 380), the paragraph with the
-// timeline link, the facts table (the family's rows less the one repeating
-// the wallet heading's address, then the event's place, time, block and
-// transaction), and the previous and next arrows.
+// ui-jobs 286), the paragraph with the timeline link, the facts table (the
+// family's rows less the one repeating the wallet heading's address, then the
+// event's place, time, block and transaction), and at its foot the Learn more
+// link reading the modal's title (ui-jobs 380). The column stands inside the
+// protocol's bar (C20). The event's ⋮ (Copy link, Copy transaction hash, the
+// explorer, View as Markdown, Copy for LLM, Inspect provenance) sits at the
+// card's top right and the previous and next arrows under the card
+// (`EventPageMenu`, `EventPageSteps`; design rounds of 6 Nov 2026).
 // The family supplies the data and its words (`EventPageContract`); the
 // shared words are `lib/shared/event-page-words.ts`. The table is identity
 // and position, no figure that carries a receipt, so the provenance tripwire
@@ -282,58 +283,56 @@ function EventPageSentence({ sentence, beside }: { sentence: ReactNode; beside?:
   );
 }
 
-/** The h1's first line's height, where the ⋮ centres: the sentence's line
- *  (text-xl or, below sm, text-lg, leading-snug), the title's 40px icons, or
- *  the title's kind word alone (text-2xl, leading-tight). */
-function firstLine(c: EventPageContract, sentence: boolean): string {
-  if (sentence) return "h-[1.71875rem] max-sm:h-[1.546875rem]";
-  if (c.title !== "head" && c.title.amounts.length === 0) return "h-[1.875rem]";
-  return "h-10";
+/** The event's ⋮ (`EventCardMenu` with the page's rows), at the card's top
+ *  right on the event page. `provScope`: the card's receipts scope, which its
+ *  Inspect provenance arms (ui-jobs 284). */
+export function EventPageMenu({ page, provScope }: { page: EventPageShell; provScope: string }) {
+  const shareHref = useEventShareHref();
+  return (
+    <span className="flex items-center" data-event-head-menu="">
+      <EventCardMenu
+        shareHref={shareHref}
+        provScope={{ id: provScope, hint: W.provenance_hint }}
+        pageRows={(close) => <EventPageRows c={page.contract} close={close} />}
+      />
+    </span>
+  );
 }
 
-/** The column. `sentence`: the card's teaser, which stands as the h1 in place
- *  of the route's title; `beside` follows it. `learnMore`: the card's Learn
- *  more slot, drawn as a text link under the h1. `provScope`: the card's
- *  receipts scope, which the ⋮'s Inspect provenance arms (ui-jobs 284). */
+/** The previous and next arrows, under the card at the page's right. */
+export function EventPageSteps({ page }: { page: EventPageShell }) {
+  const c = page.contract;
+  return (
+    <nav aria-label={W.steps} className="flex justify-end gap-1" data-event-page-links="">
+      <Step href={c.previousHref} dir="previous" data={{ "data-event-prev": "" }} />
+      <Step href={c.nextHref} dir="next" data={{ "data-event-next": "" }} />
+    </nav>
+  );
+}
+
+/** The left column, inside the protocol's bar: the h1 (`sentence`, the card's
+ *  teaser, stands in place of the route's title; `beside` follows it), the
+ *  paragraph with the timeline link, the facts table, and at the column's foot
+ *  the Learn more slot drawn as a text link (`learnMore`), on the arrows'
+ *  line. */
 export function EventPageAside({
   page,
   sentence,
   beside,
   learnMore,
-  provScope,
 }: {
   page: EventPageShell;
   sentence?: ReactNode;
   beside?: ReactNode;
   learnMore?: ReactNode;
-  provScope: string;
 }) {
   const c = page.contract;
-  const shareHref = useEventShareHref();
   const heading = useHeadingWallet();
   // The holder or owner row says what the wallet heading above already says.
   const facts = heading ? c.facts.filter((f) => (f.full ?? f.value).toLowerCase() !== heading) : c.facts;
   return (
-    <div className="space-y-4 pb-4 pt-3 text-sm sm:pb-0 sm:pr-6" data-event-page-side="">
-      <div className="space-y-2 pb-2">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            {sentence ? <EventPageSentence sentence={sentence} beside={beside} /> : page.title}
-          </div>
-          <span className={`flex shrink-0 items-center ${firstLine(c, !!sentence)}`} data-event-head-menu="">
-            <EventCardMenu
-              shareHref={shareHref}
-              provScope={{ id: provScope, hint: W.provenance_hint }}
-              pageRows={(close) => <EventPageRows c={c} close={close} />}
-            />
-          </span>
-        </div>
-        {learnMore != null && (
-          <div>
-            <LearnMoreAsLinkContext.Provider value>{learnMore}</LearnMoreAsLinkContext.Provider>
-          </div>
-        )}
-      </div>
+    <div className="flex flex-1 flex-col gap-4 px-5 pb-2 pt-4 text-sm" data-event-page-side="">
+      {sentence ? <EventPageSentence sentence={sentence} beside={beside} /> : page.title}
       <p className="leading-relaxed text-rb-500" data-event-page-paragraph="">
         {c.words.paragraph}{" "}
         <a href={c.timelineHref} className={LINK}>
@@ -380,10 +379,11 @@ export function EventPageAside({
           </tr>
         </tbody>
       </table>
-      <nav aria-label={W.steps} className="flex justify-end gap-1" data-event-page-links="">
-        <Step href={c.previousHref} dir="previous" data={{ "data-event-prev": "" }} />
-        <Step href={c.nextHref} dir="next" data={{ "data-event-next": "" }} />
-      </nav>
+      {learnMore != null && (
+        <div className="mt-auto flex min-h-[38px] items-center">
+          <LearnMoreAsLinkContext.Provider value>{learnMore}</LearnMoreAsLinkContext.Provider>
+        </div>
+      )}
     </div>
   );
 }

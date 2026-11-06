@@ -1860,8 +1860,8 @@ await verifySheet("liquity-v2");
 /** Liquity V2's raw Markdown per event (ui-jobs 287): `<event page>.md`
  *  answers 200 `text/markdown`, `noindex`, the page as its canonical `Link`,
  *  and the body Copy for LLM puts on the clipboard; an unknown id answers 404.
- *  The event page's one menu, the ⋮ beside the h1 (the design round of 6 Nov
- *  2026), holds Copy link, Copy transaction hash, the explorer, View as
+ *  The event page's one menu, the ⋮ at the card's top right (the design rounds
+ *  of 6 Nov 2026), holds Copy link, Copy transaction hash, the explorer, View as
  *  Markdown (a new tab, at the route) and Copy for LLM, then Inspect
  *  provenance; a copy row confirms in place. The paragraph's link is the one
  *  way to the timeline; the page draws no T1 and so no number pill. The facts
@@ -1896,8 +1896,8 @@ async function verifyLiquityMarkdown(subject) {
   const fake = await fetch(`${BASE}${positionPath}/event/${encodeURIComponent(FAKE_ID)}.md`);
   check(`${name}: an unknown event's Markdown answers 404`, fake.status === 404, String(fake.status));
 
-  // The event's ⋮ beside the h1: its rows, then Inspect provenance.
-  const TRIGGER = "[data-event-page-side] [data-event-head-menu] [data-event-menu] > button";
+  // The event's ⋮ at the card's top right: its rows, then Inspect provenance.
+  const TRIGGER = "[data-event-page-card] [data-event-head-menu] [data-event-menu] > button";
   const MENU = '[data-event-menu] [role="menu"]';
   const COPY_LLM = `${MENU} [data-menu-item="copy-for-llm"]`;
   const COPY_LINK_BTN = `${MENU} [data-menu-item="copy-link"]`;

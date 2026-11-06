@@ -32,7 +32,6 @@ const BURN = "0x0000000000000000000000000000000000000000";
 const WORDS = {
   paragraph: "This page is one transaction from this Trove's history.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the Trove's timeline",
   branch: "Branch",
   trove: "Trove",
   copy_trove: "Copy the Trove id",
@@ -144,7 +143,6 @@ export const liquityForkExplorer: ExplorerAdapter<LiquityForkEventPageInput> = {
       words: {
         paragraph: WORDS.paragraph,
         timelineLink: WORDS.timeline_link,
-        timelineHint: WORDS.timeline_hint,
       },
       facts: [
         { key: "branch", label: WORDS.branch, value: collateralType },

@@ -23,7 +23,6 @@ import { retryWhen } from "@/hooks/useOverBudgetRetry";
 import { MorphoBasePositionSection, MorphoLenderOpenCard } from "@/components/protocol/morpho-base/position-section";
 import { MorphoPositionCard } from "@/components/protocol/morpho/morpho-position-card";
 import { morphoExports } from "@/components/protocol/morpho/morpho-export-menu";
-import { ExportMenu } from "@/components/shared/export-menu";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
@@ -244,12 +243,9 @@ export function MorphoMarketPositionView({
           priceReason={ORACLE_USD_REASON[d.session]}
           closed={closed}
           closing={closing}
-          // The exports ride the card's ⋮; the event route, which draws no card,
-          // keeps them in the wallet row's Tools.
-          tools={pinnedRoute}
-        >
-          {pinnedRoute && exports && <ExportMenu {...exports} />}
-        </DetailTopRow>
+          // The card's ⋮ carries the menu; an event page draws no Tools.
+          tools={false}
+        />
         {summary?.(data)}
 
         {/* A segment that is not a market id never reaches here: the server

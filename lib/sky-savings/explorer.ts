@@ -15,7 +15,6 @@ import { skyFirstSentence } from "@/lib/sky-savings/explainer-clauses";
 const WORDS = {
   paragraph: "This page is one transaction from this saver's sUSDS history.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the saver's timeline",
   savings: "Savings",
   savings_value: "sUSDS on Ethereum",
   account: "Account",
@@ -70,7 +69,6 @@ export const skySavingsExplorer: ExplorerAdapter<SkySavingsEventPageInput> = {
     words: {
       paragraph: WORDS.paragraph,
       timelineLink: WORDS.timeline_link,
-      timelineHint: WORDS.timeline_hint,
     },
     facts: [
       { key: "savings", label: WORDS.savings, value: WORDS.savings_value },

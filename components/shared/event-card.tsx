@@ -19,7 +19,7 @@ import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
 import { EventCardMenu, useEventMenuRows } from "@/components/shared/event-card-menu";
-import { EventPageAside, EventPageContext } from "@/components/shared/event-page-aside";
+import { EventPageAside, EventPageContext, EventPageMenu, EventPageSteps } from "@/components/shared/event-page-aside";
 import { EVENT_PAGE_WORDS } from "@/lib/shared/event-page-words";
 import { CardSidebarFrame } from "@/components/shared/position-card";
 import { SheetCollectContext, type CollectedCard, type GroupLane } from "@/components/shared/group-sheet";
@@ -484,7 +484,8 @@ function EventCardView(props: EventCardProps) {
   const { ledgers, onIntent, onOpen } = props.slots;
   const scale = useTimelineScale();
   const singleWallet = useSingleWallet();
-  const showAvatar = !singleWallet && !!avatar;
+  // The event page names its wallet in the heading above: no avatar.
+  const showAvatar = !singleWallet && !!avatar && !pageMode;
   // The event page's path, for the event menu: null outside a timeline.
   const shareHref = useEventShareHref();
 
@@ -958,29 +959,29 @@ function EventCardView(props: EventCardProps) {
               data-prov-lit={lit ? "" : undefined}
               className={`${
                 pageMode
-                  ? "flex w-full flex-col max-sm:!px-0 sm:flex-row sm:items-start"
+                  ? "flex w-full flex-col gap-4 md:flex-row md:items-stretch"
                   : `spine-row evt-row${showChevron ? " evt-row-target" : ""}${inTimeline ? " spine-seg" : ""}${showAvatar ? " spine-row-avatar" : ""}`
               } relative ${scale.cardRounded} ${
                 muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
               }`}
-              style={pageMode ? { padding: scale.cardPad } : undefined}
               {...(rowTarget ? rowClick : {})}
               onPointerEnter={onIntent}
               onFocus={onIntent}
             >
               {showAvatar && avatar}
               {page ? (
-                // The event page: the column holds the shared side column,
-                // stacked above the card below sm, where the row drops its side
-                // padding so the paragraph and the card share one width.
-                <div className="w-full shrink-0 sm:w-2/5" data-event-page-aside="">
-                  <EventPageAside
-                    page={page}
-                    sentence={pageSentence}
-                    beside={pageSentence && head?.surplus ? <HeadSurplusChip surplus={head.surplus} /> : undefined}
-                    learnMore={learnMore}
-                    provScope={scopeId}
-                  />
+                // The event page: the shared side column inside the protocol's
+                // bar (C20), as tall as the card and its arrows; stacked above
+                // the card below md, where the row drops its side padding.
+                <div className="w-full shrink-0 md:w-2/5" data-event-page-aside="">
+                  <CardSidebarFrame narrow className="h-full">
+                    <EventPageAside
+                      page={page}
+                      sentence={pageSentence}
+                      beside={pageSentence && head?.surplus ? <HeadSurplusChip surplus={head.surplus} /> : undefined}
+                      learnMore={learnMore}
+                    />
+                  </CardSidebarFrame>
                 </div>
               ) : (
                 <div className="spine-cell" data-anatomy="L3">
@@ -1003,12 +1004,24 @@ function EventCardView(props: EventCardProps) {
                   )}
                 </div>
               )}
-              <div className={pageMode ? "min-w-0 grow" : "spine-content"}>
+              <div className={page ? "flex min-w-0 grow flex-col gap-3" : "spine-content"}>
                 <EventPageContext.Provider value={null}>
-                  {pageMode ? (
+                  {page ? (
                     // No T1 on the event page: the h1 states the event. The
-                    // card stands beside the protocol's bar (C20).
-                    <CardSidebarFrame>{body}</CardSidebarFrame>
+                    // ⋮ stands at the card's top right, level with its first
+                    // heading; the arrows sit under the card, on the line of
+                    // the column's Learn more link.
+                    <>
+                      <div className="relative" data-event-page-card="">
+                        {body}
+                        <div className="absolute right-3 top-3 flex h-7 items-center">
+                          <EventPageMenu page={page} provScope={scopeId} />
+                        </div>
+                      </div>
+                      <div className="mt-auto pb-2">
+                        <EventPageSteps page={page} />
+                      </div>
+                    </>
                   ) : (
                     <>
                       {t1}

@@ -1,13 +1,13 @@
 // Liquity V2's explorer adapter (rails-ops TO-DO-ui-jobs 307): the contracts
 // the shared units read. For now the event page's (ui-jobs 236): the branch,
 // the Trove id and its holder, the event's place and the neighbours' links.
-// The words are the strings file's `page_words` and `action_words`
+// The words are the strings file's `page_words`
 // (content/liquity-v2/event-prose.yaml).
 
 import type { TroveSummary } from "@/types/api/trove";
 import type { ExplorerAdapter } from "@/lib/shared/explorer-adapter";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
-import { ACTION_WORDS, PAGE_WORDS } from "@/lib/liquity/event-templates";
+import { PAGE_WORDS } from "@/lib/liquity/event-templates";
 import {
   eventHeadingWords,
   eventPageDescription,
@@ -43,7 +43,6 @@ export const liquityV2Explorer: ExplorerAdapter<LiquityEventPageInput> = {
       words: {
         paragraph: PAGE_WORDS.paragraph,
         timelineLink: PAGE_WORDS.timeline_link,
-        timelineHint: ACTION_WORDS.in_timeline_hint,
       },
       facts: [
         { key: "branch", label: PAGE_WORDS.branch, value: trove.collateralType },

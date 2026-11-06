@@ -55,7 +55,6 @@ import {
   MoonwellClosedPositionExplanation,
 } from "@/components/protocol/moonwell/moonwell-position-explanation";
 import { moonwellExports } from "@/components/protocol/moonwell/moonwell-export-menu";
-import { ExportMenu } from "@/components/shared/export-menu";
 import { computeMoonwellCardCaptions, moonwellLifetimeWithOpening } from "@/lib/moonwell/economics";
 import { LifetimeFlowsPanel } from "@/components/shared/lifetime-flows-panel";
 import { LifetimeFlowsScrubber } from "@/components/shared/lifetime-flows-scrubber";
@@ -395,12 +394,9 @@ export default function MoonwellPositionView({
             owner={{ wallet }}
             assets={stripAssets}
             closed={liveView != null && liveView.status !== "open"}
-            // The exports ride the card's ⋮; the event route, which draws no card,
-            // keeps them in the wallet row's Tools.
-            tools={onEventPage}
-          >
-            {onEventPage && exports && <ExportMenu {...exports} />}
-          </DetailTopRow>
+            // The card's ⋮ carries the menu; an event page draws no Tools.
+            tools={false}
+          />
 
           {loading ? (
             <DetailBodySkeleton />

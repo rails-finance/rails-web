@@ -16,7 +16,6 @@ import { FX_POOLS, isFxPoolKey, type FxPoolKey } from "@/lib/fx/asset-catalog";
 const WORDS = {
   paragraph: "This page is one transaction from this position's history.",
   timeline_link: "See the whole history in the timeline.",
-  timeline_hint: "Open this event in the position's timeline",
   pool: "Pool",
   position: "Position",
   copy_position: "Copy the position's id",
@@ -74,7 +73,6 @@ export const fxExplorer: ExplorerAdapter<FxEventPageInput> = {
     words: {
       paragraph: WORDS.paragraph,
       timelineLink: WORDS.timeline_link,
-      timelineHint: WORDS.timeline_hint,
     },
     facts: [
       { key: "pool", label: WORDS.pool, value: `${FX_POOLS[pool].tokenSymbol} pool` },

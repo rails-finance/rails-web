@@ -81,7 +81,6 @@ import { summariseExternalActors, withOpeningActors } from "@/lib/shared/externa
 import { MapleCustodyCard } from "@/components/protocol/maple/maple-custody-card";
 import type { MapleCustodyHolding } from "@/lib/sources/chain/maple-custody";
 import { exportScopeNote, markdownHistoryScope } from "@/lib/shared/markdown-history";
-import { ExportMenu } from "@/components/shared/export-menu";
 import type { PositionCardExports } from "@/components/shared/position-card";
 import { maplePositionToMarkdown } from "@/lib/maple/position-to-markdown";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -416,8 +415,7 @@ export default function MaplePositionView({
   // Stat captions (earned interest) — the event stream feeds the split; the
   // rate rides the listing row's per-pool chain read.
   const captions = view ? computeMapleCardCaptions(view, lifetimeEvents, precomputedLifetime) : null;
-  // The card ⋮'s export shapes (ui-jobs 308 point 2). The event route, which
-  // draws no card, keeps them in the wallet row's Tools.
+  // The card ⋮'s export shapes (ui-jobs 308 point 2).
   const exports: PositionCardExports | null = view
     ? {
         buildMarkdown: () =>
@@ -565,12 +563,9 @@ export default function MaplePositionView({
             assets={stripAssets}
             priceReason={ORACLE_USD_REASON.maple}
             closed={view != null && view.status !== "open"}
-            // The exports ride the card's ⋮; the event route, which draws no card,
-            // keeps them in the wallet row's Tools.
-            tools={onEventPage}
-          >
-            {onEventPage && exports && <ExportMenu {...exports} />}
-          </DetailTopRow>
+            // The card's ⋮ carries the menu; an event page draws no Tools.
+            tools={false}
+          />
 
           {!onEventPage && protocolContract && (
             <ContractIdentityCard

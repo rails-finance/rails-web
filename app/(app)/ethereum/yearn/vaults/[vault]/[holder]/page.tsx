@@ -338,8 +338,8 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
             assets={shareAssets}
             priceReason={ORACLE_USD_REASON["yearn"]}
             owner={{ wallet: lookup.address, filterProtocol: null, bookmark: false }}
-            // The card's ⋮ carries the menu; the event route draws no card.
-            tools={onEventPage}
+            // The card's ⋮ carries the menu; an event page draws no Tools.
+            tools={false}
           />
           {!onEventPage && (
             <>
