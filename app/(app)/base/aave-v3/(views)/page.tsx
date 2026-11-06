@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Aave V3 Positions on Base", canonicalPath: "/base/aave-v3" });
+export const metadata = listingMetadata({ title: "Explore Aave V3 positions on Base", canonicalPath: "/base/aave-v3" });
 
 async function AaveV3BaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = aaveV3BaseListDimensions();

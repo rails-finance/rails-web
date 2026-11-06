@@ -14,7 +14,7 @@ export const maxDuration = 30;
 
 export function generateMetadata(): Metadata {
   return listingMetadata({
-    title: "Explore Alchemix Transmuter Positions",
+    title: "Explore Alchemix Transmuter positions",
     canonicalPath: transmuterListingPath(ALCHEMIX_ETHEREUM),
     description:
       "Every Alchemix V3 Transmuter position on the alUSD and alETH lines: the synthetic each one staked, the block it matures at, and what its claim paid out, each from the Transmuter's own events.",

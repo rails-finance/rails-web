@@ -217,7 +217,7 @@ export function positionMetadata(opts: {
   // words ("Aave V3 on Base Position 0x…"); Ethereum stays unsaid.
   const label = entry ? explorerName(entry) : "Rails";
   const noun = POSITION_NOUN[opts.session];
-  const title = [label, opts.market, noun, shortSubject(opts.subject)].filter(Boolean).join(" ");
+  const title = [label, opts.market, noun.toLowerCase(), shortSubject(opts.subject)].filter(Boolean).join(" ");
   // The description leads with Rails for the same reason the title carries
   // the prefix: a preview that shows only title + description must say whose
   // page this is, and "every event of this Moonwell position…" on its own
@@ -268,7 +268,7 @@ export function sectionPositionMetadata(opts: {
     opts.section.chainId === MAINNET_CHAIN_ID
       ? opts.section.label
       : `${opts.section.label} on ${CHAINS[opts.section.chainId].name}`;
-  const title = [label, opts.market, "Holding", shortSubject(opts.subject)].filter(Boolean).join(" ");
+  const title = [label, opts.market, "holding", shortSubject(opts.subject)].filter(Boolean).join(" ");
   return {
     title,
     description: opts.description,
@@ -333,7 +333,7 @@ export function eventMetadata(opts: {
   const entry = protocolForSession(opts.session);
   const label = entry ? explorerName(entry) : "Rails";
   const noun = POSITION_NOUN[opts.session];
-  const base = [label, opts.market, noun, shortSubject(opts.subject)].filter(Boolean).join(" ");
+  const base = [label, opts.market, noun.toLowerCase(), shortSubject(opts.subject)].filter(Boolean).join(" ");
   const title = opts.event ? `${base} · ${opts.event.actionLabel}` : base;
   const description = opts.description
     ? opts.description
@@ -437,7 +437,7 @@ export function holderListingMetadata(opts: {
   const label = entry?.label ?? "Rails";
   const noun = POSITION_NOUN[opts.session];
   const plural = positionNounPlural(opts.session);
-  const title = `${label} ${plural} held by ${shortSubject(opts.subject)}`;
+  const title = `${label} ${plural.toLowerCase()} held by ${shortSubject(opts.subject)}`;
   const description = `A Rails replay of every ${label} ${noun} this wallet holds or held — counts, collateral and debt, and the ${noun} nearest its floor — from the protocol's own on-chain events, with a receipt on every number.`;
   return {
     title,

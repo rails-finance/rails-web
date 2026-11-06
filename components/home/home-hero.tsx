@@ -55,7 +55,10 @@ export function HomeHero() {
     <section className="flex flex-col items-center text-center py-40 overflow-x-clip relative" data-anatomy="S1">
       <div className="absolute top-22 left-1/2 -translate-x-1/2 w-[500px] h-[220px] bg-[var(--marketing)]/[0.07] rounded-full blur-[80px] pointer-events-none" />
       {/* One line naming the place (Miles's mock, ui-jobs 498): the mark, "Rails",
-          then "Explorers" in the marketing blue, never wrapped. The mark is
+          then "Explorers" in the marketing blue (rb-500 in dark; the .marketing
+          rule is unlayered and outranks a dark: utility, so the span sets the
+          colour with utilities), never wrapped. "Rails" takes the mark's 0.85
+          opacity. The mark is
           sized in cap units so its right-hand leg spans the cap height, top on
           the cap line and bottom on the baseline (Miles, 4 Nov 2026); the long
           stroke reaches a little past both (MARK_STYLE). At every width the line
@@ -70,9 +73,9 @@ export function HomeHero() {
         >
           <span className="whitespace-nowrap text-foreground">
             <RailsMark size={60} className="inline-block" style={MARK_STYLE} uniform />
-            Rails
+            <span className="opacity-[0.85]">Rails</span>
           </span>{" "}
-          <span className="marketing whitespace-nowrap">Explorers</span>
+          <span className="whitespace-nowrap text-[var(--marketing)] dark:text-rb-500">Explorers</span>
         </h1>
       </div>
       {/* The promise, under the h1 (Miles, 5 Nov 2026). */}

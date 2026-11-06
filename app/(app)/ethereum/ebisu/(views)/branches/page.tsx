@@ -22,7 +22,7 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Ebisu Branches",
+  title: "Ebisu branches",
   description:
     "Ebisu's five collateral branches and the order redemption reaches them — each branch with its own oracle, minimum collateral ratio and terms.",
 };

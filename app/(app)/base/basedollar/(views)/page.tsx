@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export const metadata = listingMetadata({
-  title: "Explore Basedollar Troves on Base",
+  title: "Explore Basedollar troves on Base",
   canonicalPath: "/base/basedollar",
 });
 

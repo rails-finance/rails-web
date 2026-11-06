@@ -521,7 +521,7 @@ for (const f of fixtures) {
   };
   const wanted = isBase ? "Rails | Vaults on Base" : "Rails | Vaults";
   check(`S3a·${f.label} the title names the section`, title.startsWith(wanted), JSON.stringify(title));
-  check(`S3b·${f.label} the title names a Holding`, title.includes("Holding"), JSON.stringify(title));
+  check(`S3b·${f.label} the title names a Holding`, /holding/i.test(title), JSON.stringify(title));
   if (!isBase)
     check(
       `S3b'·${f.label} the title does not say a chain Ethereum never says`,

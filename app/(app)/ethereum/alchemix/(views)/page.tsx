@@ -16,7 +16,7 @@ export const maxDuration = 30;
 
 export function generateMetadata(): Metadata {
   return listingMetadata({
-    title: "Explore Alchemix Positions",
+    title: "Explore Alchemix positions",
     canonicalPath: ALCHEMIX_ETHEREUM.basePath,
     description:
       "Every Alchemix V3 position on the alUSD and alETH lines. Both lines have had a redemption, which moves every open position's debt at once, so each figure here is read from the contract at the block shown beside it.",

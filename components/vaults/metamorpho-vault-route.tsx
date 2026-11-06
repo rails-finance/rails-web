@@ -72,7 +72,7 @@ export async function metaMorphoVaultMetadata(
   const data = await load(chainId, address, undefined);
   const name = data.vault.name || shortAddr(address);
   return listingMetadata({
-    title: `${name} Vault Exposure · ${chain}`,
+    title: `${name} vault exposure · ${chain}`,
     description: `One address's proportional exposure to each Morpho Blue market the ${name} vault allocates to, read from chain at one block.`,
     canonicalPath: metaMorphoVaultHref(chainId, address),
   });

@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Maple Positions", canonicalPath: "/ethereum/maple" });
+export const metadata = listingMetadata({ title: "Explore Maple positions", canonicalPath: "/ethereum/maple" });
 
 async function MapleListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = mapleListDimensions();

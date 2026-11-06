@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export const metadata = listingMetadata({
-  title: "Explore Compound V3 Positions on Base",
+  title: "Explore Compound V3 positions on Base",
   canonicalPath: "/base/compound-v3",
 });
 

@@ -38,7 +38,7 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 export const revalidate = 600;
 
 export const metadata = {
-  title: "Compound V2 Markets",
+  title: "Compound V2 markets",
   description:
     "Every Compound V2 market: what it holds, how little of it is borrowed, and which markets no longer back borrowing at all.",
 };

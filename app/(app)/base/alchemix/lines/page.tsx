@@ -16,7 +16,7 @@ import { unlaunchedRobotsForPath } from "@/lib/shared/page-metadata";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Alchemix Lines",
+  title: "Alchemix lines",
   description:
     "The alUSDb line and its Transmuter, and what each can say about its own figures — this line has had no redemption, so a position's debt is replayed from its own events.",
   ...unlaunchedRobotsForPath(`${ALCHEMIX_BASE.basePath}/lines`),
