@@ -23,7 +23,7 @@ import { usePathname } from "next/navigation";
 import { ArrowDown } from "lucide-react";
 import { StartCard, startGridCols } from "@/components/start/start-card";
 import { LearnContent } from "@/components/start/learn-content";
-import { START_HREF, leavesStart, optionHref, resolveStartPath, type Level } from "@/lib/start/tree";
+import { START_HREF, leavesStart, optionHref, optionIcons, resolveStartPath, type Level } from "@/lib/start/tree";
 
 const TEAL_TEXT = "text-teal-600 dark:text-teal-400";
 const TEAL_RING =
@@ -143,6 +143,7 @@ function CurrentQuestion({ level, target }: { level: Level; target: boolean }) {
             title={o.label}
             line={o.line}
             tone={leavesStart(o) ? "page" : "answer"}
+            icons={optionIcons(o)}
           />
         ))}
       </div>

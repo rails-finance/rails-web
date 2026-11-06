@@ -16,7 +16,9 @@ export type Destination =
   | { node: string; intro?: Intro }
   | { results: ResultsKey; group?: GroupKey }
   | { roster: RosterKey }
-  | { vaults: GroupKey };
+  | { vaults: GroupKey }
+  /** A group's coins, each opening the vaults that hold it (ui-jobs 525). */
+  | { coins: GroupKey };
 
 export interface StartOption {
   slug: string;
@@ -42,6 +44,11 @@ interface Group {
   note: string;
   symbols?: string[];
   categories?: AssetCategory[];
+  /** The tokens drawn on the group's card, by symbol. */
+  icons?: string[];
+  /** The group's coin lists, one level past its card: each list a heading
+   *  (or none) and its symbols, in the order drawn. */
+  coins?: { question: string; lists: { heading?: string; symbols: string[] }[] };
 }
 
 interface Tree {
@@ -97,7 +104,10 @@ export interface Level {
 }
 
 /** What sits under the last answered level when the path ends on a leaf. */
-export type Leaf = { kind: "roster"; roster: RosterKey } | { kind: "results"; results: ResultsKey; group?: GroupKey };
+export type Leaf =
+  | { kind: "roster"; roster: RosterKey }
+  | { kind: "results"; results: ResultsKey; group?: GroupKey }
+  | { kind: "coins"; group: GroupKey };
 
 export interface Resolved {
   /** Every level from the top of the tree down; with no leaf, the last one is
@@ -106,6 +116,13 @@ export interface Resolved {
   leaf: Leaf | null;
   /** The answers given, oldest first: the page title. */
   answers: string[];
+}
+
+/** The tokens an option's card draws: its group's, where it opens one. */
+export function optionIcons(option: StartOption): string[] {
+  const to = option.to;
+  const group = "coins" in to ? to.coins : "vaults" in to ? to.vaults : null;
+  return group ? (TREE.groups[group].icons ?? []) : [];
 }
 
 /** Does pressing this option leave /start? */
@@ -142,6 +159,7 @@ export function resolveStartPath(segments: string[]): Resolved | null {
     if (!last) return null;
     if ("roster" in to) return { levels, leaf: { kind: "roster", roster: to.roster }, answers };
     if ("results" in to) return { levels, leaf: { kind: "results", results: to.results, group: to.group }, answers };
+    if ("coins" in to) return { levels, leaf: { kind: "coins", group: to.coins }, answers };
     return null;
   }
   return { levels, leaf: null, answers };

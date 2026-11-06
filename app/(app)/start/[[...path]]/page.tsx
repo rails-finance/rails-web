@@ -12,12 +12,15 @@ import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { ExplorerPicker } from "@/components/start/explorer-picker";
 import { CHAINS } from "@/lib/shared/chains";
 import { withoutLiquidations } from "@/lib/start/liquidation-probe";
+import { loadVaultIndex } from "@/lib/vaults/index-read";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { resultRows } from "@/lib/start/results";
 import {
   TREE,
   groupPhrase,
   leavesStart,
   resolveStartPath,
+  vaultsHref,
   type GroupKey,
   type Leaf,
   type ResultsKey,
@@ -65,6 +68,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 function leafHeading(leaf: Leaf): string {
   if (leaf.kind === "roster") return TREE.rosters[leaf.roster].question;
+  if (leaf.kind === "coins") return TREE.groups[leaf.group].coins?.question ?? TREE.groups[leaf.group].label;
   return TREE.results[leaf.results].heading.replace("{group}", leaf.group ? groupPhrase(leaf.group) : "");
 }
 
@@ -78,6 +82,7 @@ export default async function StartPage({ params }: Params) {
 
 function LeafContent({ leaf }: { leaf: Leaf }) {
   if (leaf.kind === "results") return <Results results={leaf.results} group={leaf.group} />;
+  if (leaf.kind === "coins") return <Coins group={leaf.group} />;
   return (
     <>
       <h2 className={QUESTION}>{TREE.rosters[leaf.roster].question}</h2>
@@ -128,6 +133,75 @@ async function Results({ results, group }: { results: ResultsKey; group?: GroupK
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** A group's coins (G6; ui-jobs 525): "All <group>" first, then each list
+ *  under its heading, a row per coin opening the vaults that hold it. A coin
+ *  no vault in the index holds is left off, so no row opens an empty list;
+ *  the count is the index's, linked in the vault's own spelling. */
+async function Coins({ group }: { group: GroupKey }) {
+  const g = TREE.groups[group];
+  const { vaults } = await loadVaultIndex();
+  const held = new Map<string, { symbol: string; count: number }>();
+  for (const v of vaults) {
+    if (!v.asset.named) continue;
+    const key = v.asset.symbol.toLowerCase();
+    const h = held.get(key);
+    if (h) h.count += 1;
+    else held.set(key, { symbol: v.asset.symbol, count: 1 });
+  }
+  const lists = (g.coins?.lists ?? [])
+    .map((l) => ({
+      heading: l.heading,
+      rows: l.symbols.flatMap((s) => {
+        const h = held.get(s.toLowerCase());
+        return h ? [{ label: s, ...h }] : [];
+      }),
+    }))
+    .filter((l) => l.rows.length > 0);
+  return (
+    <div data-anatomy="G6" data-start-coins={group}>
+      <h2 className={QUESTION}>{g.coins?.question ?? g.label}</h2>
+      <p className="mb-8 max-w-2xl text-lg text-rb-500">Each opens the vaults that hold it.</p>
+      <Link href={vaultsHref(group)} className={PAGE_ROW} data-start-coin="all">
+        <span className="flex -space-x-1.5" aria-hidden="true">
+          {(g.icons ?? []).map((sym) => (
+            <span key={sym} className="rounded-full ring-2 ring-[var(--surface-raised)]">
+              <TokenChipIcon symbol={sym} size={24} filterable={false} untitled />
+            </span>
+          ))}
+        </span>
+        <span className="text-base font-medium text-foreground">All {groupPhrase(group)}</span>
+        <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+      </Link>
+      {lists.map((l, i) => (
+        <section key={l.heading ?? i} className="mt-8" aria-label={l.heading ?? g.label}>
+          {l.heading && <h3 className="mb-2 text-sm font-medium text-rb-500">{l.heading}</h3>}
+          <ul className={`grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 ${l.heading ? "" : "mt-2"}`}>
+            {l.rows.map((c) => (
+              <li key={c.symbol}>
+                <Link
+                  href={`/vaults?asset=${encodeURIComponent(c.symbol)}`}
+                  className={PAGE_ROW}
+                  data-start-coin={c.symbol}
+                >
+                  <TokenChipIcon symbol={c.label} size={24} filterable={false} untitled />
+                  <span className="text-base font-medium text-foreground">{c.label}</span>
+                  <span className="text-sm text-rb-500">
+                    {c.count.toLocaleString("en-US")} {c.count === 1 ? "vault" : "vaults"}
+                  </span>
+                  <ArrowRight
+                    className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400"
+                    aria-hidden="true"
+                  />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }
