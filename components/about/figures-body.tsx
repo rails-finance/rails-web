@@ -2,14 +2,18 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { formatFlowUsd } from "@/lib/shared/flows-timeline";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
-import { formatValueHeld, spokenValueHeld, type ValueHeld } from "@/lib/home/value-held";
+import { formatValueHeld, spokenValueHeld, type ValueHeld, type ValueHeldPlace } from "@/lib/home/value-held";
+import { CHAINS, type ChainId } from "@/lib/shared/chains";
+import { ChainGlyph } from "@/components/icons/chain-glyphs";
 
 /**
  * The body of /about/figures (ui-jobs 523; the home band's (i) modal until 6 Nov
  * 2026): what the home figures are and how they are counted. In order: the lead
- * (when a value is stated), the open and closed caption, the per-explorer
- * breakdown with each explorer linking to its listing, what is not counted, the
- * overlaps and the floor sentence, then how positions are counted.
+ * (when a value is stated), the open and closed caption, then three tables on
+ * one set of columns (FiguresTable): the per-explorer breakdown, what is not
+ * counted and what counted explorers left out, each explorer linking to its
+ * listing and its chain a glyph; the overlaps and the floor sentence; how
+ * positions are counted.
  *
  * The "how positions are counted" text states the rule the loader applies
  * (covered-positions-data.ts): each explorer's own listing total, all-time,
@@ -35,6 +39,80 @@ const fmtBlock = (b: { from: number; to: number }) =>
 
 const fmtShare = (share: number) => (share < 0.001 ? "<0.1%" : `${(share * 100).toFixed(1)}%`);
 
+const ROW = "border-t border-rb-200 align-top dark:border-rb-700";
+const CELL = "py-2 pr-4 last:pr-0";
+
+/** The three tables share one set of columns (Miles, 6 Nov 2026): the
+ *  explorer, its chain as a glyph, a figure, the block, and a text column, so
+ *  they read as one ledger; a column a table has nothing for stays empty. */
+function FiguresTable({
+  heads,
+  label,
+  children,
+}: {
+  heads: [string, string, string];
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px] table-fixed text-left text-sm tabular-nums" aria-label={label}>
+        <colgroup>
+          <col className="w-[24%]" />
+          <col className="w-14" />
+          <col className="w-24" />
+          <col className="w-48" />
+          <col />
+        </colgroup>
+        <thead className="text-rb-500">
+          <tr>
+            <th scope="col" className="py-2 pr-4 font-medium">
+              Explorer
+            </th>
+            <th scope="col" className="py-2 pr-4 font-medium">
+              Chain
+            </th>
+            <th scope="col" className="py-2 pr-4 text-right font-medium">
+              {heads[0]}
+            </th>
+            <th scope="col" className="py-2 pr-4 font-medium">
+              {heads[1]}
+            </th>
+            <th scope="col" className="py-2 font-medium">
+              {heads[2]}
+            </th>
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
+  );
+}
+
+/** The explorer (a link to its listing, "vaults" after it for a vault
+ *  surface) and its chain's glyph, named for a screen reader and on hover. */
+function PlaceCells({ place, label }: { place: ValueHeldPlace; label: string }) {
+  const chain = CHAINS[place.chainId as ChainId];
+  return (
+    <>
+      <td className={CELL}>
+        {place.href ? (
+          <Link href={place.href} className={INLINE_LINK} data-figures-explorer={`${place.chainId}:${label}`}>
+            {label}
+          </Link>
+        ) : (
+          <span className="text-foreground">{label}</span>
+        )}
+        {place.surface && <span className="text-rb-500"> {place.surface}</span>}
+      </td>
+      <td className={CELL} title={chain?.name}>
+        <ChainGlyph id={place.chainId as ChainId} className="inline-block h-4 w-4 align-[-3px] text-foreground" />
+        <span className="sr-only">{chain?.name ?? place.chainId}</span>
+      </td>
+    </>
+  );
+}
+
 function Heading({ children }: { children: ReactNode }) {
   return <h2 className="mt-12 mb-4 text-2xl font-semibold tracking-tight text-foreground">{children}</h2>;
 }
@@ -57,81 +135,53 @@ export function FiguresBody({ value, caption }: { value: ValueHeld | null; capti
       {value && (
         <>
           <Heading>Held, by explorer</Heading>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm tabular-nums">
-              <thead className="text-rb-500">
-                <tr>
-                  <th scope="col" className="py-2 pr-4 font-medium">
-                    Explorer
-                  </th>
-                  <th scope="col" className="py-2 pr-4 text-right font-medium">
-                    Share
-                  </th>
-                  <th scope="col" className="py-2 pr-4 font-medium">
-                    Block
-                  </th>
-                  <th scope="col" className="py-2 font-medium">
-                    Prices
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {value.rows.map((r) => (
-                  <tr key={r.key} className="border-t border-rb-200 align-top dark:border-rb-700">
-                    <td className="py-2 pr-4">
-                      {r.href ? (
-                        <Link href={r.href} className={INLINE_LINK} data-figures-explorer={r.key}>
-                          {r.label}
-                        </Link>
-                      ) : (
-                        <span className="text-foreground">{r.label}</span>
-                      )}{" "}
-                      <span className="text-rb-500">{r.chainName}</span>
-                    </td>
-                    <td className="py-2 pr-4 text-right">{fmtShare(r.share)}</td>
-                    <td className="whitespace-nowrap py-2 pr-4">{r.block ? fmtBlock(r.block) : "—"}</td>
-                    <td className="py-2 text-rb-500">
-                      {r.oracleOf ?? r.prices}
-                      {r.exemption && `; ${r.exemption}`}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <FiguresTable heads={["Share", "Block", "Prices"]} label="Held, by explorer">
+            {value.rows.map((r) => (
+              <tr key={r.key} className={ROW}>
+                <PlaceCells place={r} label={r.label} />
+                <td className={`${CELL} text-right`}>{fmtShare(r.share)}</td>
+                <td className={`${CELL} whitespace-nowrap`}>{r.block ? fmtBlock(r.block) : "—"}</td>
+                <td className={`${CELL} text-rb-500`}>
+                  {r.oracleOf ?? r.prices}
+                  {r.exemption && `; ${r.exemption}`}
+                </td>
+              </tr>
+            ))}
+          </FiguresTable>
 
           {value.notCounted.length > 0 && (
             <>
               <Heading>Not counted</Heading>
-              <ul className="body-text space-y-2">
+              <FiguresTable heads={["", "", "Reason"]} label="Not counted">
                 {value.notCounted.map((n) => (
-                  <li key={`${n.label}:${n.chainName}:${n.reason}`}>
-                    <span className="text-foreground">
-                      {n.label} {n.chainName}
-                    </span>
-                    : {n.reason}
-                  </li>
+                  <tr key={`${n.label}:${n.chainId}:${n.surface}:${n.reason}`} className={ROW}>
+                    <PlaceCells place={n} label={n.label} />
+                    <td className={CELL} />
+                    <td className={CELL} />
+                    <td className={`${CELL} text-rb-500`}>{n.reason}</td>
+                  </tr>
                 ))}
-              </ul>
+              </FiguresTable>
             </>
           )}
 
           {value.leftOut.length > 0 && (
             <>
               <Heading>Left out of counted explorers</Heading>
-              <ul className="body-text space-y-2">
+              <FiguresTable heads={["Value", "", "What, and why"]} label="Left out of counted explorers">
                 {value.leftOut.map((l) => (
-                  <li key={`${l.label}:${l.chainName}:${l.reason}`}>
-                    <span className="text-foreground">
-                      {l.label} {l.chainName}
-                    </span>
-                    : {l.what}
-                    {l.usd !== null && l.usd >= 0.5 && (
-                      <span className="tabular-nums"> ({formatFlowUsd(l.usd)})</span>
-                    )}: {l.reason}
-                  </li>
+                  <tr key={`${l.label}:${l.chainId}:${l.surface}:${l.reason}`} className={ROW}>
+                    <PlaceCells place={l} label={l.label} />
+                    <td className={`${CELL} text-right`}>
+                      {l.usd !== null && l.usd >= 0.5 ? formatFlowUsd(l.usd) : ""}
+                    </td>
+                    <td className={CELL} />
+                    <td className={`${CELL} text-rb-500`}>
+                      <span className="text-foreground">{l.what}</span>: {l.reason}
+                    </td>
+                  </tr>
                 ))}
-              </ul>
+              </FiguresTable>
             </>
           )}
 

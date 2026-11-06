@@ -59,7 +59,9 @@ test("counted rows add; an uncounted row is named, not added", () => {
   assert.equal(v.rows[1].oracleOf, "Aave V3's oracle");
   assert.equal(v.rows[1].prices, "on-chain oracle");
   assert.equal(v.rows[1].exemption, null);
-  assert.deepEqual(v.notCounted, [{ label: "Fluid", chainName: "Ethereum", reason: "no USD price" }]);
+  assert.deepEqual(v.notCounted, [
+    { chainId: 1, surface: null, href: null, label: "Fluid", chainName: "Ethereum", reason: "no USD price" },
+  ]);
 });
 
 test("a launched explorer with no row omits the value", () => {
@@ -124,7 +126,10 @@ test("rows match on slug and chain; the vaults surface reads after the chain", (
     r,
   );
   assert.equal(v.rows[0].chainName, "Base vaults");
-  assert.deepEqual(v.notCounted, [{ label: "Morpho Blue", chainName: "Base", reason: "no price" }]);
+  assert.deepEqual(v.notCounted, [
+    { chainId: 8453, surface: null, href: null, label: "Morpho Blue", chainName: "Base", reason: "no price" },
+  ]);
+  assert.equal(v.rows[0].surface, "vaults");
 });
 
 test("stale assets read as one line per explorer", () => {
