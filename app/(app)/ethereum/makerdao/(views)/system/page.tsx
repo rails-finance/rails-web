@@ -17,7 +17,7 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 export const revalidate = 600;
 
 export const metadata = {
-  title: "MakerDAO System",
+  title: "MakerDAO system",
   description:
     "The Vat's balance sheet decomposed by collateral type: every DAI in existence, what mints it, and the terms governance set for each.",
 };

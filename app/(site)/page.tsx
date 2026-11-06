@@ -60,15 +60,16 @@ export default async function Home() {
             way out of the hero, the roster counted, the live sample (a link to
             it on a phone), the explorer directory. */}
         {/* Track lines graphic — the animated stripes, risen 80px into the
-            hero's foot. The casing var is the gradient's floor tone:
+            hero's foot. The casing var is the gradient tone behind the lines:
             `--background` light, which tracks the `to-background` stop; dark
-            the INLINED @theme rb-800 literal rgb(20 22 30), because the
-            `dark:to-rb-800` stop inlines the @theme value and never sees the
-            html.dark override. This high on the gradient the floor is a few
-            steps darker than the surface in dark, so the crossings read as
-            slightly darker gaps. */}
+            a literal rgb(24 26 36), the gradient's colour at the middle of the
+            graphic (it runs 25 27 38 at the top edge to 23 25 35 at the foot,
+            rb-600 to rb-800 over the first half of the page), so a crossing
+            reads as a gap rather than a darker patch. The literal is needed
+            because the `dark:to-rb-800` stop inlines the @theme value and
+            never sees the html.dark override. */}
         <section
-          className="-mt-20 pb-16 [--track-casing:var(--background)] dark:[--track-casing:rgb(20_22_30)]"
+          className="-mt-20 pb-16 [--track-casing:var(--background)] dark:[--track-casing:rgb(24_26_36)]"
           data-anatomy="S4"
         >
           <TrackLines />

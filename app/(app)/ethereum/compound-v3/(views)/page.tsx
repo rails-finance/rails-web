@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export const metadata = listingMetadata({
-  title: "Explore Compound V3 Positions",
+  title: "Explore Compound V3 positions",
   canonicalPath: "/ethereum/compound-v3",
 });
 

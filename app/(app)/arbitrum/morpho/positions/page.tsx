@@ -13,7 +13,7 @@ import { loadArbitrumCensus } from "@/lib/sources/api/arbitrum-census";
 export const dynamic = "force-dynamic";
 
 export const metadata = listingMetadata({
-  title: "Explore Morpho Blue Positions on Arbitrum",
+  title: "Explore Morpho Blue positions on Arbitrum",
   canonicalPath: "/arbitrum/morpho/positions",
 });
 

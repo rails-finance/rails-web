@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export const metadata = listingMetadata({
-  title: "Explore Aave V4 Positions on Base",
+  title: "Explore Aave V4 positions on Base",
   canonicalPath: "/base/aave-v4",
   description:
     "Aave V4 on Base: every account on the Equities hub's Mag7 spoke, where Coinbase tokenized stocks back USDC loans, read from the spoke's own contracts.",

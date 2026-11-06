@@ -39,7 +39,7 @@ import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 export const revalidate = 600;
 
 export const metadata = {
-  title: "Maple Pools",
+  title: "Maple pools",
   description:
     "The two permissionless syrup pools — what each claims to be worth, what lenders can actually reach right now, and the loan book behind the rest.",
 };

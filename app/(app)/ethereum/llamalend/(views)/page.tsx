@@ -28,7 +28,7 @@ export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore LlamaLend Positions", canonicalPath: "/ethereum/llamalend" });
+export const metadata = listingMetadata({ title: "Explore LlamaLend positions", canonicalPath: "/ethereum/llamalend" });
 
 async function LlamalendListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = llamalendListDimensions();

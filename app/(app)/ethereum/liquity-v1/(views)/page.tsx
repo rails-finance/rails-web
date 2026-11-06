@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Liquity V1 Troves", canonicalPath: "/ethereum/liquity-v1" });
+export const metadata = listingMetadata({ title: "Explore Liquity V1 troves", canonicalPath: "/ethereum/liquity-v1" });
 
 async function LiquityV1ListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = liquityV1ListDimensions();

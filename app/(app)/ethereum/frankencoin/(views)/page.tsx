@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export const metadata = listingMetadata({
-  title: "Explore Frankencoin Positions",
+  title: "Explore Frankencoin positions",
   canonicalPath: "/ethereum/frankencoin",
 });
 

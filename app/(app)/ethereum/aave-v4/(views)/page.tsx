@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export const metadata = listingMetadata({
-  title: "Explore Aave V4 Positions",
+  title: "Explore Aave V4 positions",
   canonicalPath: "/ethereum/aave-v4",
   description:
     "Explore Aave V4 wallet activity across all 11 spokes — supply, borrow, liquidations, and collateral toggles per market with full position context.",

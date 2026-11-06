@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { loanToken, marketId } = await params;
   const token = loanToken.toLowerCase();
   const id = marketId.toLowerCase();
-  if (!ADDRESS.test(token) || !MARKET_ID.test(id)) return { title: "Morpho Blue Market" };
+  if (!ADDRESS.test(token) || !MARKET_ID.test(id)) return { title: "Morpho Blue market" };
   const m = (await load(id))?.market;
   const pair = m ? `${m.loanSymbol} / ${m.collateralSymbol ?? "no collateral"}` : "Morpho Blue market";
   return {

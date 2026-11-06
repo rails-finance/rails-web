@@ -13,7 +13,7 @@ import { loadArbitrumCensus } from "@/lib/sources/api/arbitrum-census";
 export const dynamic = "force-dynamic";
 
 export const metadata = listingMetadata({
-  title: "Explore Compound V3 Positions on Arbitrum",
+  title: "Explore Compound V3 positions on Arbitrum",
   canonicalPath: "/arbitrum/compound-v3/positions",
 });
 

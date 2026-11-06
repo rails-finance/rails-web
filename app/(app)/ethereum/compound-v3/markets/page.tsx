@@ -32,7 +32,7 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 export const revalidate = 600;
 
 export const metadata = {
-  title: "Compound V3 Markets",
+  title: "Compound V3 markets",
   description:
     "Each Compound V3 market's own state — how heavily it is lent out against its rate-model kink, with rates, supply caps and reserves.",
 };

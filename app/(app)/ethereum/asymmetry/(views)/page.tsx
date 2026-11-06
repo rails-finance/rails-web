@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Asymmetry Troves", canonicalPath: "/ethereum/asymmetry" });
+export const metadata = listingMetadata({ title: "Explore Asymmetry troves", canonicalPath: "/ethereum/asymmetry" });
 
 async function AsymmetryListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = asymmetryListDimensions([]);

@@ -21,7 +21,7 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Asymmetry Branches",
+  title: "Asymmetry branches",
   description:
     "Asymmetry's seven collateral branches and the order redemption reaches them — each branch with its own oracle, minimum collateral ratio and terms.",
 };

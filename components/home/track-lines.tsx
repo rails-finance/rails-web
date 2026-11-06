@@ -25,11 +25,11 @@ const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffec
  *
  * Casing strokes must match the surface behind the graphic to read as gaps
  * where lines cross: they use --track-casing with --surface-raised as the
- * fallback. On the home page the wrapper sets the gradient's floor tone,
- * --background light / the INLINED rb-800 literal
- * rgb(20 22 30) dark (a `dark:to-rb-800` gradient stop inlines the @theme
- * value and never sees html.dark overrides, so var(--background) — which does
- * follow them — would land on the wrong tone there).
+ * fallback. On the home page the wrapper sets the gradient tone behind the
+ * lines: --background light, a literal rgb(24 26 36) dark (the gradient's
+ * colour at the middle of the graphic; a `dark:to-rb-800` gradient stop inlines
+ * the @theme value and never sees html.dark overrides, so var(--background)
+ * — which does follow them — would land on the wrong tone there).
  */
 export function TrackLines() {
   const wrapRef = useRef<HTMLDivElement>(null);

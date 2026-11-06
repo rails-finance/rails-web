@@ -21,7 +21,7 @@ import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/pro
 export const revalidate = 600;
 
 export const metadata = {
-  title: "f(x) Pools",
+  title: "f(x) pools",
   description:
     "f(x) V2's two pools and their tick ladders: every tick holding debt, checked against each pool's own totals exactly, and the funding state that moves them all.",
 };
