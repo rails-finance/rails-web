@@ -719,7 +719,9 @@ function FilledLayoutGrid() {
 }
 
 /** The two glyphs of the rail's toggle, cross-faded: two lines (shut) and
- *  the sidebar, a rounded square with a bar down its left (open). */
+ *  the sidebar, a rounded square with a bar down its left (open), whose bar
+ *  turns into a chevron pointing left while the button is hovered or focused
+ *  (the button carries `group`). */
 export function SidebarToggleGlyph({ open }: { open: boolean }) {
   const glyph = "absolute inset-0 m-auto transition-[opacity,transform] duration-200";
   return (
@@ -751,7 +753,15 @@ export function SidebarToggleGlyph({ open }: { open: boolean }) {
         style={{ opacity: open ? 1 : 0, transform: open ? "none" : "scale(0.8)" }}
       >
         <rect x="3" y="3" width="14" height="14" rx="3.5" />
-        <path d="M7 6.5v7" />
+        <path
+          d="M7 6.5v7"
+          className="transition-opacity duration-150 group-hover:opacity-0 group-focus-visible:opacity-0"
+        />
+        <path
+          d="M10.75 7.5 8.25 10l2.5 2.5"
+          strokeLinejoin="round"
+          className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+        />
       </svg>
     </>
   );
@@ -815,7 +825,7 @@ export function SearchLauncher({
     <button
       type="button"
       onClick={(e) => toggleWalletPanel(e.currentTarget)}
-      className={`relative flex h-[38px] w-[38px] cursor-pointer items-center justify-center rounded-lg text-rb-600 transition-colors hover:text-foreground focus-ring dark:text-rb-300 ${CHROME_HOVER}`}
+      className={`group relative flex h-[38px] w-[38px] cursor-pointer items-center justify-center rounded-lg text-rb-600 transition-colors hover:text-foreground focus-ring dark:text-rb-300 ${CHROME_HOVER}`}
       aria-label={open ? "Close search and explorers" : "Open search and explorers"}
       aria-expanded={open}
       aria-keyshortcuts="/ Meta+K"

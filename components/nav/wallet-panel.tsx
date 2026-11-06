@@ -230,7 +230,7 @@ export function WalletPanel() {
           <button
             type="button"
             onClick={close}
-            className={`relative flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground transition-colors focus-ring ${CHROME_HOVER}`}
+            className={`group relative flex h-[38px] w-[38px] shrink-0 cursor-pointer items-center justify-center rounded-lg text-foreground transition-colors focus-ring ${CHROME_HOVER}`}
             aria-label="Close search and explorers"
             data-wallet-panel-close=""
           >
