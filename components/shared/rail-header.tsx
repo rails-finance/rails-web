@@ -32,12 +32,32 @@ import { INFO_PATH } from "@/components/shared/info-disclosure";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
 
-/** The explorer's chain on the title row: its glyph alone, muted, following
- *  the protocol's name (Miles, 6 Nov 2026, ui-jobs 514), a label and not a
- *  control; the chain's name is its accessible name. */
-export function ChainLabel({ chainId, className = "" }: { chainId: ChainId; className?: string }) {
+/** The explorer's chain, muted, a label and not a control. On the title row
+ *  its glyph alone follows the protocol's name (Miles, 6 Nov 2026, ui-jobs
+ *  514), the chain's name its accessible name; under N5's name (`named`) the
+ *  glyph and the name in the rail's small caps. */
+export function ChainLabel({
+  chainId,
+  className = "",
+  named = false,
+}: {
+  chainId: ChainId;
+  className?: string;
+  named?: boolean;
+}) {
   const chain = CHAINS[chainId];
   if (!chain) return null;
+  if (named)
+    return (
+      <span
+        className={`inline-flex shrink-0 items-center gap-1.5 text-rb-500 ${className}`}
+        data-chain-label={chain.slug}
+        data-anatomy="H3.2"
+      >
+        <ChainGlyph chainId={chain.id} className="h-4 w-4" />
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em]">{chain.name}</span>
+      </span>
+    );
   return (
     <span
       role="img"
