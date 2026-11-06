@@ -15,6 +15,8 @@
 // state so first paint never waits on RPC; a chainStale response simply
 // leaves the risk surfaces unrendered.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { INDEX_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
@@ -143,6 +145,8 @@ export default function FluidPositionView({
   const [tailFailed, setTailFailed] = useState(false);
   const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<FluidPositionChainResponse | null>(null);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(chain), [chain]));
   // Whether the live read has answered (or failed): the Lifetime flows panel
   // waits for it, since today's figures and price are its.
   const [chainSettled, setChainSettled] = useState(false);

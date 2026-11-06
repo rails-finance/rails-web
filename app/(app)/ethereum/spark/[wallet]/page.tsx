@@ -1,3 +1,6 @@
+import { indexReadAt } from "@/lib/shared/position-read-server";
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -50,22 +53,25 @@ export default async function SparkPositionPage({ params, searchParams }: Props)
   const sp = await searchParams;
   const grouped = servedFoldersFromParam(sp.folders);
 
-  const tail = await loadSparkPositionTail(wallet, grouped);
+  // The index head beside the tail: the block the card states (ui-jobs 512).
+  const [tail, read] = await Promise.all([loadSparkPositionTail(wallet, grouped), indexReadAt(MAINNET_CHAIN_ID)]);
 
   return (
-    <SparkPositionDetail
-      // Keyed on the wallet AND the shape of its history, so a client-side
-      // navigation to either remounts with the new server tail as its initial
-      // state, rather than holding the previous account's numbers — or the
-      // previous partition — in state under new props.
-      key={`${wallet}:${grouped ? "rows" : "events"}`}
-      wallet={wallet}
-      initialPosition={tail.position}
-      initialEvents={tail.events}
-      initialCutoffBlock={tail.cutoffBlock}
-      initialOpening={tail.opening}
-      initialGrouped={tail.grouped}
-      initialLaneInterest={tail.laneInterest}
-    />
+    <PositionReadProvider key={`${wallet}:${grouped ? "rows" : "events"}`} read={tail.position ? read : null}>
+      <SparkPositionDetail
+        // Keyed on the wallet AND the shape of its history, so a client-side
+        // navigation to either remounts with the new server tail as its initial
+        // state, rather than holding the previous account's numbers — or the
+        // previous partition — in state under new props.
+        key={`${wallet}:${grouped ? "rows" : "events"}`}
+        wallet={wallet}
+        initialPosition={tail.position}
+        initialEvents={tail.events}
+        initialCutoffBlock={tail.cutoffBlock}
+        initialOpening={tail.opening}
+        initialGrouped={tail.grouped}
+        initialLaneInterest={tail.laneInterest}
+      />
+    </PositionReadProvider>
   );
 }

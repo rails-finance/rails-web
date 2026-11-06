@@ -1,3 +1,7 @@
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { indexReadAt, timedRead } from "@/lib/shared/position-read-server";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -41,20 +45,24 @@ export default async function MakerVaultPage({ params, searchParams }: Props) {
 
   // Rows by default; `?folders=0` reads the flat window.
   const grouped = servedFoldersFromParam((await searchParams).folders);
-  const tail = await loadMakerVaultTail(vault, grouped);
+  // The card states the Vat read where the figures stand on it, else the index head (ui-jobs 512).
+  const [tail, indexRead] = await Promise.all([loadMakerVaultTail(vault, grouped), indexReadAt(MAINNET_CHAIN_ID)]);
+  const read = await timedRead(tail.summary ? (readOfHeadAnswer(tail.chain) ?? indexRead) : null, MAINNET_CHAIN_ID);
 
   return (
-    <MakerVaultDetailView
-      // Keyed on the vault so a client-side navigation to another one remounts
-      // with that vault's server tail as its initial state.
-      key={`${vault}:${grouped ? "rows" : "events"}`}
-      vault={vault}
-      initialSummary={tail.summary}
-      initialChain={tail.chain}
-      initialEvents={tail.events}
-      initialCutoffBlock={tail.cutoffBlock}
-      initialOpening={tail.opening}
-      initialGrouped={tail.grouped}
-    />
+    <PositionReadProvider key={`${vault}:${grouped ? "rows" : "events"}`} read={read}>
+      <MakerVaultDetailView
+        // Keyed on the vault so a client-side navigation to another one remounts
+        // with that vault's server tail as its initial state.
+        key={`${vault}:${grouped ? "rows" : "events"}`}
+        vault={vault}
+        initialSummary={tail.summary}
+        initialChain={tail.chain}
+        initialEvents={tail.events}
+        initialCutoffBlock={tail.cutoffBlock}
+        initialOpening={tail.opening}
+        initialGrouped={tail.grouped}
+      />
+    </PositionReadProvider>
   );
 }

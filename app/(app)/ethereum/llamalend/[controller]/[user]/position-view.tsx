@@ -20,6 +20,8 @@
 // state legs upgrade from the listing snapshot to the live head read when it
 // lands.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
@@ -146,6 +148,8 @@ export default function LlamalendPositionView({
   const [tailFailed, setTailFailed] = useState(false);
   const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<LlamalendChainResponse | null>(null);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(chain), [chain]));
   // Whether the live read has answered (or failed): the Lifetime flows panel
   // waits for it, since today's figures and price are its.
   const [chainSettled, setChainSettled] = useState(false);

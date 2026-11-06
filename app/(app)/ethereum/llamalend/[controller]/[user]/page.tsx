@@ -1,3 +1,6 @@
+import { indexReadAt } from "@/lib/shared/position-read-server";
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -38,19 +41,22 @@ export default async function LlamalendPositionPage({ params }: Props) {
   const user = normalizeAddressParam(rawUser ?? "");
   if (!controller || !user) notFound();
 
-  const tail = await loadLlamalendPositionTail(controller, user);
+  // The index head beside the tail: the block the card states (ui-jobs 512).
+  const [tail, read] = await Promise.all([loadLlamalendPositionTail(controller, user), indexReadAt(MAINNET_CHAIN_ID)]);
 
   return (
-    <LlamalendPositionView
-      // Keyed on the pair so a client-side navigation to another position
-      // remounts with that position's server tail as its initial state.
-      key={`${controller}:${user}`}
-      controller={controller}
-      user={user}
-      initialPosition={tail.position}
-      initialEvents={tail.events}
-      initialCutoffBlock={tail.cutoffBlock}
-      initialOpening={tail.opening}
-    />
+    <PositionReadProvider key={`${controller}:${user}`} read={tail.position ? read : null}>
+      <LlamalendPositionView
+        // Keyed on the pair so a client-side navigation to another position
+        // remounts with that position's server tail as its initial state.
+        key={`${controller}:${user}`}
+        controller={controller}
+        user={user}
+        initialPosition={tail.position}
+        initialEvents={tail.events}
+        initialCutoffBlock={tail.cutoffBlock}
+        initialOpening={tail.opening}
+      />
+    </PositionReadProvider>
   );
 }

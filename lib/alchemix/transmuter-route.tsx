@@ -4,6 +4,8 @@
 // before anything is read, and the page, its metadata and its share card share
 // one cached read per request.
 
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { indexReadAt } from "@/lib/shared/position-read-server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { decodeEventId, eventMetadata, positionMetadata } from "@/lib/shared/page-metadata";
@@ -52,7 +54,11 @@ export async function TransmuterPositionPage({
   params: TransmuterPositionParams;
 }) {
   const { lineKey, nftId } = params;
-  const read = await loadTransmuterPosition(deployment.chainId, lineKey, nftId);
+  // The index head beside the read: the block the card states (ui-jobs 512).
+  const [read, indexRead] = await Promise.all([
+    loadTransmuterPosition(deployment.chainId, lineKey, nftId),
+    indexReadAt(deployment.chainId),
+  ]);
   if (read.missing) notFound();
   if (!read.position) {
     // A read that did not land is not an absence, and the page says so.
@@ -67,7 +73,11 @@ export async function TransmuterPositionPage({
       </RouteNotFound>
     );
   }
-  return <TransmuterPositionView key={`${lineKey}:${nftId}`} deployment={deployment} position={read.position} />;
+  return (
+    <PositionReadProvider key={`${lineKey}:${nftId}`} read={indexRead}>
+      <TransmuterPositionView key={`${lineKey}:${nftId}`} deployment={deployment} position={read.position} />
+    </PositionReadProvider>
+  );
 }
 
 export interface TransmuterEventParams extends TransmuterPositionParams {

@@ -41,6 +41,8 @@
 // The history's completeness is a property of the request rather than of the
 // explorer, so it is stated under every timeline.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -524,6 +526,8 @@ export function CompoundWalletView({
   const timelineSeeded = initialTimeline != null;
 
   const [data, setData] = useState<CompoundWalletChainResponse | null>(initialWallet);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(data), [data]));
   const [loading, setLoading] = useState(!seeded);
   const [error, setError] = useState<string | null>(null);
 

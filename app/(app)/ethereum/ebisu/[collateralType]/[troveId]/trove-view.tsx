@@ -26,6 +26,8 @@
 // empty (a backend blip) `initialTrove` is null and this component fetches
 // the tail itself, exactly as it did before the route had a server half.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { liquityForkExplorer } from "@/lib/liquity-fork/explorer";
@@ -157,6 +159,8 @@ export default function EbisuTroveDetail({
   const [tailFailed, setTailFailed] = useState(false);
   const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<LiquityForkTroveChainResponse | null>(null);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(chain), [chain]));
   // Standing display framing (risk view) — a global preference, so the reader's
   // choice on one trove carries to the next.
 

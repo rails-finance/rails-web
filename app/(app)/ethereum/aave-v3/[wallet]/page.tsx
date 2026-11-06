@@ -1,3 +1,6 @@
+import { indexReadAt } from "@/lib/shared/position-read-server";
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -61,23 +64,29 @@ export default async function AaveV3PositionPage({ params, searchParams }: Props
   // `servedFoldersFromParam` is the same test the browser half applies.
   const grouped = servedFoldersFromParam(sp.folders);
 
-  const tail = await loadAaveV3PositionTail(wallet, market, grouped);
+  // The index head beside the tail: the block the card states (ui-jobs 512).
+  const [tail, read] = await Promise.all([
+    loadAaveV3PositionTail(wallet, market, grouped),
+    indexReadAt(MAINNET_CHAIN_ID),
+  ]);
 
   return (
-    <AaveV3PositionDetail
-      // Keyed on the account, its market AND the shape of its history: all
-      // three change what this page is about, so a client-side navigation to
-      // any of them remounts with the new server tail rather than holding the
-      // previous numbers — or the previous partition — under new props.
-      key={`${wallet}:${market}:${grouped ? "rows" : "events"}`}
-      wallet={wallet}
-      market={market}
-      initialPosition={tail.position}
-      initialEvents={tail.events}
-      initialCutoffBlock={tail.cutoffBlock}
-      initialOpening={tail.opening}
-      initialGrouped={tail.grouped}
-      initialLaneInterest={tail.laneInterest}
-    />
+    <PositionReadProvider key={`${wallet}:${market}:${grouped ? "rows" : "events"}`} read={tail.position ? read : null}>
+      <AaveV3PositionDetail
+        // Keyed on the account, its market AND the shape of its history: all
+        // three change what this page is about, so a client-side navigation to
+        // any of them remounts with the new server tail rather than holding the
+        // previous numbers — or the previous partition — under new props.
+        key={`${wallet}:${market}:${grouped ? "rows" : "events"}`}
+        wallet={wallet}
+        market={market}
+        initialPosition={tail.position}
+        initialEvents={tail.events}
+        initialCutoffBlock={tail.cutoffBlock}
+        initialOpening={tail.opening}
+        initialGrouped={tail.grouped}
+        initialLaneInterest={tail.laneInterest}
+      />
+    </PositionReadProvider>
   );
 }

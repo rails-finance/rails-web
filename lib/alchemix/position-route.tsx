@@ -11,6 +11,9 @@
 // is real on the other chain is a 404 here, not a position served by the wrong
 // explorer: the two would be different positions wearing the same id.
 
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { indexReadAt } from "@/lib/shared/position-read-server";
+import { chainRead } from "@/lib/shared/position-read";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { decodeEventId, eventMetadata, positionMetadata } from "@/lib/shared/page-metadata";
@@ -70,7 +73,12 @@ export async function AlchemixPositionPage({
   // tail: earmarked accrues every block, so this is where a CURRENT figure can
   // come from, and its absence leaves a slot that says so rather than a stored
   // figure standing in for one.
-  const live = await loadAlchemistLiveState(deployment.chainId, lineKey, tokenId);
+  const [live, indexRead] = await Promise.all([
+    loadAlchemistLiveState(deployment.chainId, lineKey, tokenId),
+    indexReadAt(deployment.chainId),
+  ]);
+  // The card states the live read where the figures stand on it, else the index head (ui-jobs 512).
+  const read = (live ? chainRead(live.asOfBlock, live.readAt) : null) ?? indexRead;
 
   // The V2 account this position's holder closed on 2026-04-02, where the
   // successor table links one. Its rows join the timeline, marked V2, so a
@@ -81,21 +89,23 @@ export async function AlchemixPositionPage({
   const v2History = await loadV2History(deployment, tail.position.v2Predecessors ?? [], !tail.hasMore);
 
   return (
-    <AlchemistPositionView
-      // Keyed on the position so a client-side move to another one remounts
-      // with the new server tail as its initial state.
-      key={`${lineKey}:${tokenId}`}
-      deployment={deployment}
-      lineKey={lineKey}
-      tokenId={tokenId}
-      position={tail.position}
-      events={tail.events}
-      totalEvents={tail.hasMore ? tail.totalEvents : null}
-      lineScopedNote={tail.lineScopedNote}
-      lineEventWindow={tail.lineEventWindow}
-      initialLiveState={live}
-      v2History={v2History}
-    />
+    <PositionReadProvider key={`${lineKey}:${tokenId}`} read={read}>
+      <AlchemistPositionView
+        // Keyed on the position so a client-side move to another one remounts
+        // with the new server tail as its initial state.
+        key={`${lineKey}:${tokenId}`}
+        deployment={deployment}
+        lineKey={lineKey}
+        tokenId={tokenId}
+        position={tail.position}
+        events={tail.events}
+        totalEvents={tail.hasMore ? tail.totalEvents : null}
+        lineScopedNote={tail.lineScopedNote}
+        lineEventWindow={tail.lineEventWindow}
+        initialLiveState={live}
+        v2History={v2History}
+      />
+    </PositionReadProvider>
   );
 }
 

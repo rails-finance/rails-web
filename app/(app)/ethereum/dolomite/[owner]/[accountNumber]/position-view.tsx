@@ -22,6 +22,8 @@
 // market-state read to the live getAccountBalances wei when the chain read
 // lands.
 
+import { useReportPositionRead } from "@/components/shared/position-read";
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DRAINED_ROW_CEILING } from "@/lib/shared/timeline-row-ceiling";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
@@ -139,6 +141,8 @@ export default function DolomitePositionView({
   const [tailFailed, setTailFailed] = useState(false);
   const [tailTry, setTailTry] = useState(0);
   const [chain, setChain] = useState<DolomiteChainResponse | null>(null);
+  // The card's stamp follows the live read once it lands (ui-jobs 512).
+  useReportPositionRead(useMemo(() => readOfHeadAnswer(chain), [chain]));
   // The core read is in flight: the card's margin ratio waits behind a pulsing bar.
   const [chainPending, setChainPending] = useState(true);
   // Standing display framing (risk view) — a global preference, so the

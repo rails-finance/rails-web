@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { loadTroveTail } from "@/lib/liquity/trove-page-data";
+import { indexReadAt } from "@/lib/shared/position-read-server";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { PositionReadProvider } from "@/components/shared/position-read";
 import TroveView from "./trove-view";
 
 interface Props {
@@ -41,7 +44,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function TrovePage({ params }: Props) {
   const { collateralType, troveId } = await params;
 
-  const tail = await loadTroveTail(collateralType, troveId);
+  // The index head beside the tail: the block the card states (ui-jobs 512).
+  const [tail, read] = await Promise.all([loadTroveTail(collateralType, troveId), indexReadAt(MAINNET_CHAIN_ID)]);
   // Only an answered-and-empty backend roster reaches this — a failed read
   // leaves `missing` false and hands the client an unseeded view to retry.
   //
@@ -52,18 +56,20 @@ export default async function TrovePage({ params }: Props) {
   if (tail.missing) notFound();
 
   return (
-    <TroveView
-      // Keyed on the trove so a client-side navigation to another position
-      // remounts with the new server tail as its initial state, rather than
-      // holding the previous trove's numbers in state under new props.
-      key={`${collateralType}:${troveId}`}
-      collateralType={collateralType}
-      troveId={troveId}
-      initialTrove={tail.trove}
-      initialEvents={tail.events}
-      initialTotalEvents={tail.hasMore ? tail.totalEvents : null}
-      initialPrices={tail.prices}
-      renderedAt={Date.now() / 1000}
-    />
+    <PositionReadProvider key={`${collateralType}:${troveId}`} read={tail.trove ? read : null}>
+      <TroveView
+        // Keyed on the trove so a client-side navigation to another position
+        // remounts with the new server tail as its initial state, rather than
+        // holding the previous trove's numbers in state under new props.
+        key={`${collateralType}:${troveId}`}
+        collateralType={collateralType}
+        troveId={troveId}
+        initialTrove={tail.trove}
+        initialEvents={tail.events}
+        initialTotalEvents={tail.hasMore ? tail.totalEvents : null}
+        initialPrices={tail.prices}
+        renderedAt={Date.now() / 1000}
+      />
+    </PositionReadProvider>
   );
 }

@@ -1,8 +1,12 @@
+import { ARBITRUM_CHAIN_ID } from "@/lib/shared/chains";
+import { timedRead } from "@/lib/shared/position-read-server";
 // One Compound V3 position on Arbitrum: a Comet and a wallet. The Comet read
 // and the history are the whole wallet's (one batched call answers every
 // Comet); the view draws the market this URL names
 // (rails-ops reference/arbitrum-position-first-lane.md).
 
+import { readOfHeadAnswer } from "@/lib/shared/position-read";
+import { PositionReadProvider } from "@/components/shared/position-read";
 import type { Metadata } from "next";
 import { after } from "next/server";
 import { notFound } from "next/navigation";
@@ -45,6 +49,8 @@ export default async function CompoundArbitrumMarketPage({ params }: Props) {
   // The four Comets at one block, and the history from rails-server's store;
   // either that misses its budget is left to the client half.
   const tail = await loadCompoundArbitrumTail(wallet);
+  // The chain read the figures stand on, as the card states it (ui-jobs 512).
+  const read = await timedRead(readOfHeadAnswer(tail.head), ARBITRUM_CHAIN_ID);
 
   // One post of this render's Comet read, once the response is sent; a stale
   // stub or a missed read posts nothing.
@@ -55,12 +61,14 @@ export default async function CompoundArbitrumMarketPage({ params }: Props) {
   }
 
   return (
-    <CompoundArbitrumMarketView
-      key={`${market.key}:${wallet}`}
-      wallet={wallet}
-      market={market.key}
-      initialWallet={tail.head}
-      initialTimeline={tail.timeline}
-    />
+    <PositionReadProvider key={`${market.key}:${wallet}`} read={tail.head ? read : null}>
+      <CompoundArbitrumMarketView
+        key={`${market.key}:${wallet}`}
+        wallet={wallet}
+        market={market.key}
+        initialWallet={tail.head}
+        initialTimeline={tail.timeline}
+      />
+    </PositionReadProvider>
   );
 }

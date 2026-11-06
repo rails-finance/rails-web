@@ -1,3 +1,6 @@
+import { indexReadAt } from "@/lib/shared/position-read-server";
+import { PositionReadProvider } from "@/components/shared/position-read";
+import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { positionMetadata } from "@/lib/shared/page-metadata";
@@ -44,7 +47,11 @@ export default async function BasedollarTrovePage({ params, searchParams }: Prop
 
   // Rows by default; `?folders=0` reads the flat window.
   const grouped = servedFoldersFromParam((await searchParams).folders);
-  const tail = await loadBasedollarTroveTail(collateralType, troveId, grouped);
+  // The index head beside the tail: the block the card states (ui-jobs 512).
+  const [tail, read] = await Promise.all([
+    loadBasedollarTroveTail(collateralType, troveId, grouped),
+    indexReadAt(BASE_CHAIN_ID),
+  ]);
   // Only an unknown branch, or an answered-and-empty roster, reaches this — a
   // failed read leaves `missing` false and hands the client an unseeded view to
   // retry. It resolves to a real 404 because no Suspense boundary sits above
@@ -53,18 +60,23 @@ export default async function BasedollarTrovePage({ params, searchParams }: Prop
   if (tail.missing) notFound();
 
   return (
-    <BasedollarTroveDetail
-      // Keyed on the trove so a client-side navigation to another position
-      // remounts with the new server tail as its initial state, rather than
-      // holding the previous trove's numbers in state under new props.
+    <PositionReadProvider
       key={`${collateralType}:${troveId}:${grouped ? "rows" : "events"}`}
-      collateralType={collateralType}
-      troveId={troveId}
-      initialTrove={tail.trove}
-      initialEvents={tail.events}
-      initialCutoffBlock={tail.cutoffBlock}
-      initialOpening={tail.opening}
-      initialGrouped={tail.grouped}
-    />
+      read={tail.trove ? read : null}
+    >
+      <BasedollarTroveDetail
+        // Keyed on the trove so a client-side navigation to another position
+        // remounts with the new server tail as its initial state, rather than
+        // holding the previous trove's numbers in state under new props.
+        key={`${collateralType}:${troveId}:${grouped ? "rows" : "events"}`}
+        collateralType={collateralType}
+        troveId={troveId}
+        initialTrove={tail.trove}
+        initialEvents={tail.events}
+        initialCutoffBlock={tail.cutoffBlock}
+        initialOpening={tail.opening}
+        initialGrouped={tail.grouped}
+      />
+    </PositionReadProvider>
   );
 }
