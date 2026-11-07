@@ -71,7 +71,7 @@ export function MoonwellFlowsNote({ facts }: { facts: MoonwellFlowsFacts | null 
 
 export function moonwellFlowsContent(): LearnMoreContent {
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro:
       "The bars add up every Moonwell event of this account, each at Moonwell's oracle price at its block, and the line under them draws what it held and owed at the end of each day.",
     stepsHeading: "How it's built:",

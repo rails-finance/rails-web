@@ -509,6 +509,104 @@ await phone.close();
   await ctx.close();
 }
 
+// Saved positions and views (ui-jobs 530, 521): one list under
+// `rails-saved` with a kind per entry, started from the wallet-only
+// `rails-bookmarks`, which keeps its old shape for builds from before. A
+// wallet such a build adds there joins the list and the views stay; the
+// profile menu groups Wallets, Positions, Views in that order, and /bookmarks
+// has the same three tabs, each row opening its saved page. A listing's ⋮
+// (N1.7) saves the view under its URL.
+{
+  const wallet = "0xf06016d822943c42e3cb7fc3a6a3b1889c1045f8";
+  const later = "0xd8da6bf26964af9d7eed9e03e53415d37aa96045";
+  // Morpho Base filtered to WETH collateral.
+  const VIEW = "/base/morpho?coll=0x4200000000000000000000000000000000000006";
+  const legacyRow = (a, t) => ({ key: a, addresses: [a], ensNames: { [a]: null }, lastVisited: t, pinned: true });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.addInitScript(
+    (row) => {
+      if (sessionStorage.getItem("sv-seeded")) return;
+      sessionStorage.setItem("sv-seeded", "1");
+      localStorage.setItem("rails-bookmarks", JSON.stringify([row]));
+      localStorage.setItem("rails-bookmarks-migrated", "1");
+      localStorage.setItem("rails-bookmarks-ordered", "1");
+    },
+    legacyRow(wallet, 1),
+  );
+  const sp = await ctx.newPage();
+  const read = (k) => sp.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "null"), k);
+  await sp.goto(`${BASE}${VIEW}`, { waitUntil: "networkidle", timeout: 180_000 });
+  const seeded = await read("rails-saved");
+  const legacyAfter = await read("rails-bookmarks");
+  check(
+    "SV a wallet-only profile moves to rails-saved with its kind; rails-bookmarks keeps the old shape",
+    seeded?.map((r) => r.kind).join() === "wallet" && legacyAfter?.length === 1 && !("kind" in legacyAfter[0]),
+    JSON.stringify({ seeded, legacyAfter }),
+  );
+  const trig = sp.locator("[data-view-menu] > button");
+  let open = false;
+  for (let i = 0; i < 6 && !open; i++) {
+    await trig.click({ timeout: 10_000 }).catch(() => {});
+    open = await sp
+      .locator('[data-view-menu] [role="menu"]')
+      .waitFor({ state: "visible", timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+  const items = await sp
+    .locator('[data-view-menu] [role="menu"] [data-menu-item]')
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-menu-item")));
+  check(
+    "SV the listing ⋮ holds Save this view and Copy link",
+    items.join() === "save-view,copy-view-link",
+    items.join(),
+  );
+  await sp.locator('[data-menu-item="save-view"]').click();
+  const saved = (await read("rails-saved")).find((r) => r.kind === "view");
+  check(
+    "SV the view saves under the listing's URL, named protocol · chain · value and noun",
+    saved?.key === VIEW && saved?.name === "Morpho · Base · WETH collateral",
+    JSON.stringify(saved),
+  );
+  await sp.keyboard.press("Escape");
+  // A build from before 521 in another tab saves a wallet: it writes the
+  // wallet-only list in the old shape.
+  await sp.evaluate(
+    (rows) => localStorage.setItem("rails-bookmarks", JSON.stringify(rows)),
+    [legacyRow(later, 2), legacyRow(wallet, 1)],
+  );
+  await sp.reload({ waitUntil: "networkidle" });
+  const after = await read("rails-saved");
+  check(
+    "SV an old-format write adds its wallet and the view stays",
+    after
+      .filter((r) => r.kind === "wallet")
+      .map((r) => r.key)
+      .join() === `${later},${wallet}` && after.some((r) => r.kind === "view" && r.key === VIEW),
+    JSON.stringify(after.map((r) => [r.kind, r.key])),
+  );
+  await sp.locator('[data-profile-corner] [data-anatomy="H20"]').click();
+  const groups = await sp
+    .locator("[data-profile-menu-group]")
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-profile-menu-group")));
+  check("SV profile menu groups: wallets, views", groups.join() === "wallets,views", groups.join());
+  await sp.keyboard.press("Escape");
+  await sp.goto(`${BASE}/bookmarks?tab=views`, { waitUntil: "networkidle" });
+  await sp.waitForSelector('[data-bookmark-row="view"]');
+  const tabs = await sp
+    .locator("[data-saved-tab]")
+    .evaluateAll((els) =>
+      els.map((e) => `${e.getAttribute("data-saved-tab")}${e.getAttribute("aria-selected") === "true" ? "*" : ""}`),
+    );
+  const viewHref = await sp.locator('[data-bookmark-row="view"] a').first().getAttribute("href");
+  check(
+    "SV /bookmarks tabs Wallets, Positions, Views; ?tab=views lists the view opening its URL",
+    tabs.join() === "wallets,positions,views*" && viewHref === VIEW,
+    JSON.stringify({ tabs, viewHref }),
+  );
+  await ctx.close();
+}
+
 await browser.close();
 const failed = results.filter((r) => !r.ok);
 console.log(

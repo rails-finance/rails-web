@@ -399,7 +399,7 @@ export function aaveV3EconomicsContent(opts: AaveV3EconomicsOpts = {}, data?: Aa
   const isSeamless = label === "Seamless";
   const isBase = label === "Aave V3 on Base";
   return {
-    title: "About the Economics",
+    title: "About the economics",
     intro:
       "This section traces a position's supply and borrow flows over its lifetime, replayed from the Pool's own events.",
     stepsHeading: "How it's built:",

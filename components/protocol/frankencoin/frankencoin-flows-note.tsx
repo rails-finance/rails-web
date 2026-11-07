@@ -79,7 +79,7 @@ export function FrankencoinFlowsNote({ facts, collSymbol, clone }: FrankencoinFl
 
 export function frankencoinFlowsContent(): LearnMoreContent {
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro:
       "The bars add up every ledger row the index has recorded for this position, the collateral in its token and the debt in ZCHF, and the line under them draws what it held and owed at the end of each day.",
     stepsHeading: "How it's built:",

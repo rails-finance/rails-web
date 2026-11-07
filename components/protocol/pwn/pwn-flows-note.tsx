@@ -79,7 +79,7 @@ export function PwnFlowsNote({ facts, collSymbol, collLabel, creditSymbol, apr, 
 
 export function pwnFlowsContent(): LearnMoreContent {
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro:
       "The bars add up the loan's rows, the collateral in its token and the debt in the credit token, and the line under them draws what the loan held and owed at the end of each day.",
     stepsHeading: "How it's built:",

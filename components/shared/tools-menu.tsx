@@ -137,8 +137,10 @@ export function ToolsMenu({
    *  ⋮ menu, a sheet on a phone. `event`: the event card's ⋮ at its header's
    *  right end, the card menu named by `label` and `heading`. `panel`: the
    *  same for a panel's header (Lifetime flows), its last row the panel's
-   *  "Inspect provenance" (`provScope`). */
-  variant?: "tools" | "card" | "event" | "panel";
+   *  "Inspect provenance" (`provScope`). `view`: the listing's ⋮ at the
+   *  right end of its sort and filter row (N1.7, ui-jobs 521), named like
+   *  `event`. */
+  variant?: "tools" | "card" | "event" | "panel" | "view";
   /** Rows above the export shapes (the card's ID, NFT and page link), handed
    *  the menu's close like `children`. */
   leading?: (close: () => void) => ReactNode;
@@ -165,7 +167,7 @@ export function ToolsMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   // The event and panel menus: the card menu's trigger and rows, named by
   // `label` and `heading`; a panel's ends on its section's "Inspect provenance".
-  const eventMenu = variant === "event" || variant === "panel";
+  const eventMenu = variant === "event" || variant === "panel" || variant === "view";
   const card = variant === "card" || eventMenu;
   const scope =
     provScope ??
@@ -253,9 +255,11 @@ export function ToolsMenu({
     const wrapperData =
       variant === "panel"
         ? { "data-panel-menu": "" }
-        : eventMenu
-          ? { "data-event-menu": "" }
-          : { "data-export-menu": "", "data-tools-menu": "", "data-card-menu": "", "data-anatomy": "C17" };
+        : variant === "view"
+          ? { "data-view-menu": "", "data-anatomy": "N1.7" }
+          : eventMenu
+            ? { "data-event-menu": "" }
+            : { "data-export-menu": "", "data-tools-menu": "", "data-card-menu": "", "data-anatomy": "C17" };
     return (
       <div ref={ref} className="relative flex" {...wrapperData}>
         <button

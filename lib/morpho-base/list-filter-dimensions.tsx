@@ -191,12 +191,25 @@ const COLLATERAL_TOKEN_OPTIONS: FilterOptionDef[] = COLLATERAL_TOKEN_ROSTER.map(
   icon: <TokenChipIcon symbol={symbol} address={address} size={18} filterable={false} />,
 }));
 
-/** Roster option, or (for a value the roster doesn't name) the shortened
- *  address fallback — so an out-of-roster selection still has a row to
- *  un-tick. */
+/** Lowercase address to symbol over the whole Base token table, so a chip for a
+ *  token outside the curated rosters still names it. */
+const BASE_SYMBOL_BY_ADDRESS: ReadonlyMap<string, string> = new Map(
+  Object.entries(BASE_TOKEN_ADDRESSES).map(([symbol, address]) => [address.toLowerCase(), symbol]),
+);
+
+/** Roster option, or (for a value the roster doesn't name) the Base token
+ *  table's symbol, or the shortened address when the table has none — so an
+ *  out-of-roster selection still has a row to un-tick. */
 function tokenOptions(roster: FilterOptionDef[], selected: string[]): FilterOptionDef[] {
   const known = new Set(roster.map((o) => o.value));
-  const extra = selected.filter((v) => !known.has(v)).map((v) => ({ value: v, label: shortAddr(v) }));
+  const extra = selected
+    .filter((v) => !known.has(v))
+    .map((v) => {
+      const symbol = BASE_SYMBOL_BY_ADDRESS.get(v.toLowerCase());
+      return symbol
+        ? { value: v, label: symbol, icon: <TokenChipIcon symbol={symbol} address={v} size={18} filterable={false} /> }
+        : { value: v, label: shortAddr(v) };
+    });
   return [...roster, ...extra];
 }
 

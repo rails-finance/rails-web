@@ -97,7 +97,7 @@ function nearestSentence(p: FluidFlowsNoteFacts["pricing"]): string {
 
 export function fluidFlowsContent(): LearnMoreContent {
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro:
       "The bars add up every event Fluid has recorded for this position, in the vault's debt token (the collateral token where the position never borrowed), and the line under them draws what it held and owed at the end of each day.",
     stepsHeading: "How it's built:",

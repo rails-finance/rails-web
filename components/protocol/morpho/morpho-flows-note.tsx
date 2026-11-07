@@ -80,7 +80,7 @@ export function MorphoFlowsNote({ facts, loanSymbol, collSymbol, name }: MorphoF
 
 export function morphoFlowsContent(name: string): LearnMoreContent {
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro: `The bars add up every event ${name} has recorded for this position, in the market's loan token, and the line under them draws what it held and owed at the end of each day.`,
     stepsHeading: "How it's built:",
     steps: [

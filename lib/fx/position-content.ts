@@ -77,7 +77,7 @@ export function fxPositionContent(opts: {
 
   if (status === "liquidated") {
     return {
-      title: "About This Position",
+      title: "About this position",
       intro: `This position was liquidated when its debt ratio reached the ${pool} pool's liquidation line. The debt line above compares what its transactions add up to with the pool's final reading.`,
       detailsHeading: "Key concepts:",
       details: [...mechanics(pool, t), nft],
@@ -87,7 +87,7 @@ export function fxPositionContent(opts: {
 
   if (status === "closed") {
     return {
-      title: "About This Position",
+      title: "About this position",
       intro:
         "This position has been closed. Its collateral and debt are zero in the pool's reading, and the debt line above compares what its transactions added up to with that reading.",
       detailsHeading: "Key concepts:",
@@ -108,7 +108,7 @@ export function fxPositionContent(opts: {
 
   const cost = costs(t, opts.colls, opts.normalizedSymbol);
   return {
-    title: "About This Position",
+    title: "About this position",
     intro: `This panel describes the position as the ${pool} pool reads it now, and how that compares with what its own transactions add up to.`,
     detailsHeading: "Key concepts:",
     details: [

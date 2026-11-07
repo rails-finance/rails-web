@@ -109,7 +109,7 @@ export function AaveV3BaseFlowsNote({
 
 export function aaveV3BaseFlowsContent(brand: string): LearnMoreContent {
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro: `The bars add up every event of this account on the Pool, each at ${brand}'s oracle price at its block, and the line under them draws what it held and owed at the end of each day.`,
     stepsHeading: "How it's built:",
     steps: [

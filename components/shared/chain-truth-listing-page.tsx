@@ -506,6 +506,8 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
         onChange,
         sortOptions: typeof sortOptions === "function" ? sortOptions(filters) : sortOptions,
         searchPlaceholder,
+        // Every chain-truth listing can be saved as a view (N1.7, ui-jobs 521).
+        viewMenu: true,
       }}
     />
   );

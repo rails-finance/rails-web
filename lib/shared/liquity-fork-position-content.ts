@@ -37,7 +37,7 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
 
   if (status === "liquidated") {
     return {
-      title: "About This Position",
+      title: "About this position",
       intro: `This Trove was liquidated when its collateral ratio fell ${minCRText}. The panel above reconstructs its final state — peak collateral, ${debtSymbol} debt, and how long it stayed open.`,
       detailsHeading: "Key concepts:",
       details: [
@@ -56,7 +56,7 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
 
   if (status === "closed") {
     return {
-      title: "About This Position",
+      title: "About this position",
       intro: `This Trove has been closed and its ${debtSymbol} debt fully repaid. The panel above shows its lifetime peaks — the most collateral and debt it ever held.`,
       detailsHeading: "Key concepts:",
       details: [
@@ -115,7 +115,7 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
   );
 
   return {
-    title: "About This Position",
+    title: "About this position",
     intro: `This panel explains the Trove's live state in plain language — what backs the ${debtSymbol} debt, what it costs to hold, and how exposed it is to redemption — the same Liquity V2 architecture ${name} runs.`,
     detailsHeading: "Key concepts:",
     details,
