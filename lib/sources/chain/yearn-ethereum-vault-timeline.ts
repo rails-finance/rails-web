@@ -382,11 +382,6 @@ export async function loadYearnEthereumVaultTimeline(
   }
 }
 
-/** The ceiling a withheld life is measured against on the page. Stated here so
- *  the reader and the renderer name one figure: with no stored tail on this
- *  arm, what bounds a drawn life is what one request will BUILD inline. */
-export const YEARN_VAULT_TIMELINE_CEILING = VAULT_TIMELINE_HORIZON;
-
 // ── the gate's own read ──────────────────────────────────────────────────────
 
 async function balanceAt(

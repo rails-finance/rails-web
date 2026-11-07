@@ -11,10 +11,7 @@
 // an empty page — an empty list and a failed read are different statements and
 // the listing must not make them look alike.
 
-import {
-  alchemixPositionsQuery,
-  type FetchAlchemixPositionsParams,
-} from "@/lib/sources/api/alchemix-positions-backend";
+import { alchemixPositionsQuery, type FetchAlchemixPositionsParams } from "@/lib/sources/api/alchemix-positions-query";
 import type { AlchemixPositionsResponse } from "@/types/api/alchemix";
 
 export type { FetchAlchemixPositionsParams };

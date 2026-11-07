@@ -3,7 +3,7 @@
 // rather than served as an empty page: an empty list and a failed read are
 // different statements.
 
-import { alchemixV2Query, type FetchAlchemixV2PositionsParams } from "@/lib/sources/api/alchemix-v2-backend";
+import { alchemixV2Query, type FetchAlchemixV2PositionsParams } from "@/lib/sources/api/alchemix-v2-query";
 import type { AlchemixV2PositionsResponse } from "@/types/api/alchemix";
 
 export async function fetchAlchemixV2Positions(

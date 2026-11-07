@@ -135,7 +135,12 @@ await run("fork delegate pill", async (page) => {
   assert(discBadges === 0, `the open's token discs carry no actor badge (${discBadges})`);
   // Theme colours are oklch(L C H) — a pink pill is saturated (chroma ≳ 0.1); a
   // neutral individual pill is ~0 chroma. Assert the delegate colour is saturated.
-  const chroma = Number((delegate.color.match(/oklch\(\s*[\d.]+\s+([\d.]+)/) || [])[1] || 0);
+  // A production build (`next build`) writes them as lab(L a b), where the
+  // chroma is the length of (a, b) on a scale about 250 times oklch's.
+  const lab = delegate.color.match(/lab\(\s*[\d.]+\s+(-?[\d.]+)\s+(-?[\d.]+)/);
+  const chroma = lab
+    ? Math.hypot(Number(lab[1]), Number(lab[2])) / 250
+    : Number((delegate.color.match(/oklch\(\s*[\d.]+\s+([\d.]+)/) || [])[1] || 0);
   assert(chroma > 0.1, `delegate pill colour is saturated/pink (${delegate.color}, chroma ${chroma})`);
   assert(delegate.visible && delegate.display !== "none", "delegate pill visible at 1280px (survives spine hand-off)");
 });

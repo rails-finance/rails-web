@@ -192,6 +192,8 @@ export interface AaveV3ArbitrumPositionRow {
   totalDebtUsd: number | null;
   supplyCount: number;
   borrowCount: number;
+  /** Lowercase addresses of the reserves the wallet holds as collateral. */
+  collateralAssets: string[];
   chainOpen: boolean | null;
   chainHasDebt: boolean | null;
   chainStale: boolean;
@@ -217,6 +219,8 @@ export interface AaveV3ArbitrumPositionsResponse {
 }
 
 const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
+const strings = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").map((x) => x.toLowerCase()) : [];
 const bool = (v: unknown): boolean | null => (typeof v === "boolean" ? v : null);
 
 /** The answer checked against the contract; null when it does not hold one.
@@ -255,6 +259,7 @@ export function readPositionsAnswer(raw: unknown): AaveV3ArbitrumPositionsRespon
         totalDebtUsd: block(p.totalDebtUsd),
         supplyCount: block(p.supplyCount) ?? 0,
         borrowCount: block(p.borrowCount) ?? 0,
+        collateralAssets: strings(p.collateralAssets),
         chainOpen: bool(p.chainOpen),
         chainHasDebt: bool(p.chainHasDebt),
         chainStale: p.chainStale === true,

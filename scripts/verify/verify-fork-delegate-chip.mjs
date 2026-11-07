@@ -154,7 +154,7 @@ async function chips(page) {
   }, RATE_TO);
 }
 
-// oklch(L C H) or rgb(r g b) → is this the party pink, not a neutral?
+// oklch(L C H), lab(L a b) or rgb(r g b) → is this the party pink, not a neutral?
 function isPink(color) {
   const ok = color.match(/oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)/);
   if (ok) {
@@ -164,6 +164,15 @@ function isPink(color) {
     // resolves near hue 0.6 in light, pink-400 near 350 in dark. A neutral
     // rb-* token is ~0 chroma, so chroma is what separates them.
     return chroma > 0.08 && (hue > 300 || hue < 30);
+  }
+  // A production build (`next build`) writes the theme colours as lab(L a b):
+  // chroma is the length of (a, b), the hue its angle.
+  const lab = color.match(/lab\(\s*([\d.]+)\s+(-?[\d.]+)\s+(-?[\d.]+)/);
+  if (lab) {
+    const a = Number(lab[2]);
+    const b = Number(lab[3]);
+    const hue = (Math.atan2(b, a) * 180) / Math.PI;
+    return Math.hypot(a, b) > 20 && hue > -60 && hue < 30;
   }
   const rgb = (color.match(/\d+/g) || []).map(Number);
   return rgb.length >= 3 && rgb[0] > 140 && rgb[0] - rgb[1] > 40 && rgb[2] - rgb[1] > 20;
