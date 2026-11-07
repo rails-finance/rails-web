@@ -107,10 +107,12 @@ async function openMenu(heading) {
   return null;
 }
 
-/** Close whatever panel is open — FilterDropdown listens for a pointerdown
- *  outside its own subtree, so a click in the page margin is the dismissal. */
+/** Close whatever panel is open — FilterDropdown closes on Escape wherever focus
+ *  sits. A click at (4, 4) was the dismissal until the rail (H1) took that
+ *  corner: a press there opens the wallet panel, whose scrim then takes the
+ *  next click. */
 async function dismiss() {
-  await page.mouse.click(4, 4);
+  await page.keyboard.press("Escape");
 }
 
 /** The toolbar's own count line, and beside it the two row grains the line no

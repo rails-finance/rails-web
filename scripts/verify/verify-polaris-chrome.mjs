@@ -378,6 +378,16 @@ async function checkModal(name, { title, links }) {
   await page.goto(`${BASE}/sepolia/polaris/markets`, { waitUntil: "domcontentloaded", timeout: 180000 });
   const btns = page.locator('button[aria-label="Learn more"]');
   await btns.first().waitFor({ state: "visible", timeout: 60000 });
+  // The board's loading state carries a hidden copy of each market card's
+  // trigger for about a second after the first one shows; counted then, the
+  // loop presses a button that has left the page.
+  await page
+    .waitForFunction(
+      () => [...document.querySelectorAll('button[aria-label="Learn more"]')].every((b) => b.checkVisibility()),
+      null,
+      { timeout: 60000 },
+    )
+    .catch(() => {});
   const n = await btns.count();
   check("5a. the markets page carries its inline learn-more triggers", n >= 2, `${n} triggers`);
   for (let i = 0; i < n; i++) {
