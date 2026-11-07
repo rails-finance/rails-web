@@ -11,7 +11,8 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { SearchBox } from "@/components/shared/front-door-search";
 import { FilterSections } from "@/components/shared/filter-bar/filter-sections";
-import { FilterChips } from "@/components/shared/filter-bar/filter-chips";
+import { activeFilterLabels, FilterChips } from "@/components/shared/filter-bar/filter-chips";
+import { ListingViewMenu } from "@/components/shared/saved-items";
 import { SortControl, type SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
 import { ctrlWaking } from "@/lib/shared/ui-grammar";
@@ -32,6 +33,9 @@ export interface ListToolbarProps<F extends BaseListFilters> {
   /** The search box's skeleton anchor (`data-skel-section`); "listing-toolbar"
    *  by default. */
   skel?: string;
+  /** The ⋮ at the row's right end (N1.7): save this view, copy its link
+   *  (ui-jobs 521). The chain-truth listings draw it. */
+  viewMenu?: boolean;
 }
 
 export function ListToolbar<F extends BaseListFilters>({
@@ -43,6 +47,7 @@ export function ListToolbar<F extends BaseListFilters>({
   count,
   countNode,
   skel = "listing-toolbar",
+  viewMenu = false,
 }: ListToolbarProps<F>) {
   // Inert until this strip's handlers are attached — including the search box,
   // which pre-hydration accepts typing into a value React then overwrites from
@@ -78,6 +83,11 @@ export function ListToolbar<F extends BaseListFilters>({
           sortOrder={filters.sortOrder}
           onChange={(sortBy, sortOrder) => onChange({ ...filters, sortBy, sortOrder })}
         />
+        {viewMenu && (
+          <ListingViewMenu
+            filterLabels={[...activeFilterLabels(dimensions, filters), ...(filters.q ? [`“${filters.q}”`] : [])]}
+          />
+        )}
       </div>
       <FilterChips dimensions={dimensions} filters={filters} onChange={onChange} count={count} countNode={countNode} />
     </div>

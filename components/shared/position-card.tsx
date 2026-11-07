@@ -89,6 +89,9 @@ import { HeadingTip, TipLabel } from "@/components/shared/tip-label";
 import { StatDash, StatValue } from "@/components/shared/stat-value";
 import { ToolsMenu } from "@/components/shared/tools-menu";
 import { ExportMenu, type ExportMenuProps } from "@/components/shared/export-menu";
+import { POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
+import { SavePositionRow, useSavedEndedRefresh } from "@/components/shared/saved-items";
+import type { SavedLink } from "@/lib/shared/sessions";
 import { formatDate } from "@/lib/date";
 
 export type { PositionPanelRow, PositionPanelColumns } from "@/components/shared/position-card-panel";
@@ -267,11 +270,6 @@ export interface PositionCardListingSlots extends PositionCardSlotsCommon {
 export type PositionCardDetailSlots = PositionCardDetailOpen | PositionCardDetailClosed;
 export type PositionCardSlots = PositionCardDetailSlots | PositionCardListingSlots;
 
-const TAG_TONE: Record<PositionCardTone, string> = {
-  muted: "bg-rb-300 dark:bg-rb-700 text-foreground/70",
-  danger: "bg-red-500/20 text-red-500",
-  caution: "bg-caution-500/20 text-tone-caution",
-};
 const OUTCOME_TONE: Record<PositionCardTone, string> = {
   muted: "text-rb-500",
   danger: "text-red-400",
@@ -451,7 +449,10 @@ function PositionCardRow({
 function StatusTag({ status }: { status: PositionCardStatus }) {
   return (
     <span className="inline-flex items-center">
-      <span className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${TAG_TONE[status.tone]}`} data-anatomy="C6">
+      <span
+        className={`rounded-xs px-1.5 py-0.5 text-[11px] font-semibold ${POSITION_TAG_TONE[status.tone]}`}
+        data-anatomy="C6"
+      >
         {status.word}
       </span>
       {status.tip && <RowHelp tip={status.tip} name={status.word} />}
@@ -468,14 +469,17 @@ function ListingPill({ status }: { status: PositionCardStatus | null }) {
   const edge = useContext(PositionCardEdgeContext);
   if (!status && edge?.atRisk)
     return (
-      <span className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${TAG_TONE.caution}`} data-anatomy="C6">
+      <span
+        className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${POSITION_TAG_TONE.caution}`}
+        data-anatomy="C6"
+      >
         AT RISK
       </span>
     );
   if (!status && edge?.surface === "wallet") return null;
   return (
     <span
-      className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${status ? TAG_TONE[status.tone] : OPEN_PILL}`}
+      className={`font-bold tracking-wider px-2 py-0.5 rounded-xs text-xs ${status ? POSITION_TAG_TONE[status.tone] : OPEN_PILL}`}
       data-anatomy="C6"
     >
       {status ? status.word.toUpperCase() : "OPEN"}
@@ -707,11 +711,50 @@ function ClosedGrid({
   );
 }
 
-function DetailMenu({ menu }: { menu: PositionCardMenu }) {
+/** The card's identity (C5) as it reads, its pieces joined with " · ": the
+ *  first part of a saved position's default name (ui-jobs 530). */
+function identityTextOf(header: HTMLElement | null): string {
+  const holder = header?.querySelector<HTMLElement>("[data-card-identity]");
+  if (!holder) return "";
+  // Each piece's visible text, its inner pieces spaced ("PT-USDe LLTV 91.5%").
+  const textOf = (el: Element): string => {
+    const parts: string[] = [];
+    const walk = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+      if (n.parentElement?.closest(".sr-only")) continue;
+      const t = n.textContent?.trim();
+      if (t) parts.push(t);
+    }
+    return parts
+      .join(" ")
+      .replace(/\s+/g, " ")
+      .replace(/ ([%,.)])/g, "$1");
+  };
+  return Array.from(holder.children).map(textOf).filter(Boolean).join(" · ");
+}
+
+function DetailMenu({
+  menu,
+  identityText,
+  ended,
+}: {
+  menu: PositionCardMenu;
+  identityText: () => string;
+  ended?: SavedLink["ended"];
+}) {
+  useSavedEndedRefresh(ended);
+  // "Save position" after the family's identity rows, before the exports
+  // (ui-jobs 530).
+  const leading = (close: () => void) => (
+    <>
+      {menu.leading?.(close)}
+      <SavePositionRow identityText={identityText} ended={ended} />
+    </>
+  );
   return menu.exports ? (
-    <ExportMenu variant="card" leading={menu.leading} {...menu.exports} />
+    <ExportMenu variant="card" leading={leading} {...menu.exports} />
   ) : (
-    <ToolsMenu variant="card" leading={menu.leading} />
+    <ToolsMenu variant="card" leading={leading} />
   );
 }
 
@@ -752,7 +795,20 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       {countersExtra}
     </span>
   ) : null;
-  const menu = detail ? slots.menu && <DetailMenu menu={slots.menu} /> : slots.menu;
+  const headerRef = useRef<HTMLDivElement>(null);
+  const menu = detail
+    ? slots.menu && (
+        <DetailMenu
+          menu={slots.menu}
+          identityText={() => identityTextOf(headerRef.current)}
+          ended={
+            slots.outcome
+              ? { word: slots.status?.word ?? slots.outcome.word, tone: slots.status?.tone ?? "muted" }
+              : undefined
+          }
+        />
+      )
+    : slots.menu;
   const edge = useContext(PositionCardEdgeContext);
   const wallet = !detail && edge?.surface === "wallet";
   const identity = usePositionCardIdentity();
@@ -802,7 +858,12 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const over = overCap(slots);
 
   const header = (
-    <div className="flex items-start gap-2 mb-3" data-anatomy="C5" {...(detail ? { "data-card-header": "" } : {})}>
+    <div
+      ref={headerRef}
+      className="flex items-start gap-2 mb-3"
+      data-anatomy="C5"
+      {...(detail ? { "data-card-header": "" } : {})}
+    >
       <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
         {/* Wraps between pieces: at 390px an owner address would break in two
             beside a squeezed label. */}
@@ -817,7 +878,11 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
           {protocolMark}
           {detail ? (
             <>
-              {slots.identity}
+              {/* `contents`: the wrapper names the identity for a saved
+                  position's default name without taking part in the row. */}
+              <span className="contents" data-card-identity="">
+                {slots.identity}
+              </span>
               {slots.status && <StatusTag status={slots.status} />}
               {/* The block and time of the read behind the figures (ui-jobs 512). */}
               <PositionReadStamp />

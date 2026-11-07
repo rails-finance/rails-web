@@ -30,6 +30,21 @@ interface FilterChipsProps<F> {
   countNode?: ReactNode;
 }
 
+/** A dimension's chip, in plain words ("WETH collateral"). */
+export function filterChipText<F>(dim: FilterDimension<F>, filters: F): string {
+  const vals = dim.get(filters);
+  if (dim.chipLabel) return dim.chipLabel(vals, dim.options);
+  return dim.cardinality === "range"
+    ? rangeChipLabel(dim.label, vals, dim.range?.usd, dim.range?.unit)
+    : defaultChipLabel(dim.label, vals, dim.options);
+}
+
+/** The active filters' chips, in the row's order: a saved view's default
+ *  name ends in them (ui-jobs 521). */
+export function activeFilterLabels<F>(dimensions: FilterDimension<F>[], filters: F): string[] {
+  return dimensions.filter((d) => isDimensionActive(d, filters)).map((d) => filterChipText(d, filters));
+}
+
 export function FilterChips<F>({ dimensions, filters, onChange, count, countNode }: FilterChipsProps<F>) {
   const activeDims = dimensions.filter((d) => isDimensionActive(d, filters));
   // A dimension resting on a default that constrains the list names it in a
@@ -40,13 +55,7 @@ export function FilterChips<F>({ dimensions, filters, onChange, count, countNode
     .filter((c): c is { id: string; text: string; clear: ((f: F) => F) | undefined } => c.text != null);
   if (activeDims.length === 0 && defaultChips.length === 0 && !count && countNode == null) return null;
 
-  const chipText = (dim: FilterDimension<F>) => {
-    const vals = dim.get(filters);
-    if (dim.chipLabel) return dim.chipLabel(vals, dim.options);
-    return dim.cardinality === "range"
-      ? rangeChipLabel(dim.label, vals, dim.range?.usd, dim.range?.unit)
-      : defaultChipLabel(dim.label, vals, dim.options);
-  };
+  const chipText = (dim: FilterDimension<F>) => filterChipText(dim, filters);
 
   const removeDim = (dim: FilterDimension<F>) => onChange(dim.set(filters, dim.defaultValues?.(filters) ?? []));
 

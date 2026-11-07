@@ -211,6 +211,18 @@ const headerLayout = (card) =>
       .catch(() => false);
   }
   check("1g. a press on the card ⋮ opens its menu", menuOpen);
+  // ui-jobs 530: C17 carries "Save position" after the identity rows, before
+  // the exports and the provenance row.
+  const c17Rows = await page
+    .locator('[data-card-menu] [role="menu"] [role="menuitem"]')
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-menu-item") ?? e.textContent.trim().split("\n")[0]));
+  const saveAt = c17Rows.indexOf("save-position");
+  const exportAt = c17Rows.findIndex((t) => /^Copy Position/.test(t));
+  check(
+    "1g2. the card ⋮ carries Save position before the exports",
+    saveAt > 0 && (exportAt < 0 || saveAt < exportAt),
+    JSON.stringify(c17Rows),
+  );
   await page.keyboard.press("Escape");
 
   // 1h repointed (330): "Liquidates at" is a stat in the card's panel (C18).

@@ -509,6 +509,96 @@ await phone.close();
   await ctx.close();
 }
 
+// Saved positions and views (ui-jobs 530, 521): one list with a kind per
+// entry. A wallet-only list from before takes its kind once and keeps its
+// rows; the profile menu groups Wallets, Positions, Views in that order, and
+// /bookmarks has the same three tabs, each row opening its saved page. A
+// listing's ⋮ (N1.7) saves the view under its URL.
+{
+  const wallet = "0xf06016d822943c42e3cb7fc3a6a3b1889c1045f8";
+  const position = {
+    kind: "position",
+    key: "/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
+    name: "ETH/BOLD trove 10224703…",
+    protocol: { id: "liquity-v2", name: "Liquity V2" },
+    chain: { id: "1", name: "Ethereum" },
+    savedAt: 1,
+  };
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.addInitScript(
+    ([w, p]) => {
+      if (localStorage.getItem("rails-bookmarks")) return;
+      localStorage.setItem(
+        "rails-bookmarks",
+        JSON.stringify([{ key: w, addresses: [w], ensNames: { [w]: null }, lastVisited: 1, pinned: true }, p]),
+      );
+      localStorage.setItem("rails-bookmarks-migrated", "1");
+      localStorage.setItem("rails-bookmarks-ordered", "1");
+    },
+    [wallet, position],
+  );
+  const sp = await ctx.newPage();
+  await sp.goto(`${BASE}/base/morpho`, { waitUntil: "networkidle", timeout: 180_000 });
+  const kinds = await sp.evaluate(() => JSON.parse(localStorage.getItem("rails-bookmarks")).map((r) => r.kind));
+  check(
+    "SV a wallet-only row takes its kind, the position keeps its own",
+    kinds.join() === "wallet,position",
+    kinds.join(),
+  );
+  const trig = sp.locator("[data-view-menu] > button");
+  let open = false;
+  for (let i = 0; i < 6 && !open; i++) {
+    await trig.click({ timeout: 10_000 }).catch(() => {});
+    open = await sp
+      .locator('[data-view-menu] [role="menu"]')
+      .waitFor({ state: "visible", timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+  const items = await sp
+    .locator('[data-view-menu] [role="menu"] [data-menu-item]')
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-menu-item")));
+  check(
+    "SV the listing ⋮ holds Save this view and Copy link",
+    items.join() === "save-view,copy-view-link",
+    items.join(),
+  );
+  await sp.locator('[data-menu-item="save-view"]').click();
+  const saved = await sp.evaluate(() =>
+    JSON.parse(localStorage.getItem("rails-bookmarks")).find((r) => r.kind === "view"),
+  );
+  check(
+    "SV the view saves under the listing's URL, named by protocol and chain",
+    saved?.key === "/base/morpho" && /^Morpho Blue · Base/.test(saved?.name ?? ""),
+    JSON.stringify(saved),
+  );
+  await sp.keyboard.press("Escape");
+  await sp.locator('[data-profile-corner] [data-anatomy="H20"]').click();
+  const groups = await sp
+    .locator("[data-profile-menu-group]")
+    .evaluateAll((els) => els.map((e) => e.getAttribute("data-profile-menu-group")));
+  check(
+    "SV profile menu groups: wallets, positions, views",
+    groups.join() === "wallets,positions,views",
+    groups.join(),
+  );
+  await sp.keyboard.press("Escape");
+  await sp.goto(`${BASE}/bookmarks?tab=views`, { waitUntil: "networkidle" });
+  await sp.waitForSelector('[data-bookmark-row="view"]');
+  const tabs = await sp
+    .locator("[data-saved-tab]")
+    .evaluateAll((els) =>
+      els.map((e) => `${e.getAttribute("data-saved-tab")}${e.getAttribute("aria-selected") === "true" ? "*" : ""}`),
+    );
+  const viewHref = await sp.locator('[data-bookmark-row="view"] a').first().getAttribute("href");
+  check(
+    "SV /bookmarks tabs Wallets, Positions, Views; ?tab=views lists the view opening its URL",
+    tabs.join() === "wallets,positions,views*" && viewHref === "/base/morpho",
+    JSON.stringify({ tabs, viewHref }),
+  );
+  await ctx.close();
+}
+
 await browser.close();
 const failed = results.filter((r) => !r.ok);
 console.log(

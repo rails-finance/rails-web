@@ -49,6 +49,8 @@ export interface ChainTruthListingFilter<F extends BaseListFilters> {
   onChange: (next: F) => void;
   sortOptions: SortOption[];
   searchPlaceholder?: string;
+  /** Draw the ⋮ that saves this view (N1.7, ui-jobs 521). */
+  viewMenu?: boolean;
 }
 
 /** The default failure state: a listing fetch rejected and the config
@@ -237,6 +239,7 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
           sortOptions={filter.sortOptions}
           searchPlaceholder={filter.searchPlaceholder}
           count={count}
+          viewMenu={filter.viewMenu}
         />
       ) : (
         toolbar

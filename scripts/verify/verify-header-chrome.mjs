@@ -407,7 +407,7 @@ check(
     sheet.start &&
     sheet.scrim &&
     sheet.themes === "Light,Dark,Auto",
-  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: Start here across the top, how to save, Manage wallets, the theme switch (${JSON.stringify(sheet)})`,
+  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: Start here across the top, how to save, Manage saved items, the theme switch (${JSON.stringify(sheet)})`,
 );
 // A press on the dim closes the sheet.
 await mHomePage.waitForTimeout(300);

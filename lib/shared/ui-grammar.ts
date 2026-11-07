@@ -245,3 +245,12 @@ export const POSITION_CARD_FRAME = `${POSITION_CARD_FRAME_BOX} ${POSITION_CARD_P
  *  something: the profile control (H20) stands at the column's top right
  *  there (app/(app)/layout.tsx) and takes the last 28px inside the edge. */
 export const PROFILE_CLEARANCE = "md:pr-10";
+
+/** The position card's status tag tones (C6): muted for an ending the owner
+ *  chose, danger for a forced exit, caution for a third party's ending. A
+ *  saved position's row draws its tag with them (ui-jobs 530). */
+export const POSITION_TAG_TONE = {
+  muted: "bg-rb-300 dark:bg-rb-700 text-foreground/70",
+  danger: "bg-red-500/20 text-red-500",
+  caution: "bg-caution-500/20 text-tone-caution",
+} as const;

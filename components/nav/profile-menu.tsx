@@ -2,11 +2,12 @@
 
 // The profile control (H20) and its menu (rails-ops ui-jobs 504): the facehash
 // with a chevron, a menu button. The menu has no heading of its own: each group
-// carries its own label (ui-jobs 524), so groups can join it (saved searches,
-// ui-jobs 521). Top down: with none saved, "New to Rails? Start here" to /start
-// as a blue button across the top (ui-jobs 509); the filled bookmark and "Saved
-// wallets", then the first ten in the reader's order (lib/shared/sessions.ts;
-// /bookmarks orders them) or, with none, how to save one; "Manage wallets →" to
+// carries its own label (ui-jobs 524). Top down: with nothing saved, "New to
+// Rails? Start here" to /start as a blue button across the top (ui-jobs 509);
+// the filled bookmark and "Saved wallets", then the first ten in the reader's
+// order (lib/shared/sessions.ts; /bookmarks orders them) or, with none, how to
+// save one; "Saved positions" (ui-jobs 530) and "Saved views" (ui-jobs 521),
+// the first five of each, drawn when there is one; "Manage saved items →" to
 // /bookmarks; the theme switch. From md a dropdown under the control, right
 // edges aligned; below md a sheet from the foot of the screen over a dim (ui-jobs 507), rising
 // over 220ms (globals.css `.profile-sheet`). Rows show what the
@@ -33,23 +34,27 @@ import { useTheme } from "next-themes";
 
 import { Facehash } from "@/components/shared/facehash";
 import { useBookmarks } from "@/components/shared/bookmark-list";
+import { savedName, useSavedLinks } from "@/components/shared/saved-items";
+import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
 import { CTRL_OFF, CTRL_ON, START_CTA } from "@/lib/shared/ui-grammar";
-import type { WalletSession } from "@/lib/shared/sessions";
+import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 
 const BOOKMARKS_PATH = "/bookmarks";
 /** The control's and the menu's accessible name: what the menu holds as a whole. */
 const MENU_NAME = "Saved and settings";
-/** A group's small label (Saved wallets; Saved searches to come). */
+/** A group's small label (Saved wallets, Saved positions, Saved views). */
 const GROUP_LABEL = "flex items-center gap-2 px-3 pb-2 pt-2 text-sm font-semibold text-foreground";
 /** "New to Rails? Start here" across the menu's top. */
 const START_BUTTON = `mb-1 flex w-full ${START_CTA}`;
 /** The guided way in (G, /start), reached from this menu (ui-jobs 509). */
 const START_PATH = "/start";
-/** The menu lists this many; the rest are on /bookmarks. */
+/** The menu lists this many wallets, and this many of each other kind; the
+ *  rest are on /bookmarks. */
 const MENU_ROWS = 10;
+const MENU_LINK_ROWS = 5;
 
 const ITEM =
   "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors focus:outline-none focus-visible:bg-rb-100 hover:bg-rb-100 dark:hover:bg-rb-800 dark:focus-visible:bg-rb-800";
@@ -73,6 +78,31 @@ function WalletRow({ session, onDone }: { session: WalletSession; onDone: () => 
       </span>
       <span className="min-w-0 flex-1 truncate font-semibold text-foreground">{name ?? short(primary)}</span>
       {name && <span className="shrink-0 font-mono text-xs text-rb-500">{short(primary)}</span>}
+    </Link>
+  );
+}
+
+/** A saved position or view: the explorer's mark, the name, the chain. */
+function LinkRow({ link, onDone }: { link: SavedLink; onDone: () => void }) {
+  return (
+    <Link
+      href={link.key}
+      role="menuitem"
+      onClick={onDone}
+      className={ITEM}
+      data-profile-menu-link={link.kind}
+      data-href={link.key}
+    >
+      <span className="flex size-5 shrink-0 items-center justify-center text-rb-500">
+        {link.protocol && <ProtocolIcon id={link.protocol.id} className="size-4" />}
+      </span>
+      <span className="min-w-0 flex-1 truncate font-semibold text-foreground">{savedName(link)}</span>
+      {link.ended ? (
+        <span className="shrink-0 text-xs text-rb-500">{link.ended.word}</span>
+      ) : (
+        link.kind === "position" &&
+        link.chain && <span className="shrink-0 text-xs text-rb-500">{link.chain.name}</span>
+      )}
     </Link>
   );
 }
@@ -115,6 +145,8 @@ const ITEMS = '[role="menuitem"], [role="menuitemradio"]';
 
 export function ProfileMenu() {
   const bookmarks = useBookmarks();
+  const positions = useSavedLinks("position");
+  const views = useSavedLinks("view");
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -130,6 +162,11 @@ export function ProfileMenu() {
 
   const face = bookmarks == null ? null : (bookmarks[0]?.addresses[0] ?? SAMPLE_WALLET);
   const rows = (bookmarks ?? []).slice(0, MENU_ROWS);
+  const links = [
+    { kind: "positions", label: "Saved positions", rows: (positions ?? []).slice(0, MENU_LINK_ROWS) },
+    { kind: "views", label: "Saved views", rows: (views ?? []).slice(0, MENU_LINK_ROWS) },
+  ].filter((g) => g.rows.length > 0);
+  const anything = rows.length > 0 || links.length > 0;
 
   const close = useCallback((refocus = true) => {
     setOpen(false);
@@ -277,7 +314,7 @@ export function ProfileMenu() {
             >
               {/* With none saved, the way in fills the menu's top (Miles, 6 Nov
                   2026); with a wallet saved there is none (ui-jobs 509). */}
-              {rows.length === 0 && (
+              {!anything && (
                 <Link
                   href={START_PATH}
                   role="menuitem"
@@ -306,7 +343,20 @@ export function ProfileMenu() {
                   </p>
                 )}
               </div>
-              {rows.length > 0 && <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />}
+              {links.map((g) => (
+                <div key={g.kind} role="group" aria-labelledby={`${menuId}-${g.kind}`}>
+                  <p id={`${menuId}-${g.kind}`} className={GROUP_LABEL} data-profile-menu-group={g.kind}>
+                    <Bookmark className="size-4 shrink-0" fill="currentColor" aria-hidden="true" />
+                    {g.label}
+                  </p>
+                  <div className="pb-1" data-profile-menu-links={g.kind}>
+                    {g.rows.map((l) => (
+                      <LinkRow key={l.key} link={l} onDone={() => close(false)} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+              {anything && <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />}
               <div className="py-1">
                 <Link
                   href={BOOKMARKS_PATH}
@@ -316,7 +366,7 @@ export function ProfileMenu() {
                   data-profile-menu-manage=""
                 >
                   <Settings className="size-4 shrink-0" aria-hidden="true" />
-                  Manage wallets →
+                  Manage saved items →
                 </Link>
               </div>
               <div className="px-1 pb-1 pt-1">
