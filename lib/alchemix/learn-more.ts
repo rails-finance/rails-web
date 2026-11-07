@@ -344,7 +344,7 @@ export function alchemixPositionContent(status: string, infoHref: string): Learn
 /** The Lifetime flows "?": what the bars and the line add up, in which unit,
  *  and what they leave out. */
 export const ALCHEMIX_LIFETIME_FLOWS: LearnMoreContent = {
-  title: "About the Lifetime flows",
+  title: "About the lifetime flows",
   intro:
     "The bars add up every event of this position over its whole life, and the line under them draws what it held and owed at the end of each day. Every figure is in the asset under the vault (USDC or WETH): the collateral at the vault's share price, each unit of the synthetic owed counted as one unit of that asset, as the Alchemist counts it. No dollar figure is used.",
   stepsHeading: "How it's built:",

@@ -155,7 +155,7 @@ export function fluidEconomicsExplanation(data: FluidTowerData): ReactNode {
 
 export function fluidEconomicsContent(): LearnMoreContent {
   return {
-    title: "About the Economics",
+    title: "About the economics",
     intro:
       "Lifetime flows add up everything that has moved into and out of the position: deposits, withdrawals, borrows, repays and liquidations, each side in its own token.",
     stepsHeading: "How it's built:",

@@ -39,7 +39,7 @@ const LINKS = [link(SKY_DOCS.susds), link(SKY_DOCS.usds), link(SKY_DOCS.source)]
 
 export function skyPositionContent(): LearnMoreContent {
   return {
-    title: "How Sky Savings Works",
+    title: "How Sky Savings works",
     intro:
       "A Sky Savings position is an address that holds sUSDS. Depositing USDS mints sUSDS at the share price of the moment, and the share price rises at the Savings Rate until the shares are withdrawn.",
     detailsHeading: "Key concepts",
@@ -95,7 +95,7 @@ export function skyEventContent(kind: SkySavingsEventType): LearnMoreContent {
   switch (kind) {
     case "deposit":
       return {
-        title: "How Depositing into Savings USDS Works",
+        title: "How depositing into Savings USDS works",
         intro:
           "A deposit hands USDS to the savings module and mints sUSDS in return, at the share price of that block.",
         stepsHeading: "What happens",
@@ -118,7 +118,7 @@ export function skyEventContent(kind: SkySavingsEventType): LearnMoreContent {
       };
     case "withdrawal":
       return {
-        title: "How Withdrawing from Savings USDS Works",
+        title: "How withdrawing from Savings USDS works",
         intro: "A withdrawal burns sUSDS and pays out USDS at the share price of that block.",
         stepsHeading: "What happens",
         steps: [
@@ -134,7 +134,7 @@ export function skyEventContent(kind: SkySavingsEventType): LearnMoreContent {
     case "sent":
     case "self":
       return {
-        title: "Why a Transfer Carries Value",
+        title: "Why a transfer carries value",
         intro:
           "sUSDS is an ordinary token, so shares move between addresses with no deposit or withdrawal. The savings module sees no USDS move.",
         detailsHeading: "Key concepts",
@@ -156,7 +156,7 @@ export function skyEventContent(kind: SkySavingsEventType): LearnMoreContent {
 
 export function skyRateContent(): LearnMoreContent {
   return {
-    title: "How the Sky Savings Rate Is Set",
+    title: "How the Sky Savings Rate is set",
     intro:
       "The Savings Rate is the per-second factor chi grows by. Sky governance changes it, and every change is a File log on the sUSDS contract.",
     detailsHeading: "Key concepts",

@@ -93,7 +93,7 @@ export function MapleFlowsNote({ facts, pools }: MapleFlowsNoteProps): ReactNode
 
 export function mapleFlowsContent(): LearnMoreContent {
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro:
       "The bars add up every event Maple has recorded for this wallet in one pool, in the pool's token, and the line under them draws its claim at the end of each day.",
     stepsHeading: "How it's built:",

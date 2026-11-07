@@ -82,7 +82,7 @@ export function CompoundV2FlowsNote({ facts }: { facts: CompoundV2FlowsFacts | n
 
 export function compoundV2FlowsContent(): LearnMoreContent {
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro:
       "The bars add up every Compound V2 event of this account, each at Compound's oracle price at its block, and the line under them draws what it held and owed at the end of each day.",
     stepsHeading: "How it's built:",

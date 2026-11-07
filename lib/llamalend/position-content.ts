@@ -17,7 +17,7 @@ export function llamalendPositionContent(opts: {
 }): LearnMoreContent {
   if (opts.status === "liquidated") {
     return {
-      title: "About This Position",
+      title: "About this position",
       intro:
         "This position was hard-liquidated after its health fell below 0. The panel above shows its collateral and debt after its last event.",
       detailsHeading: "Key concepts:",
@@ -37,7 +37,7 @@ export function llamalendPositionContent(opts: {
 
   if (opts.status === "closed") {
     return {
-      title: "About This Position",
+      title: "About this position",
       intro:
         "This position has been closed — its debt repaid and its collateral withdrawn. The panel above shows the final recorded collateral and debt, the last amounts LlamaLend's own events emitted; this lane keeps no lifetime peaks.",
       detailsHeading: "Key concepts:",
@@ -82,7 +82,7 @@ export function llamalendPositionContent(opts: {
   ];
 
   return {
-    title: "About This Position",
+    title: "About this position",
     intro:
       "This panel explains the position's live state in plain language — the collateral held in the market's AMM, the debt accrued against it, and where the price sits relative to the position's band.",
     detailsHeading: "Key concepts:",

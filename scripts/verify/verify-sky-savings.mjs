@@ -502,7 +502,7 @@ check("rate history lists every change", rows === String(rates.data.ssr.length),
     await lm.nth(i).click();
     await p2.waitForTimeout(300);
     const t = await p2.evaluate(() => document.body.innerText);
-    if (t.includes("How Sky Savings Works")) {
+    if (t.includes("How Sky Savings works")) {
       modal = t;
       break;
     }
