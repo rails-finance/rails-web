@@ -22,6 +22,8 @@ export interface FetchCompoundPositionsParams {
   /** wallet address — restrict to one account. */
   wallet?: string;
   hasLiquidations?: boolean;
+  /** Lowercase collateral token addresses; a position holding any matches. */
+  collateralTokens?: string[];
   /** Inclusive bounds on the position's transaction count; either alone. */
   minTx?: number;
   maxTx?: number;
@@ -57,6 +59,7 @@ export async function fetchCompoundPositions(p: FetchCompoundPositionsParams): P
   const qs = new URLSearchParams();
   if (p.market) qs.set("market", p.market);
   if (p.wallet) qs.set("wallet", p.wallet);
+  if (p.collateralTokens && p.collateralTokens.length > 0) qs.set("collateralTokens", p.collateralTokens.join(","));
   if (p.hasLiquidations != null) qs.set("hasLiquidations", String(p.hasLiquidations));
   for (const k of ["minTx", "maxTx", "minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"] as const) {
     if (p[k] != null) qs.set(k, String(p[k]));

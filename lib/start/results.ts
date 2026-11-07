@@ -67,6 +67,7 @@ import { FX_POOLS, FX_POOL_KEYS } from "@/lib/fx/asset-catalog";
 import { AAVE_V3_ARBITRUM_SYMBOL_BY_ADDR } from "@/lib/aave-v3-arbitrum/asset-catalog";
 import { COMPOUND_ARBITRUM_DEPLOYMENT } from "@/lib/compound-arbitrum/asset-catalog";
 import { COLLATERAL_PARAM as COMPOUND_ARBITRUM_COLLATERAL_PARAM } from "@/lib/compound-arbitrum/comet-cards";
+import { COLLATERAL_PARAM, collateralOptions } from "@/lib/shared/collateral-facet";
 import { MORPHO_ARBITRUM_MARKETS } from "@/lib/morpho-arbitrum/market-catalog";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -110,7 +111,9 @@ const LISTINGS: Record<string, { dims: () => AnyDims; sorts: SortOption[] }> = {
 /** The facet params of the in-memory listings LISTINGS leaves out (their
  *  dimensions live in a client component): the Arbitrum positions pages. */
 const MEMORY_FACETS: Record<string, string[]> = {
+  "aave-v3-arbitrum": [COLLATERAL_PARAM],
   "compound-v3-arbitrum": [COMPOUND_ARBITRUM_COLLATERAL_PARAM],
+  "morpho-arbitrum": [COLLATERAL_PARAM],
 };
 
 /** The collateral an explorer's catalog states, and the listing facet that
@@ -123,6 +126,16 @@ interface CatalogCollateral {
 }
 
 const symbolsOf = (rows: { symbol: string }[]) => rows.map((r) => r.symbol);
+
+/** An explorer whose listing takes `collateral` symbols and sends their
+ *  addresses; the symbols are those with an address on its chain. */
+function serverCollateral(id: string, chainId: ChainId): CatalogCollateral {
+  return {
+    symbols: collateralOptions(chainId).map((o) => o.value),
+    source: TREE.collateral[id].note,
+    param: COLLATERAL_PARAM,
+  };
+}
 
 const CATALOGS: Record<string, CatalogCollateral> = {
   liquity: {
@@ -174,6 +187,7 @@ const CATALOGS: Record<string, CatalogCollateral> = {
   "aave-v3-arbitrum": {
     symbols: Object.values(AAVE_V3_ARBITRUM_SYMBOL_BY_ADDR),
     source: "lib/aave-v3-arbitrum/asset-catalog.ts, the reserves",
+    param: COLLATERAL_PARAM,
   },
   "compound-v3-arbitrum": {
     symbols: COMPOUND_ARBITRUM_DEPLOYMENT.markets.flatMap((m) => (m.collateral ?? []).map((c) => c.symbol)),
@@ -183,7 +197,12 @@ const CATALOGS: Record<string, CatalogCollateral> = {
   "morpho-arbitrum": {
     symbols: MORPHO_ARBITRUM_MARKETS.map((m) => m.collateralSymbol).filter((s): s is string => !!s),
     source: "lib/morpho-arbitrum/market-catalog.ts, each market's collateral",
+    param: COLLATERAL_PARAM,
   },
+  // Server-driven: the listing sends the addresses the symbols name.
+  compound: serverCollateral("compound", 1),
+  "compound-base": serverCollateral("compound-base", 8453),
+  llamalend: serverCollateral("llamalend", 1),
 };
 
 /** One row of a results page. */

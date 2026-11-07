@@ -52,6 +52,7 @@ export async function readLlamalendPositions(
   if (sp.get("user")) qs.set("user", sp.get("user")!);
   if (sp.get("controller")) qs.set("controller", sp.get("controller")!);
   if (sp.get("status")) qs.set("status", sp.get("status")!);
+  if (sp.get("collateralTokens")) qs.set("collateralTokens", sp.get("collateralTokens")!);
   if (sp.get("hasLiquidations")) qs.set("hasLiquidations", sp.get("hasLiquidations")!);
   // A transaction bound is forwarded only as a whole number.
   for (const k of ["minTx", "maxTx"]) {
