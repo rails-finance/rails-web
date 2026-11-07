@@ -87,6 +87,7 @@ import {
   MOONWELL_BASE_DEPLOY_BLOCK,
   MOONWELL_BASE_WETH_ROUTER,
 } from "@/lib/moonwell-base/asset-catalog";
+import { MoonwellBorrowFrozenNote } from "@/components/protocol/moonwell/moonwell-borrow-frozen-note";
 import { moonwellViewFromChain } from "@/lib/moonwell-base/chain-position-view";
 import type { MoonwellChainTimelineResponse } from "@/lib/moonwell-base/chain-timeline";
 import { fetchMoonwellChainPosition, type MoonwellChainResponse } from "@/lib/api/fetch-moonwell-position";
@@ -513,6 +514,9 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
                 </div>
               ) : (
                 <>
+                  {!pinnedRoute && view && data && view.borrows.length > 0 && (
+                    <MoonwellBorrowFrozenNote className="mb-3" />
+                  )}
                   {!pinnedRoute && view && data && (
                     <MoonwellPositionCard
                       v={view}
