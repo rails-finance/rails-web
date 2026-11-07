@@ -16,10 +16,9 @@
         "osETH",
         "ezETH",
         "rsETH",
-        "tETH",
-        "wsuperOETHb",
-        "LsETH"
+        "tETH"
       ],
+      "borrow": ["WETH", "wstETH", "cbETH", "rETH", "weETH"],
       "icons": ["ETH", "wstETH", "rETH"],
       "coins": {
         "question": "Which ETH?",
@@ -29,7 +28,8 @@
     "btc": {
       "label": "BTC",
       "note": "Written here: the wrapped and bridged forms of bitcoin the explorers list.",
-      "symbols": ["BTC", "WBTC", "cbBTC", "tBTC", "LBTC", "WBTC18", "cbBTC18", "wcbBTC", "uniBTC"],
+      "symbols": ["BTC", "WBTC", "cbBTC", "tBTC", "LBTC", "WBTC18", "cbBTC18", "wcbBTC"],
+      "borrow": ["WBTC", "cbBTC", "tBTC", "LBTC"],
       "icons": ["WBTC", "cbBTC", "tBTC"],
       "coins": {
         "question": "Which BTC?",
@@ -42,6 +42,7 @@
       "keyword": "stablecoins",
       "note": "Derived: every symbol lib/shared/asset-categories.ts files as Stablecoin or Yield-bearing Stable.",
       "categories": ["stablecoin", "yield-stable"],
+      "borrow": ["USDC", "USDT", "USDS", "DAI", "BOLD", "LUSD", "crvUSD", "GHO"],
       "icons": ["USDC", "USDT", "USDS", "BOLD"],
       "coins": {
         "question": "Which stablecoin?",
@@ -301,18 +302,7 @@
         "USDe": ["0x5d3a1ff2b6bab83b63cd9ad0787074081a52ef34"],
         "syrupUSDC": ["0x660975730059246a68521a3e2fbd4740173100f5"],
         "USDS": ["0x820c137fa70c8691f0e44dc420a5e53c168921dc"],
-        "EURC": ["0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42"],
-        "wsuperOETHb": ["0x7fcd174e80f264448ebee8c88a7c4476aaf58ea6"],
-        "USR": ["0x35e5db674d8e93a03d814fa0ada70731efe8a4b9"],
-        "reUSD": ["0x7d214438d0f27afccc23b3d1e1a53906ace5cfea"],
-        "wUSDM": ["0x57f5e098cad7a3d1eed53991d4d66c45c9af7812"],
-        "wstUSR": ["0xb67675158b412d53fe6b68946483ba920b135ba1"],
-        "savUSD": ["0xa6ef20fe18cd529ca15a8a53a29d1832b1f848ff"],
-        "sUSN": ["0x34a2798d47b238a7cba9d87d49618dee6c4d999f"],
-        "sUSDe": ["0x211cc4dd073734da055fbf44a2b4667d5e5fe5d2"],
-        "wsrUSD": ["0x62344be8ca1c339b46274a4017dd87af436900b1"],
-        "uniBTC": ["0x93919784c523f39cacaa98ee0a9d96c3f32b593e"],
-        "LsETH": ["0xb29749498954a3a821ec37bde86e386df3ce30b6"]
+        "EURC": ["0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42"]
       }
     },
     "fluid": {
