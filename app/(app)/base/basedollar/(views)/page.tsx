@@ -17,6 +17,8 @@ export const maxDuration = 30;
 export const metadata = listingMetadata({
   title: "Explore Basedollar troves on Base",
   canonicalPath: "/base/basedollar",
+  description:
+    "Every Basedollar Trove on Base: loans of the BD stablecoin across five collateral types, with collateral, debt and full history.",
 });
 
 async function BasedollarListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

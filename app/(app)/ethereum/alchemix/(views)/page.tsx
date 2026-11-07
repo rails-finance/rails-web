@@ -18,7 +18,7 @@ export function generateMetadata(): Metadata {
     title: "Explore Alchemix positions",
     canonicalPath: ALCHEMIX_ETHEREUM.basePath,
     description:
-      "Every Alchemix V3 position on the alUSD and alETH lines. Both have had a redemption, so each figure is read from the contract at the block shown.",
+      "Every Alchemix V3 self-repaying loan on Ethereum (alUSD and alETH): collateral and debt read from the contract, including what redemptions took.",
   });
 }
 

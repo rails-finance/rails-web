@@ -13,7 +13,12 @@ export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Asymmetry troves", canonicalPath: "/ethereum/asymmetry" });
+export const metadata = listingMetadata({
+  title: "Explore Asymmetry troves",
+  canonicalPath: "/ethereum/asymmetry",
+  description:
+    "Every Asymmetry Trove on Ethereum: loans of the USDaf stablecoin across seven collateral types, with collateral, debt and full history.",
+});
 
 async function AsymmetryListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = asymmetryListDimensions([]);

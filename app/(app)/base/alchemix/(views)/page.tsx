@@ -21,7 +21,7 @@ export function generateMetadata(): Metadata {
     title: "Explore Alchemix positions",
     canonicalPath: ALCHEMIX_BASE.basePath,
     description:
-      "Every Alchemix V3 position on the alUSDb line. It has had no redemption, so each figure is replayed from the position's events, exact to the wei.",
+      "Every Alchemix V3 self-repaying loan on Base (alUSDb): collateral and debt for each position, exact to the last unit, with its full history.",
   });
 }
 

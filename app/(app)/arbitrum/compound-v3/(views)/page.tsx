@@ -8,6 +8,8 @@ import { ProtocolFrontDoor } from "@/components/shared/protocol-front-door";
 export const metadata = listingMetadata({
   title: "Compound V3 on Arbitrum",
   canonicalPath: "/arbitrum/compound-v3",
+  description:
+    "Look up any wallet's Compound V3 position on Arbitrum: what it has lent, borrowed and put up as collateral in each of the four markets.",
 });
 
 function Page() {

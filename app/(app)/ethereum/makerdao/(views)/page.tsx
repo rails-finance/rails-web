@@ -26,7 +26,12 @@ export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore MakerDAO vaults", canonicalPath: "/ethereum/makerdao" });
+export const metadata = listingMetadata({
+  title: "Explore MakerDAO vaults",
+  canonicalPath: "/ethereum/makerdao",
+  description:
+    "Every MakerDAO vault on Ethereum: collateral, debt and how close each is to liquidation, with its full history.",
+});
 
 /** The roster for this request, or "unavailable" when the backend fails to
  *  answer; the listing is built to work without it. */

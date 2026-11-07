@@ -28,7 +28,7 @@ export const metadata = listingMetadata({
   title: "Explore Maple positions",
   canonicalPath: "/ethereum/maple",
   description:
-    "Maple's institutional credit pools from the lender's side: exact share balances, the withdrawal queue, and what is liquid against what is deployed.",
+    "Every lender in Maple's syrup pools on Ethereum: each wallet's balance, the withdrawal queue, and how much of the pool can pay out now.",
 });
 
 async function MapleListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

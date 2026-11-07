@@ -19,7 +19,12 @@ export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Moonwell positions", canonicalPath: "/ethereum/moonwell" });
+export const metadata = listingMetadata({
+  title: "Explore Moonwell positions",
+  canonicalPath: "/ethereum/moonwell",
+  description:
+    "Every Moonwell account on Ethereum: what each wallet has supplied and borrowed in each market, with its full history.",
+});
 
 async function MoonwellListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = moonwellListDimensions();

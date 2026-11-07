@@ -22,7 +22,7 @@ export const metadata = listingMetadata({
   title: "Explore Fluid positions",
   canonicalPath: "/ethereum/fluid",
   description:
-    "Instadapp's Fluid vault positions as NFTs, read from chain, with tick-swept liquidations attributed per position from the vault's settlement views.",
+    "Every Fluid vault position on Ethereum: collateral, debt and liquidation price for each, and what each liquidation took from it.",
 });
 
 async function FluidListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

@@ -19,6 +19,8 @@ export const maxDuration = 30;
 export const metadata = listingMetadata({
   title: "Explore Compound V3 positions on Base",
   canonicalPath: "/base/compound-v3",
+  description:
+    "Look up any Compound V3 wallet on Base: what it has lent, borrowed and put up as collateral in each of the five markets, read from the chain.",
 });
 
 async function CompoundBaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

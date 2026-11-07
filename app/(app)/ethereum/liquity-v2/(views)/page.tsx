@@ -45,8 +45,7 @@ export async function generateMetadata({
   const directory = listingMetadata({
     title: "Explore Liquity V2 troves",
     canonicalPath: LIQUITY_V2_BASE_PATH,
-    description:
-      "Every Liquity V2 Trove across the ETH, wstETH and rETH branches, filterable by owner, status and collateral ratio, each with its full timeline.",
+    description: "Every Liquity V2 Trove on Ethereum, with its collateral, debt, interest rate and full history.",
   });
   const { ownerAddress, ownerEns } = parseTroveSearch(readListQuery(toURLSearchParams(await searchParams)));
   // An address is lowercased (one wallet, one URL, whatever case it was typed

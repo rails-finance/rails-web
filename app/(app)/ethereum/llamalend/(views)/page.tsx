@@ -31,7 +31,7 @@ export const metadata = listingMetadata({
   title: "Explore LlamaLend positions",
   canonicalPath: "/ethereum/llamalend",
   description:
-    "Curve's LlamaLend markets, where liquidation is a band: soft-liquidation read live from the protocol's state and cross-checked across two contracts.",
+    "Every LlamaLend loan on Ethereum: collateral, debt and how far each is through Curve's gradual liquidation, market by market.",
 });
 
 async function LlamalendListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

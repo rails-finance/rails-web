@@ -29,7 +29,7 @@ export const metadata = listingMetadata({
   title: "Explore Dolomite accounts",
   canonicalPath: "/ethereum/dolomite",
   description:
-    "Dolomite margin accounts by (owner, account number): balances from emitted absolutes, debt as negative balances, the margin line read live.",
+    "Every Dolomite margin account on Ethereum: each wallet's balances and debts, how close it is to liquidation, and its full history.",
 });
 
 async function DolomiteListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

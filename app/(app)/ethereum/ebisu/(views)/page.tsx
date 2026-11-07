@@ -13,7 +13,12 @@ export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Ebisu troves", canonicalPath: "/ethereum/ebisu" });
+export const metadata = listingMetadata({
+  title: "Explore Ebisu troves",
+  canonicalPath: "/ethereum/ebisu",
+  description:
+    "Every Ebisu Trove on Ethereum: loans of the ebUSD stablecoin across five collateral types, with collateral, debt and full history.",
+});
 
 async function EbisuListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = ebisuListDimensions([]);

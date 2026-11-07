@@ -21,6 +21,8 @@ export const maxDuration = 30;
 export const metadata = listingMetadata({
   title: "Explore Compound V3 positions",
   canonicalPath: "/ethereum/compound-v3",
+  description:
+    "Every Compound V3 account on Ethereum: what each wallet has lent, borrowed and put up as collateral in each market, with its full history.",
 });
 
 async function CompoundListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

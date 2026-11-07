@@ -27,7 +27,7 @@ export const metadata = listingMetadata({
   title: "Explore Compound V2 positions",
   canonicalPath: "/ethereum/compound-v2",
   description:
-    "Every Compound V2 account over six years of cToken markets: supplies, borrows and 26,639 liquidations from the contracts' events, the markets read live.",
+    "Every Compound V2 account on Ethereum over six years: supplies, borrows and liquidations, with each market's current rates and size.",
 });
 
 async function CompoundV2ListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

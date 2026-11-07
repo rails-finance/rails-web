@@ -27,7 +27,7 @@ export const metadata = listingMetadata({
   title: "Explore Morpho Blue positions on Base",
   canonicalPath: "/base/morpho",
   description:
-    "Morpho Blue on Base: every borrower position across more than 4,300 isolated markets, and a wallet's whole standing read from the singleton.",
+    "Look up any Morpho borrower on Base: collateral, debt and health across every market, read from the chain.",
 });
 
 async function MorphoBaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

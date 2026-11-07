@@ -28,7 +28,7 @@ export const metadata = listingMetadata({
   title: "Explore Frankencoin positions",
   canonicalPath: "/ethereum/frankencoin",
   description:
-    "Oracle-free ZCHF minting positions, each a separate contract, with owner-declared liquidation prices tested by challenge auctions, in native units.",
+    "Every Frankencoin position on Ethereum: Swiss franc stablecoin loans with the owner's declared liquidation price and any challenges to it.",
 });
 
 async function FrankencoinListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

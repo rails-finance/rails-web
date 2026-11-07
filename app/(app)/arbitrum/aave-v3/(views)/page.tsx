@@ -8,6 +8,7 @@ import { ProtocolFrontDoor } from "@/components/shared/protocol-front-door";
 export const metadata = listingMetadata({
   title: "Aave V3 on Arbitrum",
   canonicalPath: "/arbitrum/aave-v3",
+  description: "Look up any wallet's Aave V3 position on Arbitrum: collateral, debt and health, read from the chain.",
 });
 
 function Page() {

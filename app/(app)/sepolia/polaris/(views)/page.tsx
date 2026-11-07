@@ -38,7 +38,7 @@ export async function generateMetadata({
     title: "Explore Polaris positions",
     canonicalPath: POLARIS_BASE_PATH,
     description:
-      "Polaris on Sepolia: USDp and GOLDp minted against pETH, every position rebuilt from the market's events, liquidations absorbed by stability pools.",
+      "Every Polaris position on the Sepolia testnet: USDp and GOLDp loans against pETH, with collateral, debt and full history. Test tokens only.",
   });
   const { ownerAddress, ownerEns } = parsePolarisSearch(toURLSearchParams(await searchParams).get("q") ?? "");
   // An address is lowercased (one wallet, one URL, whatever case it was typed

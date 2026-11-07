@@ -20,7 +20,7 @@ export const metadata = listingMetadata({
   title: "Explore f(x) positions",
   canonicalPath: "/ethereum/fx",
   description:
-    "Leveraged f(x) xPOSITIONs on wstETH and WBTC: every event read from chain, current state from the pool's views, socialized funding split out per position.",
+    "Every f(x) Protocol leveraged position on Ethereum, on wstETH and WBTC: size, debt, funding costs and full history.",
 });
 
 async function FxListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

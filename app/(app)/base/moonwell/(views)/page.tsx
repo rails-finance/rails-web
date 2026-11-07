@@ -25,6 +25,8 @@ export const maxDuration = 30;
 export const metadata = listingMetadata({
   title: "Explore Moonwell positions on Base",
   canonicalPath: "/base/moonwell",
+  description:
+    "Every Moonwell account on Base: what each wallet has supplied and borrowed across 21 markets, and how close it is to liquidation.",
 });
 
 /** The facet roster for this request, or "unavailable" — it never rejects and

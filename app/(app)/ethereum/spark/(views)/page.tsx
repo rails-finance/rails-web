@@ -19,7 +19,12 @@ export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore SparkLend positions", canonicalPath: "/ethereum/spark" });
+export const metadata = listingMetadata({
+  title: "Explore SparkLend positions",
+  canonicalPath: "/ethereum/spark",
+  description:
+    "Every SparkLend borrower on Ethereum: collateral, debt and health for each wallet, with every liquidation shown.",
+});
 
 async function SparkListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = sparkListDimensions();

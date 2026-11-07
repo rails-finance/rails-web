@@ -8,6 +8,8 @@ import { ProtocolFrontDoor } from "@/components/shared/protocol-front-door";
 export const metadata = listingMetadata({
   title: "Morpho Blue on Arbitrum",
   canonicalPath: "/arbitrum/morpho",
+  description:
+    "Look up any wallet's Morpho Blue positions on Arbitrum: collateral, debt and health across 258 markets, read from the chain.",
 });
 
 function Page() {

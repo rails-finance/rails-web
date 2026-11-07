@@ -244,7 +244,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "aave-v4",
     protocolKey: "aave-v4",
     tags: ["Lend", "Borrow"],
-    desc: "Aave V4's Base deployment: the Equities hub's Mag7 spoke, where Coinbase tokenized stocks back USDC loans, each account read from the spoke and each stock price stated with the time it was published",
+    desc: "Aave V4 on Base: the Equities hub's Mag7 spoke, where Coinbase tokenized stocks back USDC loans, each stock price stated with when it was published",
     subPages: [{ segment: "hubs", label: "Equities hub", tab: "Hub" }],
   },
   {
@@ -260,7 +260,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "aave",
     brand: 336,
     tags: ["Vaults", "Savings"],
-    desc: "Aave's vault layer (savings GHO, Umbrella stake tokens and static aTokens): each vault's totals and share price read from chain at one block, and every address that holds one",
+    desc: "Aave's vaults (savings GHO, Umbrella stake tokens and static aTokens): each vault's size and share price, and every address that holds one",
     // No position listing: a holder's share in a vault is not a position in the
     // roster's sense (rails-ops decision 0027 call 2), so the rail's first tab
     // is this sub-page and `/ethereum/aave` opens on it.
@@ -279,7 +279,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "alchemix",
     brand: 50,
     tags: ["CDP", "Yield"],
-    desc: "Self-repaying loans against a yield-bearing vault token: each position's debt and collateral stated with the grade and the block they were settled at, and the line-wide redemptions that moved them",
+    desc: "Self-repaying loans against yield-bearing vault tokens: each position's debt and collateral, dated by block, and the redemptions that moved them",
     subPages: [{ segment: "lines", label: "Lines overview", tab: "Lines" }],
   },
   {
@@ -297,7 +297,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "alchemix",
     protocolKey: "alchemix",
     tags: ["CDP", "Yield"],
-    desc: "Alchemix V3's Base deployment: the alUSDb line, every position's debt and collateral replayed from its events, with the block each figure was settled at stated beside it",
+    desc: "Alchemix V3 on Base: every position on the alUSDb line, its debt and collateral rebuilt from its events and dated by block",
     subPages: [{ segment: "lines", label: "Lines overview", tab: "Lines" }],
   },
   {
@@ -319,7 +319,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "compound-v2",
     brand: 160,
     tags: ["Lend", "Borrow"],
-    desc: "The original cToken markets replayed over six years: every account's supplies, borrows and liquidations from the contracts' events, with the markets read live at /compound-v2/markets",
+    desc: "The original cToken markets over six years: every account's supplies, borrows and liquidations, with the markets read live at /compound-v2/markets",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
@@ -373,7 +373,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "dolomite",
     brand: 195,
     tags: ["Lend", "Borrow"],
-    desc: "Solo-fork margin accounts at the contract's (owner, account number) grain: balances replayed from emitted absolutes, debt as negative balances, the account's margin line read live including the LST/ETH override",
+    desc: "Dolomite margin accounts, one per owner and account number: balances and debts from the contract's events, each account's liquidation line read live",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
@@ -406,7 +406,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "fluid",
     brand: 260,
     tags: ["Lend", "Borrow", "CDP"],
-    desc: "Instadapp's vault positions as NFTs: composite deposit and borrow events read from chain, tick-swept liquidations attributed per position from the vault's settlement views",
+    desc: "Fluid vault positions as NFTs: deposits and borrows from the chain, and each liquidation's effect on every position it touched",
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
   },
   {
@@ -417,7 +417,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "frankencoin",
     brand: 25,
     tags: ["Borrow", "CDP"],
-    desc: "Oracle-free ZCHF minting positions, each a separate contract: owner-declared liquidation prices tested by two-phase challenge auctions, everything in native units",
+    desc: "Oracle-free ZCHF loans, each a separate contract whose owner declares the liquidation price, which anyone can challenge by auction, all in native units",
     subPages: [{ segment: "system", label: "System overview", tab: "System" }],
   },
   {
@@ -428,7 +428,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "fx",
     brand: 15,
     tags: ["Leverage", "CDP"],
-    desc: "Leveraged xPOSITIONs on wstETH and WBTC: every event read from chain, current state settled from the pool's views, socialized funding reconciled explicitly",
+    desc: "Leveraged f(x) positions on wstETH and WBTC: every event from the chain, current state from the pools, and shared funding costs split per position",
     subPages: [{ segment: "pools", label: "Pools overview", tab: "Pools" }],
   },
   {
@@ -461,7 +461,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "llamalend",
     brand: 20,
     tags: ["Borrow"],
-    desc: "Curve's LLAMMA lending: isolated markets where liquidation is a band, soft-liquidation read live from the protocol's state and cross-checked across two contracts",
+    desc: "Curve's LlamaLend markets, where liquidation happens gradually across a price band: each loan's soft-liquidation state read live and cross-checked",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
@@ -483,7 +483,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "maple",
     brand: 30,
     tags: ["Lend", "RWA"],
-    desc: "Institutional credit pools from the lender's on-chain side: exact share balances, the withdrawal queue, and what is liquid now against what is deployed to off-chain-custodied loans",
+    desc: "Maple's institutional credit pools from the lender's side: share balances, the withdrawal queue, and what is liquid now against what is lent out",
     subPages: [{ segment: "pools", label: "Pools overview", tab: "Pools" }],
   },
   {
@@ -542,7 +542,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "morpho",
     protocolKey: "morpho",
     tags: ["Lend", "Borrow"],
-    desc: "Morpho Blue's Base deployment: more than 4,300 isolated markets, every borrower position across them listed, and a wallet's whole standing found by asking the singleton",
+    desc: "Morpho Blue on Base: more than 4,300 isolated markets, every borrower listed, and any wallet's positions across all of them",
     // MetaMorpho is Morpho's own vault layer, so it is a view of this explorer
     // rather than a section beside it (rails-ops decision 0028): the tab lands
     // on the roster of vaults, and each vault's page and each holder's reading
@@ -579,7 +579,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "polaris",
     brand: 220,
     tags: ["CDP", "Stablecoin"],
-    desc: "Polaris's Sepolia testnet: USDp and GOLDp minted against pETH, every position replayed from the market's events, liquidations absorbed by the stability pools",
+    desc: "Polaris on the Sepolia testnet: USDp and GOLDp minted against pETH, every position from the market's events, liquidations absorbed by stability pools",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
@@ -617,7 +617,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "sky-savings",
     brand: 280,
     tags: ["Savings"],
-    desc: "Every sUSDS holder on Ethereum: the balance, its worth in USDS and the interest earned to the wei, replayed from the token's logs and checked against the contract",
+    desc: "Every sUSDS holder on Ethereum: the balance, its worth in USDS and the interest earned, from the token's logs and checked against the contract",
     subPages: [{ segment: "rates", label: "Savings Rate history", tab: "Rate" }],
   },
   {

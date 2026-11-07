@@ -18,7 +18,12 @@ export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Aave V3 positions", canonicalPath: "/ethereum/aave-v3" });
+export const metadata = listingMetadata({
+  title: "Explore Aave V3 positions",
+  canonicalPath: "/ethereum/aave-v3",
+  description:
+    "Every Aave V3 borrower on Ethereum: collateral, debt and health for each wallet, valued at the prices Aave uses, with every liquidation shown.",
+});
 
 async function AaveV3ListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = aaveV3ListDimensions();

@@ -27,7 +27,12 @@ export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Morpho Blue positions", canonicalPath: "/ethereum/morpho" });
+export const metadata = listingMetadata({
+  title: "Explore Morpho Blue positions",
+  canonicalPath: "/ethereum/morpho",
+  description:
+    "Every Morpho Blue borrower on Ethereum: collateral, debt and health in each market, priced in the token the market lends.",
+});
 
 /** The roster for this request, or "unavailable" when the backend fails to
  *  answer; the listing is built to work without it. */
