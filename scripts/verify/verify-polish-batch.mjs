@@ -509,41 +509,37 @@ await phone.close();
   await ctx.close();
 }
 
-// Saved positions and views (ui-jobs 530, 521): one list with a kind per
-// entry. A wallet-only list from before takes its kind once and keeps its
-// rows; the profile menu groups Wallets, Positions, Views in that order, and
-// /bookmarks has the same three tabs, each row opening its saved page. A
-// listing's ⋮ (N1.7) saves the view under its URL.
+// Saved positions and views (ui-jobs 530, 521): one list under
+// `rails-saved` with a kind per entry, started from the wallet-only
+// `rails-bookmarks`, which keeps its old shape for builds from before. A
+// wallet such a build adds there joins the list and the views stay; the
+// profile menu groups Wallets, Positions, Views in that order, and /bookmarks
+// has the same three tabs, each row opening its saved page. A listing's ⋮
+// (N1.7) saves the view under its URL.
 {
   const wallet = "0xf06016d822943c42e3cb7fc3a6a3b1889c1045f8";
-  const position = {
-    kind: "position",
-    key: "/ethereum/liquity-v2/trove/WETH/102247037494986730506041632222868001124387697185626929998095238518734059870154",
-    name: "ETH/BOLD trove 10224703…",
-    protocol: { id: "liquity-v2", name: "Liquity V2" },
-    chain: { id: "1", name: "Ethereum" },
-    savedAt: 1,
-  };
+  const later = "0xd8da6bf26964af9d7eed9e03e53415d37aa96045";
+  const legacyRow = (a, t) => ({ key: a, addresses: [a], ensNames: { [a]: null }, lastVisited: t, pinned: true });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await ctx.addInitScript(
-    ([w, p]) => {
-      if (localStorage.getItem("rails-bookmarks")) return;
-      localStorage.setItem(
-        "rails-bookmarks",
-        JSON.stringify([{ key: w, addresses: [w], ensNames: { [w]: null }, lastVisited: 1, pinned: true }, p]),
-      );
+    (row) => {
+      if (sessionStorage.getItem("sv-seeded")) return;
+      sessionStorage.setItem("sv-seeded", "1");
+      localStorage.setItem("rails-bookmarks", JSON.stringify([row]));
       localStorage.setItem("rails-bookmarks-migrated", "1");
       localStorage.setItem("rails-bookmarks-ordered", "1");
     },
-    [wallet, position],
+    legacyRow(wallet, 1),
   );
   const sp = await ctx.newPage();
+  const read = (k) => sp.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "null"), k);
   await sp.goto(`${BASE}/base/morpho`, { waitUntil: "networkidle", timeout: 180_000 });
-  const kinds = await sp.evaluate(() => JSON.parse(localStorage.getItem("rails-bookmarks")).map((r) => r.kind));
+  const seeded = await read("rails-saved");
+  const legacyAfter = await read("rails-bookmarks");
   check(
-    "SV a wallet-only row takes its kind, the position keeps its own",
-    kinds.join() === "wallet,position",
-    kinds.join(),
+    "SV a wallet-only profile moves to rails-saved with its kind; rails-bookmarks keeps the old shape",
+    seeded?.map((r) => r.kind).join() === "wallet" && legacyAfter?.length === 1 && !("kind" in legacyAfter[0]),
+    JSON.stringify({ seeded, legacyAfter }),
   );
   const trig = sp.locator("[data-view-menu] > button");
   let open = false;
@@ -564,24 +560,34 @@ await phone.close();
     items.join(),
   );
   await sp.locator('[data-menu-item="save-view"]').click();
-  const saved = await sp.evaluate(() =>
-    JSON.parse(localStorage.getItem("rails-bookmarks")).find((r) => r.kind === "view"),
-  );
+  const saved = (await read("rails-saved")).find((r) => r.kind === "view");
   check(
     "SV the view saves under the listing's URL, named by protocol and chain",
     saved?.key === "/base/morpho" && /^Morpho Blue · Base/.test(saved?.name ?? ""),
     JSON.stringify(saved),
   );
   await sp.keyboard.press("Escape");
+  // A build from before 521 in another tab saves a wallet: it writes the
+  // wallet-only list in the old shape.
+  await sp.evaluate(
+    (rows) => localStorage.setItem("rails-bookmarks", JSON.stringify(rows)),
+    [legacyRow(later, 2), legacyRow(wallet, 1)],
+  );
+  await sp.reload({ waitUntil: "networkidle" });
+  const after = await read("rails-saved");
+  check(
+    "SV an old-format write adds its wallet and the view stays",
+    after
+      .filter((r) => r.kind === "wallet")
+      .map((r) => r.key)
+      .join() === `${later},${wallet}` && after.some((r) => r.kind === "view" && r.key === "/base/morpho"),
+    JSON.stringify(after.map((r) => [r.kind, r.key])),
+  );
   await sp.locator('[data-profile-corner] [data-anatomy="H20"]').click();
   const groups = await sp
     .locator("[data-profile-menu-group]")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-profile-menu-group")));
-  check(
-    "SV profile menu groups: wallets, positions, views",
-    groups.join() === "wallets,positions,views",
-    groups.join(),
-  );
+  check("SV profile menu groups: wallets, views", groups.join() === "wallets,views", groups.join());
   await sp.keyboard.press("Escape");
   await sp.goto(`${BASE}/bookmarks?tab=views`, { waitUntil: "networkidle" });
   await sp.waitForSelector('[data-bookmark-row="view"]');

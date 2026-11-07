@@ -3,8 +3,8 @@
  *  primary address), a position (keyed by its page path) and a listing view
  *  (keyed by its path and query). Every item shows everywhere, whatever
  *  explorer is in view. The list lives in this origin's localStorage under
- *  `rails-bookmarks`; `exportBookmarks` / `importBookmarks` at the foot carry
- *  it off the origin and back, which is what makes it survivable across
+ *  `rails-saved`; `exportBookmarks` / `importBookmarks` at the foot carry it
+ *  off the origin and back, which is what makes it survivable across
  *  browsers, machines and a site-data clear.
  *
  *  One array holds all three kinds. A kind's order (ui-jobs 504) is the order
@@ -13,11 +13,13 @@
  *  Until 431 each explorer kept its own list under `<explorer>-sessions`. On
  *  the first read in a browser those lists are merged into the one list by
  *  primary address (`migrateScopedBookmarks`) and left where they are. Until
- *  521 the list held wallets only and its rows carried no kind: they take
- *  `kind: "wallet"` once (`KINDS_KEY`), in place. A row with addresses and no
- *  kind still reads as a wallet, so a build from before 521 writing to the list
- *  in another tab loses nothing it wrote; that build reads the wallets and
- *  skips the other kinds.
+ *  521 the list was `rails-bookmarks`, wallets only, its rows carrying no
+ *  kind. That key stays a wallet-only list in its old shape: the first read
+ *  copies it into `rails-saved` (`seedSavedList`), every write mirrors the
+ *  wallets back to it (`saveSessions`), and every read merges into
+ *  `rails-saved` what a build from before 521, open in another tab, wrote
+ *  there (`reconcileLegacyWallets`). That build reads and writes the wallets
+ *  it knows and never sees the positions and views, so it cannot drop them.
  *
  *  `SessionProtocol` names an explorer for the props that still take one (the
  *  page's session, a listing's filter); it no longer scopes a bookmark. */
@@ -137,6 +139,10 @@ export type SavedEntry = WalletSession | SavedLink;
  *  tabs. */
 export const SESSIONS_CHANGED_EVENT = "rails-sessions-changed";
 
+/** Every saved item, all three kinds (ui-jobs 521, 530). */
+const SAVED_KEY = "rails-saved";
+/** The wallet-only list of every build before 521, kept in step with
+ *  `SAVED_KEY`'s wallets in its old shape so those builds read them. */
 const STORAGE_KEY = "rails-bookmarks";
 /** Set once the per-explorer lists have been merged into `STORAGE_KEY`. */
 const MIGRATED_KEY = "rails-bookmarks-migrated";
@@ -146,9 +152,6 @@ const MIGRATED_KEY = "rails-bookmarks-migrated";
  *  rearranges on /bookmarks. The array keeps its shape, so a build from
  *  before reads the same rows. */
 const ORDERED_KEY = "rails-bookmarks-ordered";
-/** Set once every wallet row in `STORAGE_KEY` carries `kind: "wallet"`
- *  (ui-jobs 521). */
-const KINDS_KEY = "rails-bookmarks-kinds";
 /** The suffix every pre-431 explorer list's key ends in. */
 const LEGACY_SUFFIX = "-sessions";
 
@@ -233,9 +236,9 @@ function readRows(key: string): WalletSession[] {
   return readJson(key).filter(isSessionRow);
 }
 
-/** Every entry under `STORAGE_KEY`, wallets and links, in the stored order. */
-function readAll(): SavedEntry[] {
-  return readJson(STORAGE_KEY).filter((r): r is SavedEntry => isSessionRow(r) || isLinkRow(r));
+/** Every entry under `key`, wallets and links, in the stored order. */
+function readAll(key: string = SAVED_KEY): SavedEntry[] {
+  return readJson(key).filter((r): r is SavedEntry => isSessionRow(r) || isLinkRow(r));
 }
 
 /** Merge every pre-431 explorer list into the one list, once per browser. The
@@ -249,9 +252,8 @@ function migrateScopedBookmarks(): void {
       if (key && key.endsWith(LEGACY_SUFFIX)) legacy.push(...readRows(key).filter((r) => r.pinned));
     }
     if (legacy.length > 0) {
-      const all = readAll();
-      const { rows } = mergeRows(all.filter(isWallet), legacy);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([...rows, ...all.filter((r) => !isWallet(r))]));
+      const { rows } = mergeRows(readRows(STORAGE_KEY), legacy);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(rows.map(legacyShape)));
     }
     localStorage.setItem(MIGRATED_KEY, "1");
   } catch {
@@ -265,36 +267,72 @@ const newestFirst = (a: WalletSession, b: WalletSession) => (b.lastVisited ?? 0)
 function migrateToReaderOrder(): void {
   try {
     if (localStorage.getItem(ORDERED_KEY)) return;
-    const all = readAll();
-    const wallets = all.filter(isWallet);
-    if (wallets.length > 0) {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify([...wallets.sort(newestFirst), ...all.filter((r) => !isWallet(r))]),
-      );
-    }
+    const rows = readRows(STORAGE_KEY);
+    if (rows.length > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify([...rows].sort(newestFirst)));
     localStorage.setItem(ORDERED_KEY, "1");
   } catch {
     /* storage blocked: nothing to order */
   }
 }
 
-/** Give every wallet row its kind, once per browser (KINDS_KEY). In place:
- *  the rows keep their order and every other field, and a row that has its
- *  kind is left as it is, so a second run writes the same list. */
-function migrateToKinds(): void {
+/** A wallet row as builds before 521 wrote it: no kind. */
+function legacyShape(row: WalletSession): WalletSession {
+  const { kind: _kind, ...rest } = row;
+  void _kind;
+  return rest;
+}
+
+/** One wallet merged with what another list holds for it, by `mergeRows`'
+ *  rules. */
+function mergeWallet(prev: WalletSession, row: WalletSession): WalletSession {
+  return mergeRows([prev], [row]).rows[0];
+}
+
+/** Start `SAVED_KEY` from the wallet-only list, once per browser: the wallets
+ *  take `kind: "wallet"` and keep their order and every other field. Runs
+ *  while `SAVED_KEY` is absent, so a second run finds it and writes nothing. */
+function seedSavedList(): void {
   try {
-    if (localStorage.getItem(KINDS_KEY)) return;
-    const all = readAll();
-    if (all.some((r) => r.kind === undefined)) {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(all.map((r) => (r.kind === undefined ? { ...r, kind: "wallet" } : r))),
-      );
-    }
-    localStorage.setItem(KINDS_KEY, "1");
+    if (localStorage.getItem(SAVED_KEY) !== null) return;
+    const rows = readAll(STORAGE_KEY).map((r) => (isWallet(r) ? { ...r, kind: "wallet" as const } : r));
+    localStorage.setItem(SAVED_KEY, JSON.stringify(rows));
   } catch {
-    /* storage blocked: nothing to mark */
+    /* storage blocked: nothing to copy */
+  }
+}
+
+/** Merge into `SAVED_KEY` the wallets a build from before 521 wrote to
+ *  `STORAGE_KEY` since the last mirror: a wallet it added goes first among
+ *  the wallets, a name or ENS name it gave is kept (`mergeRows`). A wallet it
+ *  removed stays saved here. Writes only on a change, so a second run with
+ *  nothing new writes nothing. */
+function reconcileLegacyWallets(): void {
+  try {
+    const legacy = readRows(STORAGE_KEY).filter((r) => r.pinned !== false);
+    if (legacy.length === 0) return;
+    const all = readAll();
+    let changed = false;
+    const added: WalletSession[] = [];
+    for (const row of legacy) {
+      const addr = primaryOf(row);
+      const at = all.findIndex((r) => isWallet(r) && primaryOf(r) === addr);
+      if (at < 0) {
+        added.push(mergeRows([], [row]).rows[0]);
+        changed = true;
+        continue;
+      }
+      const merged = mergeWallet(all[at] as WalletSession, row);
+      if (JSON.stringify(merged) !== JSON.stringify(all[at])) {
+        all[at] = merged;
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    const first = all.findIndex(isWallet);
+    all.splice(first < 0 ? 0 : first, 0, ...added);
+    localStorage.setItem(SAVED_KEY, JSON.stringify(all));
+  } catch {
+    /* storage blocked: nothing to merge */
   }
 }
 
@@ -302,15 +340,25 @@ function loadSessions(): SavedEntry[] {
   if (typeof window === "undefined") return [];
   migrateScopedBookmarks();
   migrateToReaderOrder();
-  migrateToKinds();
+  seedSavedList();
+  reconcileLegacyWallets();
   return readAll();
+}
+
+/** Write the list, and its wallets in the old shape to `STORAGE_KEY` (removed
+ *  when there are none, as builds before 521 did). Throws when storage
+ *  refuses. */
+function writeAll(sessions: SavedEntry[]): void {
+  localStorage.setItem(SAVED_KEY, JSON.stringify(sessions));
+  const wallets = sessions.filter(isWallet).map(legacyShape);
+  if (wallets.length === 0) localStorage.removeItem(STORAGE_KEY);
+  else localStorage.setItem(STORAGE_KEY, JSON.stringify(wallets));
 }
 
 function saveSessions(sessions: SavedEntry[]): void {
   if (typeof window === "undefined") return;
   try {
-    if (sessions.length === 0) localStorage.removeItem(STORAGE_KEY);
-    else localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+    writeAll(sessions);
     // Defer dispatch to a microtask so callers that run from inside a React
     // render phase (a setState updater) do not set subscribers' state
     // synchronously. localStorage is still written immediately.
@@ -553,7 +601,7 @@ export function importBookmarks(source: string): BookmarksImportResult {
 
   const read = new Set(wallets.map(primaryOf)).size + new Set(links.map(linkId)).size;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
+    writeAll(rows);
   } catch {
     throw new Error("This browser wouldn't let the items be saved. Check that site data is allowed.");
   }
