@@ -11,7 +11,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { SearchBox } from "@/components/shared/front-door-search";
 import { FilterSections } from "@/components/shared/filter-bar/filter-sections";
-import { activeFilterLabels, FilterChips } from "@/components/shared/filter-bar/filter-chips";
+import { savedViewFilterNames, FilterChips } from "@/components/shared/filter-bar/filter-chips";
 import { ListingViewMenu } from "@/components/shared/saved-items";
 import { SortControl, type SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
@@ -85,7 +85,7 @@ export function ListToolbar<F extends BaseListFilters>({
         />
         {viewMenu && (
           <ListingViewMenu
-            filterLabels={[...activeFilterLabels(dimensions, filters), ...(filters.q ? [`“${filters.q}”`] : [])]}
+            filterLabels={[...savedViewFilterNames(dimensions, filters), ...(filters.q ? [`“${filters.q}”`] : [])]}
           />
         )}
       </div>

@@ -519,6 +519,8 @@ await phone.close();
 {
   const wallet = "0xf06016d822943c42e3cb7fc3a6a3b1889c1045f8";
   const later = "0xd8da6bf26964af9d7eed9e03e53415d37aa96045";
+  // Morpho Base filtered to WETH collateral.
+  const VIEW = "/base/morpho?coll=0x4200000000000000000000000000000000000006";
   const legacyRow = (a, t) => ({ key: a, addresses: [a], ensNames: { [a]: null }, lastVisited: t, pinned: true });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await ctx.addInitScript(
@@ -533,7 +535,7 @@ await phone.close();
   );
   const sp = await ctx.newPage();
   const read = (k) => sp.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "null"), k);
-  await sp.goto(`${BASE}/base/morpho`, { waitUntil: "networkidle", timeout: 180_000 });
+  await sp.goto(`${BASE}${VIEW}`, { waitUntil: "networkidle", timeout: 180_000 });
   const seeded = await read("rails-saved");
   const legacyAfter = await read("rails-bookmarks");
   check(
@@ -562,8 +564,8 @@ await phone.close();
   await sp.locator('[data-menu-item="save-view"]').click();
   const saved = (await read("rails-saved")).find((r) => r.kind === "view");
   check(
-    "SV the view saves under the listing's URL, named by protocol and chain",
-    saved?.key === "/base/morpho" && /^Morpho Blue · Base/.test(saved?.name ?? ""),
+    "SV the view saves under the listing's URL, named protocol · chain · value and noun",
+    saved?.key === VIEW && saved?.name === "Morpho · Base · WETH collateral",
     JSON.stringify(saved),
   );
   await sp.keyboard.press("Escape");
@@ -580,7 +582,7 @@ await phone.close();
     after
       .filter((r) => r.kind === "wallet")
       .map((r) => r.key)
-      .join() === `${later},${wallet}` && after.some((r) => r.kind === "view" && r.key === "/base/morpho"),
+      .join() === `${later},${wallet}` && after.some((r) => r.kind === "view" && r.key === VIEW),
     JSON.stringify(after.map((r) => [r.kind, r.key])),
   );
   await sp.locator('[data-profile-corner] [data-anatomy="H20"]').click();
@@ -599,7 +601,7 @@ await phone.close();
   const viewHref = await sp.locator('[data-bookmark-row="view"] a').first().getAttribute("href");
   check(
     "SV /bookmarks tabs Wallets, Positions, Views; ?tab=views lists the view opening its URL",
-    tabs.join() === "wallets,positions,views*" && viewHref === "/base/morpho",
+    tabs.join() === "wallets,positions,views*" && viewHref === VIEW,
     JSON.stringify({ tabs, viewHref }),
   );
   await ctx.close();

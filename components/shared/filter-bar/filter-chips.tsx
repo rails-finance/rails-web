@@ -17,6 +17,7 @@ import {
   type FilterDimension,
   isDimensionActive,
   defaultChipLabel,
+  joinOptionLabels,
   rangeChipLabel,
 } from "@/components/shared/filter-bar/types";
 
@@ -39,10 +40,23 @@ export function filterChipText<F>(dim: FilterDimension<F>, filters: F): string {
     : defaultChipLabel(dim.label, vals, dim.options);
 }
 
-/** The active filters' chips, in the row's order: a saved view's default
- *  name ends in them (ui-jobs 521). */
-export function activeFilterLabels<F>(dimensions: FilterDimension<F>[], filters: F): string[] {
-  return dimensions.filter((d) => isDimensionActive(d, filters)).map((d) => filterChipText(d, filters));
+/** Dimensions whose values name a thing the dimension is a noun for: a
+ *  saved view names them "<value> <noun>" ("WETH collateral", "USDC loan",
+ *  "Core market"). The noun is the label's first word in lower case. */
+const NOUN_DIMENSION = /^(collateral|loan|market|pool|hub|spoke|line|vault|borrowed|supplied)(?: token| type)?$/i;
+
+/** The active filters as a saved view's default name ends in them (ui-jobs
+ *  521, Miles 7 Nov 2026), in the row's order: "<value> <noun>" where the
+ *  dimension has a natural noun, else the chip's text. */
+export function savedViewFilterNames<F>(dimensions: FilterDimension<F>[], filters: F): string[] {
+  return dimensions
+    .filter((d) => isDimensionActive(d, filters))
+    .map((d) => {
+      const noun = d.cardinality === "range" ? null : NOUN_DIMENSION.exec(d.label.trim());
+      return noun
+        ? `${joinOptionLabels(d.get(filters), d.options)} ${noun[1].toLowerCase()}`
+        : filterChipText(d, filters);
+    });
 }
 
 export function FilterChips<F>({ dimensions, filters, onChange, count, countNode }: FilterChipsProps<F>) {

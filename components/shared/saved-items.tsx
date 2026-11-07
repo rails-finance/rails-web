@@ -50,12 +50,17 @@ function useSavedLink(kind: "position" | "view", key: string | null): SavedLink 
   return entry;
 }
 
+/** The protocol's short display name for a saved entry (Miles, 7 Nov 2026):
+ *  the label without "Blue", as the card's sidebar shortens it ("Morpho Blue"
+ *  → "Morpho"); a version stays ("Liquity V2", "Aave V3"). */
+const shortName = (label: string) => label.replace(/ Blue$/, "");
+
 /** The explorer and chain a path belongs to, as a saved entry keeps them. */
 function placeOf(pathname: string): Pick<SavedLink, "protocol" | "chain"> {
   const entry = protocolForPathname(pathname);
   if (!entry) return {};
   return {
-    protocol: { id: entry.id, name: entry.label },
+    protocol: { id: entry.id, name: shortName(entry.label) },
     chain: { id: String(entry.chainId), name: chainMeta(entry.chainId).name },
   };
 }
@@ -124,7 +129,9 @@ export function SavePositionRow({ identityText, ended }: { identityText: () => s
       item="save-position"
       onClick={() => {
         const place = placeOf(window.location.pathname);
-        const name = [identityText(), positionSubject(place.protocol?.name)].filter(Boolean).join(" · ");
+        const name = [identityText(), positionSubject(protocolForPathname(window.location.pathname)?.label)]
+          .filter(Boolean)
+          .join(" · ");
         toggleSavedLink({
           kind: "position",
           key,
