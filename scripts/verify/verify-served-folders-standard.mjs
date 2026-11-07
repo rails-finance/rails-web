@@ -366,9 +366,14 @@ async function runNeverEmpty(f, name) {
     ? await page.locator("[data-event-id]").evaluateAll((els) => els.map((e) => e.getAttribute("data-event-id") ?? ""))
     : [];
   const looseOk = (f.loose == null || loose === f.loose) && !looseKinds.some((k) => k.startsWith(`${f.looseNot}:`));
+  // A cut (`f.ends`) slices the oldest folder to one member, a loose card
+  // (af40fed1). Whether the whole folder is seen first depends on how fast the
+  // cut lands after hydration: on a local production build it lands before the
+  // folder draws. Either is the list drawing the cut's events.
+  const drawn = f.ends ? folders + loose > 0 : folders > 0;
   check(
     `${name} [${f.id}]`,
-    folders > 0 && said.length === 0 && looseOk,
+    drawn && said.length === 0 && looseOk,
     `count line "${line}", ${folders} folder row(s), ${loose} loose card(s)${
       said.length ? `; says "${said.join('", "')}"` : ""
     }`,
@@ -410,7 +415,7 @@ try {
   if (!ONLY || ONLY.has(e3.id))
     await runNeverEmpty(e3, 'E3 a filter that hides every loose event leaves the folders, not "filtered out"');
   if (!ONLY || ONLY.has(e4.id))
-    await runNeverEmpty(e4, "E4a a past-day cut on an all-folder answer draws the folder, not the empty label");
+    await runNeverEmpty(e4, "E4a a past-day cut on an all-folder answer draws its events, not the empty label");
   // C1 dropped: it read "Collapse like events" in a client-grouped page's
   // Display menu, a toggle 326 (web `81662167`) removed from every family.
 } finally {

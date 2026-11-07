@@ -149,9 +149,14 @@ export function vaultStripChecks(check, id, strip, store, { chain, vault, census
       holders ? `"${holders.sentence}"` : "no tile",
     );
   } else {
+    // Yearn has no census, so until the store serves a holders series the tile
+    // says so; once it serves one the tile draws it (components/vaults/vault-strip.tsx),
+    // and ${id}b has held its change and days to the store.
     check(
-      `${id}d the Holders tile on Yearn states that there is no census, and draws no line`,
-      holders != null && holders.census === "none" && /no census/.test(holders.sentence) && holders.days == null,
+      `${id}d the Holders tile on Yearn draws the store's series, or states that there is no census and draws no line`,
+      holders != null &&
+        (holders.change != null ||
+          (holders.census === "none" && /no census/.test(holders.sentence) && holders.days == null)),
       holders ? `"${holders.sentence}"` : "no tile",
     );
   }

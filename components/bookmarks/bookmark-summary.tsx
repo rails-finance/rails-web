@@ -2,7 +2,10 @@
 
 // B2.1, the line under a bookmark's name (rails-ops ui-jobs 492): each
 // protocol the wallet has positions in, as its glyph with its open and closed
-// counts, from lib/wallet/wallet-summary.ts. Read when the row first comes
+// counts, from lib/wallet/wallet-summary.ts. Each protocol a pill (Miles's
+// design, 6 Nov 2026; ui-jobs 528): its glyph, the open count in the
+// foreground, a hairline, the closed count muted; no words, the tooltip and a
+// screen reader carry "1 open · 2 closed". Read when the row first comes
 // into view, from the browser's kept summary while it is under its max age.
 // A protocol holding one position links to that position's page; otherwise
 // its glyph opens the wallet view.
@@ -33,7 +36,8 @@ function byHolding(a: WalletSummaryProtocol, b: WalletSummaryProtocol): number {
 
 const chainOf = (slug: WalletSummaryProtocol["chain"]) => Object.values(CHAINS).find((c) => c.slug === slug);
 
-const LINK = "inline-flex items-center gap-1 rounded-sm text-rb-500 transition-colors hover:text-foreground focus-ring";
+const PILL =
+  "inline-flex h-7 items-center gap-2 rounded-md bg-rb-100 px-2 text-rb-500 tabular-nums transition-colors hover:bg-rb-200 focus-ring dark:bg-rb-800 dark:hover:bg-rb-700";
 
 function Holding({ p, address }: { p: WalletSummaryProtocol; address: string }) {
   const chain = chainOf(p.chain);
@@ -45,7 +49,7 @@ function Holding({ p, address }: { p: WalletSummaryProtocol; address: string }) 
     <Link
       href={p.href ?? walletHref(address)}
       prefetch={false}
-      className={LINK}
+      className={PILL}
       title={label}
       data-bookmark-holding={`${p.chain}/${p.family}`}
       data-open={p.open}
@@ -53,8 +57,10 @@ function Holding({ p, address }: { p: WalletSummaryProtocol; address: string }) 
     >
       <ProtocolIcon id={p.protocolId} className="h-4 w-4 shrink-0 [&:is(img)]:grayscale" />
       {chain && chain.slug !== "ethereum" && <ChainGlyph id={chain.id} className="h-3 w-3 shrink-0" />}
-      <span className="tabular-nums" aria-hidden="true">
-        {counts}
+      <span className="inline-flex items-center gap-2" aria-hidden="true">
+        {p.open > 0 && <span className="font-semibold text-foreground">{p.open}</span>}
+        {p.open > 0 && p.closed > 0 && <span className="h-4 w-px bg-rb-300 dark:bg-rb-600" />}
+        {p.closed > 0 && <span>{p.closed}</span>}
       </span>
       <span className="sr-only">{label}</span>
     </Link>
@@ -96,7 +102,7 @@ export function BookmarkSummary({ address }: { address: string }) {
   return (
     <div
       ref={ref}
-      className="flex min-h-4 flex-wrap items-center gap-x-3 gap-y-1 text-xs"
+      className="flex min-h-4 flex-wrap items-center gap-2 text-xs"
       data-anatomy="B2.1"
       data-bookmark-summary={state.kind === "read" ? (protocols.length > 0 ? "read" : "none") : state.kind}
     >

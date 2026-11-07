@@ -778,14 +778,22 @@ async function waitForRows(page, rowSel, tries = 40) {
  *  page (so the rendered rows ARE the answer, and so `search()`'s wait for the
  *  row set to change can never be waiting for 20 → 20) and whose positions
  *  include one that has ended. Candidates come from the index, never from the
- *  page under test. */
+ *  page under test. A holder with activity in the last two hours is passed
+ *  over: the index's status can lag a position minutes old (Aave V4, 6 Nov
+ *  2026: a one-supply position read "closed" while the card drew OPEN). */
+const FRESH_S = 2 * 3600;
+const isFresh = (r) => {
+  const t = Number(r?.lastActivityAt);
+  return Number.isFinite(t) && t > 0 && Date.now() / 1000 - (t > 1e12 ? t / 1000 : t) < FRESH_S;
+};
 async function pickRosterHolder(spec) {
   for (const st of spec.ended) {
     const seed = await api(`${spec.api}?status=${st}&limit=60`);
     for (const row of rowsOf(seed)) {
       const addr = spec.holder(row);
-      if (!addr) continue;
+      if (!addr || isFresh(row)) continue;
       const held = await api(`${spec.api}?${spec.holderParam}=${addr}&limit=100`);
+      if (rowsOf(held).some(isFresh)) continue;
       const total = totalOf(held) ?? 0;
       const ended = rowsOf(held).filter((r) => spec.ended.includes(r.status)).length;
       if (total > 0 && total < spec.perPage && ended > 0) return { addr, total, ended, row };
