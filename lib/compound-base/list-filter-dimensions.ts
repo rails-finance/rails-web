@@ -49,7 +49,7 @@ const COMPOUND_V3_BASE_TX_TOP = 100000;
 const COMPOUND_V3_BASE_SIZE_NOTE = "At the Comet's own price feed at the pinned block.";
 
 export function compoundBaseListDimensions(): SerializableDimension<CompoundListFilters>[] {
-  return compoundListDimensions(COMPOUND_V3_BASE_TX_TOP, COMPOUND_V3_BASE_SIZE_NOTE).map((d) =>
+  return compoundListDimensions(COMPOUND_V3_BASE_TX_TOP, COMPOUND_V3_BASE_SIZE_NOTE, 8453).map((d) =>
     d.id === "market" ? { ...d, options: MARKET_OPTIONS } : d,
   );
 }
@@ -60,5 +60,5 @@ export function compoundBaseFiltersToFetchParams(
   filters: CompoundListFilters,
   page: number,
 ): FetchCompoundPositionsParams {
-  return { ...compoundFiltersToFetchParams(filters, page), route: COMPOUND_BASE_POSITIONS_ROUTE };
+  return { ...compoundFiltersToFetchParams(filters, page, 8453), route: COMPOUND_BASE_POSITIONS_ROUTE };
 }

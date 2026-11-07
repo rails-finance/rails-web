@@ -42,6 +42,9 @@ interface Group {
   /** The `/vaults?asset=` keyword for a category group. */
   keyword?: string;
   note: string;
+  /** The collateral a Borrowing row filters by: a short list for beginners (Miles, 7 Nov 2026).
+   *  Takes the place of `symbols` and `categories` there; /vaults still reads those. */
+  borrow?: string[];
   symbols?: string[];
   categories?: AssetCategory[];
   /** The tokens drawn on the group's card, by symbol. */
@@ -87,6 +90,7 @@ export const START_HREF = "/start";
 /** Does `symbol` belong to the group? Matched without case. */
 export function inGroup(group: GroupKey, symbol: string): boolean {
   const g = TREE.groups[group];
+  if (g.borrow) return g.borrow.some((s) => s.toLowerCase() === symbol.toLowerCase());
   if (g.symbols) return g.symbols.some((s) => s.toLowerCase() === symbol.toLowerCase());
   return g.categories?.includes(assetCategory(symbol)) ?? false;
 }

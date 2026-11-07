@@ -48,6 +48,9 @@ import { AAVE_V3_ARBITRUM_POOL } from "@/lib/aave-v3-arbitrum/asset-catalog";
 import { MORPHO_ARBITRUM_BLUE } from "@/lib/morpho-arbitrum/asset-catalog";
 import { ListingTag } from "@/components/shared/listing-tag";
 import type { CompoundArbitrumVisitMarket } from "@/lib/compound-arbitrum/api-contract";
+import { AAVE_V3_ARBITRUM_SYMBOL_BY_ADDR } from "@/lib/aave-v3-arbitrum/asset-catalog";
+import { MORPHO_ARBITRUM_MARKETS } from "@/lib/morpho-arbitrum/market-catalog";
+import { COLLATERAL_SYMBOLS } from "@/lib/shared/collateral-facet";
 import { COMPOUND_ARBITRUM_DEPLOYMENT } from "@/lib/compound-arbitrum/asset-catalog";
 import { compoundArbitrumMarketHref } from "@/lib/compound-arbitrum/routes";
 import {
@@ -81,6 +84,10 @@ export interface ArbitrumReadRow {
   /** The wallet's last block in the daily discovery log read; absent or null
    *  for a wallet no discovery named. */
   lastActivityBlock?: number | null;
+  /** Aave only: lowercase addresses of the reserves held as collateral. */
+  collateralAssets?: string[];
+  /** Morpho only: ids of the markets the wallet holds collateral in. */
+  collateralMarkets?: string[];
   /** Compound only: the stored visit's Comets; absent until the server sends it. */
   markets?: CompoundArbitrumVisitMarket[];
   /** The wallet's distinct transactions on the protocol, over its recorded
@@ -170,7 +177,7 @@ interface ArbitrumPositionsFilters extends BaseListFilters {
   coll: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
-  /** Compound only: collateral symbols held (multi, OR). URL param `collateral`. */
+  /** Collateral symbols held (multi, OR). URL param `collateral`. */
   collateral: string[];
 }
 
@@ -267,11 +274,56 @@ const COLLATERAL_DIMENSION: ListDimension<ArbitrumPositionsFilters, Card> = {
   matches: (c, v) => cardHoldsCollateral(c, new Set(v.flatMap((s) => [...(COMET_COLLATERAL.get(s) ?? [])]))),
 };
 
+/** Aave's reserves and Morpho's markets, by the Start tree's collateral symbols. */
+const AAVE_COLLATERAL = new Map<string, Set<string>>();
+for (const [addr, symbol] of Object.entries(AAVE_V3_ARBITRUM_SYMBOL_BY_ADDR)) {
+  if (!COLLATERAL_SYMBOLS.includes(symbol)) continue;
+  const set = AAVE_COLLATERAL.get(symbol) ?? new Set<string>();
+  set.add(addr.toLowerCase());
+  AAVE_COLLATERAL.set(symbol, set);
+}
+const MORPHO_COLLATERAL = new Map<string, Set<string>>();
+for (const m of MORPHO_ARBITRUM_MARKETS) {
+  if (!m.collateralSymbol || !COLLATERAL_SYMBOLS.includes(m.collateralSymbol)) continue;
+  const set = MORPHO_COLLATERAL.get(m.collateralSymbol) ?? new Set<string>();
+  set.add(m.id.toLowerCase());
+  MORPHO_COLLATERAL.set(m.collateralSymbol, set);
+}
+
+/** The Collateral facet of Aave and Morpho: a chip per symbol, matched in memory
+ *  against the reserves (`collateralAssets`) or the markets (`collateralMarkets`)
+ *  the wallet's row names. */
+function collateralDimension(
+  by: Map<string, Set<string>>,
+  held: (row: ArbitrumReadRow) => string[] | undefined,
+): ListDimension<ArbitrumPositionsFilters, Card> {
+  return {
+    id: "collateral",
+    label: "Collateral",
+    group: "Assets",
+    cardinality: "multi",
+    param: COLLATERAL_PARAM,
+    options: COLLATERAL_SYMBOLS.filter((s) => by.has(s)).map((s) => ({ value: s, label: s })),
+    get: (f) => f.collateral,
+    set: (f, v) => ({ ...f, collateral: v }),
+    matches: (c, v) => {
+      const wanted = new Set(v.flatMap((s) => [...(by.get(s) ?? [])]));
+      return (held(c.row) ?? []).some((x) => wanted.has(x));
+    },
+  };
+}
+
 /** One registry per family, so each keeps one function across renders. */
 const DIMENSIONS: Record<ArbitrumPositionsFamily, () => ListDimension<ArbitrumPositionsFilters, Card>[]> = {
-  "aave-v3": () => dimensions(FAMILIES["aave-v3"].txTop),
+  "aave-v3": () => [
+    ...dimensions(FAMILIES["aave-v3"].txTop),
+    collateralDimension(AAVE_COLLATERAL, (r) => r.collateralAssets),
+  ],
   "compound-v3": () => [...dimensions(FAMILIES["compound-v3"].txTop), COLLATERAL_DIMENSION],
-  morpho: () => dimensions(FAMILIES.morpho.txTop),
+  morpho: () => [
+    ...dimensions(FAMILIES.morpho.txTop),
+    collateralDimension(MORPHO_COLLATERAL, (r) => r.collateralMarkets),
+  ],
 };
 
 const APPLY = {

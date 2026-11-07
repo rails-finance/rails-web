@@ -55,6 +55,7 @@ export async function readCompoundPositions(
   if (sp.get("wallet")) qs.set("wallet", sp.get("wallet")!);
   if (sp.get("hasLiquidations")) qs.set("hasLiquidations", sp.get("hasLiquidations")!);
   if (sp.get("status")) qs.set("status", sp.get("status")!);
+  if (sp.get("collateralTokens")) qs.set("collateralTokens", sp.get("collateralTokens")!);
   // A transaction-count or USD bound travels only as a whole number.
   for (const k of ["minTx", "maxTx", "minDebtUsd", "maxDebtUsd", "minCollUsd", "maxCollUsd"]) {
     const v = sp.get(k);

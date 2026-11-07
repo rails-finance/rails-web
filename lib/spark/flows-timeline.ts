@@ -16,7 +16,7 @@ import type { ChainTruthTowerData } from "@/lib/shared/chain-truth-economics";
 import type { FlowEvent, FlowTimeline } from "@/lib/shared/flows-timeline";
 import type { FocusEvent } from "@/lib/shared/flow-focus";
 import type { FlowSeries } from "@/lib/api/fetch-aave-v3-flow-series";
-import { scaleRaw } from "@/lib/sources/chain/erc20-meta";
+import { scaleRaw } from "@/lib/shared/scale-raw";
 import type { AaveV3EventLeg, FlowLeg } from "@/lib/aave-v3/chain-truth-tower";
 import {
   AAVE_V3_FLOW_BUCKETS,

@@ -22,6 +22,7 @@
 
 import { parseAbi } from "viem";
 import { chainClient } from "./rpc";
+import { scaleRaw } from "@/lib/shared/scale-raw";
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
 import {
   ARBITRUM_CHAIN_ID,
@@ -407,16 +408,4 @@ export async function resolveDecimalsTrust(
   return out;
 }
 
-/** BigInt-safe scale of a raw token amount to a display Number (ES2017 — no
- *  `10n ** n` literal). Mirrors lib/sources/chain/aave-v3-tokens.ts `scaleV3`. */
-export function scaleRaw(raw: bigint, decimals: number): number {
-  if (raw === BigInt(0)) return 0;
-  const neg = raw < BigInt(0);
-  const a = neg ? -raw : raw;
-  if (decimals <= 0) return neg ? -Number(a) : Number(a);
-  const divisor = BigInt("1" + "0".repeat(decimals));
-  const whole = a / divisor;
-  const frac = a % divisor;
-  const v = Number(whole) + Number(frac) / Number(divisor);
-  return neg ? -v : v;
-}
+export { scaleRaw };

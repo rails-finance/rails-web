@@ -18,6 +18,7 @@
         "rsETH",
         "tETH"
       ],
+      "borrow": ["ETH", "WETH", "wstETH", "cbETH", "rETH", "weETH"],
       "icons": ["ETH", "wstETH", "rETH"],
       "coins": {
         "question": "Which ETH?",
@@ -28,6 +29,7 @@
       "label": "BTC",
       "note": "Written here: the wrapped and bridged forms of bitcoin the explorers list.",
       "symbols": ["BTC", "WBTC", "cbBTC", "tBTC", "LBTC", "WBTC18", "cbBTC18", "wcbBTC"],
+      "borrow": ["WBTC", "cbBTC", "tBTC", "LBTC", "WBTC18", "cbBTC18", "wcbBTC"],
       "icons": ["WBTC", "cbBTC", "tBTC"],
       "coins": {
         "question": "Which BTC?",
@@ -40,6 +42,7 @@
       "keyword": "stablecoins",
       "note": "Derived: every symbol lib/shared/asset-categories.ts files as Stablecoin or Yield-bearing Stable.",
       "categories": ["stablecoin", "yield-stable"],
+      "borrow": ["USDC", "USDT", "USDS", "DAI", "BOLD", "LUSD", "crvUSD", "GHO", "USDe", "sUSDe", "sUSDS", "sDAI"],
       "icons": ["USDC", "USDT", "USDS", "BOLD"],
       "coins": {
         "question": "Which stablecoin?",

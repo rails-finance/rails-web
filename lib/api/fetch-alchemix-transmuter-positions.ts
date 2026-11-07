@@ -6,7 +6,7 @@
 import {
   alchemixTransmuterQuery,
   type FetchAlchemixTransmuterPositionsParams,
-} from "@/lib/sources/api/alchemix-transmuter-backend";
+} from "@/lib/sources/api/alchemix-transmuter-query";
 import type { AlchemixTransmuterPositionsResponse } from "@/types/api/alchemix";
 
 export async function fetchAlchemixTransmuterPositions(

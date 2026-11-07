@@ -118,6 +118,8 @@ export interface MorphoArbitrumPositionRow {
   supplyCount: number;
   borrowCount: number;
   collateralCount: number;
+  /** Ids of the markets the wallet holds collateral in. */
+  collateralMarkets: string[];
   chainOpen: boolean | null;
   chainHasDebt: boolean | null;
   chainStale: boolean;
@@ -183,6 +185,9 @@ export function readPositionsAnswer(raw: unknown): MorphoArbitrumPositionsRespon
         supplyCount: num(p.supplyCount) ?? 0,
         borrowCount: num(p.borrowCount) ?? 0,
         collateralCount: num(p.collateralCount) ?? 0,
+        collateralMarkets: Array.isArray(p.collateralMarkets)
+          ? p.collateralMarkets.filter((x): x is string => typeof x === "string").map((x) => x.toLowerCase())
+          : [],
         chainOpen: bool(p.chainOpen),
         chainHasDebt: bool(p.chainHasDebt),
         chainStale: p.chainStale === true,

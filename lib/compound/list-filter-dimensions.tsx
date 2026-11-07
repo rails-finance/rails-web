@@ -28,6 +28,8 @@ import { RECENT_ACTIVITY_LABEL, type SortOption } from "@/components/shared/filt
 import type { FetchCompoundPositionsParams } from "@/lib/api/fetch-compound-positions";
 import type { CompoundPositionSort } from "@/lib/sources/api/compound-positions";
 import { COMPOUND_MARKETS } from "@/lib/compound/asset-catalog";
+import { COLLATERAL_PARAM, collateralOptions, collateralTokensOf } from "@/lib/shared/collateral-facet";
+import type { ChainId } from "@/lib/shared/chains";
 import {
   canonicalStatuses,
   defaultStatuses,
@@ -61,6 +63,8 @@ export interface CompoundListFilters extends BaseListFilters {
   liquidations: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
+  /** Collateral token symbols held (multi, OR). URL param `collateral`. */
+  collateral: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -78,6 +82,7 @@ export const COMPOUND_LIST_DEFAULTS: CompoundListFilters = {
   coll: [],
   liquidations: [],
   tx: [],
+  collateral: [],
 };
 
 // Values match Liquity V2's (lib/liquity-v2/list-filter-dimensions.tsx) so the
@@ -108,6 +113,7 @@ const LIQUIDATION_OPTIONS: FilterOptionDef[] = [{ value: "liquidated", label: "L
 export function compoundListDimensions(
   txTop: number = COMPOUND_V3_TX_TOP,
   sizeNote: string = COMPOUND_V3_SIZE_NOTE,
+  chainId: ChainId = 1,
 ): SerializableDimension<CompoundListFilters>[] {
   return [
     {
@@ -155,6 +161,16 @@ export function compoundListDimensions(
       set: (f, v) => ({ ...f, liquidations: v }),
       chipLabel: () => "Liquidated before",
     },
+    {
+      id: "collateral",
+      label: "Collateral",
+      group: "Assets",
+      cardinality: "multi",
+      param: COLLATERAL_PARAM,
+      options: collateralOptions(chainId),
+      get: (f) => f.collateral,
+      set: (f, v) => ({ ...f, collateral: v }),
+    },
     transactionsDimension<CompoundListFilters>({
       get: (f) => f.tx,
       set: (f, tx) => ({ ...f, tx }),
@@ -164,7 +180,11 @@ export function compoundListDimensions(
 }
 
 /** Map the decoded selection + page onto the Comet fetch params. */
-export function compoundFiltersToFetchParams(filters: CompoundListFilters, page: number): FetchCompoundPositionsParams {
+export function compoundFiltersToFetchParams(
+  filters: CompoundListFilters,
+  page: number,
+  chainId: ChainId = 1,
+): FetchCompoundPositionsParams {
   const wallet = filters.q.trim();
   return {
     wallet: wallet ? wallet : undefined,
@@ -173,6 +193,7 @@ export function compoundFiltersToFetchParams(filters: CompoundListFilters, page:
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
     ...usdBounds(filters),
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
+    collateralTokens: collateralTokensOf(filters.collateral, chainId),
     ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as CompoundPositionSort,
     sortOrder: filters.sortOrder,

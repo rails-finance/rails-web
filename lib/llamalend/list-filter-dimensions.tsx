@@ -27,6 +27,7 @@
 // facet either: it is a chain overlay figure (no event carries it), so the
 // backend cannot filter on it — the cards state it instead.
 
+import { COLLATERAL_PARAM, collateralOptions, collateralTokensOf } from "@/lib/shared/collateral-facet";
 import { transactionBounds, transactionsDimension } from "@/lib/shared/transactions-dimension";
 import { sizeDimensions, usdBounds } from "@/lib/shared/size-dimensions";
 import type { FilterOptionDef } from "@/components/shared/filter-bar/types";
@@ -63,6 +64,8 @@ export interface LlamalendListFilters extends BaseListFilters {
   coll: string[];
   /** Transaction-count range, one encodeRange value or [] for no bound. */
   tx: string[];
+  /** Collateral token symbols of the market (multi, OR). URL param `collateral`. */
+  collateral: string[];
 }
 
 // No status is written into the page defaults: an empty `status` is "no opinion", and
@@ -79,6 +82,7 @@ export const LLAMALEND_LIST_DEFAULTS: LlamalendListFilters = {
   debt: [],
   coll: [],
   tx: [],
+  collateral: [],
 };
 
 // Values match Liquity V2's (lib/liquity-v2/list-filter-dimensions.tsx) so the
@@ -137,6 +141,16 @@ export function llamalendListDimensions(): SerializableDimension<LlamalendListFi
       set: (f, v) => ({ ...f, liquidations: v }),
       chipLabel: () => "Liquidated before",
     },
+    {
+      id: "collateral",
+      label: "Collateral",
+      group: "Assets",
+      cardinality: "multi",
+      param: COLLATERAL_PARAM,
+      options: collateralOptions(),
+      get: (f) => f.collateral,
+      set: (f, v) => ({ ...f, collateral: v }),
+    },
     transactionsDimension<LlamalendListFilters>({
       get: (f) => f.tx,
       set: (f, tx) => ({ ...f, tx }),
@@ -157,6 +171,7 @@ export function llamalendFiltersToFetchParams(
     // The full set maps to no status filter; a real subset is sent verbatim.
     status: isAllStatuses(filters) ? undefined : effectiveStatuses(filters),
     hasLiquidations: filters.liquidations.includes("liquidated") ? true : undefined,
+    collateralTokens: collateralTokensOf(filters.collateral),
     ...usdBounds(filters),
     ...transactionBounds(filters.tx),
     sortBy: filters.sortBy as LlamalendPositionSort,
