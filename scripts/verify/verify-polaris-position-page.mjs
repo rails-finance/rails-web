@@ -470,7 +470,7 @@ for (const [path, want, what] of [
   // explanation pane behind it carries a holder bullet whose first six words
   // are the same, and matching that would pass with the modal shut.
   await page.getByRole("button", { name: "Learn more" }).first().click();
-  const heading = page.getByText("About This Position").first();
+  const heading = page.getByText("About this position").first();
   await heading.waitFor({ state: "visible", timeout: 10000 });
   const modal = (await heading.locator("xpath=ancestor::div[contains(@class,'rounded-2xl')][1]").innerText()).replace(
     /\s+/g,

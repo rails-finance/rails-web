@@ -75,7 +75,7 @@ export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): Reac
 
 export function polarisFlowsContent(stable: string): LearnMoreContent {
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro: `The bars add up every change Polaris has made to this position, in ${stable}, and the line under them draws what it held and owed at the end of each day.`,
     stepsHeading: "How it's built:",
     steps: [

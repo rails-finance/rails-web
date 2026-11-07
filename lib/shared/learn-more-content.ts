@@ -171,7 +171,7 @@ export function liquityPositionContent(opts: {
 
   if (status === "liquidated") {
     return {
-      title: "About This Position",
+      title: "About this position",
       intro:
         "This trove was liquidated when its collateral ratio fell below the minimum threshold. The panel above reconstructs its final state — peak debt, collateral, and how long it stayed open.",
       detailsHeading: "Key concepts:",
@@ -194,7 +194,7 @@ export function liquityPositionContent(opts: {
 
   if (status === "closed") {
     return {
-      title: "About This Position",
+      title: "About this position",
       intro:
         "This trove has been closed and its debt fully repaid. The panel above shows its lifetime peaks — the most debt and collateral it ever held.",
       detailsHeading: "Key concepts:",
@@ -262,7 +262,7 @@ export function liquityPositionContent(opts: {
   );
 
   return {
-    title: "About This Position",
+    title: "About this position",
     intro:
       "This panel explains the trove's live state in plain language — what backs the debt, what it costs to hold, and how exposed it is to redemption.",
     detailsHeading: "Key concepts:",
@@ -278,7 +278,7 @@ export function liquityPositionContent(opts: {
 // position panel's "About this position".
 export function liquityLifetimeFlowsContent(opts: { isBatched?: boolean } = {}): LearnMoreContent {
   return {
-    title: "About Lifetime flows",
+    title: "About lifetime flows",
     intro:
       "This panel breaks down what the trove costs to carry and traces every unit of debt and collateral that has flowed through it over its lifetime. Debt is valued at BOLD's $1 face.",
     detailsHeading: "Key concepts:",
@@ -408,7 +408,7 @@ const DOLOMITE_DOC_URL = "https://docs.dolomite.io/";
 export function dolomiteDepositWithdrawContent(eventType: "deposit" | "withdraw"): LearnMoreContent {
   const depositing = eventType === "deposit";
   return {
-    title: depositing ? "How Depositing Works" : "How Withdrawing Works",
+    title: depositing ? "How depositing works" : "How withdrawing works",
     intro: depositing
       ? "Depositing moves tokens into one of the account's Dolomite balances. If the balance was negative — a negative balance IS debt here — the deposit repays it first; past zero it becomes a lending balance earning the market's rate."
       : "Withdrawing moves tokens out of a Dolomite balance. A withdrawal can push a balance BELOW zero — that is how borrowing happens: there is no separate Borrow action, only balances allowed to go negative against the account's collateral.",
@@ -436,7 +436,7 @@ export function dolomiteDepositWithdrawContent(eventType: "deposit" | "withdraw"
 export function dolomiteTransferContent(direction: "transfer_in" | "transfer_out"): LearnMoreContent {
   const incoming = direction === "transfer_in";
   return {
-    title: incoming ? "How Receiving a Transfer Works" : "How Sending a Transfer Works",
+    title: incoming ? "How receiving a transfer works" : "How sending a transfer works",
     intro:
       "Transfers move balances between two Dolomite accounts — Account.Info pairs — without any tokens leaving the protocol. Most commonly the two sides are the SAME owner: the Dolomite Balance (account 0) funding an isolated Borrow Position, or a position paying back out.",
     detailsHeading: "Key concepts:",
@@ -462,7 +462,7 @@ export function dolomiteTransferContent(direction: "transfer_in" | "transfer_out
 
 export function dolomiteTradeContent(): LearnMoreContent {
   return {
-    title: "How Trades Work",
+    title: "How trades work",
     intro:
       "A trade (the core's Sell action) swaps one of the account's balances for another through an exchange wrapper — two markets move in one event: the taker side leaves the account, the maker side arrives.",
     detailsHeading: "Key concepts:",
@@ -486,7 +486,7 @@ export function dolomiteTradeContent(): LearnMoreContent {
 
 export function dolomiteLiquidationContent(): LearnMoreContent {
   return {
-    title: "How Liquidations Work",
+    title: "How liquidations work",
     intro:
       "An account becomes liquidatable when its adjusted collateral value falls below the margin requirement times its adjusted debt — the requirement being the global 117.65% minimum scaled up by each market's margin premium (multiplicatively), or the account's own risk override (111.11% on the LST/ETH category) where one applies.",
     extraParagraphs: [
@@ -506,7 +506,7 @@ export function dolomiteLiquidationContent(): LearnMoreContent {
 
 export function dolomiteEventFallbackContent(): LearnMoreContent {
   return {
-    title: "How Dolomite Positions Work",
+    title: "How Dolomite positions work",
     intro:
       "Dolomite on Ethereum is a hard fork of dYdX Solo Margin: one core contract holds every market, and a position is an account — an (owner, account number) pair. Balances may go negative, and a negative balance IS the debt; there is no separate Borrow action.",
     detailsHeading: "Key concepts:",
@@ -542,7 +542,7 @@ const LLAMALEND_DOC_URL = "https://docs.curve.finance/user/llamalend/overview";
 export function llamalendBorrowContent(kind: "borrow" | "add_collateral"): LearnMoreContent {
   const borrowing = kind === "borrow";
   return {
-    title: borrowing ? "How Borrowing Works" : "How Adding Collateral Works",
+    title: borrowing ? "How borrowing works" : "How adding collateral works",
     intro: borrowing
       ? "Borrowing deposits collateral into the market's AMM, spread across a number of price bands the borrower picks (4 to 50), and draws the borrowed token against it. The more debt against the collateral, the closer the bands sit below the current price."
       : "Adding collateral deposits more of the collateral token into the position's bands without changing the debt. The extra collateral moves the bands further below the current price.",
@@ -587,7 +587,7 @@ export function llamalendBorrowContent(kind: "borrow" | "add_collateral"): Learn
 export function llamalendRepayContent(kind: "repay" | "remove_collateral"): LearnMoreContent {
   const repaying = kind === "repay";
   return {
-    title: repaying ? "How Repaying Works" : "How Removing Collateral Works",
+    title: repaying ? "How repaying works" : "How removing collateral works",
     intro: repaying
       ? "Repaying returns borrowed tokens to the market and lowers the debt; a full repay closes the loan and returns the collateral. Outside soft-liquidation, less debt moves the bands further below the current price; inside it, the bands stay where they are."
       : "Removing collateral withdraws part of the position's collateral from its bands. It is only possible while the position is not in soft-liquidation, and it moves the bands closer to the current price.",
@@ -617,7 +617,7 @@ export function llamalendLiquidationContent(self: boolean, approvals: boolean | 
         ? "Only the owner may liquidate at any health."
         : "The owner may liquidate at any health.";
   return {
-    title: self ? "How Self-Liquidation Works" : "How Hard Liquidation Works",
+    title: self ? "How self-liquidation works" : "How hard liquidation works",
     intro: self
       ? "A borrower whose position is partly converted can settle it themselves: self-liquidation repays the debt using the already-converted borrowed tokens plus a top-up, and withdraws whatever collateral remains. It is a normal close from soft-liquidation, with no third party."
       : `Hard liquidation needs health below 0. Health falls as the price moves down through the bands, as interest adds to the debt, and with each loss on the AMM's sales. Anyone may then liquidate the position, in full or in part: the position's converted tokens go toward the debt, the liquidator pays the rest and receives the collateral, and any converted tokens above the debt. The owner receives nothing and keeps what they borrowed. ${anyHealth}`,
@@ -631,7 +631,7 @@ export function llamalendLiquidationContent(self: boolean, approvals: boolean | 
 
 export function llamalendEventFallbackContent(): LearnMoreContent {
   return {
-    title: "How LlamaLend Positions Work",
+    title: "How LlamaLend positions work",
     intro:
       "LlamaLend is Curve's lending system. A position is one borrower in one market; each market is isolated, and its collateral sits in an AMM across a range of price bands, so liquidation is a range the price moves through.",
     detailsHeading: "Key concepts:",
@@ -673,10 +673,10 @@ export function fxOperateContent(kind: "open" | "reopen" | "adjust" | "close"): 
   return {
     title:
       kind === "open" || kind === "reopen"
-        ? "How Opening Works"
+        ? "How opening works"
         : kind === "close"
-          ? "How Closing Works"
-          : "How Adjusting Works",
+          ? "How closing works"
+          : "How adjusting works",
     intro,
     ...(kind === "reopen"
       ? {
@@ -709,7 +709,7 @@ export function fxOperateContent(kind: "open" | "reopen" | "adjust" | "close"): 
  *  figure. */
 export function fxLiquidationContent(expenseRatio?: number | null): LearnMoreContent {
   return {
-    title: "How Liquidations & Rebalances Work",
+    title: "How liquidations & rebalances work",
     intro:
       "f(x) positions sit in ticks: buckets of positions with nearly the same debt ratio. When a tick's debt ratio reaches the pool's rebalance line, a keeper can rebalance it; when it reaches the higher liquidation line, a keeper can liquidate. The pool judges both at the oracle's min price, which is at or below the anchor price the rows' ratios are read at. Keepers are any address that calls the manager; they are paid by the bonus. Since March 2025 a liquidation runs from the pool's top tick down, and the manager logs one event for the whole run; a rebalance can target one tick or run the same way.",
     extraParagraphs: [
@@ -724,7 +724,7 @@ export function fxLiquidationContent(expenseRatio?: number | null): LearnMoreCon
 
 export function fxTransferContent(): LearnMoreContent {
   return {
-    title: "How Position Ownership Works",
+    title: "How position ownership works",
     intro:
       "f(x) V2 positions are ERC-721 tokens minted by the pool contract — the pool is the NFT. Holding the token is owning the position: only the account holding it when the manager is called can withdraw collateral or borrow against it (anyone may add collateral or repay), and it transfers like any NFT. A contract the holder approves, such as f(x)'s router or limit-order manager, can hold it for one transaction and hand it back.",
     extraParagraphs: [
@@ -737,7 +737,7 @@ export function fxTransferContent(): LearnMoreContent {
 
 export function fxEventFallbackContent(): LearnMoreContent {
   return {
-    title: "How f(x) Positions Work",
+    title: "How f(x) positions work",
     intro:
       "f(x) V2 splits yield-bearing collateral into fxUSD (a stable token) and leveraged long positions. A position deposits wstETH or WBTC, mints fxUSD against it, and pays a funding rate that follows Aave's borrow rate.",
     detailsHeading: "Key concepts:",
@@ -787,10 +787,10 @@ export function fluidOperateContent(kind: "deposit" | "borrow" | "composite"): L
   return {
     title:
       kind === "deposit"
-        ? "How Collateral Moves Work"
+        ? "How collateral moves work"
         : kind === "borrow"
-          ? "How Debt Moves Work"
-          : "How Composite Operations Work",
+          ? "How debt moves work"
+          : "How composite operations work",
     intro,
     detailsHeading: "Key concepts:",
     details: [
@@ -813,7 +813,7 @@ export function fluidOperateContent(kind: "deposit" | "borrow" | "composite"): L
 
 export function fluidLiquidationContent(absorbed: boolean): LearnMoreContent {
   return {
-    title: absorbed ? "How Absorption Works" : "How Fluid Liquidations Work",
+    title: absorbed ? "How absorption works" : "How Fluid liquidations work",
     intro: absorbed
       ? "When a position sinks past the vault's maximum liquidation limit, the vault takes over its remaining debt and collateral, leaving the position empty. No event of the position's own records it."
       : "When a position's debt grows too large against its collateral, a liquidator repays part of the debt and takes collateral worth a little more in return. Fluid does this for a whole price band of positions at once, so the on-chain event names no single position.",
@@ -838,7 +838,7 @@ export function fluidLiquidationContent(absorbed: boolean): LearnMoreContent {
 
 export function fluidMintContent(): LearnMoreContent {
   return {
-    title: "How Opening a Position Works",
+    title: "How opening a position works",
     intro:
       "Opening a Fluid position mints an NFT that is the position: it holds one vault's collateral and debt, and whoever holds the NFT controls them.",
     detailsHeading: "Key concepts:",
@@ -862,7 +862,7 @@ export function fluidMintContent(): LearnMoreContent {
 
 export function fluidTransferContent(): LearnMoreContent {
   return {
-    title: "How Ownership Transfers Work",
+    title: "How ownership transfers work",
     intro:
       "A Fluid position is an NFT, and transferring the NFT hands the whole position, collateral, debt and liquidation exposure, to the new holder. The balances stay as they were.",
     detailsHeading: "Key concepts:",
@@ -882,7 +882,7 @@ export function fluidTransferContent(): LearnMoreContent {
 
 export function fluidEventFallbackContent(): LearnMoreContent {
   return {
-    title: "About This Event",
+    title: "About this event",
     intro:
       "Every change to a Fluid position is an operation on its vault that moves the collateral, the debt, or both.",
     detailsHeading: "Key concepts:",
@@ -903,7 +903,7 @@ const MAPLE_DOC_URL = "https://docs.maple.finance";
 export function mapleDepositWithdrawContent(eventType: "deposit" | "withdraw"): LearnMoreContent {
   const depositing = eventType === "deposit";
   return {
-    title: depositing ? "How Lending to Maple Works" : "How Withdrawing Works",
+    title: depositing ? "How lending to Maple works" : "How withdrawing works",
     intro: depositing
       ? "Depositing lends an asset into a Maple syrup pool and mints pool shares (an ERC-4626 vault token) in exchange. The pool lends the money onward to Maple's institutional borrowers; the share's value tracks that loan book."
       : "Withdrawing burns pool shares and returns the funds asset at the pool's EXIT rate. In the syrup pools, exits normally travel through the withdrawal queue — a direct withdraw is the final settlement leg of a processed request.",
@@ -930,7 +930,7 @@ export function mapleQueueContent(
   eventType: "request" | "request_decrease" | "request_cancel" | "request_fill",
 ): LearnMoreContent {
   return {
-    title: "How the Withdrawal Queue Works",
+    title: "How the withdrawal queue works",
     intro:
       "Syrup-pool withdrawals are queued: a request moves the shares into the queue and takes a place in a first-in, first-out (FIFO) line, paid from the pool's liquid cash. Maple's docs say most withdrawals are processed in under 24 hours and some can take up to 30 days. The page has no record of the pool's cash at past requests, so it cannot say why a given fill waited.",
     detailsHeading: "Key concepts:",
@@ -962,7 +962,7 @@ export function mapleQueueContent(
 
 export function mapleTransferContent(eventType: "transfer_in" | "transfer_out"): LearnMoreContent {
   return {
-    title: "Transferable Pool Shares",
+    title: "Transferable pool shares",
     intro:
       eventType === "transfer_in"
         ? "Syrup-pool shares move between wallets like any token: receiving them moves the pool claim into this wallet with no pool event."
@@ -984,7 +984,7 @@ export function mapleTransferContent(eventType: "transfer_in" | "transfer_out"):
 
 export function mapleEventFallbackContent(): LearnMoreContent {
   return {
-    title: "Maple Syrup Pools",
+    title: "Maple Syrup pools",
     intro:
       "Maple's syrup pools are ERC-4626 lending vaults over an institutional credit book: deposits mint transferable shares, withdrawals travel a FIFO queue, and the share price is the pool's own on-chain accounting of loans whose collateral is custodied off-chain.",
     detailsHeading: "Key concepts:",
@@ -1057,7 +1057,7 @@ export function liquityForkBorrowingContent(
 
   if (eventType === "openTrove") {
     return {
-      title: "How Opening a Trove Works",
+      title: "How opening a Trove works",
       intro: `${Art} ${p.protocolName} Trove holds one branch's collateral and mints ${p.stablecoin} against it, at an interest rate the borrower sets themselves — the Liquity V2 architecture. Interest accrues continuously into the debt from the moment the Trove opens.`,
       stepsHeading: "The mechanics:",
       steps: [
@@ -1071,7 +1071,7 @@ export function liquityForkBorrowingContent(
 
   if (eventType === "closeTrove") {
     return {
-      title: "How Closing a Trove Works",
+      title: "How closing a Trove works",
       intro: `Closing ${art} ${p.protocolName} Trove repays its debt in full and hands the collateral back to the owner — the Trove's last act.`,
       stepsHeading: "The mechanics:",
       steps: [
@@ -1084,7 +1084,7 @@ export function liquityForkBorrowingContent(
   }
 
   return {
-    title: "How Trove Adjustments Work",
+    title: "How Trove adjustments work",
     intro: `An adjustment changes ${art} ${p.protocolName} Trove's collateral or debt without closing it — adding or withdrawing collateral, drawing more ${p.stablecoin}, or repaying some of what's owed.`,
     stepsHeading: "The mechanics:",
     steps: [
@@ -1098,7 +1098,7 @@ export function liquityForkBorrowingContent(
 
 export function liquityForkRateContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
   return {
-    title: "How the User-Set Interest Rate Works",
+    title: "How the user-set interest rate works",
     intro: `${p.protocolName} borrowers set their own annual interest rate (the V2 model). Interest accrues continuously into the debt — the emitted figure grows between events — and the rate doubles as the Trove's redemption-queue position.`,
     stepsHeading: "What the rate controls:",
     steps: [
@@ -1112,7 +1112,7 @@ export function liquityForkRateContent(p: LiquityForkLearnMoreParams): LearnMore
 
 export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
   return {
-    title: "How Redemptions Work",
+    title: "How redemptions work",
     intro: `Any ${p.stablecoin} holder can redeem it against the system at $1 face value — the peg mechanism. Redemptions are routed across branches by their unbacked portions and, within a branch, sweep the LOWEST user-set interest rates first (not the lowest collateral ratio — the V1 difference).`,
     stepsHeading: "What happens to a redeemed Trove:",
     steps: [
@@ -1126,7 +1126,7 @@ export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams): Lea
 
 export function liquityForkLiquidationContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
   return {
-    title: "How Liquidations Work",
+    title: "How liquidations work",
     intro: `A Trove whose collateral ratio falls below its branch minimum — at the branch's own oracle price — can be liquidated by anyone. The debt is absorbed by the branch's Stability Pool (${p.stablecoin} deposits), or redistributed to the branch's other Troves when the pool runs short.`,
     stepsHeading: "The mechanics:",
     steps: [
@@ -1141,7 +1141,7 @@ export function liquityForkLiquidationContent(p: LiquityForkLearnMoreParams): Le
 
 export function liquityForkBatchContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
   return {
-    title: "How Interest-Rate Batches Work",
+    title: "How interest-rate batches work",
     intro: `A Trove can delegate its interest rate to a batch manager (the V2 delegation model): the manager sets one rate for every Trove in the batch, adjusting it as market conditions move — active peg management without the owner touching the Trove.`,
     stepsHeading: "What batching changes:",
     steps: [
@@ -1155,7 +1155,7 @@ export function liquityForkBatchContent(p: LiquityForkLearnMoreParams): LearnMor
 
 export function liquityForkEventFallbackContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
   return {
-    title: `How ${p.protocolName} Troves Work`,
+    title: `How ${p.protocolName} Troves work`,
     intro: `${p.protocolName} runs the Liquity V2 architecture: per-branch Troves minting ${p.stablecoin} at a user-set interest rate, redemptions at $1 face sweeping the lowest rates first, per-branch minimum collateral ratios, and Stability Pools absorbing liquidations.`,
     detailsHeading: "Key concepts:",
     details: [
@@ -1193,7 +1193,7 @@ const PWN_DOC_URL = "https://docs.pwn.xyz";
  *  v1.2/v1.3), so nothing about its total is fixed at origination. */
 export function pwnLoanCreatedContent(accruing = false): LearnMoreContent {
   return {
-    title: "How a PWN Loan Is Struck",
+    title: "How a PWN loan is struck",
     intro: accruing
       ? "PWN loans are peer-to-peer on terms the two parties agree: the collateral, the credit, the interest rate and the deadline — no pool, no oracle, no floating rate. The SimpleLoan contract records those terms on-chain and enforces them."
       : "PWN loans are peer-to-peer on fixed terms: the lender and borrower agree the collateral, the credit, the repayment total and the deadline between themselves — no pool, no oracle, no floating rate. The SimpleLoan contract records those terms on-chain and enforces them.",
@@ -1228,7 +1228,7 @@ export function pwnLoanCreatedContent(accruing = false): LearnMoreContent {
 export function pwnNoteLifecycleContent(eventType: "minted" | "burned"): LearnMoreContent {
   const minted = eventType === "minted";
   return {
-    title: minted ? "How the LOAN Note Works" : "How a Loan Is Retired",
+    title: minted ? "How the LOAN note works" : "How a loan is retired",
     intro: minted
       ? "The LOAN note is an ERC-721 minted to the lender when the loan is struck. Whoever holds it is entitled to the loan's repayment — or, if the borrower defaults, to the escrowed collateral."
       : "Burning the LOAN note is the loan's final act: the claim it represented has been settled — repayment collected or collateral claimed — and the note is retired on-chain.",
@@ -1250,7 +1250,7 @@ export function pwnNoteLifecycleContent(eventType: "minted" | "burned"): LearnMo
 export function pwnRepaymentContent(eventType: "paid_back" | "claimed", accruing = false): LearnMoreContent {
   const paying = eventType === "paid_back";
   return {
-    title: paying ? "How Repayment Works" : "How Claiming Works",
+    title: paying ? "How repayment works" : "How claiming works",
     intro: paying
       ? accruing
         ? "The borrower repays the principal plus the interest accrued to that minute, in the credit token. Repaying before the deadline releases the escrowed collateral back to the borrower."
@@ -1280,7 +1280,7 @@ export function pwnRepaymentContent(eventType: "paid_back" | "claimed", accruing
 
 export function pwnDefaultContent(): LearnMoreContent {
   return {
-    title: "How a PWN Default Works",
+    title: "How a PWN default works",
     intro:
       "A PWN default is a clock event, not a price event. If the deadline passes with the loan unpaid, the lender claims the escrowed collateral in place of the repayment — that is the whole mechanism.",
     detailsHeading: "Key concepts:",
@@ -1304,7 +1304,7 @@ export function pwnDefaultContent(): LearnMoreContent {
 
 export function pwnExtensionContent(): LearnMoreContent {
   return {
-    title: "How Loan Extensions Work",
+    title: "How loan extensions work",
     intro:
       "An extension moves a loan's deadline later, giving the borrower more time to repay under the same terms. How it is agreed depends on the loan contract's version.",
     detailsHeading: "Key concepts:",
@@ -1328,7 +1328,7 @@ export function pwnExtensionContent(): LearnMoreContent {
 
 export function pwnEventFallbackContent(): LearnMoreContent {
   return {
-    title: "How PWN Loans Work",
+    title: "How PWN loans work",
     intro:
       "PWN is a peer-to-peer lending protocol for fixed-term loans: two parties strike every term at origination, the SimpleLoan contract escrows the collateral, and an ERC-721 LOAN note carries the lender's claim.",
     detailsHeading: "Key concepts:",
@@ -1578,7 +1578,7 @@ export function liquityCollSurplusClaimContent(
             },
           ];
   return {
-    title: "How Claiming Collateral Works",
+    title: "How claiming collateral works",
     intro: v1
       ? `When a liquidation in Recovery Mode takes less than all of a Trove's ETH, or redemptions cancel its whole debt, the ETH left over does not go back to the owner's wallet. ${name} credits it to the owner in a surplus pool, which holds it until the owner claims it.`
       : `When a liquidation takes less collateral than the Trove holds, the rest does not go back to the owner's wallet. ${name} credits it to the owner in the collateral branch's CollSurplusPool, which holds it until the owner calls claimCollateral() on BorrowerOperations.`,

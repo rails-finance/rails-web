@@ -15,7 +15,7 @@ const LINKS: LearnMoreContent["links"] = [
 export function maplePositionContent(opts: { status: "open" | "closed"; inQueue?: boolean }): LearnMoreContent {
   if (opts.status === "closed") {
     return {
-      title: "About This Position",
+      title: "About this position",
       intro:
         "This lender has withdrawn its whole pool claim. The headline above shows its lifetime peak — the highest share balance it ever held, and the highest principal ever deposited where one was recorded.",
       detailsHeading: "Key concepts:",
@@ -66,7 +66,7 @@ export function maplePositionContent(opts: { status: "open" | "closed"; inQueue?
   ];
 
   return {
-    title: "About This Position",
+    title: "About this position",
     intro:
       "The pool shares this wallet holds, what they pay out at the pool's exit rate, and anything waiting in the withdrawal queue.",
     detailsHeading: "Key concepts:",

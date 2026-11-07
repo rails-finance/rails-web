@@ -30,7 +30,7 @@ export function dolomitePositionContent(opts: {
   if (opts.status === "liquidated") {
     const count = opts.liquidationCount ?? opts.liquidations?.length ?? 0;
     return {
-      title: "About This Position",
+      title: "About this position",
       intro:
         opts.liquidations && opts.liquidations.length > 0 && count > 0
           ? liquidatedIntro(opts.liquidations, count)
@@ -53,7 +53,7 @@ export function dolomitePositionContent(opts: {
 
   if (opts.status === "closed") {
     return {
-      title: "About This Position",
+      title: "About this position",
       intro:
         "This account's balances have returned to zero. The panel above describes its life in words: the highest balance on each side, the closing date and the transaction count.",
       detailsHeading: "Key concepts:",
@@ -97,7 +97,7 @@ export function dolomitePositionContent(opts: {
   ];
 
   return {
-    title: "About This Position",
+    title: "About this position",
     intro:
       "This panel explains the account's live state in plain language — the balances it holds across Dolomite's markets, which ones are debt, and how the margin requirement covers it, all read from the core contract at the block this card names.",
     detailsHeading: "Key concepts:",

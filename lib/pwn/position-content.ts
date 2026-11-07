@@ -59,7 +59,7 @@ export function pwnPositionContent(opts: {
 
   if (status === "defaulted") {
     return {
-      title: "About This Position",
+      title: "About this position",
       intro:
         (extended
           ? `This loan defaulted: its deadline, extended from ${extended.from} to ${extended.to}, passed unpaid, and the lender claimed the escrowed collateral in place of repayment.`
@@ -88,7 +88,7 @@ export function pwnPositionContent(opts: {
 
   if (status === "repaid") {
     return {
-      title: "About This Position",
+      title: "About this position",
       intro:
         (accruing
           ? "This loan was repaid before its deadline: the borrower paid the principal plus the interest accrued to that minute, and the escrowed collateral was released back to them."
@@ -114,7 +114,7 @@ export function pwnPositionContent(opts: {
 
   if (opts.unclaimed) {
     return {
-      title: "About This Position",
+      title: "About this position",
       intro:
         "This loan has defaulted and no one has claimed it yet: its deadline passed unpaid, so the contract no longer accepts a repayment. The collateral stays in escrow until the lender claims it.",
       detailsHeading: "Key concepts:",
@@ -142,7 +142,7 @@ export function pwnPositionContent(opts: {
 
   // A running loan.
   return {
-    title: "About This Position",
+    title: "About this position",
     intro:
       "This panel explains the loan's struck terms in plain language — what the borrower posted, what the lender advanced, and what happens if the deadline passes unpaid.",
     detailsHeading: "Key concepts:",

@@ -90,7 +90,7 @@ function pricingSentence(p: FxFlowsNoteFacts["pricing"]): string {
 
 export function fxFlowsContent(): LearnMoreContent {
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro:
       "The bars add up every change f(x) has made to this position, in fxUSD, and the line under them draws what it held and owed at the end of each day.",
     stepsHeading: "How it's built:",
