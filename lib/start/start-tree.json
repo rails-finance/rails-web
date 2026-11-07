@@ -42,7 +42,7 @@
       "keyword": "stablecoins",
       "note": "Derived: every symbol lib/shared/asset-categories.ts files as Stablecoin or Yield-bearing Stable.",
       "categories": ["stablecoin", "yield-stable"],
-      "borrow": ["USDC", "USDT", "USDS", "DAI", "BOLD", "LUSD", "crvUSD", "GHO"],
+      "borrow": ["USDC", "USDT", "USDS", "DAI", "BOLD", "LUSD", "crvUSD", "GHO", "USDe", "sUSDe", "sUSDS", "sDAI"],
       "icons": ["USDC", "USDT", "USDS", "BOLD"],
       "coins": {
         "question": "Which stablecoin?",
