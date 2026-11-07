@@ -18,7 +18,7 @@
         "rsETH",
         "tETH"
       ],
-      "borrow": ["WETH", "wstETH", "cbETH", "rETH", "weETH"],
+      "borrow": ["ETH", "WETH", "wstETH", "cbETH", "rETH", "weETH"],
       "icons": ["ETH", "wstETH", "rETH"],
       "coins": {
         "question": "Which ETH?",
@@ -29,7 +29,7 @@
       "label": "BTC",
       "note": "Written here: the wrapped and bridged forms of bitcoin the explorers list.",
       "symbols": ["BTC", "WBTC", "cbBTC", "tBTC", "LBTC", "WBTC18", "cbBTC18", "wcbBTC"],
-      "borrow": ["WBTC", "cbBTC", "tBTC", "LBTC"],
+      "borrow": ["WBTC", "cbBTC", "tBTC", "LBTC", "WBTC18", "cbBTC18", "wcbBTC"],
       "icons": ["WBTC", "cbBTC", "tBTC"],
       "coins": {
         "question": "Which BTC?",
