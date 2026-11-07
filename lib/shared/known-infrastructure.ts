@@ -365,7 +365,7 @@ const escrow = (poolSymbol: string): CcipEscrow => ({
   contractName: "LockReleaseTokenPool",
   description:
     `Chainlink's CCIP lock-release token pool for ${poolSymbol}. Shares locked in this contract back bridged ` +
-    `${poolSymbol} balances on other networks — the shares sit here in custody while their owners hold the ` +
+    `${poolSymbol} balances on other networks. The shares sit here in custody while their owners hold the ` +
     "bridged claim elsewhere.",
 });
 

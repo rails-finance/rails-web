@@ -54,5 +54,5 @@ export function ratioLabel(family: RatioFamily): string {
  *  position (most explorers) or the wallet (Morpho, where a wallet hub holds
  *  every market position). */
 export function notRecordedNote(open: "position" | "wallet" = "position"): string {
-  return `not recorded on this lane — open the ${open} for its whole history`;
+  return `not recorded on this lane; open the ${open} for its whole history`;
 }

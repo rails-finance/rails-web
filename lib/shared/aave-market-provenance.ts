@@ -146,7 +146,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       kind: "chain-derived",
       pclass: "oracle",
       source: { block: coords.blockNumber },
-      summary: `Market ${side} — Σ over every reserve on the Pool of its ${side} value in USD${atBlock(coords)}: each reserve's ${side === "supplied" ? "aToken totalSupply" : "variable-debt totalSupply"} × the market's own IAaveOracle price. Every leg read at that block; the sum is ours.`,
+      summary: `Market ${side}: Σ over every reserve on the Pool of its ${side} value in USD${atBlock(coords)}; each reserve's ${side === "supplied" ? "aToken totalSupply" : "variable-debt totalSupply"} × the market's own IAaveOracle price. Every leg read at that block; the sum is ours.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Σ per-reserve ${side} × oracle price @ head`,
       formula: `Σ (reserve ${side} × oracle price)`,
@@ -165,7 +165,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getReservesList", coords),
-      summary: `Reserves on the Pool — the length of \`getReservesList\`${atBlock(coords)}: every reserve the Pool enumerates, the roster this whole table is read from. The Pool's own count.`,
+      summary: `Reserves on the Pool: the length of \`getReservesList\`${atBlock(coords)}; every reserve the Pool enumerates, the roster this whole table is read from. The Pool's own count.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getReservesList (length) @ head`,
     }),
@@ -173,7 +173,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       kind: "chain-derived",
       pclass: "oracle",
       source: { block: coords.blockNumber },
-      summary: `${symbol} ${side} — the reserve's ${side === "supplied" ? "aToken totalSupply" : "variable-debt totalSupply"} valued in USD${atBlock(coords)}: the token-unit total × the market's own IAaveOracle price (the price the Pool liquidates with, never a market API).`,
+      summary: `${symbol} ${side}: the reserve's ${side === "supplied" ? "aToken totalSupply" : "variable-debt totalSupply"} valued in USD${atBlock(coords)}: the token-unit total × the market's own IAaveOracle price (the price the Pool liquidates with, never a market API).`,
       contract: poolContract(coords),
       via: `${cfg.lane} · ${side === "supplied" ? "aToken" : "variableDebtToken"} totalSupply × IAaveOracle price @ head`,
       formula: `${side} tokens × oracle price`,
@@ -198,7 +198,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getConfiguration", coords),
-      summary: `${symbol} liquidation threshold — decoded from the reserve's configuration word${atBlock(coords)} (Pool.getConfiguration), the collateral ratio past which a position holding it becomes liquidatable. Zero means the reserve cannot be collateral ON ITS OWN — an efficiency-mode category can still lend it one, which the eMode figure beside this states. A governance-set slot, read straight.`,
+      summary: `${symbol} liquidation threshold: decoded from the reserve's configuration word${atBlock(coords)} (Pool.getConfiguration), the collateral ratio past which a position holding it becomes liquidatable. Zero means the reserve cannot be collateral ON ITS OWN, though an efficiency-mode category can still lend it one, which the eMode figure beside this states. A governance-set slot, read straight.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · liquidationThreshold @ head`,
     }),
@@ -207,7 +207,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getEModeCategory* ", coords),
-      summary: `${symbol} in efficiency mode — the threshold the Pool applies to this reserve for a wallet inside ${categories.length === 1 ? "the category" : "one of the categories"} ${categories.map((c) => `${c.label} (${c.ltv != null ? `loan-to-value ${(c.ltv * 100).toFixed(2)}%, ` : ""}threshold ${(c.lt * 100).toFixed(2)}%)`).join(", ")}${atBlock(coords)}, IN PLACE of the reserve's own. Read from the Pool's own eMode categories — the collateral bitmap and threshold on the newer Pools, the category each reserve names for itself on the pre-3.2 ones. Which category applies is each wallet's own choice (getUserEMode), so a market table can only list them.`,
+      summary: `${symbol} in efficiency mode: the threshold the Pool applies to this reserve for a wallet inside ${categories.length === 1 ? "the category" : "one of the categories"} ${categories.map((c) => `${c.label} (${c.ltv != null ? `loan-to-value ${(c.ltv * 100).toFixed(2)}%, ` : ""}threshold ${(c.lt * 100).toFixed(2)}%)`).join(", ")}${atBlock(coords)}, IN PLACE of the reserve's usual threshold. Read from the Pool's eMode categories: the collateral bitmap and threshold on the newer Pools, the category each reserve names for itself on the pre-3.2 ones. Which category applies is each wallet's own choice (getUserEMode), so a market table can only list them.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool eMode category threshold + membership @ head`,
     }),
@@ -216,7 +216,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "oracle",
       source: { block: coords.blockNumber },
       verify: recompute("IAaveOracle.getAssetPrice", coords),
-      summary: `${symbol} price — the market's own \`IAaveOracle.getAssetPrice\`${atBlock(coords)}, in USD. The same price the Pool prices collateral and triggers liquidations with.`,
+      summary: `${symbol} price: the market's own \`IAaveOracle.getAssetPrice\`${atBlock(coords)}, in USD. The same price the Pool prices collateral and triggers liquidations with.`,
       contract: oracleContract(coords),
       via: `${cfg.lane} · IAaveOracle.getAssetPrice @ head`,
     }),
@@ -225,7 +225,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getReserveData", coords),
-      summary: `${symbol} ${side} rate — the reserve's ${side === "borrow" ? "variable borrow" : "supply"} rate off \`getReserveData\`${atBlock(coords)} (the Pool's per-second rate, ray-scaled, expressed here as an annual percentage). What the Pool applied at that block.`,
+      summary: `${symbol} ${side} rate: the reserve's ${side === "borrow" ? "variable borrow" : "supply"} rate off \`getReserveData\`${atBlock(coords)} (the Pool's per-second rate, ray-scaled, expressed here as an annual percentage). What the Pool applied at that block.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getReserveData · ${side === "borrow" ? "currentVariableBorrowRate" : "currentLiquidityRate"} @ head`,
     }),
@@ -234,7 +234,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getConfiguration", coords),
-      summary: `${symbol} reserve factor — the protocol's cut of borrow interest, decoded from the reserve's configuration word${atBlock(coords)} (Pool.getConfiguration, bits 64-79). The share of each unit of borrow interest that accrues to the protocol treasury. A governance-set slot, read straight.`,
+      summary: `${symbol} reserve factor: the protocol's cut of borrow interest, decoded from the reserve's configuration word${atBlock(coords)} (Pool.getConfiguration, bits 64-79). The share of each unit of borrow interest that accrues to the protocol treasury. A governance-set slot, read straight.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · reserveFactor @ head`,
     }),
@@ -243,7 +243,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getConfiguration", coords),
-      summary: `${symbol} loan-to-value — the most a wallet can borrow against this reserve, as a share of its value, set by governance in the reserve's configuration${atBlock(coords)}. At 0 the reserve backs no new borrowing: a position holding it still counts it toward the liquidation threshold, and it adds nothing to what the position can borrow.`,
+      summary: `${symbol} loan-to-value: the most a wallet can borrow against this reserve, as a share of its value, set by governance in the reserve's configuration${atBlock(coords)}. At 0 the reserve backs no new borrowing: a position holding it still counts it toward the liquidation threshold, and it adds nothing to what the position can borrow.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · bits 0-15 (ltv) @ head`,
       scaling: {
@@ -259,7 +259,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getConfiguration", coords),
-      summary: `${symbol} liquidation bonus — the extra collateral a liquidator receives, as a share of the debt they repay, when they liquidate a position holding this reserve${atBlock(coords)}. The configuration stores it as 10000 plus the bonus in hundredths of a percent: ${bonusBps} is a bonus of ${((bonusBps - 10000) / 100).toFixed(2).replace(/\.?0+$/, "")}%.`,
+      summary: `${symbol} liquidation bonus: the extra collateral a liquidator receives, as a share of the debt they repay, when they liquidate a position holding this reserve${atBlock(coords)}. The configuration stores it as 10000 plus the bonus in hundredths of a percent: ${bonusBps} is a bonus of ${((bonusBps - 10000) / 100).toFixed(2).replace(/\.?0+$/, "")}%.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · bits 32-47 (liquidationBonus) = ${bonusBps} @ head`,
       formula: `(${bonusBps} − 10000) ÷ 100`,
@@ -277,7 +277,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
         kind: "chain-derived",
         pclass: "state",
         source: { block: coords.blockNumber },
-        summary: `${symbol} ${side} cap used — ${coords.blockNumber != null ? `at block ${coords.blockNumber}, ` : ""}${counted}, divided by ${ceiling}.`,
+        summary: `${symbol} ${side} cap used: ${coords.blockNumber != null ? `at block ${coords.blockNumber}, ` : ""}${counted}, divided by ${ceiling}.`,
         contract: c.basis === "automator" ? automatorContract(coords) : poolContract(coords),
         via:
           c.basis === "automator"
@@ -338,7 +338,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute(basis === "automator" ? `CapAutomator.${side}CapConfigs` : "Pool.getConfiguration", coords),
-      summary: `${symbol} closed to new ${side === "supply" ? "supply" : "borrowing"} — ${basis === "automator" ? `SparkLend's CapAutomator sets the reserve's maximum ${side} cap to 1 whole ${symbol}` : `the reserve's ${side} cap is 1 whole ${symbol}`}${atBlock(coords)}. Governance sets a cap of one token to close a side, so no share of it is quoted.`,
+      summary: `${symbol} closed to new ${side === "supply" ? "supply" : "borrowing"}: ${basis === "automator" ? `SparkLend's CapAutomator sets the reserve's maximum ${side} cap to 1 whole ${symbol}` : `the reserve's ${side} cap is 1 whole ${symbol}`}${atBlock(coords)}. Governance sets a cap of one token to close a side, so no share of it is quoted.`,
       contract: basis === "automator" ? automatorContract(coords) : poolContract(coords),
       via:
         basis === "automator"
@@ -352,10 +352,10 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       verify: recompute(basis === "automator" ? `CapAutomator.${side}CapConfigs` : "Pool.getConfiguration", coords),
       summary:
         why === "zero"
-          ? `${symbol} has no ${side} cap — the reserve's ${side} cap is 0${atBlock(coords)}, which the Pool reads as no limit.`
+          ? `${symbol} has no ${side} cap: the reserve's ${side} cap is 0${atBlock(coords)}, which the Pool reads as no limit.`
           : basis === "automator"
-            ? `${symbol} has no ${side} cap — SparkLend's CapAutomator sets the reserve's maximum ${side} cap to 68719476735${atBlock(coords)}, the largest value a cap can hold (2^36 − 1), so it raises the Pool's cap${liveCap != null ? ` (${tokens(liveCap)} ${symbol})` : ""} with no ceiling.`
-            : `${symbol} has no ${side} cap — the reserve's ${side} cap is 68719476735${atBlock(coords)}, the largest value the field can hold (2^36 − 1), which SparkLend uses for no limit.`,
+            ? `${symbol} has no ${side} cap: SparkLend's CapAutomator sets the reserve's maximum ${side} cap to 68719476735${atBlock(coords)}, the largest value a cap can hold (2^36 − 1), so it raises the Pool's cap${liveCap != null ? ` (${tokens(liveCap)} ${symbol})` : ""} with no ceiling.`
+            : `${symbol} has no ${side} cap: the reserve's ${side} cap is 68719476735${atBlock(coords)}, the largest value the field can hold (2^36 − 1), which SparkLend uses for no limit.`,
       contract: basis === "automator" ? automatorContract(coords) : poolContract(coords),
       via:
         basis === "automator"
@@ -367,7 +367,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getConfiguration", coords),
-      summary: `${symbol} borrowing off — the borrowing-enabled bit of the reserve's configuration is 0${atBlock(coords)}, so the Pool accepts no new borrowing of it. Any borrow cap on the reserve has no effect while this holds.`,
+      summary: `${symbol} borrowing off: the borrowing-enabled bit of the reserve's configuration is 0${atBlock(coords)}, so the Pool accepts no new borrowing of it. Any borrow cap on the reserve has no effect while this holds.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · bit 58 (borrowingEnabled) = 0 @ head`,
     }),
@@ -378,8 +378,8 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       verify: recompute("Pool.getConfiguration", coords),
       summary:
         flag === "frozen"
-          ? `${symbol} frozen — the frozen bit of the reserve's configuration is set${atBlock(coords)}. The Pool accepts no new supply or borrowing of it; interest keeps accruing, and repayment, withdrawal and liquidation still work.`
-          : `${symbol} paused — the paused bit of the reserve's configuration is set${atBlock(coords)}. The Pool refuses every action on the reserve, liquidation included, until it is unpaused.`,
+          ? `${symbol} frozen: the frozen bit of the reserve's configuration is set${atBlock(coords)}. The Pool accepts no new supply or borrowing of it; interest keeps accruing, and repayment, withdrawal and liquidation still work.`
+          : `${symbol} paused: the paused bit of the reserve's configuration is set${atBlock(coords)}. The Pool refuses every action on the reserve, liquidation included, until it is unpaused.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · bit ${flag === "frozen" ? "57 (frozen)" : "60 (paused)"} = 1 @ head`,
     }),
@@ -388,7 +388,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getConfiguration", coords),
-      summary: `${symbol} backs no new borrowing — its loan-to-value is 0 and its liquidation threshold is above 0${atBlock(coords)}, and no efficiency-mode category lends it a loan-to-value. A position holding it keeps it as collateral against what it owes; it adds nothing to what the position can borrow.`,
+      summary: `${symbol} backs no new borrowing: its loan-to-value is 0 and its liquidation threshold is above 0${atBlock(coords)}, and no efficiency-mode category lends it a loan-to-value. A position holding it keeps it as collateral against what it owes; it adds nothing to what the position can borrow.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · bits 0-15 (ltv) = 0, bits 16-31 (liquidationThreshold) > 0; eMode category loan-to-values @ head`,
     }),
@@ -397,7 +397,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getConfiguration", coords),
-      summary: `${symbol} isolated — the reserve carries a debt ceiling of $${ceilingUsd.toLocaleString("en-US")}${atBlock(coords)}. A wallet using it as collateral can borrow only the assets marked borrowable in isolation, and all such wallets together can borrow up to that ceiling against it.`,
+      summary: `${symbol} isolated: the reserve carries a debt ceiling of $${ceilingUsd.toLocaleString("en-US")}${atBlock(coords)}. A wallet using it as collateral can borrow only the assets marked borrowable in isolation, and all such wallets together can borrow up to that ceiling against it.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · bits 212-251 (debtCeiling) ÷10^2 @ head`,
     }),
@@ -406,7 +406,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getConfiguration", coords),
-      summary: `${symbol} siloed — the siloed-borrowing bit of the reserve's configuration is set${atBlock(coords)}. A wallet borrowing it can borrow no other asset in the same position.`,
+      summary: `${symbol} siloed: the siloed-borrowing bit of the reserve's configuration is set${atBlock(coords)}. A wallet borrowing it can borrow no other asset in the same position.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · bit 62 (siloedBorrowing) = 1 @ head`,
     }),
@@ -415,7 +415,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: "state",
       source: { block: coords.blockNumber },
       verify: recompute(`${k.method}`, coords),
-      summary: `${symbol} rate kink — the utilisation at which the reserve's borrow rate starts to climb steeply, read from its interest-rate strategy${atBlock(coords)}. The tick on the utilisation bar marks it.`,
+      summary: `${symbol} rate kink: the utilisation at which the reserve's borrow rate starts to climb steeply, read from its interest-rate strategy${atBlock(coords)}. The tick on the utilisation bar marks it.`,
       contract: { name: `${symbol} interest-rate strategy`, address: k.strategy },
       via: `${cfg.lane} · getReserveData.interestRateStrategyAddress → ${k.method === "getOptimalUsageRatio" ? "getOptimalUsageRatio(asset)" : "OPTIMAL_USAGE_RATIO()"} @ head`,
       ...(k.raw

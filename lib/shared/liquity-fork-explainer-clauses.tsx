@@ -582,7 +582,7 @@ function eventSlots(
       const feeNote = hasFee
         ? clause(
             <>
-              {fork.protocolName} added its one-time borrowing fee of {feeFig()} to the debt — about a week of the
+              {fork.protocolName} added its one-time borrowing fee of {feeFig()} to the debt, about a week of the
               branch&rsquo;s average interest, owed rather than paid out of pocket.
             </>,
           )
@@ -708,7 +708,7 @@ function eventSlots(
           hasFee
             ? clause(
                 <>
-                  This change came soon enough after the last one to cost {feeFig()} — the fee on adjusting a rate again
+                  This change came soon enough after the last one to cost {feeFig()}: the fee on adjusting a rate again
                   inside the protocol&rsquo;s window, added to the debt.
                 </>,
               )

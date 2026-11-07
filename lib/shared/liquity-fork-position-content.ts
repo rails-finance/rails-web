@@ -38,7 +38,7 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
   if (status === "liquidated") {
     return {
       title: "About this position",
-      intro: `This Trove was liquidated when its collateral ratio fell ${minCRText}. The panel above reconstructs its final state — peak collateral, ${debtSymbol} debt, and how long it stayed open.`,
+      intro: `This Trove was liquidated when its collateral ratio fell ${minCRText}. The panel above reconstructs its final state: peak collateral, ${debtSymbol} debt, and how long it stayed open.`,
       detailsHeading: "Key concepts:",
       details: [
         {
@@ -57,7 +57,7 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
   if (status === "closed") {
     return {
       title: "About this position",
-      intro: `This Trove has been closed and its ${debtSymbol} debt fully repaid. The panel above shows its lifetime peaks — the most collateral and debt it ever held.`,
+      intro: `This Trove has been closed and its ${debtSymbol} debt fully repaid. The panel above shows its lifetime peaks: the most collateral and debt it ever held.`,
       detailsHeading: "Key concepts:",
       details: [
         {
@@ -102,11 +102,11 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
   details.push(
     {
       bold: "Redemption exposure",
-      text: `any ${debtSymbol} holder can redeem it against the system at $1 face value, sweeping each branch's queue from the lowest user-set interest rate upward — not the lowest collateral ratio. A redeemed Trove gives up collateral worth the debt it sheds: it deleverages, but its net value is preserved.`,
+      text: `any ${debtSymbol} holder can redeem it against the system at $1 face value, sweeping each branch's queue from the lowest user-set interest rate upward, not the lowest collateral ratio. A redeemed Trove gives up collateral worth the debt it sheds: it deleverages, but its net value is preserved.`,
     },
     {
       bold: "Branch scoping",
-      text: `each collateral type is its own branch with its own oracle, minimum ratio and redemption queue — one branch's stress does not liquidate another's Troves.`,
+      text: `each collateral type is its own branch with its own oracle, minimum ratio and redemption queue, so one branch's stress does not liquidate another's Troves.`,
     },
     {
       bold: "Trove NFT",
@@ -116,7 +116,7 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
 
   return {
     title: "About this position",
-    intro: `This panel explains the Trove's live state in plain language — what backs the ${debtSymbol} debt, what it costs to hold, and how exposed it is to redemption — the same Liquity V2 architecture ${name} runs.`,
+    intro: `This panel explains the Trove's live state in plain language: what backs the ${debtSymbol} debt, what it costs to hold, and how exposed it is to redemption. ${name} runs the same Liquity V2 architecture.`,
     detailsHeading: "Key concepts:",
     details,
     links,

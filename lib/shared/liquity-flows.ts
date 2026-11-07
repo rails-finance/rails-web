@@ -616,7 +616,7 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
 /** Liquity V1's level in the receipt: the 110 % line, and Recovery Mode,
  *  which the chart does not draw. */
 const LIQUITY_V1_LEVEL_SUMMARY =
-  "Liquidation price — the ETH price at which the Trove's collateral ratio reaches Liquity V1's 110% minimum: its debt × 110% ÷ its collateral. Below that price the Trove can be liquidated. Recovery Mode is not drawn: while the system's total collateral ratio is under 150%, a Trove under that total ratio can be liquidated too, and that line hangs on the whole system's collateral and debt, which the rows do not carry.";
+  "Liquidation price: the ETH price at which the Trove's collateral ratio reaches Liquity V1's 110% minimum; its debt × 110% ÷ its collateral. Below that price the Trove can be liquidated. Recovery Mode is not drawn: while the system's total collateral ratio is under 150%, a Trove under that total ratio can be liquidated too, and that line hangs on the whole system's collateral and debt, which the rows do not carry.";
 
 /** Liquity V1's sentence in the charts' how-to-read. */
 const LIQUITY_V1_LEVEL_HELP =
@@ -651,7 +651,7 @@ function forkLevelWords(
         : `Today's ${pctOf(f.mcr)} minimum is held across the life: no earlier value is listed for this branch.`;
   return {
     formula: formula(f.mcr),
-    summary: `Liquidation price — the ${symbol} price at which the Trove's collateral ratio reaches the ${f.name} branch's minimum: its debt × the minimum ÷ its collateral. Below that price the Trove can be liquidated. ${history}`,
+    summary: `Liquidation price: the ${symbol} price at which the Trove's collateral ratio reaches the ${f.name} branch's minimum; its debt × the minimum ÷ its collateral. Below that price the Trove can be liquidated. ${history}`,
     ...(steps.length > 0
       ? {
           formulaBefore: steps.map((st) => ({
