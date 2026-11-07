@@ -50,8 +50,8 @@ import { vaultExplorer } from "@/lib/vaults/explorer";
 import { useTimelineEvents } from "@/hooks/useTimelineEvents";
 import { boundaryFromVaultDrawn } from "@/lib/shared/timeline-boundary";
 import { AAVE_VAULT_TIMELINE_KEY, aaveVaultTimelineRuns, vaultEventToActivity } from "@/lib/aave-vaults/timeline-runs";
-import { YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
-import { YEARN_VAULT_TIMELINE_CEILING } from "@/lib/sources/chain/yearn-ethereum-vault-timeline";
+import { MAINNET_CHAIN_ID as YEARN_CHAIN_ID } from "@/lib/shared/chains";
+import { VAULT_TIMELINE_HORIZON as YEARN_VAULT_TIMELINE_CEILING } from "@/lib/shared/vault-holder-timeline";
 import {
   yearnVaultTimelineAccrualProv,
   yearnVaultTimelineAssetsProv,
