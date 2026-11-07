@@ -1,3 +1,5 @@
+import "server-only";
+
 // Shared JSON-RPC clients for every chain read the web makes.
 // ----------------------------------------------------------------------------
 // History is the indexed backend's (RAILS_API_URL); these clients serve what it

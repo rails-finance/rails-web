@@ -1,3 +1,5 @@
+import "server-only";
+
 const API_BEARER_TOKEN = process.env.API_BEARER_TOKEN;
 
 /** How a call reaches the box. `hopHeaders`: a server render's read passes
