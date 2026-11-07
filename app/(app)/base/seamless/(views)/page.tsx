@@ -11,7 +11,6 @@ import {
 } from "@/lib/seamless/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -43,4 +42,4 @@ async function SeamlessListingPage({ searchParams }: { searchParams: Promise<Raw
   return <SeamlessListing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/base/seamless", SeamlessListingPage);
+export default SeamlessListingPage;

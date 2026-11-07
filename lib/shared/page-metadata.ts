@@ -184,7 +184,7 @@ function shareMetadata(opts: {
   };
 }
 
-const FOUNDATION = "replayed from the protocol's own on-chain events, with a receipt on every number.";
+const FOUNDATION = "replayed from the protocol's on-chain events, with a receipt on every number.";
 
 const isAddress = (s: string) => /^0x[a-fA-F0-9]{40}$/.test(s);
 
@@ -222,7 +222,7 @@ export function positionMetadata(opts: {
   // the prefix: a preview that shows only title + description must say whose
   // page this is, and "every event of this Moonwell position…" on its own
   // reads as Moonwell's.
-  const description = `A Rails replay of this ${label} ${noun.toLowerCase()}: every event from the protocol's own on-chain events, with a receipt on every number.`;
+  const description = `A Rails replay of this ${label} ${noun.toLowerCase()}: every event from the protocol's on-chain events, with a receipt on every number.`;
   return {
     // Plain, so the root `template: "Rails | %s"` wraps it — see the header.
     title,
@@ -339,7 +339,7 @@ export function eventMetadata(opts: {
     ? opts.description
     : opts.event
       ? `One on-chain event from this ${label} ${noun.toLowerCase()}, replayed by Rails: ${opts.event.actionLabel} on ${formatEventStamp(opts.event.timestamp)}, with a receipt on every number.`
-      : `A Rails replay of this ${label} ${noun.toLowerCase()}: every event from the protocol's own on-chain events, with a receipt on every number.`;
+      : `A Rails replay of this ${label} ${noun.toLowerCase()}: every event from the protocol's on-chain events, with a receipt on every number.`;
   return {
     title,
     description,
@@ -438,7 +438,7 @@ export function holderListingMetadata(opts: {
   const noun = POSITION_NOUN[opts.session];
   const plural = positionNounPlural(opts.session);
   const title = `${label} ${plural.toLowerCase()} held by ${shortSubject(opts.subject)}`;
-  const description = `A Rails replay of every ${label} ${noun} this wallet holds or held — counts, collateral and debt, and the ${noun} nearest its floor — from the protocol's own on-chain events, with a receipt on every number.`;
+  const description = `A Rails replay of every ${label} ${noun} this wallet holds or held: counts, collateral and debt, and the ${noun} nearest its floor, from the protocol's on-chain events, with a receipt on every number.`;
   return {
     title,
     description,

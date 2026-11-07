@@ -13,7 +13,6 @@ import {
 } from "@/lib/aave-v3/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -42,4 +41,4 @@ async function AaveV3ListingPage({ searchParams }: { searchParams: Promise<RawSe
   return <AaveV3Listing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/ethereum/aave-v3", AaveV3ListingPage);
+export default AaveV3ListingPage;

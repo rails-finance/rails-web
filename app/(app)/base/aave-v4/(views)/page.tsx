@@ -14,7 +14,6 @@ import {
 import { listKey } from "@/lib/shared/list-filter";
 import { toURLSearchParams, ssrDecode, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -24,7 +23,7 @@ export const metadata = listingMetadata({
   title: "Explore Aave V4 positions on Base",
   canonicalPath: "/base/aave-v4",
   description:
-    "Aave V4 on Base: every account on the Equities hub's Mag7 spoke, where Coinbase tokenized stocks back USDC loans, read from the spoke's own contracts.",
+    "Aave V4 on Base: every account on the Equities hub's Mag7 spoke, where Coinbase tokenized stocks back USDC loans, read from the spoke's contracts.",
 });
 
 async function AaveV4BaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
@@ -54,4 +53,4 @@ async function AaveV4BaseListingPage({ searchParams }: { searchParams: Promise<R
   );
 }
 
-export default withExplorerAbout("/base/aave-v4", AaveV4BaseListingPage);
+export default AaveV4BaseListingPage;

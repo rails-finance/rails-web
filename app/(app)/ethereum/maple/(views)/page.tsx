@@ -19,13 +19,17 @@ import {
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Maple positions", canonicalPath: "/ethereum/maple" });
+export const metadata = listingMetadata({
+  title: "Explore Maple positions",
+  canonicalPath: "/ethereum/maple",
+  description:
+    "Maple's institutional credit pools from the lender's side: exact share balances, the withdrawal queue, and what is liquid against what is deployed.",
+});
 
 async function MapleListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = mapleListDimensions();
@@ -49,4 +53,4 @@ async function MapleListingPage({ searchParams }: { searchParams: Promise<RawSea
   return <MapleListing {...initial} initialSearch={sp.toString()} poolState={poolState} />;
 }
 
-export default withExplorerAbout("/ethereum/maple", MapleListingPage);
+export default MapleListingPage;

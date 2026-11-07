@@ -20,22 +20,22 @@
  *  not been ruled out. */
 export const ORACLE_USD_REASON: Record<string, string> = {
   fluid:
-    "debt-token units by design — each vault's oracle prices the collateral in the vault's debt token (the exact space its liquidation engine judges in); Fluid runs no USD feed",
+    "debt-token units by design: each vault's oracle prices the collateral in the vault's debt token (the space its liquidation engine judges in); Fluid runs no USD feed",
   frankencoin:
-    "oracle-free by design — the liquidation price is owner-declared and enforced by challenge auctions; no USD feed exists anywhere in the protocol",
+    "oracle-free by design: the liquidation price is owner-declared and enforced by challenge auctions; no USD feed exists anywhere in the protocol",
   maple:
-    "USDC and USDT amounts are shown in the token, with no dollar price: Maple's own USDC price is a fixed $1 set by its governance, and it states none for USDT",
+    "USDC and USDT amounts are shown in the token, with no dollar price: Maple's USDC price is a fixed $1 set by its governance, and it states none for USDT",
   morpho:
-    "prices are in the market's loan token — each market's oracle quotes the collateral in it — so the loan token has no price of its own; Morpho Blue has no USD oracle",
+    "prices are in the market's loan token (each market's oracle quotes the collateral in it), so the loan token has no price; Morpho Blue has no USD oracle",
   "morpho-arbitrum":
-    "prices are in the market's loan token — each market's oracle quotes the collateral in it; Morpho Blue has no USD oracle, so the wallet's dollar totals convert the loan token at the Aave V3 Arbitrum oracle's price",
+    "prices are in the market's loan token, which each market's oracle quotes the collateral in; Morpho Blue has no USD oracle, so the wallet's dollar totals convert the loan token at the Aave V3 Arbitrum oracle's price",
   "morpho-base":
-    "prices are in the market's loan token — each market's oracle quotes the collateral in it — so the loan token has no price of its own; Morpho Blue has no USD oracle",
-  pwn: "no protocol oracle — the two parties set the price",
+    "prices are in the market's loan token (each market's oracle quotes the collateral in it), so the loan token has no price; Morpho Blue has no USD oracle",
+  pwn: "no protocol oracle: the two parties set the price",
   "aave-vaults":
-    "a vault share has no protocol oracle to value it — the one priced figure is the census's, the balance through the vault's own convertToAssets and the chain's Aave V3 oracle on the ASSET at that block",
+    "a vault share has no protocol oracle to value it. The one priced figure is the census's: the balance through the vault's convertToAssets and the chain's Aave V3 oracle on the asset at that block",
   "sky-savings":
     "Sky has no price oracle for USDS, so amounts show in USDS and their dollar value goes through the LitePSM, Sky's USDS–USDC swap: one USDS is 1 ÷ (1 + exit fee) USDC, and the fee has been zero for the whole life of sUSDS. Lifetime flows count USDC as one dollar; the home page's value held prices it at the Aave V3 oracle.",
   yearn:
-    "72 distinct assets across the roster and no per-asset feed to value them against, so every figure stays in the vault's own asset and no two assets are ever added together",
+    "72 distinct assets across the roster and no per-asset feed to value them against, so every figure stays in the vault's asset and no two assets are ever added together",
 };

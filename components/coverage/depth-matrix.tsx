@@ -21,7 +21,7 @@ import type { ChainId } from "@/lib/shared/chains";
 /** Popovers and tooltips open their copy with a capital, applied HERE and only
  *  here: the same source strings (`CAPABILITIES[].detail`, `{ why }`,
  *  `{ awaiting }` in lib/shared/coverage.ts) also render as em-dash
- *  continuations on the mobile page ("Live dashboard — health factor…"),
+ *  continuations on the mobile page ("Live dashboard: health factor…"),
  *  where lowercase-after-dash is the house style — so the sources stay
  *  lowercase and the render site does the casing. */
 const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -237,8 +237,8 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
           <Clock className="h-3.5 w-3.5 text-rb-400" aria-hidden="true" /> built, awaiting the first on-chain instance
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <Ban className="h-3.5 w-3.5 text-rb-400" aria-hidden="true" /> the protocol can&apos;t provide it — open the
-          cell for the why
+          <Ban className="h-3.5 w-3.5 text-rb-400" aria-hidden="true" /> the protocol can&apos;t provide it (open the
+          cell for the why)
         </span>
       </p>
       {/* Column 1 is 30% (34% before the brand rail took 56px, ui-jobs 498):

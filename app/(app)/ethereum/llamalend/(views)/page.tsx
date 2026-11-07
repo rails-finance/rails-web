@@ -22,13 +22,17 @@ import {
 } from "@/lib/llamalend/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore LlamaLend positions", canonicalPath: "/ethereum/llamalend" });
+export const metadata = listingMetadata({
+  title: "Explore LlamaLend positions",
+  canonicalPath: "/ethereum/llamalend",
+  description:
+    "Curve's LlamaLend markets, where liquidation is a band: soft-liquidation read live from the protocol's state and cross-checked across two contracts.",
+});
 
 async function LlamalendListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = llamalendListDimensions();
@@ -53,4 +57,4 @@ async function LlamalendListingPage({ searchParams }: { searchParams: Promise<Ra
   return <LlamalendListing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/ethereum/llamalend", LlamalendListingPage);
+export default LlamalendListingPage;

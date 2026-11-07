@@ -7,7 +7,6 @@ import { fetchAllPwnPositions } from "@/lib/api/fetch-pwn-positions";
 import { pwnListDimensions, PWN_LIST_DEFAULTS } from "@/lib/pwn/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -36,4 +35,4 @@ async function PwnListingPage({ searchParams }: { searchParams: Promise<RawSearc
   return <PwnListing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/ethereum/pwn", PwnListingPage);
+export default PwnListingPage;

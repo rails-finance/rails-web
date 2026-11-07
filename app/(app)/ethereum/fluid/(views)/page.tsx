@@ -13,13 +13,17 @@ import {
 } from "@/lib/fluid/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Fluid positions", canonicalPath: "/ethereum/fluid" });
+export const metadata = listingMetadata({
+  title: "Explore Fluid positions",
+  canonicalPath: "/ethereum/fluid",
+  description:
+    "Instadapp's Fluid vault positions as NFTs, read from chain, with tick-swept liquidations attributed per position from the vault's settlement views.",
+});
 
 async function FluidListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = fluidListDimensions();
@@ -42,4 +46,4 @@ async function FluidListingPage({ searchParams }: { searchParams: Promise<RawSea
   return <FluidListing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/ethereum/fluid", FluidListingPage);
+export default FluidListingPage;

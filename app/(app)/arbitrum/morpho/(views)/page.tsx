@@ -4,7 +4,6 @@
 
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { ProtocolFrontDoor } from "@/components/shared/protocol-front-door";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const metadata = listingMetadata({
   title: "Morpho Blue on Arbitrum",
@@ -15,4 +14,4 @@ function Page() {
   return <ProtocolFrontDoor session="morpho-arbitrum" />;
 }
 
-export default withExplorerAbout("/arbitrum/morpho", Page);
+export default Page;
