@@ -85,7 +85,7 @@ export function MakerFlowsNote({ facts, collSymbol, debtSymbol, ilk, capped }: M
 export function makerdaoFlowsContent(opts: { debtSym: string; ilk: string }): LearnMoreContent {
   const dsym = opts.debtSym;
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro: `The bars add up every event Maker has recorded for this vault in USD, and the line under them draws what it held and owed at the end of each day.`,
     stepsHeading: "How it's built:",
     steps: [

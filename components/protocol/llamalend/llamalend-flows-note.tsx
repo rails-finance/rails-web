@@ -139,7 +139,7 @@ function unstatedSentence(f: LlamalendFlowFacts): string {
 
 export function llamalendFlowsContent(): LearnMoreContent {
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro:
       "The bars add up every event the index has recorded for this position, in the market's borrowed token, and the line under them draws what it held and owed at the end of each day.",
     stepsHeading: "How it's built:",

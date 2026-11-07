@@ -95,7 +95,7 @@ export function CompoundFlowsNote({ facts, baseSymbol, ethQuoted }: CompoundFlow
 
 export function compoundFlowsContent(): LearnMoreContent {
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro:
       "The bars add up every event Compound V3 has recorded for this position, each at Comet's oracle price at its block, and the line under them draws what it held and owed at the end of each day.",
     stepsHeading: "How it's built:",

@@ -296,7 +296,7 @@ export function liquityForkEconomicsContent({
   docsLinks,
 }: LiquityForkEconomicsParams): LearnMoreContent {
   return {
-    title: "About the Economics",
+    title: "About the economics",
     intro: `This panel replays the trove's own events on ${name} into lifetime flows. Its current collateral and ${debtSymbol} debt are the balances the trove's last event recorded; the position card above reads the live figures from the chain. Debt is valued at ${debtSymbol}'s $1 face.`,
     stepsHeading: "How the tower is built:",
     steps: [

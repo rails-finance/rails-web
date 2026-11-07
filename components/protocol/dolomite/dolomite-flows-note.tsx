@@ -150,7 +150,7 @@ export function DolomiteFlowsNote({ facts }: { facts: DolomiteFlowsFacts | null 
 
 export function dolomiteFlowsContent(): LearnMoreContent {
   return {
-    title: "About the Lifetime flows",
+    title: "About the lifetime flows",
     intro:
       "The bars add up every Dolomite event of this account, each at Dolomite's oracle price on its day, and the line under them draws what it held and owed at the end of each day.",
     stepsHeading: "How it's built:",
