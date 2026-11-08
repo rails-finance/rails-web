@@ -58,7 +58,9 @@ export default async function PendleMarketPage({
             <RailHeader session="pendle" venue="subPage" />
           </div>
           <div className="mb-1 text-[11px] uppercase tracking-wider text-rb-500">Pendle market</div>
-          <h1 className="text-2xl font-semibold text-foreground">{read.ok ? marketName(read.data.tokens) : m}</h1>
+          <h1 className="text-2xl font-semibold text-foreground">
+            {read.ok ? marketName(read.data.tokens) : `${m.slice(0, 6)}…${m.slice(-4)}`}
+          </h1>
         </header>
         {read.ok ? (
           <PendleMarketView m={read.data} meta={meta} initialSearch={initialSearch} />

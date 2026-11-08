@@ -3,7 +3,7 @@
 // The Pendle market roster on the house table (components/shared/data-table):
 // one row per market the router record names, read at one block.
 // ----------------------------------------------------------------------------
-// D1 one-line rows; D2 sortable headers, the sort in `?sort=` and `?dir=`, each
+// D1 one-line rows (`rowHeight="one"`); D2 sortable headers, the sort in `?sort=` and `?dir=`, each
 // written only off its default (maturity, soonest first); D3 the market pinned
 // while the table scrolls sideways; D4 the whole row opens the market's page;
 // D6 cards below sm, with a select and a direction button for the sort. No
@@ -20,7 +20,7 @@
 
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
-import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { AssetUnit } from "@/components/shared/asset-unit";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { BlockRef } from "@/components/shared/block-ref";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
@@ -189,26 +189,15 @@ function countProv(shown: number, total: number, block: number, criteria: string
 /** A figure in the market's asset, the asset's mark after it, or its symbol in
  *  words where the token has no mark. */
 function InAsset({ m, children }: { m: PendleRosterEntry; children: ReactNode }) {
-  const symbol = assetOf(m);
-  const word = <span className="text-[10px] font-medium text-rb-500">{symbol}</span>;
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
       <span>{children}</span>
-      <span className="inline-flex shrink-0" title={symbol} data-asset-unit={symbol}>
-        <TokenChipIcon
-          symbol={m.tokens.asset.symbol ?? symbol}
-          address={m.tokens.asset.address}
-          size={15}
-          filterable={false}
-          untitled
-          fallback={word}
-        />
-      </span>
+      <AssetUnit symbol={assetOf(m)} address={m.tokens.asset.address} />
     </span>
   );
 }
 
-/** A pill on a row: a ground apart from both stripes and the hovered row. */
+/** A pill on a row: a ground apart from both stripes. */
 const PILL =
   "rounded-sm bg-background px-1.5 py-0.5 text-[11px] whitespace-nowrap text-foreground/80 dark:bg-rb-600 dark:text-foreground/70";
 
@@ -430,7 +419,7 @@ export function PendleRosterView({
             caption="Pendle markets on Ethereum; TVL and PT price are in each market's asset"
             tableClassName="min-w-[720px] text-sm"
             stacked
-            oneLine
+            rowHeight="one"
             data-pendle-table=""
           >
             <DataTableHead>
