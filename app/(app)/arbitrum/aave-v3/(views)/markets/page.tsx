@@ -8,7 +8,7 @@ export const metadata = listingMetadata({
   title: "Aave V3 on Arbitrum · Market overview",
   canonicalPath: "/arbitrum/aave-v3/markets",
   description:
-    "Every reserve of Aave V3's Arbitrum Pool — size, rates, risk configuration and oracle price — read live from the Pool and decoded from each reserve's configuration.",
+    "Every reserve of Aave V3's Arbitrum Pool: size, rates, risk configuration and oracle price, read live from the Pool and decoded from each reserve's configuration.",
 });
 
 export default function Page() {
