@@ -14,7 +14,7 @@
 
 import { IndexNotice } from "@/components/shared/index-notice";
 import Link from "next/link";
-import { Suspense, use, type CSSProperties } from "react";
+import { Suspense, use } from "react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { WalletHeading } from "@/components/shared/wallet-heading";
 import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
@@ -26,7 +26,7 @@ import { WalletPositionCard, atRisk, protocolId } from "@/components/wallet/wall
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { Icon } from "@/components/icons/icon";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
-import { protocolBrand } from "@/lib/shared/protocols";
+import { RowZone, hueStyle } from "@/components/shared/row-zone";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { formatCompactUsd } from "@/lib/shared/format-compact";
 import { formatDate } from "@/lib/date";
@@ -164,32 +164,6 @@ function TxCount({ n }: { n: number }) {
       <Icon name="arrow-left-right" size={12} />
       {n.toLocaleString("en-US")}
       <span className="sr-only">{n === 1 ? " transaction" : " transactions"}</span>
-    </span>
-  );
-}
-
-/** The protocol's brand hue for the zone and edge tokens; a grey zone where
- *  the roster has none. */
-function hueStyle(id: string): CSSProperties {
-  const hue = protocolBrand(id)?.hue ?? null;
-  return { "--brand-hue": hue ?? 0, ...(hue == null ? { "--brand-strength": 0 } : {}) } as CSSProperties;
-}
-
-/** A row's lead on the History table and the Trades row: the protocol's mark
- *  and the chain's glyph on the protocol's tint, as the card's sidebar draws
- *  them (C20). Spans the row's height from its left edge. */
-function RowZone({ id, chain }: { id: string; chain: ChainId }) {
-  return (
-    <span
-      className="flex w-[95px] shrink-0 items-center justify-evenly self-stretch rounded-l-[15px] bg-brand-zone"
-      style={hueStyle(id)}
-      data-closed-zone={id}
-    >
-      <ProtocolIcon id={id} className="h-[18px] w-[18px] shrink-0 text-brand-mark [&:is(img)]:grayscale" />
-      <span className="flex items-center text-brand-zone">
-        <ChainGlyph id={chain} className="h-[18px] w-[18px] shrink-0" />
-        <span className="sr-only">{chainMeta(chain).name}</span>
-      </span>
     </span>
   );
 }

@@ -3,8 +3,8 @@
 // Where the assets are (V3, rails-ops ui-jobs 407; survey 2026-10-20 §6): one
 // section under the vault card on every family. At its head the allocation
 // band (decision 0043 point 4, the one `band`; the plan in
-// lib/vaults/allocation-plan.ts), beneath it one table, Venue · Amount · Share
-// of this vault · Links, in the source's own order with Idle as a row. "Share
+// lib/vaults/allocation-plan.ts), beneath it one table in the house style
+// (components/shared/data-table), Venue · Amount · Share of this vault · Links, in the source's own order with Idle as a row. "Share
 // of this vault" is a fraction of one vault's book, both terms reads of the
 // vault at one block (survey §7.3); its header tip names the denominator. One
 // line under the heading; the rest is behind the section's "?".
@@ -15,6 +15,14 @@ import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { NotLoaded } from "@/components/shared/not-loaded";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 import { assetText, pctText } from "@/lib/shared/vault-amount-text";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import { planAllocation } from "@/lib/vaults/allocation-plan";
@@ -122,29 +130,30 @@ export function VaultAssets({
           emptyLabel={total === BigInt(0) ? "Nothing to divide at this block." : undefined}
         />
       </div>
-      <table className="mt-2 w-full text-[12px]">
-        <thead>
-          <tr className="border-b border-rb-200 text-left text-[11px] uppercase tracking-wider text-rb-500 dark:border-rb-500/30">
-            <th className="py-2 pr-3 font-normal">Venue</th>
-            <th className="py-2 pr-3 text-right font-normal">Amount · {assetSymbol}</th>
-            <th className="py-2 text-right font-normal sm:pr-3">
-              <HeadingTip text="Share of this vault" tip={shareTip} />
-            </th>
-            <th className="hidden py-2 text-right font-normal sm:table-cell">Links</th>
-          </tr>
-        </thead>
-        <tbody>
+      <DataTable className="mt-2" tableClassName="text-[12px]" label={`Where this vault's ${assetSymbol} is, by venue`}>
+        <DataTableHead>
+          <DataTableHeader label="Venue" />
+          <DataTableHeader label={`Amount · ${assetSymbol}`} align="right" />
+          <DataTableHeader align="right">
+            <HeadingTip text="Share of this vault" tip={shareTip} />
+          </DataTableHeader>
+          <DataTableHeader label="Links" align="right" className="hidden sm:table-cell" />
+        </DataTableHead>
+        <DataTableBody>
           {rows.map((r) => (
-            <tr key={r.key} className="border-b border-rb-200/60 align-top dark:border-rb-500/20" {...r.hooks}>
-              <td className="min-w-0 py-2 pr-3">
+            <DataTableRow key={r.key} {...r.hooks}>
+              <DataTableCell className="min-w-0 py-2">
                 <span className="text-foreground" data-cell="venue">
                   {r.venue}
                 </span>
-                {r.sub != null && <span className="block break-words text-[11px] text-rb-500">{r.sub}</span>}
+                {r.sub != null && (
+                  <span className="block text-[11px] [overflow-wrap:anywhere] text-rb-500">{r.sub}</span>
+                )}
                 {r.links && <span className="mt-0.5 block sm:hidden">{r.links}</span>}
-              </td>
-              <td
-                className="py-2 pr-3 text-right tabular-nums text-foreground"
+              </DataTableCell>
+              <DataTableCell
+                align="right"
+                className="py-2 tabular-nums text-foreground"
                 data-cell="leg-assets"
                 {...(r.amountFigure ? { "data-figure": r.amountFigure } : {})}
               >
@@ -157,8 +166,13 @@ export function VaultAssets({
                 ) : (
                   assetText(r.amount, assetDecimals)
                 )}
-              </td>
-              <td className="py-2 text-right tabular-nums text-rb-500 sm:pr-3" data-cell="leg-share">
+              </DataTableCell>
+              {/* The last cell below sm, where Links is hidden: it rounds the row's right end. */}
+              <DataTableCell
+                align="right"
+                className="py-2 tabular-nums text-rb-500 max-sm:rounded-r-2xl"
+                data-cell="leg-share"
+              >
                 {r.share == null ? (
                   "—"
                 ) : r.shareProv ? (
@@ -166,12 +180,14 @@ export function VaultAssets({
                 ) : (
                   pctText(r.share)
                 )}
-              </td>
-              <td className="hidden py-2 text-right sm:table-cell">{r.links}</td>
-            </tr>
+              </DataTableCell>
+              <DataTableCell align="right" className="hidden py-2 sm:table-cell">
+                {r.links}
+              </DataTableCell>
+            </DataTableRow>
           ))}
-        </tbody>
-      </table>
+        </DataTableBody>
+      </DataTable>
     </section>
   );
 }
