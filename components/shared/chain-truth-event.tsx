@@ -1067,7 +1067,7 @@ export function PartyChip({ party }: { party: NonNullable<ChainTruthRowSpec["par
       value={party.name ?? ens ?? party.address}
       className="inline-flex items-center gap-1 text-sm"
     >
-      <span className="text-rb-500" data-party-chip={chipId}>
+      <span className="text-rb-500" data-party-chip={chipId} data-prov-hidden="">
         {party.prefix}
       </span>
       {party.name && party.glyph ? (

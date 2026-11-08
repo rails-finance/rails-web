@@ -352,7 +352,7 @@ export const saleLegProv = (sale: RouterSale, sentSymbol: string, coords: V3Coor
   const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
   const { leg } = sale;
   const venue = getProtocolContract(sale.via, chainId);
-  const venueName = venue?.name ?? "the contract";
+  const venueName = venue?.fullName ?? venue?.name ?? "the contract";
   const native = leg.source === "trace" || leg.source === "asset-transfers";
   const txHref = coords.txHash ? explorerUrl(chainId, native ? "tx" : "tx-logs", coords.txHash) : undefined;
   const legVerify: ProvVerify | undefined = txHref
@@ -737,7 +737,7 @@ export const swapVenueProv = (coords: V3Coords, swap: AaveV3SwapDetail): Provena
 /** The sentence a receipt's summary adds for a named contract: growthepie's
  *  owner where it labels one, the verified source behind it. */
 export const knownContractSentence = (named: ProtocolContract): string =>
-  ` Rails names the address ${named.name}${named.growthepie?.owner ? `, which growthepie labels ${named.growthepie.owner}` : ""}: its verified contract source is \`${named.contractName}\`, ${named.role}.`;
+  ` Rails names the address ${named.fullName ?? named.name}${named.growthepie?.owner ? `, which growthepie labels ${named.growthepie.owner}` : ""}: its verified contract source is \`${named.contractName}\`, ${named.role}.`;
 
 /** The receipt leaves for a registry name, in the order the registry consults
  *  its sources (its header): growthepie's label where it has one, credited as
@@ -760,12 +760,23 @@ export const counterpartyNameInputs = (named: ProtocolContract, addressHref: str
     : []),
   {
     label: "name",
-    value: named.name,
+    value: named.entryName ?? named.name,
     kind: "offchain",
     pclass: "offchain",
     note: `Rails' registry of known contracts · verified source \`${named.contractName}\``,
     verify: { kind: "etherscan", href: `${addressHref}#code`, text: "Confirm the verified contract source" },
   },
+  ...(named.brandSource
+    ? [
+        {
+          label: "owner",
+          value: named.name,
+          kind: "offchain" as const,
+          pclass: "offchain" as const,
+          note: `The product the contract belongs to, from ${named.brandSource}`,
+        },
+      ]
+    : []),
 ];
 
 /** Supplied balance of a reserve AFTER this event = Σ supply/withdraw/transfer/seizure deltas.

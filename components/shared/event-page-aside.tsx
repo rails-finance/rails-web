@@ -321,11 +321,15 @@ export function EventPageAside({
   page,
   sentence,
   beside,
+  party,
   learnMore,
 }: {
   page: EventPageShell;
   sentence?: ReactNode;
   beside?: ReactNode;
+  /** The protocol the event went through, by its brand ("to Relay"): the
+   *  card's head chip, beside the h1 (rails-ops TO-DO-ui-jobs 438). */
+  party?: ReactNode;
   learnMore?: ReactNode;
 }) {
   const c = page.contract;
@@ -334,7 +338,16 @@ export function EventPageAside({
   const facts = heading ? c.facts.filter((f) => (f.full ?? f.value).toLowerCase() !== heading) : c.facts;
   return (
     <div className="flex flex-1 flex-col gap-4 px-5 pb-2 pt-4 text-sm" data-event-page-side="">
-      {sentence ? <EventPageSentence sentence={sentence} beside={beside} /> : page.title}
+      {sentence ? (
+        <EventPageSentence sentence={sentence} beside={beside} />
+      ) : party ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1" data-event-page-party="">
+          {page.title}
+          {party}
+        </div>
+      ) : (
+        page.title
+      )}
       <table className="w-full table-fixed border-collapse" data-event-page-facts="" data-prov-exempt="">
         <tbody className="divide-y divide-rb-200 dark:divide-rb-800">
           {facts.map((f) => (

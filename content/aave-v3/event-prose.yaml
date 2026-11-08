@@ -1817,7 +1817,7 @@ L5:
 
   transfer:
     title: |-
-      How Position Transfers Work
+      How position transfers work
     intro: |-
       Supplied balances are aTokens, which move between accounts like any token. A transfer hands supply to another account without leaving the Pool.
     detailsHeading: |-
@@ -1827,10 +1827,6 @@ L5:
           Not a deposit or withdrawal
         text: |-
           custody changes hands and no new value enters the Pool, so the lifetime flows give it a separate row.
-      - bold: |-
-          Two accounts, one move
-        text: |-
-          one transfer is an out-leg on the sender and an in-leg on the recipient.
       - bold: |-
           Health still enforced
         text: |-
@@ -1843,6 +1839,10 @@ L5:
           Who receives it
         text: |-
           the chain does not say whether the receiving account has the same owner.
+      - bold: |-
+          Through a third party
+        text: |-
+          supply sent to a swap or bridge router leaves the position, and the router swaps or bridges it and passes the output on.
     links:
       - label: |-
           aTokens

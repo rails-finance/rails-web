@@ -268,6 +268,20 @@ export interface ProtocolContract extends KnownContractBase {
    *  those also sit on venues' shared contracts (CoW's settlement, Uniswap's
    *  pools) and on the protocol's own adapters, which take the protocol's bar. */
   bar?: BarSubject;
+  /** The contract as its owner's product calls it, the brand left off, where
+   *  the entry's `name` does not give it ("Settler contract" for 0x's
+   *  Settlers, "router" for Zerion's). Read by `getProtocolContract` for a
+   *  branded router or settlement. */
+  brandNoun?: string;
+  /** Set by `getProtocolContract` on a router or settlement whose owner the
+   *  registry or `bar-owners.ts` states: the brand is `name` (the chip reads
+   *  "to Relay"), `entryName` the registry's own name ("Multicall router"),
+   *  and `fullName` the two joined for an explanation ("Relay’s Multicall
+   *  router"). Absent on every other entry, where `name` serves all three. */
+  entryName?: string;
+  fullName?: string;
+  /** Where the brand is stated, for the receipt's owner leaf. */
+  brandSource?: string;
 }
 
 /** Who a row's stretch of the timeline's side bar names: a product whose entry
@@ -376,6 +390,7 @@ const COW: ProtocolContract = {
   protocolGlyph: "cow",
   role: "CoW’s settlement contract, which takes in the tokens a CoW trade sells and pays out the tokens it buys",
   bar: COW_BAR,
+  brandNoun: "settlement contract",
 };
 const WETH_GATEWAY: ProtocolContract = {
   name: "WETH gateway",
@@ -464,6 +479,7 @@ const ENSO: ProtocolContract = {
   contractName: "EnsoShortcuts",
   role: "Enso’s shortcuts contract, which runs a batch of DeFi actions in one transaction",
   bar: ENSO_BAR,
+  brandNoun: "shortcuts contract",
 };
 
 const distributor = (name: string, contractName: string, role: string): ProtocolContract => ({
@@ -512,9 +528,10 @@ const zeroExSettler = (contractName: string): ProtocolContract => ({
     "settlement",
     "0x Settler",
     contractName,
-    "0x’s Settler, which takes in the tokens a 0x swap sells and pays out the tokens it buys",
+    "0x’s Settler contract, which takes in the tokens a 0x swap sells and pays out the tokens it buys",
   ),
   bar: ZEROX_BAR,
+  brandNoun: "Settler contract",
 });
 const oneInchFusion = (contractName: string) =>
   known(
@@ -608,10 +625,12 @@ const LIFI_EXECUTOR: ProtocolContract = {
 const DZAP_DIAMOND: ProtocolContract = {
   ...known("router", "DZap", "DZapDiamond", "DZap’s diamond, which routes a swap or a bridge across other venues"),
   bar: DZAP_BAR,
+  brandNoun: "diamond",
 };
 const RANGO_DIAMOND: ProtocolContract = {
   ...known("router", "Rango", "RangoDiamond", "Rango’s diamond, which routes a swap or a bridge across other venues"),
   bar: RANGO_BAR,
+  brandNoun: "diamond",
 };
 const SOCKET_GATEWAY: ProtocolContract = {
   ...known(
@@ -695,6 +714,7 @@ const PENDLE_SWAP: ProtocolContract = {
   ),
   proxyContractName: "ERC1967Proxy",
   bar: PENDLE_BAR,
+  brandNoun: "swap helper",
 };
 // PendleRouterV4, Ethereum, Base and Arbitrum 0x8888…f946: Pendle's own deployments
 // repo (pendle-finance/pendle-core-v2-public, `deployments/1-core.json`,
@@ -725,6 +745,7 @@ const MAYAN_SWIFT: ProtocolContract = {
     "Mayan’s Swift bridge contract, which takes in the tokens of a cross-chain order and releases them on the other side",
   ),
   bar: MAYAN_BAR,
+  brandNoun: "Swift bridge contract",
 };
 const SWIFT_DEST = known(
   "router",
@@ -1150,6 +1171,7 @@ const CALL_CHAIN_MULTICALL = known(
 const LIFI_DIAMOND: ProtocolContract = {
   ...known("router", "LI.FI", "LiFiDiamond", "LI.FI’s diamond, which routes a swap or a bridge across other venues"),
   bar: LIFI_BAR,
+  brandNoun: "diamond",
 };
 const RELAY_ROUTER_V3: ProtocolContract = {
   ...known(
@@ -1407,7 +1429,7 @@ const ENTRIES: [ChainId, string, KnownInfrastructure][] = [
   [
     BASE_CHAIN_ID,
     "0xd7f1dd5d49206349cae8b585fcb0ce3d96f1696f",
-    { ...router("Zerion", "Router", "Zerion’s"), protocolIcon: "zerion", bar: ZERION_BAR },
+    { ...router("Zerion", "Router", "Zerion’s"), protocolIcon: "zerion", bar: ZERION_BAR, brandNoun: "router" },
   ],
   [BASE_CHAIN_ID, "0x7d585b0e27bbb3d981b7757115ec11f47c476994", ENSO],
   [BASE_CHAIN_ID, "0x4fe93ebc4ce6ae4f81601cc7ce7139023919e003", ENSO],
@@ -1967,11 +1989,49 @@ export function barSubjectOf(to: string | null | undefined, chainId: ChainId): B
 }
 
 /** A protocol contract (settlement, router, adapter, gateway, multicall,
- *  amm-pool, lending-pool, distributor, staking) on a chain, or `undefined`. */
+ *  amm-pool, lending-pool, distributor, staking) on a chain, or `undefined`.
+ *  A router or settlement whose owner is stated (its `bar`, or `bar-owners.ts`)
+ *  is named by its brand (Miles, 8 Nov 2026, rails-ops TO-DO-ui-jobs 438). */
 export function getProtocolContract(
   address: string | null | undefined,
   chainId: ChainId,
 ): ProtocolContract | undefined {
   const entry = getKnownInfrastructure(address, chainId);
-  return entry && entry.kind !== "ccip-lock-release" ? entry : undefined;
+  if (!entry || entry.kind === "ccip-lock-release") return undefined;
+  if (entry.kind !== "router" && entry.kind !== "settlement") return entry;
+  const owner = entry.bar ? undefined : barOwnerOf(address, chainId);
+  const brand = (entry.bar ?? owner?.subject)?.name;
+  if (!brand) return entry;
+  const source = owner
+    ? owner.source
+    : entry.growthepie?.owner
+      ? "growthepie's contract labels"
+      : "the owner's publication or verified source, as Rails' registry cites it";
+  return branded(entry, brand, source);
+}
+
+const BRANDED = new Map<ProtocolContract, ProtocolContract>();
+function branded(entry: ProtocolContract, brand: string, brandSource: string): ProtocolContract {
+  let out = BRANDED.get(entry);
+  if (!out) {
+    // A name ending in s takes the apostrophe alone ("Odos’ router").
+    const possessive = brand.endsWith("s") ? `${brand}’` : `${brand}’s`;
+    out = {
+      ...entry,
+      name: brand,
+      entryName: entry.name,
+      fullName: `${possessive} ${brandNounOf(entry, brand)}`,
+      brandSource,
+    };
+    BRANDED.set(entry, out);
+  }
+  return out;
+}
+
+/** The entry's name with the brand left off ("LI.FI DEX aggregator" → "DEX
+ *  aggregator"), or its `brandNoun`. */
+function brandNounOf(entry: ProtocolContract, brand: string): string {
+  if (entry.brandNoun) return entry.brandNoun;
+  if (entry.name.startsWith(`${brand} `)) return entry.name.slice(brand.length + 1);
+  return entry.name === brand ? "contract" : entry.name;
 }

@@ -433,7 +433,7 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
     }
     case "aave3.transfer_in": {
       const named = getProtocolContract(ctx.counterparty, chainId);
-      v.sender = named?.name ?? V3_WORDS.another_account;
+      v.sender = named?.fullName ?? named?.name ?? V3_WORDS.another_account;
       if (named) v.role = named.role;
       if (variant === "distributor") sp.say("tin.payout", { amount: "transfer" });
       else {
@@ -449,7 +449,7 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
     }
     case "aave3.transfer_out": {
       const named = getProtocolContract(ctx.counterparty, chainId);
-      v.recipient = named?.name ?? V3_WORDS.another_account;
+      v.recipient = named?.fullName ?? named?.name ?? V3_WORDS.another_account;
       if (named) v.role = named.role;
       if (variant === "sold" && ctx.sale && named) {
         v.received = Number(legAmount(ctx.sale.leg));

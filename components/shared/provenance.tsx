@@ -633,6 +633,13 @@ function ProvModal({ ariaLabel, onClose, children }: { ariaLabel: string; onClos
   );
 }
 
+/** Whether a receipt's exact value is a figure (the notation modal's subject),
+ *  not a name or an address. */
+function isFigure(value: string): boolean {
+  const t = value.replace(/[−+$,%\s]/g, "");
+  return t !== "" && !/x/i.test(t) && Number.isFinite(Number(t));
+}
+
 /** Names the ACTUAL adjustment the compact form made to this value — the
  *  direction and size of the rounding — not just the general rule. */
 function NotationModal({ display, exact, onClose }: { display: string; exact: string; onClose: () => void }) {
@@ -805,6 +812,10 @@ export function ProvReceipt({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [info]);
   const compacted = Boolean(display && display !== value);
+  // The notation (?) explains a figure's compact or rounded form; a name or an
+  // address shown short is no figure, and its receipt's leaves say where the
+  // name comes from.
+  const figure = compacted && isFigure(value);
   // Headline token icon: the captured ticker, else the vocabulary's "asset" leaf.
   const sym = symbol ?? byLabel("asset")?.value ?? null;
   // Embedded dedup: the popover's head already carries the name, the value and
@@ -906,7 +917,7 @@ export function ProvReceipt({
                 <TokenChipIcon symbol={sym} size={20} filterable={false} />
               </span>
             )}
-            {compacted && (
+            {figure && (
               <button
                 type="button"
                 className="prov-fmt-help"
@@ -921,7 +932,7 @@ export function ProvReceipt({
         {compacted && (
           <div className="prov-ins-exact">
             {value}
-            {embedded && (
+            {embedded && figure && (
               <button
                 type="button"
                 className="prov-fmt-help"

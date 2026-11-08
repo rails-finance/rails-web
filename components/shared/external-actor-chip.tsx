@@ -43,7 +43,9 @@ export function ExternalActorChip({
   );
   return (
     <Prov info={prov} value={name ?? address} className="inline-flex items-center gap-1 text-sm">
-      <span className="text-rb-500">{prefix}</span>
+      <span className="text-rb-500" data-prov-hidden="">
+        {prefix}
+      </span>
       {tip ? <RevealTip tip={tip}>{label}</RevealTip> : label}
     </Prov>
   );
