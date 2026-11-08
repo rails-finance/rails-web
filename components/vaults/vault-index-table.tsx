@@ -4,10 +4,13 @@
 // `/vaults?layout=table` beside the cards (V1) while Miles compares the two;
 // the one he does not pick is deleted, so this file stands alone.
 // ----------------------------------------------------------------------------
-// One row per vault: Vault (the asset's icon, the name linking the vault's page
-// under its protocol, the chain beneath), Protocol (mark, name, the vault's
-// pills), then the four headlines in the row's order. Every figure is the
-// row's own (vaultHeads), with its receipt; nothing is re-derived here.
+// One row per vault in the house table (components/shared/data-table): the
+// lead zone (the protocol's tint, mark and chain, named for a screen reader
+// and in its tooltip), Vault (the asset's icon, the name linking the vault's
+// page under its protocol, the standing pills beneath where there are any),
+// then Total assets, Share price, Yield and Holders. Every figure is the row's
+// own with its receipt (vaultHeads; Holders is the census's open count with
+// the census receipt); nothing is re-derived here.
 //
 // SORT. Each column header is a button; the sort lives in `?sort=` and
 // `?dir=`, each written only off its default (Holders, most first, the cards'
@@ -17,24 +20,43 @@
 // point 8: no USD, no cross-asset total). Yield and Holders compare across
 // every row. A vault with no figure for the key sorts last, both ways.
 //
-// BELOW sm the table scrolls inside its own frame with the Vault column
-// pinned at the left; the page never scrolls sideways.
+// The whole row links the vault's page (the name is the one focusable link).
+// BELOW sm the table scrolls inside its own frame with the lead zone and the
+// Vault column pinned at the left; the page never scrolls sideways.
 
 import Link from "next/link";
 import { useCallback, type ReactNode } from "react";
+import type { ChainId } from "@/lib/shared/chains";
 import { Prov } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
-import { VaultPills, vaultHeads, YIELD_LABEL_TIP, type VaultRowReceipts } from "@/components/vaults/vault-heads";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableLeadCell,
+  DataTableLeadHeader,
+  DataTableRow,
+  DataTableRowLink,
+} from "@/components/shared/data-table/data-table";
+import {
+  STANDING_WORD,
+  VAULT_PILL,
+  vaultHeads,
+  YIELD_LABEL_TIP,
+  type VaultRowReceipts,
+} from "@/components/vaults/vault-heads";
+import { vaultHoldersProv } from "@/lib/vaults/row-provenance";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { VAULT_FAMILIES } from "@/lib/vaults/families";
-import { chainName, VAULT_INDEX_PROTOCOL_LABEL, vaultIndexProtocol } from "@/lib/vaults/index-rosters";
+import { VAULT_INDEX_PROTOCOL_LABEL, vaultIndexProtocol } from "@/lib/vaults/index-rosters";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
 import type { VaultYield } from "@/lib/vaults/yield";
 
-type SortKey = "vault" | "protocol" | "assets" | "price" | "yield" | "holders";
+type SortKey = "vault" | "assets" | "price" | "yield" | "holders";
 
 interface Column {
   key: SortKey;
@@ -46,7 +68,6 @@ interface Column {
 
 const COLUMNS: readonly Column[] = [
   { key: "vault", label: "Vault", first: "asc", numeric: false },
-  { key: "protocol", label: "Protocol", first: "asc", numeric: false },
   { key: "assets", label: "Total assets", first: "desc", numeric: true },
   { key: "price", label: "Share price", first: "desc", numeric: true },
   { key: "yield", label: "Yield", first: "desc", numeric: true },
@@ -71,7 +92,7 @@ function figureOf(key: SortKey, v: VaultSummary, y: VaultYield | undefined): num
     case "yield":
       return y && "yearly" in y ? y.yearly : null;
     case "holders":
-      return v.census?.holders ?? null;
+      return v.census?.live ?? null;
     default:
       return null;
   }
@@ -84,12 +105,6 @@ function comparator(key: SortKey, dir: "asc" | "desc", yieldOf: (v: VaultSummary
   const byName = (a: VaultSummary, b: VaultSummary) => text(nameOf(a), nameOf(b)) || a.address.localeCompare(b.address);
   return (a: VaultSummary, b: VaultSummary): number => {
     if (key === "vault") return sign * byName(a, b) || a.chainId - b.chainId;
-    if (key === "protocol")
-      return (
-        sign *
-          text(VAULT_INDEX_PROTOCOL_LABEL[vaultIndexProtocol(a)], VAULT_INDEX_PROTOCOL_LABEL[vaultIndexProtocol(b)]) ||
-        byName(a, b)
-      );
     // An amount in the asset compares inside its token only.
     const within = key === "assets" || key === "price" ? byToken(a, b) : 0;
     if (within !== 0) return within;
@@ -103,7 +118,11 @@ function comparator(key: SortKey, dir: "asc" | "desc", yieldOf: (v: VaultSummary
   };
 }
 
-const CELL = "px-3 py-2.5 align-top";
+/** Below sm the lead zone and the Vault column stay pinned while the frame scrolls. */
+const PIN_LEAD = "max-sm:sticky max-sm:left-0";
+const PIN_VAULT = "max-sm:sticky max-sm:left-16";
+
+const n = (x: number) => x.toLocaleString("en-US");
 
 export function VaultIndexTable({
   rows,
@@ -151,50 +170,6 @@ export function VaultIndexTable({
   const sorted = [...rows].sort(comparator(sort, dir, yieldOf));
   const inToken = sort === "assets" || sort === "price";
 
-  const header = (c: Column, sticky: boolean): ReactNode => {
-    const on = c.key === sort;
-    return (
-      <th
-        key={c.key}
-        scope="col"
-        aria-sort={on ? (dir === "asc" ? "ascending" : "descending") : undefined}
-        data-sort-key={c.key}
-        className={`${CELL} py-2 text-xs font-semibold whitespace-nowrap text-rb-500 ${c.numeric ? "text-right" : "text-left"} ${
-          sticky
-            ? "sticky left-0 z-10 bg-background max-sm:shadow-[inset_-1px_0_0_0_var(--color-rb-200)] dark:max-sm:shadow-[inset_-1px_0_0_0_var(--color-rb-700)]"
-            : ""
-        }`}
-      >
-        <span className={`inline-flex items-center gap-1 ${c.numeric ? "flex-row-reverse" : ""}`}>
-          <button
-            type="button"
-            onClick={() => press(c.key)}
-            className={`inline-flex cursor-pointer items-center gap-1 rounded-sm focus-ring hover:text-foreground ${
-              on ? "text-foreground" : ""
-            }`}
-          >
-            {c.label}
-            <span aria-hidden className={`text-[10px] ${on ? "" : "invisible"}`}>
-              {on && dir === "asc" ? "▲" : "▼"}
-            </span>
-          </button>
-          {c.key === "yield" && (
-            // The label's tip marks the figure as Rails's interpretation, as on the row.
-            <RevealTip
-              tip={YIELD_LABEL_TIP}
-              label={`Yield: ${YIELD_LABEL_TIP}`}
-              focusable
-              wrap
-              className="focus-ring rounded-sm"
-            >
-              <span className="tip-underline text-[10px]">?</span>
-            </RevealTip>
-          )}
-        </span>
-      </th>
-    );
-  };
-
   return (
     <div data-vault-table={part}>
       {inToken && part === "funded" && (
@@ -202,111 +177,159 @@ export function VaultIndexTable({
           Sorted by token, then by {sort === "assets" ? "total assets" : "share price"} within each token.
         </p>
       )}
-      <div className="relative max-w-full overflow-x-auto rounded-xl border border-rb-200 dark:border-rb-700">
-        <table className="w-full min-w-[760px] border-collapse text-sm">
-          <caption className="sr-only">
-            {part === "funded" ? "Vaults" : "Vaults that hold nothing"}; total assets and share price are in each
-            vault&rsquo;s asset
-          </caption>
-          <thead className="border-b border-rb-200 dark:border-rb-700">
-            <tr>{COLUMNS.map((c, i) => header(c, i === 0))}</tr>
-          </thead>
-          <tbody>
-            {sorted.map((v) => {
-              const receipts = receiptsOf(v);
-              const heads = vaultHeads({ vault: v, yieldFigure: yieldOf(v), holdersHref: holdersHrefOf(v), receipts });
-              const head = (id: string) => heads.find((h) => h.id === id);
-              const name = v.name ?? v.catalogName ?? v.symbol;
-              const protocol = vaultIndexProtocol(v);
-              const raw = v.totalAssets?.raw ?? "";
-              const figure = (id: string) => {
-                const h = head(id);
-                return (
-                  <td className={`${CELL} text-right tabular-nums`} data-col={id}>
-                    <div className="flex flex-col items-end gap-0.5">
-                      {h?.value != null ? (
-                        <span className="text-sm font-semibold text-foreground">{h.value}</span>
-                      ) : (
-                        <span className="text-sm text-rb-500">
-                          <span aria-hidden>–</span>
-                          <span className="sr-only">no figure</span>
+      <DataTable
+        caption={`${part === "funded" ? "Vaults" : "Vaults that hold nothing"}; total assets and share price are in each vault’s asset`}
+        tableClassName="min-w-[640px] text-sm"
+      >
+        <DataTableHead>
+          <DataTableLeadHeader sticky={PIN_LEAD} />
+          {COLUMNS.map((c) => (
+            <DataTableHeader
+              key={c.key}
+              label={c.label}
+              align={c.numeric ? "right" : "left"}
+              sticky={c.key === "vault" ? PIN_VAULT : ""}
+              sort={{ dir: c.key === sort ? dir : null, onSort: () => press(c.key) }}
+              data-sort-key={c.key}
+              after={
+                c.key === "yield" && (
+                  // The label's tip marks the figure as Rails's interpretation, as on the row.
+                  <RevealTip
+                    tip={YIELD_LABEL_TIP}
+                    label={`Yield: ${YIELD_LABEL_TIP}`}
+                    focusable
+                    wrap
+                    className="focus-ring rounded-sm"
+                  >
+                    <span className="tip-underline text-[10px]">?</span>
+                  </RevealTip>
+                )
+              }
+            />
+          ))}
+        </DataTableHead>
+        <DataTableBody>
+          {sorted.map((v) => {
+            const receipts = receiptsOf(v);
+            const href = hrefOf(v);
+            const heads = vaultHeads({ vault: v, yieldFigure: yieldOf(v), holdersHref: null, receipts });
+            const head = (id: string) => heads.find((h) => h.id === id);
+            const name = v.name ?? v.catalogName ?? v.symbol;
+            const raw = v.totalAssets?.raw ?? "";
+            const c = v.census;
+            const holdersHref = holdersHrefOf(v);
+            const cell = (id: string, value: ReactNode) => (
+              <DataTableCell
+                align="right"
+                valign="middle"
+                className="whitespace-nowrap tabular-nums [&_.flex-wrap]:flex-nowrap [&_.flex-wrap]:justify-end"
+                data-col={id}
+              >
+                {value != null ? (
+                  <span className="text-sm font-semibold text-foreground">{value}</span>
+                ) : (
+                  <span className="text-sm text-rb-500">
+                    <span aria-hidden>–</span>
+                    <span className="sr-only">no figure</span>
+                  </span>
+                )}
+              </DataTableCell>
+            );
+            // Holders: the census's open count, with the census receipt;
+            // linked to the positions listing filtered to this vault.
+            const holders =
+              c == null ? null : c.live > 0 && holdersHref ? (
+                <Link
+                  href={holdersHref}
+                  prefetch={false}
+                  className="hover:text-blue-600 dark:hover:text-[var(--text-link)]"
+                  data-cell="holders"
+                  data-positions-link={v.address}
+                  data-link="vault-positions"
+                  data-positions-vault={v.address}
+                >
+                  <Prov info={vaultHoldersProv(v, c)}>{n(c.live)}</Prov>
+                </Link>
+              ) : (
+                <span data-cell="holders" data-positions-none="">
+                  <Prov info={vaultHoldersProv(v, c)}>{n(c.live)}</Prov>
+                </span>
+              );
+            return (
+              <DataTableRow
+                href={href}
+                key={`${v.chainId}:${v.address}`}
+                data-vault-table-row={v.address}
+                data-group={raw === "" ? "unread" : BigInt(raw) > BigInt(0) ? "funded" : "empty"}
+                data-asset={v.asset.address}
+                data-total-assets-raw={raw}
+                data-share-price-raw={v.sharePrice?.raw ?? ""}
+                data-vault-family={v.family}
+                data-holders-live={c?.live ?? ""}
+                {...hooksOf(v)}
+              >
+                <DataTableLeadCell
+                  protocol={VAULT_FAMILIES[v.family].venue}
+                  protocolName={VAULT_INDEX_PROTOCOL_LABEL[vaultIndexProtocol(v)]}
+                  chain={v.chainId as ChainId}
+                  sticky={PIN_LEAD}
+                />
+                <DataTableCell
+                  rowHeader
+                  sticky={PIN_VAULT}
+                  valign="middle"
+                  className="max-sm:max-w-[150px] max-sm:min-w-[130px] sm:min-w-[260px]"
+                >
+                  <div className="flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:gap-2.5">
+                    <span className="shrink-0" data-prov-exempt>
+                      <TokenChipIcon
+                        symbol={v.asset.symbol}
+                        address={v.asset.address}
+                        size={28}
+                        filterable={false}
+                        untitled
+                      />
+                    </span>
+                    <span className="flex min-w-0 flex-col gap-1">
+                      <DataTableRowLink
+                        href={href}
+                        className="min-w-0 text-sm font-semibold break-words"
+                        data-vault-link={v.address}
+                        data-vault-name
+                      >
+                        {v.name != null && receipts.name ? (
+                          <Prov info={receipts.name}>{v.name}</Prov>
+                        ) : name != null ? (
+                          name
+                        ) : (
+                          <span className="font-mono">{shortAddress(v.address)}</span>
+                        )}
+                      </DataTableRowLink>
+                      {v.standing.length > 0 && (
+                        <span className="flex flex-wrap gap-1">
+                          {v.standing.map((st) => (
+                            <span key={st} className={VAULT_PILL} data-pill={st}>
+                              {receipts.standing?.[st] ? (
+                                <Prov info={receipts.standing[st]}>{STANDING_WORD[st]}</Prov>
+                              ) : (
+                                STANDING_WORD[st]
+                              )}
+                            </span>
+                          ))}
                         </span>
                       )}
-                      {h?.sub != null && <span className="text-[11px] leading-snug text-rb-500">{h.sub}</span>}
-                    </div>
-                  </td>
-                );
-              };
-              return (
-                <tr
-                  key={`${v.chainId}:${v.address}`}
-                  className="group/tr border-b border-rb-200 last:border-b-0 dark:border-rb-700"
-                  data-vault-table-row={v.address}
-                  data-group={raw === "" ? "unread" : BigInt(raw) > BigInt(0) ? "funded" : "empty"}
-                  data-asset={v.asset.address}
-                  data-total-assets-raw={raw}
-                  data-share-price-raw={v.sharePrice?.raw ?? ""}
-                  data-vault-family={v.family}
-                  data-holders-live={v.census?.live ?? ""}
-                  {...hooksOf(v)}
-                >
-                  <th
-                    scope="row"
-                    className={`${CELL} sticky left-0 z-10 max-w-[180px] bg-background max-sm:shadow-[inset_-1px_0_0_0_var(--color-rb-200)] dark:max-sm:shadow-[inset_-1px_0_0_0_var(--color-rb-700)] text-left font-normal sm:max-w-none`}
-                  >
-                    <div className="flex items-start gap-2">
-                      <span className="mt-0.5 shrink-0" data-prov-exempt>
-                        <TokenChipIcon
-                          symbol={v.asset.symbol}
-                          address={v.asset.address}
-                          size={20}
-                          filterable={false}
-                          untitled
-                        />
-                      </span>
-                      <span className="flex min-w-0 flex-col">
-                        <Link
-                          href={hrefOf(v)}
-                          prefetch={false}
-                          className="text-sm font-semibold break-words text-blue-600 hover:underline dark:text-[var(--text-link)]"
-                          data-vault-link={v.address}
-                          data-vault-name
-                        >
-                          {v.name != null && receipts.name ? (
-                            <Prov info={receipts.name}>{v.name}</Prov>
-                          ) : name != null ? (
-                            name
-                          ) : (
-                            <span className="font-mono">{shortAddress(v.address)}</span>
-                          )}
-                        </Link>
-                        <span className="text-[11px] text-rb-500" data-vault-chain={v.chainId}>
-                          {chainName(v.chainId)}
-                        </span>
-                      </span>
-                    </div>
-                  </th>
-                  <td className={CELL} data-col="protocol">
-                    <span className="inline-flex items-center gap-1.5 font-medium whitespace-nowrap text-foreground">
-                      <span aria-hidden className="inline-flex">
-                        <ProtocolIcon id={VAULT_FAMILIES[v.family].venue} className="h-4 w-4" />
-                      </span>
-                      {VAULT_INDEX_PROTOCOL_LABEL[protocol]}
                     </span>
-                    <span className="mt-1 flex flex-wrap gap-1">
-                      <VaultPills vault={v} receipts={receipts} />
-                    </span>
-                  </td>
-                  {figure("total-assets")}
-                  {figure("share-price")}
-                  {figure("yield")}
-                  {figure("holders")}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                  </div>
+                </DataTableCell>
+                {cell("total-assets", head("total-assets")?.value)}
+                {cell("share-price", head("share-price")?.value)}
+                {cell("yield", head("yield")?.value)}
+                {cell("holders", holders)}
+              </DataTableRow>
+            );
+          })}
+        </DataTableBody>
+      </DataTable>
     </div>
   );
 }
