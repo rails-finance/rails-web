@@ -73,7 +73,7 @@ export function FxPoolStatsBand({
                 label="Debt"
                 note={
                   p.settledBlock != null ? (
-                    <span title="Pool totals are the contract's own settled views, read at this block">
+                    <span title="Pool totals are the contract's settled views, read at this block">
                       settled @ {p.settledBlock}
                     </span>
                   ) : undefined

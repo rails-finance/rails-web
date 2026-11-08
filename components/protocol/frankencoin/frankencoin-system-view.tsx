@@ -85,10 +85,10 @@ function FrancCard({ data, readBy }: { data: FrankencoinSystemChainResponse; rea
       </p>
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-        ZCHF is a Swiss-franc stablecoin with more than one minter — the hubs below, a bridge, and the savings
-        module&rsquo;s interest all mint it — so the supply is the franc count itself, stated beside the hub book rather
-        than equated with it. The FPS price is the Equity contract&rsquo;s own issuance rule (3 × equity ÷ FPS supply),
-        in ZCHF like every figure on this page.
+        ZCHF is a Swiss-franc stablecoin with more than one minter (the hubs below, a bridge, and the savings
+        module&rsquo;s interest all mint it) so the supply is the franc count, stated beside the hub book rather than
+        equated with it. The FPS price is the Equity contract&rsquo;s issuance rule (3 × equity ÷ FPS supply), in ZCHF
+        like every figure on this page.
       </p>
     </div>
   );
@@ -133,10 +133,10 @@ function CapitalCard({ data, readBy }: { data: FrankencoinSystemChainResponse; r
       )}
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-        One pool, two accounts — the reserve&rsquo;s balance equals equity plus the borrowers&rsquo; contributions by
-        the contract&rsquo;s own accounting, and this page reads all three sides at one block. A challenge shortfall
-        lands on the position&rsquo;s own contribution first, then on the equity: the FCS holders&rsquo; capital is the
-        junior tranche.
+        One pool, two accounts: the reserve&rsquo;s balance equals equity plus the borrowers&rsquo; contributions by the
+        contract&rsquo;s accounting, and this page reads all three sides at one block. A challenge shortfall lands on
+        the position&rsquo;s own contribution first, then on the equity: the FCS holders&rsquo; capital is the junior
+        tranche.
       </p>
     </div>
   );
@@ -185,9 +185,9 @@ function RatesCard({ data, readBy }: { data: FrankencoinSystemChainResponse; rea
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
         The Leadrate prices <span className="text-foreground">new</span> V2 minting: each position pays it plus its own
         fixed risk premium, charged up front for the remaining term at each mint. Governance moves the Leadrate, and a
-        position&rsquo;s past mints keep the rate of their own moment — today&rsquo;s figure prices today&rsquo;s
-        minting only. V1 positions fixed their whole rate at opening; the opening fee is the flat spam gate every new
-        original position pays before its veto window starts.
+        position&rsquo;s past mints keep the rate of their own moment, today&rsquo;s figure prices today&rsquo;s minting
+        only. V1 positions fixed their whole rate at opening; the opening fee is the flat spam gate every new original
+        position pays before its veto window starts.
       </p>
     </div>
   );
@@ -255,7 +255,7 @@ function BookCard({ book, supply }: { book: FrankencoinBook; supply: number }) {
             )}
           </p>
           <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-            Anyone can open a position on any ERC-20 — {book.clones} of the {book.total} are clones reusing an
+            Anyone can open a position on any ERC-20: {book.clones} of the {book.total} are clones reusing an
             already-vetted original&rsquo;s terms. The tokens are counted rather than summed:{" "}
             <span className="text-foreground">no collateral total exists here</span>, because valuing{" "}
             {book.allCollateralTokens} different tokens would take a price feed the protocol deliberately runs without.{" "}
@@ -325,8 +325,8 @@ function EnforcementCard({ book }: { book: FrankencoinBook }) {
           <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
             This record is Frankencoin&rsquo;s whole substitute for an oracle: declared prices stand until a challenge
             auction tests one, the veto window filters new originals, and forced sales clear what expires. A challenge
-            that reached a phase-2 sale sold position collateral; the others were averted at the declared price — the
-            market calling the price fair — or are still running.
+            that reached a phase-2 sale sold position collateral; the others were averted at the declared price, the
+            market calling the price fair, or are still running.
           </p>
         </>
       )}

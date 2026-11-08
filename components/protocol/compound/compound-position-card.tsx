@@ -401,7 +401,7 @@ export function useCompoundCardSlots({
     const noPeaksNote = peaks ? undefined : notRecordedNote("position");
     // On the Base sweep the peak is the base's replayed PRINCIPAL; on Ethereum
     // each row is the chain's balance, interest included.
-    const principalNote = vocab.baseAtLastEvent ? undefined : "principal only — accrued interest not included";
+    const principalNote = vocab.baseAtLastEvent ? undefined : "principal only: accrued interest not included";
     // A wallet that only ever lent the base posted no collateral: its peak is
     // "supply" (the Aave V4 spoke-card grammar).
     const supplyOnly = v.peak.collateral.length === 0 && v.peak.lentBase > 0;

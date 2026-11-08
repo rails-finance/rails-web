@@ -67,14 +67,14 @@ export function DolomitePositionExplanation({
   const lead: React.ReactNode = hasDebt ? (
     <>The account borrows against its own collateral inside a single cross-margined account number:</>
   ) : supplied.length > 0 ? (
-    <>The account is lending only — every balance is positive, so nothing in it can be liquidated:</>
+    <>The account is lending only. Every balance is positive, so nothing in it can be liquidated:</>
   ) : null;
 
   const bullets: React.ReactNode[] = [];
 
   if (hasDebt) {
     bullets.push(
-      <span key="negative-balance">A negative balance IS the debt here — Dolomite has no separate Borrow action.</span>,
+      <span key="negative-balance">A negative balance IS the debt here: Dolomite has no separate Borrow action.</span>,
     );
   }
 
@@ -134,7 +134,7 @@ export function DolomitePositionExplanation({
       bullets.push(
         <span key="capacity">
           That adjusted debt sits at <H>{pct(chain.adjBorrowValueUsd / capacityUsd)}</H> of the account&rsquo;s borrow
-          capacity — it becomes liquidatable at <H>{formatUsd(capacityUsd)}</H> of adjusted debt.
+          capacity: it becomes liquidatable at <H>{formatUsd(capacityUsd)}</H> of adjusted debt.
         </span>,
       );
     }
@@ -151,8 +151,8 @@ export function DolomitePositionExplanation({
       const globalSpreadPct = `${(chain.liquidationSpread * 100).toFixed(0)}%`;
       bullets.push(
         <span key="override">
-          The account carries <H>Dolomite&rsquo;s own account-level risk override</H> — an e-mode-like carve-out the
-          protocol grants its correlated-pair categories (ETH liquid-staking pairs, BTC pairs):{" "}
+          The account carries <H>Dolomite&rsquo;s account-level risk override</H>. An e-mode-like carve-out the protocol
+          grants its correlated-pair categories (ETH liquid-staking pairs, BTC pairs):{" "}
           {reqPct === globalReqPct ? (
             <>
               its minimum collateralisation stays at the global <H>{reqPct}%</H>
@@ -269,15 +269,15 @@ export function DolomitePositionExplanation({
       <span key="operators">
         {operatorLead(ext, null, "recorded on this account")}
         {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed by a third-party address.
-        Dolomite has one permission for that and it is all-or-nothing: an operator the owner registered — or one the
-        protocol&rsquo;s admin approved across every account — may deposit, withdraw, transfer and trade the account
+        Dolomite has one permission for that and it is all-or-nothing: an operator the owner registered, or one the
+        protocol&rsquo;s admin approved across every account, may deposit, withdraw, transfer and trade the account
         alike, so nothing here separates an address trusted to top the account up from one trusted to empty it.
         {ext.actors.length === 1
           ? leadName
             ? ` All of it ran through ${leadName}.`
             : " A single address accounts for all of it."
           : leadName
-            ? ` Most of it — ${ext.actors[0].count.toLocaleString("en-US")} events — ran through ${leadName}, with the remaining ${others.toLocaleString("en-US")} spread across ${ext.actors.length - 1} other address${ext.actors.length === 2 ? "" : "es"}${secondName ? `, one of them ${secondName}` : ""}.`
+            ? ` Most of it, ${ext.actors[0].count.toLocaleString("en-US")} events, ran through ${leadName}, with the remaining ${others.toLocaleString("en-US")} spread across ${ext.actors.length - 1} other address${ext.actors.length === 2 ? "" : "es"}${secondName ? `, one of them ${secondName}` : ""}.`
             : ` The work is spread across ${ext.actors.length} addresses, the most active of them accounting for ${ext.actors[0].count.toLocaleString("en-US")}.`}
       </span>,
     );
