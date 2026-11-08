@@ -589,8 +589,8 @@ export default function FxPositionView({
               an empty timeline is the truthful record, not missing data. */}
             {view && !onEventPage && fxEvents.length === 0 && (
               <div className="text-sm text-rb-500">
-                This position has no recorded events — it was created by a path that logs nothing, so only the
-                pool&rsquo;s own current figures above describe it.
+                This position has no recorded events: it was created by a path that logs nothing, so only the
+                pool&rsquo;s current figures above describe it.
               </div>
             )}
             <FxSocializedReadsContext.Provider value={socializedReads}>

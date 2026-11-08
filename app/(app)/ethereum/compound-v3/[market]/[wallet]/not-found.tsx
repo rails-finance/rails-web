@@ -11,7 +11,7 @@ export default function CompoundPositionNotFound() {
       backLabel="Browse Compound V3 positions"
     >
       This page is about one account on one Comet, named by its 20-byte address. The URL does not carry one, so there is
-      no account to look up — an address the market has simply never seen would still resolve, and say so.
+      no account to look up. An address the market has simply never seen would still resolve, and say so.
     </RouteNotFound>
   );
 }

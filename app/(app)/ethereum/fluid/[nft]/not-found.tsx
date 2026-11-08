@@ -11,7 +11,7 @@ export default function FluidPositionNotFound() {
       backLabel="Browse Fluid positions"
     >
       A Fluid position is an ERC-721, and its id is a whole number. The URL does not carry one, so there is nothing the
-      vault could answer to — an id it has not minted yet would still resolve, and say so.
+      vault could answer to. An id it has not minted yet would still resolve, and say so.
     </RouteNotFound>
   );
 }
