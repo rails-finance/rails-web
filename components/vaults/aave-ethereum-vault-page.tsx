@@ -649,6 +649,7 @@ export function AaveEthereumVaultPage({
       <VaultAssets
         rows={rows}
         assetSymbol={unit}
+        assetAddress={asset.address}
         assetDecimals={ad}
         line={
           family === "sgho" ? (

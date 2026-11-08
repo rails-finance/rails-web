@@ -21,7 +21,8 @@
 //   3. Every reserve's caps text matches this script's reading of the route
 //      (closed / no cap / off / N% used, each side).
 //   4. The summary's closed count equals this script's count.
-//   5. At 390px the page does not scroll sideways, and every reserve is a block.
+//   5. At 390px the page does not scroll sideways, and every reserve is a card
+//      (the table's row, stacked: D6).
 // And once each:
 //   6. Core carries a cap-1 side and it reads "closed"; SparkLend carries a
 //      field-max cap and it reads "no cap", and an automator maximum.
@@ -146,7 +147,7 @@ for (const p of PAGES) {
     const tagged = await wide.evaluate(
       () =>
         [...document.querySelectorAll("tr[data-reserve-row]")].filter((tr) =>
-          /frozen/i.test(tr.querySelector("td")?.textContent ?? ""),
+          /frozen/i.test(tr.querySelector("th, td")?.textContent ?? ""),
         ).length,
     );
     const frozen = rows.filter((r) => r.frozen).length;
@@ -183,17 +184,20 @@ for (const p of PAGES) {
   // ── Narrow ───────────────────────────────────────────────────────────────
   const narrow = await browser.newPage({ viewport: { width: 390, height: 900 } });
   await narrow.goto(`${BASE}${p.path}`, NAV);
-  await narrow.locator("li[data-reserve-row]").first().waitFor({ timeout: ROWS_TIMEOUT_MS });
-  const { sw, cw, blocks, tables } = await narrow.evaluate(() => ({
-    sw: document.scrollingElement.scrollWidth,
-    cw: document.scrollingElement.clientWidth,
-    blocks: document.querySelectorAll("li[data-reserve-row]").length,
-    tables: document.querySelectorAll("tr[data-reserve-row]").length,
-  }));
+  await narrow.locator("tr[data-reserve-row]").first().waitFor({ timeout: ROWS_TIMEOUT_MS });
+  const { sw, cw, cards, rowsDrawn } = await narrow.evaluate(() => {
+    const trs = [...document.querySelectorAll("tr[data-reserve-row]")];
+    return {
+      sw: document.scrollingElement.scrollWidth,
+      cw: document.scrollingElement.clientWidth,
+      cards: trs.filter((tr) => getComputedStyle(tr).display === "grid").length,
+      rowsDrawn: trs.length,
+    };
+  });
   check(
-    `${p.name} 5  390px: no sideways scroll, one block per reserve`,
-    sw <= cw + 1 && blocks === rows.length && tables === 0,
-    `scrollWidth ${sw} / ${cw}, ${blocks} blocks`,
+    `${p.name} 5  390px: no sideways scroll, one card per reserve`,
+    sw <= cw + 1 && cards === rows.length && rowsDrawn === rows.length,
+    `scrollWidth ${sw} / ${cw}, ${cards} cards of ${rowsDrawn} rows`,
   );
   await narrow.close();
 }

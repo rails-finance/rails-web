@@ -369,6 +369,7 @@ export function YearnVaultPage({
       <VaultAssets
         rows={rows}
         assetSymbol={unit}
+        assetAddress={asset.address}
         assetDecimals={ad}
         line={
           <>

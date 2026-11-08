@@ -8,6 +8,13 @@
 // of this vault" is a fraction of one vault's book, both terms reads of the
 // vault at one block (survey §7.3); its header tip names the denominator. One
 // line under the heading; the rest is behind the section's "?".
+//
+// From sm every row is two lines, 64px (D1 `rowHeight="two"`): the venue over its
+// sub-label, each truncating with its full text in a `title` where it is
+// text. Amount carries the asset's mark (`AssetUnit`). Rows are unlinked: a
+// venue has no one Rails page (a Morpho market has two, a strategy or a
+// reserve none). Below sm each row is a card (D6): the venue across, Amount
+// and Share two-up under their names, the links on a line at the foot.
 
 import type { ReactNode } from "react";
 import { AllocationBar, type AllocationSegment } from "@/components/shared/ratio-bar";
@@ -15,6 +22,7 @@ import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { NotLoaded } from "@/components/shared/not-loaded";
+import { AssetUnit } from "@/components/shared/asset-unit";
 import {
   DataTable,
   DataTableBody,
@@ -54,6 +62,7 @@ export interface VaultAssetRow {
 export function VaultAssets({
   rows,
   assetSymbol,
+  assetAddress,
   assetDecimals,
   line,
   shareTip,
@@ -61,6 +70,8 @@ export function VaultAssets({
 }: {
   rows: VaultAssetRow[];
   assetSymbol: string;
+  /** The asset's mark after each amount. */
+  assetAddress: string;
   assetDecimals: number;
   /** The one line under the heading. */
   line: ReactNode;
@@ -107,6 +118,8 @@ export function VaultAssets({
     });
   }
 
+  const shareHead = <HeadingTip text="Share of this vault" tip={shareTip} />;
+
   return (
     <section
       className="mb-6"
@@ -130,58 +143,71 @@ export function VaultAssets({
           emptyLabel={total === BigInt(0) ? "Nothing to divide at this block." : undefined}
         />
       </div>
-      <DataTable className="mt-2" tableClassName="text-[12px]" label={`Where this vault's ${assetSymbol} is, by venue`}>
+      <DataTable
+        className="mt-2"
+        tableClassName="text-[12px]"
+        label={`Where this vault's ${assetSymbol} is, by venue`}
+        stacked
+        rowHeight="two"
+      >
         <DataTableHead>
           <DataTableHeader label="Venue" />
-          <DataTableHeader label={`Amount · ${assetSymbol}`} align="right" />
-          <DataTableHeader align="right">
-            <HeadingTip text="Share of this vault" tip={shareTip} />
-          </DataTableHeader>
-          <DataTableHeader label="Links" align="right" className="hidden sm:table-cell" />
+          <DataTableHeader label="Amount" align="right" />
+          <DataTableHeader align="right">{shareHead}</DataTableHeader>
+          <DataTableHeader label="Links" align="right" />
         </DataTableHead>
         <DataTableBody>
           {rows.map((r) => (
             <DataTableRow key={r.key} {...r.hooks}>
-              <DataTableCell className="min-w-0 py-2">
-                <span className="text-foreground" data-cell="venue">
+              <DataTableCell rowHeader className="sm:w-full sm:max-w-0">
+                <span
+                  className="block text-foreground sm:truncate"
+                  title={typeof r.venue === "string" ? r.venue : undefined}
+                  data-cell="venue"
+                >
                   {r.venue}
                 </span>
                 {r.sub != null && (
-                  <span className="block text-[11px] [overflow-wrap:anywhere] text-rb-500">{r.sub}</span>
+                  <span
+                    className="block text-[11px] [overflow-wrap:anywhere] text-rb-500 sm:truncate"
+                    title={typeof r.sub === "string" ? r.sub : undefined}
+                  >
+                    {r.sub}
+                  </span>
                 )}
-                {r.links && <span className="mt-0.5 block sm:hidden">{r.links}</span>}
               </DataTableCell>
-              <DataTableCell
-                align="right"
-                className="py-2 tabular-nums text-foreground"
-                data-cell="leg-assets"
-                {...(r.amountFigure ? { "data-figure": r.amountFigure } : {})}
-              >
+              <DataTableCell label="Amount" align="right" className="whitespace-nowrap tabular-nums text-foreground">
                 {r.offBand ? (
-                  <span className="text-rb-500">—</span>
-                ) : r.amount == null ? (
-                  <NotLoaded />
-                ) : r.amountProv ? (
-                  <Prov info={r.amountProv}>{assetText(r.amount, assetDecimals)}</Prov>
+                  <span className="text-rb-500" data-cell="leg-assets">
+                    —
+                  </span>
                 ) : (
-                  assetText(r.amount, assetDecimals)
+                  <span className="inline-flex items-center gap-1.5">
+                    <span data-cell="leg-assets" {...(r.amountFigure ? { "data-figure": r.amountFigure } : {})}>
+                      {r.amount == null ? (
+                        <NotLoaded />
+                      ) : r.amountProv ? (
+                        <Prov info={r.amountProv}>{assetText(r.amount, assetDecimals)}</Prov>
+                      ) : (
+                        assetText(r.amount, assetDecimals)
+                      )}
+                    </span>
+                    {r.amount != null && <AssetUnit symbol={assetSymbol} address={assetAddress} />}
+                  </span>
                 )}
               </DataTableCell>
-              {/* The last cell below sm, where Links is hidden: it rounds the row's right end. */}
-              <DataTableCell
-                align="right"
-                className="py-2 tabular-nums text-rb-500 max-sm:rounded-r-2xl"
-                data-cell="leg-share"
-              >
-                {r.share == null ? (
-                  "—"
-                ) : r.shareProv ? (
-                  <Prov info={r.shareProv}>{pctText(r.share)}</Prov>
-                ) : (
-                  pctText(r.share)
-                )}
+              <DataTableCell label={shareHead} align="right" className="whitespace-nowrap tabular-nums text-rb-500">
+                <span data-cell="leg-share">
+                  {r.share == null ? (
+                    "—"
+                  ) : r.shareProv ? (
+                    <Prov info={r.shareProv}>{pctText(r.share)}</Prov>
+                  ) : (
+                    pctText(r.share)
+                  )}
+                </span>
               </DataTableCell>
-              <DataTableCell align="right" className="hidden py-2 sm:table-cell">
+              <DataTableCell align="right" wide className="whitespace-nowrap max-sm:pt-0">
                 {r.links}
               </DataTableCell>
             </DataTableRow>

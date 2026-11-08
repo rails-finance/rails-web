@@ -6,11 +6,13 @@
 //   1. The vitals band — identity, size, supply composition, and a sentence
 //      counting the reserves closed to new business.
 //   2. The reserve list — every reserve on the Pool, sortable, filterable by
-//      asset class. From 1024px it is a table (min-w-[980px]):
+//      asset class. From 1024px a table (min-w-[980px]), every row 76px:
 //        ASSET · PRICE · SUPPLIED · BORROWED · RATES S/B · RF · CAPS USED ·
 //        UTILISATION & RISK
-//      Below that each reserve is a block in the same order, with a sort
-//      select in place of the headers, and nothing scrolls sideways.
+//      Below that the same table reads as cards (D6, `stackBelow="lg"`): the
+//      asset across, the figures under their names, utilisation and risk
+//      across the foot, with a sort select in place of the headers. Rows are
+//      unlinked: a reserve has no page of its own.
 //
 // The risk context is Moonwell's (components/protocol/moonwell/
 // moonwell-markets-view.tsx) brought into this table (rails-ops TO-DO-ui-jobs
@@ -38,10 +40,11 @@
 // from lib/shared/aave-market-provenance; utilisation (a ratio of the row's two
 // receipted sizes) is exempt from the coverage tripwire.
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, Ban } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { AssetUnit } from "@/components/shared/asset-unit";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
 import { fmtUsd } from "@/lib/aave-v4/format";
@@ -61,6 +64,7 @@ import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import {
+  DATA_TABLE_PILL,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -71,31 +75,10 @@ import {
 } from "@/components/shared/data-table/data-table";
 
 const CLOSED = "text-tone-caution";
-const TAG = "text-[10px] uppercase tracking-wide text-rb-500";
+const TAG = `${DATA_TABLE_PILL} px-1 py-px text-[10px] uppercase tracking-wide`;
 
 // Display order for the class filter — stablecoin first, "other" last.
 const CLASS_ORDER: AssetClass[] = ["stablecoin", "eth", "btc", "gold", "other"];
-
-// The table needs ~980px; below the `lg` breakpoint the rows become blocks.
-const WIDE_QUERY = "(min-width: 1024px)";
-
-/** Whether the table layout applies. Read synchronously on first render: this
- *  view mounts only after the client fetch resolves, so `window` is there and
- *  a phone never paints the table first. */
-function useWide(): boolean {
-  const [wide, setWide] = useState(() =>
-    typeof window !== "undefined" && window.matchMedia ? window.matchMedia(WIDE_QUERY).matches : true,
-  );
-  useEffect(() => {
-    if (!window.matchMedia) return;
-    const mq = window.matchMedia(WIDE_QUERY);
-    const onChange = () => setWide(mq.matches);
-    onChange();
-    mq.addEventListener?.("change", onChange);
-    return () => mq.removeEventListener?.("change", onChange);
-  }, []);
-  return wide;
-}
 
 // A class grouping-color dot — shared by the filter chips and the rows.
 function ClassDot({ cls }: { cls: AssetClass }) {
@@ -425,8 +408,9 @@ function sizes({ r, vocab, assetHref }: RowProps) {
   const fixed = r.fixedOraclePrice;
   const supplied =
     fixed && r.supplied > 0 ? (
-      <span className="text-foreground/80">
-        {formatCompact(r.supplied)} {r.symbol}
+      <span className="inline-flex items-center gap-1.5 text-foreground/80">
+        {formatCompact(r.supplied)}
+        <AssetUnit symbol={r.symbol} address={r.address} />
       </span>
     ) : supplyLink ? (
       <Link href={supplyLink} className={INLINE_LINK}>
@@ -492,7 +476,7 @@ function ReserveRow(props: RowProps) {
   return (
     <ProvReceiptsScope registry={registry} bounds={false}>
       <DataTableRow data-reserve-row={r.address}>
-        <DataTableCell>
+        <DataTableCell rowHeader>
           <div className="flex items-center gap-2">
             <TokenChipIcon symbol={r.symbol} address={r.address} size={20} filterable={false} />
             <div className="leading-tight">
@@ -511,13 +495,14 @@ function ReserveRow(props: RowProps) {
           align="right"
           className="tabular-nums text-[13px] text-foreground/80"
           title="The market's oracle price (IAaveOracle getAssetPrice)"
+          label="Price"
         >
           {z.price}
         </DataTableCell>
-        <DataTableCell align="right" className="tabular-nums text-[13px]">
+        <DataTableCell align="right" className="tabular-nums text-[13px]" label="Supplied">
           {z.supplied}
         </DataTableCell>
-        <DataTableCell align="right" className="tabular-nums text-[13px]">
+        <DataTableCell align="right" className="tabular-nums text-[13px]" label="Borrowed">
           {z.borrowed ??
             (!r.borrowEnabled ? (
               // Structurally not borrowable — a no-entry mark, distinct
@@ -536,6 +521,7 @@ function ReserveRow(props: RowProps) {
           align="right"
           className="whitespace-nowrap tabular-nums text-[13px] text-foreground/80"
           title="Supply rate / variable borrow rate, read from the Pool at the stamped block"
+          label="Rates S / B"
         >
           {z.rates}
         </DataTableCell>
@@ -543,98 +529,29 @@ function ReserveRow(props: RowProps) {
           align="right"
           className="tabular-nums text-[13px] text-foreground/80"
           title="Reserve factor: the protocol's cut of borrow interest"
+          label={<span title={HEADER_TIP.reserveFactor}>RF</span>}
         >
           {z.rf}
         </DataTableCell>
-        <DataTableCell className="whitespace-nowrap tabular-nums text-[12px] text-foreground/80" data-caps="">
+        <DataTableCell
+          className="whitespace-nowrap tabular-nums text-[12px] text-foreground/80"
+          label={<span title={HEADER_TIP.caps}>Caps used</span>}
+          data-caps=""
+        >
           <span className="text-rb-500">S</span> <CapText side="supply" c={r.supplyCapState} r={r} vocab={vocab} />
           <span className="text-rb-500"> · B</span> <CapText side="borrow" c={r.borrowCapState} r={r} vocab={vocab} />
         </DataTableCell>
-        <DataTableCell className="w-[270px] min-w-[220px]">
+        <DataTableCell
+          className="lg:w-[270px] lg:min-w-[220px]"
+          label={<span title={HEADER_TIP.util}>Utilisation &amp; risk</span>}
+          wide
+        >
           <UtilBar r={r} />
           <div className="mt-1.5 text-[10px] tabular-nums text-rb-500">
             <RiskLine r={r} vocab={vocab} />
           </div>
         </DataTableCell>
       </DataTableRow>
-    </ProvReceiptsScope>
-  );
-}
-
-/** One reserve as a block, for widths below the table's. Same figures, same
- *  receipts, in four lines:
- *    WETH · ETH                          $5.75B supplied
- *    [bar] 83% utilised · $4.77B borrowed
- *    LTV 80.5 · LT 83 (95 eMode) · bonus 5% · 1.44% / 2.04% · RF 15%
- *    caps: supply 78% · borrow 73% · $2,740 */
-function ReserveBlock(props: RowProps) {
-  const { r, vocab } = props;
-  const registry = useReceiptRegistry();
-  const z = sizes(props);
-
-  return (
-    <ProvReceiptsScope registry={registry} bounds={false}>
-      <li className="border-t border-rb-200 px-3 py-3 first:border-t-0 dark:border-rb-800" data-reserve-row={r.address}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2">
-            <TokenChipIcon symbol={r.symbol} address={r.address} size={18} filterable={false} />
-            <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 text-[13px] font-medium leading-tight text-foreground">
-              {r.symbol}
-              <span className="inline-flex items-center gap-1 text-[11px] font-normal text-rb-500">
-                · <ClassDot cls={r.cls} />
-                {r.classLabel}
-              </span>
-              <StateTags r={r} vocab={vocab} />
-            </div>
-          </div>
-          <div className="shrink-0 text-right text-[13px] tabular-nums">
-            {z.supplied} <span className="text-[11px] text-rb-500">supplied</span>
-          </div>
-        </div>
-
-        <div className="mt-2">
-          <UtilBar r={r} suffix={<span className="text-rb-500"> utilised</span>} />
-        </div>
-        <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-[11px] tabular-nums text-rb-500">
-          {z.borrowed ? (
-            <span>{z.borrowed} borrowed</span>
-          ) : !r.borrowEnabled ? (
-            <span>not borrowable</span>
-          ) : (
-            <span>no borrows</span>
-          )}
-          {r.kink != null && r.rateStrategy && (
-            <span>
-              · kink{" "}
-              <Prov
-                info={vocab.kinkProv(r.symbol, {
-                  strategy: r.rateStrategy,
-                  method: r.kinkMethod ?? "",
-                  raw: r.kinkRaw ?? null,
-                })}
-              >
-                {fracText(r.kink)}%
-              </Prov>
-            </span>
-          )}
-        </div>
-
-        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[11px] tabular-nums text-rb-500">
-          <RiskLine r={r} vocab={vocab} narrow />
-          <span aria-hidden>·</span>
-          <span className="text-foreground/80">{z.rates}</span>
-          <span aria-hidden>·</span>
-          <span>RF {z.rf}</span>
-        </div>
-        <div className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5 text-[11px] tabular-nums text-rb-500">
-          <span data-caps="">
-            caps: supply <CapText side="supply" c={r.supplyCapState} r={r} vocab={vocab} /> · borrow{" "}
-            <CapText side="borrow" c={r.borrowCapState} r={r} vocab={vocab} />
-          </span>
-          <span aria-hidden>·</span>
-          <span className="text-foreground/80">{z.price}</span>
-        </div>
-      </li>
     </ProvReceiptsScope>
   );
 }
@@ -693,7 +610,6 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
   // rather than to prose. The registry already knows which explorers those are,
   // so nothing has to be remembered at the call site.
   const hasListing = !EXPLORERS_WITHOUT_LISTING.has(view.protocol);
-  const wide = useWide();
   // One receipts scope for the band — the figures are one block's reading of
   // one Pool. The vocabulary is protocol-parameterised (each market sits on
   // different Pool/oracle contracts), bound here to the addresses + block the
@@ -894,53 +810,11 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
               Clear filter
             </button>
           </div>
-        ) : wide ? (
-          <DataTable label={`${view.label} reserves`} tableClassName="min-w-[980px]" anatomy="M1">
-            <DataTableHead>
-              {th("Asset", "asset")}
-              {th("Price", "price", "right")}
-              {th("Supplied", "supplied", "right")}
-              {th("Borrowed", "borrowed", "right")}
-              <DataTableHeader
-                align="right"
-                ariaSort={
-                  sortKey === "supplyApy" || sortKey === "rate"
-                    ? sortDir === "asc"
-                      ? "ascending"
-                      : "descending"
-                    : undefined
-                }
-              >
-                <span className="inline-flex items-center gap-1.5">
-                  Rates
-                  <DataTableSortButton
-                    label="S"
-                    dir={dirOf("supplyApy")}
-                    onSort={() => toggleSort("supplyApy")}
-                    ariaLabel={`Sort by ${SORT_LABEL.supplyApy}`}
-                  />
-                  /
-                  <DataTableSortButton
-                    label="B"
-                    dir={dirOf("rate")}
-                    onSort={() => toggleSort("rate")}
-                    ariaLabel={`Sort by ${SORT_LABEL.rate}`}
-                  />
-                </span>
-              </DataTableHeader>
-              {th("RF", "reserveFactor", "right")}
-              {th("Caps used", "caps")}
-              {th("Utilisation & risk", "util")}
-            </DataTableHead>
-            <DataTableBody>
-              {sortedRows.map((r) => (
-                <ReserveRow key={r.address} r={r} vocab={vocab} assetHref={assetHref} />
-              ))}
-            </DataTableBody>
-          </DataTable>
         ) : (
           <>
-            <div className="mb-2 flex items-center gap-2">
+            {/* Below lg the header row is hidden (D6): a select and a direction
+                button drive the same sort. */}
+            <div className="mb-2 flex items-center gap-2 lg:hidden" data-mobile-sort="">
               <label className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-rb-500">
                 Sort by
                 <select
@@ -965,11 +839,56 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
                 {sortDir === "asc" ? "Low first" : "High first"}
               </button>
             </div>
-            <ul className="rounded-lg border border-rb-200 dark:border-rb-800" data-anatomy="M1">
-              {sortedRows.map((r) => (
-                <ReserveBlock key={r.address} r={r} vocab={vocab} assetHref={assetHref} />
-              ))}
-            </ul>
+            <DataTable
+              label={`${view.label} reserves`}
+              tableClassName="lg:min-w-[980px]"
+              anatomy="M1"
+              stacked
+              stackBelow="lg"
+              rowHeight="three"
+            >
+              <DataTableHead>
+                {th("Asset", "asset")}
+                {th("Price", "price", "right")}
+                {th("Supplied", "supplied", "right")}
+                {th("Borrowed", "borrowed", "right")}
+                <DataTableHeader
+                  align="right"
+                  ariaSort={
+                    sortKey === "supplyApy" || sortKey === "rate"
+                      ? sortDir === "asc"
+                        ? "ascending"
+                        : "descending"
+                      : undefined
+                  }
+                >
+                  <span className="inline-flex items-center gap-1.5">
+                    Rates
+                    <DataTableSortButton
+                      label="S"
+                      dir={dirOf("supplyApy")}
+                      onSort={() => toggleSort("supplyApy")}
+                      ariaLabel={`Sort by ${SORT_LABEL.supplyApy}`}
+                    />
+                    /
+                    <DataTableSortButton
+                      label="B"
+                      dir={dirOf("rate")}
+                      onSort={() => toggleSort("rate")}
+                      ariaLabel={`Sort by ${SORT_LABEL.rate}`}
+                    />
+                  </span>
+                </DataTableHeader>
+                {th("RF", "reserveFactor", "right")}
+                {th("Caps used", "caps")}
+                {th("Utilisation & risk", "util")}
+              </DataTableHead>
+              <DataTableBody>
+                {sortedRows.map((r) => (
+                  <ReserveRow key={r.address} r={r} vocab={vocab} assetHref={assetHref} />
+                ))}
+              </DataTableBody>
+            </DataTable>
           </>
         )}
       </div>
