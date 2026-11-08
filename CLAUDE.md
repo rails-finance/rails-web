@@ -25,7 +25,7 @@ the charter above; the *how the code is laid out* is below.
 There are **no directory tiers** (rails-ops decision `0012`): one uniform roster of
 protocol explorers (`lib/shared/protocols.ts`), and the depth matrix in
 `lib/shared/coverage.ts` (rendered per chain at /coverage/{ethereum,base,arbitrum,sepolia} —
-there is no bare /coverage; its structural `COVERAGE_NOTES` also
+the bare /coverage redirects to Ethereum's; its structural `COVERAGE_NOTES` also
 open each listing's intro drawer) is the one statement of how deep each explorer
 currently goes. Cells distinguish `false` ("not yet") from `{ why }` ("the protocol
 can't provide it"). When an explorer gains a capability, flip its matrix cell in the

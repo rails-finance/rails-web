@@ -234,6 +234,13 @@ const nextConfig: NextConfig = {
         destination: "/",
         permanent: true,
       },
+      // Coverage is one page per chain; the bare path opens Ethereum's.
+      // Temporary, so a chain chooser can take /coverage later.
+      {
+        source: "/coverage",
+        destination: "/coverage/ethereum",
+        permanent: false,
+      },
       // Mono-rails move: /trove/[c]/[id] now lives under /liquity-v2/trove/...
       {
         source: "/trove/:collateralType/:troveId",
