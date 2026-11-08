@@ -5,8 +5,10 @@
  * button carrying the count of active filters, opening a full-screen sheet.
  * The sheet lists one row per dimension, its name at the left and the current
  * choice with a chevron at the right; a row opens that dimension's options
- * (single, multi, range) as a sub-view with its own back control. A single
- * dimension with one option is on or off, so it draws a switch in its row.
+ * (single, multi, range) as a sub-view with its own back control. Short
+ * choices sit in the list: a single dimension with one option is on or off,
+ * a switch in its row; one with two options is a segmented "Any / A / B"
+ * under its name.
  * The footer holds "Clear filters" (every dimension back to its default) and
  * the primary button with the count the edits would give.
  *
@@ -22,7 +24,15 @@
  * Filters button on close; the page behind does not scroll.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MutableRefObject,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 import { CTRL_GHOST, CTRL_OFF, CTRL_ON, RESET_LINK } from "@/lib/shared/ui-grammar";
@@ -66,6 +76,9 @@ const resetDim = <F,>(dim: FilterDimension<F>, f: F): F => dim.set(f, dim.defaul
 
 /** A dimension that is on or off: one option, picked or not. */
 const isToggle = <F,>(dim: FilterDimension<F>) => dim.cardinality === "single" && dim.options.length === 1;
+
+/** A dimension short enough to choose in place: Any or one of two. */
+const isSegmented = <F,>(dim: FilterDimension<F>) => dim.cardinality === "single" && dim.options.length === 2;
 
 /** The row's right-hand text: the current choice in the option words. */
 function currentChoice<F>(dim: FilterDimension<F>, f: F): string {
@@ -148,7 +161,15 @@ function Sheet<F>({
   onClose: () => void;
 }) {
   // The staged filters: every control in the sheet reads and writes these.
-  const [filters, onChange] = useState<F>(applied);
+  const [filters, setDraft] = useState<F>(applied);
+  // The newest draft, for Show after a range flush has written one this tick.
+  const draftRef = useRef<F>(applied);
+  const onChange = (next: F) => {
+    draftRef.current = next;
+    setDraft(next);
+  };
+  // A range sub-view's pending slider move.
+  const flushRange = useRef<(() => void) | null>(null);
   const dirty = filters !== applied;
   const dims = dimensions.filter((d) => !d.available || d.available(filters));
 
@@ -247,8 +268,14 @@ function Sheet<F>({
       ? `Show ${shown.toLocaleString("en-US")} ${shown === 1 ? count.noun.replace(/s$/, "") : count.noun}`
       : "Show results";
   const apply = () => {
-    if (dirty) onApply(filters);
+    flushRange.current?.();
+    if (draftRef.current !== applied) onApply(draftRef.current);
     onClose();
+  };
+  const backToList = (id: string) => {
+    flushRange.current?.();
+    returnTo.current = id;
+    setOpenId(null);
   };
 
   const title = openDim ? openDim.label : "Filters";
@@ -268,10 +295,8 @@ function Sheet<F>({
         <button
           type="button"
           onClick={() => {
-            if (openDim) {
-              returnTo.current = openDim.id;
-              setOpenId(null);
-            } else onClose();
+            if (openDim) backToList(openDim.id);
+            else onClose();
           }}
           className={`${CTRL_GHOST} ${CTRL_OFF} size-10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
           aria-label={openDim ? "Back to filters" : "Close filters"}
@@ -300,10 +325,8 @@ function Sheet<F>({
             dim={openDim}
             filters={filters}
             onChange={onChange}
-            onPicked={() => {
-              returnTo.current = openDim.id;
-              setOpenId(null);
-            }}
+            flushRef={flushRange}
+            onPicked={() => backToList(openDim.id)}
           />
         ) : (
           <ul className="px-4">
@@ -311,6 +334,8 @@ function Sheet<F>({
               <li key={dim.id} className="border-b border-rb-200 dark:border-rb-800">
                 {isToggle(dim) ? (
                   <ToggleRow dim={dim} filters={filters} onChange={onChange} />
+                ) : isSegmented(dim) ? (
+                  <SegmentRow dim={dim} filters={filters} onChange={onChange} />
                 ) : (
                   <button
                     type="button"
@@ -399,17 +424,93 @@ function ToggleRow<F>({
   );
 }
 
+/** A two-option dimension as a segmented radio group under its name: "Any"
+ *  (the dimension's default) and the two options. Arrow keys move and pick,
+ *  as in any radio group; Tab enters on the picked segment. */
+function SegmentRow<F>({
+  dim,
+  filters,
+  onChange,
+}: {
+  dim: FilterDimension<F>;
+  filters: F;
+  onChange: (next: F) => void;
+}) {
+  const active = isDimensionActive(dim, filters);
+  const cur = dim.get(filters);
+  const segments = [
+    { value: null as string | null, label: "Any" },
+    ...dim.options.map((o) => ({ value: o.value as string | null, label: o.label })),
+  ];
+  const at = active ? segments.findIndex((s) => s.value != null && cur.includes(s.value)) : 0;
+  const refs = useRef<(HTMLButtonElement | null)[]>([]);
+  const pick = (i: number) => {
+    const v = segments[i].value;
+    onChange(v == null ? resetDim(dim, filters) : dim.set(filters, [v]));
+  };
+  const onKeyDown = (e: ReactKeyboardEvent) => {
+    const step =
+      e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const i = (Math.max(at, 0) + step + segments.length) % segments.length;
+    pick(i);
+    refs.current[i]?.focus();
+  };
+  const labelId = `filter-sheet-seg-${dim.id}`;
+  return (
+    <div className="py-3" data-filter-sheet-segments={dim.id}>
+      <span id={labelId} className="block text-sm mb-2">
+        {dim.label}
+      </span>
+      <div
+        role="radiogroup"
+        aria-labelledby={labelId}
+        onKeyDown={onKeyDown}
+        className="flex rounded-lg border border-rb-300 dark:border-rb-700 p-0.5 gap-0.5"
+      >
+        {segments.map((s, i) => {
+          const on = i === at;
+          return (
+            <button
+              key={s.value ?? ""}
+              ref={(el) => {
+                refs.current[i] = el;
+              }}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              tabIndex={on ? 0 : -1}
+              onClick={() => pick(i)}
+              className={`flex-auto h-10 whitespace-nowrap rounded-md px-3 text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
+                on
+                  ? "bg-rb-200 dark:bg-rb-600 text-foreground font-medium"
+                  : "text-rb-500 hover:bg-rb-100 dark:hover:bg-rb-700 hover:text-foreground"
+              }`}
+              data-filter-sheet-segment={s.value ?? "any"}
+            >
+              {s.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /** One dimension's options: radio or checkbox rows, or the range control. A
  *  single pick returns to the list; a multi stays for the next tick. */
 function DimensionView<F>({
   dim,
   filters,
   onChange,
+  flushRef,
   onPicked,
 }: {
   dim: FilterDimension<F>;
   filters: F;
   onChange: (next: F) => void;
+  flushRef: MutableRefObject<(() => void) | null>;
   onPicked: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -417,7 +518,7 @@ function DimensionView<F>({
   if (dim.cardinality === "range") {
     return (
       <div className="pt-4" data-filter-sheet-view={dim.id}>
-        <RangeControl dim={dim} filters={filters} onChange={onChange} wide />
+        <RangeControl dim={dim} filters={filters} onChange={onChange} wide flushRef={flushRef} />
         {dim.panelNote != null && (
           <p className="px-4 pt-1 pb-3 text-xs text-rb-500" data-prov-exempt="">
             {dim.panelNote}
