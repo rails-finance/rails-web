@@ -2,7 +2,7 @@
 
 // The cross-protocol vault index (rails-ops ui-jobs 39; decision 0028 point 8):
 // the shared roster (components/vaults/vault-roster.tsx) over the union of the
-// vault rosters, each row the vault row (V1) with its protocol's sidebar (C20).
+// vault rosters, its rows the index's table (vault-index-table.tsx, ui-jobs 538).
 // ----------------------------------------------------------------------------
 // The index owns no vault page: every row opens the vault's page under its
 // protocol, a Maple pool's opening Maple's pools page. Facets: Token (by
@@ -16,9 +16,8 @@ import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-ro
 import { VaultIndexTable } from "@/components/vaults/vault-index-table";
 import { isoSeconds, RosterBlock, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import type { VaultRowReceipts } from "@/components/vaults/vault-row";
-import { chainMeta, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { protocolForPathname } from "@/lib/shared/protocols";
-import type { PositionCardEdge } from "@/components/shared/position-card-edge";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { symbolsOfKeyword } from "@/lib/shared/asset-categories";
 import {
@@ -65,21 +64,15 @@ import { maplePoolCountProv, vaultIndexEmptyCountProv, vaultIndexGroupCountProv 
 
 const n = (v: number) => v.toLocaleString("en-US");
 
-/** Each row's sidebar (C20): the roster entry whose route holds the vault's
- *  family directory, as on that directory (Maple: its pools page), keyed by
- *  protocol and chain (Morpho is on two). */
-const EDGES = Object.fromEntries(
-  VAULT_INDEX_ROSTERS.map((r) => {
-    const entry = protocolForPathname(vaultIndexRosterHref(r.protocol, r.chainId));
-    const edge: PositionCardEdge | null = entry
-      ? {
-          protocol: { id: entry.id, name: entry.label },
-          chain: { id: entry.chainId, name: chainMeta(entry.chainId).name },
-        }
-      : null;
-    return [vaultIndexRosterKey(r), edge];
-  }),
-) as Record<string, PositionCardEdge | null>;
+/** Each row's lead zone: the roster entry whose route holds the vault's
+ *  family directory (Maple: its pools page), keyed by protocol and chain
+ *  (Morpho is on two); its tint and mark are that entry's. */
+const LEAD_IDS = Object.fromEntries(
+  VAULT_INDEX_ROSTERS.map((r) => [
+    vaultIndexRosterKey(r),
+    protocolForPathname(vaultIndexRosterHref(r.protocol, r.chainId))?.id ?? null,
+  ]),
+) as Record<string, string | null>;
 
 const FACETS: VaultRosterFacet[] = [
   {
@@ -135,11 +128,7 @@ export function VaultIndexView({
   yields,
   rosters,
   asset,
-  layout = "cards",
 }: {
-  /** `?layout=table`: the vaults as a table (ui-jobs 538), beside the cards
-   *  while the two are compared. */
-  layout?: "cards" | "table";
   /** The query string the page was served with (the roster's preset and sort). */
   initialSearch?: string;
   vaults: VaultSummary[];
@@ -282,29 +271,23 @@ export function VaultIndexView({
         facets={FACETS}
         assetFacet={TOKEN_FACET}
         initialFilters={assetValues.length > 0 ? { [TOKEN_FACET.id]: assetValues } : undefined}
-        edgeOf={(v) => EDGES[vaultIndexRosterKeyOf(v)] ?? null}
         hrefOf={vaultIndexHref}
         holdersHrefOf={vaultIndexHoldersHref}
         receiptsOf={receiptsOf}
-        chainOf={(v) => chainName(v.chainId)}
-        yieldKeyOf={vaultIndexKey}
         hooksOf={hooksOf}
-        table={
-          layout === "table"
-            ? (rows, part) => (
-                <VaultIndexTable
-                  rows={rows}
-                  part={part}
-                  initialSearch={initialSearch ?? ""}
-                  yieldOf={(v) => yields[vaultIndexKey(v)]}
-                  hrefOf={vaultIndexHref}
-                  holdersHrefOf={vaultIndexHoldersHref}
-                  receiptsOf={receiptsOf}
-                  hooksOf={hooksOf}
-                />
-              )
-            : undefined
-        }
+        table={(rows, part) => (
+          <VaultIndexTable
+            rows={rows}
+            part={part}
+            initialSearch={initialSearch ?? ""}
+            yieldOf={(v) => yields[vaultIndexKey(v)]}
+            leadOf={(v) => LEAD_IDS[vaultIndexRosterKeyOf(v)] ?? null}
+            hrefOf={vaultIndexHref}
+            holdersHrefOf={vaultIndexHoldersHref}
+            receiptsOf={receiptsOf}
+            hooksOf={hooksOf}
+          />
+        )}
         groupCountProv={(assetSymbol, count, chainId) =>
           vaultIndexGroupCountProv(assetSymbol, chainName(chainId), count)
         }

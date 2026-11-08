@@ -2,8 +2,8 @@
 
 // One vault roster (rails-ops ui-jobs 407, V1): the rows of one family's
 // vaults, grouped by asset, under one set of controls. The cross-protocol
-// index (ui-jobs 39) is the same roster over the union, each row's sidebar
-// naming its protocol and chain, and one read stamp for the oldest roster.
+// index (ui-jobs 39) is the same roster over the union, its rows drawn as the
+// index's table (`table`, ui-jobs 538), and one read stamp for the oldest roster.
 // ----------------------------------------------------------------------------
 // Every roster draws the same thing: the listings' toolbar (search, the Asset
 // facet and the family's own facets, the preset, the sort), one group per
@@ -42,7 +42,6 @@ import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
 import { DisclosureChevron } from "@/components/shared/expand-chevron";
 import { VaultRow, type VaultRowReceipts } from "@/components/vaults/vault-row";
-import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
@@ -173,8 +172,6 @@ export function VaultRoster({
   holdersHrefOf,
   receiptsOf,
   hooksOf,
-  chainOf,
-  yieldKeyOf,
   assetFacet,
   groupCountProv,
   emptyCountProv,
@@ -182,11 +179,10 @@ export function VaultRoster({
   initialFilters,
   initialSearch = "",
   readTime,
-  edgeOf,
   table,
 }: {
   vaults: readonly VaultSummary[];
-  /** Decision 0047's figure per lowercased vault address (or `yieldKeyOf`). */
+  /** Decision 0047's figure per lowercased vault address. */
   yields: Record<string, VaultYield>;
   chainId: ChainId;
   /** The block every row was read at; 0 on the index, whose rosters each
@@ -200,10 +196,6 @@ export function VaultRoster({
   holdersHrefOf: ((v: VaultSummary) => string | null) | null;
   receiptsOf: (v: VaultSummary) => VaultRowReceipts;
   hooksOf?: (v: VaultSummary) => Record<string, string>;
-  /** The chain's word after a group's symbol ("on Base"), on the index only. */
-  chainOf?: (v: VaultSummary) => string;
-  /** The key a vault's Yield is held under; the address where absent. */
-  yieldKeyOf?: (v: VaultSummary) => string;
   /** In place of the Asset facet (the index's Token, by symbol across chains). */
   assetFacet?: VaultRosterFacet;
   groupCountProv: (assetSymbol: string, count: number, chainId: number) => Provenance;
@@ -217,11 +209,8 @@ export function VaultRoster({
   /** The read block's time, seconds (rails-server's stamp); else the loader's
    *  read time. */
   readTime?: number | null;
-  /** The row's sidebar (C20) where the page is on no roster's route: the
-   *  index names each row's protocol and chain. */
-  edgeOf?: (v: VaultSummary) => PositionCardEdge | null;
   /** Draws the shown rows as a table in place of the cards, which then sorts
-   *  them itself (the index's `?layout=table`, ui-jobs 538). */
+   *  them itself (the index, ui-jobs 538). */
   table?: (rows: VaultSummary[], part: "funded" | "empty") => ReactNode;
 }) {
   const [introOpen, setIntroOpen] = useState(false);
@@ -400,27 +389,17 @@ export function VaultRoster({
     </span>
   );
 
-  const row = (v: VaultSummary) => {
-    const drawn = (
-      <VaultRow
-        key={v.address}
-        vault={v}
-        yieldFigure={yields[yieldKeyOf ? yieldKeyOf(v) : v.address]}
-        href={hrefOf(v)}
-        holdersHref={holdersHrefOf ? holdersHrefOf(v) : null}
-        receipts={receiptsOf(v)}
-        hooks={hooksOf?.(v)}
-      />
-    );
-    const edge = edgeOf?.(v);
-    return edge ? (
-      <PositionCardEdgeContext.Provider key={v.address} value={edge}>
-        {drawn}
-      </PositionCardEdgeContext.Provider>
-    ) : (
-      drawn
-    );
-  };
+  const row = (v: VaultSummary) => (
+    <VaultRow
+      key={v.address}
+      vault={v}
+      yieldFigure={yields[v.address]}
+      href={hrefOf(v)}
+      holdersHref={holdersHrefOf ? holdersHrefOf(v) : null}
+      receipts={receiptsOf(v)}
+      hooks={hooksOf?.(v)}
+    />
+  );
 
   // On the index every roster has its own block, so a group says "at its block".
   const atBlock = blockNumber > 0 ? "at this block" : "at its roster’s block";
@@ -556,7 +535,6 @@ export function VaultRoster({
                 >
                   {g.asset.symbol}
                 </a>
-                {chainOf && <span className="font-normal text-rb-500">on {chainOf(g.rows[0])}</span>}
                 <span className="text-[12px] font-normal text-rb-500" data-figure="group-count">
                   <Prov info={groupCountProv(g.asset.symbol, g.rows.length, g.chainId)}>
                     {g.rows.length === 1 ? "1 vault" : `${n(g.rows.length)} vaults`}

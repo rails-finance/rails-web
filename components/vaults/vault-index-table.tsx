@@ -1,8 +1,7 @@
 "use client";
 
-// The cross-protocol vault index as a table (rails-ops ui-jobs 538), drawn at
-// `/vaults?layout=table` beside the cards (V1) while Miles compares the two;
-// the one he does not pick is deleted, so this file stands alone.
+// The cross-protocol vault index as a table (rails-ops ui-jobs 538, V6): the
+// rows of `/vaults`, drawn inside the shared roster's controls.
 // ----------------------------------------------------------------------------
 // One row per vault in the house table (components/shared/data-table): the
 // lead zone (the protocol's tint, mark and chain, named for a screen reader
@@ -13,8 +12,8 @@
 // the census receipt); nothing is re-derived here.
 //
 // SORT. Each column header is a button; the sort lives in `?sort=` and
-// `?dir=`, each written only off its default (Holders, most first, the cards'
-// default order). Total assets and Share price are amounts in the vault's
+// `?dir=`, each written only off its default (Holders, most first, as the
+// rosters' cards open). Total assets and Share price are amounts in the vault's
 // asset, so they sort by token (A to Z) and by the amount inside each token:
 // two quantities of one token are the only amounts compared (decision 0028
 // point 8: no USD, no cross-asset total). Yield and Holders compare across
@@ -129,6 +128,7 @@ export function VaultIndexTable({
   part,
   initialSearch,
   yieldOf,
+  leadOf,
   hrefOf,
   holdersHrefOf,
   receiptsOf,
@@ -139,6 +139,9 @@ export function VaultIndexTable({
   part: "funded" | "empty";
   initialSearch: string;
   yieldOf: (v: VaultSummary) => VaultYield | undefined;
+  /** The lead zone's `protocols.ts` id (the roster entry the vault's
+   *  directory sits under); null falls back to the family's venue. */
+  leadOf: (v: VaultSummary) => string | null;
   hrefOf: (v: VaultSummary) => string;
   holdersHrefOf: (v: VaultSummary) => string | null;
   receiptsOf: (v: VaultSummary) => VaultRowReceipts;
@@ -171,7 +174,7 @@ export function VaultIndexTable({
   const inToken = sort === "assets" || sort === "price";
 
   return (
-    <div data-vault-table={part}>
+    <div data-vault-table={part} data-anatomy="V6">
       {inToken && part === "funded" && (
         <p className="mb-2 text-[12px] text-rb-500" data-sort-note="">
           Sorted by token, then by {sort === "assets" ? "total assets" : "share price"} within each token.
@@ -218,7 +221,9 @@ export function VaultIndexTable({
             const raw = v.totalAssets?.raw ?? "";
             const c = v.census;
             const holdersHref = holdersHrefOf(v);
-            const cell = (id: string, value: ReactNode) => (
+            // `none`: what stands for an absent figure, for a screen reader
+            // (the Yield slot's reason, with its `data-yield-none`).
+            const cell = (id: string, value: ReactNode, none: ReactNode = "no figure") => (
               <DataTableCell
                 align="right"
                 valign="middle"
@@ -230,7 +235,7 @@ export function VaultIndexTable({
                 ) : (
                   <span className="text-sm text-rb-500">
                     <span aria-hidden>–</span>
-                    <span className="sr-only">no figure</span>
+                    <span className="sr-only">{none}</span>
                   </span>
                 )}
               </DataTableCell>
@@ -259,17 +264,20 @@ export function VaultIndexTable({
               <DataTableRow
                 href={href}
                 key={`${v.chainId}:${v.address}`}
-                data-vault-table-row={v.address}
+                data-vault-row={v.address}
                 data-group={raw === "" ? "unread" : BigInt(raw) > BigInt(0) ? "funded" : "empty"}
                 data-asset={v.asset.address}
                 data-total-assets-raw={raw}
                 data-share-price-raw={v.sharePrice?.raw ?? ""}
                 data-vault-family={v.family}
                 data-holders-live={c?.live ?? ""}
+                data-standing={v.standing.join(" ")}
+                data-created-block={v.createdBlock ?? ""}
+                data-token={tokenOf(v)}
                 {...hooksOf(v)}
               >
                 <DataTableLeadCell
-                  protocol={VAULT_FAMILIES[v.family].venue}
+                  protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
                   protocolName={VAULT_INDEX_PROTOCOL_LABEL[vaultIndexProtocol(v)]}
                   chain={v.chainId as ChainId}
                   sticky={PIN_LEAD}
@@ -323,7 +331,7 @@ export function VaultIndexTable({
                 </DataTableCell>
                 {cell("total-assets", head("total-assets")?.value)}
                 {cell("share-price", head("share-price")?.value)}
-                {cell("yield", head("yield")?.value)}
+                {cell("yield", head("yield")?.value, head("yield")?.sub)}
                 {cell("holders", holders)}
               </DataTableRow>
             );

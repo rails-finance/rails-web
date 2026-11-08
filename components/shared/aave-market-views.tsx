@@ -895,7 +895,7 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
             </button>
           </div>
         ) : wide ? (
-          <DataTable label={`${view.label} reserves`} tableClassName="min-w-[980px]">
+          <DataTable label={`${view.label} reserves`} tableClassName="min-w-[980px]" anatomy="M1">
             <DataTableHead>
               {th("Asset", "asset")}
               {th("Price", "price", "right")}
@@ -965,7 +965,7 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
                 {sortDir === "asc" ? "Low first" : "High first"}
               </button>
             </div>
-            <ul className="rounded-lg border border-rb-200 dark:border-rb-800">
+            <ul className="rounded-lg border border-rb-200 dark:border-rb-800" data-anatomy="M1">
               {sortedRows.map((r) => (
                 <ReserveBlock key={r.address} r={r} vocab={vocab} assetHref={assetHref} />
               ))}

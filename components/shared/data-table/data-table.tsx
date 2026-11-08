@@ -24,6 +24,10 @@
 // foreground: a clickable card takes the border, not blue text
 // (standards/color-grammar.md §4a).
 //
+// ANATOMY (rails-ops reference/app-anatomy.md, region D): D1 the frame and
+// its rows, D2 a sortable header, D3 the sideways scroll and pinned cells
+// (on the frame), D4 a linked row, D5 the lead cell.
+//
 // THE LEAD COLUMN. Where rows span protocols or chains, each row opens with
 // the protocol's tinted zone (components/shared/row-zone.tsx, the wallet's
 // History lead): `DataTableLeadHeader` and `DataTableLeadCell`.
@@ -64,6 +68,7 @@ const RowHref = createContext<string | null>(null);
 export function DataTable({
   caption,
   label,
+  anatomy,
   tableClassName = "",
   className = "",
   children,
@@ -73,6 +78,8 @@ export function DataTable({
   caption?: ReactNode;
   /** The table's accessible name where there is no caption. */
   label?: string;
+  /** The caller's own part code, before D1 and D3 (`M1`). */
+  anatomy?: string;
   tableClassName?: string;
   className?: string;
   children: ReactNode;
@@ -80,7 +87,11 @@ export function DataTable({
   return (
     // `relative`: a visually hidden span inside a cell is placed against the
     // frame, so it never widens the page.
-    <div className={`relative max-w-full overflow-x-auto ${className}`} {...frame}>
+    <div
+      className={`relative max-w-full overflow-x-auto ${className}`}
+      data-anatomy={anatomy ? `${anatomy} D1 D3` : "D1 D3"}
+      {...frame}
+    >
       <table
         className={`w-full border-separate border-spacing-x-0 border-spacing-y-1 ${tableClassName}`}
         aria-label={caption ? undefined : label}
@@ -167,6 +178,7 @@ export function DataTableHeader({
     <th
       scope="col"
       aria-sort={sorted}
+      data-anatomy={sort || ariaSort ? "D2" : undefined}
       className={`${DATA_TABLE_PAD} pb-1.5 text-xs font-semibold whitespace-nowrap text-rb-500 ${
         align === "right" ? "text-right" : "text-left"
       } ${sticky ? `${sticky} z-10 bg-background` : ""} ${className}`}
@@ -202,7 +214,11 @@ export function DataTableRow({
 }: HTMLAttributes<HTMLTableRowElement> & { href?: string }) {
   return (
     <RowHref.Provider value={href ?? null}>
-      <tr className={`group/dt-row ${href ? LINKED_ROW : ""} ${className}`} {...rest}>
+      <tr
+        className={`group/dt-row ${href ? LINKED_ROW : ""} ${className}`}
+        data-anatomy={href ? "D4" : undefined}
+        {...rest}
+      >
         {children}
       </tr>
     </RowHref.Provider>
@@ -309,7 +325,9 @@ export function DataTableLeadCell({
       sticky={sticky}
       className="h-px w-16 sm:w-[95px]"
       title={`${protocolName} on ${chainMeta(chain).name}`}
+      data-anatomy="D5"
       data-row-zone={protocol}
+      data-row-zone-chain={chainMeta(chain).name}
     >
       <span className="sr-only">{protocolName} on </span>
       <RowZone id={protocol} chain={chain} className="h-full min-h-11 w-16 rounded-l-2xl sm:w-[95px]" />
