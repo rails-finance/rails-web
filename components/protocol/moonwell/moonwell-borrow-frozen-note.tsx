@@ -9,7 +9,7 @@ import { MOONWELL_BASE_BORROW_FREEZE_BLOCK, MOONWELL_BASE_BORROW_FREEZE_DATE } f
 export function MoonwellBorrowFrozenNote({ className = "mb-3" }: { className?: string }) {
   return (
     <p className={`${className} max-w-3xl text-[11px] leading-relaxed text-rb-500`} data-borrow-cap-note="">
-      Borrowing is frozen: Moonwell set every borrow cap on Base to 1 wei at block{" "}
+      Borrowing is frozen: at block{" "}
       <Link
         href={explorerUrl(BASE_CHAIN_ID, "block", MOONWELL_BASE_BORROW_FREEZE_BLOCK)}
         target="_blank"
@@ -18,7 +18,7 @@ export function MoonwellBorrowFrozenNote({ className = "mb-3" }: { className?: s
       >
         {MOONWELL_BASE_BORROW_FREEZE_BLOCK.toLocaleString("en-US")}
       </Link>{" "}
-      ({MOONWELL_BASE_BORROW_FREEZE_DATE}).
+      ({MOONWELL_BASE_BORROW_FREEZE_DATE}) Moonwell set every borrow cap on Base to the smallest amount a token allows.
     </p>
   );
 }
