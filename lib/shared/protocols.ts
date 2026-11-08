@@ -569,6 +569,25 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
+    // Pendle on Ethereum, phase 1: a wallet's PT, YT and LP per market at a
+    // pinned block, from the routers' events and chain reads. A Pendle market
+    // is not a share vault and holds no loan, so there is no position listing
+    // and no place in /vaults; `/ethereum/pendle` opens on the market roster.
+    id: "pendle",
+    session: "pendle",
+    label: "Pendle",
+    chainId: 1,
+    slug: "pendle",
+    // Hue 260, read off pendle.finance's favicon #1A2E4F (known-infrastructure's
+    // PENDLE_BAR).
+    brand: 260,
+    tags: ["Fixed yield", "Yield trading"],
+    desc: "A wallet's principal, yield and liquidity tokens in each Pendle market, valued at Pendle's oracle and read at one block",
+    positionListing: false,
+    unlaunched: true,
+    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
+  },
+  {
     // The first testnet explorer. A Sepolia figure is a test figure, and the
     // chain axis says so (`CHAINS[11155111].testnet`); the roster entry is
     // otherwise an ordinary one — same rail header, same coverage row.
@@ -853,6 +872,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "sky-savings": "Position",
   // A wallet's trades: the page titles name them, and nothing lists positions.
   cow: "Trades",
+  pendle: "Position",
 };
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",
