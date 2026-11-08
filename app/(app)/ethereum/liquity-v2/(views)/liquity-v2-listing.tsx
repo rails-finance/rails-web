@@ -140,6 +140,7 @@ export function LiquityV2Listing({ initialItems, initialTotal, initialKey, initi
           })),
       })}
       onFilters={onFilters}
+      mobileFilterSheet
       renderAbove={({ items, total, filters }) =>
         // The strip is a statement about a WALLET, so it mounts only where the
         // page IS that wallet's own set: the search names a holder, the status

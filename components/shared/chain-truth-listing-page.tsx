@@ -176,6 +176,9 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
   countLine?: (filters: F) => { noun?: string; note?: string } | null;
   /** Opt-in line under the empty state for the live selection; null for none. */
   emptyNote?: (filters: F) => ReactNode | null;
+  /** The facets as a full-screen sheet below sm (ui-jobs 544); Liquity V2
+   *  first, every listing once the design settles. */
+  mobileFilterSheet?: boolean;
 }
 
 export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefined>({
@@ -202,6 +205,7 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   titleAs,
   countLine,
   emptyNote,
+  mobileFilterSheet = false,
 }: ChainTruthListingPageProps<T, F, Ext>) {
   const searchParams = useUrlSearchParams(initialSearch ?? "");
 
@@ -441,6 +445,14 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   );
   const viewKey = strategy.kind === "server" ? serverViewKey : memoryViewKey;
 
+  // The phone sheet's staged count, by this listing's own filtering: the
+  // in-memory rows filtered, or the server's total for the first page.
+  const countFor = (draft: F): number | Promise<number> => {
+    const s = strategyRef.current;
+    if (s.kind === "memory") return applyListFilter(fetched, s.dimensions(fetched), draft, s.apply).length;
+    return s.fetchPage(draft, 1).then((r) => r.total);
+  };
+
   const line = countLine?.(filters) ?? null;
   const pagination =
     strategy.kind === "server"
@@ -508,6 +520,8 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
         searchPlaceholder,
         // Every chain-truth listing can be saved as a view (N1.7, ui-jobs 521).
         viewMenu: true,
+        mobileSheet: mobileFilterSheet,
+        countFor,
       }}
     />
   );

@@ -51,6 +51,10 @@ export interface ChainTruthListingFilter<F extends BaseListFilters> {
   searchPlaceholder?: string;
   /** Draw the ⋮ that saves this view (N1.7, ui-jobs 521). */
   viewMenu?: boolean;
+  /** The facets as a full-screen sheet below sm (ui-jobs 544). */
+  mobileSheet?: boolean;
+  /** The count a staged selection in that sheet would give. */
+  countFor?: (draft: F) => number | Promise<number>;
 }
 
 /** The default failure state: a listing fetch rejected and the config
@@ -240,6 +244,9 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
           searchPlaceholder={filter.searchPlaceholder}
           count={count}
           viewMenu={filter.viewMenu}
+          mobileSheet={filter.mobileSheet}
+          countPending={loading || refreshing}
+          countFor={filter.countFor}
         />
       ) : (
         toolbar

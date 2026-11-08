@@ -11,6 +11,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { SearchBox } from "@/components/shared/front-door-search";
 import { FilterSections } from "@/components/shared/filter-bar/filter-sections";
+import { FilterSheet } from "@/components/shared/filter-bar/filter-sheet";
 import { savedViewFilterNames, FilterChips } from "@/components/shared/filter-bar/filter-chips";
 import { ListingViewMenu } from "@/components/shared/saved-items";
 import { SortControl, type SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -36,6 +37,14 @@ export interface ListToolbarProps<F extends BaseListFilters> {
   /** The ⋮ at the row's right end (N1.7): save this view, copy its link
    *  (ui-jobs 521). The chain-truth listings draw it. */
   viewMenu?: boolean;
+  /** Below sm, the facets as a Filters button opening a full-screen sheet
+   *  (`./filter-sheet`, ui-jobs 544) in place of the row of group buttons.
+   *  Above sm nothing changes. */
+  mobileSheet?: boolean;
+  /** True while the listing re-reads after a change; the sheet's count waits. */
+  countPending?: boolean;
+  /** The count a staged selection in the sheet would give. */
+  countFor?: (draft: F) => number | Promise<number>;
 }
 
 export function ListToolbar<F extends BaseListFilters>({
@@ -48,6 +57,9 @@ export function ListToolbar<F extends BaseListFilters>({
   countNode,
   skel = "listing-toolbar",
   viewMenu = false,
+  mobileSheet = false,
+  countPending = false,
+  countFor,
 }: ListToolbarProps<F>) {
   // Inert until this strip's handlers are attached — including the search box,
   // which pre-hydration accepts typing into a value React then overwrites from
@@ -74,9 +86,25 @@ export function ListToolbar<F extends BaseListFilters>({
           size="sm"
           anatomy="N1.1 H15"
           inputRef={searchRef}
-          className="flex-1 min-w-[200px]"
+          className={`flex-1 min-w-[200px] ${mobileSheet ? "max-sm:basis-full" : ""}`}
         />
-        <FilterSections dimensions={dimensions} filters={filters} onChange={onChange} />
+        {mobileSheet ? (
+          <>
+            <FilterSheet
+              dimensions={dimensions}
+              filters={filters}
+              onChange={onChange}
+              count={count}
+              countPending={countPending}
+              countFor={countFor}
+            />
+            <div className="contents max-sm:hidden">
+              <FilterSections dimensions={dimensions} filters={filters} onChange={onChange} />
+            </div>
+          </>
+        ) : (
+          <FilterSections dimensions={dimensions} filters={filters} onChange={onChange} />
+        )}
         {sortOptions.length > 0 && (
           <SortControl
             options={sortOptions}

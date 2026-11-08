@@ -90,9 +90,12 @@ interface RangeControlProps<F> {
   dim: FilterDimension<F>;
   filters: F;
   onChange: (next: F) => void;
+  /** Span the container (the phone filter sheet) in place of the panel's
+   *  fixed width. */
+  wide?: boolean;
 }
 
-export function RangeControl<F>({ dim, filters, onChange }: RangeControlProps<F>) {
+export function RangeControl<F>({ dim, filters, onChange, wide = false }: RangeControlProps<F>) {
   const spec = dim.range ?? { min: 1, max: 1000 };
   const stops = useMemo(() => rangeStops(spec), [spec.min, spec.max]); // eslint-disable-line react-hooks/exhaustive-deps
   const last = stops.length - 1;
@@ -174,7 +177,11 @@ export function RangeControl<F>({ dim, filters, onChange }: RangeControlProps<F>
         : fmt(draft.max ?? stops[idx]);
 
   return (
-    <div className="px-4 pt-2 pb-3 w-64 max-w-full" data-range-control={dim.id} data-anatomy="N1.5">
+    <div
+      className={`px-4 pt-2 pb-3 ${wide ? "w-full" : "w-64 max-w-full"}`}
+      data-range-control={dim.id}
+      data-anatomy="N1.5"
+    >
       <div className="relative h-6">
         <div className="absolute inset-x-2 top-1/2 h-1 -translate-y-1/2 rounded-full bg-rb-200 dark:bg-rb-700" />
         <div
