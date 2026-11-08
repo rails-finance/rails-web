@@ -507,7 +507,7 @@ export function WalletView({
             address={address}
             className="mt-6"
             // The address menu a position page draws (ui-jobs 430): Copy the
-            // address and Bookmark it; no View the wallet on the wallet view.
+            // address and Bookmark it; no View wallet on the wallet view.
             title={<WalletMenu wallet={address} ensName={ensName} heading view={false} />}
             lines={
               <>
