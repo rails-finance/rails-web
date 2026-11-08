@@ -177,7 +177,7 @@ function MarketCard({
         {!m.borrowedIsCrvusd && (
           <span
             className="text-foreground"
-            title={`This market borrows ${m.borrowedSymbol}, not crvUSD — its figures are in ${m.borrowedSymbol}, and no dollar is asserted from the oracle.`}
+            title={`This market borrows ${m.borrowedSymbol}, not crvUSD: its figures are in ${m.borrowedSymbol}, and no dollar is asserted from the oracle.`}
           >
             · own-token units
           </span>
@@ -306,7 +306,7 @@ export function LlamalendMarketsStamp({ data }: { data: LlamalendMarketsResponse
       >
         V2
       </a>
-      ) · prices from each market&rsquo;s own oracle
+      ) · prices from each market&rsquo;s oracle
       {serverReadVia(data.head)}
     </p>
   );
@@ -361,7 +361,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
             // Roster cardinality — a count over the three factories' own
             // rosters (with unreadable markets dropped), not a single chain read.
             value: <span data-prov-exempt="">{s.total}</span>,
-            title: "A cardinality over the three factories' own rosters (unreadable markets dropped).",
+            title: "A cardinality over the three factories' rosters (unreadable markets dropped).",
           },
           {
             slot: "sizeOut",
@@ -373,7 +373,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
               </>
             ),
             title:
-              "Σ total_debt over the crvUSD-borrowed markets only — crvUSD is a $-pegged stable, so the sum reads as dollars (unit: crvUSD ~$1). The non-crvUSD markets are excluded, not converted.",
+              "Σ total_debt over the crvUSD-borrowed markets only, crvUSD is a $-pegged stable, so the sum reads as dollars (unit: crvUSD ~$1). The non-crvUSD markets are excluded, not converted.",
           },
           {
             slot: "population",
@@ -385,7 +385,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
           <>
             <span
               data-prov-exempt=""
-              title="A cardinality over the three factories' own rosters (unreadable markets dropped)."
+              title="A cardinality over the three factories' rosters (unreadable markets dropped)."
             >
               <span className="text-foreground">{s.v1Lend}</span> V1 lend ·{" "}
               <span className="text-foreground">{s.v1Mint}</span> V1 mint ·{" "}
@@ -396,7 +396,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
               <span
                 className="text-foreground"
                 data-prov-exempt=""
-                title="A count of the markets carrying at least one open loan — a cardinality."
+                title="A count of the markets carrying at least one open loan. A cardinality."
               >
                 {s.live}
               </span>{" "}
@@ -405,7 +405,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
             {s.nonCrvusdBorrow > 0 && (
               <span
                 data-prov-exempt=""
-                title="A count of the markets whose borrowed token is not crvUSD — a cardinality."
+                title="A count of the markets whose borrowed token is not crvUSD. A cardinality."
               >
                 <span className="text-foreground">{s.nonCrvusdBorrow}</span> markets borrow something other than crvUSD
               </span>
@@ -485,7 +485,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
               perishable thing a page can hardcode, so it now counts the same
               rows the cards below render and can no longer contradict them. */}
           <p className="mb-2 max-w-3xl text-[11px] leading-relaxed text-rb-500">
-            The next generation, from its own factory — the LLAMMA core (bands, soft-liquidation, the state reads) is
+            The next generation, from its own factory: the LLAMMA core (bands, soft-liquidation, the state reads) is
             identical to V1&rsquo;s.{" "}
             {v2Live === 0
               ? `${v2.length === 1 ? "The one listed market is" : `All ${v2.length} listed markets are`} pre-launch: zero debt, zero loans, borrowing not yet open.`
@@ -520,7 +520,7 @@ export function LlamalendMarketsView({ data }: { data: LlamalendMarketsResponse 
                 borrows <span className="text-foreground">{m.borrowedSymbol}</span>.
               </span>
             ))}{" "}
-            On every other market the borrowed token is crvUSD — a $-pegged stable — so the AMM&rsquo;s own oracle reads
+            On every other market the borrowed token is crvUSD, a $-pegged stable, so the AMM&rsquo;s own oracle reads
             as dollars there (unit: crvUSD, ~$1). On these it does not: their prices, debts and band edges are in the
             borrowed token itself, and this explorer presents them that way rather than inventing a conversion. All are
             empty or dust today, but the roster is read from the factories at head.

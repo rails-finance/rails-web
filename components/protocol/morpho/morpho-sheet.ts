@@ -85,7 +85,7 @@ const pts = (a: number) => `${a.toFixed(2)} pts`;
 const acrossProv = (what: string, formula: string, price: MorphoHealthMove): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `${what} across this event — the figure after it less the figure before it, the position's collateral and debt either side of the event both valued at the market oracle's price at the end of block ${price.priceBlock}, so the move is the event's alone.`,
+  summary: `${what} across this event. The figure after it less the figure before it, the position's collateral and debt either side of the event both valued at the market oracle's price at the end of block ${price.priceBlock}, so the move is the event's alone.`,
   formula,
 });
 
@@ -99,7 +99,7 @@ const fallProv = (
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `Collateral can fall — how far the market oracle's ${collSym} price can fall, the ${loanSym} debt held, before the position's LTV reaches the market's LLTV: one less one over the health factor after this event, with the collateral valued at the oracle's price at the end of block ${m.priceBlock}.`,
+  summary: `Collateral can fall. How far the market oracle's ${collSym} price can fall, the ${loanSym} debt held, before the position's LTV reaches the market's LLTV; one less one over the health factor after this event, with the collateral valued at the oracle's price at the end of block ${m.priceBlock}.`,
   formula: "1 − 1 ÷ health factor; health factor = collateral × price × LLTV ÷ debt",
   inputs: [
     { label: "health factor", value: String(hf), kind: "chain-derived", note: "after the event" },
@@ -132,7 +132,7 @@ const lltvAtBlockProv = (coords: MorphoCoords, lltv: number): Provenance => ({
   kind: "chain",
   pclass: "state",
   summary:
-    "LLTV — the market's liquidation loan-to-value: the lltv field of its immutable params (Morpho.idToMarketParams), fixed when the market was created. Debt above LLTV × the collateral's value is liquidatable; there is no separate borrow threshold.",
+    "LLTV. The market's liquidation loan-to-value, the lltv field of its immutable params (Morpho.idToMarketParams), fixed when the market was created. Debt above LLTV × the collateral's value is liquidatable; there is no separate borrow threshold.",
   via: "Morpho.idToMarketParams(id).lltv · 1e18-scaled",
   inputs: [
     { label: "lltv", value: String(lltv), kind: "chain", note: "market params" },
@@ -145,7 +145,7 @@ const lltvAtBlockProv = (coords: MorphoCoords, lltv: number): Provenance => ({
 const debtLastProv = (sym: string, coords: MorphoCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `${sym} owed at the last event — what the position owed once its previous event had run: the debt just before this event less the interest accrued between the two, which is the previous row's debt after.`,
+  summary: `${sym} owed at the last event. What the position owed once its previous event had run: the debt just before this event less the interest accrued between the two, which is the previous row's debt after.`,
   formula: "debt before − interest since the previous event",
   inputs: [
     { label: "debt before", kind: "chain-derived", pclass: "indexed", note: `${sym} owed just before this event` },
@@ -161,7 +161,7 @@ const debtLastProv = (sym: string, coords: MorphoCoords): Provenance => ({
 const supplyLastProv = (sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `${sym} supplied at the last event — the position's supply once its previous event had run: the supply just before this event less what it earned between the two, which is the previous row's supply after.`,
+  summary: `${sym} supplied at the last event. The position's supply once its previous event had run: the supply just before this event less what it earned between the two, which is the previous row's supply after.`,
   formula: "supply before − move since the previous event",
 });
 

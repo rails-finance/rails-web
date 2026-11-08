@@ -123,7 +123,7 @@ function BranchCard({
           <span className="text-sm font-semibold text-foreground">{sym}</span>
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-rb-500">
-          This branch&rsquo;s contracts didn&rsquo;t answer on this read — its figures are withheld rather than
+          This branch&rsquo;s contracts didn&rsquo;t answer on this read: its figures are withheld rather than
           estimated. The rest of the roster is unaffected.
         </p>
       </div>
@@ -139,7 +139,7 @@ function BranchCard({
   const ccrFill = branch.tcr != null ? Math.min(1, branch.tcr / branch.ccr) : null;
   const ticks: RatioBarTick[] =
     branch.tcr != null
-      ? [{ f: branch.scr / branch.ccr, kind: "neutral", title: `SCR ${ratio(branch.scr)} — branch shutdown line` }]
+      ? [{ f: branch.scr / branch.ccr, kind: "neutral", title: `SCR ${ratio(branch.scr)}: branch shutdown line` }]
       : [];
 
   return (
@@ -386,12 +386,12 @@ export function LiquityForkBranchesView({
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
           Anyone holding {learnMore.stablecoin} can redeem it against {protocolName} at $1 face value. A redemption
           routes across the branches by how much of each is unbacked, then sweeps the branch it lands on from the LOWEST
-          user-set interest rate up — so a borrower&rsquo;s rate is also their place in this queue. Being redeemed
+          user-set interest rate up, so a borrower&rsquo;s rate is also their place in this queue. Being redeemed
           isn&rsquo;t a penalty: the trove gives up collateral and sheds the same value of debt, and its collateral
           ratio rises.
         </p>
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-          A branch&rsquo;s queue is its troves in rate order, which is the listing sorted that way — one link per branch
+          A branch&rsquo;s queue is its troves in rate order, which is the listing sorted that way. One link per branch
           below. Two things that order leaves out: a trove redeemed below the minimum debt drops out of the sorted list
           and is redeemed ahead of everything in it, whatever rate it carries, so those sit under the listing&rsquo;s
           Zombie status rather than in these links; and how much is redeemed before any one trove is stated on that

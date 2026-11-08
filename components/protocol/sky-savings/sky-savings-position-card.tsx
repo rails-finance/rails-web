@@ -85,7 +85,7 @@ const earnedHead = (p: SkyPosition, asOf: SkyAsOf): PositionCardHead => {
 
 const rateHead = (asOf: SkyAsOf): PositionCardHead => ({
   id: "rate",
-  label: "Savings Rate",
+  label: "Savings rate",
   labelTip:
     "The yearly rate Sky governance has set for every sUSDS holder, in force at the page's block. Governance can change it at any block.",
   value: (

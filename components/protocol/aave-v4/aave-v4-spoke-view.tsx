@@ -1199,7 +1199,7 @@ function AaveV4SpokeTowerBlock({
                     <span className="select-none text-rb-500">•</span>
                     <span>
                       A total of {gasEth.toFixed(4)} ETH (${gasUsd.toFixed(2)}) has been spent on gas fees across these
-                      transactions — each event&apos;s own gas is in its footnote below.
+                      transactions. Each event&apos;s own gas is in its footnote below.
                     </span>
                   </div>
                 )}

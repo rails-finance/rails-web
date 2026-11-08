@@ -88,7 +88,7 @@ const DUST = 1e-12;
 const impliedDebtBeforeProv = (coords: FxCoords): Provenance => ({
   ...impliedDebtAfterProv(coords),
   summary:
-    "Event-implied fxUSD debt before this event — the implied debt after it minus this event's debt delta. Funding and rebalances move the real debt between events with no per-position log, so this is the replay lane.",
+    "Event-implied fxUSD debt before this event. The implied debt after it minus this event's debt delta. Funding and rebalances move the real debt between events with no per-position log, so this is the replay lane.",
   formula: "implied debt after − debt change",
 });
 

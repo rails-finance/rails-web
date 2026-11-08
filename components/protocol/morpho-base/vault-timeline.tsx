@@ -253,7 +253,7 @@ export function MorphoBaseVaultTimeline({
               The count is a floor rather than a census: the endpoint would not answer this address&rsquo;s whole sweep
               at once, so the range was walked in chunks and the walk stopped as soon as it passed what this page draws.
               Because the logs were never read whole, the balance check below the rows could not be run on this address
-              at all, and nothing about this address is kept in Rails&rsquo;s store of chain readings — a floor is a
+              at all, and nothing about this address is kept in Rails&rsquo;s store of chain readings. A floor is a
               statement that the answer is at least this, and storing it would turn it into a statement that it is this.
             </>
           ) : (
@@ -262,7 +262,7 @@ export function MorphoBaseVaultTimeline({
               withheld is the drawing of it.
             </>
           )}{" "}
-          The newest rows are not shown in place of the rest — a part of a life shown as the whole of one is the failure
+          The newest rows are not shown in place of the rest. A part of a life shown as the whole of one is the failure
           this check exists to prevent.
         </p>
       ) : !reconcile ? null : !reconcile.reconciled ? (
@@ -277,7 +277,7 @@ export function MorphoBaseVaultTimeline({
             block {n(building.keptCut)}
           </Prov>
           . The rows and the flows are drawn once the whole life is stored, on a later visit. Every figure above this is
-          unaffected — they are calls answered at block {n(timeline.blockNumber)}.
+          unaffected: they are calls answered at block {n(timeline.blockNumber)}.
         </p>
       ) : onEventPage ? null : (
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-reconciled">
@@ -300,12 +300,11 @@ export function MorphoBaseVaultTimeline({
             vault&rsquo;s own <code>decimals()</code>
             {decimalsOffset != null ? (
               <>
-                {" "}
-                — its asset&rsquo;s {assetDecimals} plus a <code>DECIMALS_OFFSET()</code> of {decimalsOffset}
+                : its asset&rsquo;s {assetDecimals} plus a <code>DECIMALS_OFFSET()</code> of {decimalsOffset}
               </>
             ) : null}
           </Prov>
-          . Both are reads at block {n(timeline.blockNumber)}, not a convention this page assumed.
+          . Both are reads at block {n(timeline.blockNumber)}.
         </p>
       )}
 
@@ -470,7 +469,7 @@ function GateFailure({
         (r.refetchDiffered
           ? " Both sweeps were run a second time and returned a different number of logs from the first, which is direct evidence of the lane answering one question two ways."
           : " Both sweeps were run a second time and returned the same number of logs.")}{" "}
-      The figures above this are unaffected — they are calls at block {n(timeline.blockNumber)}.
+      The figures above this are unaffected: they are calls at block {n(timeline.blockNumber)}.
     </p>
   );
 }

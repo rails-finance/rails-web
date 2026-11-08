@@ -174,7 +174,7 @@ function pctTransition(before: number, after: number, beforeProv: Provenance, wh
     changeExact: `${sign}${Math.abs(change)}%`,
     changeProv: {
       kind: "derived",
-      summary: `${what} change at this event, in percentage points — the figure after minus the figure before.`,
+      summary: `${what} change at this event, in percentage points. The figure after minus the figure before.`,
       formula: "after − before",
     },
   };
@@ -254,7 +254,7 @@ export function liquityForkStateStats(
         prov: {
           kind: "chain",
           pclass: "emitted",
-          summary: "Management fee after this change — as the batch logged it.",
+          summary: "Management fee after this change. As the batch logged it.",
           via: "BatchUpdated log · _annualManagementFee · ÷10^16",
           inputs: [{ label: "fee", value: `${br.managementFee}%`, kind: "chain", pclass: "emitted" }],
         },
@@ -266,7 +266,7 @@ export function liquityForkStateStats(
                 {
                   kind: "chain",
                   pclass: "emitted",
-                  summary: "Management fee before this change — from the batch's previous update.",
+                  summary: "Management fee before this change. From the batch's previous update.",
                   via: "the batch's previous BatchUpdated log · _annualManagementFee · ÷10^16",
                   inputs: [{ label: "fee", value: `${before}%`, kind: "chain", pclass: "emitted" }],
                 },

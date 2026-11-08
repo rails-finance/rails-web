@@ -399,7 +399,7 @@ export function useMorphoCardSlots({
           : owed
             ? "owed at its events, interest included"
             : v.peakBorrowed > 0
-              ? "principal only — accrued interest not included"
+              ? "principal only: accrued interest not included"
               : undefined,
       },
     ];

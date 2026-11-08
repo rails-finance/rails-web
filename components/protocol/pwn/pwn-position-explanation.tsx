@@ -90,7 +90,7 @@ export function PwnPositionExplanation({
     ) : v.status === "open" ? (
       hasRepay ? (
         <>
-          This loan is running: <H>{coll}</H> sits in the loan contract&rsquo;s own escrow against a fixed repayment of{" "}
+          This loan is running: <H>{coll}</H> sits in the loan contract&rsquo;s escrow against a fixed repayment of{" "}
           <H>
             <AmountText value={cost!.total} /> {creditSym}
           </H>
@@ -103,7 +103,7 @@ export function PwnPositionExplanation({
         </>
       ) : (
         <>
-          This loan is running: <H>{coll}</H> sits in the loan contract&rsquo;s own escrow until the borrower repays:
+          This loan is running: <H>{coll}</H> sits in the loan contract&rsquo;s escrow until the borrower repays:
         </>
       )
     ) : v.status === "repaid" ? (
@@ -146,7 +146,7 @@ export function PwnPositionExplanation({
         <H>
           <AmountText value={v.credit.amount} /> {creditSym}
         </H>{" "}
-        to the borrower {shortAddress(v.borrower)} — a private agreement between exactly these two wallets
+        to the borrower {shortAddress(v.borrower)}: a private agreement between these two wallets
         {side ? <>; this page reads the loan from the {side} side</> : null}.
       </span>,
     );
@@ -169,7 +169,7 @@ export function PwnPositionExplanation({
         {v.status === "repaid" ? (
           <>
             Of the amount repaid, <AmountText value={cost!.interest} /> {creditSym} was the fixed interest
-            {rate ? <> ({interestRateText(rate)})</> : null} — the loan&rsquo;s whole cost, agreed at origination.
+            {rate ? <> ({interestRateText(rate)})</> : null}: the loan&rsquo;s whole cost, agreed at origination.
             {unchanged}
           </>
         ) : v.status === "defaulted" ? (
@@ -193,7 +193,7 @@ export function PwnPositionExplanation({
         ) : (
           <>
             Of the repayment, <AmountText value={cost!.interest} /> {creditSym} is fixed interest
-            {rate ? <> ({interestRateText(rate)})</> : null} — the loan&rsquo;s whole cost, agreed at origination.
+            {rate ? <> ({interestRateText(rate)})</> : null}: the loan&rsquo;s whole cost, agreed at origination.
             {unchanged}
           </>
         )}
@@ -323,7 +323,7 @@ export function PwnPositionExplanation({
     bullets.push(
       <span key="bundle">
         The escrowed token is PWN&rsquo;s own Bundle #{shortTokenId(v.collateral.tokenId)}, a wrapper whose real
-        contents —{" "}
+        contents:{" "}
         <H>
           {v.bundleContents
             .map((a) =>
@@ -332,8 +332,8 @@ export function PwnPositionExplanation({
                 : `${a.amount > 1 ? `${a.amount}× ` : ""}${a.symbol}${a.tokenId != null ? ` #${shortTokenId(a.tokenId)}` : ""}`,
             )
             .join(", ")}
-        </H>{" "}
-        — are the loan&rsquo;s actual security.
+        </H>
+        : are the loan&rsquo;s actual security.
       </span>,
     );
   }
@@ -343,7 +343,7 @@ export function PwnPositionExplanation({
   if (v.status === "open") {
     bullets.push(
       <span key="note">
-        The claim on this loan — its repayment, or the collateral on default — is LOAN note #{v.loanId}, an ERC-721 the
+        The claim on this loan (its repayment, or the collateral on default) is LOAN note #{v.loanId}, an ERC-721 the
         lender can transfer while the loan runs; the loan settles to whoever holds it.
       </span>,
     );

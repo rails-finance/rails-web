@@ -102,7 +102,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
                   >
                     <span>{formatUsdValue(chain.totalColl * chain.price.pethUsd)}</span>
                   </Prov>{" "}
-                  · the market&rsquo;s own total, PSM shares included
+                  · the market&rsquo;s total, PSM shares included
                 </>
               }
             >
@@ -110,7 +110,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
                 <AmountText value={chain.totalColl} format="compact" /> pETH
               </Prov>
             </Stat>
-            <Stat label="Debt across positions, now" note="the market's own total, PSM shares included">
+            <Stat label="Debt across positions, now" note="the market's total, PSM shares included">
               <Prov info={liveTotalProv("debt", market)} value={formatExact(chain.totalDebt)}>
                 <AmountText value={chain.totalDebt} format="compact" /> {stable}
               </Prov>
@@ -199,7 +199,7 @@ function MarketCard({ chain, book }: { chain: PolarisMarketChainState | null; bo
         </>
       ) : (
         <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-          The chain did not answer on this read, so the market&rsquo;s own figures are withheld rather than estimated.
+          The chain did not answer on this read, so the market&rsquo;s figures are withheld rather than estimated.
         </p>
       )}
 
@@ -297,7 +297,7 @@ export function PolarisMarketsView({ chain, book }: { chain: PolarisMarketsChain
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read Polaris&apos;s markets from Sepolia, and the index did not answer.</p>
         <p className="text-sm">
-          This view is a live contract read with no cached fallback — it shows nothing. Try again shortly.
+          This view is a live contract read with no cached fallback. It shows nothing. Try again shortly.
         </p>
       </div>
     );

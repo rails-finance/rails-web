@@ -115,7 +115,7 @@ function UtilMini({ m }: { m: DolomiteMarketRow }) {
     <span
       className="inline-flex items-center gap-1.5"
       data-prov-exempt=""
-      title="Utilisation is borrowed ÷ supplied — both already traced in this row (the supplied and borrowed USD receipts). A ratio of two receipted figures."
+      title="Utilisation is borrowed ÷ supplied: both already traced in this row (the supplied and borrowed USD receipts). A ratio of two receipted figures."
     >
       <span className="h-1 w-10 overflow-hidden rounded-full bg-foreground/10">
         <span
@@ -145,8 +145,8 @@ function MarketRow({
   const registry = useReceiptRegistry();
   const coords: DolomiteMarketCoords = { blockNumber: block, marketId: m.marketId, symbol: m.symbol, readBy };
   const priceTitle = m.priceAliasOf
-    ? `This market's price equals ${m.priceAliasOf.symbol}'s (market ${m.priceAliasOf.marketId}) to the wei — a 1:1 alias through the shared oracle: live, but not an independent feed.`
-    : "The market's own oracle price (DolomiteMargin.getMarketPrice)";
+    ? `This market's price equals ${m.priceAliasOf.symbol}'s (market ${m.priceAliasOf.marketId}) to the wei. A 1:1 alias through the shared oracle: live, but not an independent feed.`
+    : "The market's oracle price (DolomiteMargin.getMarketPrice)";
 
   return (
     <ProvReceiptsScope registry={registry} bounds={false}>
@@ -402,24 +402,24 @@ export function DolomiteMarketsView({ data }: { data: DolomiteMarketsResponse })
             label: "Utilisation",
             value: <span data-prov-exempt="">{pctText(s.utilisation)}</span>,
             title:
-              "Σ borrowed value ÷ Σ supplied value, both in USD at DolomiteMargin's own price — the two figures beside it in this band. A ratio of two receipted figures.",
+              "Σ borrowed value ÷ Σ supplied value, both in USD at DolomiteMargin's price. The two figures beside it in this band. A ratio of two receipted figures.",
           },
         ]}
         notes={
           <>
             {/* A count over each market's own getMarketMarginPremium read (the leg
-                traced on every row), not a single chain figure — exempt rather
+                traced on every row) — exempt rather
                 than a receipt that would overclaim it as one read. */}
             <span
               data-prov-exempt=""
-              title="A count over each market's own getMarketMarginPremium read — the premium is traced per row; this tally over the roster is not itself a single chain read."
+              title="A count over each market's getMarketMarginPremium read: the premium is traced per row."
             >
               <span className="text-foreground">{s.withPremium}</span> carry a margin premium
             </span>
             {s.closing > 0 && (
               <span
                 data-prov-exempt=""
-                title="A count over each market's own getMarketIsClosing read — not a single chain figure."
+                title="A count over each market's getMarketIsClosing read: not a single chain figure."
               >
                 <span className="text-foreground">{s.closing}</span> closed to new borrowing
               </span>
@@ -464,15 +464,15 @@ export function DolomiteMarketsView({ data }: { data: DolomiteMarketsResponse })
       <section className="mt-8">
         <h2 className="text-sm font-semibold text-foreground">The account-level carve-out</h2>
         <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-rb-500">
-          The ladder above is the DEFAULT frame, not a universal one. The core names a{" "}
+          The ladder above is the DEFAULT frame. The core names a{" "}
           <span className="text-foreground">DefaultAccountRiskOverrideSetter</span>, and its own
-          <span className="text-foreground"> getAccountRiskOverrideByAccount</span> gives some accounts — observed on
-          wstETH/WETH and weETH/WETH pairs, an e-mode-like category — different terms entirely: a lower minimum
+          <span className="text-foreground"> getAccountRiskOverrideByAccount</span> gives some accounts (observed on
+          wstETH/WETH and weETH/WETH pairs, an e-mode-like category) different terms entirely: a lower minimum
           collateralisation than the global <Prov info={dolGlobalMinProv(summaryCoords)}>{pctText(baseline, 2)}</Prov>,
           a narrower liquidation spread than the global{" "}
           <Prov info={dolGlobalSpreadProv(summaryCoords)}>{pctText(data.risk.liquidationSpread, 0)}</Prov>, and the
-          per-market margin premiums <span className="text-foreground">skipped</span> — an overridden account&rsquo;s
-          adjusted values equal its raw ones exactly. That override is account-keyed —{" "}
+          per-market margin premiums <span className="text-foreground">skipped</span>: an overridden account&rsquo;s
+          adjusted values equal its raw ones. That override is account-keyed:{" "}
           <span className="text-foreground">getAccountRiskOverrideByAccount</span> takes an account, so it has no answer
           on a market roster with no account in hand. Its exact terms are not asserted here; reading the ladder as
           universal would misstate every such account, which is why each position page reads the override for its own
@@ -487,8 +487,8 @@ export function DolomiteMarketsView({ data }: { data: DolomiteMarketsResponse })
             {aliased.map((m, i) => (
               <span key={m.marketId}>
                 {i > 0 ? " " : ""}
-                <span className="text-foreground">{m.symbol}</span> (market {m.marketId})&rsquo;s price is exactly{" "}
-                <span className="text-foreground">{m.priceAliasOf!.symbol}</span>&rsquo;s, to the wei — a 1:1 alias
+                <span className="text-foreground">{m.symbol}</span> (market {m.marketId})&rsquo;s price is{" "}
+                <span className="text-foreground">{m.priceAliasOf!.symbol}</span>&rsquo;s, to the wei. A 1:1 alias
                 through the shared oracle: live, but not an independent feed.
               </span>
             ))}{" "}

@@ -117,7 +117,7 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
     ticks.push({
       f: queueShare,
       kind: "neutral",
-      title: `Withdrawal queue's claim on pool value (${pct(queueShare)}) — left of the liquid fill, the queue is coverable from cash this block`,
+      title: `Withdrawal queue's claim on pool value (${pct(queueShare)}): left of the liquid fill, the queue is coverable from cash this block`,
     });
 
   return (
@@ -131,7 +131,7 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
             target="_blank"
             rel="noopener noreferrer"
             className="link-external text-[11px] text-rb-500"
-            title="The ERC-4626 pool contract — the share token itself"
+            title="The ERC-4626 pool contract: the share token itself"
           >
             {shortAddress(cat.pool)}
           </a>
@@ -166,21 +166,21 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
       <div className="mt-2 space-y-1">
         <SplitRow
           label="Liquid now"
-          note="The funds asset actually in the pool contract — the only part redeemable this block"
+          note="The funds asset in the pool contract: the only part redeemable this block"
           value={amount(s.cash, cat.assetSymbol)}
           share={liquidShare}
           prov={withRead(poolCashProv(cat.assetSymbol, s.blockNumber))}
         />
         <SplitRow
           label="Fixed-term loans"
-          note="The fixed-term LoanManager's assetsUnderManagement — loans that run to a maturity date, collateral custodied off-chain"
+          note="The fixed-term LoanManager's assetsUnderManagement: loans that run to a maturity date, collateral custodied off-chain"
           value={amount(s.fixedTermAum, cat.assetSymbol)}
           share={share(s.fixedTermAum)}
           prov={withRead(poolLoanManagerAumProv(cat.assetSymbol, "fixed-term", s.blockNumber))}
         />
         <SplitRow
           label="Open-term loans"
-          note="The open-term LoanManager's assetsUnderManagement — no maturity, callable by the delegate, collateral custodied off-chain"
+          note="The open-term LoanManager's assetsUnderManagement: no maturity, callable by the delegate, collateral custodied off-chain"
           value={amount(s.openTermAum, cat.assetSymbol)}
           share={share(s.openTermAum)}
           prov={withRead(poolLoanManagerAumProv(cat.assetSymbol, "open-term", s.blockNumber))}
@@ -190,7 +190,7 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
         {s.strategiesAum > 0 && (share(s.strategiesAum) ?? 0) >= 0.0005 && (
           <SplitRow
             label="Other strategies"
-            note="Non-LoanManager strategies' assetsUnderManagement — on-chain yield strategies"
+            note="Non-LoanManager strategies' assetsUnderManagement: on-chain yield strategies"
             value={amount(s.strategiesAum, cat.assetSymbol)}
             share={share(s.strategiesAum)}
             prov={withRead(poolStrategiesAumProv(cat.assetSymbol, s.blockNumber))}
@@ -235,11 +235,11 @@ function PoolCard({ s, cat }: { s: MaplePoolState; cat: MaplePool }) {
               <span className="text-foreground/80">
                 {formatCompactTitled(s.unrealizedLosses).display} {cat.assetSymbol}
               </span>{" "}
-              marked — exits realize it
+              marked: exits realize it
             </span>
           </Prov>
         ) : (
-          <span title={MAPLE_NO_IMPAIRMENT_TIP}>no impairment marked — NAV and exit rates are equal</span>
+          <span title={MAPLE_NO_IMPAIRMENT_TIP}>no impairment marked: NAV and exit rates are equal</span>
         )}
       </div>
     </div>

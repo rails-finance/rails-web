@@ -172,7 +172,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
               <ul className={UL}>
                 <li>
                   The top card shows what the account supplied or borrowed and the collateral it locked, with the
-                  market&apos;s own reading of whether the account is liquidatable, read now from the market&apos;s
+                  market&apos;s reading of whether the account is liquidatable, read now from the market&apos;s
                   contract.
                 </li>
                 <li>The timeline lists the account&apos;s events, newest first.</li>

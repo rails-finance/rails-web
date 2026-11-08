@@ -125,7 +125,7 @@ const collUsdProv = (sym: string, amount: number, price: number, coords: FxCoord
 const prevCollProv = (sym: string, amount: number, coords: FxCoords): Provenance => ({
   kind: "chain",
   pclass: "state",
-  summary: `Collateral at the previous event (${sym}) — getPosition's collateral at that event's block, in the pool's normalized unit.`,
+  summary: `Collateral at the previous event (${sym}). getPosition's collateral at that event's block, in the pool's normalized unit.`,
   contract: { name: "AaveFundingPool", address: coords.pool },
   inputs: [{ label: "collateral", value: `${formatExact(amount)} ${sym}`, kind: "chain", pclass: "state" }],
 });
@@ -308,7 +308,7 @@ export function useFxSheet({
           info: {
             kind: "chain-derived",
             pclass: "state",
-            summary: `Collateral moved by the pool (${normalizedSymbol}) — funding and rebalances since the previous event: the collateral just before this event less the collateral after the previous one.`,
+            summary: `Collateral moved by the pool (${normalizedSymbol}). Funding and rebalances since the previous event; the collateral just before this event less the collateral after the previous one.`,
             formula: "collateral before − collateral at the previous event",
             contract: { name: "AaveFundingPool", address: coords.pool },
           },
@@ -328,7 +328,7 @@ export function useFxSheet({
             info: {
               kind: "chain-derived",
               pclass: "oracle",
-              summary: `Market move on the collateral since the last event — the ${normalizedSymbol} held at the previous event, valued at the oracle's price at this block less its price at the previous event. No token moved.`,
+              summary: `Market move on the collateral since the last event. The ${normalizedSymbol} held at the previous event, valued at the oracle's price at this block less its price at the previous event. No token moved.`,
               formula: "collateral at the previous event × (price now − price then)",
               inputs: [
                 { label: "collateral", value: `${formatNumber(prevColl)} ${normalizedSymbol}`, kind: "chain" },
@@ -447,7 +447,7 @@ export function useFxSheet({
         info: {
           kind: "chain",
           pclass: "state",
-          summary: "Debt at the previous event (fxUSD) — getPosition's debt at that event's block.",
+          summary: "Debt at the previous event (fxUSD). getPosition's debt at that event's block.",
           contract: { name: "AaveFundingPool", address: coords.pool },
           inputs: [{ label: "debt", value: `${formatExact(last)} fxUSD`, kind: "chain", pclass: "state" }],
         },
@@ -556,7 +556,7 @@ export function useFxSheet({
               info: {
                 kind: "derived",
                 summary:
-                  "Price to the tick's change since the previous event — the price after this event less the price on the previous event's collateral and debt, both against the pool's rebalance line at this block.",
+                  "Price to the tick's change since the previous event. The price after this event less the price on the previous event's collateral and debt, both against the pool's rebalance line at this block.",
                 formula: "price now − price at the previous event",
               },
             }

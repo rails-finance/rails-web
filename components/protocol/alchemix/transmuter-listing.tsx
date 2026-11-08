@@ -42,7 +42,7 @@ export function TransmuterListing({
 }: TransmuterListingProps) {
   return (
     <ChainTruthListingPage<AlchemixTransmuterPositionSummary, TransmuterListFilters>
-      title="Alchemix Transmuter Positions"
+      title="Alchemix Transmuter positions"
       noun="Transmuter positions"
       basePath={transmuterListingPath(deployment)}
       identity={<RailHeader session={deployment.session} venue="listing" stamp />}

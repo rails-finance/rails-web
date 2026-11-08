@@ -104,9 +104,9 @@ export function morphoFlowsContent(name: string): LearnMoreContent {
       },
     ],
     links: [
-      { label: "docs.morpho.org — Markets", url: DOCS.MARKET },
-      { label: "docs.morpho.org — Liquidation", url: DOCS.LIQUIDATION },
-      { label: "docs.morpho.org — Interest rate model", url: DOCS.IRM },
+      { label: "docs.morpho.org: Markets", url: DOCS.MARKET },
+      { label: "docs.morpho.org: Liquidation", url: DOCS.LIQUIDATION },
+      { label: "docs.morpho.org: Interest rate model", url: DOCS.IRM },
     ],
   };
 }

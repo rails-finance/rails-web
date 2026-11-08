@@ -312,7 +312,7 @@ export function FrankencoinChallengeCard({
         <div className="flex items-baseline justify-between gap-2">
           <h3 className="text-sm font-semibold">Challenge history</h3>
           <span className="text-xs text-rb-500">
-            {groups.length} challenge{groups.length === 1 ? "" : "s"} — Frankencoin&rsquo;s oracle-free enforcement:
+            {groups.length} challenge{groups.length === 1 ? "" : "s"} , Frankencoin&rsquo;s oracle-free enforcement:
             auctions test the owner-declared price
           </span>
         </div>
