@@ -189,6 +189,25 @@ export async function checkRosterView({ page, base, route, scope, check, tag, ho
     const rows = (await readRosterRows(page, scope)).filter((r) => r.group === "funded");
     const bad = outOfOrder(rows, tableAssetsOk);
     check(`${tag}h ?sort=assets: by token, the largest first inside each token`, bad === 0, `${bad} rows out of order`);
+    // The rule is the header's tip, read with the sort button (no line above the table).
+    for (const [key, word] of [
+      ["assets", "total assets"],
+      ["price", "share price"],
+    ]) {
+      const th = page.locator(`${scope} [data-vault-table='funded'] th[data-sort-key='${key}']`);
+      const tip = await th.locator(`[data-header-tip='${key}']`).count();
+      const said = await th
+        .locator("button[aria-describedby]")
+        .first()
+        .evaluate((b) => document.getElementById(b.getAttribute("aria-describedby"))?.textContent ?? "")
+        .catch(() => "");
+      check(
+        `${tag}i the ${word} header's tip says how it sorts, read with its sort button`,
+        tip === 1 && said === `Sorts by token, then by ${word} within each token.`,
+        `tip ${tip}, described as “${said}”`,
+      );
+    }
+    check(`${tag}j no sort line above the table`, (await page.locator(`${scope} [data-sort-note]`).count()) === 0);
     return;
   }
 

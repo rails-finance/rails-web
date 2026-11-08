@@ -17,7 +17,8 @@
 // rosters' cards open). Total assets and Share price are amounts in the vault's
 // asset, so they sort by token (A to Z) and by the amount inside each token:
 // two quantities of one token are the only amounts compared (decision 0028
-// point 8: no USD, no cross-asset total). Yield and Holders compare across
+// point 8: no USD, no cross-asset total); each header's "?" says so, and the
+// sort button reads the same words. Yield and Holders compare across
 // every row. A vault with no figure for the key sorts last, both ways.
 //
 // The whole row links the vault's page (the name is the one focusable link).
@@ -67,6 +68,12 @@ const COLUMNS: readonly Column[] = [
 ];
 
 const DEFAULT_SORT: SortKey = "holders";
+
+/** How an amount in the vault's asset sorts: by token, then inside it. */
+const SORT_NOTE: Partial<Record<SortKey, string>> = {
+  assets: "Sorts by token, then by total assets within each token.",
+  price: "Sorts by token, then by share price within each token.",
+};
 
 /** The token a vault's amounts are in: its symbol across chains, its address
  *  where the symbol did not decode (the Token facet's value). */
@@ -162,15 +169,37 @@ export function VaultIndexTable({
   );
 
   const sorted = [...rows].sort(comparator(sort, dir, yieldOf));
-  const inToken = sort === "assets" || sort === "price";
+
+  // A header's "?": Yield's marks the figure as Rails's interpretation, as on
+  // the row; Total assets' and Share price's say how the column sorts, the
+  // same words read with the sort button.
+  const headerTip = (key: SortKey) => {
+    const tip = key === "yield" ? YIELD_LABEL_TIP : SORT_NOTE[key];
+    if (!tip) return null;
+    return (
+      <>
+        <RevealTip
+          tip={tip}
+          label={`${COLUMNS.find((c) => c.key === key)!.label}: ${tip}`}
+          focusable
+          wrap
+          className="focus-ring rounded-sm"
+        >
+          <span className="tip-underline text-[10px]" data-header-tip={key}>
+            ?
+          </span>
+        </RevealTip>
+        {SORT_NOTE[key] && (
+          <span id={`${part}-sort-note-${key}`} className="sr-only">
+            {tip}
+          </span>
+        )}
+      </>
+    );
+  };
 
   return (
     <div data-vault-table={part} data-anatomy="V6">
-      {inToken && part === "funded" && (
-        <p className="mb-2 text-[12px] text-rb-500" data-sort-note="">
-          Sorted by token, then by {sort === "assets" ? "total assets" : "share price"} within each token.
-        </p>
-      )}
       <DataTable
         caption={`${part === "funded" ? "Vaults" : "Vaults that hold nothing"}; total assets and share price are in each vault’s asset`}
         tableClassName="min-w-[640px] text-sm"
@@ -183,22 +212,13 @@ export function VaultIndexTable({
               label={c.label}
               align={c.numeric ? "right" : "left"}
               sticky={c.key === "vault" ? PIN_VAULT : ""}
-              sort={{ dir: c.key === sort ? dir : null, onSort: () => press(c.key) }}
+              sort={{
+                dir: c.key === sort ? dir : null,
+                onSort: () => press(c.key),
+                describedBy: SORT_NOTE[c.key] ? `${part}-sort-note-${c.key}` : undefined,
+              }}
               data-sort-key={c.key}
-              after={
-                c.key === "yield" && (
-                  // The label's tip marks the figure as Rails's interpretation, as on the row.
-                  <RevealTip
-                    tip={YIELD_LABEL_TIP}
-                    label={`Yield: ${YIELD_LABEL_TIP}`}
-                    focusable
-                    wrap
-                    className="focus-ring rounded-sm"
-                  >
-                    <span className="tip-underline text-[10px]">?</span>
-                  </RevealTip>
-                )
-              }
+              after={headerTip(c.key)}
             />
           ))}
         </DataTableHead>

@@ -123,18 +123,22 @@ export function DataTableSortButton({
   dir,
   onSort,
   ariaLabel,
+  describedBy,
 }: {
   label: ReactNode;
   /** The direction where this key is the sort; null where it is not. */
   dir: DataTableDir | null;
   onSort: () => void;
   ariaLabel?: string;
+  /** The id of text that says how the column sorts, read with the button. */
+  describedBy?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onSort}
       aria-label={ariaLabel}
+      aria-describedby={describedBy}
       className={`inline-flex cursor-pointer items-center gap-1 rounded-sm focus-ring hover:text-foreground ${
         dir ? "text-foreground" : ""
       }`}
@@ -163,7 +167,7 @@ export function DataTableHeader({
   ...rest
 }: {
   label?: ReactNode;
-  sort?: { dir: DataTableDir | null; onSort: () => void; ariaLabel?: string };
+  sort?: { dir: DataTableDir | null; onSort: () => void; ariaLabel?: string; describedBy?: string };
   after?: ReactNode;
   align?: Align;
   /** Classes that pin the header with its column (`max-sm:sticky max-sm:left-0`). */
@@ -187,7 +191,13 @@ export function DataTableHeader({
       {children ?? (
         <span className={`inline-flex items-center gap-1 ${align === "right" ? "flex-row-reverse" : ""}`}>
           {sort ? (
-            <DataTableSortButton label={label} dir={dir} onSort={sort.onSort} ariaLabel={sort.ariaLabel} />
+            <DataTableSortButton
+              label={label}
+              dir={dir}
+              onSort={sort.onSort}
+              ariaLabel={sort.ariaLabel}
+              describedBy={sort.describedBy}
+            />
           ) : (
             label
           )}
