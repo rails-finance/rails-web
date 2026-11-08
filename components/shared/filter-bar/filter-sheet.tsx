@@ -22,6 +22,14 @@
  *
  * A modal dialog: focus is held inside while it is open and returns to the
  * Filters button on close; the page behind does not scroll.
+ *
+ * Browser back steps back inside the sheet (a phone's edge swipe or back
+ * button fires it): opening the sheet and opening a sub-view each push a
+ * history entry at the same URL, marked in `history.state[SHEET_STATE]`, and
+ * popstate closes the sub-view or the sheet (dropping the draft, as Escape
+ * does). The sheet's own controls leave through the same entries, so none is
+ * left behind, and Show writes the draft only once they are gone. A sub-view
+ * also returns to the list on a swipe to the right.
  */
 
 import {
@@ -69,6 +77,17 @@ export interface FilterSheetProps<F> {
 /** Wait after a draft edit before counting it, so a run of taps costs one read. */
 const COUNT_DELAY_MS = 250;
 
+/** The `history.state` key the sheet's entries carry: "list" or "view". */
+const SHEET_STATE = "filterSheet";
+const sheetState = (): string | undefined =>
+  (window.history.state as Record<string, unknown> | null)?.[SHEET_STATE] as string | undefined;
+
+/** A swipe returns when it passes this share of the view's width, or ends
+ *  faster than SWIPE_FLICK px/ms. */
+const SWIPE_SHARE = 1 / 3;
+const SWIPE_FLICK = 0.5;
+const SWIPE_MS = 180;
+
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])';
 
 /** The dimension back at its default. */
@@ -106,7 +125,12 @@ export function FilterSheet<F>({ dimensions, filters, onChange, count, countPend
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          // The sheet's history entry, at the same URL (no query change, so
+          // Copy link and the listing do not see it).
+          window.history.pushState({ [SHEET_STATE]: "list" }, "");
+          setOpen(true);
+        }}
         className={`${CTRL_GHOST} ${active > 0 ? CTRL_ON : CTRL_OFF} sm:hidden h-8 gap-1.5 px-3 rounded-md text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500`}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -211,6 +235,76 @@ function Sheet<F>({
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
+  const applyRef = useRef(onApply);
+  applyRef.current = onApply;
+  const openIdRef = useRef(openId);
+  openIdRef.current = openId;
+
+  // History: how many of the sheet's entries stand above the listing's (1
+  // with the list showing, 2 with a sub-view), and the draft Show writes once
+  // they are gone.
+  const depth = useRef(1);
+  const pendingApply = useRef<{ draft: F } | null>(null);
+  const closing = useRef(false);
+  const finished = useRef(false);
+  const fallback = useRef<number | undefined>(undefined);
+  const finishClose = () => {
+    if (finished.current) return;
+    finished.current = true;
+    window.clearTimeout(fallback.current);
+    const p = pendingApply.current;
+    closeRef.current();
+    if (p) applyRef.current(p.draft);
+  };
+  /** Close, writing `draft` when given; the sheet's entries go first. */
+  const closeSheet = (draft?: F) => {
+    if (closing.current) return;
+    closing.current = true;
+    pendingApply.current = draft !== undefined ? { draft } : null;
+    const n = depth.current;
+    depth.current = 0;
+    if (n > 0 && sheetState()) {
+      window.history.go(-n);
+      // Should popstate never come, close anyway.
+      fallback.current = window.setTimeout(finishClose, 800);
+    } else finishClose();
+  };
+  const openSub = (id: string) => {
+    window.history.pushState({ [SHEET_STATE]: "view" }, "");
+    depth.current = 2;
+    setOpenId(id);
+  };
+  /** Back to the list, keeping the draft: through history when the sub-view
+   *  has its entry, so popstate does the rest. */
+  const leaveSub = () => {
+    if (depth.current === 2 && sheetState() === "view") window.history.back();
+    else {
+      returnTo.current = openIdRef.current;
+      setOpenId(null);
+    }
+  };
+
+  useEffect(() => {
+    const onPop = () => {
+      const st = sheetState();
+      if (st === "list") {
+        depth.current = 1;
+        if (openIdRef.current) {
+          returnTo.current = openIdRef.current;
+          setOpenId(null);
+        }
+      } else if (!st) {
+        depth.current = 0;
+        finishClose();
+      }
+    };
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      window.clearTimeout(fallback.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reads refs only
+  }, []);
 
   const openDim = dims.find((d) => d.id === openId) ?? null;
 
@@ -227,12 +321,15 @@ function Sheet<F>({
     panel.querySelector<HTMLElement>("[data-filter-sheet-back]")?.focus();
   }, [openId]);
 
+  const closeSheetRef = useRef(() => closeSheet());
+  closeSheetRef.current = () => closeSheet();
+
   // Escape closes; Tab cycles inside the sheet; the page does not scroll.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !e.defaultPrevented) {
         e.preventDefault();
-        closeRef.current();
+        closeSheetRef.current();
         return;
       }
       if (e.key !== "Tab" || !panelRef.current) return;
@@ -275,12 +372,7 @@ function Sheet<F>({
       : "Show results";
   const apply = () => {
     flushRanges();
-    if (draftRef.current !== applied) onApply(draftRef.current);
-    onClose();
-  };
-  const backToList = (id: string) => {
-    returnTo.current = id;
-    setOpenId(null);
+    closeSheet(draftRef.current !== applied ? draftRef.current : undefined);
   };
 
   const title = openDim ? openDim.label : "Filters";
@@ -300,8 +392,8 @@ function Sheet<F>({
         <button
           type="button"
           onClick={() => {
-            if (openDim) backToList(openDim.id);
-            else onClose();
+            if (openDim) leaveSub();
+            else closeSheet();
           }}
           className={`${CTRL_GHOST} ${CTRL_OFF} size-10 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500`}
           aria-label={openDim ? "Back to filters" : "Close filters"}
@@ -325,13 +417,9 @@ function Sheet<F>({
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
         {openDim ? (
-          <DimensionView
-            key={openDim.id}
-            dim={openDim}
-            filters={filters}
-            onChange={onChange}
-            onPicked={() => backToList(openDim.id)}
-          />
+          <SwipeBack key={openDim.id} onBack={leaveSub}>
+            <DimensionView dim={openDim} filters={filters} onChange={onChange} onPicked={leaveSub} />
+          </SwipeBack>
         ) : (
           <ul className="px-4">
             {dims.map((dim) => (
@@ -352,7 +440,7 @@ function Sheet<F>({
                 ) : (
                   <button
                     type="button"
-                    onClick={() => setOpenId(dim.id)}
+                    onClick={() => openSub(dim.id)}
                     className="flex w-full min-h-14 items-center gap-3 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     data-filter-sheet-row={dim.id}
                   >
@@ -507,6 +595,110 @@ function SegmentRow<F>({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** A sub-view that returns to the list on a swipe to the right: the view
+ *  follows the finger once the drag is mostly sideways (a mostly vertical
+ *  one is left to scroll the list, `touch-action: pan-y`), and the release
+ *  returns past a third of the width or on a flick, else snaps back. With
+ *  reduced motion the view does not move; the release alone decides. */
+function SwipeBack({ onBack, children }: { onBack: () => void; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [dx, setDx] = useState(0);
+  const [settling, setSettling] = useState(false);
+  const g = useRef<{
+    id: number;
+    x: number;
+    y: number;
+    mode: "pending" | "swipe" | "off";
+    dx: number;
+    lastX: number;
+    lastT: number;
+    v: number;
+  } | null>(null);
+  const swiped = useRef(false);
+  const still = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const end = (cancelled: boolean) => {
+    const s = g.current;
+    g.current = null;
+    if (!s || s.mode !== "swipe") return;
+    const width = ref.current?.offsetWidth ?? window.innerWidth;
+    const done = !cancelled && (s.dx > width * SWIPE_SHARE || (s.v > SWIPE_FLICK && s.dx > 24));
+    if (done && !still()) {
+      setSettling(true);
+      setDx(width);
+      window.setTimeout(onBack, SWIPE_MS);
+    } else if (done) onBack();
+    else {
+      setSettling(true);
+      setDx(0);
+    }
+  };
+
+  return (
+    <div
+      ref={ref}
+      className="min-h-full touch-pan-y"
+      style={{
+        transform: dx ? `translateX(${dx}px)` : undefined,
+        transition: settling ? `transform ${SWIPE_MS}ms ease-out` : undefined,
+      }}
+      onTransitionEnd={() => setSettling(false)}
+      data-filter-sheet-swipe=""
+      onPointerDown={(e) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        swiped.current = false;
+        g.current = {
+          id: e.pointerId,
+          x: e.clientX,
+          y: e.clientY,
+          mode: "pending",
+          dx: 0,
+          lastX: e.clientX,
+          lastT: e.timeStamp,
+          v: 0,
+        };
+      }}
+      onPointerMove={(e) => {
+        const s = g.current;
+        if (!s || s.id !== e.pointerId || s.mode === "off") return;
+        const ddx = e.clientX - s.x;
+        const ddy = e.clientY - s.y;
+        if (s.mode === "pending") {
+          if (Math.abs(ddx) < 10 && Math.abs(ddy) < 10) return;
+          if (ddx > 0 && Math.abs(ddx) > Math.abs(ddy) * 1.5) {
+            s.mode = "swipe";
+            swiped.current = true;
+            ref.current?.setPointerCapture?.(e.pointerId);
+          } else {
+            s.mode = "off";
+            return;
+          }
+        }
+        const dt = e.timeStamp - s.lastT;
+        if (dt > 0) s.v = (e.clientX - s.lastX) / dt;
+        s.lastX = e.clientX;
+        s.lastT = e.timeStamp;
+        s.dx = Math.max(0, ddx);
+        if (!still()) {
+          setSettling(false);
+          setDx(s.dx);
+        }
+      }}
+      onPointerUp={() => end(false)}
+      onPointerCancel={() => end(true)}
+      // A swipe that ends on an option does not also pick it.
+      onClickCapture={(e) => {
+        if (!swiped.current) return;
+        swiped.current = false;
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
+      {children}
     </div>
   );
 }
