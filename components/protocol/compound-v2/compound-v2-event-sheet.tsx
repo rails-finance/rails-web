@@ -100,7 +100,7 @@ function heldProv(side: FlowSide, when: "after" | "before" | "previous"): Proven
         : "once this transaction had run";
   return {
     kind: "chain-derived",
-    summary: `${what} ${when === "previous" ? "at the last event" : `${when} this event`} — what the account ${side === "collateral" ? "supplied" : "owed"} ${at}, in USD: each market's ${side === "collateral" ? "supply (cTokens × the exchange rate)" : "debt (accountBorrows)"} as its rows recorded it, a market the transaction left alone grown by its interest since its last event, each at ${ORACLE}.`,
+    summary: `${what} ${when === "previous" ? "at the last event" : `${when} this event`}. What the account ${side === "collateral" ? "supplied" : "owed"} ${at}, in USD: each market's ${side === "collateral" ? "supply (cTokens × the exchange rate)" : "debt (accountBorrows)"} as its rows recorded it, a market the transaction left alone grown by its interest since its last event, each at ${ORACLE}.`,
     formula: "Σ balance × price",
   };
 }
@@ -109,7 +109,7 @@ function heldProv(side: FlowSide, when: "after" | "before" | "previous"): Proven
 const atPriceUsdProv = (sym: string, what: string, amount: number, price: number): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `${what}, in US dollars — the amount times Compound's oracle price for ${sym} (getUnderlyingPrice, in USD) of its latest priced event.`,
+  summary: `${what}, in US dollars. The amount times Compound's oracle price for ${sym} (getUnderlyingPrice, in USD) of its latest priced event.`,
   formula: "amount × price",
   inputs: [
     { label: "amount", value: `${fmtPositionAmount(amount)} ${sym}`, kind: "chain-derived", pclass: "indexed" },
@@ -120,19 +120,19 @@ const atPriceUsdProv = (sym: string, what: string, amount: number, price: number
 /** A market's balance change across the transaction. */
 const changeProv = (side: FlowSide, sym: string): Provenance => ({
   kind: "chain-derived",
-  summary: `${sym} ${side === "collateral" ? "supply" : "debt"} change at this event — the balance once the transaction had run less the balance just before it, as the market's rows state them.`,
+  summary: `${sym} ${side === "collateral" ? "supply" : "debt"} change at this event. The balance once the transaction had run less the balance just before it, as the market's rows state them.`,
   formula: "after − before",
 });
 
 /** A market's balance once the transaction had run. */
 const balanceProv = (side: FlowSide, sym: string): Provenance => ({
   kind: "chain-derived",
-  summary: `${sym} ${side === "collateral" ? "supplied" : "owed"} after this event — the market's ${side === "collateral" ? "supply (the cToken balance × the exchange rate at the block)" : "debt (the emitted accountBorrows)"} as the row states it, or grown by its index to the block where the transaction left it alone.`,
+  summary: `${sym} ${side === "collateral" ? "supplied" : "owed"} after this event. The market's ${side === "collateral" ? "supply (the cToken balance × the exchange rate at the block)" : "debt (the emitted accountBorrows)"} as the row states it, or grown by its index to the block where the transaction left it alone.`,
 });
 
 const interestProv = (side: FlowSide, sym: string): Provenance => ({
   kind: "chain-derived",
-  summary: `${sym} interest since the last event — the ${side === "collateral" ? "supply" : "debt"} just before this transaction less the ${side === "collateral" ? "supply" : "debt"} once the previous transaction had run, as the market's rows state them; a market neither transaction touched is grown along its index, interpolated between the rows that state it.`,
+  summary: `${sym} interest since the last event. The ${side === "collateral" ? "supply" : "debt"} just before this transaction less the ${side === "collateral" ? "supply" : "debt"} once the previous transaction had run, as the market's rows state them; a market neither transaction touched is grown along its index, interpolated between the rows that state it.`,
   formula: "before this event − after the last event",
 });
 
@@ -262,7 +262,7 @@ function sheetSide(
               info: {
                 kind: "chain-derived",
                 pclass: "oracle",
-                summary: `Interest on the ${side} since the last event, in US dollars — every market's interest at ${ORACLE}, added up.`,
+                summary: `Interest on the ${side} since the last event, in US dollars. Every market's interest at ${ORACLE}, added up.`,
                 formula: "Σ interest × price",
               },
             }
@@ -283,7 +283,7 @@ function sheetSide(
             info: {
               kind: "chain-derived",
               pclass: "oracle",
-              summary: `Market move on the ${side} since the last event — the side's total before this transaction, less its total once the previous transaction had run and the interest since, all in US dollars: the change Compound's oracle prices made to the balances held between the two. No token moved.`,
+              summary: `Market move on the ${side} since the last event. The side's total before this transaction, less its total once the previous transaction had run and the interest since, all in US dollars: the change Compound's oracle prices made to the balances held between the two. No token moved.`,
               formula: "before this event − last event − interest since",
               inputs: balances
                 .filter((b) => then.has(b.symbol))

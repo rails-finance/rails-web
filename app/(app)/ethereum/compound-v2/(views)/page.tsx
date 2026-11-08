@@ -18,7 +18,6 @@ import {
 } from "@/lib/compound-v2/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -27,6 +26,8 @@ export const maxDuration = 30;
 export const metadata = listingMetadata({
   title: "Explore Compound V2 positions",
   canonicalPath: "/ethereum/compound-v2",
+  description:
+    "Every Compound V2 account on Ethereum over six years: supplies, borrows and liquidations, with each market's current rates and size.",
 });
 
 async function CompoundV2ListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
@@ -52,4 +53,4 @@ async function CompoundV2ListingPage({ searchParams }: { searchParams: Promise<R
   return <CompoundV2Listing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/ethereum/compound-v2", CompoundV2ListingPage);
+export default CompoundV2ListingPage;

@@ -72,7 +72,7 @@ export function TroveDetailsBand({
   const feeProv: Provenance = {
     kind: "chain",
     summary:
-      "The delegate's annual management fee — the fee rate the contract logged for the batch this trove is in. The delegate charges it on top of the interest the trove pays.",
+      "The delegate's annual management fee. The fee rate the contract logged for the batch this trove is in. The delegate charges it on top of the interest the trove pays.",
     via: "the batch's most recent BatchUpdated log: _annualManagementFee",
   };
   // Both figures are computed server-side per request: a MultiTroveGetter walk

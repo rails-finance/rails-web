@@ -105,7 +105,7 @@ function useHeadingWallet(): string | null {
   );
 }
 
-const LINK = "text-blue-600 hover:underline dark:text-blue-400";
+const LINK = "text-blue-600 hover:underline dark:text-[var(--text-link)]";
 const TH = "w-24 py-1.5 pr-3 text-left align-top font-normal text-rb-500";
 const TD = "min-w-0 py-1.5 align-top text-foreground";
 

@@ -10,7 +10,7 @@ export const metadata = listingMetadata({
   title: "About MetaMorpho vaults on Base",
   canonicalPath: "/base/morpho/vaults/info",
   description:
-    "How Rails builds the vault position listing on Base: membership from a whole-Transfer census swept from each vault's own creation block and proven complete by Σ balanceOf, the three blocks the section reads at, the one priced figure, and what the search does and does not do.",
+    "How Rails builds the vault position listing on Base: membership from a whole-Transfer census swept from each vault's creation block and proven complete by Σ balanceOf, the three blocks the section reads at, the one priced figure, and what the search does and does not do.",
 });
 
 export default function BaseVaultsInfoPage() {

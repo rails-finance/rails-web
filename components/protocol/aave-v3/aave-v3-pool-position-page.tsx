@@ -258,7 +258,7 @@ export function AaveV3PoolPositionView({
       .then((d) => {
         if (cancelled) return;
         setData(d);
-        setError(d.chainStale ? "The read failed — reload to retry." : null);
+        setError(d.chainStale ? "The read failed: reload to retry." : null);
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load the position");

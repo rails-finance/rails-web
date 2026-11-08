@@ -85,7 +85,7 @@ export function CTokenLiquidationBreakdown(p: CTokenLiquidationBreakdownProps) {
   const fmt = p.format ?? formatUsdValue;
   const read = (what: string, fn: string, block: number, note?: string): Provenance => ({
     kind: "chain",
-    summary: `${what} — ${p.brand}'s Comptroller answered \`${fn}\` for this account at block ${block.toLocaleString("en-US")}.${note ? ` ${note}` : ""}`,
+    summary: `${what}. ${p.brand}'s Comptroller answered \`${fn}\` for this account at block ${block.toLocaleString("en-US")}.${note ? ` ${note}` : ""}`,
     contract: p.comptroller,
     via: `${fn} @ block ${block}`,
     verify: { kind: "recompute", text: `To check: ask an archive node for the Comptroller's ${fn} at block ${block}.` },

@@ -18,7 +18,6 @@ import {
 } from "@/lib/morpho-base/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -27,6 +26,8 @@ export const maxDuration = 30;
 export const metadata = listingMetadata({
   title: "Explore Morpho Blue positions on Base",
   canonicalPath: "/base/morpho",
+  description:
+    "Look up any Morpho borrower on Base: collateral, debt and health across every market, read from the chain.",
 });
 
 async function MorphoBaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
@@ -54,4 +55,4 @@ async function MorphoBaseListingPage({ searchParams }: { searchParams: Promise<R
   return <MorphoBaseListing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/base/morpho", MorphoBaseListingPage);
+export default MorphoBaseListingPage;

@@ -11,7 +11,7 @@ export default function CompoundArbitrumWalletNotFound() {
       backLabel="Look up another wallet on Compound V3 Arbitrum"
     >
       This page is about one account across every Comet on Arbitrum, named by its 20-byte address. The URL does not
-      carry one, so there is no account to look up — an address none of them has seen would still resolve, and say so.
+      carry one, so there is no account to look up. An address none of them has seen would still resolve, and say so.
     </RouteNotFound>
   );
 }

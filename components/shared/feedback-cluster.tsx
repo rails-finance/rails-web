@@ -29,7 +29,7 @@ export function FeedbackCluster({ variant = "stacked" }: { variant?: "stacked" |
       ) : (
         <>
           <h4 className="text-sm font-semibold text-foreground mb-3">Feedback</h4>
-          <p className="body-text mb-3">Spotted a wrong number or a rough edge? It goes straight to the team.</p>
+          <p className="body-text mb-3">Spotted a wrong number or a rough edge? It goes to the team.</p>
         </>
       )}
       <button

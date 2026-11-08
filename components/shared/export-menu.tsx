@@ -142,7 +142,7 @@ export function ExportMenu({
       if (fetched.missing > 0) {
         setCsvError(
           `The index served ${fetched.events.length.toLocaleString("en-US")} events and could not reach the other ` +
-            `${fetched.missing.toLocaleString("en-US")}. Nothing was downloaded — a spreadsheet short of the position ` +
+            `${fetched.missing.toLocaleString("en-US")}. Nothing was downloaded: a spreadsheet short of the position ` +
             `would not say so.`,
         );
         return;

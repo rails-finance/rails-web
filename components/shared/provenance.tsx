@@ -661,7 +661,7 @@ function NotationModal({ display, exact, onClose }: { display: string; exact: st
     // exponent-safe: parsed straight back into a number.
     const diff = parseFloat((Math.abs(exactN) - Math.abs(displayN)).toPrecision(12));
     if (diff === 0) {
-      adjustment = <>No adjustment — the compact form is this value exactly.</>;
+      adjustment = <>No adjustment: the compact form is this value.</>;
     } else {
       const pct = (Math.abs(diff) / Math.abs(exactN)) * 100;
       adjustment = (
@@ -683,7 +683,7 @@ function NotationModal({ display, exact, onClose }: { display: string; exact: st
         {adjustment && <p>{adjustment}</p>}
         <p>
           <b>K</b> thousand · <b>M</b> million · <b>B</b> billion, rounded to the nearest step at the shown precision
-          (ties round away from zero). The compact form is a reading aid, never the figure itself — the exact value
+          (ties round away from zero). The compact form is a reading aid, never the figure itself: the exact value
           beneath the headline is what rides the trace and the compute steps.
         </p>
       </div>
@@ -697,11 +697,11 @@ export function LadderModal({ onClose }: { onClose: () => void }) {
     <ProvModal ariaLabel="Distance ladder" onClose={onClose}>
       <h2 className="text-lg font-bold mb-4">The distance ladder</h2>
       <LadderRung cls="emitted" name="Emitted">
-        A field in the event&rsquo;s own log. <b>Proof:</b> the tx event logs on any explorer.
+        A field in the event&rsquo;s log. <b>Proof:</b> the tx event logs on any explorer.
       </LadderRung>
       <LadderRung cls="state" name="State">
-        Read from a contract slot at a block. <b>Proof:</b> re-run the eth_call at that block against any node —
-        explorers only show the current head.
+        Read from a contract slot at a block. <b>Proof:</b> re-run the eth_call at that block against any node.
+        Explorers only show the current head.
       </LadderRung>
       <LadderRung cls="oracle" name="Oracle">
         An on-chain price feed. <b>Proof:</b> the AnswerUpdated log for that round.
@@ -712,20 +712,20 @@ export function LadderModal({ onClose }: { onClose: () => void }) {
         <span className="prov-bar" />
       </div>
       <LadderRung cls="indexed" name="Indexed">
-        Materialized by our backend. <b>No third-party proof</b> — you trust the indexer&rsquo;s replay. Bottoms out
+        Materialized by our backend. <b>No third-party proof</b>: you trust the indexer&rsquo;s replay. Bottoms out
         here.
       </LadderRung>
       <LadderRung cls="offchain" name="Off-chain">
-        No on-chain anchor at all — an API price, an approximation. Nothing to verify against.
+        No on-chain anchor at all: an API price, an approximation. Nothing to verify against.
       </LadderRung>
       <p className="prov-prose">
-        <b>Computed</b> isn&rsquo;t a rung — it&rsquo;s the operator between them, and it inherits the furthest class of
-        its inputs. The result&rsquo;s badge is that <b>weakest link</b>. Temperature carries the split —{" "}
-        <b>cool = on-chain</b>, <b>warm = trust required</b>. A categorical ladder, not a score.
+        <b>Computed</b> isn&rsquo;t a rung: it&rsquo;s the operator between them, and it inherits the furthest class of
+        its inputs. The result&rsquo;s badge is that <b>weakest link</b>. Temperature carries the split:{" "}
+        <b>cool = on-chain</b>, <b>warm = trust required</b>. A categorical ladder.
       </p>
       <p className="prov-prose">
-        <b>Delivery is not verification.</b> How Rails fetched a number — replayed by our indexer or read live from a
-        node — is a freshness question, and both routes are still us. Verification points at a neutral third party (the
+        <b>Delivery is not verification.</b> How Rails fetched a number, replayed by our indexer or read live from a
+        node, is a freshness question, and both routes are still us. Verification points at a neutral third party (the
         tx logs, the oracle round) so the proof never passes through Rails at all.
       </p>
     </ProvModal>
@@ -887,7 +887,7 @@ export function ProvReceipt({
               className={`prov-chip ${CLASS_CSS[vcls]}`}
               title={
                 isComputed
-                  ? `Computed value — the class is its furthest input's (the weakest link): ${CLASS_META[vcls]}`
+                  ? `Computed value: the class is its furthest input's (the weakest link): ${CLASS_META[vcls]}`
                   : undefined
               }
             >
@@ -975,7 +975,7 @@ export function ProvReceipt({
             <p className="prov-audit">
               <TriangleAlert aria-hidden />
               <span>
-                Untraced input{untraced.length > 1 ? "s" : ""}: <b>{untraced.join(", ")}</b> — the formula names{" "}
+                Untraced input{untraced.length > 1 ? "s" : ""}: <b>{untraced.join(", ")}</b>: the formula names{" "}
                 {untraced.length > 1 ? "them" : "it"} but no traced input carries {untraced.length > 1 ? "them" : "it"}.
                 This trace is incomplete; treat the vocabulary as needing a fix.
               </span>

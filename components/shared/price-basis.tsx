@@ -96,7 +96,7 @@ export const TODAY_PRICE_WORDS = "at the latest block’s price";
 export function todayUsdProv(what: string, symbol: string): Provenance {
   return {
     kind: "chain-derived",
-    summary: `${what} ${TODAY_PRICE_WORDS} — the amount at the event times ${symbol}'s oracle price at the latest block, which the page's Prices chip states.`,
+    summary: `${what} ${TODAY_PRICE_WORDS}. The amount at the event times ${symbol}'s oracle price at the latest block, which the page's Prices chip states.`,
     formula: "amount × price at the latest block",
   };
 }
@@ -140,7 +140,7 @@ export function ThenTodayChip({
         <Prov
           info={{
             kind: "chain-derived",
-            summary: `${symbol} price today — the oracle's price at the latest block, which the page's Prices chip states.`,
+            summary: `${symbol} price today. The oracle's price at the latest block, which the page's Prices chip states.`,
           }}
         >
           {format(today)}

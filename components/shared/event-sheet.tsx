@@ -441,7 +441,7 @@ function SidePanel({ s, breakdown, col }: { s: SheetSide; breakdown: boolean; co
         <div className="contents" data-sheet-row="total">
           <span className="min-w-0 self-center py-2 text-sm text-rb-500">
             {/* The total line's words open its read-more: "After this event"
-                on a side the event moved, the side's own words elsewhere. */}
+                on a side the event moved, the side's words elsewhere. */}
             <HeadingTip
               text={touched ? (s.after ?? WORDS.after) : (s.untouched ?? WORDS.untouched)}
               tip={s.totalTip}

@@ -2004,7 +2004,7 @@ function ChainTruthTimelineBody({
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap text-sm text-rb-500">
           <span>One event from this position&rsquo;s history</span>
-          <a href={viewInTimelineHref} className="text-blue-600 hover:underline dark:text-blue-400 shrink-0">
+          <a href={viewInTimelineHref} className="text-blue-600 hover:underline dark:text-[var(--text-link)] shrink-0">
             View in timeline →
           </a>
         </div>
@@ -2428,7 +2428,7 @@ function ChainTruthTimelineBody({
                       : tl.isFiltered && cut != null && tl.sortedEvents.some((e) => e.timestamp <= cut)
                         ? `Nothing to ${rewind!.word} matches these filters.`
                         : tl.isFiltered
-                          ? "All events filtered out — adjust the filters above to show some."
+                          ? "All events filtered out: adjust the filters above to show some."
                           : cut != null
                             ? cutEmptyState(cut, rewind!.word)
                             : emptyLabel}

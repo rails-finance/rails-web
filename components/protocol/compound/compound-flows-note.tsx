@@ -120,9 +120,9 @@ export function compoundFlowsContent(): LearnMoreContent {
       },
     ],
     links: [
-      { label: "docs.compound.xyz — Collateral and borrowing", url: DOCS.ACCOUNTS },
-      { label: "docs.compound.xyz — Interest rates", url: DOCS.INTEREST },
-      { label: "docs.compound.xyz — Liquidation", url: DOCS.LIQUIDATION },
+      { label: "docs.compound.xyz: Collateral and borrowing", url: DOCS.ACCOUNTS },
+      { label: "docs.compound.xyz: Interest rates", url: DOCS.INTEREST },
+      { label: "docs.compound.xyz: Liquidation", url: DOCS.LIQUIDATION },
     ],
   };
 }

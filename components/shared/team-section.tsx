@@ -78,7 +78,7 @@ export function TeamSection({ aside }: { aside?: ReactNode }) {
                     {/* A page on Rails, so the link hue (color-grammar.md §4a), in this tab. */}
                     <Link
                       href={m.journey.url}
-                      className="text-blue-600 transition-colors hover:underline dark:text-blue-400"
+                      className="text-blue-600 transition-colors hover:underline dark:text-[var(--text-link)]"
                     >
                       {m.journey.label}
                     </Link>

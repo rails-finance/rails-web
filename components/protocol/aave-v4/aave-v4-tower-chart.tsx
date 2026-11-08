@@ -61,7 +61,7 @@ import type { Provenance } from "@/components/shared/provenance";
 const HOLDING_PRICE_NOTE =
   "the latest block's price: Aave's oracle where it covers the asset, an off-chain market price otherwise";
 const OUTFLOW_PRICE_NOTE =
-  "each outflow at the price stored for its block — what Aave's oracle answered there, so the figure stays at the value the tokens left at";
+  "each outflow at the price stored for its block. What Aave's oracle answered there, so the figure stays at the value the tokens left at";
 
 // Deposited and Borrowed: what the side holds and what has left it, less the
 // interest (lib/aave-v4/lifetime-totals.ts), so in each token they are the sums
@@ -99,12 +99,12 @@ const borrowedProv = () => inflowProv("debt");
 const CURRENT_COLL_PROV: Provenance = {
   ...chainTruthProv("Current collateral", "net supply"),
   summary:
-    "Current collateral — what the spoke contract answers for this position at the latest block, carrying the interest accrued up to it. Where that read is unavailable the row falls back to the position's supplies less what has been withdrawn or liquidated.",
+    "Current collateral. What the spoke contract answers for this position at the latest block, carrying the interest accrued up to it. Where that read is unavailable the row falls back to the position's supplies less what has been withdrawn or liquidated.",
 };
 const CURRENT_DEBT_PROV: Provenance = {
   ...chainTruthProv("Current debt", "net debt"),
   summary:
-    "Current debt — what the spoke contract answers for this position at the latest block, carrying the interest accrued up to it. Where that read is unavailable the row falls back to the position's draws less what has been repaid or liquidated.",
+    "Current debt. What the spoke contract answers for this position at the latest block, carrying the interest accrued up to it. Where that read is unavailable the row falls back to the position's draws less what has been repaid or liquidated.",
 };
 
 // RULE (TO-DO-ui-jobs §101): the breakdown's figure column is USD on every
@@ -119,13 +119,13 @@ const CURRENT_DEBT_PROV: Provenance = {
 // price, since "what's it worth now" is a current-price question.
 const flowUsdHintProv = (symbol: string): Provenance => ({
   kind: "derived",
-  summary: `${symbol} outflow value in USD — each event's amount at the price stored for its block, added up. The figure stays at what the tokens were worth as they left.`,
+  summary: `${symbol} outflow value in USD. Each event's amount at the price stored for its block, added up. The figure stays at what the tokens were worth as they left.`,
   formula: "Σ(flow amount × price at the event's block)",
   inputs: [{ label: "price", kind: "chain", pclass: "oracle", note: OUTFLOW_PRICE_NOTE }],
 });
 const currentUsdHintProv = (symbol: string, source: AaveV4PriceSource | null): Provenance => ({
   kind: "derived",
-  summary: `${symbol} value in USD — the row's token balance at the latest block's price.`,
+  summary: `${symbol} value in USD. The row's token balance at the latest block's price.`,
   formula: "amount × latest block's price",
   inputs: [livePriceInput(source)],
 });

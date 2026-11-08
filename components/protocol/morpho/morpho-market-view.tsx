@@ -171,7 +171,7 @@ export function MorphoMarketView({ data, chainId }: { data: MorphoMarketViewData
             slot: "usage" as const,
             label: "Utilisation",
             value: <Prov info={morphoUtilizationProv(coords)}>{pctText(m.utilization)}</Prov>,
-            title: `Borrowed ÷ supplied, both in ${m.loanSymbol} — the one aggregate ratio Blue keeps. Blue records collateral per position and never totals it, so there is no market-wide loan-to-value to state.`,
+            title: `Borrowed ÷ supplied, both in ${m.loanSymbol}: the one aggregate ratio Blue keeps. Blue records collateral per position and never totals it, so there is no market-wide loan-to-value to state.`,
           },
         ]}
         notes={
@@ -195,7 +195,7 @@ export function MorphoMarketView({ data, chainId }: { data: MorphoMarketViewData
               <span
                 title={`${m.loanSymbol} misreports its own decimals, so its balances cannot be scaled to a quantity.`}
               >
-                sizes not stated — {m.loanSymbol} misreports its decimals
+                sizes not stated: {m.loanSymbol} misreports its decimals
               </span>
             )}
             {m.utilization == null && <span>no supply</span>}
@@ -283,7 +283,7 @@ export function MorphoMarketView({ data, chainId }: { data: MorphoMarketViewData
         <dl
           className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 text-[12px] sm:grid-cols-[10rem_1fr]"
           data-prov-exempt=""
-          title="Market parameters and identifiers, not figures read from a slot."
+          title="Market parameters and identifiers."
         >
           <dt className="text-rb-500">Market id</dt>
           <dd>

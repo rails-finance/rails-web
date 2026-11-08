@@ -21,7 +21,7 @@ export const metadata: Metadata = {
 };
 
 const H2 = "text-3xl font-semibold tracking-tight text-foreground";
-const LINK = "text-blue-600 dark:text-blue-400 hover:underline";
+const LINK = "text-blue-600 dark:text-[var(--text-link)] hover:underline";
 
 export default function AboutPage() {
   return (

@@ -186,7 +186,7 @@
   /* Link/party accents — see color-grammar.md for the full rule.
      blue = stays inside Rails (internal nav + links).
      pink = leaves Rails (external links) OR is an external party (delegates). */
-  /* Link blue: blue-600 light, blue-400 dark (WCAG AA), set again in .dark.
+  /* Link blue: blue-600 light, #4b8df7 dark (WCAG AA), set again in .dark.
      Links that rest blue take an underline on hover; links that rest neutral
      turn link blue. See color-grammar.md §4a. */
   --text-link: var(--color-blue-600);
@@ -292,7 +292,7 @@
 
 .dark {
   /* Dark mode colors (current theme as dark) */
-  --text-link: var(--color-blue-400);
+  --text-link: #4b8df7; /* between blue-400 and -500: 4.92:1 on rb-600, AA on every dark ground */
   --foreground: #ffffff;
 
   /* The sidebar's tint on the dark card (C20): Aave's panel near #3f2238 and

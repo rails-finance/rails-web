@@ -93,7 +93,7 @@ function OpenBookSection({ book }: { book: PwnLoanBook }) {
 
         {unsettled === 0 ? (
           <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-            No loan stands open — every loan ever struck has settled, by repayment or by the lender&rsquo;s claim. The
+            No loan stands open: every loan ever struck has settled, by repayment or by the lender&rsquo;s claim. The
             rest of this page is the book&rsquo;s record.
           </p>
         ) : (
@@ -104,7 +104,7 @@ function OpenBookSection({ book }: { book: PwnLoanBook }) {
             </p>
             <Link
               href={OPEN_BOOK_HREF}
-              className="mt-2 inline-block text-[13px] text-blue-600 dark:text-blue-400 hover:underline"
+              className="mt-2 inline-block text-[13px] text-blue-600 dark:text-[var(--text-link)] hover:underline"
             >
               Loans in escrow, soonest deadline first <span aria-hidden>→</span>
             </Link>
@@ -122,10 +122,9 @@ function CollateralSection({ book }: { book: PwnLoanBook }) {
     <section className="mt-8">
       <h2 className="text-sm font-semibold text-foreground">What secures the loans</h2>
       <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-        The book&rsquo;s collateral, grouped by asset. PWN accepts arbitrary tokens — fungible ERC-20s, single NFTs, and
-        the protocol&rsquo;s own Token Bundler wrapper, which rolls several assets into one ERC-1155 bundle (its
-        contents are chain-readable and shown on each loan&rsquo;s page). Each line carries the asset&rsquo;s own
-        outcome record.
+        The book&rsquo;s collateral, grouped by asset. PWN accepts arbitrary tokens: fungible ERC-20s, single NFTs, and
+        the protocol&rsquo;s Token Bundler wrapper, which rolls several assets into one ERC-1155 bundle (its contents
+        are chain-readable and shown on each loan&rsquo;s page). Each line carries the asset&rsquo;s own outcome record.
       </p>
 
       <div className="mt-3 rounded-xl bg-raised px-4 py-3.5">
@@ -153,7 +152,7 @@ function CollateralSection({ book }: { book: PwnLoanBook }) {
                 >
                   {c.named ? c.symbol : <span className="font-mono text-[0.85em]">{c.symbol}</span>}
                 </a>
-                {c.isBundle && <span className="ml-1.5 text-[11px] text-rb-500">the protocol&rsquo;s own wrapper</span>}
+                {c.isBundle && <span className="ml-1.5 text-[11px] text-rb-500">the protocol&rsquo;s wrapper</span>}
                 {!c.named && !c.isBundle && <span className="ml-1.5 text-[11px] text-rb-500">unnamed contract</span>}
               </div>
               <div className="text-xs text-rb-500">{c.category ? CATEGORY_LABEL[c.category] : "—"}</div>
@@ -185,9 +184,9 @@ function CreditSection({ book }: { book: PwnLoanBook }) {
     <section className="mt-8">
       <h2 className="text-sm font-semibold text-foreground">What the loans owe</h2>
       <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-        The credit side, per token. Sums stay within one token: PWN has no protocol oracle — the two parties set the
-        price between themselves — so there is no unit the whole book could be totalled in, and this view does not
-        invent one.
+        The credit side, per token. Sums stay within one token: PWN has no protocol oracle, the two parties set the
+        price between themselves, so there is no unit the whole book could be totalled in, and this view does not invent
+        one.
       </p>
 
       <div className="mt-3 rounded-xl bg-raised px-4 py-3.5">
@@ -299,8 +298,8 @@ function TermsSection({ book }: { book: PwnLoanBook }) {
       <h2 className="text-sm font-semibold text-foreground">The terms the parties fixed</h2>
       <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
         On PWN nothing prices a loan but its two parties: no rate curve, no utilisation, no floating anything. So the
-        book&rsquo;s terms are a distribution, not a curve — each loan&rsquo;s length and interest were negotiated at
-        creation and fixed for its life. Stated as shortest · median · longest across the book.
+        book&rsquo;s terms are a distribution. Each loan&rsquo;s length and interest were negotiated at creation and
+        fixed for its life. Stated as shortest · median · longest across the book.
       </p>
 
       <div className="mt-3 rounded-xl bg-raised px-4 py-3.5">
@@ -348,8 +347,8 @@ function DefaultsSection({ book }: { book: PwnLoanBook }) {
       <h2 className="text-sm font-semibold text-foreground">Defaults &amp; claims</h2>
       <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
         A PWN default is a clock event, not a price event: a loan that expires unpaid simply lapses, and the lender
-        claims the escrowed collateral — whatever it is then worth. Nothing is liquidated, no penalty is computed, and
-        no third party takes part.
+        claims the escrowed collateral, whatever it is then worth. Nothing is liquidated, no penalty is computed, and no
+        third party takes part.
       </p>
 
       <div className="mt-3 rounded-xl bg-raised px-4 py-3.5">
@@ -370,7 +369,7 @@ function DefaultsSection({ book }: { book: PwnLoanBook }) {
 
         {book.totals.defaulted === 0 ? (
           <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-            No loan in the book has lapsed — every settled loan was repaid.
+            No loan in the book has lapsed: every settled loan was repaid.
           </p>
         ) : (
           <>
@@ -380,7 +379,7 @@ function DefaultsSection({ book }: { book: PwnLoanBook }) {
             </p>
             <Link
               href={DEFAULTS_HREF}
-              className="mt-2 inline-block text-[13px] text-blue-600 dark:text-blue-400 hover:underline"
+              className="mt-2 inline-block text-[13px] text-blue-600 dark:text-[var(--text-link)] hover:underline"
             >
               Defaulted loans, most recent deadline first <span aria-hidden>→</span>
             </Link>
@@ -401,7 +400,7 @@ export function PwnBookView({ book }: { book: PwnLoanBook }) {
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read the loan book from the indexed backend.</p>
         <p className="text-sm">
-          This view reduces the explorer&rsquo;s own loan index and has no cached fallback — it shows nothing. Try again
+          This view reduces the explorer&rsquo;s own loan index and has no cached fallback. It shows nothing. Try again
           shortly.
         </p>
       </div>
@@ -496,7 +495,7 @@ export function PwnBookStamp({ book }: { book: PwnLoanBook }) {
       {book.latestCreatedBlock != null ? (
         <BlockRef block={book.latestCreatedBlock} chainId={MAINNET_CHAIN_ID} />
       ) : (
-        "block —"
+        "block: "
       )}{" "}
       · drawn from the same loan records the{" "}
       <Link href="/ethereum/pwn" className={INLINE_LINK}>

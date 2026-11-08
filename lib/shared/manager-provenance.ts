@@ -75,7 +75,7 @@ export function managerProv(k: Managed, chainId: ChainId): Provenance | null {
   return {
     kind: "chain",
     pclass: "state",
-    summary: `Who runs this account — ${lower(claim(k))}${closed}`,
+    summary: `Who runs this account. ${lower(claim(k))}${closed}`,
     contract: { name: m.contractName, address: m.contract },
     via: calls.map((c) => `${c.contractName}.${c.call.replace(/\(.*$/, "()")}`).join(" + "),
     verify: {

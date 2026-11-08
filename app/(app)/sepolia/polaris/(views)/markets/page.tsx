@@ -27,7 +27,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Polaris markets",
   description:
-    "Polaris's two Sepolia markets side by side — collateral and debt, the algorithmic rate in force, mode and reserve ratio, the stability pools, and the price legs the protocol values pETH with.",
+    "Polaris's two Sepolia markets side by side: collateral and debt, the algorithmic rate in force, mode and reserve ratio, the stability pools, and the price legs the protocol values pETH with.",
 };
 
 const PROTOCOL = protocolForHref(POLARIS_BASE_PATH)!;

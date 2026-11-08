@@ -66,7 +66,7 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
     const costsProv: Provenance = {
       kind: "derived",
       summary:
-        "Estimated interest cost per year — the recorded debt times the annual interest rate, both read live. It is a year's interest at today's rate; the rate can change.",
+        "Estimated interest cost per year. The recorded debt times the annual interest rate, both read live. It is a year's interest at today's rate; the rate can change.",
       formula: "recorded debt × rate ÷ 100",
       inputs: [
         {
@@ -99,7 +99,7 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
     const room = Math.max(0, (chain.entireColl * chain.priceUsd) / chain.mcr - chain.entireDebt);
     const roomProv: Provenance = {
       kind: "derived",
-      summary: `Room to borrow — the further ${debtSym} debt this Trove could carry before its collateral ratio reaches the ${chain.symbol} branch's ${pct(chain.mcr)} minimum (MCR), at today's price: the collateral's worth divided by the minimum, less the debt.`,
+      summary: `Room to borrow. The further ${debtSym} debt this Trove could carry before its collateral ratio reaches the ${chain.symbol} branch's ${pct(chain.mcr)} minimum (MCR), at today's price: the collateral's worth divided by the minimum, less the debt.`,
       formula: "collateral × price ÷ MCR − debt",
       inputs: [
         {

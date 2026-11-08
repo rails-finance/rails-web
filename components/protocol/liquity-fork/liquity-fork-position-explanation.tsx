@@ -79,11 +79,11 @@ export function LiquityForkClosedExplanation({
 
   const lead = liquidated ? (
     <>
-      This Trove life <H>ended in liquidation</H> — no balances remain on it:
+      This Trove life <H>ended in liquidation</H>. No balances remain on it:
     </>
   ) : (
     <>
-      This Trove life <H>was closed by its owner</H> — no balances remain on it:
+      This Trove life <H>was closed by its owner</H>. No balances remain on it:
     </>
   );
 
@@ -106,7 +106,7 @@ export function LiquityForkClosedExplanation({
             —{" "}
           </>
         ) : (
-          <>The liquidation seized the Trove&rsquo;s remaining collateral and cleared its remaining debt — </>
+          <>The liquidation seized the Trove&rsquo;s remaining collateral and cleared its remaining debt, </>
         )}
         the branch liquidates a Trove whose collateral ratio falls below its minimum, in one whole-Trove seizure.
       </span>,
@@ -133,7 +133,7 @@ export function LiquityForkClosedExplanation({
         <H>
           <AmountText value={peakDebt} /> {debtSymbol}
         </H>{" "}
-        of debt — the highest balances in its record, each its own lifetime maximum.
+        of debt: the highest balances in its record, each its own lifetime maximum.
       </span>,
     );
   }
@@ -237,7 +237,7 @@ export function LiquityForkPositionExplanation({
   if (chain.priceUsd != null) {
     bullets.push(
       <span key="worth">
-        At the branch&rsquo;s own price, that collateral is worth{" "}
+        At the branch&rsquo;s price, that collateral is worth{" "}
         <Prov info={vocab.forkUsdProv("Collateral", sym)}>
           <H>{formatUsd(chain.entireColl * chain.priceUsd)}</H>
         </Prov>
@@ -265,7 +265,7 @@ export function LiquityForkPositionExplanation({
           <Prov info={rateProv}>
             <H>{chain.annualInterestRatePct.toFixed(2)}%</H>
           </Prov>{" "}
-          annual rate — the rate its interest-batch manager sets for every member.
+          annual rate: the rate its interest-batch manager sets for every member.
           {chain.accruedBatchManagementFee > 0 && (
             <>
               {" "}
@@ -389,7 +389,7 @@ export function LiquityForkPositionExplanation({
       <span key="branch">
         The {chain.symbol} branch as a whole is <H>{(chain.branchTcr * 100).toFixed(0)}%</H> collateralised
         {chain.branchTcr < chain.ccr ? (
-          <> — below its {(chain.ccr * 100).toFixed(0)}% critical ratio, so new borrowing is paused until it recovers</>
+          <> : below its {(chain.ccr * 100).toFixed(0)}% critical ratio, so new borrowing is paused until it recovers</>
         ) : null}
         .
       </span>,
@@ -409,7 +409,7 @@ export function LiquityForkPositionExplanation({
   if (chain.priceStale) {
     bullets.push(
       <span key="stale">
-        The branch&rsquo;s price didn&rsquo;t refresh on this load, so the price shown is its last recorded value — it
+        The branch&rsquo;s price didn&rsquo;t refresh on this load, so the price shown is its last recorded value. It
         updates when someone acts on the branch and can lag on a quiet one.
       </span>,
     );

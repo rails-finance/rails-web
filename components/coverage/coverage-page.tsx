@@ -34,16 +34,16 @@ function coverageHref(chainId: ChainId): string {
 }
 
 const coverageBlurb = (chainId: ChainId) =>
-  `What every Rails explorer on ${CHAINS[chainId].name} gives you, and how deep each one currently goes — position dashboards, oracle pricing, chain verification, exports.`;
+  `What every Rails explorer on ${CHAINS[chainId].name} gives you, and how deep each one goes: position dashboards, oracle pricing, chain verification, exports.`;
 
 /** Metadata for a chain's coverage route — built here so the two thin route
  *  files can't drift apart. */
 export function coverageMetadata(chainId: ChainId): Metadata {
   const blurb = coverageBlurb(chainId);
   const url = `${SITE_URL}${coverageHref(chainId)}`;
-  const share = { title: `Rails coverage — ${CHAINS[chainId].name}`, description: blurb };
+  const share = { title: `Rails coverage on ${CHAINS[chainId].name}`, description: blurb };
   return {
-    title: `Coverage — ${CHAINS[chainId].name}`,
+    title: `Coverage on ${CHAINS[chainId].name}`,
     description: blurb,
     openGraph: { ...share, url, images: [HOME_SHARE_IMAGE] },
     twitter: twitterCard(share),
@@ -77,7 +77,7 @@ const COMING_SOON: ComingSoonEntry[] = [];
  *  checklist, not a comparison. Phrased as what the reader gets. */
 const FOUNDATION: { title: string; detail: string }[] = [
   {
-    title: "Every position, not just yours",
+    title: "Every position in the protocol",
     detail: "browse all open positions in the protocol, search any wallet",
   },
   {
@@ -90,11 +90,11 @@ const FOUNDATION: { title: string; detail: string }[] = [
   },
   {
     title: "No modeled state",
-    detail: "every number replayed from the protocol's own on-chain events, nothing estimated or interpolated",
+    detail: "every number replayed from the protocol's on-chain events, nothing estimated or interpolated",
   },
   {
     title: "Provenance on every figure",
-    detail: "open a receipt showing exactly which contract event or storage read produced a number",
+    detail: "open a receipt showing which contract event or storage read produced a number",
   },
   {
     title: "Live",
@@ -221,7 +221,7 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
                     <p key={cap.key} className="text-xs text-rb-500 mt-2 flex items-start gap-1.5">
                       <Mark className="h-3.5 w-3.5 shrink-0 mt-px text-rb-400" aria-hidden="true" />
                       <span>
-                        {cap.label} — {except ? `all but ${cell.except}` : awaiting ? cell.awaiting : cell.why}
+                        {cap.label}: {except ? `all but ${cell.except}` : awaiting ? cell.awaiting : cell.why}
                       </span>
                     </p>
                   );
@@ -278,7 +278,7 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
                 <Check className="h-[18px] w-[18px] text-green-500 shrink-0 mt-0.5" aria-hidden="true" />
                 <p>
                   <span className="font-semibold text-foreground">{item.title}</span>
-                  <span className="body-text"> — {item.detail}</span>
+                  <span className="body-text">: {item.detail}</span>
                 </p>
               </div>
             ))}

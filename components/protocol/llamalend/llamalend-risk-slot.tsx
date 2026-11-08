@@ -115,7 +115,7 @@ export function llamalendRiskRows(
               <span
                 title={
                   chain.convertedRaw != null
-                    ? `${formatUnitsExact(chain.convertedRaw, chain.borrowedDecimals)} — exact`
+                    ? `${formatUnitsExact(chain.convertedRaw, chain.borrowedDecimals)}: exact`
                     : undefined
                 }
               >

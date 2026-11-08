@@ -23,7 +23,6 @@ import {
 import { listKey } from "@/lib/shared/list-filter";
 import { toURLSearchParams, ssrDecode, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -33,7 +32,7 @@ export const metadata = listingMetadata({
   title: "Explore Aave V4 positions",
   canonicalPath: "/ethereum/aave-v4",
   description:
-    "Explore Aave V4 wallet activity across all 11 spokes — supply, borrow, liquidations, and collateral toggles per market with full position context.",
+    "Every Aave V4 account on Ethereum across all 11 spokes: deposits, loans, liquidations and the collateral each wallet has switched on.",
 });
 
 async function AaveV4LandingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
@@ -68,4 +67,4 @@ async function AaveV4LandingPage({ searchParams }: { searchParams: Promise<RawSe
   );
 }
 
-export default withExplorerAbout("/ethereum/aave-v4", AaveV4LandingPage);
+export default AaveV4LandingPage;

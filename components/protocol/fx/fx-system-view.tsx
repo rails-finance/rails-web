@@ -224,7 +224,7 @@ function FundingCard({ p, blockTs, readBy }: { p: FxPoolSystem; blockTs: number;
   return (
     <div className="rounded-xl bg-raised px-4 py-3.5">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="text-xs font-semibold text-foreground">Funding — the eventless mutation</span>
+        <span className="text-xs font-semibold text-foreground">Funding: the eventless mutation</span>
         <span className="text-[11px] tabular-nums text-rb-500">
           checkpointed{" "}
           <Prov
@@ -293,17 +293,17 @@ function FundingCard({ p, blockTs, readBy }: { p: FxPoolSystem; blockTs: number;
       </div>
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-        Two dials, no events. Funding is charged into the <em>collateral</em> index — every position in the pool holds
-        less, pro-rata, each time it turns — and write-offs turn the same dials. Both started at exactly ×1.0.{" "}
+        Two dials, no events. Funding is charged into the <em>collateral</em> index (every position in the pool holds
+        less, pro-rata, each time it turns) and write-offs turn the same dials. Both started at ×1.0.{" "}
         <Prov info={stampServerRead(indexIdentityProv(label, p.address, p.indexIdentityExact), readBy)}>
           {p.indexIdentityExact ? (
             <span>
-              Re-checked on this read: shares × index equals the pool&rsquo;s own raw totals,{" "}
+              Re-checked on this read: shares × index equals the pool&rsquo;s raw totals,{" "}
               <span className="text-foreground">exact in integers</span> on both sides.
             </span>
           ) : (
             <span className="text-red-500">
-              The shares × index identity did not close on this read — treat the derived figures below as suspect.
+              The shares × index identity did not close on this read, treat the derived figures below as suspect.
             </span>
           )}
         </Prov>
@@ -332,7 +332,7 @@ function OracleCard({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | null
 
       <div className="mt-3 space-y-1.5 text-xs tabular-nums">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-rb-500">min — borrowing, rebalancing, liquidation</span>
+          <span className="text-rb-500">min: borrowing, rebalancing, liquidation</span>
           <Prov
             info={stampServerRead(oracleLegProv("min", label, p.address, p.oracle, p.normalizedSymbol), readBy)}
             value={formatExact(p.priceMin)}
@@ -341,7 +341,7 @@ function OracleCard({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | null
           </Prov>
         </div>
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-rb-500">anchor — a position&rsquo;s stated debt ratio</span>
+          <span className="text-rb-500">anchor: a position&rsquo;s stated debt ratio</span>
           <Prov
             info={stampServerRead(oracleLegProv("anchor", label, p.address, p.oracle, p.normalizedSymbol), readBy)}
             value={formatExact(p.priceAnchor)}
@@ -350,7 +350,7 @@ function OracleCard({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | null
           </Prov>
         </div>
         <div className="flex items-baseline justify-between gap-2">
-          <span className="text-rb-500">max — prices redemption</span>
+          <span className="text-rb-500">max: prices redemption</span>
           <Prov
             info={stampServerRead(oracleLegProv("max", label, p.address, p.oracle, p.normalizedSymbol), readBy)}
             value={formatExact(p.priceMax)}
@@ -434,13 +434,12 @@ function ReconcileCard({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | n
         >
           {p.debtSharesReconcile ? (
             <span className="text-rb-500">
-              Reconciles exactly — residual <span className="tabular-nums text-foreground">0</span>, checked in raw
-              integer share space before anything is scaled. Every fxUSD of this pool&rsquo;s debt sits in exactly one
-              tick below.
+              Reconciles: residual <span className="tabular-nums text-foreground">0</span>, checked in raw integer share
+              space before anything is scaled. Every fxUSD of this pool&rsquo;s debt sits in exactly one tick below.
             </span>
           ) : (
             <span className="text-red-500">
-              Does not reconcile — the ladder read is missing debt the pool says exists. The tick figures below are this
+              Does not reconcile: the ladder read is missing debt the pool says exists. The tick figures below are this
               read&rsquo;s, but the residual is the headline.
             </span>
           )}
@@ -457,7 +456,7 @@ function ReconcileCard({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | n
             {amt(p.collOutsideLadder)} {p.normalizedSymbol}
           </span>
         </Prov>{" "}
-        sits outside the ladder entirely, held by positions with no debt — a position with no debt has no tick.
+        sits outside the ladder entirely, held by positions with no debt. A position with no debt has no tick.
         {p.dustTicks > 0 && (
           <>
             {" "}
@@ -468,7 +467,7 @@ function ReconcileCard({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | n
             >
               <span className="tabular-nums text-foreground">{p.dustTicks}</span>
             </Prov>{" "}
-            of the {p.occupiedTicks} ticks hold only dust — under 10⁻⁹ fxUSD, the exact line the protocol&rsquo;s own
+            of the {p.occupiedTicks} ticks hold only dust: under 10⁻⁹ fxUSD, the exact line the protocol&rsquo;s own
             sweeps skip a tick at
             {p.dustPastLiquidate > 0 && (
               <>
@@ -509,17 +508,17 @@ function LadderStrip({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | nul
         <div
           className="absolute inset-y-0 w-px bg-foreground/40"
           style={{ left: `${x(p.maxBorrowRatio)}%` }}
-          title={`Borrow cap · ${pctOf(p.maxBorrowRatio, 2)} — positions can be opened or adjusted only at or under this ratio (min leg)`}
+          title={`Borrow cap · ${pctOf(p.maxBorrowRatio, 2)}: positions can be opened or adjusted only at or under this ratio (min leg)`}
         />
         <div
           className="absolute inset-y-0 w-px bg-foreground/40"
           style={{ left: `${x(p.rebalanceRatio)}%` }}
-          title={`Rebalance rung · ${pctOf(p.rebalanceRatio, 0)} (min leg) — from here the whole tick can be rebalanced, +${pctOf(p.rebalanceBonus, 1)} bonus`}
+          title={`Rebalance rung · ${pctOf(p.rebalanceRatio, 0)} (min leg): from here the whole tick can be rebalanced, +${pctOf(p.rebalanceBonus, 1)} bonus`}
         />
         <div
           className="absolute inset-y-0 w-0.5 bg-red-500"
           style={{ left: `${x(p.liquidateRatio)}%` }}
-          title={`Liquidation rung · ${pctOf(p.liquidateRatio, 0)} (min leg) — from here the whole tick is liquidatable, +${pctOf(p.liquidateBonus, 1)} bonus`}
+          title={`Liquidation rung · ${pctOf(p.liquidateRatio, 0)} (min leg): from here the whole tick is liquidatable, +${pctOf(p.liquidateBonus, 1)} bonus`}
         />
         {/* ticks */}
         {drawn.map((t) => (
@@ -589,8 +588,8 @@ function LadderStrip({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | nul
       <p className="mt-2 max-w-3xl text-[11px] leading-relaxed text-rb-500">
         Each column is one occupied tick at its current debt ratio; column heights follow a square-root scale of the
         tick&rsquo;s fxUSD debt so the small ticks stay visible beside the largest (hover any column for the exact
-        figures; the table below is the full record). Funding moves every column right at once — the ladder drifts
-        toward the rungs while every position inside stands still. Adjacent ticks are 0.15% apart and may overlap in the
+        figures; the table below is the full record). Funding moves every column right at once: the ladder drifts toward
+        the rungs while every position inside stands still. Adjacent ticks are 0.15% apart and may overlap in the
         drawing, never in the table.
       </p>
     </div>
@@ -620,7 +619,11 @@ function TickRow({
         <Prov info={stampServerRead(tickIdProv(label, p.address, t.tick), readBy)} value={String(t.tick)}>
           {t.tick}
         </Prov>
-        {mine && <span className="ml-1.5 text-[10px] text-blue-600 dark:text-blue-400">the position&rsquo;s tick</span>}
+        {mine && (
+          <span className="ml-1.5 text-[10px] text-blue-600 dark:text-[var(--text-link)]">
+            the position&rsquo;s tick
+          </span>
+        )}
       </div>
       <div className="text-xs tabular-nums">
         {t.debtRatio != null ? (
@@ -631,7 +634,7 @@ function TickRow({
             <span className="text-foreground">{pctOf(t.debtRatio, 2)}</span>
           </Prov>
         ) : (
-          <span className="text-rb-400" title="Debt against zero collateral — a pure bad-debt bucket; no ratio exists.">
+          <span className="text-rb-400" title="Debt against zero collateral: a pure bad-debt bucket; no ratio exists.">
             —
           </span>
         )}

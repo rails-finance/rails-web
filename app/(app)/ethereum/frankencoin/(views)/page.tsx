@@ -19,7 +19,6 @@ import {
 } from "@/lib/frankencoin/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -28,6 +27,8 @@ export const maxDuration = 30;
 export const metadata = listingMetadata({
   title: "Explore Frankencoin positions",
   canonicalPath: "/ethereum/frankencoin",
+  description:
+    "Every Frankencoin position on Ethereum: Swiss franc stablecoin loans with the owner's declared liquidation price and any challenges to it.",
 });
 
 async function FrankencoinListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
@@ -53,4 +54,4 @@ async function FrankencoinListingPage({ searchParams }: { searchParams: Promise<
   return <FrankencoinListing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/ethereum/frankencoin", FrankencoinListingPage);
+export default FrankencoinListingPage;

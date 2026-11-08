@@ -87,7 +87,7 @@ const COVERAGE_PATHS = launchedProductionChains()
 // The home page is the front door, one search (decision 0051), so the title and
 // the share card say the door; the brand leads.
 const SITE_TITLE = "Rails - Look up a wallet";
-const OG_DESCRIPTION = `Look up a wallet by address or ENS name and see its DeFi positions. Rails explores ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia — every position replayed from the protocol's own on-chain events, with a receipt on every number.`;
+const OG_DESCRIPTION = `Look up a wallet by address or ENS name and see its DeFi positions. Rails explores ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia. Every position is replayed from the protocol's on-chain events, with a receipt on every number.`;
 // Opens on /about's first two sentences (`lib/shared/site-copy.ts`, ui-jobs
 // 475), so a search summary built from it says what /about says.
 const SITE_DESCRIPTION = `${SITE_LEAD} ${SITE_METHOD} Look up any wallet by address or ENS name, or browse every open position. How deep each explorer goes is stated per protocol at ${COVERAGE_PATHS}.`;

@@ -234,7 +234,7 @@ function listingCrProv(
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `Collateral ratio — the Trove's replayed collateral × the ${symbol} branch's own PriceFeed price${stale ? " (lastGoodPrice — the live fetch failed, so it may lag)" : " (fetchPrice simulated at head)"} ÷ its ${cfg.debtSymbol} debt. The same formula the TroveManager's getCurrentICR computes (identity verified BigInt-exact); the branch liquidates below its MCR.`,
+    summary: `Collateral ratio. The Trove's replayed collateral × the ${symbol} branch's PriceFeed price${stale ? " (lastGoodPrice: the live fetch failed, so it may lag)" : " (fetchPrice simulated at head)"} ÷ its ${cfg.debtSymbol} debt. The same formula the TroveManager's getCurrentICR computes (identity verified BigInt-exact); the branch liquidates below its MCR.`,
     contract: {
       name: `${cfg.name} ${symbol} PriceFeed`,
       address: deps.resolveBranch(symbol)?.priceFeed ?? deps.defaultPriceFeed,
@@ -289,7 +289,7 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
         liq: {
           kind: "derived",
           summary:
-            "Liquidation price — the collateral price at which this Trove would hit its branch's minimum " +
+            "Liquidation price. The collateral price at which this Trove would hit its branch's minimum " +
             "collateral ratio (MCR); below it the Trove becomes eligible for liquidation. Computed from the " +
             "Trove's own replayed debt and collateral against the branch's MCR constant.",
           formula: "debt × MCR ÷ collateral",
@@ -329,7 +329,7 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
 function debtUsdProv(symbol: string, debt: number): Provenance {
   return {
     kind: "derived",
-    summary: `Debt value in USD — the ${symbol} debt at its $1 face: the protocol redeems ${symbol} for $1 of collateral.`,
+    summary: `Debt value in USD. The ${symbol} debt at its $1 face: the protocol redeems ${symbol} for $1 of collateral.`,
     formula: "debt × $1",
     inputs: [
       { label: "debt", value: `${formatPrice(debt)} ${symbol}`, kind: "chain", pclass: "state" },

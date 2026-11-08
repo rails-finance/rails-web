@@ -6,7 +6,7 @@ import { RAILS_TELEGRAM_URL, RAILS_X_URL } from "@/lib/shared/social";
 
 export const ROBINHOOD_LABEL = "Robinhood";
 
-const LINK = "text-blue-600 dark:text-blue-400 transition-colors hover:underline";
+const LINK = "text-blue-600 dark:text-[var(--text-link)] transition-colors hover:underline";
 
 export function RobinhoodSoon() {
   return (

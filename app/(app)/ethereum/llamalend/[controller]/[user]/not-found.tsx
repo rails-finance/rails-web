@@ -11,7 +11,7 @@ export default function LlamalendPositionNotFound() {
       backHref="/ethereum/llamalend"
       backLabel="Browse LlamaLend positions"
     >
-      A LlamaLend position is a borrower in one market&rsquo;s Controller, and each market liquidates independently — so
+      A LlamaLend position is a borrower in one market&rsquo;s Controller, and each market liquidates independently, so
       it takes both addresses to name one. The URL does not carry them.
     </RouteNotFound>
   );

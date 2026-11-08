@@ -122,14 +122,14 @@ const fallText = (n: number) => `${n < 10 ? n.toFixed(1) : n.toFixed(0)}%`;
 /** What a figure became since the previous event: after less after then. */
 const sinceProv = (what: string): Provenance => ({
   kind: "derived",
-  summary: `${what} since the previous event — the figure at this event's reading, less the figure at the previous event's reading.`,
+  summary: `${what} since the previous event. The figure at this event's reading, less the figure at the previous event's reading.`,
   formula: "after − after the previous event",
 });
 
 /** A synthetic amount at its $1 face. */
 const faceProv = (what: string, sym: string, amount: string): Provenance => ({
   kind: "chain-derived",
-  summary: `${what}, in US dollars — the ${sym} at its $1 face.`,
+  summary: `${what}, in US dollars. The ${sym} at its $1 face.`,
   formula: `${sym} × $1`,
   inputs: [{ label: "amount", value: `${amount} ${sym}`, kind: "chain" }],
 });
@@ -146,7 +146,7 @@ const nowUsdProv = (
 ): Provenance => ({
   kind: "offchain",
   pclass: "offchain",
-  summary: `${what}, in US dollars — the ${mytSymbol} valued in ${unit.symbol} at the share price read at block ${atBlock}, then at ${unit.symbol}'s price now, the one dollar price the page holds.`,
+  summary: `${what}, in US dollars. The ${mytSymbol} valued in ${unit.symbol} at the share price read at block ${atBlock}, then at ${unit.symbol}'s price now, the one dollar price the page holds.`,
   formula: "shares × share price × price now",
   via: unit.usd ? `${unit.usd.priceSource} · ${unit.usd.pricedAt}` : undefined,
   verify: { kind: "none", text: "An off-chain price, with no on-chain anchor" },
@@ -183,7 +183,7 @@ const yieldProv = (
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `Yield since the previous event — the ${mytSymbol} held at the previous event times the rise in the share price between block ${from.block} and block ${at.block}, in ${under}.`,
+  summary: `Yield since the previous event. The ${mytSymbol} held at the previous event times the rise in the share price between block ${from.block} and block ${at.block}, in ${under}.`,
   contract: { name: "Alchemist V3", address: coords.emitter },
   via: `getCDP(${coords.tokenId}) and convertToAssets(1e18) at blocks ${from.block} and ${at.block}`,
   formula: "shares × (share price now − share price then)",
@@ -208,7 +208,7 @@ const ratioDerivedProv = (
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `${what} — this position's collateralisation at block ${atBlock} against the line's ${getter === "minimumCollateralization" ? "minimum collateralisation" : "liquidation ratio"} read at block ${ratios.asOfBlock}.`,
+  summary: `${what}. This position's collateralisation at block ${atBlock} against the line's ${getter === "minimumCollateralization" ? "minimum collateralisation" : "liquidation ratio"} read at block ${ratios.asOfBlock}.`,
   contract: { name: "Alchemist V3", address: coords.emitter },
   via: `getCDP(${coords.tokenId}) and the share price at block ${atBlock}; ${getter}() at block ${ratios.asOfBlock}`,
   formula,
@@ -464,7 +464,7 @@ export function alchemixSheet({
                 info: {
                   kind: "offchain",
                   pclass: "offchain",
-                  summary: `The yield since the previous event, in US dollars — the yield in ${unit.symbol} at ${unit.symbol}'s price now, the one dollar price the page holds.`,
+                  summary: `The yield since the previous event, in US dollars. The yield in ${unit.symbol} at ${unit.symbol}'s price now, the one dollar price the page holds.`,
                   formula: "yield × price now",
                   via: unit.usd ? `${unit.usd.priceSource} · ${unit.usd.pricedAt}` : undefined,
                   verify: { kind: "none", text: "An off-chain price, with no on-chain anchor" },
@@ -647,7 +647,7 @@ export function alchemixSheet({
               value: pct2(ltv),
               info: {
                 ...ratioProv,
-                summary: `LTV at block ${atBlock} — the debt over the ${mytSymbol} held valued in ${under} at the share price read with it, one debt unit counted as one ${under}`,
+                summary: `LTV at block ${atBlock}. The debt over the ${mytSymbol} held valued in ${under} at the share price read with it, one debt unit counted as one ${under}`,
                 formula: "debt ÷ (collateral × share price)",
               },
             }
@@ -710,7 +710,7 @@ export function alchemixSheet({
                 info: {
                   kind: "chain-derived",
                   pclass: "state",
-                  summary: `Still borrowable at block ${atBlock} — the ${mytSymbol} held valued in ${under} at the share price read with it, over the line's minimum collateralisation read at block ${ratios.asOfBlock}, less the debt, one debt unit counted as one ${under}.`,
+                  summary: `Still borrowable at block ${atBlock}. The ${mytSymbol} held valued in ${under} at the share price read with it, over the line's minimum collateralisation read at block ${ratios.asOfBlock}, less the debt, one debt unit counted as one ${under}.`,
                   contract: { name: "Alchemist V3", address: coords.emitter },
                   via: `getCDP(${coords.tokenId}) and the share price at block ${atBlock}; minimumCollateralization() at block ${ratios.asOfBlock}`,
                   formula: "collateral × share price ÷ minimum collateralisation − debt",
@@ -761,7 +761,7 @@ export function alchemixSheet({
             info: {
               ...lineRatioProv("minimumCollateralization", ratios.minimumRaw, ratios.asOfBlock, coords),
               kind: "chain-derived",
-              summary: `Max LTV — one over the line's minimum collateralisation, read at block ${ratios.asOfBlock}; a mint or a withdrawal must leave the position below it`,
+              summary: `Max LTV. One over the line's minimum collateralisation, read at block ${ratios.asOfBlock}; a mint or a withdrawal must leave the position below it`,
               formula: "1 ÷ minimum collateralisation",
               scaling: undefined,
             },

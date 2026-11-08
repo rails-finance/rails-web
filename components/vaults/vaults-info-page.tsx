@@ -55,7 +55,7 @@ export function VaultsInfoPage({
       <p className="mt-4 text-sm text-rb-500">
         <Link
           href={`/coverage/${CHAINS[chainId].slug}`}
-          className="whitespace-nowrap font-medium text-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-blue-600 dark:hover:text-blue-400"
+          className="whitespace-nowrap font-medium text-foreground underline decoration-dotted underline-offset-2 transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]"
         >
           What Rails covers
         </Link>

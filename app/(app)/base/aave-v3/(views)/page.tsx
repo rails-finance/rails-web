@@ -11,13 +11,16 @@ import {
 } from "@/lib/aave-v3-base/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Aave V3 positions on Base", canonicalPath: "/base/aave-v3" });
+export const metadata = listingMetadata({
+  title: "Explore Aave V3 positions on Base",
+  canonicalPath: "/base/aave-v3",
+  description: "Look up any Aave V3 wallet on Base: collateral, debt and health for each account, read from the chain.",
+});
 
 async function AaveV3BaseListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = aaveV3BaseListDimensions();
@@ -42,4 +45,4 @@ async function AaveV3BaseListingPage({ searchParams }: { searchParams: Promise<R
   return <AaveV3BaseListing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/base/aave-v3", AaveV3BaseListingPage);
+export default AaveV3BaseListingPage;

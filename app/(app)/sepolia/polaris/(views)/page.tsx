@@ -17,7 +17,6 @@ import { holderListingMetadata, listingMetadata } from "@/lib/shared/page-metada
 import { parsePolarisSearch } from "@/lib/polaris/search";
 import { resolveEnsAddress } from "@/lib/ens/resolve-ens";
 import type { Metadata } from "next";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -35,7 +34,12 @@ export async function generateMetadata({
 }: {
   searchParams: Promise<RawSearchParams>;
 }): Promise<Metadata> {
-  const directory = listingMetadata({ title: "Explore Polaris positions", canonicalPath: POLARIS_BASE_PATH });
+  const directory = listingMetadata({
+    title: "Explore Polaris positions",
+    canonicalPath: POLARIS_BASE_PATH,
+    description:
+      "Every Polaris position on the Sepolia testnet: USDp and GOLDp loans against pETH, with collateral, debt and full history. Test tokens only.",
+  });
   const { ownerAddress, ownerEns } = parsePolarisSearch(toURLSearchParams(await searchParams).get("q") ?? "");
   // An address is lowercased (one wallet, one URL, whatever case it was typed
   // in); an ENS name stays as typed, which is how it resolves.
@@ -71,4 +75,4 @@ async function PolarisListingPage({ searchParams }: { searchParams: Promise<RawS
   return <PolarisListing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/sepolia/polaris", PolarisListingPage);
+export default PolarisListingPage;

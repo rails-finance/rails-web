@@ -19,35 +19,35 @@ export function flowSegmentProv(
     return isLive
       ? {
           kind: "chain-derived",
-          summary: `${s.label} — each asset the position has ${held} now, at the oracle price now, added up. The segment's tip lists them.`,
+          summary: `${s.label}. Each asset the position has ${held} now, at the oracle price now, added up. The segment's tip lists them.`,
           formula: "Σ balance × price",
         }
       : s.basis
-        ? { kind: "chain-derived", summary: `${s.label} at ${when} — ${s.basis}` }
+        ? { kind: "chain-derived", summary: `${s.label} at ${when}. ${s.basis}` }
         : daily
           ? {
               kind: "chain-derived",
-              summary: `${s.label} at ${when} — each asset's balance after its last event by then, at the last oracle price recorded by the end of that day, added up.`,
+              summary: `${s.label} at ${when}. Each asset's balance after its last event by then, at the last oracle price recorded by the end of that day, added up.`,
               formula: "Σ balance × price at the day's end",
             }
           : {
               kind: "chain-derived",
-              summary: `${s.label} at ${when} — each asset's balance after its last event by then, at the oracle price that event carried, added up.`,
+              summary: `${s.label} at ${when}. Each asset's balance after its last event by then, at the oracle price that event carried, added up.`,
               formula: "Σ balance × price at its last event",
             };
   if (s.fill === "estimate")
     return {
       kind: "chain-derived",
       summary: s.key.endsWith("-interest")
-        ? `${s.label} — over the position's whole life, as the Explanation states it.`
+        ? `${s.label}. Over the position's whole life, as the Explanation states it.`
         : s.note
-          ? `${s.label} at ${when} — the bar's length less the sources beside it: ${s.note}. No funds moved.`
-          : `${s.label} at ${when} — the bar's length less the sources beside it: what prices and interest added to what came in. No funds moved.`,
+          ? `${s.label} at ${when}. The bar's length less the sources beside it: ${s.note}. No funds moved.`
+          : `${s.label} at ${when}. The bar's length less the sources beside it; what prices and interest added to what came in. No funds moved.`,
       formula: s.key.endsWith("-interest") ? undefined : "in − Σ sources",
     };
   return {
     kind: "chain-derived",
-    summary: `${s.label} up to ${when} — every such flow the position's events record by then, each at the oracle price at its block, added up.`,
+    summary: `${s.label} up to ${when}. Every such flow the position's events record by then, each at the oracle price at its block, added up.`,
     formula: "Σ amount × price at block",
   };
 }
@@ -59,7 +59,7 @@ export function flowRemainderProv(label: string, side: FlowSide, when: string, n
   const holds = note ? `It is ${note}` : "It holds price changes and interest together";
   return {
     kind: "chain-derived",
-    summary: `${label} ${when === "now" ? "now" : `at ${when}`} — the remainder: what the position has ${held} ${when === "now" ? "now" : "at that date"} less every flow above it, each flow valued at the oracle price at its block. ${holds}; no funds moved.`,
+    summary: `${label} ${when === "now" ? "now" : `at ${when}`}. The remainder; what the position has ${held} ${when === "now" ? "now" : "at that date"} less every flow above it, each flow valued at the oracle price at its block. ${holds}; no funds moved.`,
     formula: `${held} − Σ flows`,
   };
 }
@@ -70,7 +70,7 @@ export function flowOpeningProv(label: string, side: FlowSide): Provenance {
   const held = side === "collateral" ? "held" : "owed";
   return {
     kind: "chain-derived",
-    summary: `${label} — what the position had ${held} at the close of the day before the bars' window opens: each asset's balance after its last event by then, at the last oracle price recorded that day, added up.`,
+    summary: `${label}. What the position had ${held} at the close of the day before the bars' window opens; each asset's balance after its last event by then, at the last oracle price recorded that day, added up.`,
     formula: "Σ balance × price at the day's end",
   };
 }
@@ -90,14 +90,14 @@ export function flowAssetProv(
     return {
       kind: "chain-derived",
       summary: isLive
-        ? `${symbol} ${held} now — the position's ${symbol} balance at the oracle price now.`
-        : `${symbol} ${held} at ${when} — the ${symbol} balance after its last event by then, at ${daily ? "the last oracle price recorded by the end of that day" : "the oracle price that event carried"}.`,
+        ? `${symbol} ${held} now. The position's ${symbol} balance at the oracle price now.`
+        : `${symbol} ${held} at ${when}. The ${symbol} balance after its last event by then, at ${daily ? "the last oracle price recorded by the end of that day" : "the oracle price that event carried"}.`,
       formula: daily && !isLive ? "balance × price at the day's end" : "balance × price",
     };
   }
   return {
     kind: "chain-derived",
-    summary: `${s.label} in ${symbol} up to ${when} — every ${symbol} flow of this kind the position's events record by then, each at the oracle price at its block, added up.`,
+    summary: `${s.label} in ${symbol} up to ${when}. Every ${symbol} flow of this kind the position's events record by then, each at the oracle price at its block, added up.`,
     formula: "Σ amount × price at block",
   };
 }
@@ -115,24 +115,24 @@ export function flowTokenProv(
   if (figure === "interest")
     return {
       kind: "chain-derived",
-      summary: `${label} in ${symbol} at ${when} — the ${symbol} balance at the block less every ${symbol} flow before it: what the reserve's index added.`,
+      summary: `${label} in ${symbol} at ${when}. The ${symbol} balance at the block less every ${symbol} flow before it; what the reserve's index added.`,
       formula: "balance − Σ flows",
     };
   if (figure === "move")
     return {
       kind: "chain-derived",
-      summary: `${label}'s move at ${when} — the ${symbol} the event's transaction added or took, its legs added up; the interest built since the last event is not the transaction's.`,
+      summary: `${label}'s move at ${when}. The ${symbol} the event's transaction added or took, its legs added up; the interest built since the last event is not the transaction's.`,
       formula: "Σ legs of the transaction",
     };
   if (figure === "held")
     return {
       kind: "chain-derived",
-      summary: `${label} at ${when} — the ${symbol} balance once the event's transaction had run, as the position's events record it.`,
+      summary: `${label} at ${when}. The ${symbol} balance once the event's transaction had run, as the position's events record it.`,
       formula: "recorded balance",
     };
   return {
     kind: "chain-derived",
-    summary: `${label} in ${symbol} up to ${when} — every ${symbol} amount of this kind the position's events record by then, added up. The lines are rounded together to the printed decimals, so they add to the total.`,
+    summary: `${label} in ${symbol} up to ${when}. Every ${symbol} amount of this kind the position's events record by then, added up. The lines are rounded together to the printed decimals, so they add to the total.`,
     formula: "Σ amount",
   };
 }
@@ -142,7 +142,7 @@ export function flowTokenProv(
 export function flowInterestUsdProv(label: string, when: string): Provenance {
   return {
     kind: "chain-derived",
-    summary: `${label} at ${when} — each asset's interest in its token (its balance at the block less every flow in it) at the oracle price at the block, an asset no longer held at the price of its latest flow, added up.`,
+    summary: `${label} at ${when}. Each asset's interest in its token (its balance at the block less every flow in it) at the oracle price at the block, an asset no longer held at the price of its latest flow, added up.`,
     formula: "Σ (balance − Σ flows) × price",
   };
 }
@@ -161,18 +161,18 @@ export function ledgerPartProv(
   if (part === "held-before")
     return {
       kind: "chain-derived",
-      summary: `${label} just before ${when} — the ${unit} balance before the event's transaction ran: the balance after it less the transaction's legs.`,
+      summary: `${label} just before ${when}. The ${unit} balance before the event's transaction ran; the balance after it less the transaction's legs.`,
       formula: "balance after − Σ legs of the transaction",
     };
   if (part === "event")
     return {
       kind: "chain-derived",
-      summary: `${label} at ${when} — the ${usd ? "USD of the" : unit} legs of this kind the event moved, added up${usd ? ", each at the oracle price at its block" : ""}.`,
+      summary: `${label} at ${when}. The ${usd ? "USD of the" : unit} legs of this kind the event moved, added up${usd ? ", each at the oracle price at its block" : ""}.`,
       formula: usd ? "Σ amount × price at block" : "Σ legs",
     };
   return {
     kind: "chain-derived",
-    summary: `${label} up to ${when} — every amount of this kind the position's events record before this one, added up${usd ? ", each at the oracle price at its block" : ` in ${unit}`}. The rows are rounded together, so they add to the total.`,
+    summary: `${label} up to ${when}. Every amount of this kind the position's events record before this one, added up${usd ? ", each at the oracle price at its block" : ` in ${unit}`}. The rows are rounded together, so they add to the total.`,
     formula: usd ? "Σ amount × price at block" : "Σ amount",
   };
 }
@@ -183,7 +183,7 @@ export function ledgerPartProv(
 export function faceUsdProv(symbol: string, amount: string, which: "before" | "after"): Provenance {
   return {
     kind: "chain-derived",
-    summary: `Debt ${which} this event in USD — the ${symbol} owed ${which} the transaction at its $1 face, as the Lifetime flows count it.`,
+    summary: `Debt ${which} this event in USD. The ${symbol} owed ${which} the transaction at its $1 face, as the Lifetime flows count it.`,
     formula: `${symbol} × $1`,
     inputs: [{ label: "debt", value: `${amount} ${symbol}`, kind: "chain", note: which }],
   };
@@ -200,12 +200,12 @@ export function ledgerAssetUsdProv(
   return part === "interest"
     ? {
         kind: "chain-derived",
-        summary: `${label} in ${symbol} at ${when}, in USD — the ${symbol} interest (its balance at the block less every flow in it) at the oracle price at the block, or at its latest flow's price where it is no longer held.`,
+        summary: `${label} in ${symbol} at ${when}, in USD. The ${symbol} interest (its balance at the block less every flow in it) at the oracle price at the block, or at its latest flow's price where it is no longer held.`,
         formula: "(balance − Σ flows) × price",
       }
     : {
         kind: "chain-derived",
-        summary: `${label} on ${symbol} at ${when} — the remainder: the ${symbol} balance at the oracle price at the block less every ${symbol} row above it. It is the change in ${symbol}'s price since its flows; no funds moved.`,
+        summary: `${label} on ${symbol} at ${when}. The remainder; the ${symbol} balance at the oracle price at the block less every ${symbol} row above it. It is the change in ${symbol}'s price since its flows; no funds moved.`,
         formula: "balance × price − Σ rows",
       };
 }

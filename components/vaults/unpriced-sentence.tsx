@@ -30,7 +30,7 @@ export function UnpricedSentence({ census }: { census: readonly VaultCensusRow[]
   return (
     <span data-intro-unpriced data-unpriced-vaults={declined.length} data-unpriced-assets={assets.join(",")}>
       That oracle does not price {assets.length === 1 ? "the asset of" : "the assets of"} {n(declined.length)} of the
-      held vaults — {assets.join(", ")} — so their {n(positions)} open positions carry no USD figure and are stated as
+      held vaults ({assets.join(", ")}), so their {n(positions)} open positions carry no USD figure and are stated as
       not priced, never guessed; a zero from the oracle is the oracle declining, not a reading of value.
     </span>
   );

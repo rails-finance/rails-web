@@ -607,7 +607,7 @@ export function WalletView({
  *  them here. To remove once Arbitrum history is indexed like Ethereum's and
  *  Base's (ui-jobs 522). */
 function ArbitrumNote({ address }: { address: string }) {
-  const link = "text-blue-600 hover:underline dark:text-blue-400";
+  const link = "text-blue-600 hover:underline dark:text-[var(--text-link)]";
   return (
     <p className="flex items-start gap-2 text-xs text-rb-500" data-wallet-arbitrum-note="">
       <ChainGlyph id={ARBITRUM_CHAIN_ID} className="mt-px h-3.5 w-3.5 shrink-0" />

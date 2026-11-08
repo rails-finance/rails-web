@@ -196,7 +196,7 @@ function AddrLink({ address }: { address: string }) {
       href={explorerUrl(MAINNET_CHAIN_ID, "address", address)}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-blue-600 dark:text-blue-400 hover:underline tabular-nums"
+      className="text-blue-600 dark:text-[var(--text-link)] hover:underline tabular-nums"
       onClick={(e) => e.stopPropagation()}
     >
       {shortAddress(address)}
@@ -312,7 +312,7 @@ export function FrankencoinChallengeCard({
         <div className="flex items-baseline justify-between gap-2">
           <h3 className="text-sm font-semibold">Challenge history</h3>
           <span className="text-xs text-rb-500">
-            {groups.length} challenge{groups.length === 1 ? "" : "s"} — Frankencoin&rsquo;s oracle-free enforcement:
+            {groups.length} challenge{groups.length === 1 ? "" : "s"} , Frankencoin&rsquo;s oracle-free enforcement:
             auctions test the owner-declared price
           </span>
         </div>

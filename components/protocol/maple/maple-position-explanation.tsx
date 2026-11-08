@@ -111,7 +111,7 @@ export function MaplePositionExplanation({
       <span key="tx-count">
         {eventTotal > v.txCount ? (
           <>
-            The account has recorded <H>{eventTotal}</H> events across <H>{v.txCount}</H> transactions to date — several
+            The account has recorded <H>{eventTotal}</H> events across <H>{v.txCount}</H> transactions to date: several
             events can settle in one transaction.
           </>
         ) : (
@@ -149,7 +149,7 @@ export function MaplePositionExplanation({
             ? ` All of it ran through ${leadName}.`
             : ` All of it ran through one address, ${shortAddress(ext.actors[0].address)}.`
           : leadName
-            ? ` Most of it — ${ext.actors[0].count.toLocaleString("en-US")} events — ran through ${leadName}, with the remaining ${others.toLocaleString("en-US")} spread across ${ext.actors.length - 1} other address${ext.actors.length === 2 ? "" : "es"}${secondName ? `, one of them ${secondName}` : ""}.`
+            ? ` Most of it, ${ext.actors[0].count.toLocaleString("en-US")} events, ran through ${leadName}, with the remaining ${others.toLocaleString("en-US")} spread across ${ext.actors.length - 1} other address${ext.actors.length === 2 ? "" : "es"}${secondName ? `, one of them ${secondName}` : ""}.`
             : ` The work is spread across ${ext.actors.length} addresses, the most active of them accounting for ${ext.actors[0].count.toLocaleString("en-US")}.`}
       </span>
     );
@@ -181,7 +181,7 @@ export function MaplePositionExplanation({
               of deposited principal recorded at its height.
             </>
           ) : (
-            <>. Every share arrived by transfer — the wallet has no pool deposit of its own on record.</>
+            <>. Every share arrived by transfer: the wallet has no pool deposit of its own on record.</>
           )}
         </span>,
       );
@@ -197,7 +197,7 @@ export function MaplePositionExplanation({
     closedBullets.push(countsBullet(), operatorBullet());
     const closedLead = (
       <>
-        This position is closed — the wallet holds no pool shares and nothing waits in the withdrawal queue
+        This position is closed: the wallet holds no pool shares and nothing waits in the withdrawal queue
         {peaks.length > 0 ? <>. Its history below is the full record of how it grew and wound down:</> : <>:</>}
       </>
     );
@@ -217,7 +217,7 @@ export function MaplePositionExplanation({
     <>This position lends across {live.length} Maple pools, each claim priced at its own pool&rsquo;s exit rate:</>
   ) : fullyQueued ? (
     <>
-      This position is winding down its {one.assetSymbol} lending — every share sits in the pool&rsquo;s withdrawal
+      This position is winding down its {one.assetSymbol} lending. Every share sits in the pool&rsquo;s withdrawal
       queue:
     </>
   ) : one.currentValue != null ? (
@@ -390,7 +390,7 @@ export function MaplePositionExplanation({
     } else {
       bullets.push(
         <span key={`queue-${p.pool}`}>
-          Nothing is waiting in {poolLabel}&rsquo;s withdrawal queue — a new request would stand first in line, filled
+          Nothing is waiting in {poolLabel}&rsquo;s withdrawal queue: a new request would stand first in line, filled
           from the pool&rsquo;s liquid cash.
         </span>,
       );
@@ -405,7 +405,7 @@ export function MaplePositionExplanation({
       bullets.push(
         <span key={`split-${p.pool}`}>
           Of {poolLabel}&rsquo;s value, {bandCompact(st.cash).display} {p.assetSymbol} ({pctLiquid}%) is liquid in the
-          contract right now — the only part withdrawals can draw on. The other {pctLoans}% is deployed to loans whose
+          contract right now: the only part withdrawals can draw on. The other {pctLoans}% is deployed to loans whose
           collateral is held with custodians off-chain.
         </span>,
       );

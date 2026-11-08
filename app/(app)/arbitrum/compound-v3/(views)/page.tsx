@@ -4,15 +4,16 @@
 
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { ProtocolFrontDoor } from "@/components/shared/protocol-front-door";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const metadata = listingMetadata({
   title: "Compound V3 on Arbitrum",
   canonicalPath: "/arbitrum/compound-v3",
+  description:
+    "Look up any wallet's Compound V3 position on Arbitrum: what it has lent, borrowed and put up as collateral in each of the four markets.",
 });
 
 function Page() {
   return <ProtocolFrontDoor session="compound-v3-arbitrum" />;
 }
 
-export default withExplorerAbout("/arbitrum/compound-v3", Page);
+export default Page;

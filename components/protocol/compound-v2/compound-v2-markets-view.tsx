@@ -177,7 +177,7 @@ function MarketCard({
             receipted figures rather than naming a distinct chain read. */}
         <span
           data-prov-exempt=""
-          title="Utilisation is borrowed ÷ supplied — both already traced on this card (USD supplied and USD borrowed). A ratio of two receipted figures, not a distinct chain read."
+          title="Utilisation is borrowed ÷ supplied: both already traced on this card (USD supplied and USD borrowed). A ratio of two receipted figures."
         >
           <span className="text-foreground">{pctText(m.utilisation)}</span> utilised
         </span>
@@ -309,7 +309,7 @@ export function CompoundV2MarketsView({ data }: { data: CompoundV2MarketsRespons
             label: "Utilisation",
             value: <span data-prov-exempt="">{pctText(s.utilisation)}</span>,
             title:
-              "Σ borrowed ÷ Σ supplied, both in USD at the Comptroller's own oracle price — the two figures beside it in this band. How much of the money is working. A ratio of two receipted figures, not a distinct chain read.",
+              "Σ borrowed ÷ Σ supplied, both in USD at the Comptroller's oracle price. The two figures beside it in this band. How much of the money is working. A ratio of two receipted figures.",
           },
         ]}
         notes={
@@ -319,7 +319,7 @@ export function CompoundV2MarketsView({ data }: { data: CompoundV2MarketsRespons
               // a single figure — stated as a count, exempt from a per-read receipt.
               <span
                 data-prov-exempt=""
-                title="A count over each market's Comptroller markets() record — the number whose collateral factor is zero (disabled as collateral). A JSX sum over per-market reads, not a single chain figure."
+                title="A count over each market's Comptroller markets() record: the number whose collateral factor is zero (disabled as collateral). A JSX sum over per-market reads."
               >
                 <span className="text-foreground">{s.collateralDisabled}</span> disabled as collateral
               </span>

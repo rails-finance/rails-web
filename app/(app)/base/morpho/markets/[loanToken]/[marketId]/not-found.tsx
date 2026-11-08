@@ -12,7 +12,7 @@ export default function MorphoBaseMarketNotFound() {
       backHref="/base/morpho/markets"
       backLabel="Browse Morpho Blue markets"
     >
-      The id in the URL is not a Morpho Blue market on Base that lends this asset — either no market has that id, or it
+      The id in the URL is not a Morpho Blue market on Base that lends this asset: either no market has that id, or it
       lends a different token, or it is not a market id at all.
     </RouteNotFound>
   );

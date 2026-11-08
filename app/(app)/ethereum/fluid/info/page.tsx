@@ -81,9 +81,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <ul className={UL}>
         <li>Each row is one position, identified by its NFT id and its current owner.</li>
-        <li>
-          A row shows the position&apos;s collateral and debt in the vault&apos;s own tokens, with no dollar value.
-        </li>
+        <li>A row shows the position&apos;s collateral and debt in the vault&apos;s tokens, with no dollar value.</li>
         <li>A row says whether the position is open or closed and whether it has been liquidated.</li>
       </ul>
     ),

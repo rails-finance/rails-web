@@ -34,7 +34,7 @@ export default function SeamlessMarketPage() {
               >
                 one transaction
               </a>{" "}
-              at block {SEAMLESS_FREEZE_BLOCK.toLocaleString("en-US")}, {SEAMLESS_FREEZE_DATE} — eighteen{" "}
+              at block {SEAMLESS_FREEZE_BLOCK.toLocaleString("en-US")}, {SEAMLESS_FREEZE_DATE}: eighteen{" "}
               <span className="font-mono text-[12px]">ReserveFrozen</span> events, and none undone since. A frozen
               reserve still accrues interest, still liquidates, and still lets a holder repay and withdraw; what it will
               not accept is a new supply or a new borrow. So every rate and every risk parameter below is live and
@@ -58,7 +58,7 @@ export default function SeamlessMarketPage() {
         listingHref="/base/seamless"
         protocolName="Seamless"
         marketLabel="Seamless · Base"
-        purpose="An Aave V3 fork on Base with its own Pool, reserves, risk parameters and oracle — frozen since April 2025 and winding down."
+        purpose="An Aave V3 fork on Base with its own Pool, reserves, risk parameters and oracle, frozen since April 2025 and winding down."
         learnMore={aaveV3MarketModal("seamless")}
       />
       <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />

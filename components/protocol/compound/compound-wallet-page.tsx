@@ -551,7 +551,7 @@ export function CompoundWalletView({
       .then((d) => {
         if (cancelled) return;
         setData(d);
-        setError(d.chainStale ? "The read failed — reload to retry." : null);
+        setError(d.chainStale ? "The read failed: reload to retry." : null);
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load the positions");
@@ -982,7 +982,7 @@ export function CompoundWalletView({
                       {data?.marketsScanned ?? d.deployment.markets.length}
                     </span>{" "}
                     Compound markets; the others hold nothing for it. Each market is separate: nothing is
-                    cross-collateralised between them, so there is no combined health factor here and no total — the
+                    cross-collateralised between them, so there is no combined health factor here and no total. The
                     markets do not all price in the same unit.
                   </p>
                 )}

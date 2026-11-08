@@ -65,7 +65,7 @@ export function ProvInspectorToggle({
     () => provInspector.getArmed() && provInspector.getScope() == null,
     () => false,
   );
-  const label = armed ? "Exit the provenance inspector" : "Provenance inspector — click any value to trace it";
+  const label = armed ? "Exit the provenance inspector" : "Provenance inspector: click any value to trace it";
   const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     const opener = variant === "dock" ? e.currentTarget : (openerRef?.current ?? null);
     provInspector.setArmed(!armed, null, opener);
@@ -99,7 +99,7 @@ export function ProvInspectorToggle({
       className="prov-inspect-toggle"
       aria-pressed={armed}
       aria-label={label}
-      title={armed ? "Exit the provenance inspector (Esc)" : "Provenance inspector — click any value to trace it"}
+      title={armed ? "Exit the provenance inspector (Esc)" : "Provenance inspector: click any value to trace it"}
       onClick={onClick}
     >
       <Crosshair aria-hidden />
@@ -339,7 +339,7 @@ function InspectorPopover({ pin }: { pin: ProvInspectorPin }) {
         <button
           type="button"
           className="prov-rrow-dots"
-          title={`${involvedTitle} — what the colours mean`}
+          title={`${involvedTitle}, what the colours mean`}
           aria-label={`${involvedTitle}. What the colours mean`}
           aria-haspopup="dialog"
           onClick={() => setLadderOpen(true)}

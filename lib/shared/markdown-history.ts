@@ -79,7 +79,7 @@ export function markdownTimelineSlice<T extends BaseActivityEvent>(
       rows,
       heading:
         `## Recent activity (last ${n(rows.length)} ${plural(rows.length)}, oldest first${suffix}` +
-        ` — the earlier events are neither listed nor summarised here)`,
+        `; the earlier events are neither listed nor summarised here)`,
       firstIndex: 1,
     };
   }
@@ -95,7 +95,7 @@ export function markdownTimelineSlice<T extends BaseActivityEvent>(
       rows,
       heading:
         `## Recent activity (${n(rows.length)} of ${n(total)} ${plural(total)}, oldest first${suffix}` +
-        ` — the ${n(history.folderMembers)} ${plural(history.folderMembers)} inside collapsed groups are not listed)`,
+        `; the ${n(history.folderMembers)} ${plural(history.folderMembers)} inside collapsed groups are not listed)`,
       firstIndex: 1,
     };
   }
@@ -194,7 +194,7 @@ export function exportScopeNote(
   if (scope.folderMembers > 0) {
     return (
       `The position figures cover ${figuresCover}. The Markdown snapshot lists ${listed} of ` +
-      `${total} events — the ${scope.folderMembers.toLocaleString("en-US")} inside collapsed groups are not ` +
+      `${total} events; the ${scope.folderMembers.toLocaleString("en-US")} inside collapsed groups are not ` +
       `among them; the CSV downloads the whole history.`
     );
   }

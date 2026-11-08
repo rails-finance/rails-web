@@ -104,7 +104,7 @@ export function makerdaoFlowsContent(opts: { debtSym: string; ilk: string }): Le
       },
     ],
     links: [
-      { label: "Vat — the core accounting", url: MAKER_DOCS.VAT },
+      { label: "Vat: the core accounting", url: MAKER_DOCS.VAT },
       { label: "Rates module (stability fees)", url: MAKER_DOCS.RATES },
       { label: "Maker protocol docs", url: MAKER_DOCS.OVERVIEW },
     ],

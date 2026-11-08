@@ -161,7 +161,7 @@ export default function InfoPage() {
                 at which the tick would be rebalanced or liquidated.
               </li>
               <li>
-                Beside the pool&apos;s figures, the page shows what the position&apos;s own transactions add up to. The
+                Beside the pool&apos;s figures, the page shows what the position&apos;s transactions add up to. The
                 difference between the two figures is what funding and tick-wide events changed, and a table below
                 splits it by the period between two transactions.
               </li>

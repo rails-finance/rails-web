@@ -20,7 +20,7 @@ export const metadata = listingMetadata({
   title: "About the Yearn V3 vault roster",
   canonicalPath: "/ethereum/yearn/vaults/info",
   description:
-    "How Rails builds the Yearn V3 roster: every vault the five V3 factories deployed rather than the endorsed shortlist, the creation log that enumerates them, what the endorsed badge means, and why totals stay in each vault's own asset.",
+    "How Rails builds the Yearn V3 roster: every vault the five V3 factories deployed, endorsed or not, the creation log that enumerates them, what the endorsed badge means, and why totals stay in each vault's asset.",
 });
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -43,8 +43,8 @@ export default async function YearnVaultsInfoPage() {
         Share price column on the roster shows, in the vault&rsquo;s asset.
       </p>
       <p data-intro-roster>
-        The roster is every vault the {word(factories.length)} V3 factories deployed — {n(vaults.length)} of them at
-        block {n(censusBlock)} — which is a wider list than the shortlist Yearn endorses. Anyone may deploy from a
+        The roster is every vault the {word(factories.length)} V3 factories deployed, {n(vaults.length)} of them at
+        block {n(censusBlock)}, which is a wider list than the shortlist Yearn endorses. Anyone may deploy from a
         factory, and a deployment is announced by a creation event on that factory, which is the only enumeration there
         is: a vault keeps no list of its siblings and a factory keeps no list of its children. Each vault the sweep
         found is then asked which factory made it, which release it runs and which token it takes, and the three answers

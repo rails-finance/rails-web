@@ -174,7 +174,7 @@ export function useLiquityCells({
     kind: "chain",
     pclass: "emitted",
     verify: txVerify,
-    summary: `Collateral (${collSym}) held by the trove after this event — every time a trove changes, the TroveManager contract writes the trove's full ${collSym} balance into its log. This is that balance as it stood after this event.`,
+    summary: `Collateral (${collSym}) held by the trove after this event. Every time a trove changes, the TroveManager contract writes the trove's full ${collSym} balance into its log. This is that balance as it stood after this event.`,
     contract: tmContract,
     via: `${streamVia()} · ${originSeg(stateAfter.origin?.coll, {
       event: "TroveUpdated",
@@ -201,7 +201,7 @@ export function useLiquityCells({
         kind: "chain-derived",
         pclass: "indexed",
         verify: txVerify,
-        summary: `Trove debt (${debtSym}) after this event — this trove is in a delegate's batch, so the contract logs the trove's share of the batch and the batch's total debt. The trove's debt is that share of the total, including interest and any upfront fee.`,
+        summary: `Trove debt (${debtSym}) after this event. This trove is in a delegate's batch, so the contract logs the trove's share of the batch and the batch's total debt. The trove's debt is that share of the total, including interest and any upfront fee.`,
         contract: tmContract,
         via: `${streamVia()} · BatchedTroveUpdated + BatchUpdated logs · _batchDebtShares ∕ total shares × batch debt · ÷10^18`,
         inputs: eventInputs({ ...coords, asset: debtSym }),
@@ -210,7 +210,7 @@ export function useLiquityCells({
         kind: "chain",
         pclass: "emitted",
         verify: txVerify,
-        summary: `Trove debt (${debtSym}) after this event — every time a trove changes, the TroveManager contract writes the trove's full debt into its log. This is that figure after this event, including the interest built up since the last change and any upfront fee.`,
+        summary: `Trove debt (${debtSym}) after this event. Every time a trove changes, the TroveManager contract writes the trove's full debt into its log. This is that figure after this event, including the interest built up since the last change and any upfront fee.`,
         contract: tmContract,
         via: `${streamVia()} · ${originSeg(stateAfter.origin?.debt, {
           event: "TroveUpdated",
@@ -231,7 +231,7 @@ export function useLiquityCells({
       ? {
           kind: "derived",
           summary:
-            "Collateral before this redemption — the collateral left after the redemption plus the collateral redeemed.",
+            "Collateral before this redemption. The collateral left after the redemption plus the collateral redeemed.",
           formula: "collateral after + collateral redeemed",
           inputs: [
             {
@@ -252,7 +252,7 @@ export function useLiquityCells({
         ? {
             kind: "derived",
             summary:
-              "Collateral before liquidation — the sum of where the liquidation sent it: the Stability Pool, other troves, the surplus the owner can claim, and the liquidator's gas compensation.",
+              "Collateral before liquidation. The sum of where the liquidation sent it: the Stability Pool, other troves, the surplus the owner can claim, and the liquidator's gas compensation.",
             formula: "collSentToSP + collRedistributed + collSurplus + collGasComp",
             contract: tmContract,
             via: "Liquidation event",
@@ -261,14 +261,14 @@ export function useLiquityCells({
           ? {
               kind: "derived",
               summary:
-                "Collateral before close — closing returns all of a trove's collateral, so this is the amount the close moved.",
+                "Collateral before close. Closing returns all of a trove's collateral, so this is the amount the close moved.",
               formula: "|operation collateral change|",
               contract: tmContract,
               via: "TroveOperation log",
             }
           : {
               kind: "chain",
-              summary: `Collateral (${collSym}) before this event — the balance the contract logged at the trove's previous change.`,
+              summary: `Collateral (${collSym}) before this event. The balance the contract logged at the trove's previous change.`,
               contract: tmContract,
               via: `${streamVia()} · ${originSeg(
                 stateBefore.origin?.coll,
@@ -289,7 +289,7 @@ export function useLiquityCells({
     (isRedemption && troveOperation) || (isLiquidation && liquidation) || isCloseRecon
       ? {
           kind: "derived",
-          summary: `Debt (${debtSym}) before this event — the debt the trove's previous event recorded. This event logs only the debt after, so it is that less this event's move: the operation, any upfront fee and the ${accrualNoun(accrual)} accrued since the previous event.`,
+          summary: `Debt (${debtSym}) before this event. The debt the trove's previous event recorded. This event logs only the debt after, so it is that less this event's move: the operation, any upfront fee and the ${accrualNoun(accrual)} accrued since the previous event.`,
           formula: "debt after − operation − upfront fee − accrual since the previous event",
           inputs: [
             {
@@ -316,14 +316,14 @@ export function useLiquityCells({
         ? {
             kind: "chain-derived",
             pclass: "indexed",
-            summary: `Debt (${debtSym}) before this event — the trove's share of its delegate batch's total debt, as the contract logged it at the trove's previous change.`,
+            summary: `Debt (${debtSym}) before this event. The trove's share of its delegate batch's total debt, as the contract logged it at the trove's previous change.`,
             contract: tmContract,
             via: `${streamVia()} · previous BatchedTroveUpdated + BatchUpdated logs · _batchDebtShares ∕ total shares × batch debt · ÷10^18`,
             inputs: [{ label: "asset", value: debtSym, kind: "chain" }],
           }
         : {
             kind: "chain",
-            summary: `Debt (${debtSym}) before this event — the debt the contract logged at the trove's previous change.`,
+            summary: `Debt (${debtSym}) before this event. The debt the contract logged at the trove's previous change.`,
             contract: tmContract,
             via: `${streamVia()} · ${originSeg(
               stateBefore.origin?.debt,
@@ -335,7 +335,7 @@ export function useLiquityCells({
           };
   const rateBeforeProv: Provenance = {
     kind: "chain",
-    summary: `Annual interest rate before this event — the rate the contract logged for the trove at its previous change.`,
+    summary: `Annual interest rate before this event. The rate the contract logged for the trove at its previous change.`,
     contract: tmContract,
     // A batched previous state's envelope names the batch's BatchUpdated —
     // the rate a batched trove accrues at.
@@ -354,7 +354,7 @@ export function useLiquityCells({
     collPrice > 0
       ? {
           kind: "chain-derived",
-          summary: `Collateral value (after) in USD — the collateral after this event, multiplied by Liquity's price for ${collSym} at this block.`,
+          summary: `Collateral value (after) in USD. The collateral after this event, multiplied by Liquity's price for ${collSym} at this block.`,
           formula: "collateral × price",
           inputs: [
             {
@@ -371,7 +371,7 @@ export function useLiquityCells({
     collPrice > 0
       ? {
           kind: "chain-derived",
-          summary: `Collateral value (before) in USD — the collateral before this event, multiplied by Liquity's price for ${collSym} at this block.`,
+          summary: `Collateral value (before) in USD. The collateral before this event, multiplied by Liquity's price for ${collSym} at this block.`,
           formula: "collateral × price",
           inputs: [
             {
@@ -387,7 +387,7 @@ export function useLiquityCells({
   const crAfterProv: Provenance = {
     kind: "chain-derived",
     summary:
-      "Collateral ratio after this event — the collateral's dollar value divided by the debt, at Liquity's price for this block.",
+      "Collateral ratio after this event. The collateral's dollar value divided by the debt, at Liquity's price for this block.",
     formula: "collateral × price ÷ debt × 100",
     inputs: [
       {
@@ -403,7 +403,7 @@ export function useLiquityCells({
   const crBeforeProv: Provenance = {
     kind: "chain-derived",
     summary:
-      "Collateral ratio before this event — the collateral's dollar value divided by the debt before this event, both at Liquity's price for this event's block, so the change from before to after is the event's alone.",
+      "Collateral ratio before this event. The collateral's dollar value divided by the debt before this event, both at Liquity's price for this event's block, so the change from before to after is the event's alone.",
     formula: "collateral × price ÷ debt × 100",
     inputs: [
       { label: "collateral", value: `${toLocaleStringHelper(beforeColl)} ${collSym}`, kind: "chain", note: "before" },
@@ -415,7 +415,7 @@ export function useLiquityCells({
     accrual.source === "ledger"
       ? {
           kind: "derived",
-          summary: `${accrual.batched ? "Interest and batch management fee" : "Interest"} since the previous event — what the debt accrued, as the debt ledger states it: the rest of the debt's move once the operation, any upfront fee and any redistributed debt are taken out${accrual.batched ? ", split by the batch's rate and fee" : ""}.`,
+          summary: `${accrual.batched ? "Interest and batch management fee" : "Interest"} since the previous event. What the debt accrued, as the debt ledger states it: the rest of the debt's move once the operation, any upfront fee and any redistributed debt are taken out${accrual.batched ? ", split by the batch's rate and fee" : ""}.`,
           formula: "debt after − debt before − operation − upfront fee − redistributed debt",
           inputs: [
             { label: "interest", value: `${fmtAccrued(accrual.interest)} ${debtSym}`, kind: "chain" },
@@ -427,13 +427,13 @@ export function useLiquityCells({
       : accrual.source === "logs"
         ? {
             kind: "derived",
-            summary: `${accrual.batched ? "Interest and batch management fee" : "Interest"} since the previous event — what the debt accrued: the rest of the debt's move once the operation, any upfront fee and any redistributed debt are taken out.`,
+            summary: `${accrual.batched ? "Interest and batch management fee" : "Interest"} since the previous event. What the debt accrued: the rest of the debt's move once the operation, any upfront fee and any redistributed debt are taken out.`,
             formula: "debt after − debt before − operation − upfront fee − redistributed debt",
             inputs: eventInputs(coords),
           }
         : {
             kind: "derived",
-            summary: `${accrual.batched ? "Interest and batch management fee" : "Interest"} since the previous event — worked from the recorded debt and rate: Liquity accrues it simply, per second, over a 365-day year.`,
+            summary: `${accrual.batched ? "Interest and batch management fee" : "Interest"} since the previous event. Worked from the recorded debt and rate: Liquity accrues it simply, per second, over a 365-day year.`,
             formula: "recorded debt × (rate + fee) × seconds ÷ 31,536,000",
           };
   const batchFeeProv: Provenance | undefined = batchFee
@@ -443,7 +443,7 @@ export function useLiquityCells({
           pclass: "emitted",
           verify: txVerify,
           summary:
-            "The batch's annual management fee — charged on top of the interest rate on every trove in the batch, set by its batch manager.",
+            "The batch's annual management fee. Charged on top of the interest rate on every trove in the batch, set by its batch manager.",
           contract: tmContract,
           via: `${streamVia()} · BatchUpdated log · _annualManagementFee · ÷10^16`,
           inputs: eventInputs(coords),
@@ -451,7 +451,7 @@ export function useLiquityCells({
       : {
           kind: "derived",
           summary:
-            "The batch's annual management fee — charged on top of the interest rate on every trove in the batch. Carried from the batch's last BatchUpdated log, as the debt ledger reads it.",
+            "The batch's annual management fee. Charged on top of the interest rate on every trove in the batch. Carried from the batch's last BatchUpdated log, as the debt ledger reads it.",
           formula: "rate in force (rate + fee) − rate",
           via: `${streamVia()} · previous BatchUpdated log · _annualManagementFee · ÷10^16`,
         }
@@ -552,7 +552,7 @@ export function useLiquityCells({
   const collDelta = collAfter - beforeColl;
   const collDeltaProv: Provenance = {
     kind: "derived",
-    summary: `Collateral (${collSym}) change at this event — the collateral after minus the collateral before.`,
+    summary: `Collateral (${collSym}) change at this event. The collateral after minus the collateral before.`,
     via: "after − before",
     formula: "after collateral − before collateral",
   };
@@ -689,7 +689,7 @@ export function useLiquityCells({
   const ratioCanToggle = !isClose && stateAfter.debt !== 0 && isFinite(afterDisp);
   const ratioDeltaProv: Provenance = {
     kind: "derived",
-    summary: `${ratioLabel(mode)} change at this event, in percentage points — the ratio after minus the ratio before.`,
+    summary: `${ratioLabel(mode)} change at this event, in percentage points. The ratio after minus the ratio before.`,
     via: "after − before",
     formula: mode === "ltv" ? "(10000 ÷ after) − (10000 ÷ before)" : "after − before",
   };
@@ -742,12 +742,12 @@ export function useLiquityCells({
   const sheetDebtCp = debtChangeProv(ctx, coords);
   const debtMoveProv: Provenance = {
     kind: "derived",
-    summary: `Debt (${debtSym}) this event moved — the debt after less the debt before this event, any upfront fee and any redistributed debt.`,
+    summary: `Debt (${debtSym}) this event moved. The debt after less the debt before this event, any upfront fee and any redistributed debt.`,
     formula: "debt after − debt before this event − upfront fee − redistributed debt",
   };
   const debtBeforeEventProv: Provenance = {
     kind: "derived",
-    summary: `Debt (${debtSym}) immediately before this event — the debt the Trove's previous event recorded plus the ${accrualNoun(accrual)} accrued since.`,
+    summary: `Debt (${debtSym}) immediately before this event. The debt the Trove's previous event recorded plus the ${accrualNoun(accrual)} accrued since.`,
     formula: "debt at the previous event + accrual since",
     inputs: [
       { label: "debt at the previous event", value: `${toLocaleStringHelper(beforeDebt)} ${debtSym}`, kind: "chain" },
@@ -1004,7 +1004,7 @@ export function useLiquityCells({
   const pts = (a: number) => `${a.toFixed(2)} pts`;
   const sinceProv = (what: string, formula: string): Provenance => ({
     kind: "derived",
-    summary: `${what} — the figure after this event less the figure after the Trove's previous event.`,
+    summary: `${what}. The figure after this event less the figure after the Trove's previous event.`,
     formula,
   });
   const liqOf = (coll: number, d: number) => (safety.mcr > 0 && coll > 0 && d > 0 ? (d * safety.mcr) / coll : null);
@@ -1013,7 +1013,7 @@ export function useLiquityCells({
   const usd2 = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const liqProv: Provenance = {
     kind: "chain-derived",
-    summary: `The ${collSym} price at which this Trove's collateral ratio meets the branch's minimum, ${(safety.mcr * 100).toFixed(0)}% — the debt times the minimum ratio, divided by the collateral, after this event.`,
+    summary: `The ${collSym} price at which this Trove's collateral ratio meets the branch's minimum, ${(safety.mcr * 100).toFixed(0)}%. The debt times the minimum ratio, divided by the collateral, after this event.`,
     formula: "debt × minimum ratio ÷ collateral",
     inputs: [
       { label: "debt", value: `${toLocaleStringHelper(stateAfter.debt)} ${debtSym}`, kind: "chain", note: "after" },
@@ -1097,7 +1097,7 @@ export function useLiquityCells({
   const paramProv = (what: string, pct: number): Provenance => ({
     kind: "chain",
     pclass: "state",
-    summary: `The ${collSym} branch's ${what}, ${pct.toFixed(0)}% — a constant the branch's contracts were deployed with.`,
+    summary: `The ${collSym} branch's ${what}: ${pct.toFixed(0)}%. A constant the branch's contracts were deployed with.`,
     contract: tmContract,
   });
   const params: SheetStat[] = branch
@@ -1157,7 +1157,7 @@ export function useLiquityCells({
 function usdMoveProv(sym: string, amount: number, price: number): Provenance {
   return {
     kind: "chain-derived",
-    summary: `${sym} this event moved, in US dollars — the amount times Liquity's price for ${sym} at this block.`,
+    summary: `${sym} this event moved, in US dollars. The amount times Liquity's price for ${sym} at this block.`,
     formula: "amount × price",
     inputs: [
       { label: "amount", value: `${fmtColl(amount)} ${sym}`, kind: "chain" },
@@ -1176,7 +1176,7 @@ function usdMoveProv(sym: string, amount: number, price: number): Provenance {
 function atPriceProv(sym: string, amount: number, price: number, when: string): Provenance {
   return {
     kind: "chain-derived",
-    summary: `${sym} held after ${when}, in US dollars — the amount times Liquity's price for ${sym} then.`,
+    summary: `${sym} held after ${when}, in US dollars. The amount times Liquity's price for ${sym} then.`,
     formula: "collateral × price then",
     inputs: [
       { label: "collateral", value: `${fmtColl(amount)} ${sym}`, kind: "chain" },
@@ -1190,7 +1190,7 @@ function atPriceProv(sym: string, amount: number, price: number, when: string): 
 function marketMoveProv(sym: string, amount: number, prev: number, now: number): Provenance {
   return {
     kind: "chain-derived",
-    summary: `Market move — the change in the ${sym} price from the previous event to this one, on the ${sym} the Trove held between them. No ${sym} moved.`,
+    summary: `Market move. The change in the ${sym} price from the previous event to this one, on the ${sym} the Trove held between them. No ${sym} moved.`,
     formula: "collateral × (price now − price at the previous event)",
     inputs: [
       { label: "collateral", value: `${fmtColl(amount)} ${sym}`, kind: "chain" },
@@ -1227,7 +1227,7 @@ export function LiquityRedeemerNote({
           text: "Confirm in the tx event logs",
         }
       : undefined,
-    summary: "Redeemer — the wallet that made the redemption.",
+    summary: "Redeemer. The wallet that made the redemption.",
     contract: tmContractOf(TROVE_MANAGER[(ctx.collateralType ?? "").toLowerCase()]),
     via: `${streamVia()} · redemption event`,
     inputs: eventInputs(coords),

@@ -11,7 +11,7 @@ export default function MorphoArbitrumWalletNotFound() {
       backLabel="Look up another wallet on Morpho Blue Arbitrum"
     >
       This page is about one account, named by its 20-byte address. The URL does not carry one, so there is no account
-      to look up — an address the singleton has never seen would still resolve, and say so.
+      to look up. An address the singleton has never seen would still resolve, and say so.
     </RouteNotFound>
   );
 }

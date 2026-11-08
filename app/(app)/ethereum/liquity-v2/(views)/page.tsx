@@ -23,7 +23,6 @@ import { holderListingMetadata, listingMetadata } from "@/lib/shared/page-metada
 import { parseTroveSearch } from "@/lib/liquity-v2/search";
 import { resolveEnsAddress } from "@/lib/ens/resolve-ens";
 import type { Metadata } from "next";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -46,8 +45,7 @@ export async function generateMetadata({
   const directory = listingMetadata({
     title: "Explore Liquity V2 troves",
     canonicalPath: LIQUITY_V2_BASE_PATH,
-    description:
-      "Explore all Liquity V2 Troves across ETH, wstETH, and rETH collateral types. Filter by owner, status, collateral ratio, and more. View detailed transaction timelines for any trove.",
+    description: "Every Liquity V2 Trove on Ethereum, with its collateral, debt, interest rate and full history.",
   });
   const { ownerAddress, ownerEns } = parseTroveSearch(readListQuery(toURLSearchParams(await searchParams)));
   // An address is lowercased (one wallet, one URL, whatever case it was typed
@@ -88,4 +86,4 @@ async function LiquityV2ListingPage({ searchParams }: { searchParams: Promise<Ra
   return <LiquityV2Listing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/ethereum/liquity-v2", LiquityV2ListingPage);
+export default LiquityV2ListingPage;

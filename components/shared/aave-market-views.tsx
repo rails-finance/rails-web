@@ -292,7 +292,7 @@ function RiskLine({ r, vocab, narrow }: { r: MarketReserveRow; vocab: AaveMarket
     </span>
   );
   const kink = r.kink != null && r.rateStrategy && (
-    <span title="The utilisation at which the borrow rate starts to climb steeply — the tick on the bar">
+    <span title="The utilisation at which the borrow rate starts to climb steeply: the tick on the bar">
       kink{" "}
       <Prov
         info={vocab.kinkProv(r.symbol, {
@@ -391,7 +391,7 @@ function UtilBar({ r, suffix }: { r: MarketReserveRow; suffix?: React.ReactNode 
       <span
         className="shrink-0 tabular-nums text-[12px] text-foreground/80"
         data-prov-exempt=""
-        title="Utilisation: borrowed ÷ supplied — both traced in this row"
+        title="Utilisation: borrowed ÷ supplied, both traced in this row"
       >
         {u != null ? pct(u) : "—"}
         {suffix}
@@ -531,7 +531,7 @@ function ReserveRow(props: RowProps) {
         </td>
         <td
           className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80"
-          title="Reserve factor — the protocol's cut of borrow interest"
+          title="Reserve factor: the protocol's cut of borrow interest"
         >
           {z.rf}
         </td>
@@ -800,7 +800,7 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
               {hasListing ? (
                 <Link
                   href={listingHref}
-                  className="text-base font-semibold text-foreground transition-colors hover:text-blue-600 dark:hover:text-blue-400"
+                  className="text-base font-semibold text-foreground transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]"
                   title={`View ${view.label} positions`}
                 >
                   {view.label}
@@ -842,7 +842,7 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
               // the per-row utilisation.
               value: <span data-prov-exempt="">{pct(marketUtilization)}</span>,
               title:
-                "Borrowed ÷ supplied, both in USD at the market's oracle price — the two figures beside it in this band.",
+                "Borrowed ÷ supplied, both in USD at the market's oracle price: the two figures beside it in this band.",
             },
           ]}
           aside={
@@ -870,9 +870,9 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
         <div className="mb-3">
           <h2 className="text-[11px] uppercase tracking-wider text-rb-500">Reserves</h2>
           <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
-            Every reserve on the Pool — filter by class, sort any column. Rates, caps and risk parameters decode from
-            the configuration the Pool enforces; USD is the market&apos;s oracle price. The bar is utilisation, and its
-            tick is the rate model&apos;s kink.
+            Every reserve on the Pool, filter by class, sort any column. Rates, caps and risk parameters decode from the
+            configuration the Pool enforces; USD is the market&apos;s oracle price. The bar is utilisation, and its tick
+            is the rate model&apos;s kink.
           </p>
         </div>
 

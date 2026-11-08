@@ -26,7 +26,7 @@ export const metadata = listingMetadata({
   title: "Vault positions on Ethereum",
   canonicalPath: "/ethereum/morpho/vaults/positions",
   description:
-    "Every address that holds — or has ever held — a share of a MetaMorpho vault catalogued on Ethereum, live and closed, as position cards. Filter by vault, status and what the holding address is; shares, claim and share of the vault read from chain at one block.",
+    "Every address that holds (or has ever held) a share of a MetaMorpho vault catalogued on Ethereum, live and closed, as position cards. Filter by vault, status and what the holding address is; shares, claim and share of the vault read from chain at one block.",
 });
 
 export default async function EthereumMorphoVaultPositionsPage({

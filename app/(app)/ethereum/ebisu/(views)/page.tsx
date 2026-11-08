@@ -8,13 +8,17 @@ import { fetchEbisuTroves } from "@/lib/api/fetch-ebisu-troves";
 import { ebisuListDimensions, EBISU_LIST_DEFAULTS } from "@/lib/ebisu/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Ebisu troves", canonicalPath: "/ethereum/ebisu" });
+export const metadata = listingMetadata({
+  title: "Explore Ebisu troves",
+  canonicalPath: "/ethereum/ebisu",
+  description:
+    "Every Ebisu Trove on Ethereum: loans of the ebUSD stablecoin across five collateral types, with collateral, debt and full history.",
+});
 
 async function EbisuListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = ebisuListDimensions([]);
@@ -37,4 +41,4 @@ async function EbisuListingPage({ searchParams }: { searchParams: Promise<RawSea
   return <EbisuListing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/ethereum/ebisu", EbisuListingPage);
+export default EbisuListingPage;

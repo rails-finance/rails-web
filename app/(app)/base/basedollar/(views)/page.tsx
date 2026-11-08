@@ -9,7 +9,6 @@ import { fetchBasedollarTroves } from "@/lib/api/fetch-basedollar-troves";
 import { basedollarListDimensions, BASEDOLLAR_LIST_DEFAULTS } from "@/lib/basedollar/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -18,6 +17,8 @@ export const maxDuration = 30;
 export const metadata = listingMetadata({
   title: "Explore Basedollar troves on Base",
   canonicalPath: "/base/basedollar",
+  description:
+    "Every Basedollar Trove on Base: loans of the BD stablecoin across five collateral types, with collateral, debt and full history.",
 });
 
 async function BasedollarListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
@@ -41,4 +42,4 @@ async function BasedollarListingPage({ searchParams }: { searchParams: Promise<R
   return <BasedollarListing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/base/basedollar", BasedollarListingPage);
+export default BasedollarListingPage;

@@ -89,7 +89,7 @@ export type RailVenue = "listing" | "subPage" | "info";
 // stands for whatever rail comes next.
 export const TAB_BASE = "border-b pb-0.5 text-[11px] font-semibold uppercase tracking-[0.14em]";
 export const TAB_ACTIVE = `${TAB_BASE} border-current text-foreground`;
-export const TAB_IDLE = `${TAB_BASE} border-transparent text-rb-500 transition-colors hover:text-blue-600 dark:hover:text-blue-400`;
+export const TAB_IDLE = `${TAB_BASE} border-transparent text-rb-500 transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]`;
 
 export function RailHeader({
   session,

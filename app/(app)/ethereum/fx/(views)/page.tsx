@@ -11,13 +11,17 @@ import { fetchFxPoolStats } from "@/lib/api/fetch-fx-stats";
 import { fxListDimensions, fxFiltersToFetchParams, FX_LIST_DEFAULTS } from "@/lib/fx/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, ssrHop, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore f(x) positions", canonicalPath: "/ethereum/fx" });
+export const metadata = listingMetadata({
+  title: "Explore f(x) positions",
+  canonicalPath: "/ethereum/fx",
+  description:
+    "Every f(x) Protocol leveraged position on Ethereum, on wstETH and WBTC: size, debt, funding costs and full history.",
+});
 
 async function FxListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = fxListDimensions();
@@ -45,4 +49,4 @@ async function FxListingPage({ searchParams }: { searchParams: Promise<RawSearch
   return <FxListing {...initial} initialSearch={sp.toString()} poolStats={poolStats} />;
 }
 
-export default withExplorerAbout("/ethereum/fx", FxListingPage);
+export default FxListingPage;

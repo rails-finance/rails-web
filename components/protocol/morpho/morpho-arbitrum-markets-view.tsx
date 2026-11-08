@@ -52,7 +52,7 @@ function Token({ symbol, address }: { symbol: string | null; address: string }) 
       href={explorerUrl(MORPHO_ARBITRUM_CHAIN_ID, "address", address)}
       target="_blank"
       rel="noopener noreferrer"
-      className="hover:text-blue-600 dark:hover:text-blue-400"
+      className="hover:text-blue-600 dark:hover:text-[var(--text-link)]"
       title={address}
     >
       {symbol ?? <span className="font-mono">{shortAddr(address)}</span>}

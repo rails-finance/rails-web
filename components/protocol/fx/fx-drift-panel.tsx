@@ -104,7 +104,7 @@ export function FxDriftPanel({
         </p>
         {state === "error" && (
           <p className="mt-2 text-xs text-rb-500">
-            Boundary reads failed{reason ? ` — ${reason}` : ""}.{" "}
+            Boundary reads failed{reason ? `: ${reason}` : ""}.{" "}
             <button onClick={onLoad} className="underline decoration-dotted underline-offset-2 hover:text-foreground">
               Try again
             </button>
@@ -115,10 +115,10 @@ export function FxDriftPanel({
             {drift.intervals.length === 0 ? (
               <p className="text-xs text-rb-500">
                 {drift.headPending
-                  ? "The position was touched after the last settled sweep — its stretches are stated once the next sweep lands."
+                  ? "The position was touched after the last settled sweep. Its stretches are stated once the next sweep lands."
                   : drift.headBlock == null
-                    ? "No settled sweep for this position yet — the stretches are stated once it lands."
-                    : "No quiet stretches — every block gap between events is empty."}
+                    ? "No settled sweep for this position yet: the stretches are stated once it lands."
+                    : "No quiet stretches: every block gap between events is empty."}
               </p>
             ) : moved.length === 0 ? null : (
               <table className="w-full text-xs">
@@ -221,7 +221,7 @@ export function FxDriftPanel({
             {drift.unread > 0 && (
               <p className="mt-2 text-xs text-rb-500">
                 {drift.unread} older stretch{drift.unread === 1 ? "" : "es"} not read yet
-                {drift.stalled ? ` (${drift.stalled})` : ""} — the card&rsquo;s debt line covers the whole history
+                {drift.stalled ? ` (${drift.stalled})` : ""} : the card&rsquo;s debt line covers the whole history
                 regardless; its collateral line says how much it covers.{" "}
                 <button
                   onClick={onLoad}

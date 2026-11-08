@@ -125,6 +125,17 @@ async function countRows() {
   return page.locator(ROW).count();
 }
 
+/** The listing's whole count (N1.6 `data-result-count`), or null where the
+ *  listing draws none. */
+async function resultTotal() {
+  const v = await page
+    .locator("[data-result-count]")
+    .first()
+    .getAttribute("data-result-count", { timeout: 2000 })
+    .catch(() => null);
+  return v == null || v === "" ? null : Number(v);
+}
+
 /**
  * Click the wallet pill until the URL actually changes.
  *
@@ -238,6 +249,7 @@ for (const { slug, route, onListing } of subjects) {
     const landed = new URL(page.url()).pathname;
     check(`${slug}: serves its chain-scoped listing route`, landed === route, `landed on ${landed}`);
     const full = await countRows();
+    const fullTotal = await resultTotal();
     check(`${slug}: listing renders rows`, full > 0, `${full} rows (full)`);
     if (full === 0) continue;
 
@@ -313,23 +325,28 @@ for (const { slug, route, onListing } of subjects) {
     const { count: filtered, settled } = await waitForFilteredCount(full);
     // A wallet that holds a page or more here (a Frankencoin minter with 20+
     // positions) fills the filtered page to `full`; the filter is then proven
-    // by every row carrying the wallet instead. Some listing cards don't
-    // render the owner as visible text, so that read is only a second proof,
-    // never a second requirement.
+    // by every row carrying the wallet instead, or by the listing's whole
+    // count falling (a MakerDAO wallet with 21 vaults, its rows naming its ENS
+    // name, 7 Nov 2026). Some listing cards don't render the owner as visible
+    // text, so that read is only a second proof, never a second requirement.
     const tail = q.length >= 6 ? q.slice(-4).toLowerCase() : null;
     const bodies = filtered > 0 ? await page.locator(ROW).allInnerTexts() : [];
     const matched = tail ? bodies.filter((t) => t.toLowerCase().includes(tail)).length : 0;
     const everyRowIsTheWallet = tail !== null && bodies.length > 0 && matched === bodies.length;
+    const filteredTotal = settled ? null : await resultTotal();
+    const totalFell = fullTotal != null && filteredTotal != null && filteredTotal >= 1 && filteredTotal < fullTotal;
     check(
       `${slug}: FILTERED count < full (proves ?q= is honored)`,
-      filtered >= 1 && (filtered < full || everyRowIsTheWallet),
+      filtered >= 1 && (filtered < full || everyRowIsTheWallet || totalFell),
       settled
         ? `filtered=${filtered} vs full=${full}  q=${q}`
         : everyRowIsTheWallet
           ? `a full page of ${filtered}, every row the wallet's  q=${q}`
-          : `NOT SETTLED — still ${filtered} of ${full} when the wait expired, so the filter was never` +
-            ` observed to apply. Re-run this explorer alone before recording it: a busy box looks like` +
-            ` an ignored ?q= here.  q=${q}`,
+          : totalFell
+            ? `a full page of ${filtered}, the listing's count ${filteredTotal} of ${fullTotal}  q=${q}`
+            : `NOT SETTLED — still ${filtered} of ${full} when the wait expired, so the filter was never` +
+              ` observed to apply. Re-run this explorer alone before recording it: a busy box looks like` +
+              ` an ignored ?q= here.  q=${q}`,
     );
 
     // 3c) Informational: how many filtered rows visibly carry the wallet's

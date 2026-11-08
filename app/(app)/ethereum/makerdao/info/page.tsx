@@ -200,8 +200,8 @@ export default function InfoPage() {
               <Link href="/ethereum/sky-savings" className={INLINE_LINK}>
                 Sky Savings
               </Link>{" "}
-              is a separate explorer for a savings product, not for vaults. It lists every wallet address holding sUSDS,
-              with the interest each has earned.
+              is a separate explorer for a savings product. It lists every wallet address holding sUSDS, with the
+              interest each has earned.
             </p>
           ),
         },

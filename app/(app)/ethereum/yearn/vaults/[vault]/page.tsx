@@ -54,7 +54,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const name = data.vault.name ?? data.vault.censusName;
   return listingMetadata({
     title: `${name} · Yearn V3`,
-    description: `What the ${name} vault holds, how it splits between idle and deployed, the strategies its withdrawal queue walks and who holds the roles over it — read from the contract at one block.`,
+    description: `What the ${name} vault holds, how it splits between idle and deployed, the strategies its withdrawal queue walks and who holds the roles over it, read from the contract at one block.`,
     canonicalPath: yearnVaultHref(address),
   });
 }
