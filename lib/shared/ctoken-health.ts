@@ -91,7 +91,7 @@ export function ctokenHealthSource(chain: number, changed = false): HealthSource
     levels: {
       formula: BASKET_LEVEL_FORMULA,
       summary:
-        "Liquidation level — the asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the collateral factors the Comptroller held at the day's last read.",
+        "Liquidation level. The asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the collateral factors the Comptroller held at the day's last read.",
       here: {
         live: "Here at today's balances and prices and the card's health factor.",
         read: "Here at the balances and prices of {day}, against the collateral factors the Comptroller held at the end of block {block}.",

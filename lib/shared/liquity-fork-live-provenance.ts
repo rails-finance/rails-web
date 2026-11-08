@@ -241,8 +241,8 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       verify: recompute("PriceFeed", stale ? "lastGoodPrice" : "fetchPrice"),
       summary:
         (stale
-          ? `${sym} price in USD — the branch PriceFeed's lastGoodPrice: the last value a user operation fetched (the live fetchPrice simulation failed on this read). It lags between operations on a quiet branch; treat it as the protocol's most recent price, not this block's.`
-          : `${sym} price in USD — the branch's own PriceFeed, fetchPrice SIMULATED via eth_call at the latest block (the call is state-mutating on-chain, read-only under eth_call). This is the same price the branch liquidates and redeems with.`) +
+          ? `${sym} price in USD. The branch PriceFeed's lastGoodPrice; the last value a user operation fetched (the live fetchPrice simulation failed on this read). It lags between operations on a quiet branch; treat it as the protocol's most recent price, not this block's.`
+          : `${sym} price in USD. The branch's PriceFeed, fetchPrice SIMULATED via eth_call at the latest block (the call is state-mutating on-chain, read-only under eth_call). This is the same price the branch liquidates and redeems with.`) +
         (g?.sentence ?? ""),
       contract: pfContract(sym),
       via: `${lane} · PriceFeed.${stale ? "lastGoodPrice" : "fetchPrice (simulated)"} @ head`,
@@ -255,7 +255,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain",
       pclass: "state",
       verify: recompute("TroveManager", "getLatestTroveData"),
-      summary: `${what} — read live from the ${sym} branch's own TroveManager (getLatestTroveData(): ${field}) at the latest block. The ENTIRE figure: pending redistribution gains from liquidations and interest accrued to this moment are included — the branch's own live reckoning, which redemptions shrink without the captured events necessarily showing it.`,
+      summary: `${what}. Read live from the ${sym} branch's TroveManager (getLatestTroveData(): ${field}) at the latest block. The ENTIRE figure: pending redistribution gains from liquidations and interest accrued to this moment are included. It is the branch's live reckoning, which redemptions shrink without the captured events necessarily showing it.`,
       contract: tmContract(sym),
       via: `${LANE_VIA} · TroveManager.getLatestTroveData(): ${field}`,
       scaling,
@@ -265,8 +265,8 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       pclass: "state",
       verify: recompute("TroveManager", "getLatestTroveData"),
       summary: isBatched
-        ? `Annual interest rate — read live from the ${sym} branch's own TroveManager (getLatestTroveData(): annual interest rate) at the latest block. This Trove is a batch member, so the contract serves its batch's CURRENT rate — the rate its interest-batch manager sets for every member, which can differ from the rate on the Trove's own last recorded event.`
-        : `Annual interest rate — read live from the ${sym} branch's own TroveManager (getLatestTroveData(): annual interest rate) at the latest block. The rate the owner set with the Trove's own latest adjustment; it accrues continuously on the recorded debt.`,
+        ? `Annual interest rate. Read live from the ${sym} branch's TroveManager (getLatestTroveData(): annual interest rate) at the latest block. This Trove is a batch member, so the contract serves its batch's CURRENT rate, the rate its interest-batch manager sets for every member, which can differ from the rate on the Trove's last recorded event.`
+        : `Annual interest rate. Read live from the ${sym} branch's TroveManager (getLatestTroveData(): annual interest rate) at the latest block. The rate the owner set with the Trove's latest adjustment; it accrues continuously on the recorded debt.`,
       contract: tmContract(sym),
       via: `${LANE_VIA} · TroveManager.getLatestTroveData(): annual interest rate`,
       scaling,
@@ -275,7 +275,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain",
       pclass: "state",
       verify: recompute("TroveManager", "getCurrentICR"),
-      summary: `Collateral ratio — the TroveManager's OWN getCurrentICR at the branch's own oracle price, computed by the contract at the latest block (the arithmetic identity entireColl × price ÷ entireDebt is verified BigInt-exact by scripts/verify-liquity-forks-chain.mjs).`,
+      summary: `Collateral ratio. The TroveManager's OWN getCurrentICR at the branch's own oracle price, computed by the contract at the latest block (the arithmetic identity entireColl × price ÷ entireDebt is verified BigInt-exact by scripts/verify-liquity-forks-chain.mjs).`,
       contract: tmContract(sym),
       via: `${LANE_VIA} · TroveManager.getCurrentICR @ head`,
     }),
@@ -287,8 +287,8 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
         verify: recompute("PriceFeed", stale ? "lastGoodPrice" : "fetchPrice"),
         summary:
           (stale
-            ? `${sym} price in USD — the branch PriceFeed's lastGoodPrice: the last value a user operation fetched (the live fetchPrice simulation failed on this read). It lags between operations on a quiet branch; treat it as the protocol's most recent price, not this block's.`
-            : `${sym} price in USD — the branch's own PriceFeed, fetchPrice SIMULATED via eth_call at the latest block (the call is state-mutating on-chain, read-only under eth_call). This is the same price the branch liquidates and redeems with.`) +
+            ? `${sym} price in USD. The branch PriceFeed's lastGoodPrice; the last value a user operation fetched (the live fetchPrice simulation failed on this read). It lags between operations on a quiet branch; treat it as the protocol's most recent price, not this block's.`
+            : `${sym} price in USD. The branch's PriceFeed, fetchPrice SIMULATED via eth_call at the latest block (the call is state-mutating on-chain, read-only under eth_call). This is the same price the branch liquidates and redeems with.`) +
           (g?.sentence ?? ""),
         contract: pfContract(sym),
         via: `${LANE_VIA} · PriceFeed.${stale ? "lastGoodPrice" : "fetchPrice (simulated)"} @ head`,
@@ -300,9 +300,9 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       pclass: "state",
       verify: {
         kind: "recompute",
-        text: `Re-derive from the TroveManager (${cfg.constantsSource}) — scripts/verify-liquity-forks-chain.mjs does exactly this`,
+        text: `Re-derive from the TroveManager (${cfg.constantsSource}): scripts/verify-liquity-forks-chain.mjs does this`,
       },
-      summary: `${what} (${name}) for the ${sym} branch — the governance-set constant, chain-verified against ${cfg.constantsSource} (each branch sets its own).`,
+      summary: `${what} (${name}) for the ${sym} branch. The governance-set constant, chain-verified against ${cfg.constantsSource} (each branch sets its own).`,
       contract: tmContract(sym),
       via: `${LANE_VIA} · ${cfg.constantsSource} · ${name}`,
     }),
@@ -310,7 +310,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain-derived",
       pclass: "state",
       verify: recompute("TroveManager", "getLatestTroveData"),
-      summary: `Liquidation price — the ${sym} price at which this trove's collateral ratio hits the branch minimum: entire debt × MCR ÷ entire collateral, every input a chain read at the same block (the liquidation equation rearranged for price).`,
+      summary: `Liquidation price. The ${sym} price at which this trove's collateral ratio hits the branch minimum; entire debt × MCR ÷ entire collateral, every input a chain read at the same block (the liquidation equation rearranged for price).`,
       contract: tmContract(sym),
       via: `${LANE_VIA} · derived ratio`,
       formula: "entire debt × MCR ÷ entire collateral",
@@ -329,7 +329,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain-derived",
       pclass: "state",
       verify: recompute("TroveManager", "getEntireBranchColl / getEntireBranchDebt"),
-      summary: `The ${sym} branch's total collateral ratio — entire branch collateral × the branch's own oracle price ÷ entire branch debt, every input read at the same block. Below CCR the branch gates new borrowing; below SCR it can be shut down.`,
+      summary: `The ${sym} branch's total collateral ratio. Entire branch collateral × the branch's own oracle price ÷ entire branch debt, every input read at the same block. Below CCR the branch gates new borrowing; below SCR it can be shut down.`,
       contract: tmContract(sym),
       via: `${LANE_VIA} · derived ratio`,
       formula: "branch coll × price ÷ branch debt",
@@ -338,7 +338,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain-derived",
       pclass: "state",
       verify: recompute("SortedTroves", "getFirst/getNext + TroveManager.getLatestTroveData"),
-      summary: `${cfg.stablecoin} debt redeemed before this trove — the sum of entire debt across the ${sym} branch troves sitting at LOWER interest rates (redemptions sweep the lowest user-set rate first in this family, not the lowest collateral ratio), from a live walk of the branch's own SortedTroves in its descending-rate order. Branch-scoped: cross-branch redemption routing splits by each branch's unbacked portion, and zombie troves (outside the list) are redeemed before everything in it.`,
+      summary: `${cfg.stablecoin} debt redeemed before this trove. The sum of entire debt across the ${sym} branch troves sitting at LOWER interest rates (redemptions sweep the lowest user-set rate first in this family, not the lowest collateral ratio), from a live walk of the branch's own SortedTroves in its descending-rate order. Branch-scoped: cross-branch redemption routing splits by each branch's unbacked portion, and zombie troves (outside the list) are redeemed before everything in it.`,
       contract: {
         name: `${cfg.protocolName} ${sym} SortedTroves`,
         address: cfg.branchBySymbol[sym]?.sortedTroves ?? "",
@@ -349,7 +349,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain-derived",
       pclass: "state",
       verify: recompute("SortedTroves", "getFirst/getNext walk"),
-      summary: `Troves ahead — the number of other ${sym} branch troves sitting at a lower or equal interest rate, counted in the same live walk of the branch's SortedTroves as the debt in front. A redemption reaches them first.`,
+      summary: `Troves ahead. The number of other ${sym} branch troves sitting at a lower or equal interest rate, counted in the same live walk of the branch's SortedTroves as the debt in front. A redemption reaches them first.`,
       contract: {
         name: `${cfg.protocolName} ${sym} SortedTroves`,
         address: cfg.branchBySymbol[sym]?.sortedTroves ?? "",
@@ -361,7 +361,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain-derived",
       pclass: "state",
       verify: recompute("SortedTroves", "getFirst/getNext walk + TroveManager.getEntireBranchDebt"),
-      summary: `Share of the ${sym} branch's debt redeemed before this trove — debt in front ÷ entire branch debt, both live reads at the same block. This is the redemption runway's fill: redemptions sweep from the front of the rate-ordered queue, so a larger share is a longer runway before they reach this trove.`,
+      summary: `Share of the ${sym} branch's debt redeemed before this trove. Debt in front ÷ entire branch debt, both live reads at the same block. This is the redemption runway's fill: redemptions sweep from the front of the rate-ordered queue, so a larger share is a longer runway before they reach this trove.`,
       contract: {
         name: `${cfg.protocolName} ${sym} SortedTroves`,
         address: cfg.branchBySymbol[sym]?.sortedTroves ?? "",
@@ -376,7 +376,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
     forkUsdProv: (what, sym) => ({
       kind: "chain-derived",
       pclass: pricePclass(sym),
-      summary: `${what} valued in USD from the branch's own PriceFeed — the chain balance multiplied by the same price the branch liquidates and redeems with (fetchPrice simulated at head).`,
+      summary: `${what} valued in USD from the branch's own PriceFeed. The chain balance multiplied by the same price the branch liquidates and redeems with (fetchPrice simulated at head).`,
       contract: pfContract(sym),
       via: "chain balance × branch PriceFeed price",
       formula: "balance × oracle price",
@@ -394,7 +394,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
     debtFaceUsdProv: (what) => ({
       kind: "chain-derived",
       pclass: "state",
-      summary: `${what} valued at ${cfg.stablecoin}'s $1 redemption face — the protocol's own mechanism: any holder can redeem 1 ${cfg.stablecoin} against exactly $1 of collateral at the branch oracle price (the TroveManager's own redemption machinery, its redeemability read live). The redemption face is what the debt costs to clear, which is what a debt figure states.`,
+      summary: `${what} valued at ${cfg.stablecoin}'s $1 redemption face. The protocol's mechanism; any holder can redeem 1 ${cfg.stablecoin} against exactly $1 of collateral at the branch oracle price (the TroveManager's own redemption machinery, its redeemability read live). The redemption face is what the debt costs to clear, which is what a debt figure states.`,
       contract: { name: `${cfg.protocolName} TroveManager`, address: "" },
       via: "debt × $1 redemption face (protocol mechanism)",
       formula: "debt × 1.00",
@@ -410,7 +410,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain",
       pclass: "state",
       verify: recompute("TroveManager", getter),
-      summary: `${what} — read live from the ${sym} branch's own TroveManager (${getter}) at the latest block. The ENTIRE figure: every trove's pending redistribution gains and accrued interest are already in it.`,
+      summary: `${what}. Read live from the ${sym} branch's own TroveManager (${getter}) at the latest block. The ENTIRE figure: every trove's pending redistribution gains and accrued interest are already in it.`,
       contract: tmContract(sym),
       via: `${ROSTER_VIA} · TroveManager.${getter} @ head`,
     }),
@@ -418,7 +418,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain-derived",
       pclass: "state",
       verify: recompute("TroveManager", "getEntireBranchColl / getEntireBranchDebt"),
-      summary: `The ${sym} branch's total collateral ratio — entire branch collateral × the branch's own oracle price ÷ entire branch debt, every input read at the same block. Each branch stands alone in this family: its TCR gates only its own borrowing (below CCR) and only it can be shut down (below SCR).`,
+      summary: `The ${sym} branch's total collateral ratio. Entire branch collateral × the branch's own oracle price ÷ entire branch debt, every input read at the same block. Each branch stands alone in this family: its TCR gates only its own borrowing (below CCR) and only it can be shut down (below SCR).`,
       contract: tmContract(sym),
       via: `${ROSTER_VIA} · derived ratio`,
       formula: "branch coll × price ÷ branch debt",
@@ -441,9 +441,9 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       pclass: "state",
       verify: {
         kind: "recompute",
-        text: `Re-derive from the TroveManager (${cfg.constantsSource}) — scripts/verify-liquity-forks-chain.mjs does exactly this`,
+        text: `Re-derive from the TroveManager (${cfg.constantsSource}): scripts/verify-liquity-forks-chain.mjs does this`,
       },
-      summary: `${what} (${name}) for the ${sym} branch — the governance-set constant, chain-verified against ${cfg.constantsSource}. Each branch sets its own, which is why they differ down this column.`,
+      summary: `${what} (${name}) for the ${sym} branch. The governance-set constant, chain-verified against ${cfg.constantsSource}. Each branch sets its own, which is why they differ down this column.`,
       contract: tmContract(sym),
       via: `${ROSTER_VIA} · ${cfg.constantsSource} · ${name}`,
     }),
@@ -451,7 +451,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain",
       pclass: "state",
       verify: recompute("SortedTroves", "getSize"),
-      summary: `Troves in the ${sym} branch's redemption queue — SortedTroves.getSize at the latest block: the branch's own count of its listed troves. Zombie troves are NOT in this figure; they sit outside the list (and are counted separately here) because a partial redemption left them below the branch's minimum debt.`,
+      summary: `Troves in the ${sym} branch's redemption queue. SortedTroves.getSize at the latest block; the branch's own count of its listed troves. Zombie troves are NOT in this figure; they sit outside the list (and are counted separately here) because a partial redemption left them below the branch's minimum debt.`,
       contract: {
         name: `${cfg.protocolName} ${sym} SortedTroves`,
         address: cfg.branchBySymbol[sym]?.sortedTroves ?? "",
@@ -463,7 +463,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       pclass: "state",
       verify: recompute("TroveManager", "getTroveStatus + getTroveIdsCount/getTroveFromTroveIdsArray"),
       summary:
-        `A zombie trove — status 4 on the ${sym} branch's own TroveManager: a partial redemption left it below the branch minimum debt, so the protocol removed it from SortedTroves. While it still carries debt it is redeemed BEFORE everything in the list — a debt-bearing zombie leads the queue here; one redeemed to zero debt keeps its collateral on the branch but stands outside every redemption path. Found through the TroveManager's own trove-ids array (it enumerates every trove the branch has, listed or not) — a walk of the sorted list alone cannot see it.` +
+        `A zombie trove (status 4 on the ${sym} branch's TroveManager): a partial redemption left it below the branch minimum debt, so the protocol removed it from SortedTroves. While it still carries debt it is redeemed BEFORE everything in the list, so a debt-bearing zombie leads the queue here; one redeemed to zero debt keeps its collateral on the branch but stands outside every redemption path. Found through the TroveManager's trove-ids array (it enumerates every trove the branch has, listed or not), because a walk of the sorted list alone cannot see it.` +
         (idsCapped ? ` The enumeration is bounded on this read, so the zombie count is a floor, not a census.` : ""),
       contract: tmContract(sym),
       via: `${ROSTER_VIA} · TroveManager.getTroveIdsCount / getTroveFromTroveIdsArray + getTroveStatus @ head`,
@@ -472,7 +472,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain-derived",
       pclass: "state",
       verify: recompute("SortedTroves", "getLast/getPrev + TroveManager.getLatestTroveData"),
-      summary: `${what} ${cappedShown ? `across the first ${cappedShown} troves of the ${sym} branch's queue (the walk's bound — the branch lists more behind them, at higher rates)` : `across the ${sym} branch's listed troves`} — over the user-set rates read live from the branch's own queue at this block. Borrowers set these rates themselves, so this describes what this branch's borrowers are currently choosing to pay; it is not a protocol-set rate.`,
+      summary: `${what} ${cappedShown ? `across the first ${cappedShown} troves of the ${sym} branch's queue (the walk's bound; the branch lists more behind them, at higher rates)` : `across the ${sym} branch's listed troves`}: the user-set rates read live from the branch's queue at this block. Borrowers set these rates themselves, so this describes what this branch's borrowers are currently choosing to pay; it is not a protocol-set rate.`,
       contract: tmContract(sym),
       via: `${ROSTER_VIA} · SortedTroves tail-first walk @ head · over getLatestTroveData.annualInterestRate`,
     }),
@@ -480,7 +480,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain-derived",
       pclass: pricePclass(sym),
       verify: recompute("PriceFeed", "fetchPrice"),
-      summary: `The ${sym} branch's collateral in USD — its entire collateral multiplied by the same price the branch liquidates and redeems with (fetchPrice simulated at head).`,
+      summary: `The ${sym} branch's collateral in USD. Its entire collateral multiplied by the same price the branch liquidates and redeems with (fetchPrice simulated at head).`,
       contract: pfContract(sym),
       via: `${ROSTER_VIA} · getEntireBranchColl × PriceFeed.fetchPrice (simulated) @ head`,
       formula: "branch collateral × oracle price",

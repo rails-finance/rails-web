@@ -18,7 +18,7 @@ export function learnMoreMarkdown(c: LearnMoreContent, linksWord: string): strin
         c.detailsHeading,
         ...c.details.map(
           (d) =>
-            `- **${d.bold}** — ${
+            `- **${d.bold}**: ${
               d.sources?.length ? `${d.text.replace(/\.$/, "")} (${d.sources.map((s) => s.label).join("; ")}).` : d.text
             }`,
         ),

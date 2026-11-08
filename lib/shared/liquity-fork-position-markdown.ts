@@ -80,10 +80,10 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
   lines.push(
     `> Point-in-time snapshot generated ${fmtUtc(generatedAt.getTime() / 1000)}. ` +
       `Balances are the replayed TroveUpdated events upgraded to the branch contracts' live reads where taken ` +
-      `(getLatestTroveData: entire debt/coll incl. accrued interest and pending redistribution — redemptions can ` +
-      `shrink these between events), USD is the branch's own PriceFeed (the price it liquidates and redeems with), ` +
-      `the collateral ratio is the TroveManager's own getCurrentICR, and ${debtSymbol} debt is stated at its $1 ` +
-      `redemption face (the protocol's own mechanism). Everything drifts as the market and position change. ` +
+      `(getLatestTroveData: entire debt/coll incl. accrued interest and pending redistribution; redemptions can ` +
+      `shrink these between events), USD is the branch's PriceFeed (the price it liquidates and redeems with), ` +
+      `the collateral ratio is the TroveManager's getCurrentICR, and ${debtSymbol} debt is stated at its $1 ` +
+      `redemption face (the protocol's mechanism). Everything drifts as the market and position change. ` +
       `Not financial advice.`,
   );
   lines.push("");
@@ -104,7 +104,7 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
       lines.push(
         lastLiq
           ? `- This Trove life ended in liquidation: the final liquidate event seized its last ${amt(Number(lastLiq.context.data.collBefore) || 0)} ${coll} of collateral and cleared the ${amt(Number(lastLiq.context.data.debtBefore) || 0)} ${debtSymbol} it still owed.`
-          : `- This Trove life ended in liquidation — the branch seized its remaining collateral and cleared its remaining debt in one whole-Trove seizure.`,
+          : `- This Trove life ended in liquidation: the branch seized its remaining collateral and cleared its remaining debt in one whole-Trove seizure.`,
       );
     } else {
       lines.push(
@@ -117,7 +117,7 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
     lines.push("");
     lines.push(`- **Peak collateral:** ${amt(view.peakCollateral)} ${coll}`);
     lines.push(`- **Peak debt:** ${amt(view.peakDebt)} ${debtSymbol}`);
-    lines.push(`- Each peak is its own lifetime maximum — the two can come from different moments.`);
+    lines.push(`- Each peak is its own lifetime maximum, and the two can come from different moments.`);
     lines.push("");
   } else {
     lines.push(`## Position`);
@@ -144,7 +144,7 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
       lines.push(
         `- **Interest rate:** ${num(live.annualInterestRatePct, 2)}% annual ${
           view.isBatched
-            ? "(the batch's current rate — set by its interest-batch manager for every member)"
+            ? "(the batch's current rate, set by its interest-batch manager for every member)"
             : "(user-set, adjustable any time)"
         }`,
       );
@@ -153,28 +153,28 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
       lines.push("");
       if (live.priceUsd != null)
         lines.push(
-          `- **${coll} price:** ${usd(live.priceUsd)} — the branch's own PriceFeed${live.priceStale ? " (lastGoodPrice — the live fetch failed on this read; it lags between user operations)" : " (fetchPrice simulated at head)"}`,
+          `- **${coll} price:** ${usd(live.priceUsd)}, the branch's PriceFeed${live.priceStale ? " (lastGoodPrice; the live fetch failed on this read; it lags between user operations)" : " (fetchPrice simulated at head)"}`,
         );
       if (live.icr != null)
         lines.push(
-          `- **Collateral ratio:** ${pct(live.icr)} (the TroveManager's own getCurrentICR) vs the branch minimum ${pct(live.mcr, 0)} (MCR)`,
+          `- **Collateral ratio:** ${pct(live.icr)} (the TroveManager's getCurrentICR) vs the branch minimum ${pct(live.mcr, 0)} (MCR)`,
         );
       if (live.liqPriceUsd != null)
         lines.push(
           `- **Liquidation price:** ${usd(live.liqPriceUsd)} per ${coll} (entire debt × MCR ÷ entire collateral)` +
             (live.priceUsd != null && live.priceUsd > live.liqPriceUsd
-              ? ` — ${num((1 - live.liqPriceUsd / live.priceUsd) * 100, 0)}% below the current price`
+              ? `, ${num((1 - live.liqPriceUsd / live.priceUsd) * 100, 0)}% below the current price`
               : ""),
         );
       if (live.status === "zombie") {
         lines.push(
           live.entireDebt > 0
-            ? `- **Redemption queue:** ZOMBIE — a partial redemption left the trove below the minimum debt; it sits outside the rate-ordered queue and is redeemed FIRST when redemptions next route through this branch`
-            : `- **Redemption queue:** ZOMBIE — redemption cancelled all of its debt; it sits outside the queue with nothing left to redeem, and closing it returns its ${coll} to the owner`,
+            ? `- **Redemption queue:** ZOMBIE: a partial redemption left the trove below the minimum debt; it sits outside the rate-ordered queue and is redeemed FIRST when redemptions next route through this branch`
+            : `- **Redemption queue:** ZOMBIE: redemption cancelled all of its debt; it sits outside the queue with nothing left to redeem, and closing it returns its ${coll} to the owner`,
         );
       } else if (live.debtInFront != null) {
         lines.push(
-          `- **Redemption queue (this branch):** ${amt(live.debtInFront)} ${debtSymbol} of debt sits at the same or lower interest rate (${live.trovesAhead ?? 0} trove${(live.trovesAhead ?? 0) === 1 ? "" : "s"}) — redeemed before this one; redemptions sweep the lowest user-set rates first at $1 face`,
+          `- **Redemption queue (this branch):** ${amt(live.debtInFront)} ${debtSymbol} of debt sits at the same or lower interest rate (${live.trovesAhead ?? 0} trove${(live.trovesAhead ?? 0) === 1 ? "" : "s"}), redeemed before this one; redemptions sweep the lowest user-set rates first at $1 face`,
         );
       }
       if (live.branchTcr != null)
@@ -195,7 +195,7 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
       lines.push(
         `- **Interest rate:** ${num(view.interestRate, 2)}% annual ${
           view.isBatched
-            ? "(its batch's rate as of the trove's own last event — the interest-batch manager can have moved the batch since)"
+            ? "(its batch's rate as of the trove's last event; the interest-batch manager can have moved the batch since)"
             : "(user-set)"
         }`,
       );

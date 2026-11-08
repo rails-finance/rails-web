@@ -108,7 +108,7 @@ export function barSubjectProv(args: {
   return {
     kind: "chain",
     pclass: "indexed",
-    summary: `The contract this transaction entered — the transaction was sent to ${role}${through}.${closed}${shared}`,
+    summary: `The contract this transaction entered. The transaction was sent to ${role}${through}.${closed}${shared}`,
     contract: { name: registry?.name ?? owner?.contractName ?? subject.name, address: a },
     via: inner ? `transaction · to ${entry!.to} · first call ${a}` : "transaction · to",
     ...(txHash
