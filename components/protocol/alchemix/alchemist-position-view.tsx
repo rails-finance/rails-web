@@ -596,7 +596,7 @@ export function AlchemistPositionView({
         info: {
           kind: "offchain",
           pclass: "offchain",
-          summary: `${u.symbol}'s price — the dollar figure this asset is quoted at now.`,
+          summary: `${u.symbol}'s price. The dollar figure this asset is quoted at now.`,
           via: `${priceView.usd.priceSource} · ${priceView.usd.pricedAt}`,
           verify: { kind: "none", text: "An off-chain price, with no on-chain anchor" },
           inputs: [

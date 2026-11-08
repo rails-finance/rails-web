@@ -41,8 +41,7 @@ export function AlchemixFlowsNote({
       {facts && facts.redemptions > 0 && (
         <p>
           {n(facts.redemptions, "A line redemption", "line redemptions")} cleared debt set aside for repayment and took
-          collateral; each figure is the difference of the readings either side of it, not a figure from the
-          redemption&apos;s log.
+          collateral; each figure is the difference of the readings either side of it.
           {facts.redemptionsUnstated > 0
             ? ` ${n(facts.redemptionsUnstated, "One redemption's", "redemptions'")} figures cannot be stated, another step falling between ${facts.redemptionsUnstated === 1 ? "its" : "their"} readings, so the bars leave ${facts.redemptionsUnstated === 1 ? "it" : "them"} out.`
             : ""}

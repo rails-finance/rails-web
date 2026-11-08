@@ -123,7 +123,7 @@ const pts = (a: number) => `${a.toFixed(2)} pts`;
 /** What a figure became since the previous event: after less after then. */
 const sinceProv = (what: string): Provenance => ({
   kind: "derived",
-  summary: `${what} since the previous event — the figure once this transaction had run, less the figure once the previous transaction on this timeline had run.`,
+  summary: `${what} since the previous event. The figure once this transaction had run, less the figure once the previous transaction on this timeline had run.`,
   formula: "after − after the previous event",
 });
 
@@ -131,7 +131,7 @@ const sinceProv = (what: string): Provenance => ({
 const atBlockUsdProv = (sym: string, what: string, amount: string, price: number): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `${what}, in US dollars — the amount times the oracle's price for ${sym} at this block.`,
+  summary: `${what}, in US dollars. The amount times the oracle's price for ${sym} at this block.`,
   formula: "amount × price",
   inputs: [
     { label: "amount", value: `${amount} ${sym}`, kind: "chain-derived", pclass: "indexed" },
@@ -254,7 +254,7 @@ function sheetSide(
               info: {
                 kind: "chain-derived",
                 pclass: "oracle",
-                summary: `Interest on the ${side} since the previous event, in US dollars — every reserve's interest at its oracle price at this block, added up.`,
+                summary: `Interest on the ${side} since the previous event, in US dollars. Every reserve's interest at its oracle price at this block, added up.`,
                 formula: "Σ interest × price",
               },
             }
@@ -277,7 +277,7 @@ function sheetSide(
             info: {
               kind: "chain-derived",
               pclass: "oracle",
-              summary: `Market move on the ${side} since the previous event — the Pool's total before this transaction, less its total once the previous transaction had run and the interest since, all in US dollars: the change the oracle's prices made to the balances held between the two. No token moved.`,
+              summary: `Market move on the ${side} since the previous event. The Pool's total before this transaction, less its total once the previous transaction had run and the interest since, all in US dollars: the change the oracle's prices made to the balances held between the two. No token moved.`,
               formula: "before this event − last event − interest since",
               inputs: held.flatMap((r) => {
                 const sym = reserveSymbol(r);
@@ -447,7 +447,7 @@ export function aaveFamilySheet({
   const dropProv: Provenance = {
     kind: "chain-derived",
     summary:
-      "Collateral can fall — how far the collateral's total value can fall, the debt's value held, before the health factor reaches 1 and the position can be liquidated: one less one over the health factor after this transaction.",
+      "Collateral can fall. How far the collateral's total value can fall, the debt's value held, before the health factor reaches 1 and the position can be liquidated; one less one over the health factor after this transaction.",
     formula: "1 − 1 ÷ health factor",
     inputs: [{ label: "health factor", value: hfFig.text, kind: "chain-derived", pclass: "state" }],
   };

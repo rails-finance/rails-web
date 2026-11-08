@@ -50,7 +50,7 @@ const SNAPSHOT_USD_PROV = usdProv("The after-balance", {
 });
 const RATIO_PROV: Provenance = {
   kind: "derived",
-  summary: "Collateral-to-debt ratio at this event — the snapshot collateral USD divided by the snapshot debt USD.",
+  summary: "Collateral-to-debt ratio at this event. The snapshot collateral USD divided by the snapshot debt USD.",
   via: "collateral USD ÷ debt USD",
   formula: "Σ(collateral × price) ÷ Σ(debt × price)",
 };
