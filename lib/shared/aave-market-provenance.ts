@@ -56,8 +56,9 @@ export interface AaveMarketVocab {
   reserveCountProv: () => Provenance;
   /** One reserve's supplied / borrowed value in USD. */
   reserveValueProv: (side: "supplied" | "borrowed", symbol: string) => Provenance;
-  /** One reserve's supplied less its borrowed, from the two figures beside it. */
-  reserveAvailableProv: (symbol: string, priced: boolean) => Provenance;
+  /** One reserve's available underlying: the Pool's virtual balance where it
+   *  has one (v3.3+), else supplied less borrowed. */
+  reserveAvailableProv: (symbol: string, a: { priced: boolean; basis: "virtual" | "difference" }) => Provenance;
   /** One reserve's liquidation threshold. */
   reserveLtProv: (symbol: string) => Provenance;
   /** The threshold an efficiency-mode category lends this reserve, in place of
@@ -195,30 +196,54 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
         },
       ],
     }),
-    reserveAvailableProv: (symbol, priced) => ({
-      kind: "chain-derived",
-      pclass: priced ? "oracle" : "state",
-      source: { block: coords.blockNumber },
-      summary: `${symbol} available. Supplied less borrowed${atBlock(coords)}: the reserve's aToken totalSupply less its variable-debt totalSupply${priced ? ", each valued at the market's IAaveOracle price" : ", in tokens"}. The two figures beside it on this row; the subtraction is ours.`,
-      contract: poolContract(coords),
-      via: `${cfg.lane} · aToken totalSupply − variableDebtToken totalSupply${priced ? " × IAaveOracle price" : ""} @ head`,
-      formula: "supplied − borrowed",
-      inputs: [
-        { label: "supplied", kind: "chain", pclass: "state", note: "aToken totalSupply @ head" },
-        { label: "borrowed", kind: "chain", pclass: "state", note: "variableDebtToken totalSupply @ head" },
-        ...(priced
-          ? [
-              {
-                label: "oracle price",
-                kind: "chain-derived" as const,
-                pclass: "oracle" as const,
-                contract: oracleContract(coords),
-                note: "IAaveOracle.getAssetPrice @ head",
-              },
-            ]
-          : []),
-      ],
-    }),
+    reserveAvailableProv: (symbol, { priced, basis }) => {
+      const oracleLeg = {
+        label: "oracle price",
+        kind: "chain-derived" as const,
+        pclass: "oracle" as const,
+        contract: oracleContract(coords),
+        note: "IAaveOracle.getAssetPrice @ head",
+      };
+      if (basis === "virtual")
+        return {
+          kind: priced ? "chain-derived" : "chain",
+          pclass: priced ? "oracle" : "state",
+          source: { block: coords.blockNumber },
+          ...(priced ? {} : { verify: recompute("Pool.getVirtualUnderlyingBalance", coords) }),
+          summary: `${symbol} available. Pool.getVirtualUnderlyingBalance(asset)${atBlock(coords)}: the underlying the Pool holds for this reserve, what suppliers can withdraw and borrowers can take${priced ? ", valued at the market's IAaveOracle price" : ", in tokens"}. A deficit written off in a liquidation leaves it below supplied − borrowed.`,
+          contract: poolContract(coords),
+          via: `${cfg.lane} · Pool.getVirtualUnderlyingBalance(asset)${priced ? " × IAaveOracle price" : ""} @ head`,
+          ...(priced
+            ? {
+                formula: "virtual balance × oracle price",
+                inputs: [
+                  {
+                    label: "virtual balance",
+                    kind: "chain" as const,
+                    pclass: "state" as const,
+                    contract: poolContract(coords),
+                    note: "Pool.getVirtualUnderlyingBalance(asset) @ head",
+                  },
+                  oracleLeg,
+                ],
+              }
+            : {}),
+        };
+      return {
+        kind: "chain-derived",
+        pclass: priced ? "oracle" : "state",
+        source: { block: coords.blockNumber },
+        summary: `${symbol} available. Supplied less borrowed${atBlock(coords)}: the reserve's aToken totalSupply less its variable-debt totalSupply${priced ? ", each valued at the market's IAaveOracle price" : ", in tokens"}. Supplied − borrowed; this Pool has no virtual balance (Pool.getVirtualUnderlyingBalance arrived in v3.3).`,
+        contract: poolContract(coords),
+        via: `${cfg.lane} · aToken totalSupply − variableDebtToken totalSupply${priced ? " × IAaveOracle price" : ""} @ head`,
+        formula: "supplied − borrowed",
+        inputs: [
+          { label: "supplied", kind: "chain", pclass: "state", note: "aToken totalSupply @ head" },
+          { label: "borrowed", kind: "chain", pclass: "state", note: "variableDebtToken totalSupply @ head" },
+          ...(priced ? [oracleLeg] : []),
+        ],
+      };
+    },
     reserveLtProv: (symbol) => ({
       kind: "chain",
       pclass: "state",

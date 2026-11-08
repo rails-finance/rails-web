@@ -15,7 +15,8 @@
 //      sort select in place of the headers. Rows are unlinked: a reserve has no
 //      page of its own.
 //
-// Available is supplied less borrowed, from the row's two receipted sizes.
+// Available is the Pool's virtual balance on a v3.3+ Pool
+// (Pool.getVirtualUnderlyingBalance), else supplied less borrowed.
 // Collateral is "LTV / LT", or "Not collateral" at a loan-to-value of 0 ("eMode
 // only" where an eMode category lends one). The bar is <RatioBar> on the
 // UTILISATION axis, its one tick the rate model's kink.
@@ -313,6 +314,10 @@ function UtilBar({ r }: { r: MarketReserveRow }) {
   );
 }
 
+/** A reserve's available underlying, token units: the Pool's virtual balance
+ *  where it has one, else supplied less borrowed. */
+const availableTokens = (r: MarketReserveRow) => r.virtualBalance ?? Math.max(0, r.supplied - r.borrowed);
+
 type RowProps = {
   r: MarketReserveRow;
   vocab: AaveMarketVocab;
@@ -356,15 +361,19 @@ function sizes({ r, vocab, assetHref }: RowProps) {
       </span>
     )
   ) : null;
-  // Available: supplied less borrowed, in the unit the row's sizes are in.
-  const availUsd = Math.max(0, r.suppliedUsd - r.borrowedUsd);
-  const availTokens = Math.max(0, r.supplied - r.borrowed);
+  // Available: the Pool's virtual balance where it has one (v3.3+), else
+  // supplied less borrowed, in the unit the row's sizes are in.
+  const availTokens = availableTokens(r);
+  const basis = r.virtualBalance != null ? "virtual" : "difference";
+  const availUsd = r.priceUsd != null ? availTokens * r.priceUsd : 0;
   const available =
     fixed && r.supplied > 0 ? (
-      <Prov info={vocab.reserveAvailableProv(r.symbol, false)}>{inTokens(availTokens)}</Prov>
+      <span data-available-basis={basis}>
+        <Prov info={vocab.reserveAvailableProv(r.symbol, { priced: false, basis })}>{inTokens(availTokens)}</Prov>
+      </span>
     ) : (
-      <span className={availUsd > 0 ? "text-foreground/80" : "text-rb-500"}>
-        <Prov info={vocab.reserveAvailableProv(r.symbol, true)}>{fmtUsd(availUsd).display}</Prov>
+      <span className={availUsd > 0 ? "text-foreground/80" : "text-rb-500"} data-available-basis={basis}>
+        <Prov info={vocab.reserveAvailableProv(r.symbol, { priced: true, basis })}>{fmtUsd(availUsd).display}</Prov>
       </span>
     );
   const supplyRate =
@@ -568,7 +577,7 @@ function ReserveRow(props: RowProps) {
         <DataTableCell
           align="right"
           className="tabular-nums text-[13px]"
-          title="Supplied less borrowed"
+          title={r.virtualBalance != null ? "The Pool's virtual balance of this reserve" : "Supplied less borrowed"}
           label="Available"
           data-available=""
         >
@@ -638,7 +647,8 @@ const RF_TIP = "The share of the interest borrowers pay that the protocol keeps;
 
 /** What a column header stands for, in its tip. */
 const HEADER_TIP: Partial<Record<SortKey, string>> = {
-  available: "Available: supplied less borrowed, what suppliers can withdraw and borrowers can still take",
+  available:
+    "Available: the underlying the Pool holds for this reserve, what suppliers can withdraw and borrowers can still take (supplied less borrowed on a Pool before v3.3)",
   collateral:
     "Collateral: loan-to-value / liquidation threshold, the most a wallet can borrow against this reserve and the ratio past which a position holding it can be liquidated",
   util: "Utilisation: the share of the reserve's supply that is on loan; the tick is the rate model's kink",
@@ -710,8 +720,8 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
           return a.borrowedUsd - b.borrowedUsd || a.borrowed - b.borrowed;
         case "available":
           return (
-            a.suppliedUsd - a.borrowedUsd - (b.suppliedUsd - b.borrowedUsd) ||
-            a.supplied - a.borrowed - (b.supplied - b.borrowed)
+            availableTokens(a) * (a.priceUsd ?? 0) - availableTokens(b) * (b.priceUsd ?? 0) ||
+            availableTokens(a) - availableTokens(b)
           );
         case "supplyRate":
           return a.supplyApr - b.supplyApr;

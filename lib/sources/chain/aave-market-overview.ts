@@ -5,7 +5,8 @@
 // own reserve roster (getReservesList), each reserve's getReserveData (rates,
 // config bits, token addresses), the aToken / variableDebtToken totalSupply
 // (market size + utilisation), the market's IAaveOracle price, each reserve's
-// normalized income (the supply-cap check's index), each rate strategy's kink,
+// normalized income (the supply-cap check's index), its virtual underlying
+// balance where the Pool has one (v3.3+), each rate strategy's kink,
 // and on SparkLend the CapAutomator's maximum caps — a handful of multicall
 // bursts at the live head.
 //
@@ -41,6 +42,14 @@ const POOL_ABI = parseAbi([
   "function getReserveData(address asset) view returns ((uint256 configuration, uint128 liquidityIndex, uint128 currentLiquidityRate, uint128 variableBorrowIndex, uint128 currentVariableBorrowRate, uint128 currentStableBorrowRate, uint40 lastUpdateTimestamp, uint16 id, address aTokenAddress, address stableDebtTokenAddress, address variableDebtTokenAddress, address interestRateStrategyAddress, uint128 accruedToTreasury, uint128 unbacked, uint128 isolationModeTotalDebt))",
   "function getReserveNormalizedIncome(address asset) view returns (uint256)",
 ]);
+// The underlying a reserve holds on a v3.3+ Pool: its virtual balance
+// (Pool.getVirtualUnderlyingBalance), the cash the Pool counts as withdrawable
+// or borrowable. A deficit left by a liquidation (DeficitCreated) burns the
+// debt without returning the cash, so supplied − borrowed overstates it. Whether
+// a Pool has the getter is asked of the Pool: on an earlier Pool the call
+// reverts, the reserve carries no virtual balance, and its available figure
+// falls back to supplied − borrowed.
+const VIRTUAL_ABI = parseAbi(["function getVirtualUnderlyingBalance(address asset) view returns (uint128)"]);
 // The rate model's kink — the utilisation at which the borrow-rate curve turns
 // steep. Two generations again: the V3.2+ strategy is one contract serving every
 // reserve and answers per asset; the V3.0/3.1 strategy is one contract per
@@ -385,6 +394,15 @@ async function readMarket(src: AaveMarketSource, clientOf: () => PublicClient): 
                 args: [a as `0x${string}`],
               }) as const,
           ),
+          ...reserves.map(
+            (a) =>
+              ({
+                address: poolAddr,
+                abi: VIRTUAL_ABI,
+                functionName: "getVirtualUnderlyingBalance",
+                args: [a as `0x${string}`],
+              }) as const,
+          ),
           ...(automatorAddr
             ? (["supplyCapConfigs", "borrowCapConfigs"] as const).flatMap((fn) =>
                 reserves.map(
@@ -406,6 +424,7 @@ async function readMarket(src: AaveMarketSource, clientOf: () => PublicClient): 
     const data = new Map<string, ReserveData>();
     const priceOf = new Map<string, number>();
     const incomeOf = new Map<string, bigint>();
+    const virtualOf = new Map<string, bigint>();
     const automatorMax = new Map<string, { supply: number | null; borrow: number | null }>();
     const n = reserves.length;
     // An automator answer of max 0 means "no config" — the live cap stands.
@@ -424,7 +443,9 @@ async function readMarket(src: AaveMarketSource, clientOf: () => PublicClient): 
       }
       const iRes = mixed[2 * n + i];
       if (iRes?.status === "success" && iRes.result != null) incomeOf.set(addr, iRes.result as bigint);
-      if (automatorAddr) automatorMax.set(addr, { supply: maxOf(mixed[3 * n + i]), borrow: maxOf(mixed[4 * n + i]) });
+      const vRes = mixed[3 * n + i];
+      if (vRes?.status === "success" && vRes.result != null) virtualOf.set(addr, vRes.result as bigint);
+      if (automatorAddr) automatorMax.set(addr, { supply: maxOf(mixed[4 * n + i]), borrow: maxOf(mixed[5 * n + i]) });
     });
 
     // Phase 2 — market size: aToken + variableDebtToken totalSupply per reserve,
@@ -507,6 +528,7 @@ async function readMarket(src: AaveMarketSource, clientOf: () => PublicClient): 
             ? "OPTIMAL_USAGE_RATIO"
             : null;
       const kinkRaw = kinkMethod ? (kinkRes!.result as bigint) : null;
+      const virtualRaw = virtualOf.get(addr);
 
       out.push({
         address: addr,
@@ -526,6 +548,7 @@ async function readMarket(src: AaveMarketSource, clientOf: () => PublicClient): 
         supplyCapMax: automatorMax.get(addr)?.supply ?? null,
         borrowCapMax: automatorMax.get(addr)?.borrow ?? null,
         accruedToTreasury: treasury,
+        virtualBalance: virtualRaw != null ? scaleRaw(virtualRaw, decimals) : null,
         liquidationBonus: bonusBps > PRECISION_BPS ? (bonusBps - PRECISION_BPS) / PRECISION_BPS : null,
         bps: { ltv: ltvBps, lt: ltBps, bonus: bonusBps },
         siloed: bitSet(config, 62),

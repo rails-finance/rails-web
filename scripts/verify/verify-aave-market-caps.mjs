@@ -34,11 +34,19 @@
 //      in its Collateral cell; one with an eMode loan-to-value reads "eMode
 //      only"; one with an LTV reads "LTV% / LT%".
 //   9. No non-zero rate reads 0.00% (each page).
+//  10. Available's receipt names the formula that applies (each page): every
+//      row's basis (`data-available-basis`) is "virtual" where the route
+//      carries the Pool's virtual balance and "difference" where it does not,
+//      and the first row's receipt, opened in the inspector, names
+//      Pool.getVirtualUnderlyingBalance or "supplied − borrowed; this Pool has
+//      no virtual balance" to match. On Core, WETH's Available is its virtual
+//      balance at the oracle price.
 //
 // Run:
 //   BASE=http://localhost:3000 node scripts/verify/verify-aave-market-caps.mjs
 
 import { chromium } from "playwright";
+import { armInspector } from "./lib/prov-inspector.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
@@ -232,6 +240,67 @@ for (const p of PAGES) {
       const t = await collText(lends.address);
       const want = `${(lends.bps.ltv / 100).toFixed(2).replace(/\.?0+$/, "")}% / ${(lends.bps.lt / 100).toFixed(2).replace(/\.?0+$/, "")}%`;
       check(`core 8c ${lends.symbol} reads LTV / LT`, t === want, `"${t}" vs "${want}"`);
+    }
+  }
+  // ── 10. Available names its formula ────────────────────────────────────
+  {
+    const bases = await wide.evaluate(() =>
+      Object.fromEntries(
+        [...document.querySelectorAll("tr[data-reserve-row]")].map((tr) => [
+          tr.getAttribute("data-reserve-row"),
+          tr.querySelector("[data-available-basis]")?.getAttribute("data-available-basis") ?? null,
+        ]),
+      ),
+    );
+    const wrong = rows.filter((r) => bases[r.address] !== (r.virtualBalance != null ? "virtual" : "difference"));
+    const virtual = rows.filter((r) => r.virtualBalance != null).length;
+    check(
+      `${p.name} 10a every row's Available basis matches the Pool (${virtual} of ${rows.length} virtual)`,
+      wrong.length === 0,
+      wrong
+        .slice(0, 3)
+        .map((r) => `${r.symbol} ${bases[r.address]}`)
+        .join("; "),
+    );
+    const first = rows.find((r) => r.address === Object.keys(bases)[0]);
+    const want =
+      first?.virtualBalance != null
+        ? /Pool\.getVirtualUnderlyingBalance\(asset\) at block \d+/
+        : /supplied − borrowed; this Pool has no virtual balance/i;
+    let text = "";
+    if (await armInspector(wide)) {
+      await wide
+        .locator("tr[data-reserve-row]")
+        .first()
+        .locator("[data-available-basis] [data-prov-pickable]")
+        .first()
+        .click();
+      await wide.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
+      text = norm(
+        await wide
+          .locator(".prov-inspect-pop")
+          .first()
+          .innerText()
+          .catch(() => ""),
+      );
+      await wide.keyboard.press("Escape");
+    }
+    check(`${p.name} 10b ${first?.symbol} Available receipt names its formula`, want.test(text), text.slice(0, 140));
+    if (p.name === "core") {
+      const weth = rows.find((r) => r.symbol === "WETH");
+      const shown = await wide
+        .locator(`tr[data-reserve-row="${weth?.address}"] [data-available-basis]`)
+        .innerText()
+        .catch(() => "");
+      const m = /\$([\d.,]+)([KMB]?)/.exec(shown);
+      const usd = m ? Number(m[1].replace(/,/g, "")) * { "": 1, K: 1e3, M: 1e6, B: 1e9 }[m[2]] : NaN;
+      const vbUsd = (weth?.virtualBalance ?? NaN) * (weth?.priceUsd ?? NaN);
+      const diffUsd = ((weth?.supplied ?? 0) - (weth?.borrowed ?? 0)) * (weth?.priceUsd ?? 0);
+      check(
+        "core 10c WETH Available is its virtual balance",
+        Math.abs(usd - vbUsd) / vbUsd < 0.01,
+        `shown ${shown}; virtual $${(vbUsd / 1e6).toFixed(1)}M; supplied − borrowed $${(diffUsd / 1e6).toFixed(1)}M`,
+      );
     }
   }
   await wide.close();

@@ -67,6 +67,11 @@ export interface AaveMarketReserve {
   /** The treasury's share not yet minted as aTokens, token units. The Pool's
    *  supply-cap check adds it to the aToken supply. */
   accruedToTreasury?: number;
+  /** The reserve's virtual underlying balance on a v3.3+ Pool
+   *  (Pool.getVirtualUnderlyingBalance), token units: the cash it holds for
+   *  withdrawals and new borrowing. Null where the Pool has no such getter or
+   *  the reserve keeps no virtual accounting. */
+  virtualBalance?: number | null;
   /** Liquidation bonus as the extra fraction a liquidator receives (0.05 =
    *  5%); null when the reserve carries none. */
   liquidationBonus?: number | null;
