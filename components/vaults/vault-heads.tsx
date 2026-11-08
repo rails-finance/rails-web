@@ -22,6 +22,7 @@ import type { VaultFamily } from "@/lib/vaults/families";
 import { changeText, jumpTail, measuredYield, yieldText, type VaultYield } from "@/lib/vaults/yield";
 import { vaultHoldersProv, vaultWithdrawableProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
 import { illiquidSentence, type VaultIlliquid } from "@/lib/vaults/illiquid";
+import { heldAssetsRaw } from "@/lib/vaults/lost-assets";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -30,6 +31,10 @@ export interface VaultRowReceipts {
   name?: Provenance;
   totalAssets?: Provenance;
   sharePrice?: Provenance;
+  /** The Total assets caution's two figures (ui-jobs 543): `lostAssets()` and
+   *  what the vault holds. */
+  lostAssets?: Provenance;
+  heldAssets?: Provenance;
   standing?: Partial<Record<VaultStanding, Provenance>>;
 }
 
@@ -39,6 +44,7 @@ export const STANDING_WORD: Record<VaultStanding, string> = {
   paused: "paused",
   "address-book": "in Aave’s address book",
   illiquid: "illiquid",
+  "lost-assets": "lost assets",
 };
 
 const VENUE: Record<VaultFamily, VaultVenue> = {
@@ -162,6 +168,37 @@ export function IlliquidCaution({ vault: v, il, detail }: { vault: VaultSummary;
   );
 }
 
+/** The Total assets slot's caution on a vault whose total includes lost assets
+ *  (ui-jobs 543): what was lost and what the vault holds, at the read block.
+ *  `detail` prints the full figures with their receipts; the row, the compact
+ *  form. The words are lib/vaults/lost-assets.ts `lostAssetsSentence`. */
+export function LostAssetsCaution({
+  vault: v,
+  receipts,
+  detail,
+}: {
+  vault: VaultSummary;
+  receipts: VaultRowReceipts;
+  detail: boolean;
+}) {
+  if (!v.totalAssets || !v.lostAssets) return null;
+  const d = v.asset.decimals;
+  const heldRaw = heldAssetsRaw(v.totalAssets.raw, v.lostAssets.raw).toString();
+  const held = { raw: heldRaw, value: Number(heldRaw) / 10 ** d };
+  const text = (a: { raw: string; value: number }) => (detail ? assetText(a, d) : formatCompact(a.value));
+  return (
+    <span className="block" data-total-assets-lost="">
+      Includes{" "}
+      <span data-lost-assets={v.lostAssets.raw}>
+        {detail ? withProv(receipts.lostAssets, text(v.lostAssets)) : text(v.lostAssets)}
+      </span>{" "}
+      {v.asset.symbol} lost at block {n(v.readAt.block)}. The vault holds{" "}
+      <span data-held-assets={heldRaw}>{detail ? withProv(receipts.heldAssets, text(held)) : text(held)}</span>{" "}
+      {v.asset.symbol}; the share price has not been lowered for the loss, so the holders who withdraw last carry it.
+    </span>
+  );
+}
+
 /** The four headlines. `detail`: the card, which prints the print rules' full
  *  figures and gives every label its read-more; else the row's compact form. */
 type MeasuredYield = Extract<VaultYield, { yearly: number }>;
@@ -222,6 +259,9 @@ export function vaultHeads({
           </InAsset>
         </span>
       ) : null,
+      ...(v.standing.includes("lost-assets")
+        ? { sub: <LostAssetsCaution vault={v} receipts={receipts} detail={detail} /> }
+        : {}),
     },
     {
       id: "share-price",
