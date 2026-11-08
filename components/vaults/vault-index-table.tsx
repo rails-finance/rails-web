@@ -28,7 +28,7 @@
 // The whole row links the vault's page (the name is the one focusable link).
 // BELOW sm each row reads as a card (D6): the protocol's hue as its left edge,
 // the mark and chain beside the asset's icon, the name across, the figures
-// two by two under their labels; a select and a direction button sort.
+// two by two under their labels; the toolbar sorts (N1.3, `useVaultIndexSort`).
 
 import Link from "next/link";
 import { useCallback, type ReactNode } from "react";
@@ -179,6 +179,44 @@ function InAsset({ v, children, ...rest }: { v: VaultSummary; children: ReactNod
 /** A standing pill on a row, on the table's pill ground. */
 const PILL = `${DATA_TABLE_PILL} px-1.5 py-0.5 text-[11px]`;
 
+/** The index's sort, in `?sort=` and `?dir=`, each written only off its
+ *  default: read by the table's headers and by the toolbar's sort below sm. */
+export function useVaultIndexSort(initialSearch: string) {
+  const sp = useUrlSearchParams(initialSearch);
+  const sortParam = sp.get("sort");
+  const sort: SortKey = COLUMNS.some((c) => c.key === sortParam) ? (sortParam as SortKey) : DEFAULT_SORT;
+  const column = COLUMNS.find((c) => c.key === sort)!;
+  const dirParam = sp.get("dir");
+  const dir: "asc" | "desc" = dirParam === "asc" || dirParam === "desc" ? dirParam : column.first;
+
+  const writeSort = useCallback((key: SortKey, nextDir: "asc" | "desc") => {
+    const col = COLUMNS.find((c) => c.key === key)!;
+    const p = new URLSearchParams(window.location.search);
+    if (key === DEFAULT_SORT) p.delete("sort");
+    else p.set("sort", key);
+    if (nextDir === col.first) p.delete("dir");
+    else p.set("dir", nextDir);
+    const qs = p.toString().replace(/%2C/gi, ",");
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+    notifyUrlChanged();
+  }, []);
+  /** A header's press: the same key flips, another key takes its first direction. */
+  const press = (key: SortKey) =>
+    writeSort(key, key === sort ? (dir === "asc" ? "desc" : "asc") : COLUMNS.find((c) => c.key === key)!.first);
+
+  /** The toolbar's sort below sm: a new key takes its first direction. */
+  const mobileSort = {
+    options: COLUMNS.map((c) => ({ value: c.key, label: c.label })),
+    sortBy: sort as string,
+    sortOrder: dir,
+    onChange: (key: string, order: "asc" | "desc") => {
+      const k = key as SortKey;
+      writeSort(k, k === sort ? order : COLUMNS.find((c) => c.key === k)!.first);
+    },
+  };
+  return { sort, dir, press, mobileSort };
+}
+
 export function VaultIndexTable({
   rows,
   part,
@@ -201,28 +239,7 @@ export function VaultIndexTable({
   holdersHrefOf: (v: VaultSummary) => string | null;
   hooksOf: (v: VaultSummary) => Record<string, string>;
 }) {
-  const sp = useUrlSearchParams(initialSearch);
-  const sortParam = sp.get("sort");
-  const sort: SortKey = COLUMNS.some((c) => c.key === sortParam) ? (sortParam as SortKey) : DEFAULT_SORT;
-  const column = COLUMNS.find((c) => c.key === sort)!;
-  const dirParam = sp.get("dir");
-  const dir: "asc" | "desc" = dirParam === "asc" || dirParam === "desc" ? dirParam : column.first;
-
-  /** Writes the sort to the URL, each param only off its default. */
-  const writeSort = useCallback((key: SortKey, nextDir: "asc" | "desc") => {
-    const col = COLUMNS.find((c) => c.key === key)!;
-    const p = new URLSearchParams(window.location.search);
-    if (key === DEFAULT_SORT) p.delete("sort");
-    else p.set("sort", key);
-    if (nextDir === col.first) p.delete("dir");
-    else p.set("dir", nextDir);
-    const qs = p.toString().replace(/%2C/gi, ",");
-    window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
-    notifyUrlChanged();
-  }, []);
-  /** A header's press: the same key flips, another key takes its first direction. */
-  const press = (key: SortKey) =>
-    writeSort(key, key === sort ? (dir === "asc" ? "desc" : "asc") : COLUMNS.find((c) => c.key === key)!.first);
+  const { sort, dir, press } = useVaultIndexSort(initialSearch);
 
   // A figure on total assets under the dust floor is too small to measure.
   const measuredOf = (v: VaultSummary) => measuredYield(yieldOf(v), v.totalAssets?.raw);
@@ -258,47 +275,13 @@ export function VaultIndexTable({
 
   return (
     <div data-vault-table={part} data-anatomy="V6">
-      {/* Below sm the header row is hidden (D6): the sort is a select and a
-          direction button, writing the same params; the funded table's
-          control sorts both tables. */}
-      {part === "funded" && (
-        <div className="mb-3 sm:hidden" data-mobile-sort="">
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 text-[12px] text-rb-500">
-              Sort by
-              <select
-                value={sort}
-                onChange={(e) => {
-                  const key = e.target.value as SortKey;
-                  writeSort(key, COLUMNS.find((c) => c.key === key)!.first);
-                }}
-                className="rounded-md border border-rb-200 bg-background px-2 py-1 text-base text-foreground dark:border-rb-700"
-                aria-describedby={SORT_NOTE[sort] ? `${part}-mobile-sort-note` : undefined}
-              >
-                {COLUMNS.map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              onClick={() => writeSort(sort, dir === "asc" ? "desc" : "asc")}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-rb-200 px-2 py-1 text-[12px] text-foreground focus-ring dark:border-rb-700"
-              aria-label={dir === "asc" ? "Ascending; switch to descending" : "Descending; switch to ascending"}
-              data-mobile-sort-dir={dir}
-            >
-              <span aria-hidden>{dir === "asc" ? "▲" : "▼"}</span>
-              {column.numeric ? (dir === "asc" ? "Low first" : "High first") : dir === "asc" ? "A to Z" : "Z to A"}
-            </button>
-          </div>
-          {SORT_NOTE[sort] && (
-            <p id={`${part}-mobile-sort-note`} className="mt-1.5 text-[12px] text-rb-500" data-mobile-sort-note="">
-              {SORT_NOTE[sort]}
-            </p>
-          )}
-        </div>
+      {/* Below sm the header row is hidden (D6) and the toolbar's sort
+          (`vaultIndexMobileSort`) writes the same params; the chosen sort's
+          note stands here, where no header carries it. */}
+      {part === "funded" && SORT_NOTE[sort] && (
+        <p className="mb-3 text-[12px] text-rb-500 sm:hidden" data-mobile-sort-note="">
+          {SORT_NOTE[sort]}
+        </p>
       )}
       <DataTable
         caption={`${part === "funded" ? "Vaults" : "Vaults that hold nothing"}; total assets and share price are in each vault’s asset`}

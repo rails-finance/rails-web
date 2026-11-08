@@ -52,6 +52,8 @@ export function MapleListing({ initialItems, initialTotal, initialKey, initialSe
             data: r.data,
             total: r.pagination.total,
           })),
+        fetchCount: (filters) =>
+          fetchMaplePositions({ ...mapleFiltersToFetchParams(filters, 1), limit: 1 }).then((r) => r.pagination.total),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

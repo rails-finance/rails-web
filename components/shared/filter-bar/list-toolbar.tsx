@@ -37,14 +37,23 @@ export interface ListToolbarProps<F extends BaseListFilters> {
   /** The ⋮ at the row's right end (N1.7): save this view, copy its link
    *  (ui-jobs 521). The chain-truth listings draw it. */
   viewMenu?: boolean;
-  /** Below sm, the facets as a Filters button opening a full-screen sheet
-   *  (`./filter-sheet`, ui-jobs 544) in place of the row of group buttons.
-   *  Above sm nothing changes. */
-  mobileSheet?: boolean;
+  /** The sheet's figure and noun ("Show 80 funded vaults") where the page
+   *  draws its own `countNode` in place of `count`. */
+  sheetCount?: { total: number; noun: string };
+  /** A sort drawn below sm only, for a listing whose table sorts by its
+   *  headers above sm and stacks as cards (D6) below it. */
+  mobileSort?: {
+    options: SortOption[];
+    sortBy: string;
+    sortOrder: "asc" | "desc";
+    onChange: (sortBy: string, sortOrder: "asc" | "desc") => void;
+  };
   /** True while the listing re-reads after a change; the sheet's count waits. */
   countPending?: boolean;
   /** The count a staged selection in the sheet would give. */
   countFor?: (draft: F) => number | Promise<number>;
+  /** The sheet's noun for a draft, where the selection names it. */
+  nounFor?: (draft: F) => string;
 }
 
 export function ListToolbar<F extends BaseListFilters>({
@@ -57,9 +66,11 @@ export function ListToolbar<F extends BaseListFilters>({
   countNode,
   skel = "listing-toolbar",
   viewMenu = false,
-  mobileSheet = false,
+  sheetCount,
+  mobileSort,
   countPending = false,
   countFor,
+  nounFor,
 }: ListToolbarProps<F>) {
   // Inert until this strip's handlers are attached — including the search box,
   // which pre-hydration accepts typing into a value React then overwrites from
@@ -86,25 +97,22 @@ export function ListToolbar<F extends BaseListFilters>({
           size="sm"
           anatomy="N1.1 H15"
           inputRef={searchRef}
-          className={`flex-1 min-w-[200px] ${mobileSheet ? "max-sm:basis-full" : ""}`}
+          className="flex-1 min-w-[200px] max-sm:basis-full"
         />
-        {mobileSheet ? (
-          <>
-            <FilterSheet
-              dimensions={dimensions}
-              filters={filters}
-              onChange={onChange}
-              count={count}
-              countPending={countPending}
-              countFor={countFor}
-            />
-            <div className="contents max-sm:hidden">
-              <FilterSections dimensions={dimensions} filters={filters} onChange={onChange} />
-            </div>
-          </>
-        ) : (
+        {/* Below sm the facets are one Filters button opening the sheet
+            (ui-jobs 544); from sm, the row of group buttons. */}
+        <FilterSheet
+          dimensions={dimensions}
+          filters={filters}
+          onChange={onChange}
+          count={count ?? sheetCount}
+          countPending={countPending}
+          countFor={countFor}
+          nounFor={nounFor}
+        />
+        <div className="contents max-sm:hidden">
           <FilterSections dimensions={dimensions} filters={filters} onChange={onChange} />
-        )}
+        </div>
         {sortOptions.length > 0 && (
           <SortControl
             options={sortOptions}
@@ -112,6 +120,16 @@ export function ListToolbar<F extends BaseListFilters>({
             sortOrder={filters.sortOrder}
             onChange={(sortBy, sortOrder) => onChange({ ...filters, sortBy, sortOrder })}
           />
+        )}
+        {mobileSort && (
+          <div className="contents sm:hidden" data-toolbar-mobile-sort="">
+            <SortControl
+              options={mobileSort.options}
+              sortBy={mobileSort.sortBy}
+              sortOrder={mobileSort.sortOrder}
+              onChange={mobileSort.onChange}
+            />
+          </div>
         )}
         {viewMenu && (
           <ListingViewMenu

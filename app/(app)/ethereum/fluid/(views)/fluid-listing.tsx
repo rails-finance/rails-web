@@ -45,6 +45,8 @@ export function FluidListing({ initialItems, initialTotal, initialKey, initialSe
             data: r.data,
             total: r.pagination.total,
           })),
+        fetchCount: (filters) =>
+          fetchFluidPositions({ ...fluidFiltersToFetchParams(filters, 1), limit: 1 }).then((r) => r.pagination.total),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

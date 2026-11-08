@@ -8,7 +8,8 @@
  * (multi, or single with three or more) as a sub-view with its own back
  * control. Short choices sit in the list: a single dimension with one option
  * is on or off, a switch in its row; one with two options is a segmented
- * "Any / A / B" under its name; a range draws its slider under its name.
+ * "Any / A / B" under its name ("A / B" where the dimension rests on one of
+ * them, a preset); a range draws its slider under its name.
  * The footer holds "Clear filters" (every dimension back to its default) and
  * the primary button with the count the edits would give.
  *
@@ -72,6 +73,9 @@ export interface FilterSheetProps<F> {
   /** The count a draft would give, with the listing's own filtering. Without
    *  it an edited draft's button reads "Show results". */
   countFor?: (draft: F) => number | Promise<number>;
+  /** The noun for a draft, where the selection names it ("open positions"
+   *  while Status rests on Open). Without it, `count.noun`. */
+  nounFor?: (draft: F) => string;
 }
 
 /** Wait after a draft edit before counting it, so a run of taps costs one read. */
@@ -114,7 +118,15 @@ function currentChoice<F>(dim: FilterDimension<F>, f: F): string {
   return joinOptionLabels(vals, dim.options);
 }
 
-export function FilterSheet<F>({ dimensions, filters, onChange, count, countPending, countFor }: FilterSheetProps<F>) {
+export function FilterSheet<F>({
+  dimensions,
+  filters,
+  onChange,
+  count,
+  countPending,
+  countFor,
+  nounFor,
+}: FilterSheetProps<F>) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dims = dimensions.filter((d) => !d.available || d.available(filters));
@@ -157,6 +169,7 @@ export function FilterSheet<F>({ dimensions, filters, onChange, count, countPend
           count={count}
           countPending={countPending}
           countFor={countFor}
+          nounFor={nounFor}
           onClose={() => {
             setOpen(false);
             buttonRef.current?.focus();
@@ -174,6 +187,7 @@ function Sheet<F>({
   count,
   countPending,
   countFor,
+  nounFor,
   onClose,
 }: {
   dimensions: FilterDimension<F>[];
@@ -182,6 +196,7 @@ function Sheet<F>({
   count?: { total: number; noun: string };
   countPending?: boolean;
   countFor?: (draft: F) => number | Promise<number>;
+  nounFor?: (draft: F) => string;
   onClose: () => void;
 }) {
   // The staged filters: every control in the sheet reads and writes these.
@@ -366,9 +381,10 @@ function Sheet<F>({
   // last figure stays, dimmed, while a read is in flight).
   const shown = dirty ? (countFor ? draftCount : null) : (count?.total ?? null);
   const pending = dirty ? draftPending : countPending;
+  const noun = count ? (dirty && nounFor ? nounFor(filters) : count.noun) : "";
   const showLabel =
     count && shown != null
-      ? `Show ${shown.toLocaleString("en-US")} ${shown === 1 ? count.noun.replace(/s$/, "") : count.noun}`
+      ? `Show ${shown.toLocaleString("en-US")} ${shown === 1 ? noun.replace(/s$/, "") : noun}`
       : "Show results";
   const apply = () => {
     flushRanges();
@@ -537,13 +553,14 @@ function SegmentRow<F>({
   filters: F;
   onChange: (next: F) => void;
 }) {
-  const active = isDimensionActive(dim, filters);
   const cur = dim.get(filters);
-  const segments = [
-    { value: null as string | null, label: "Any" },
-    ...dim.options.map((o) => ({ value: o.value as string | null, label: o.label })),
-  ];
-  const at = active ? segments.findIndex((s) => s.value != null && cur.includes(s.value)) : 0;
+  // A dimension resting on one of its options (a preset: "100+ holders" or
+  // "Every vault") needs no "Any": its two options are the whole choice.
+  const preset = (dim.defaultValues?.(filters) ?? []).length > 0;
+  const options = dim.options.map((o) => ({ value: o.value as string | null, label: o.label }));
+  const segments = preset ? options : [{ value: null as string | null, label: "Any" }, ...options];
+  const picked = segments.findIndex((s) => s.value != null && cur.includes(s.value));
+  const at = preset ? Math.max(picked, 0) : isDimensionActive(dim, filters) ? picked : 0;
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const pick = (i: number) => {
     const v = segments[i].value;
