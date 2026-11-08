@@ -147,7 +147,7 @@ function usdMoveProv(sym: string, amount: number, price: number): Provenance {
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `${sym} this event moved, in US dollars — the amount times the branch's price for ${sym} at this block.`,
+    summary: `${sym} this event moved, in US dollars. The amount times the branch's price for ${sym} at this block.`,
     formula: "amount × price",
     inputs: [
       { label: "amount", value: `${forkCollAmount(amount)} ${sym}`, kind: "chain" },
@@ -165,7 +165,7 @@ function usdMoveProv(sym: string, amount: number, price: number): Provenance {
 function sinceProv(what: string, formula: string): Provenance {
   return {
     kind: "derived",
-    summary: `${what} — the figure after this event less the figure before it.`,
+    summary: `${what}. The figure after this event less the figure before it.`,
     formula,
   };
 }
@@ -233,7 +233,7 @@ export function liquityForkSheet({
     provs.collDeltaProv(coords, { after: ctx.collAfter, before: Number(ctx.collAfter) - amount }, ctx.origin?.coll);
   const debtMoveProv: Provenance = {
     kind: "derived",
-    summary: `Debt (${debtSym}) this event moved, in US dollars — the ${debtSym} at its $1 face.`,
+    summary: `Debt (${debtSym}) this event moved, in US dollars. The ${debtSym} at its $1 face.`,
     formula: `${debtSym} × $1`,
   };
 
@@ -376,7 +376,7 @@ export function liquityForkSheet({
   const debtBeforeEvent = debtBefore + (accrualProv ? accrued : 0);
   const debtBeforeEventProv: Provenance = {
     kind: "derived",
-    summary: `Debt (${debtSym}) immediately before this event — the debt the Trove's previous event recorded plus the ${noun} accrued since.`,
+    summary: `Debt (${debtSym}) immediately before this event. The debt the Trove's previous event recorded plus the ${noun} accrued since.`,
     formula: "debt at the previous event + accrual since",
     inputs: [
       { label: "debt at the previous event", value: `${forkAmount(debtBefore)} ${debtSym}`, kind: "chain" },
@@ -505,7 +505,7 @@ export function liquityForkSheet({
     mcr != null
       ? {
           kind: "chain-derived",
-          summary: `The ${collSym} price at which this Trove's collateral ratio meets the branch's minimum, ${pct(mcr)} — the debt times the minimum ratio, divided by the collateral, after this event.`,
+          summary: `The ${collSym} price at which this Trove's collateral ratio meets the branch's minimum, ${pct(mcr)}. The debt times the minimum ratio, divided by the collateral, after this event.`,
           formula: "debt × minimum ratio ÷ collateral",
           inputs: [
             { label: "debt", value: `${forkAmount(debtAfter)} ${debtSym}`, kind: "chain", note: "after" },
@@ -568,7 +568,7 @@ export function liquityForkSheet({
   const paramProv = (what: string, ratio: number): Provenance => ({
     kind: "chain",
     pclass: "state",
-    summary: `The ${collSym} branch's ${what}, ${pct(ratio)} — a constant the branch's contracts were deployed with.`,
+    summary: `The ${collSym} branch's ${what}: ${pct(ratio)}. A constant the branch's contracts were deployed with.`,
     contract: branch?.constants,
   });
   const params: SheetStat[] =

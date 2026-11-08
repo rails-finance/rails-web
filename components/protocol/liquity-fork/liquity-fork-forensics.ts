@@ -97,7 +97,7 @@ export function forkLiquidationStats(
       symbol: coll,
       prov: {
         kind: "derived",
-        summary: `Collateral taken by the liquidation — the Trove's whole collateral less the surplus that came back to the owner: what went to the Stability Pool, the branch's other Troves and the liquidator.`,
+        summary: `Collateral taken by the liquidation. The Trove's whole collateral less the surplus that came back to the owner: what went to the Stability Pool, the branch's other Troves and the liquidator.`,
         formula: "collateral before − surplus",
         inputs: [
           { label: "collateral before", value: forkCollAmount(whole), kind: "chain" },

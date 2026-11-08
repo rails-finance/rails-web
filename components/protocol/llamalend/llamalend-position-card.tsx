@@ -312,7 +312,7 @@ export function useLlamalendCardSlots({
           // sentinel path) — unstated, never zero. The live read repairs it.
           <span
             className="text-xs text-rb-500"
-            title="The last emitted UserState carried the controller's 2^256−1 sentinel here — the chain did not state the figure; the live read on the position page carries the current one."
+            title="The last emitted UserState carried the controller's 2^256−1 sentinel here. The chain did not state the figure; the live read on the position page carries the current one."
           >
             unstated
           </span>
