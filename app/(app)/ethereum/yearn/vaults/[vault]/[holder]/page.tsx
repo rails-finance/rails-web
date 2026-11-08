@@ -313,7 +313,7 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
       address: data.vault.address,
       price: sharePrice,
       unit: sharePrice ? data.vault.asset.symbol : undefined,
-      label: `One share in ${data.vault.asset.symbol}, the vault's own convertToAssets`,
+      label: `One share in ${data.vault.asset.symbol}, the vault's convertToAssets`,
       info: yearnVaultSharePriceProv({
         readBy: serverReadOf(data),
         blockNumber: data.blockNumber,

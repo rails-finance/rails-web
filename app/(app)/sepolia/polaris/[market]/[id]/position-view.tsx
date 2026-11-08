@@ -64,7 +64,7 @@ import { usePolarisUiState } from "@/hooks/usePolarisUiState";
 import { polarisExplorer } from "@/lib/polaris/explorer";
 
 /** What the ETH/USD row is, and why it is in the menu. */
-const ETH_USD_LABEL = "ETH/USD — the protocol's medianiser";
+const ETH_USD_LABEL = "ETH/USD: the protocol's medianiser";
 
 /** The card's "Highest recorded" peaks, with the liquidation's own state
  *  counted: the index takes its peaks over each touch's resulting figures, and
@@ -284,7 +284,7 @@ export default function PolarisPositionView({
         address: PETH.address,
         price: chain.price.curve,
         unit: "ETH",
-        label: `${PETH.symbol} — bonding curve, native`,
+        label: `${PETH.symbol}, bonding curve, native`,
         // "2.84 ETH" alone read as a gas price: the trigger names the token.
         triggerLabel: PETH.symbol,
         info: liveCurvePriceProv(),
@@ -318,7 +318,7 @@ export default function PolarisPositionView({
           address: PETH.address,
           price: p.curve,
           unit: "ETH",
-          label: `${PETH.symbol} — bonding curve, native`,
+          label: `${PETH.symbol}, bonding curve, native`,
           triggerLabel: PETH.symbol,
           info: curvePriceAtBlockProv(row.blockNumber),
         },
@@ -378,7 +378,7 @@ export default function PolarisPositionView({
           <DetailBodySkeleton />
         ) : view == null ? (
           <div className="text-sm text-rb-500">
-            Nothing readable for this position — the market has no position with this number, or the chain read is
+            Nothing readable for this position: the market has no position with this number, or the chain read is
             unavailable.
           </div>
         ) : (
@@ -426,7 +426,7 @@ export default function PolarisPositionView({
               <IndexNotice onRetry={() => setTailTry((n) => n + 1)} />
             ) : indexPending && polarisEvents.length === 0 ? (
               <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
-                Event history pending — the indexed backend for this explorer has not answered for this position.
+                Event history pending: the indexed backend for this explorer has not answered for this position.
                 Everything above is read from the market&rsquo;s contracts at the latest Sepolia block.
               </div>
             ) : (

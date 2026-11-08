@@ -3,12 +3,12 @@ import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
 
 const SHARE = {
-  title: "Technical Architecture — Rails",
+  title: "Technical architecture: Rails",
   description: "How Rails processes and serves blockchain data accurately, layer by layer.",
 };
 
 export const metadata: Metadata = {
-  title: "Technical Architecture",
+  title: "Technical architecture",
   description:
     "The multi-layer architecture behind Rails: the Sieve indexer, RabbitMQ, processors and materialized views, the chain-state refresher, the API and frontend, and the vault position census.",
   openGraph: {
@@ -22,16 +22,16 @@ export const metadata: Metadata = {
 const H2 = "text-3xl font-semibold tracking-tight text-foreground";
 const CARD = "rounded-xl border border-rb-200 dark:border-rb-800 bg-raised p-5";
 
-/* System Components — the multi-layer stack. */
+/* System components — the multi-layer stack. */
 const COMPONENTS = [
   {
     n: 1,
     title: "Blockchain Indexer (Sieve)",
-    lead: "Sieve — our in-house indexer — connects directly to Ethereum and Base and monitors every protocol's contracts in real-time.",
+    lead: "Sieve, our in-house indexer, connects directly to Ethereum and Base and monitors every protocol's contracts in real-time.",
     points: [
-      "Captures each protocol's own events — Trove and CDP operations, lending activity, spoke activity — across both chains",
-      "Processes each protocol's native event types — Supply, Borrow, Repay, Withdraw, Liquidation, TroveOperation, Redemption, and more — as they're emitted",
-      "Reads from Ethereum and Base through redundant RPC providers — a primary endpoint with automatic failover to a backup",
+      "Captures each protocol's own events: Trove and CDP operations, lending activity, spoke activity, across both chains",
+      "Processes each protocol's native event types (Supply, Borrow, Repay, Withdraw, Liquidation, TroveOperation, Redemption, and more) as they're emitted",
+      "Reads from Ethereum and Base through redundant RPC providers: a primary endpoint with automatic failover to a backup",
       "Fetches oracle prices from Chainlink for accurate USD valuations",
       "Routes events to the appropriate processing queues via RabbitMQ",
       "Maintains real-time synchronization with blockchain state",
@@ -60,11 +60,11 @@ const COMPONENTS = [
   {
     n: 4,
     title: "Chain-State Refresher",
-    lead: "Reads current balances and risk straight from each protocol's contracts, independent of the event history.",
+    lead: "Reads current balances and risk from each protocol's contracts, independent of the event history.",
     points: [
       "A background worker batches reads across positions via Multicall3 on a short refresh",
-      "Health factor, collateral factor, and live balances come from chain state, not inferred from events",
-      "Keeps positions opened through swap aggregators — which skip a protocol's standard events — accurate on screen",
+      "Health factor, collateral factor, and live balances come from chain state",
+      "Keeps positions opened through swap aggregators (which skip a protocol's standard events) accurate on screen",
     ],
   },
   {
@@ -74,18 +74,18 @@ const COMPONENTS = [
     points: [
       "An Express API joins enriched history with live chain state",
       "The Next.js frontend renders timelines, positions, and event detail",
-      "Read-only throughout — no wallet connection, no account, no private keys",
+      "Read-only throughout: no wallet connection, no account, no private keys",
     ],
   },
   {
     n: 6,
-    title: "Vault Position Census",
-    lead: "Vault positions are a set, not a stream: who holds a vault's shares is established by a daily census of the vault's own transfers rather than inferred from events as they pass.",
+    title: "Vault position census",
+    lead: "Vault positions are a set, not a stream: who holds a vault's shares is established by a daily census of the vault's transfers.",
     points: [
       "A whole-history sweep of every Transfer a catalogued vault has emitted names each address that ever held its shares, so the set is complete rather than sampled from a floor",
       "Each sweep is proven against the contract: the sum of every holder's balanceOf must equal totalSupply() at the sweep block, and a sweep that does not add up is refused and the previous census stands",
-      "Value is priced once, at the census block, through the vault's own convertToAssets and the chain's Aave V3 oracle, and each figure carries the oracle and the block it came from",
-      "Live figures on a card — shares, claim, share of the vault — are read from the contracts through Multicall3 per request, and the card states both blocks: the census's and the read's",
+      "Value is priced once, at the census block, through the vault's convertToAssets and the chain's Aave V3 oracle, and each figure carries the oracle and the block it came from",
+      "Live figures on a card (shares, claim, share of the vault) are read from the contracts through Multicall3 per request, and the card states both blocks: the census's and the read's",
     ],
   },
 ];
@@ -103,11 +103,11 @@ export default function ArchitecturePage() {
       </h1>
       <p className="text-rb-500 text-lg leading-relaxed mb-12">
         Rails uses a multi-layer architecture to process and serve blockchain data efficiently and accurately. Two data
-        paths run side by side — enriched event history and live chain state — and the API stitches them together.
+        paths run side by side (enriched event history and live chain state), and the API stitches them together.
       </p>
 
       <section>
-        <h2 className={`${H2} mb-4`}>System Components</h2>
+        <h2 className={`${H2} mb-4`}>System components</h2>
         <div className="space-y-4">
           {COMPONENTS.map((c) => (
             <div key={c.n} className={CARD}>
