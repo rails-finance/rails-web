@@ -111,6 +111,22 @@ export function VaultIndexView({
         ),
       ]
     : [];
+  // `?network=` and `?protocol=` (written by the roster, which keeps its
+  // facets in the URL here) choose those facets on arrival, as `?asset=` does.
+  const arrival = new URLSearchParams(initialSearch ?? "");
+  const chosen = (id: string, known: string[]) =>
+    (arrival.get(id) ?? "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter((x) => known.includes(x));
+  const networks = chosen("network", [...new Set(vaults.map((v) => String(v.chainId)))]);
+  const protocols = chosen("protocol", [...VAULT_INDEX_PROTOCOLS]);
+  const initialFilters = {
+    ...(assetValues.length > 0 ? { [TOKEN_FACET.id]: assetValues } : {}),
+    ...(networks.length > 0 ? { network: networks } : {}),
+    ...(protocols.length > 0 ? { protocol: protocols } : {}),
+  };
+
   const hooksOf = (v: VaultSummary) => ({
     "data-protocol": vaultIndexProtocol(v),
     "data-chain": String(v.chainId),
@@ -169,7 +185,8 @@ export function VaultIndexView({
           skel="index"
           facets={FACETS}
           assetFacet={TOKEN_FACET}
-          initialFilters={assetValues.length > 0 ? { [TOKEN_FACET.id]: assetValues } : undefined}
+          initialFilters={initialFilters}
+          facetsInUrl
           hrefOf={vaultIndexHref}
           holdersHrefOf={vaultIndexHoldersHref}
           receiptsOf={() => ({})}

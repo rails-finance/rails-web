@@ -180,6 +180,7 @@ export function VaultRoster({
   emptyCountProv,
   head,
   initialFilters,
+  facetsInUrl = false,
   initialSearch = "",
   readTime,
   table,
@@ -216,6 +217,9 @@ export function VaultRoster({
   /** Draws the shown rows as a table in place of the cards, which then sorts
    *  them itself (the index, ui-jobs 538). */
   table?: (rows: VaultSummary[], part: "funded" | "empty") => ReactNode;
+  /** Keep the facets in the URL, one param per facet id, comma-separated
+   *  (the index, ui-jobs 538), so a saved view or a copied link keeps them. */
+  facetsInUrl?: boolean;
 }) {
   const [introOpen, setIntroOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(initialFilters ?? {});
@@ -286,6 +290,24 @@ export function VaultRoster({
       : defaultSort;
   const sortOrder: "asc" | "desc" = sp.get("sortOrder") === "asc" ? "asc" : "desc";
   const dir = sortOrder === "desc" ? 1 : -1;
+  /** The facets, written to the URL too where the roster keeps them there. */
+  const setFacets = useCallback(
+    (next: Filters) => {
+      setFilters(next);
+      if (!facetsInUrl) return;
+      const p = new URLSearchParams(window.location.search);
+      for (const f of all) {
+        const values = next[f.id] ?? [];
+        if (values.length > 0) p.set(f.id, values.join(","));
+        else p.delete(f.id);
+      }
+      const qs = p.toString().replace(/%2C/gi, ",");
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+      notifyUrlChanged();
+    },
+    [facetsInUrl, all],
+  );
+
   const writeUrl = useCallback(
     (next: { show: string; sortBy: string; sortOrder: string }) => {
       const p = new URLSearchParams(window.location.search);
@@ -303,7 +325,7 @@ export function VaultRoster({
   const state: RosterFilters = { q: query, sortBy: sort, sortOrder, facets: filters, show: [show] };
   const onToolbar = (next: RosterFilters) => {
     if (next.q !== query) setQuery(next.q);
-    if (next.facets !== filters) setFilters(next.facets);
+    if (next.facets !== filters) setFacets(next.facets);
     const nextShow = next.show[0] ?? arrivalShow;
     if (nextShow !== show || next.sortBy !== sort || next.sortOrder !== sortOrder)
       writeUrl({ show: nextShow, sortBy: next.sortBy, sortOrder: next.sortOrder });
@@ -511,6 +533,9 @@ export function VaultRoster({
         sortOptions={table ? [] : sortOptions}
         searchPlaceholder="Vault name, symbol or address"
         countNode={countNode}
+        // The view menu (N1.7: save this view, copy its link) where the URL
+        // holds the whole view, facets included.
+        viewMenu={facetsInUrl}
         skel={`${skel}-facets`}
       />
 
