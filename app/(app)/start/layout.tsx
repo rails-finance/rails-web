@@ -19,7 +19,7 @@ export default function StartLayout({ children }: { children: ReactNode }) {
           Start here
         </h1>
         <p className="mt-2 text-rb-500">
-          If you are new to Rails and want to discover how our explorers can benefit you.
+          Start here if you are new to Rails and want to discover how our explorers can benefit you.
         </p>
       </div>
       <StartStack>{children}</StartStack>
