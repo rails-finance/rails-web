@@ -454,8 +454,15 @@ export function aaveV3EventProse(input: AaveV3ProseInput): AaveV3EventProse {
       if (variant === "sold" && ctx.sale && named) {
         v.received = Number(legAmount(ctx.sale.leg));
         v.r_symbol = ctx.sale.leg.symbol;
+        // A partial fill is a sale of what went: the sent amount less what
+        // came back in the same token (lib/shared/tx-legs.ts).
+        const partial = ctx.sale.partial;
+        if (partial) {
+          v.amount = Number(legAmount({ raw: partial.soldRaw, decimals: partial.decimals }));
+          v.returned = Number(legAmount({ raw: partial.returnedRaw, decimals: partial.decimals }));
+        }
         sp.say("tout.sold", { amount: "transfer", received: "received" });
-        sp.say("tout.paired");
+        sp.say(partial ? "tout.paired_part" : "tout.paired");
       } else if (variant === "staking") {
         // A stake's sentence names the staking contract by its role.
         sp.say("tout.staked", { amount: "transfer" });

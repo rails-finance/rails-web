@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readTxLegs } from "@/lib/sources/chain/tx-legs";
-import { saleVenue } from "@/lib/shared/tx-legs";
+import { saleVenue } from "@/lib/shared/sale-venue";
 import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 
 // What a transaction moved to and from a wallet, read from its receipt

@@ -330,6 +330,24 @@ export const poolCallerProv = (eventType: string, coords: V3Coords, caller: stri
  *  value transfer the transaction's internal transfers list (read from the
  *  stored call tree, or Alchemy's alchemy_getAssetTransfers).
  *  The `paired` leaf states the pairing as Rails' inference. */
+/** The pairing as Rails' inference, with the rulings that chose the leg
+ *  (lib/shared/tx-legs.ts): the largest of several, fee legs left out, a
+ *  partial fill. */
+function pairedNote(sale: RouterSale, sentSymbol: string, venueName: string): string {
+  const which =
+    sale.legsBack > 1
+      ? `the largest of the ${sale.legsBack} legs paid back to this wallet in this transaction (by USD value at the block, from Aave's oracle, where their tokens differ)`
+      : "the one leg paid back to this wallet in this transaction";
+  const fees =
+    sale.feeLegs > 0
+      ? ` ${sale.feeLegs === 1 ? "A smaller leg" : `${sale.feeLegs} smaller legs`} under 1% of it ${sale.feeLegs === 1 ? "was" : "were"} left out as ${sale.feeLegs === 1 ? "a fee" : "fees"}.`
+      : "";
+  const partial = sale.partial
+    ? ` Some of the ${sentSymbol} came back in the same transaction; the sale is the part that went.`
+    : "";
+  return `Rails' inference: ${which}, in a token other than the ${sentSymbol} it sent to ${venueName}.${fees}${partial} No protocol log joins the two legs.`;
+}
+
 export const saleLegProv = (sale: RouterSale, sentSymbol: string, coords: V3Coords): Provenance => {
   const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
   const { leg } = sale;
@@ -368,7 +386,7 @@ export const saleLegProv = (sale: RouterSale, sentSymbol: string, coords: V3Coor
         value: "Rails paired it",
         kind: "derived",
         pclass: "indexed",
-        note: `Rails' inference: the one leg paid back to this wallet in this transaction, in a token other than the ${sentSymbol} it sent to ${venueName}. No protocol log joins the two legs.`,
+        note: pairedNote(sale, sentSymbol, venueName),
         ...(legVerify ? { verify: legVerify } : {}),
       },
     ]),
