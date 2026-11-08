@@ -5,10 +5,10 @@
  * button carrying the count of active filters, opening a full-screen sheet.
  * The sheet lists one row per dimension, its name at the left and the current
  * choice with a chevron at the right; a row opens that dimension's options
- * (single, multi, range) as a sub-view with its own back control. Short
- * choices sit in the list: a single dimension with one option is on or off,
- * a switch in its row; one with two options is a segmented "Any / A / B"
- * under its name.
+ * (multi, or single with three or more) as a sub-view with its own back
+ * control. Short choices sit in the list: a single dimension with one option
+ * is on or off, a switch in its row; one with two options is a segmented
+ * "Any / A / B" under its name; a range draws its slider under its name.
  * The footer holds "Clear filters" (every dimension back to its default) and
  * the primary button with the count the edits would give.
  *
@@ -168,8 +168,14 @@ function Sheet<F>({
     draftRef.current = next;
     setDraft(next);
   };
-  // A range sub-view's pending slider move.
-  const flushRange = useRef<(() => void) | null>(null);
+  // Each range row's pending slider move, written before Show.
+  const flushers = useRef(new Map<string, MutableRefObject<(() => void) | null>>());
+  const flushFor = (id: string) => {
+    let r = flushers.current.get(id);
+    if (!r) flushers.current.set(id, (r = { current: null }));
+    return r;
+  };
+  const flushRanges = () => flushers.current.forEach((r) => r.current?.());
   const dirty = filters !== applied;
   const dims = dimensions.filter((d) => !d.available || d.available(filters));
 
@@ -268,12 +274,11 @@ function Sheet<F>({
       ? `Show ${shown.toLocaleString("en-US")} ${shown === 1 ? count.noun.replace(/s$/, "") : count.noun}`
       : "Show results";
   const apply = () => {
-    flushRange.current?.();
+    flushRanges();
     if (draftRef.current !== applied) onApply(draftRef.current);
     onClose();
   };
   const backToList = (id: string) => {
-    flushRange.current?.();
     returnTo.current = id;
     setOpenId(null);
   };
@@ -325,7 +330,6 @@ function Sheet<F>({
             dim={openDim}
             filters={filters}
             onChange={onChange}
-            flushRef={flushRange}
             onPicked={() => backToList(openDim.id)}
           />
         ) : (
@@ -336,6 +340,15 @@ function Sheet<F>({
                   <ToggleRow dim={dim} filters={filters} onChange={onChange} />
                 ) : isSegmented(dim) ? (
                   <SegmentRow dim={dim} filters={filters} onChange={onChange} />
+                ) : dim.cardinality === "range" ? (
+                  <RangeRow
+                    dim={dim}
+                    filters={filters}
+                    // A delayed slider write lands on the newest draft, so it
+                    // never undoes an edit made in another row meanwhile.
+                    onChange={(next) => onChange(dim.set(draftRef.current, dim.get(next)))}
+                    flushRef={flushFor(dim.id)}
+                  />
                 ) : (
                   <button
                     type="button"
@@ -498,35 +511,57 @@ function SegmentRow<F>({
   );
 }
 
-/** One dimension's options: radio or checkbox rows, or the range control. A
- *  single pick returns to the list; a multi stays for the next tick. */
-function DimensionView<F>({
+/** A range dimension in place: its name and current bounds as the heading,
+ *  the slider and inputs across the row under it, then its one-line note. */
+function RangeRow<F>({
   dim,
   filters,
   onChange,
   flushRef,
-  onPicked,
 }: {
   dim: FilterDimension<F>;
   filters: F;
   onChange: (next: F) => void;
   flushRef: MutableRefObject<(() => void) | null>;
+}) {
+  const active = isDimensionActive(dim, filters);
+  return (
+    <div className="pt-3 pb-1" data-filter-sheet-range={dim.id}>
+      <div className="flex items-center gap-3">
+        <span className="text-sm">{dim.label}</span>
+        <span
+          className={`ml-auto truncate text-sm tabular-nums ${active ? "text-foreground font-medium" : "text-rb-500"}`}
+          data-filter-sheet-readout=""
+        >
+          {currentChoice(dim, filters)}
+        </span>
+      </div>
+      <div className="-mx-4">
+        <RangeControl dim={dim} filters={filters} onChange={onChange} wide flushRef={flushRef} />
+      </div>
+      {dim.panelNote != null && (
+        <p className="pb-2 text-xs text-rb-500" data-prov-exempt="">
+          {dim.panelNote}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** One dimension's options as radio or checkbox rows. A single pick returns
+ *  to the list; a multi stays for the next tick. */
+function DimensionView<F>({
+  dim,
+  filters,
+  onChange,
+  onPicked,
+}: {
+  dim: FilterDimension<F>;
+  filters: F;
+  onChange: (next: F) => void;
   onPicked: () => void;
 }) {
   const [query, setQuery] = useState("");
-
-  if (dim.cardinality === "range") {
-    return (
-      <div className="pt-4" data-filter-sheet-view={dim.id}>
-        <RangeControl dim={dim} filters={filters} onChange={onChange} wide flushRef={flushRef} />
-        {dim.panelNote != null && (
-          <p className="px-4 pt-1 pb-3 text-xs text-rb-500" data-prov-exempt="">
-            {dim.panelNote}
-          </p>
-        )}
-      </div>
-    );
-  }
 
   const multi = dim.cardinality === "multi";
   const selected = new Set(dim.get(filters));
