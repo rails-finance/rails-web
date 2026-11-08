@@ -118,7 +118,7 @@ export function PolarisSinceLastTouchRow({
     kind: "chain-derived",
     pclass: "oracle",
     summary:
-      `What the market's own price feed did to the collateral — the figure this position stated at its last touch. The position's stated ` +
+      `What the market's price feed did to the collateral. The figure this position stated at its last touch. The position's stated ` +
       `collateral does not change between touches, so this is the whole of the feed's effect: the pETH price in ` +
       `${stable} at the end of the touch's block (the oracle-at-block lane's previewPrice()) against the same feed ` +
       `read at the head block, times the collateral the chain recorded at that touch.`,
@@ -129,7 +129,7 @@ export function PolarisSinceLastTouchRow({
         value: formatExact(w.collAtTouch),
         kind: "chain",
         pclass: "state",
-        note: "getCDP(id).coll — the slot written at the last touch",
+        note: "getCDP(id).coll: the slot written at the last touch",
       },
       {
         label: `pETH in ${stable} at the touch`,
@@ -165,7 +165,7 @@ export function PolarisSinceLastTouchRow({
           kind: "chain-derived",
           pclass: "state",
           summary:
-            `This position's net PSM share — its pro-rata share of every PSM mint and redemption since that touch, valued ` +
+            `This position's net PSM share. Its pro-rata share of every PSM mint and redemption since that touch, valued ` +
             `at the feed now; its two sides can move in opposite directions. The docs call these the peg-defence fees. ` +
             `It is ${pendingNote}.`,
           formula: "mintRedeemCollChange × price − mintRedeemDebtChange",
@@ -192,7 +192,7 @@ export function PolarisSinceLastTouchRow({
           kind: "chain-derived",
           pclass: "state",
           summary:
-            `This position's pETH reward — the pETH the protocol has distributed to it in proportion to its debt since ` +
+            `This position's pETH reward. The pETH the protocol has distributed to it in proportion to its debt since ` +
             `that touch, valued at the feed now. The docs call it the pETH yield to minters. It is ${pendingNote}.`,
           formula: "bcTokenGain × price",
           inputs: [
@@ -210,7 +210,7 @@ export function PolarisSinceLastTouchRow({
         return {
           kind: "chain",
           pclass: "state",
-          summary: `Interest charged — the interest accrued on the debt since that touch, ${pendingNote}.`,
+          summary: `Interest charged. The interest accrued on the debt since that touch, ${pendingNote}.`,
           formula: "− accruedInterest",
           inputs: [
             {
@@ -226,7 +226,7 @@ export function PolarisSinceLastTouchRow({
         return {
           kind: "chain",
           pclass: "state",
-          summary: `The stability gain — the Protocol Safety Rate's credit against the debt since that touch, ${pendingNote}.`,
+          summary: `The stability gain. The Protocol Safety Rate's credit against the debt since that touch, ${pendingNote}.`,
           formula: "accruedStables",
           inputs: [
             {
@@ -242,7 +242,7 @@ export function PolarisSinceLastTouchRow({
         return {
           kind: "derived",
           summary:
-            `The debt below zero — the pending legs clear more than the debt, and the next touch settles the debt to ` +
+            `The debt below zero. The pending legs clear more than the debt, and the next touch settles the debt to ` +
             `zero, so this part is taken back out.`,
           formula: "min(0, entireDebt)",
           inputs: [
@@ -385,7 +385,7 @@ export function PolarisSinceLastTouchRow({
   return (
     <NoteRowShell
       icon="live-window"
-      label={`${since} — ${signedFigure(w.total, stable)}`}
+      label={`${since}: ${signedFigure(w.total, stable)}`}
       marker={{ attr: "data-live-window", value: "polaris-since-touch" }}
       header={
         <>
@@ -667,7 +667,7 @@ function polarisLiveSheet(
   const crProv = (what: string, coll: number, debt: number, price: number, at: string): Provenance => ({
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `${what} — the collateral times the feed's pETH price in ${stable}, over the debt, ${at}.`,
+    summary: `${what}. The collateral times the feed's pETH price in ${stable}, over the debt, ${at}.`,
     formula: "coll × pETH price ÷ debt",
     contract: manager,
     inputs: [
@@ -679,7 +679,7 @@ function polarisLiveSheet(
   const liqProv = (what: string, coll: number, debt: number): Provenance => ({
     kind: "chain-derived",
     pclass: "state",
-    summary: `${what} — the price of pETH, in ${stable}, at which the ratio meets the market's normal-mode minimum, ${mcr.label}: the debt times the minimum ratio, divided by the collateral.`,
+    summary: `${what}. The price of pETH, in ${stable}, at which the ratio meets the market's normal-mode minimum, ${mcr.label}: the debt times the minimum ratio, divided by the collateral.`,
     formula: "debt × minimum ratio ÷ collateral",
     contract: manager,
     inputs: [
@@ -690,7 +690,7 @@ function polarisLiveSheet(
   });
   const sinceStated: Provenance = {
     kind: "derived",
-    summary: "Change since the last touch — the value at the feed less the one the last touch wrote.",
+    summary: "Change since the last touch. The value at the feed less the one the last touch wrote.",
     formula: "at the feed − as last written",
   };
   const fromTouch = `at the last touch's block ${w.from.block.toLocaleString("en-US")}`;

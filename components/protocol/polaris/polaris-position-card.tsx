@@ -621,8 +621,8 @@ export function polarisCardSlots({
       <div className="notice-caution flex items-start gap-2 p-3 mb-3 text-sm text-caution-700 dark:text-caution-400">
         <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
         <p>
-          Below the minimum ratio — {(v.icr * 100).toFixed(1)}% against {(v.mcr * 100).toFixed(0)}%; anyone may
-          liquidate it
+          Below the minimum ratio: {(v.icr * 100).toFixed(1)}% against {(v.mcr * 100).toFixed(0)}%; anyone may liquidate
+          it
         </p>
       </div>
     ) : undefined;
