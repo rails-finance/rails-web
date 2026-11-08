@@ -73,7 +73,7 @@ export function PendleTokenStrip({ m }: { m: PendleMarketPage }) {
   const t = m.tokens;
   const rewards = Object.entries(m.rewardTokens).map(([address, r]) => ({ address, ...r }));
   return (
-    <section className="space-y-2" aria-label="How the market is built" data-pendle-strip="">
+    <section className="space-y-2" aria-label="How the market is built" data-pendle-strip="" data-anatomy="M2">
       <h2 className={`flex items-center gap-1.5 ${SECTION_HEADING} ${CARD_INSET_START}`}>
         How the market is built
         <RevealTip tip={SY_TIP} label={`SY: ${SY_TIP}`} focusable wrap className="focus-ring rounded-sm">
