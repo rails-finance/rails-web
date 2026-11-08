@@ -868,6 +868,22 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // have is a POSITION LISTING, and that is not this column: every (vault,
   // holder) pair on this roster needs a whole-`Transfer` census per vault, the
   // share-ledger job parked at TO-DO-infra-and-backend §5.4.
+  // Pendle on Ethereum, phase 1 (routers only). `dashboard`: every position
+  // figure is a contract read at the page's block (RouterStatic balances,
+  // interest and rewards, Pendle's oracle or RouterStatic's spot marks,
+  // readState). `views`: the market roster and the market pages. USD is ruled
+  // out: Pendle values PT, YT and LP in the market's asset and runs no USD feed.
+  // No loan, so no forensics. Explainers wait on the newcomer review.
+  pendle: explorerDepth({
+    dashboard: true,
+    views: true,
+    oracleUsd: {
+      why: "Pendle values PT, YT and LP in each market's own asset, through its oracle and the SY's exchange rate, and runs no USD feed",
+    },
+    forensics: {
+      why: "nobody in a Pendle market holds a loan, so there is no threshold to breach and no liquidation to trace",
+    },
+  }),
   yearn: explorerDepth({
     views: true,
     verification: true,
@@ -1549,6 +1565,8 @@ export const VIEW_NOTES: Record<string, string> = {
   maple: "Both syrup pools' liquid/deployed split and queue coverability against liquid cash.",
   fx: "The tick ladders read off the pools' tick storage, with tick debt shares reconciled integer-exact against the pool totals.",
   pwn: "The loan book: the outcome record, the open book by soonest deadline, what secures the loans and what they owe per token.",
+  pendle:
+    "Every market the routers have named, grouped by the protocol behind its yield token (a Rails label), each with its implied APY, pool and maturity, and a page per market with its marks and latest router events.",
   "sky-savings":
     "The Savings Rate over the whole life of sUSDS: every change governance made, each at the block that made it, drawn as steps.",
   polaris:
