@@ -8,7 +8,10 @@
 // the trade's fixed APY where it priced PT, and the router; T3 the event in
 // words.
 
+import Link from "next/link";
 import { EventCard, type EventCardSlots } from "@/components/shared/event-card";
+import { PendleTokenIcon, type PendleTokenKind } from "@/components/protocol/pendle/pendle-token-icon";
+import { pendleWalletHref } from "@/lib/pendle/routes";
 import type { EventCellSpec } from "@/components/shared/event-cells";
 import type { SpineColumnProps, SpineTokenRow } from "@/components/shared/spine-column";
 import { AssetPopover } from "@/components/shared/asset-popover";
@@ -46,13 +49,24 @@ const ROLE_WORDS: Record<PendleRole, string> = {
   taker: "This wallet filled another's limit order.",
 };
 
-function TokenIcon({ tok }: { tok: PendleToken }) {
+function TokenIcon({ tok, kind, tokens }: { tok: PendleToken; kind: string; tokens: PendleMarketTokens | null }) {
   return (
     <AssetPopover symbol={symbolOf(tok)} address={tok.address}>
-      <TokenChipIcon symbol={tok.symbol ?? ""} address={tok.address} size={16} filterable={false} untitled />
+      {tokens && kind !== "token" ? (
+        <PendleTokenIcon kind={kind as PendleTokenKind} tokens={tokens} size={16} />
+      ) : (
+        <TokenChipIcon symbol={tok.symbol ?? ""} address={tok.address} size={16} filterable={false} untitled />
+      )}
     </AssetPopover>
   );
 }
+
+/** The event's verb: a zero-price-impact add (the KeepYt events) names the YT it keeps. */
+export function eventLabel(row: Pick<PendleTimelineRow, "kind" | "event">): string {
+  return /KeepYt$/.test(row.event) ? "Add liquidity, keep YT" : KIND_LABEL[row.kind];
+}
+
+const STAMP: Record<string, string> = { pt: "PT", yt: "YT", lp: "LP", sy: "SY" };
 
 export function PendleEventCard({
   row,
@@ -73,6 +87,8 @@ export function PendleEventCard({
   parties?: { caller: string | null; receiver: string | null };
 }) {
   const id = `${row.txHash}-${row.logIndex}`;
+  // The wallet a market row names: the receiver, which on a limit fill is the maker.
+  const wallet = side === "market" ? (parties?.receiver ?? null) : null;
   const legs = row.legs
     .filter((l) => l.amount !== "0")
     .map((l) => ({ l, tok: legToken(l.leg, l.token, tokens, meta) }))
@@ -80,12 +96,16 @@ export function PendleEventCard({
 
   const spineRows: SpineTokenRow[] = legs.slice(0, 3).map(({ l, tok }) => {
     const n = units(l.amount.replace(/^-/, ""), tok.decimals);
+    // A market token wears the yield token's mark, its kind as the unit.
+    const own = l.leg !== "token" && tokens;
     return {
       symbol: tok.symbol ?? "",
-      address: tok.address,
+      iconSymbol: own ? (tokens.yieldToken.symbol ?? undefined) : undefined,
+      address: own ? tokens.yieldToken.address : tok.address,
       direction: l.amount.startsWith("-") ? "right" : "left",
       popover: true,
       value: n ?? undefined,
+      unit: own ? STAMP[l.leg] : (tok.symbol ?? undefined),
     };
   });
   const spine: SpineColumnProps = { tokens: spineRows, isLast };
@@ -106,7 +126,7 @@ export function PendleEventCard({
           info: legProv(row, tok, raw),
           value: exact(raw, tok.decimals) ?? raw,
         },
-        chip: <TokenIcon tok={tok} />,
+        chip: <TokenIcon tok={tok} kind={l.leg} tokens={tokens} />,
       },
     };
   });
@@ -181,7 +201,22 @@ export function PendleEventCard({
     },
     spine,
     head: {
-      label: KIND_LABEL[row.kind],
+      label: eventLabel(row),
+      ...(side === "market" && wallet && tokens
+        ? {
+            clauses: [
+              <Link
+                key="w"
+                href={`${pendleWalletHref(wallet)}/${tokens.market.address}`}
+                onClick={(e) => e.stopPropagation()}
+                className="font-mono text-xs text-rb-500 hover:text-foreground hover:underline"
+                data-pendle-row-wallet={wallet}
+              >
+                {shortAddress(wallet)}
+              </Link>,
+            ],
+          }
+        : {}),
       deltas: legs.slice(0, 2).flatMap(({ l, tok }) => {
         const n = units(l.amount, tok.decimals);
         return n == null

@@ -24,6 +24,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { BlockRef } from "@/components/shared/block-ref";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
+import { PendleTokenIcon } from "@/components/protocol/pendle/pendle-token-icon";
 import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
@@ -492,7 +493,7 @@ function Row({ m, block, at }: { m: PendleRosterEntry; block: number; at: number
       >
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 sm:flex-nowrap">
           <span className="shrink-0" data-prov-exempt>
-            <TokenChipIcon symbol={t.pt.symbol ?? ""} address={t.pt.address} size={28} filterable={false} untitled />
+            <PendleTokenIcon kind="pt" tokens={t} size={28} />
           </span>
           <DataTableRowLink
             href={href}

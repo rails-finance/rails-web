@@ -1,22 +1,17 @@
 "use client";
 
 // One Pendle market at one block: the card (implied APY, pool, PT price and
-// maturity; the pool's PT and SY, the marks and their source), its tokens, and
-// the market's latest router events from their own side.
+// maturity; the pool's PT and SY, the marks and their source), the strip of how
+// the market is built, and its router events from their own side.
 
 import { PositionCard, type PositionCardSlots } from "@/components/shared/position-card";
 import { PanelFigure, type PositionPanelRow } from "@/components/shared/position-card-panel";
 import { PositionReadProvider } from "@/components/shared/position-read";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { SpineTipContext } from "@/components/shared/spine-column";
-import { EventDateContext } from "@/components/shared/event-time";
-import { shortDate, shortDateYear } from "@/lib/shared/format-event";
-import { explorerUrl } from "@/lib/shared/chains";
-import { CARD_INSET_START, SECTION_HEADING } from "@/lib/shared/ui-grammar";
-import { PendleEventCard } from "@/components/protocol/pendle/pendle-event-card";
+import { PendleTokenStrip } from "@/components/protocol/pendle/pendle-token-strip";
+import { PendleMarketEvents } from "@/components/protocol/pendle/pendle-market-events";
 import { UnderlyingLabel } from "@/components/protocol/pendle/pendle-position-card";
 import {
-  PENDLE_CHAIN_ID,
   amountText,
   apyText,
   assetDecimals,
@@ -25,33 +20,21 @@ import {
   maturityDate,
   maturityWords,
   rate,
-  shortAddress,
   symbolOf,
 } from "@/lib/pendle/format";
 import { impliedApyProv, markProv, maturityProv, poolStateProv, tvlProv } from "@/lib/pendle/provenance";
-import type { PendleMarketPage, PendleTimelineRow, PendleToken } from "@/lib/pendle/types";
+import type { PendleMarketPage, PendleTokenMeta } from "@/lib/pendle/types";
 
-const utcDay = (ts: number) => Math.floor(ts / 86_400);
-const datePrefix = (ts: number, aboveTs: number | null): string | null =>
-  aboveTs != null && utcDay(aboveTs) === utcDay(ts) ? null : `${shortDate(ts)} ${shortDateYear(ts)}`;
-
-function ContractLink({ tok, label }: { tok: PendleToken; label: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 py-1 text-xs" data-pendle-contract={label}>
-      <span className="text-rb-500">{label}</span>
-      <a
-        href={explorerUrl(PENDLE_CHAIN_ID, "address", tok.address)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="link-external min-w-0 truncate"
-      >
-        {symbolOf(tok)} <span className="font-mono text-rb-500">{shortAddress(tok.address)}</span>
-      </a>
-    </div>
-  );
-}
-
-export function PendleMarketView({ m }: { m: PendleMarketPage }) {
+export function PendleMarketView({
+  m,
+  meta,
+  initialSearch,
+}: {
+  m: PendleMarketPage;
+  /** The outside tokens' symbols and decimals (lib/sources/api/pendle.ts outsideTokenMeta). */
+  meta: Record<string, PendleTokenMeta>;
+  initialSearch: string;
+}) {
   const registry = useReceiptRegistry();
   const t = m.tokens;
   const live = m.live;
@@ -193,7 +176,6 @@ export function PendleMarketView({ m }: { m: PendleMarketPage }) {
           ) : (
             "–"
           ),
-          asset: { symbol: symbolOf(t.pt), address: t.pt.address },
         },
         {
           id: "pool-sy",
@@ -210,7 +192,6 @@ export function PendleMarketView({ m }: { m: PendleMarketPage }) {
           ) : (
             "–"
           ),
-          asset: { symbol: symbolOf(t.sy), address: t.sy.address },
         },
         {
           id: "lp-supply",
@@ -232,72 +213,17 @@ export function PendleMarketView({ m }: { m: PendleMarketPage }) {
     ],
   };
 
-  // The outside tokens a market page can name: the wrapped token and the asset.
-  const known = {
-    [t.yieldToken.address]: { symbol: t.yieldToken.symbol, decimals: t.yieldToken.decimals },
-    [t.asset.address]: { symbol: t.asset.symbol, decimals: t.asset.decimals },
-  };
-  const rows: PendleTimelineRow[] = m.recent.map((r) => ({
-    ...r,
-    role: "both",
-    syToAsset: null,
-    asset: null,
-    impliedApy: null,
-    partial: false,
-  }));
-
   return (
     <PositionReadProvider read={{ kind: "chain", block: m.block, at: m.timestamp }}>
-      <div className="space-y-6">
-        <div data-pendle-market-card={t.market.address}>
-          <PositionCard slots={slots} />
+      <ProvReceiptsScope registry={registry}>
+        <div className="space-y-6">
+          <div data-pendle-market-card={t.market.address}>
+            <PositionCard slots={slots} />
+          </div>
+          <PendleTokenStrip m={m} />
+          <PendleMarketEvents m={m} initialMeta={meta} initialSearch={initialSearch} />
         </div>
-        <section className="space-y-2" aria-label="Tokens" data-pendle-tokens="">
-          <h2 className={`${SECTION_HEADING} ${CARD_INSET_START}`}>Tokens</h2>
-          <div className="rounded-xl bg-raised px-4 py-2 sm:px-5">
-            <ContractLink tok={t.market} label="Market (LP)" />
-            <ContractLink tok={t.pt} label="Principal token" />
-            <ContractLink tok={t.yt} label="Yield token" />
-            <ContractLink tok={t.sy} label="SY" />
-            <ContractLink tok={t.yieldToken} label="Wrapped token" />
-            {Object.entries(m.rewardTokens).map(([a, r]) => (
-              <ContractLink key={a} tok={{ address: a, ...r }} label="Reward" />
-            ))}
-          </div>
-        </section>
-        <section className="space-y-4" data-anatomy="P3" aria-label="Latest router events">
-          <div className={`flex flex-wrap items-baseline justify-between gap-2 ${CARD_INSET_START}`}>
-            <h2 className={SECTION_HEADING}>Latest router events</h2>
-            {m.router && (
-              <span className="text-xs tabular-nums text-rb-500">
-                {rows.length} of {m.router.events.toLocaleString("en-US")}
-              </span>
-            )}
-          </div>
-          <ProvReceiptsScope registry={registry}>
-            <div data-pendle-market-events="">
-              {rows.map((row, i) => (
-                <EventDateContext.Provider
-                  key={`${row.txHash}-${row.logIndex}`}
-                  value={datePrefix(row.timestamp, i > 0 ? rows[i - 1].timestamp : null)}
-                >
-                  <SpineTipContext.Provider value={i === 0 ? "above" : null}>
-                    <PendleEventCard
-                      row={row}
-                      tokens={t}
-                      meta={known}
-                      side="market"
-                      isLast={i === rows.length - 1}
-                      parties={{ caller: m.recent[i].caller, receiver: m.recent[i].receiver }}
-                    />
-                  </SpineTipContext.Provider>
-                </EventDateContext.Provider>
-              ))}
-              {rows.length === 0 && <p className="py-6 text-sm text-rb-500">No router event names this market.</p>}
-            </div>
-          </ProvReceiptsScope>
-        </section>
-      </div>
+      </ProvReceiptsScope>
     </PositionReadProvider>
   );
 }

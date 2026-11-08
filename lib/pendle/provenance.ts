@@ -343,3 +343,31 @@ export function readBlockProv(block: number): Provenance {
     verify: { kind: "rollup", text: "Each figure's receipt names this block." },
   };
 }
+
+/** A market token: which contract read names it. */
+export function marketTokenProv(
+  role: "Wrapped token" | "SY" | "PT" | "YT" | "LP" | "Reward",
+  tok: PendleToken,
+  market: string,
+): Provenance {
+  const via =
+    role === "Wrapped token"
+      ? "SY.yieldToken()"
+      : role === "Reward"
+        ? "market.getRewardTokens()"
+        : role === "LP"
+          ? "the market contract"
+          : `market.readTokens() → ${role}`;
+  return {
+    kind: "chain",
+    pclass: "state",
+    summary: `${role}. ${symbolOf(tok)}, contract ${tok.address}, named by ${via}.`,
+    contract: { name: "Pendle market", address: market },
+    via,
+    verify: {
+      kind: "etherscan",
+      href: explorerUrl(PENDLE_CHAIN_ID, "address", tok.address),
+      text: "The contract on Etherscan",
+    },
+  };
+}

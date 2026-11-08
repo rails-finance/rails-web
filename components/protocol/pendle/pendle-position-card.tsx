@@ -200,7 +200,6 @@ export function PendlePositionCard({
           )}
         </span>
       ),
-    asset: { symbol: symbolOf(tok), address: tok.address, figure: exact(raw, tok.decimals) ?? undefined },
     tip,
   });
 

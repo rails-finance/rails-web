@@ -10,7 +10,8 @@ import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import { RailHeader } from "@/components/shared/rail-header";
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
-import { readPendleMarket } from "@/lib/sources/api/pendle";
+import { outsideTokenMeta, readPendleMarket } from "@/lib/sources/api/pendle";
+import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { PendleMarketView } from "@/components/protocol/pendle/pendle-market-view";
 import { PendleReadNotice } from "@/components/protocol/pendle/pendle-read-notice";
 import { marketName } from "@/lib/pendle/format";
@@ -38,12 +39,17 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-export default async function PendleMarketPage({ params }: Params) {
+export default async function PendleMarketPage({
+  params,
+  searchParams,
+}: Params & { searchParams: Promise<RawSearchParams> }) {
+  const initialSearch = toURLSearchParams(await searchParams).toString();
   const { market } = await params;
   const m = market.toLowerCase();
   if (!ADDRESS.test(m)) notFound();
   const read = await load(m);
   if (!read.ok && read.status === 404) notFound();
+  const meta = read.ok ? await outsideTokenMeta(read.data) : {};
   return (
     <div className="min-h-screen">
       <div className="py-8">
@@ -54,7 +60,11 @@ export default async function PendleMarketPage({ params }: Params) {
           <div className="mb-1 text-[11px] uppercase tracking-wider text-rb-500">Pendle market</div>
           <h1 className="text-2xl font-semibold text-foreground">{read.ok ? marketName(read.data.tokens) : m}</h1>
         </header>
-        {read.ok ? <PendleMarketView m={read.data} /> : <PendleReadNotice failure={read} />}
+        {read.ok ? (
+          <PendleMarketView m={read.data} meta={meta} initialSearch={initialSearch} />
+        ) : (
+          <PendleReadNotice failure={read} />
+        )}
       </div>
       <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
       <ProvInspectorLayer />
