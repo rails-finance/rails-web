@@ -48,8 +48,8 @@ import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
-import { legInput, readRatesAtTarget } from "./metamorpho-illiquid";
-import { needsRateAtTarget, vaultIlliquid, type VaultIlliquid } from "@/lib/vaults/illiquid";
+import { legInput, readBorrowRates, readNeedsBorrowRate, readRatesAtTarget } from "./metamorpho-illiquid";
+import { needsRateAtTarget, vaultIlliquid, type IlliquidLegInput, type VaultIlliquid } from "@/lib/vaults/illiquid";
 import { MORPHO_BASE_BLUE, MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { type MorphoBaseVaultCatalogEntry, type MorphoBaseVaultFactory } from "@/lib/morpho-base/vault-catalog";
 import {
@@ -729,8 +729,9 @@ export async function loadMorphoBaseVault(
     });
 
     // The illiquid test (ui-jobs 540) over the same reads, at the same block,
-    // with each hot market's rate at target: lib/vaults/illiquid.ts. A queue
-    // with a leg unread, or a rate that did not answer, is left untested.
+    // each market accrued to it and each hot market's rate at target:
+    // lib/vaults/illiquid.ts. A queue with a leg unread, or a rate that did
+    // not answer, is left untested.
     let illiquid: VaultIlliquid | null | undefined;
     try {
       const reads = ids.map((id, i) => ({
@@ -740,24 +741,27 @@ export async function loadMorphoBaseVault(
         position: ok(legReads[i * 3 + 2]) as PositionTuple | undefined,
       }));
       if (reads.every((r) => r.params && r.market && r.position)) {
-        const inputs = reads.map((r) =>
+        const timestamp = Number((await client.getBlock({ blockNumber })).timestamp);
+        const marketReads = reads.map((r) => ({ id: r.id, read: { params: r.params!, market: r.market! } }));
+        const borrowRates = await readBorrowRates(
+          client,
+          blockNumber,
+          marketReads.filter((m) => readNeedsBorrowRate(m.read, timestamp)),
+        );
+        const accrued = reads.map((r, i) =>
           legInput(
             r.id,
-            { params: r.params!, market: r.market! },
+            marketReads[i].read,
             r.position![0],
-            null,
+            borrowRates.get(r.id) ?? null,
+            timestamp,
             raw.find((x) => x.leg.id === r.id)?.leg.collateralSymbol ?? null,
           ),
         );
+        const inputs = accrued.filter((l): l is IlliquidLegInput => l != null);
         const hot = inputs.filter((l) => needsRateAtTarget(chainId, l));
-        const [rates, timestamp] =
-          hot.length > 0
-            ? await Promise.all([
-                readRatesAtTarget(client, blockNumber, hot),
-                client.getBlock({ blockNumber }).then((b) => Number(b.timestamp)),
-              ])
-            : [new Map<string, bigint>(), 0];
-        if (hot.every((l) => rates.has(l.id)))
+        const rates = hot.length > 0 ? await readRatesAtTarget(client, blockNumber, hot) : new Map<string, bigint>();
+        if (inputs.length === accrued.length && hot.every((l) => rates.has(l.id)))
           illiquid = vaultIlliquid(
             chainId,
             Number(blockNumber),

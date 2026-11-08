@@ -2,15 +2,16 @@
 // ui-jobs 540; the test and its arithmetic are lib/vaults/illiquid.ts).
 // SERVER-ONLY.
 // ----------------------------------------------------------------------------
-// Four waves, every call pinned to the directory's block:
+// Five waves, every call pinned to the directory's block:
 //
 //   1. `withdrawQueueLength()` on every vault holding assets;
 //   2. `withdrawQueue(i)`;
 //   3. `market(id)` and `idToMarketParams(id)` once per distinct market;
-//   4. for the vaults whose queue holds a market 99.9% or more borrowed on the
+//   4. the IRM's `borrowRateView` on each market with interest to accrue, and
+//      the block's timestamp: the totals accrued to the block;
+//   5. for the vaults whose queue holds a market 99.9% or more borrowed on the
 //      chain's AdaptiveCurveIRM: `position(id, vault)` on every leg of that
-//      queue, and `rateAtTarget(id)` on those markets, with the block's
-//      timestamp to adapt it.
+//      queue, and `rateAtTarget(id)` on those markets.
 //
 // A vault whose read did not answer is left out of the map: unread, never
 // liquid. A vault read and not caught maps to null.
@@ -18,7 +19,16 @@
 import { parseAbi, type PublicClient } from "viem";
 import { resolveErc20Meta } from "./erc20-meta";
 import type { ChainId } from "@/lib/shared/chains";
-import { needsRateAtTarget, vaultIlliquid, type IlliquidLegInput, type VaultIlliquid } from "@/lib/vaults/illiquid";
+import {
+  expectedMarket,
+  needsBorrowRate,
+  needsRateAtTarget,
+  toAssetsDown,
+  vaultIlliquid,
+  type IlliquidLegInput,
+  type SettledMarket,
+  type VaultIlliquid,
+} from "@/lib/vaults/illiquid";
 
 const ZERO = BigInt(0);
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
@@ -35,7 +45,12 @@ const BLUE_ABI = parseAbi([
   "function market(bytes32) view returns (uint128 totalSupplyAssets, uint128 totalSupplyShares, uint128 totalBorrowAssets, uint128 totalBorrowShares, uint128 lastUpdate, uint128 fee)",
   "function position(bytes32, address) view returns (uint256 supplyShares, uint128 borrowShares, uint128 collateral)",
 ]);
-const IRM_ABI = parseAbi(["function rateAtTarget(bytes32) view returns (int256)"]);
+const IRM_ABI = parseAbi([
+  "function rateAtTarget(bytes32) view returns (int256)",
+  "struct MarketParams { address loanToken; address collateralToken; address oracle; address irm; uint256 lltv; }",
+  "struct Market { uint128 totalSupplyAssets; uint128 totalSupplyShares; uint128 totalBorrowAssets; uint128 totalBorrowShares; uint128 lastUpdate; uint128 fee; }",
+  "function borrowRateView(MarketParams marketParams, Market market) view returns (uint256)",
+]);
 
 /** The Blue singleton, the same address on both chains. */
 export const MORPHO_BLUE = "0xbbbbbbbbbb9cc5e90e3b3af64bdaf62c37eeffcb";
@@ -70,27 +85,81 @@ export interface MarketRead {
   market: MarketTuple;
 }
 
-/** One leg as the test takes it, from its reads. */
+const settled = (market: MarketTuple): SettledMarket => ({
+  totalSupplyAssets: market[0],
+  totalSupplyShares: market[1],
+  totalBorrowAssets: market[2],
+  lastUpdate: Number(market[4]),
+  fee: market[5],
+});
+
+/** Does accruing this market to `timestamp` need its IRM's `borrowRateView`? */
+export const readNeedsBorrowRate = (read: MarketRead, timestamp: number): boolean =>
+  needsBorrowRate(settled(read.market), read.params[3], timestamp);
+
+/** Reads `borrowRateView(params, market)` for each market given, at `blockNumber`. */
+export async function readBorrowRates(
+  client: PublicClient,
+  blockNumber: bigint,
+  markets: { id: string; read: MarketRead }[],
+): Promise<Map<string, bigint>> {
+  const answers = await multicall(
+    client,
+    markets.map(({ read: { params: p, market: m } }) => ({
+      address: p[3] as `0x${string}`,
+      abi: IRM_ABI,
+      functionName: "borrowRateView",
+      args: [
+        { loanToken: p[0], collateralToken: p[1], oracle: p[2], irm: p[3], lltv: p[4] },
+        {
+          totalSupplyAssets: m[0],
+          totalSupplyShares: m[1],
+          totalBorrowAssets: m[2],
+          totalBorrowShares: m[3],
+          lastUpdate: m[4],
+          fee: m[5],
+        },
+      ],
+    })),
+    blockNumber,
+  );
+  const out = new Map<string, bigint>();
+  markets.forEach((m, i) => {
+    const r = ok(answers[i]) as bigint | undefined;
+    if (r != null) out.set(m.id, r);
+  });
+  return out;
+}
+
+/** One leg as the test takes it, from its reads, accrued to `timestamp`:
+ *  null where the accrual needs a borrow rate that was not read. */
 export function legInput(
   id: string,
   read: MarketRead,
   supplyShares: bigint,
-  rateAtTarget: bigint | null,
+  borrowRate: bigint | null,
+  timestamp: number,
   collateralSymbol: string | null,
-): IlliquidLegInput {
+): IlliquidLegInput | null {
   const [, collateral, oracle, irm, lltv] = read.params;
-  const [supplyAssets, supplyShares_, borrowAssets, , lastUpdate] = read.market;
+  const s = settled(read.market);
+  const at = expectedMarket(s, irm, borrowRate, timestamp);
+  if (at == null) return null;
   return {
     id,
     collateralSymbol,
     isIdle: collateral.toLowerCase() === ZERO_ADDR && oracle.toLowerCase() === ZERO_ADDR,
     irm: irm.toLowerCase(),
     lltv: Number((lltv * BigInt(1_000_000)) / WAD) / 1_000_000,
-    vaultAssets: supplyShares_ === ZERO ? ZERO : (supplyShares * supplyAssets) / supplyShares_,
-    supplyAssets,
-    borrowAssets,
-    lastUpdate: Number(lastUpdate),
-    rateAtTarget,
+    vaultAssets: toAssetsDown(supplyShares, at.supplyAssets, at.supplyShares),
+    supplyAssets: at.supplyAssets,
+    borrowAssets: at.borrowAssets,
+    lastUpdate: s.lastUpdate,
+    settledUtilisation:
+      s.totalSupplyAssets === ZERO
+        ? 0
+        : Number((s.totalBorrowAssets * BigInt(1_000_000)) / s.totalSupplyAssets) / 1_000_000,
+    rateAtTarget: null,
   };
 }
 
@@ -175,21 +244,29 @@ export async function readMetaMorphoIlliquid(
     ]),
     blockNumber,
   );
-  const markets = new Map<string, MarketRead>();
+  const read = new Map<string, MarketRead>();
   distinct.forEach((id, k) => {
     const market = ok(marketAnswers[2 * k]) as MarketTuple | undefined;
     const params = ok(marketAnswers[2 * k + 1]) as ParamsTuple | undefined;
-    if (market && params) markets.set(id, { market, params });
+    if (market && params) read.set(id, { market, params });
   });
+
+  // 4. Each market accrued to the block. One whose rate did not answer is unread.
+  const timestamp = Number((await client.getBlock({ blockNumber })).timestamp);
+  const accruing = [...read].filter(([, r]) => readNeedsBorrowRate(r, timestamp)).map(([id, r]) => ({ id, read: r }));
+  const borrowRates = await readBorrowRates(client, blockNumber, accruing);
+  // The market's totals at the block, as a leg with no supply of the vault's.
+  const markets = new Map<string, MarketRead>();
+  const atBlock = new Map<string, IlliquidLegInput>();
+  for (const [id, r] of read) {
+    const l = legInput(id, r, ZERO, borrowRates.get(id) ?? null, timestamp, null);
+    if (l == null) continue;
+    markets.set(id, r);
+    atBlock.set(id, l);
+  }
   const hot = (id: string) => {
-    const m = markets.get(id);
-    if (!m) return false;
-    return needsRateAtTarget(chainId, {
-      isIdle: m.params[1].toLowerCase() === ZERO_ADDR && m.params[2].toLowerCase() === ZERO_ADDR,
-      irm: m.params[3],
-      supplyAssets: m.market[0],
-      borrowAssets: m.market[2],
-    });
+    const l = atBlock.get(id);
+    return l != null && needsRateAtTarget(chainId, l);
   };
 
   // A vault with a market unread cannot be tested; one with no hot market is not caught.
@@ -202,7 +279,7 @@ export async function readMetaMorphoIlliquid(
     else out.set(v, null);
   }
 
-  // 4. Positions on every leg of a candidate's queue, and the hot markets' rates.
+  // 5. Positions on every leg of a candidate's queue, and the hot markets' rates.
   const posSlots = candidates.flatMap((v) => (queues.get(v) ?? []).map((id) => ({ vault: v, id })));
   const hotIds = [...new Set(posSlots.map((s) => s.id).filter(hot))];
   const [positions, rates] = await Promise.all([
@@ -228,12 +305,14 @@ export async function readMetaMorphoIlliquid(
     shares.set(`${s.vault}:${s.id}`, p?.[0]);
   });
 
-  const timestamp = candidates.length > 0 ? Number((await client.getBlock({ blockNumber })).timestamp) : 0;
   const caught = new Map<string, IlliquidLegInput[]>();
   for (const v of candidates) {
     const q = queues.get(v)!;
     if (q.some((id) => shares.get(`${v}:${id}`) == null)) continue;
-    const legs = q.map((id) => legInput(id, markets.get(id)!, shares.get(`${v}:${id}`)!, rates.get(id) ?? null, null));
+    const legs = q.map((id) => ({
+      ...legInput(id, markets.get(id)!, shares.get(`${v}:${id}`)!, borrowRates.get(id) ?? null, timestamp, null)!,
+      rateAtTarget: rates.get(id) ?? null,
+    }));
     const il = vaultIlliquid(chainId, Number(blockNumber), timestamp, legs);
     if (il == null) out.set(v, null);
     else caught.set(v, legs);

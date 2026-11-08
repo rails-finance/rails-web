@@ -15,12 +15,13 @@
 // settlement reaches the maximum from the minimum in about 55 days, so a stored
 // figure at the minimum can sit under a market paying the ceiling.
 //
-// A leg's assets are Morpho Blue's stored totals (the market as last
-// settled), the same figure V3 draws, and its share is over the queue's sum.
-// What can be withdrawn is, per leg, the lesser of the vault's assets there
-// and the market's free liquidity (supply less borrow), summed. Accrual adds
-// the same interest to both sides of a market, so the free liquidity is the
-// head's figure though the totals are stored.
+// A leg's assets are the market's totals accrued to the block, as
+// MorphoBalancesLib's `expectedMarketBalances` accrues them with the IRM's
+// `borrowRateView`, and the vault's supply shares converted over them: the
+// figure MetaMorpho's `totalAssets()` sums. A market unsettled for months
+// holds far more than its stored totals say. Each leg's share is over the
+// queue's sum. What can be withdrawn is, per leg, the lesser of the vault's
+// assets there and the market's free liquidity (supply less borrow), summed.
 //
 // The borrow rate is the IRM's curve at the stored utilisation over the
 // adapted rate at target: at its maximum it cannot adapt higher, and at full utilisation it is the ceiling,
@@ -35,6 +36,10 @@ export const ADAPTIVE_CURVE_IRM: Readonly<Record<number, string>> = {
 };
 
 const WAD = BigInt("1000000000000000000");
+const ZERO = BigInt(0);
+/** SharesMathLib's virtual shares and assets. */
+const VIRTUAL_SHARES = BigInt(1_000_000);
+const VIRTUAL_ASSETS = BigInt(1);
 const YEAR_SECONDS = 31_536_000;
 /** ConstantsLib.MAX_RATE_AT_TARGET: 2.0 a year, per second, in WAD. */
 export const MAX_RATE_AT_TARGET = (BigInt(2) * WAD) / BigInt(YEAR_SECONDS);
@@ -61,12 +66,15 @@ export interface IlliquidLegInput {
   isIdle: boolean;
   irm: string;
   lltv: number;
-  /** The vault's assets in the market, on the stored totals. */
+  /** The vault's assets in the market, over the totals accrued to the block. */
   vaultAssets: bigint;
+  /** The market's totals accrued to the block. */
   supplyAssets: bigint;
   borrowAssets: bigint;
   /** `market(id).lastUpdate`, a unix second. */
   lastUpdate: number;
+  /** Borrow over supply as last settled: the utilisation the IRM adapts on. */
+  settledUtilisation: number;
   /** `rateAtTarget(id)` as stored, per second in WAD; null where it was not read. */
   rateAtTarget: bigint | null;
 }
@@ -94,6 +102,63 @@ export interface VaultIlliquid {
   share: number;
   /** Σ over the legs of min(vault's assets, supply − borrow), raw. */
   withdrawable: string;
+}
+
+// ── Accrual (MorphoBalancesLib, SharesMathLib, MathLib) ─────────────────────
+
+/** `market(id)` as stored. */
+export interface SettledMarket {
+  totalSupplyAssets: bigint;
+  totalSupplyShares: bigint;
+  totalBorrowAssets: bigint;
+  /** A unix second. */
+  lastUpdate: number;
+  /** WAD. */
+  fee: bigint;
+}
+
+/** Does accruing this market to `timestamp` need the IRM's `borrowRateView`? */
+export const needsBorrowRate = (m: SettledMarket, irm: string, timestamp: number): boolean =>
+  timestamp > m.lastUpdate && m.totalBorrowAssets > ZERO && BigInt(irm) !== ZERO;
+
+const wMulDown = (x: bigint, y: bigint) => (x * y) / WAD;
+
+/** MathLib.wTaylorCompounded: e^(x·n) − 1, to the third term. */
+const wTaylorCompounded = (x: bigint, n: bigint) => {
+  const first = x * n;
+  const second = (first * first) / (BigInt(2) * WAD);
+  const third = (second * first) / (BigInt(3) * WAD);
+  return first + second + third;
+};
+
+/** SharesMathLib.toAssetsDown. */
+export const toAssetsDown = (shares: bigint, totalAssets: bigint, totalShares: bigint): bigint =>
+  (shares * (totalAssets + VIRTUAL_ASSETS)) / (totalShares + VIRTUAL_SHARES);
+
+/** MorphoBalancesLib.expectedMarketBalances: the market accrued to
+ *  `timestamp` at `borrowRate` (per second, WAD), with the fee's shares
+ *  minted. Null where the accrual needs a rate that was not read. */
+export function expectedMarket(
+  m: SettledMarket,
+  irm: string,
+  borrowRate: bigint | null,
+  timestamp: number,
+): { supplyAssets: bigint; supplyShares: bigint; borrowAssets: bigint } | null {
+  let supplyAssets = m.totalSupplyAssets;
+  let supplyShares = m.totalSupplyShares;
+  let borrowAssets = m.totalBorrowAssets;
+  if (needsBorrowRate(m, irm, timestamp)) {
+    if (borrowRate == null) return null;
+    const interest = wMulDown(borrowAssets, wTaylorCompounded(borrowRate, BigInt(timestamp - m.lastUpdate)));
+    borrowAssets += interest;
+    supplyAssets += interest;
+    if (m.fee !== ZERO) {
+      const feeAmount = wMulDown(interest, m.fee);
+      // SharesMathLib.toSharesDown over the supply before the fee.
+      supplyShares += (feeAmount * (supplyShares + VIRTUAL_SHARES)) / (supplyAssets - feeAmount + VIRTUAL_ASSETS);
+    }
+  }
+  return { supplyAssets, supplyShares, borrowAssets };
 }
 
 /** Is a market's utilisation at or above 99.9%? A market with no supply is not. */
@@ -140,7 +205,7 @@ export function vaultIlliquid(
   timestamp: number,
   legs: readonly IlliquidLegInput[],
 ): VaultIlliquid | null {
-  const zero = BigInt(0);
+  const zero = ZERO;
   const sum = legs.reduce((s, l) => s + l.vaultAssets, zero);
   if (sum === zero) return null;
   const markets: IlliquidMarket[] = [];
@@ -152,7 +217,7 @@ export function vaultIlliquid(
     const share = Number((l.vaultAssets * BigInt(1_000_000)) / sum) / 1_000_000;
     if (share < ILLIQUID_MIN_SHARE || !needsRateAtTarget(chainId, l) || l.rateAtTarget == null) continue;
     const utilisation = Number((l.borrowAssets * BigInt(1_000_000)) / l.supplyAssets) / 1_000_000;
-    const rateAtTarget = adaptedRateAtTarget(l.rateAtTarget, utilisation, timestamp - l.lastUpdate);
+    const rateAtTarget = adaptedRateAtTarget(l.rateAtTarget, l.settledUtilisation, timestamp - l.lastUpdate);
     if (rateAtTarget >= MAX_RATE_AT_TARGET) {
       caught += l.vaultAssets;
       markets.push({

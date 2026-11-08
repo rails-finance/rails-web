@@ -10,6 +10,8 @@ import {
   RATE_CEILING_YEARLY,
   ADAPTIVE_CURVE_IRM,
   adaptedRateAtTarget,
+  expectedMarket,
+  toAssetsDown,
 } from "../../lib/vaults/illiquid.ts";
 
 const IRM = ADAPTIVE_CURVE_IRM[8453];
@@ -25,6 +27,7 @@ const leg = (o) => ({
   supplyAssets: 1000n,
   borrowAssets: 1000n,
   lastUpdate: 1_760_000_000,
+  settledUtilisation: 1,
   rateAtTarget: MAX_RATE_AT_TARGET,
   ...o,
 });
@@ -98,4 +101,51 @@ test("a full market's stored minimum adapts to the maximum in about 55 days", ()
   assert.ok(il);
   assert.equal(Math.round(il.markets[0].borrowRateYearly * 100), 800);
   assert.equal(adaptedRateAtTarget(MAX_RATE_AT_TARGET, 0.5, 365 * 86_400), MIN);
+});
+
+test("a market unsettled for months is weighed on its accrued totals (spDAI's shape)", () => {
+  const WAD = 1_000_000_000_000_000_000n;
+  const DAY = 86_400;
+  // A full market, settled 196 days ago, the vault's 25 of its 26 supplied.
+  const stuck = {
+    totalSupplyAssets: 26n * WAD,
+    totalSupplyShares: 26n * WAD * 1_000_000n,
+    totalBorrowAssets: 26n * WAD,
+    lastUpdate: T,
+    fee: 0n,
+  };
+  // A market at 15%, settled at the block.
+  const open = {
+    totalSupplyAssets: 2000n * WAD,
+    totalSupplyShares: 2000n * WAD * 1_000_000n,
+    totalBorrowAssets: 300n * WAD,
+    lastUpdate: T + 196 * DAY,
+    fee: 0n,
+  };
+  const now = T + 196 * DAY;
+  const avgRate = (7n * WAD) / 31_536_000n; // 700% a year, the climb to the ceiling averaged
+  const legOf = (id, m, shares, rate) => {
+    const at = expectedMarket(m, IRM, rate, now);
+    return leg({
+      id,
+      vaultAssets: toAssetsDown(shares, at.supplyAssets, at.supplyShares),
+      supplyAssets: at.supplyAssets,
+      borrowAssets: at.borrowAssets,
+      lastUpdate: m.lastUpdate,
+      settledUtilisation: Number((m.totalBorrowAssets * 1000n) / m.totalSupplyAssets) / 1000,
+      rateAtTarget: m === stuck ? MAX_RATE_AT_TARGET : null,
+    });
+  };
+  // Without the rate the accrual cannot be made.
+  assert.equal(expectedMarket(stuck, IRM, null, now), null);
+  // On the stored totals the full market is 25 of 1,025: under 10%.
+  const storedShare = 25 / 1025;
+  assert.ok(storedShare < 0.1);
+  const il = vaultIlliquid(8453, 1, now, [
+    legOf("0xa", open, 800n * WAD * 1_000_000n, null),
+    legOf("0xb", stuck, 25n * WAD * 1_000_000n, avgRate),
+  ]);
+  assert.ok(il);
+  assert.equal(il.markets[0].id, "0xb");
+  assert.ok(il.share > 0.1);
 });
