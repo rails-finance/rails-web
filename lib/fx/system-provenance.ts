@@ -114,7 +114,7 @@ export const indexIdentityProv = (label: string, address: string, exact: boolean
   kind: "chain-derived",
   pclass: "state",
   summary: exact
-    ? `The index identities re-checked on THIS read, in integers: totalRawDebts == debtShares × debtIndex ÷ 2^96 and totalRawCollaterals == collShares × 2^96 ÷ collIndex, both exact. These are the same identities every per-tick amount below is derived through, so the check covers the ladder's arithmetic.`
+    ? `The index identities re-checked on THIS read, in integers. totalRawDebts == debtShares × debtIndex ÷ 2^96 and totalRawCollaterals == collShares × 2^96 ÷ collIndex, both exact. These are the same identities every per-tick amount below is derived through, so the check covers the ladder's arithmetic.`
     : `The index identities did NOT close on this read — shares × index disagrees with the pool's own raw totals. The per-tick amounts below pass through this same arithmetic, so treat them as suspect until a later block closes it.`,
   contract: pool(label, address),
   via: `${SYSTEM_VIA} · derived check`,
@@ -331,7 +331,7 @@ export const tickCollProv = (
 export const tickRatioProv = (label: string, address: string, tick: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `Tick ${tick}'s current debt ratio, judged the way the protocol's own engines judge a tick: raw debt × 1e36 ÷ (raw collateral × the oracle's MIN leg) — the exact comparison the rebalance and liquidation sweeps run (their code takes the min price; getLiquidatePrice IS the min leg). Deliberately NOT the anchor leg a position's stated ratio uses; the two judgments coexist in the protocol and are named apart here. Funding moves this ratio for every tick at once — the ladder drifts toward the rungs while every position stands still.`,
+  summary: `Tick ${tick}'s current debt ratio, judged the way the protocol's own engines judge a tick. Raw debt × 1e36 ÷ (raw collateral × the oracle's MIN leg) — the exact comparison the rebalance and liquidation sweeps run (their code takes the min price; getLiquidatePrice IS the min leg). Deliberately NOT the anchor leg a position's stated ratio uses; the two judgments coexist in the protocol and are named apart here. Funding moves this ratio for every tick at once — the ladder drifts toward the rungs while every position stands still.`,
   contract: pool(label, address),
   via: `${SYSTEM_VIA} · derived ratio at the min leg`,
   formula: "tick raw debt × 1e36 ÷ (tick raw coll × min price)",

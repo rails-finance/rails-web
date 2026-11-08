@@ -261,7 +261,7 @@ export function PolarisSinceLastTouchRow({
   const totalProv: Provenance = {
     kind: "derived",
     summary:
-      `The whole change in this position's equity at the feed since its ${w.sinceOpen ? "open" : "last touch"}: the feed's ` +
+      `The whole change in this position's equity at the feed since its ${w.sinceOpen ? "open" : "last touch"}. The feed's ` +
       `effect plus the protocol's legs. The holder did nothing inside this window, so no other cause exists. Equity ` +
       `here is a valuation at a block.`,
     formula: "(entireColl × price now − max(0, entireDebt)) − (coll × price at the touch − debt)",
@@ -469,8 +469,8 @@ function polarisLiveSheet(
         pclass: "oracle",
         summary:
           token === "coll"
-            ? `${what} in US dollars: the pETH times the feed's price for pETH in ${stable}, times ${stable} in dollars, ${atHead}.`
-            : `${what} in US dollars: the ${stable} times its price in dollars, ${atHead}.`,
+            ? `${what} in US dollars. The pETH times the feed's price for pETH in ${stable}, times ${stable} in dollars, ${atHead}.`
+            : `${what} in US dollars. The ${stable} times its price in dollars, ${atHead}.`,
         formula:
           token === "coll" ? `pETH × pETH price in ${stable} × ${stable} in USD` : `${stable} × ${stable} in USD`,
         inputs: [

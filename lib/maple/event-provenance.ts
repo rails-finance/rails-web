@@ -251,7 +251,7 @@ export const transferValueProv = (
     kind: "chain-derived",
     pclass: fromChain ? "state" : "emitted",
     verify: fromChain ? stateVerify("totalAssets() and totalSupply()", coords.blockNumber) : txVerify(coords),
-    summary: `What the ${poolSym} moved were worth in ${assetSym}${atBlock(coords)}: the shares times the pool's rate in that block. ${
+    summary: `What the ${poolSym} moved were worth in ${assetSym}${atBlock(coords)}. The shares times the pool's rate in that block. ${
       fromChain
         ? `The rate is the pool's totalAssets() ÷ totalSupply() read at the block, the division convertToAssets makes.`
         : `The rate is the ${log} another lender made in the same block — its own assets ÷ shares, the pool pricing a share at that moment.`
@@ -463,7 +463,7 @@ export const claimAfterProv = (
             text: `Re-run the pool's convertToAssets eth_call on the wallet's balanceOf plus its escrowed shares at block ${coords.blockNumber} against an archive node`,
           }
         : b.verify,
-    summary: `${assetSym} the position's ${poolSym} were worth after this event${atBlock(coords)}: the shares held plus any escrowed in the withdrawal queue, times the pool's rate in this block (${b.words}). Interest accrued before this event is inside the figure. ${CUSTODY_NOTE}`,
+    summary: `${assetSym} the position's ${poolSym} were worth after this event${atBlock(coords)}. The shares held plus any escrowed in the withdrawal queue, times the pool's rate in this block (${b.words}). Interest accrued before this event is inside the figure. ${CUSTODY_NOTE}`,
     contract: poolContract(coords),
     via: `(shares + escrowed) × ${b.fromChain ? "totalAssets ÷ totalSupply (archive read)" : "assets ÷ shares (same-block log)"}${raw ? ` = ${raw}` : ""}`,
     formula: "(shares + escrowed) × rate",
@@ -508,7 +508,7 @@ export const interestSincePrevProv = (
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `${assetSym} the position's ${poolSym} earned between the previous event in this pool and this one: the shares and escrow it held after the previous event, valued at the pool's rate in this block, less their value at the previous event's block rate. Every share movement is an event, so the holding did not change in between and the difference is the pool's rate rising on it: interest accrued by the loan book. A loss the pool delegate marked would read negative. ${CUSTODY_NOTE}`,
+  summary: `${assetSym} the position's ${poolSym} earned between the previous event in this pool and this one. The shares and escrow it held after the previous event, valued at the pool's rate in this block, less their value at the previous event's block rate. Every share movement is an event, so the holding did not change in between and the difference is the pool's rate rising on it: interest accrued by the loan book. A loss the pool delegate marked would read negative. ${CUSTODY_NOTE}`,
   contract: poolContract(coords),
   via: `held after the previous event × (rate now − rate then)${raw ? ` = ${raw}` : ""}`,
   formula: "held × rate now − held × rate then",
@@ -544,7 +544,7 @@ export const queueWaitProv = (requestAt: number, filledAt: number): Provenance =
 export const interestEarnedLifetimeProv = (sym: string): Provenance => ({
   kind: "chain-derived",
   pclass: "indexed",
-  summary: `Interest earned on the ${sym} position over its life: what it holds now (zero once closed) plus everything that came out (withdrawals and shares sent), less everything that went in (deposits and shares received), each transfer valued at the pool's rate in its block. It equals the interest the timeline rows state since each previous event in the pool, added up, with the rise since the last event. The exit rate leg carries the loan-book caveat: the accrued side is Maple's on-chain bookkeeping of off-chain-collateralized loans.`,
+  summary: `Interest earned on the ${sym} position over its life. What it holds now (zero once closed) plus everything that came out (withdrawals and shares sent), less everything that went in (deposits and shares received), each transfer valued at the pool's rate in its block. It equals the interest the timeline rows state since each previous event in the pool, added up, with the rise since the last event. The exit rate leg carries the loan-book caveat: the accrued side is Maple's on-chain bookkeeping of off-chain-collateralized loans.`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
   via: "held now + withdrawn + sent − deposited − received",
   formula: "held now − net principal",
@@ -570,7 +570,7 @@ export const externalActorProv = (
   kind: "chain-derived",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `This ${args.eventType.replace(/_/g, " ")} was executed by a third party: the position owner neither signed the transaction nor was the event's own caller. Both facts are chain values${atBlock(coords)}; each is compared against the owner. Deposits made on behalf (a router, a manager) keep the owner in the log's \`owner\` param — this event has the owner as neither actor.`,
+  summary: `This ${args.eventType.replace(/_/g, " ")} was executed by a third party. The position owner neither signed the transaction nor was the event's own caller. Both facts are chain values${atBlock(coords)}; each is compared against the owner. Deposits made on behalf (a router, a manager) keep the owner in the log's \`owner\` param — this event has the owner as neither actor.`,
   contract: poolContract(coords),
   via: `${MAPLE_VIA} · tx envelope from + caller param vs owner`,
   inputs: eventInputs(coords, [

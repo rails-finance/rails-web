@@ -260,7 +260,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
     summary:
       when === "previous"
         ? `${baseSym} owed once the account's previous event in this market had run. The base balance the position's replay of its rows holds at that row, interest to then included.`
-        : `${baseSym} owed just before this event: the base balance once the previous event had run plus the interest charged since, from the position's replay of its rows.`,
+        : `${baseSym} owed just before this event. The base balance once the previous event had run plus the interest charged since, from the position's replay of its rows.`,
     formula:
       when === "previous"
         ? "−base balance at the previous row"

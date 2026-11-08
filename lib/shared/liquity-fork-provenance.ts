@@ -749,8 +749,8 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     pclass: "state",
     summary:
       vals.which === "pool"
-        ? `The branch's liquidation penalty on debt the Stability Pool absorbs: the pool receives that debt plus this share of it, in collateral at the branch's price.`
-        : `The branch's liquidation penalty on redistributed debt: the other Troves receive that debt plus this share of it, in collateral at the branch's price.`,
+        ? `The branch's liquidation penalty on debt the Stability Pool absorbs. The pool receives that debt plus this share of it, in collateral at the branch's price.`
+        : `The branch's liquidation penalty on redistributed debt. The other Troves receive that debt plus this share of it, in collateral at the branch's price.`,
     via: vals.source,
     inputs: [{ label: "penalty", value: vals.pct, kind: "chain", pclass: "state" }, ...eventInputs(coords)],
   });

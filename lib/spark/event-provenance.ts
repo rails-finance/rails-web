@@ -104,7 +104,7 @@ export const externalActorProv = (
   kind: "chain-derived",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `This ${args.eventType} was executed by a third party: the position owner neither signed the transaction nor made the Pool call. The transaction sender and the Pool's msg.sender (the ${args.eventType === "repay" ? "Repay event's repayer param" : `${args.eventType} event's user param`}) are both chain facts${atBlock(coords)}; each is compared against the owner. Routed flows keep the owner as signer and contract-owned positions keep the owner as Pool caller — this event has the owner as neither.`,
+  summary: `This ${args.eventType} was executed by a third party. The position owner neither signed the transaction nor made the Pool call. The transaction sender and the Pool's msg.sender (the ${args.eventType === "repay" ? "Repay event's repayer param" : `${args.eventType} event's user param`}) are both chain facts${atBlock(coords)}; each is compared against the owner. Routed flows keep the owner as signer and contract-owned positions keep the owner as Pool caller — this event has the owner as neither.`,
   contract: SPARK,
   via: `${SPARK_VIA} · tx envelope from + ${args.eventType === "repay" ? "repayer" : "user"} param vs owner`,
   inputs: eventInputs(coords, [
@@ -396,8 +396,8 @@ export const sparkInterestCaptionProv = (side: "supply" | "debt"): Provenance =>
   pclass: "indexed",
   summary:
     side === "supply"
-      ? "Supply interest inside the collateral balance above: per reserve, the interest added since the balance last started from zero (a balance under a cent counts as zero). Each row states the balance before and after it, so each row's before less the previous row's after is the interest between them, and the balance now less the last row's after is the interest since. Valued at the price the SparkLend oracle reports now. Interest from before that start left with earlier withdrawals; the Lifetime flows panel counts all of it."
-      : "Borrow interest inside the debt balance above: per reserve, the interest added since the debt last started from zero. Each row states the debt before and after it, so each row's before less the previous row's after is the interest between them, and the debt now less the last row's after is the interest since. Valued at the price the SparkLend oracle reports now. Interest from before that start was repaid; the Lifetime flows panel counts all of it.",
+      ? "Supply interest inside the collateral balance above. Per reserve, the interest added since the balance last started from zero (a balance under a cent counts as zero). Each row states the balance before and after it, so each row's before less the previous row's after is the interest between them, and the balance now less the last row's after is the interest since. Valued at the price the SparkLend oracle reports now. Interest from before that start left with earlier withdrawals; the Lifetime flows panel counts all of it."
+      : "Borrow interest inside the debt balance above. Per reserve, the interest added since the debt last started from zero. Each row states the debt before and after it, so each row's before less the previous row's after is the interest between them, and the debt now less the last row's after is the interest since. Valued at the price the SparkLend oracle reports now. Interest from before that start was repaid; the Lifetime flows panel counts all of it.",
   contract: SPARK,
   via: "Σ (row before − previous row after) + (balance now − last row after), since the balance last started from zero, × IAaveOracle getAssetPrice, per reserve",
   formula: "interest since the balance started from zero × oracle price",
@@ -617,7 +617,7 @@ export const rowInterestProv = (sym: string, side: "supply" | "debt", coords: Sp
   pclass: "indexed",
   summary: `Interest the ${side === "supply" ? "supplied" : "borrowed"} ${sym} ${
     side === "supply" ? "earned" : "accrued"
-  } since the last transaction that moved it: the scaled balance held over that time, valued at this transaction's ${
+  } since the last transaction that moved it. The scaled balance held over that time, valued at this transaction's ${
     side === "supply" ? "liquidity" : "variable borrow"
   } index, less the same balance at the index of that transaction. It is the gap between this event's balance before and the previous event's balance after.`,
   contract: SPARK,

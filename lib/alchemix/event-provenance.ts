@@ -415,7 +415,7 @@ export function eventsAloneDebtProv(
   return {
     kind: "chain-derived",
     pclass: "indexed",
-    summary: `${symbol} debt from this position's events alone: every mint, burn, repay and liquidation it emitted, added up to block ${reducedToBlock}. A redemption clears debt with no event of the position's to show it, so from the line's first redemption at block ${validToBlock} this sum can sit above the debt read now.`,
+    summary: `${symbol} debt from this position's events alone. Every mint, burn, repay and liquidation it emitted, added up to block ${reducedToBlock}. A redemption clears debt with no event of the position's to show it, so from the line's first redemption at block ${validToBlock} this sum can sit above the debt read now.`,
     contract: alchemistContract(coords),
     via: `${ALCHEMIX_VIA} · replayed per position`,
     formula: "Σ debt added by the position's own events − Σ debt they cleared",

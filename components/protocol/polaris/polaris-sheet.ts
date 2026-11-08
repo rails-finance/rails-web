@@ -145,8 +145,8 @@ export function polarisSheet(
     pclass: "oracle",
     summary:
       token === "coll"
-        ? `${what} in US dollars: the pETH times the market's feed price for pETH in ${stable}, times ${stable}'s price in dollars (${prevUnit?.words}), at the previous event's block.`
-        : `${what} in US dollars: the ${stable} times its price in dollars (${prevUnit?.words}) at the previous event's block.`,
+        ? `${what} in US dollars. The pETH times the market's feed price for pETH in ${stable}, times ${stable}'s price in dollars (${prevUnit?.words}), at the previous event's block.`
+        : `${what} in US dollars. The ${stable} times its price in dollars (${prevUnit?.words}) at the previous event's block.`,
     formula: token === "coll" ? `pETH × pETH price in ${stable} × ${stable} in USD` : `${stable} × ${stable} in USD`,
     via: "polaris_oracle_at_block",
     inputs: [
@@ -208,8 +208,8 @@ export function polarisSheet(
     pclass: "oracle",
     summary:
       token === "coll"
-        ? `${what} in US dollars: the pETH times the market's feed price for pETH in ${stable}, times ${stable}'s price in dollars (${unit?.words}), at this block.`
-        : `${what} in US dollars: the ${stable} times its price in dollars (${unit?.words}) at this block.`,
+        ? `${what} in US dollars. The pETH times the market's feed price for pETH in ${stable}, times ${stable}'s price in dollars (${unit?.words}), at this block.`
+        : `${what} in US dollars. The ${stable} times its price in dollars (${unit?.words}) at this block.`,
     formula: token === "coll" ? `pETH × pETH price in ${stable} × ${stable} in USD` : `${stable} × ${stable} in USD`,
     via: "polaris_oracle_at_block",
     inputs: [

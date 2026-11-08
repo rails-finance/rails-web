@@ -283,7 +283,7 @@ export const llamaLiqSeizedValueProv = (
   parts: { collateral: string; price?: string; converted: string },
 ): Provenance => ({
   kind: "chain-derived",
-  summary: `Everything the liquidation took from the position's AMM holding, valued in ${borrowedSymbol}: the unconverted ${collateralSymbol} leg at the AMM's own oracle price at this block, plus the ${borrowedSymbol} soft-liquidation had already converted, at face. Both legs are the Liquidate log's own fields — collateral_received and stablecoin_received; the converted leg is a taking of ${borrowedSymbol} the position already held, never part of the debt.`,
+  summary: `Everything the liquidation took from the position's AMM holding, valued in ${borrowedSymbol}. The unconverted ${collateralSymbol} leg at the AMM's own oracle price at this block, plus the ${borrowedSymbol} soft-liquidation had already converted, at face. Both legs are the Liquidate log's own fields — collateral_received and stablecoin_received; the converted leg is a taking of ${borrowedSymbol} the position already held, never part of the debt.`,
   formula: "collateral × price + converted",
   inputs: [
     {
@@ -407,7 +407,7 @@ export const liquidationConvertedProv = (sym: string, coords: LlamalendCoords, r
 export const llamalendLostProv = (sym: string, controller?: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `${sym} the AMM sold while the price sat in this position's bands and did not buy back: everything deposited, less everything withdrawn, less what the position holds now. Nothing is converted at head and nothing was liquidated, so no other way out remains.`,
+  summary: `${sym} the AMM sold while the price sat in this position's bands and did not buy back. Everything deposited, less everything withdrawn, less what the position holds now. Nothing is converted at head and nothing was liquidated, so no other way out remains.`,
   formula: "deposited − withdrawn − held now",
   contract: { name: "LlamaLend Controller", address: controller ?? "" },
   via: `${LLAMALEND_VIA} · Σ emitted collateral amounts · user_state @ head`,
@@ -424,7 +424,7 @@ export const llamalendLostProv = (sym: string, controller?: string): Provenance 
 export const llamalendSoldProv = (sym: string, controller?: string): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `${sym} the AMM has sold from this position and not bought back: everything deposited, less everything withdrawn, less what the position holds now. The converted balance is what the AMM holds for it; nothing was liquidated.`,
+  summary: `${sym} the AMM has sold from this position and not bought back. Everything deposited, less everything withdrawn, less what the position holds now. The converted balance is what the AMM holds for it; nothing was liquidated.`,
   formula: "deposited − withdrawn − held now",
   contract: { name: "LlamaLend Controller", address: controller ?? "" },
   via: `${LLAMALEND_VIA} · Σ emitted collateral amounts · user_state @ head`,

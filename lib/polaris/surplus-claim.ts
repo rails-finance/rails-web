@@ -72,7 +72,7 @@ export function polarisSurplusCreditProv(coords: PolarisSurplusCoords, s: Polari
   return {
     kind: "chain",
     pclass: "indexed",
-    summary: `The pETH the liquidation credited to the owner in the market's CollSurplusPool${blockPart}: the SurplusAccounted log's amount, equal to the Liquidation log's \`_collSurplus\`. The index serves it as \`credit_amount\`.`,
+    summary: `The pETH the liquidation credited to the owner in the market's CollSurplusPool${blockPart}. The SurplusAccounted log's amount, equal to the Liquidation log's \`_collSurplus\`. The index serves it as \`credit_amount\`.`,
     contract: poolOf(coords.market),
     via: `${API} · surplus.liquidations[].credit_amount (SurplusAccounted, owner ${s.owner})`,
     ...(coords.txHash
@@ -118,7 +118,7 @@ export function polarisSurplusClaimProv(coords: PolarisSurplusCoords, s: Polaris
   return {
     kind: "chain",
     pclass: "indexed",
-    summary: `When the owner claimed: the block time of the pool's CollSurplusClaimed log at block ${c.block.toLocaleString("en-US")}, the owner's first claim after the credit. A claim pays the owner's whole balance in the pool. The index serves it as \`claim_timestamp\`.`,
+    summary: `When the owner claimed. The block time of the pool's CollSurplusClaimed log at block ${c.block.toLocaleString("en-US")}, the owner's first claim after the credit. A claim pays the owner's whole balance in the pool. The index serves it as \`claim_timestamp\`.`,
     contract: poolOf(coords.market),
     via: `${API} · surplus.liquidations[].claim_timestamp, claim_tx_hash, claim_amount (CollSurplusClaimed)`,
     verify: {
