@@ -22,8 +22,9 @@
 // every row. A vault with no figure for the key sorts last, both ways.
 //
 // The whole row links the vault's page (the name is the one focusable link).
-// BELOW sm the table scrolls inside its own frame with the lead zone and the
-// Vault column pinned at the left; the page never scrolls sideways.
+// BELOW sm each row reads as a card (D6): the protocol's hue as its left edge,
+// the mark and chain beside the asset's icon, the name across, the figures
+// two by two under their labels; a select and a direction button sort.
 
 import Link from "next/link";
 import { useCallback, type ReactNode } from "react";
@@ -38,10 +39,11 @@ import {
   DataTableHeader,
   DataTableLeadCell,
   DataTableLeadHeader,
+  DataTableLeadMark,
   DataTableRow,
   DataTableRowLink,
 } from "@/components/shared/data-table/data-table";
-import { STANDING_WORD, VAULT_PILL, vaultHeads, YIELD_LABEL_TIP } from "@/components/vaults/vault-heads";
+import { STANDING_WORD, vaultHeads, YIELD_LABEL_TIP } from "@/components/vaults/vault-heads";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { VAULT_FAMILIES } from "@/lib/vaults/families";
@@ -117,11 +119,12 @@ function comparator(key: SortKey, dir: "asc" | "desc", yieldOf: (v: VaultSummary
   };
 }
 
-/** Below sm the lead zone and the Vault column stay pinned while the frame scrolls. */
-const PIN_LEAD = "max-sm:sticky max-sm:left-0";
-const PIN_VAULT = "max-sm:sticky max-sm:left-16";
-
 const n = (x: number) => x.toLocaleString("en-US");
+
+/** A standing pill on a row: a ground apart from both stripes and the hovered
+ *  row's `bg-selected` (the card's VAULT_PILL is rb-300, which is that). */
+const PILL =
+  "rounded-sm bg-background px-1.5 py-0.5 text-[11px] text-foreground/80 dark:bg-rb-600 dark:text-foreground/70";
 
 export function VaultIndexTable({
   rows,
@@ -152,21 +155,21 @@ export function VaultIndexTable({
   const dirParam = sp.get("dir");
   const dir: "asc" | "desc" = dirParam === "asc" || dirParam === "desc" ? dirParam : column.first;
 
-  const press = useCallback(
-    (key: SortKey) => {
-      const col = COLUMNS.find((c) => c.key === key)!;
-      const nextDir = key === sort ? (dir === "asc" ? "desc" : "asc") : col.first;
-      const p = new URLSearchParams(window.location.search);
-      if (key === DEFAULT_SORT) p.delete("sort");
-      else p.set("sort", key);
-      if (nextDir === col.first) p.delete("dir");
-      else p.set("dir", nextDir);
-      const qs = p.toString().replace(/%2C/gi, ",");
-      window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
-      notifyUrlChanged();
-    },
-    [sort, dir],
-  );
+  /** Writes the sort to the URL, each param only off its default. */
+  const writeSort = useCallback((key: SortKey, nextDir: "asc" | "desc") => {
+    const col = COLUMNS.find((c) => c.key === key)!;
+    const p = new URLSearchParams(window.location.search);
+    if (key === DEFAULT_SORT) p.delete("sort");
+    else p.set("sort", key);
+    if (nextDir === col.first) p.delete("dir");
+    else p.set("dir", nextDir);
+    const qs = p.toString().replace(/%2C/gi, ",");
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+    notifyUrlChanged();
+  }, []);
+  /** A header's press: the same key flips, another key takes its first direction. */
+  const press = (key: SortKey) =>
+    writeSort(key, key === sort ? (dir === "asc" ? "desc" : "asc") : COLUMNS.find((c) => c.key === key)!.first);
 
   const sorted = [...rows].sort(comparator(sort, dir, yieldOf));
 
@@ -200,18 +203,60 @@ export function VaultIndexTable({
 
   return (
     <div data-vault-table={part} data-anatomy="V6">
+      {/* Below sm the header row is hidden (D6): the sort is a select and a
+          direction button, writing the same params; the funded table's
+          control sorts both tables. */}
+      {part === "funded" && (
+        <div className="mb-3 sm:hidden" data-mobile-sort="">
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-2 text-[12px] text-rb-500">
+              Sort by
+              <select
+                value={sort}
+                onChange={(e) => {
+                  const key = e.target.value as SortKey;
+                  writeSort(key, COLUMNS.find((c) => c.key === key)!.first);
+                }}
+                className="rounded-md border border-rb-200 bg-background px-2 py-1 text-base text-foreground dark:border-rb-700"
+                aria-describedby={SORT_NOTE[sort] ? `${part}-mobile-sort-note` : undefined}
+              >
+                {COLUMNS.map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => writeSort(sort, dir === "asc" ? "desc" : "asc")}
+              className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-rb-200 px-2 py-1 text-[12px] text-foreground focus-ring dark:border-rb-700"
+              aria-label={dir === "asc" ? "Ascending; switch to descending" : "Descending; switch to ascending"}
+              data-mobile-sort-dir={dir}
+            >
+              <span aria-hidden>{dir === "asc" ? "▲" : "▼"}</span>
+              {column.numeric ? (dir === "asc" ? "Low first" : "High first") : dir === "asc" ? "A to Z" : "Z to A"}
+            </button>
+          </div>
+          {SORT_NOTE[sort] && (
+            <p id={`${part}-mobile-sort-note`} className="mt-1.5 text-[12px] text-rb-500" data-mobile-sort-note="">
+              {SORT_NOTE[sort]}
+            </p>
+          )}
+        </div>
+      )}
       <DataTable
         caption={`${part === "funded" ? "Vaults" : "Vaults that hold nothing"}; total assets and share price are in each vault’s asset`}
         tableClassName="min-w-[640px] text-sm"
+        stacked
       >
         <DataTableHead>
-          <DataTableLeadHeader sticky={PIN_LEAD} />
+          <DataTableLeadHeader />
           {COLUMNS.map((c) => (
             <DataTableHeader
               key={c.key}
               label={c.label}
               align={c.numeric ? "right" : "left"}
-              sticky={c.key === "vault" ? PIN_VAULT : ""}
               sort={{
                 dir: c.key === sort ? dir : null,
                 onSort: () => press(c.key),
@@ -236,8 +281,9 @@ export function VaultIndexTable({
             const holdersHref = holdersHrefOf(v);
             // `none`: what stands for an absent figure, for a screen reader
             // (the Yield slot's reason, with its `data-yield-none`).
-            const cell = (id: string, value: ReactNode, none: ReactNode = "no figure") => (
+            const cell = (id: string, label: string, value: ReactNode, none: ReactNode = "no figure") => (
               <DataTableCell
+                label={label}
                 align="right"
                 valign="middle"
                 className="whitespace-nowrap tabular-nums [&_.flex-wrap]:flex-nowrap [&_.flex-wrap]:justify-end"
@@ -293,15 +339,9 @@ export function VaultIndexTable({
                   protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
                   protocolName={VAULT_INDEX_PROTOCOL_LABEL[vaultIndexProtocol(v)]}
                   chain={v.chainId as ChainId}
-                  sticky={PIN_LEAD}
                 />
-                <DataTableCell
-                  rowHeader
-                  sticky={PIN_VAULT}
-                  valign="middle"
-                  className="max-sm:max-w-[150px] max-sm:min-w-[130px] sm:min-w-[260px]"
-                >
-                  <div className="flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:gap-2.5">
+                <DataTableCell rowHeader valign="middle" className="sm:min-w-[260px]">
+                  <div className="flex items-center gap-2.5">
                     <span className="shrink-0" data-prov-exempt>
                       <TokenChipIcon
                         symbol={v.asset.symbol}
@@ -311,35 +351,40 @@ export function VaultIndexTable({
                         untitled
                       />
                     </span>
-                    <span className="flex min-w-0 flex-col gap-1">
-                      <DataTableRowLink
-                        href={href}
-                        className="min-w-0 text-sm font-semibold break-words"
-                        data-vault-link={v.address}
-                        data-vault-name
-                      >
-                        {name != null ? name : <span className="font-mono">{shortAddress(v.address)}</span>}
-                      </DataTableRowLink>
-                      {v.standing.length > 0 && (
-                        <span className="flex flex-wrap gap-1">
-                          {v.standing.map((st) => (
-                            <span key={st} className={VAULT_PILL} data-pill={st}>
-                              {STANDING_WORD[st]}
-                            </span>
-                          ))}
-                        </span>
-                      )}
-                    </span>
+                    <DataTableLeadMark
+                      protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
+                      chain={v.chainId as ChainId}
+                    />
+                    <DataTableRowLink
+                      href={href}
+                      className="min-w-0 text-sm font-semibold break-words"
+                      data-vault-link={v.address}
+                      data-vault-name
+                    >
+                      {name != null ? name : <span className="font-mono">{shortAddress(v.address)}</span>}
+                    </DataTableRowLink>
                   </div>
+                  {/* The standing pills: their own line, under the name from
+                      sm (past the icon), from the card's left edge below sm. */}
+                  {v.standing.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1 sm:pl-[38px]">
+                      {v.standing.map((st) => (
+                        <span key={st} className={PILL} data-pill={st}>
+                          {STANDING_WORD[st]}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </DataTableCell>
-                {cell("total-assets", head("total-assets")?.value)}
-                {cell("share-price", head("share-price")?.value)}
+                {cell("total-assets", "Total assets", head("total-assets")?.value)}
+                {cell("share-price", "Share price", head("share-price")?.value)}
                 {cell(
                   "yield",
+                  "Yield",
                   yf && "yearly" in yf ? <span data-cell="yield">{yieldText(yf.yearly)}</span> : null,
                   head("yield")?.sub,
                 )}
-                {cell("holders", holders)}
+                {cell("holders", "Holders", holders)}
               </DataTableRow>
             );
           })}
