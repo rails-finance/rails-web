@@ -241,6 +241,8 @@ export interface PendleMarketPage {
   rewardTokens: Record<string, PendleTokenMeta>;
   router: PendleMarketSeen | null;
   recent: PendleMarketEvent[];
+  /** The cursor of the next page of router events ("block-txIndex-logIndex"); null on the last. */
+  next: string | null;
   provenance: PendleProvenance;
 }
 

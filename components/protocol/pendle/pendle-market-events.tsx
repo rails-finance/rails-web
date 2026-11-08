@@ -7,10 +7,9 @@
 // limit fill, the maker) and links to that wallet's position on this market.
 //
 // THE FILTER is in the URL (`?kind=pt,yt,liquidity,mint,limit`, only off the
-// default of every kind) and narrows the rows loaded. The api answers the 50
-// events at or before a block, so the next page is the market read at the
-// oldest block on the page (/api/pendle/market/<market>/events), its rows
-// already shown dropped.
+// default of every kind) and narrows the rows loaded. "Show 50 more" reads the
+// page after the cursor the last page named (/api/pendle/market/<market>/events
+// ?before=block-txIndex-logIndex).
 
 import { useCallback, useMemo, useState } from "react";
 import { FilterDropdown } from "@/components/shared/filter-dropdown";
@@ -68,6 +67,7 @@ export function PendleMarketEvents({
   const [meta, setMeta] = useState(initialMeta);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [next, setNext] = useState<string | null>(m.next);
   const total = m.router?.events ?? rows.length;
 
   const sp = useUrlSearchParams(initialSearch);
@@ -95,31 +95,24 @@ export function PendleMarketEvents({
   for (const r of rows) counts.set(GROUP_OF[r.kind], (counts.get(GROUP_OF[r.kind]) ?? 0) + 1);
   const visible = rows.filter((r) => shown.has(GROUP_OF[r.kind]));
   const filtered = shown.size < GROUPS.length;
-  const more = rows.length < total;
+  const more = next != null;
 
   const loadMore = async () => {
-    const oldest = rows[rows.length - 1];
-    if (!oldest) return;
+    if (!next) return;
     setLoading(true);
     setFailed(false);
     try {
-      const seen = new Set(rows.map(keyOf));
-      // At the oldest block first (the page may have cut it), then below it.
-      for (const block of [oldest.block, oldest.block - 1]) {
-        const res = await fetch(`/api/pendle/market/${m.tokens.market.address}/events?block=${block}`);
-        const body = (await res.json()) as {
-          success: boolean;
-          recent: PendleMarketEvent[];
-          meta: Record<string, PendleTokenMeta>;
-        };
-        if (!res.ok || !body.success) throw new Error(String(res.status));
-        const fresh = body.recent.filter((r) => !seen.has(keyOf(r)));
-        setMeta((prev) => ({ ...prev, ...body.meta }));
-        if (fresh.length > 0) {
-          setRows((prev) => [...prev, ...fresh]);
-          break;
-        }
-      }
+      const res = await fetch(`/api/pendle/market/${m.tokens.market.address}/events?before=${next}`);
+      const body = (await res.json()) as {
+        success: boolean;
+        recent: PendleMarketEvent[];
+        next: string | null;
+        meta: Record<string, PendleTokenMeta>;
+      };
+      if (!res.ok || !body.success) throw new Error(String(res.status));
+      setMeta((prev) => ({ ...prev, ...body.meta }));
+      setRows((prev) => [...prev, ...body.recent]);
+      setNext(body.next);
     } catch {
       setFailed(true);
     } finally {

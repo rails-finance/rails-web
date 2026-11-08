@@ -39,9 +39,9 @@ export const readPendleWallet = (wallet: string, readerIp?: string, market?: str
     readerIp,
   );
 
-/** A market at the finalized block, or at `block` (a page of older router events). */
-export const readPendleMarket = (market: string, readerIp?: string, block?: number) =>
-  read<PendleMarketPage>(`/market/${market.toLowerCase()}${block ? `?block=${block}` : ""}`, readerIp);
+/** A market at the finalized block; with `before` (a page's `next`), its router events below that cursor. */
+export const readPendleMarket = (market: string, readerIp?: string, before?: string) =>
+  read<PendleMarketPage>(`/market/${market.toLowerCase()}${before ? `?before=${before}` : ""}`, readerIp);
 
 /** The roster; kept ten minutes, as the backend keeps it. */
 export const readPendleRoster = (readerIp?: string) => read<PendleRoster>(`/markets`, readerIp, { revalidate: 600 });
