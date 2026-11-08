@@ -1,32 +1,11 @@
-"use client";
+// Aave V3 market overview on Ethereum; the client half is market-page.tsx
+// beside this file. `?market=prime|etherfi` reads that Pool.
 
-// Aave V3 market overview (/aave-v3/market). Protocol-aggregate, read-only:
-// the Core Pool's full reserve roster — size, rates, risk parameters, oracle
-// prices — read live from the Pool + IAaveOracle. The V3 carry-across of the
-// /aave-v4/hubs shape (single market, so one summary card, not a hub band).
-// Scoped to Core, the explorer's market; Prime / EtherFi can join later
-// through the same reader (lib/sources/chain/aave-market-overview.ts takes any
-// Pool). Framing: present, don't rank — no score, no risk valence.
+import { AaveV3MarketPage } from "./market-page";
 
-import { AaveMarketPage } from "@/components/shared/aave-market-page";
-import { aaveV3MarketModal } from "@/lib/aave-v3/event-templates";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+type Search = Promise<Record<string, string | string[] | undefined>>;
 
-export default function AaveV3MarketPage() {
-  return (
-    <>
-      <AaveMarketPage
-        protocol="aave-v3"
-        apiRoute="/api/chain/aave-v3/market"
-        listingHref="/ethereum/aave-v3"
-        protocolName="Aave V3"
-        marketLabel="Aave V3 Core"
-        purpose="The main Aave V3 market on Ethereum: one Pool, the broadest reserve roster, every account cross-collateralised under a shared health factor."
-        learnMore={aaveV3MarketModal("aave-v3")}
-      />
-      <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
-      <ProvInspectorLayer />
-    </>
-  );
+export default async function Page({ searchParams }: { searchParams: Search }) {
+  const market = (await searchParams).market;
+  return <AaveV3MarketPage market={Array.isArray(market) ? market[0] : market} />;
 }

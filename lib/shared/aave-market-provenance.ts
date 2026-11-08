@@ -98,6 +98,24 @@ export interface AaveMarketVocab {
   siloedProv: (symbol: string) => Provenance;
   /** The rate model's kink, read from the reserve's interest-rate strategy. */
   kinkProv: (symbol: string, k: { strategy: string; method: string; raw: string | null }) => Provenance;
+  /** The price source the market's oracle reads for this asset. */
+  oracleSourceProv: (symbol: string, source: string) => Provenance;
+  /** The reserve's outstanding deficit (Pool.getReserveDeficit). */
+  reserveDeficitProv: (symbol: string, priced: boolean) => Provenance;
+  /** A minted reserve's remaining borrow capacity: borrow cap less borrowed. */
+  reserveBorrowRoomProv: (symbol: string, cap: number) => Provenance;
+  /** The borrow and supply rate curves, from the reserve's rate strategy. */
+  reserveCurveProv: (
+    symbol: string,
+    c: {
+      strategy: string;
+      method: "getInterestRateData" | "v1";
+      optimal: string;
+      base: string;
+      slope1: string;
+      slope2: string;
+    },
+  ) => Provenance;
 }
 
 /** What a cap-used receipt states: the amount counted, the ceiling, where the
@@ -111,7 +129,14 @@ export interface CapUsedInput {
 }
 
 interface AaveMarketConfig {
-  protocol: "aave-v3" | "aave-v3-base" | "aave-v3-arbitrum" | "seamless" | "spark";
+  protocol:
+    | "aave-v3"
+    | "aave-v3-prime"
+    | "aave-v3-etherfi"
+    | "aave-v3-base"
+    | "aave-v3-arbitrum"
+    | "seamless"
+    | "spark";
   poolName: string;
   oracleName: string;
   /** The chain-proxy lane the surface reads through. */
@@ -461,6 +486,68 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · bit 62 (siloedBorrowing) = 1 @ head`,
     }),
+    oracleSourceProv: (symbol, source) => ({
+      kind: "chain",
+      pclass: "oracle",
+      source: { block: coords.blockNumber },
+      verify: recompute("IAaveOracle.getSourceOfAsset", coords),
+      summary: `${symbol} price source. The feed the market's IAaveOracle reads for ${symbol}${atBlock(coords)} (\`getSourceOfAsset\`): ${source}. The oracle price on this page is that feed's answer in USD.`,
+      contract: oracleContract(coords),
+      via: `${cfg.lane} · IAaveOracle.getSourceOfAsset(asset) @ head`,
+    }),
+    reserveDeficitProv: (symbol, priced) => ({
+      kind: priced ? "chain-derived" : "chain",
+      pclass: priced ? "oracle" : "state",
+      source: { block: coords.blockNumber },
+      verify: recompute("Pool.getReserveDeficit", coords),
+      summary: `${symbol} deficit. Pool.getReserveDeficit(asset)${atBlock(coords)}: debt a liquidation wrote off with no collateral left to cover it (DeficitCreated), not yet repaid by the protocol${priced ? ", valued at the market's IAaveOracle price" : ""}. It is the gap between supplied − borrowed and the Pool's virtual balance.`,
+      contract: poolContract(coords),
+      via: `${cfg.lane} · Pool.getReserveDeficit(asset)${priced ? " × IAaveOracle price" : ""} @ head`,
+    }),
+    reserveBorrowRoomProv: (symbol, cap) => ({
+      kind: "chain-derived",
+      pclass: "oracle",
+      source: { block: coords.blockNumber },
+      summary: `${symbol} borrow capacity. The reserve's borrow cap (${tokens(cap)} ${symbol}) less its variable-debt totalSupply${atBlock(coords)}, valued at the market's IAaveOracle price. ${symbol} is minted when borrowed, so it has no supply side; the cap is what bounds new borrowing.`,
+      contract: poolContract(coords),
+      via: `${cfg.lane} · Pool.getConfiguration · bits ${CAP_BITS.borrow} (borrowCap) − variableDebtToken totalSupply @ head`,
+      formula: "borrow cap − borrowed",
+      inputs: [
+        {
+          label: "borrow cap",
+          kind: "chain",
+          pclass: "state",
+          note: `Pool.getConfiguration bits ${CAP_BITS.borrow} @ head`,
+        },
+        { label: "borrowed", kind: "chain", pclass: "state", note: "variableDebtToken totalSupply @ head" },
+        {
+          label: "oracle price",
+          kind: "chain-derived",
+          pclass: "oracle",
+          contract: oracleContract(coords),
+          note: "IAaveOracle.getAssetPrice @ head",
+        },
+      ],
+    }),
+    reserveCurveProv: (symbol, c) => ({
+      kind: "chain-derived",
+      pclass: "state",
+      source: { block: coords.blockNumber },
+      summary: `${symbol} rate curves. The borrow rate at each utilisation from the reserve's rate strategy ${c.strategy}${atBlock(coords)}: base + slope1 × U ÷ optimal up to the optimal utilisation, then base + slope1 + slope2 × (U − optimal) ÷ (1 − optimal). The supply rate is borrow rate × U × (1 − reserve factor). The marked point is the reserve's utilisation and the rates the Pool applies now.`,
+      contract: { name: `${symbol} rate strategy`, address: c.strategy },
+      via:
+        c.method === "getInterestRateData"
+          ? `${cfg.lane} · strategy.getInterestRateData(reserve) @ head`
+          : `${cfg.lane} · strategy.OPTIMAL_USAGE_RATIO, getBaseVariableBorrowRate, getVariableRateSlope1, getVariableRateSlope2 @ head`,
+      formula: "borrow(U), supply(U) = borrow(U) × U × (1 − RF)",
+      inputs: [
+        { label: "optimal", kind: "chain", pclass: "state", value: c.optimal, note: "ray" },
+        { label: "base", kind: "chain", pclass: "state", value: c.base, note: "ray" },
+        { label: "slope1", kind: "chain", pclass: "state", value: c.slope1, note: "ray" },
+        { label: "slope2", kind: "chain", pclass: "state", value: c.slope2, note: "ray" },
+        { label: "reserve factor", kind: "chain", pclass: "state", note: "Pool.getConfiguration bits 64-79 @ head" },
+      ],
+    }),
     kinkProv: (symbol, k) => ({
       kind: "chain",
       pclass: "state",
@@ -490,6 +577,18 @@ const FACTORIES: Record<string, (coords: AaveMarketCoords) => AaveMarketVocab> =
     poolName: "Aave V3 Core Pool",
     oracleName: "Aave V3 IAaveOracle",
     lane: "GET /api/chain/aave-v3/market",
+  }),
+  "aave-v3-prime": makeVocab({
+    protocol: "aave-v3-prime",
+    poolName: "Aave V3 Prime Pool",
+    oracleName: "Aave V3 Prime IAaveOracle",
+    lane: "GET /api/chain/aave-v3/market?market=prime",
+  }),
+  "aave-v3-etherfi": makeVocab({
+    protocol: "aave-v3-etherfi",
+    poolName: "Aave V3 EtherFi Pool",
+    oracleName: "Aave V3 EtherFi IAaveOracle",
+    lane: "GET /api/chain/aave-v3/market?market=etherfi",
   }),
   "aave-v3-base": makeVocab({
     protocol: "aave-v3-base",

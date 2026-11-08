@@ -1,49 +1,43 @@
 "use client";
 
 // Shared page shell for the V3-family market-overview surfaces (/aave-v3/market,
-// /spark/market) — the single-market carry-across of /aave-v4/hubs. Owns the
-// fetch lifecycle, header (breadcrumb · title · explainer · chain stamp) and
-// the loading / error / stale states; the two route pages are thin configs.
-// Unlike the V4 hubs page there is no prices context to enrol: USD arrives in
-// the payload itself, priced by the market's own oracle in the same chain read.
+// /spark/market and the rest; lib/shared/aave-market-configs.ts names them) —
+// the single-market carry-across of /aave-v4/hubs. Owns the fetch lifecycle,
+// header (breadcrumb · title · explainer · chain stamp) and the loading /
+// error / stale states; the route pages pass a market config. The reserve
+// pages under it (components/shared/aave-reserve-page.tsx) read the same
+// market through `useAaveMarket`. There is no prices context to enrol: USD
+// arrives in the payload, priced by the market's own oracle in the same read.
 
 import { useEffect, useState } from "react";
-import { MAINNET_CHAIN_ID, chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
+import Link from "next/link";
 import { fetchAaveMarketOverview, type AaveMarketOverviewResponse } from "@/lib/api/fetch-aave-market-overview";
-import { buildAaveMarketView } from "@/lib/shared/aave-market-view";
+import { buildAaveMarketView, type AaveMarketView } from "@/lib/shared/aave-market-view";
 import { AaveMarketViews, AaveMarketLoadingSkeleton } from "@/components/shared/aave-market-views";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
-import { LearnMore } from "@/components/shared/learn-more-modal";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { BlockRef } from "@/components/shared/block-ref";
-import { headReadOf, serverReadVia } from "@/lib/shared/server-head-read";
+import { headReadOf, serverReadVia, type ServerRead } from "@/lib/shared/server-head-read";
+import { aaveV3MarketModal } from "@/lib/aave-v3/event-templates";
+import { sparkModal } from "@/lib/spark/event-templates";
+import { ETHEREUM_AAVE_V3_MARKETS, reserveHref, type AaveMarketConfig } from "@/lib/shared/aave-market-configs";
 
-export interface AaveMarketPageProps {
-  /** This deployment's chain proxy for the market ("/api/chain/spark/market"). */
-  apiRoute: string;
-  /** Protocol id — selects the market-surface provenance vocabulary
-   *  ("aave-v3" / "aave-v3-base" / "aave-v3-arbitrum" / "seamless" / "spark"). */
-  protocol: "aave-v3" | "aave-v3-base" | "aave-v3-arbitrum" | "seamless" | "spark";
-  /** Which chain the market is on. Drives the block link's explorer; defaults
-   *  to Ethereum, so the two existing pages render the Etherscan URL they
-   *  rendered before. Getting this wrong is invisible on the page and wrong in
-   *  the link, which is why it comes off the roster rather than the call site's
-   *  memory. */
-  chainId?: ChainId;
-  /** The protocol's listing route + display name (breadcrumb root). */
-  listingHref: string;
-  protocolName: string;
-  /** Market identity on the summary card ("Aave V3 Core" / "SparkLend"). */
-  marketLabel: string;
-  /** Neutral one-liner — what the market is, not how good it is. */
-  purpose: string;
-  learnMore: LearnMoreContent;
-  /** Listing URL filtered to one asset/side, where the listing supports it. */
-  assetHref?: (symbol: string, side: "supply" | "borrow") => string;
+/** The market's "?" explainer. */
+export const marketModal = (m: AaveMarketConfig): LearnMoreContent =>
+  m.modal === "spark" ? sparkModal("market") : aaveV3MarketModal(m.modal);
+
+export interface AaveMarketRead {
+  data: AaveMarketOverviewResponse | null;
+  loading: boolean;
+  error: string | null;
+  /** Who read the block: rails-server live, its stored snapshot, or (null) the web's chain read. */
+  readBy: ServerRead | null;
+  view: AaveMarketView | null;
 }
 
-export function AaveMarketPage(props: AaveMarketPageProps) {
+/** One market's overview, read through its chain proxy and built into the view. */
+export function useAaveMarket(m: AaveMarketConfig): AaveMarketRead {
   const [data, setData] = useState<AaveMarketOverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +45,7 @@ export function AaveMarketPage(props: AaveMarketPageProps) {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    fetchAaveMarketOverview(props.apiRoute)
+    fetchAaveMarketOverview(m.apiRoute)
       .then((d) => {
         if (!cancelled) {
           setData(d);
@@ -67,16 +61,15 @@ export function AaveMarketPage(props: AaveMarketPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [props.apiRoute]);
+  }, [m.apiRoute]);
 
-  // Who read the block: rails-server live, its stored snapshot, or (null) the web's chain read.
   const readBy = data ? (headReadOf(data.head, data.blockNumber, data.stored) ?? null) : null;
   const view =
     data && !data.chainStale
       ? buildAaveMarketView(data.reserves, {
-          label: props.marketLabel,
-          purpose: props.purpose,
-          protocol: props.protocol,
+          label: m.marketLabel,
+          purpose: m.purpose,
+          protocol: m.key,
           blockNumber: data.blockNumber,
           readBy,
           pool: data.pool,
@@ -84,11 +77,53 @@ export function AaveMarketPage(props: AaveMarketPageProps) {
           capAutomator: data.capAutomator,
         })
       : null;
+  return { data, loading, error, readBy, view };
+}
+
+/** The chain-snapshot line under the h1. */
+export function MarketStamp({ read, m }: { read: AaveMarketRead; m: AaveMarketConfig }) {
+  const { data, readBy } = read;
+  if (!data || data.chainStale || data.blockNumber <= 0) return null;
+  return (
+    <p className="mt-2 text-[11px] text-rb-500">
+      Chain snapshot · <BlockRef block={data.blockNumber} chainId={m.chainId} />
+      {serverReadVia(readBy)}
+    </p>
+  );
+}
+
+/** Core · Prime · EtherFi on the Ethereum Aave V3 market page: each a link to
+ *  its market (`?market=`), the current one muted. */
+function EthereumMarketSelector({ current }: { current: AaveMarketConfig }) {
+  return (
+    <nav aria-label="Aave V3 markets on Ethereum" className="mb-4 flex items-center gap-3 text-[13px]">
+      {ETHEREUM_AAVE_V3_MARKETS.map(({ key, config }) =>
+        config.key === current.key ? (
+          <span key={key} aria-current="page" className="font-semibold text-rb-500">
+            {config.marketLabel.replace(/^Aave V3 /, "")}
+          </span>
+        ) : (
+          <Link
+            key={key}
+            href={`${config.marketHref}${config.marketQuery}`}
+            className="text-blue-600 hover:underline dark:text-[var(--text-link)]"
+          >
+            {config.marketLabel.replace(/^Aave V3 /, "")}
+          </Link>
+        ),
+      )}
+    </nav>
+  );
+}
+
+export function AaveMarketPage({ market: m }: { market: AaveMarketConfig }) {
+  const read = useAaveMarket(m);
+  const { data, loading, error, view } = read;
   // The roster entry supplies the crumb + chain mark; `listingHref` is the
-  // page's own basePath, so a market page cannot crumb to a listing that is
-  // not its own.
-  const protocol = protocolForHref(props.listingHref);
-  if (!protocol) throw new Error(`aave-market-page: no roster entry for ${props.listingHref}`);
+  // page's basePath, so a market page cannot crumb to a listing that is not
+  // its own.
+  const protocol = protocolForHref(m.listingHref);
+  if (!protocol) throw new Error(`aave-market-page: no roster entry for ${m.listingHref}`);
 
   const body =
     loading && !data ? (
@@ -100,22 +135,26 @@ export function AaveMarketPage(props: AaveMarketPageProps) {
       </div>
     ) : (
       <div data-skel-section="page-table">
-        <AaveMarketViews view={view} listingHref={props.listingHref} assetHref={props.assetHref} />
+        <AaveMarketViews
+          view={view}
+          listingHref={m.listingHref}
+          assetHref={m.assetHref}
+          reserveHref={(asset) => reserveHref(m, asset)}
+          chainId={m.chainId}
+        />
       </div>
     );
-
-  const stamp =
-    data && !data.chainStale && data.blockNumber > 0 ? (
-      <p className="mt-2 text-[11px] text-rb-500">
-        Chain snapshot · <BlockRef block={data.blockNumber} chainId={props.chainId ?? MAINNET_CHAIN_ID} />
-        {serverReadVia(readBy)}
-      </p>
-    ) : undefined;
 
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader protocol={protocol} title="Market overview" learnMore={props.learnMore} stamp={stamp} />
+        <SubPageHeader
+          protocol={protocol}
+          title="Market overview"
+          learnMore={marketModal(m)}
+          stamp={<MarketStamp read={read} m={m} />}
+        />
+        {m.listingHref === "/ethereum/aave-v3" && <EthereumMarketSelector current={m} />}
 
         {body}
       </div>

@@ -12,8 +12,9 @@
 //        ASSET · SUPPLIED · BORROWED · AVAILABLE · SUPPLY RATE · BORROW RATE ·
 //        COLLATERAL · UTILISATION
 //      Below that the same table reads as cards (D6, `stackBelow="lg"`), with a
-//      sort select in place of the headers. Rows are unlinked: a reserve has no
-//      page of its own.
+//      sort select in place of the headers. Each row is a linked row (D4) to
+//      its reserve page (anatomy M3, components/shared/aave-reserve-page.tsx);
+//      the asset cell holds the link.
 //
 // Available is the Pool's virtual balance on a v3.3+ Pool
 // (Pool.getVirtualUnderlyingBalance), else supplied less borrowed.
@@ -25,10 +26,11 @@
 // closed by a cap of one whole token (lib/shared/aave-market-view.ts capSide,
 // capShows), reads as a pill under its size, `data-caps` on the pill.
 //
-// One level down: the oracle price, reserve factor, liquidation bonus, eMode
-// categories and kink open from the asset cell's "Details" control in a panel
-// (AnchoredPanel; a bottom sheet on a phone), so a row link (D4) can land on
-// the row later without a second meaning for a press on it.
+// One level down: the reserve's parameters (ReserveParameters: oracle price and
+// source, LTV, LT, bonus, reserve factor, caps, debt ceiling, kink, eMode
+// categories) open from the asset cell's "Details" control in a panel
+// (AnchoredPanel; a bottom sheet on a phone); the reserve page's M3.5 draws
+// the same list. The control and the receipts stand above the row's cover.
 //
 // No-opinionated-colour rule: asset classes are distinguished by label +
 // grouping colour, and the one caution tint marks a closed door (Moonwell's
@@ -74,7 +76,9 @@ import {
   DataTableHead,
   DataTableHeader,
   DataTableRow,
+  DataTableRowLink,
 } from "@/components/shared/data-table/data-table";
+import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 
 const CLOSED = "text-tone-caution";
 const TAG = `${DATA_TABLE_PILL} px-1 py-px text-[10px] uppercase tracking-wide`;
@@ -162,7 +166,7 @@ function CompositionBar({ composition }: { composition: AaveMarketView["composit
 // ── Row pieces ───────────────────────────────────────────────────────────────
 
 /** The lifecycle and mode tags beside the symbol — states, not judgements. */
-function StateTags({ r, vocab }: { r: MarketReserveRow; vocab: AaveMarketVocab }) {
+export function StateTags({ r, vocab }: { r: MarketReserveRow; vocab: AaveMarketVocab }) {
   return (
     <>
       {r.frozen && (
@@ -322,9 +326,12 @@ type RowProps = {
   r: MarketReserveRow;
   vocab: AaveMarketVocab;
   assetHref?: (symbol: string, side: "supply" | "borrow") => string;
+  /** The row's reserve page (D4). */
+  href?: string;
+  chainId?: ChainId;
 };
 
-function sizes({ r, vocab, assetHref }: RowProps) {
+export function reserveFigures({ r, vocab, assetHref }: RowProps) {
   const sUsd = fmtUsd(r.suppliedUsd);
   const bUsd = fmtUsd(r.borrowedUsd);
   const hasBorrow = r.borrowedUsd >= 0.01 || r.borrowed > 0;
@@ -419,10 +426,172 @@ function DetailLine({ term, children, title }: { term: string; children: React.R
   );
 }
 
-/** The reserve's second-level figures: oracle price, reserve factor,
- *  liquidation bonus, eMode categories, kink. A "Details" control in the
- *  asset cell opens them in a panel (a bottom sheet on a phone). */
-function ReserveDetails({ r, vocab, price }: { r: MarketReserveRow; vocab: AaveMarketVocab; price: React.ReactNode }) {
+/** One cap side as a parameter line: the share in use and the ceiling, or
+ *  the state that replaces them, with its receipt. */
+function CapLine({
+  side,
+  c,
+  r,
+  vocab,
+}: {
+  side: "supply" | "borrow";
+  c: CapState;
+  r: MarketReserveRow;
+  vocab: AaveMarketVocab;
+}) {
+  switch (c.state) {
+    case "off":
+      return <Prov info={vocab.borrowOffProv(r.symbol)}>borrowing off</Prov>;
+    case "closed":
+      return <Prov info={vocab.capClosedProv(side, r.symbol, c.basis)}>closed</Prov>;
+    case "none":
+      return (
+        <Prov info={vocab.capNoneProv(side, r.symbol, c.why, c.basis, side === "supply" ? r.supplyCap : r.borrowCap)}>
+          no cap
+        </Prov>
+      );
+    case "used":
+      return (
+        <span title={`${tokens(c.amount)} of ${tokens(c.cap)} ${r.symbol}`}>
+          <Prov
+            info={vocab.capUsedProv(side, r.symbol, {
+              amount: c.amount,
+              cap: c.cap,
+              basis: c.basis,
+              liveCap: c.liveCap,
+              treasury: side === "supply" ? (r.accruedToTreasury ?? 0) : undefined,
+            })}
+          >
+            {usedText(c.used)}
+          </Prov>{" "}
+          <span className="text-rb-500">of {formatCompact(c.cap)}</span>
+        </span>
+      );
+  }
+}
+
+/** A reserve's parameters: oracle price and its source, loan-to-value,
+ *  liquidation threshold and bonus, reserve factor, the two caps with their
+ *  use, the debt ceiling where set, the kink and the eMode categories, each
+ *  with its receipt. M1's Details panel and the reserve page's M3.5 draw it. */
+export function ReserveParameters({
+  r,
+  vocab,
+  price,
+  chainId,
+}: {
+  r: MarketReserveRow;
+  vocab: AaveMarketVocab;
+  price: React.ReactNode;
+  chainId?: ChainId;
+}) {
+  const ltvBps = ltvBpsOf(r);
+  const ltBps = ltBpsOf(r);
+  const bonusBps = r.bps?.bonus ?? 0;
+  const em = emodeOf(r);
+  const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+  return (
+    <div data-reserve-parameters="">
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]">
+        <DetailLine term="Oracle price" title="The market's oracle price (IAaveOracle getAssetPrice)">
+          {price}
+        </DetailLine>
+        {r.oracleSource && (
+          <DetailLine term="Price source" title="The feed the market's oracle reads for this asset">
+            <Prov info={vocab.oracleSourceProv(r.symbol, r.oracleSource)}>
+              {chainId != null ? (
+                <a
+                  href={explorerUrl(chainId, "address", r.oracleSource)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link-muted font-mono text-[12px]"
+                >
+                  {short(r.oracleSource)}
+                </a>
+              ) : (
+                <span className="font-mono text-[12px]">{short(r.oracleSource)}</span>
+              )}
+            </Prov>
+          </DetailLine>
+        )}
+        <DetailLine term="Loan-to-value" title="The most a wallet can borrow against this reserve">
+          <Prov info={vocab.reserveLtvProv(r.symbol, ltvBps)}>{bpsText(ltvBps)}%</Prov>
+        </DetailLine>
+        <DetailLine term="Liquidation threshold" title="The share of its value that counts toward covering debt">
+          <Prov info={vocab.reserveLtProv(r.symbol)}>{bpsText(ltBps)}%</Prov>
+        </DetailLine>
+        {bonusBps > 10000 && (
+          <DetailLine term="Liquidation bonus" title="The extra collateral a liquidator receives">
+            <Prov info={vocab.reserveBonusProv(r.symbol, bonusBps)}>{bpsText(bonusBps - 10000)}%</Prov>
+          </DetailLine>
+        )}
+        <DetailLine term="Reserve factor" title={RF_TIP}>
+          <Prov info={vocab.reserveFactorProv(r.symbol)}>{pct(r.reserveFactor)}</Prov>
+        </DetailLine>
+        <DetailLine term="Supply cap" title="Share of the supply cap in use, and the cap">
+          <CapLine side="supply" c={r.supplyCapState} r={r} vocab={vocab} />
+        </DetailLine>
+        <DetailLine term="Borrow cap" title="Share of the borrow cap in use, and the cap">
+          <CapLine side="borrow" c={r.borrowCapState} r={r} vocab={vocab} />
+        </DetailLine>
+        {r.debtCeiling != null && (
+          <DetailLine term="Debt ceiling" title="Isolation mode: the most that can be borrowed against this reserve">
+            <Prov info={vocab.isolatedProv(r.symbol, r.debtCeiling)}>
+              ${r.debtCeiling.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+            </Prov>
+          </DetailLine>
+        )}
+        {r.kink != null && r.rateStrategy && (
+          <DetailLine term="Kink" title="The utilisation at which the borrow rate starts to climb steeply">
+            <Prov
+              info={vocab.kinkProv(r.symbol, {
+                strategy: r.rateStrategy,
+                method: r.kinkMethod ?? "",
+                raw: r.kinkRaw ?? null,
+              })}
+            >
+              {fracText(r.kink)}%
+            </Prov>
+          </DetailLine>
+        )}
+      </dl>
+      {em.cats.length > 0 && (
+        <div className="mt-3 border-t border-rb-200 pt-2 dark:border-rb-700" data-reserve-emode="">
+          <p className="mb-1.5 text-[11px] text-rb-500">eMode categories (LTV / LT)</p>
+          <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-[12px]">
+            {em.cats.map((c) => (
+              <div key={c.label} className="contents">
+                <dt className="truncate text-rb-500" title={c.label}>
+                  {c.label}
+                </dt>
+                <dd className="text-right tabular-nums text-foreground">
+                  <Prov info={vocab.reserveEModeLtProv(r.symbol, [c])}>
+                    {c.ltv != null ? `${fracText(c.ltv)}% / ` : ""}
+                    {fracText(c.lt)}%
+                  </Prov>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The "Details" control in the asset cell: it opens ReserveParameters in a
+ *  panel (a bottom sheet on a phone). */
+function ReserveDetails({
+  r,
+  vocab,
+  price,
+  chainId,
+}: {
+  r: MarketReserveRow;
+  vocab: AaveMarketVocab;
+  price: React.ReactNode;
+  chainId?: ChainId;
+}) {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement | null>(null);
   const panelId = useId();
@@ -430,8 +599,6 @@ function ReserveDetails({ r, vocab, price }: { r: MarketReserveRow; vocab: AaveM
     setOpen(false);
     button.current?.focus();
   };
-  const bonusBps = r.bps?.bonus ?? 0;
-  const em = emodeOf(r);
   const label = `${r.symbol} reserve`;
   return (
     <>
@@ -468,55 +635,7 @@ function ReserveDetails({ r, vocab, price }: { r: MarketReserveRow; vocab: AaveM
             surface="overlay"
           >
             <p className="mb-3 pr-8 text-[13px] font-semibold text-foreground sm:pr-0">{label}</p>
-            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]">
-              <DetailLine term="Oracle price" title="The market's oracle price (IAaveOracle getAssetPrice)">
-                {price}
-              </DetailLine>
-              <DetailLine term="Reserve factor" title={RF_TIP}>
-                <Prov info={vocab.reserveFactorProv(r.symbol)}>{pct(r.reserveFactor)}</Prov>
-              </DetailLine>
-              {bonusBps > 10000 && (
-                <DetailLine term="Liquidation bonus" title="The extra collateral a liquidator receives">
-                  <Prov info={vocab.reserveBonusProv(r.symbol, bonusBps)}>{bpsText(bonusBps - 10000)}%</Prov>
-                </DetailLine>
-              )}
-              {r.kink != null && r.rateStrategy && (
-                <DetailLine
-                  term="Kink"
-                  title="The utilisation at which the borrow rate starts to climb steeply: the tick on the bar"
-                >
-                  <Prov
-                    info={vocab.kinkProv(r.symbol, {
-                      strategy: r.rateStrategy,
-                      method: r.kinkMethod ?? "",
-                      raw: r.kinkRaw ?? null,
-                    })}
-                  >
-                    {fracText(r.kink)}%
-                  </Prov>
-                </DetailLine>
-              )}
-            </dl>
-            {em.cats.length > 0 && (
-              <div className="mt-3 border-t border-rb-200 pt-2 dark:border-rb-700" data-reserve-emode="">
-                <p className="mb-1.5 text-[11px] text-rb-500">eMode categories (LTV / LT)</p>
-                <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-[12px]">
-                  {em.cats.map((c) => (
-                    <div key={c.label} className="contents">
-                      <dt className="truncate text-rb-500" title={c.label}>
-                        {c.label}
-                      </dt>
-                      <dd className="text-right tabular-nums text-foreground">
-                        <Prov info={vocab.reserveEModeLtProv(r.symbol, [c])}>
-                          {c.ltv != null ? `${fracText(c.ltv)}% / ` : ""}
-                          {fracText(c.lt)}%
-                        </Prov>
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
-            )}
+            <ReserveParameters r={r} vocab={vocab} price={price} chainId={chainId} />
           </AnchoredPanel>
         </span>
       )}
@@ -527,19 +646,25 @@ function ReserveDetails({ r, vocab, price }: { r: MarketReserveRow; vocab: AaveM
 /** One reserve as a table row. A keyed component so it can own its
  *  `useReceiptRegistry()`: each row is its own bounds-free receipts scope. */
 function ReserveRow(props: RowProps) {
-  const { r, vocab } = props;
+  const { r, vocab, href, chainId } = props;
   const registry = useReceiptRegistry();
-  const z = sizes(props);
+  const z = reserveFigures(props);
 
   return (
     <ProvReceiptsScope registry={registry} bounds={false}>
-      <DataTableRow data-reserve-row={r.address}>
+      <DataTableRow data-reserve-row={r.address} href={href}>
         <DataTableCell rowHeader>
           <div className="flex items-center gap-2">
             <TokenChipIcon symbol={r.symbol} address={r.address} size={20} filterable={false} />
             <div className="min-w-0 flex-1 leading-tight">
               <div className="flex flex-wrap items-center gap-x-1.5 text-[13px] font-medium text-foreground">
-                {r.symbol}
+                {href ? (
+                  <DataTableRowLink href={href} data-reserve-link={r.address}>
+                    {r.symbol}
+                  </DataTableRowLink>
+                ) : (
+                  r.symbol
+                )}
                 <StateTags r={r} vocab={vocab} />
               </div>
               <div className="flex items-center gap-1 text-[11px] text-rb-500" title={r.classLabel}>
@@ -547,7 +672,7 @@ function ReserveRow(props: RowProps) {
                 <span className="truncate">{r.classLabel}</span>
               </div>
             </div>
-            <ReserveDetails r={r} vocab={vocab} price={z.price} />
+            <ReserveDetails r={r} vocab={vocab} price={z.price} chainId={chainId} />
           </div>
         </DataTableCell>
         <DataTableCell align="right" className="tabular-nums text-[13px]" label="Supplied">
@@ -628,6 +753,9 @@ export interface AaveMarketViewsProps {
   /** Listing URL filtered to one asset on one side, when the listing's param
    *  space supports it (SparkLend's ?supply=/&borrow=); omit → plain cells. */
   assetHref?: (symbol: string, side: "supply" | "borrow") => string;
+  /** Each row's reserve page (the row becomes a D4 link). */
+  reserveHref?: (asset: string) => string;
+  chainId?: ChainId;
 }
 
 type SortKey = "asset" | "supplied" | "borrowed" | "available" | "supplyRate" | "borrowRate" | "collateral" | "util";
@@ -658,7 +786,7 @@ const HEADER_TIP: Partial<Record<SortKey, string>> = {
  *  then liquidation threshold. */
 const collateralRank = (r: MarketReserveRow) => ltvBpsOf(r) * 1e5 + ltBpsOf(r);
 
-export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketViewsProps) {
+export function AaveMarketViews({ view, listingHref, assetHref, reserveHref, chainId }: AaveMarketViewsProps) {
   // Not every explorer on this surface HAS a listing behind it. The Base ones
   // open on a wallet because the open-position set is not enumerable there, and
   // a "View all positions" link that lands back on this same page is a promise
@@ -839,8 +967,8 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
           <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
             Every reserve on the Pool, filter by class, sort any column. Rates, caps and risk parameters decode from the
             configuration the Pool enforces; USD is the market&apos;s oracle price. A cap shows under its size once 90%
-            of it is in use. The bar is utilisation, and its tick is the rate model&apos;s kink. Details on a row opens
-            its oracle price, reserve factor, liquidation bonus and eMode categories.
+            of it is in use. The bar is utilisation, and its tick is the rate model&apos;s kink. A row opens its
+            reserve&apos;s page; Details opens its parameters in place.
           </p>
         </div>
 
@@ -914,7 +1042,14 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
               </DataTableHead>
               <DataTableBody>
                 {sortedRows.map((r) => (
-                  <ReserveRow key={r.address} r={r} vocab={vocab} assetHref={assetHref} />
+                  <ReserveRow
+                    key={r.address}
+                    r={r}
+                    vocab={vocab}
+                    assetHref={assetHref}
+                    href={reserveHref?.(r.address)}
+                    chainId={chainId}
+                  />
                 ))}
               </DataTableBody>
             </DataTable>

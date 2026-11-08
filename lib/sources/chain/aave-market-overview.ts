@@ -49,7 +49,10 @@ const POOL_ABI = parseAbi([
 // a Pool has the getter is asked of the Pool: on an earlier Pool the call
 // reverts, the reserve carries no virtual balance, and its available figure
 // falls back to supplied − borrowed.
-const VIRTUAL_ABI = parseAbi(["function getVirtualUnderlyingBalance(address asset) view returns (uint128)"]);
+const VIRTUAL_ABI = parseAbi([
+  "function getVirtualUnderlyingBalance(address asset) view returns (uint128)",
+  "function getReserveDeficit(address asset) view returns (uint256)",
+]);
 // The rate model's kink — the utilisation at which the borrow-rate curve turns
 // steep. Two generations again: the V3.2+ strategy is one contract serving every
 // reserve and answers per asset; the V3.0/3.1 strategy is one contract per
@@ -59,6 +62,12 @@ const VIRTUAL_ABI = parseAbi(["function getVirtualUnderlyingBalance(address asse
 const RATE_STRATEGY_ABI = parseAbi([
   "function getOptimalUsageRatio(address reserve) view returns (uint256)",
   "function OPTIMAL_USAGE_RATIO() view returns (uint256)",
+  // The whole curve (the reserve page's M3.3): one struct per reserve on a
+  // v3.2+ strategy, four constants on a v1 one. All ray-scaled.
+  "function getInterestRateData(address reserve) view returns ((uint256 optimalUsageRatio, uint256 baseVariableBorrowRate, uint256 variableRateSlope1, uint256 variableRateSlope2))",
+  "function getBaseVariableBorrowRate() view returns (uint256)",
+  "function getVariableRateSlope1() view returns (uint256)",
+  "function getVariableRateSlope2() view returns (uint256)",
 ]);
 // SparkLend's CapAutomator (sparkdotfi/sparklend-cap-automator). SparkLend keeps
 // each live cap a short gap above current use and lets anyone raise it, after a
@@ -101,7 +110,10 @@ const EMODE_ABI = parseAbi([
 // only a 32-id hole in a sequentially-allocated id space could end it early.
 const EMODE_WAVE = 32;
 const EMODE_MAX_ID = 255; // category ids are uint8
-const ORACLE_ABI = parseAbi(["function getAssetPrice(address asset) view returns (uint256)"]);
+const ORACLE_ABI = parseAbi([
+  "function getAssetPrice(address asset) view returns (uint256)",
+  "function getSourceOfAsset(address asset) view returns (address)",
+]);
 const SUPPLY_ABI = parseAbi(["function totalSupply() view returns (uint256)"]);
 
 const RAY = 1e27; // rates are ray-scaled APR fractions (1e27 = 100%)
@@ -287,6 +299,41 @@ async function loadEModeMembership(
   }
 }
 
+/** Reads per reserve in the strategy burst: the two kink getters, then
+ *  getInterestRateData and the three v1 constants. */
+const KINK_READS = 6;
+type Settled = { status: string; result?: unknown };
+
+/** The curve from the strategy burst (OPTIMAL_USAGE_RATIO, getInterestRateData,
+ *  base, slope1, slope2): the v3.2+ struct where it answered, else the four v1
+ *  getters where all answered, else null. */
+function curveOf([optimalV1, data, base, slope1, slope2]: Settled[]): AaveMarketReserve["rateCurve"] {
+  if (data?.status === "success" && data.result != null) {
+    const d = data.result as {
+      optimalUsageRatio: bigint;
+      baseVariableBorrowRate: bigint;
+      variableRateSlope1: bigint;
+      variableRateSlope2: bigint;
+    };
+    return {
+      method: "getInterestRateData",
+      optimal: d.optimalUsageRatio.toString(),
+      base: d.baseVariableBorrowRate.toString(),
+      slope1: d.variableRateSlope1.toString(),
+      slope2: d.variableRateSlope2.toString(),
+    };
+  }
+  const ok = [optimalV1, base, slope1, slope2].every((r) => r?.status === "success" && r.result != null);
+  if (!ok) return null;
+  return {
+    method: "v1",
+    optimal: String(optimalV1.result),
+    base: String(base.result),
+    slope1: String(slope1.result),
+    slope2: String(slope2.result),
+  };
+}
+
 export interface AaveMarketSource {
   /** The market's Pool proxy. */
   pool: string;
@@ -403,6 +450,24 @@ async function readMarket(src: AaveMarketSource, clientOf: () => PublicClient): 
                 args: [a as `0x${string}`],
               }) as const,
           ),
+          ...reserves.map(
+            (a) =>
+              ({
+                address: poolAddr,
+                abi: VIRTUAL_ABI,
+                functionName: "getReserveDeficit",
+                args: [a as `0x${string}`],
+              }) as const,
+          ),
+          ...reserves.map(
+            (a) =>
+              ({
+                address: oracleAddr,
+                abi: ORACLE_ABI,
+                functionName: "getSourceOfAsset",
+                args: [a as `0x${string}`],
+              }) as const,
+          ),
           ...(automatorAddr
             ? (["supplyCapConfigs", "borrowCapConfigs"] as const).flatMap((fn) =>
                 reserves.map(
@@ -425,6 +490,8 @@ async function readMarket(src: AaveMarketSource, clientOf: () => PublicClient): 
     const priceOf = new Map<string, number>();
     const incomeOf = new Map<string, bigint>();
     const virtualOf = new Map<string, bigint>();
+    const deficitOf = new Map<string, bigint>();
+    const sourceOf = new Map<string, string>();
     const automatorMax = new Map<string, { supply: number | null; borrow: number | null }>();
     const n = reserves.length;
     // An automator answer of max 0 means "no config" — the live cap stands.
@@ -445,7 +512,11 @@ async function readMarket(src: AaveMarketSource, clientOf: () => PublicClient): 
       if (iRes?.status === "success" && iRes.result != null) incomeOf.set(addr, iRes.result as bigint);
       const vRes = mixed[3 * n + i];
       if (vRes?.status === "success" && vRes.result != null) virtualOf.set(addr, vRes.result as bigint);
-      if (automatorAddr) automatorMax.set(addr, { supply: maxOf(mixed[4 * n + i]), borrow: maxOf(mixed[5 * n + i]) });
+      const dfRes = mixed[4 * n + i];
+      if (dfRes?.status === "success" && dfRes.result != null) deficitOf.set(addr, dfRes.result as bigint);
+      const sRes = mixed[5 * n + i];
+      if (sRes?.status === "success" && sRes.result != null) sourceOf.set(addr, (sRes.result as string).toLowerCase());
+      if (automatorAddr) automatorMax.set(addr, { supply: maxOf(mixed[6 * n + i]), borrow: maxOf(mixed[7 * n + i]) });
     });
 
     // Phase 2 — market size: aToken + variableDebtToken totalSupply per reserve,
@@ -472,6 +543,15 @@ async function readMarket(src: AaveMarketSource, clientOf: () => PublicClient): 
             args: [a as `0x${string}`],
           } as const,
           { address: strategy, abi: RATE_STRATEGY_ABI, functionName: "OPTIMAL_USAGE_RATIO" } as const,
+          {
+            address: strategy,
+            abi: RATE_STRATEGY_ABI,
+            functionName: "getInterestRateData",
+            args: [a as `0x${string}`],
+          } as const,
+          { address: strategy, abi: RATE_STRATEGY_ABI, functionName: "getBaseVariableBorrowRate" } as const,
+          { address: strategy, abi: RATE_STRATEGY_ABI, functionName: "getVariableRateSlope1" } as const,
+          { address: strategy, abi: RATE_STRATEGY_ABI, functionName: "getVariableRateSlope2" } as const,
         ];
       }),
     });
@@ -520,14 +600,16 @@ async function readMarket(src: AaveMarketSource, clientOf: () => PublicClient): 
       // income. accruedToTreasury is scaled, so it takes the same index.
       const income = incomeOf.get(addr);
       const treasury = income != null ? scaleRaw((d.accruedToTreasury * income) / RAY_BIG, decimals) : 0;
-      const kinkRes = kinks[i * 2]?.status === "success" ? kinks[i * 2] : kinks[i * 2 + 1];
+      const k = i * KINK_READS;
+      const kinkRes = kinks[k]?.status === "success" ? kinks[k] : kinks[k + 1];
       const kinkMethod =
-        kinks[i * 2]?.status === "success"
+        kinks[k]?.status === "success"
           ? "getOptimalUsageRatio"
-          : kinks[i * 2 + 1]?.status === "success"
+          : kinks[k + 1]?.status === "success"
             ? "OPTIMAL_USAGE_RATIO"
             : null;
       const kinkRaw = kinkMethod ? (kinkRes!.result as bigint) : null;
+      const rateCurve = curveOf(kinks.slice(k + 1, k + KINK_READS));
       const virtualRaw = virtualOf.get(addr);
 
       out.push({
@@ -549,6 +631,9 @@ async function readMarket(src: AaveMarketSource, clientOf: () => PublicClient): 
         borrowCapMax: automatorMax.get(addr)?.borrow ?? null,
         accruedToTreasury: treasury,
         virtualBalance: virtualRaw != null ? scaleRaw(virtualRaw, decimals) : null,
+        deficit: deficitOf.has(addr) ? scaleRaw(deficitOf.get(addr)!, decimals) : null,
+        oracleSource: sourceOf.get(addr) ?? null,
+        rateCurve,
         liquidationBonus: bonusBps > PRECISION_BPS ? (bonusBps - PRECISION_BPS) / PRECISION_BPS : null,
         bps: { ltv: ltvBps, lt: ltBps, bonus: bonusBps },
         siloed: bitSet(config, 62),
