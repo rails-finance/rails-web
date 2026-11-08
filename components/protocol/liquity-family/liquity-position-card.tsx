@@ -234,7 +234,7 @@ function listingCrProv(
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `Collateral ratio: the Trove's replayed collateral × the ${symbol} branch's PriceFeed price${stale ? " (lastGoodPrice: the live fetch failed, so it may lag)" : " (fetchPrice simulated at head)"} ÷ its ${cfg.debtSymbol} debt. The same formula the TroveManager's getCurrentICR computes (identity verified BigInt-exact); the branch liquidates below its MCR.`,
+    summary: `Collateral ratio. The Trove's replayed collateral × the ${symbol} branch's PriceFeed price${stale ? " (lastGoodPrice: the live fetch failed, so it may lag)" : " (fetchPrice simulated at head)"} ÷ its ${cfg.debtSymbol} debt. The same formula the TroveManager's getCurrentICR computes (identity verified BigInt-exact); the branch liquidates below its MCR.`,
     contract: {
       name: `${cfg.name} ${symbol} PriceFeed`,
       address: deps.resolveBranch(symbol)?.priceFeed ?? deps.defaultPriceFeed,

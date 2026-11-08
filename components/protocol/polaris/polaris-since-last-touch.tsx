@@ -533,7 +533,7 @@ function polarisLiveSheet(
                 {
                   kind: "chain",
                   pclass: "state",
-                  summary: `The pETH pending since the last touch: the position's net PSM collateral share and its pETH reward, two view calls on the cdpManager ${atHead}. The next touch writes them into the collateral.`,
+                  summary: `The pETH pending since the last touch. The position's net PSM collateral share and its pETH reward, two view calls on the cdpManager ${atHead}. The next touch writes them into the collateral.`,
                   formula: "getCDPMintRedeemCollChange(id) + getCDPBcTokenGain(id)",
                   contract: manager,
                   inputs: [
@@ -609,7 +609,7 @@ function polarisLiveSheet(
                 {
                   kind: "chain-derived",
                   pclass: "state",
-                  summary: `The debt pending since the last touch: interest charged, less the stability gain, with the net PSM debt share, view calls on the cdpManager ${atHead}. The next touch writes them into the debt.`,
+                  summary: `The debt pending since the last touch. Interest charged, less the stability gain, with the net PSM debt share, view calls on the cdpManager ${atHead}. The next touch writes them into the debt.`,
                   formula: "getCDPAccruedInterest(id) − getCDPAccruedStables(id) + getCDPMintRedeemDebtChange(id)",
                   contract: manager,
                   inputs: [

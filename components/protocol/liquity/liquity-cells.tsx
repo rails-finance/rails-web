@@ -201,7 +201,7 @@ export function useLiquityCells({
         kind: "chain-derived",
         pclass: "indexed",
         verify: txVerify,
-        summary: `Trove debt (${debtSym}) after this event: this trove is in a delegate's batch, so the contract logs the trove's share of the batch and the batch's total debt. The trove's debt is that share of the total, including interest and any upfront fee.`,
+        summary: `Trove debt (${debtSym}) after this event. This trove is in a delegate's batch, so the contract logs the trove's share of the batch and the batch's total debt. The trove's debt is that share of the total, including interest and any upfront fee.`,
         contract: tmContract,
         via: `${streamVia()} · BatchedTroveUpdated + BatchUpdated logs · _batchDebtShares ∕ total shares × batch debt · ÷10^18`,
         inputs: eventInputs({ ...coords, asset: debtSym }),
@@ -210,7 +210,7 @@ export function useLiquityCells({
         kind: "chain",
         pclass: "emitted",
         verify: txVerify,
-        summary: `Trove debt (${debtSym}) after this event: every time a trove changes, the TroveManager contract writes the trove's full debt into its log. This is that figure after this event, including the interest built up since the last change and any upfront fee.`,
+        summary: `Trove debt (${debtSym}) after this event. Every time a trove changes, the TroveManager contract writes the trove's full debt into its log. This is that figure after this event, including the interest built up since the last change and any upfront fee.`,
         contract: tmContract,
         via: `${streamVia()} · ${originSeg(stateAfter.origin?.debt, {
           event: "TroveUpdated",
@@ -289,7 +289,7 @@ export function useLiquityCells({
     (isRedemption && troveOperation) || (isLiquidation && liquidation) || isCloseRecon
       ? {
           kind: "derived",
-          summary: `Debt (${debtSym}) before this event: the debt the trove's previous event recorded. This event logs only the debt after, so it is that less this event's move: the operation, any upfront fee and the ${accrualNoun(accrual)} accrued since the previous event.`,
+          summary: `Debt (${debtSym}) before this event. The debt the trove's previous event recorded. This event logs only the debt after, so it is that less this event's move: the operation, any upfront fee and the ${accrualNoun(accrual)} accrued since the previous event.`,
           formula: "debt after − operation − upfront fee − accrual since the previous event",
           inputs: [
             {
@@ -1190,7 +1190,7 @@ function atPriceProv(sym: string, amount: number, price: number, when: string): 
 function marketMoveProv(sym: string, amount: number, prev: number, now: number): Provenance {
   return {
     kind: "chain-derived",
-    summary: `Market move: the change in the ${sym} price from the previous event to this one, on the ${sym} the Trove held between them. No ${sym} moved.`,
+    summary: `Market move. The change in the ${sym} price from the previous event to this one, on the ${sym} the Trove held between them. No ${sym} moved.`,
     formula: "collateral × (price now − price at the previous event)",
     inputs: [
       { label: "collateral", value: `${fmtColl(amount)} ${sym}`, kind: "chain" },
