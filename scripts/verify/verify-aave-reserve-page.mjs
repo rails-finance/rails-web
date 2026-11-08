@@ -22,12 +22,39 @@
 //   6. Available's receipt opens in the inspector.
 //   7. "A reserve of <market>" links that Pool's reserves view, and lands on
 //      its table.
+//   8. History (M3.4) agrees with GET /api/aave-family/reserve-history over the
+//      year the page asks for: its first and last day, its point count, the
+//      days with no utilisation (a gap note where there are any), the latest
+//      rates and utilisation in the readout, a drawn canvas, a mark where the
+//      config log has a cap, reserve factor, collateral or freeze change in the
+//      span, and its borrow rate's receipt opens. Arbitrum states it is not
+//      indexed.
+//   9. The change log (M3.6) lists the route's rows newest first (block and
+//      kind per row, the first 20), with the held line, and SparkLend's
+//      CapAutomator line on SparkLend only.
+//  10. The largest suppliers and borrowers (M3.7, M3.8) are the route's ten a
+//      side, wallet, amount and position link per row, a holder's receipt
+//      opens, and a press on a row's amount cell lands on its position. Base
+//      and Seamless state "Not ranked yet on Base.", Arbitrum "Not indexed yet
+//      on Arbitrum.".
 //
 // Run:
 //   BASE=http://localhost:3000 node scripts/verify/verify-aave-reserve-page.mjs
 
 import { chromium } from "playwright";
 import { armInspector } from "./lib/prov-inspector.mjs";
+
+/** The upstream market each fixture's reads name (lib/api/fetch-aave-reserve-reads.ts). */
+const API_MARKET = {
+  "/api/chain/aave-v3/market": "core",
+  "/api/chain/aave-v3/market?market=prime": "prime",
+  "/api/chain/spark/market": "spark",
+  "/api/chain/seamless/market": "seamless",
+  "/api/chain/aave-v3-base/market": "base",
+  "/api/chain/aave-v3-arbitrum/market": "arbitrum",
+};
+const MARKED = new Set(["supply-cap", "borrow-cap", "reserve-factor", "collateral", "frozen"]);
+const CHANGES_SHOWN = 20;
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
@@ -238,6 +265,187 @@ for (const f of FIXTURES) {
     );
   }
   check(`${tag} 6  Available's receipt opens`, pop.length > 0, pop.slice(0, 100));
+  // ── 8–10. The indexed reads ──────────────────────────────────────────────
+  await page.keyboard.press("Escape");
+  const q = `market=${API_MARKET[f.api]}&reserve=${r.address}`;
+  const from = new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10);
+  const read = async (path) => {
+    const res = await fetch(`${BASE}/api/aave-family/${path}`);
+    return res.ok ? res.json() : { error: res.status };
+  };
+  const [hist, cfg, holders] = await Promise.all([
+    read(`reserve-history?${q}&from=${from}`),
+    read(`reserve-config-log?${q}`),
+    read(`reserve-holders?${q}`),
+  ]);
+  await page
+    .waitForFunction(
+      () =>
+        !document.querySelector(
+          '[data-anatomy~="M3.4"] .animate-pulse, [data-anatomy~="M3.6"] .animate-pulse, [data-anatomy~="M3.7"] .animate-pulse',
+        ),
+      null,
+      { timeout: WAIT },
+    )
+    .catch(() => {});
+  await page.waitForTimeout(800);
+  const ix = await page.evaluate(() => {
+    const h = document.querySelector("[data-reserve-history]");
+    const canvas = document.querySelector("[data-history-canvas] canvas");
+    const t = (sel) => document.querySelector(sel)?.textContent ?? null;
+    return {
+      notIndexed: t("[data-reserve-not-indexed]"),
+      notHeld: [...document.querySelectorAll("[data-reserve-not-held]")].map((e) => e.textContent),
+      failed: document.querySelectorAll("[data-reserve-read-failed]").length,
+      hist: h ? { ...h.dataset } : null,
+      canvas: canvas ? canvas.width * canvas.height : 0,
+      marks: Number(document.querySelector("[data-history-marks]")?.getAttribute("data-history-marks") ?? 0),
+      gapNotes: document.querySelectorAll("[data-history-gap-note]").length,
+      borrow: t("[data-history-borrow]"),
+      supply: t("[data-history-supply]"),
+      util: t("[data-history-utilisation]"),
+      rows: [...document.querySelectorAll("tr[data-change-row]")].map((tr) => ({
+        block: Number(tr.getAttribute("data-change-block")),
+        kind: tr.getAttribute("data-change-kind"),
+        words: tr.querySelector("[data-change-words]")?.textContent ?? "",
+      })),
+      held: t("[data-change-log-held]"),
+      automator: Boolean(document.querySelector("[data-change-log-automator]")),
+      holders: Object.fromEntries(
+        ["suppliers", "borrowers"].map((side) => [
+          side,
+          [...document.querySelectorAll(`[data-holders="${side}"] tr[data-holder-row]`)].map((tr) => ({
+            wallet: tr.getAttribute("data-holder-row"),
+            href: tr.querySelector("[data-row-link]")?.getAttribute("href"),
+            amount: tr.querySelector("[data-holder-amount]")?.getAttribute("data-holder-amount"),
+          })),
+        ]),
+      ),
+      refreshed: document.querySelectorAll("[data-holders-refreshed]").length,
+    };
+  });
+  check(`${tag} 8  no indexed read failed on the page`, ix.failed === 0, `${ix.failed} failed`);
+  if (hist.status === "not-indexed") {
+    check(
+      `${tag} 8a history, changes and holders state "Not indexed yet"`,
+      /Not indexed yet on Arbitrum\./.test(ix.notIndexed ?? ""),
+      norm(ix.notIndexed),
+    );
+  } else if (!hist.points) {
+    check(`${tag} 8a the history route answers`, false, JSON.stringify(hist).slice(0, 120));
+  } else {
+    const pts = hist.points;
+    const last = pts[pts.length - 1];
+    const gaps = pts.filter((p) => p.utilisation == null).length;
+    check(
+      `${tag} 8a history spans the route's year`,
+      ix.hist &&
+        Number(ix.hist.historyPoints) === pts.length &&
+        ix.hist.historyFrom === pts[0]?.date &&
+        ix.hist.historyTo === last?.date,
+      `${ix.hist?.historyPoints} points ${ix.hist?.historyFrom}…${ix.hist?.historyTo} vs ${pts.length} ${pts[0]?.date}…${last?.date}`,
+    );
+    check(`${tag} 8b the chart draws`, ix.canvas > 0 && pts.length > 1, `canvas ${ix.canvas}px²`);
+    check(
+      `${tag} 8c utilisation gaps match the route, with a note where there are any`,
+      Number(ix.hist?.historyGaps) === gaps && (gaps === 0 ? ix.gapNotes === 0 : ix.gapNotes > 0),
+      `${ix.hist?.historyGaps} gaps, ${ix.gapNotes} notes vs ${gaps} null days`,
+    );
+    if (last) {
+      check(
+        `${tag} 8d latest rates in the readout`,
+        rateOk(ix.borrow, last.borrowApr) && rateOk(ix.supply, last.supplyApr),
+        `${norm(ix.borrow)} / ${norm(ix.supply)} vs ${(last.borrowApr * 100).toFixed(4)}% / ${(last.supplyApr * 100).toFixed(4)}%`,
+      );
+      check(
+        `${tag} 8e latest utilisation in the readout`,
+        last.utilisation == null
+          ? /not drawn/.test(ix.util ?? "")
+          : Math.abs(pctOf(ix.util) - last.utilisation * 100) <= 0.06,
+        `${norm(ix.util)} vs ${last.utilisation == null ? "null" : (last.utilisation * 100).toFixed(2)}`,
+      );
+    }
+    const firstTs = pts.length ? Date.parse(`${pts[0].date}T00:00:00Z`) / 1000 : Infinity;
+    const marked = (cfg.logs ?? []).filter((l) => MARKED.has(l.kind) && l.timestamp >= firstTs).length;
+    check(
+      `${tag} 8f a mark where the span holds a marked change`,
+      marked === 0 ? ix.marks === 0 : ix.marks > 0,
+      `${ix.marks} marks for ${marked} changes`,
+    );
+    let hpop = "";
+    if (await armInspector(page)) {
+      await page.locator("[data-history-borrow]").first().click();
+      await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
+      hpop = norm(
+        await page
+          .locator(".prov-inspect-pop")
+          .first()
+          .innerText()
+          .catch(() => ""),
+      );
+      await page.keyboard.press("Escape");
+    }
+    check(
+      `${tag} 8g the history's borrow rate receipt opens`,
+      /ReserveDataUpdated|reserve-history/.test(hpop),
+      hpop.slice(0, 100),
+    );
+  }
+
+  if (cfg.logs && cfg.status !== "not-indexed") {
+    const want = [...cfg.logs].reverse().slice(0, CHANGES_SHOWN);
+    check(
+      `${tag} 9a change log rows match the route, newest first`,
+      ix.rows.length === want.length &&
+        want.every((l, i) => ix.rows[i]?.block === l.block && ix.rows[i]?.kind === l.kind && ix.rows[i]?.words),
+      `${ix.rows.length} rows vs ${want.length}; first ${ix.rows[0]?.block} ${ix.rows[0]?.kind} "${ix.rows[0]?.words}" vs ${want[0]?.block} ${want[0]?.kind}`,
+    );
+    check(`${tag} 9b the held line`, /held from/.test(ix.held ?? ""), norm(ix.held));
+    check(
+      `${tag} 9c CapAutomator line on SparkLend only`,
+      ix.automator === (API_MARKET[f.api] === "spark"),
+      String(ix.automator),
+    );
+  }
+
+  if (holders.status === "not-ranked" || holders.status === "not-indexed") {
+    if (holders.status === "not-ranked")
+      check(
+        `${tag} 10a holders state "Not ranked yet on Base."`,
+        ix.notHeld.some((t) => /Not ranked yet on Base\./.test(t)) &&
+          ix.holders.suppliers.length + ix.holders.borrowers.length === 0,
+        ix.notHeld.join(" | "),
+      );
+  } else if (holders.suppliers) {
+    for (const side of ["suppliers", "borrowers"]) {
+      const want = holders[side];
+      const got = ix.holders[side];
+      check(
+        `${tag} 10a ${side}: the route's ${want.length}, wallet, amount and link per row`,
+        got.length === want.length &&
+          want.every(
+            (w, i) => got[i]?.wallet === w.wallet && got[i]?.amount === w.amount && got[i]?.href === w.positionPath,
+          ),
+        `${got.length} rows vs ${want.length}; first ${got[0]?.wallet} ${got[0]?.href}`,
+      );
+    }
+    check(`${tag} 10b refresh line under each table`, ix.refreshed === 2, String(ix.refreshed));
+    let opop = "";
+    if (await armInspector(page)) {
+      await page.locator('[data-holders="suppliers"] [data-holder-amount] [data-prov-pickable]').first().click();
+      await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
+      opop = norm(
+        await page
+          .locator(".prov-inspect-pop")
+          .first()
+          .innerText()
+          .catch(() => ""),
+      );
+      await page.keyboard.press("Escape");
+    }
+    check(`${tag} 10c a holder's receipt opens, naming the view`, /mv_|refreshed/i.test(opop), opop.slice(0, 100));
+  }
+
   // ── 7. The market link lands on the reserves view ──────────────────────────
   await page.keyboard.press("Escape");
   const marketLink = await page.locator("[data-reserve-market-link]").getAttribute("href");
@@ -256,6 +464,20 @@ for (const f of FIXTURES) {
     `${landed.pathname}${landed.search}` === f.market && table,
     page.url(),
   );
+  if (holders.suppliers?.length) {
+    const target = holders.suppliers[0].positionPath;
+    await page.goto(`${BASE}${wantHref}`, NAV);
+    const cell = page
+      .locator(`[data-holders="suppliers"] tr[data-holder-row="${holders.suppliers[0].wallet}"] td`)
+      .last();
+    await cell.waitFor({ timeout: WAIT });
+    await cell.click({ position: { x: 4, y: 4 } });
+    // A path carries its Pool's `?market=` on Prime and EtherFi.
+    const t = new URL(target, BASE);
+    const at = (u) => u.pathname === t.pathname && [...t.searchParams].every(([k, v]) => u.searchParams.get(k) === v);
+    await page.waitForURL(at, { timeout: 120000 }).catch(() => {});
+    check(`${tag} 10d a press on a holder row lands on its position`, at(new URL(page.url())), page.url());
+  }
   await page.close();
 }
 
