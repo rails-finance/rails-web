@@ -288,8 +288,8 @@ export function TimelineRunCard({
   const runProv = (what: string): Provenance => ({
     kind: "chain-derived",
     summary: folder
-      ? `${what} across this folder — the total over the ${count} ${memberPlural} it holds. Opening the folder shows each event with its receipt.`
-      : `${what} across this run — the total over the ${count} ${memberPlural} in this row. Expanding the run shows each event with its receipt.`,
+      ? `${what} across this folder. The total over the ${count} ${memberPlural} it holds. Opening the folder shows each event with its receipt.`
+      : `${what} across this run. The total over the ${count} ${memberPlural} in this row. Expanding the run shows each event with its receipt.`,
     formula: `Σ ${what.toLowerCase()} over ${count} events`,
     inputs: [
       {
@@ -798,7 +798,7 @@ function priceProv(
   const c = coll.provWhat.toLowerCase();
   return {
     kind: "chain-derived",
-    summary: `Effective price across this group — the ${d} divided by the ${c}, each summed over the ${count} ${plural}.`,
+    summary: `Effective price across this group. The ${d} divided by the ${c}, each summed over the ${count} ${plural}.`,
     formula: `Σ ${d} ÷ Σ ${c}`,
     inputs: [
       { label: d, value: `${fullNum(debt.value)} ${debt.symbol}`, kind: "chain" },

@@ -39,17 +39,17 @@ export function AaveFirstPartySources() {
   return (
     <section className="mb-8" data-skel-section="first-party-sources" data-first-party-sources>
       <h2 className="text-sm font-semibold text-foreground">
-        <Prov info={aaveFirstPartySourcesProv(AAVE_FIRST_PARTY_SOURCES.length, fetchedOn)}>Aave&rsquo;s own pages</Prov>
+        <Prov info={aaveFirstPartySourcesProv(AAVE_FIRST_PARTY_SOURCES.length, fetchedOn)}>Aave&rsquo;s pages</Prov>
       </h2>
       <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-        The venue publishes these vaults itself, so what stands here is Aave&rsquo;s own documentation for the three
-        families — cited, and each page fetched on {fetchedOn}. It is a citation and not an attribution: a holder in
-        this section is the holder&rsquo;s own wallet address, and the section names no app on any row.
+        The venue publishes these vaults itself, so what stands here is Aave&rsquo;s documentation for the three
+        families, cited, and each page fetched on {fetchedOn}. It is a citation and not an attribution: a holder in this
+        section is the holder&rsquo;s wallet address, and the section names no app on any row.
       </p>
       <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-        Rails states a reading for any address, and the address rides in the URL. Aave&rsquo;s own surfaces can only be
+        Rails states a reading for any address, and the address rides in the URL. Aave&rsquo;s surfaces can only be
         pointed at one by hand: the app carries a read-only watch mode that keeps the watched address in the
-        browser&rsquo;s own storage, and the surfaces below have no per-address route.
+        browser&rsquo;s storage, and the surfaces below have no per-address route.
       </p>
       <ul className="mt-3 max-w-3xl space-y-2 text-[12px] text-rb-500">
         {AAVE_FIRST_PARTY_SOURCES.map((source) => (
