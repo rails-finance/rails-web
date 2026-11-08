@@ -332,3 +332,14 @@ export function poolStateProv(
     verify: callCheck(`the market's ${fn}`, block),
   };
 }
+
+/** The block a roster is read at. */
+export function readBlockProv(block: number): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    summary: `Read block. Every figure on this page is read at block ${n(block)}: the market's state, its marks and the SY's exchange rate.`,
+    source: { block },
+    verify: { kind: "rollup", text: "Each figure's receipt names this block." },
+  };
+}

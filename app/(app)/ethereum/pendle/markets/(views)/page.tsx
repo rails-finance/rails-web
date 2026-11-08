@@ -11,6 +11,7 @@ import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { readPendleRoster } from "@/lib/sources/api/pendle";
+import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { PendleRosterView, PendleWalletSearch } from "@/components/protocol/pendle/pendle-roster";
 import { PendleReadNotice } from "@/components/protocol/pendle/pendle-read-notice";
 
@@ -25,7 +26,8 @@ export const metadata = listingMetadata({
     "Every Pendle market on Ethereum the routers have named: its implied APY, pool and maturity read at one block, grouped by the protocol behind its yield token.",
 });
 
-export default async function PendleMarketsPage() {
+export default async function PendleMarketsPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
+  const initialSearch = toURLSearchParams(await searchParams).toString();
   const ip = readerIpFromRequest({ headers: await headers() });
   const read = await readPendleRoster(ip);
   const at = Math.floor(Date.now() / 1000);
@@ -36,7 +38,11 @@ export default async function PendleMarketsPage() {
         <div className="mb-8 max-w-xl">
           <PendleWalletSearch />
         </div>
-        {read.ok ? <PendleRosterView roster={read.data} at={at} /> : <PendleReadNotice failure={read} />}
+        {read.ok ? (
+          <PendleRosterView roster={read.data} at={at} initialSearch={initialSearch} />
+        ) : (
+          <PendleReadNotice failure={read} />
+        )}
       </div>
       <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
       <ProvInspectorLayer />
