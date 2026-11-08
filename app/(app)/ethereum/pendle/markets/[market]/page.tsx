@@ -48,7 +48,7 @@ export default async function PendleMarketPage({
   const m = market.toLowerCase();
   if (!ADDRESS.test(m)) notFound();
   const read = await load(m);
-  if (!read.ok && read.status === 404) notFound();
+  if (!read.ok && read.code === "not_a_market") notFound();
   const meta = read.ok ? await outsideTokenMeta(read.data) : {};
   return (
     <div className="min-h-screen">
