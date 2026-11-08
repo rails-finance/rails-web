@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Fluid vaults",
   description:
-    "Every Fluid vault and its three thresholds — where borrowing stops, where liquidation starts, and where the vault absorbs a position outright.",
+    "Every Fluid vault and its three thresholds: where borrowing stops, where liquidation starts, and where the vault absorbs a position outright.",
 };
 
 const PROTOCOL = protocolForHref("/ethereum/fluid")!;

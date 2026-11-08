@@ -404,7 +404,7 @@ export default function FluidPositionView({
         ? {
             kind: "chain",
             pclass: "oracle",
-            summary: `${supply} priced in ${borrow} — what the vault's oracle reports at this block.`,
+            summary: `${supply} priced in ${borrow}. What the vault's oracle reports at this block.`,
             contract: { name: "Fluid oracle", address: chain.oracle },
             via: `VaultResolver.positionByNftId(${chain.nftId}) at block ${chain.blockNumber}`,
             source: { block: chain.blockNumber },
@@ -422,7 +422,7 @@ export default function FluidPositionView({
         symbol: supply,
         price: debtPerCol,
         unit: debtPerCol ? borrow : undefined,
-        label: `${supply} in ${borrow} (the vault's own oracle)`,
+        label: `${supply} in ${borrow} (the vault's oracle)`,
         info: priceInfo,
       },
       { symbol: borrow, label: `${borrow}, the vault's debt token` },
@@ -442,7 +442,7 @@ export default function FluidPositionView({
         const debtPerCol = row.context.data.oraclePriceAtBlock?.debtPerCol;
         if (debtPerCol == null || !(debtPerCol > 0)) return undefined;
         return [
-          { symbol: supply, price: debtPerCol, unit: borrow, label: `${supply} in ${borrow} (the vault's own oracle)` },
+          { symbol: supply, price: debtPerCol, unit: borrow, label: `${supply} in ${borrow} (the vault's oracle)` },
           { symbol: borrow, label: `${borrow}, the vault's debt token` },
         ];
       },

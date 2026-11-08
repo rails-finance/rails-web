@@ -47,7 +47,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const name = g?.loanNamed ? g.loanSymbol : `${token.slice(0, 6)}…${token.slice(-4)}`;
   return {
     title: `${name} markets · Morpho Blue on Base`,
-    description: `Every Morpho Blue market on Base that lends ${name} — what it is lent against, how much, how used, and the one loan-to-value that governs each.`,
+    description: `Every Morpho Blue market on Base that lends ${name}, what it is lent against, how much, how used, and the one loan-to-value that governs each.`,
     alternates: { canonical: `/base/morpho/markets/${token}` },
     ...ROBOTS,
   };
@@ -87,7 +87,7 @@ export default async function MorphoBaseLoanTokenPage({ params }: Params) {
             )}
           </h1>
           <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-            Every market here lends {g?.loanSymbol ?? "this token"} and measures in it — every figure on this page is a
+            Every market here lends {g?.loanSymbol ?? "this token"} and measures in it. Every figure on this page is a
             quantity of {g?.loanSymbol ?? "it"}, never dollars. A market&rsquo;s loan-to-value is its whole risk
             surface: the borrow limit and the liquidation line at once, fixed when the market was created. Sizes are the
             balance each market last settled, left as the contract stores them; the rates are live.
@@ -96,7 +96,7 @@ export default async function MorphoBaseLoanTokenPage({ params }: Params) {
             <p className="mt-2">
               {/* Sorting the listing by Debt/Collateral (UI job 2) only means
                   something once it is narrowed to ONE loan token, which this
-                  link already is — the listing's own `loan` param, same
+                  link already is — the listing's `loan` param, same
                   address this page is keyed on. */}
               <Link href={`/base/morpho?loan=${g.loanToken.toLowerCase()}`} className={PAGE_LINK} prefetch={false}>
                 Positions on {g.loanSymbol} <span aria-hidden>→</span>

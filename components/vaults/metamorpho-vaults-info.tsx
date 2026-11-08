@@ -51,8 +51,8 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
     <VaultsInfoPage chainId={chainId} protocol={protocolForPathname(metaMorphoVaultRosterHref(chainId))!}>
       <p data-intro-membership>
         Membership comes from the census and only from the census: every address named either side of any{" "}
-        <code>Transfer</code> a vault has ever emitted, swept from that vault&rsquo;s own creation block rather than
-        from a fixed window — {words.window} — and proven complete by Σ <code>balanceOf</code> equalling{" "}
+        <code>Transfer</code> a vault has ever emitted, swept from that vault&rsquo;s creation block rather than from a
+        fixed window ({words.window}) and proven complete by Σ <code>balanceOf</code> equalling{" "}
         <code>totalSupply()</code> wei-exact at the census block the listing states. A sweep that came back short cannot
         pass that check, so a silent partial answer becomes a refused load and the previous census stands. Transfers,
         first seen, last activity and what the holding address is all come from that sweep, at that block. The one
@@ -63,7 +63,7 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
         Three blocks, and this section never reduces them to one. The census block the listing states is when membership
         was swept. The block each card names is when its shares, claim and share of the vault were called. The third is
         the lane&rsquo;s own <code>finalized</code> block, the cut a position&rsquo;s stored history is kept below: it
-        is read in the same request as the cards it is about, and stated there — on a position page, beside them — never
+        is read in the same request as the cards it is about, and stated there, on a position page, beside them, never
         here, because a number read for this page would be a different request&rsquo;s answer. That distance is a chain
         answer and never a constant: {words.finalized}
       </p>
@@ -71,19 +71,19 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
         The listing rests on value. Each card&rsquo;s Value · USD is the census&rsquo;s figure at the census block: the
         balance at that block through the vault&rsquo;s own <code>convertToAssets</code> and the chain&rsquo;s Aave V3
         oracle (<code>IAaveOracle.getAssetPrice</code>) at the same block, the oracle and the block named on the
-        figure&rsquo;s receipt — computed once by the daily census and never read for a listing page, so it is what a
+        figure&rsquo;s receipt, computed once by the daily census and never read for a listing page, so it is what a
         position was worth at that block and says nothing about now. <UnpricedSentence census={census} /> The Size
-        filter&rsquo;s brackets are whole-dollar lower bounds on that value, and its Unpriced option is exactly the rows
-        the oracle declined. Sorting by share of the vault orders each row&rsquo;s balance over its own vault&rsquo;s
-        supply at the census block, which compares across vaults; sorting by shares sorts on the raw balance in each
-        vault&rsquo;s own units — a MetaMorpho share token&rsquo;s <code>decimals()</code> is its asset&rsquo;s plus the
-        factory&rsquo;s offset — so it orders raw share counts and not amounts of anything comparable.
+        filter&rsquo;s brackets are whole-dollar lower bounds on that value, and its Unpriced option is the rows the
+        oracle declined. Sorting by share of the vault orders each row&rsquo;s balance over its own vault&rsquo;s supply
+        at the census block, which compares across vaults; sorting by shares sorts on the raw balance in each
+        vault&rsquo;s units, a MetaMorpho share token&rsquo;s <code>decimals()</code> is its asset&rsquo;s plus the
+        factory&rsquo;s offset, so it orders raw share counts and not amounts of anything comparable.
       </p>
       {neverHeld > 0 && (
         <p data-intro-empty>
           {n(neverHeld)} of the {n(census.length)} catalogued vaults have never been held: the sweep ran over each
           one&rsquo;s whole life and returned no <code>Transfer</code> at all. Each is named in the roster of vaults as
-          &ldquo;no holder yet&rdquo; — a reading about those vaults, not an absence of data about them — and none is
+          &ldquo;no holder yet&rdquo;, a reading about those vaults, not an absence of data about them, and none is
           offered in the vault filter, because a choice that always answers an empty page states nothing.
         </p>
       )}
@@ -95,7 +95,7 @@ export async function MetaMorphoVaultsInfo({ chainId }: { chainId: MetaMorphoCha
       )}
       <p data-intro-search>
         The search matches an address, or a fragment of one, against the holder. An address the census has never seen
-        has no row here — the listing answers no rows for it and records nothing about the search, because a set
+        has no row here, the listing answers no rows for it and records nothing about the search, because a set
         assembled from what visitors typed would be a public record of who looked at what. What an address holds right
         now, census member or not, is a different question, and nothing here answers it.
       </p>

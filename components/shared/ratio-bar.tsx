@@ -68,7 +68,7 @@ export function RatioBar({ fill, ticks }: { fill: number; ticks: RatioBarTick[] 
    market is which segment, so a segment carries no colour that could be read as
    a judgement about it: no hue per market, no green for large and amber for
    small, nothing an eye would rank. What the segments carry instead is the
-   page's own ink at descending strength, stepped by the SOURCE's own ordering —
+   page's ink at descending strength, stepped by the SOURCE's ordering —
    an index the contract publishes, not one Rails invented. The ramp separates
    neighbours and says nothing else. A saturated hue anywhere in this bar would
    be a claim, so there is none.

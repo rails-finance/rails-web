@@ -97,12 +97,12 @@ function FeedbackModalInner({ onClose, initialType = "bug", initialTitle = "" }:
       }
       if (res.status === 429) {
         const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        setError(data?.error ?? "Too many submissions — try again later");
+        setError(data?.error ?? "Too many submissions: try again later");
       } else {
-        setError("Sending failed — the form is intact, try again in a moment.");
+        setError("Sending failed: the form is intact, try again in a moment.");
       }
     } catch {
-      setError("Sending failed — the form is intact, try again in a moment.");
+      setError("Sending failed: the form is intact, try again in a moment.");
     } finally {
       setPending(false);
     }
@@ -153,7 +153,7 @@ function FeedbackModalInner({ onClose, initialType = "bug", initialTitle = "" }:
 
           {sent ? (
             <div className="flex flex-col gap-4">
-              <p className="text-sm text-foreground">Thanks — received.</p>
+              <p className="text-sm text-foreground">Thanks, received.</p>
               <button
                 onClick={onClose}
                 className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-sm font-bold tracking-widest uppercase py-3 rounded-xl transition-colors duration-150 cursor-pointer"

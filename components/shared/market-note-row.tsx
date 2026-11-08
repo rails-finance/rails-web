@@ -785,7 +785,7 @@ function psmGapBody(note: PsmGapNote): NoteBody {
 function vaultTermsBody(note: VaultTermsNote, links: NoteLinks): NoteBody {
   const figure: NoteFigure = { text: note.headline, prov: note.prov };
   return {
-    label: `${note.marketSymbol} — ${note.quantity}`,
+    label: `${note.marketSymbol}, ${note.quantity}`,
     measure: { kind: "protocol", id: note.measureProtocolId },
     headline: figure,
     quantity: note.quantity,
@@ -810,8 +810,8 @@ function vaultTermsBody(note: VaultTermsNote, links: NoteLinks): NoteBody {
           on the chain&rsquo;s explorer
         </a>
         ). It is not this address&rsquo;s event: it moved every holder&rsquo;s terms at once, which is why it sits among
-        the rows and this page&rsquo;s event counts leave it out. The values are the log&rsquo;s own words, raw. What
-        the vault&rsquo;s terms are NOW is the reading in the sections above, at the page&rsquo;s own block.
+        the rows and this page&rsquo;s event counts leave it out. The values are the log&rsquo;s words, raw. What the
+        vault&rsquo;s terms are NOW is the reading in the sections above, at the page&rsquo;s block.
       </>
     ),
   };
@@ -842,8 +842,8 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     if (which === "to" && note.live) {
       return (
         <>
-          now: the cdpManager&rsquo;s own primary rate, read live at block {p.block.toLocaleString("en-US")} — not a
-          touch of this position&rsquo;s
+          now: the cdpManager&rsquo;s primary rate, read live at block {p.block.toLocaleString("en-US")}, not a touch of
+          this position&rsquo;s
         </>
       );
     }
@@ -851,7 +851,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     if (!o) {
       return (
         <>
-          {polarisEndLabel(p)}: this position&rsquo;s own touch at block {p.block.toLocaleString("en-US")}
+          {polarisEndLabel(p)}: this position&rsquo;s touch at block {p.block.toLocaleString("en-US")}
           {observationLinks(p, links)}
         </>
       );
@@ -959,11 +959,10 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
     learnMore: polarisModal("rate_step"),
     derivation: note.live ? (
       <>
-        This is a LIVE note: the primary rate is the market&rsquo;s Peg Stability Rate — algorithmic, set on the
+        This is a LIVE note: the primary rate is the market&rsquo;s Peg Stability Rate, algorithmic, set on the
         market&rsquo;s PSM mints and redemptions. The earlier value is the rate in force at this position&rsquo;s own
-        last touch; the later is the cdpManager&rsquo;s own rate read now — {observation("from")}, {observation("to")}.
-        Shown whenever this position is open, whatever the move — nothing having moved is itself the fact this note
-        states.
+        last touch; the later is the cdpManager&rsquo;s rate read now, {observation("from")}, {observation("to")}. Shown
+        whenever this position is open, whatever the move: nothing having moved is the fact this note states.
         {note.setsBetween != null && (
           <>
             {" "}
@@ -974,7 +973,7 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
         {note.interest && (
           <>
             {" "}
-            The interest figures hold this position&rsquo;s own debt at that touch fixed and move only the rate; the
+            The interest figures hold this position&rsquo;s debt at that touch fixed and move only the rate; the
             secondary rate, which rises with the market&rsquo;s debt-to-reserve ratio, is added on top by the protocol
             and is not on this log.
           </>
@@ -982,14 +981,14 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
       </>
     ) : (
       <>
-        The primary rate is the market&rsquo;s Peg Stability Rate — algorithmic, set on the market&rsquo;s own PSM mints
-        and redemptions. The two values are the rate in force at the two touches this note runs between —{" "}
+        The primary rate is the market&rsquo;s Peg Stability Rate (algorithmic, set on the market&rsquo;s PSM mints and
+        redemptions). The two values are the rate in force at the two touches this note runs between:{" "}
         {observation("from")}, {observation("to")}.{" "}
         {note.steps != null && (
           <>
             Those two ends are {f.steps} of this position&rsquo;s touches apart: the rate moved the same way at every
             step in between, and a run of steps one after another in one direction is one thing happening to this
-            position — so it is stated as one stretch, and the receipt lists each step it took in. A step the other way
+            position, so it is stated as one stretch, and the receipt lists each step it took in. A step the other way
             ends the run and begins the next note.{" "}
           </>
         )}
@@ -1005,9 +1004,9 @@ function rateStepBody(note: RateStepNote, links: NoteLinks): NoteBody {
         {note.interest && (
           <>
             {" "}
-            The interest figures hold this position&rsquo;s own debt at the earlier touch fixed and move only the rate;
-            the secondary rate, which rises with the market&rsquo;s debt-to-reserve ratio, is added on top by the
-            protocol and is not on this log.
+            The interest figures hold this position&rsquo;s debt at the earlier touch fixed and move only the rate; the
+            secondary rate, which rises with the market&rsquo;s debt-to-reserve ratio, is added on top by the protocol
+            and is not on this log.
           </>
         )}
       </>
@@ -1235,8 +1234,8 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
     if (which === "to" && note.live) {
       return (
         <>
-          now: the Pool&rsquo;s own getReserveData for the {note.marketSymbol} reserve, read live at block{" "}
-          {p.block.toLocaleString("en-US")} — a slot read at the head, not a log
+          now: the Pool&rsquo;s getReserveData for the {note.marketSymbol} reserve, read live at block{" "}
+          {p.block.toLocaleString("en-US")}, a slot read at the head, not a log
         </>
       );
     }
@@ -1244,7 +1243,7 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
     if (!o) {
       return (
         <>
-          {aaveFamilyEndLabel(p)}: this position&rsquo;s own touch at block {p.block.toLocaleString("en-US")}
+          {aaveFamilyEndLabel(p)}: this position&rsquo;s touch at block {p.block.toLocaleString("en-US")}
           {observationLinks(p, links)}
         </>
       );
@@ -1262,8 +1261,8 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
       <>
         {aaveFamilyEndLabel(p)}:{" "}
         {which === "from"
-          ? "the reserve's last ReserveDataUpdated at or before this position's own action"
-          : "the reserve's last ReserveDataUpdated at its next touch, read before the position's own transaction"}
+          ? "the reserve's last ReserveDataUpdated at or before this position's action"
+          : "the reserve's last ReserveDataUpdated at its next touch, read before the position's transaction"}
         , block {o.block.toLocaleString("en-US")}
         {observationLinks(logPoint, links)}
       </>
@@ -1334,19 +1333,18 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
     derivation: note.live ? (
       <>
         This is a LIVE note: the {note.marketSymbol} {rateNoun} on {marketName} is the reserve&rsquo;s own, not this
-        position&rsquo;s — utilisation across every account in the reserve makes it, and nobody chooses it. The earlier
-        value is the rate this position&rsquo;s own last touch left in force; the later is the Pool&rsquo;s
-        getReserveData read now, at the chain head — {observation("from")}, {observation("to")}. Shown whenever this
-        position still holds this reserve on this side, whatever the move — nothing having moved is itself the fact this
-        note states. A side whose rate is nothing at both ends is not drawn at all: a reserve nobody borrows pays no
-        supply rate, and &ldquo;0.00% → 0.00%&rdquo; is an absence rather than a reading.
+        position&rsquo;s: utilisation across every account in the reserve makes it, and nobody chooses it. The earlier
+        value is the rate this position&rsquo;s last touch left in force; the later is the Pool&rsquo;s getReserveData
+        read now, at the chain head, {observation("from")}, {observation("to")}. Shown whenever this position still
+        holds this reserve on this side, whatever the move: nothing having moved is the fact this note states. A side
+        whose rate is nothing at both ends is not drawn at all: a reserve nobody borrows pays no supply rate, and
+        &ldquo;0.00% → 0.00%&rdquo; is an absence rather than a reading.
         {note.interest && (
           <>
             {" "}
             The interest figures hold this position&rsquo;s own {note.marketSymbol} {isSupply ? "supply" : "debt"} at
-            that touch fixed and move only the rate; what it has actually {isSupply ? "earned" : "cost"} since is
-            whatever the reserve&rsquo;s own index has done to the balance, which the position&rsquo;s next row will
-            record.
+            that touch fixed and move only the rate; what it has {isSupply ? "earned" : "cost"} since is whatever the
+            reserve&rsquo;s index has done to the balance, which the position&rsquo;s next row will record.
           </>
         )}
       </>
@@ -1355,19 +1353,18 @@ function aaveFamilyRateStepBody(note: RateStepNote, links: NoteLinks): NoteBody 
         The {note.marketSymbol} {rateNoun} on {marketName} is not on either of this position&rsquo;s rows: the Pool
         emits a ReserveDataUpdated on every action that touches the reserve, whoever made it, and the rate is the field
         on that log. The two ends here are that log, found two ways. The earlier is the last one AT OR BEFORE this
-        position&rsquo;s own {aaveFamilyEndLabel(note.from)} — the Pool emits it inside that transaction, before the
-        position&rsquo;s own event, so it is the rate that action left in force. The later is the last one before the
-        position&rsquo;s next touch and NOT inside that touch&rsquo;s own transaction, so a move the position itself
-        caused there — a large borrow lifting utilisation — is never stated as the market&rsquo;s. {observation("from")}
-        , {observation("to")}. Nothing between them is drawn, because this position transacted nothing between them. A
+        position&rsquo;s {aaveFamilyEndLabel(note.from)}: the Pool emits it inside that transaction, before the
+        position&rsquo;s event, so it is the rate that action left in force. The later is the last one before the
+        position&rsquo;s next touch and NOT inside that touch&rsquo;s transaction, so a move the position itself caused
+        there (a large borrow lifting utilisation) is never stated as the market&rsquo;s. {observation("from")},{" "}
+        {observation("to")}. Nothing between them is drawn, because this position transacted nothing between them. A
         stretch is stated only where the rate moved at least one percentage point.
         {note.interest && (
           <>
             {" "}
             The interest figures hold this position&rsquo;s own {note.marketSymbol} {isSupply ? "supply" : "debt"} at
-            the earlier touch fixed and move only the rate; what it actually {isSupply ? "earned" : "cost"} across the
-            stretch is whatever the reserve&rsquo;s own index did to the balance, which the position&rsquo;s own next
-            row records.
+            the earlier touch fixed and move only the rate; what it {isSupply ? "earned" : "cost"} across the stretch is
+            whatever the reserve&rsquo;s index did to the balance, which the position&rsquo;s next row records.
           </>
         )}
       </>

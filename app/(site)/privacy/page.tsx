@@ -48,9 +48,9 @@ export default function PrivacyPage() {
         </section>
 
         <section className="mb-8">
-          <h2 className="text-2xl font-semibold text-rb-500 mb-4">Information We Access</h2>
+          <h2 className="text-2xl font-semibold text-rb-500 mb-4">Information we access</h2>
 
-          <h3 className="text-xl font-semibold text-rb-500 mb-3">Blockchain Data</h3>
+          <h3 className="text-xl font-semibold text-rb-500 mb-3">Blockchain data</h3>
           <ul className="list-disc pl-6 mb-4 text-rb-500">
             <li>Publicly available wallet addresses and ENS names you search for</li>
             <li>Publicly available position IDs and transaction hashes you view</li>
@@ -62,7 +62,7 @@ export default function PrivacyPage() {
             your private keys or the ability to execute transactions on your behalf.
           </p>
 
-          <h3 className="text-xl font-semibold text-rb-500 mb-3">Technical Information</h3>
+          <h3 className="text-xl font-semibold text-rb-500 mb-3">Technical information</h3>
           <ul className="list-disc pl-6 mb-4 text-rb-500">
             <li>Browser type and version</li>
             <li>Device type (mobile/desktop)</li>
@@ -72,7 +72,7 @@ export default function PrivacyPage() {
         </section>
 
         <section className="mb-8">
-          <h2 className="text-2xl font-semibold text-rb-500 mb-4">How We Use Information</h2>
+          <h2 className="text-2xl font-semibold text-rb-500 mb-4">How we use information</h2>
           <p className="text-rb-500 mb-4">We use the information we access to:</p>
           <ul className="list-disc pl-6 mb-4 text-rb-500">
             <li>Display blockchain data and transaction history</li>
@@ -84,7 +84,7 @@ export default function PrivacyPage() {
         </section>
 
         <section className="mb-8">
-          <h2 className="text-2xl font-semibold text-rb-500 mb-4">Data Storage and Retention</h2>
+          <h2 className="text-2xl font-semibold text-rb-500 mb-4">Data storage and retention</h2>
           <p className="text-rb-500 mb-4">
             Rails indexes public blockchain data from the chains it covers and keeps it in its database. This is public
             chain data and contains no personal information.
@@ -127,7 +127,7 @@ export default function PrivacyPage() {
         </section>
 
         <section className="mb-8">
-          <h2 className="text-2xl font-semibold text-rb-500 mb-4">Cookies and Local Storage</h2>
+          <h2 className="text-2xl font-semibold text-rb-500 mb-4">Cookies and local storage</h2>
           <p className="text-rb-500 mb-4">We use minimal browser local storage to enhance your experience:</p>
           <ul className="list-disc pl-6 mb-4 text-rb-500">
             <li>User interface preferences (theme, layout settings)</li>
@@ -158,7 +158,7 @@ export default function PrivacyPage() {
         </section>
 
         <section className="mb-8">
-          <h2 className="text-2xl font-semibold text-rb-500 mb-4">Changes to This Policy</h2>
+          <h2 className="text-2xl font-semibold text-rb-500 mb-4">Changes to this policy</h2>
           <p className="text-rb-500 mb-4">
             We may update this Privacy Policy from time to time. We will notify users of any material changes by posting
             the new Privacy Policy on this page and updating the "Last updated" date.
@@ -166,7 +166,7 @@ export default function PrivacyPage() {
         </section>
 
         <section className="mb-8">
-          <h2 className="text-2xl font-semibold text-rb-500 mb-4">Contact Us</h2>
+          <h2 className="text-2xl font-semibold text-rb-500 mb-4">Contact us</h2>
           <p className="text-rb-500 mb-4">
             If you have questions about this Privacy Policy or our practices, please contact us at:
           </p>

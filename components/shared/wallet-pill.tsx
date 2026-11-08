@@ -122,7 +122,7 @@ function WalletPillInner({
   // truncated, and a clipped name with no way to read it in full would be worse
   // than the hex it replaced.
   const labelTip = vault
-    ? `${vault.name} — a MetaMorpho vault · ${wallet}`
+    ? `${vault.name}, a MetaMorpho vault · ${wallet}`
     : href && hrefOverride && hrefLabel
       ? `${hrefLabel} · ${name ?? wallet}`
       : name

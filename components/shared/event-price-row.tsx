@@ -38,8 +38,8 @@ export function gasReceipt(gas: EventGas): Provenance {
     kind: "chain-derived",
     pclass: "emitted",
     summary: run
-      ? `Gas across the ${gas.run} transactions this row stands for — each one's gas used times its effective gas price, summed, in ETH and in USD at ETH's price at each block.`
-      : "Gas for this transaction — the gas used times the effective gas price, in ETH, and in USD at ETH's price at the block.",
+      ? `Gas across the ${gas.run} transactions this row stands for. Each one's gas used times its effective gas price, summed, in ETH and in USD at ETH's price at each block.`
+      : "Gas for this transaction. The gas used times the effective gas price, in ETH, and in USD at ETH's price at the block.",
     formula: "gasUsed × effectiveGasPrice",
     via: "transaction receipt",
     inputs: [

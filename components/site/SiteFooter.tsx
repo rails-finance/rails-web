@@ -49,7 +49,7 @@ export function SiteFooter() {
             </div>
             <p className="body-text mb-4">
               Dedicated, read-only explorers for DeFi support. On-chain-verifiable positions, timelines, and event
-              detail for the protocols you actually use.
+              detail for the protocols you use.
             </p>
             <div className="flex items-center gap-4">
               <a

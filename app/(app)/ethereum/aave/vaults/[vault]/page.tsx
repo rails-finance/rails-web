@@ -73,7 +73,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const name = data.vault.name || shortAddr(address);
   return listingMetadata({
     title: `${name} · Vaults on Ethereum`,
-    description: `What the ${name} vault holds — total assets, shares issued, share price and the family's own mechanic, read from chain at one block in native units.`,
+    description: `What the ${name} vault holds, total assets, shares issued, share price and the family's mechanic, read from chain at one block in native units.`,
     canonicalPath: ethereumVaultHref(address),
   });
 }

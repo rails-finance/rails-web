@@ -51,7 +51,7 @@ export const metadata = listingMetadata({
   title: "Vault positions on Ethereum",
   canonicalPath: "/ethereum/aave/vaults/positions",
   description:
-    "Every address that holds — or has ever held — a share of one of Aave's own ERC-4626 vaults on Ethereum, live and closed, as position cards. Filter by vault, family, status and what the holding address is; shares, claim and share of the vault read from chain at one block.",
+    "Every address that holds (or has ever held) a share of one of Aave's ERC-4626 vaults on Ethereum, live and closed, as position cards. Filter by vault, family, status and what the holding address is; shares, claim and share of the vault read from chain at one block.",
 });
 
 export default async function VaultPositionsPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

@@ -362,13 +362,13 @@ function RowNotes({
         <p className="mt-1 max-w-3xl text-[12px] leading-relaxed text-rb-500" data-figure="row-asset-leg">
           {event.assets ? (
             <>
-              The vault stated the other leg itself:{" "}
+              The vault stated the other leg:{" "}
               <Prov info={prov.assets(coords, event.kind === "deposit" ? "deposit" : "withdrawal")}>
                 {assetText(rawAmount(event.assets, ad), ad)} {assetSymbol}
               </Prov>{" "}
               in the ERC-4626 <code>{event.kind === "deposit" ? "Deposit" : "Withdraw"}</code> event of this same
-              transaction. It is the contract&rsquo;s own figure, not these shares multiplied by a share price. This
-              address&rsquo;s own leg is what is stated here; the transaction may have moved other shares too.
+              transaction. It is the contract&rsquo;s figure. This address&rsquo;s leg is what is stated here; the
+              transaction may have moved other shares too.
             </>
           ) : (
             <>
@@ -391,7 +391,7 @@ function RowNotes({
           >
             {shortAddress(event.counterparty)}
           </a>
-          . An address, and nothing more — this page does not say who it is.
+          . An address, and nothing more: this page does not say who it is.
         </p>
       )}
 
@@ -411,17 +411,17 @@ function explainerLines(event: VaultHolderEvent, shareUnit: string, assetSymbol:
       case "withdrawal":
         return `The vault burned this address's ${shareUnit}. A burn is what a withdrawal looks like on the share token: the shares left existence rather than passing to anyone, and the ${assetSymbol} leg came back in the same transaction.`;
       case "transfer-in":
-        return `Another address sent this one ${shareUnit}. Nothing was deposited: the shares already existed and changed hands, so the vault's own total supply did not move and no asset leg was emitted.`;
+        return `Another address sent this one ${shareUnit}. Nothing was deposited: the shares already existed and changed hands, so the vault's total supply did not move and no asset leg was emitted.`;
       case "transfer-out":
         return `This address sent ${shareUnit} to another. Nothing was withdrawn: the shares changed hands rather than being redeemed, so the vault's total supply did not move and no asset leg was emitted.`;
       case "transfer-self":
-        return `A transfer whose two ends are the same address. The balance is the same after it as before, and the row is here because the action is on the chain — a zero is a reading.`;
+        return `A transfer whose two ends are the same address. The balance is the same after it as before, and the row is here because the action is on the chain: a zero is a reading.`;
       case "cooldown":
         return `This address started a cooldown on the stake token, in a transaction that moved no shares. A stake token keeps one cooldown record per address at a time: starting a new one replaces the old, and an outgoing transfer decays it.`;
     }
   })();
   return [
     line,
-    `The share price on this row was read at block ${event.blockNumber.toLocaleString("en-US")} — the block this transaction landed in. It says nothing about the blocks before or after it, and this page draws no line between one row's price and the next.`,
+    `The share price on this row was read at block ${event.blockNumber.toLocaleString("en-US")}, the block this transaction landed in. It says nothing about the blocks before or after it, and this page draws no line between one row's price and the next.`,
   ];
 }

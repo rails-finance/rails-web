@@ -221,7 +221,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
       .then((d) => {
         if (cancelled) return;
         setData(d);
-        setError(d.chainStale ? "The read failed — reload to retry." : null);
+        setError(d.chainStale ? "The read failed: reload to retry." : null);
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load the position");
@@ -642,7 +642,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
               </div>
             ) : historyPending ? (
               <SweepInFlight>
-                Reading this wallet&rsquo;s whole history from the Pool&rsquo;s logs — the sweep runs from the
+                Reading this wallet&rsquo;s whole history from the Pool&rsquo;s logs. The sweep runs from the
                 Pool&rsquo;s first block, so it takes a moment.
               </SweepInFlight>
             ) : historyUnread ? (
@@ -657,7 +657,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
               <div className="py-12 text-center text-rb-500">
                 <p className="mb-1">This wallet has never touched Seamless.</p>
                 <p className="text-sm">
-                  No supplied assets, no debt, and no events on the Pool between its first block and now — and because
+                  No supplied assets, no debt, and no events on the Pool between its first block and now, and because
                   the market has been closed to new positions since April 2025, nothing can start here.
                 </p>
               </div>
@@ -748,7 +748,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                       emptyLabel={
                         sweptClean
                           ? "This wallet has no Seamless activity."
-                          : "No events to show — the sweep could not read this wallet's history."
+                          : "No events to show: the sweep could not read this wallet's history."
                       }
                       footer={<TimelineCoverageFooter coverage={timeline.coverage} sourceLabel={SOURCE_LABEL} />}
                       // On a grouped answer the list covers `eventsServed`; a month
@@ -788,14 +788,14 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
                   </>
                 ) : timelineState === "loading" ? (
                   <SweepInFlight>
-                    Reading this wallet&rsquo;s whole history from the Pool&rsquo;s logs — the sweep runs from the
+                    Reading this wallet&rsquo;s whole history from the Pool&rsquo;s logs. The sweep runs from the
                     Pool&rsquo;s first block, so it takes a moment.
                   </SweepInFlight>
                 ) : (
                   <p className="py-6 text-center text-sm text-rb-500">
                     {timelineState === "unavailable"
                       ? "The history endpoint isn't answering, so the timeline and the lifetime economics are unavailable. The position above is read live from the Pool and is unaffected."
-                      : "The history sweep failed. Reload to try again — the position above is read live from the Pool and is unaffected."}
+                      : "The history sweep failed. Reload to try again. The position above is read live from the Pool and is unaffected."}
                   </p>
                 )}
               </>

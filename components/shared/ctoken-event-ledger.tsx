@@ -75,7 +75,7 @@ function heldProv(
   const what = side === "collateral" ? "held" : "owed";
   return {
     kind: "chain-derived",
-    summary: `${side === "collateral" ? "Collateral" : "Debt"} ${before ? "before" : "after"} ${at} — what the account ${what} ${before ? "just before the transaction ran" : "once the transaction had run"}, in USD: each market's ${words ? words.held[side] : side === "collateral" ? `supply (${receipt}s × the exchange rate)` : "debt (accountBorrows)"} as its rows recorded it, a market the transaction left alone grown by its interest since its last event, each at ${brand}'s oracle price of its latest priced event.`,
+    summary: `${side === "collateral" ? "Collateral" : "Debt"} ${before ? "before" : "after"} ${at}. What the account ${what} ${before ? "just before the transaction ran" : "once the transaction had run"}, in USD: each market's ${words ? words.held[side] : side === "collateral" ? `supply (${receipt}s × the exchange rate)` : "debt (accountBorrows)"} as its rows recorded it, a market the transaction left alone grown by its interest since its last event, each at ${brand}'s oracle price of its latest priced event.`,
     formula: "Σ balance × price",
   };
 }
@@ -90,7 +90,7 @@ function tokenProv(
 ): Provenance {
   return {
     kind: "chain-derived",
-    summary: `${symbol} ${side === "collateral" ? "supplied" : "owed"} ${before ? "before" : "after"} ${at} — ${before ? "just before the transaction ran" : "once the transaction had run"}: the market's ${words ? words.token[side] : side === "collateral" ? `supply (the ${receipt} balance × the exchange rate at the block)` : "debt (the emitted accountBorrows, and that less the act before it)"} as the row states it.`,
+    summary: `${symbol} ${side === "collateral" ? "supplied" : "owed"} ${before ? "before" : "after"} ${at}. ${before ? "Just before the transaction ran" : "Once the transaction had run"}: the market's ${words ? words.token[side] : side === "collateral" ? `supply (the ${receipt} balance × the exchange rate at the block)` : "debt (the emitted accountBorrows, and that less the act before it)"} as the row states it.`,
   };
 }
 
@@ -213,7 +213,7 @@ function sideCell(
               text: `${a.amount >= a.before ? "+" : "−"}${fmt(Math.abs(a.amount - a.before))}`,
               info: {
                 kind: "chain-derived",
-                summary: `${a.symbol} ${side === "collateral" ? "supply" : "debt"} change at ${at} — the balance after the transaction less the balance before it.`,
+                summary: `${a.symbol} ${side === "collateral" ? "supply" : "debt"} change at ${at}. The balance after the transaction less the balance before it.`,
                 formula: "after − before",
               },
             }

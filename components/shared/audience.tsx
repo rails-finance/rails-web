@@ -11,25 +11,25 @@ type Reader = { icon: LucideIcon; label: string; lead: string; body: React.React
 const READERS: readonly Reader[] = [
   {
     icon: GraduationCap,
-    label: "The DeFi Curious",
+    label: "The DeFi curious",
     lead: "Learn by example.",
     body: "See how DeFi works through real positions, before you risk any of your own money.",
   },
   {
     icon: Wallet,
-    label: "The Active DeFi User",
+    label: "The active DeFi user",
     lead: "Stay on top of positions.",
-    body: "Collateral, debt and liquidation risk, explained in plain language so you know exactly where you stand.",
+    body: "Collateral, debt and liquidation risk, explained in plain language so you know where you stand.",
   },
   {
     icon: Code2,
-    label: "DeFi Teams",
+    label: "DeFi teams",
     lead: "Support your users.",
     body: "Give them an independent, verifiable view of their positions, with full coverage of your protocol.",
   },
   {
     icon: ShieldAlert,
-    label: "Crisis Support",
+    label: "Crisis support",
     lead: "When frontends fail.",
     body: (
       <>

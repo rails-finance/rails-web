@@ -11,7 +11,7 @@ export default function CompoundV2PositionNotFound() {
       backLabel="Browse Compound V2 positions"
     >
       This page is about one account, named by its 20-byte address. The URL does not carry one, so there is no account
-      to look up — an address Compound V2 has simply never seen would still resolve, and say so.
+      to look up. An address Compound V2 has simply never seen would still resolve, and say so.
     </RouteNotFound>
   );
 }

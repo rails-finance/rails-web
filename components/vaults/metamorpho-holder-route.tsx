@@ -428,7 +428,7 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
       address: data.vault.address,
       price: !data.chainStale && data.sharePrice.value > 0 ? data.sharePrice.value : undefined,
       unit: !data.chainStale && data.sharePrice.value > 0 ? data.vault.asset.symbol : undefined,
-      label: `One share in ${data.vault.asset.symbol}, the vault's own convertToAssets`,
+      label: `One share in ${data.vault.asset.symbol}, the vault's convertToAssets`,
       info: vaultSharePriceProv({
         chainId,
         readBy: serverReadOf(data),

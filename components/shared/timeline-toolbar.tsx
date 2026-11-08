@@ -982,7 +982,7 @@ export function TimelineToolbar({
           so it is the width of the TIMELINE rather than of the button it
           hangs from: the month matrix is a twelve-column grid and a
           button-width popover would make each month four pixels wide.
-          z-40 clears the spine's own z-20. */}
+          z-40 clears the spine's z-20. */}
       {tl.datesAxis &&
         tl.heatmapOpen &&
         (isPhone ? (

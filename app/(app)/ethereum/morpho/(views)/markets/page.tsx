@@ -26,7 +26,7 @@ export const revalidate = 600;
 export const metadata = {
   title: "Morpho Blue markets",
   description:
-    "Every Morpho Blue market, one row per loan token — what it is lent against, how much, how used, and the one loan-to-value that governs each market.",
+    "Every Morpho Blue market, one row per loan token: what it is lent against, how much, how used, and the one loan-to-value that governs each market.",
 };
 
 const PROTOCOL = protocolForHref("/ethereum/morpho")!;

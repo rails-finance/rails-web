@@ -1763,8 +1763,8 @@ function healthProv(s: FlowPriceSeries, r: PriceAt, dayWord: string): Provenance
     kind: "derived",
     summary:
       block == null
-        ? (s.here?.live ?? "Health factor — the live figure.")
-        : (s.here?.read ?? "Health factor — on {day}, from the read at block {block}.")
+        ? (s.here?.live ?? "Health factor. The live figure.")
+        : (s.here?.read ?? "Health factor. On {day}, from the read at block {block}.")
             .replace("{block}", block.toLocaleString("en-US"))
             .replace("{day}", dayWord),
     formula: s.here?.formula ?? "Σ collateral × price × liquidation threshold ÷ Σ debt × price",
@@ -1797,8 +1797,8 @@ function readoutProv(s: FlowPriceSeries, r: PriceAt, dayWord: string, pointWord:
     kind: "chain",
     pclass: "oracle",
     summary: r.carried
-      ? `${s.asset.symbol} price — in ${s.unitLabel}, carried to ${dayWord} from ${pointWord}, the last day with a price recorded; from ${s.source}.`
-      : `${s.asset.symbol} price — in ${s.unitLabel} on ${dayWord}, from ${s.source}.`,
+      ? `${s.asset.symbol} price. In ${s.unitLabel}, carried to ${dayWord} from ${pointWord}, the last day with a price recorded; from ${s.source}.`
+      : `${s.asset.symbol} price. In ${s.unitLabel} on ${dayWord}, from ${s.source}.`,
     ...(block != null ? { source: { block } } : {}),
   };
 }

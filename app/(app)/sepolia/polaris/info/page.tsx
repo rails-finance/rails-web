@@ -29,8 +29,8 @@ const intro = (
         stablecoin against it.
       </li>
       <li>
-        pETH is Polaris&apos;s own collateral token. You buy it with ETH from a bonding curve, and its price rises as
-        more ETH goes in.
+        pETH is Polaris&apos;s collateral token. You buy it with ETH from a bonding curve, and its price rises as more
+        ETH goes in.
       </li>
       <li>
         Nobody chooses an interest rate. The primary rate moves with the PSM&apos;s mints and redemptions. A secondary
@@ -64,9 +64,9 @@ const intro = (
         share.
       </li>
       <li>
-        Live figures come straight from the contracts at the latest block: collateral ratio against the minimum, current
-        rate, and what has built up since the last touch. The collateral&apos;s dollar value comes from the
-        protocol&apos;s own price feed.
+        Live figures come from the contracts at the latest block: collateral ratio against the minimum, current rate,
+        and what has built up since the last touch. The collateral&apos;s dollar value comes from the protocol&apos;s
+        price feed.
       </li>
     </ul>
 
@@ -83,7 +83,7 @@ const intro = (
 
     <h2 className={H}>Testnet note</h2>
     <ul className={UL}>
-      <li>Tokens are test tokens, and ETH and gold prices come from the protocol&apos;s own testnet medianisers.</li>
+      <li>Tokens are test tokens, and ETH and gold prices come from the protocol&apos;s testnet medianisers.</li>
     </ul>
 
     <h2 className={H}>Not shown yet</h2>

@@ -11,7 +11,7 @@ export default function FrankencoinPositionNotFound() {
       backHref="/ethereum/frankencoin"
       backLabel="Browse Frankencoin positions"
     >
-      A Frankencoin position is its own contract, so its 20-byte address is the identity — not the owner&rsquo;s, which
+      A Frankencoin position is its own contract, so its 20-byte address is the identity, not the owner&rsquo;s, which
       is transferable. The URL does not carry one, so there is no contract to read.
     </RouteNotFound>
   );
