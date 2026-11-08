@@ -463,7 +463,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       pclass: "state",
       verify: recompute("TroveManager", "getTroveStatus + getTroveIdsCount/getTroveFromTroveIdsArray"),
       summary:
-        `A zombie trove (status 4 on the ${sym} branch's TroveManager): a partial redemption left it below the branch minimum debt, so the protocol removed it from SortedTroves. While it still carries debt it is redeemed BEFORE everything in the list, so a debt-bearing zombie leads the queue here; one redeemed to zero debt keeps its collateral on the branch but stands outside every redemption path. Found through the TroveManager's trove-ids array (it enumerates every trove the branch has, listed or not), because a walk of the sorted list alone cannot see it.` +
+        `A zombie trove (status 4 on the ${sym} branch's TroveManager). A partial redemption left it below the branch minimum debt, so the protocol removed it from SortedTroves. While it still carries debt it is redeemed BEFORE everything in the list, so a debt-bearing zombie leads the queue here; one redeemed to zero debt keeps its collateral on the branch but stands outside every redemption path. Found through the TroveManager's trove-ids array (it enumerates every trove the branch has, listed or not), because a walk of the sorted list alone cannot see it.` +
         (idsCapped ? ` The enumeration is bounded on this read, so the zombie count is a floor, not a census.` : ""),
       contract: tmContract(sym),
       via: `${ROSTER_VIA} · TroveManager.getTroveIdsCount / getTroveFromTroveIdsArray + getTroveStatus @ head`,

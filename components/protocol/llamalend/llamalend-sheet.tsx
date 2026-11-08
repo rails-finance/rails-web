@@ -144,7 +144,7 @@ const faceProv = (sym: string, what: string): Provenance => ({
 const inBorrowedProv = (what: string, b: string, parts: { label: string; value: string }[]): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `${what}, in ${b}: the collateral at the market's AMM oracle price (price_oracle, ${b} per collateral) at this block, plus any ${b} the AMM holds. This market borrows ${b}, so its figures stay in ${b}.`,
+  summary: `${what}, in ${b}. The collateral at the market's AMM oracle price (price_oracle, ${b} per collateral) at this block, plus any ${b} the AMM holds. This market borrows ${b}, so its figures stay in ${b}.`,
   formula: "collateral × oracle price + converted",
   inputs: parts.map((p) => ({ label: p.label, value: p.value, kind: "chain" as const, pclass: "state" as const })),
 });

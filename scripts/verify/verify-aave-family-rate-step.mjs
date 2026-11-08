@@ -798,8 +798,9 @@ for (const p of PAGES) {
       `USDe figures on the row: ${nums.join(", ") || "none"}`,
     );
     check(
-      '3c. the derivation names block 23,038,027 and the words "before the position\'s own transaction"',
-      text.includes(blk(23038027)) && text.includes("before the position's own transaction"),
+      // The row's words since the ui-jobs 34 sweep; the export keeps "own" (lib/shared/market-note.ts).
+      '3c. the derivation names block 23,038,027 and the words "before the position\'s transaction"',
+      text.includes(blk(23038027)) && text.includes("before the position's transaction"),
       text.includes(blk(23038027)) ? "block present" : "block missing",
     );
     check('3d. the header word is "borrow rate"', text.includes("borrow rate"), text.slice(0, 80));

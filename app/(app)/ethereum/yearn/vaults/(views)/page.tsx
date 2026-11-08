@@ -37,7 +37,7 @@ export async function generateMetadata() {
   return listingMetadata({
     title: "Yearn V3 vaults",
     canonicalPath: "/ethereum/yearn/vaults",
-    description: `Every vault the ${roster.factories.length} Yearn V3 factories had deployed on Ethereum at the census block — ${roster.vaults.length.toLocaleString("en-US")} of them, endorsed and unendorsed alike — with each one's name, asset, total assets, share price and endorsement read from chain at one block.`,
+    description: `Every vault the ${roster.factories.length} Yearn V3 factories had deployed on Ethereum at the census block, ${roster.vaults.length.toLocaleString("en-US")} of them, endorsed or not, with each one's name, asset, total assets, share price and endorsement read from chain at one block.`,
   });
 }
 

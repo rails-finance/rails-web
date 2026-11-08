@@ -490,7 +490,7 @@ export function fluidSheet({
       ? {
           kind: "chain-derived",
           pclass: "state",
-          summary: `Collateral can fall: how far the ${colSym} price in ${debtSym} can fall before the position ratio after this event reaches the vault's liquidation threshold; one less the ratio over the threshold. The threshold is the vault's configuration as the page reads it at the latest block.`,
+          summary: `Collateral can fall. How far the ${colSym} price in ${debtSym} can fall before the position ratio after this event reaches the vault's liquidation threshold; one less the ratio over the threshold. The threshold is the vault's configuration as the page reads it at the latest block.`,
           formula: "1 − ratio ÷ liquidation threshold",
           inputs: [
             {
@@ -545,7 +545,7 @@ export function fluidSheet({
               info: {
                 kind: "chain-derived",
                 pclass: "state",
-                summary: `Still borrowable: the ${colSym} collateral after this event times the vault oracle's price at this block and the vault's collateral factor, less the ${debtSym} debt: what an operation could borrow before the vault refuses it. The collateral factor is the vault's configuration as the page reads it at the latest block.`,
+                summary: `Still borrowable. The ${colSym} collateral after this event times the vault oracle's price at this block and the vault's collateral factor, less the ${debtSym} debt: what an operation could borrow before the vault refuses it. The collateral factor is the vault's configuration as the page reads it at the latest block.`,
                 formula: "collateral × oracle price × collateral factor − debt",
                 inputs: [
                   {

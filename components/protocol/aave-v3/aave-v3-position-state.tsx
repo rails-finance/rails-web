@@ -221,7 +221,7 @@ export function hfAtCallProv(
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `Health factor at the moment of the liquidation: the account's balances before the call, valued at the ${brand} oracle's prices in the liquidation's block, each collateral counted up to its liquidation threshold, divided by the debt. The liquidation ran at these prices.${endOfPrevious != null ? ` At the end of the block before, at that block's prices, the factor was ${hfLabelV3(endOfPrevious)}.` : ""}`,
+    summary: `Health factor at the moment of the liquidation. The account's balances before the call, valued at the ${brand} oracle's prices in the liquidation's block, each collateral counted up to its liquidation threshold, divided by the debt. The liquidation ran at these prices.${endOfPrevious != null ? ` At the end of the block before, at that block's prices, the factor was ${hfLabelV3(endOfPrevious)}.` : ""}`,
     contract: coords.pool ? { name: coords.pool.name, address: coords.pool.address } : undefined,
     via: `Σ collateral before × price at block ${coords.blockNumber ?? "N"} × threshold ÷ Σ debt before × price = ${hf.toFixed(6)}`,
     formula: "collateral × threshold ÷ debt",
@@ -238,7 +238,7 @@ export function ltvAtCallProv(
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `Loan-to-value at the moment of the liquidation: the account's debt before the call divided by its collateral before the call, both valued at the ${brand} oracle's prices in the liquidation's block.${endOfPrevious != null ? ` At the end of the block before, at that block's prices, it was ${(endOfPrevious * 100).toFixed(2)}%.` : ""}`,
+    summary: `Loan-to-value at the moment of the liquidation. The account's debt before the call divided by its collateral before the call, both valued at the ${brand} oracle's prices in the liquidation's block.${endOfPrevious != null ? ` At the end of the block before, at that block's prices, it was ${(endOfPrevious * 100).toFixed(2)}%.` : ""}`,
     contract: coords.pool ? { name: coords.pool.name, address: coords.pool.address } : undefined,
     via: `Σ debt before × price at block ${coords.blockNumber ?? "N"} ÷ Σ collateral before × price = ${(ltv * 100).toFixed(2)}%`,
     formula: "debt ÷ collateral",

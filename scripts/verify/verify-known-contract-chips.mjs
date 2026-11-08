@@ -58,8 +58,10 @@ const FIXTURES = [
   {
     label: "aave-v3 base 0x0750 (CoW swap on Base)",
     path: "/base/aave-v3/0x07502bf24fe1a4d81254900a693b7dce64945556",
+    // The transfer out reads as a sale through CoW once the receipt read
+    // lands (ui-jobs 438: the aToken's interest mint is no second leg back).
     expect: [
-      { text: "to CoW", icon: COW_ICON },
+      { text: "via CoW", icon: COW_ICON },
       { text: "from CoW", icon: COW_ICON },
     ],
   },
@@ -80,7 +82,7 @@ const FIXTURES = [
 
 // Every registry display name the control must NOT show.
 const REGISTRY_NAMES =
-  /CoW|WETH gateway|ParaSwap|Uniswap|PancakeSwap|1inch|Odos|Magpie|Zerion|Enso|Multicall|CCIP escrow|0x Settler|0x flash wallet|0xbow zap|Aave Clinic Steward|Aave Umbrella|Aave adapter|Aerodrome|Asset pool|Balancer V3|Cross-chain order contract|Curve|DEX aggregator|DODO pool|DZap|Dynamic route|Eisen|Fee collector|Fee vault|Gaslite|Krystal|LI\.FI|Leftover exchanger|Mayan|Merkl|Morpho migration bundler|Oku router|OKX|Omni Exchange|Order fee taker|Pendle|Pool liquidity manager|Portikus|Rainbow|Rango|Revert auto-compound|Socket|Sushi|Swap callback|Swap executor|Swap helper|Swap router|SwapVM router|Underscore|V3 pool adaptor|V3 position utils|Vault rewards module|Superfluid Aave backend|Portals multicall|DCA\.fun|Aave migration helper|Aave Pool Exposure Steward|Aave Collector|Flash-loan action|Operation executor|Aave V3 swap adapter|Enzyme Aave V3 adapter|Aave V3 adapter|Contango|Synthereum lending manager|Auto-repaying manager|Morpho bundler adapter|Clear GSM rebalance adapter|Deposit contract|App contract|Leveraged position|L1 sender|ElfomoFi|Commission contract|Rosetta proxy|Deleverage connector|Zap executor|Relay router|Vault deposit router|Balancer fee burner|Balancer V2|Equalizer pool/;
+  /CoW|WETH gateway|ParaSwap|Uniswap|PancakeSwap|1inch|Odos|Magpie|Zerion|Enso|Multicall|CCIP escrow|0x(?![0-9a-fA-F])|0x flash wallet|0xbow zap|Aave Clinic Steward|Aave Umbrella|Aave adapter|Aerodrome|Asset pool|Balancer V3|Cross-chain order contract|Curve|DEX aggregator|DODO pool|DZap|Dynamic route|Eisen|Fee collector|Fee vault|Gaslite|Krystal|LI\.FI|Leftover exchanger|Mayan|Merkl|Morpho migration bundler|Oku router|OKX|Omni Exchange|Order fee taker|Pendle|Pool liquidity manager|Portikus|Rainbow|Rango|Revert auto-compound|Socket|Sushi|Swap callback|Swap executor|Swap helper|Swap router|SwapVM router|Underscore|V3 pool adaptor|V3 position utils|Vault rewards module|Superfluid Aave backend|Portals|DCA\.fun|Aave migration helper|Aave Pool Exposure Steward|Aave Collector|Flash-loan action|Operation executor|Aave V3 swap adapter|Enzyme Aave V3 adapter|Aave V3 adapter|Contango|Synthereum lending manager|Auto-repaying manager|Morpho bundler adapter|Clear GSM rebalance adapter|Deposit contract|App contract|Leveraged position|L1 sender|ElfomoFi|Commission contract|Rosetta proxy|Deleverage connector|Zap executor|Relay|Vault deposit router|Balancer fee burner|Balancer V2|Equalizer pool/;
 
 const only = process.env.FIXTURES ? new RegExp(process.env.FIXTURES) : null;
 let pass = 0;
@@ -135,7 +137,7 @@ for (const fx of FIXTURES) {
     await page.waitForTimeout(2500);
     chips = await page.evaluate(() =>
       [...document.querySelectorAll("span.text-rb-500")]
-        .filter((s) => /^(to|from)$/.test((s.textContent || "").trim()))
+        .filter((s) => /^(to|from|via)$/.test((s.textContent || "").trim()))
         .map((p) => {
           const chip = p.parentElement;
           const icon = chip.querySelector("[data-party-icon]");
@@ -161,7 +163,7 @@ for (const fx of FIXTURES) {
   }
 
   // The chip's text is prefix + label with no separator in textContent.
-  const norm = (s) => s.replace(/^(to|from)\s*/, "$1 ");
+  const norm = (s) => s.replace(/^(to|from|via)\s*/, "$1 ");
 
   for (const want of fx.expect ?? []) {
     const hit = chips.find((c) => norm(c.text) === want.text);

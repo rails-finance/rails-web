@@ -1189,8 +1189,8 @@ check(
   `${sharesDesc.data.length} rows`,
 );
 check(
-  "L4b the section's about page states that the shares sort is in each vault's own units",
-  /own units/.test(dom.info) && /decimals\(\)/.test(dom.info),
+  "L4b the section's about page states that the shares sort is in each vault's units",
+  /each vault.s units/.test(dom.info) && /decimals\(\)/.test(dom.info),
   "the drawer's sort paragraph names the units",
 );
 

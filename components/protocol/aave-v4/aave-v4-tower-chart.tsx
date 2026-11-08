@@ -119,7 +119,7 @@ const CURRENT_DEBT_PROV: Provenance = {
 // price, since "what's it worth now" is a current-price question.
 const flowUsdHintProv = (symbol: string): Provenance => ({
   kind: "derived",
-  summary: `${symbol} outflow value in USD: each event's amount at the price stored for its block, added up. The figure stays at what the tokens were worth as they left.`,
+  summary: `${symbol} outflow value in USD. Each event's amount at the price stored for its block, added up. The figure stays at what the tokens were worth as they left.`,
   formula: "Σ(flow amount × price at the event's block)",
   inputs: [{ label: "price", kind: "chain", pclass: "oracle", note: OUTFLOW_PRICE_NOTE }],
 });

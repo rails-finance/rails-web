@@ -949,7 +949,7 @@ check(
 // to keep the claim, and dropping the claim is not.
 const citationText = citationDrawn ? (await citation.innerText()).replace(/\s+/g, " ") : "";
 const wantClauses = [
-  "a holder in this section is the holder’s own wallet address",
+  "a holder in this section is the holder’s wallet address",
   "the section names no app on any row",
   "Rails states a reading for any address",
   "no per-address route",

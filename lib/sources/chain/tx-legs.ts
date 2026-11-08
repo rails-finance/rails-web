@@ -18,7 +18,9 @@
 // then fails whole rather than reporting no native leg. The balance difference
 // across the block is the named fallback and is not built: the wallet's other
 // transactions in the block muddy it. Token names and decimals are read here
-// in every case.
+// in every case. Where legs back come in two or more tokens, each is priced at
+// the block by the chain's Aave oracle through rails-server
+// (aaveOraclePricesAtBlock), the native coin as WETH.
 //
 // A receipt never changes, so an answer is kept for the life of the process,
 // keyed by chain, hash and wallet; a failure is not kept. `rpcCalls` counts
@@ -27,15 +29,22 @@
 import { decodeEventLog, parseAbi, type Hex } from "viem";
 import { chainClient } from "./rpc";
 import { resolveErc20Meta } from "./erc20-meta";
+import { aaveOraclePricesAtBlock } from "./aave-oracle-prices";
 import { fetchStoredTxLegs } from "@/lib/sources/api/tx-legs-at-block";
 import type { ChainId } from "@/lib/shared/chains";
-import type { TxLeg, TxLegs } from "@/lib/shared/tx-legs";
+import { needsLegPrices, type TxLeg, type TxLegs } from "@/lib/shared/tx-legs";
 
 const TRANSFER = parseAbi(["event Transfer(address indexed from, address indexed to, uint256 value)"]);
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const ZERO = "0x0000000000000000000000000000000000000000";
 /** The native coin on every chain the route reads (Ethereum, Base, Arbitrum). */
 const NATIVE = { symbol: "ETH", decimals: 18 };
+/** WETH per chain: the oracle prices the native coin under it. */
+const WRAPPED_NATIVE: Partial<Record<ChainId, string>> = {
+  1: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+  8453: "0x4200000000000000000000000000000000000006",
+  42161: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+};
 
 type Answer = Omit<TxLegs, "rpcCalls" | "cached">;
 const kept = new Map<string, Answer>();
@@ -71,10 +80,18 @@ function receiptLegs(
       // An ERC-721 Transfer shares the topic with a fourth indexed field.
     }
   }
-  const sentTokens = new Set(raw.filter((r) => r.from === wallet).map((r) => r.token));
-  // A mint of a token the wallet also sent is the token minting the wallet's
-  // accrued interest as it moves (an aToken), not a payment.
-  return raw.filter((r) => !(r.from === ZERO && r.to === wallet && sentTokens.has(r.token)));
+  return dropInterestMints(raw, wallet);
+}
+
+/** A mint to the wallet of a token it also sent, or also received from
+ *  another account, is the token minting the wallet's accrued interest as its
+ *  balance moves (an aToken does this on every transfer), not a payment. The
+ *  store's answer leaves out the first case only, so both paths pass here. */
+function dropInterestMints(raw: RawLeg[], wallet: string): RawLeg[] {
+  const moved = new Set(
+    raw.filter((r) => r.from === wallet || (r.to === wallet && r.from !== ZERO)).map((r) => r.token),
+  );
+  return raw.filter((r) => !(r.from === ZERO && r.to === wallet && moved.has(r.token)));
 }
 
 /** Native legs to the wallet from Alchemy's asset-transfers index, the one
@@ -114,7 +131,10 @@ async function read(chainId: ChainId, hash: string, wallet: string): Promise<{ a
   if (stored) {
     blockNumber = stored.blockNumber;
     to = stored.to;
-    legsRaw = stored.erc20.map((l) => ({ ...l, value: BigInt(l.raw) }));
+    legsRaw = dropInterestMints(
+      stored.erc20.map((l) => ({ ...l, value: BigInt(l.raw) })),
+      wallet,
+    );
   } else {
     rpcCalls++;
     const receipt = await chainClient(chainId).getTransactionReceipt({ hash: hash as Hex });
@@ -166,6 +186,18 @@ async function read(chainId: ChainId, hash: string, wallet: string): Promise<{ a
       }),
     ),
   ];
+  // Legs back in two or more tokens are ranked by USD at the block (the
+  // rulings in lib/shared/tx-legs.ts): one request to rails-server, no chain
+  // read of this process's, so `rpcCalls` does not count it.
+  if (needsLegPrices({ sent, back })) {
+    const assetOf = (l: TxLeg) => l.token ?? WRAPPED_NATIVE[chainId];
+    const assets = [...new Set(back.map(assetOf).filter((a): a is string => !!a))];
+    const prices = await aaveOraclePricesAtBlock(chainId, blockNumber, assets);
+    for (const l of back) {
+      const usd = prices.get(assetOf(l) ?? "");
+      if (usd != null) l.usd = usd;
+    }
+  }
   return { answer: { chainId, hash, wallet, blockNumber, to, sent, back }, rpcCalls };
 }
 
