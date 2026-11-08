@@ -18,9 +18,7 @@ export default function StartLayout({ children }: { children: ReactNode }) {
         <h1 className="flex min-h-[38px] items-center text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
           Start here
         </h1>
-        <p className="mt-2 text-rb-500">
-          Start here to discover how Rails explorers can benefit you.
-        </p>
+        <p className="mt-2 text-rb-500">Start here to discover how Rails explorers can benefit you.</p>
       </div>
       <StartStack>{children}</StartStack>
     </div>
