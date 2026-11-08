@@ -46,6 +46,7 @@ export function ToolsMenuItem({
   copied,
   item,
   expanded,
+  internal,
 }: {
   icon: ReactNode;
   title: ReactNode;
@@ -60,6 +61,9 @@ export function ToolsMenuItem({
   /** A row that shows or hides a group (ui-jobs 250): its state, drawn as
    *  `aria-expanded` with `data-group-button` on the row. */
   expanded?: boolean;
+  /** A row that goes to another page of Rails: its title in link blue
+   *  (`--text-link`, ui-jobs 535). */
+  internal?: boolean;
 }) {
   const className =
     "flex items-start gap-3 mx-1 my-0.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]";
@@ -67,7 +71,9 @@ export function ToolsMenuItem({
     <>
       <span className="mt-0.5 shrink-0 text-rb-500">{icon}</span>
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-foreground">{title}</span>
+        <span className={`block text-sm font-semibold ${internal ? "text-[var(--text-link)]" : "text-foreground"}`}>
+          {title}
+        </span>
         <span className="block text-xs text-rb-500">{subtitle}</span>
       </span>
     </>
@@ -131,6 +137,8 @@ export function ToolsMenu({
   label,
   heading,
   provScope,
+  scopeInline,
+  onScopeArm,
   children,
 }: {
   /** `tools`: the spanner trigger of a page row. `card`: the position card's
@@ -154,12 +162,17 @@ export function ToolsMenu({
   /** The section a menu's last row arms the inspector on (ui-jobs 284), and
    *  the row's subtitle. The `card` menu's is the position card. */
   provScope?: { id: string; hint: string };
+  /** The caller places the Inspect provenance row among its own: `children`
+   *  takes it as its second argument (the event menu, ui-jobs 535). */
+  scopeInline?: boolean;
+  /** Called as Inspect provenance arms the scope (`ProvScopeToggle` `onArm`). */
+  onScopeArm?: () => void;
   /** Flash the trigger as the confirmation for a copy taken from the menu —
    *  the menu closes on action, so the trigger is where the answer lands. */
   copied?: boolean;
   /** The caller's rows, under the inspector. Handed the menu's close so a row
    *  can shut the panel when it acts. */
-  children?: (close: () => void) => ReactNode;
+  children?: (close: () => void, scopeRow?: ReactNode) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -228,8 +241,21 @@ export function ToolsMenu({
         <>
           {leading?.(close)}
           {leading && children && <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />}
-          {children?.(close)}
-          {scope && (
+          {scopeInline
+            ? children?.(
+                close,
+                scope ? (
+                  <ProvScopeToggle
+                    scope={scope.id}
+                    hint={scope.hint}
+                    onPick={closeToTrigger}
+                    onArm={onScopeArm}
+                    openerRef={triggerRef}
+                  />
+                ) : undefined,
+              )
+            : children?.(close)}
+          {scope && !scopeInline && (
             <>
               {(leading || children) && <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />}
               <ProvScopeToggle scope={scope.id} hint={scope.hint} onPick={closeToTrigger} openerRef={triggerRef} />

@@ -18,7 +18,7 @@ import {
 import { useTimelineScale, useSingleWallet } from "@/components/shared/activity-timeline";
 import { DiscChevron } from "@/components/shared/expand-chevron";
 import { EventCardFooter } from "@/components/shared/event-card-footer";
-import { EventCardMenu, useEventMenuRows } from "@/components/shared/event-card-menu";
+import { EventCardMenu } from "@/components/shared/event-card-menu";
 import {
   EventPageAside,
   EventPageContext,
@@ -34,7 +34,7 @@ import { eventIdFromShareHref, useEventShareHref } from "@/components/shared/eve
 import { CardTabStrip } from "@/components/shared/info-disclosure";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { isCardOpen, setCardOpen } from "@/lib/shared/card-open-store";
-import { ProvReceiptsScope, provInspector, useProvScopeLit, useReceiptRegistry } from "@/components/shared/provenance";
+import { ProvReceiptsScope, useProvScopeLit, useReceiptRegistry } from "@/components/shared/provenance";
 import { useUnreadTokens } from "@/components/shared/unread-tokens-context";
 import type { UnreadToken } from "@/lib/shared/types/event-shape";
 import { EventCaptionContext, SpineRowContext, isPhoneViewport, useSpineView } from "@/components/shared/mobile-spine";
@@ -51,7 +51,6 @@ import {
 import { useRowTarget } from "@/components/shared/row-target";
 import {
   ChainTruthRow,
-  HeadChipContext,
   HeadSurplusChip,
   PartyChip,
   type ChainTruthRowSpec,
@@ -697,39 +696,13 @@ function EventCardView(props: EventCardProps) {
   const rowNum = captionCtx?.n != null ? { number: captionCtx.n, last: captionCtx.nLast } : num;
   const numberNode = rowNum ? <PlainNumber number={rowNum.number} last={rowNum.last} /> : null;
   // The event menu (⋮) at the right end of the T1 row, at both widths: after
-  // the header on desktop, at the caption's right on a phone. On the event
-  // page it carries the event's "Inspect provenance". A press on it stays
-  // with the menu (Escape still reaches the menu's document listener).
-  // The head chips the row draws (PartyChip offers each), and the ⋮'s Trace
-  // row for the first: it arms this event and pins the chip's receipt at the
-  // chip, as an armed click on it would.
-  const [chips, setChips] = useState<ReadonlyMap<string, string>>(() => new Map());
-  const offerChip = useCallback((id: string, words: string | null) => {
-    setChips((prev) => {
-      if (words == null ? !prev.has(id) : prev.get(id) === words) return prev;
-      const next = new Map(prev);
-      if (words == null) next.delete(id);
-      else next.set(id, words);
-      return next;
-    });
-  }, []);
-  const firstChip = groupMenu ? undefined : chips.entries().next().value;
-  const headChip = firstChip
-    ? {
-        words: firstChip[1],
-        open: () => {
-          const marker = rowRef.current?.querySelector(`[data-party-chip="${CSS.escape(firstChip[0])}"]`);
-          if (!marker) return;
-          provInspector.setArmed(true, scopeId);
-          const entry = registry.getEntries().find((e) => !e.echo && e.el?.contains(marker));
-          if (entry?.el) provInspector.pin(entry, registry, entry.el);
-        },
-      }
-    : undefined;
-  const menuRows = useEventMenuRows(groupMenu ? null : shareHref, !!groupMenu, !!headChip);
-  // On the event page the ⋮ stands beside the h1 (`EventPageAside`).
+  // the header on desktop, at the caption's right on a phone. Every event row
+  // carries Inspect provenance, armed on this card's receipts scope, and Copy
+  // transaction hash (ui-jobs 535). A press on it stays with the menu (Escape
+  // still reaches the menu's document listener). On the event page the ⋮
+  // stands at the card's top right (`EventPageControls`).
   const headMenu =
-    !pageMode && menuRows ? (
+    !pageMode && (groupMenu || props.slots.event) ? (
       <span
         className="inline-flex items-center"
         data-event-head-menu=""
@@ -738,7 +711,16 @@ function EventCardView(props: EventCardProps) {
           if (e.key === "Enter" || e.key === " ") e.stopPropagation();
         }}
       >
-        <EventCardMenu shareHref={groupMenu ? null : shareHref} groupShow={groupMenu} headChip={headChip} />
+        <EventCardMenu
+          shareHref={groupMenu ? null : shareHref}
+          groupShow={groupMenu}
+          provScope={groupMenu ? undefined : { id: scopeId, hint: EVENT_PAGE_WORDS.provenance_hint }}
+          txHash={groupMenu ? null : txHash}
+          onInspect={() => {
+            if (hasFigures) setOpenTab("figures");
+            if (!showDetail && hasDetail) toggleDetail();
+          }}
+        />
       </span>
     ) : null;
 
@@ -951,105 +933,103 @@ function EventCardView(props: EventCardProps) {
     <SpineLegsContext.Provider value={spineLegs}>
       <PriceBasisProvider>
         <ProvReceiptsScope registry={registry} scopeId={scopeId}>
-          <HeadChipContext.Provider value={offerChip}>
-            {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder):
+          {/* data-skel-section feeds the skeleton memory layer (skeleton-size-recorder):
           the first event card stands for the spine's row height. One DOM at
           both widths (`.spine-row` in app/globals.css): from 640px the spine
           column holds 2/5 of the row beside the card; below it, a timeline
           row's column takes the width with the T1 row drawn as the caption
           under its node, and the body opens beneath. */}
-            <div
-              ref={rowRef}
-              data-skel-section="detail-event"
-              data-prov-scope={scopeId}
-              data-prov-lit={lit ? "" : undefined}
-              className={`${
-                pageMode
-                  ? "flex w-full flex-col gap-4 md:flex-row md:items-stretch"
-                  : `spine-row evt-row${showChevron ? " evt-row-target" : ""}${inTimeline ? " spine-seg" : ""}${showAvatar ? " spine-row-avatar" : ""}`
-              } relative ${scale.cardRounded} ${
-                muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
-              }`}
-              {...(rowTarget ? rowClick : {})}
-              onPointerEnter={onIntent}
-              onFocus={onIntent}
-            >
-              {showAvatar && avatar}
-              {page ? (
-                // The event page: the shared side column inside the protocol's
-                // bar (C20), as tall as the card and its arrows; stacked above
-                // the card below md, where the row drops its side padding.
-                <div className="w-full shrink-0 md:w-2/5" data-event-page-aside="">
-                  <CardSidebarFrame narrow className="h-full">
-                    <EventPageAside
-                      page={page}
-                      sentence={pageSentence}
-                      beside={pageSentence && head?.surplus ? <HeadSurplusChip surplus={head.surplus} /> : undefined}
-                      party={head?.party?.name ? <PartyChip party={head.party} /> : undefined}
-                      learnMore={learnMore}
-                    />
-                  </CardSidebarFrame>
-                </div>
-              ) : (
-                <div className="spine-cell" data-anatomy="L3">
-                  {inTimeline && (
-                    <span id={labelId} hidden>
-                      {spoken}
-                    </span>
-                  )}
-                  <SpineRowContext.Provider value={rowSlot}>{iconColumn}</SpineRowContext.Provider>
-                  {phoneToggles && (
-                    // Under 640px the segment, its flank values and its caption
-                    // are one button, laid over the column; the glyphs under it
-                    // take no pointer.
-                    <button
-                      data-spine-toggle=""
-                      {...disclosureProps<HTMLButtonElement>(showDetail, panelId, () => toggleDetail())}
-                      {...nameProps}
-                      className="absolute inset-0 z-20 min-h-11 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:hidden"
-                    />
-                  )}
-                </div>
-              )}
-              <div className={page ? "flex min-w-0 grow flex-col gap-3" : "spine-content"}>
-                <EventPageContext.Provider value={null}>
-                  {page ? (
-                    // No T1 on the event page: the h1 states the event. The
-                    // ⋮ stands at the card's top right, level with its first
-                    // heading; the arrows sit under the card, on the line of
-                    // the column's Learn more link.
-                    <>
-                      <div className="relative" data-event-page-card="">
-                        {body}
-                        <div className="absolute right-3 top-3 flex h-7 items-center">
-                          <EventPageControls page={page} provScope={scopeId} />
-                        </div>
-                      </div>
-                      <div className="mt-auto pb-2">
-                        <EventPageSteps page={page} />
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {t1}
-                      {body}
-                    </>
-                  )}
-                </EventPageContext.Provider>
+          <div
+            ref={rowRef}
+            data-skel-section="detail-event"
+            data-prov-scope={scopeId}
+            data-prov-lit={lit ? "" : undefined}
+            className={`${
+              pageMode
+                ? "flex w-full flex-col gap-4 md:flex-row md:items-stretch"
+                : `spine-row evt-row${showChevron ? " evt-row-target" : ""}${inTimeline ? " spine-seg" : ""}${showAvatar ? " spine-row-avatar" : ""}`
+            } relative ${scale.cardRounded} ${
+              muted && !showDetail ? " opacity-60 transition-opacity hover:opacity-100 focus-within:opacity-100" : ""
+            }`}
+            {...(rowTarget ? rowClick : {})}
+            onPointerEnter={onIntent}
+            onFocus={onIntent}
+          >
+            {showAvatar && avatar}
+            {page ? (
+              // The event page: the shared side column inside the protocol's
+              // bar (C20), as tall as the card and its arrows; stacked above
+              // the card below md, where the row drops its side padding.
+              <div className="w-full shrink-0 md:w-2/5" data-event-page-aside="">
+                <CardSidebarFrame narrow className="h-full">
+                  <EventPageAside
+                    page={page}
+                    sentence={pageSentence}
+                    beside={pageSentence && head?.surplus ? <HeadSurplusChip surplus={head.surplus} /> : undefined}
+                    party={head?.party?.name ? <PartyChip party={head.party} /> : undefined}
+                    learnMore={learnMore}
+                  />
+                </CardSidebarFrame>
               </div>
-              {/* The number column, at the row's far left, level with the
+            ) : (
+              <div className="spine-cell" data-anatomy="L3">
+                {inTimeline && (
+                  <span id={labelId} hidden>
+                    {spoken}
+                  </span>
+                )}
+                <SpineRowContext.Provider value={rowSlot}>{iconColumn}</SpineRowContext.Provider>
+                {phoneToggles && (
+                  // Under 640px the segment, its flank values and its caption
+                  // are one button, laid over the column; the glyphs under it
+                  // take no pointer.
+                  <button
+                    data-spine-toggle=""
+                    {...disclosureProps<HTMLButtonElement>(showDetail, panelId, () => toggleDetail())}
+                    {...nameProps}
+                    className="absolute inset-0 z-20 min-h-11 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus-ring)] sm:hidden"
+                  />
+                )}
+              </div>
+            )}
+            <div className={page ? "flex min-w-0 grow flex-col gap-3" : "spine-content"}>
+              <EventPageContext.Provider value={null}>
+                {page ? (
+                  // No T1 on the event page: the h1 states the event. The
+                  // ⋮ stands at the card's top right, level with its first
+                  // heading; the arrows sit under the card, on the line of
+                  // the column's Learn more link.
+                  <>
+                    <div className="relative" data-event-page-card="">
+                      {body}
+                      <div className="absolute right-3 top-3 flex h-7 items-center">
+                        <EventPageControls page={page} provScope={scopeId} />
+                      </div>
+                    </div>
+                    <div className="mt-auto pb-2">
+                      <EventPageSteps page={page} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    {t1}
+                    {body}
+                  </>
+                )}
+              </EventPageContext.Provider>
+            </div>
+            {/* The number column, at the row's far left, level with the
                 first node: the event's number, or the boundary's count. After
                 the card in the DOM, so the keyboard reaches the header first. */}
-              {!pageMode && (
-                <div
-                  className={`spine-num absolute z-20 w-11 justify-center ${inTimeline ? "flex" : "hidden sm:flex"}`}
-                  data-number-column=""
-                >
-                  {numberSlot ?? numberNode}
-                </div>
-              )}
-            </div>
-          </HeadChipContext.Provider>
+            {!pageMode && (
+              <div
+                className={`spine-num absolute z-20 w-11 justify-center ${inTimeline ? "flex" : "hidden sm:flex"}`}
+                data-number-column=""
+              >
+                {numberSlot ?? numberNode}
+              </div>
+            )}
+          </div>
         </ProvReceiptsScope>
       </PriceBasisProvider>
     </SpineLegsContext.Provider>

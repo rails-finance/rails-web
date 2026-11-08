@@ -1,22 +1,22 @@
 "use client";
 
-// The event card's ⋮ (rails-ops TO-DO-ui-jobs 281, 308), at the T1 row's
-// right end (ui-jobs 295), the same on every family: Open event page, inside
-// a group Show {n} grouped events or Group {n} events, and on a timeline Hide the row's
-// type of event, the Types of event filter's untick, and where the row's head
-// names a party (a via, to/from or venue chip) Trace that chip, which opens its
-// receipt at the chip (`headChip`, ui-jobs 433). On the event page it holds
-// the event's Inspect provenance (`provScope`). The explorer link is the row's
-// hash under Display's Transaction hashes (ui-jobs 294). On the event page the
-// menu stands beside the h1 and adds the event's rows (`pageRows`: copy link,
-// copy the transaction hash, the explorer, the Markdown and Copy for LLM;
-// `components/shared/event-page-aside.tsx`, which reuses `useMenuCopied` and
-// `eventMarkdownHref` from here).
+// The event card's ⋮ (rails-ops TO-DO-ui-jobs 281, 308, 535), at the T1 row's
+// right end (ui-jobs 295), the same on every family. On a timeline: Open event
+// page, Inspect provenance (armed on this card, `provScope`), Copy transaction
+// hash, inside a group Group {n} events, and Hide the row's type of event, the
+// Types of event filter's untick; a closed group's row holds Show {n} grouped
+// events. On the event page it stands at the card's top right: View in
+// timeline (`timelineHref`), Inspect provenance, Copy transaction hash, then
+// the page's rows (`pageRows`: copy link, the explorer, the Markdown and Copy
+// for LLM; `components/shared/event-page-aside.tsx`, which reuses
+// `useMenuCopied` and `eventMarkdownHref` from here). The explorer link is the
+// row's hash under Display's Transaction hashes (ui-jobs 294).
 
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, ChevronDown, ChevronUp, Crosshair, EyeOff } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, ChevronUp, Copy, EyeOff, History } from "lucide-react";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
+import { EVENT_PAGE_WORDS as W } from "@/lib/shared/event-page-words";
 
 /** The menu's words. */
 const WORDS = {
@@ -25,7 +25,6 @@ const WORDS = {
   view_page: "Open event page",
   view_page_hint: "Open this event's page",
   hide_type_hint: "Tick it in Types of event to bring them back",
-  trace_chip_hint: "Open its receipt in the row",
 };
 
 /** The clipboard write for a text that arrives later (a fetch): a
@@ -87,21 +86,13 @@ export function hideTypeWords(label: string, suffix?: ReactNode): { title: React
   };
 }
 
-/** Whether the ⋮ has a row: the event page from anywhere but that page,
- *  a group's show or hide, the row's type to hide, or a head chip to trace. */
-export function useEventMenuRows(shareHref: string | null, groupShow: boolean, headChip = false): boolean {
-  const pathname = usePathname();
-  const group = useContext(GroupHideContext);
-  const hideType = useContext(EventTypeHideContext);
-  const pagePath = shareHref?.split("?")[0] ?? null;
-  return groupShow || headChip || group != null || hideType != null || (pagePath != null && pathname !== pagePath);
-}
-
 export function EventCardMenu({
   shareHref,
   groupShow,
   provScope,
-  headChip,
+  txHash,
+  timelineHref,
+  onInspect,
   pageRows,
 }: {
   /** A closed group's row: its one item, "Show 48 grouped events", the only
@@ -110,13 +101,15 @@ export function EventCardMenu({
   /** The event page's path (`useEventShareHref`); null outside a timeline,
    *  where the page row is left out. */
   shareHref: string | null;
-  /** The event page's row: Inspect provenance, armed on this event. */
+  /** Inspect provenance, armed on this card: the event's receipts scope. */
   provScope?: { id: string; hint: string };
-  /** The row's head chip ("via WETH gateway", "to Balancer V3", "via CoW
-   *  Protocol"): its words, and the open that arms the row and pins the
-   *  chip's receipt. One mechanism for every PartyChip (HeadChipContext). */
-  headChip?: { words: string; open: () => void };
-  /** The event page's rows, above Inspect provenance. */
+  /** The event's transaction, for Copy transaction hash. */
+  txHash?: string | null;
+  /** The event page's View in timeline, its top row. */
+  timelineHref?: string;
+  /** Called as Inspect provenance arms the card: a timeline card opens. */
+  onInspect?: () => void;
+  /** The event page's rows, under Copy transaction hash. */
   pageRows?: (close: () => void) => ReactNode;
 }) {
   const pathname = usePathname();
@@ -124,6 +117,7 @@ export function EventCardMenu({
   const hideType = useContext(EventTypeHideContext);
   const pagePath = shareHref?.split("?")[0] ?? null;
   const onEventPage = pagePath != null && pathname === pagePath;
+  const [copied, copy] = useMenuCopied();
   const hideTypeRow = (close: () => void) =>
     hideType && (
       <ToolsMenuItem
@@ -139,8 +133,15 @@ export function EventCardMenu({
     );
 
   return (
-    <ToolsMenu variant="event" label={WORDS.menu} heading={WORDS.heading} provScope={provScope}>
-      {(close) =>
+    <ToolsMenu
+      variant="event"
+      label={WORDS.menu}
+      heading={WORDS.heading}
+      provScope={provScope}
+      scopeInline
+      onScopeArm={onInspect}
+    >
+      {(close, scopeRow) =>
         groupShow ? (
           <>
             <ToolsMenuItem
@@ -158,6 +159,17 @@ export function EventCardMenu({
           </>
         ) : (
           <>
+            {timelineHref && (
+              <ToolsMenuItem
+                item="view-timeline"
+                icon={<History size={16} />}
+                title={W.in_timeline}
+                subtitle={W.in_timeline_hint}
+                href={timelineHref}
+                internal
+                onClick={close}
+              />
+            )}
             {shareHref && !onEventPage && (
               <ToolsMenuItem
                 item="view-page"
@@ -165,19 +177,19 @@ export function EventCardMenu({
                 title={WORDS.view_page}
                 subtitle={WORDS.view_page_hint}
                 href={shareHref}
+                internal
                 onClick={close}
               />
             )}
-            {headChip && (
+            {scopeRow}
+            {txHash && (
               <ToolsMenuItem
-                item="trace-chip"
-                icon={<Crosshair size={16} />}
-                title={<>Trace “{headChip.words}”</>}
-                subtitle={WORDS.trace_chip_hint}
-                onClick={() => {
-                  close();
-                  headChip.open();
-                }}
+                item="copy-hash"
+                icon={copied === "hash" ? <Check size={16} /> : <Copy size={16} />}
+                title={W.copy_hash}
+                subtitle={copied === "hash" ? W.copied : W.copy_hash_hint}
+                copied={copied === "hash"}
+                onClick={() => copy("hash", txHash)}
               />
             )}
             {group && (

@@ -90,7 +90,7 @@ export function EventNumberPill(props: { number: number; last?: number }) {
 }
 
 /** The transaction hash, abbreviated ("0x53e0…fac5"), as a link to the
- *  chain's explorer: "Transaction hashes" in Display, off by default, at
+ *  chain's explorer, pink on hover as a link that leaves Rails (ui-jobs 535): "Transaction hashes" in Display, off by default, at
  *  >=640px; below it the row's ⋮ menu carries the explorer link. It
  *  is a pointer and carries no receipt (TO-DO-mobile-timeline decision 13). */
 function TxHashLink() {
@@ -103,7 +103,7 @@ function TxHashLink() {
       href={explorerUrl(chainId, "tx", txHash)}
       target="_blank"
       rel="noopener noreferrer"
-      className="hidden font-mono text-xs text-rb-500 underline-offset-2 hover:text-foreground hover:underline sm:inline"
+      className="hidden font-mono text-xs text-rb-500 underline-offset-2 transition-colors hover:text-[var(--text-external)] hover:underline sm:inline"
       title={txHash}
       data-event-tx-hash={txHash}
       data-prov-exempt=""

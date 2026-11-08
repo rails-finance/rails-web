@@ -118,6 +118,7 @@ export function ProvScopeToggle({
   scope,
   hint,
   onPick,
+  onArm,
   openerRef,
 }: {
   scope: string;
@@ -126,6 +127,9 @@ export function ProvScopeToggle({
   hint?: string;
   /** Called after the click, so the menu that holds the row can close. */
   onPick?: () => void;
+  /** Called as the row arms the scope: a timeline card opens on its Figures
+   *  so the values it traces are on screen (ui-jobs 535). */
+  onArm?: () => void;
   /** The control focus returns to when the mode is put down; where absent,
    *  the pressed button. */
   openerRef?: React.RefObject<HTMLElement | null>;
@@ -136,6 +140,7 @@ export function ProvScopeToggle({
     () => false,
   );
   const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!pressed) onArm?.();
     provInspector.setArmed(!pressed, scope, openerRef?.current ?? e.currentTarget);
     onPick?.();
   };

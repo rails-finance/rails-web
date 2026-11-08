@@ -103,7 +103,9 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 
 // The event page's one timeline link, the View in timeline tile beside the
 // card's ⋮ (the design rounds of 6 Nov 2026).
-const IN_TIMELINE = "[data-event-page-timeline]";
+// View in timeline: the event page's ⋮, its top row (ui-jobs 535).
+const IN_TIMELINE = '[data-menu-item="view-timeline"]';
+const PAGE_MENU_TRIGGER = "[data-event-page-card] [data-event-head-menu] [data-event-menu] > button";
 const BASE = process.env.BASE ?? "http://localhost:3101";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
 const SCREENSHOT_DIR = process.env.SCREENSHOT_DIR ?? path.join(os.tmpdir(), "rails-share-events");
@@ -1418,6 +1420,12 @@ async function verifyFamilyOnce(
   // A throw here (the link never settling, a navigation that hangs) is this
   // check's failure, not the run's — record it and move on to the next
   // family rather than taking the whole table down with an uncaught error.
+  // The row is in the ⋮: pressed until the menu shows (a press before
+  // hydration is lost).
+  for (let i = 0; i < 20 && !(await viewPage.locator(IN_TIMELINE).count()); i++) {
+    await viewPage.click(PAGE_MENU_TRIGGER, { timeout: 5000 }).catch(() => {});
+    await viewPage.waitForSelector(IN_TIMELINE, { timeout: 1500 }).catch(() => {});
+  }
   const followed = await viewPage
     .waitForSelector(IN_TIMELINE, { timeout: 60000 })
     .then(() => viewPage.click(IN_TIMELINE, { timeout: 60000 }))
@@ -1899,14 +1907,23 @@ async function verifyLiquityMarkdown(subject) {
   const fake = await fetch(`${BASE}${positionPath}/event/${encodeURIComponent(FAKE_ID)}.md`);
   check(`${name}: an unknown event's Markdown answers 404`, fake.status === 404, String(fake.status));
 
-  // The event's ⋮ at the card's top right: its rows, then Inspect provenance.
+  // The event's ⋮ at the card's top right: View in timeline, Inspect
+  // provenance, Copy transaction hash, then the page's rows (ui-jobs 535).
   const TRIGGER = "[data-event-page-card] [data-event-head-menu] [data-event-menu] > button";
   const MENU = '[data-event-menu] [role="menu"]';
   const COPY_LLM = `${MENU} [data-menu-item="copy-for-llm"]`;
   const COPY_LINK_BTN = `${MENU} [data-menu-item="copy-link"]`;
   const VIEW_MD = `${MENU} [data-menu-item="view-markdown"]`;
   const COPY_HASH = '[data-event-page-facts] [data-copy-fact="transaction"]';
-  const WANT = ["copy-link", "view-explorer", "view-markdown", "copy-for-llm", "show-provenance"];
+  const WANT = [
+    "view-timeline",
+    "show-provenance",
+    "copy-hash",
+    "copy-link",
+    "view-explorer",
+    "view-markdown",
+    "copy-for-llm",
+  ];
   const TX_ID = /^(0x[0-9a-f]{64})/i.exec(decodedId)?.[1]?.toLowerCase() ?? null;
   {
     const { ctx, page, errors } = await open(1280, link);
@@ -1928,12 +1945,12 @@ async function verifyLiquityMarkdown(subject) {
       els.map((e) => e.getAttribute("data-menu-item")),
     );
     check(
-      `${name} event page: the ⋮ holds its rows in order, Inspect provenance last`,
+      `${name} event page: the ⋮ holds its rows in order, View in timeline first`,
       JSON.stringify(items) === JSON.stringify(WANT),
       JSON.stringify(items),
     );
     const provRow = await page.locator(`${MENU} [data-prov-scope-toggle]`).count();
-    check(`${name} event page: the ⋮ ends on Inspect provenance`, provRow === 1, `${provRow} found`);
+    check(`${name} event page: the ⋮ holds Inspect provenance`, provRow === 1, `${provRow} found`);
     const timelineLinks = await page.locator("[data-event-id] a[href*='?at=']").count();
     check(`${name} event page: one timeline link`, timelineLinks === 1, `${timelineLinks} found`);
     const timelineHref = await page.locator(IN_TIMELINE).first().getAttribute("href");
