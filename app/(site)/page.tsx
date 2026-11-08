@@ -114,7 +114,7 @@ export default async function Home() {
           <div className="max-w-7xl mx-auto px-4 pt-16 pb-16">
             <div className="mb-6">
               <h2 className="mb-10 text-3xl font-semibold tracking-tight text-foreground">
-                <span className="marketing">DeFi</span> for everyone
+                <span className="text-[var(--marketing)] dark:text-rb-500">DeFi</span> for everyone
               </h2>
             </div>
 
