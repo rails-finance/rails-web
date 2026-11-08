@@ -376,11 +376,15 @@ export function reserveFigures({ r, vocab, assetHref }: RowProps) {
   const available =
     fixed && r.supplied > 0 ? (
       <span data-available-basis={basis}>
-        <Prov info={vocab.reserveAvailableProv(r.symbol, { priced: false, basis })}>{inTokens(availTokens)}</Prov>
+        <Prov info={vocab.reserveAvailableProv(r.symbol, { priced: false, basis, deficit: r.deficit })}>
+          {inTokens(availTokens)}
+        </Prov>
       </span>
     ) : (
       <span className={availUsd > 0 ? "text-foreground/80" : "text-rb-500"} data-available-basis={basis}>
-        <Prov info={vocab.reserveAvailableProv(r.symbol, { priced: true, basis })}>{fmtUsd(availUsd).display}</Prov>
+        <Prov info={vocab.reserveAvailableProv(r.symbol, { priced: true, basis, deficit: r.deficit })}>
+          {fmtUsd(availUsd).display}
+        </Prov>
       </span>
     );
   const supplyRate =

@@ -58,7 +58,10 @@ export interface AaveMarketVocab {
   reserveValueProv: (side: "supplied" | "borrowed", symbol: string) => Provenance;
   /** One reserve's available underlying: the Pool's virtual balance where it
    *  has one (v3.3+), else supplied less borrowed. */
-  reserveAvailableProv: (symbol: string, a: { priced: boolean; basis: "virtual" | "difference" }) => Provenance;
+  reserveAvailableProv: (
+    symbol: string,
+    a: { priced: boolean; basis: "virtual" | "difference"; deficit?: number | null },
+  ) => Provenance;
   /** One reserve's liquidation threshold. */
   reserveLtProv: (symbol: string) => Provenance;
   /** The threshold an efficiency-mode category lends this reserve, in place of
@@ -221,7 +224,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
         },
       ],
     }),
-    reserveAvailableProv: (symbol, { priced, basis }) => {
+    reserveAvailableProv: (symbol, { priced, basis, deficit }) => {
       const oracleLeg = {
         label: "oracle price",
         kind: "chain-derived" as const,
@@ -235,7 +238,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
           pclass: priced ? "oracle" : "state",
           source: { block: coords.blockNumber },
           ...(priced ? {} : { verify: recompute("Pool.getVirtualUnderlyingBalance", coords) }),
-          summary: `${symbol} available. Pool.getVirtualUnderlyingBalance(asset)${atBlock(coords)}: the underlying the Pool holds for this reserve, what suppliers can withdraw and borrowers can take${priced ? ", valued at the market's IAaveOracle price" : ", in tokens"}. A deficit written off in a liquidation leaves it below supplied − borrowed.`,
+          summary: `${symbol} available. Pool.getVirtualUnderlyingBalance(asset)${atBlock(coords)}: the underlying the Pool holds for this reserve, what suppliers can withdraw and borrowers can take${priced ? ", valued at the market's IAaveOracle price" : ", in tokens"}. A deficit written off in a liquidation leaves it below supplied − borrowed${deficit != null ? `; Pool.getReserveDeficit(asset) reads ${tokens(deficit)} ${symbol} here` : ""}.`,
           contract: poolContract(coords),
           via: `${cfg.lane} · Pool.getVirtualUnderlyingBalance(asset)${priced ? " × IAaveOracle price" : ""} @ head`,
           ...(priced
@@ -508,7 +511,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       kind: "chain-derived",
       pclass: "oracle",
       source: { block: coords.blockNumber },
-      summary: `${symbol} borrow capacity. The reserve's borrow cap (${tokens(cap)} ${symbol}) less its variable-debt totalSupply${atBlock(coords)}, valued at the market's IAaveOracle price. ${symbol} is minted when borrowed, so it has no supply side; the cap is what bounds new borrowing.`,
+      summary: `${symbol} borrow capacity. The reserve's borrow cap (${tokens(cap)} ${symbol}) less its variable-debt totalSupply${atBlock(coords)}, valued at the market's IAaveOracle price. Its supply cap is one whole token, so the side is closed to new supply and the borrow cap is what bounds new borrowing.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getConfiguration · bits ${CAP_BITS.borrow} (borrowCap) − variableDebtToken totalSupply @ head`,
       formula: "borrow cap − borrowed",

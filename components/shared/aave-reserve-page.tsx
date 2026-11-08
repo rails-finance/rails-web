@@ -8,9 +8,10 @@
 //        in (a link back to the market page) and the back control;
 //   M3.2 vitals: Supplied · Borrowed · Available · Supply rate · Borrow rate ·
 //        Utilisation. Available is the Pool's virtual balance on a v3.3+ Pool
-//        (else supplied − borrowed); an outstanding deficit is stated under it.
-//        GHO, minted when borrowed, shows its remaining borrow capacity, the
-//        borrow cap less borrowed, in Available's place;
+//        (else supplied − borrowed). Under it, a deficit of at least
+//        DEFICIT_SHOWN_SHARE of the supplied amount, and the remaining borrow
+//        capacity (cap less borrowed) where the supply side is closed (GHO on
+//        Core; lib/shared/aave-market-view.ts borrowRoomShows);
 //   M3.3 rate curve (components/shared/aave-reserve-curve.tsx);
 //   M3.5 parameters, the list M1's Details panel draws (ReserveParameters).
 // Every figure carries its receipt from lib/shared/aave-market-provenance.
@@ -33,19 +34,15 @@ import { aaveMarketConfig, type AaveMarketKey } from "@/lib/shared/aave-market-c
 import { protocolForHref } from "@/lib/shared/protocols";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { formatCompact } from "@/lib/shared/format-compact";
-import type { MarketReserveRow } from "@/lib/shared/aave-market-view";
+import { borrowRoomShows, deficitShows, type MarketReserveRow } from "@/lib/shared/aave-market-view";
 import type { AaveMarketVocab } from "@/lib/shared/aave-market-provenance";
 import type { ChainId } from "@/lib/shared/chains";
 
 const SECTION = "mb-3 text-[11px] uppercase tracking-wider text-rb-500";
 
-/** GHO, which is minted when borrowed (Miles, 8 Nov: it shows its remaining
- *  borrow capacity in Available's place), or any reserve with borrows and
- *  nothing supplied. */
-const mintedOnBorrow = (r: MarketReserveRow) => r.symbol === "GHO" || (r.supplied === 0 && r.borrowed > 0);
-
-/** Available, or a minted reserve's remaining borrow capacity, with an
- *  outstanding deficit stated under it. */
+/** Available, with the lines that qualify it under it: an outstanding deficit
+ *  of at least DEFICIT_SHOWN_SHARE of the supplied amount, and the remaining
+ *  borrow capacity where the supply side is closed (borrowRoomShows). */
 function AvailableVital({
   r,
   vocab,
@@ -55,26 +52,21 @@ function AvailableVital({
   vocab: AaveMarketVocab;
   available: React.ReactNode;
 }) {
-  if (mintedOnBorrow(r)) {
-    const c = r.borrowCapState;
-    if (c.state !== "used") return <span className="text-rb-500">no cap</span>;
-    const room = Math.max(0, c.cap - r.borrowed);
-    return (
-      <Prov info={vocab.reserveBorrowRoomProv(r.symbol, c.cap)}>
-        {r.priceUsd != null ? fmtUsd(room * r.priceUsd).display : `${formatCompact(room)} ${r.symbol}`}
-      </Prov>
-    );
-  }
-  const deficit = r.deficit ?? 0;
+  const usd = (tokens: number) =>
+    r.priceUsd != null ? fmtUsd(tokens * r.priceUsd).display : `${formatCompact(tokens)} ${r.symbol}`;
+  const c = r.borrowCapState;
   return (
     <>
       {available}
-      {deficit > 0 && (
+      {deficitShows(r) && (
         <span className="block text-[11px] font-normal text-rb-500" data-reserve-deficit="">
-          deficit{" "}
-          <Prov info={vocab.reserveDeficitProv(r.symbol, r.priceUsd != null)}>
-            {r.priceUsd != null ? fmtUsd(deficit * r.priceUsd).display : `${formatCompact(deficit)} ${r.symbol}`}
-          </Prov>
+          deficit <Prov info={vocab.reserveDeficitProv(r.symbol, r.priceUsd != null)}>{usd(r.deficit ?? 0)}</Prov>
+        </span>
+      )}
+      {borrowRoomShows(r) && c.state === "used" && (
+        <span className="block text-[11px] font-normal text-rb-500" data-reserve-capacity="">
+          borrow capacity{" "}
+          <Prov info={vocab.reserveBorrowRoomProv(r.symbol, c.cap)}>{usd(Math.max(0, c.cap - r.borrowed))}</Prov>
         </span>
       )}
     </>
@@ -83,7 +75,6 @@ function AvailableVital({
 
 function ReserveBody({ r, vocab, chainId }: { r: MarketReserveRow; vocab: AaveMarketVocab; chainId: ChainId }) {
   const z = reserveFigures({ r, vocab });
-  const minted = mintedOnBorrow(r);
   const u = r.utilization != null && r.supplied > 0 ? r.utilization : null;
   return (
     <>
@@ -99,9 +90,9 @@ function ReserveBody({ r, vocab, chainId }: { r: MarketReserveRow; vocab: AaveMa
             },
             {
               slot: "sizeFree",
-              label: minted ? "Borrow capacity" : "Available",
+              label: "Available",
               value: (
-                <span data-vital={minted ? "capacity" : "available"}>
+                <span data-vital="available">
                   <AvailableVital r={r} vocab={vocab} available={z.available} />
                 </span>
               ),

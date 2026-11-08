@@ -11,9 +11,12 @@
 //      Available cell (not the link) lands on that page.
 //   2. The page names the reserve and stays inside the viewport's width.
 //   3. Vitals match the route: Supplied, Borrowed, Available (the virtual
-//      balance where the Pool has one, else supplied − borrowed; GHO's borrow
-//      capacity, cap − borrowed), Supply rate, Borrow rate, Utilisation.
-//   4. A deficit the route carries above a dollar is stated under Available.
+//      balance where the Pool has one, else supplied − borrowed, GHO included),
+//      Supply rate, Borrow rate, Utilisation; where the supply cap is one token
+//      and the borrow cap real (GHO on Core), the borrow capacity line under
+//      Available is cap − borrowed.
+//   4. The deficit line shows exactly when the route's deficit is at least
+//      0.01% of the supplied amount (DEFICIT_SHOWN_SHARE).
 //   5. The curve draws: its kink at the route's kink, today's point at the
 //      route's utilisation (none where nothing is supplied).
 //   6. Available's receipt opens in the inspector.
@@ -96,7 +99,7 @@ for (const f of FIXTURES) {
       supplied: t("supplied"),
       borrowed: t("borrowed"),
       available: t("available"),
-      capacity: t("capacity"),
+      capacity: document.querySelector("[data-reserve-capacity]")?.textContent ?? null,
       supplyRate: t("supply-rate"),
       borrowRate: t("borrow-rate"),
       util: t("utilisation"),
@@ -121,21 +124,26 @@ for (const f of FIXTURES) {
       near(parseAmount(got.borrowed), r.borrowed * price),
       `${norm(got.borrowed)} vs $${(r.borrowed * price).toFixed(0)}`,
     );
-  if (r.symbol === "GHO") {
-    const cap = r.borrowCapMax ?? r.borrowCap;
-    const room = Math.max(0, cap - r.borrowed) * price;
-    check(
-      `${tag} 3c Borrow capacity is cap − borrowed`,
-      near(parseAmount(got.capacity), room),
-      `${norm(got.capacity)} vs $${room.toFixed(0)}`,
-    );
-  } else {
+  {
     const tokens = r.virtualBalance ?? Math.max(0, r.supplied - r.borrowed);
     check(
       `${tag} 3c Available (${r.virtualBalance != null ? "virtual balance" : "supplied − borrowed"})`,
       near(parseAmount(got.available), tokens * price),
       `${norm(got.available)} vs $${(tokens * price).toFixed(0)}`,
     );
+  }
+  {
+    const sCap = r.supplyCapMax ?? r.supplyCap;
+    const bCap = r.borrowCapMax ?? r.borrowCap;
+    const closedSupply = sCap === 1 && r.borrowEnabled && bCap != null && bCap > 1 && bCap < 2 ** 36 - 1;
+    if (closedSupply) {
+      const room = Math.max(0, bCap - r.borrowed) * price;
+      check(
+        `${tag} 3g borrow capacity under Available is cap − borrowed`,
+        near(parseAmount((got.capacity ?? "").replace(/borrow capacity/, "")), room),
+        `${norm(got.capacity)} vs $${room.toFixed(0)}`,
+      );
+    } else check(`${tag} 3g no borrow capacity line (supply side open)`, got.capacity == null, norm(got.capacity));
   }
   const rateOk = (text, apr) => {
     const p = apr * 100;
@@ -164,12 +172,14 @@ for (const f of FIXTURES) {
       `${norm(got.util)} vs ${(r.utilization * 100).toFixed(1)}%`,
     );
 
-  if (r.symbol !== "GHO" && (r.deficit ?? 0) * price >= 1)
+  {
+    const shows = (r.deficit ?? 0) > 0 && r.deficit >= 0.0001 * r.supplied;
     check(
-      `${tag} 4  deficit stated under Available`,
-      got.deficit != null && /deficit/.test(got.deficit),
+      `${tag} 4  deficit line ${shows ? "shown" : "absent"} (${r.deficit ?? "no read"} vs 0.01% of ${r.supplied.toFixed(2)})`,
+      shows ? got.deficit != null && /deficit/.test(got.deficit) : got.deficit == null,
       norm(got.deficit),
     );
+  }
 
   check(
     `${tag} 5a curve draws with its kink`,
@@ -185,10 +195,7 @@ for (const f of FIXTURES) {
 
   let pop = "";
   if (await armInspector(page)) {
-    await page
-      .locator(`[data-vital="${r.symbol === "GHO" ? "capacity" : "available"}"] [data-prov-pickable]`)
-      .first()
-      .click();
+    await page.locator(`[data-vital="available"] [data-prov-pickable]`).first().click();
     await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
     pop = norm(
       await page
