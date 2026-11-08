@@ -148,6 +148,7 @@ export function FilterSheet<F>({
         aria-expanded={open}
         aria-label={active > 0 ? `Filters, ${active} active` : "Filters"}
         data-filter-sheet-open=""
+        data-anatomy="N1.8.1"
       >
         <SlidersHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
         <span>Filters</span>
@@ -403,8 +404,12 @@ function Sheet<F>({
       aria-labelledby="filter-sheet-title"
       className="fixed inset-0 z-[var(--z-modal)] flex flex-col bg-background text-foreground sm:hidden"
       data-filter-sheet=""
+      data-anatomy="N1.8"
     >
-      <div className="flex h-14 shrink-0 items-center gap-1 border-b border-rb-200 dark:border-rb-700 px-2">
+      <div
+        className="flex h-14 shrink-0 items-center gap-1 border-b border-rb-200 dark:border-rb-700 px-2"
+        data-anatomy="N1.8.2"
+      >
         <button
           type="button"
           onClick={() => {
@@ -459,6 +464,7 @@ function Sheet<F>({
                     onClick={() => openSub(dim.id)}
                     className="flex w-full min-h-14 items-center gap-3 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     data-filter-sheet-row={dim.id}
+                    data-anatomy="N1.8.3"
                   >
                     <span className="text-sm">{dim.label}</span>
                     <span
@@ -477,6 +483,7 @@ function Sheet<F>({
 
       <div
         className="flex shrink-0 gap-3 border-t border-rb-200 dark:border-rb-700 px-4 pt-3"
+        data-anatomy="N1.8.8"
         style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}
       >
         <button
@@ -525,6 +532,7 @@ function ToggleRow<F>({
       onClick={() => onChange(on ? resetDim(dim, filters) : dim.set(filters, [opt.value]))}
       className="flex w-full min-h-14 items-center gap-3 py-3 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
       data-filter-sheet-row={dim.id}
+      data-anatomy="N1.8.5"
     >
       <span className="text-sm">{dim.label}</span>
       <span
@@ -577,7 +585,7 @@ function SegmentRow<F>({
   };
   const labelId = `filter-sheet-seg-${dim.id}`;
   return (
-    <div className="py-3" data-filter-sheet-segments={dim.id}>
+    <div className="py-3" data-filter-sheet-segments={dim.id} data-anatomy="N1.8.4">
       <span id={labelId} className="block text-sm mb-2">
         {dim.label}
       </span>
@@ -665,6 +673,7 @@ function SwipeBack({ onBack, children }: { onBack: () => void; children: ReactNo
       }}
       onTransitionEnd={() => setSettling(false)}
       data-filter-sheet-swipe=""
+      data-anatomy="N1.8.9"
       onPointerDown={(e) => {
         if (e.pointerType === "mouse" && e.button !== 0) return;
         swiped.current = false;
@@ -735,7 +744,7 @@ function RangeRow<F>({
 }) {
   const active = isDimensionActive(dim, filters);
   return (
-    <div className="pt-3 pb-1" data-filter-sheet-range={dim.id}>
+    <div className="pt-3 pb-1" data-filter-sheet-range={dim.id} data-anatomy="N1.8.6">
       <div className="flex items-center gap-3">
         <span className="text-sm">{dim.label}</span>
         <span
@@ -790,7 +799,7 @@ function DimensionView<F>({
   };
 
   return (
-    <div className="pt-2" data-filter-sheet-view={dim.id}>
+    <div className="pt-2" data-filter-sheet-view={dim.id} data-anatomy="N1.8.7">
       {searchable && <OptionSearchInput value={query} onChange={setQuery} />}
       <div role="group" aria-label={dim.label} className="px-4">
         {rows.map((opt) => (
