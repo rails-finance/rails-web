@@ -575,7 +575,9 @@ await phone.close();
     (rows) => localStorage.setItem("rails-bookmarks", JSON.stringify(rows)),
     [legacyRow(later, 2), legacyRow(wallet, 1)],
   );
-  await sp.reload({ waitUntil: "networkidle" });
+  // The listing's card prefetches can hold networkidle past 30 s on a local
+  // production build (26 s measured): the reload waits as long as the goto.
+  await sp.reload({ waitUntil: "networkidle", timeout: 180_000 });
   const after = await read("rails-saved");
   check(
     "SV an old-format write adds its wallet and the view stays",
