@@ -258,7 +258,7 @@ export function vaultHeads({
         <Link
           href={holdersHref}
           prefetch={false}
-          className="pointer-events-auto hover:text-blue-600 dark:hover:text-blue-400"
+          className="pointer-events-auto hover:text-blue-600 dark:hover:text-[var(--text-link)]"
           data-cell="holders"
           data-positions-link={v.address}
           data-link="vault-positions"

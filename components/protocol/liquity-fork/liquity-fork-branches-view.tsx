@@ -150,7 +150,7 @@ function BranchCard({
           className="group/branch flex items-center gap-2"
         >
           <TokenChipIcon symbol={sym} size={20} filterable={false} />
-          <span className="text-sm font-semibold text-foreground group-hover/branch:text-blue-600 dark:group-hover/branch:text-blue-400">
+          <span className="text-sm font-semibold text-foreground group-hover/branch:text-blue-600 dark:group-hover/branch:text-[var(--text-link)]">
             {sym}
           </span>
         </Link>

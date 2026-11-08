@@ -50,7 +50,7 @@ export function ArticleLayout({ article, nextArticle, prevArticle, children }: A
               Originally published on{" "}
               <a
                 href={`https://rails.finance/blog/${article.slug}`}
-                className="text-blue-600 dark:text-blue-400 hover:underline"
+                className="text-blue-600 dark:text-[var(--text-link)] hover:underline"
               >
                 rails.finance
               </a>
@@ -85,7 +85,7 @@ export function ArticleLayout({ article, nextArticle, prevArticle, children }: A
                 className="group p-6 rounded-lg border border-rb-200 dark:border-rb-700 hover:border-rb-300 dark:hover:border-rb-600 hover:bg-rb-50 dark:hover:bg-rb-800 transition-all"
               >
                 <div className="text-sm text-rb-500 mb-2">← Previous</div>
-                <div className="font-semibold text-foreground mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                <div className="font-semibold text-foreground mb-1 group-hover:text-blue-600 dark:group-hover:text-[var(--text-link)] transition-colors">
                   {prevArticle.title}
                 </div>
                 <div className="text-sm text-rb-500 line-clamp-2">{prevArticle.subtitle}</div>
@@ -99,7 +99,7 @@ export function ArticleLayout({ article, nextArticle, prevArticle, children }: A
                 className={`group p-6 rounded-lg border border-rb-200 dark:border-rb-700 hover:border-rb-300 dark:hover:border-rb-600 hover:bg-rb-50 dark:hover:bg-rb-800 transition-all ${!prevArticle ? "md:col-start-2" : ""}`}
               >
                 <div className="text-sm text-rb-500 mb-2 text-right">Next →</div>
-                <div className="font-semibold text-foreground mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors text-right">
+                <div className="font-semibold text-foreground mb-1 group-hover:text-blue-600 dark:group-hover:text-[var(--text-link)] transition-colors text-right">
                   {nextArticle.title}
                 </div>
                 <div className="text-sm text-rb-500 line-clamp-2 text-right">{nextArticle.subtitle}</div>

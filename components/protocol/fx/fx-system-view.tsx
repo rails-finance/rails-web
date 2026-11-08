@@ -619,7 +619,11 @@ function TickRow({
         <Prov info={stampServerRead(tickIdProv(label, p.address, t.tick), readBy)} value={String(t.tick)}>
           {t.tick}
         </Prov>
-        {mine && <span className="ml-1.5 text-[10px] text-blue-600 dark:text-blue-400">the position&rsquo;s tick</span>}
+        {mine && (
+          <span className="ml-1.5 text-[10px] text-blue-600 dark:text-[var(--text-link)]">
+            the position&rsquo;s tick
+          </span>
+        )}
       </div>
       <div className="text-xs tabular-nums">
         {t.debtRatio != null ? (

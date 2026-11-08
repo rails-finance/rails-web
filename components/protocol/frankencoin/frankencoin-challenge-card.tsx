@@ -196,7 +196,7 @@ function AddrLink({ address }: { address: string }) {
       href={explorerUrl(MAINNET_CHAIN_ID, "address", address)}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-blue-600 dark:text-blue-400 hover:underline tabular-nums"
+      className="text-blue-600 dark:text-[var(--text-link)] hover:underline tabular-nums"
       onClick={(e) => e.stopPropagation()}
     >
       {shortAddress(address)}

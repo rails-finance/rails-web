@@ -800,7 +800,7 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
               {hasListing ? (
                 <Link
                   href={listingHref}
-                  className="text-base font-semibold text-foreground transition-colors hover:text-blue-600 dark:hover:text-blue-400"
+                  className="text-base font-semibold text-foreground transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]"
                   title={`View ${view.label} positions`}
                 >
                   {view.label}

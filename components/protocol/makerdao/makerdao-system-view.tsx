@@ -329,7 +329,7 @@ function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null 
             // believing it's this ilk's.
             <Link
               href={`/ethereum/makerdao?ilk=${encodeURIComponent(row.ilk)}`}
-              className="truncate text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              className="truncate text-xs text-blue-600 dark:text-[var(--text-link)] hover:underline"
             >
               {row.ilk}
             </Link>

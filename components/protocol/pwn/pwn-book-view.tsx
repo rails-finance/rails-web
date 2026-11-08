@@ -104,7 +104,7 @@ function OpenBookSection({ book }: { book: PwnLoanBook }) {
             </p>
             <Link
               href={OPEN_BOOK_HREF}
-              className="mt-2 inline-block text-[13px] text-blue-600 dark:text-blue-400 hover:underline"
+              className="mt-2 inline-block text-[13px] text-blue-600 dark:text-[var(--text-link)] hover:underline"
             >
               Loans in escrow, soonest deadline first <span aria-hidden>→</span>
             </Link>
@@ -379,7 +379,7 @@ function DefaultsSection({ book }: { book: PwnLoanBook }) {
             </p>
             <Link
               href={DEFAULTS_HREF}
-              className="mt-2 inline-block text-[13px] text-blue-600 dark:text-blue-400 hover:underline"
+              className="mt-2 inline-block text-[13px] text-blue-600 dark:text-[var(--text-link)] hover:underline"
             >
               Defaulted loans, most recent deadline first <span aria-hidden>→</span>
             </Link>

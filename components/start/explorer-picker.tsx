@@ -47,7 +47,7 @@ export function ExplorerPicker({ mode }: { mode: RosterKey }) {
                     <ProtocolIcon id={entry.id} className="h-5 w-5 shrink-0" />
                     <span className="truncate">{entry.label}</span>
                     <ArrowRight
-                      className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400"
+                      className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-[var(--text-link)]"
                       aria-hidden="true"
                     />
                   </Link>

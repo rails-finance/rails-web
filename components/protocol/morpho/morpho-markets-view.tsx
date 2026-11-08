@@ -295,7 +295,7 @@ function MarketRow({ m, block, chainId }: { m: MorphoMarketRow; block: number; c
       <Link
         href={morphoMarketHref(chainId, m.loanToken, m.id)}
         prefetch={false}
-        className="shrink-0 font-mono text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+        className="shrink-0 font-mono text-rb-500 hover:text-blue-600 dark:hover:text-[var(--text-link)] hover:underline"
         title={m.id}
       >
         {shortMarketId(m.id)}
@@ -346,7 +346,7 @@ function NeverFunded({ runs, count, loanSymbol }: { runs: MorphoEmptyRun[]; coun
       {/* A native disclosure: no state, no client bundle, and it still works if JS never
           arrives — the list is in the HTML either way. */}
       <details className="mt-2 group">
-        <summary className="cursor-pointer list-none text-[11px] text-blue-600 dark:text-blue-400 hover:underline">
+        <summary className="cursor-pointer list-none text-[11px] text-blue-600 dark:text-[var(--text-link)] hover:underline">
           <span className="group-open:hidden">Show {count.toLocaleString("en-US")} empty markets</span>
           <span className="hidden group-open:inline">Hide empty markets</span>
         </summary>
@@ -624,7 +624,7 @@ export function MorphoMarketsOverview({
           </div>
           {unfunded.length > 0 && (
             <details className="mt-3 group">
-              <summary className="cursor-pointer list-none text-[11px] text-blue-600 dark:text-blue-400 hover:underline">
+              <summary className="cursor-pointer list-none text-[11px] text-blue-600 dark:text-[var(--text-link)] hover:underline">
                 <span className="group-open:hidden">
                   Show {unfunded.length} loan tokens whose markets have never been funded
                 </span>
@@ -723,7 +723,7 @@ function FamilyEntry({
         borrowed, in {g.loanSymbol}.
       </p>
       <details className="mt-2 group">
-        <summary className="cursor-pointer list-none text-[11px] text-blue-600 dark:text-blue-400 hover:underline">
+        <summary className="cursor-pointer list-none text-[11px] text-blue-600 dark:text-[var(--text-link)] hover:underline">
           <span className="group-open:hidden">Show all {f.markets.length} markets</span>
           <span className="hidden group-open:inline">Hide the {f.markets.length} markets</span>
         </summary>
@@ -910,7 +910,7 @@ export function MorphoLoanTokenView({
                 Every figure on their rows carries the same receipt as the rows above.
               </p>
               <details className="mt-2 group">
-                <summary className="cursor-pointer list-none text-[11px] text-blue-600 dark:text-blue-400 hover:underline">
+                <summary className="cursor-pointer list-none text-[11px] text-blue-600 dark:text-[var(--text-link)] hover:underline">
                   <span className="group-open:hidden">Show {shape.dust.length.toLocaleString("en-US")} markets</span>
                   <span className="hidden group-open:inline">Hide them</span>
                 </summary>

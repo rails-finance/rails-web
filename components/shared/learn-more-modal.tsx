@@ -305,7 +305,7 @@ export function LearnMore({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="cursor-pointer text-left text-sm text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 rounded-sm dark:text-blue-400"
+          className="cursor-pointer text-left text-sm text-blue-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rb-400 rounded-sm dark:text-[var(--text-link)]"
           data-anatomy={anatomy ?? "T4"}
           data-event-page-learn-more=""
         >

@@ -36,17 +36,17 @@ export const NAV_BUTTON =
 export const NAV_PILL = NAV_BUTTON.replace("rounded-lg", "rounded-full");
 
 /** Text/inline link that navigates to another page. Turns blue on hover. */
-export const NAV_LINK = "text-rb-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors";
+export const NAV_LINK = "text-rb-500 hover:text-blue-600 dark:hover:text-[var(--text-link)] transition-colors";
 
 /**
  * Marketing-page CTA pill — the bordered rounded-full navigation button the
  * home page uses for "View a live position" (ui-jobs 507). Blue text per the one-meaning-per-colour rule (blue =
  * navigation); hover turns the border blue. In dark a blue tint and a blue
  * border at rest carry the strength, the text staying the link pair's
- * blue-400 (color-grammar.md §4a).
+ * --text-link (color-grammar.md §4a).
  */
 export const PILL_CTA =
-  "inline-flex items-center gap-2 whitespace-nowrap text-sm font-medium text-blue-600 dark:text-blue-400 bg-background/90 dark:bg-blue-500/10 border border-rb-200 dark:border-blue-400/30 px-4 py-2 rounded-full backdrop-blur-sm transition-colors hover:border-blue-500 dark:hover:border-blue-500";
+  "inline-flex items-center gap-2 whitespace-nowrap text-sm font-medium text-blue-600 dark:text-[var(--text-link)] bg-background/90 dark:bg-blue-500/10 border border-rb-200 dark:border-blue-400/30 px-4 py-2 rounded-full backdrop-blur-sm transition-colors hover:border-blue-500 dark:hover:border-blue-500";
 
 /**
  * In-place control — structural base only (layout + transition). Pair with
@@ -160,14 +160,15 @@ export const RESET_LINK = "text-xs font-semibold text-teal-600 hover:text-teal-5
  * somewhere", not "resets". The app-wide rule: any link that opens a page is
  * blue (and a clickable card gets a blue hover border instead).
  */
-export const PAGE_LINK = "text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer";
+export const PAGE_LINK =
+  "text-xs font-semibold text-blue-600 dark:text-[var(--text-link)] hover:underline cursor-pointer";
 
 /**
  * A link inside running prose (an info page's blurb, an explanation's
  * sentence): blue, underlined on hover, and the sentence's own size and
  * weight. PAGE_LINK fixes both, for a link that stands beside a control.
  */
-export const INLINE_LINK = "text-blue-600 dark:text-blue-400 hover:underline";
+export const INLINE_LINK = "text-blue-600 dark:text-[var(--text-link)] hover:underline";
 
 /**
  * Dropdown / overlay-panel title — the heading row at the top of every

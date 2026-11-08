@@ -114,7 +114,7 @@ export function NestedTimeline({
                       )}
                       <ArrowUpRight
                         className={`size-4 opacity-0 group-hover/nested:opacity-100 transition-opacity ${
-                          isInternal ? "text-blue-600 dark:text-blue-400" : "text-pink-500"
+                          isInternal ? "text-blue-600 dark:text-[var(--text-link)]" : "text-pink-500"
                         }`}
                         aria-hidden="true"
                       />

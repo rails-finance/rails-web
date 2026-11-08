@@ -791,8 +791,8 @@ export function SearchLauncher({
       <button
         type="button"
         onClick={(e) => toggleWalletPanel(e.currentTarget, "chooser")}
-        className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-          open ? "text-blue-600 dark:text-blue-400" : "text-rb-700 dark:text-rb-300"
+        className={`cursor-pointer rounded-lg p-2.5 transition-colors duration-150 hover:text-blue-600 dark:hover:text-[var(--text-link)] focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+          open ? "text-blue-600 dark:text-[var(--text-link)]" : "text-rb-700 dark:text-rb-300"
         }`}
         aria-label="Open an explorer"
         aria-expanded={open}

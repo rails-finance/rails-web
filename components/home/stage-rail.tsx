@@ -98,7 +98,7 @@ const LINES = {
 function glyph(Icon: typeof Box, accent?: boolean) {
   return (
     <Icon
-      className={`h-[18px] w-[18px] shrink-0 ${accent ? "text-blue-600 dark:text-blue-400" : "text-foreground"}`}
+      className={`h-[18px] w-[18px] shrink-0 ${accent ? "text-blue-600 dark:text-[var(--text-link)]" : "text-foreground"}`}
       aria-hidden="true"
     />
   );
@@ -333,7 +333,7 @@ export function StageRail() {
         Every number on the page traces back to the contracts it came from.{" "}
         <Link
           href="/about/architecture"
-          className="whitespace-nowrap text-sm font-medium text-blue-600 dark:text-blue-400 transition-colors hover:underline"
+          className="whitespace-nowrap text-sm font-medium text-blue-600 dark:text-[var(--text-link)] transition-colors hover:underline"
         >
           Read the technical architecture&nbsp;→
         </Link>
