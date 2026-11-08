@@ -7,9 +7,10 @@
 // lead zone (the protocol's tint, mark and chain, named for a screen reader
 // and in its tooltip), Vault (the asset's icon, the name linking the vault's
 // page under its protocol, the standing pills beneath where there are any),
-// then Total assets, Share price, Yield and Holders. Every figure is the row's
-// own with its receipt (vaultHeads; Holders is the census's open count with
-// the census receipt); nothing is re-derived here.
+// then Total assets, Share price, Yield and Holders (the census's open
+// count). The figures print as the row prints them (vaultHeads, yieldText) as
+// plain values: the index carries no receipts (Miles, 8 Nov 2026), and each
+// vault's page keeps them.
 //
 // SORT. Each column header is a button; the sort lives in `?sort=` and
 // `?dir=`, each written only off its default (Holders, most first, as the
@@ -26,7 +27,6 @@
 import Link from "next/link";
 import { useCallback, type ReactNode } from "react";
 import type { ChainId } from "@/lib/shared/chains";
-import { Prov } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import {
@@ -40,20 +40,13 @@ import {
   DataTableRow,
   DataTableRowLink,
 } from "@/components/shared/data-table/data-table";
-import {
-  STANDING_WORD,
-  VAULT_PILL,
-  vaultHeads,
-  YIELD_LABEL_TIP,
-  type VaultRowReceipts,
-} from "@/components/vaults/vault-heads";
-import { vaultHoldersProv } from "@/lib/vaults/row-provenance";
+import { STANDING_WORD, VAULT_PILL, vaultHeads, YIELD_LABEL_TIP } from "@/components/vaults/vault-heads";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { VAULT_FAMILIES } from "@/lib/vaults/families";
 import { VAULT_INDEX_PROTOCOL_LABEL, vaultIndexProtocol } from "@/lib/vaults/index-rosters";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
-import type { VaultYield } from "@/lib/vaults/yield";
+import { yieldText, type VaultYield } from "@/lib/vaults/yield";
 
 type SortKey = "vault" | "assets" | "price" | "yield" | "holders";
 
@@ -131,7 +124,6 @@ export function VaultIndexTable({
   leadOf,
   hrefOf,
   holdersHrefOf,
-  receiptsOf,
   hooksOf,
 }: {
   rows: readonly VaultSummary[];
@@ -144,7 +136,6 @@ export function VaultIndexTable({
   leadOf: (v: VaultSummary) => string | null;
   hrefOf: (v: VaultSummary) => string;
   holdersHrefOf: (v: VaultSummary) => string | null;
-  receiptsOf: (v: VaultSummary) => VaultRowReceipts;
   hooksOf: (v: VaultSummary) => Record<string, string>;
 }) {
   const sp = useUrlSearchParams(initialSearch);
@@ -213,9 +204,11 @@ export function VaultIndexTable({
         </DataTableHead>
         <DataTableBody>
           {sorted.map((v) => {
-            const receipts = receiptsOf(v);
             const href = hrefOf(v);
-            const heads = vaultHeads({ vault: v, yieldFigure: yieldOf(v), holdersHref: null, receipts });
+            // The figures as the row prints them, with no receipt (the index
+            // states none); Yield's text through the same formatter.
+            const yf = yieldOf(v);
+            const heads = vaultHeads({ vault: v, yieldFigure: yf, holdersHref: null, receipts: {} });
             const head = (id: string) => heads.find((h) => h.id === id);
             const name = v.name ?? v.catalogName ?? v.symbol;
             const raw = v.totalAssets?.raw ?? "";
@@ -253,11 +246,11 @@ export function VaultIndexTable({
                   data-link="vault-positions"
                   data-positions-vault={v.address}
                 >
-                  <Prov info={vaultHoldersProv(v, c)}>{n(c.live)}</Prov>
+                  {n(c.live)}
                 </Link>
               ) : (
                 <span data-cell="holders" data-positions-none="">
-                  <Prov info={vaultHoldersProv(v, c)}>{n(c.live)}</Prov>
+                  {n(c.live)}
                 </span>
               );
             return (
@@ -305,23 +298,13 @@ export function VaultIndexTable({
                         data-vault-link={v.address}
                         data-vault-name
                       >
-                        {v.name != null && receipts.name ? (
-                          <Prov info={receipts.name}>{v.name}</Prov>
-                        ) : name != null ? (
-                          name
-                        ) : (
-                          <span className="font-mono">{shortAddress(v.address)}</span>
-                        )}
+                        {name != null ? name : <span className="font-mono">{shortAddress(v.address)}</span>}
                       </DataTableRowLink>
                       {v.standing.length > 0 && (
                         <span className="flex flex-wrap gap-1">
                           {v.standing.map((st) => (
                             <span key={st} className={VAULT_PILL} data-pill={st}>
-                              {receipts.standing?.[st] ? (
-                                <Prov info={receipts.standing[st]}>{STANDING_WORD[st]}</Prov>
-                              ) : (
-                                STANDING_WORD[st]
-                              )}
+                              {STANDING_WORD[st]}
                             </span>
                           ))}
                         </span>
@@ -331,7 +314,11 @@ export function VaultIndexTable({
                 </DataTableCell>
                 {cell("total-assets", head("total-assets")?.value)}
                 {cell("share-price", head("share-price")?.value)}
-                {cell("yield", head("yield")?.value, head("yield")?.sub)}
+                {cell(
+                  "yield",
+                  yf && "yearly" in yf ? <span data-cell="yield">{yieldText(yf.yearly)}</span> : null,
+                  head("yield")?.sub,
+                )}
                 {cell("holders", holders)}
               </DataTableRow>
             );

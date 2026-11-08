@@ -31,8 +31,7 @@
 //   7  every row links under its protocol, to a vault its roster lists; two
 //      links per protocol answer 200
 //   8  the rosters' heads link the index
-//   9  the dev provenance tripwire reports no uncovered figure (SKIP on a
-//      production build)
+//   9  the index draws no receipt and offers no provenance inspector (ui-jobs 538)
 //  10  the default view (ui-jobs 485): the preset's rows against ?show=all,
 //      its chip, the counts line, its removal and Reset, and the table's
 //      sorts (ui-jobs 538: Holders by default, Total assets within each token)
@@ -383,12 +382,14 @@ for (const k of KEYS) {
   );
 }
 
-// ── 9: the dev provenance tripwire ──────────────────────────────────────────
-if ((await page.locator("[data-prov-tripwire]").count()) > 0) {
-  const uncovered = await page.locator("[data-prov-uncovered]").count();
-  check("9  the dev provenance tripwire reports no uncovered figure", uncovered === 0, `${uncovered} uncovered`);
-} else {
-  skip("9  the dev provenance tripwire", "no tripwire bookends on this build (production renders none)");
+// ── 9: no receipts and no inspector (ui-jobs 538) ───────────────────────
+{
+  const receipts = await page
+    .locator("[data-vault-index] .prov-locate-box, [data-vault-index] [data-prov-covered]")
+    .count();
+  check("9a the index draws no receipt", receipts === 0, `${receipts} receipt spans`);
+  const tools = await page.locator("button.prov-inspect-toggle, [data-prov-tripwire]").count();
+  check("9b the page offers no provenance inspector", tools === 0, `${tools} inspector controls`);
 }
 
 // ── 10: the default view (ui-jobs 485) ──────────────────────────────────────

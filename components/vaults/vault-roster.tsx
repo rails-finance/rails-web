@@ -56,6 +56,9 @@ import { ROSTER_HOLDERS_MIN, inRosterPreset } from "@/lib/vaults/roster-preset";
 const n = (v: number) => v.toLocaleString("en-US");
 const ZERO = BigInt(0);
 
+/** A count with its receipt where the roster states one. */
+const withProv = (info: Provenance | undefined, text: string) => (info ? <Prov info={info}>{text}</Prov> : text);
+
 /** One facet beyond Asset: a dimension every vault has one value on. */
 export interface VaultRosterFacet {
   id: string;
@@ -198,8 +201,9 @@ export function VaultRoster({
   hooksOf?: (v: VaultSummary) => Record<string, string>;
   /** In place of the Asset facet (the index's Token, by symbol across chains). */
   assetFacet?: VaultRosterFacet;
-  groupCountProv: (assetSymbol: string, count: number, chainId: number) => Provenance;
-  emptyCountProv: (count: number) => Provenance;
+  /** The counts' receipts; absent on the index, which states none (ui-jobs 538). */
+  groupCountProv?: (assetSymbol: string, count: number, chainId: number) => Provenance;
+  emptyCountProv?: (count: number) => Provenance;
   head: VaultRosterHead;
   /** The facets chosen on arrival (the index's `?asset=`, ui-jobs 482). */
   initialFilters?: Filters;
@@ -536,9 +540,10 @@ export function VaultRoster({
                   {g.asset.symbol}
                 </a>
                 <span className="text-[12px] font-normal text-rb-500" data-figure="group-count">
-                  <Prov info={groupCountProv(g.asset.symbol, g.rows.length, g.chainId)}>
-                    {g.rows.length === 1 ? "1 vault" : `${n(g.rows.length)} vaults`}
-                  </Prov>
+                  {withProv(
+                    groupCountProv?.(g.asset.symbol, g.rows.length, g.chainId),
+                    g.rows.length === 1 ? "1 vault" : `${n(g.rows.length)} vaults`,
+                  )}
                   {filtering ? " shown" : ""}
                 </span>
               </h2>
@@ -558,11 +563,12 @@ export function VaultRoster({
           >
             <DisclosureChevron isOpen={emptyOpen} />
             <span data-figure="empty-count">
-              <Prov info={emptyCountProv(emptyRows.length)}>
-                {emptyRows.length === 1
+              {withProv(
+                emptyCountProv?.(emptyRows.length),
+                emptyRows.length === 1
                   ? `1 vault holds nothing ${atBlock}`
-                  : `${n(emptyRows.length)} vaults hold nothing ${atBlock}`}
-              </Prov>
+                  : `${n(emptyRows.length)} vaults hold nothing ${atBlock}`,
+              )}
             </span>
             {filtering && emptyShown.length !== emptyRows.length && (
               <span className="text-[12px] font-normal text-rb-500">· {n(emptyShown.length)} shown</span>

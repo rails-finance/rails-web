@@ -8,43 +8,19 @@
 // protocol, a Maple pool's opening Maple's pools page. Facets: Token (by
 // symbol, across chains), Network and Protocol, with the rosters' search.
 // Each roster was read at its block and the read-at line names each one.
-// Every figure keeps its roster's receipt. No USD and no cross-asset total.
+// No USD and no cross-asset total. The index carries no receipts and offers
+// no inspector (Miles, 8 Nov 2026): each vault's page keeps them.
 
 import Link from "next/link";
-import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
+import { ProvUnscoped } from "@/components/shared/provenance";
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { VaultIndexTable } from "@/components/vaults/vault-index-table";
 import { isoSeconds, RosterBlock, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
-import type { VaultRowReceipts } from "@/components/vaults/vault-row";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { protocolForPathname } from "@/lib/shared/protocols";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { symbolsOfKeyword } from "@/lib/shared/asset-categories";
-import {
-  vaultDirectoryCensusProv,
-  vaultDirectoryNameProv,
-  vaultDirectorySharePriceProv,
-  vaultDirectoryTotalAssetsProv,
-} from "@/lib/morpho-base/vault-provenance";
-import {
-  aaveVaultBookProv,
-  aaveVaultCatalogueProv,
-  aaveVaultNameProv,
-  aaveVaultSharePriceProv,
-  aaveVaultTotalAssetsProv,
-} from "@/lib/aave-vaults/vault-provenance";
-import { aaveVaultAttestation, type AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
-import {
-  yearnRosterCensusProv,
-  yearnVaultEndorsedProv,
-  yearnVaultNameProv,
-  yearnVaultSharePriceProv,
-  yearnVaultShutdownProv,
-  yearnVaultTotalAssetsProv,
-} from "@/lib/yearn/vault-provenance";
-import { poolNavRateProv, poolTotalAssetsProv } from "@/lib/maple/event-provenance";
-import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
-import { stampServerRead } from "@/lib/shared/server-head-read";
+import type { VaultSummary } from "@/lib/vaults/summary";
 import type { VaultYield } from "@/lib/vaults/yield";
 import {
   chainName,
@@ -60,7 +36,6 @@ import {
   vaultIndexRosterKeyOf,
   type VaultIndexRoster,
 } from "@/lib/vaults/index-rosters";
-import { maplePoolCountProv, vaultIndexEmptyCountProv, vaultIndexGroupCountProv } from "@/lib/vaults/index-provenance";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -99,28 +74,9 @@ const TOKEN_FACET: VaultRosterFacet = {
   labelOf: (s) => s,
 };
 
-/** The count sentence's receipt for one roster: the roster's. */
-function rosterCountProv(r: VaultIndexRoster): Provenance {
-  const coords = { blockNumber: r.blockNumber || undefined, readBy: r.readBy };
-  const c = r.catalog;
-  switch (r.protocol) {
-    case "morpho":
-      return vaultDirectoryCensusProv(
-        { ...coords, chainId: r.chainId },
-        { catalogSize: c.catalogSize, censusBlock: c.censusBlock ?? 0 },
-      );
-    case "aave":
-      return aaveVaultCatalogueProv(coords, {
-        catalogSize: c.catalogSize,
-        stataCount: c.stataCount ?? 0,
-        stakeCount: c.stakeCount ?? 0,
-      });
-    case "yearn":
-      return yearnRosterCensusProv(coords, { catalogSize: c.catalogSize, censusBlock: c.censusBlock ?? 0 });
-    case "maple":
-      return maplePoolCountProv(r.count, r.blockNumber);
-  }
-}
+/** The index states no receipts: its figures are plain, each vault's page
+ *  carries them (check:prov reads this). */
+export const PROV_EXEMPT = "the cross-protocol index states no receipts; each vault's page carries them (ui-jobs 538)";
 
 export function VaultIndexView({
   initialSearch,
@@ -155,71 +111,12 @@ export function VaultIndexView({
         ),
       ]
     : [];
-  const rosterOf = (v: VaultSummary) => rosters.find((r) => vaultIndexRosterKey(r) === vaultIndexRosterKeyOf(v));
-
-  const receiptsOf = (v: VaultSummary): VaultRowReceipts => {
-    const roster = rosterOf(v);
-    const blockNumber = roster?.blockNumber || undefined;
-    const readBy = roster?.readBy;
-    const vaultName = vaultDisplayName(v) ?? undefined;
-    switch (vaultIndexProtocol(v)) {
-      case "morpho": {
-        const c = { blockNumber, readBy, vault: v.address, vaultName, assetSymbol: v.asset.symbol, chainId: v.chainId };
-        return {
-          name: vaultDirectoryNameProv(c),
-          totalAssets: vaultDirectoryTotalAssetsProv(c),
-          sharePrice: vaultDirectorySharePriceProv(c),
-        };
-      }
-      case "aave": {
-        const family = v.family as AaveVaultFamily;
-        const c = {
-          blockNumber,
-          readBy,
-          vault: v.address,
-          vaultName,
-          assetSymbol: v.asset.symbol,
-          shareSymbol: v.symbol ?? undefined,
-        };
-        const att = aaveVaultAttestation(v.address, family);
-        return {
-          name: aaveVaultNameProv(c, att),
-          totalAssets: aaveVaultTotalAssetsProv(c, family),
-          sharePrice: v.shareDecimals != null ? aaveVaultSharePriceProv(c, v.shareDecimals) : undefined,
-          standing: { "address-book": aaveVaultBookProv(c, att) },
-        };
-      }
-      case "yearn": {
-        const c = {
-          blockNumber,
-          readBy,
-          vault: v.address,
-          vaultName,
-          assetSymbol: v.asset.symbol,
-          apiVersion: v.release ?? undefined,
-        };
-        return {
-          name: yearnVaultNameProv(c),
-          totalAssets: yearnVaultTotalAssetsProv(c),
-          sharePrice: yearnVaultSharePriceProv(c),
-          standing: { endorsed: yearnVaultEndorsedProv(c, true), "shut-down": yearnVaultShutdownProv(c) },
-        };
-      }
-      case "maple":
-        return {
-          totalAssets: stampServerRead(poolTotalAssetsProv(v.asset.symbol, blockNumber), readBy),
-          sharePrice: stampServerRead(poolNavRateProv(v.asset.symbol, v.symbol ?? "pool", blockNumber), readBy),
-        };
-    }
-  };
-
   const hooksOf = (v: VaultSummary) => ({
     "data-protocol": vaultIndexProtocol(v),
     "data-chain": String(v.chainId),
     "data-family": v.family,
   });
 
-  const registry = useReceiptRegistry();
   const total = vaults.length;
 
   const readOf = (r: VaultIndexRoster) => ({
@@ -229,8 +126,7 @@ export function VaultIndexView({
   });
   const counts = rosters.filter((r) => !r.chainStale);
 
-  // One stamp for the oldest roster's read; its receipt names every roster's
-  // block and time, and the panel names each.
+  // One stamp for the oldest roster's read; the panel names each roster's block.
   const readAt = <RosterReadStamp reads={counts.map(readOf)} />;
 
   const drawer = (
@@ -250,7 +146,7 @@ export function VaultIndexView({
           <Link href={vaultIndexRosterHref(r.protocol, r.chainId)} className={PAGE_LINK} prefetch={false}>
             {VAULT_INDEX_PROTOCOL_LABEL[r.protocol]}
           </Link>{" "}
-          <Prov info={rosterCountProv(r)}>{n(r.count)}</Prov> at <RosterBlock read={readOf(r)} chainId={r.chainId} />
+          {n(r.count)} at <RosterBlock read={readOf(r)} chainId={r.chainId} />
           {r.chainId !== MAINNET_CHAIN_ID && ` on ${chainName(r.chainId)}`}
         </span>
       ))}
@@ -259,49 +155,48 @@ export function VaultIndexView({
   );
 
   return (
-    <ProvReceiptsScope registry={registry}>
-      <VaultRoster
-        initialSearch={initialSearch}
-        vaults={vaults}
-        yields={yields}
-        chainId={MAINNET_CHAIN_ID as ChainId}
-        blockNumber={0}
-        chainStale={rosters.every((r) => r.chainStale)}
-        skel="index"
-        facets={FACETS}
-        assetFacet={TOKEN_FACET}
-        initialFilters={assetValues.length > 0 ? { [TOKEN_FACET.id]: assetValues } : undefined}
-        hrefOf={vaultIndexHref}
-        holdersHrefOf={vaultIndexHoldersHref}
-        receiptsOf={receiptsOf}
-        hooksOf={hooksOf}
-        table={(rows, part) => (
-          <VaultIndexTable
-            rows={rows}
-            part={part}
-            initialSearch={initialSearch ?? ""}
-            yieldOf={(v) => yields[vaultIndexKey(v)]}
-            leadOf={(v) => LEAD_IDS[vaultIndexRosterKeyOf(v)] ?? null}
-            hrefOf={vaultIndexHref}
-            holdersHrefOf={vaultIndexHoldersHref}
-            receiptsOf={receiptsOf}
-            hooksOf={hooksOf}
-          />
-        )}
-        groupCountProv={(assetSymbol, count, chainId) =>
-          vaultIndexGroupCountProv(assetSymbol, chainName(chainId), count)
-        }
-        emptyCountProv={(count) => vaultIndexEmptyCountProv(count, total)}
-        head={{
-          census: null,
-          censusFigure: "index-census",
-          listingHref: null,
-          infoHref: null,
-          indexHref: null,
-          readAt,
-          drawer,
-        }}
-      />
-    </ProvReceiptsScope>
+    // The whole index is exempt from the coverage tripwire, its reason on the
+    // element (the tripwire reads `data-prov-exempt`).
+    <div data-prov-exempt={PROV_EXEMPT}>
+      <ProvUnscoped>
+        <VaultRoster
+          initialSearch={initialSearch}
+          vaults={vaults}
+          yields={yields}
+          chainId={MAINNET_CHAIN_ID as ChainId}
+          blockNumber={0}
+          chainStale={rosters.every((r) => r.chainStale)}
+          skel="index"
+          facets={FACETS}
+          assetFacet={TOKEN_FACET}
+          initialFilters={assetValues.length > 0 ? { [TOKEN_FACET.id]: assetValues } : undefined}
+          hrefOf={vaultIndexHref}
+          holdersHrefOf={vaultIndexHoldersHref}
+          receiptsOf={() => ({})}
+          hooksOf={hooksOf}
+          table={(rows, part) => (
+            <VaultIndexTable
+              rows={rows}
+              part={part}
+              initialSearch={initialSearch ?? ""}
+              yieldOf={(v) => yields[vaultIndexKey(v)]}
+              leadOf={(v) => LEAD_IDS[vaultIndexRosterKeyOf(v)] ?? null}
+              hrefOf={vaultIndexHref}
+              holdersHrefOf={vaultIndexHoldersHref}
+              hooksOf={hooksOf}
+            />
+          )}
+          head={{
+            census: null,
+            censusFigure: "index-census",
+            listingHref: null,
+            infoHref: null,
+            indexHref: null,
+            readAt,
+            drawer,
+          }}
+        />
+      </ProvUnscoped>
+    </div>
   );
 }
