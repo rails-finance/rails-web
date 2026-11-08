@@ -44,6 +44,7 @@ export async function readRosterRows(page, scope) {
         standing: (el.getAttribute("data-standing") ?? "").split(" ").filter(Boolean),
         created: created ? Number(created) : null,
         raw: el.getAttribute("data-total-assets-raw") ? BigInt(el.getAttribute("data-total-assets-raw")) : null,
+        token: el.getAttribute("data-token"),
       };
     }),
   );
@@ -85,11 +86,19 @@ const newestOk = (a, b) =>
 const holdersKeyOk = (a, b) => (a.live == null ? b.live == null : b.live == null || a.live >= b.live);
 const newestKeyOk = (a, b) => (a.created == null ? b.created == null : b.created == null || a.created >= b.created);
 
+/** The table's order (ui-jobs 538): under Holders, counted rows first, most
+ *  open holders first; under Total assets, by token, the larger first inside
+ *  one token. */
+const tableHoldersOk = (a, b) => (a.live == null ? b.live == null : b.live == null || a.live >= b.live);
+const tokenCmp = (a, b) => a.token.localeCompare(b.token, "en-US", { sensitivity: "base" });
+const tableAssetsOk = (a, b) => tokenCmp(a, b) < 0 || (tokenCmp(a, b) === 0 && a.raw >= b.raw);
+
 /**
  * The default view against `?show=all`, the preset's chip and its removal, and
- * the three sorts. `holders`: the roster has a census (Holders is its default).
+ * the sorts. `holders`: the roster has a census (Holders is its default).
+ * `table`: the rows are the index's table, which sorts by `?sort=`, not in groups.
  */
-export async function checkRosterView({ page, base, route, scope, check, tag, holders = true }) {
+export async function checkRosterView({ page, base, route, scope, check, tag, holders = true, table = false }) {
   const go = async (q) => {
     await page.goto(`${base}${route}${q}`, { waitUntil: "networkidle", timeout: 300_000 });
     await page.waitForSelector(`${scope} [data-vault-row]`, { timeout: 120_000 });
@@ -135,7 +144,14 @@ export async function checkRosterView({ page, base, route, scope, check, tag, ho
     emptyDrawn === wantEmpty && (await page.locator(`${scope} [data-empty-group]`).count()) > 0 === wantEmpty > 0,
     `${emptyDrawn} drawn, ${wantEmpty} kept`,
   );
-  if (holders) {
+  if (table) {
+    const bad = outOfOrder(defFunded, tableHoldersOk);
+    check(
+      `${tag}e Holders is the default sort: counted rows first, most open holders first`,
+      bad === 0,
+      `${bad} rows out of order`,
+    );
+  } else if (holders) {
     const bad = groups(def).reduce((a, g) => a + outOfOrder(g, holdersOk), 0);
     const firsts = groups(def).map((g) => g[0]);
     check(
@@ -167,6 +183,33 @@ export async function checkRosterView({ page, base, route, scope, check, tag, ho
     !new URL(page.url()).searchParams.has("show") && (await shownCount()).shown === want.size,
     page.url(),
   );
+
+  if (table) {
+    await go("?show=all&sort=assets");
+    const rows = (await readRosterRows(page, scope)).filter((r) => r.group === "funded");
+    const bad = outOfOrder(rows, tableAssetsOk);
+    check(`${tag}h ?sort=assets: by token, the largest first inside each token`, bad === 0, `${bad} rows out of order`);
+    // The rule is the header's tip, read with the sort button (no line above the table).
+    for (const [key, word] of [
+      ["assets", "total assets"],
+      ["price", "share price"],
+    ]) {
+      const th = page.locator(`${scope} [data-vault-table='funded'] th[data-sort-key='${key}']`);
+      const tip = await th.locator(`[data-header-tip='${key}']`).count();
+      const said = await th
+        .locator("button[aria-describedby]")
+        .first()
+        .evaluate((b) => document.getElementById(b.getAttribute("aria-describedby"))?.textContent ?? "")
+        .catch(() => "");
+      check(
+        `${tag}i the ${word} header's tip says how it sorts, read with its sort button`,
+        tip === 1 && said === `Sorts by token, then by ${word} within each token.`,
+        `tip ${tip}, described as “${said}”`,
+      );
+    }
+    check(`${tag}j no sort line above the table`, (await page.locator(`${scope} [data-sort-note]`).count()) === 0);
+    return;
+  }
 
   // Size and Newest, by URL, over every row.
   const bySize = groups(all);

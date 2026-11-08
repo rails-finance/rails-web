@@ -4,10 +4,8 @@
 // page. Every row is a vault a protocol roster lists, read by that roster's
 // loader at that roster's block (lib/vaults/index-read.ts), and opens the
 // vault's page under its protocol. It spans chains, so it sits under no chain
-// and no explorer rail.
+// and no explorer rail. It carries no receipts and no inspector (ui-jobs 538).
 
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { VaultIndexView } from "@/components/vaults/vault-index-view";
 import { IndexNotice } from "@/components/shared/index-notice";
 import { loadVaultIndex } from "@/lib/vaults/index-read";
@@ -44,8 +42,6 @@ export default async function VaultIndexPage({ searchParams }: { searchParams: P
             initialSearch={toURLSearchParams(sp).toString()}
           />
         </div>
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
-        <ProvInspectorLayer />
       </div>
     </div>
   );

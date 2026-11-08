@@ -496,7 +496,7 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
                 happened: [
                   clause(
                     <>
-                      Received {transferShareFig("in")} from {named.name}, {named.role}.
+                      Received {transferShareFig("in")} from {named.fullName ?? named.name}, {named.role}.
                     </>,
                   ),
                 ],
@@ -567,7 +567,7 @@ function mapleEventSlotsBase(ctx: MapleContext, coords: MapleCoords): EventProse
               clause(
                 named ? (
                   <>
-                    Sent {transferShareFig("out")} to {named.name}, {named.role}.
+                    Sent {transferShareFig("out")} to {named.fullName ?? named.name}, {named.role}.
                   </>
                 ) : (
                   <>Sent {transferShareFig("out")} to another wallet.</>

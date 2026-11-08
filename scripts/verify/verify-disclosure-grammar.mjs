@@ -434,13 +434,15 @@ const headerLayout = (card) =>
     .locator('[data-event-menu] [role="menu"] [data-menu-item]')
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-menu-item")))
     .catch(() => []);
-  // f98ff4ca (23 Oct 2026): where the row's head draws a party chip, Trace
-  // "<chip>" stands after Open event page.
+  // ui-jobs 535: Open event page, Inspect provenance, Copy transaction hash,
+  // then Hide the row's type of event.
   const after = items.slice(1);
-  const order = ["trace-chip", "hide-type"];
+  const order = ["show-provenance", "copy-hash", "hide-group", "hide-type"];
   check(
-    "4b. a press on it opens the menu: Open event page (ui-jobs 308; provenance is on the event page), then Trace the head's chip where it draws one, then Hide the row's type of event where the timeline has more than one",
+    "4b. a press on it opens the menu: Open event page, Inspect provenance, Copy transaction hash, then Hide the row's type of event where the timeline has more than one",
     items[0] === "view-page" &&
+      items[1] === "show-provenance" &&
+      items[2] === "copy-hash" &&
       after.every((i) => order.includes(i)) &&
       after.every((i, k) => k === 0 || order.indexOf(after[k - 1]) < order.indexOf(i)),
     JSON.stringify(items),

@@ -180,6 +180,10 @@ placeholders:
     rounding: text
     means: |-
       The symbol of what a swap received.
+  returned:
+    rounding: token
+    means: |-
+      What came back unsold of the aTokens a partial fill sent.
   venue:
     rounding: text
     means: |-
@@ -1312,6 +1316,11 @@ templates:
           sold
         text: |-
           Rails paired the two from the receipt; no protocol log joins them. The figures show {brand}'s side: one aToken transfer.
+      tout.paired_part:
+        when: |-
+          sold, and some of the aTokens sent came back in the same transaction
+        text: |-
+          Rails paired the two from the receipt; {returned} {symbol} came back unsold. The figures show {brand}'s side: one aToken transfer.
     order:
       [
         tout.what,
@@ -1319,6 +1328,7 @@ templates:
         tout.named,
         tout.sold,
         tout.paired,
+        tout.paired_part,
         off.switched,
         hf.under,
         hf.close,
@@ -1338,7 +1348,7 @@ templates:
         prior.plain,
       ]
     groups:
-      happened: [tout.what, tout.staked, tout.named, tout.sold, tout.paired, off.switched]
+      happened: [tout.what, tout.staked, tout.named, tout.sold, tout.paired, tout.paired_part, off.switched]
       leaves:
         [
           hf.under,
@@ -1360,7 +1370,7 @@ templates:
         ]
     alternates:
       - [tout.what, tout.sold]
-      - [tout.named, tout.paired]
+      - [tout.named, tout.paired, tout.paired_part]
       - [
           hf.under,
           hf.close,
@@ -1807,7 +1817,7 @@ L5:
 
   transfer:
     title: |-
-      How Position Transfers Work
+      How position transfers work
     intro: |-
       Supplied balances are aTokens, which move between accounts like any token. A transfer hands supply to another account without leaving the Pool.
     detailsHeading: |-
@@ -1817,10 +1827,6 @@ L5:
           Not a deposit or withdrawal
         text: |-
           custody changes hands and no new value enters the Pool, so the lifetime flows give it a separate row.
-      - bold: |-
-          Two accounts, one move
-        text: |-
-          one transfer is an out-leg on the sender and an in-leg on the recipient.
       - bold: |-
           Health still enforced
         text: |-
@@ -1833,6 +1839,10 @@ L5:
           Who receives it
         text: |-
           the chain does not say whether the receiving account has the same owner.
+      - bold: |-
+          Through a third party
+        text: |-
+          supply sent to a swap or bridge router leaves the position, and the router swaps or bridges it and passes the output on.
     links:
       - label: |-
           aTokens

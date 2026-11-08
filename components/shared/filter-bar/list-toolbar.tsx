@@ -77,12 +77,14 @@ export function ListToolbar<F extends BaseListFilters>({
           className="flex-1 min-w-[200px]"
         />
         <FilterSections dimensions={dimensions} filters={filters} onChange={onChange} />
-        <SortControl
-          options={sortOptions}
-          sortBy={filters.sortBy}
-          sortOrder={filters.sortOrder}
-          onChange={(sortBy, sortOrder) => onChange({ ...filters, sortBy, sortOrder })}
-        />
+        {sortOptions.length > 0 && (
+          <SortControl
+            options={sortOptions}
+            sortBy={filters.sortBy}
+            sortOrder={filters.sortOrder}
+            onChange={(sortBy, sortOrder) => onChange({ ...filters, sortBy, sortOrder })}
+          />
+        )}
         {viewMenu && (
           <ListingViewMenu
             filterLabels={[...savedViewFilterNames(dimensions, filters), ...(filters.q ? [`“${filters.q}”`] : [])]}

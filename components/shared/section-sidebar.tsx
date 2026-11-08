@@ -61,7 +61,7 @@ import {
   type RefObject,
 } from "react";
 import { usePositionCardIdentity } from "@/components/shared/position-card-edge";
-import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
+import { BarSubjectMark, barSubjectHue } from "@/components/shared/bar-subject-mark";
 import { barSubjectOf, type BarSubject } from "@/lib/shared/known-infrastructure";
 import { notTheirs, type TxEntry } from "@/lib/shared/tx-entry";
 import { fetchAddressKind } from "@/lib/api/fetch-address-kind";
@@ -283,22 +283,11 @@ function SubjectStretches({
           <span key={`${s.top}:${s.subject.name}`}>
             <span
               className="absolute inset-x-0 bg-brand-edge md:rounded-l-2xl md:bg-brand-zone"
-              style={
-                {
-                  top: s.top,
-                  height: s.bottom - s.top,
-                  "--brand-hue": s.subject.hue ?? 0,
-                  "--brand-strength": s.subject.hue == null ? 0 : 1,
-                } as CSSProperties
-              }
+              style={{ top: s.top, height: s.bottom - s.top, ...barSubjectHue(s.subject) }}
               data-anatomy="P3.1.1"
               data-bar-subject={s.subject.name}
             >
-              <ProtocolIcon
-                id={s.subject.icon}
-                fallback={s.subject.shared ? "route" : undefined}
-                className="absolute left-3 top-3 hidden h-4 w-4 text-brand-mark md:block [&:is(img)]:grayscale"
-              />
+              <BarSubjectMark subject={s.subject} className="absolute left-3 top-3 hidden md:block" />
             </span>
           </span>
         ))}

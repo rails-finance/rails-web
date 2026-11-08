@@ -74,6 +74,46 @@ async function serverPrices(oracle: string, assets: string[]): Promise<Map<strin
   return out;
 }
 
+/** The Aave V3 market whose oracle prices a chain's tokens at a past block. */
+const CHAIN_MARKET: Partial<Record<ChainId, string>> = { 1: "core", 8453: "base", 42161: "arbitrum" };
+
+/** USD per whole token at `block` from the chain's Aave V3 oracle, through
+ *  the server route asked at a block (Sieve's stored rounds, then the at-block
+ *  store): the source of the event rows' at-block USD. Keyed by lowercase
+ *  asset; an asset the oracle does not price is absent, and every asset is
+ *  absent where the route cannot answer. No chain read of this process's own. */
+export async function aaveOraclePricesAtBlock(
+  chainId: ChainId,
+  block: number,
+  assets: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const market = CHAIN_MARKET[chainId];
+  const api = process.env.RAILS_API_URL;
+  if (!market || !api || assets.length === 0) return out;
+  try {
+    const qs = new URLSearchParams({
+      market,
+      assets: assets.slice(0, SERVER_MAX_ASSETS).join(","),
+      block: String(block),
+    });
+    const res = await fetch(`${api}/api/at-block/aave-v3/oracle-prices?${qs.toString()}`, {
+      ...createAuthFetchOptions(),
+      cache: "no-store",
+      signal: AbortSignal.timeout(SERVER_TIMEOUT_MS),
+    });
+    if (!res.ok) return out;
+    const body = (await res.json()) as { prices?: Record<string, string> };
+    for (const [a, v] of Object.entries(body.prices ?? {})) {
+      const usd = Number(BigInt(v)) / PRICE_SCALE;
+      if (usd > 0) out.set(a.toLowerCase(), usd);
+    }
+  } catch {
+    // Unpriced: the sale reading then ranks no legs across tokens.
+  }
+  return out;
+}
+
 const AAVE_ORACLE_ABI = parseAbi(["function getAssetPrice(address asset) view returns (uint256)"]);
 
 /** IAaveOracle returns USD with 8 decimals (BASE_CURRENCY_UNIT) — checked on
