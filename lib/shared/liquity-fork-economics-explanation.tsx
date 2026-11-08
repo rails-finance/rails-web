@@ -183,8 +183,8 @@ export function liquityForkEconomicsExplanation(
   if (!valued) {
     bullets.push(
       <span key="unvalued">
-        Amounts are shown in token units because the branch&apos;s oracle price wasn&apos;t available on this load, so no
-        dollar total is shown.
+        Amounts are shown in token units because the branch&apos;s oracle price wasn&apos;t available on this load, so
+        no dollar total is shown.
       </span>,
     );
   }
@@ -218,7 +218,7 @@ export function liquityForkRedemptionOutcome(
   const atRedemption = o.debtCleared - o.collValueAtRedemption;
   const realizedProv: Provenance = {
     kind: "derived",
-    summary: `Redemption net outcome: the ${debtSymbol} debt that redemptions cleared, counted at $1 each, minus the dollar value of the collateral they took at the price ${name}'s branch emitted in each Redemption log.`,
+    summary: `Redemption net outcome. The ${debtSymbol} debt that redemptions cleared, counted at $1 each, minus the dollar value of the collateral they took at the price ${name}'s branch emitted in each Redemption log.`,
     via: "added up across the trove's redemptions",
     formula: "debt cleared − collateral value at redemption",
     inputs: [
@@ -237,7 +237,7 @@ export function liquityForkRedemptionOutcome(
     o.currentPrice != null
       ? {
           kind: "derived",
-          summary: `Redemption net outcome at the latest block's price: the ${debtSymbol} debt that redemptions cleared, counted at $1 each, minus the collateral they took valued at the branch's price at the latest block.`,
+          summary: `Redemption net outcome at the latest block's price. The ${debtSymbol} debt that redemptions cleared, counted at $1 each, minus the collateral they took valued at the branch's price at the latest block.`,
           via: "added up across the trove's redemptions",
           formula: "debt cleared − collateral taken × current price",
           inputs: [

@@ -752,7 +752,7 @@ export function fxEventFallbackContent(): LearnMoreContent {
       },
       {
         bold: "fxUSD",
-        text: "the debt token positions mint; its peg is defended by the rebalance machinery and the stability pool, and the explorer renders amounts in fxUSD, not assumed dollars.",
+        text: "the debt token positions mint; its peg is defended by the rebalance machinery and the stability pool, and the explorer renders amounts in fxUSD.",
       },
     ],
     links: [{ label: "f(x) docs", url: FX_DOC_URL }],
@@ -914,7 +914,7 @@ export function mapleDepositWithdrawContent(eventType: "deposit" | "withdraw"): 
         text: "the share is a claim on the pool. The exit rate is what one share pays out on withdrawal, so shares × the exit rate = what a withdrawal pays. It rises as borrowers pay interest, and falls when a loan loses value: the pool delegate, the manager that runs the pool's lending, marks it as impaired, or it defaults. A lender who exits while the loss stands takes it for good.",
       },
       {
-        bold: "Where the money actually is",
+        bold: "Where the money is",
         text: "only a small liquid buffer sits in the pool contract (a few percent of the pool; the pool band shows it live). The rest is deployed to loans whose collateral (BTC, ETH, stables) is held by custodians, firms that keep the borrowers' collateral in safekeeping and release it only on the agreed terms (BitGo, Copper, Anchorage, Hex Trust). The chain records the bookkeeping; the collateral itself is not on-chain.",
       },
       {
@@ -1063,7 +1063,7 @@ export function liquityForkBorrowingContent(
       steps: [
         "Each collateral branch is its own market with its own minimum collateral ratio; below it, anyone can liquidate the Trove.",
         `The chosen interest rate is also the Trove's place in the redemption queue: redemptions sweep the LOWEST rates first, so a higher rate buys ${p.stablecoin} peg protection at a carrying cost.`,
-        `Drawing ${p.stablecoin} pays an upfront fee (a week of average branch interest) added straight to the debt, and a fixed liquidation reserve is set aside apart from the collateral.`,
+        `Drawing ${p.stablecoin} pays an upfront fee (a week of average branch interest) added to the debt, and a fixed liquidation reserve is set aside apart from the collateral.`,
       ],
       links: forkLinks(p, "open"),
     };
@@ -1270,7 +1270,7 @@ export function pwnRepaymentContent(eventType: "paid_back" | "claimed", accruing
       {
         bold: "Escrow does the settling",
         text: accruing
-          ? "the loan contract passes the repayment straight to the note holder when it can, in the same transaction; otherwise it holds it until the holder claims."
+          ? "the loan contract passes the repayment to the note holder when it can, in the same transaction; otherwise it holds it until the holder claims."
           : "the loan contract holds the repayment until the note holder claims it; the two legs (borrower pays in, lender collects) are usually separate transactions.",
       },
     ],

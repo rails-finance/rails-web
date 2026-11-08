@@ -19,7 +19,7 @@ export function collSurplusClaimableProv(s: LiquityTroveSurplus, symbol: string)
   return {
     kind: "chain",
     pclass: "state",
-    summary: `Claimable collateral: the ${symbol} left over after the liquidation had covered the Trove's debt and penalty. The branch's CollSurplusPool holds it until the owner claims it through BorrowerOperations.claimCollateral().`,
+    summary: `Claimable collateral. The ${symbol} left over after the liquidation had covered the Trove's debt and penalty. The branch's CollSurplusPool holds it until the owner claims it through BorrowerOperations.claimCollateral().`,
     contract: { name: "CollSurplusPool", address: s.pool },
     via: `the liquidation's CollBalanceUpdated log for the owner, less the balance the pool held for them the block before; no claim since, and getCollateral(owner) at block ${s.blockNumber.toLocaleString("en-US")} still covers it`,
     source: { block: s.blockNumber },
@@ -36,7 +36,7 @@ export function collSurplusUsdProv(s: LiquityTroveSurplus, symbol: string, price
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `Claimable collateral in USD: the ${symbol} still claimable, valued at the branch's oracle price.`,
+    summary: `Claimable collateral in USD. The ${symbol} still claimable, valued at the branch's oracle price.`,
     formula: "claimable collateral × oracle price",
     inputs: [
       { label: "claimable", value: `${formatNum(s.claimable, 4)} ${symbol}`, kind: "chain", pclass: "state" },
@@ -50,7 +50,7 @@ export function collSurplusClaimedProv(s: LiquityTroveSurplus, symbol: string): 
   return {
     kind: "chain",
     pclass: "emitted",
-    summary: `Surplus claimed: the ${symbol} the liquidation left in the branch's CollSurplusPool, which the owner has since claimed.`,
+    summary: `Surplus claimed. The ${symbol} the liquidation left in the branch's CollSurplusPool, which the owner has since claimed.`,
     contract: { name: "CollSurplusPool", address: s.pool },
     via: `the liquidation's CollBalanceUpdated log for the owner, less the balance the pool held for them the block before; a later CollBalanceUpdated(owner, 0)${when} is the claim`,
     ...(s.claimed?.txHash ? { source: { block: s.claimed.block ?? undefined, txHash: s.claimed.txHash } } : {}),
@@ -69,7 +69,7 @@ export function claimAmountProv(d: CollSurplusClaimContext, at: ClaimCoords): Pr
   return {
     kind: "chain",
     pclass: "emitted",
-    summary: `Collateral claimed for this Trove: the ${d.symbol} its ${creditWord(d)} credited to the owner in the CollSurplusPool, paid out by this claim.`,
+    summary: `Collateral claimed for this Trove. The ${d.symbol} its ${creditWord(d)} credited to the owner in the CollSurplusPool, paid out by this claim.`,
     contract: { name: "CollSurplusPool", address: d.pool },
     via: `the ${creditWord(d)}'s CollBalanceUpdated log for the owner, less the balance the pool held for them the block before; CollBalanceUpdated(owner, 0) at block ${at.blockNumber.toLocaleString("en-US")} is the claim`,
     source: { block: at.blockNumber, txHash: at.txHash },
@@ -82,7 +82,7 @@ export function claimPaidProv(d: CollSurplusClaimContext, at: ClaimCoords): Prov
   return {
     kind: "chain",
     pclass: "emitted",
-    summary: `Paid to the owner: their whole ${d.symbol} balance in the CollSurplusPool, which claimCollateral() pays out in one call.`,
+    summary: `Paid to the owner. Their whole ${d.symbol} balance in the CollSurplusPool, which claimCollateral() pays out in one call.`,
     contract: { name: "CollSurplusPool", address: d.pool },
     via: `the owner's CollBalanceUpdated log before the claim's CollBalanceUpdated(owner, 0) at block ${at.blockNumber.toLocaleString("en-US")}`,
     source: { block: at.blockNumber, txHash: at.txHash },
@@ -104,7 +104,7 @@ export function claimOthersProv(d: CollSurplusClaimContext, others: number): Pro
   return {
     kind: "chain-derived",
     pclass: "emitted",
-    summary: `Other Troves' surplus: collateral the owner's other Troves had left in the same pool, paid out by the same claim.`,
+    summary: `Other Troves' surplus. Collateral the owner's other Troves had left in the same pool, paid out by the same claim.`,
     formula: "paid to the owner − this Trove's surplus",
     inputs: [
       {
@@ -135,7 +135,7 @@ export function claimPriceProv(d: CollSurplusClaimContext, at: ClaimCoords): Pro
       kind: "recompute",
       text: `To check: ask an archive node for the branch PriceFeed's lastGoodPrice at block ${at.blockNumber}.`,
     },
-    summary: `${d.symbol} price at the claim's block: the US-dollar price the branch's PriceFeed held at the end of this block; the price its last liquidation, redemption or borrower operation fetched.`,
+    summary: `${d.symbol} price at the claim's block. The US-dollar price the branch's PriceFeed held at the end of this block; the price its last liquidation, redemption or borrower operation fetched.`,
     ...(d.priceFeed ? { contract: { name: `${d.symbol} PriceFeed`, address: d.priceFeed } } : {}),
     via: `PriceFeed.lastGoodPrice() at block ${at.blockNumber.toLocaleString("en-US")}, ÷10^${places}`,
     source: { block: at.blockNumber, txHash: at.txHash },
@@ -157,7 +157,7 @@ export function claimPaidUsdAtBlockProv(d: CollSurplusClaimContext, priceUsd: nu
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `${d.symbol} the claim paid the owner, in USD: the amount the CollSurplusPool sent, times the branch's PriceFeed price at the claim's block.`,
+    summary: `${d.symbol} the claim paid the owner, in USD. The amount the CollSurplusPool sent, times the branch's PriceFeed price at the claim's block.`,
     formula: `${d.symbol} paid × price at block`,
     inputs: [
       {

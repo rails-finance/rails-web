@@ -396,7 +396,7 @@ export function healthView(
       formula: ratio?.line.formula ?? "below 1 the position can be liquidated",
       summary:
         ratio?.line.summary ??
-        `Liquidation line: below a health factor of 1 ${src.below ?? `${src.pool} lets a liquidator repay the debt`}.`,
+        `Liquidation line. Below a health factor of 1 ${src.below ?? `${src.pool} lets a liquidator repay the debt`}.`,
       end: endWord,
     },
     ...(ratio?.warn && warnPoints.length
@@ -421,7 +421,7 @@ export function healthView(
         formula: src.levels?.formula ?? BASKET_LEVEL_FORMULA,
         summary:
           src.levels?.summary ??
-          `Liquidation level: the asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the ${factors} ${src.pool} held at the day's last event.`,
+          `Liquidation level. The asset's price at which the health factor reaches 1, with every other balance and price as they stood on the day and the ${factors} ${src.pool} held at the day's last event.`,
         end: endWord,
         here: src.levels?.here ?? {
           live: "Here at today's balances and prices and the card's health factor.",

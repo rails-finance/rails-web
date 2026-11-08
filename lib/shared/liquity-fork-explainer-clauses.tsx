@@ -583,7 +583,7 @@ function eventSlots(
         ? clause(
             <>
               {fork.protocolName} added its one-time borrowing fee of {feeFig()} to the debt, about a week of the
-              branch&rsquo;s average interest, owed rather than paid out of pocket.
+              branch&rsquo;s average interest.
             </>,
           )
         : clause(

@@ -74,10 +74,10 @@ export function gasEscrowProv(
 ): Provenance {
   const what = `the fixed ${e.label} every ${e.protocol} Trove sends to its branch's GasPool beside its collateral at the open, held apart from the collateral and outside the collateral ratio`;
   const summary = {
-    sent: `Gas compensation escrow sent at the open: ${what}. The close returns it and a liquidation pays it to the liquidator. The TroveUpdated log does not carry it; this transaction's ${e.symbol} Transfer to the GasPool does.`,
-    returned: `Gas compensation escrow returned at the close: ${what}, sent back by the GasPool. This transaction's ${e.symbol} Transfer from the GasPool carries it; the TroveUpdated log does not.`,
-    paid: `Gas compensation escrow paid to the liquidator: ${what}, paid out by the GasPool to the address that called the liquidation, beside its share of the collateral. This transaction's ${e.symbol} Transfer from the GasPool carries it.`,
-    held: `Gas compensation escrow held by the branch's GasPool${at.block != null ? ` at block ${at.block}` : ""}: ${what}. No event between the open and the close moves it.`,
+    sent: `Gas compensation escrow sent at the open. ${what}. The close returns it and a liquidation pays it to the liquidator. The TroveUpdated log does not carry it; this transaction's ${e.symbol} Transfer to the GasPool does.`,
+    returned: `Gas compensation escrow returned at the close. ${what}, sent back by the GasPool. This transaction's ${e.symbol} Transfer from the GasPool carries it; the TroveUpdated log does not.`,
+    paid: `Gas compensation escrow paid to the liquidator. ${what}, paid out by the GasPool to the address that called the liquidation, beside its share of the collateral. This transaction's ${e.symbol} Transfer from the GasPool carries it.`,
+    held: `Gas compensation escrow held by the branch's GasPool${at.block != null ? ` at block ${at.block}` : ""}. ${what}. No event between the open and the close moves it.`,
   }[move];
   return {
     kind: "chain-derived",
