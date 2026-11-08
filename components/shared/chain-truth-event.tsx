@@ -512,7 +512,7 @@ function openingBeforeProv(derived: Provenance): Provenance {
   return {
     kind: "chain",
     pclass: "emitted",
-    summary: "Balance before the opening row — 0: the position is created in this transaction.",
+    summary: "Balance before the opening row. It is 0: the position is created in this transaction.",
     contract: derived.contract,
     via: "opening row",
     verify: { kind: "none", text: "a position holds nothing before it exists" },

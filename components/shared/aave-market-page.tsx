@@ -96,7 +96,7 @@ export function AaveMarketPage(props: AaveMarketPageProps) {
     ) : error || !view ? (
       <div className="py-12 text-center text-rb-500">
         <p className="mb-1">Couldn&apos;t read the market from chain.</p>
-        <p className="text-sm">{error ?? "The RPC read failed — reload to retry."}</p>
+        <p className="text-sm">{error ?? "The RPC read failed: reload to retry."}</p>
       </div>
     ) : (
       <div data-skel-section="page-table">

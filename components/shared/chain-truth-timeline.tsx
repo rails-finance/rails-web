@@ -2428,7 +2428,7 @@ function ChainTruthTimelineBody({
                       : tl.isFiltered && cut != null && tl.sortedEvents.some((e) => e.timestamp <= cut)
                         ? `Nothing to ${rewind!.word} matches these filters.`
                         : tl.isFiltered
-                          ? "All events filtered out — adjust the filters above to show some."
+                          ? "All events filtered out: adjust the filters above to show some."
                           : cut != null
                             ? cutEmptyState(cut, rewind!.word)
                             : emptyLabel}

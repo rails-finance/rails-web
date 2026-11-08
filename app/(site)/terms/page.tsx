@@ -36,7 +36,7 @@ export default function TermsPage() {
         <p className="text-sm text-rb-500 mb-8">Last updated: {LEGAL_LAST_UPDATED.label}</p>
 
         <div className="notice-caution p-4 mb-8">
-          <h3 className="text-lg font-bold text-caution-800 dark:text-caution-300 mb-2">Important Notice</h3>
+          <h3 className="text-lg font-bold text-caution-800 dark:text-caution-300 mb-2">Important notice</h3>
           <p className="text-caution-700 dark:text-caution-400 text-sm">
             Rails is not a financial advisor, investment advisor, or broker. The information provided on this platform
             is for informational purposes only and should not be considered as financial, investment, legal, or tax
