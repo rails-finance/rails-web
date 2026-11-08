@@ -26,11 +26,22 @@
 //
 // ANATOMY (rails-ops reference/app-anatomy.md, region D): D1 the frame and
 // its rows, D2 a sortable header, D3 the sideways scroll and pinned cells
-// (on the frame), D4 a linked row, D5 the lead cell.
+// (on the frame), D4 a linked row, D5 the lead cell, D6 stacked rows (on the
+// frame in D3's place).
+//
+// STACKED ROWS (D6, opt-in: `DataTable stacked`). Below sm the same <table>
+// reflows into cards by CSS (`.dt-stacked`, app/globals.css), with explicit
+// ARIA roles so a screen reader still reads rows of labelled cells: the
+// header row hides, the lead zone narrows to a 6px edge in the protocol's hue
+// (W4's pattern below sm), the row header spans the card, the other cells sit
+// two to a line, each with its `label`. Stripes, corners, the gap, the linked
+// row and its border carry over; pinning (D3) does not apply.
 //
 // THE LEAD COLUMN. Where rows span protocols or chains, each row opens with
 // the protocol's tinted zone (components/shared/row-zone.tsx, the wallet's
-// History lead): `DataTableLeadHeader` and `DataTableLeadCell`.
+// History lead): `DataTableLeadHeader` and `DataTableLeadCell`. Where the zone
+// meets the next cell the body's corners curve in over the hue (the frame is
+// `isolate`, so the hue behind them stays inside the table).
 
 import Link from "next/link";
 import {
@@ -42,7 +53,9 @@ import {
   type TdHTMLAttributes,
   type ThHTMLAttributes,
 } from "react";
-import { RowZone } from "@/components/shared/row-zone";
+import { hueStyle, RowZone } from "@/components/shared/row-zone";
+import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
+import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
 
 export type DataTableDir = "asc" | "desc";
@@ -63,12 +76,17 @@ const LINKED_CELL =
 /** The row's link, which each cell's cover repeats. */
 const RowHref = createContext<string | null>(null);
 
+/** The table reads as cards below sm (D6): its parts carry explicit roles,
+ *  since a reflowed table loses its own. */
+const Stacked = createContext(false);
+
 /** The frame and the table. `tableClassName` sets a minimum width (the frame
  *  scrolls below it) and the body's type. */
 export function DataTable({
   caption,
   label,
   anatomy,
+  stacked = false,
   tableClassName = "",
   className = "",
   children,
@@ -80,6 +98,11 @@ export function DataTable({
   label?: string;
   /** The caller's own part code, before D1 and D3 (`M1`). */
   anatomy?: string;
+  /** Below sm each row reads as a card (D6, `.dt-stacked` in globals.css):
+   *  no header row, the lead zone a 6px edge, the row header across the card,
+   *  the other cells in two columns, each with its `label`. The caller draws
+   *  its own sort control for that width. */
+  stacked?: boolean;
   tableClassName?: string;
   className?: string;
   children: ReactNode;
@@ -87,33 +110,38 @@ export function DataTable({
   return (
     // `relative`: a visually hidden span inside a cell is placed against the
     // frame, so it never widens the page.
-    <div
-      className={`relative max-w-full overflow-x-auto ${className}`}
-      data-anatomy={anatomy ? `${anatomy} D1 D3` : "D1 D3"}
-      {...frame}
-    >
-      <table
-        className={`w-full border-separate border-spacing-x-0 border-spacing-y-1 ${tableClassName}`}
-        aria-label={caption ? undefined : label}
+    <Stacked.Provider value={stacked}>
+      <div
+        className={`relative isolate max-w-full overflow-x-auto ${className}`}
+        data-anatomy={[anatomy, "D1", stacked ? "D6" : "D3"].filter(Boolean).join(" ")}
+        {...frame}
       >
-        {caption && <caption className="sr-only">{caption}</caption>}
-        {children}
-      </table>
-    </div>
+        <table
+          className={`w-full border-separate border-spacing-x-0 border-spacing-y-1 ${stacked ? "dt-stacked" : ""} ${tableClassName}`}
+          aria-label={caption ? undefined : label}
+          role={stacked ? "table" : undefined}
+        >
+          {caption && <caption className="sr-only">{caption}</caption>}
+          {children}
+        </table>
+      </div>
+    </Stacked.Provider>
   );
 }
 
 /** The header row. */
 export function DataTableHead({ children }: { children: ReactNode }) {
+  const stacked = useContext(Stacked);
   return (
-    <thead>
-      <tr>{children}</tr>
+    <thead role={stacked ? "rowgroup" : undefined}>
+      <tr role={stacked ? "row" : undefined}>{children}</tr>
     </thead>
   );
 }
 
 export function DataTableBody({ children }: { children: ReactNode }) {
-  return <tbody>{children}</tbody>;
+  const stacked = useContext(Stacked);
+  return <tbody role={stacked ? "rowgroup" : undefined}>{children}</tbody>;
 }
 
 /** A sort control for a header: the label and the direction's caret. Used by
@@ -178,9 +206,11 @@ export function DataTableHeader({
 } & Omit<ThHTMLAttributes<HTMLTableCellElement>, "children" | "align">) {
   const dir = sort?.dir ?? null;
   const sorted = ariaSort ?? (dir ? (dir === "asc" ? "ascending" : "descending") : undefined);
+  const stacked = useContext(Stacked);
   return (
     <th
       scope="col"
+      role={stacked ? "columnheader" : undefined}
       aria-sort={sorted}
       data-anatomy={sort || ariaSort ? "D2" : undefined}
       className={`${DATA_TABLE_PAD} pb-1.5 text-xs font-semibold whitespace-nowrap text-rb-500 ${
@@ -222,9 +252,11 @@ export function DataTableRow({
   children,
   ...rest
 }: HTMLAttributes<HTMLTableRowElement> & { href?: string }) {
+  const stacked = useContext(Stacked);
   return (
     <RowHref.Provider value={href ?? null}>
       <tr
+        role={stacked ? "row" : undefined}
         className={`group/dt-row ${href ? LINKED_ROW : ""} ${className}`}
         data-anatomy={href ? "D4" : undefined}
         {...rest}
@@ -274,10 +306,13 @@ export function DataTableCell({
   valign = "top",
   sticky = "",
   pad = true,
+  label,
   className = "",
   children,
   ...rest
 }: {
+  /** The column's name, shown in the cell when the table stacks (D6). */
+  label?: string;
   rowHeader?: boolean;
   align?: Align;
   valign?: "top" | "middle";
@@ -287,18 +322,26 @@ export function DataTableCell({
   children?: ReactNode;
 } & Omit<TdHTMLAttributes<HTMLTableCellElement>, "align">) {
   const href = useContext(RowHref);
+  const stacked = useContext(Stacked);
+  const named = stacked && label ? <span className="dt-cell-label">{label}</span> : null;
   const cls = `${CELL_SURFACE} ${valign === "middle" ? "align-middle" : "align-top"} ${href ? LINKED_CELL : ""} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
     sticky ? `${sticky} z-10` : ""
   } ${className}`;
   const cover = href ? <RowCover href={href} /> : null;
   return rowHeader ? (
-    <th scope="row" className={`font-normal ${cls}`} {...(rest as ThHTMLAttributes<HTMLTableCellElement>)}>
+    <th
+      scope="row"
+      role={stacked ? "rowheader" : undefined}
+      className={`font-normal ${cls}`}
+      {...(rest as ThHTMLAttributes<HTMLTableCellElement>)}
+    >
       {cover}
       {children}
     </th>
   ) : (
-    <td className={cls} {...rest}>
+    <td role={stacked ? "cell" : undefined} className={cls} {...rest}>
       {cover}
+      {named}
       {children}
     </td>
   );
@@ -306,8 +349,13 @@ export function DataTableCell({
 
 /** The lead column's header: no visible label, its name for a screen reader. */
 export function DataTableLeadHeader({ sticky = "" }: { sticky?: string }) {
+  const stacked = useContext(Stacked);
   return (
-    <th scope="col" className={`w-16 p-0 sm:w-[95px] ${sticky ? `${sticky} z-10 bg-background` : ""}`}>
+    <th
+      scope="col"
+      role={stacked ? "columnheader" : undefined}
+      className={`w-16 p-0 sm:w-[95px] ${sticky ? `${sticky} z-10 bg-background` : ""}`}
+    >
       <span className="sr-only">Protocol and chain</span>
     </th>
   );
@@ -315,7 +363,9 @@ export function DataTableLeadHeader({ sticky = "" }: { sticky?: string }) {
 
 /** The lead cell: the protocol's tinted zone with its mark and the chain's
  *  glyph, spanning the row's height, with the protocol's and the chain's
- *  names for a screen reader. */
+ *  names for a screen reader. The hue runs on under the next cell, whose left
+ *  corners round over it (`.dt-lead` curve in globals.css), so the row's body
+ *  reads as a panel set into the hue. */
 export function DataTableLeadCell({
   protocol,
   protocolName,
@@ -333,7 +383,8 @@ export function DataTableLeadCell({
     <DataTableCell
       pad={false}
       sticky={sticky}
-      className="h-px w-16 sm:w-[95px]"
+      className="relative h-px w-16 sm:w-[95px]"
+      style={hueStyle(protocol)}
       title={`${protocolName} on ${chainMeta(chain).name}`}
       data-anatomy="D5"
       data-row-zone={protocol}
@@ -342,5 +393,17 @@ export function DataTableLeadCell({
       <span className="sr-only">{protocolName} on </span>
       <RowZone id={protocol} chain={chain} className="h-full min-h-11 w-16 rounded-l-2xl sm:w-[95px]" />
     </DataTableCell>
+  );
+}
+
+/** The lead zone's mark and chain glyph for a stacked card's first line (D6),
+ *  where the zone narrows to its edge; drawn only there, and silent (the lead
+ *  cell names both). */
+export function DataTableLeadMark({ protocol, chain }: { protocol: string; chain: ChainId }) {
+  return (
+    <span className="dt-lead-mark shrink-0 items-center gap-1 text-rb-500" aria-hidden>
+      <ProtocolIcon id={protocol} className="h-4 w-4 shrink-0 [&:is(img)]:grayscale" />
+      <ChainGlyph id={chain} className="h-4 w-4 shrink-0" />
+    </span>
   );
 }
