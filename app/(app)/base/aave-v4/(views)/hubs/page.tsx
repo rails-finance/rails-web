@@ -5,7 +5,9 @@
 // page states that hub's reserves as the spoke sees them: each reserve's price
 // and when its feed published it, the risk parameters the spoke enforces, and
 // the hub's caps and usage for the spoke. Present, don't rank: reserve order is
-// the spoke's own reserve id, no score, no valence colour.
+// the spoke's own reserve id, no score, no valence colour. On the house table
+// (rails-ops ui-jobs 539: D1, D6 cards below sm), unsorted and unlinked; token
+// amounts carry the reserve's mark (`AssetUnit`).
 
 import { useEffect, useState } from "react";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
@@ -15,9 +17,18 @@ import { aaveV4Modal } from "@/lib/aave-v4/event-templates";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { explorerUrl, BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { formatNumber } from "@/lib/utils/format";
-import { publishedText, ageClauseText } from "@/lib/morpho/oracle-age";
+import { publishedText, ageClauseText, ageText } from "@/lib/morpho/oracle-age";
 import { AAVE_V4_BASE_API_ROOT } from "@/lib/aave-v4/deployment-routes";
 import { BlockRef } from "@/components/shared/block-ref";
+import { AssetUnit } from "@/components/shared/asset-unit";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 
 const PROTOCOL = protocolForHref("/base/aave-v4")!;
 
@@ -74,6 +85,7 @@ function tokens(raw: string | null, decimals: number): number | null {
   return Number(v / d) + Number(v % d) / Number(d);
 }
 const pct = (bps: number | null) => (bps == null ? "—" : `${(bps / 100).toFixed(2)}%`);
+const NUM = "whitespace-nowrap tabular-nums text-foreground";
 const usd = (n: number | null) => (n == null ? "—" : `$${formatNumber(n)}`);
 
 // The spoke's state first, then Coinbase's registry pause beside it: the
@@ -173,72 +185,106 @@ export default function AaveV4BaseHubPage() {
                 </p>
               )}
             </div>
-            <div className="overflow-x-auto rounded-2xl bg-raised" data-skel-section="page-table">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-wider text-rb-500">
-                    <th className="px-4 py-3">Reserve</th>
-                    <th className="px-4 py-3 text-right">Price</th>
-                    <th className="px-4 py-3">Published</th>
-                    <th className="px-4 py-3 text-right">Collateral factor</th>
-                    <th className="px-4 py-3 text-right">Max bonus</th>
-                    <th className="px-4 py-3 text-right">Supplied / cap</th>
-                    <th className="px-4 py-3 text-right">Supplied value</th>
-                    <th className="px-4 py-3 text-right">Borrowed / credit line</th>
-                    <th className="px-4 py-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.reserves.map((r) => {
-                    const price = Number(r.priceRaw) / 10 ** r.priceDecimals;
-                    const added = tokens(r.addedRaw, r.decimals);
-                    const owed = tokens(r.owedRaw, r.decimals);
-                    return (
-                      <tr key={r.reserveId} className="border-t border-rb-200/40 dark:border-rb-800/60">
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center gap-2 text-foreground">
-                            <TokenChipIcon
-                              symbol={r.symbol ?? "???"}
-                              address={r.underlying}
-                              size={18}
-                              filterable={false}
-                            />
-                            {r.symbol ?? "???"}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-foreground">${formatNumber(price)}</td>
-                        <td className="px-4 py-3 text-rb-500 whitespace-nowrap">
-                          {r.feedUpdatedAt != null && readTs != null
+            <DataTable
+              label="The Mag7 spoke's reserves"
+              stacked
+              rowHeight="two"
+              tableClassName="text-[13px] sm:min-w-[900px]"
+              data-skel-section="page-table"
+            >
+              <DataTableHead>
+                <DataTableHeader label="Reserve" />
+                <DataTableHeader label="Price" align="right" />
+                <DataTableHeader label="Published" />
+                <DataTableHeader label="Collateral factor" align="right" />
+                <DataTableHeader label="Max bonus" align="right" />
+                <DataTableHeader label="Supplied / cap" align="right" />
+                <DataTableHeader label="Supplied value" align="right" />
+                <DataTableHeader label="Borrowed / credit line" align="right" />
+                <DataTableHeader label="Status" />
+              </DataTableHead>
+              <DataTableBody>
+                {data.reserves.map((r) => {
+                  const price = Number(r.priceRaw) / 10 ** r.priceDecimals;
+                  const added = tokens(r.addedRaw, r.decimals);
+                  const owed = tokens(r.owedRaw, r.decimals);
+                  const unit = <AssetUnit symbol={r.symbol ?? "???"} address={r.underlying} named={r.symbol != null} />;
+                  return (
+                    <DataTableRow key={r.reserveId}>
+                      <DataTableCell rowHeader className="whitespace-nowrap">
+                        <span className="inline-flex items-center gap-2 text-foreground">
+                          <TokenChipIcon
+                            symbol={r.symbol ?? "???"}
+                            address={r.underlying}
+                            size={18}
+                            filterable={false}
+                          />
+                          {r.symbol ?? "???"}
+                        </span>
+                      </DataTableCell>
+                      <DataTableCell label="Price" align="right" className={NUM}>
+                        ${formatNumber(price)}
+                      </DataTableCell>
+                      {/* The date over its age; the stamp names the read's block,
+                          and the full clause is the cell's title. */}
+                      <DataTableCell
+                        label="Published"
+                        wide
+                        className="whitespace-nowrap"
+                        title={
+                          r.feedUpdatedAt != null && readTs != null
                             ? `${publishedText(r.feedUpdatedAt, readTs)} ${ageClauseText(r.feedUpdatedAt, readTs, r.blockNumber)}`
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          {r.collateralFactorBps ? pct(r.collateralFactorBps) : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          {r.collateralFactorBps && r.maxLiquidationBonusBps != null
-                            ? pct(r.maxLiquidationBonusBps - 10_000)
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
+                            : undefined
+                        }
+                      >
+                        {r.feedUpdatedAt != null && readTs != null ? (
+                          <>
+                            <span className="block text-foreground">{publishedText(r.feedUpdatedAt, readTs)}</span>
+                            <span className="block text-[11px] text-rb-500">
+                              {ageText(readTs - r.feedUpdatedAt)} before the read
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-rb-500">—</span>
+                        )}
+                      </DataTableCell>
+                      <DataTableCell label="Collateral factor" align="right" className={NUM}>
+                        {r.collateralFactorBps ? pct(r.collateralFactorBps) : "—"}
+                      </DataTableCell>
+                      <DataTableCell label="Max bonus" align="right" className={NUM}>
+                        {r.collateralFactorBps && r.maxLiquidationBonusBps != null
+                          ? pct(r.maxLiquidationBonusBps - 10_000)
+                          : "—"}
+                      </DataTableCell>
+                      <DataTableCell label="Supplied / cap" align="right" className={NUM}>
+                        <span className="inline-flex items-center gap-1.5">
                           {added == null ? "—" : formatNumber(added)} /{" "}
                           {r.addCap ? formatNumber(Number(r.addCap)) : "—"}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">
-                          {usd(added == null ? null : added * price)}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
-                          {r.borrowable
-                            ? `${owed == null ? "—" : formatNumber(owed)} / ${r.drawCap ? formatNumber(Number(r.drawCap)) : "—"}`
-                            : "Not borrowable"}
-                        </td>
-                        <td className="px-4 py-3 text-rb-500">{statusWords(r)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                          {unit}
+                        </span>
+                      </DataTableCell>
+                      <DataTableCell label="Supplied value" align="right" className={NUM}>
+                        {usd(added == null ? null : added * price)}
+                      </DataTableCell>
+                      <DataTableCell label="Borrowed / credit line" align="right" className={NUM}>
+                        {r.borrowable ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            {owed == null ? "—" : formatNumber(owed)} /{" "}
+                            {r.drawCap ? formatNumber(Number(r.drawCap)) : "—"}
+                            {unit}
+                          </span>
+                        ) : (
+                          <span className="text-rb-500">Not borrowable</span>
+                        )}
+                      </DataTableCell>
+                      <DataTableCell label="Status" className="text-rb-500">
+                        {statusWords(r)}
+                      </DataTableCell>
+                    </DataTableRow>
+                  );
+                })}
+              </DataTableBody>
+            </DataTable>
             <p className="text-xs text-rb-500 max-w-prose">
               Prices are the spoke oracle&apos;s getReservePrice; &ldquo;Published&rdquo; is the updatedAt of the
               Chainlink round behind it, read with latestRoundData at the same block. Caps are whole tokens, set by the
