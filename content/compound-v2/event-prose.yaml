@@ -782,7 +782,7 @@ doc_urls:
 L5:
   supply:
     title: |-
-      How Supplying Works
+      How supplying works
     intro: |-
       Supplying deposits an asset into a Compound V2 market and mints cTokens, a transferable receipt, in exchange. The deposit earns the supply rate and, once the market is entered, backs borrowing.
     detailsHeading: |-
@@ -817,7 +817,7 @@ L5:
 
   withdraw:
     title: |-
-      How Withdrawing Works
+      How withdrawing works
     intro: |-
       Withdrawing burns cTokens and returns the underlying asset to the wallet. It goes only as far as the account's liquidity and the market's cash allow.
     detailsHeading: |-
@@ -845,7 +845,7 @@ L5:
 
   borrow:
     title: |-
-      How Borrowing Works
+      How borrowing works
     intro: |-
       Borrowing draws an asset against the account's supplied collateral and accrues interest at the market's borrow rate. The amount must stay within the account's liquidity and the market's cash.
     detailsHeading: |-
@@ -876,7 +876,7 @@ L5:
 
   repay:
     title: |-
-      How Repaying Works
+      How repaying works
     intro: |-
       Repaying returns borrowed assets to the market, clearing debt and restoring the account's borrowing room.
     detailsHeading: |-
@@ -907,7 +907,7 @@ L5:
 
   transfer_in:
     title: |-
-      How Receiving cTokens Works
+      How receiving cTokens works
     intro: |-
       cTokens are ordinary ERC-20 tokens, so a Compound V2 deposit can change hands without touching the market. Transferring cTokens transfers the underlying claim and its collateral role.
     detailsHeading: |-
@@ -935,7 +935,7 @@ L5:
 
   transfer_out:
     title: |-
-      How Sending cTokens Works
+      How sending cTokens works
     intro: |-
       cTokens are ordinary ERC-20 tokens, so a Compound V2 deposit can change hands without touching the market. Transferring cTokens transfers the underlying claim and its collateral role.
     detailsHeading: |-
@@ -963,7 +963,7 @@ L5:
 
   liquidation:
     title: |-
-      How Liquidations Work
+      How liquidations work
     intro: |-
       A Compound V2 account can be liquidated when its liquidity turns into a shortfall: its debt is worth more than its collateral counts for. Anyone may then repay part of the debt for collateral.
     detailsHeading: |-
@@ -1002,7 +1002,7 @@ L5:
 
   seize_out:
     title: |-
-      How Collateral Seizure Works
+      How collateral seizure works
     intro: |-
       When a liquidator repays part of an account's debt, the protocol moves cTokens in a collateral market out of the borrower's balance. The borrower did not send them.
     detailsHeading: |-
@@ -1032,7 +1032,7 @@ L5:
 
   seize_in:
     title: |-
-      How Seized Collateral Arrives
+      How seized collateral arrives
     intro: |-
       A liquidator receives these cTokens for repaying part of a liquidatable account's debt. They are its side of a seizure, worth the repaid debt plus the liquidation incentive.
     detailsHeading: |-
@@ -1062,7 +1062,7 @@ L5:
 
   seize_burn:
     title: |-
-      The Protocol's Seize Share
+      The protocol's seize share
     intro: |-
       The protocol's share of a seizure: 2.8% of the seized cTokens are taken from the borrower and burned, and their underlying joins the market's reserves. No wallet receives them.
     detailsHeading: |-
@@ -1086,7 +1086,7 @@ L5:
 
   fallback:
     title: |-
-      How Compound V2 Positions Work
+      How Compound V2 positions work
     intro: |-
       Compound V2 is the original pooled-lending protocol. A wallet supplies assets into cToken markets, receiving transferable receipts, and borrows against them through one Comptroller.
     detailsHeading: |-
@@ -1119,7 +1119,7 @@ L5:
   # without, a closed one, a liquidated one) ──
   position_borrowing:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This panel explains the account in plain words. It covers what is supplied in each Compound V2 market, what is borrowed against it, and the borrowing room the Comptroller leaves.
     detailsHeading: |-
@@ -1161,7 +1161,7 @@ L5:
 
   position_supply:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This panel explains the account in plain words: what is supplied in each Compound V2 market, and whether any of it backs borrowing.
     detailsHeading: |-
@@ -1199,7 +1199,7 @@ L5:
 
   position_closed:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This account has repaid all its debt and withdrawn its supply. The panel above shows its lifetime peaks.
     detailsHeading: |-
@@ -1227,7 +1227,7 @@ L5:
 
   position_liquidated:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This account was liquidated and has since closed: nothing remains supplied or borrowed. The panel above shows the highest supply and debt each market reached.
     detailsHeading: |-

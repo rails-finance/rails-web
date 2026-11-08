@@ -854,7 +854,7 @@ doc_urls:
 L5:
   supply_collateral:
     title: |-
-      How Adding Collateral Works
+      How adding collateral works
     intro: |-
       Adding collateral deposits one asset into one Morpho market, where it backs borrowing of that market's loan asset.
     detailsHeading: |-
@@ -895,7 +895,7 @@ L5:
 
   withdraw_collateral:
     title: |-
-      How Removing Collateral Works
+      How removing collateral works
     intro: |-
       Removing collateral takes some or all of it out of the market. With no debt, any amount can leave; with debt open, only while the position stays healthy afterwards.
     detailsHeading: |-
@@ -926,7 +926,7 @@ L5:
 
   borrow:
     title: |-
-      How Borrowing Works
+      How borrowing works
     intro: |-
       Borrowing draws the market's loan asset against the collateral in the same market, up to the market's liquidation LTV (LLTV).
     detailsHeading: |-
@@ -968,7 +968,7 @@ L5:
 
   repay:
     title: |-
-      How Repaying Works
+      How repaying works
     intro: |-
       Repaying returns the loan asset to the market and burns borrow shares, which lowers the debt and raises the health factor.
     detailsHeading: |-
@@ -1003,7 +1003,7 @@ L5:
 
   liquidation:
     title: |-
-      How Morpho Liquidation Works
+      How Morpho liquidation works
     intro: |-
       A Morpho position can be liquidated once its LTV passes the market's LLTV, which is a health factor below 1. Anyone can then repay some or all of the debt and seize collateral worth more than they repaid.
     detailsHeading: |-
@@ -1045,7 +1045,7 @@ L5:
 
   fallback:
     title: |-
-      How Morpho Blue Works
+      How Morpho Blue works
     intro: |-
       Morpho Blue is a lending contract holding many isolated markets. Each pairs one loan asset with one collateral asset under a fixed liquidation LTV, an oracle and a rate model.
     detailsHeading: |-
@@ -1073,7 +1073,7 @@ L5:
 
   position_open:
     title: |-
-      About This Position
+      About this position
     intro: |-
       A Morpho position is one wallet's collateral and debt in one isolated market, which shares nothing with any other market.
     intro_base: |-
@@ -1123,7 +1123,7 @@ L5:
 
   position_closed:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This position repaid its debt and withdrew its collateral. The panel above shows the highest collateral it held, the highest principal it borrowed, and how it ended.
     intro_owed: |-
@@ -1163,7 +1163,7 @@ L5:
 
   position_liquidated:
     title: |-
-      About This Position
+      About this position
     intro: |-
       Liquidators seized collateral from this position once its debt passed the market's LLTV, so its outcome is Liquidated. The panel above shows the highest collateral it held, the highest principal it borrowed, and how it ended.
     intro_owed: |-

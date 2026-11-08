@@ -970,7 +970,7 @@ doc_urls:
 L5:
   supply:
     title: |-
-      How Supplying the Base Asset Works
+      How supplying the base asset works
     intro: |-
       Each Compound V3 market lends and borrows one base asset. Supplying base repays any debt first, then lends the rest to earn the supply rate.
     detailsHeading: |-
@@ -1005,7 +1005,7 @@ L5:
 
   withdraw:
     title: |-
-      How Withdrawing and Borrowing Work
+      How withdrawing and borrowing work
     intro: |-
       Withdrawing base spends the account's lent balance first, and anything past zero is a borrow. Compound V3 has no separate borrow call.
     detailsHeading: |-
@@ -1040,7 +1040,7 @@ L5:
 
   collateral_in:
     title: |-
-      How Collateral Works
+      How collateral works
     intro: |-
       Compound V3 collateral is a separate stack from the base balance. It earns nothing and backs the account's base borrowing.
     detailsHeading: |-
@@ -1079,7 +1079,7 @@ L5:
 
   collateral_out:
     title: |-
-      How Withdrawing Collateral Works
+      How withdrawing collateral works
     intro: |-
       Withdrawing collateral shrinks the stack backing the account's borrowing. The market blocks a withdrawal that would leave debt over the account's borrow capacity.
     detailsHeading: |-
@@ -1114,7 +1114,7 @@ L5:
 
   absorb:
     title: |-
-      How Absorb (Liquidation) Works
+      How absorb (liquidation) works
     intro: |-
       Compound V3 calls its liquidation an absorb. Once an account's debt passes its liquidation line, anyone may trigger it and the protocol takes over the whole account.
     detailsHeading: |-
@@ -1156,7 +1156,7 @@ L5:
 
   transfer_base:
     title: |-
-      How Position Transfers Work
+      How position transfers work
     intro: |-
       A Compound V3 base position is an ERC-20 balance, so it can move to another account directly. The signed balance changes hands without a supply or a withdraw.
     detailsHeading: |-
@@ -1184,7 +1184,7 @@ L5:
 
   transfer_collateral:
     title: |-
-      How Collateral Transfers Work
+      How collateral transfers work
     intro: |-
       Compound V3 lets an account move collateral to another account in the same market, without withdrawing to a wallet and supplying it again.
     detailsHeading: |-
@@ -1212,7 +1212,7 @@ L5:
 
   fallback:
     title: |-
-      How Compound V3 Positions Work
+      How Compound V3 positions work
     intro: |-
       Compound V3 runs one market per base asset, each a contract Compound calls a Comet. A position is a signed base balance plus a separate stack of non-earning collateral.
     detailsHeading: |-
@@ -1243,7 +1243,7 @@ L5:
   # the text_arbitrum forms, then the text_base ones. ──
   position_borrowing:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This panel explains the position in plain words: the base balance, the collateral behind its borrowing, and what would trigger an absorb.
     detailsHeading: |-
@@ -1286,7 +1286,7 @@ L5:
 
   position_lending:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This panel explains the position in plain words: the base balance it holds, any collateral posted beside it, and what would trigger an absorb.
     detailsHeading: |-
@@ -1329,7 +1329,7 @@ L5:
 
   position_closed:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This position has unwound: its debt is repaid and its collateral withdrawn, with at most dust under a cent left.
     detailsHeading: |-
@@ -1367,7 +1367,7 @@ L5:
 
   position_liquidated:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This position was absorbed when its debt outgrew its liquidation line, and nothing is borrowed or posted now.
     detailsHeading: |-
