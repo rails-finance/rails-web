@@ -19,7 +19,11 @@
 // two quantities of one token are the only amounts compared (decision 0028
 // point 8: no USD, no cross-asset total); each header's "?" says so, and the
 // sort button reads the same words. Yield and Holders compare across
-// every row. A vault with no figure for the key sorts last, both ways.
+// every row. A vault with no figure for the key sorts last, both ways; on
+// Yield an illiquid vault (ui-jobs 540) and a one-off move (ui-jobs 542) sort
+// after the other figures, and a vault too small to measure (542) has none.
+// Total assets ranks by what the vault holds, `totalAssets − lostAssets`
+// (ui-jobs 543), and the cell prints the stated total.
 //
 // The whole row links the vault's page (the name is the one focusable link).
 // BELOW sm each row reads as a card (D6): the protocol's hue as its left edge,
@@ -45,13 +49,21 @@ import {
   DataTableRow,
   DataTableRowLink,
 } from "@/components/shared/data-table/data-table";
-import { STANDING_WORD, vaultHeads, YIELD_LABEL_TIP } from "@/components/vaults/vault-heads";
+import {
+  STANDING_WORD,
+  tooSmallSentence,
+  vaultHeads,
+  yieldSublineText,
+  YIELD_LABEL_TIP,
+} from "@/components/vaults/vault-heads";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { VAULT_FAMILIES } from "@/lib/vaults/families";
 import { VAULT_INDEX_PROTOCOL_LABEL, vaultIndexProtocol } from "@/lib/vaults/index-rosters";
-import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
-import { yieldText, type VaultYield } from "@/lib/vaults/yield";
+import { vaultDisplayName, type VaultStanding, type VaultSummary } from "@/lib/vaults/summary";
+import { measuredYield, yieldText, type VaultYield } from "@/lib/vaults/yield";
+import { illiquidSentence } from "@/lib/vaults/illiquid";
+import { heldAssetsRaw, lostAssetsSentence } from "@/lib/vaults/lost-assets";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { sharePriceText } from "@/lib/shared/vault-amount-text";
 
@@ -77,7 +89,7 @@ const DEFAULT_SORT: SortKey = "holders";
 
 /** How an amount in the vault's asset sorts: by token, then inside it. */
 const SORT_NOTE: Partial<Record<SortKey, string>> = {
-  assets: "Sorts by token, then by total assets within each token.",
+  assets: "Sorts by token, then by what the vault holds within each token: total assets less lost assets.",
   price: "Sorts by token, then by share price within each token.",
 };
 
@@ -87,11 +99,28 @@ const tokenOf = (v: VaultSummary) => (v.asset.named ? v.asset.symbol : v.asset.a
 
 const nameOf = (v: VaultSummary) => vaultDisplayName(v) ?? v.address;
 
+/** What the vault holds, in the asset: `totalAssets − lostAssets`. */
+const heldOf = (v: VaultSummary, totalRaw: string) =>
+  Number(heldAssetsRaw(totalRaw, v.lostAssets?.raw)) / 10 ** v.asset.decimals;
+
+/** A pill's title: the standing's sentence where it has one, else its word. */
+function pillTitle(st: VaultStanding, v: VaultSummary): string {
+  if (st === "illiquid" && v.illiquid) return illiquidSentence(v.illiquid);
+  if (st === "lost-assets" && v.totalAssets && v.lostAssets)
+    return lostAssetsSentence({
+      lost: formatCompact(v.lostAssets.value),
+      held: formatCompact(heldOf(v, v.totalAssets.raw)),
+      symbol: v.asset.symbol,
+      block: v.readAt.block,
+    });
+  return STANDING_WORD[st];
+}
+
 /** The key's figure; null sorts last both ways. */
 function figureOf(key: SortKey, v: VaultSummary, y: VaultYield | undefined): number | null {
   switch (key) {
     case "assets":
-      return v.totalAssets?.value ?? null;
+      return v.totalAssets ? heldOf(v, v.totalAssets.raw) : null;
     case "price":
       return v.sharePrice?.value ?? null;
     case "yield":
@@ -102,6 +131,12 @@ function figureOf(key: SortKey, v: VaultSummary, y: VaultYield | undefined): num
       return null;
   }
 }
+
+/** A one-off move named on the Yield subline (decision 0047 point 2, ui-jobs 542). */
+const oneOff = (y: VaultYield | undefined) => y != null && "yearly" in y && y.jump != null;
+
+/** A Yield figure that sorts after the others: illiquid, or a one-off move. */
+const sortsLate = (v: VaultSummary, y: VaultYield | undefined) => Boolean(v.illiquid) || oneOff(y);
 
 function comparator(key: SortKey, dir: "asc" | "desc", yieldOf: (v: VaultSummary) => VaultYield | undefined) {
   const sign = dir === "asc" ? 1 : -1;
@@ -115,6 +150,12 @@ function comparator(key: SortKey, dir: "asc" | "desc", yieldOf: (v: VaultSummary
     if (within !== 0) return within;
     const fa = figureOf(key, a, yieldOf(a));
     const fb = figureOf(key, b, yieldOf(b));
+    // Yield: an illiquid vault's figure is interest accruing on debt nobody
+    // repays (ui-jobs 540), and a one-off move's is mostly one span of days
+    // (ui-jobs 542), so each sorts after every other figure, both ways, and
+    // before the rows with none.
+    if (key === "yield" && fa != null && fb != null && sortsLate(a, yieldOf(a)) !== sortsLate(b, yieldOf(b)))
+      return sortsLate(a, yieldOf(a)) ? 1 : -1;
     if (fa == null || fb == null) {
       if (fa != null) return -1;
       if (fb != null) return 1;
@@ -183,7 +224,9 @@ export function VaultIndexTable({
   const press = (key: SortKey) =>
     writeSort(key, key === sort ? (dir === "asc" ? "desc" : "asc") : COLUMNS.find((c) => c.key === key)!.first);
 
-  const sorted = [...rows].sort(comparator(sort, dir, yieldOf));
+  // A figure on total assets under the dust floor is too small to measure.
+  const measuredOf = (v: VaultSummary) => measuredYield(yieldOf(v), v.totalAssets?.raw);
+  const sorted = [...rows].sort(comparator(sort, dir, measuredOf));
 
   // A header's "?": Yield's marks the figure as Rails's interpretation, as on
   // the row; Total assets' and Share price's say how the column sorts, the
@@ -285,7 +328,7 @@ export function VaultIndexTable({
             const href = hrefOf(v);
             // The figures as the row prints them, with no receipt (the index
             // states none); Yield's text through the same formatter.
-            const yf = yieldOf(v);
+            const yf = measuredOf(v);
             const heads = vaultHeads({ vault: v, yieldFigure: yf, holdersHref: null, receipts: {} });
             const head = (id: string) => heads.find((h) => h.id === id);
             const name = v.name ?? v.catalogName ?? v.symbol;
@@ -340,6 +383,7 @@ export function VaultIndexTable({
                 data-group={raw === "" ? "unread" : BigInt(raw) > BigInt(0) ? "funded" : "empty"}
                 data-asset={v.asset.address}
                 data-total-assets-raw={raw}
+                data-held-assets-raw={raw === "" ? "" : heldAssetsRaw(raw, v.lostAssets?.raw).toString()}
                 data-share-price-raw={v.sharePrice?.raw ?? ""}
                 data-vault-family={v.family}
                 data-holders-live={c?.live ?? ""}
@@ -384,14 +428,24 @@ export function VaultIndexTable({
                     >
                       {name != null ? name : <span className="font-mono">{shortAddress(v.address)}</span>}
                     </DataTableRowLink>
-                    {v.standing.length > 0 && (
+                    {(v.standing.length > 0 || oneOff(yf)) && (
                       // From sm the pills give way before the name's first 7rem.
                       <span className="flex flex-wrap gap-1 max-sm:basis-full sm:min-w-0 sm:flex-nowrap sm:overflow-hidden">
                         {v.standing.map((st) => (
-                          <span key={st} className={`${PILL} sm:truncate`} title={STANDING_WORD[st]} data-pill={st}>
+                          <span key={st} className={`${PILL} sm:truncate`} title={pillTitle(st, v)} data-pill={st}>
                             {STANDING_WORD[st]}
                           </span>
                         ))}
+                        {yf && "yearly" in yf && yf.jump && (
+                          <span
+                            className={`${PILL} sm:truncate`}
+                            title={yieldSublineText(yf)}
+                            data-pill="one-off-move"
+                            data-yield-jump-day={yf.jump.day}
+                          >
+                            one-off move
+                          </span>
+                        )}
                       </span>
                     )}
                   </div>
@@ -417,7 +471,13 @@ export function VaultIndexTable({
                 {cell(
                   "yield",
                   "Yield",
-                  yf && "yearly" in yf ? <span data-cell="yield">{yieldText(yf.yearly)}</span> : null,
+                  yf && "yearly" in yf ? (
+                    <span data-cell="yield">{yieldText(yf.yearly)}</span>
+                  ) : yf?.none === "too-small" ? (
+                    <span data-cell="yield" data-yield-none="too-small" title={tooSmallSentence(v)}>
+                      too small to measure
+                    </span>
+                  ) : null,
                   head("yield")?.sub,
                 )}
                 {cell("holders", "Holders", holders)}

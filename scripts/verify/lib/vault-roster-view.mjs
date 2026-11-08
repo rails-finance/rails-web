@@ -44,6 +44,8 @@ export async function readRosterRows(page, scope) {
         standing: (el.getAttribute("data-standing") ?? "").split(" ").filter(Boolean),
         created: created ? Number(created) : null,
         raw: el.getAttribute("data-total-assets-raw") ? BigInt(el.getAttribute("data-total-assets-raw")) : null,
+        // The table ranks Total assets by what the vault holds (ui-jobs 543).
+        held: el.getAttribute("data-held-assets-raw") ? BigInt(el.getAttribute("data-held-assets-raw")) : null,
         token: el.getAttribute("data-token"),
       };
     }),
@@ -72,8 +74,9 @@ const holdersOk = (a, b) =>
       ? false
       : a.live != null && a.live !== b.live
         ? a.live > b.live
-        : a.raw >= b.raw;
-const sizeOk = (a, b) => a.raw >= b.raw;
+        : (a.held ?? a.raw) >= (b.held ?? b.raw);
+/** Size ranks by what the vault holds: total assets less lost assets (ui-jobs 543). */
+const sizeOk = (a, b) => (a.held ?? a.raw) >= (b.held ?? b.raw);
 const newestOk = (a, b) =>
   a.created != null && b.created == null
     ? true
@@ -81,17 +84,17 @@ const newestOk = (a, b) =>
       ? false
       : a.created != null && a.created !== b.created
         ? a.created > b.created
-        : a.raw >= b.raw;
+        : (a.held ?? a.raw) >= (b.held ?? b.raw);
 /** Groups under Holders and Newest compare their first rows on the key alone. */
 const holdersKeyOk = (a, b) => (a.live == null ? b.live == null : b.live == null || a.live >= b.live);
 const newestKeyOk = (a, b) => (a.created == null ? b.created == null : b.created == null || a.created >= b.created);
 
 /** The table's order (ui-jobs 538): under Holders, counted rows first, most
- *  open holders first; under Total assets, by token, the larger first inside
- *  one token. */
+ *  open holders first; under Total assets, by token, the larger held figure
+ *  first inside one token (ui-jobs 543). */
 const tableHoldersOk = (a, b) => (a.live == null ? b.live == null : b.live == null || a.live >= b.live);
 const tokenCmp = (a, b) => a.token.localeCompare(b.token, "en-US", { sensitivity: "base" });
-const tableAssetsOk = (a, b) => tokenCmp(a, b) < 0 || (tokenCmp(a, b) === 0 && a.raw >= b.raw);
+const tableAssetsOk = (a, b) => tokenCmp(a, b) < 0 || (tokenCmp(a, b) === 0 && (a.held ?? a.raw) >= (b.held ?? b.raw));
 
 /**
  * The default view against `?show=all`, the preset's chip and its removal, and
@@ -188,11 +191,19 @@ export async function checkRosterView({ page, base, route, scope, check, tag, ho
     await go("?show=all&sort=assets");
     const rows = (await readRosterRows(page, scope)).filter((r) => r.group === "funded");
     const bad = outOfOrder(rows, tableAssetsOk);
-    check(`${tag}h ?sort=assets: by token, the largest first inside each token`, bad === 0, `${bad} rows out of order`);
+    check(
+      `${tag}h ?sort=assets: by token, the most held first inside each token`,
+      bad === 0,
+      `${bad} rows out of order`,
+    );
     // The rule is the header's tip, read with the sort button (no line above the table).
-    for (const [key, word] of [
-      ["assets", "total assets"],
-      ["price", "share price"],
+    for (const [key, word, rule] of [
+      [
+        "assets",
+        "total assets",
+        "Sorts by token, then by what the vault holds within each token: total assets less lost assets.",
+      ],
+      ["price", "share price", "Sorts by token, then by share price within each token."],
     ]) {
       const th = page.locator(`${scope} [data-vault-table='funded'] th[data-sort-key='${key}']`);
       const tip = await th.locator(`[data-header-tip='${key}']`).count();
@@ -203,7 +214,7 @@ export async function checkRosterView({ page, base, route, scope, check, tag, ho
         .catch(() => "");
       check(
         `${tag}i the ${word} header's tip says how it sorts, read with its sort button`,
-        tip === 1 && said === `Sorts by token, then by ${word} within each token.`,
+        tip === 1 && said === rule,
         `tip ${tip}, described as “${said}”`,
       );
     }

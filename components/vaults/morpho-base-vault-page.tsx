@@ -16,6 +16,7 @@ import { VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults
 import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
 import { VaultFinder } from "@/components/vaults/vault-finder";
 import { VaultStrip } from "@/components/vaults/vault-strip";
+import { VaultIlliquidMarkets } from "@/components/vaults/vault-illiquid";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
 import { explorerUrl } from "@/lib/shared/chains";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
@@ -30,6 +31,7 @@ import {
   vaultLegLltvProv,
   vaultLegShareProv,
   vaultLostAssetsProv,
+  vaultHeldAssetsProv,
   vaultSharePriceProv,
   vaultTotalAssetsProv,
   vaultTotalSupplyProv,
@@ -46,7 +48,7 @@ import {
   SHARES_ISSUED_TIP,
   STEWARD_TIP,
 } from "@/lib/vaults/card-words";
-import type { VaultYield } from "@/lib/vaults/yield";
+import { measuredYield, type VaultYield } from "@/lib/vaults/yield";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const lltvText = (lltv: number) => `${(lltv * 100).toFixed(1)}%`;
@@ -71,7 +73,7 @@ const blueWalletHref = (chainId: 1 | 8453, vault: string) =>
 export function MorphoBaseVaultPage({
   data,
   census,
-  yieldFigure,
+  yieldFigure: storeYield,
   strip,
   factory,
 }: {
@@ -88,6 +90,8 @@ export function MorphoBaseVaultPage({
   const words = CHAIN_WORDS[chainId];
   const base = (kind: "address" | "block", v: string | number) => explorerUrl(chainId, kind, v);
   const v = morphoBaseVaultPageSummary(data, census);
+  // A figure on total assets under the dust floor is too small to measure (ui-jobs 542).
+  const yieldFigure = measuredYield(storeYield, v.totalAssets?.raw);
   const coords: MorphoVaultCoords = {
     chainId,
     readBy: serverReadOf(data),
@@ -156,8 +160,9 @@ export function MorphoBaseVaultPage({
       ),
     },
   ];
-  // Absent, not zero, on a V1.0 vault: that family keeps no such ledger.
-  if (data.lostAssets)
+  // Absent on a V1.0 vault, which keeps no such ledger, and hidden at zero.
+  const lostStat = data.lostAssets && BigInt(data.lostAssets.raw) > BigInt(0) ? data.lostAssets : null;
+  if (lostStat)
     stats.push({
       id: "lost-assets",
       label: "Lost assets",
@@ -165,7 +170,7 @@ export function MorphoBaseVaultPage({
       asset,
       value: (
         <span data-figure="lost-assets">
-          <Prov info={vaultLostAssetsProv(coords)}>{assetText(data.lostAssets, ad)}</Prov>
+          <Prov info={vaultLostAssetsProv(coords)}>{assetText(lostStat, ad)}</Prov>
         </span>
       ),
     });
@@ -307,9 +312,22 @@ export function MorphoBaseVaultPage({
         vault={v}
         yieldFigure={yieldFigure}
         holdersHref={metaMorphoVaultsListingHref(chainId, { vault: vault.address })}
-        receipts={{ totalAssets: vaultTotalAssetsProv(coords), sharePrice: vaultSharePriceProv(coords) }}
+        receipts={{
+          totalAssets: vaultTotalAssetsProv(coords),
+          sharePrice: vaultSharePriceProv(coords),
+          ...(data.lostAssets
+            ? {
+                lostAssets: vaultLostAssetsProv(coords),
+                heldAssets: vaultHeldAssetsProv(coords, {
+                  totalAssets: data.totalAssets.raw,
+                  lostAssets: data.lostAssets.raw,
+                }),
+              }
+            : {}),
+        }}
         status={null}
         stats={stats}
+        band={v.illiquid ? <VaultIlliquidMarkets vault={v} il={v.illiquid} /> : undefined}
         links={links}
         explanation={explanation}
         learnMore={morphoVaultCardContent()}
@@ -327,9 +345,7 @@ export function MorphoBaseVaultPage({
             ["Allocated in Morpho Blue", `${assetText(data.allocated, ad)} ${unit}`],
             ["Unaccrued interest", `${assetText(data.gap, ad)} ${unit}`],
             [`Steward (${steward.role})`, steward.address],
-            ...(data.lostAssets
-              ? ([["Lost assets", `${assetText(data.lostAssets, ad)} ${unit}`]] as [string, string][])
-              : []),
+            ...(lostStat ? ([["Lost assets", `${assetText(lostStat, ad)} ${unit}`]] as [string, string][]) : []),
           ],
           rows: legs.map((l) => [
             `${l.isIdle ? "Idle market" : (l.collateralSymbol ?? shortId(l.id))} ${l.id}`,
