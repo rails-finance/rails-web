@@ -27,7 +27,7 @@ export const metadata = {
 
 export default async function VaultIndexPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const [{ vaults, yields, rosters, indexDown }, sp] = await Promise.all([loadVaultIndex(), searchParams]);
-  const { asset } = sp;
+  const { asset, layout } = sp;
   return (
     <div className="min-h-screen">
       <div className="py-8">
@@ -41,6 +41,7 @@ export default async function VaultIndexPage({ searchParams }: { searchParams: P
             yields={yields}
             rosters={rosters}
             asset={typeof asset === "string" ? asset : undefined}
+            layout={layout === "table" ? "table" : "cards"}
             initialSearch={toURLSearchParams(sp).toString()}
           />
         </div>

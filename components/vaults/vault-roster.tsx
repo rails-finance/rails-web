@@ -183,6 +183,7 @@ export function VaultRoster({
   initialSearch = "",
   readTime,
   edgeOf,
+  table,
 }: {
   vaults: readonly VaultSummary[];
   /** Decision 0047's figure per lowercased vault address (or `yieldKeyOf`). */
@@ -219,6 +220,9 @@ export function VaultRoster({
   /** The row's sidebar (C20) where the page is on no roster's route: the
    *  index names each row's protocol and chain. */
   edgeOf?: (v: VaultSummary) => PositionCardEdge | null;
+  /** Draws the shown rows as a table in place of the cards, which then sorts
+   *  them itself (the index's `?layout=table`, ui-jobs 538). */
+  table?: (rows: VaultSummary[], part: "funded" | "empty") => ReactNode;
 }) {
   const [introOpen, setIntroOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(initialFilters ?? {});
@@ -521,7 +525,7 @@ export function VaultRoster({
         dimensions={dimensions}
         filters={state}
         onChange={onToolbar}
-        sortOptions={sortOptions}
+        sortOptions={table ? [] : sortOptions}
         searchPlaceholder="Vault name, symbol or address"
         countNode={countNode}
         skel={`${skel}-facets`}
@@ -534,33 +538,35 @@ export function VaultRoster({
             {blockNumber > 0 ? `No funded vault matches at block ${n(blockNumber)}.` : "No funded vault matches."}
           </p>
         )}
-        {groups.map((g) => (
-          <section
-            key={`${g.chainId}:${g.asset.address}`}
-            className="mb-6"
-            data-asset-group={g.asset.address}
-            data-asset-group-chain={g.chainId}
-          >
-            <h2 className="mb-2 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-foreground">
-              <a
-                href={explorerUrl(g.chainId as ChainId, "address", g.asset.address)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={g.asset.named ? "" : "font-mono"}
-              >
-                {g.asset.symbol}
-              </a>
-              {chainOf && <span className="font-normal text-rb-500">on {chainOf(g.rows[0])}</span>}
-              <span className="text-[12px] font-normal text-rb-500" data-figure="group-count">
-                <Prov info={groupCountProv(g.asset.symbol, g.rows.length, g.chainId)}>
-                  {g.rows.length === 1 ? "1 vault" : `${n(g.rows.length)} vaults`}
-                </Prov>
-                {filtering ? " shown" : ""}
-              </span>
-            </h2>
-            <div className="flex flex-col gap-3">{g.rows.map(row)}</div>
-          </section>
-        ))}
+        {table && fundedShown.length > 0 && table(fundedShown, "funded")}
+        {!table &&
+          groups.map((g) => (
+            <section
+              key={`${g.chainId}:${g.asset.address}`}
+              className="mb-6"
+              data-asset-group={g.asset.address}
+              data-asset-group-chain={g.chainId}
+            >
+              <h2 className="mb-2 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-foreground">
+                <a
+                  href={explorerUrl(g.chainId as ChainId, "address", g.asset.address)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={g.asset.named ? "" : "font-mono"}
+                >
+                  {g.asset.symbol}
+                </a>
+                {chainOf && <span className="font-normal text-rb-500">on {chainOf(g.rows[0])}</span>}
+                <span className="text-[12px] font-normal text-rb-500" data-figure="group-count">
+                  <Prov info={groupCountProv(g.asset.symbol, g.rows.length, g.chainId)}>
+                    {g.rows.length === 1 ? "1 vault" : `${n(g.rows.length)} vaults`}
+                  </Prov>
+                  {filtering ? " shown" : ""}
+                </span>
+              </h2>
+              <div className="flex flex-col gap-3">{g.rows.map(row)}</div>
+            </section>
+          ))}
       </div>
 
       {/* ── the vaults that hold nothing: a reading, behind one disclosure ── */}
@@ -588,6 +594,8 @@ export function VaultRoster({
             <div className="mt-3 flex flex-col gap-3" data-empty-rows>
               {emptyShown.length === 0 ? (
                 <p className="text-[13px] text-rb-500">No empty vault matches.</p>
+              ) : table ? (
+                table(emptyShown, "empty")
               ) : (
                 emptyShown.map(row)
               )}

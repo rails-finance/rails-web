@@ -13,6 +13,7 @@
 import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
+import { VaultIndexTable } from "@/components/vaults/vault-index-table";
 import { isoSeconds, RosterBlock, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import type { VaultRowReceipts } from "@/components/vaults/vault-row";
 import { chainMeta, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
@@ -134,7 +135,11 @@ export function VaultIndexView({
   yields,
   rosters,
   asset,
+  layout = "cards",
 }: {
+  /** `?layout=table`: the vaults as a table (ui-jobs 538), beside the cards
+   *  while the two are compared. */
+  layout?: "cards" | "table";
   /** The query string the page was served with (the roster's preset and sort). */
   initialSearch?: string;
   vaults: VaultSummary[];
@@ -219,6 +224,12 @@ export function VaultIndexView({
     }
   };
 
+  const hooksOf = (v: VaultSummary) => ({
+    "data-protocol": vaultIndexProtocol(v),
+    "data-chain": String(v.chainId),
+    "data-family": v.family,
+  });
+
   const registry = useReceiptRegistry();
   const total = vaults.length;
 
@@ -277,11 +288,23 @@ export function VaultIndexView({
         receiptsOf={receiptsOf}
         chainOf={(v) => chainName(v.chainId)}
         yieldKeyOf={vaultIndexKey}
-        hooksOf={(v) => ({
-          "data-protocol": vaultIndexProtocol(v),
-          "data-chain": String(v.chainId),
-          "data-family": v.family,
-        })}
+        hooksOf={hooksOf}
+        table={
+          layout === "table"
+            ? (rows, part) => (
+                <VaultIndexTable
+                  rows={rows}
+                  part={part}
+                  initialSearch={initialSearch ?? ""}
+                  yieldOf={(v) => yields[vaultIndexKey(v)]}
+                  hrefOf={vaultIndexHref}
+                  holdersHrefOf={vaultIndexHoldersHref}
+                  receiptsOf={receiptsOf}
+                  hooksOf={hooksOf}
+                />
+              )
+            : undefined
+        }
         groupCountProv={(assetSymbol, count, chainId) =>
           vaultIndexGroupCountProv(assetSymbol, chainName(chainId), count)
         }
