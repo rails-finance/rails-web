@@ -70,7 +70,7 @@ function lineText(l: TowerLine, valued: boolean): string {
 function usdHintProv(l: TowerLine): Provenance {
   return {
     kind: "chain-derived",
-    summary: `${l.symbol} value in USD — the row's ${l.symbol} amount multiplied by the price the protocol uses for ${l.symbol} now.`,
+    summary: `${l.symbol} value in USD. The row's ${l.symbol} amount multiplied by the price the protocol uses for ${l.symbol} now.`,
     formula: "amount × price",
     inputs: [
       { label: "amount", value: `${formatNumber(l.amount)} ${l.symbol}`, kind: l.prov.kind, note: "this row" },
@@ -102,7 +102,7 @@ type DisplayLine = TowerLine & {
 function mergedProv(label: string, parts: TowerLine[], valued: boolean): Provenance {
   return {
     kind: "chain-derived",
-    summary: `${label} — the ${parts.length} rows merged into this one, added together. With "Group assets" off, each row shows separately with its receipt.`,
+    summary: `${label}. The ${parts.length} rows merged into this one, added together. With "Group assets" off, each row shows separately with its receipt.`,
     formula: valued && parts.some((p) => p.symbol !== parts[0].symbol) ? "Σ amount × price" : "Σ amount",
     inputs: parts.slice(0, 6).map((p) => ({
       label: p.symbol,
@@ -539,8 +539,8 @@ function buildSide(
       prov: {
         kind: "chain-derived",
         summary: valued
-          ? `${inflowLabel} over the position's life — every inflow the position's events record, added up per token and valued at ${opts.flowsPricedAtEvents ? "the price the protocol used for that token at each event's block" : "the price the protocol uses for that token now"}.`
-          : `${inflowLabel} over the position's life — every inflow the position's events record, added up.`,
+          ? `${inflowLabel} over the position's life. Every inflow the position's events record, added up per token and valued at ${opts.flowsPricedAtEvents ? "the price the protocol used for that token at each event's block" : "the price the protocol uses for that token now"}.`
+          : `${inflowLabel} over the position's life. Every inflow the position's events record, added up.`,
         formula: "Σ inflows",
       },
     });
@@ -754,8 +754,8 @@ function buildSide(
       prov: {
         kind: "chain-derived",
         summary: withInterest
-          ? `${resultLabel} in USD — the value of what the position owes now. Each token amount owed${interestLine ? ", including the interest built up," : ""} is multiplied by the price the protocol uses for that token, and the results are added.`
-          : `${resultLabel} in USD — the value of what the position holds now. Each token amount held, including any surplus still to claim, is multiplied by the price the protocol uses for that token, and the results are added.`,
+          ? `${resultLabel} in USD. The value of what the position owes now. Each token amount owed${interestLine ? ", including the interest built up," : ""} is multiplied by the price the protocol uses for that token, and the results are added.`
+          : `${resultLabel} in USD. The value of what the position holds now. Each token amount held, including any surplus still to claim, is multiplied by the price the protocol uses for that token, and the results are added.`,
         formula: "Σ amount × price",
       },
     });
@@ -772,7 +772,7 @@ function buildSide(
       isResult: true,
       prov: {
         kind: "chain-derived",
-        summary: `${resultLabel} (${interestLine.symbol}) — the principal and the ${(opts.interestLabel ?? "Accrued interest").toLowerCase()} above, added together in ${interestLine.symbol}.`,
+        summary: `${resultLabel} (${interestLine.symbol}). The principal and the ${(opts.interestLabel ?? "Accrued interest").toLowerCase()} above, added together in ${interestLine.symbol}.`,
         formula: "principal + accrued",
       },
     });
@@ -787,7 +787,7 @@ function buildSide(
       isResult: true,
       prov: {
         kind: "chain-derived",
-        summary: `${resultLabel} (${sideSymbol}) — the balance the position's events record, plus what it has gained and less what it has lost since its last event, in ${sideSymbol}.`,
+        summary: `${resultLabel} (${sideSymbol}). The balance the position's events record, plus what it has gained and less what it has lost since its last event, in ${sideSymbol}.`,
         formula: "recorded + gains − losses",
       },
     });

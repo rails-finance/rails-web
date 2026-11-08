@@ -92,7 +92,7 @@ export const placesOf = (text: string) => /\.(\d+)/.exec(text)?.[1].length ?? 0;
 function sumProv(what: string, n: number): Provenance {
   return {
     kind: "chain-derived",
-    summary: `${what} across this group — the total over its ${n} events. Opening the group shows each event with its receipt.`,
+    summary: `${what} across this group. The total over its ${n} events. Opening the group shows each event with its receipt.`,
     formula: `Σ over ${n} events`,
   };
 }
@@ -313,7 +313,7 @@ const LANE_TIPS = {
 function laneInterestProv(sym: string, before: number, after: number, moved: number, n: number): Provenance {
   return {
     kind: "chain-derived",
-    summary: `Interest on ${sym} across these events — the balance after the last of them, less the balance before the first and the ${n} moves between, each as the events' rows state it.`,
+    summary: `Interest on ${sym} across these events. The balance after the last of them, less the balance before the first and the ${n} moves between, each as the events' rows state it.`,
     formula: "after − before − Σ moves",
     inputs: [
       { label: "before", value: `${before} ${sym}`, kind: "chain" },
@@ -326,14 +326,14 @@ function laneInterestProv(sym: string, before: number, after: number, moved: num
 const laneMarketProv: Provenance = {
   kind: "chain-derived",
   summary:
-    "Market move across these events — the side's dollars after the last event, less its dollars before the first, the moves and the interest, each at the price its row carries: what the prices changed.",
+    "Market move across these events. The side's dollars after the last event, less its dollars before the first, the moves and the interest, each at the price its row carries: what the prices changed.",
   formula: "$ after − $ before − Σ $ moves − $ interest",
 };
 
 function laneTotalProv(side: FlowSide, parts: { sym: string; usd: number }[]): Provenance {
   return {
     kind: "chain-derived",
-    summary: `The ${side === "collateral" ? "collateral" : "debt"} after these events, in dollars — each asset's balance after the last event that moved it, at the price that event's row carries.`,
+    summary: `The ${side === "collateral" ? "collateral" : "debt"} after these events, in dollars. Each asset's balance after the last event that moved it, at the price that event's row carries.`,
     formula: "Σ balance × price",
     inputs: parts.map((p) => ({ label: p.sym, value: sheetUsd(p.usd), kind: "chain-derived" as const })),
   };

@@ -208,7 +208,7 @@ export function LearnMoreModal({
 
             {content.video && (
               <div className="mt-4">
-                <p className="font-semibold  mb-2">Learn More</p>
+                <p className="font-semibold  mb-2">Learn more</p>
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-8 h-8 bg-red-500/10 rounded-full flex items-center justify-center">
                     <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 24 24">
@@ -232,7 +232,7 @@ export function LearnMoreModal({
 
             {content.links && content.links.length > 0 && (
               <div className="mt-4">
-                <p className="font-semibold  mb-2">Quick Links</p>
+                <p className="font-semibold  mb-2">Quick links</p>
                 <div className="space-y-1">
                   {content.links.map((link, i) =>
                     // A path on this site (an explorer's info page) opens in

@@ -258,7 +258,7 @@ export function BusyFlows({ model, onLedgerNote }: BusyFlowsProps) {
 
 const throughputProv = (what: string, figure: string): Provenance => ({
   kind: "chain-derived",
-  summary: `${what} over the position's life — every such flow its events record, each at the oracle price at its block, added up (${figure}).`,
+  summary: `${what} over the position's life. Every such flow its events record, each at the oracle price at its block, added up (${figure}).`,
   formula: "Σ amount × price at block",
 });
 
