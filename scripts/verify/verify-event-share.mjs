@@ -139,9 +139,10 @@ const FAMILIES_FILTER = process.env.FAMILIES
  *  PWN's mint, burn, non-default claim and extension, Compound V2's rows that
  *  move neither side, Frankencoin's terms changes and challenges, a Liquity
  *  fork's batch-manager rate changes), so the generic pinned page is not
- *  checked either way here. Seamless keeps the cells (no read lane), and so
- *  does Compound V3 on Base (no sheet drawn on 0x2b4e…f40f or 0x5c38…f4f6,
- *  13 Oct 2026). */
+ *  checked either way here. Compound V3 on Base draws the Compound family's
+ *  card (compound-event-detail.tsx), whose T2 is a sheet once the wallet's
+ *  replay is ready: on 0x4cfa…7e04 (8 Nov 2026, solo, `next start`) it drew
+ *  one, where on 13 Oct the two subjects then picked drew none. */
 const SHEET_FAMILIES = new Set([
   "liquity-v2",
   "aave-v3",
@@ -170,6 +171,7 @@ const SHEET_FAMILIES = new Set([
   "morpho-base-vaults",
   "yearn-vaults",
   "compound-v3",
+  "compound-v3-base",
   "morpho",
   "morpho-base",
   "fluid",
