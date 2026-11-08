@@ -1,55 +1,56 @@
 "use client";
 
-// The shared Aave-V3-family market-overview surface — Aave V3 Core and Aave V3
-// on Base, SparkLend and Seamless (/ethereum/aave-v3/market, /base/aave-v3/market,
-// /ethereum/spark/market, /base/seamless/market). Two sections:
+// The shared Aave-V3-family market-overview surface — Aave V3 on Ethereum,
+// Base and Arbitrum, SparkLend and Seamless (/ethereum/aave-v3/market,
+// /base/aave-v3/market, /arbitrum/aave-v3/markets, /ethereum/spark/market,
+// /base/seamless/market). Two sections:
 //   1. The vitals band — identity, size, supply composition, and a sentence
 //      counting the reserves closed to new business.
-//   2. The reserve list — every reserve on the Pool, sortable, filterable by
-//      asset class. From 1024px a table (min-w-[980px]), every row 76px:
-//        ASSET · PRICE · SUPPLIED · BORROWED · RATES S/B · RF · CAPS USED ·
-//        UTILISATION & RISK
-//      Below that the same table reads as cards (D6, `stackBelow="lg"`): the
-//      asset across, the figures under their names, utilisation and risk
-//      across the foot, with a sort select in place of the headers. Rows are
-//      unlinked: a reserve has no page of its own.
+//   2. The reserve list (anatomy M1, ui-jobs 541) — every reserve on the
+//      Pool, sortable, filterable by asset class. From 1024px a table, every
+//      row 64px:
+//        ASSET · SUPPLIED · BORROWED · AVAILABLE · SUPPLY RATE · BORROW RATE ·
+//        COLLATERAL · UTILISATION
+//      Below that the same table reads as cards (D6, `stackBelow="lg"`), with a
+//      sort select in place of the headers. Rows are unlinked: a reserve has no
+//      page of its own.
 //
-// The risk context is Moonwell's (components/protocol/moonwell/
-// moonwell-markets-view.tsx) brought into this table (rails-ops TO-DO-ui-jobs
-// §9). The bar is <RatioBar> on the UTILISATION axis: fill = borrowed ÷
-// supplied, and the one tick is the reserve's rate-model kink. Caps are stated
-// as text in their own column and never drawn on the bar: a cap is a ceiling on
-// what may arrive, which is a different axis. Under the bar sit the collateral
-// parameters: loan-to-value, liquidation threshold, the eMode threshold where
-// it differs, the liquidation bonus and the kink.
+// Available is supplied less borrowed, from the row's two receipted sizes.
+// Collateral is "LTV / LT", or "Not collateral" at a loan-to-value of 0 ("eMode
+// only" where an eMode category lends one). The bar is <RatioBar> on the
+// UTILISATION axis, its one tick the rate model's kink.
 //
-// Caps read their sentinels (lib/shared/aave-market-view.ts capSide): one
-// whole token is "closed", the field's largest value is "no cap", and on
-// SparkLend the share is measured against the CapAutomator's maximum. A
-// reserve closed to new business says so on its row — the frozen / paused
-// tags, "closed" or "off" in the caps column, "backs no new borrowing" under
-// the bar — and the band's sentence counts them.
+// Caps show only near binding: a side in use at CAP_NEAR_BINDING or more, or
+// closed by a cap of one whole token (lib/shared/aave-market-view.ts capSide,
+// capShows), reads as a pill under its size, `data-caps` on the pill.
+//
+// One level down: the oracle price, reserve factor, liquidation bonus, eMode
+// categories and kink open from the asset cell's "Details" control in a panel
+// (AnchoredPanel; a bottom sheet on a phone), so a row link (D4) can land on
+// the row later without a second meaning for a press on it.
 //
 // No-opinionated-colour rule: asset classes are distinguished by label +
-// grouping colour, the only interaction chroma is the link blue, and the one
-// caution tint marks a closed door (Moonwell's convention). Present, don't
-// rank: default order is size, no score anywhere.
+// grouping colour, and the one caution tint marks a closed door (Moonwell's
+// convention). Present, don't rank: default order is size, no score anywhere.
 //
 // Provenance: one scope for the band, one per reserve row, so the inspector
-// pins a row's receipts to that row. Every figure on a row carries a <Prov>
-// from lib/shared/aave-market-provenance; utilisation (a ratio of the row's two
-// receipted sizes) is exempt from the coverage tripwire.
+// pins a row's receipts to that row; the details panel sits inside its row's
+// scope. Every figure carries a <Prov> from lib/shared/aave-market-provenance;
+// utilisation (a ratio of the row's two receipted sizes) is exempt from the
+// coverage tripwire.
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, Ban } from "lucide-react";
+import { ArrowDown, ArrowUp, Ban, ChevronDown } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
+import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { type AssetClass, ASSET_CLASS_TITLE, ASSET_CLASS_COLOR } from "@/lib/aave-v4/asset-class";
 import {
+  capShows,
   marketSummaryText,
   type AaveMarketView,
   type CapState,
@@ -62,6 +63,7 @@ import { VitalsBand } from "@/components/shared/vitals-band";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { useSkeletonSizes } from "@/hooks/useSkeletonSizes";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { ratePercentText } from "@/lib/shared/rate-percent";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import {
   DATA_TABLE_PILL,
@@ -71,11 +73,13 @@ import {
   DataTableHead,
   DataTableHeader,
   DataTableRow,
-  DataTableSortButton,
 } from "@/components/shared/data-table/data-table";
 
 const CLOSED = "text-tone-caution";
 const TAG = `${DATA_TABLE_PILL} px-1 py-px text-[10px] uppercase tracking-wide`;
+const CAP_PILL = `${DATA_TABLE_PILL} inline-block whitespace-nowrap px-1 py-px text-[10px] leading-tight`;
+/** A closed side's pill: D1's pill ground, the caution tint in both schemes. */
+const CAP_PILL_CLOSED = `${CAP_PILL} ${CLOSED} dark:text-tone-caution`;
 
 // Display order for the class filter — stablecoin first, "other" last.
 const CLASS_ORDER: AssetClass[] = ["stablecoin", "eth", "btc", "gold", "other"];
@@ -88,9 +92,6 @@ function ClassDot({ cls }: { cls: AssetClass }) {
 function pct(x: number): string {
   return `${Math.round(x * 100)}%`;
 }
-function ratePct(x: number): string {
-  return `${(x * 100).toFixed(2)}%`;
-}
 /** A basis-point integer as a percentage number with no trailing zeros:
  *  8050 → "80.5", 10 → "0.1", 5 → "0.05". Epsilon values (Spark's 1-bp DAI
  *  threshold, 0.1% Pendle thresholds) stay visible. */
@@ -101,10 +102,9 @@ function bpsText(bps: number): string {
 function fracText(f: number): string {
   return bpsText(Math.round(f * 1e4));
 }
-/** Share of a cap in use: one decimal under 10%, whole numbers above. */
+/** Share of a cap in use, whole numbers (the pill shows from 90%). */
 function usedText(f: number): string {
-  const p = f * 100;
-  return `${p < 10 ? p.toFixed(1) : Math.round(p).toLocaleString("en-US")}%`;
+  return `${Math.round(f * 100).toLocaleString("en-US")}%`;
 }
 // Oracle price — full figure above $1k (prices read as exact quotes, not
 // sizes), two decimals below so stables show "$1.00", not "$1".
@@ -158,7 +158,7 @@ function CompositionBar({ composition }: { composition: AaveMarketView["composit
   );
 }
 
-// ── Row pieces, shared by the table row and the narrow block ─────────────────
+// ── Row pieces ───────────────────────────────────────────────────────────────
 
 /** The lifecycle and mode tags beside the symbol — states, not judgements. */
 function StateTags({ r, vocab }: { r: MarketReserveRow; vocab: AaveMarketVocab }) {
@@ -188,8 +188,10 @@ function StateTags({ r, vocab }: { r: MarketReserveRow; vocab: AaveMarketVocab }
   );
 }
 
-/** One side of the caps figure: a share in use, or the state that replaces it. */
-function CapText({
+/** One side's cap, where it shows (capShows): "cap 94%" near binding, "cap
+ *  closed" at a cap of one whole token. Borrowing switched off on a reserve
+ *  that still carries borrows reads "borrowing off". Otherwise nothing. */
+function CapPill({
   side,
   c,
   r,
@@ -200,165 +202,85 @@ function CapText({
   r: MarketReserveRow;
   vocab: AaveMarketVocab;
 }) {
-  switch (c.state) {
-    case "off":
-      return (
-        <span className={CLOSED} title="Borrowing is switched off for this reserve">
-          <Prov info={vocab.borrowOffProv(r.symbol)}>off</Prov>
-        </span>
-      );
-    case "closed":
-      return (
-        <span
-          className={CLOSED}
-          title={`A ${side} cap of one whole ${r.symbol}: governance closes a side this way, so no share is quoted.`}
-        >
-          <Prov info={vocab.capClosedProv(side, r.symbol, c.basis)}>closed</Prov>
-        </span>
-      );
-    case "none":
-      return (
-        <span className="text-rb-500">
-          <Prov info={vocab.capNoneProv(side, r.symbol, c.why, c.basis, side === "supply" ? r.supplyCap : r.borrowCap)}>
-            no cap
-          </Prov>
-        </span>
-      );
-    case "used":
-      return (
-        <span
-          title={
-            c.basis === "automator"
-              ? `${tokens(c.amount)} of a ${tokens(c.cap)} ${r.symbol} maximum (CapAutomator); Pool cap ${c.liveCap != null ? tokens(c.liveCap) : "—"}`
-              : `${tokens(c.amount)} of a ${tokens(c.cap)} ${r.symbol} cap`
-          }
-        >
-          <Prov
-            info={vocab.capUsedProv(side, r.symbol, {
-              amount: c.amount,
-              cap: c.cap,
-              basis: c.basis,
-              liveCap: c.liveCap,
-              treasury: side === "supply" ? (r.accruedToTreasury ?? 0) : undefined,
-            })}
-          >
-            {usedText(c.used)}
-          </Prov>
-        </span>
-      );
-  }
-}
-
-/** The eMode thresholds this reserve can be judged at instead of its own. A
- *  category matching the reserve's own number says nothing new, so only
- *  differences survive, stated as a span: sUSDe belongs to ten categories on
- *  Aave V3 Core, and ten numbers in a cell would bury the one fact the reader
- *  needs — that a wallet in eMode is judged by its category's figure. Every
- *  category and its exact figures are in the title and the receipt. */
-function emodeOf(r: MarketReserveRow) {
-  const cats = r.emodeCategories ?? [];
-  const alt = cats.map((c) => c.lt).filter((lt) => lt !== r.lt);
-  const span =
-    alt.length === 0
-      ? null
-      : [fracText(Math.min(...alt)), fracText(Math.max(...alt))].filter((v, i, a) => a.indexOf(v) === i).join("–");
-  const title = cats
-    .map((c) => `${c.label}: ${c.ltv != null ? `LTV ${fracText(c.ltv)}% · ` : ""}LT ${fracText(c.lt)}%`)
-    .join("\n");
-  const lendsLtv = cats.some((c) => (c.ltv ?? 0) > 0);
-  return { cats, span, title, lendsLtv };
-}
-
-/** The collateral parameters: LTV · LT · eMode · bonus · kink. `narrow`
- *  writes the eMode figure as "LT 83 (95 eMode)". */
-function RiskLine({ r, vocab, narrow }: { r: MarketReserveRow; vocab: AaveMarketVocab; narrow?: boolean }) {
-  const ltvBps = r.bps?.ltv ?? Math.round((r.ltv ?? 0) * 1e4);
-  const ltBps = r.bps?.lt ?? Math.round((r.lt ?? 0) * 1e4);
-  const bonusBps = r.bps?.bonus ?? 0;
-  const em = emodeOf(r);
-  const emode = em.span && (
-    <span title={em.title}>
-      <Prov info={vocab.reserveEModeLtProv(r.symbol, em.cats)}>
-        {narrow ? `(${em.span} eMode)` : `eMode ${em.span}`}
-      </Prov>
-    </span>
-  );
-  const kink = r.kink != null && r.rateStrategy && (
-    <span title="The utilisation at which the borrow rate starts to climb steeply: the tick on the bar">
-      kink{" "}
+  if (c.state === "off")
+    return (
+      <span className={CAP_PILL_CLOSED} title="Borrowing is switched off for this reserve" data-caps={side}>
+        <Prov info={vocab.borrowOffProv(r.symbol)}>borrowing off</Prov>
+      </span>
+    );
+  if (!capShows(c)) return null;
+  if (c.state === "closed")
+    return (
+      <span
+        className={CAP_PILL_CLOSED}
+        title={`A ${side} cap of one whole ${r.symbol}: governance closes a side this way, so no share is quoted.`}
+        data-caps={side}
+      >
+        cap <Prov info={vocab.capClosedProv(side, r.symbol, c.basis)}>closed</Prov>
+      </span>
+    );
+  if (c.state !== "used") return null;
+  return (
+    <span
+      className={CAP_PILL}
+      title={
+        c.basis === "automator"
+          ? `${tokens(c.amount)} of a ${tokens(c.cap)} ${r.symbol} maximum (CapAutomator); Pool cap ${c.liveCap != null ? tokens(c.liveCap) : "—"}`
+          : `${tokens(c.amount)} of a ${tokens(c.cap)} ${r.symbol} ${side} cap`
+      }
+      data-caps={side}
+    >
+      cap{" "}
       <Prov
-        info={vocab.kinkProv(r.symbol, {
-          strategy: r.rateStrategy,
-          method: r.kinkMethod ?? "",
-          raw: r.kinkRaw ?? null,
+        info={vocab.capUsedProv(side, r.symbol, {
+          amount: c.amount,
+          cap: c.cap,
+          basis: c.basis,
+          liveCap: c.liveCap,
+          treasury: side === "supply" ? (r.accruedToTreasury ?? 0) : undefined,
         })}
       >
-        {fracText(r.kink)}%
+        {usedText(c.used)}
       </Prov>
     </span>
   );
-  const sep = <span aria-hidden>·</span>;
+}
 
-  // Never collateral on its own: say that, and let eMode say where it is.
-  if (ltvBps === 0 && ltBps === 0) {
-    return (
-      <span className="inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-        <span>
-          <Prov info={vocab.reserveLtProv(r.symbol)}>
-            {em.span ? "not collateral outside eMode" : "not collateral"}
-          </Prov>
+/** The eMode categories this reserve belongs to, and whether any lends it a
+ *  loan-to-value. */
+function emodeOf(r: MarketReserveRow) {
+  const cats = r.emodeCategories ?? [];
+  const lendsLtv = cats.some((c) => (c.ltv ?? 0) > 0);
+  return { cats, lendsLtv };
+}
+
+const ltvBpsOf = (r: MarketReserveRow) => r.bps?.ltv ?? Math.round((r.ltv ?? 0) * 1e4);
+const ltBpsOf = (r: MarketReserveRow) => r.bps?.lt ?? Math.round((r.lt ?? 0) * 1e4);
+
+/** The Collateral cell: "LTV / LT", or "Not collateral" at a loan-to-value of
+ *  0, "eMode only" where an eMode category lends one. */
+function Collateral({ r, vocab }: { r: MarketReserveRow; vocab: AaveMarketVocab }) {
+  const ltvBps = ltvBpsOf(r);
+  const ltBps = ltBpsOf(r);
+  const em = emodeOf(r);
+  if (ltvBps === 0) {
+    if (em.lendsLtv)
+      return (
+        <span className="text-rb-500" title="Collateral only for a wallet in one of its eMode categories (Details)">
+          <Prov info={vocab.reserveEModeLtProv(r.symbol, em.cats)}>eMode only</Prov>
         </span>
-        {emode && (
-          <>
-            {sep}
-            {emode}
-          </>
-        )}
-        {!narrow && kink && (
-          <>
-            {sep}
-            {kink}
-          </>
-        )}
+      );
+    return (
+      <span className="text-rb-500" title="A loan-to-value of 0: holding it adds nothing to what a wallet can borrow">
+        <Prov info={ltBps > 0 ? vocab.ltvZeroProv(r.symbol) : vocab.reserveLtProv(r.symbol)}>Not collateral</Prov>
       </span>
     );
   }
   return (
-    <span className="inline-flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-      <span title="Loan-to-value: the most a wallet can borrow against this reserve">
-        LTV <Prov info={vocab.reserveLtvProv(r.symbol, ltvBps)}>{bpsText(ltvBps)}</Prov>
-        {ltvBps === 0 && em.lendsLtv && " outside eMode"}
-      </span>
-      {sep}
-      <span title="Liquidation threshold">
-        LT <Prov info={vocab.reserveLtProv(r.symbol)}>{bpsText(ltBps)}</Prov>
-        {narrow && emode && <> {emode}</>}
-      </span>
-      {!narrow && emode && (
-        <>
-          {sep}
-          {emode}
-        </>
-      )}
-      {bonusBps > 10000 && (
-        <>
-          {sep}
-          <span title="Liquidation bonus: the extra collateral a liquidator receives">
-            bonus <Prov info={vocab.reserveBonusProv(r.symbol, bonusBps)}>{bpsText(bonusBps - 10000)}%</Prov>
-          </span>
-        </>
-      )}
-      {!narrow && kink && (
-        <>
-          {sep}
-          {kink}
-        </>
-      )}
-      {r.closed.includes("ltvZero") && (
-        <span className={`basis-full ${CLOSED}`}>
-          <Prov info={vocab.ltvZeroProv(r.symbol)}>backs no new borrowing</Prov>
-        </span>
-      )}
+    <span title="Loan-to-value / liquidation threshold">
+      <Prov info={vocab.reserveLtvProv(r.symbol, ltvBps)}>{bpsText(ltvBps)}%</Prov>
+      <span className="text-rb-500"> / </span>
+      <Prov info={vocab.reserveLtProv(r.symbol)}>{bpsText(ltBps)}%</Prov>
     </span>
   );
 }
@@ -366,7 +288,7 @@ function RiskLine({ r, vocab, narrow }: { r: MarketReserveRow; vocab: AaveMarket
 /** The utilisation bar with the kink tick. Utilisation is borrowed ÷ supplied,
  *  both traced in the same row, so its percentage is exempt from the coverage
  *  tripwire. */
-function UtilBar({ r, suffix }: { r: MarketReserveRow; suffix?: React.ReactNode }) {
+function UtilBar({ r }: { r: MarketReserveRow }) {
   const ticks: RatioBarTick[] = [];
   if (r.kink != null)
     ticks.push({
@@ -381,12 +303,11 @@ function UtilBar({ r, suffix }: { r: MarketReserveRow; suffix?: React.ReactNode 
         <RatioBar fill={u ?? 0} ticks={ticks} />
       </div>
       <span
-        className="shrink-0 tabular-nums text-[12px] text-foreground/80"
+        className="w-9 shrink-0 text-right tabular-nums text-[12px] text-foreground/80"
         data-prov-exempt=""
         title="Utilisation: borrowed ÷ supplied, both traced in this row"
       >
         {u != null ? pct(u) : "—"}
-        {suffix}
       </span>
     </div>
   );
@@ -406,12 +327,15 @@ function sizes({ r, vocab, assetHref }: RowProps) {
   const borrowLink = assetHref && hasBorrow ? assetHref(r.symbol, "borrow") : null;
   // A reserve with no market price states its size in tokens.
   const fixed = r.fixedOraclePrice;
+  const inTokens = (n: number) => (
+    <span className="inline-flex items-center gap-1.5 text-foreground/80">
+      {formatCompact(n)}
+      <AssetUnit symbol={r.symbol} address={r.address} />
+    </span>
+  );
   const supplied =
     fixed && r.supplied > 0 ? (
-      <span className="inline-flex items-center gap-1.5 text-foreground/80">
-        {formatCompact(r.supplied)}
-        <AssetUnit symbol={r.symbol} address={r.address} />
-      </span>
+      inTokens(r.supplied)
     ) : supplyLink ? (
       <Link href={supplyLink} className={INLINE_LINK}>
         <Prov info={vocab.reserveValueProv("supplied", r.symbol)}>{sUsd.display}</Prov>
@@ -432,20 +356,27 @@ function sizes({ r, vocab, assetHref }: RowProps) {
       </span>
     )
   ) : null;
-  const rates = (
-    <>
-      {r.supplied > 0 ? (
-        <Prov info={vocab.reserveRateProv("supply", r.symbol)}>{ratePct(r.supplyApr)}</Prov>
-      ) : (
-        <span className="text-rb-500">—</span>
-      )}
-      <span className="text-rb-500"> / </span>
-      {hasBorrow ? (
-        <Prov info={vocab.reserveRateProv("borrow", r.symbol)}>{ratePct(r.borrowApr)}</Prov>
-      ) : (
-        <span className="text-rb-500">—</span>
-      )}
-    </>
+  // Available: supplied less borrowed, in the unit the row's sizes are in.
+  const availUsd = Math.max(0, r.suppliedUsd - r.borrowedUsd);
+  const availTokens = Math.max(0, r.supplied - r.borrowed);
+  const available =
+    fixed && r.supplied > 0 ? (
+      <Prov info={vocab.reserveAvailableProv(r.symbol, false)}>{inTokens(availTokens)}</Prov>
+    ) : (
+      <span className={availUsd > 0 ? "text-foreground/80" : "text-rb-500"}>
+        <Prov info={vocab.reserveAvailableProv(r.symbol, true)}>{fmtUsd(availUsd).display}</Prov>
+      </span>
+    );
+  const supplyRate =
+    r.supplied > 0 ? (
+      <Prov info={vocab.reserveRateProv("supply", r.symbol)}>{ratePercentText(r.supplyApr)}</Prov>
+    ) : (
+      <span className="text-rb-500">—</span>
+    );
+  const borrowRate = hasBorrow ? (
+    <Prov info={vocab.reserveRateProv("borrow", r.symbol)}>{ratePercentText(r.borrowApr)}</Prov>
+  ) : (
+    <span className="text-rb-500">—</span>
   );
   const price =
     r.priceUsd != null ? (
@@ -455,6 +386,8 @@ function sizes({ r, vocab, assetHref }: RowProps) {
         tip={`No market price. The oracle returns a fixed ${fmtPrice(fixed.usd)} for ${r.symbol} (source ${fixed.source.slice(0, 6)}…${fixed.source.slice(-4)}), so ${r.symbol} is left out of the dollar totals. It is not collateral, so the figure moves no health factor.`}
         label={`No market price for ${r.symbol}`}
         focusable
+        wrap
+        align="end"
         className="focus-ring rounded-sm text-rb-500 underline decoration-dotted"
       >
         no price
@@ -462,8 +395,124 @@ function sizes({ r, vocab, assetHref }: RowProps) {
     ) : (
       <span className="text-rb-500">—</span>
     );
-  const rf = <Prov info={vocab.reserveFactorProv(r.symbol)}>{pct(r.reserveFactor)}</Prov>;
-  return { hasBorrow, supplied, borrowed, rates, price, rf };
+  return { supplied, borrowed, available, supplyRate, borrowRate, price };
+}
+
+/** One line of the details panel. */
+function DetailLine({ term, children, title }: { term: string; children: React.ReactNode; title?: string }) {
+  return (
+    <div className="contents">
+      <dt className="text-rb-500" title={title}>
+        {term}
+      </dt>
+      <dd className="text-right tabular-nums text-foreground">{children}</dd>
+    </div>
+  );
+}
+
+/** The reserve's second-level figures: oracle price, reserve factor,
+ *  liquidation bonus, eMode categories, kink. A "Details" control in the
+ *  asset cell opens them in a panel (a bottom sheet on a phone). */
+function ReserveDetails({ r, vocab, price }: { r: MarketReserveRow; vocab: AaveMarketVocab; price: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const button = useRef<HTMLButtonElement | null>(null);
+  const panelId = useId();
+  const close = () => {
+    setOpen(false);
+    button.current?.focus();
+  };
+  const bonusBps = r.bps?.bonus ?? 0;
+  const em = emodeOf(r);
+  const label = `${r.symbol} reserve`;
+  return (
+    <>
+      <button
+        ref={button}
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
+        aria-label={`${r.symbol} details`}
+        className={`focus-ring relative z-30 inline-flex shrink-0 cursor-pointer items-center gap-0.5 rounded-md px-1 py-0.5 text-[11px] transition-colors hover:text-foreground ${open ? "text-foreground" : "text-rb-500"}`}
+        data-reserve-details-toggle={r.address}
+      >
+        Details
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
+      </button>
+      {open && (
+        // The panel renders in a portal; its events still pass through the
+        // row's React handlers, so they stop here.
+        <span className="contents" onClick={(e) => e.stopPropagation()}>
+          <AnchoredPanel
+            id={panelId}
+            label={label}
+            anchor={() => button.current}
+            onClose={close}
+            fit={320}
+            drop
+            name="reserve-details"
+            surface="overlay"
+          >
+            <p className="mb-3 pr-8 text-[13px] font-semibold text-foreground sm:pr-0">{label}</p>
+            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]">
+              <DetailLine term="Oracle price" title="The market's oracle price (IAaveOracle getAssetPrice)">
+                {price}
+              </DetailLine>
+              <DetailLine term="Reserve factor" title={RF_TIP}>
+                <Prov info={vocab.reserveFactorProv(r.symbol)}>{pct(r.reserveFactor)}</Prov>
+              </DetailLine>
+              {bonusBps > 10000 && (
+                <DetailLine term="Liquidation bonus" title="The extra collateral a liquidator receives">
+                  <Prov info={vocab.reserveBonusProv(r.symbol, bonusBps)}>{bpsText(bonusBps - 10000)}%</Prov>
+                </DetailLine>
+              )}
+              {r.kink != null && r.rateStrategy && (
+                <DetailLine
+                  term="Kink"
+                  title="The utilisation at which the borrow rate starts to climb steeply: the tick on the bar"
+                >
+                  <Prov
+                    info={vocab.kinkProv(r.symbol, {
+                      strategy: r.rateStrategy,
+                      method: r.kinkMethod ?? "",
+                      raw: r.kinkRaw ?? null,
+                    })}
+                  >
+                    {fracText(r.kink)}%
+                  </Prov>
+                </DetailLine>
+              )}
+            </dl>
+            {em.cats.length > 0 && (
+              <div className="mt-3 border-t border-rb-200 pt-2 dark:border-rb-700" data-reserve-emode="">
+                <p className="mb-1.5 text-[11px] text-rb-500">eMode categories (LTV / LT)</p>
+                <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-[12px]">
+                  {em.cats.map((c) => (
+                    <div key={c.label} className="contents">
+                      <dt className="truncate text-rb-500" title={c.label}>
+                        {c.label}
+                      </dt>
+                      <dd className="text-right tabular-nums text-foreground">
+                        <Prov info={vocab.reserveEModeLtProv(r.symbol, [c])}>
+                          {c.ltv != null ? `${fracText(c.ltv)}% / ` : ""}
+                          {fracText(c.lt)}%
+                        </Prov>
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+          </AnchoredPanel>
+        </span>
+      )}
+    </>
+  );
 }
 
 /** One reserve as a table row. A keyed component so it can own its
@@ -479,77 +528,84 @@ function ReserveRow(props: RowProps) {
         <DataTableCell rowHeader>
           <div className="flex items-center gap-2">
             <TokenChipIcon symbol={r.symbol} address={r.address} size={20} filterable={false} />
-            <div className="leading-tight">
+            <div className="min-w-0 flex-1 leading-tight">
               <div className="flex flex-wrap items-center gap-x-1.5 text-[13px] font-medium text-foreground">
                 {r.symbol}
                 <StateTags r={r} vocab={vocab} />
               </div>
-              <div className="flex items-center gap-1 text-[11px] text-rb-500">
+              <div className="flex items-center gap-1 text-[11px] text-rb-500" title={r.classLabel}>
                 <ClassDot cls={r.cls} />
-                {r.classLabel}
+                <span className="truncate">{r.classLabel}</span>
               </div>
             </div>
+            <ReserveDetails r={r} vocab={vocab} price={z.price} />
           </div>
+        </DataTableCell>
+        <DataTableCell align="right" className="tabular-nums text-[13px]" label="Supplied">
+          <div>{z.supplied}</div>
+          <CapPill side="supply" c={r.supplyCapState} r={r} vocab={vocab} />
+        </DataTableCell>
+        <DataTableCell align="right" className="tabular-nums text-[13px]" label="Borrowed">
+          <div>
+            {z.borrowed ??
+              (!r.borrowEnabled ? (
+                // Structurally not borrowable — a no-entry mark, distinct
+                // from a borrowable reserve that has no draws.
+                <span
+                  className="inline-flex items-center justify-end gap-1 text-rb-500/70"
+                  title="Not borrowable in this market"
+                >
+                  <Ban className="h-3.5 w-3.5" aria-label="Not borrowable" />
+                </span>
+              ) : (
+                <span className="text-rb-500">no borrows</span>
+              ))}
+          </div>
+          {(z.borrowed != null || r.borrowEnabled) && (
+            <CapPill side="borrow" c={r.borrowCapState} r={r} vocab={vocab} />
+          )}
         </DataTableCell>
         <DataTableCell
           align="right"
-          className="tabular-nums text-[13px] text-foreground/80"
-          title="The market's oracle price (IAaveOracle getAssetPrice)"
-          label="Price"
+          className="tabular-nums text-[13px]"
+          title="Supplied less borrowed"
+          label="Available"
+          data-available=""
         >
-          {z.price}
-        </DataTableCell>
-        <DataTableCell align="right" className="tabular-nums text-[13px]" label="Supplied">
-          {z.supplied}
-        </DataTableCell>
-        <DataTableCell align="right" className="tabular-nums text-[13px]" label="Borrowed">
-          {z.borrowed ??
-            (!r.borrowEnabled ? (
-              // Structurally not borrowable — a no-entry mark, distinct
-              // from a borrowable reserve that has no draws.
-              <span
-                className="inline-flex items-center justify-end gap-1 text-rb-500/70"
-                title="Not borrowable in this market"
-              >
-                <Ban className="h-3.5 w-3.5" aria-label="Not borrowable" />
-              </span>
-            ) : (
-              <span className="text-rb-500">no borrows</span>
-            ))}
+          {z.available}
         </DataTableCell>
         <DataTableCell
           align="right"
           className="whitespace-nowrap tabular-nums text-[13px] text-foreground/80"
-          title="Supply rate / variable borrow rate, read from the Pool at the stamped block"
-          label="Rates S / B"
+          title="Supply rate, read from the Pool at the stamped block"
+          label="Supply rate"
+          data-rate="supply"
         >
-          {z.rates}
+          {z.supplyRate}
         </DataTableCell>
         <DataTableCell
           align="right"
-          className="tabular-nums text-[13px] text-foreground/80"
-          title="Reserve factor: the protocol's cut of borrow interest"
-          label={<span title={HEADER_TIP.reserveFactor}>RF</span>}
+          className="whitespace-nowrap tabular-nums text-[13px] text-foreground/80"
+          title="Variable borrow rate, read from the Pool at the stamped block"
+          label="Borrow rate"
+          data-rate="borrow"
         >
-          {z.rf}
+          {z.borrowRate}
         </DataTableCell>
         <DataTableCell
-          className="whitespace-nowrap tabular-nums text-[12px] text-foreground/80"
-          label={<span title={HEADER_TIP.caps}>Caps used</span>}
-          data-caps=""
+          align="right"
+          className="whitespace-nowrap tabular-nums text-[13px] text-foreground/80"
+          label={<span title={HEADER_TIP.collateral}>Collateral</span>}
+          data-collateral=""
         >
-          <span className="text-rb-500">S</span> <CapText side="supply" c={r.supplyCapState} r={r} vocab={vocab} />
-          <span className="text-rb-500"> · B</span> <CapText side="borrow" c={r.borrowCapState} r={r} vocab={vocab} />
+          <Collateral r={r} vocab={vocab} />
         </DataTableCell>
         <DataTableCell
-          className="lg:w-[270px] lg:min-w-[220px]"
-          label={<span title={HEADER_TIP.util}>Utilisation &amp; risk</span>}
+          className="lg:w-[180px] lg:min-w-[112px]"
+          label={<span title={HEADER_TIP.util}>Utilisation</span>}
           wide
         >
           <UtilBar r={r} />
-          <div className="mt-1.5 text-[10px] tabular-nums text-rb-500">
-            <RiskLine r={r} vocab={vocab} />
-          </div>
         </DataTableCell>
       </DataTableRow>
     </ProvReceiptsScope>
@@ -565,42 +621,32 @@ export interface AaveMarketViewsProps {
   assetHref?: (symbol: string, side: "supply" | "borrow") => string;
 }
 
-type SortKey = "asset" | "price" | "supplied" | "borrowed" | "supplyApy" | "rate" | "reserveFactor" | "caps" | "util";
+type SortKey = "asset" | "supplied" | "borrowed" | "available" | "supplyRate" | "borrowRate" | "collateral" | "util";
 
 const SORT_LABEL: Record<SortKey, string> = {
   asset: "Asset",
-  price: "Price",
   supplied: "Supplied",
   borrowed: "Borrowed",
-  supplyApy: "Supply rate",
-  rate: "Borrow rate",
-  reserveFactor: "Reserve factor",
-  caps: "Caps used",
+  available: "Available",
+  supplyRate: "Supply rate",
+  borrowRate: "Borrow rate",
+  collateral: "Collateral",
   util: "Utilisation",
 };
 
-/** What an abbreviated or compound column header stands for, in its tip. */
+const RF_TIP = "The share of the interest borrowers pay that the protocol keeps; suppliers get the rest";
+
+/** What a column header stands for, in its tip. */
 const HEADER_TIP: Partial<Record<SortKey, string>> = {
-  reserveFactor:
-    "Reserve factor: the share of the interest borrowers pay that the protocol keeps; suppliers get the rest",
-  caps: "Caps used: how much of the reserve's supply cap and borrow cap is taken",
-  util: "Utilisation & risk: the share of the reserve's supply that is on loan (the bar, its tick the rate model's kink), then the loan-to-value, liquidation threshold and liquidation bonus the Pool applies to it",
+  available: "Available: supplied less borrowed, what suppliers can withdraw and borrowers can still take",
+  collateral:
+    "Collateral: loan-to-value / liquidation threshold, the most a wallet can borrow against this reserve and the ratio past which a position holding it can be liquidated",
+  util: "Utilisation: the share of the reserve's supply that is on loan; the tick is the rate model's kink",
 };
 
-/** A cap side as one sortable number: a closed side sorts above any share, a
- *  side with no cap or no borrowing below every share. */
-function capRank(c: CapState): number {
-  switch (c.state) {
-    case "closed":
-      return 1e9;
-    case "used":
-      return c.used;
-    case "none":
-      return -1;
-    case "off":
-      return -2;
-  }
-}
+/** A reserve's collateral standing as one sortable number: loan-to-value,
+ *  then liquidation threshold. */
+const collateralRank = (r: MarketReserveRow) => ltvBpsOf(r) * 1e5 + ltBpsOf(r);
 
 export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketViewsProps) {
   // Not every explorer on this surface HAS a listing behind it. The Base ones
@@ -658,23 +704,21 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
       switch (sortKey) {
         case "asset":
           return a.symbol.localeCompare(b.symbol);
-        case "price":
-          return (a.priceUsd ?? -1) - (b.priceUsd ?? -1);
         case "supplied":
           return a.suppliedUsd - b.suppliedUsd || a.supplied - b.supplied;
         case "borrowed":
           return a.borrowedUsd - b.borrowedUsd || a.borrowed - b.borrowed;
-        case "rate":
-          return a.borrowApr - b.borrowApr;
-        case "supplyApy":
-          return a.supplyApr - b.supplyApr;
-        case "reserveFactor":
-          return a.reserveFactor - b.reserveFactor;
-        case "caps":
+        case "available":
           return (
-            Math.max(capRank(a.supplyCapState), capRank(a.borrowCapState)) -
-            Math.max(capRank(b.supplyCapState), capRank(b.borrowCapState))
+            a.suppliedUsd - a.borrowedUsd - (b.suppliedUsd - b.borrowedUsd) ||
+            a.supplied - a.borrowed - (b.supplied - b.borrowed)
           );
+        case "supplyRate":
+          return a.supplyApr - b.supplyApr;
+        case "borrowRate":
+          return a.borrowApr - b.borrowApr;
+        case "collateral":
+          return collateralRank(a) - collateralRank(b);
         case "util":
           return (a.utilization ?? -1) - (b.utilization ?? -1);
       }
@@ -784,8 +828,9 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
           <h2 className="text-[11px] uppercase tracking-wider text-rb-500">Reserves</h2>
           <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
             Every reserve on the Pool, filter by class, sort any column. Rates, caps and risk parameters decode from the
-            configuration the Pool enforces; USD is the market&apos;s oracle price. The bar is utilisation, and its tick
-            is the rate model&apos;s kink.
+            configuration the Pool enforces; USD is the market&apos;s oracle price. A cap shows under its size once 90%
+            of it is in use. The bar is utilisation, and its tick is the rate model&apos;s kink. Details on a row opens
+            its oracle price, reserve factor, liquidation bonus and eMode categories.
           </p>
         </div>
 
@@ -841,47 +886,21 @@ export function AaveMarketViews({ view, listingHref, assetHref }: AaveMarketView
             </div>
             <DataTable
               label={`${view.label} reserves`}
-              tableClassName="lg:min-w-[980px]"
+              tableClassName="lg:min-w-[900px]"
               anatomy="M1"
               stacked
               stackBelow="lg"
-              rowHeight="three"
+              rowHeight="two"
             >
               <DataTableHead>
                 {th("Asset", "asset")}
-                {th("Price", "price", "right")}
                 {th("Supplied", "supplied", "right")}
                 {th("Borrowed", "borrowed", "right")}
-                <DataTableHeader
-                  align="right"
-                  ariaSort={
-                    sortKey === "supplyApy" || sortKey === "rate"
-                      ? sortDir === "asc"
-                        ? "ascending"
-                        : "descending"
-                      : undefined
-                  }
-                >
-                  <span className="inline-flex items-center gap-1.5">
-                    Rates
-                    <DataTableSortButton
-                      label="S"
-                      dir={dirOf("supplyApy")}
-                      onSort={() => toggleSort("supplyApy")}
-                      ariaLabel={`Sort by ${SORT_LABEL.supplyApy}`}
-                    />
-                    /
-                    <DataTableSortButton
-                      label="B"
-                      dir={dirOf("rate")}
-                      onSort={() => toggleSort("rate")}
-                      ariaLabel={`Sort by ${SORT_LABEL.rate}`}
-                    />
-                  </span>
-                </DataTableHeader>
-                {th("RF", "reserveFactor", "right")}
-                {th("Caps used", "caps")}
-                {th("Utilisation & risk", "util")}
+                {th("Available", "available", "right")}
+                {th("Supply rate", "supplyRate", "right")}
+                {th("Borrow rate", "borrowRate", "right")}
+                {th("Collateral", "collateral", "right")}
+                {th("Utilisation", "util")}
               </DataTableHead>
               <DataTableBody>
                 {sortedRows.map((r) => (

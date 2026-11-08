@@ -80,6 +80,15 @@ export function capSide(r: AaveMarketReserve, side: "supply" | "borrow"): CapSta
   return judge(live, "live");
 }
 
+/** The share of a cap in use at which the reserves table shows it (ui-jobs
+ *  541): below this the cap is not stated on the row. */
+export const CAP_NEAR_BINDING = 0.9;
+
+/** Whether a side's cap shows on the row: in use at CAP_NEAR_BINDING or more,
+ *  or closed by a cap of one whole token. */
+export const capShows = (c: CapState): boolean =>
+  c.state === "closed" || (c.state === "used" && c.used >= CAP_NEAR_BINDING);
+
 // ── Closed to new business ───────────────────────────────────────────────────
 
 export type ClosedRoute = "frozen" | "paused" | "borrowOff" | "supplyCapOne" | "borrowCapOne" | "ltvZero";

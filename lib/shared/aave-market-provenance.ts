@@ -56,6 +56,8 @@ export interface AaveMarketVocab {
   reserveCountProv: () => Provenance;
   /** One reserve's supplied / borrowed value in USD. */
   reserveValueProv: (side: "supplied" | "borrowed", symbol: string) => Provenance;
+  /** One reserve's supplied less its borrowed, from the two figures beside it. */
+  reserveAvailableProv: (symbol: string, priced: boolean) => Provenance;
   /** One reserve's liquidation threshold. */
   reserveLtProv: (symbol: string) => Provenance;
   /** The threshold an efficiency-mode category lends this reserve, in place of
@@ -191,6 +193,30 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
           contract: oracleContract(coords),
           note: "IAaveOracle.getAssetPrice @ head",
         },
+      ],
+    }),
+    reserveAvailableProv: (symbol, priced) => ({
+      kind: "chain-derived",
+      pclass: priced ? "oracle" : "state",
+      source: { block: coords.blockNumber },
+      summary: `${symbol} available. Supplied less borrowed${atBlock(coords)}: the reserve's aToken totalSupply less its variable-debt totalSupply${priced ? ", each valued at the market's IAaveOracle price" : ", in tokens"}. The two figures beside it on this row; the subtraction is ours.`,
+      contract: poolContract(coords),
+      via: `${cfg.lane} · aToken totalSupply − variableDebtToken totalSupply${priced ? " × IAaveOracle price" : ""} @ head`,
+      formula: "supplied − borrowed",
+      inputs: [
+        { label: "supplied", kind: "chain", pclass: "state", note: "aToken totalSupply @ head" },
+        { label: "borrowed", kind: "chain", pclass: "state", note: "variableDebtToken totalSupply @ head" },
+        ...(priced
+          ? [
+              {
+                label: "oracle price",
+                kind: "chain-derived" as const,
+                pclass: "oracle" as const,
+                contract: oracleContract(coords),
+                note: "IAaveOracle.getAssetPrice @ head",
+              },
+            ]
+          : []),
       ],
     }),
     reserveLtProv: (symbol) => ({
