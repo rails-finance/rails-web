@@ -10,7 +10,8 @@
 // `border-separate` with no horizontal spacing and a small vertical gap, the
 // stripe lies on the cells, and only the first and last cells round their
 // outer corners. Stripes alternate the raised and sunken surfaces; a hovered
-// row takes the selected surface. The frame scrolls sideways inside itself,
+// row keeps its ground and takes a thin neutral border (`--edge-row-hover`),
+// drawn as a linked row's is. The frame scrolls sideways inside itself,
 // never the page; a pinned cell carries its row's stripe.
 //
 // A LINKED ROW. `DataTableRow href` with one `DataTableRowLink` in a cell
@@ -67,18 +68,23 @@ type Align = "left" | "right";
 /** The cell's padding; a caller adds its own sizes and type. */
 export const DATA_TABLE_PAD = "px-2 py-2.5 sm:px-3";
 
-/** A pill or tag on a row: a ground apart from both stripes and the hovered
- *  row's `bg-selected`; the caller adds its size and case. */
+/** A pill or tag on a row: a ground apart from both stripes (the canvas in
+ *  light, rb-600 in dark); the caller adds its size and case. */
 export const DATA_TABLE_PILL = "rounded-sm bg-background text-foreground/80 dark:bg-rb-600 dark:text-foreground/70";
 
 /** The row block's surfaces and corners, on every body cell. */
-const CELL_SURFACE =
-  "transition-colors group-odd/dt-row:bg-raised group-even/dt-row:bg-sunken group-hover/dt-row:bg-selected first:rounded-l-2xl last:rounded-r-2xl";
+const CELL_SURFACE = "group-odd/dt-row:bg-raised group-even/dt-row:bg-sunken first:rounded-l-2xl last:rounded-r-2xl";
 
-/** A linked row's cell: the cell holds its cover, and its ::after draws the
- *  row's border, top and bottom, the end cells' outer sides and corners. */
-const LINKED_CELL =
-  "relative after:pointer-events-none after:absolute after:inset-0 after:z-20 after:border-y after:border-transparent after:transition-colors after:content-[''] first:after:rounded-l-2xl first:after:border-l last:after:rounded-r-2xl last:after:border-r group-hover/dt-row:after:border-blue-500 group-focus-within/dt-row:after:border-blue-500";
+/** The row's hover border, drawn by each cell's ::after along its top and
+ *  bottom and by the end cells round their outer sides and corners, so the
+ *  row's height never moves. A sticky cell is positioned already. */
+const ROW_EDGE =
+  "after:pointer-events-none after:absolute after:inset-0 after:z-20 after:border-y after:border-transparent after:transition-colors after:content-[''] first:after:rounded-l-2xl first:after:border-l last:after:rounded-r-2xl last:after:border-r";
+/** An unlinked row's border: neutral, on hover only. */
+const PLAIN_EDGE = "group-hover/dt-row:after:border-[var(--edge-row-hover)]";
+/** A linked row's: blue-500 on hover and on keyboard focus; the cell holds
+ *  its cover. */
+const LINKED_EDGE = "group-hover/dt-row:after:border-blue-500 group-focus-within/dt-row:after:border-blue-500";
 
 /** The row's link, which each cell's cover repeats. */
 const RowHref = createContext<string | null>(null);
@@ -356,7 +362,7 @@ export function DataTableCell({
   const stacked = useContext(Stacked);
   const height = useContext(RowHeight);
   const named = stacked && label ? <span className="dt-cell-label">{label}</span> : null;
-  const cls = `${CELL_SURFACE} ${valign === "middle" || height ? "align-middle" : "align-top"} ${height} ${wide ? "dt-cell-wide" : ""} ${href ? LINKED_CELL : ""} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
+  const cls = `${CELL_SURFACE} ${valign === "middle" || height ? "align-middle" : "align-top"} ${height} ${wide ? "dt-cell-wide" : ""} ${sticky ? "" : "relative"} ${ROW_EDGE} ${href ? LINKED_EDGE : PLAIN_EDGE} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
     sticky ? `${sticky} z-10` : ""
   } ${className}`;
   const cover = href ? <RowCover href={href} /> : null;

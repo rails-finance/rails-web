@@ -164,6 +164,7 @@
   --surface-marker: var(--color-rb-200); /* small inline tags: badges, count pills, token chips */
   --surface-skeleton: var(--color-rb-100); /* loading shimmer — matched to --surface-raised */
   --surface-selected: var(--color-rb-300); /* pressed/active segment in a toggle group */
+  --edge-row-hover: var(--color-rb-400); /* a hovered unlinked table row's outline (D1) */
   --surface-field: oklch(
     0.9939 calc(0.0082 * var(--paper-chroma)) var(--paper-hue)
   ); /* prominent text inputs — near-white "type here" affordance */
@@ -437,6 +438,7 @@ html.dark {
   --surface-marker: rgb(20 22 30);
   --surface-skeleton: rgb(20 22 30);
   --surface-selected: rgb(25 28 38); /* = rb-700 */
+  --edge-row-hover: rgb(104 119 144 / 0.5); /* rb-500 at half */
   --surface-field: rgb(15 16 23); /* rb-900 — recessed well vs the rgb(20 22 30) overlay panel */
   /* Band — midpoint of the dark ladder's ends, rb-600 (30 33 46) and the
      --background canvas (23 27 36), same construction as the light value. The
@@ -2448,9 +2450,6 @@ table.dt-stacked {
     & > tbody > tr:nth-child(even)::before {
       background-color: var(--surface-sunken);
     }
-    & > tbody > tr:hover::before {
-      background-color: var(--surface-selected);
-    }
     /* The hue behind the panel's corners: the edge's own run-on, widened to
        the card's full height under the panel. */
     & > tbody > tr > [data-anatomy~="D5"]::before {
@@ -2468,11 +2467,12 @@ table.dt-stacked {
       border-radius: 0;
       text-align: left;
     }
-    /* The linked row's border: one outline round the card, in place of the cells'. */
+    /* The row's hover border: one outline round the card, in place of the
+       cells'; neutral, blue on a linked row. */
     & > tbody > tr > *::after {
       display: none;
     }
-    & > tbody > tr[data-anatomy~="D4"]::after {
+    & > tbody > tr::after {
       content: "";
       position: absolute;
       inset: 0;
@@ -2481,6 +2481,9 @@ table.dt-stacked {
       border: 1px solid transparent;
       border-radius: 1rem;
       transition: border-color 150ms;
+    }
+    & > tbody > tr:hover::after {
+      border-color: var(--edge-row-hover);
     }
     & > tbody > tr[data-anatomy~="D4"]:hover::after,
     & > tbody > tr[data-anatomy~="D4"]:focus-within::after {
