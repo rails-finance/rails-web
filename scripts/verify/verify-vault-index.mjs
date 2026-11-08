@@ -31,7 +31,8 @@
 //   7  every row links under its protocol, to a vault its roster lists; two
 //      links per protocol answer 200
 //   8  the rosters' heads link the index
-//   9  the index draws no receipt and offers no provenance inspector (ui-jobs 538)
+//   9  the index draws no receipt and offers no provenance inspector (ui-jobs 538);
+//      every Total assets and Share price figure names its asset
 //  10  the default view (ui-jobs 485): the preset's rows against ?show=all,
 //      its chip, the counts line, its removal and Reset, and the table's
 //      sorts (ui-jobs 538: Holders by default, Total assets within each token)
@@ -390,6 +391,26 @@ for (const k of KEYS) {
   check("9a the index draws no receipt", receipts === 0, `${receipts} receipt spans`);
   const tools = await page.locator("button.prov-inspect-toggle, [data-prov-tripwire]").count();
   check("9b the page offers no provenance inspector", tools === 0, `${tools} inspector controls`);
+}
+
+// ── 9c: no figure reads unitless (decision 0028 point 8) ────────────────────
+{
+  const bad = await page
+    .locator("[data-vault-index] [data-cell='total-assets'], [data-vault-index] [data-cell='share-price']")
+    .evaluateAll(
+      (els) =>
+        els.filter((el) => {
+          const unit = el.querySelector("[data-asset-unit]");
+          if (!unit) return true;
+          const said = unit.querySelector("img")?.getAttribute("alt") ?? unit.textContent?.trim();
+          return !said || said !== unit.getAttribute("data-asset-unit");
+        }).length,
+    );
+  check(
+    "9c every Total assets and Share price figure names its asset (its mark or its symbol)",
+    bad === 0,
+    `${bad} without`,
+  );
 }
 
 // ── 10: the default view (ui-jobs 485) ──────────────────────────────────────

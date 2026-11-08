@@ -50,6 +50,8 @@ import { VAULT_FAMILIES } from "@/lib/vaults/families";
 import { VAULT_INDEX_PROTOCOL_LABEL, vaultIndexProtocol } from "@/lib/vaults/index-rosters";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
 import { yieldText, type VaultYield } from "@/lib/vaults/yield";
+import { formatCompact } from "@/lib/shared/format-compact";
+import { sharePriceText } from "@/lib/shared/vault-amount-text";
 
 type SortKey = "vault" | "assets" | "price" | "yield" | "holders";
 
@@ -120,6 +122,30 @@ function comparator(key: SortKey, dir: "asc" | "desc", yieldOf: (v: VaultSummary
 }
 
 const n = (x: number) => x.toLocaleString("en-US");
+
+/** A figure in the vault's asset, the asset's mark after it (its symbol as the
+ *  image's text and title), or the symbol in words where the token has no mark:
+ *  never a unitless figure (decision 0028 point 8). */
+function InAsset({ v, children, ...rest }: { v: VaultSummary; children: ReactNode; "data-cell": string }) {
+  const word = (
+    <span className={`text-[10px] font-medium text-rb-500 ${v.asset.named ? "" : "font-mono"}`}>{v.asset.symbol}</span>
+  );
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap" {...rest}>
+      <span>{children}</span>
+      <span className="inline-flex shrink-0" title={v.asset.symbol} data-asset-unit={v.asset.symbol}>
+        <TokenChipIcon
+          symbol={v.asset.symbol}
+          address={v.asset.address}
+          size={15}
+          filterable={false}
+          untitled
+          fallback={word}
+        />
+      </span>
+    </span>
+  );
+}
 
 /** A standing pill on a row: a ground apart from both stripes and the hovered
  *  row's `bg-selected` (the card's VAULT_PILL is rb-300, which is that). */
@@ -249,6 +275,7 @@ export function VaultIndexTable({
         caption={`${part === "funded" ? "Vaults" : "Vaults that hold nothing"}; total assets and share price are in each vault’s asset`}
         tableClassName="min-w-[640px] text-sm"
         stacked
+        oneLine
       >
         <DataTableHead>
           <DataTableLeadHeader />
@@ -286,7 +313,7 @@ export function VaultIndexTable({
                 label={label}
                 align="right"
                 valign="middle"
-                className="whitespace-nowrap tabular-nums [&_.flex-wrap]:flex-nowrap [&_.flex-wrap]:justify-end"
+                className="whitespace-nowrap tabular-nums"
                 data-col={id}
               >
                 {value != null ? (
@@ -340,8 +367,15 @@ export function VaultIndexTable({
                   protocolName={VAULT_INDEX_PROTOCOL_LABEL[vaultIndexProtocol(v)]}
                   chain={v.chainId as ChainId}
                 />
-                <DataTableCell rowHeader valign="middle" className="sm:min-w-[260px]">
-                  <div className="flex items-center gap-2.5">
+                {/* From sm one line: icon, name (truncating, its full text in a
+                    title), the standing pills after it. Below sm (D6) the name
+                    wraps and the pills take their own line from the card's edge. */}
+                <DataTableCell
+                  rowHeader
+                  valign="middle"
+                  className="sm:w-full sm:max-w-0 sm:min-w-[180px] xl:min-w-[260px]"
+                >
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 sm:flex-nowrap">
                     <span className="shrink-0" data-prov-exempt>
                       <TokenChipIcon
                         symbol={v.asset.symbol}
@@ -357,27 +391,43 @@ export function VaultIndexTable({
                     />
                     <DataTableRowLink
                       href={href}
-                      className="min-w-0 text-sm font-semibold break-words"
+                      className="min-w-0 flex-1 text-sm font-semibold break-words sm:min-w-[7rem] sm:flex-initial sm:truncate"
+                      title={name ?? v.address}
                       data-vault-link={v.address}
                       data-vault-name
                     >
                       {name != null ? name : <span className="font-mono">{shortAddress(v.address)}</span>}
                     </DataTableRowLink>
+                    {v.standing.length > 0 && (
+                      // From sm the pills give way before the name's first 7rem.
+                      <span className="flex flex-wrap gap-1 max-sm:basis-full sm:min-w-0 sm:flex-nowrap sm:overflow-hidden">
+                        {v.standing.map((st) => (
+                          <span key={st} className={`${PILL} sm:truncate`} title={STANDING_WORD[st]} data-pill={st}>
+                            {STANDING_WORD[st]}
+                          </span>
+                        ))}
+                      </span>
+                    )}
                   </div>
-                  {/* The standing pills: their own line, under the name from
-                      sm (past the icon), from the card's left edge below sm. */}
-                  {v.standing.length > 0 && (
-                    <div className="mt-1.5 flex flex-wrap gap-1 sm:pl-[38px]">
-                      {v.standing.map((st) => (
-                        <span key={st} className={PILL} data-pill={st}>
-                          {STANDING_WORD[st]}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                 </DataTableCell>
-                {cell("total-assets", "Total assets", head("total-assets")?.value)}
-                {cell("share-price", "Share price", head("share-price")?.value)}
+                {cell(
+                  "total-assets",
+                  "Total assets",
+                  v.totalAssets && (
+                    <InAsset v={v} data-cell="total-assets">
+                      {formatCompact(v.totalAssets.value)}
+                    </InAsset>
+                  ),
+                )}
+                {cell(
+                  "share-price",
+                  "Share price",
+                  v.sharePrice && (
+                    <InAsset v={v} data-cell="share-price">
+                      {sharePriceText(v.sharePrice, v.asset.decimals)}
+                    </InAsset>
+                  ),
+                )}
                 {cell(
                   "yield",
                   "Yield",

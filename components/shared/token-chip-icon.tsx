@@ -101,6 +101,10 @@ export interface TokenChipIconProps {
   /** No native title on the fallback glyph: the caller wraps the chip in a
    *  RevealTip that names the token. */
   untitled?: boolean;
+  /** Drawn in place of the placeholder glyph where the token has no mark
+   *  (none resolved, or every source failed): a caller that would rather say
+   *  the symbol in words than show a letter. */
+  fallback?: React.ReactNode;
 }
 
 export function TokenChipIcon({
@@ -111,6 +115,7 @@ export function TokenChipIcon({
   onClick,
   filterable = true,
   untitled = false,
+  fallback,
 }: TokenChipIconProps) {
   const ctxFilter = useTokenFilterCtx();
   const chainId = useChainId();
@@ -195,13 +200,17 @@ export function TokenChipIcon({
 
   const chip =
     srcs.length === 0 ? (
-      <UnknownTokenSvg
-        size={size}
-        symbol={symbol}
-        clickProps={clickProps}
-        clickClass={clickClass}
-        untitled={untitled}
-      />
+      fallback !== undefined ? (
+        <>{fallback}</>
+      ) : (
+        <UnknownTokenSvg
+          size={size}
+          symbol={symbol}
+          clickProps={clickProps}
+          clickClass={clickClass}
+          untitled={untitled}
+        />
+      )
     ) : (
       <FallbackTokenIcon
         symbol={symbol}
@@ -210,6 +219,7 @@ export function TokenChipIcon({
         clickClass={clickClass}
         clickProps={clickProps}
         untitled={untitled}
+        fallback={fallback}
       />
     );
   if (!isPt) return chip;
@@ -271,8 +281,10 @@ function FallbackTokenIcon({
   clickClass,
   clickProps,
   untitled,
+  fallback,
 }: {
   untitled: boolean;
+  fallback?: React.ReactNode;
   symbol: string;
   srcs: string[];
   size: number;
@@ -282,6 +294,7 @@ function FallbackTokenIcon({
   const [idx, setIdx] = useState(0);
   const advance = () => setIdx((i) => i + 1);
   if (idx >= srcs.length) {
+    if (fallback !== undefined) return <>{fallback}</>;
     return (
       <UnknownTokenSvg
         size={size}
