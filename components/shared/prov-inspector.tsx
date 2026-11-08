@@ -154,9 +154,9 @@ export function ProvScopeToggle({
       data-prov-scope-toggle={scope}
       onClick={onClick}
     >
-      <Crosshair aria-hidden />
+      <Crosshair aria-hidden className={PROV_TEAL} />
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-foreground">
+        <span className={`block text-sm font-semibold ${PROV_TEAL}`}>
           {pressed ? SCOPE_WORDS.hide : SCOPE_WORDS.show}
         </span>
         <span className="block text-xs text-rb-500">{pressed ? SCOPE_WORDS.armed_hint : hint}</span>
@@ -164,6 +164,11 @@ export function ProvScopeToggle({
     </button>
   );
 }
+
+/** The provenance teal: the popover's border and the inspector's armed and
+ *  dotted marks (teal-600, teal-400 in dark; globals.css), on the menu row's
+ *  title and crosshair (ui-jobs 535). */
+const PROV_TEAL = "text-teal-600 dark:text-teal-400";
 
 /** The scoped row's words. */
 const SCOPE_WORDS = {

@@ -14,7 +14,7 @@
 
 import { createContext, useContext, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { ArrowUpRight, Check, ChevronDown, ChevronUp, Copy, EyeOff, History } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, ChevronUp, Copy, EyeOff } from "lucide-react";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
 import { EVENT_PAGE_WORDS as W } from "@/lib/shared/event-page-words";
 
@@ -162,7 +162,7 @@ export function EventCardMenu({
             {timelineHref && (
               <ToolsMenuItem
                 item="view-timeline"
-                icon={<History size={16} />}
+                icon={<ArrowUpRight size={16} />}
                 title={W.in_timeline}
                 subtitle={W.in_timeline_hint}
                 href={timelineHref}

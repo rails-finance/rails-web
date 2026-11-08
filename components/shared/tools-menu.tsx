@@ -8,7 +8,8 @@
 // shapes were their own trigger and the inspector's toggle rode in the fixed
 // bottom dock; the dock is gone from these views, so the two live together.
 //
-// While the inspector is armed the trigger carries a small green dot. The dot
+// While the inspector is armed the trigger carries a small dot in the
+// provenance teal (teal-600, teal-400 in dark, ui-jobs 535). The dot
 // is always in the DOM and merely uncoloured at rest, so arming the tool never
 // moves the row.
 //
@@ -61,15 +62,15 @@ export function ToolsMenuItem({
   /** A row that shows or hides a group (ui-jobs 250): its state, drawn as
    *  `aria-expanded` with `data-group-button` on the row. */
   expanded?: boolean;
-  /** A row that goes to another page of Rails: its title in link blue
-   *  (`--text-link`, ui-jobs 535). */
+  /** A row that goes to another page of Rails: its title and icon in link
+   *  blue (`--text-link`, ui-jobs 535). */
   internal?: boolean;
 }) {
   const className =
     "flex items-start gap-3 mx-1 my-0.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]";
   const body = (
     <>
-      <span className="mt-0.5 shrink-0 text-rb-500">{icon}</span>
+      <span className={`mt-0.5 shrink-0 ${internal ? "text-[var(--text-link)]" : "text-rb-500"}`}>{icon}</span>
       <span className="min-w-0">
         <span className={`block text-sm font-semibold ${internal ? "text-[var(--text-link)]" : "text-foreground"}`}>
           {title}
@@ -307,7 +308,7 @@ export function ToolsMenu({
           {scope && (
             <span
               data-prov-armed={armed ? "" : undefined}
-              className={`absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full ${armed ? "bg-green-500" : "bg-transparent"}`}
+              className={`absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full ${armed ? "bg-teal-600 dark:bg-teal-400" : "bg-transparent"}`}
               aria-hidden="true"
             />
           )}
@@ -364,7 +365,7 @@ export function ToolsMenu({
         <span className={copied ? undefined : "hidden sm:inline"}>{copied ? "Copied" : "Tools"}</span>
         <span
           data-prov-armed={armed ? "" : undefined}
-          className={`h-1.5 w-1.5 rounded-full ${armed ? "bg-green-500" : "bg-transparent"}`}
+          className={`h-1.5 w-1.5 rounded-full ${armed ? "bg-teal-600 dark:bg-teal-400" : "bg-transparent"}`}
           aria-hidden="true"
         />
         {copied ? (
