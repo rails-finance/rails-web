@@ -28,6 +28,9 @@
 //      openers read the same as V2 — `Open  Deposit 6 ◊  Borrow 10K ♭`.
 
 import { ProtocolGlyph } from "@/components/icons/protocol-glyphs";
+import { BarSubjectTile } from "@/components/shared/bar-subject-mark";
+import { barSubjectOf } from "@/lib/shared/known-infrastructure";
+import { useChainId } from "@/lib/shared/chain-context";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { createContext, Fragment, useContext, type ReactNode } from "react";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
@@ -1040,9 +1043,14 @@ export function HeadSurplusChip({ surplus }: { surplus: NonNullable<ChainTruthRo
  *  the truncated address; with `ens` set and no registry name, the address's
  *  ENS reverse record does (batched through the same hook the pink chip uses),
  *  degrading to the hex until one resolves. Its own component so the hook
- *  runs unconditionally. */
-export function PartyChip({ party }: { party: NonNullable<ChainTruthRowSpec["party"]> }) {
+ *  runs unconditionally. `tile`: the event page's head chip, where a product
+ *  the timeline's bar names draws the bar's mark as a 40 px tile
+ *  (`BarSubjectTile`, rails-ops TO-DO-ui-jobs 438); any other party keeps the
+ *  chip's own mark. */
+export function PartyChip({ party, tile }: { party: NonNullable<ChainTruthRowSpec["party"]>; tile?: boolean }) {
   const ens = useEnsName(party.ens ? party.address : null);
+  const chainId = useChainId();
+  const subject = tile && party.name ? barSubjectOf(party.address, chainId) : undefined;
   const shown = party.name ?? ens ?? `${party.address.slice(0, 6)}…${party.address.slice(-4)}`;
   // Named by its words and its address, not its place in the tree, so the
   // server's and the browser's renders agree (rails-ops TO-DO-ui-jobs 508).
@@ -1051,12 +1059,16 @@ export function PartyChip({ party }: { party: NonNullable<ChainTruthRowSpec["par
     <Prov
       info={party.prov}
       value={party.name ?? ens ?? party.address}
-      className="inline-flex items-center gap-1 text-sm"
+      className={`inline-flex items-center text-sm ${subject ? "gap-2" : "gap-1"}`}
     >
       <span className="text-rb-500" data-party-chip={chipId} data-prov-hidden="">
         {party.prefix}
       </span>
-      {party.name && party.glyph ? (
+      {subject ? (
+        <span className="inline-flex" data-party-icon={`bar:${subject.icon}`} data-prov-hidden="">
+          <BarSubjectTile subject={subject} />
+        </span>
+      ) : party.name && party.glyph ? (
         <span className="inline-flex shrink-0" data-party-icon={`glyph:${party.glyph}`} data-prov-hidden="">
           <ProtocolGlyph id={party.glyph} className="size-3.5 text-foreground" />
         </span>

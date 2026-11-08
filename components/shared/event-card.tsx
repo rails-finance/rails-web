@@ -966,7 +966,7 @@ function EventCardView(props: EventCardProps) {
                     page={page}
                     sentence={pageSentence}
                     beside={pageSentence && head?.surplus ? <HeadSurplusChip surplus={head.surplus} /> : undefined}
-                    party={head?.party?.name ? <PartyChip party={head.party} /> : undefined}
+                    party={head?.party?.name ? <PartyChip party={head.party} tile /> : undefined}
                     learnMore={learnMore}
                   />
                 </CardSidebarFrame>
