@@ -27,7 +27,7 @@ import {
   yearnVaultAssetsContent,
   yearnVaultCardContent,
 } from "@/lib/vaults/card-words";
-import type { VaultYield } from "@/lib/vaults/yield";
+import { measuredYield, type VaultYield } from "@/lib/vaults/yield";
 import {
   yearnVaultDebtProv,
   yearnVaultEndorsedProv,
@@ -69,7 +69,7 @@ const fraction = (part: RawAmount | null, total: RawAmount | null): number | nul
 
 export function YearnVaultPage({
   data,
-  yieldFigure,
+  yieldFigure: storeYield,
   strip,
 }: {
   data: YearnVaultResponse;
@@ -80,6 +80,8 @@ export function YearnVaultPage({
   const registry = useReceiptRegistry();
   const y = data.vault;
   const v = yearnVaultPageSummary(data);
+  // A figure on total assets under the dust floor is too small to measure (ui-jobs 542).
+  const yieldFigure = measuredYield(storeYield, v.totalAssets?.raw);
   const unit = y.asset.symbol;
   const ad = y.asset.decimals;
   const asset = { symbol: unit, address: y.asset.address };

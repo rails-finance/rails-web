@@ -2,7 +2,14 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { vaultYield, yieldText, changeText } from "../../lib/vaults/yield.ts";
+import {
+  vaultYield,
+  yieldText,
+  changeText,
+  jumpTail,
+  measuredYield,
+  tooSmallToMeasure,
+} from "../../lib/vaults/yield.ts";
 
 /** Days `first`..`last` with a price rising by `step` raw units a day from `start`. */
 function series(first, last, { start = 1_000_000n, step = 100n, skip = [], firstDay } = {}) {
@@ -104,4 +111,70 @@ test("a flat series names no jump however its wobble falls", () => {
   const s = series(100, 130, { step: 0n });
   s.obs = s.obs.map(([d, raw, b]) => [d, String(BigInt(raw) + (d === 120 ? 1n : 0n)), b]);
   assert.equal(vaultYield(s).jump, undefined);
+});
+
+// ui-jobs 542: a one-off move over up to 7 days, and the dust floor.
+
+/** A flat price from `first` to `last`, doubling linearly over `riseFrom`..`riseTo`. */
+function rising(first, last, riseFrom, riseTo) {
+  const obs = [];
+  for (let d = first; d <= last; d++) {
+    const k = d <= riseFrom ? 0 : d >= riseTo ? riseTo - riseFrom : d - riseFrom;
+    obs.push([d, String(1_000_000n + (1_000_000n * BigInt(k)) / BigInt(riseTo - riseFrom)), String(d * 7200)]);
+  }
+  return { firstDay: first, obs };
+}
+
+test("a doubling unlocked over 7 days is named as one span (dUSDT's shape)", () => {
+  const y = vaultYield(rising(100, 130, 120, 127));
+  assert.equal(y.jump.fromDay, 120);
+  assert.equal(y.jump.day, 127);
+  assert.equal(
+    jumpTail(y.jump, (d) => `day ${d}`),
+    ", +100.00% of it from day 120 to day 127",
+  );
+});
+
+test("a one-day step inside steady growth reads 'on' its day", () => {
+  const s = series(100, 130, { step: 30n });
+  s.obs = s.obs.map(([d, raw, b]) => [d, String(BigInt(raw) + (d >= 115 ? 500_000n : 0n)), b]);
+  const y = vaultYield(s);
+  assert.equal(y.jump.fromDay, undefined);
+  assert.equal(y.jump.day, 115);
+});
+
+test("a rate that runs high for 5 days is no one-off move", () => {
+  // 0.05% a day, then 0.3% a day for 5 days: those days carry over half the move at 6 times the pace.
+  const obs = [];
+  let p = 1_000_000_000n;
+  for (let d = 100; d <= 130; d++) {
+    obs.push([d, String(p), String(d * 7200)]);
+    p += d >= 120 && d < 125 ? (p * 30n) / 10_000n : (p * 5n) / 10_000n;
+  }
+  assert.equal(vaultYield({ firstDay: 100, obs }).jump, undefined);
+});
+
+test("a move spread over more than 7 days is not named", () => {
+  assert.equal(vaultYield(rising(100, 130, 110, 125)).jump, undefined);
+});
+
+test("a one-day step still reads 'on' its day", () => {
+  const y = vaultYield(rising(100, 130, 120, 121));
+  assert.equal(y.jump.fromDay, undefined);
+  assert.equal(y.jump.day, 121);
+  assert.equal(
+    jumpTail(y.jump, (d) => `day ${d}`),
+    ", +100.00% of it on day 121",
+  );
+});
+
+test("under 10,000 raw units of total assets is too small to measure", () => {
+  assert.equal(tooSmallToMeasure("9999"), true);
+  assert.equal(tooSmallToMeasure(10_000n), false);
+  const y = vaultYield(series(100, 130));
+  assert.deepEqual(measuredYield(y, "2"), { none: "too-small" });
+  assert.equal(measuredYield(y, "10000"), y);
+  // Unread total assets, or no figure to replace, leave the answer as it is.
+  assert.equal(measuredYield(y, null), y);
+  assert.deepEqual(measuredYield({ none: "no-series" }, "2"), { none: "no-series" });
 });

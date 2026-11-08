@@ -19,7 +19,7 @@ import { formatDate } from "@/lib/date";
 import { assetText, sharePriceText } from "@/lib/shared/vault-amount-text";
 import type { VaultStanding, VaultSummary } from "@/lib/vaults/summary";
 import type { VaultFamily } from "@/lib/vaults/families";
-import { changeText, yieldText, type VaultYield } from "@/lib/vaults/yield";
+import { changeText, jumpTail, measuredYield, yieldText, type VaultYield } from "@/lib/vaults/yield";
 import { vaultHoldersProv, vaultWithdrawableProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
 import { illiquidSentence, type VaultIlliquid } from "@/lib/vaults/illiquid";
 
@@ -164,9 +164,24 @@ export function IlliquidCaution({ vault: v, il, detail }: { vault: VaultSummary;
 
 /** The four headlines. `detail`: the card, which prints the print rules' full
  *  figures and gives every label its read-more; else the row's compact form. */
+type MeasuredYield = Extract<VaultYield, { yearly: number }>;
+
+/** The Yield subline's words: "share price +0.42% over the 30 days to block
+ *  N", and the one-off move where there is one. */
+export const yieldSublineText = (y: MeasuredYield): string =>
+  `share price ${changeText(y.change)} over the ${y.days} days to block ${n(y.to.block)}${
+    y.jump ? jumpTail(y.jump, (d) => formatDate(new Date(d * 86_400_000))) : ""
+  }`;
+
+/** "The vault holds 0.000002 USDC at block N.": the too-small subline. */
+export const tooSmallSentence = (v: VaultSummary): string =>
+  v.totalAssets
+    ? `The vault holds ${assetText(v.totalAssets, v.asset.decimals)} ${v.asset.symbol} at block ${n(v.readAt.block)}.`
+    : "";
+
 export function vaultHeads({
   vault: v,
-  yieldFigure,
+  yieldFigure: storeYield,
   holdersHref,
   receipts,
   detail = false,
@@ -229,7 +244,9 @@ export function vaultHeads({
 
   // The slot draws whatever the store answers, so the four headlines align
   // (decision 0047 point 4): a figure where the store measures 30 days, else
-  // no figure and a subline saying why. The interpretation tip goes with the label.
+  // no figure and a subline saying why; a vault under the dust floor is too
+  // small to measure (ui-jobs 542). The interpretation tip goes with the label.
+  const yieldFigure = measuredYield(storeYield, v.totalAssets?.raw);
   if (yieldFigure && "yearly" in yieldFigure) {
     heads.push({
       id: "yield",
@@ -247,10 +264,34 @@ export function vaultHeads({
         </span>
       ),
       sub: (
-        <span {...(yieldFigure.jump ? { "data-yield-jump-day": String(yieldFigure.jump.day) } : {})}>
-          {`share price ${changeText(yieldFigure.change)} over the ${yieldFigure.days} days to block ${n(yieldFigure.to.block)}`}
-          {yieldFigure.jump &&
-            `, ${changeText(yieldFigure.jump.change)} of it on ${formatDate(new Date(yieldFigure.jump.day * 86_400_000))}`}
+        <span
+          {...(yieldFigure.jump
+            ? {
+                "data-yield-jump-day": String(yieldFigure.jump.day),
+                ...(yieldFigure.jump.fromDay != null
+                  ? { "data-yield-jump-from": String(yieldFigure.jump.fromDay) }
+                  : {}),
+              }
+            : {})}
+        >
+          {yieldSublineText(yieldFigure)}
+          {v.illiquid && <IlliquidCaution vault={v} il={v.illiquid} detail={detail} />}
+        </span>
+      ),
+    });
+  } else if (yieldFigure?.none === "too-small" && v.totalAssets) {
+    heads.push({
+      id: "yield",
+      label: "Yield",
+      labelTip: detail ? VAULT_HEAD_TIPS.yield : undefined,
+      value: (
+        <span className="text-[15px] font-normal text-rb-500" data-cell="yield" data-yield-none="too-small">
+          too small to measure
+        </span>
+      ),
+      sub: (
+        <span data-yield-too-small={v.totalAssets.raw}>
+          {tooSmallSentence(v)}
           {v.illiquid && <IlliquidCaution vault={v} il={v.illiquid} detail={detail} />}
         </span>
       ),

@@ -47,7 +47,7 @@ import {
   SHARES_ISSUED_TIP,
   STEWARD_TIP,
 } from "@/lib/vaults/card-words";
-import type { VaultYield } from "@/lib/vaults/yield";
+import { measuredYield, type VaultYield } from "@/lib/vaults/yield";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const lltvText = (lltv: number) => `${(lltv * 100).toFixed(1)}%`;
@@ -72,7 +72,7 @@ const blueWalletHref = (chainId: 1 | 8453, vault: string) =>
 export function MorphoBaseVaultPage({
   data,
   census,
-  yieldFigure,
+  yieldFigure: storeYield,
   strip,
   factory,
 }: {
@@ -89,6 +89,8 @@ export function MorphoBaseVaultPage({
   const words = CHAIN_WORDS[chainId];
   const base = (kind: "address" | "block", v: string | number) => explorerUrl(chainId, kind, v);
   const v = morphoBaseVaultPageSummary(data, census);
+  // A figure on total assets under the dust floor is too small to measure (ui-jobs 542).
+  const yieldFigure = measuredYield(storeYield, v.totalAssets?.raw);
   const coords: MorphoVaultCoords = {
     chainId,
     readBy: serverReadOf(data),

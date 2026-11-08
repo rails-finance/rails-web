@@ -15,7 +15,14 @@ import { assetText } from "@/lib/shared/vault-amount-text";
 import { stripChangeProv, stripYoungProv, type StripTile } from "@/lib/vaults/strip-provenance";
 import { vaultHoldersProv } from "@/lib/vaults/row-provenance";
 import type { VaultSummary } from "@/lib/vaults/summary";
-import { changeText, type SeriesWindow, type VaultYield, type VaultYieldRead } from "@/lib/vaults/yield";
+import {
+  changeText,
+  jumpTail,
+  type SeriesWindow,
+  type VaultYield,
+  type VaultYieldJump,
+  type VaultYieldRead,
+} from "@/lib/vaults/yield";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -85,10 +92,10 @@ function Sparkline({ points, label }: { points: readonly VaultYieldRead[]; label
 type Measured = Extract<SeriesWindow, { from: VaultYieldRead }>;
 
 /** The tile's sentence for a measured window. */
-function changeSentence(tile: StripTile, v: VaultSummary, w: Measured, jump?: { day: number; change: number }) {
+function changeSentence(tile: StripTile, v: VaultSummary, w: Measured, jump?: VaultYieldJump) {
   const tail = ` over the ${w.days} days to block ${n(w.to.block)}`;
   if (w.change != null) {
-    return `${changeText(w.change)}${tail}${jump ? `, ${changeText(jump.change)} of it on ${dayText(jump.day)}` : ""}`;
+    return `${changeText(w.change)}${tail}${jump ? jumpTail(jump, dayText) : ""}`;
   }
   // A window that starts at zero has no percentage; the move is stated.
   if (BigInt(w.to.raw) === BigInt(0)) return `0 throughout the ${w.days} days to block ${n(w.to.block)}`;
@@ -145,7 +152,7 @@ function SeriesTile({
   label: string;
   vault: VaultSummary;
   series: { key: string; window: SeriesWindow } | null;
-  jump?: { day: number; change: number };
+  jump?: VaultYieldJump;
   /** What the tile says where the store holds no series. */
   none?: React.ReactNode;
 }) {
@@ -194,7 +201,7 @@ export function VaultStrip({
   vault: VaultSummary;
   /** The store's three windows; null where the store did not answer. */
   strip: VaultStripSeries | null;
-  /** The share price's Yield, for the one-day jump its subline names. */
+  /** The share price's Yield, for the one-off move its subline names. */
   yieldFigure?: VaultYield;
 }) {
   const c = v.census;
