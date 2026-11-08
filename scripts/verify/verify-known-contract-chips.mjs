@@ -58,8 +58,10 @@ const FIXTURES = [
   {
     label: "aave-v3 base 0x0750 (CoW swap on Base)",
     path: "/base/aave-v3/0x07502bf24fe1a4d81254900a693b7dce64945556",
+    // The transfer out reads as a sale through CoW once the receipt read
+    // lands (ui-jobs 438: the aToken's interest mint is no second leg back).
     expect: [
-      { text: "to CoW", icon: COW_ICON },
+      { text: "via CoW", icon: COW_ICON },
       { text: "from CoW", icon: COW_ICON },
     ],
   },
@@ -135,7 +137,7 @@ for (const fx of FIXTURES) {
     await page.waitForTimeout(2500);
     chips = await page.evaluate(() =>
       [...document.querySelectorAll("span.text-rb-500")]
-        .filter((s) => /^(to|from)$/.test((s.textContent || "").trim()))
+        .filter((s) => /^(to|from|via)$/.test((s.textContent || "").trim()))
         .map((p) => {
           const chip = p.parentElement;
           const icon = chip.querySelector("[data-party-icon]");
@@ -161,7 +163,7 @@ for (const fx of FIXTURES) {
   }
 
   // The chip's text is prefix + label with no separator in textContent.
-  const norm = (s) => s.replace(/^(to|from)\s*/, "$1 ");
+  const norm = (s) => s.replace(/^(to|from|via)\s*/, "$1 ");
 
   for (const want of fx.expect ?? []) {
     const hit = chips.find((c) => norm(c.text) === want.text);
