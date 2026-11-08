@@ -11,11 +11,11 @@
 // from without saying so would be technically true and practically a lie.
 
 import { AaveMarketPage } from "@/components/shared/aave-market-page";
+import { SEAMLESS_MARKET } from "@/lib/shared/aave-market-configs";
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
 import { BASE_CHAIN_ID, explorerUrl } from "@/lib/shared/chains";
 import { SEAMLESS_FREEZE_BLOCK, SEAMLESS_FREEZE_DATE, SEAMLESS_FREEZE_TX } from "@/lib/seamless/asset-catalog";
-import { aaveV3MarketModal } from "@/lib/aave-v3/event-templates";
 
 export default function SeamlessMarketPage() {
   return (
@@ -51,16 +51,7 @@ export default function SeamlessMarketPage() {
         </div>
       </div>
 
-      <AaveMarketPage
-        protocol="seamless"
-        chainId={BASE_CHAIN_ID}
-        apiRoute="/api/chain/seamless/market"
-        listingHref="/base/seamless"
-        protocolName="Seamless"
-        marketLabel="Seamless · Base"
-        purpose="An Aave V3 fork on Base with its own Pool, reserves, risk parameters and oracle, frozen since April 2025 and winding down."
-        learnMore={aaveV3MarketModal("seamless")}
-      />
+      <AaveMarketPage market={SEAMLESS_MARKET} />
       <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
       <ProvInspectorLayer />
     </>

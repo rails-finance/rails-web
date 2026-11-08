@@ -88,7 +88,10 @@ export type SessionProtocol =
   | "sky-savings"
   // CoW, at `/ethereum/cow`: a wallet's trades through CoW's
   // settlement, from victoria's Sieve (rails-ops decisions/0058 step 3).
-  | "cow";
+  | "cow"
+  // Pendle, at `/ethereum/pendle`: a wallet's PT, YT and LP per market, from
+  // victoria's router capture and chain reads at a pinned block.
+  | "pendle";
 
 /** What a saved entry is: a wallet, a position page or a listing view. */
 export type SavedKind = "wallet" | "position" | "view";
