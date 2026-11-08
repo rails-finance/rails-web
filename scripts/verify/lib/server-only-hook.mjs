@@ -7,7 +7,16 @@
 //
 // run-all.mjs passes it for every `.ts` verifier except one that mocks a module
 // (`mock.module` does not tolerate it; those mock `server-only` themselves).
-import { register } from "node:module";
+//
+// tsx loads a module that is not ESM through `require`, which the resolve hook
+// does not see (lib/sources/chain/rpc.ts and lib/api/fetch-with-auth.ts are
+// server-only since ui-jobs 519), so `server-only` is also put in the require
+// cache as an empty module.
+import { createRequire, register } from "node:module";
+
+const require = createRequire(import.meta.url);
+const serverOnly = require.resolve("server-only");
+require.cache[serverOnly] = { id: serverOnly, filename: serverOnly, loaded: true, exports: {} };
 
 register(
   "data:text/javascript," +
