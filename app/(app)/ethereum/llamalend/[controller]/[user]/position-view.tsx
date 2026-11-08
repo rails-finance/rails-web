@@ -408,7 +408,7 @@ export default function LlamalendPositionView({
     return (
       <div className="py-8">
         <p className="text-sm text-rb-500">
-          Not a LlamaLend position — the route is /llamalend/&lt;controller&gt;/&lt;user&gt;, two addresses (each
+          Not a LlamaLend position: the route is /llamalend/&lt;controller&gt;/&lt;user&gt;, two addresses (each
           controller is an isolated market).
         </p>
       </div>

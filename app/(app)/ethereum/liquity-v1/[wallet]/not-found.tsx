@@ -11,7 +11,7 @@ export default function LiquityV1TroveNotFound() {
       backLabel="Browse Liquity V1 Troves"
     >
       A Liquity V1 Trove is keyed by its owner&rsquo;s 20-byte address. The URL does not carry one, so there is no Trove
-      to look up — an address that never borrowed here would still resolve, and say so.
+      to look up. An address that never borrowed here would still resolve, and say so.
     </RouteNotFound>
   );
 }

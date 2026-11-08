@@ -41,7 +41,7 @@ export const revalidate = 600;
 export const metadata = {
   title: "Maple pools",
   description:
-    "The two permissionless syrup pools — what each claims to be worth, what lenders can actually reach right now, and the loan book behind the rest.",
+    "The two permissionless syrup pools: what each claims to be worth, what lenders can reach right now, and the loan book behind the rest.",
 };
 
 const PROTOCOL = protocolForHref("/ethereum/maple")!;
@@ -60,7 +60,7 @@ export default async function MaplePoolsPage() {
       <div className="py-8">
         <SubPageHeader
           protocol={PROTOCOL}
-          title="Pools & what lenders can actually reach"
+          title="Pools & what lenders can reach"
           stamp={<MaplePoolsStamp pools={pools} />}
         />
 
