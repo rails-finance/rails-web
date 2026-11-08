@@ -2395,130 +2395,147 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
 }
 
 /* The house table's stacked rows (D6; components/shared/data-table). Below sm
-   a table that opts in (`DataTable stacked`) reads each row as a card: the
+   (below lg with `stackBelow="lg"`, `.dt-stack-lg`; the `dt-cards` variant
+   holds both) a table that opts in (`DataTable stacked`) reads each row as a card: the
    same elements reflowed, the stripes and the linked row's border moving
    from the cells to the row. Unlayered, so it wins over the cells' utilities. */
 .dt-cell-label,
 .dt-lead-mark {
   display: none;
 }
-@media (width < 40rem) {
-  table.dt-stacked {
+@custom-variant dt-cards {
+  @media (width < 40rem) {
+    @slot;
+  }
+  @media (40rem <= width < 64rem) {
+    &:where(.dt-stack-lg, .dt-stack-lg *) {
+      @slot;
+    }
+  }
+}
+table.dt-stacked {
+  @variant dt-cards {
     display: block;
     min-width: 0;
     width: 100%;
+    & > thead {
+      display: none;
+    }
+    & > tbody {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    & > tbody > tr {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      position: relative;
+      padding-left: 6px;
+      border-radius: 1rem;
+      overflow: hidden;
+    }
+    /* The card's body, a panel in the stripe: right of the 6px hue edge, its
+       left corners rounded over the hue (D5's curve at this width). */
+    & > tbody > tr::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 0 6px;
+      z-index: -1;
+      border-radius: 1rem;
+      background-color: var(--surface-raised);
+      transition: background-color 150ms;
+    }
+    & > tbody > tr:nth-child(even)::before {
+      background-color: var(--surface-sunken);
+    }
+    & > tbody > tr:hover::before {
+      background-color: var(--surface-selected);
+    }
+    /* The hue behind the panel's corners: the edge's own run-on, widened to
+       the card's full height under the panel. */
+    & > tbody > tr > [data-anatomy~="D5"]::before {
+      left: 0;
+      width: 1.375rem;
+      z-index: -2;
+    }
+    & > tbody > tr > [data-anatomy~="D5"] + * {
+      border-radius: 0;
+    }
+    & > tbody > tr > * {
+      display: block;
+      position: relative;
+      background-color: transparent;
+      border-radius: 0;
+      text-align: left;
+    }
+    /* The linked row's border: one outline round the card, in place of the cells'. */
+    & > tbody > tr > *::after {
+      display: none;
+    }
+    & > tbody > tr[data-anatomy~="D4"]::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 20;
+      pointer-events: none;
+      border: 1px solid transparent;
+      border-radius: 1rem;
+      transition: border-color 150ms;
+    }
+    & > tbody > tr[data-anatomy~="D4"]:hover::after,
+    & > tbody > tr[data-anatomy~="D4"]:focus-within::after {
+      border-color: var(--color-blue-500);
+    }
+    & > tbody > tr > [role="rowheader"],
+    & > tbody > tr > .dt-cell-wide {
+      grid-column: 1 / -1;
+    }
+    & > tbody > tr > [role="cell"]:empty {
+      display: none;
+    }
+    /* No lead zone, no edge: the card's body runs to its left side. */
+    & > tbody > tr:not(:has(> [data-anatomy~="D5"])) {
+      padding-left: 0;
+    }
+    & > tbody > tr:not(:has(> [data-anatomy~="D5"]))::before {
+      left: 0;
+    }
+    /* The lead zone: a 6px edge in the protocol's hue, its glyphs moved to the
+       card's first line (`DataTableLeadMark`); its names stay for a screen reader. */
+    & > tbody > tr > [data-anatomy~="D5"] {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 6px;
+      height: auto;
+      padding: 0;
+    }
+    & > tbody > tr > [data-anatomy~="D5"] > [data-closed-zone] {
+      width: 6px;
+      height: 100%;
+      min-height: 0;
+      border-radius: 0;
+    }
+    & > tbody > tr > [data-anatomy~="D5"] > [data-closed-zone] :is(svg, img) {
+      display: none;
+    }
+    & [role="cell"] .flex-wrap {
+      justify-content: flex-start;
+    }
+    & .dt-cell-label {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 11px;
+      line-height: 1.3;
+      color: var(--text-muted);
+    }
+    & .dt-lead-mark {
+      display: inline-flex;
+    }
   }
-  table.dt-stacked > thead {
-    display: none;
-  }
-  table.dt-stacked > tbody {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-  table.dt-stacked > tbody > tr {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    position: relative;
-    padding-left: 6px;
-    border-radius: 1rem;
-    overflow: hidden;
-  }
-  /* The card's body, a panel in the stripe: right of the 6px hue edge, its
-     left corners rounded over the hue (D5's curve at this width). */
-  table.dt-stacked > tbody > tr::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 0 6px;
-    z-index: -1;
-    border-radius: 1rem;
-    background-color: var(--surface-raised);
-    transition: background-color 150ms;
-  }
-  table.dt-stacked > tbody > tr:nth-child(even)::before {
-    background-color: var(--surface-sunken);
-  }
-  table.dt-stacked > tbody > tr:hover::before {
-    background-color: var(--surface-selected);
-  }
-  /* The hue behind the panel's corners: the edge's own run-on, widened to
-     the card's full height under the panel. */
-  table.dt-stacked > tbody > tr > [data-anatomy~="D5"]::before {
-    left: 0;
-    width: 1.375rem;
-    z-index: -2;
-  }
-  table.dt-stacked > tbody > tr > [data-anatomy~="D5"] + * {
-    border-radius: 0;
-  }
-  table.dt-stacked > tbody > tr > * {
-    display: block;
-    position: relative;
-    background-color: transparent;
-    border-radius: 0;
-    text-align: left;
-  }
-  /* The linked row's border: one outline round the card, in place of the cells'. */
-  table.dt-stacked > tbody > tr > *::after {
-    display: none;
-  }
-  table.dt-stacked > tbody > tr[data-anatomy~="D4"]::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    z-index: 20;
-    pointer-events: none;
-    border: 1px solid transparent;
-    border-radius: 1rem;
-    transition: border-color 150ms;
-  }
-  table.dt-stacked > tbody > tr[data-anatomy~="D4"]:hover::after,
-  table.dt-stacked > tbody > tr[data-anatomy~="D4"]:focus-within::after {
-    border-color: var(--color-blue-500);
-  }
-  table.dt-stacked > tbody > tr > [role="rowheader"],
-  table.dt-stacked > tbody > tr > .dt-cell-wide {
-    grid-column: 1 / -1;
-  }
-  table.dt-stacked > tbody > tr > [role="cell"]:empty {
-    display: none;
-  }
-  /* No lead zone, no edge: the card's body runs to its left side. */
-  table.dt-stacked > tbody > tr:not(:has(> [data-anatomy~="D5"])) {
-    padding-left: 0;
-  }
-  table.dt-stacked > tbody > tr:not(:has(> [data-anatomy~="D5"]))::before {
-    left: 0;
-  }
-  /* The lead zone: a 6px edge in the protocol's hue, its glyphs moved to the
-     card's first line (`DataTableLeadMark`); its names stay for a screen reader. */
-  table.dt-stacked > tbody > tr > [data-anatomy~="D5"] {
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: 6px;
-    height: auto;
-    padding: 0;
-  }
-  table.dt-stacked > tbody > tr > [data-anatomy~="D5"] > [data-closed-zone] {
-    width: 6px;
-    height: 100%;
-    min-height: 0;
-    border-radius: 0;
-  }
-  table.dt-stacked > tbody > tr > [data-anatomy~="D5"] > [data-closed-zone] :is(svg, img) {
-    display: none;
-  }
-  table.dt-stacked [role="cell"] .flex-wrap {
-    justify-content: flex-start;
-  }
-  table.dt-stacked .dt-cell-label {
-    display: block;
-    margin-bottom: 2px;
-    font-size: 11px;
-    line-height: 1.3;
-    color: var(--text-muted);
-  }
-  table.dt-stacked .dt-lead-mark {
-    display: inline-flex;
+}
+/* A table that stacks below lg has room for three figures a line from sm. */
+@media (40rem <= width < 64rem) {
+  table.dt-stacked.dt-stack-lg > tbody > tr {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

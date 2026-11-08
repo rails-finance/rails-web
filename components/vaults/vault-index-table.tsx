@@ -31,8 +31,9 @@ import { useCallback, type ReactNode } from "react";
 import type { ChainId } from "@/lib/shared/chains";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { AssetUnit } from "@/components/vaults/asset-unit";
+import { AssetUnit } from "@/components/shared/asset-unit";
 import {
+  DATA_TABLE_PILL,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -134,10 +135,8 @@ function InAsset({ v, children, ...rest }: { v: VaultSummary; children: ReactNod
   );
 }
 
-/** A standing pill on a row: a ground apart from both stripes and the hovered
- *  row's `bg-selected` (the card's VAULT_PILL is rb-300, which is that). */
-const PILL =
-  "rounded-sm bg-background px-1.5 py-0.5 text-[11px] text-foreground/80 dark:bg-rb-600 dark:text-foreground/70";
+/** A standing pill on a row, on the table's pill ground. */
+const PILL = `${DATA_TABLE_PILL} px-1.5 py-0.5 text-[11px]`;
 
 export function VaultIndexTable({
   rows,
@@ -262,7 +261,7 @@ export function VaultIndexTable({
         caption={`${part === "funded" ? "Vaults" : "Vaults that hold nothing"}; total assets and share price are in each vault’s asset`}
         tableClassName="min-w-[640px] text-sm"
         stacked
-        oneLine
+        rowHeight="one"
       >
         <DataTableHead>
           <DataTableLeadHeader />

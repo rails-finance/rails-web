@@ -29,7 +29,8 @@
 // (on the frame), D4 a linked row, D5 the lead cell, D6 stacked rows (on the
 // frame in D3's place).
 //
-// STACKED ROWS (D6, opt-in: `DataTable stacked`). Below sm the same <table>
+// STACKED ROWS (D6, opt-in: `DataTable stacked`; `stackBelow="lg"` for a
+// table too wide for a tablet). Below sm (or lg) the same <table>
 // reflows into cards by CSS (`.dt-stacked`, app/globals.css), with explicit
 // ARIA roles so a screen reader still reads rows of labelled cells: the
 // header row hides, the lead zone narrows to a 6px edge in the protocol's hue
@@ -66,6 +67,10 @@ type Align = "left" | "right";
 /** The cell's padding; a caller adds its own sizes and type. */
 export const DATA_TABLE_PAD = "px-2 py-2.5 sm:px-3";
 
+/** A pill or tag on a row: a ground apart from both stripes and the hovered
+ *  row's `bg-selected`; the caller adds its size and case. */
+export const DATA_TABLE_PILL = "rounded-sm bg-background text-foreground/80 dark:bg-rb-600 dark:text-foreground/70";
+
 /** The row block's surfaces and corners, on every body cell. */
 const CELL_SURFACE =
   "transition-colors group-odd/dt-row:bg-raised group-even/dt-row:bg-sunken group-hover/dt-row:bg-selected first:rounded-l-2xl last:rounded-r-2xl";
@@ -82,9 +87,13 @@ const RowHref = createContext<string | null>(null);
  *  since a reflowed table loses its own. */
 const Stacked = createContext(false);
 
-/** Every row one fixed height from sm: one line, 56px (D1's `oneLine`), or a
- *  name over a sub-label, 64px (`twoLine`). */
-const RowHeight = createContext<"one" | "two" | null>(null);
+/** D1's `rowHeight`, from sm (from lg where the table stacks below lg). The
+ *  class names are written out for Tailwind to find. */
+const ROW_HEIGHT = {
+  sm: { one: "sm:h-14 sm:py-0", two: "sm:h-16 sm:py-0", three: "sm:h-19 sm:py-0" },
+  lg: { one: "lg:h-14 lg:py-0", two: "lg:h-16 lg:py-0", three: "lg:h-19 lg:py-0" },
+} as const;
+const RowHeight = createContext<string>("");
 
 /** The frame and the table. `tableClassName` sets a minimum width (the frame
  *  scrolls below it) and the body's type. */
@@ -93,8 +102,8 @@ export function DataTable({
   label,
   anatomy,
   stacked = false,
-  oneLine = false,
-  twoLine = false,
+  stackBelow = "sm",
+  rowHeight,
   tableClassName = "",
   className = "",
   children,
@@ -111,14 +120,14 @@ export function DataTable({
    *  the other cells in two columns, each with its `label`. The caller draws
    *  its own sort control for that width. */
   stacked?: boolean;
-  /** From sm every row is one line, 56px (room for a 28px icon), each cell
-   *  middle-aligned; the caller keeps its content to one line (a long name
-   *  truncates). */
-  oneLine?: boolean;
-  /** From sm every row is two lines, 64px (a name over a one-line
-   *  sub-label), each cell middle-aligned; the caller keeps each line to one
-   *  (it truncates). Not with `oneLine`. */
-  twoLine?: boolean;
+  /** Where the cards give way to the table: `lg` for a table too wide for a
+   *  tablet (`.dt-stack-lg`). The row heights then start at lg. */
+  stackBelow?: "sm" | "lg";
+  /** From sm every row is one fixed height, each cell middle-aligned, the
+   *  caller keeping its content inside it (a long name truncates): `one`
+   *  line, 56px (room for a 28px icon); `two`, 64px (a name over a one-line
+   *  sub-label); `three`, 76px (a bar over two lines of text). */
+  rowHeight?: "one" | "two" | "three";
   tableClassName?: string;
   className?: string;
   children: ReactNode;
@@ -127,14 +136,14 @@ export function DataTable({
     // `relative`: a visually hidden span inside a cell is placed against the
     // frame, so it never widens the page.
     <Stacked.Provider value={stacked}>
-      <RowHeight.Provider value={oneLine ? "one" : twoLine ? "two" : null}>
+      <RowHeight.Provider value={rowHeight ? ROW_HEIGHT[stacked ? stackBelow : "sm"][rowHeight] : ""}>
         <div
           className={`relative isolate max-w-full overflow-x-auto ${className}`}
           data-anatomy={[anatomy, "D1", stacked ? "D6" : "D3"].filter(Boolean).join(" ")}
           {...frame}
         >
           <table
-            className={`w-full border-separate border-spacing-x-0 border-spacing-y-1 ${stacked ? "dt-stacked" : ""} ${tableClassName}`}
+            className={`w-full border-separate border-spacing-x-0 border-spacing-y-1 ${stacked ? "dt-stacked" : ""} ${stacked && stackBelow === "lg" ? "dt-stack-lg" : ""} ${tableClassName}`}
             aria-label={caption ? undefined : label}
             role={stacked ? "table" : undefined}
           >
@@ -347,7 +356,7 @@ export function DataTableCell({
   const stacked = useContext(Stacked);
   const height = useContext(RowHeight);
   const named = stacked && label ? <span className="dt-cell-label">{label}</span> : null;
-  const cls = `${CELL_SURFACE} ${valign === "middle" || height ? "align-middle" : "align-top"} ${height === "one" ? "sm:h-14 sm:py-0" : height === "two" ? "sm:h-16 sm:py-0" : ""} ${wide ? "dt-cell-wide" : ""} ${href ? LINKED_CELL : ""} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
+  const cls = `${CELL_SURFACE} ${valign === "middle" || height ? "align-middle" : "align-top"} ${height} ${wide ? "dt-cell-wide" : ""} ${href ? LINKED_CELL : ""} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
     sticky ? `${sticky} z-10` : ""
   } ${className}`;
   const cover = href ? <RowCover href={href} /> : null;

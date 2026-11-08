@@ -9,7 +9,7 @@
 // vault at one block (survey §7.3); its header tip names the denominator. One
 // line under the heading; the rest is behind the section's "?".
 //
-// From sm every row is two lines, 64px (D1 `twoLine`): the venue over its
+// From sm every row is two lines, 64px (D1 `rowHeight="two"`): the venue over its
 // sub-label, each truncating with its full text in a `title` where it is
 // text. Amount carries the asset's mark (`AssetUnit`). Rows are unlinked: a
 // venue has no one Rails page (a Morpho market has two, a strategy or a
@@ -22,7 +22,7 @@ import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { NotLoaded } from "@/components/shared/not-loaded";
-import { AssetUnit } from "@/components/vaults/asset-unit";
+import { AssetUnit } from "@/components/shared/asset-unit";
 import {
   DataTable,
   DataTableBody,
@@ -148,7 +148,7 @@ export function VaultAssets({
         tableClassName="text-[12px]"
         label={`Where this vault's ${assetSymbol} is, by venue`}
         stacked
-        twoLine
+        rowHeight="two"
       >
         <DataTableHead>
           <DataTableHeader label="Venue" />

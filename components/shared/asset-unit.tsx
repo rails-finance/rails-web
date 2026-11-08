@@ -1,7 +1,7 @@
 "use client";
 
 // The unit after a figure in a vault's asset, in the house table's rows (V3,
-// V6; rails-ops ui-jobs 538, 539): the asset's mark at 15px, its symbol as
+// V6, M1; rails-ops ui-jobs 538, 539): the asset's mark at 15px, its symbol as
 // the image's text and title, or the symbol in words where the token has no
 // mark, so no figure reads unitless (decision 0028 point 8).
 
