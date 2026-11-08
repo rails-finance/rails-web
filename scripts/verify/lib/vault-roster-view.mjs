@@ -196,9 +196,13 @@ export async function checkRosterView({ page, base, route, scope, check, tag, ho
       `${bad} rows out of order`,
     );
     // The rule is the header's tip, read with the sort button (no line above the table).
-    for (const [key, word, more] of [
-      ["assets", "total assets", " It ranks by what the vault holds: total assets less lost assets."],
-      ["price", "share price", ""],
+    for (const [key, word, rule] of [
+      [
+        "assets",
+        "total assets",
+        "Sorts by token, then by what the vault holds within each token: total assets less lost assets.",
+      ],
+      ["price", "share price", "Sorts by token, then by share price within each token."],
     ]) {
       const th = page.locator(`${scope} [data-vault-table='funded'] th[data-sort-key='${key}']`);
       const tip = await th.locator(`[data-header-tip='${key}']`).count();
@@ -209,7 +213,7 @@ export async function checkRosterView({ page, base, route, scope, check, tag, ho
         .catch(() => "");
       check(
         `${tag}i the ${word} header's tip says how it sorts, read with its sort button`,
-        tip === 1 && said === `Sorts by token, then by ${word} within each token.${more}`,
+        tip === 1 && said === rule,
         `tip ${tip}, described as “${said}”`,
       );
     }

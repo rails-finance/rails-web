@@ -80,8 +80,7 @@ const DEFAULT_SORT: SortKey = "holders";
 
 /** How an amount in the vault's asset sorts: by token, then inside it. */
 const SORT_NOTE: Partial<Record<SortKey, string>> = {
-  assets:
-    "Sorts by token, then by total assets within each token. It ranks by what the vault holds: total assets less lost assets.",
+  assets: "Sorts by token, then by what the vault holds within each token: total assets less lost assets.",
   price: "Sorts by token, then by share price within each token.",
 };
 
