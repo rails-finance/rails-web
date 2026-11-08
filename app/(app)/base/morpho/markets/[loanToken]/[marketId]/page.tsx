@@ -57,7 +57,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const pair = m ? `${m.loanSymbol} / ${m.collateralSymbol ?? "no collateral"}` : "Morpho Blue market";
   return {
     title: `${pair} · Morpho Blue on Base`,
-    description: `One Morpho Blue market on Base — ${pair}: what it holds, how used, its oracle price and when that price was published, and every position in it.`,
+    description: `One Morpho Blue market on Base, ${pair}: what it holds, how used, its oracle price and when that price was published, and every position in it.`,
     alternates: { canonical: `/base/morpho/markets/${token}/${id}` },
     ...ROBOTS,
   };

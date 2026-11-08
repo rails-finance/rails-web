@@ -11,7 +11,7 @@ export default function AaveV4SpokePositionNotFound() {
       backLabel="Browse Aave V4 positions"
     >
       This page is about one account in one spoke, named by its 20-byte address. The URL does not carry one, so there is
-      no account to look up — an address with no position in this spoke would still resolve, and say so.
+      no account to look up. An address with no position in this spoke would still resolve, and say so.
     </RouteNotFound>
   );
 }
