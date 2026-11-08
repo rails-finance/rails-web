@@ -20,7 +20,8 @@ import { assetText, sharePriceText } from "@/lib/shared/vault-amount-text";
 import type { VaultStanding, VaultSummary } from "@/lib/vaults/summary";
 import type { VaultFamily } from "@/lib/vaults/families";
 import { changeText, yieldText, type VaultYield } from "@/lib/vaults/yield";
-import { vaultHoldersProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
+import { vaultHoldersProv, vaultWithdrawableProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
+import { illiquidSentence, type VaultIlliquid } from "@/lib/vaults/illiquid";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -37,6 +38,7 @@ export const STANDING_WORD: Record<VaultStanding, string> = {
   "shut-down": "shut down",
   paused: "paused",
   "address-book": "in Aave’s address book",
+  illiquid: "illiquid",
 };
 
 const VENUE: Record<VaultFamily, VaultVenue> = {
@@ -137,6 +139,29 @@ function InAsset({ v, children, exact }: { v: VaultSummary; children: ReactNode;
 
 const withProv = (info: Provenance | undefined, text: string) => (info ? <Prov info={info}>{text}</Prov> : text);
 
+/** The Yield slot's caution on an illiquid vault (ui-jobs 540): which markets
+ *  hold it, and what can be withdrawn at the read block. `detail` prints the
+ *  full figures with the receipt; the row, the compact form. */
+export function IlliquidCaution({ vault: v, il, detail }: { vault: VaultSummary; il: VaultIlliquid; detail: boolean }) {
+  const raw = BigInt(il.withdrawable);
+  const amount = { raw: il.withdrawable, value: Number(raw) / 10 ** v.asset.decimals };
+  const out = detail ? assetText(amount, v.asset.decimals) : formatCompact(amount.value);
+  const total = v.totalAssets
+    ? detail
+      ? assetText(v.totalAssets, v.asset.decimals)
+      : formatCompact(v.totalAssets.value)
+    : null;
+  return (
+    <span className="mt-1 block" data-yield-illiquid={il.markets.map((m) => m.id).join(" ")}>
+      {illiquidSentence(il)}{" "}
+      <span data-illiquid-withdrawable={il.withdrawable}>
+        {detail ? <Prov info={vaultWithdrawableProv(v, il)}>{out}</Prov> : out}
+      </span>
+      {total != null ? ` of ${total}` : ""} {v.asset.symbol} can be withdrawn at block {n(il.block)}.
+    </span>
+  );
+}
+
 /** The four headlines. `detail`: the card, which prints the print rules' full
  *  figures and gives every label its read-more; else the row's compact form. */
 export function vaultHeads({
@@ -226,6 +251,7 @@ export function vaultHeads({
           {`share price ${changeText(yieldFigure.change)} over the ${yieldFigure.days} days to block ${n(yieldFigure.to.block)}`}
           {yieldFigure.jump &&
             `, ${changeText(yieldFigure.jump.change)} of it on ${formatDate(new Date(yieldFigure.jump.day * 86_400_000))}`}
+          {v.illiquid && <IlliquidCaution vault={v} il={v.illiquid} detail={detail} />}
         </span>
       ),
     });
@@ -243,6 +269,7 @@ export function vaultHeads({
             : yieldFigure == null
               ? "daily series not read"
               : "no daily series yet"}
+          {v.illiquid && <IlliquidCaution vault={v} il={v.illiquid} detail={detail} />}
         </span>
       ),
     });

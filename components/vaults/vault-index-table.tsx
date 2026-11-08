@@ -19,7 +19,8 @@
 // two quantities of one token are the only amounts compared (decision 0028
 // point 8: no USD, no cross-asset total); each header's "?" says so, and the
 // sort button reads the same words. Yield and Holders compare across
-// every row. A vault with no figure for the key sorts last, both ways.
+// every row. A vault with no figure for the key sorts last, both ways; on
+// Yield an illiquid vault (ui-jobs 540) sorts after the other figures.
 //
 // The whole row links the vault's page (the name is the one focusable link).
 // BELOW sm each row reads as a card (D6): the protocol's hue as its left edge,
@@ -50,6 +51,7 @@ import { VAULT_FAMILIES } from "@/lib/vaults/families";
 import { VAULT_INDEX_PROTOCOL_LABEL, vaultIndexProtocol } from "@/lib/vaults/index-rosters";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
 import { yieldText, type VaultYield } from "@/lib/vaults/yield";
+import { illiquidSentence } from "@/lib/vaults/illiquid";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { sharePriceText } from "@/lib/shared/vault-amount-text";
 
@@ -113,6 +115,11 @@ function comparator(key: SortKey, dir: "asc" | "desc", yieldOf: (v: VaultSummary
     if (within !== 0) return within;
     const fa = figureOf(key, a, yieldOf(a));
     const fb = figureOf(key, b, yieldOf(b));
+    // Yield: an illiquid vault's figure is interest accruing on debt nobody
+    // repays (ui-jobs 540), so it sorts after every other figure, both ways,
+    // and before the rows with none.
+    if (key === "yield" && fa != null && fb != null && Boolean(a.illiquid) !== Boolean(b.illiquid))
+      return a.illiquid ? 1 : -1;
     if (fa == null || fb == null) {
       if (fa != null) return -1;
       if (fb != null) return 1;
@@ -402,7 +409,12 @@ export function VaultIndexTable({
                       // From sm the pills give way before the name's first 7rem.
                       <span className="flex flex-wrap gap-1 max-sm:basis-full sm:min-w-0 sm:flex-nowrap sm:overflow-hidden">
                         {v.standing.map((st) => (
-                          <span key={st} className={`${PILL} sm:truncate`} title={STANDING_WORD[st]} data-pill={st}>
+                          <span
+                            key={st}
+                            className={`${PILL} sm:truncate`}
+                            title={st === "illiquid" && v.illiquid ? illiquidSentence(v.illiquid) : STANDING_WORD[st]}
+                            data-pill={st}
+                          >
                             {STANDING_WORD[st]}
                           </span>
                         ))}

@@ -59,6 +59,8 @@ import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta } from "./erc20-meta";
+import { readMetaMorphoIlliquid } from "./metamorpho-illiquid";
+import type { VaultIlliquid } from "@/lib/vaults/illiquid";
 import type { RawAmount } from "./morpho-base-vault";
 import { type MorphoBaseVaultFactory } from "@/lib/morpho-base/vault-catalog";
 import {
@@ -132,6 +134,9 @@ export interface MorphoBaseVaultDirectoryRow {
   curator: string | null;
   /** `owner()`, or null when the call did not answer. */
   owner: string | null;
+  /** The illiquid test at the pinned block (lib/vaults/illiquid.ts): null
+   *  where the vault was read and not caught, absent where it was not read. */
+  illiquid?: VaultIlliquid | null;
 }
 
 export interface MorphoBaseVaultDirectoryResponse {
@@ -242,6 +247,24 @@ async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaul
         });
       }),
     );
+
+    // The illiquid test (ui-jobs 540) on every vault holding assets, at the
+    // same block. A failed read leaves the rows untested, never liquid.
+    try {
+      const funded = rows.filter((r) => r.totalAssets != null && BigInt(r.totalAssets.raw) > ZERO);
+      const illiquid = await readMetaMorphoIlliquid(
+        client,
+        chainId,
+        blockNumber,
+        funded.map((r) => r.address.toLowerCase()),
+      );
+      for (const r of funded) {
+        const key = r.address.toLowerCase();
+        if (illiquid.has(key)) r.illiquid = illiquid.get(key)!;
+      }
+    } catch (error) {
+      console.error(`Morpho vault directory: the illiquid read failed (chain ${chainId}):`, error);
+    }
 
     return {
       chainId,

@@ -48,6 +48,8 @@ import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta, assertDecimalsRead } from "./erc20-meta";
+import { legInput, readRatesAtTarget } from "./metamorpho-illiquid";
+import { needsRateAtTarget, vaultIlliquid, type VaultIlliquid } from "@/lib/vaults/illiquid";
 import { MORPHO_BASE_BLUE, MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { type MorphoBaseVaultCatalogEntry, type MorphoBaseVaultFactory } from "@/lib/morpho-base/vault-catalog";
 import {
@@ -317,6 +319,9 @@ export interface MorphoBaseVaultResponse {
   gap: RawAmount;
 
   legs: MorphoBaseVaultLeg[];
+  /** The illiquid test at `blockNumber` (lib/vaults/illiquid.ts): null where
+   *  the vault is not caught, absent where it was not tested. */
+  illiquid?: VaultIlliquid | null;
   holder: MorphoBaseVaultHolder | null;
 }
 
@@ -723,6 +728,40 @@ export async function loadMorphoBaseVault(
       });
     });
 
+    // The illiquid test (ui-jobs 540) over the same reads, at the same block,
+    // with each hot market's rate at target: lib/vaults/illiquid.ts. A queue
+    // with a leg unread, or a rate that did not answer, is left untested.
+    let illiquid: VaultIlliquid | null | undefined;
+    try {
+      const reads = ids.map((id, i) => ({
+        id,
+        params: ok(legReads[i * 3]) as MarketParamsTuple | undefined,
+        market: ok(legReads[i * 3 + 1]) as MarketTuple | undefined,
+        position: ok(legReads[i * 3 + 2]) as PositionTuple | undefined,
+      }));
+      if (reads.every((r) => r.params && r.market && r.position)) {
+        const inputs = reads.map((r) =>
+          legInput(
+            r.id,
+            { params: r.params!, market: r.market! },
+            r.position![0],
+            null,
+            raw.find((x) => x.leg.id === r.id)?.leg.collateralSymbol ?? null,
+          ),
+        );
+        const hot = inputs.filter((l) => needsRateAtTarget(chainId, l));
+        const rates = hot.length > 0 ? await readRatesAtTarget(client, blockNumber, hot) : new Map<string, bigint>();
+        if (hot.every((l) => rates.has(l.id)))
+          illiquid = vaultIlliquid(
+            chainId,
+            Number(blockNumber),
+            inputs.map((l) => ({ ...l, rateAtTarget: rates.get(l.id) ?? null })),
+          );
+      }
+    } catch (error) {
+      console.error(`Morpho vault ${vaultAddress}: the illiquid read failed:`, error);
+    }
+
     const allocatedRaw = raw.reduce((s, r) => s + r.assetsRaw, ZERO);
     const shares = holderShares ?? ZERO;
     const legs: MorphoBaseVaultLeg[] = raw.map(({ leg, assetsRaw }) => ({
@@ -788,6 +827,7 @@ export async function loadMorphoBaseVault(
       allocated: amount(allocatedRaw, assetDecimals),
       gap: amount(totalAssetsRaw - allocatedRaw, assetDecimals),
       legs,
+      ...(illiquid !== undefined ? { illiquid } : {}),
       holder:
         holderShares == null || holderAddress == null
           ? null

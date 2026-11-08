@@ -16,6 +16,7 @@ import { VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults
 import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
 import { VaultFinder } from "@/components/vaults/vault-finder";
 import { VaultStrip } from "@/components/vaults/vault-strip";
+import { VaultIlliquidMarkets } from "@/components/vaults/vault-illiquid";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
 import { explorerUrl } from "@/lib/shared/chains";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
@@ -310,6 +311,7 @@ export function MorphoBaseVaultPage({
         receipts={{ totalAssets: vaultTotalAssetsProv(coords), sharePrice: vaultSharePriceProv(coords) }}
         status={null}
         stats={stats}
+        band={v.illiquid ? <VaultIlliquidMarkets vault={v} il={v.illiquid} /> : undefined}
         links={links}
         explanation={explanation}
         learnMore={morphoVaultCardContent()}

@@ -30,12 +30,15 @@ import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import type { MaplePool } from "@/lib/maple/asset-catalog";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { releaseLabel, type VaultFamily } from "@/lib/vaults/families";
+import type { VaultIlliquid } from "@/lib/vaults/illiquid";
 
 /** What the chain or the venue states about a vault's standing, as a pill
  *  reads it. `endorsed`: Yearn's Registry endorses it. `shut-down`: the vault
  *  answers `isShutdown()` true. `paused`: the vault says deposits are paused.
- *  `address-book`: Aave publishes the address in its own address book. */
-export type VaultStanding = "endorsed" | "shut-down" | "paused" | "address-book";
+ *  `address-book`: Aave publishes the address in its own address book.
+ *  `illiquid`: Rails's test over the chain's reads of a MetaMorpho vault's
+ *  markets (lib/vaults/illiquid.ts, ui-jobs 540). */
+export type VaultStanding = "endorsed" | "shut-down" | "paused" | "address-book" | "illiquid";
 
 /** Who runs the vault, by the role the contract names: a MetaMorpho
  *  `curator()` (or its `owner()` where no curator is named), an Umbrella
@@ -79,6 +82,9 @@ export interface VaultSummary {
   steward: VaultSteward | null;
   /** What the chain or the venue states; empty where it states nothing. */
   standing: VaultStanding[];
+  /** The markets that make a MetaMorpho vault illiquid, at the read block;
+   *  absent where the vault is not caught or was not tested. */
+  illiquid?: VaultIlliquid;
   /** The block the vault was created in, where the catalogue holds it. */
   createdBlock: number | null;
   /** The position census for this vault: every address it counted, live and
@@ -128,7 +134,8 @@ export function morphoBaseVaultSummary(
     totalSupply: r.totalSupply,
     sharePrice: r.sharePrice,
     steward: r.curator ? { role: "curator", address: r.curator } : r.owner ? { role: "owner", address: r.owner } : null,
-    standing: [],
+    standing: r.illiquid ? ["illiquid"] : [],
+    ...(r.illiquid ? { illiquid: r.illiquid } : {}),
     createdBlock: r.createdBlock,
     census: censusOf(census),
     readAt: readAt(d),
@@ -274,7 +281,8 @@ export function morphoBaseVaultPageSummary(d: MorphoBaseVaultResponse, census: V
     totalSupply: d.totalSupply,
     sharePrice: d.sharePrice,
     steward: v.curator ? { role: "curator", address: v.curator } : { role: "owner", address: v.owner },
-    standing: [],
+    standing: d.illiquid ? ["illiquid"] : [],
+    ...(d.illiquid ? { illiquid: d.illiquid } : {}),
     createdBlock: v.createdBlock,
     census: censusOf(census ?? undefined),
     readAt: { block: d.blockNumber, timestamp: "" },
