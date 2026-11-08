@@ -57,6 +57,16 @@ export const shareText = (a: RawAmount, decimals: number) => {
   return a.value !== 0 && parseFloat(text.replace(/,/g, "")) === 0 ? formatUnitsExact(a.raw, decimals) : text;
 };
 
+/** A figure in a vault card's stats (anatomy V2, ui-jobs 546), whose column is a third of a phone
+ *  wide: a zero reads "0", and a non-zero amount below the floor reads "<0.000001" (its exact
+ *  decimal goes in the tip, components/vaults/stat-amount.tsx). Anything larger reads `printed`,
+ *  the amount or share rule above. */
+export const statText = (a: RawAmount, printed: string): string => {
+  if (/^-?0*$/.test(a.raw.trim())) return "0";
+  if (Math.abs(a.value) < TINY_AMOUNT_FLOOR) return `${a.value < 0 ? "-" : ""}${TINY_AMOUNT_FLOOR_TEXT}`;
+  return printed;
+};
+
 /** A percentage to four significant figures. Only ever called above the dust
  *  threshold, where four figures is a real reading rather than a row of zeroes.
  *  Below 0.000001% toPrecision would switch to exponent form, so that reads

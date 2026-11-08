@@ -391,6 +391,13 @@ const amountText = (raw, decimals) => {
   });
   return value !== 0 && parseFloat(text.replace(/,/g, "")) === 0 ? exactUnits(raw, decimals) : text;
 };
+/** …its `statText` (ui-jobs 546): a vault card's stat reads "0" at zero and "<0.000001" below it. */
+const statAmountText = (raw, decimals) =>
+  raw === BigInt(0)
+    ? "0"
+    : Math.abs(Number(raw) / Math.pow(10, decimals)) < 1e-6
+      ? "<0.000001"
+      : amountText(raw, decimals);
 /** …its `shareText`. */
 const shareText = (raw, decimals) => {
   const value = Number(raw) / Math.pow(10, decimals);
@@ -893,10 +900,10 @@ check(
 );
 check(
   "3b the cap and the remaining capacity are this script's own supplyCap() and maxDeposit(), and cap − total == maxDeposit exactly",
-  sghoPage.supplyCap?.startsWith(amountText(ownCap, sghoAd)) &&
-    sghoPage.capacity?.startsWith(amountText(ownMaxDeposit, sghoAd)) &&
+  sghoPage.supplyCap?.startsWith(statAmountText(ownCap, sghoAd)) &&
+    sghoPage.capacity?.startsWith(statAmountText(ownMaxDeposit, sghoAd)) &&
     ownCap - OWN.get(SGHO).totalAssets === ownMaxDeposit,
-  `cap "${sghoPage.supplyCap}" vs "${amountText(ownCap, sghoAd)}"; capacity "${sghoPage.capacity}" vs "${amountText(ownMaxDeposit, sghoAd)}"; invariant ${ownCap - OWN.get(SGHO).totalAssets === ownMaxDeposit}`,
+  `cap "${sghoPage.supplyCap}" vs "${statAmountText(ownCap, sghoAd)}"; capacity "${sghoPage.capacity}" vs "${statAmountText(ownMaxDeposit, sghoAd)}"; invariant ${ownCap - OWN.get(SGHO).totalAssets === ownMaxDeposit}`,
 );
 const ownGap = ownGhoHeld - OWN.get(SGHO).totalAssets;
 const wantGapText = (ownGap > BigInt(0) ? "+" : "") + amountText(ownGap, sghoAd);
@@ -904,8 +911,8 @@ const wantGapText = (ownGap > BigInt(0) ? "+" : "") + amountText(ownGap, sghoAd)
 // them, and carries no RAY slot: 3c reads the held balance alone, 3d retired.
 check(
   "3c the GHO the contract holds is a separate read from totalAssets(), this script's own balanceOf()",
-  sghoPage.sghoAssetHeld?.startsWith(amountText(ownGhoHeld, sghoAd)),
-  `held "${sghoPage.sghoAssetHeld}" vs "${amountText(ownGhoHeld, sghoAd)}" (gap own ${ownGap}, ${wantGapText}, not drawn)`,
+  sghoPage.sghoAssetHeld?.startsWith(statAmountText(ownGhoHeld, sghoAd)),
+  `held "${sghoPage.sghoAssetHeld}" vs "${statAmountText(ownGhoHeld, sghoAd)}" (gap own ${ownGap}, ${wantGapText}, not drawn)`,
 );
 skip(
   "3d both RAY slots print as the contract stores them",
@@ -1027,9 +1034,9 @@ check(
 );
 check(
   "5b the slashable amount is this script's own read, and totalAssets − its floor == slashable exactly (the floor is not drawn)",
-  stkPage.maxSlashable?.startsWith(amountText(ownSlashable, stkAd)) &&
+  stkPage.maxSlashable?.startsWith(statAmountText(ownSlashable, stkAd)) &&
     OWN.get(STK_USDC).totalAssets - ownMinRemaining === ownSlashable,
-  `slashable "${stkPage.maxSlashable}" vs "${amountText(ownSlashable, stkAd)}"; floor "${stkPage.minRemaining}" vs "${amountText(ownMinRemaining, stkAd)}"; invariant ${OWN.get(STK_USDC).totalAssets - ownMinRemaining === ownSlashable}`,
+  `slashable "${stkPage.maxSlashable}" vs "${statAmountText(ownSlashable, stkAd)}"; floor "${stkPage.minRemaining}" vs "${amountText(ownMinRemaining, stkAd)}"; invariant ${OWN.get(STK_USDC).totalAssets - ownMinRemaining === ownSlashable}`,
 );
 check(
   "5c the reserve is the one THIS SCRIPT's own asset() hops reach, and Umbrella's answers about it are this script's own",

@@ -19,6 +19,7 @@ import { VaultStrip } from "@/components/vaults/vault-strip";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
 import { explorerUrl } from "@/lib/shared/chains";
 import { assetText, pctText, shareText, shortAddress } from "@/lib/shared/vault-amount-text";
+import { StatAmount } from "@/components/vaults/stat-amount";
 import { yearnVaultPageSummary } from "@/lib/vaults/summary";
 import { vaultVenueShareProv } from "@/lib/vaults/card-provenance";
 import {
@@ -114,7 +115,9 @@ export function YearnVaultPage({
         "total-supply",
         y.totalSupply?.raw,
         y.totalSupply ? (
-          <Prov info={yearnVaultTotalSupplyProv(coords)}>{shareText(y.totalSupply, y.shareDecimals ?? ad)}</Prov>
+          <Prov info={yearnVaultTotalSupplyProv(coords)}>
+            <StatAmount amount={y.totalSupply} decimals={y.shareDecimals ?? ad} shares />
+          </Prov>
         ) : (
           UNREAD
         ),
@@ -128,7 +131,13 @@ export function YearnVaultPage({
       value: fig(
         "total-idle",
         y.totalIdle?.raw,
-        y.totalIdle ? <Prov info={yearnVaultIdleProv(coords)}>{assetText(y.totalIdle, ad)}</Prov> : UNREAD,
+        y.totalIdle ? (
+          <Prov info={yearnVaultIdleProv(coords)}>
+            <StatAmount amount={y.totalIdle} decimals={ad} symbol={unit} />
+          </Prov>
+        ) : (
+          UNREAD
+        ),
       ),
     },
     {
@@ -139,7 +148,13 @@ export function YearnVaultPage({
       value: fig(
         "total-debt",
         y.totalDebt?.raw,
-        y.totalDebt ? <Prov info={yearnVaultDebtProv(coords)}>{assetText(y.totalDebt, ad)}</Prov> : UNREAD,
+        y.totalDebt ? (
+          <Prov info={yearnVaultDebtProv(coords)}>
+            <StatAmount amount={y.totalDebt} decimals={ad} symbol={unit} />
+          </Prov>
+        ) : (
+          UNREAD
+        ),
       ),
     },
     {

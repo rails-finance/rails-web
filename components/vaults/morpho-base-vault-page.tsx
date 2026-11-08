@@ -21,6 +21,7 @@ import type { VaultStripSeries } from "@/lib/vaults/yield-read";
 import { explorerUrl } from "@/lib/shared/chains";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { assetText, pctText, shareText, shortAddress, shortId } from "@/lib/shared/vault-amount-text";
+import { StatAmount } from "@/components/vaults/stat-amount";
 import { morphoBasePositionHref, morphoBaseWalletHref } from "@/lib/morpho-base/routes";
 import { morphoLoanTokenHref } from "@/lib/morpho/market-routes";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
@@ -115,7 +116,9 @@ export function MorphoBaseVaultPage({
       sub: vault.symbol,
       value: (
         <span data-figure="total-shares">
-          <Prov info={vaultTotalSupplyProv(coords)}>{shareText(data.totalSupply, vault.decimals)}</Prov>
+          <Prov info={vaultTotalSupplyProv(coords)}>
+            <StatAmount amount={data.totalSupply} decimals={vault.decimals} symbol={vault.symbol} shares />
+          </Prov>
         </span>
       ),
     },
@@ -126,7 +129,9 @@ export function MorphoBaseVaultPage({
       asset,
       value: (
         <span data-figure="allocated">
-          <Prov info={vaultAllocatedProv(coords)}>{assetText(data.allocated, ad)}</Prov>
+          <Prov info={vaultAllocatedProv(coords)}>
+            <StatAmount amount={data.allocated} decimals={ad} symbol={unit} />
+          </Prov>
         </span>
       ),
     },
@@ -137,7 +142,9 @@ export function MorphoBaseVaultPage({
       asset,
       value: (
         <span data-figure="gap">
-          <Prov info={vaultGapProv(coords)}>{assetText(data.gap, ad)}</Prov>
+          <Prov info={vaultGapProv(coords)}>
+            <StatAmount amount={data.gap} decimals={ad} symbol={unit} />
+          </Prov>
         </span>
       ),
     },
@@ -170,7 +177,9 @@ export function MorphoBaseVaultPage({
       asset,
       value: (
         <span data-figure="lost-assets">
-          <Prov info={vaultLostAssetsProv(coords)}>{assetText(lostStat, ad)}</Prov>
+          <Prov info={vaultLostAssetsProv(coords)}>
+            <StatAmount amount={lostStat} decimals={ad} symbol={unit} />
+          </Prov>
         </span>
       ),
     });
