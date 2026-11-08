@@ -31,14 +31,18 @@ import type { MaplePool } from "@/lib/maple/asset-catalog";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { releaseLabel, type VaultFamily } from "@/lib/vaults/families";
 import type { VaultIlliquid } from "@/lib/vaults/illiquid";
+import { hasLostAssets } from "@/lib/vaults/lost-assets";
+import { tooSmallToMeasure } from "@/lib/vaults/yield";
 
 /** What the chain or the venue states about a vault's standing, as a pill
  *  reads it. `endorsed`: Yearn's Registry endorses it. `shut-down`: the vault
  *  answers `isShutdown()` true. `paused`: the vault says deposits are paused.
  *  `address-book`: Aave publishes the address in its own address book.
  *  `illiquid`: Rails's test over the chain's reads of a MetaMorpho vault's
- *  markets (lib/vaults/illiquid.ts, ui-jobs 540). */
-export type VaultStanding = "endorsed" | "shut-down" | "paused" | "address-book" | "illiquid";
+ *  markets (lib/vaults/illiquid.ts, ui-jobs 540). `lost-assets`: a MetaMorpho
+ *  V1.1 vault's `lostAssets()` is 1% or more of its total (lib/vaults/lost-assets.ts,
+ *  ui-jobs 543). */
+export type VaultStanding = "endorsed" | "shut-down" | "paused" | "address-book" | "illiquid" | "lost-assets";
 
 /** Who runs the vault, by the role the contract names: a MetaMorpho
  *  `curator()` (or its `owner()` where no curator is named), an Umbrella
@@ -77,6 +81,10 @@ export interface VaultSummary {
   totalSupply: RawAmount | null;
   /** One whole share in the asset, `convertToAssets(10 ** shareDecimals)`. */
   sharePrice: RawAmount | null;
+  /** A MetaMorpho V1.1 vault's `lostAssets()` at the read block, in the asset.
+   *  Null where the vault reverted (V1.0), the call failed, or the family has
+   *  no such ledger. */
+  lostAssets: RawAmount | null;
   /** Null where the directory reads no steward, or the role is unread. A
    *  steward of the zero address is a reading (ownership renounced). */
   steward: VaultSteward | null;
@@ -96,6 +104,10 @@ export interface VaultSummary {
 }
 
 const readAt = (d: { blockNumber: number; readAt: string }) => ({ block: d.blockNumber, timestamp: d.readAt });
+
+/** The "lost assets" standing's test, the dust floor applied. */
+const lostOf = (total: RawAmount | null, lost: RawAmount | null) =>
+  hasLostAssets(total?.raw, lost?.raw, tooSmallToMeasure);
 
 /** Census rows by lowercased vault address. */
 export function censusByVault(rows: readonly VaultCensusRow[]): Map<string, VaultCensusRow> {
@@ -133,8 +145,12 @@ export function morphoBaseVaultSummary(
     totalAssets: r.totalAssets,
     totalSupply: r.totalSupply,
     sharePrice: r.sharePrice,
+    lostAssets: r.lostAssets,
     steward: r.curator ? { role: "curator", address: r.curator } : r.owner ? { role: "owner", address: r.owner } : null,
-    standing: r.illiquid ? ["illiquid"] : [],
+    standing: [
+      ...(r.illiquid ? (["illiquid"] as const) : []),
+      ...(lostOf(r.totalAssets, r.lostAssets) ? (["lost-assets"] as const) : []),
+    ],
     ...(r.illiquid ? { illiquid: r.illiquid } : {}),
     createdBlock: r.createdBlock,
     census: censusOf(census),
@@ -173,6 +189,7 @@ export function aaveEthereumVaultSummary(
     totalAssets: r.totalAssets,
     totalSupply: r.totalSupply,
     sharePrice: r.sharePrice,
+    lostAssets: null,
     steward: null,
     standing: inBook ? ["address-book"] : [],
     createdBlock: null,
@@ -211,6 +228,7 @@ export function yearnVaultSummary(r: YearnVaultDirectoryRow, d: YearnVaultDirect
     totalAssets: r.totalAssets,
     totalSupply: null,
     sharePrice: r.sharePrice,
+    lostAssets: null,
     steward: null,
     standing,
     createdBlock: r.createdBlock,
@@ -247,6 +265,7 @@ export function maplePoolSummary(
     totalAssets: state ? amount(state.raw.totalAssets, state.totalAssets) : null,
     totalSupply: state ? amount(state.raw.totalSupply, state.totalSupply) : null,
     sharePrice: state ? amount(state.raw.navRate, state.navRate) : null,
+    lostAssets: null,
     steward: null,
     standing: [],
     createdBlock: p.deployBlock,
@@ -280,8 +299,12 @@ export function morphoBaseVaultPageSummary(d: MorphoBaseVaultResponse, census: V
     totalAssets: d.totalAssets,
     totalSupply: d.totalSupply,
     sharePrice: d.sharePrice,
+    lostAssets: d.lostAssets,
     steward: v.curator ? { role: "curator", address: v.curator } : { role: "owner", address: v.owner },
-    standing: d.illiquid ? ["illiquid"] : [],
+    standing: [
+      ...(d.illiquid ? (["illiquid"] as const) : []),
+      ...(lostOf(d.totalAssets, d.lostAssets) ? (["lost-assets"] as const) : []),
+    ],
     ...(d.illiquid ? { illiquid: d.illiquid } : {}),
     createdBlock: v.createdBlock,
     census: censusOf(census ?? undefined),
@@ -313,6 +336,7 @@ export function aaveEthereumVaultPageSummary(
     totalAssets: d.totalAssets,
     totalSupply: d.totalSupply,
     sharePrice: d.sharePrice,
+    lostAssets: null,
     steward: d.umbrella?.owner ? { role: "owner", address: d.umbrella.owner } : null,
     standing,
     createdBlock: null,
@@ -341,6 +365,7 @@ export function yearnVaultPageSummary(d: YearnVaultResponse): VaultSummary {
     totalAssets: v.totalAssets,
     totalSupply: v.totalSupply,
     sharePrice: v.sharePrice,
+    lostAssets: null,
     steward: v.roleManager ? { role: "roleManager", address: v.roleManager } : null,
     standing,
     createdBlock: v.createdBlock,

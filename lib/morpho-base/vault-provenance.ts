@@ -150,6 +150,32 @@ const vaultLostAssetsProv_ = (c: MorphoVaultCoords): Provenance => ({
   via: `${lane(c)} · MetaMorpho.lostAssets() @ the pinned block`,
 });
 
+/** Held — `totalAssets() − lostAssets()`, what a V1.1 vault's markets hold
+ *  (ui-jobs 543). Recomputable from the two reads; the raw values are inputs. */
+const vaultHeldAssetsProv_ = (c: MorphoVaultCoords, r: { totalAssets: string; lostAssets: string }): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: c.blockNumber },
+  verify: {
+    kind: "recompute",
+    text: `Re-run MetaMorpho.totalAssets() and MetaMorpho.lostAssets()${atBlock(c)} against any ${chainWord(c)} node and subtract`,
+  },
+  summary: `Held — the vault's \`totalAssets()\` minus its \`lostAssets()\`${atBlock(c)}, in ${asset(c)}: what its markets hold. Total assets and the share price are stated with the loss included; the holders who withdraw last carry it.`,
+  contract: vaultContract(c),
+  via: `${lane(c)} · MetaMorpho.totalAssets() − MetaMorpho.lostAssets() @ the pinned block`,
+  formula: "totalAssets − lostAssets",
+  inputs: [
+    {
+      label: "totalAssets",
+      value: r.totalAssets,
+      kind: "chain",
+      pclass: "state",
+      note: "MetaMorpho.totalAssets(), raw",
+    },
+    { label: "lostAssets", value: r.lostAssets, kind: "chain", pclass: "state", note: "MetaMorpho.lostAssets(), raw" },
+  ],
+});
+
 // ── what Blue says the vault holds ───────────────────────────────────────────
 
 /** One leg's assets — Blue's own share→asset conversion on the market's STORED
@@ -463,6 +489,7 @@ export const vaultTotalAssetsProv = withServerRead(vaultTotalAssetsProv_);
 export const vaultTotalSupplyProv = withServerRead(vaultTotalSupplyProv_);
 export const vaultSharePriceProv = withServerRead(vaultSharePriceProv_);
 export const vaultLostAssetsProv = withServerRead(vaultLostAssetsProv_);
+export const vaultHeldAssetsProv = withServerRead(vaultHeldAssetsProv_);
 export const vaultLegAssetsProv = withServerRead(vaultLegAssetsProv_);
 export const vaultLegShareProv = withServerRead(vaultLegShareProv_);
 export const vaultLegLltvProv = withServerRead(vaultLegLltvProv_);

@@ -31,6 +31,7 @@ import {
   vaultLegLltvProv,
   vaultLegShareProv,
   vaultLostAssetsProv,
+  vaultHeldAssetsProv,
   vaultSharePriceProv,
   vaultTotalAssetsProv,
   vaultTotalSupplyProv,
@@ -157,8 +158,9 @@ export function MorphoBaseVaultPage({
       ),
     },
   ];
-  // Absent, not zero, on a V1.0 vault: that family keeps no such ledger.
-  if (data.lostAssets)
+  // Absent on a V1.0 vault, which keeps no such ledger, and hidden at zero.
+  const lostStat = data.lostAssets && BigInt(data.lostAssets.raw) > BigInt(0) ? data.lostAssets : null;
+  if (lostStat)
     stats.push({
       id: "lost-assets",
       label: "Lost assets",
@@ -166,7 +168,7 @@ export function MorphoBaseVaultPage({
       asset,
       value: (
         <span data-figure="lost-assets">
-          <Prov info={vaultLostAssetsProv(coords)}>{assetText(data.lostAssets, ad)}</Prov>
+          <Prov info={vaultLostAssetsProv(coords)}>{assetText(lostStat, ad)}</Prov>
         </span>
       ),
     });
@@ -308,7 +310,19 @@ export function MorphoBaseVaultPage({
         vault={v}
         yieldFigure={yieldFigure}
         holdersHref={metaMorphoVaultsListingHref(chainId, { vault: vault.address })}
-        receipts={{ totalAssets: vaultTotalAssetsProv(coords), sharePrice: vaultSharePriceProv(coords) }}
+        receipts={{
+          totalAssets: vaultTotalAssetsProv(coords),
+          sharePrice: vaultSharePriceProv(coords),
+          ...(data.lostAssets
+            ? {
+                lostAssets: vaultLostAssetsProv(coords),
+                heldAssets: vaultHeldAssetsProv(coords, {
+                  totalAssets: data.totalAssets.raw,
+                  lostAssets: data.lostAssets.raw,
+                }),
+              }
+            : {}),
+        }}
         status={null}
         stats={stats}
         band={v.illiquid ? <VaultIlliquidMarkets vault={v} il={v.illiquid} /> : undefined}
@@ -329,9 +343,7 @@ export function MorphoBaseVaultPage({
             ["Allocated in Morpho Blue", `${assetText(data.allocated, ad)} ${unit}`],
             ["Unaccrued interest", `${assetText(data.gap, ad)} ${unit}`],
             [`Steward (${steward.role})`, steward.address],
-            ...(data.lostAssets
-              ? ([["Lost assets", `${assetText(data.lostAssets, ad)} ${unit}`]] as [string, string][])
-              : []),
+            ...(lostStat ? ([["Lost assets", `${assetText(lostStat, ad)} ${unit}`]] as [string, string][]) : []),
           ],
           rows: legs.map((l) => [
             `${l.isIdle ? "Idle market" : (l.collateralSymbol ?? shortId(l.id))} ${l.id}`,

@@ -20,7 +20,9 @@
 // point 8: no USD, no cross-asset total); each header's "?" says so, and the
 // sort button reads the same words. Yield and Holders compare across
 // every row. A vault with no figure for the key sorts last, both ways; on
-// Yield an illiquid vault (ui-jobs 540) sorts after the other figures.
+// Yield an illiquid vault (ui-jobs 540) sorts after the other figures. Total
+// assets ranks by what the vault holds, `totalAssets − lostAssets` (ui-jobs
+// 543), and the cell prints the stated total.
 //
 // The whole row links the vault's page (the name is the one focusable link).
 // BELOW sm each row reads as a card (D6): the protocol's hue as its left edge,
@@ -49,9 +51,10 @@ import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-searc
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { VAULT_FAMILIES } from "@/lib/vaults/families";
 import { VAULT_INDEX_PROTOCOL_LABEL, vaultIndexProtocol } from "@/lib/vaults/index-rosters";
-import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
+import { vaultDisplayName, type VaultStanding, type VaultSummary } from "@/lib/vaults/summary";
 import { yieldText, type VaultYield } from "@/lib/vaults/yield";
 import { illiquidSentence } from "@/lib/vaults/illiquid";
+import { heldAssetsRaw, lostAssetsSentence } from "@/lib/vaults/lost-assets";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { sharePriceText } from "@/lib/shared/vault-amount-text";
 
@@ -77,7 +80,8 @@ const DEFAULT_SORT: SortKey = "holders";
 
 /** How an amount in the vault's asset sorts: by token, then inside it. */
 const SORT_NOTE: Partial<Record<SortKey, string>> = {
-  assets: "Sorts by token, then by total assets within each token.",
+  assets:
+    "Sorts by token, then by total assets within each token. It ranks by what the vault holds: total assets less lost assets.",
   price: "Sorts by token, then by share price within each token.",
 };
 
@@ -87,11 +91,28 @@ const tokenOf = (v: VaultSummary) => (v.asset.named ? v.asset.symbol : v.asset.a
 
 const nameOf = (v: VaultSummary) => vaultDisplayName(v) ?? v.address;
 
+/** What the vault holds, in the asset: `totalAssets − lostAssets`. */
+const heldOf = (v: VaultSummary, totalRaw: string) =>
+  Number(heldAssetsRaw(totalRaw, v.lostAssets?.raw)) / 10 ** v.asset.decimals;
+
+/** A pill's title: the standing's sentence where it has one, else its word. */
+function pillTitle(st: VaultStanding, v: VaultSummary): string {
+  if (st === "illiquid" && v.illiquid) return illiquidSentence(v.illiquid);
+  if (st === "lost-assets" && v.totalAssets && v.lostAssets)
+    return lostAssetsSentence({
+      lost: formatCompact(v.lostAssets.value),
+      held: formatCompact(heldOf(v, v.totalAssets.raw)),
+      symbol: v.asset.symbol,
+      block: v.readAt.block,
+    });
+  return STANDING_WORD[st];
+}
+
 /** The key's figure; null sorts last both ways. */
 function figureOf(key: SortKey, v: VaultSummary, y: VaultYield | undefined): number | null {
   switch (key) {
     case "assets":
-      return v.totalAssets?.value ?? null;
+      return v.totalAssets ? heldOf(v, v.totalAssets.raw) : null;
     case "price":
       return v.sharePrice?.value ?? null;
     case "yield":
@@ -361,6 +382,7 @@ export function VaultIndexTable({
                 data-group={raw === "" ? "unread" : BigInt(raw) > BigInt(0) ? "funded" : "empty"}
                 data-asset={v.asset.address}
                 data-total-assets-raw={raw}
+                data-held-assets-raw={raw === "" ? "" : heldAssetsRaw(raw, v.lostAssets?.raw).toString()}
                 data-share-price-raw={v.sharePrice?.raw ?? ""}
                 data-vault-family={v.family}
                 data-holders-live={c?.live ?? ""}
@@ -409,12 +431,7 @@ export function VaultIndexTable({
                       // From sm the pills give way before the name's first 7rem.
                       <span className="flex flex-wrap gap-1 max-sm:basis-full sm:min-w-0 sm:flex-nowrap sm:overflow-hidden">
                         {v.standing.map((st) => (
-                          <span
-                            key={st}
-                            className={`${PILL} sm:truncate`}
-                            title={st === "illiquid" && v.illiquid ? illiquidSentence(v.illiquid) : STANDING_WORD[st]}
-                            data-pill={st}
-                          >
+                          <span key={st} className={`${PILL} sm:truncate`} title={pillTitle(st, v)} data-pill={st}>
                             {STANDING_WORD[st]}
                           </span>
                         ))}

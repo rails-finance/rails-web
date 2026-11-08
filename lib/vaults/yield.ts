@@ -56,6 +56,14 @@ export type VaultYield =
 
 export const YIELD_WINDOW_DAYS = 30;
 
+/** The dust floor: a vault whose `totalAssets()` is under 10,000 raw units is
+ *  too small to measure (ui-jobs 542). */
+export const MEASURABLE_MIN_ASSETS_RAW = BigInt(10_000);
+
+export function tooSmallToMeasure(totalAssetsRaw: string | bigint): boolean {
+  return BigInt(totalAssetsRaw) < MEASURABLE_MIN_ASSETS_RAW;
+}
+
 /** The smallest step the subline names: 0.005%, the least changeText prints
  *  as other than 0.00%. */
 const JUMP_FLOOR = 0.00005;
