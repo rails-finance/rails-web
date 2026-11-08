@@ -19,7 +19,7 @@ import { SECTION_HEADING, CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import { BlockRef } from "@/components/shared/block-ref";
 import { PendleEventCard } from "@/components/protocol/pendle/pendle-event-card";
 import { LEG_NAME, PENDLE_CHAIN_ID, amountText, exact, symbolOf } from "@/lib/pendle/format";
-import { boundaryProv } from "@/lib/pendle/provenance";
+import { boundaryProv, flowProv } from "@/lib/pendle/provenance";
 import type { PendleBoundary, PendleMarketTokens, PendleTimelineRow, PendleTokenMeta } from "@/lib/pendle/types";
 
 const utcDay = (ts: number) => Math.floor(ts / 86_400);
@@ -142,7 +142,9 @@ export function PendleTimeline({
       <div className={`flex flex-wrap items-baseline justify-between gap-2 ${CARD_INSET_START}`}>
         <h2 className={SECTION_HEADING}>{heading}</h2>
         <span className="text-xs tabular-nums text-rb-500" data-pendle-count="">
-          {n(rows.length)} {rows.length === 1 ? "event" : "events"}
+          <Prov info={flowProv("Router events", rows.length)} value={String(rows.length)}>
+            {n(rows.length)} {rows.length === 1 ? "event" : "events"}
+          </Prov>
         </span>
       </div>
       <ProvReceiptsScope registry={registry}>
