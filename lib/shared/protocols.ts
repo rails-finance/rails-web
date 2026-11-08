@@ -584,6 +584,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Fixed yield", "Yield trading"],
     desc: "A wallet's principal, yield and liquidity tokens in each Pendle market, valued at Pendle's oracle and read at one block",
     positionListing: false,
+    unlaunched: true,
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
