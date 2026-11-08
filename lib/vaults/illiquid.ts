@@ -8,6 +8,13 @@
 // read at that one block: `position(id, vault)`, `market(id)`,
 // `idToMarketParams(id)` and the IRM's `rateAtTarget(id)`.
 //
+// The stored rate at target is the one set when the market last settled. The
+// IRM adapts it over the time since, `rateAtTarget × exp(speed × err × elapsed)`
+// bounded to the IRM's range, and accrues on the adapted curve; the test takes
+// the adapted rate at the block's timestamp. A market left full since its last
+// settlement reaches the maximum from the minimum in about 55 days, so a stored
+// figure at the minimum can sit under a market paying the ceiling.
+//
 // A leg's assets are Morpho Blue's stored totals (the market as last
 // settled), the same figure V3 draws, and its share is over the queue's sum.
 // What can be withdrawn is, per leg, the lesser of the vault's assets there
@@ -16,8 +23,7 @@
 // head's figure though the totals are stored.
 //
 // The borrow rate is the IRM's curve at the stored utilisation over the
-// stored rate at target: with the rate at target at its maximum it cannot
-// adapt higher, and at full utilisation it is the ceiling,
+// adapted rate at target: at its maximum it cannot adapt higher, and at full utilisation it is the ceiling,
 // MAX_RATE_AT_TARGET × CURVE_STEEPNESS = 800% a year.
 //
 // Pure, with no imports: scripts/test/vault-illiquid.test.mjs reads it.
@@ -32,6 +38,10 @@ const WAD = BigInt("1000000000000000000");
 const YEAR_SECONDS = 31_536_000;
 /** ConstantsLib.MAX_RATE_AT_TARGET: 2.0 a year, per second, in WAD. */
 export const MAX_RATE_AT_TARGET = (BigInt(2) * WAD) / BigInt(YEAR_SECONDS);
+/** ConstantsLib.MIN_RATE_AT_TARGET: 0.1% a year, per second, in WAD. */
+const MIN_RATE_AT_TARGET = WAD / BigInt(1000) / BigInt(YEAR_SECONDS);
+/** ConstantsLib.ADJUSTMENT_SPEED: 50 a year, per second. */
+const ADJUSTMENT_SPEED = 50 / YEAR_SECONDS;
 const CURVE_STEEPNESS = 4;
 const TARGET_UTILIZATION = 0.9;
 /** The rate a market at full utilisation pays with its rate at target at the maximum. */
@@ -57,7 +67,7 @@ export interface IlliquidLegInput {
   borrowAssets: bigint;
   /** `market(id).lastUpdate`, a unix second. */
   lastUpdate: number;
-  /** `rateAtTarget(id)`, per second in WAD; null where it was not read. */
+  /** `rateAtTarget(id)` as stored, per second in WAD; null where it was not read. */
   rateAtTarget: bigint | null;
 }
 
@@ -71,7 +81,7 @@ export interface IlliquidMarket {
   share: number;
   /** Borrow over supply, 0..1. */
   utilisation: number;
-  /** The IRM's curve at `utilisation` over the stored rate at target, a year, simple. */
+  /** The IRM's curve at `utilisation` over the adapted rate at target, a year, simple. */
   borrowRateYearly: number;
   lastUpdate: number;
 }
@@ -100,18 +110,36 @@ export const needsRateAtTarget = (
   leg.irm.toLowerCase() === ADAPTIVE_CURVE_IRM[chainId] &&
   fullyBorrowed(leg.supplyAssets, leg.borrowAssets);
 
+const errAt = (utilisation: number) =>
+  utilisation > TARGET_UTILIZATION
+    ? (utilisation - TARGET_UTILIZATION) / (1 - TARGET_UTILIZATION)
+    : (utilisation - TARGET_UTILIZATION) / TARGET_UTILIZATION;
+
+/** The rate at target the IRM holds `elapsed` seconds after it stored
+ *  `rateAtTarget` at `utilisation`: AdaptiveCurveIrm `_newRateAtTarget`, bounded
+ *  to the IRM's range. */
+export function adaptedRateAtTarget(rateAtTarget: bigint, utilisation: number, elapsed: number): bigint {
+  const adapted = Number(rateAtTarget) * Math.exp(ADJUSTMENT_SPEED * errAt(utilisation) * Math.max(0, elapsed));
+  if (adapted >= Number(MAX_RATE_AT_TARGET)) return MAX_RATE_AT_TARGET;
+  if (adapted <= Number(MIN_RATE_AT_TARGET)) return MIN_RATE_AT_TARGET;
+  return BigInt(Math.floor(adapted));
+}
+
 /** The AdaptiveCurveIRM's borrow rate at a utilisation, a year, simple. */
 export function borrowRateYearly(rateAtTarget: bigint, utilisation: number): number {
-  const err =
-    utilisation > TARGET_UTILIZATION
-      ? (utilisation - TARGET_UTILIZATION) / (1 - TARGET_UTILIZATION)
-      : (utilisation - TARGET_UTILIZATION) / TARGET_UTILIZATION;
+  const err = errAt(utilisation);
   const curve = err < 0 ? (1 - 1 / CURVE_STEEPNESS) * err + 1 : (CURVE_STEEPNESS - 1) * err + 1;
   return ((Number(rateAtTarget) * YEAR_SECONDS) / 1e18) * curve;
 }
 
-/** The test over one vault's queue at one block: null where no market is caught. */
-export function vaultIlliquid(chainId: number, block: number, legs: readonly IlliquidLegInput[]): VaultIlliquid | null {
+/** The test over one vault's queue at one block, whose unix second is
+ *  `timestamp`: null where no market is caught. */
+export function vaultIlliquid(
+  chainId: number,
+  block: number,
+  timestamp: number,
+  legs: readonly IlliquidLegInput[],
+): VaultIlliquid | null {
   const zero = BigInt(0);
   const sum = legs.reduce((s, l) => s + l.vaultAssets, zero);
   if (sum === zero) return null;
@@ -122,13 +150,10 @@ export function vaultIlliquid(chainId: number, block: number, legs: readonly Ill
     const free = l.supplyAssets > l.borrowAssets ? l.supplyAssets - l.borrowAssets : zero;
     withdrawable += l.vaultAssets < free ? l.vaultAssets : free;
     const share = Number((l.vaultAssets * BigInt(1_000_000)) / sum) / 1_000_000;
-    if (
-      share >= ILLIQUID_MIN_SHARE &&
-      needsRateAtTarget(chainId, l) &&
-      l.rateAtTarget != null &&
-      l.rateAtTarget >= MAX_RATE_AT_TARGET
-    ) {
-      const utilisation = Number((l.borrowAssets * BigInt(1_000_000)) / l.supplyAssets) / 1_000_000;
+    if (share < ILLIQUID_MIN_SHARE || !needsRateAtTarget(chainId, l) || l.rateAtTarget == null) continue;
+    const utilisation = Number((l.borrowAssets * BigInt(1_000_000)) / l.supplyAssets) / 1_000_000;
+    const rateAtTarget = adaptedRateAtTarget(l.rateAtTarget, utilisation, timestamp - l.lastUpdate);
+    if (rateAtTarget >= MAX_RATE_AT_TARGET) {
       caught += l.vaultAssets;
       markets.push({
         id: l.id,
@@ -137,7 +162,7 @@ export function vaultIlliquid(chainId: number, block: number, legs: readonly Ill
         vaultAssets: l.vaultAssets.toString(),
         share,
         utilisation,
-        borrowRateYearly: borrowRateYearly(l.rateAtTarget, utilisation),
+        borrowRateYearly: borrowRateYearly(rateAtTarget, utilisation),
         lastUpdate: l.lastUpdate,
       });
     }

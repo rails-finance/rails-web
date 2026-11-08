@@ -750,11 +750,18 @@ export async function loadMorphoBaseVault(
           ),
         );
         const hot = inputs.filter((l) => needsRateAtTarget(chainId, l));
-        const rates = hot.length > 0 ? await readRatesAtTarget(client, blockNumber, hot) : new Map<string, bigint>();
+        const [rates, timestamp] =
+          hot.length > 0
+            ? await Promise.all([
+                readRatesAtTarget(client, blockNumber, hot),
+                client.getBlock({ blockNumber }).then((b) => Number(b.timestamp)),
+              ])
+            : [new Map<string, bigint>(), 0];
         if (hot.every((l) => rates.has(l.id)))
           illiquid = vaultIlliquid(
             chainId,
             Number(blockNumber),
+            timestamp,
             inputs.map((l) => ({ ...l, rateAtTarget: rates.get(l.id) ?? null })),
           );
       }

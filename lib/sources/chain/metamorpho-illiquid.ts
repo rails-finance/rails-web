@@ -9,7 +9,8 @@
 //   3. `market(id)` and `idToMarketParams(id)` once per distinct market;
 //   4. for the vaults whose queue holds a market 99.9% or more borrowed on the
 //      chain's AdaptiveCurveIRM: `position(id, vault)` on every leg of that
-//      queue, and `rateAtTarget(id)` on those markets.
+//      queue, and `rateAtTarget(id)` on those markets, with the block's
+//      timestamp to adapt it.
 //
 // A vault whose read did not answer is left out of the map: unread, never
 // liquid. A vault read and not caught maps to null.
@@ -227,12 +228,13 @@ export async function readMetaMorphoIlliquid(
     shares.set(`${s.vault}:${s.id}`, p?.[0]);
   });
 
+  const timestamp = candidates.length > 0 ? Number((await client.getBlock({ blockNumber })).timestamp) : 0;
   const caught = new Map<string, IlliquidLegInput[]>();
   for (const v of candidates) {
     const q = queues.get(v)!;
     if (q.some((id) => shares.get(`${v}:${id}`) == null)) continue;
     const legs = q.map((id) => legInput(id, markets.get(id)!, shares.get(`${v}:${id}`)!, rates.get(id) ?? null, null));
-    const il = vaultIlliquid(chainId, Number(blockNumber), legs);
+    const il = vaultIlliquid(chainId, Number(blockNumber), timestamp, legs);
     if (il == null) out.set(v, null);
     else caught.set(v, legs);
   }
@@ -250,7 +252,7 @@ export async function readMetaMorphoIlliquid(
       const m = meta.get(collateral.get(l.id) ?? "");
       return { ...l, collateralSymbol: m?.named ? m.symbol : null };
     });
-    out.set(v, vaultIlliquid(chainId, Number(blockNumber), named));
+    out.set(v, vaultIlliquid(chainId, Number(blockNumber), timestamp, named));
   }
   return out;
 }
