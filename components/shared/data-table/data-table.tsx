@@ -80,6 +80,9 @@ const RowHref = createContext<string | null>(null);
  *  since a reflowed table loses its own. */
 const Stacked = createContext(false);
 
+/** Every row one line tall from sm (D1's `oneLine`). */
+const OneLine = createContext(false);
+
 /** The frame and the table. `tableClassName` sets a minimum width (the frame
  *  scrolls below it) and the body's type. */
 export function DataTable({
@@ -87,6 +90,7 @@ export function DataTable({
   label,
   anatomy,
   stacked = false,
+  oneLine = false,
   tableClassName = "",
   className = "",
   children,
@@ -103,6 +107,10 @@ export function DataTable({
    *  the other cells in two columns, each with its `label`. The caller draws
    *  its own sort control for that width. */
   stacked?: boolean;
+  /** From sm every row is one line, 56px (room for a 28px icon), each cell
+   *  middle-aligned; the caller keeps its content to one line (a long name
+   *  truncates). */
+  oneLine?: boolean;
   tableClassName?: string;
   className?: string;
   children: ReactNode;
@@ -111,20 +119,22 @@ export function DataTable({
     // `relative`: a visually hidden span inside a cell is placed against the
     // frame, so it never widens the page.
     <Stacked.Provider value={stacked}>
-      <div
-        className={`relative isolate max-w-full overflow-x-auto ${className}`}
-        data-anatomy={[anatomy, "D1", stacked ? "D6" : "D3"].filter(Boolean).join(" ")}
-        {...frame}
-      >
-        <table
-          className={`w-full border-separate border-spacing-x-0 border-spacing-y-1 ${stacked ? "dt-stacked" : ""} ${tableClassName}`}
-          aria-label={caption ? undefined : label}
-          role={stacked ? "table" : undefined}
+      <OneLine.Provider value={oneLine}>
+        <div
+          className={`relative isolate max-w-full overflow-x-auto ${className}`}
+          data-anatomy={[anatomy, "D1", stacked ? "D6" : "D3"].filter(Boolean).join(" ")}
+          {...frame}
         >
-          {caption && <caption className="sr-only">{caption}</caption>}
-          {children}
-        </table>
-      </div>
+          <table
+            className={`w-full border-separate border-spacing-x-0 border-spacing-y-1 ${stacked ? "dt-stacked" : ""} ${tableClassName}`}
+            aria-label={caption ? undefined : label}
+            role={stacked ? "table" : undefined}
+          >
+            {caption && <caption className="sr-only">{caption}</caption>}
+            {children}
+          </table>
+        </div>
+      </OneLine.Provider>
     </Stacked.Provider>
   );
 }
@@ -323,8 +333,9 @@ export function DataTableCell({
 } & Omit<TdHTMLAttributes<HTMLTableCellElement>, "align">) {
   const href = useContext(RowHref);
   const stacked = useContext(Stacked);
+  const oneLine = useContext(OneLine);
   const named = stacked && label ? <span className="dt-cell-label">{label}</span> : null;
-  const cls = `${CELL_SURFACE} ${valign === "middle" ? "align-middle" : "align-top"} ${href ? LINKED_CELL : ""} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
+  const cls = `${CELL_SURFACE} ${valign === "middle" || oneLine ? "align-middle" : "align-top"} ${oneLine ? "sm:h-14 sm:py-0" : ""} ${href ? LINKED_CELL : ""} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
     sticky ? `${sticky} z-10` : ""
   } ${className}`;
   const cover = href ? <RowCover href={href} /> : null;
