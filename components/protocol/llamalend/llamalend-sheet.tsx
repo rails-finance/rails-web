@@ -126,7 +126,7 @@ function valuedProv(what: string, parts: { label: string; value: string }[], coo
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `${what}, in US dollars — the collateral at the market's AMM oracle price (price_oracle, crvUSD per collateral) at block ${coords.blockNumber ?? "?"}, plus any crvUSD at its $1 face.`,
+    summary: `${what}, in US dollars. The collateral at the market's AMM oracle price (price_oracle, crvUSD per collateral) at block ${coords.blockNumber ?? "?"}, plus any crvUSD at its $1 face.`,
     formula: "collateral × oracle price + crvUSD",
     via: "GET /api/chain/llamalend/event-state · AMM.price_oracle() at this block",
     inputs: parts.map((p) => ({ label: p.label, value: p.value, kind: "chain" as const, pclass: "state" as const })),
@@ -136,7 +136,7 @@ function valuedProv(what: string, parts: { label: string; value: string }[], coo
 /** A borrowed-token figure (crvUSD) at its $1 face. */
 const faceProv = (sym: string, what: string): Provenance => ({
   kind: "derived",
-  summary: `${what} in US dollars — the ${sym} amount at its $1 face.`,
+  summary: `${what} in US dollars. The ${sym} amount at its $1 face.`,
   formula: "amount × $1",
 });
 
@@ -144,7 +144,7 @@ const faceProv = (sym: string, what: string): Provenance => ({
 const inBorrowedProv = (what: string, b: string, parts: { label: string; value: string }[]): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `${what}, in ${b} — the collateral at the market's AMM oracle price (price_oracle, ${b} per collateral) at this block, plus any ${b} the AMM holds. This market borrows ${b}, so its figures stay in ${b}.`,
+  summary: `${what}, in ${b}: the collateral at the market's AMM oracle price (price_oracle, ${b} per collateral) at this block, plus any ${b} the AMM holds. This market borrows ${b}, so its figures stay in ${b}.`,
   formula: "collateral × oracle price + converted",
   inputs: parts.map((p) => ({ label: p.label, value: p.value, kind: "chain" as const, pclass: "state" as const })),
 });
@@ -273,7 +273,7 @@ export function llamalendSheet({
       amount: collAmt(fmtColl(previousStated.collateral), {
         kind: "chain",
         pclass: "state",
-        summary: `${c} collateral at the last event — the previous row's UserState after-image on ${formatDayMonth(previousStated.timestamp)}, the position's absolute collateral once that transaction had run.`,
+        summary: `${c} collateral at the last event. The previous row's UserState after-image on ${formatDayMonth(previousStated.timestamp)}, the position's absolute collateral once that transaction had run.`,
         via: "the previous row's UserState after-image",
       }),
       tip: TIPS.collLast(c),
@@ -285,7 +285,7 @@ export function llamalendSheet({
         amount: collAmt(`−${fmtColl(sold)}`, {
           kind: "chain-derived",
           pclass: "state",
-          summary: `${c} the AMM sold from the position's bands since the ${formatDayMonth(previousStated.timestamp)} event — the collateral that row's UserState stated, less Controller.user_state(user)[0] at block ${block - 1}.`,
+          summary: `${c} the AMM sold from the position's bands since the ${formatDayMonth(previousStated.timestamp)} event. The collateral that row's UserState stated, less Controller.user_state(user)[0] at block ${block - 1}.`,
           formula: "last stated − collateral at block − 1",
         }),
         tip: TIPS.sold(c),
@@ -417,7 +417,7 @@ export function llamalendSheet({
         {
           kind: "chain",
           pclass: "state",
-          summary: `${b} owed at the last event — the previous row's UserState after-image on ${formatDayMonth(lastDebt.timestamp)}, the position's debt once that transaction had run.`,
+          summary: `${b} owed at the last event. The previous row's UserState after-image on ${formatDayMonth(lastDebt.timestamp)}, the position's debt once that transaction had run.`,
           via: "the previous row's UserState after-image",
         },
         formatExactDecimal(String(lastDebt.amount)),
@@ -435,7 +435,7 @@ export function llamalendSheet({
           {
             kind: "chain-derived",
             pclass: "state",
-            summary: `Interest on the ${b} debt since the ${formatDayMonth(lastDebt.timestamp)} event — Controller.user_state(user)[2] at block ${block - 1}, less the debt that row stated.`,
+            summary: `Interest on the ${b} debt since the ${formatDayMonth(lastDebt.timestamp)} event. Controller.user_state(user)[2] at block ${block - 1}, less the debt that row stated.`,
             formula: "debt at block − 1 − debt at the last event",
           },
           formatExactDecimal(String(interest)),

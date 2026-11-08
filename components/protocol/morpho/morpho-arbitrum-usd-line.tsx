@@ -24,7 +24,7 @@ const receipt = (what: string, block: number): Provenance => ({
     kind: "recompute",
     text: `To check: ask any Arbitrum archive node for Morpho.position, Morpho.market and the market oracle's price() at block ${block}, then AaveOracle.getAssetPrice(loan token) at the same block.`,
   },
-  summary: `${what} in dollars — each held market's figure in its loan token, read from the singleton at block ${block}, times the loan token's price on the Aave V3 Arbitrum oracle at that block, summed over the markets that oracle prices. Morpho Blue states no dollar price.`,
+  summary: `${what} in dollars: each held market's figure in its loan token, read from the singleton at block ${block}, times the loan token's price on the Aave V3 Arbitrum oracle at that block, summed over the markets that oracle prices. Morpho Blue states no dollar price.`,
   contract: { name: "Aave V3 IAaveOracle (Arbitrum)", address: AAVE_V3_ARBITRUM_ORACLE },
   via: "GET /api/chain/morpho-arbitrum/wallet · figure × AaveOracle.getAssetPrice(loan token) ÷ 1e8",
   formula: "Σ market figure × loan token price",
