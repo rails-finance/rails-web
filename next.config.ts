@@ -127,6 +127,8 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/compound-v3-arbitrum", "/arbitrum/compound-v3"],
   // CoW never had a pre-0016 path; the row is for check:routes.
   ["/cow", "/ethereum/cow"],
+  // Pendle never had a pre-0016 path; the row is for check:routes.
+  ["/pendle", "/ethereum/pendle"],
   // Polaris never had a pre-0016 path; the row exists because check:routes
   // wants every explorer forwarded from its bare slug, and a bare /polaris is
   // the address anyone will guess.

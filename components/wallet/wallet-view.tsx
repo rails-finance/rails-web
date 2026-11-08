@@ -41,6 +41,11 @@ const ROW_PANEL = "rounded-2xl border border-rb-300/40 bg-raised dark:border-rb-
 /** A closed row's link: the panel with the open cards' blue border on hover
  *  (POSITION_CARD_FRAME_BOX) and on keyboard focus. */
 const ROW_LINK = `${ROW_PANEL} transition-colors hover:border-blue-500 focus-visible:border-blue-500 dark:hover:border-blue-500 dark:focus-visible:border-blue-500`;
+/** A History row's link (W4): the frame and its border over the protocol's
+ *  hue, the body's ground an element after the zone whose left corners round
+ *  over the hue (D5's curve). */
+const HISTORY_LINK =
+  "overflow-hidden rounded-2xl border border-rb-300/40 bg-clip-padding transition-colors hover:border-blue-500 focus-visible:border-blue-500 dark:border-rb-700/40 dark:hover:border-blue-500 dark:focus-visible:border-blue-500";
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
@@ -201,9 +206,14 @@ function History({ closed }: { closed: WalletPosition[] }) {
               {/* The open cards' phone form (C20.1): the hue's 6px edge, the
                   mark and name at the left of the first line, the chain's
                   glyph at its right. */}
-              <Link href={p.href} prefetch={false} className={`${ROW_LINK} flex overflow-hidden text-sm`}>
-                <span className="w-[6px] shrink-0 self-stretch bg-brand-edge" style={hueStyle(protocolId(p))} />
-                <span className="flex min-w-0 flex-1 flex-col gap-1 py-3 pl-5 pr-4">
+              <Link
+                href={p.href}
+                prefetch={false}
+                className={`${HISTORY_LINK} flex bg-brand-edge text-sm`}
+                style={hueStyle(protocolId(p))}
+              >
+                <span className="w-[6px] shrink-0 self-stretch bg-brand-edge" />
+                <span className="flex min-w-0 flex-1 flex-col gap-1 rounded-l-2xl bg-raised py-3 pl-5 pr-4">
                   <span className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-zone">
                       <ProtocolIcon id={protocolId(p)} className="h-4 w-4 shrink-0 text-rb-500" />
@@ -270,13 +280,16 @@ function History({ closed }: { closed: WalletPosition[] }) {
                   href={p.href}
                   prefetch={false}
                   role="row"
-                  className={`${HISTORY_GRID} items-center ${ROW_LINK} py-3 pr-5 text-sm`}
+                  className={`${HISTORY_GRID} relative isolate items-center ${HISTORY_LINK} bg-brand-zone py-3 pr-5 text-sm`}
+                  style={hueStyle(protocolId(p))}
                   data-history-row={p.positionId}
                   data-family={p.family}
                 >
                   <div role="cell" className="-my-3 flex self-stretch">
                     <RowZone id={protocolId(p)} chain={p.chain} />
                   </div>
+                  {/* The body's ground, from the zone's edge: the hue shows at its left corners. */}
+                  <span aria-hidden className="absolute inset-y-0 right-0 left-[95px] -z-10 rounded-l-2xl bg-raised" />
                   <div role="cell" className="text-foreground/80">
                     {h.closedAt != null ? formatDate(h.closedAt) : "—"}
                   </div>

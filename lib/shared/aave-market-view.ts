@@ -80,6 +80,30 @@ export function capSide(r: AaveMarketReserve, side: "supply" | "borrow"): CapSta
   return judge(live, "live");
 }
 
+/** The share of a cap in use at which the reserves table shows it (ui-jobs
+ *  541): below this the cap is not stated on the row. */
+export const CAP_NEAR_BINDING = 0.9;
+
+/** The deficit at which the reserve page states it under Available, as a
+ *  share of the reserve's supplied amount (Miles, 8 Nov: 0.01%). Below it the
+ *  line is left off; the figure stays in Available's receipt. */
+export const DEFICIT_SHOWN_SHARE = 0.0001;
+
+/** Whether the reserve page states a deficit under Available. */
+export const deficitShows = (r: { deficit?: number | null; supplied: number }): boolean =>
+  (r.deficit ?? 0) > 0 && (r.deficit ?? 0) >= DEFICIT_SHOWN_SHARE * r.supplied;
+
+/** Whether the reserve page states the remaining borrow capacity (borrow cap
+ *  less borrowed) under Available: the supply side is closed by a cap of one
+ *  whole token and borrowing runs against a real cap (GHO on Core). */
+export const borrowRoomShows = (r: { supplyCapState: CapState; borrowCapState: CapState }): boolean =>
+  r.supplyCapState.state === "closed" && r.borrowCapState.state === "used";
+
+/** Whether a side's cap shows on the row: in use at CAP_NEAR_BINDING or more,
+ *  or closed by a cap of one whole token. */
+export const capShows = (c: CapState): boolean =>
+  c.state === "closed" || (c.state === "used" && c.used >= CAP_NEAR_BINDING);
+
 // ── Closed to new business ───────────────────────────────────────────────────
 
 export type ClosedRoute = "frozen" | "paused" | "borrowOff" | "supplyCapOne" | "borrowCapOne" | "ltvZero";
@@ -261,7 +285,7 @@ export function closedText(rows: MarketReserveRow[]): string | null {
     [n("paused"), "paused"],
     [n("borrowOff"), "with borrowing switched off"],
     [n(["supplyCapOne", "borrowCapOne"]), "with a cap of one token"],
-    [n("ltvZero"), "backing no new borrowing at a loan-to-value of 0"],
+    [n("ltvZero"), "not collateral"],
   ] as const;
   const listed = routes.filter(([k]) => k > 0).map(([k, what]) => `${k} ${what}`);
   const total = rows.length;

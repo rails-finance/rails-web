@@ -2229,27 +2229,27 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Utilisation and rates
+          Available
         text: |-
-          borrowed divided by supplied; the rate climbs steeply past the kink, the tick on the blue utilisation bar.
-      - bold: |-
-          Loan-to-value (LTV)
-        text: |-
-          the most a wallet can borrow against a reserve, as a share of its value; at 0 the reserve backs no new borrowing.
-      - bold: |-
-          Liquidation threshold (LT)
-        text: |-
-          the share of a reserve's value that counts toward covering debt; a reserve with none cannot be collateral.
-      - bold: |-
-          Liquidation bonus
-        text: |-
-          the extra collateral a liquidator receives, as a share of the debt repaid.
-      - bold: |-
-          Caps and closed reserves
-        text: |-
-          a cap of one token closes that side, and a frozen or paused reserve takes no new supply or borrowing.
+          the underlying the Pool holds for a reserve, what suppliers can withdraw and borrowers can take; a liquidation's deficit leaves it below supplied less borrowed.
         text_seamless: |-
-          a frozen reserve takes no new supply or borrowing, and still accrues interest and can be liquidated.
+          supplied less borrowed: what suppliers can withdraw and borrowers can take.
+      - bold: |-
+          Supply rate, borrow rate and utilisation
+        text: |-
+          the yearly rates paid and charged; utilisation is borrowed divided by supplied, and the rate climbs past the kink, the tick on the blue bar.
+      - bold: |-
+          Collateral
+        text: |-
+          loan-to-value / liquidation threshold; "Not collateral" at a loan-to-value of 0, "eMode only" where an eMode category lends one.
+      - bold: |-
+          Caps near binding
+        text: |-
+          a pill under Supplied or Borrowed from 90% of a cap in use; "cap closed" and "borrowing off" mark a closed side.
+      - bold: |-
+          Details
+        text: |-
+          each row's Details opens the oracle price, reserve factor, liquidation bonus, kink and eMode categories.
     links:
       - label: |-
           Reserve parameters

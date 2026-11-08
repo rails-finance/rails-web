@@ -67,6 +67,11 @@ export interface AaveMarketReserve {
   /** The treasury's share not yet minted as aTokens, token units. The Pool's
    *  supply-cap check adds it to the aToken supply. */
   accruedToTreasury?: number;
+  /** The reserve's virtual underlying balance on a v3.3+ Pool
+   *  (Pool.getVirtualUnderlyingBalance), token units: the cash it holds for
+   *  withdrawals and new borrowing. Null where the Pool has no such getter or
+   *  the reserve keeps no virtual accounting. */
+  virtualBalance?: number | null;
   /** Liquidation bonus as the extra fraction a liquidator receives (0.05 =
    *  5%); null when the reserve carries none. */
   liquidationBonus?: number | null;
@@ -85,6 +90,23 @@ export interface AaveMarketReserve {
   /** The strategy's ray-scaled answer, untouched, and which getter gave it. */
   kinkRaw?: string | null;
   kinkMethod?: "getOptimalUsageRatio" | "OPTIMAL_USAGE_RATIO" | null;
+  /** The borrow-rate curve's four parameters, ray-scaled strings, and which
+   *  getters gave them: `getInterestRateData(reserve)` on a v3.2+ strategy,
+   *  the four v1 getters on an earlier one. Null where the strategy answers
+   *  neither (SparkLend's own rate strategies). */
+  rateCurve?: {
+    method: "getInterestRateData" | "v1";
+    optimal: string;
+    base: string;
+    slope1: string;
+    slope2: string;
+  } | null;
+  /** The reserve's outstanding deficit on a v3.3+ Pool (Pool.getReserveDeficit),
+   *  token units; null where the Pool has no such getter. */
+  deficit?: number | null;
+  /** The price source the market's oracle reads for this asset
+   *  (IAaveOracle.getSourceOfAsset), lowercased; null where it does not answer. */
+  oracleSource?: string | null;
   /** Live reserve-config flags. */
   borrowEnabled: boolean;
   frozen: boolean;

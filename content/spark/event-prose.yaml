@@ -1344,25 +1344,25 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Reserve
+          Available
         text: |-
-          one listed asset in the Pool, with its supplied balance, its variable debt and the governance-set risk parameters.
+          supplied less borrowed: what suppliers can withdraw and borrowers can take.
       - bold: |-
-          Utilisation and rates
+          Supply rate, borrow rate and utilisation
         text: |-
-          utilisation is borrowed ÷ supplied, the bar's blue fill, with the reserve's kink as a tick; rates rise with it, and Sky governance sets some.
+          the yearly rates paid and charged, some set by Sky governance; utilisation is borrowed ÷ supplied, the blue bar, its tick the kink.
       - bold: |-
-          Limits
+          Collateral
         text: |-
-          loan-to-value caps what a wallet can borrow against a reserve, the liquidation threshold counts toward covering debt, and the bonus pays liquidators.
+          loan-to-value / liquidation threshold; "Not collateral" at a loan-to-value of 0, "eMode only" where an eMode category lends one.
       - bold: |-
-          Caps used
+          Caps near binding
         text: |-
-          how much of each side's cap is in use; Sky governance sets the caps and the Cap Automator scales them with market depth.
+          a pill under Supplied or Borrowed from 90% of a cap, against the Cap Automator's maximum; "cap closed" and "borrowing off" mark a closed side.
       - bold: |-
-          Closed reserves
+          Details
         text: |-
-          a frozen reserve takes no new supply or borrowing while withdrawals and repayments continue; a deprecated one still works in full.
+          each row's Details opens the oracle price, reserve factor, liquidation bonus, kink and eMode categories.
     links:
       - label: |-
           Active, deprecated and frozen markets

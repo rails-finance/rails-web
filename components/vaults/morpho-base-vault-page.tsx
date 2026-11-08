@@ -344,6 +344,7 @@ export function MorphoBaseVaultPage({
       <VaultAssets
         rows={rows}
         assetSymbol={unit}
+        assetAddress={asset.address}
         assetDecimals={ad}
         line={
           <>
