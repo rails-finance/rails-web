@@ -31,6 +31,7 @@ import { useCallback, type ReactNode } from "react";
 import type { ChainId } from "@/lib/shared/chains";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { AssetUnit } from "@/components/vaults/asset-unit";
 import {
   DataTable,
   DataTableBody,
@@ -123,26 +124,12 @@ function comparator(key: SortKey, dir: "asc" | "desc", yieldOf: (v: VaultSummary
 
 const n = (x: number) => x.toLocaleString("en-US");
 
-/** A figure in the vault's asset, the asset's mark after it (its symbol as the
- *  image's text and title), or the symbol in words where the token has no mark:
- *  never a unitless figure (decision 0028 point 8). */
+/** A figure in the vault's asset, its unit after it (`AssetUnit`). */
 function InAsset({ v, children, ...rest }: { v: VaultSummary; children: ReactNode; "data-cell": string }) {
-  const word = (
-    <span className={`text-[10px] font-medium text-rb-500 ${v.asset.named ? "" : "font-mono"}`}>{v.asset.symbol}</span>
-  );
   return (
     <span className="inline-flex items-center gap-1.5 whitespace-nowrap" {...rest}>
       <span>{children}</span>
-      <span className="inline-flex shrink-0" title={v.asset.symbol} data-asset-unit={v.asset.symbol}>
-        <TokenChipIcon
-          symbol={v.asset.symbol}
-          address={v.asset.address}
-          size={15}
-          filterable={false}
-          untitled
-          fallback={word}
-        />
-      </span>
+      <AssetUnit symbol={v.asset.symbol} address={v.asset.address} named={v.asset.named} />
     </span>
   );
 }

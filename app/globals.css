@@ -2476,8 +2476,19 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
   table.dt-stacked > tbody > tr[data-anatomy~="D4"]:focus-within::after {
     border-color: var(--color-blue-500);
   }
-  table.dt-stacked > tbody > tr > [role="rowheader"] {
+  table.dt-stacked > tbody > tr > [role="rowheader"],
+  table.dt-stacked > tbody > tr > .dt-cell-wide {
     grid-column: 1 / -1;
+  }
+  table.dt-stacked > tbody > tr > [role="cell"]:empty {
+    display: none;
+  }
+  /* No lead zone, no edge: the card's body runs to its left side. */
+  table.dt-stacked > tbody > tr:not(:has(> [data-anatomy~="D5"])) {
+    padding-left: 0;
+  }
+  table.dt-stacked > tbody > tr:not(:has(> [data-anatomy~="D5"]))::before {
+    left: 0;
   }
   /* The lead zone: a 6px edge in the protocol's hue, its glyphs moved to the
      card's first line (`DataTableLeadMark`); its names stay for a screen reader. */

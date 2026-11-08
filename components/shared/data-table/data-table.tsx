@@ -34,8 +34,10 @@
 // ARIA roles so a screen reader still reads rows of labelled cells: the
 // header row hides, the lead zone narrows to a 6px edge in the protocol's hue
 // (W4's pattern below sm), the row header spans the card, the other cells sit
-// two to a line, each with its `label`. Stripes, corners, the gap, the linked
-// row and its border carry over; pinning (D3) does not apply.
+// two to a line, each with its `label`, a `wide` cell on a line of its own,
+// an empty cell not drawn. A table with no lead zone has no edge. Stripes,
+// corners, the gap, the linked row and its border carry over; pinning (D3)
+// does not apply.
 //
 // THE LEAD COLUMN. Where rows span protocols or chains, each row opens with
 // the protocol's tinted zone (components/shared/row-zone.tsx, the wallet's
@@ -80,8 +82,9 @@ const RowHref = createContext<string | null>(null);
  *  since a reflowed table loses its own. */
 const Stacked = createContext(false);
 
-/** Every row one line tall from sm (D1's `oneLine`). */
-const OneLine = createContext(false);
+/** Every row one fixed height from sm: one line, 56px (D1's `oneLine`), or a
+ *  name over a sub-label, 64px (`twoLine`). */
+const RowHeight = createContext<"one" | "two" | null>(null);
 
 /** The frame and the table. `tableClassName` sets a minimum width (the frame
  *  scrolls below it) and the body's type. */
@@ -91,6 +94,7 @@ export function DataTable({
   anatomy,
   stacked = false,
   oneLine = false,
+  twoLine = false,
   tableClassName = "",
   className = "",
   children,
@@ -111,6 +115,10 @@ export function DataTable({
    *  middle-aligned; the caller keeps its content to one line (a long name
    *  truncates). */
   oneLine?: boolean;
+  /** From sm every row is two lines, 64px (a name over a one-line
+   *  sub-label), each cell middle-aligned; the caller keeps each line to one
+   *  (it truncates). Not with `oneLine`. */
+  twoLine?: boolean;
   tableClassName?: string;
   className?: string;
   children: ReactNode;
@@ -119,7 +127,7 @@ export function DataTable({
     // `relative`: a visually hidden span inside a cell is placed against the
     // frame, so it never widens the page.
     <Stacked.Provider value={stacked}>
-      <OneLine.Provider value={oneLine}>
+      <RowHeight.Provider value={oneLine ? "one" : twoLine ? "two" : null}>
         <div
           className={`relative isolate max-w-full overflow-x-auto ${className}`}
           data-anatomy={[anatomy, "D1", stacked ? "D6" : "D3"].filter(Boolean).join(" ")}
@@ -134,7 +142,7 @@ export function DataTable({
             {children}
           </table>
         </div>
-      </OneLine.Provider>
+      </RowHeight.Provider>
     </Stacked.Provider>
   );
 }
@@ -317,12 +325,16 @@ export function DataTableCell({
   sticky = "",
   pad = true,
   label,
+  wide = false,
   className = "",
   children,
   ...rest
 }: {
   /** The column's name, shown in the cell when the table stacks (D6). */
-  label?: string;
+  label?: ReactNode;
+  /** When the table stacks (D6), the cell takes a line of its own across
+   *  the card. */
+  wide?: boolean;
   rowHeader?: boolean;
   align?: Align;
   valign?: "top" | "middle";
@@ -333,9 +345,9 @@ export function DataTableCell({
 } & Omit<TdHTMLAttributes<HTMLTableCellElement>, "align">) {
   const href = useContext(RowHref);
   const stacked = useContext(Stacked);
-  const oneLine = useContext(OneLine);
+  const height = useContext(RowHeight);
   const named = stacked && label ? <span className="dt-cell-label">{label}</span> : null;
-  const cls = `${CELL_SURFACE} ${valign === "middle" || oneLine ? "align-middle" : "align-top"} ${oneLine ? "sm:h-14 sm:py-0" : ""} ${href ? LINKED_CELL : ""} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
+  const cls = `${CELL_SURFACE} ${valign === "middle" || height ? "align-middle" : "align-top"} ${height === "one" ? "sm:h-14 sm:py-0" : height === "two" ? "sm:h-16 sm:py-0" : ""} ${wide ? "dt-cell-wide" : ""} ${href ? LINKED_CELL : ""} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
     sticky ? `${sticky} z-10` : ""
   } ${className}`;
   const cover = href ? <RowCover href={href} /> : null;
