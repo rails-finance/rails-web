@@ -74,8 +74,9 @@ const holdersOk = (a, b) =>
       ? false
       : a.live != null && a.live !== b.live
         ? a.live > b.live
-        : a.raw >= b.raw;
-const sizeOk = (a, b) => a.raw >= b.raw;
+        : (a.held ?? a.raw) >= (b.held ?? b.raw);
+/** Size ranks by what the vault holds: total assets less lost assets (ui-jobs 543). */
+const sizeOk = (a, b) => (a.held ?? a.raw) >= (b.held ?? b.raw);
 const newestOk = (a, b) =>
   a.created != null && b.created == null
     ? true
@@ -83,7 +84,7 @@ const newestOk = (a, b) =>
       ? false
       : a.created != null && a.created !== b.created
         ? a.created > b.created
-        : a.raw >= b.raw;
+        : (a.held ?? a.raw) >= (b.held ?? b.raw);
 /** Groups under Holders and Newest compare their first rows on the key alone. */
 const holdersKeyOk = (a, b) => (a.live == null ? b.live == null : b.live == null || a.live >= b.live);
 const newestKeyOk = (a, b) => (a.created == null ? b.created == null : b.created == null || a.created >= b.created);

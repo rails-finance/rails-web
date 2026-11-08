@@ -21,7 +21,8 @@
 // THREE RULES THE LAYOUT KEEPS:
 //  1. NO CROSS-ASSET ORDER, NO USD. Rows inside a group sort by the chosen key:
 //     Holders (census current holders, most first; vaults with no census
-//     after), Size (`totalAssets` raw) or Newest (`createdBlock`), size the
+//     after), Size (what the vault holds: `totalAssets` less `lostAssets`, raw)
+//     or Newest (`createdBlock`), size the
 //     tie-break inside a group. Groups follow their first row under Holders
 //     and Newest, compared on that key alone, and by vault count under Size;
 //     then by symbol. Two quantities of one token are the only amounts compared.
@@ -50,6 +51,7 @@ import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 import { vaultRosterShownProv } from "@/lib/vaults/roster-provenance";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
+import { heldAssetsRaw } from "@/lib/vaults/lost-assets";
 import type { VaultYield } from "@/lib/vaults/yield";
 import { ROSTER_HOLDERS_MIN, inRosterPreset } from "@/lib/vaults/roster-preset";
 
@@ -91,6 +93,8 @@ export interface VaultRosterHead {
 }
 
 const rawOf = (v: VaultSummary) => BigInt(v.totalAssets?.raw ?? "0");
+/** Size's key: what the vault holds, its stated total less `lostAssets` (ui-jobs 543). */
+const heldOf = (v: VaultSummary) => (v.totalAssets ? heldAssetsRaw(v.totalAssets.raw, v.lostAssets?.raw) : BigInt(0));
 
 /** Has the vault a signal the preset reads: a census, or Yearn's endorsement. */
 const hasSignal = (v: VaultSummary) => v.census != null || v.family === "yearn-v3";
@@ -122,7 +126,7 @@ function primaryCmp(sort: SortKey, dir: number) {
 function rowCmp(sort: SortKey, dir: number) {
   const primary = primaryCmp(sort, dir);
   return (a: VaultSummary, b: VaultSummary) =>
-    primary(a, b) || dir * bigCmp(rawOf(b), rawOf(a)) || a.address.localeCompare(b.address);
+    primary(a, b) || dir * bigCmp(heldOf(b), heldOf(a)) || a.address.localeCompare(b.address);
 }
 
 interface AssetGroup {
