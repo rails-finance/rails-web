@@ -285,7 +285,7 @@ export function closedText(rows: MarketReserveRow[]): string | null {
     [n("paused"), "paused"],
     [n("borrowOff"), "with borrowing switched off"],
     [n(["supplyCapOne", "borrowCapOne"]), "with a cap of one token"],
-    [n("ltvZero"), "backing no new borrowing at a loan-to-value of 0"],
+    [n("ltvZero"), "not collateral"],
   ] as const;
   const listed = routes.filter(([k]) => k > 0).map(([k, what]) => `${k} ${what}`);
   const total = rows.length;

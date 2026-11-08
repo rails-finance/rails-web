@@ -21,7 +21,8 @@ import { BlockRef } from "@/components/shared/block-ref";
 import { headReadOf, serverReadVia, type ServerRead } from "@/lib/shared/server-head-read";
 import { aaveV3MarketModal } from "@/lib/aave-v3/event-templates";
 import { sparkModal } from "@/lib/spark/event-templates";
-import { ETHEREUM_AAVE_V3_MARKETS, reserveHref, type AaveMarketConfig } from "@/lib/shared/aave-market-configs";
+import { reserveHref, type AaveMarketConfig } from "@/lib/shared/aave-market-configs";
+import { SkeletonBlock } from "@/components/shared/skeleton-card";
 
 /** The market's "?" explainer. */
 export const marketModal = (m: AaveMarketConfig): LearnMoreContent =>
@@ -92,69 +93,90 @@ export function MarketStamp({ read, m }: { read: AaveMarketRead; m: AaveMarketCo
   );
 }
 
-/** Core · Prime · EtherFi on the Ethereum Aave V3 market page: each a link to
- *  its market (`?market=`), the current one muted. */
-function EthereumMarketSelector({ current }: { current: AaveMarketConfig }) {
+/** One Pool's panel, or its loading and failure states. With `reservesHref`
+ *  the panel links its reserves view and draws no table (the overview, M4). */
+function MarketBody({ m, read, overview }: { m: AaveMarketConfig; read: AaveMarketRead; overview?: boolean }) {
+  const { data, loading, error, view } = read;
+  if (loading && !data) return overview ? <SkeletonBlock height={260} /> : <AaveMarketLoadingSkeleton />;
+  if (error || !view)
+    return (
+      <div className="py-12 text-center text-rb-500">
+        <p className="mb-1">Couldn&apos;t read {m.marketLabel} from chain.</p>
+        <p className="text-sm">{error ?? "The RPC read failed: reload to retry."}</p>
+      </div>
+    );
   return (
-    <nav aria-label="Aave V3 markets on Ethereum" className="mb-4 flex items-center gap-3 text-[13px]">
-      {ETHEREUM_AAVE_V3_MARKETS.map(({ key, config }) =>
-        config.key === current.key ? (
-          <span key={key} aria-current="page" className="font-semibold text-rb-500">
-            {config.marketLabel.replace(/^Aave V3 /, "")}
-          </span>
-        ) : (
-          <Link
-            key={key}
-            href={`${config.marketHref}${config.marketQuery}`}
-            className="text-blue-600 hover:underline dark:text-[var(--text-link)]"
-          >
-            {config.marketLabel.replace(/^Aave V3 /, "")}
-          </Link>
-        ),
-      )}
-    </nav>
+    <AaveMarketViews
+      view={view}
+      listingHref={m.positionsHref}
+      assetHref={m.assetHref}
+      reserveHref={(asset) => reserveHref(m, asset)}
+      reservesHref={overview ? m.reservesHref : undefined}
+      chainId={m.chainId}
+    />
+  );
+}
+
+/** One Pool of the overview: its chain-snapshot line, then its panel. */
+function OverviewPanel({ m }: { m: AaveMarketConfig }) {
+  const read = useAaveMarket(m);
+  return (
+    <section aria-label={m.marketLabel} data-overview-market={m.key}>
+      <MarketStamp read={read} m={m} />
+      <div className="mt-2">
+        <MarketBody m={m} read={read} overview />
+      </div>
+    </section>
+  );
+}
+
+/** The overview of several Pools on one route (anatomy M4: Aave V3 on
+ *  Ethereum's Core, Prime and EtherFi): each Pool's panel stacked, each with
+ *  its own figures, receipts and links to its reserves and positions. Each
+ *  panel reads its own Pool, in parallel. */
+export function AaveMarketsOverview({ markets }: { markets: readonly AaveMarketConfig[] }) {
+  const first = markets[0];
+  const protocol = protocolForHref(first.listingHref);
+  if (!protocol) throw new Error(`aave-market-page: no roster entry for ${first.listingHref}`);
+  return (
+    <div className="min-h-screen" data-anatomy="M4">
+      <div className="py-8">
+        <SubPageHeader protocol={protocol} title="Market overview" learnMore={marketModal(first)} />
+        <div className="space-y-2">
+          {markets.map((m) => (
+            <OverviewPanel key={m.key} m={m} />
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
 export function AaveMarketPage({ market: m }: { market: AaveMarketConfig }) {
   const read = useAaveMarket(m);
-  const { data, loading, error, view } = read;
   // The roster entry supplies the crumb + chain mark; `listingHref` is the
   // page's basePath, so a market page cannot crumb to a listing that is not
   // its own.
   const protocol = protocolForHref(m.listingHref);
   if (!protocol) throw new Error(`aave-market-page: no roster entry for ${m.listingHref}`);
 
-  const body =
-    loading && !data ? (
-      <AaveMarketLoadingSkeleton />
-    ) : error || !view ? (
-      <div className="py-12 text-center text-rb-500">
-        <p className="mb-1">Couldn&apos;t read the market from chain.</p>
-        <p className="text-sm">{error ?? "The RPC read failed: reload to retry."}</p>
-      </div>
-    ) : (
-      <div data-skel-section="page-table">
-        <AaveMarketViews
-          view={view}
-          listingHref={m.listingHref}
-          assetHref={m.assetHref}
-          reserveHref={(asset) => reserveHref(m, asset)}
-          chainId={m.chainId}
-        />
-      </div>
-    );
+  const body = (
+    <div data-skel-section="page-table">
+      <MarketBody m={m} read={read} />
+    </div>
+  );
 
   return (
     <div className="min-h-screen">
       <div className="py-8">
         <SubPageHeader
           protocol={protocol}
-          title="Market overview"
+          title={
+            m.reservesHref.includes("?market=") ? `${m.marketLabel.replace(/^Aave V3 /, "")} market` : "Market overview"
+          }
           learnMore={marketModal(m)}
           stamp={<MarketStamp read={read} m={m} />}
         />
-        {m.listingHref === "/ethereum/aave-v3" && <EthereumMarketSelector current={m} />}
 
         {body}
       </div>

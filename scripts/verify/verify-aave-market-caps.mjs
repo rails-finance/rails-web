@@ -34,6 +34,9 @@
 //      in its Collateral cell; one with an eMode loan-to-value reads "eMode
 //      only"; one with an LTV reads "LTV% / LT%".
 //   9. No non-zero rate reads 0.00% (each page).
+//  11. /ethereum/aave-v3/market is the overview of Core, Prime and EtherFi:
+//      three panels, each linking its reserves view (`?market=`), and no
+//      reserves table.
 //  10. Available's receipt names the formula that applies (each page): every
 //      row's basis (`data-available-basis`) is "virtual" where the route
 //      carries the Pool's virtual balance and "difference" where it does not,
@@ -54,7 +57,7 @@ const ROWS_TIMEOUT_MS = 180000;
 const FIELD_MAX = 2 ** 36 - 1;
 
 const PAGES = [
-  { name: "core", path: "/ethereum/aave-v3/market", api: "/api/chain/aave-v3/market" },
+  { name: "core", path: "/ethereum/aave-v3/market?market=core", api: "/api/chain/aave-v3/market" },
   { name: "base", path: "/base/aave-v3/market", api: "/api/chain/aave-v3-base/market" },
   { name: "arbitrum", path: "/arbitrum/aave-v3/markets", api: "/api/chain/aave-v3-arbitrum/market" },
   { name: "spark", path: "/ethereum/spark/market", api: "/api/chain/spark/market" },
@@ -324,6 +327,40 @@ for (const p of PAGES) {
     `scrollWidth ${sw} / ${cw}, ${cards} cards of ${rowsDrawn} rows`,
   );
   await narrow.close();
+}
+
+// ── 11. The Ethereum overview: three panels, each linking its reserves ─────
+{
+  const ov = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
+  await ov.goto(`${BASE}/ethereum/aave-v3/market`, NAV);
+  await ov
+    .waitForFunction(() => document.querySelectorAll("[data-market-reserves-link]").length >= 3, null, {
+      timeout: ROWS_TIMEOUT_MS,
+    })
+    .catch(() => {});
+  const panels = await ov.evaluate(() =>
+    [...document.querySelectorAll("[data-overview-market]")].map((s) => ({
+      key: s.getAttribute("data-overview-market"),
+      href: s.querySelector("[data-market-reserves-link]")?.getAttribute("href") ?? null,
+      summary: Boolean(s.querySelector("[data-market-summary]")),
+    })),
+  );
+  const rowsOnOverview = await ov.locator("tr[data-reserve-row]").count();
+  const wantPanels = [
+    ["aave-v3", "/ethereum/aave-v3/market?market=core"],
+    ["aave-v3-prime", "/ethereum/aave-v3/market?market=prime"],
+    ["aave-v3-etherfi", "/ethereum/aave-v3/market?market=etherfi"],
+  ];
+  const okPanels =
+    panels.length === 3 &&
+    wantPanels.every(([k, h], i) => panels[i]?.key === k && panels[i]?.href === h && panels[i]?.summary);
+  check(
+    "11a the Ethereum overview draws Core, Prime and EtherFi, each linking its reserves",
+    okPanels,
+    panels.map((p) => `${p.key} → ${p.href}`).join("; "),
+  );
+  check("11b the overview draws no reserves table", rowsOnOverview === 0, `${rowsOnOverview} rows`);
+  await ov.close();
 }
 
 // ── 6. The sentinels are present and named ─────────────────────────────────

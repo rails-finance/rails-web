@@ -20,6 +20,8 @@
 //   5. The curve draws: its kink at the route's kink, today's point at the
 //      route's utilisation (none where nothing is supplied).
 //   6. Available's receipt opens in the inspector.
+//   7. "A reserve of <market>" links that Pool's reserves view, and lands on
+//      its table.
 //
 // Run:
 //   BASE=http://localhost:3000 node scripts/verify/verify-aave-reserve-page.mjs
@@ -31,10 +33,38 @@ const BASE = process.env.BASE ?? "http://localhost:3000";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
 const WAIT = 180000;
 
+// `market` is the page with the Pool's reserves table; `base` the route a
+// reserve page sits under, `query` what it carries (Aave V3 on Ethereum's
+// three Pools share one route and are chosen with `?market=`).
 const FIXTURES = [
-  { market: "/ethereum/aave-v3/market", api: "/api/chain/aave-v3/market", symbol: "WETH" },
-  { market: "/ethereum/aave-v3/market", api: "/api/chain/aave-v3/market", symbol: "USDC" },
-  { market: "/ethereum/aave-v3/market", api: "/api/chain/aave-v3/market", symbol: "GHO" },
+  {
+    market: "/ethereum/aave-v3/market?market=core",
+    base: "/ethereum/aave-v3/market",
+    query: "",
+    api: "/api/chain/aave-v3/market",
+    symbol: "WETH",
+  },
+  {
+    market: "/ethereum/aave-v3/market?market=core",
+    base: "/ethereum/aave-v3/market",
+    query: "",
+    api: "/api/chain/aave-v3/market",
+    symbol: "USDC",
+  },
+  {
+    market: "/ethereum/aave-v3/market?market=core",
+    base: "/ethereum/aave-v3/market",
+    query: "",
+    api: "/api/chain/aave-v3/market",
+    symbol: "GHO",
+  },
+  {
+    market: "/ethereum/aave-v3/market?market=prime",
+    base: "/ethereum/aave-v3/market",
+    query: "?market=prime",
+    api: "/api/chain/aave-v3/market?market=prime",
+    symbol: "WETH",
+  },
   { market: "/ethereum/spark/market", api: "/api/chain/spark/market", symbol: "DAI" },
   { market: "/base/seamless/market", api: "/api/chain/seamless/market", symbol: "USDC" },
   { market: "/base/aave-v3/market", api: "/api/chain/aave-v3-base/market", symbol: "cbBTC" },
@@ -72,7 +102,9 @@ for (const f of FIXTURES) {
     check(`${tag} 0  the route carries the reserve`, false);
     continue;
   }
-  const want = `${f.market}/${r.address}`;
+  const base = f.base ?? f.market;
+  const want = `${base}/${r.address}`;
+  const wantHref = `${want}${f.query ?? ""}`;
 
   // ── 1. The M1 row links to the page ──────────────────────────────────────
   const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
@@ -80,13 +112,13 @@ for (const f of FIXTURES) {
   const row = page.locator(`tr[data-reserve-row="${r.address}"]`);
   await row.waitFor({ timeout: WAIT });
   const href = await row.locator(`[data-reserve-link="${r.address}"]`).getAttribute("href");
-  check(`${tag} 1a M1 row link`, href === want, `${href} vs ${want}`);
+  check(`${tag} 1a M1 row link`, href === wantHref, `${href} vs ${wantHref}`);
   await row.locator("[data-available]").click({ position: { x: 4, y: 4 } });
   await page.waitForURL((u) => u.pathname === want, { timeout: 60000 }).catch(() => {});
   check(`${tag} 1b a press on the row opens the page`, new URL(page.url()).pathname === want, page.url());
 
   // ── 2–6. The page ────────────────────────────────────────────────────────
-  if (new URL(page.url()).pathname !== want) await page.goto(`${BASE}${want}`, NAV);
+  if (new URL(page.url()).pathname !== want) await page.goto(`${BASE}${wantHref}`, NAV);
   await page.locator("[data-reserve-vitals]").waitFor({ timeout: WAIT });
   await page.waitForTimeout(500);
   const got = await page.evaluate(() => {
@@ -206,6 +238,24 @@ for (const f of FIXTURES) {
     );
   }
   check(`${tag} 6  Available's receipt opens`, pop.length > 0, pop.slice(0, 100));
+  // ── 7. The market link lands on the reserves view ──────────────────────────
+  await page.keyboard.press("Escape");
+  const marketLink = await page.locator("[data-reserve-market-link]").getAttribute("href");
+  check(`${tag} 7a "A reserve of" links the reserves view`, marketLink === f.market, `${marketLink} vs ${f.market}`);
+  await page.locator("[data-reserve-market-link]").click();
+  await page.waitForURL((u) => `${u.pathname}${u.search}` === f.market, { timeout: 60000 }).catch(() => {});
+  const landed = new URL(page.url());
+  const table = await page
+    .locator("tr[data-reserve-row]")
+    .first()
+    .waitFor({ timeout: WAIT })
+    .then(() => true)
+    .catch(() => false);
+  check(
+    `${tag} 7b it lands on the reserves table`,
+    `${landed.pathname}${landed.search}` === f.market && table,
+    page.url(),
+  );
   await page.close();
 }
 

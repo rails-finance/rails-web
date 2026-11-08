@@ -137,7 +137,7 @@ export function AaveReservePage({ marketKey, asset }: { marketKey: AaveMarketKey
   const registry = useReceiptRegistry();
   const protocol = protocolForHref(m.listingHref);
   if (!protocol) throw new Error(`aave-reserve-page: no roster entry for ${m.listingHref}`);
-  const marketHref = `${m.marketHref}${m.marketQuery}`;
+  const marketHref = m.reservesHref;
   const r = view?.rows.find((x) => x.address === asset.toLowerCase()) ?? null;
   const vocab = data
     ? aaveMarketVocab(m.key, {

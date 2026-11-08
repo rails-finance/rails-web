@@ -3,10 +3,12 @@
 // the route, the chain and the names are written once.
 // ----------------------------------------------------------------------------
 // A reserve page sits at `<marketHref>/<asset>`, the asset its lowercased
-// underlying address (the key /assets/<chain>/<token> uses). Aave V3's Prime
-// and EtherFi Pools share Core's route and are chosen with `?market=`, the
-// selector the Aave V3 wallet pages read (lib/aave-v3/asset-catalog.ts
-// asV3Market).
+// underlying address (the key /assets/<chain>/<token> uses). Aave V3 on
+// Ethereum runs three Pools on one route: /ethereum/aave-v3/market is the
+// overview of all three (a panel each), and `?market=core|prime|etherfi`, the
+// selector the Aave V3 wallet pages and listing read (lib/aave-v3/asset-
+// catalog.ts asV3Market), is one Pool's panel and reserves table. A sub-route
+// would collide with the reserve page's `[asset]` segment.
 
 import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { asV3Market, type AaveV3MarketKey } from "@/lib/aave-v3/asset-catalog";
@@ -30,8 +32,13 @@ export interface AaveMarketConfig {
   marketHref: string;
   /** `?market=…` for a Pool that shares its route with another; else "". */
   marketQuery: string;
+  /** The page with this Pool's reserves table (M1): `marketHref` where the
+   *  Pool has the route to itself, `?market=` on Ethereum's Aave V3. */
+  reservesHref: string;
   /** The explorer's listing (the breadcrumb root). */
   listingHref: string;
+  /** The listing filtered to this Pool's positions ("View all … positions"). */
+  positionsHref: string;
   protocolName: string;
   marketLabel: string;
   purpose: string;
@@ -48,7 +55,9 @@ const ETHEREUM_AAVE_V3: Record<AaveV3MarketKey, AaveMarketConfig> = {
     apiRoute: "/api/chain/aave-v3/market",
     marketHref: "/ethereum/aave-v3/market",
     marketQuery: "",
+    reservesHref: "/ethereum/aave-v3/market?market=core",
     listingHref: "/ethereum/aave-v3",
+    positionsHref: "/ethereum/aave-v3?market=core",
     protocolName: "Aave V3",
     marketLabel: "Aave V3 Core",
     purpose:
@@ -61,10 +70,13 @@ const ETHEREUM_AAVE_V3: Record<AaveV3MarketKey, AaveMarketConfig> = {
     apiRoute: "/api/chain/aave-v3/market?market=prime",
     marketHref: "/ethereum/aave-v3/market",
     marketQuery: "?market=prime",
+    reservesHref: "/ethereum/aave-v3/market?market=prime",
     listingHref: "/ethereum/aave-v3",
+    positionsHref: "/ethereum/aave-v3?market=prime",
     protocolName: "Aave V3",
     marketLabel: "Aave V3 Prime",
-    purpose: "Aave V3 Prime: a second Pool on Ethereum with its own reserves and risk parameters, apart from Core.",
+    purpose:
+      "A second Aave V3 Pool on Ethereum for ETH, its liquid staking tokens and a few stablecoins, with its own reserves and risk parameters apart from Core.",
     modal: "aave-v3",
   },
   etherfi: {
@@ -73,10 +85,13 @@ const ETHEREUM_AAVE_V3: Record<AaveV3MarketKey, AaveMarketConfig> = {
     apiRoute: "/api/chain/aave-v3/market?market=etherfi",
     marketHref: "/ethereum/aave-v3/market",
     marketQuery: "?market=etherfi",
+    reservesHref: "/ethereum/aave-v3/market?market=etherfi",
     listingHref: "/ethereum/aave-v3",
+    positionsHref: "/ethereum/aave-v3?market=etherfi",
     protocolName: "Aave V3",
     marketLabel: "Aave V3 EtherFi",
-    purpose: "Aave V3 EtherFi: a Pool on Ethereum with its own reserves and risk parameters, apart from Core.",
+    purpose:
+      "An Aave V3 Pool on Ethereum built around ether.fi's weETH as collateral against stablecoins, with its own reserves and risk parameters apart from Core.",
     modal: "aave-v3",
   },
 };
@@ -85,7 +100,7 @@ const ETHEREUM_AAVE_V3: Record<AaveV3MarketKey, AaveMarketConfig> = {
 export const ethereumAaveV3Market = (market: string | null | undefined): AaveMarketConfig =>
   ETHEREUM_AAVE_V3[asV3Market(market)];
 
-/** Core, Prime and EtherFi, for the market page's selector. */
+/** Core, Prime and EtherFi, the overview's three panels. */
 export const ETHEREUM_AAVE_V3_MARKETS: readonly { key: AaveV3MarketKey; config: AaveMarketConfig }[] = (
   ["core", "prime", "etherfi"] as const
 ).map((key) => ({ key, config: ETHEREUM_AAVE_V3[key] }));
@@ -96,7 +111,9 @@ export const AAVE_V3_BASE_MARKET: AaveMarketConfig = {
   apiRoute: "/api/chain/aave-v3-base/market",
   marketHref: "/base/aave-v3/market",
   marketQuery: "",
+  reservesHref: "/base/aave-v3/market",
   listingHref: "/base/aave-v3",
+  positionsHref: "/base/aave-v3",
   protocolName: "Aave V3",
   marketLabel: "Aave V3 · Base",
   purpose:
@@ -110,7 +127,9 @@ export const AAVE_V3_ARBITRUM_MARKET: AaveMarketConfig = {
   apiRoute: "/api/chain/aave-v3-arbitrum/market",
   marketHref: "/arbitrum/aave-v3/markets",
   marketQuery: "",
+  reservesHref: "/arbitrum/aave-v3/markets",
   listingHref: "/arbitrum/aave-v3",
+  positionsHref: "/arbitrum/aave-v3",
   protocolName: "Aave V3",
   marketLabel: "Aave V3 · Arbitrum",
   purpose:
@@ -124,7 +143,9 @@ export const SPARK_MARKET: AaveMarketConfig = {
   apiRoute: "/api/chain/spark/market",
   marketHref: "/ethereum/spark/market",
   marketQuery: "",
+  reservesHref: "/ethereum/spark/market",
   listingHref: "/ethereum/spark",
+  positionsHref: "/ethereum/spark",
   protocolName: "SparkLend",
   marketLabel: "SparkLend",
   purpose:
@@ -140,7 +161,9 @@ export const SEAMLESS_MARKET: AaveMarketConfig = {
   apiRoute: "/api/chain/seamless/market",
   marketHref: "/base/seamless/market",
   marketQuery: "",
+  reservesHref: "/base/seamless/market",
   listingHref: "/base/seamless",
+  positionsHref: "/base/seamless",
   protocolName: "Seamless",
   marketLabel: "Seamless · Base",
   purpose:

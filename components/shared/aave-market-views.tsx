@@ -759,6 +759,9 @@ export interface AaveMarketViewsProps {
   assetHref?: (symbol: string, side: "supply" | "borrow") => string;
   /** Each row's reserve page (the row becomes a D4 link). */
   reserveHref?: (asset: string) => string;
+  /** The page with this Pool's reserves table: the band ends with a link to
+   *  it, and the table is left off (the overview of several Pools, M4). */
+  reservesHref?: string;
   chainId?: ChainId;
 }
 
@@ -790,7 +793,14 @@ const HEADER_TIP: Partial<Record<SortKey, string>> = {
  *  then liquidation threshold. */
 const collateralRank = (r: MarketReserveRow) => ltvBpsOf(r) * 1e5 + ltBpsOf(r);
 
-export function AaveMarketViews({ view, listingHref, assetHref, reserveHref, chainId }: AaveMarketViewsProps) {
+export function AaveMarketViews({
+  view,
+  listingHref,
+  assetHref,
+  reserveHref,
+  reservesHref,
+  chainId,
+}: AaveMarketViewsProps) {
   // Not every explorer on this surface HAS a listing behind it. The Base ones
   // open on a wallet because the open-position set is not enumerable there, and
   // a "View all positions" link that lands back on this same page is a promise
@@ -892,171 +902,190 @@ export function AaveMarketViews({ view, listingHref, assetHref, reserveHref, cha
         {/* Section 1 — the vitals band: identity · head figures · supply mix.
             The figures sit in the shared slots (roster · size in · size out ·
             usage) under this market's words for them. */}
-        <VitalsBand
-          className="mb-8"
-          lead={
-            <>
-              {hasListing ? (
-                <Link
-                  href={listingHref}
-                  className="text-base font-semibold text-foreground transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]"
-                  title={`View ${view.label} positions`}
-                >
-                  {view.label}
-                </Link>
-              ) : (
-                <span className="text-base font-semibold text-foreground">{view.label}</span>
-              )}
-              <p className="mt-2 text-[13px] leading-relaxed text-rb-500">{view.purpose}</p>
-              {summary && (
-                <p className="mt-3 text-[12px] leading-relaxed text-rb-500" data-market-summary="">
-                  {summary}
-                </p>
-              )}
-            </>
-          }
-          vitals={[
-            {
-              slot: "roster",
-              label: "Reserves",
-              value: <Prov info={vocab.reserveCountProv()}>{view.reserveCount}</Prov>,
-            },
-            {
-              slot: "sizeIn",
-              label: "Supplied",
-              value: <Prov info={vocab.marketTotalProv("supplied")}>{supplied.display}</Prov>,
-              title: supplied.title,
-            },
-            {
-              slot: "sizeOut",
-              label: "Borrowed",
-              value: <Prov info={vocab.marketTotalProv("borrowed")}>{borrowed.display}</Prov>,
-              title: borrowed.title,
-            },
-            marketUtilization != null && {
-              slot: "usage" as const,
-              label: "Utilisation",
-              // Borrowed ÷ supplied, both traced in this same band. A ratio of
-              // two receipted figures — exempt from the coverage tripwire, like
-              // the per-row utilisation.
-              value: <span data-prov-exempt="">{pct(marketUtilization)}</span>,
-              title:
-                "Borrowed ÷ supplied, both in USD at the market's oracle price: the two figures beside it in this band.",
-            },
-          ]}
-          aside={
-            <>
-              {view.composition.length > 0 && (
-                <>
-                  <div className="mb-1.5 text-[11px] uppercase tracking-wider text-rb-500">Supply mix</div>
-                  <CompositionBar composition={view.composition} />
-                </>
-              )}
-              {hasListing && (
-                <Link
-                  href={listingHref}
-                  className={`mt-auto inline-flex items-center gap-1 pt-3 text-[13px] font-medium ${INLINE_LINK}`}
-                >
-                  View all {view.label} positions
-                  <span aria-hidden>→</span>
-                </Link>
-              )}
-            </>
-          }
-        />
-
-        {/* Section 2 — the reserve list */}
-        <div className="mb-3">
-          <h2 className="text-[11px] uppercase tracking-wider text-rb-500">Reserves</h2>
-          <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
-            Every reserve on the Pool, filter by class, sort any column. Rates, caps and risk parameters decode from the
-            configuration the Pool enforces; USD is the market&apos;s oracle price. A cap shows under its size once 90%
-            of it is in use. The bar is utilisation, and its tick is the rate model&apos;s kink. A row opens its
-            reserve&apos;s page; Details opens its parameters in place.
-          </p>
+        <div data-market-panel={view.protocol}>
+          <VitalsBand
+            className="mb-8"
+            lead={
+              <>
+                {hasListing ? (
+                  <Link
+                    href={listingHref}
+                    className="text-base font-semibold text-foreground transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]"
+                    title={`View ${view.label} positions`}
+                  >
+                    {view.label}
+                  </Link>
+                ) : (
+                  <span className="text-base font-semibold text-foreground">{view.label}</span>
+                )}
+                <p className="mt-2 text-[13px] leading-relaxed text-rb-500">{view.purpose}</p>
+                {summary && (
+                  <p className="mt-3 text-[12px] leading-relaxed text-rb-500" data-market-summary="">
+                    {summary}
+                  </p>
+                )}
+              </>
+            }
+            vitals={[
+              {
+                slot: "roster",
+                label: "Reserves",
+                value: <Prov info={vocab.reserveCountProv()}>{view.reserveCount}</Prov>,
+              },
+              {
+                slot: "sizeIn",
+                label: "Supplied",
+                value: <Prov info={vocab.marketTotalProv("supplied")}>{supplied.display}</Prov>,
+                title: supplied.title,
+              },
+              {
+                slot: "sizeOut",
+                label: "Borrowed",
+                value: <Prov info={vocab.marketTotalProv("borrowed")}>{borrowed.display}</Prov>,
+                title: borrowed.title,
+              },
+              marketUtilization != null && {
+                slot: "usage" as const,
+                label: "Utilisation",
+                // Borrowed ÷ supplied, both traced in this same band. A ratio of
+                // two receipted figures — exempt from the coverage tripwire, like
+                // the per-row utilisation.
+                value: <span data-prov-exempt="">{pct(marketUtilization)}</span>,
+                title:
+                  "Borrowed ÷ supplied, both in USD at the market's oracle price: the two figures beside it in this band.",
+              },
+            ]}
+            aside={
+              <>
+                {view.composition.length > 0 && (
+                  <>
+                    <div className="mb-1.5 text-[11px] uppercase tracking-wider text-rb-500">Supply mix</div>
+                    <CompositionBar composition={view.composition} />
+                  </>
+                )}
+                <div className="mt-auto flex flex-col gap-1 pt-3">
+                  {reservesHref && (
+                    <Link
+                      href={reservesHref}
+                      className={`inline-flex items-center gap-1 text-[13px] font-medium ${INLINE_LINK}`}
+                      data-market-reserves-link=""
+                    >
+                      View {view.label} reserves
+                      <span aria-hidden>→</span>
+                    </Link>
+                  )}
+                  {hasListing && (
+                    <Link
+                      href={listingHref}
+                      className={`inline-flex items-center gap-1 text-[13px] font-medium ${INLINE_LINK}`}
+                    >
+                      View all {view.label} positions
+                      <span aria-hidden>→</span>
+                    </Link>
+                  )}
+                </div>
+              </>
+            }
+          />
         </div>
-
-        {/* Filters: asset class. Quiet chips; "All" clears. */}
-        <div className="mb-4 flex flex-wrap items-center gap-1.5">
-          <span className="mr-0.5 text-[11px] uppercase tracking-wider text-rb-500">Class</span>
-          <Chip active={classes.size === 0} onClick={() => setClasses(new Set())}>
-            All
-          </Chip>
-          {presentClasses.map((c) => (
-            <Chip key={c} active={classes.has(c)} onClick={() => toggleClass(c)}>
-              <ClassDot cls={c} />
-              {ASSET_CLASS_TITLE[c]}
-            </Chip>
-          ))}
-        </div>
-
-        {filteredRows.length === 0 ? (
-          <div className="rounded-lg border border-rb-200 py-12 text-center text-rb-500 dark:border-rb-800">
-            <p className="mb-1">No reserves match this filter.</p>
-            <button type="button" onClick={() => setClasses(new Set())} className={`text-[13px] ${INLINE_LINK}`}>
-              Clear filter
-            </button>
-          </div>
-        ) : (
+        {!reservesHref && (
           <>
-            {/* Below lg the header row is hidden (D6): a select and a direction
-                button drive the same sort. */}
-            <div className="mb-2 flex items-center gap-2 lg:hidden" data-mobile-sort="">
-              <label className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-rb-500">
-                Sort by
-                <select
-                  value={sortKey}
-                  onChange={(e) => pickSort(e.target.value as SortKey)}
-                  className="rounded-md border border-rb-200 bg-background px-2 py-1 text-base sm:text-[12px] normal-case tracking-normal text-foreground dark:border-rb-800"
-                >
-                  {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
-                    <option key={k} value={k}>
-                      {SORT_LABEL[k]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="button"
-                onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-                aria-label={sortDir === "asc" ? "Ascending; switch to descending" : "Descending; switch to ascending"}
-                className="inline-flex items-center gap-1 rounded-md border border-rb-200 px-2 py-1 text-[12px] text-foreground dark:border-rb-800"
-              >
-                {sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}
-                {sortDir === "asc" ? "Low first" : "High first"}
-              </button>
+            {/* Section 2 — the reserve list */}
+            <div className="mb-3">
+              <h2 className="text-[11px] uppercase tracking-wider text-rb-500">Reserves</h2>
+              <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
+                Every reserve on the Pool, filter by class, sort any column. Rates, caps and risk parameters decode from
+                the configuration the Pool enforces; USD is the market&apos;s oracle price. A cap shows under its size
+                once 90% of it is in use. The bar is utilisation, and its tick is the rate model&apos;s kink. A row
+                opens its reserve&apos;s page; Details opens its parameters in place.
+              </p>
             </div>
-            <DataTable
-              label={`${view.label} reserves`}
-              tableClassName="lg:min-w-[900px]"
-              anatomy="M1"
-              stacked
-              stackBelow="lg"
-              rowHeight="two"
-            >
-              <DataTableHead>
-                {th("Asset", "asset")}
-                {th("Supplied", "supplied", "right")}
-                {th("Borrowed", "borrowed", "right")}
-                {th("Available", "available", "right")}
-                {th("Supply rate", "supplyRate", "right")}
-                {th("Borrow rate", "borrowRate", "right")}
-                {th("Collateral", "collateral", "right")}
-                {th("Utilisation", "util")}
-              </DataTableHead>
-              <DataTableBody>
-                {sortedRows.map((r) => (
-                  <ReserveRow
-                    key={r.address}
-                    r={r}
-                    vocab={vocab}
-                    assetHref={assetHref}
-                    href={reserveHref?.(r.address)}
-                    chainId={chainId}
-                  />
-                ))}
-              </DataTableBody>
-            </DataTable>
+
+            {/* Filters: asset class. Quiet chips; "All" clears. */}
+            <div className="mb-4 flex flex-wrap items-center gap-1.5">
+              <span className="mr-0.5 text-[11px] uppercase tracking-wider text-rb-500">Class</span>
+              <Chip active={classes.size === 0} onClick={() => setClasses(new Set())}>
+                All
+              </Chip>
+              {presentClasses.map((c) => (
+                <Chip key={c} active={classes.has(c)} onClick={() => toggleClass(c)}>
+                  <ClassDot cls={c} />
+                  {ASSET_CLASS_TITLE[c]}
+                </Chip>
+              ))}
+            </div>
+
+            {filteredRows.length === 0 ? (
+              <div className="rounded-lg border border-rb-200 py-12 text-center text-rb-500 dark:border-rb-800">
+                <p className="mb-1">No reserves match this filter.</p>
+                <button type="button" onClick={() => setClasses(new Set())} className={`text-[13px] ${INLINE_LINK}`}>
+                  Clear filter
+                </button>
+              </div>
+            ) : (
+              <>
+                {/* Below lg the header row is hidden (D6): a select and a direction
+                button drive the same sort. */}
+                <div className="mb-2 flex items-center gap-2 lg:hidden" data-mobile-sort="">
+                  <label className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-rb-500">
+                    Sort by
+                    <select
+                      value={sortKey}
+                      onChange={(e) => pickSort(e.target.value as SortKey)}
+                      className="rounded-md border border-rb-200 bg-background px-2 py-1 text-base sm:text-[12px] normal-case tracking-normal text-foreground dark:border-rb-800"
+                    >
+                      {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+                        <option key={k} value={k}>
+                          {SORT_LABEL[k]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                    aria-label={
+                      sortDir === "asc" ? "Ascending; switch to descending" : "Descending; switch to ascending"
+                    }
+                    className="inline-flex items-center gap-1 rounded-md border border-rb-200 px-2 py-1 text-[12px] text-foreground dark:border-rb-800"
+                  >
+                    {sortDir === "asc" ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />}
+                    {sortDir === "asc" ? "Low first" : "High first"}
+                  </button>
+                </div>
+                <DataTable
+                  label={`${view.label} reserves`}
+                  tableClassName="lg:min-w-[900px]"
+                  anatomy="M1"
+                  stacked
+                  stackBelow="lg"
+                  rowHeight="two"
+                >
+                  <DataTableHead>
+                    {th("Asset", "asset")}
+                    {th("Supplied", "supplied", "right")}
+                    {th("Borrowed", "borrowed", "right")}
+                    {th("Available", "available", "right")}
+                    {th("Supply rate", "supplyRate", "right")}
+                    {th("Borrow rate", "borrowRate", "right")}
+                    {th("Collateral", "collateral", "right")}
+                    {th("Utilisation", "util")}
+                  </DataTableHead>
+                  <DataTableBody>
+                    {sortedRows.map((r) => (
+                      <ReserveRow
+                        key={r.address}
+                        r={r}
+                        vocab={vocab}
+                        assetHref={assetHref}
+                        href={reserveHref?.(r.address)}
+                        chainId={chainId}
+                      />
+                    ))}
+                  </DataTableBody>
+                </DataTable>
+              </>
+            )}
           </>
         )}
       </div>
