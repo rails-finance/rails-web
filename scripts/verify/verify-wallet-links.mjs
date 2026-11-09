@@ -229,7 +229,11 @@ async function waitForFilteredCount(full, timeoutMs = 45000) {
   let last = full;
   while (Date.now() < deadline) {
     // Don't sample mid-refetch: aria-busy true means rows are being replaced.
-    const busy = (await results.count()) > 0 ? await results.getAttribute("aria-busy") : null;
+    // An [aria-busy] element can leave the DOM between the count and the read;
+    // a bare getAttribute then waits out the 90 s default for one to come back
+    // (frankencoin, whose filtered page stays full and keeps this loop polling).
+    const busy =
+      (await results.count()) > 0 ? await results.getAttribute("aria-busy", { timeout: 1000 }).catch(() => null) : null;
     if (busy !== "true") {
       last = await page.locator(ROW).count();
       if (last >= 1 && last < full) return { count: last, settled: true };
