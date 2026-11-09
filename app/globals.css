@@ -161,7 +161,9 @@
      `html.dark`. canvas = `--background`, overlay = `--surface-overlay`. */
   --surface-raised: var(--color-rb-100); /* cards, panels, inputs, active in-place control */
   --surface-sunken: var(--color-rb-200); /* segmented tracks, inset chips, recessed wells */
-  --surface-stripe: var(--surface-sunken); /* the house table's even rows (D1) */
+  --surface-stripe: oklch(
+    0.946 calc(0.0105 * var(--paper-chroma)) var(--paper-hue)
+  ); /* the house table's even rows (D1): halfway from rb-200 to rb-100, so a bar's rb-200 track shows on it (Miles, 9 Nov) */
   --surface-marker: var(--color-rb-200); /* small inline tags: badges, count pills, token chips */
   --surface-skeleton: var(--color-rb-100); /* loading shimmer — matched to --surface-raised */
   --surface-selected: var(--color-rb-300); /* pressed/active segment in a toggle group */
