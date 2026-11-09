@@ -343,37 +343,29 @@ export function readoutLines(p: PoolPosition): ReadoutLine[] {
     : [range, size, fees, withdrawals, against, steward];
 }
 
-/** The readout's (i): one group per line, in the lines' order, describing only what this position shows. */
+/** The readout's (i): one group per line, in the lines' order (charter §4, "Product panes follow
+ *  the band"). Each bullet says what its line's figure means and stands alone; what the line
+ *  already states on the face is not repeated, so the pane fits one phone screen at 390px. */
 export function readoutExplainer(p: PoolPosition, order: readonly LineKey[]): ExplainGroupWords[] {
   const groups: Record<LineKey, ExplainGroupWords> = {
     range: {
       title: "Range",
-      bullets: [
-        ["A position earns fees only while the pool's price sits inside its range."],
-        ...(p.inRange || p.range.full ? [] : [["Outside its range, a position holds only one of the two tokens."]]),
-      ],
+      bullets: [["A position earns fees only while the pool's price sits inside its range."]],
     },
     fees: {
       title: "Fees",
       bullets: [
-        ["The position's fees are what swaps paid its liquidity over the last 30 days."],
-        ["The pool's figure is what a full-range position earned, as a share of its value."],
-        ["A donation to the pool counts in the pool's figure as a fee."],
+        ["Each swap pays the pool's fee to the liquidity in range at that moment."],
+        ["A donation to the pool counts as a fee in the pool's figure."],
       ],
     },
     against: {
       title: "Against holding",
-      bullets: [
-        ["Against holding compares the position now with keeping the tokens it held 30 days ago."],
-        ...(p.sinceDeposit ? [["The figure since the first deposit counts every token paid out, fees included."]] : []),
-      ],
+      bullets: [["Against holding compares the position now with keeping the tokens it held 30 days ago."]],
     },
     size: {
       title: "Size",
-      bullets: [
-        ["The position's share is of the liquidity that earns fees at today's price."],
-        ...(p.pool30d.balances ? [["The pool's size is the two token balances it holds."]] : []),
-      ],
+      bullets: [["The position's share is of the liquidity in range now, the part that earns fees."]],
     },
     withdrawals: {
       title: "Withdrawals",

@@ -48,6 +48,9 @@ export interface PricePillProps {
   /** Drop the chip background so the price sits directly on its container
    *  surface (used by the price strip, which supplies its own dark backing). */
   bare?: boolean;
+  /** The figure as the view's own card writes it, drawn in place of the
+   *  pill's formatting so the two agree on precision. */
+  figure?: string;
 }
 
 export function PricePill({
@@ -59,6 +62,7 @@ export function PricePill({
   filterable = true,
   title,
   bare = false,
+  figure,
 }: PricePillProps) {
   return (
     <span
@@ -67,7 +71,7 @@ export function PricePill({
     >
       <TokenChipIcon symbol={symbol} address={address} size={14} filterable={filterable} />
       {showSymbol && <span className="font-medium text-rb-500">{symbol}</span>}
-      <span className="font-bold text-green-400">{unit ? fmtNative(price, unit) : fmtPrice(price)}</span>
+      <span className="font-bold text-green-400">{figure ?? (unit ? fmtNative(price, unit) : fmtPrice(price))}</span>
     </span>
   );
 }

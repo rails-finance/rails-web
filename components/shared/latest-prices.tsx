@@ -52,6 +52,10 @@ export type LatestPriceAsset = Omit<PriceStripAsset, "price"> & {
   /** Where this asset leads the trigger, the count says what it counts
    *  ("+1 more price"). Unset, it reads "+1". */
   moreInWords?: boolean;
+  /** The figure as the view's card writes it (Uniswap: "1.481 WETH"), drawn
+   *  in the trigger and the row in place of `fmtNative`, so chip and card
+   *  agree on precision. */
+  figure?: string;
 };
 
 /** The block a closed position's prices were read at: its closing row. */
@@ -157,7 +161,8 @@ export function LatestPrices({
             {priced(first) && first.info ? (
               <Prov info={first.info} value={String(first.price)} symbol={first.symbol}>
                 <span className="tabular-nums font-bold text-green-400">
-                  {first.unit ? fmtNative(first.price as number, first.unit) : fmtPrice(first.price as number)}
+                  {first.figure ??
+                    (first.unit ? fmtNative(first.price as number, first.unit) : fmtPrice(first.price as number))}
                 </span>
               </Prov>
             ) : (
@@ -165,9 +170,11 @@ export function LatestPrices({
                 className={`tabular-nums ${priced(first) ? "font-bold text-green-400" : "font-medium text-rb-500"}`}
               >
                 {priced(first)
-                  ? first.unit
-                    ? fmtNative(first.price as number, first.unit)
-                    : fmtPrice(first.price as number)
+                  ? first.figure
+                    ? first.figure
+                    : first.unit
+                      ? fmtNative(first.price as number, first.unit)
+                      : fmtPrice(first.price as number)
                   : first.symbol}
               </span>
             )}
@@ -233,6 +240,7 @@ export function LatestPrices({
                         title={a.label ?? a.symbol}
                         showSymbol
                         bare
+                        figure={a.figure}
                       />
                     </AssetPageLink>
                   </li>
