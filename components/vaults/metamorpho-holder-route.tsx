@@ -54,26 +54,17 @@ import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { MorphoBaseVaultTimeline } from "@/components/protocol/morpho-base/vault-timeline";
 import { VaultFlowsPanel } from "@/components/vaults/vault-flows-panel";
 import { vaultFlowTimeline } from "@/lib/vaults/vault-flows";
-import { vaultHoldingHistory, type VaultHoldingHistory } from "@/lib/vaults/earned";
+import { vaultHoldingHistory } from "@/lib/vaults/earned";
 import { computeVaultPositionEconomics } from "@/lib/aave-vaults/position-economics";
-import { VaultHoldingCard } from "@/components/vaults/vault-holding-card";
-import { HoldingExplanation } from "@/components/vaults/holding-explanation";
+import { VaultHoldingPlainCard } from "@/components/vaults/vault-holding-plain-card";
+import { loadHoldingWorth } from "@/lib/vaults/holding-worth-read";
+import type { PlainHoldingHistory } from "@/lib/vaults/holding-worth";
 import { HoldingReceiptsScope } from "@/components/vaults/holding-receipts-scope";
-import { HolderShapeLine } from "@/components/vaults/holder-shape-line";
-import { ExplainBullet, Fig } from "@/components/shared/explain-groups";
-import { Prov } from "@/components/shared/provenance";
-import { HOLDING_REWARDS, vaultHoldingContent } from "@/lib/vaults/card-words";
+import { HOLDING_REWARDS, vaultPlainHoldingContent } from "@/lib/vaults/card-words";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
-import { assetText, shortId } from "@/lib/shared/vault-amount-text";
-import {
-  vaultAttributedProv,
-  vaultAttributedTotalProv,
-  vaultHolderShapeProv,
-  vaultSharePriceProv,
-  type MorphoVaultCoords,
-} from "@/lib/morpho-base/vault-provenance";
+import { vaultSharePriceProv } from "@/lib/morpho-base/vault-provenance";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
 import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
@@ -84,10 +75,8 @@ import { metaMorphoVaultHref, metaMorphoVaultsListingHref } from "@/lib/vaults/r
 import { loadMorphoBaseVault, type MorphoBaseVaultResponse } from "@/lib/sources/chain/morpho-base-vault";
 import { loadMorphoBaseVaultTimelineWithTail } from "@/lib/sources/chain/morpho-base-vault-timeline";
 import { fetchVaultTail, putVaultTail } from "@/lib/api/fetch-vault-tail";
-import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
 import { ssrHop } from "@/lib/shared/listing-ssr";
 import { MORPHO_BASE_VAULT_TAIL_VERSION, type VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
-import type { VaultPositionRow } from "@/lib/aave-vaults/vault-position";
 import { BlockRef } from "@/components/shared/block-ref";
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { VaultHealthSection } from "@/components/vaults/vault-health-section";
@@ -222,7 +211,14 @@ const loadHistory = cache(async (data: MorphoBaseVaultResponse, holder: string) 
         morphoVaultTimelineNoteProv(coords, n as MorphoVaultNote),
       )
     : [];
-  return { timeline, economics, flowTimeline: withChanges(flowTimeline, changes), card };
+  return {
+    timeline,
+    economics,
+    flowTimeline: withChanges(flowTimeline, changes),
+    card,
+    allEvents,
+    replayed: economics != null && flowTimeline != null,
+  };
 });
 
 /** The Lifetime flows panel and the timeline, streamed in behind a Suspense
@@ -265,56 +261,38 @@ async function VaultTimelineSection({
   );
 }
 
-/** The holder card (components/vaults/vault-holding-card.tsx).
- *
- *  Its live figures are this page's reads at its block; its census figures
- *  (the transfer count, first seen, the dollar value, what the address is)
- *  come from the store through this deployment's listing proxy, where the
- *  census has a row. An address first seen since the last daily tick has none,
- *  and the card draws without those figures. Earned is a promise over the
- *  history, so the card paints before the sweeps answer. */
+/** The holder card (components/vaults/vault-holding-plain-card.tsx): this
+ *  page's reads at its block, and a promise over the history for the sums and
+ *  the worth line, so the card paints before the sweeps answer. An address
+ *  with no balance waits for the history, which says whether it ever held. */
 async function HoldingCardSection({ data, holder }: { data: MorphoBaseVaultResponse; holder: string }) {
   if (!data.holder) return null;
-  const hop = (await ssrHop()) ?? undefined;
-  let rows: VaultPositionRow[] = [];
-  try {
-    const page = await fetchVaultPositions({
-      chainId: data.chainId,
-      vault: data.vault.address,
-      q: holder,
-      limit: 1,
-      ...hop,
-    });
-    rows = page.data;
-  } catch (error) {
-    console.error("The holder card's census row did not answer:", error);
-  }
-  const census = rows.find((r) => r.holder.toLowerCase() === holder.toLowerCase()) ?? null;
   const { vault } = data;
   const h = data.holder;
   const shareSymbol = vault.symbol || shortAddr(vault.address);
-  const coords: MorphoVaultCoords = {
-    chainId: data.chainId,
-    readBy: serverReadOf(data),
-    blockNumber: data.blockNumber,
-    vault: vault.address,
-    vaultName: vault.name || undefined,
-    assetSymbol: vault.asset.symbol,
-    shareSymbol: vault.symbol || undefined,
-    holder: h.address,
+  const unread = {
+    earned: { status: "unreplayed" as const, block: data.blockNumber },
+    firstSeen: null,
+    worth: null,
   };
-  const history: Promise<VaultHoldingHistory> = loadHistory(data, holder).then(
-    (r) => r.card,
-    () => ({ earned: { status: "unreplayed" as const, block: data.blockNumber }, firstSeen: null }),
+  const history: Promise<PlainHoldingHistory> = loadHistory(data, holder).then(
+    async (r) => ({
+      ...r.card,
+      worth: await loadHoldingWorth(r.allEvents, {
+        chainId: data.chainId,
+        vault: vault.address,
+        shareDecimals: vault.decimals,
+        replayed: r.replayed,
+        block: data.blockNumber,
+        blockTimestamp: r.timeline.blockTimestamp,
+        claimRaw: h.claim?.raw ?? null,
+      }),
+    }),
+    () => unread,
   );
-  const markets = data.legs.map((leg) => ({
-    id: leg.id,
-    label: leg.isIdle ? "Idle market" : (leg.collateralSymbol ?? shortId(leg.id)),
-    raw: leg.attributed?.raw ?? "0",
-    prov: vaultAttributedProv({ ...coords, marketId: leg.id, collateralSymbol: leg.collateralSymbol }),
-  }));
+  const never = BigInt(h.shares.raw) === BigInt(0) && (await history).firstSeen == null;
   return (
-    <VaultHoldingCard
+    <VaultHoldingPlainCard
       coords={{
         readBy: serverReadOf(data),
         chainId: data.chainId,
@@ -336,47 +314,10 @@ async function HoldingCardSection({ data, holder }: { data: MorphoBaseVaultRespo
       claim={h.claim}
       totalSupply={data.totalSupply}
       dust={h.dust}
-      maxWithdraw={h.maxWithdraw}
-      // ERC-4626 offers both, and which one a holder uses decides which side
-      // is exact: `withdraw()` names an amount of the asset, `redeem()` a count
-      // of shares.
-      exit="withdraw() or redeem()"
-      census={census}
-      markets={markets}
+      never={never}
       history={history}
-      learnMore={vaultHoldingContent(vault.asset.symbol, shareSymbol, census != null, HOLDING_REWARDS.morpho)}
-      explanation={
-        <HoldingExplanation
-          blockNumber={data.blockNumber}
-          censusBlock={census?.census.block ?? null}
-          assetSymbol={vault.asset.symbol}
-          rewards={HOLDING_REWARDS.morpho}
-          shape={
-            h.shape ? (
-              <HolderShapeLine
-                shape={h.shape}
-                blockNumber={data.blockNumber}
-                chainId={data.chainId}
-                prov={vaultHolderShapeProv(coords, h.shape)}
-              />
-            ) : undefined
-          }
-          extra={
-            <ExplainBullet data-attribution-explanation="">
-              Claim by market applies this holding&rsquo;s share of the vault to each market&rsquo;s settled assets; its
-              sum,{" "}
-              <Fig>
-                <Prov info={vaultAttributedTotalProv(coords)}>
-                  <span data-figure="attributed-total" data-attributed-total-raw={h.attributedTotal.raw}>
-                    {assetText(h.attributedTotal, vault.asset.decimals)} {vault.asset.symbol}
-                  </span>
-                </Prov>
-              </Fig>
-              , differs slightly from the claim, which the vault extrapolates to this block.
-            </ExplainBullet>
-          }
-        />
-      }
+      rewards={HOLDING_REWARDS.morpho}
+      learnMore={vaultPlainHoldingContent(vault.asset.symbol, shareSymbol, HOLDING_REWARDS.morpho)}
     />
   );
 }

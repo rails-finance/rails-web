@@ -44,11 +44,12 @@ import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { VaultFlowsPanel } from "@/components/vaults/vault-flows-panel";
 import { vaultFlowTimeline } from "@/lib/vaults/vault-flows";
-import { vaultHoldingHistory, type VaultHoldingHistory } from "@/lib/vaults/earned";
-import { VaultHoldingCard } from "@/components/vaults/vault-holding-card";
-import { HoldingExplanation } from "@/components/vaults/holding-explanation";
+import { vaultHoldingHistory } from "@/lib/vaults/earned";
+import { VaultHoldingPlainCard } from "@/components/vaults/vault-holding-plain-card";
+import { loadHoldingWorth } from "@/lib/vaults/holding-worth-read";
+import type { PlainHoldingHistory } from "@/lib/vaults/holding-worth";
 import { HoldingReceiptsScope } from "@/components/vaults/holding-receipts-scope";
-import { HOLDING_REWARDS, vaultHoldingContent } from "@/lib/vaults/card-words";
+import { HOLDING_REWARDS, vaultPlainHoldingContent } from "@/lib/vaults/card-words";
 import { YearnVaultTimeline } from "@/components/vaults/yearn-vault-timeline";
 import { computeVaultPositionEconomics } from "@/lib/aave-vaults/position-economics";
 import { sectionPositionMetadata } from "@/lib/shared/page-metadata";
@@ -157,7 +158,7 @@ const loadHistory = cache(async (data: YearnVaultResponse, holder: string) => {
     blockNumber: data.blockNumber,
     replayed: economics != null && flowTimeline != null,
   });
-  return { timeline, economics, flowTimeline, card };
+  return { timeline, economics, flowTimeline, card, allEvents, replayed: economics != null && flowTimeline != null };
 });
 
 /** The Lifetime flows panel and the timeline, streamed in behind a Suspense
@@ -203,10 +204,11 @@ async function YearnTimelineSection({
   );
 }
 
-/** The holder card (components/vaults/vault-holding-card.tsx). Yearn has no
- *  census, so every figure on it is a call at this page's block, and First seen
- *  and Earned come from this page's own sweep. */
-function HoldingCard({
+/** The holder card (components/vaults/vault-holding-plain-card.tsx). Every
+ *  figure is a call at this page's block or a sum over this page's sweep. An
+ *  address with no balance waits for the history, which says whether it ever
+ *  held. */
+async function HoldingCard({
   data,
   holder,
 }: {
@@ -216,15 +218,34 @@ function HoldingCard({
   const { vault } = data;
   const shareDecimals = vault.shareDecimals ?? vault.asset.decimals;
   const shareSymbol = vault.symbol ?? shortAddress(vault.address);
-  const unread = { earned: { status: "unreplayed" as const, block: data.blockNumber }, firstSeen: null };
-  const history: Promise<VaultHoldingHistory> = loadHistory(data, holder.address).then(
-    (r) => r?.card ?? unread,
+  const unread = {
+    earned: { status: "unreplayed" as const, block: data.blockNumber },
+    firstSeen: null,
+    worth: null,
+  };
+  const history: Promise<PlainHoldingHistory> = loadHistory(data, holder.address).then(
+    async (r) =>
+      r
+        ? {
+            ...r.card,
+            worth: await loadHoldingWorth(r.allEvents, {
+              chainId: YEARN_CHAIN_ID,
+              vault: vault.address,
+              shareDecimals,
+              replayed: r.replayed,
+              block: data.blockNumber,
+              blockTimestamp: r.timeline.blockTimestamp,
+              claimRaw: holder.claim?.raw ?? null,
+            }),
+          }
+        : unread,
     () => unread,
   );
   const supply = vault.totalSupply ? BigInt(vault.totalSupply.raw) : BigInt(0);
   const held = BigInt(holder.shares.raw);
+  const never = held === BigInt(0) && (await history).firstSeen == null;
   return (
-    <VaultHoldingCard
+    <VaultHoldingPlainCard
       coords={{
         readBy: serverReadOf(data),
         chainId: YEARN_CHAIN_ID,
@@ -246,19 +267,10 @@ function HoldingCard({
       claim={holder.claim}
       totalSupply={vault.totalSupply}
       dust={held > BigInt(0) && supply > BigInt(0) && Number(held) / Number(supply) < 0.000001}
-      maxWithdraw={holder.maxWithdraw}
-      exit="withdraw() or redeem()"
-      census={null}
+      never={never}
       history={history}
-      learnMore={vaultHoldingContent(vault.asset.symbol, shareSymbol, false, HOLDING_REWARDS.yearn)}
-      explanation={
-        <HoldingExplanation
-          blockNumber={data.blockNumber}
-          censusBlock={null}
-          assetSymbol={vault.asset.symbol}
-          rewards={HOLDING_REWARDS.yearn}
-        />
-      }
+      rewards={HOLDING_REWARDS.yearn}
+      learnMore={vaultPlainHoldingContent(vault.asset.symbol, shareSymbol, HOLDING_REWARDS.yearn)}
     />
   );
 }
@@ -429,7 +441,17 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
           </p>
         )}
 
-        {!data.chainStale && !onEventPage && data.holder && <HoldingCard data={data} holder={data.holder} />}
+        {!data.chainStale && !onEventPage && data.holder && (
+          <Suspense
+            fallback={
+              <div className="mb-6" data-skel-section="vault-position-card-pending">
+                <SkeletonBlock height={120} />
+              </div>
+            }
+          >
+            <HoldingCard data={data} holder={data.holder} />
+          </Suspense>
+        )}
         {!data.chainStale && !onEventPage && data.holder && (
           <Suspense
             fallback={
