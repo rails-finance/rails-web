@@ -327,7 +327,7 @@ export const ASSET_DOOR = {
     `Showing ${n.toLocaleString("en-US")} ${n === 1 ? "vault" : "vaults"} the chain shows as illiquid or with lost assets.`,
   showAll: "Show all",
   hide: "Hide them",
-  all: (n: number, sym: string) => `All ${n.toLocaleString("en-US")} ${sym} ${n === 1 ? "vault" : "vaults"}`,
+  all: (sym: string) => `Every ${sym} vault`,
   allTail: " in the full index, with every column and filter.",
   none: (sym: string) => `No vault in the index holds ${sym} at the last read.`,
   card: {

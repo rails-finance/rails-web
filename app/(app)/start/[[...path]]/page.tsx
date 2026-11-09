@@ -289,13 +289,7 @@ async function AssetStep({ group, symbol, groupBase }: { group: GroupKey; symbol
       <p className="mb-6 max-w-2xl text-rb-500" data-start-disclaimer="">
         {HEALTH_DISCLAIMER}
       </p>
-      <AssetDoorCards
-        symbol={door.symbol}
-        cards={door.cards}
-        hiddenCount={door.hiddenCount}
-        indexCount={door.indexCount}
-        pool={ASSET_DOOR_POOL}
-      />
+      <AssetDoorCards symbol={door.symbol} cards={door.cards} hiddenCount={door.hiddenCount} pool={ASSET_DOOR_POOL} />
     </div>
   );
 }

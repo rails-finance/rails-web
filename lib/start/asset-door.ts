@@ -13,7 +13,6 @@
 
 import { loadVaultIndex } from "@/lib/vaults/index-read";
 import { chainName, vaultIndexHref } from "@/lib/vaults/index-rosters";
-import { shownOnArrival } from "@/lib/vaults/roster-preset";
 import { VAULT_FAMILIES } from "@/lib/vaults/families";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
 import { vaultHealth, shareOf } from "@/lib/vaults/health";
@@ -50,8 +49,6 @@ export interface AssetCard {
 
 export interface AssetDoorRead {
   symbol: string;
-  /** The rows `/vaults?asset=` opens on, as the coin list counts them. */
-  indexCount: number;
   cards: AssetCard[];
   /** Vaults hidden by default that hold something. */
   hiddenCount: number;
@@ -117,7 +114,6 @@ export async function readAssetDoor(symbol: string): Promise<AssetDoorRead> {
   });
   return {
     symbol: mine[0]?.asset.symbol ?? symbol,
-    indexCount: shownOnArrival(mine).length,
     cards,
     hiddenCount: funded.length - shown.length,
   };

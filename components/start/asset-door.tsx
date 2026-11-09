@@ -82,13 +82,11 @@ export function AssetDoorCards({
   symbol,
   cards,
   hiddenCount,
-  indexCount,
   pool,
 }: {
   symbol: string;
   cards: AssetCard[];
   hiddenCount: number;
-  indexCount: number;
   /** How many of the largest the other orders rank among. */
   pool: number;
 }) {
@@ -144,7 +142,7 @@ export function AssetDoorCards({
       )}
       <p className="mt-3 text-sm">
         <Link href={`/vaults?asset=${encodeURIComponent(symbol)}`} className={INLINE_LINK} data-asset-all="">
-          {ASSET_DOOR.all(indexCount, symbol)}
+          {ASSET_DOOR.all(symbol)}
         </Link>
         <span className={MUTED}>{ASSET_DOOR.allTail}</span>
       </p>
