@@ -171,13 +171,6 @@ const nextConfig: NextConfig = {
   // `next dev` would otherwise write an AGENTS.md into the repo; this repo
   // keeps only CLAUDE.md and README.md as prose (rails-ops decision 0004).
   agentRules: false,
-  // Next 15.5.7 dev: webpack reports framer-motion's server vendor chunk as
-  // compiled but never writes `.next/server/vendor-chunks/framer-motion@….js`,
-  // so any route that SSRs a framer-motion component 500s with
-  // "Cannot find module './vendor-chunks/framer-motion…'". Transpiling it bundles
-  // framer-motion into each route's own chunks instead of the vendor-chunk split,
-  // sidestepping the unwritten-chunk bug. (Drop once on a Next that emits it.)
-  transpilePackages: ["framer-motion"],
   experimental: {
     // Compile in a child process. Next turns the build worker off by default
     // when a config has a `webpack` function (the YAML loader below), so

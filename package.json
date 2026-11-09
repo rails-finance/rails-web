@@ -33,7 +33,6 @@
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
-    "framer-motion": "^12.23.24",
     "lightweight-charts": "5.2.1",
     "lucide-react": "^0.541.0",
     "next": "16.4.5",
