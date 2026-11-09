@@ -5,8 +5,7 @@
 // serves this chain's state, so the page is never read at build.
 
 import { MorphoRosterPage } from "@/lib/morpho/roster";
-import { loadMorphoMarketsFromChain } from "@/lib/sources/chain/morpho-markets";
-import { rosterData } from "@/lib/morpho/markets-shape";
+import { loadMorphoRoster } from "@/lib/sources/chain/morpho-roster-reads";
 import { MORPHO_ARBITRUM_DEPLOYMENT } from "@/lib/sources/chain/morpho-deployments";
 import { MORPHO_ARBITRUM_CHAIN_ID } from "@/lib/morpho-arbitrum/asset-catalog";
 import { listingMetadata } from "@/lib/shared/page-metadata";
@@ -21,6 +20,6 @@ export const metadata = listingMetadata({
 });
 
 export default async function MorphoArbitrumMarketsPage() {
-  const data = await loadMorphoMarketsFromChain(MORPHO_ARBITRUM_DEPLOYMENT);
-  return <MorphoRosterPage data={rosterData(data)} chainId={MORPHO_ARBITRUM_CHAIN_ID} />;
+  const data = await loadMorphoRoster(MORPHO_ARBITRUM_DEPLOYMENT, MORPHO_ARBITRUM_CHAIN_ID);
+  return <MorphoRosterPage data={data} chainId={MORPHO_ARBITRUM_CHAIN_ID} />;
 }

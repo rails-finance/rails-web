@@ -5,8 +5,8 @@
 // and the markets that carry its book (lib/morpho/markets-shape rosterData).
 
 import { MorphoRosterPage } from "@/lib/morpho/roster";
-import { loadMorphoMarketsFromChain } from "@/lib/sources/chain/morpho-markets";
-import { rosterData } from "@/lib/morpho/markets-shape";
+import { loadMorphoRoster } from "@/lib/sources/chain/morpho-roster-reads";
+import { MORPHO_DEPLOYMENT } from "@/lib/sources/chain/morpho-deployments";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 // ISR, ten minutes: the same render serves every visitor, and the read stamp
@@ -20,6 +20,6 @@ export const metadata = {
 };
 
 export default async function MorphoMarketsPage() {
-  const data = await loadMorphoMarketsFromChain();
-  return <MorphoRosterPage data={rosterData(data)} chainId={MAINNET_CHAIN_ID} />;
+  const data = await loadMorphoRoster(MORPHO_DEPLOYMENT, MAINNET_CHAIN_ID);
+  return <MorphoRosterPage data={data} chainId={MAINNET_CHAIN_ID} />;
 }

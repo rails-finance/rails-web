@@ -12,7 +12,9 @@
 //   c  every such section holds a ⋮ whose menu carries
 //      `[data-prov-scope-toggle="<its scope>"]` reading "Inspect provenance";
 //   d  arming from that row rings that section alone (`[data-prov-lit]` on it
-//      and nowhere else), its values are pickable and no value outside it is.
+//      and nowhere else), its values are pickable and no value outside it is;
+//   e  on the Morpho rosters, the default view lists only the markets a vault
+//      lends into and `?all=1` every row (R1.1.3); Arbitrum lists every row.
 //
 // Pages: the Morpho Base case-study vault, a Morpho Ethereum vault, the three
 // Aave vault families, a Yearn vault, the four family rosters, and the Aave
@@ -115,6 +117,75 @@ const MUST_DRAW = {
 /** A page where only these sections are held to c and d, a and b waiting for
  *  its migration. None now; kept for the next page that needs it. */
 const ONLY_SCOPES = {};
+
+/** The Morpho rosters' default view (ui-jobs 549, R1.1.3): "lent" where Rails
+ *  has a vault roster on the chain, "none" on Arbitrum. */
+const MORPHO_ROSTERS = {
+  "/ethereum/morpho/markets": "lent",
+  "/base/morpho/markets": "lent",
+  "/arbitrum/morpho/markets": "none",
+};
+
+/** e — the default view lists only markets a vault lends into, `?all=1` lists
+ *  every row with the ⋮'s switch on; Arbitrum lists every row with no switch. */
+async function morphoRosterView(page, path, tag) {
+  const want = MORPHO_ROSTERS[path];
+  const read = () =>
+    page.evaluate(() => {
+      const sec = document.querySelector("[data-morpho-markets-table]");
+      return {
+        view: sec?.getAttribute("data-morpho-view"),
+        lines: [...document.querySelectorAll("[data-morpho-group] [data-morpho-view-line]")].map((l) =>
+          (l.textContent ?? "").replace(/\s+/g, " ").trim(),
+        ),
+        rows: document.querySelectorAll("tr[data-morpho-market]").length,
+        pairs: document.querySelectorAll("tr[data-morpho-pair]").length,
+        unlent: document.querySelectorAll("tr[data-morpho-market]:not([data-morpho-lent])").length,
+        sectionLine: !!sec?.querySelector(":scope [data-morpho-view-line]"),
+      };
+    });
+  const menuItem = async () => {
+    await page.locator('[data-section-menu="markets-table"] button[aria-haspopup]').first().click();
+    await page.waitForTimeout(500);
+    const item = page.locator('[data-menu-item="show-all"]');
+    const out = (await item.count()) > 0 ? await item.first().getAttribute("aria-checked") : null;
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+    return out;
+  };
+  const d = await read();
+  check(`${tag} e: the table's view is "${want}"`, d.view === want, String(d.view));
+  if (want === "none") {
+    check(
+      `${tag} e: one line says every market is listed`,
+      d.sectionLine && d.lines.length === 0,
+      JSON.stringify(d.lines.slice(0, 2)),
+    );
+    check(`${tag} e: the ⋮ has no "Show all markets"`, (await menuItem()) === null);
+    return;
+  }
+  check(
+    `${tag} e: each group says "Showing N markets a vault lends into"`,
+    d.lines.length > 0 && d.lines.every((l) => /^Showing [\d,]+ markets? a vault lends into/.test(l)),
+    d.lines.slice(0, 2).join(" | "),
+  );
+  check(
+    `${tag} e: every row shown is a market a vault lends into`,
+    d.rows + d.pairs > 0 && d.unlent === 0,
+    JSON.stringify(d),
+  );
+  check(`${tag} e: the ⋮'s "Show all markets" is off`, (await menuItem()) === "false");
+  await page.goto(`${BASE}${path}?all=1`, { waitUntil: "domcontentloaded", timeout: 180_000 });
+  await page.waitForSelector('[data-morpho-view="all"]', { timeout: 120_000 }).catch(() => {});
+  await page.waitForTimeout(1500);
+  const a = await read();
+  check(
+    `${tag} e: ?all=1 shows every row`,
+    a.view === "all" && a.rows + a.pairs >= d.rows + d.pairs,
+    JSON.stringify(a.view),
+  );
+  check(`${tag} e: ?all=1 turns the ⋮'s switch on`, (await menuItem()) === "true");
+}
 
 let checked = 0;
 let failures = 0;
@@ -226,6 +297,7 @@ for (const path of PAGES) {
   }
 
   check(`${tag}: no page error`, errors.length === 0, errors.slice(0, 2).join(" | "));
+  if (MORPHO_ROSTERS[path]) await morphoRosterView(page, path, tag);
   await ctx.close();
 }
 
