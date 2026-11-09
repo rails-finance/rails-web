@@ -14,12 +14,13 @@
 // Two rules keep a shared band from lying about protocols it wasn't designed
 // around:
 //
-//  1. **The slot is fixed; the label is the protocol's own.** A reader learns
-//     the positions once — roster · size in · size out · usage · population —
-//     and reads every subsequent protocol in the same sweep. But the *word* in
-//     each slot is whatever that protocol actually calls the thing ("Reserves",
-//     "Vaults minted", "Branches", "Pools registered"). This matters most at
-//     `usage`: the surfaces that today all say "utilisation" are measuring
+//  1. **The slot is fixed; the label is the house's where the measure is the
+//     same** (Supplied, Borrowed, Available, Supply rate, Borrow rate,
+//     Utilisation; rails-ops decision 0059 point 9), **and the protocol's own
+//     in the usage and population slots** ("Vaults minted", "Branches", "Pools
+//     registered"). A reader learns the positions once — roster · size in ·
+//     size out · usage · population — and reads every subsequent protocol in
+//     the same sweep. This matters most at `usage`: the surfaces that today all say "utilisation" are measuring
 //     three different denominators — borrowed ÷ supplied (Aave, Compound V2,
 //     Moonwell), borrow ÷ (collateral × liquidation price) (Fluid), liquid ÷
 //     total assets (Maple). One shared *name* there would be a false
@@ -61,11 +62,15 @@ export type Vital =
       value: ReactNode;
       /** Hover text — the exact figure, the cap, whatever the number elides. */
       title?: string;
+      /** Which side of a layered market the figure comes from, under its
+       *  label: "This spoke", "Hub: Core". */
+      side?: string;
     }
   | {
       slot: "usage";
       label: string;
       value: ReactNode;
+      side?: string;
       /** Required: which quotient this is. "Borrowed ÷ supplied, both in USD
        *  at the market's own oracle price." */
       title: string;
@@ -102,7 +107,14 @@ export function VitalsBand({ vitals, lead, aside, notes, className }: VitalsBand
 
   const figures = ordered.map((v) => (
     <div key={v.slot}>
-      <dt className={LABEL}>{v.label}</dt>
+      <dt className={LABEL}>
+        {v.label}
+        {v.side && (
+          <span className="block text-[10px] normal-case tracking-normal" data-vital-side="">
+            {v.side}
+          </span>
+        )}
+      </dt>
       <dd className={VALUE}>{v.title ? <RevealTip tip={v.title}>{v.value}</RevealTip> : v.value}</dd>
     </div>
   ));
