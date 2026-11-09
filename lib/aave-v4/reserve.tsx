@@ -26,7 +26,7 @@ import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { RateCurve } from "@/components/shared/product/rate-curve";
 import { HoldersTable } from "@/components/shared/product/position-entry";
-import { ReserveChangeLog } from "@/components/shared/aave-reserve-tables";
+import { ConfigChangeTimeline } from "@/components/shared/config-change-timeline";
 import { ReservePage, type ReservePageData } from "@/components/shared/product/reserve-page";
 import { AaveV4DrawnRateHistory, type HistorySpan } from "@/components/protocol/aave-v4/aave-v4-drawn-rate-history";
 import {
@@ -63,6 +63,8 @@ import {
   v4ConfigChangeProv,
 } from "@/lib/aave-v4/market-provenance";
 import { v4HeldLine, v4ReserveChanges } from "@/lib/aave-v4/config-words";
+import { v4ChangeExplain } from "@/lib/aave-v4/config-explain";
+import { v4ParametersLearnMore } from "@/lib/aave-v4/learn-more-parameters";
 import { formatDate } from "@/lib/date";
 import {
   amountText,
@@ -73,7 +75,7 @@ import {
 } from "@/components/protocol/aave-v4/aave-v4-market-parts";
 import { headQuery, namesOf, PREMIUM_LINE, protocolOf, RATE_TIP, useV4Stored } from "@/lib/aave-v4/product";
 import { chainMeta, explorerUrl } from "@/lib/shared/chains";
-import { formatCompactTitled } from "@/lib/shared/format-compact";
+import { formatCompact, formatCompactTitled } from "@/lib/shared/format-compact";
 import { ratePercentText } from "@/lib/shared/rate-percent";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import type { Loadable, ProductHead, ProductSection, RateCurveModel, Missing } from "@/lib/shared/product/model";
@@ -549,8 +551,24 @@ function changesSection(
     hub: names.hub,
     spokeAddress: f.spokeAddress,
     hubAddress: f.hubAddress,
-  }).map((c) => ({ ...c, setOn: c.side === "spoke" ? `${names.spoke} spoke` : `${names.hub} hub` }));
+  });
+  const sideName = (side: "spoke" | "hub") => (side === "spoke" ? `${names.spoke} spoke` : `${names.hub} hub`);
   const explorer = chainMeta(d.chainId).explorerName;
+  const items = changes.map((c) => ({
+    ...v4ChangeExplain(c, { ...names, compact: formatCompact }),
+    kind: c.row.kind,
+    block: c.row.block,
+    logIndex: c.row.logIndex,
+    timestamp: c.row.timestamp,
+    txHash: c.row.txHash,
+    words: c.words,
+    setOn: { text: sideName(c.side), side: c.side },
+    receipt: v4ConfigChangeProv(c, names, {
+      block: explorerUrl(d.chainId, "block", c.row.block),
+      tx: explorerUrl(d.chainId, "tx", c.row.txHash),
+      name: explorer,
+    }),
+  }));
   const dateOf = (block: number) => {
     const p = history?.points.find((x) => x.closeBlock >= block);
     return p && p.date !== history?.points[0]?.date ? formatDate(p.date) : null;
@@ -565,12 +583,12 @@ function changesSection(
           build: () =>
             csvRows(
               ["timestamp", "block", "transaction", "log_index", "set_on", "kind", "change"],
-              changes.map(({ row, words, setOn }) => [
+              changes.map(({ row, words, side }) => [
                 row.timestamp,
                 row.block,
                 row.txHash,
                 row.logIndex,
-                setOn,
+                sideName(side),
                 row.kind,
                 `"${words.replace(/"/g, '""')}"`,
               ]),
@@ -581,21 +599,7 @@ function changesSection(
     },
     body: (
       <>
-        <ReserveChangeLog
-          changes={changes}
-          chainId={d.chainId}
-          held=""
-          automatorNote={false}
-          setOn
-          pageSize={10}
-          receipt={(c) =>
-            v4ConfigChangeProv(c, names, {
-              block: explorerUrl(d.chainId, "block", c.row.block),
-              tx: explorerUrl(d.chainId, "tx", c.row.txHash),
-              name: explorer,
-            })
-          }
-        />
+        <ConfigChangeTimeline family="aave-v4-config" items={items} pageSize={10} />
         <p className={`${NOTE} mt-2`} data-change-log-held="">
           {held}
         </p>
@@ -742,6 +746,11 @@ export function AaveV4ReservePage({
             anatomy: "M3.5",
             title: "Parameters",
             raised: "narrow",
+            learnMore: v4ParametersLearnMore(names, {
+              published: line.base?.feedUpdatedAt != null,
+              paused: Boolean(line.base),
+              curve: Boolean(f.curve),
+            }),
             tools: {
               links: [
                 {

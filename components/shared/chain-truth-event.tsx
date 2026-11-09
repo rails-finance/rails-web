@@ -321,6 +321,13 @@ export interface ChainTruthRowSpec {
   /** A token the event names without moving any (a collateral toggle's
    *  reserve): its icon, then `text`, after the amounts. */
   asset?: { symbol: string; address?: string; text: string };
+  /** A setting's move after the label, in the amounts' weight at every width
+   *  ("40.0M → 50.0M USDC"): a configuration change's figure, which names no
+   *  token the spine draws, so nothing hands off (`data-head-figure`). */
+  figure?: { text: string; title?: string };
+  /** A neutral tag in the time slot, before the time: where a configuration
+   *  change was set ("Main spoke"; `data-head-tag`). */
+  tag?: { text: string; title?: string; hook?: string };
 }
 
 /** The row's sizes: the timeline's head, or the event page's title. */
@@ -705,6 +712,15 @@ export function ChainTruthRow({
         </span>
       )}
       {spec.sameBlock && !spec.sameBlock.lead && sameBlockChip}
+      {spec.tag && (
+        <span
+          className="inline-flex items-center rounded-full bg-sunken px-2 py-0.5 text-[11px] font-medium leading-4 text-rb-500"
+          title={spec.tag.title}
+          data-head-tag={spec.tag.hook ?? ""}
+        >
+          {spec.tag.text}
+        </span>
+      )}
       {variant === "page" ? (
         <PageMeta timestamp={timestamp} counter={counter} />
       ) : (
@@ -915,6 +931,11 @@ export function ChainTruthRow({
       {labelNode}
       {spec.ratePill?.lead && rateNode}
       {spec.ratePill?.lead && managerNode}
+      {spec.figure && (
+        <span className={`${sz.txt} ${sz.amt} tabular-nums`} title={spec.figure.title} data-head-figure="">
+          {spec.figure.text}
+        </span>
+      )}
       {spec.clauses?.map((c, i) => (
         <Fragment key={`clause-${i}`}>
           {(i > 0 || labelNode) && (

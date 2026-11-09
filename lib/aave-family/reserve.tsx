@@ -30,7 +30,7 @@ import { marketModal, useAaveMarket } from "@/components/shared/aave-market-page
 import { pct, ReserveParameters, reserveFigures, StateTags } from "@/components/shared/aave-reserve-parts";
 import { RateCurve } from "@/components/shared/product/rate-curve";
 import { ReserveHistoryChart, type HistoryRange } from "@/components/shared/aave-reserve-history";
-import { ReserveChangeLog } from "@/components/shared/aave-reserve-tables";
+import { ConfigChangeTimeline, type ConfigChangeItem } from "@/components/shared/config-change-timeline";
 import { HoldersTable } from "@/components/shared/product/position-entry";
 import { DeficitSources, ReserveDeficitBody, writeOffsCsv } from "@/components/shared/aave-reserve-deficit";
 import { deficitLearnMore } from "@/lib/aave-family/deficit-learn-more";
@@ -41,7 +41,8 @@ import { suppliedByContent } from "@/lib/vaults/card-words";
 import { ethereumVaultRosterHref } from "@/lib/vaults/routes";
 import { historyFrom, useReserveReads, type Read, type ReserveHistory } from "@/lib/api/fetch-aave-reserve-reads";
 import { heldLine, reserveChanges } from "@/lib/shared/aave-reserve-config-words";
-import { holderAmountProv } from "@/lib/shared/aave-reserve-reads-provenance";
+import { reserveChangesExplained } from "@/lib/shared/aave-reserve-config-explain";
+import { configChangeProv, holderAmountProv } from "@/lib/shared/aave-reserve-reads-provenance";
 import { formatDate } from "@/lib/date";
 import { chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { aaveMarketConfig, type AaveMarketConfig, type AaveMarketKey } from "@/lib/shared/aave-market-configs";
@@ -440,6 +441,35 @@ function deficitSection(
   };
 }
 
+/** The change log's rows before its control for the rest. */
+const CHANGES_SHOWN = 20;
+
+/** The change log's rows (M3.6): each change's words, its head and explanation
+ *  (lib/shared/aave-reserve-config-explain.ts), and the PoolConfigurator's receipt. */
+function changeItems(
+  changes: ReturnType<typeof reserveChanges>,
+  symbol: string,
+  chainId: ChainId,
+  configurator: string,
+): ConfigChangeItem[] {
+  const explained = reserveChangesExplained(changes, { symbol, compact: formatCompact });
+  const name = chainMeta(chainId).explorerName;
+  return changes.map(({ row, words }, i) => ({
+    ...explained[i],
+    kind: row.kind,
+    block: row.block,
+    logIndex: row.logIndex,
+    timestamp: row.timestamp,
+    txHash: row.txHash,
+    words,
+    receipt: configChangeProv(row, words, configurator, {
+      block: explorerUrl(chainId, "block", row.block),
+      tx: explorerUrl(chainId, "tx", row.txHash),
+      name,
+    }),
+  }));
+}
+
 /** Base's DeficitCreated rows are held from the 25 Oct 2026 Sieve restart (block 53,080,566). */
 const BASE_WRITE_OFFS_FROM = "25 Oct 2026";
 
@@ -559,12 +589,12 @@ function indexedSections(
     },
     body:
       cr.state === "ok" && changes ? (
-        <ReserveChangeLog
-          changes={changes}
-          chainId={chainId}
+        <ConfigChangeTimeline
+          family={`${m.key}-config`}
+          items={changeItems(changes, r.symbol, chainId, cr.data.configurator)}
           held={heldLine(cr.data, dateOf)}
           automatorNote={m.key === "spark"}
-          configurator={cr.data.configurator}
+          pageSize={CHANGES_SHOWN}
         />
       ) : (
         missing(cr, "configuration changes", 240)

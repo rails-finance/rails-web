@@ -44,6 +44,11 @@ export interface V4Change {
   contract: { role: "spoke" | "hub" | "strategy"; address: string };
   /** The Solidity event the row comes from. */
   event: string;
+  /** The row its words are read against: the previous row of its kind, or
+   *  for collateral terms the terms it replaces. Absent on a first row. */
+  prev?: V4ConfigRow;
+  /** Collateral terms rewritten under a key the reserve has moved past. */
+  earlierKey?: boolean;
 }
 
 /** Where each kind is set and the event it comes from (aave/aave-v4 ISpoke.sol,
@@ -218,6 +223,8 @@ export function v4ReserveChanges(
   const out: V4Change[] = [];
   log.logs.forEach((r, i) => {
     const prev = last.get(r.kind);
+    let against0: V4ConfigRow | undefined = prev;
+    let earlierKey = false;
     let words: string;
     switch (r.kind) {
       case "reserve-added":
@@ -235,6 +242,7 @@ export function v4ReserveChanges(
         break;
       case "dynamic-added": {
         const before = currentKey != null ? terms.get(currentKey) : undefined;
+        against0 = before;
         words = against(before, r, TERMS);
         if (before) words = `${words}; ${NEW_TERMS_REACH}`;
         currentKey = Number(r.key);
@@ -243,7 +251,9 @@ export function v4ReserveChanges(
       }
       case "dynamic-updated": {
         const key = Number(r.key);
-        const words0 = against(terms.get(key), r, TERMS);
+        against0 = terms.get(key);
+        earlierKey = key !== currentKey;
+        const words0 = against(against0, r, TERMS);
         // An update rewrites the terms under its key at once, for every
         // position on that key (Spoke.sol reads `_dynamicConfig[reserveId][
         // userPosition.dynamicConfigKey]`).
@@ -279,7 +289,15 @@ export function v4ReserveChanges(
       const at = strategy ?? (same ? lower(same.irStrategy) : null);
       if (at) contract = { role: "strategy", address: at };
     }
-    out.push({ row: r, words, side, contract, event: V4_KINDS[r.kind]?.event ?? r.kind });
+    out.push({
+      row: r,
+      words,
+      side,
+      contract,
+      event: V4_KINDS[r.kind]?.event ?? r.kind,
+      ...(against0 ? { prev: against0 } : {}),
+      ...(earlierKey ? { earlierKey } : {}),
+    });
   });
   return out.reverse();
 }

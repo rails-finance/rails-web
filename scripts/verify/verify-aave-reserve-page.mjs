@@ -30,8 +30,9 @@
 //      span, and its borrow rate's receipt opens. Arbitrum states it is not
 //      indexed.
 //   9. The change log (M3.6) lists the route's rows newest first (block and
-//      kind per row, the first 20), with the held line, and SparkLend's
-//      CapAutomator line on SparkLend only.
+//      kind per row, the first 20, each a timeline row on the event-card
+//      shell), with the held line, SparkLend's CapAutomator line on SparkLend
+//      only, and the newest row opens.
 //  10. The largest suppliers and borrowers (M3.7, M3.8) are the route's ten a
 //      side, wallet, amount and position link per row, a holder's receipt
 //      opens, and a press on a row's amount cell lands on its position. Base
@@ -39,8 +40,11 @@
 //      on Arbitrum.".
 //  11. Aave V4 (lib/aave-v4/reserve.tsx): the change log (M3.6) lists
 //      GET /api/aave-v4/reserve/config-log's rows newest first, the first ten,
-//      each with words and its side (spoke or hub), the held line under it and
-//      a row's receipt naming its event; on Base the one line.
+//      each with words and its side (spoke or hub), the held line under it;
+//      each head states the change with its side's tag; the newest row opens
+//      to its explanation, and its Figures carry the receipt naming its event;
+//      the Parameters section's "?" (M3.5) opens the plain-words panel, the
+//      spoke's rows then the hub's. On Base the one line.
 //
 // Run:
 //   BASE=http://localhost:3000 node scripts/verify/verify-aave-reserve-page.mjs
@@ -312,10 +316,10 @@ for (const f of process.env.V4_ONLY ? [] : FIXTURES) {
       borrow: t("[data-history-borrow]"),
       supply: t("[data-history-supply]"),
       util: t("[data-history-utilisation]"),
-      rows: [...document.querySelectorAll("tr[data-change-row]")].map((tr) => ({
+      rows: [...document.querySelectorAll("[data-change-row]")].map((tr) => ({
         block: Number(tr.getAttribute("data-change-block")),
         kind: tr.getAttribute("data-change-kind"),
-        words: tr.querySelector("[data-change-words]")?.textContent ?? "",
+        words: tr.getAttribute("data-change-words") ?? "",
       })),
       held: t("[data-change-log-held]"),
       automator: Boolean(document.querySelector("[data-change-log-automator]")),
@@ -415,6 +419,23 @@ for (const f of process.env.V4_ONLY ? [] : FIXTURES) {
       ix.automator === (API_MARKET[f.api] === "spark"),
       String(ix.automator),
     );
+    // The newest row opens: its Explanation where its kind has one, else its Figures.
+    const row = page.locator('[data-anatomy~="M3.6"] [data-change-row]').first();
+    let opened = "";
+    if (ix.rows.length) {
+      await row.locator('[data-anatomy="T1"] [aria-expanded]').first().click();
+      await row
+        .locator('[data-anatomy="T2"]')
+        .waitFor({ timeout: 10000 })
+        .catch(() => {});
+      opened = norm(
+        await row
+          .locator('[data-anatomy="T2"]')
+          .innerText()
+          .catch(() => ""),
+      );
+    }
+    check(`${tag} 9d the newest row opens`, opened.length > 10, opened.slice(0, 100));
   }
 
   if (holders.status === "not-ranked" || holders.status === "not-indexed") {
@@ -517,18 +538,18 @@ for (const f of V4_FIXTURES) {
   // The section draws before its read settles: wait for rows, the empty line or a stated gap.
   await page
     .waitForSelector(
-      '[data-anatomy~="M3.6"] :is(tr[data-change-row], [data-change-log-empty], [data-reserve-not-indexed], [data-reserve-read-failed])',
+      '[data-anatomy~="M3.6"] :is([data-change-row], [data-change-log-empty], [data-reserve-not-indexed], [data-reserve-read-failed])',
       { timeout: WAIT },
     )
     .catch(() => {});
   const got = await page.evaluate(() => {
     const s = document.querySelector('[data-anatomy~="M3.6"]');
     return {
-      rows: [...(s?.querySelectorAll("tr[data-change-row]") ?? [])].map((tr) => ({
+      rows: [...(s?.querySelectorAll("[data-change-row]") ?? [])].map((tr) => ({
         block: Number(tr.getAttribute("data-change-block")),
         kind: tr.getAttribute("data-change-kind"),
         side: tr.getAttribute("data-change-side"),
-        words: tr.querySelector("[data-change-words]")?.textContent ?? "",
+        words: tr.getAttribute("data-change-words") ?? "",
       })),
       held: s?.querySelector("[data-change-log-held]")?.textContent ?? null,
       empty: Boolean(s?.querySelector("[data-change-log-empty]")),
@@ -560,19 +581,74 @@ for (const f of V4_FIXTURES) {
     `${got.rows.length} rows vs ${want.length}; first ${got.rows[0]?.block} ${got.rows[0]?.kind} "${got.rows[0]?.words}"`,
   );
   check(`${tag} 11b the held line`, /held from|not held/.test(got.held ?? ""), norm(got.held));
+  // The head (T1): plain words, and the side's tag in the time slot.
+  const heads = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-anatomy~="M3.6"] [data-change-row]')].map((r) => ({
+      side: r.getAttribute("data-change-side"),
+      words: r.querySelector('[data-anatomy="T1"]')?.textContent ?? "",
+      tag: r.querySelector("[data-head-tag]")?.getAttribute("data-head-tag") ?? null,
+    })),
+  );
+  check(
+    `${tag} 11d each row's head states the change and the side it was set on`,
+    heads.length === got.rows.length &&
+      heads.every((h) => /[A-Za-z]{4}/.test(h.words) && h.tag === h.side && /(spoke|hub)/.test(h.words)),
+    heads[0] ? `${norm(heads[0].words)} [${heads[0].tag}]` : "no rows",
+  );
+  // Opened (T2, T3): the Explanation first, then the Figures with the receipt.
+  const first = page.locator('[data-anatomy~="M3.6"] [data-change-row]').first();
+  let bullets = 0;
   let pop = "";
-  if (got.rows.length && (await arm(page, "reserve-changes"))) {
-    await page.locator('[data-anatomy~="M3.6"] tr[data-change-row] [data-prov-pickable]').first().click();
-    await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
-    pop = norm(
-      await page
-        .locator(".prov-inspect-pop")
-        .first()
-        .innerText()
-        .catch(() => ""),
-    );
+  if (got.rows.length) {
+    await first.locator('[data-anatomy="T1"] [aria-expanded]').first().click();
+    await first
+      .locator("[data-change-explain] li")
+      .first()
+      .waitFor({ timeout: 10000 })
+      .catch(() => {});
+    bullets = await first.locator("[data-change-explain] li").count();
+    // The row's ⋮ "Inspect provenance" arms the card and turns to its Figures.
+    await first.locator("[data-event-head-menu] [data-event-menu] > button").click();
+    const inspect = page.locator("[data-prov-scope-toggle]:visible").first();
+    if (
+      await inspect.waitFor({ timeout: 10000 }).then(
+        () => true,
+        () => false,
+      )
+    ) {
+      await inspect.click();
+      await first.locator('[data-figure="config-change"] [data-prov-pickable]').first().click();
+      await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
+      pop = norm(
+        await page
+          .locator(".prov-inspect-pop")
+          .first()
+          .innerText()
+          .catch(() => ""),
+      );
+      await page.keyboard.press("Escape");
+    }
   }
+  check(`${tag} 11e the newest row opens to its explanation`, bullets >= 1, `${bullets} bullets`);
   check(`${tag} 11c a row's receipt names its event`, /event at block/.test(pop), pop.slice(0, 120));
+  // M3.5's "?": the parameters in plain words, by the side that sets them.
+  const help = page.locator('[data-anatomy~="M3.5"] button[aria-label="Parameters, learn more"]');
+  let groups = [];
+  if (await help.count()) {
+    await page.keyboard.press("Escape");
+    await help.click();
+    const dialog = page.locator('[role="dialog"][aria-label="What the parameters mean"]');
+    await dialog.waitFor({ timeout: 10000 }).catch(() => {});
+    groups = await dialog
+      .locator("[data-learn-more-group]")
+      .evaluateAll((gs) => gs.map((g) => [g.getAttribute("data-learn-more-group"), g.querySelectorAll("li").length]));
+    await page.keyboard.press("Escape");
+  }
+  check(
+    `${tag} 11f M3.5's explanation opens, a bullet a row, spoke then hub`,
+    groups.length === 2 && /spoke$/.test(groups[0][0]) && /hub$/.test(groups[1][0]) && groups.every((g) => g[1] >= 4),
+    JSON.stringify(groups),
+  );
   await page.close();
 }
 
