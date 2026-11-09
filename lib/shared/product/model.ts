@@ -270,6 +270,9 @@ export interface RateCurveModel {
   optimal: number;
   /** The model has no kink (a straight or flat line): the curve draws none. */
   noKink?: boolean;
+  /** The protocol's word for the kink, on the chart: "target" for Morpho's
+   *  AdaptiveCurveIRM, whose bend is its target utilisation. "kink" where absent. */
+  kinkLabel?: string;
   base: number;
   slope1: number;
   slope2: number;

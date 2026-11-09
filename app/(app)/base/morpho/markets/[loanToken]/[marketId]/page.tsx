@@ -11,9 +11,8 @@
 import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { RailHeader } from "@/components/shared/rail-header";
 import { MorphoMarketVaults } from "@/components/protocol/morpho/morpho-market-vaults";
-import { MorphoMarketView } from "@/components/protocol/morpho/morpho-market-view";
+import { MorphoMarketPage } from "@/lib/morpho/product";
 import { loadMorphoMarketFromChain } from "@/lib/sources/chain/morpho-markets";
 import { marketViewData } from "@/lib/morpho/markets-shape";
 import { morphoMarketHref } from "@/lib/morpho/market-routes";
@@ -27,8 +26,7 @@ import {
   morphoBaseMarketFetchParams,
 } from "@/lib/morpho-base/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { unlaunchedRobotsForPath } from "@/lib/shared/page-metadata";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +40,7 @@ const ROBOTS = unlaunchedRobotsForPath("/base/morpho/markets");
 
 const ADDRESS = /^0x[0-9a-f]{40}$/;
 const MARKET_ID = /^0x[0-9a-f]{64}$/;
+const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 const load = cache((id: string) => loadMorphoMarketFromChain(id, MORPHO_BASE_DEPLOYMENT));
 
 type Params = {
@@ -95,42 +94,36 @@ export default async function MorphoBaseMarketPage({ params, searchParams }: Par
   if (!data || data.params.loanToken.toLowerCase() !== token) notFound();
   const view = marketViewData(data);
 
+  const pair = data.params.collateralToken === ZERO_ADDR ? "Idle market" : "Morpho Blue market";
+
   return (
-    <div className="min-h-screen">
-      <div className="pt-8">
-        <header className="mb-2">
-          <div className="mb-2.5">
-            <RailHeader session="morpho-base" venue="subPage" />
-          </div>
-          {view ? (
-            <MorphoMarketView data={view} chainId={MORPHO_BASE_CHAIN_ID} />
-          ) : (
-            <>
-              <h1 className="text-2xl font-semibold text-foreground">Morpho Blue market</h1>
-              <p className="mt-2 text-sm text-rb-500">This market could not be read from chain at this block.</p>
-            </>
-          )}
-        </header>
-
-        {view && data.market && (
-          <Suspense fallback={null}>
-            <MorphoMarketVaults
-              chainId={MORPHO_BASE_CHAIN_ID}
-              marketId={id}
-              asset={{ symbol: data.market.loanSymbol, address: token, decimals: data.market.loanDecimals }}
-              pair={`${data.market.loanSymbol} / ${data.market.collateralSymbol ?? "no collateral"}`}
-            />
-          </Suspense>
-        )}
-
-        <MorphoBaseListing
-          {...initial}
-          initialSearch={sp.toString()}
-          market={{ id, loanToken: token, path: morphoMarketHref(MORPHO_BASE_CHAIN_ID, token, id) }}
-        />
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
-        <ProvInspectorLayer />
-      </div>
-    </div>
+    <>
+      <MorphoMarketPage
+        data={view}
+        chainId={MORPHO_BASE_CHAIN_ID}
+        pair={pair}
+        positions={{ href: "/base/morpho", label: "All Morpho Blue positions" }}
+        vaults={
+          view && (
+            <Suspense fallback={null}>
+              <MorphoMarketVaults
+                chainId={MORPHO_BASE_CHAIN_ID}
+                marketId={id}
+                asset={{ symbol: view.market.loanSymbol, address: token, decimals: view.market.loanDecimals }}
+                pair={`${view.market.collateralSymbol ?? "no collateral"} / ${view.market.loanSymbol}`}
+              />
+            </Suspense>
+          )
+        }
+        listing={
+          <MorphoBaseListing
+            {...initial}
+            initialSearch={sp.toString()}
+            market={{ id, loanToken: token, path: morphoMarketHref(MORPHO_BASE_CHAIN_ID, token, id) }}
+          />
+        }
+      />
+      <ProvInspectorLayer />
+    </>
   );
 }

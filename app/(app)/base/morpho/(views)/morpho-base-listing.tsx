@@ -88,6 +88,8 @@ export function MorphoBaseListing({
     <ChainTruthListingPage<MorphoPositionSummary, MorphoBaseListFilters>
       title={market ? "Positions in this market" : "Morpho Blue Positions"}
       titleAs={market ? "h2" : undefined}
+      // On a market page the section heading above the listing names it.
+      titleHidden={market != null}
       noun="positions"
       basePath={market ? market.path : "/base/morpho"}
       defaults={market ? morphoBaseMarketDefaults(market.loanToken) : MORPHO_BASE_LIST_DEFAULTS}
