@@ -26,7 +26,8 @@
 // ANATOMY (rails-ops reference/app-anatomy.md, region D): D1 the frame and
 // its rows, D2 a sortable header, D3 the sideways scroll and pinned cells
 // (on the frame), D4 a linked row, D5 the lead cell, D6 stacked rows (on the
-// frame in D3's place), D7 a row's ⋮ menu.
+// frame in D3's place), D7 a row's ⋮ menu, D8 a group's parent row and its
+// children.
 //
 // STACKED ROWS (D6, opt-in: `DataTable stacked`; `stackBelow="lg"` for a
 // table too wide for a tablet). Below sm (or lg) the same <table>
@@ -45,7 +46,7 @@
 
 import Link from "next/link";
 import { createPortal } from "react-dom";
-import { Check, EllipsisVertical } from "lucide-react";
+import { Check, ChevronRight, EllipsisVertical } from "lucide-react";
 import {
   createContext,
   useContext,
@@ -266,14 +267,17 @@ const LINKED_ROW =
 
 /** A body row. `href`: the whole row opens it, and one cell holds a
  *  `DataTableRowLink` to the same place. `drawer`: the row opens under the row
- *  before it (hidden or shown), so no hairline divides the two. */
+ *  before it (hidden or shown), so no hairline divides the two. `child`: a
+ *  row under a group's parent (`DataTableGroupRow`), indented on a lifted
+ *  ground (D8). */
 export function DataTableRow({
   href,
   drawer = false,
+  child = false,
   className = "",
   children,
   ...rest
-}: HTMLAttributes<HTMLTableRowElement> & { href?: string; drawer?: boolean }) {
+}: HTMLAttributes<HTMLTableRowElement> & { href?: string; drawer?: boolean; child?: boolean }) {
   const stacked = useContext(Stacked);
   return (
     <RowHref.Provider value={href ?? null}>
@@ -282,6 +286,7 @@ export function DataTableRow({
         className={`group/dt-row ${href ? LINKED_ROW : ""} ${className}`}
         data-anatomy={href ? "D4" : undefined}
         data-dt-drawer={drawer ? "" : undefined}
+        data-dt-child={child ? "" : undefined}
         {...rest}
       >
         {children}
@@ -560,5 +565,64 @@ export function DataTableRowMenu({ label, items }: { label: string; items: DataT
           document.body,
         )}
     </>
+  );
+}
+
+/** A group's parent row (D8): one cell across the table, a chevron, the
+ *  group's name and its figures; a press anywhere on the row opens or closes
+ *  the group, whose rows follow it as `DataTableRow child`. The button holds
+ *  the keyboard and `aria-expanded`. */
+export function DataTableGroupRow({
+  open,
+  onToggle,
+  colSpan,
+  label,
+  summary,
+  toggleHooks,
+  ...rest
+}: {
+  open: boolean;
+  onToggle: () => void;
+  colSpan: number;
+  label: ReactNode;
+  summary?: ReactNode;
+  toggleHooks?: Record<`data-${string}`, string | undefined>;
+} & Omit<HTMLAttributes<HTMLTableRowElement>, "children" | "onClick">) {
+  const stacked = useContext(Stacked);
+  return (
+    <tr
+      role={stacked ? "row" : undefined}
+      className="group/dt-row cursor-pointer"
+      data-dt-parent=""
+      data-open={open ? "" : undefined}
+      onClick={(e) => {
+        if ((e.target as HTMLElement).closest("button") == null) onToggle();
+      }}
+      {...rest}
+    >
+      <th
+        scope="row"
+        role={stacked ? "rowheader" : undefined}
+        colSpan={colSpan}
+        className={`relative text-left font-normal align-middle ${DATA_TABLE_PAD} sm:h-14 sm:py-0`}
+      >
+        <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={onToggle}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-sm text-left text-[14px] font-semibold text-foreground focus-ring"
+            {...toggleHooks}
+          >
+            <ChevronRight
+              className={`h-4 w-4 shrink-0 text-rb-500 transition-transform ${open ? "rotate-90" : ""}`}
+              aria-hidden
+            />
+            {label}
+          </button>
+          {summary && <span className="text-[12px] tabular-nums text-rb-500">{summary}</span>}
+        </span>
+      </th>
+    </tr>
   );
 }

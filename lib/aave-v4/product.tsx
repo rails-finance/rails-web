@@ -509,7 +509,7 @@ function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): Reserve
       tags: <V4StateTags f={f} line={l} names={names} />,
       chips: <HubChip label={names.hub} />,
       sub: (
-        <div className="flex items-center gap-1 text-[11px] text-rb-500" title={ASSET_CLASS_TITLE[l.cls]}>
+        <div className="flex items-center gap-1 text-[12px] text-rb-500" title={ASSET_CLASS_TITLE[l.cls]}>
           <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: ASSET_CLASS_COLOR[l.cls] }} />
           <span className="truncate">{ASSET_CLASS_TITLE[l.cls]}</span>
         </div>

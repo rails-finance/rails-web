@@ -835,7 +835,7 @@ function marketRow(x: Ctx, m: ComptrollerMarket): ReserveRowModel {
       address: m.underlying ?? m.market,
       receipt: cmIdentityProv(x.v, c, m.underlying, m.identityNote),
       tags: <Tags x={x} m={m} />,
-      sub: <div className="truncate text-[11px] text-rb-500">{m.marketSymbol}</div>,
+      sub: <div className="truncate text-[12px] text-rb-500">{m.marketSymbol}</div>,
     },
     hooks: { "data-comptroller-market": m.market },
     cells: {
