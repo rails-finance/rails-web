@@ -503,7 +503,7 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
       pclass: priced ? "oracle" : "state",
       source: { block: coords.blockNumber },
       verify: recompute("Pool.getReserveDeficit", coords),
-      summary: `${symbol} deficit. Pool.getReserveDeficit(asset)${atBlock(coords)}: debt a liquidation wrote off with no collateral left to cover it (DeficitCreated), not yet repaid by the protocol${priced ? ", valued at the market's IAaveOracle price" : ""}. It is the gap between supplied − borrowed and the Pool's virtual balance.`,
+      summary: `${symbol} deficit. Pool.getReserveDeficit(asset)${atBlock(coords)}: debt a liquidation wrote off with no collateral left to cover it (DeficitCreated), not yet covered${priced ? ", valued at the market's IAaveOracle price" : ""}. It is the gap between supplied − borrowed and the Pool's virtual balance.`,
       contract: poolContract(coords),
       via: `${cfg.lane} · Pool.getReserveDeficit(asset)${priced ? " × IAaveOracle price" : ""} @ head`,
     }),

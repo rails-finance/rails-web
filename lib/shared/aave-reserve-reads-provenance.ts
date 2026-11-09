@@ -233,8 +233,15 @@ export function writtenOffSumProv(
     contract: { name: "Pool", address: d.pool },
     via: `${DEFICIT_ROUTE} · Σ DeficitCreated.amountCreated`,
     formula: "Σ amountCreated",
-    scaling: scaled(part.raw, d.asset.decimals, "amountCreated"),
-    inputs: [{ label: "write-offs", value: part.count.toLocaleString("en-US"), kind: "derived", pclass: "indexed" }],
+    inputs: [
+      {
+        label: "amountCreated, summed",
+        value: part.raw,
+        kind: "chain",
+        pclass: "emitted",
+        note: `${part.count.toLocaleString("en-US")} DeficitCreated logs, in the token's smallest unit`,
+      },
+    ],
   };
 }
 
@@ -252,15 +259,17 @@ export function deficitCoveredProv(
     summary: `${symbol} covered, derived — Σ written off less the outstanding deficit. The deficit earns no interest: it is a count of underlying tokens (DataTypes.sol L54-55), raised only by a write-off (LiquidationLogic.sol L536-540) and lowered only by a cover (LiquidationLogic.sol L76-129). So the deficit now equals Σ created less Σ covered, and Σ covered is Σ created less the deficit now. Rails derives it this way until it indexes the Pool's DeficitCovered logs.`,
     contract: { name: "Pool", address: d.pool },
     via: `${DEFICIT_ROUTE} Σ amountCreated − Pool.getReserveDeficit(asset)${outstanding.block != null ? ` @ ${block(outstanding.block)}` : " @ head"}`,
-    formula: "Σ DeficitCreated.amountCreated − Pool.getReserveDeficit(asset)",
-    scaling: coveredRaw != null ? scaled(coveredRaw, d.asset.decimals, "the difference") : undefined,
+    formula: "Σ written off − outstanding",
     inputs: [
+      ...(coveredRaw != null
+        ? [{ label: "covered, raw", value: coveredRaw, kind: "chain-derived" as const, pclass: "indexed" as const }]
+        : []),
       {
         label: "Σ written off",
         value: d.totals.writtenOff,
         kind: "derived",
         pclass: "indexed",
-        note: "DeficitCreated, raw",
+        note: "Σ DeficitCreated.amountCreated, raw",
       },
       {
         label: "outstanding",
