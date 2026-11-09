@@ -1,7 +1,7 @@
 "use client";
 
 // Fluid protocol view — the vault roster and each vault's own risk ladder, in
-// the Aave-V3-family table shape (components/shared/aave-market-views.tsx,
+// the Aave-V3-family table shape (components/shared/aave-reserve-parts.tsx,
 // carried to Dolomite 2026-09-10): one sortable row per vault rather than a
 // card grid — the conversion pays off MORE here than it did on Dolomite,
 // since this roster runs ~173 rows.

@@ -1,5 +1,5 @@
 // Aave-V3-family MARKET-SURFACE provenance vocabulary — the receipts for
-// /aave-v3/market and /spark/market, one block's reading of one Pool.
+// /aave-v3/markets and /spark/markets, one block's reading of one Pool.
 // ----------------------------------------------------------------------------
 // The market-overview surface is shared across the V3 family (SparkLend is an
 // Aave V3 fork on its own Pool + oracle deployment), so the vocabulary is a
@@ -574,50 +574,61 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
   });
 }
 
-const FACTORIES: Record<string, (coords: AaveMarketCoords) => AaveMarketVocab> = {
-  "aave-v3": makeVocab({
+const CONFIGS: Record<string, AaveMarketConfig> = {
+  "aave-v3": {
     protocol: "aave-v3",
     poolName: "Aave V3 Core Pool",
     oracleName: "Aave V3 IAaveOracle",
     lane: "GET /api/chain/aave-v3/market",
-  }),
-  "aave-v3-prime": makeVocab({
+  },
+  "aave-v3-prime": {
     protocol: "aave-v3-prime",
     poolName: "Aave V3 Prime Pool",
     oracleName: "Aave V3 Prime IAaveOracle",
     lane: "GET /api/chain/aave-v3/market?market=prime",
-  }),
-  "aave-v3-etherfi": makeVocab({
+  },
+  "aave-v3-etherfi": {
     protocol: "aave-v3-etherfi",
     poolName: "Aave V3 EtherFi Pool",
     oracleName: "Aave V3 EtherFi IAaveOracle",
     lane: "GET /api/chain/aave-v3/market?market=etherfi",
-  }),
-  "aave-v3-base": makeVocab({
+  },
+  "aave-v3-base": {
     protocol: "aave-v3-base",
     poolName: "Aave V3 Base Pool",
     oracleName: "Aave V3 Base IAaveOracle",
     lane: "GET /api/chain/aave-v3-base/market",
-  }),
-  "aave-v3-arbitrum": makeVocab({
+  },
+  "aave-v3-arbitrum": {
     protocol: "aave-v3-arbitrum",
     poolName: "Aave V3 Arbitrum Pool",
     oracleName: "Aave V3 Arbitrum IAaveOracle",
     lane: "GET /api/chain/aave-v3-arbitrum/market",
-  }),
-  seamless: makeVocab({
+  },
+  seamless: {
     protocol: "seamless",
     poolName: "Seamless Pool",
     oracleName: "Seamless IAaveOracle",
     lane: "GET /api/chain/seamless/market",
-  }),
-  spark: makeVocab({
+  },
+  spark: {
     protocol: "spark",
     poolName: "SparkLend Pool",
     oracleName: "SparkLend IAaveOracle",
     lane: "GET /api/chain/spark/market",
-  }),
+  },
 };
+
+const FACTORIES: Record<string, (coords: AaveMarketCoords) => AaveMarketVocab> = Object.fromEntries(
+  Object.entries(CONFIGS).map(([k, c]) => [k, makeVocab(c)]),
+);
+
+/** The names the receipts give a market's Pool and oracle, and the lane it is
+ *  read through: the read stamp's receipt lists them. */
+export function aaveMarketContractNames(protocol: string): { pool: string; oracle: string; lane: string } {
+  const c = CONFIGS[protocol] ?? CONFIGS["aave-v3"];
+  return { pool: c.poolName, oracle: c.oracleName, lane: c.lane };
+}
 
 /** "@ head" in the via line and the inputs' notes named as the block. */
 function atNamedBlock(p: Provenance, block: number | undefined): Provenance {
@@ -644,4 +655,30 @@ export function aaveMarketVocab(protocol: string, coords: AaveMarketCoords): Aav
       (...a: unknown[]) => stamp((build as (...x: unknown[]) => Provenance)(...a)),
     ]),
   ) as unknown as AaveMarketVocab;
+}
+
+/** The contracts one market read asks, and what of each: the read stamp's
+ *  receipt lists them (components/shared/read-stamp.tsx readStampProv). */
+export function aaveMarketReadContracts(
+  protocol: string,
+  data: { pool: string; oracle: string; capAutomator?: string },
+): { name: string; address: string; reads: string }[] {
+  const names = aaveMarketContractNames(protocol);
+  return [
+    {
+      name: names.pool,
+      address: data.pool,
+      reads: "getReservesList(), getReserveData(asset), getConfiguration(asset)",
+    },
+    { name: names.oracle, address: data.oracle, reads: "getAssetPrice(asset), getSourceOfAsset(asset)" },
+    ...(data.capAutomator
+      ? [
+          {
+            name: "SparkLend CapAutomator",
+            address: data.capAutomator,
+            reads: "supplyCapConfigs(asset), borrowCapConfigs(asset)",
+          },
+        ]
+      : []),
+  ];
 }

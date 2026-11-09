@@ -1,7 +1,7 @@
 "use client";
 
 // Dolomite protocol view — every listed market and the risk ladder over it,
-// in the Aave-V3-family table shape (components/shared/aave-market-views.tsx):
+// in the Aave-V3-family table shape (components/shared/aave-reserve-parts.tsx):
 // a summary line, then every market as one sortable row rather than a card.
 // ----------------------------------------------------------------------------
 // Provenance: the whole view owns ONE <ProvReceiptsScope> (the scoped pilots'

@@ -1,9 +1,9 @@
-// A reserve page under Aave V3 on Ethereum (anatomy M3, ui-jobs 541): /ethereum/aave-v3/market/<asset>,
+// A reserve page under Aave V3 on Ethereum (anatomy M3, ui-jobs 541): /ethereum/aave-v3/markets/<asset>,
 // the asset its underlying's lowercased address. The client half is
-// components/shared/aave-reserve-page.tsx.
+// lib/aave-family/reserve.tsx.
 
 import { notFound } from "next/navigation";
-import { AaveReservePage } from "@/components/shared/aave-reserve-page";
+import { AaveReservePage } from "@/lib/aave-family/reserve";
 import { ethereumAaveV3Market } from "@/lib/shared/aave-market-configs";
 type Params = Promise<{ asset: string }>;
 type Search = Promise<Record<string, string | string[] | undefined>>;

@@ -1,6 +1,6 @@
 // Pure transform: one Aave-V3-architecture market's live reserve roster → the
-// view model for the shared market-overview surface (/aave-v3/market,
-// /spark/market). The V3-family sibling of lib/aave-v4/hub-view.ts, adjusted
+// view model for the shared market-overview surface (/aave-v3/markets,
+// /spark/markets). The V3-family sibling of lib/aave-v4/hub-view.ts, adjusted
 // for the single-market reality: one summary (not a hub band) + per-reserve
 // rows. Kept side-effect-free and out of the component so the aggregation
 // logic is one readable place.

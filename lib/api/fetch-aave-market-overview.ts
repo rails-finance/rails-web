@@ -7,7 +7,7 @@
 // price — read LIVE from the chain (Pool.getReservesList → getReserveData +
 // IAaveOracle.getAssetPrice, one multicall burst; lib/sources/chain/
 // aave-market-overview.ts). Feeds the shared market-overview surface at
-// /aave-v3/market and /spark/market — the V3-family counterpart of Aave V4's
+// /aave-v3/markets and /spark/markets — the V3-family counterpart of Aave V4's
 // /aave-v4/hubs comparison (single market, so one summary card, not a band).
 //
 // Amounts arrive as token-unit numbers (BigInt-safe scaled server-side), USD is

@@ -1,9 +1,9 @@
-// A reserve page under SparkLend (anatomy M3, ui-jobs 541): /ethereum/spark/market/<asset>,
+// A reserve page under SparkLend (anatomy M3, ui-jobs 541): /ethereum/spark/markets/<asset>,
 // the asset its underlying's lowercased address. The client half is
-// components/shared/aave-reserve-page.tsx.
+// lib/aave-family/reserve.tsx.
 
 import { notFound } from "next/navigation";
-import { AaveReservePage } from "@/components/shared/aave-reserve-page";
+import { AaveReservePage } from "@/lib/aave-family/reserve";
 
 type Params = Promise<{ asset: string }>;
 

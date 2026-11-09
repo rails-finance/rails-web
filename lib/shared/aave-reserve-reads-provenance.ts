@@ -87,3 +87,33 @@ export function holderAmountProv(
     inputs: [{ label: "amount", value: amount, kind: "derived", pclass: "indexed", note: "the token's smallest unit" }],
   };
 }
+
+const CONFIG_ROUTE = "GET /api/aave-family/reserve-config-log";
+
+/** One configuration change: its block and transaction, which the change
+ *  log's surface leaves to this receipt (decision 0059 point 1). */
+export function configChangeProv(
+  row: { kind: string; block: number; txHash: string; logIndex: number },
+  words: string,
+  configurator: string,
+  explorer: { block: string; tx: string; name: string },
+): Provenance {
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    source: { block: row.block, txHash: row.txHash },
+    summary: `${words}. The PoolConfigurator's ${row.kind} event at block ${block(row.block)}, log ${row.logIndex} of transaction ${row.txHash}.`,
+    contract: { name: "PoolConfigurator", address: configurator },
+    via: `${CONFIG_ROUTE} · the configurator's events for this reserve`,
+    verify: { kind: "etherscan", href: explorer.tx, text: `The transaction on ${explorer.name}` },
+    inputs: [
+      {
+        label: "block",
+        value: block(row.block),
+        kind: "chain",
+        pclass: "emitted",
+        verify: { kind: "etherscan", href: explorer.block, text: `Block ${block(row.block)} on ${explorer.name}` },
+      },
+    ],
+  };
+}
