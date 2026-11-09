@@ -467,7 +467,15 @@ export function VaultIndexTable({
                   "Share price",
                   v.sharePrice && (
                     <InAsset v={v} data-cell="share-price">
-                      {sharePriceText(v.sharePrice, v.asset.decimals)}
+                      {/* Past a million, compact (its full text in the
+                          title), so one vault's figure cannot widen the column. */}
+                      {v.sharePrice.value >= 1e6 ? (
+                        <span title={sharePriceText(v.sharePrice, v.asset.decimals)}>
+                          {formatCompact(v.sharePrice.value)}
+                        </span>
+                      ) : (
+                        sharePriceText(v.sharePrice, v.asset.decimals)
+                      )}
                     </InAsset>
                   ),
                 )}
@@ -477,7 +485,12 @@ export function VaultIndexTable({
                   yf && "yearly" in yf ? (
                     <span data-cell="yield">{yieldText(yf.yearly)}</span>
                   ) : yf?.none === "too-small" ? (
-                    <span data-cell="yield" data-yield-none="too-small" title={tooSmallSentence(v)}>
+                    <span
+                      data-cell="yield"
+                      data-yield-none="too-small"
+                      title={tooSmallSentence(v)}
+                      className="inline-block w-[6.5rem] leading-tight whitespace-normal"
+                    >
                       too small to measure
                     </span>
                   ) : null,

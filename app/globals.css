@@ -2557,6 +2557,7 @@ table.dt-stacked {
       position: absolute;
       top: 10px;
       right: 8px;
+      width: auto;
       padding: 0;
       z-index: 10;
     }
