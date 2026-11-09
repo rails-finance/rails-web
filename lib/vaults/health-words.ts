@@ -108,6 +108,7 @@ const ROLE_NOUN: Record<StewardRole, string> = {
   owner: "Owner",
   roleManager: "Role manager",
   umbrellaOwner: "Owner",
+  poolDelegate: "Pool delegate",
 };
 
 const ROLE_SENTENCE: Record<StewardRole, string> = {
@@ -115,6 +116,7 @@ const ROLE_SENTENCE: Record<StewardRole, string> = {
   owner: "The address that sets the vault's curator, fees and markets.",
   roleManager: "The address that hands out every role in the vault.",
   umbrellaOwner: "The one address that can slash the stake.",
+  poolDelegate: "The address that runs the pool's lending: it funds and calls loans, and marks a loan as impaired.",
 };
 
 /** "Curator". */

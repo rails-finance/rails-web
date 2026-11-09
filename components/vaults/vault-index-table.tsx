@@ -92,6 +92,7 @@ const STEWARD_ROLE: Record<NonNullable<VaultSummary["steward"]>["role"], string>
   curator: "Curator",
   owner: "Owner",
   roleManager: "Role manager",
+  poolDelegate: "Pool delegate",
 };
 
 /** How an amount in the vault's asset sorts: by token, then inside it. */
@@ -118,7 +119,6 @@ function pillTitle(st: VaultStanding, v: VaultSummary): string {
       lost: formatCompact(v.lostAssets.value),
       held: formatCompact(heldOf(v, v.totalAssets.raw)),
       symbol: v.asset.symbol,
-      block: v.readAt.block,
     });
   return STANDING_WORD[st];
 }

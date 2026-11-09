@@ -28,6 +28,7 @@ const ROLE_CALL: Record<StewardRole, string> = {
   owner: "owner()",
   roleManager: "role_manager()",
   umbrellaOwner: "owner()",
+  poolDelegate: "poolDelegate() on the PoolManager",
 };
 
 const amountOf = (v: HealthReceiptVault, r: VaultYieldRead) =>
