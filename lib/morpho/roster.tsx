@@ -191,34 +191,30 @@ const CEILING_TIP =
 
 const list = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
 
-/** What sets each of a repeated pair's markets apart, by id: the feeds its
- *  oracle names ("priced by RSS / USD"), or, where the oracle names none Rails
- *  can read, "a second market for this pair". Where two lines would read
- *  alike, each adds the first contract that differs: a feed, the oracle or the
- *  rate model. */
+/** What sets each of a repeated pair's markets apart, by id, in words: the
+ *  feeds its oracle names ("priced by RSS / USD"), or "a separate price
+ *  source" where the oracle names none Rails can read. Where two lines would
+ *  read alike, each adds its place by size among them ("price source 1 of
+ *  2"). Contract addresses stay in the line's receipt (decision 0059 point 1). */
 function pairLines(markets: readonly MorphoRosterRow[]): Map<string, string> {
-  const feedsOf = (m: MorphoRosterRow) => (m.priceSource?.feeds ?? []).map((f) => f.address).join(",");
   const base = markets.map((m) => {
     const src = m.priceSource;
     const named = (src?.feeds ?? []).map((f) => f.description).filter((d): d is string => d != null);
-    return src?.readable && named.length > 0 && named.length === src.feeds.length
-      ? `priced by ${list(named)}`
-      : "a second market for this pair";
+    return src?.readable && named.length > 0 && named.length === src.feeds.length ? `priced by ${list(named)}` : null;
   });
+  // `markets` is largest first, so the place among alike lines is by size.
   return new Map(
     markets.map((m, i) => {
-      const alike = markets.filter((o, k) => k !== i && base[k] === base[i]);
-      if (alike.length === 0) return [m.id, base[i]];
-      const feed = m.priceSource?.feeds[0]?.address;
-      const tail =
-        feed && alike.every((o) => feedsOf(o) !== feedsOf(m))
-          ? `feed ${shortAddr(feed)}`
-          : m.oracle && alike.every((o) => o.oracle !== m.oracle)
-            ? `oracle ${shortAddr(m.oracle)}`
-            : m.irm
-              ? `rate model ${shortAddr(m.irm)}`
-              : null;
-      return [m.id, tail ? `${base[i]} · ${tail}` : base[i]];
+      const alike = markets.map((_, k) => k).filter((k) => base[k] === base[i]);
+      const place = alike.length > 1 ? `${alike.indexOf(i) + 1} of ${alike.length}` : null;
+      const line = base[i]
+        ? place
+          ? `${base[i]}, price source ${place}`
+          : base[i]
+        : place
+          ? `a separate price source, ${place}`
+          : "a separate price source";
+      return [m.id, line];
     }),
   );
 }
@@ -283,7 +279,9 @@ function MarketRow({
               </DataTableRowLink>
               {child != null && (
                 <span className="truncate text-[11px] text-rb-500" data-morpho-price-source={m.id}>
-                  <Prov info={morphoPriceSourceProv(c, { oracle: m.oracle, feeds: m.priceSource?.feeds ?? [] })}>
+                  <Prov
+                    info={morphoPriceSourceProv(c, { oracle: m.oracle, irm: m.irm, feeds: m.priceSource?.feeds ?? [] })}
+                  >
                     {child}
                   </Prov>
                 </span>

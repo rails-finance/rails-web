@@ -393,7 +393,11 @@ export const morphoPairTotalProv = (
  *  each named by its `description()`. */
 export const morphoPriceSourceProv = (
   coords: MorphoMarketCoords,
-  p: { oracle: string | null; feeds: { slot: string; address: string; description: string | null }[] },
+  p: {
+    oracle: string | null;
+    irm: string | null;
+    feeds: { slot: string; address: string; description: string | null }[];
+  },
 ): Provenance => ({
   kind: "chain",
   pclass: "state",
@@ -401,13 +405,14 @@ export const morphoPriceSourceProv = (
   verify: recompute("BASE_FEED_1() … QUOTE_FEED_2() on the oracle, then description() on each feed", coords),
   summary:
     p.feeds.length > 0
-      ? `Price source — the feeds this market's oracle names, each by its own \`description()\`${atBlock(coords)}. The market shares its loan token, collateral and LLTV with the others in its row; its oracle is its own.`
-      : `Price source — this market's oracle names no feed Rails can read${atBlock(coords)}, so the row says only that it is a second market for the pair. Its oracle is its own.`,
+      ? `Price source — the feeds this market's oracle names, each by its own \`description()\`${atBlock(coords)}. The market shares its loan token, collateral and LLTV with the others in its row; its oracle is its own. Where two markets' feeds read alike, the page numbers them by size.`
+      : `Price source — this market's oracle names no feed Rails can read${atBlock(coords)}, so the page calls it a separate price source, numbered by size where the pair has several. Its oracle is its own.`,
   contract: { name: "Market oracle", address: p.oracle ?? undefined },
   via: `${LANE} · oracle.BASE_FEED_1/2(), QUOTE_FEED_1/2() · feed.description() ${readAt(coords)}`,
   inputs: [
     { label: "market id", value: coords.marketId ?? "", kind: "chain" },
     { label: "oracle", value: p.oracle ?? "none", kind: "chain" },
+    { label: "rate model", value: p.irm ?? "none", kind: "chain" },
     ...p.feeds.map((f) => ({
       label: f.slot,
       value: f.description ? `${f.description} (${f.address})` : f.address,
