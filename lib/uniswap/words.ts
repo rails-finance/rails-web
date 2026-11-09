@@ -168,12 +168,13 @@ export interface ExplainGroupWords {
   bullets: Seg[][];
 }
 
-/** The card's (i): a lead, then what the figures are. */
-export function cardExplainer(p: PoolPosition): { lead: Seg[]; groups: ExplainGroupWords[] } {
+/** The card's (i): the status lead is the first group's first bullet (charter §4). */
+export function cardExplainer(p: PoolPosition): ExplainGroupWords[] {
   const Q = p.quote.symbol;
   const B = p.base.symbol;
   const s = shown(p);
   const position: Seg[][] = [
+    ["This position is worth ", { fig: `${num(p.valueNow)} ${Q}` }, " at the pool's price."],
     [
       "The position holds ",
       { fig: `${num(p.holds.base)} ${B}` },
@@ -197,19 +198,16 @@ export function cardExplainer(p: PoolPosition): { lead: Seg[]; groups: ExplainGr
           ".",
         ],
   );
-  return {
-    lead: ["This position is worth ", { fig: `${num(p.valueNow)} ${Q}` }, " at the pool's price."],
-    groups: [
-      { title: "This position", bullets: position },
-      {
-        title: "How it counts",
-        bullets: [
-          [`Every figure is in ${Q}, priced by the pool.`],
-          ["The two amounts follow the price: as it moves, the position trades one token for the other."],
-        ],
-      },
-    ],
-  };
+  return [
+    { title: "This position", bullets: position },
+    {
+      title: "How it counts",
+      bullets: [
+        [`Every figure is in ${Q}, priced by the pool.`],
+        ["The two amounts follow the price: as it moves, the position trades one token for the other."],
+      ],
+    },
+  ];
 }
 
 // ── Door 1: the readout ────────────────────────────────────────────────────
@@ -353,14 +351,12 @@ export function readoutExplainer(p: PoolPosition, order: readonly LineKey[]): Ex
       bullets: [
         ["A position earns fees only while the pool's price sits inside its range."],
         ...(p.inRange || p.range.full ? [] : [["Outside its range, a position holds only one of the two tokens."]]),
-        ["The days in range count one read of the price a day."],
       ],
     },
     fees: {
       title: "Fees",
       bullets: [
         ["The position's fees are what swaps paid its liquidity over the last 30 days."],
-        ["Fees not yet collected stay in the pool until the owner collects them."],
         ["The pool's figure is what a full-range position earned, as a share of its value."],
         ["A donation to the pool counts in the pool's figure as a fee."],
       ],
@@ -369,7 +365,6 @@ export function readoutExplainer(p: PoolPosition, order: readonly LineKey[]): Ex
       title: "Against holding",
       bullets: [
         ["Against holding compares the position now with keeping the tokens it held 30 days ago."],
-        ["Both sides are valued at today's price in the pool."],
         ...(p.sinceDeposit ? [["The figure since the first deposit counts every token paid out, fees included."]] : []),
       ],
     },

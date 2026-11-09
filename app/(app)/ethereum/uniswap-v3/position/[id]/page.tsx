@@ -1,0 +1,21 @@
+// One Uniswap V3 position (components/protocol/uniswap/uniswap-position-page.tsx).
+
+import type { Metadata } from "next";
+import { positionMetadata } from "@/lib/shared/page-metadata";
+import { UniswapPositionPage } from "@/components/protocol/uniswap/uniswap-position-page";
+
+interface Props {
+  params: Promise<{ id: string }>;
+}
+
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  return positionMetadata({ session: "uniswap-v3", subject: id, canonicalPath: `/ethereum/uniswap-v3/position/${id}` });
+}
+
+export default async function Page({ params }: Props) {
+  const { id } = await params;
+  return <UniswapPositionPage version="v3" id={id} />;
+}

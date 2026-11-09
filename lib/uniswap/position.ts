@@ -32,13 +32,6 @@ export const HOOK_FLAGS = [
 ] as const;
 export type HookFlag = (typeof HOOK_FLAGS)[number];
 
-/** The flags that act on a withdrawal. */
-export const REMOVE_FLAGS: readonly HookFlag[] = [
-  "beforeRemoveLiquidity",
-  "afterRemoveLiquidity",
-  "afterRemoveLiquidityReturnsDelta",
-];
-
 /** V4's PoolKey fee that hands the fee to the hook. */
 export const DYNAMIC_FEE = 0x800000;
 
@@ -326,7 +319,9 @@ export function poolPosition(r: UniPositionRead): PoolPosition {
     againstHoldingWithFees,
     liquidityChanged,
     opened: r.opened,
-    openedInWindow: r.opened !== null && r.opened.time > r.then.time,
+    // A position missing at `then` (its past liquidity null) opened inside the window.
+    openedInWindow:
+      (r.opened !== null && r.opened.time > r.then.time) || (past !== null && past.positionLiquidity === null),
     daysInRange,
     sinceDeposit,
     pool30d: {

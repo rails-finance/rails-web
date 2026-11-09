@@ -55,7 +55,7 @@ export interface UniPositionRead {
   version: UniswapVersion;
   id: string;
   head: BlockRef;
-  /** head.block − 216,000. */
+  /** About 30 days back (216,000 blocks), on the 7,200-block grid the store keeps. */
   then: BlockRef;
   provider: string;
   owner: string;
@@ -71,10 +71,11 @@ export interface UniPositionRead {
   tickUpper: number;
   liquidity: string;
   now: UniPoolRead;
-  /** Null where the pool did not exist at `then`; `positionLiquidity` null where the position did not. */
+  /** Null where the pool did not exist at `then`; where the position did not, its fields are "0" and
+   *  `positionLiquidity` is null. */
   past: (UniPoolRead & { positionLiquidity: string | null }) | null;
   opened: BlockRef | null;
-  /** Up to 30 reads, one a day back from the head, from `opened` on. */
+  /** Up to 30 reads from `opened` on: the head first, then the multiples of 7,200 below it. */
   daily: { block: number; time: number; tick: number }[];
   /** V3 only: the position manager's logs for this token id. */
   history: null | {
@@ -99,8 +100,9 @@ export interface UniPairPoolAt {
 /** GET /api/at-block/uniswap/pair?a=&b= */
 export interface UniPairRead {
   chainId: 1;
-  /** Head, then 30, 60 and 90 days back. */
+  /** Head, then about 30, 60 and 90 days back. */
   reads: BlockRef[];
+  /** The tokens named; WETH appended where ETH is named. */
   tokens: UniToken[];
   pools: {
     version: UniswapVersion;
@@ -126,5 +128,6 @@ export interface UniPositionsRead {
     fee: number;
     liquidity: string;
   }[];
-  truncated?: boolean;
+  /** More than 200 ids in a version; V4 newest first, then V3. */
+  truncated: boolean;
 }
