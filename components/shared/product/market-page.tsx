@@ -304,7 +304,7 @@ export function MarketPage({
   what: string;
 }) {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" data-anatomy="R2">
       <div className="py-8">
         <SubPageHeader protocol={header.protocol} title={header.title} learnMore={header.learnMore} />
         <div data-skel-section="page-table">

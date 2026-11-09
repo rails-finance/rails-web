@@ -100,7 +100,7 @@ export function ReservePage({
   else body = data.sections.map((s) => <ProductSectionBlock key={s.scope} s={s} />);
 
   return (
-    <div className="min-h-screen" data-anatomy="M3" {...hooks}>
+    <div className="min-h-screen" data-anatomy="M3 R3" {...hooks}>
       <div className="py-8">
         <header className="mb-6">
           <div className="mb-2.5">

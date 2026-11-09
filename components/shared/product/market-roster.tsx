@@ -42,7 +42,7 @@ export function MarketRoster<K extends string>({
   anatomy?: string;
 }) {
   return (
-    <div className="min-h-screen" data-anatomy={anatomy}>
+    <div className="min-h-screen" data-anatomy={`${anatomy} R1`}>
       <div className="py-8">
         <SubPageHeader protocol={header.protocol} title={header.title} learnMore={header.learnMore} />
         <div className="space-y-2">
