@@ -31,6 +31,15 @@
 // No animation: hundreds of rows, and a framer node per row is what froze the
 // listing shells (see the listing entrance incident).
 
+import { AssetUnit } from "@/components/shared/asset-unit";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
@@ -614,22 +623,21 @@ function TickRow({
   readBy?: ServerRead | null;
 }) {
   const label = poolLabel(p);
+  // The linked tick's row: a blue ground over both stripes.
+  const cell = `whitespace-nowrap tabular-nums ${mine ? "bg-blue-500/10!" : ""}`;
   return (
-    <div
-      id={`tick-${p.key}-${t.tick}`}
-      className={`grid grid-cols-2 gap-x-3 gap-y-1 px-4 py-2 sm:grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)] sm:items-baseline ${mine ? "bg-blue-500/10" : ""}`}
-    >
-      <div className="text-xs tabular-nums text-foreground">
+    <DataTableRow id={`tick-${p.key}-${t.tick}`} data-fx-tick={t.tick}>
+      <DataTableCell rowHeader className={`${cell} text-foreground`}>
         <Prov info={stampServerRead(tickIdProv(label, p.address, t.tick), readBy)} value={String(t.tick)}>
           {t.tick}
         </Prov>
         {mine && (
-          <span className="ml-1.5 text-[10px] text-blue-600 dark:text-[var(--text-link)]">
+          <span className="ml-1.5 text-[11px] text-blue-600 dark:text-[var(--text-link)]">
             the position&rsquo;s tick
           </span>
         )}
-      </div>
-      <div className="text-xs tabular-nums">
+      </DataTableCell>
+      <DataTableCell label="Debt ratio (min leg)" className={cell}>
         {t.debtRatio != null ? (
           <Prov
             info={stampServerRead(tickRatioProv(label, p.address, t.tick), readBy)}
@@ -642,35 +650,39 @@ function TickRow({
             —
           </span>
         )}
-        {t.pastLiquidate && <span className="ml-1.5 text-[10px] text-rb-500">past the liquidation rung</span>}
-      </div>
-      <div className="text-xs tabular-nums text-foreground">
-        <Prov
-          info={stampServerRead(tickDebtProv(label, p.address, t.tick, t.debtSharesRaw), readBy)}
-          value={formatExact(t.rawDebt)}
-        >
-          {t.rawDebt !== 0 && t.rawDebt < 0.01 ? formatTinyNonZero(t.rawDebt) : formatCompact(t.rawDebt)}
-        </Prov>{" "}
-        <span className="text-rb-500">fxUSD</span>
-      </div>
-      <div className="text-xs tabular-nums text-rb-500">
+        {t.pastLiquidate && <span className="ml-1.5 text-[11px] text-rb-500">past the liquidation rung</span>}
+      </DataTableCell>
+      <DataTableCell label="Debt" align="right" className={`${cell} text-foreground`}>
+        <span className="inline-flex items-center gap-1.5">
+          <Prov
+            info={stampServerRead(tickDebtProv(label, p.address, t.tick, t.debtSharesRaw), readBy)}
+            value={formatExact(t.rawDebt)}
+          >
+            {t.rawDebt !== 0 && t.rawDebt < 0.01 ? formatTinyNonZero(t.rawDebt) : formatCompact(t.rawDebt)}
+          </Prov>
+          <AssetUnit symbol="fxUSD" address="" />
+        </span>
+      </DataTableCell>
+      <DataTableCell label="Share of pool" align="right" className={`${cell} text-rb-500`}>
         <Prov
           info={stampServerRead(tickShareProv(label, p.address, t.tick), readBy)}
           value={formatExact(t.shareOfDebt * 100)}
         >
           {pctOf(t.shareOfDebt, 2)}
         </Prov>
-      </div>
-      <div className="text-xs tabular-nums text-rb-500">
-        <Prov
-          info={stampServerRead(tickCollProv(label, p.address, t.tick, t.collSharesRaw, p.normalizedSymbol), readBy)}
-          value={formatExact(t.rawColl)}
-        >
-          {amt(t.rawColl)}
-        </Prov>{" "}
-        {p.normalizedSymbol}
-      </div>
-    </div>
+      </DataTableCell>
+      <DataTableCell label="Collateral" align="right" className={`${cell} text-foreground`}>
+        <span className="inline-flex items-center gap-1.5">
+          <Prov
+            info={stampServerRead(tickCollProv(label, p.address, t.tick, t.collSharesRaw, p.normalizedSymbol), readBy)}
+            value={formatExact(t.rawColl)}
+          >
+            {amt(t.rawColl)}
+          </Prov>
+          <AssetUnit symbol={p.normalizedSymbol} address="" />
+        </span>
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 
@@ -701,8 +713,10 @@ function TickTable({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | null 
   }, [p.key, p.ticks]);
 
   return (
-    <div className="rounded-xl bg-raised">
-      <div className="flex items-baseline justify-between gap-3 border-b border-rb-200 px-4 py-3 dark:border-rb-700">
+    <div>
+      {/* The house table (rails-ops ui-jobs 539: D1, D6 cards below sm),
+          unlinked, on the page's ground. */}
+      <div className="mb-2 flex items-baseline justify-between gap-3">
         <div>
           <span className="text-xs font-semibold text-foreground">The ticks, top down</span>
           <span className="ml-2 text-[11px] text-rb-500">
@@ -721,20 +735,20 @@ function TickTable({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | null 
           </button>
         )}
       </div>
-
-      <div className="hidden border-b border-rb-200 px-4 py-1.5 text-[10px] uppercase tracking-wider text-rb-400 sm:grid sm:grid-cols-[4.5rem_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.2fr)] dark:border-rb-700">
-        <span>Tick</span>
-        <span>Debt ratio (min leg)</span>
-        <span>Debt</span>
-        <span>Share of pool</span>
-        <span>Collateral</span>
-      </div>
-
-      <div className="divide-y divide-rb-200 dark:divide-rb-700">
-        {rows.map((t) => (
-          <TickRow readBy={readBy} key={t.tick} p={p} t={t} mine={t.tick === mine} />
-        ))}
-      </div>
+      <DataTable label={`${poolLabel(p)} ticks, top down`} stacked tableClassName="text-sm sm:min-w-[36rem]">
+        <DataTableHead>
+          <DataTableHeader label="Tick" />
+          <DataTableHeader label="Debt ratio (min leg)" />
+          <DataTableHeader label="Debt" align="right" />
+          <DataTableHeader label="Share of pool" align="right" />
+          <DataTableHeader label="Collateral" align="right" />
+        </DataTableHead>
+        <DataTableBody>
+          {rows.map((t) => (
+            <TickRow readBy={readBy} key={t.tick} p={p} t={t} mine={t.tick === mine} />
+          ))}
+        </DataTableBody>
+      </DataTable>
     </div>
   );
 }

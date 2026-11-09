@@ -4,7 +4,8 @@
 // the Aave-V3-family table shape (components/shared/aave-reserve-parts.tsx,
 // carried to Dolomite 2026-09-10): one sortable row per vault rather than a
 // card grid — the conversion pays off MORE here than it did on Dolomite,
-// since this roster runs ~173 rows.
+// since this roster runs ~173 rows. On the house table (rails-ops ui-jobs 539:
+// D1, D2, D6 cards below lg, as M1), unlinked: a vault has no Rails page.
 // ----------------------------------------------------------------------------
 // The claim: Fluid gives every vault its OWN three rungs on one axis — borrow up
 // to collateralFactor, liquidate from liquidationThreshold, and past
@@ -45,7 +46,17 @@
 
 import { formatTinyNonZero } from "@/lib/utils/format";
 import { useMemo, useState } from "react";
-import { ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
+import { AssetUnit } from "@/components/shared/asset-unit";
+import { TokenPairIcons } from "@/components/shared/token-pair-icons";
+import {
+  DATA_TABLE_PILL,
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
 import { poolShareLabel, shortAddress, vaultKindLabel } from "@/lib/fluid/asset-catalog";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
@@ -65,6 +76,7 @@ import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { BlockRef } from "@/components/shared/block-ref";
 import { serverReadOf, type ServerRead } from "@/lib/shared/server-head-read";
 
+const NUM = "whitespace-nowrap tabular-nums text-foreground";
 const pctText = (f: number | null, dp = 0) => (f == null ? "—" : `${(f * 100).toFixed(dp)}%`);
 
 /** What a leg is called. A token leg is its symbol. A smart leg holds shares of
@@ -108,18 +120,34 @@ function LegSize({
   if (tokens && tokens.length > 0) {
     return (
       <span
+        className="inline-flex flex-col items-end max-lg:items-start"
         title={`${value.toLocaleString("en-US", { maximumFractionDigits: 6 })} DEX shares: the pool's per-share composition at this block, not a price`}
       >
+        {/* One token a line, so a pool's two fit the row's two lines. */}
         {tokens.map((t, i) => (
-          <span key={i}>
-            {i > 0 && " + "}
-            {amount(t.amount, t.symbol ?? "?")}
+          <span key={i} className="inline-flex items-center gap-1.5">
+            {i > 0 && "+ "}
+            {amount(t.amount, "").trim()}
+            <AssetUnit symbol={t.symbol ?? "?"} address="" named={t.symbol != null} />
           </span>
         ))}
       </span>
     );
   }
-  return <span>{amount(value, legLabel(symbol, pool))}</span>;
+  if (symbol)
+    return (
+      <span className="inline-flex items-center gap-1.5">
+        {amount(value, "").trim()}
+        <AssetUnit symbol={symbol} address="" />
+      </span>
+    );
+  // DEX shares with no stated composition: the count over what it counts.
+  return (
+    <span className="inline-flex flex-col items-end max-lg:items-start">
+      {amount(value, "").trim()}
+      <span className="text-[11px] text-rb-500">{legLabel(symbol, pool)}</span>
+    </span>
+  );
 }
 
 /** One vault row — a keyed component (not a `.map` callback) so it can own
@@ -162,26 +190,40 @@ function VaultRow({ v, block, readBy }: { v: FluidVaultRow; block: number; readB
 
   return (
     <ProvReceiptsScope registry={registry} bounds={false}>
-      <tr className="border-t border-rb-200 transition-colors hover:bg-foreground/[0.02] dark:border-rb-800">
-        <td className="px-3 py-2.5">
-          <div className="leading-tight">
-            <div className="flex items-center gap-1.5 text-[13px] font-medium text-foreground">
-              {legLabel(v.supplySymbol, v.supplyPool)} / {legLabel(v.borrowSymbol, v.borrowPool)}
+      <DataTableRow data-fluid-vault={v.vaultId}>
+        <DataTableCell rowHeader className="whitespace-nowrap">
+          <div className="flex items-center gap-2.5">
+            <TokenPairIcons
+              first={{ symbol: legLabel(v.supplySymbol, v.supplyPool) }}
+              second={{ symbol: legLabel(v.borrowSymbol, v.borrowPool) }}
+            />
+            <div className="min-w-0 leading-tight">
+              <div className="flex items-center gap-1.5 font-semibold text-foreground">
+                <span
+                  className="max-w-[10rem] truncate"
+                  title={`${legLabel(v.supplySymbol, v.supplyPool)} / ${legLabel(v.borrowSymbol, v.borrowPool)}`}
+                >
+                  {legLabel(v.supplySymbol, v.supplyPool)} / {legLabel(v.borrowSymbol, v.borrowPool)}
+                </span>
+              </div>
+              <a
+                href={explorerUrl(MAINNET_CHAIN_ID, "address", v.vault)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link-external text-[11px] text-rb-500"
+                title={v.vault}
+              >
+                vault {v.vaultId}
+              </a>
               {smart && (
-                <span className="text-[10px] uppercase tracking-wide text-rb-500">{vaultKindLabel(v.vaultType)}</span>
+                <span className={`${DATA_TABLE_PILL} ml-1.5 px-1.5 py-0.5 text-[11px]`}>
+                  {vaultKindLabel(v.vaultType)}
+                </span>
               )}
             </div>
-            <a
-              href={explorerUrl(MAINNET_CHAIN_ID, "address", v.vault)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="link-external text-[11px] text-rb-500"
-            >
-              vault {v.vaultId} · {shortAddress(v.vault)}
-            </a>
           </div>
-        </td>
-        <td className="min-w-[220px] px-3 py-2.5 text-[13px] text-foreground/80">
+        </DataTableCell>
+        <DataTableCell label="Ladder" wide className="min-w-[220px] text-foreground">
           {v.configured ? (
             <>
               {v.aggregateRatio != null ? (
@@ -189,7 +231,7 @@ function VaultRow({ v, block, readBy }: { v: FluidVaultRow; block: number; readB
               ) : (
                 <RatioBar fill={0} ticks={ticks} />
               )}
-              <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[10px] font-normal text-rb-500">
+              <div className="mt-1.5 flex items-baseline gap-x-2 whitespace-nowrap text-[11px] text-rb-500">
                 <span>
                   CF <Prov info={fluidVaultConfigProv("collateralFactor", coords)}>{pctText(v.collateralFactor)}</Prov>
                 </span>
@@ -218,12 +260,16 @@ function VaultRow({ v, block, readBy }: { v: FluidVaultRow; block: number; readB
           ) : (
             <span className="text-rb-500">—</span>
           )}
-        </td>
-        <td className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80">
+        </DataTableCell>
+        <DataTableCell label="Price" align="right" className={NUM}>
           {v.oraclePriceLiquidate != null ? (
             <Prov info={fluidOraclePriceProv(coords)}>
-              {v.oraclePriceLiquidate.toLocaleString("en-US", { maximumFractionDigits: 4 })}{" "}
-              {v.borrowSymbol ?? "shares"}/{v.supplySymbol ?? "share"}
+              <span className="inline-flex flex-col items-end max-lg:items-start">
+                {v.oraclePriceLiquidate.toLocaleString("en-US", { maximumFractionDigits: 4 })}
+                <span className="text-[11px] text-rb-500">
+                  {v.borrowSymbol ?? "shares"}/{v.supplySymbol ?? "share"}
+                </span>
+              </span>
             </Prov>
           ) : v.oracle ? (
             <span className="text-rb-500" title="The vault names an oracle, but it answers 0 at this block.">
@@ -232,8 +278,8 @@ function VaultRow({ v, block, readBy }: { v: FluidVaultRow; block: number; readB
           ) : (
             <span className="text-rb-500">no oracle</span>
           )}
-        </td>
-        <td className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80">
+        </DataTableCell>
+        <DataTableCell label="Supplied" align="right" className={NUM}>
           <Prov
             info={
               v.supplyLegTokens != null
@@ -243,8 +289,8 @@ function VaultRow({ v, block, readBy }: { v: FluidVaultRow; block: number; readB
           >
             <LegSize value={v.totalSupply} symbol={v.supplySymbol} pool={v.supplyPool} tokens={v.supplyLegTokens} />
           </Prov>
-        </td>
-        <td className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80">
+        </DataTableCell>
+        <DataTableCell label="Borrowed" align="right" className={NUM}>
           <Prov
             info={
               v.borrowLegTokens != null
@@ -254,8 +300,8 @@ function VaultRow({ v, block, readBy }: { v: FluidVaultRow; block: number; readB
           >
             <LegSize value={v.totalBorrow} symbol={v.borrowSymbol} pool={v.borrowPool} tokens={v.borrowLegTokens} />
           </Prov>
-        </td>
-        <td className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80">
+        </DataTableCell>
+        <DataTableCell label="Borrow rate" align="right" className={NUM}>
           {v.borrowRatePct != null ? (
             <Prov info={fluidVaultRateProv("borrow", coords)}>{v.borrowRatePct.toFixed(2)}%</Prov>
           ) : (
@@ -266,8 +312,8 @@ function VaultRow({ v, block, readBy }: { v: FluidVaultRow; block: number; readB
               —
             </span>
           )}
-        </td>
-        <td className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80">
+        </DataTableCell>
+        <DataTableCell label="Supply rate" align="right" className={NUM}>
           {v.supplyRatePct != null ? (
             <Prov info={fluidVaultRateProv("supply", coords)}>{v.supplyRatePct.toFixed(2)}%</Prov>
           ) : (
@@ -278,8 +324,8 @@ function VaultRow({ v, block, readBy }: { v: FluidVaultRow; block: number; readB
               —
             </span>
           )}
-        </td>
-      </tr>
+        </DataTableCell>
+      </DataTableRow>
     </ProvReceiptsScope>
   );
 }
@@ -303,6 +349,16 @@ export function FluidVaultsStamp({ data }: { data: FluidVaultsChainResponse }) {
 }
 
 type SortKey = "vault" | "ladder" | "price" | "supplied" | "borrowed" | "borrowRate" | "supplyRate";
+
+const SORT_LABEL: Record<SortKey, string> = {
+  vault: "Vault",
+  ladder: "Ladder",
+  price: "Price",
+  supplied: "Supplied",
+  borrowed: "Borrowed",
+  borrowRate: "Borrow rate",
+  supplyRate: "Supply rate",
+};
 
 export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
   const readBy = serverReadOf(data);
@@ -348,26 +404,14 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
     return <p className="text-sm text-rb-500">The vault roster could not be read from chain at this block.</p>;
   }
 
-  // Sortable header cell — the Aave-family table's render helper, not a
-  // component, so it shares the parent's sort state without remounting.
-  const th = (label: string, k: SortKey, align: "left" | "right" = "left") => {
-    const active = sortKey === k;
-    const Caret = sortDir === "asc" ? ChevronUp : ChevronDown;
-    return (
-      <th className={`px-3 py-2 ${align === "right" ? "text-right" : "text-left"}`}>
-        <button
-          type="button"
-          onClick={() => toggleSort(k)}
-          className={`inline-flex items-center gap-1 text-[11px] uppercase tracking-wider transition-colors hover:text-foreground ${
-            active ? "text-foreground" : "text-rb-500"
-          } ${align === "right" ? "flex-row-reverse" : ""}`}
-        >
-          {label}
-          {active ? <Caret className="h-3 w-3" /> : <ArrowUpDown className="h-3 w-3 opacity-30" />}
-        </button>
-      </th>
-    );
-  };
+  // A sortable header (D2), sharing the parent's sort state.
+  const th = (k: SortKey, align: "left" | "right" = "left") => (
+    <DataTableHeader
+      label={SORT_LABEL[k]}
+      align={align}
+      sort={{ dir: sortKey === k ? sortDir : null, onSort: () => toggleSort(k), ariaLabel: `Sort by ${SORT_LABEL[k]}` }}
+    />
+  );
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -463,26 +507,57 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
         }
       />
 
-      <div className="overflow-x-auto rounded-lg border border-rb-200 dark:border-rb-800">
-        <table className="w-full min-w-[1080px] border-collapse">
-          <thead>
-            <tr className="bg-foreground/[0.03]">
-              {th("Vault", "vault")}
-              {th("Ladder", "ladder")}
-              {th("Price", "price", "right")}
-              {th("Supplied", "supplied", "right")}
-              {th("Borrowed", "borrowed", "right")}
-              {th("Borrow rate", "borrowRate", "right")}
-              {th("Supply rate", "supplyRate", "right")}
-            </tr>
-          </thead>
-          <tbody>
-            {sortedVaults.map((v) => (
-              <VaultRow key={v.vault} v={v} block={data.blockNumber} readBy={readBy} />
+      {/* Below lg the header row is hidden (D6): a select and a direction
+          button drive the same sort. */}
+      <div className="mb-2 flex items-center gap-2 lg:hidden" data-mobile-sort="">
+        <label className="flex items-center gap-2 text-[12px] text-rb-500">
+          Sort by
+          <select
+            value={sortKey}
+            onChange={(e) => {
+              const k = e.target.value as SortKey;
+              setSortKey(k);
+              setSortDir(k === "vault" ? "asc" : "desc");
+            }}
+            className="rounded-md border border-rb-200 bg-background px-2 py-1 text-base text-foreground sm:text-[12px] dark:border-rb-800"
+          >
+            {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+              <option key={k} value={k}>
+                {SORT_LABEL[k]}
+              </option>
             ))}
-          </tbody>
-        </table>
+          </select>
+        </label>
+        <button
+          type="button"
+          onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+          className="rounded-md border border-rb-200 px-2 py-1 text-[12px] text-foreground dark:border-rb-800"
+        >
+          {sortDir === "asc" ? "Low first" : "High first"}
+        </button>
       </div>
+      <DataTable
+        label="Fluid vaults"
+        stacked
+        stackBelow="lg"
+        rowHeight="two"
+        tableClassName="text-sm lg:min-w-[1080px]"
+      >
+        <DataTableHead>
+          {th("vault")}
+          {th("ladder")}
+          {th("price", "right")}
+          {th("supplied", "right")}
+          {th("borrowed", "right")}
+          {th("borrowRate", "right")}
+          {th("supplyRate", "right")}
+        </DataTableHead>
+        <DataTableBody>
+          {sortedVaults.map((v) => (
+            <VaultRow key={v.vault} v={v} block={data.blockNumber} readBy={readBy} />
+          ))}
+        </DataTableBody>
+      </DataTable>
 
       {data.skipped && data.skipped.length > 0 && (
         <section className="mt-4">
