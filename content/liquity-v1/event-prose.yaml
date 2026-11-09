@@ -808,7 +808,7 @@ doc_urls:
 L5:
   open:
     title: |-
-      How opening a trove works
+      How opening a Trove works
     intro: |-
       A Liquity V1 Trove holds ETH as collateral and mints LUSD, a dollar stablecoin, against it. The loan charges no interest.
     stepsHeading: |-
@@ -853,7 +853,7 @@ L5:
 
   adjust:
     title: |-
-      How adjusting a trove works
+      How adjusting a Trove works
     intro: |-
       An adjustment adds or withdraws ETH, borrows more LUSD or repays some of the debt, without closing the Trove.
     stepsHeading: |-
@@ -891,7 +891,7 @@ L5:
 
   close:
     title: |-
-      How closing a trove works
+      How closing a Trove works
     intro: |-
       Closing repays the Trove's debt and returns all its ETH to the owner in one transaction.
     stepsHeading: |-
@@ -1011,7 +1011,7 @@ L5:
 
   fallback:
     title: |-
-      How Liquity V1 troves work
+      How Liquity V1 Troves work
     intro: |-
       Liquity V1 lends LUSD against ETH with no interest. Each address holds one Trove at a time.
     detailsHeading: |-
