@@ -111,7 +111,8 @@ export async function readAssetDoor(symbol: string): Promise<AssetDoorRead> {
       withdrawals: withdrawalsText(v),
       held: held(v),
       yearly30: y ? y.yearly30 : null,
-      range: y && y.low != null && y.high != null ? y.high - y.low : null,
+      // A share price that did not grow has no yield to range: it sorts last.
+      range: y && y.yearly30 > 0 && y.low != null && y.high != null ? y.high - y.low : null,
     };
   });
   return {

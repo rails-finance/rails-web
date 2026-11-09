@@ -320,7 +320,7 @@ export const ASSET_DOOR = {
       ? `The ${shown} largest, by what each held at the last read.`
       : order === "yield"
         ? `The ${shown} with the highest 30-day yield among the ${pool} largest.`
-        : `The ${shown} with the narrowest range of 30-day yields over 90 days among the ${pool} largest.`,
+        : `The ${shown} with the narrowest range of 30-day yields over 90 days among the ${pool} largest, counting vaults whose share price grew.`,
   hidden: (n: number) =>
     `Hiding ${n.toLocaleString("en-US")} ${n === 1 ? "vault" : "vaults"} the chain shows as illiquid or with lost assets.`,
   showing: (n: number) =>
