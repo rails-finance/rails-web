@@ -402,8 +402,13 @@ function HealthSection({ data }: { data: MorphoBaseVaultResponse }) {
               block: liquidity.block,
               queueAssets: liquidity.queueAssets,
               withdrawable: liquidity.withdrawable,
-              caught: liquidity.illiquid ? illiquidSentence(liquidity.illiquid) : null,
             }
+          : null
+      }
+      caught={liquidity?.illiquid ? illiquidSentence(liquidity.illiquid) : null}
+      holder={
+        data.holder?.maxWithdraw
+          ? { block: data.blockNumber, claim: data.holder.claim.raw, maxWithdraw: data.holder.maxWithdraw.raw }
           : null
       }
       // V1.0 keeps no lost-assets ledger; a V1.1 vault whose call failed is unread.

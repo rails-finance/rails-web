@@ -1,33 +1,33 @@
-// lib/vaults/health.ts against hand-made series (rails-ops ui-jobs 553).
+// lib/vaults/health.ts and its words, lib/vaults/health-words.ts, against
+// hand-made series (rails-ops ui-jobs 553).
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { vaultHealth, healthLines, spanOf, yearlyOf, durationText, flooredPct } from "../../lib/vaults/health.ts";
+import { vaultHealth, spanOf, yearlyOf } from "../../lib/vaults/health.ts";
+import { healthLines, durationText, flooredPct, signedPct, ASSET_DOOR } from "../../lib/vaults/health-words.ts";
 
-const W = { amount: (v) => v.toFixed(1), day: (d) => `day ${d}` };
+const F = { amount: (v) => v.toFixed(1), day: (d) => `day ${d}` };
 const END = 20_400;
 
-/** A share price compounding at `yearly` (piecewise by day range), one read a day. */
-function priceSeries(days, yearlyAt, { start = 1_000_000n } = {}) {
+/** A share price compounding at `yearlyAt(day)`, one read a day. */
+function priceSeries(days, yearlyAt, { start = 1_000_000 } = {}) {
   const out = [];
-  let p = Number(start);
+  let p = start;
   for (let d = END - days; d <= END; d++) {
     out.push({ day: d, block: d * 10, raw: String(BigInt(Math.round(p))) });
     p *= 1 + yearlyAt(d) / 365;
   }
   return out;
 }
-const flatAssets = (days, raw) =>
+const flat = (days, raw) =>
   Array.from({ length: days + 1 }, (_, k) => ({ day: END - days + k, block: (END - days + k) * 10, raw }));
 
-const base = {
-  family: "metamorpho",
-  assetSymbol: "USDC",
-  decimals: 6,
-  tooSmall: false,
-  exit: null,
-  steward: null,
-};
+const base = { family: "metamorpho", tooSmall: false, exit: null, steward: null, price: null, assets: null };
+const ctx = (family = "metamorpho") => ({ family, assetSymbol: "USDC", decimals: 6 });
+const lines = (input) =>
+  Object.fromEntries(healthLines(vaultHealth({ ...base, ...input }), ctx(input.family), F).map((l) => [l.key, l]));
+
+const VERDICTS = /\b(Steady|Uneven|Flat|Growing|Shrinking|Yes|Partly|Safe|Risky|Good|Bad)\b/;
 
 test("spans take the latest read at least n days back, gaps widening them", () => {
   const reads = [
@@ -35,160 +35,124 @@ test("spans take the latest read at least n days back, gaps widening them", () =
     { day: 105, block: 2, raw: "101" },
     { day: 140, block: 3, raw: "102" },
   ];
-  const s = spanOf(reads, 30);
-  assert.equal(s.from.day, 105);
+  assert.equal(spanOf(reads, 30).from.day, 105);
   assert.equal(spanOf(reads, 40).from.day, 100);
   assert.equal(spanOf(reads, 60), null);
 });
 
-test("a steady earner: three windows within a quarter of the yield", () => {
-  const h = vaultHealth({ ...base, price: priceSeries(129, () => 0.05), assets: flatAssets(129, "1000000000000") }, W);
-  assert.equal(h.earning.word, "Steady");
-  assert.match(h.earning.sentence, /^5\.\d% a year over 30 days, 5\.\d% over 90\. Each 30 days of the last 90/);
-  assert.equal(h.earning.basis.windows.length, 3);
-  assert.ok(Math.abs(yearlyOf(h.earning.basis.y30) - 0.05) < 0.002);
-  assert.equal(h.size.word, "Steady");
-  assert.equal(h.losses.word, "No");
+test("yield: the 30-day figure, the 90, and the three windows' range", () => {
+  const price = priceSeries(129, (d) => (d > END - 30 ? 0.06 : 0.04));
+  const h = vaultHealth({ ...base, price });
+  assert.equal(h.yield.windows.length, 3);
+  assert.ok(Math.abs(yearlyOf(h.yield.y30) - 0.06) < 0.002);
+  const l = lines({ price });
+  assert.match(l.yield.headline, /^(5\.9|6\.\d)% a year over the last 30 days$/);
+  assert.match(
+    l.yield.sentence,
+    /^4\.\d% over 90 days\. Each 30 days of the last 90 earned between 4\.\d% and (5\.9|6\.\d)%\.$/,
+  );
 });
 
-test("an uneven earner: the windows spread past the floor", () => {
-  const h = vaultHealth({ ...base, price: priceSeries(129, (d) => (d > END - 30 ? 0.12 : 0.03)), assets: null }, W);
-  assert.equal(h.earning.word, "Uneven");
-  assert.equal(h.size.read, false);
+test("yield: a share price that has not moved, Umbrella's rewards named", () => {
+  const price = flat(129, "1000000");
+  const l = lines({ price });
+  assert.equal(l.yield.headline, "0.0% over 90 days");
+  assert.equal(l.yield.sentence, "The share price has not moved in 90 days.");
+  const u = lines({ family: "umbrella-stake", price });
+  assert.match(u.yield.sentence, /Umbrella pays its rewards outside the share\.$/);
 });
 
-test("the one-point floor keeps a small spread steady", () => {
-  // 2% then 2.8%: the spread (0.8 points) is over a quarter of the yield but under one point.
-  const h = vaultHealth({ ...base, price: priceSeries(129, (d) => (d > END - 30 ? 0.028 : 0.02)), assets: null }, W);
-  assert.equal(h.earning.word, "Steady");
+test("young series and unread families say so", () => {
+  const l = lines({ price: priceSeries(10, () => 0.05), assets: flat(10, "5") });
+  assert.equal(l.yield.headline, "Series from day 20390");
+  assert.equal(l.size.headline, "Series from day 20390");
+  for (const x of Object.values(lines({ family: "maple-pool" }))) assert.equal(x.read, false, x.key);
+  assert.equal(lines({}).size.sentence, "The daily store did not answer.");
 });
 
-test("a share price that does not move is Flat, Umbrella's sentence naming why", () => {
-  const price = flatAssets(129, "1000000");
-  assert.equal(vaultHealth({ ...base, price, assets: null }, W).earning.word, "Flat");
-  const u = vaultHealth({ ...base, family: "umbrella-stake", price, assets: null }, W);
-  assert.match(u.earning.sentence, /Umbrella pays its rewards outside the share/);
-});
-
-test("a young series says when it starts; no series reads as not read", () => {
-  const h = vaultHealth({ ...base, price: priceSeries(10, () => 0.05), assets: flatAssets(10, "5") }, W);
-  assert.equal(h.earning.word, "Young");
-  assert.equal(h.size.word, "Young");
-  const none = vaultHealth({ ...base, family: "maple-pool", price: null, assets: null }, W);
-  for (const l of healthLines(none)) assert.equal(l.read, false, l.key);
-});
-
-test("size: growing, shrinking, and new from zero", () => {
-  const grow = [
-    { day: END - 30, block: 1, raw: "1000000000" },
-    { day: END, block: 2, raw: "1100000000" },
+test("size: the change in 30 days, then the two totals", () => {
+  const assets = [
+    { day: END - 30, block: 1, raw: "414500000" },
+    { day: END, block: 2, raw: "401100000" },
   ];
-  const h = vaultHealth({ ...base, price: null, assets: grow }, W);
-  assert.equal(h.size.word, "Growing");
-  assert.equal(h.size.sentence, "Holds 1100.0 USDC, +10.0% since day 20370 (1000.0).");
-  const shrink = [grow[1], { ...grow[0], day: END + 31 }].sort((a, b) => a.day - b.day);
-  assert.equal(vaultHealth({ ...base, price: null, assets: shrink }, W).size.word, "Shrinking");
-  const fresh = [{ ...grow[0], raw: "0" }, grow[1]];
-  assert.equal(vaultHealth({ ...base, price: null, assets: fresh }, W).size.word, "New");
+  const l = lines({ assets });
+  assert.equal(l.size.headline, "−3.2% in 30 days");
+  assert.equal(l.size.sentence, "Held 401.1 USDC at the last read, 414.5 on day 20370.");
+  const fresh = lines({ assets: [{ ...assets[0], raw: "0" }, assets[1]] });
+  assert.equal(fresh.size.headline, "From nothing in 30 days");
 });
 
-test("losses: a fall past 0.1% is Yes, smaller ones are dips, lost assets are named", () => {
+test("losses: falls counted, the largest named, lost assets where read", () => {
   const price = priceSeries(129, () => 0.05);
+  assert.equal(lines({ price }).losses.headline, "No share-price falls in 90 days");
   const k = price.length - 10;
-  const dipped = price.map((r, i) => (i === k ? { ...r, raw: String(BigInt(r.raw) - 200n) } : r));
-  assert.equal(vaultHealth({ ...base, price: dipped, assets: null }, W).losses.word, "Small dips");
   const fallen = price.map((r, i) => (i >= k ? { ...r, raw: String((BigInt(r.raw) * 99n) / 100n) } : r));
-  const h = vaultHealth({ ...base, price: fallen, assets: null, lostAssets: { raw: "2500000", block: 9 } }, W);
-  assert.equal(h.losses.word, "Yes");
-  assert.match(h.losses.sentence, /It records 2\.5 USDC of lost assets\.$/);
-  const v10 = vaultHealth({ ...base, price, assets: null, lostAssets: null }, W);
-  assert.match(v10.losses.sentence, /keeps no lost-assets ledger/);
+  const l = lines({ price: fallen, lostAssets: { raw: "2500000", block: 9 } });
+  assert.match(l.losses.headline, /^The share price fell on 1 of the last 90 days, the most \u22120\.99% on day \d+$/);
+  assert.equal(l.losses.sentence, "Lost assets on record: 2.5 USDC.");
+  assert.equal(lines({ price, lostAssets: null }).losses.sentence, "A V1.0 vault keeps no record of lost assets.");
 });
 
-test("exit: MetaMorpho's withdrawable share, the caught sentence first", () => {
-  const ok = vaultHealth(
-    {
-      ...base,
-      price: null,
-      assets: null,
-      exit: { kind: "queue", block: 5, queueAssets: "1000", withdrawable: "1000", caught: null },
-    },
-    W,
-  );
-  assert.equal(ok.exit.word, "Yes");
-  const part = vaultHealth(
-    {
-      ...base,
-      price: null,
-      assets: null,
-      exit: { kind: "queue", block: 5, queueAssets: "1000", withdrawable: "990", caught: null },
-    },
-    W,
-  );
-  assert.equal(part.exit.word, "Partly");
-  assert.match(part.exit.sentence, /^99% of it can leave today/);
-  const stuck = vaultHealth(
-    {
-      ...base,
-      price: null,
-      assets: null,
-      exit: { kind: "queue", block: 5, queueAssets: "1000", withdrawable: "12", caught: "The RLP market holds 98.8%." },
-    },
-    W,
-  );
-  assert.equal(stuck.exit.word, "Not all of it");
-  assert.equal(stuck.exit.sentence, "The RLP market holds 98.8%. 1.2% of it can leave today.");
-});
-
-test("exit: Yearn's idle part, Umbrella's cooldown, and families not read", () => {
-  const y = vaultHealth(
-    {
-      ...base,
-      family: "yearn-v3",
-      price: null,
-      assets: null,
-      exit: { kind: "idle", block: 1, idle: "250", total: "1000" },
-    },
-    W,
-  );
-  assert.equal(y.exit.word, "Partly");
-  assert.match(y.exit.sentence, /^25% of it sits idle/);
-  const u = vaultHealth(
-    {
-      ...base,
-      family: "umbrella-stake",
-      price: null,
-      assets: null,
-      exit: { kind: "cooldown", block: 1, cooldownSeconds: 20 * 86_400, windowSeconds: 2 * 86_400 },
-    },
-    W,
-  );
+test("withdrawals: the holder's figure first, then the vault's", () => {
+  const exit = { kind: "queue", block: 5, queueAssets: "1000", withdrawable: "528" };
+  const all = lines({ exit, holder: { block: 5, claim: "100000000", maxWithdraw: "100000000" } });
+  assert.equal(all.withdrawals.headline, "All of this position could be withdrawn at the last read");
   assert.equal(
-    u.exit.sentence,
-    "A withdrawal starts a cooldown of 20 days, then must be made within the 2 days after it.",
+    all.withdrawals.sentence,
+    "52.8% of the vault's assets withdrawable at the last read. The markets it lends to held that much unborrowed.",
   );
-  const s = vaultHealth({ ...base, family: "stata", price: null, assets: null }, W);
-  assert.equal(s.exit.read, false);
+  const part = lines({ exit, holder: { block: 5, claim: "100000000", maxWithdraw: "40000000" } });
+  assert.equal(part.withdrawals.headline, "40.0 of this position's 100.0 USDC could be withdrawn at the last read");
+  const vaultOnly = lines({ exit: { ...exit, withdrawable: "12" }, caught: "The RLP market holds 98.8%." });
+  assert.equal(vaultOnly.withdrawals.headline, "1.2% of the vault's assets withdrawable at the last read");
+  assert.equal(
+    vaultOnly.withdrawals.sentence,
+    "The RLP market holds 98.8%. The markets it lends to held that much unborrowed.",
+  );
+});
+
+test("withdrawals: a pause leads; Yearn's idle part; Umbrella's cooldown; unread families", () => {
+  const p = lines({ family: "sgho", paused: true, holder: { block: 1, claim: "10", maxWithdraw: "0" } });
+  assert.equal(p.withdrawals.headline, "Withdrawals are paused");
+  const y = lines({ family: "yearn-v3", exit: { kind: "idle", block: 1, idle: "250", total: "1000" } });
+  assert.equal(y.withdrawals.headline, "25% of the vault's assets idle at the last read");
+  const u = lines({
+    family: "umbrella-stake",
+    exit: { kind: "cooldown", block: 1, cooldownSeconds: 20 * 86_400, windowSeconds: 2 * 86_400 },
+  });
+  assert.equal(u.withdrawals.headline, "A cooldown of 20 days");
+  assert.equal(
+    u.withdrawals.sentence,
+    "A withdrawal starts the cooldown, then must be made within the 2 days after it.",
+  );
+  const s = lines({ family: "stata" });
+  assert.equal(s.withdrawals.read, false);
   assert.equal(s.steward.read, false);
 });
 
-test("the steward is an address, its role in words", () => {
-  const h = vaultHealth(
-    {
-      ...base,
-      price: null,
-      assets: null,
-      steward: { role: "curator", address: "0x1234567890abcdef1234567890abcdef12345678", block: 3 },
-    },
-    W,
-  );
-  assert.equal(h.steward.word, "0x1234…5678");
-  assert.match(h.steward.sentence, /its curator, which picks the markets/);
+test("the steward is the role and the address", () => {
+  const l = lines({ steward: { role: "curator", address: "0x9e33aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0585", block: 3 } });
+  assert.equal(l.steward.headline, "Curator 0x9e33…0585");
 });
 
-test("words: durations and floored shares", () => {
+test("no line and no door word carries a verdict", () => {
+  const price = priceSeries(129, () => 0.05);
+  const all = healthLines(
+    vaultHealth({ ...base, price, assets: flat(129, "1000000000"), lostAssets: { raw: "0", block: 1 } }),
+    ctx(),
+    F,
+  );
+  for (const l of all) assert.doesNotMatch(`${l.headline} ${l.sentence}`, VERDICTS, l.key);
+  assert.doesNotMatch(Object.values(ASSET_DOOR.orders).join(" "), VERDICTS);
+  assert.equal(ASSET_DOOR.heading("USDC"), "Vaults that take USDC");
+  assert.equal(ASSET_DOOR.hidden(54), "Hiding 54 vaults the chain shows as illiquid or with lost assets.");
+});
+
+test("numbers: durations, floored shares, signed changes", () => {
   assert.equal(durationText(86_400 * 2 + 3600 * 12), "2 days 12 hours");
   assert.equal(durationText(3600), "1 hour");
   assert.equal(flooredPct(0.99999), "99.9%");
   assert.equal(flooredPct(0.25), "25%");
+  assert.equal(signedPct(0.041), "+4.1%");
+  assert.equal(signedPct(-0.00001), "0.0%");
 });

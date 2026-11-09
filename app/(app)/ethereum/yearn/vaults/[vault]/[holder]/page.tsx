@@ -280,6 +280,12 @@ function HealthSection({ data }: { data: YearnVaultResponse }) {
           ? { kind: "idle", block: data.blockNumber, idle: vault.totalIdle.raw, total: vault.totalAssets.raw }
           : null
       }
+      holder={
+        data.holder?.claim && data.holder.maxWithdraw
+          ? { block: data.blockNumber, claim: data.holder.claim.raw, maxWithdraw: data.holder.maxWithdraw.raw }
+          : null
+      }
+      shutdown={vault.shutdown === true}
       steward={vault.roleManager ? { role: "roleManager", address: vault.roleManager, block: data.blockNumber } : null}
       contracts={[{ name, address: vault.address, reads: "totalAssets(), totalIdle(), role_manager()" }]}
       links={[

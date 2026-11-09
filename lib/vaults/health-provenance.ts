@@ -6,7 +6,7 @@
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import { formatDate } from "@/lib/date";
 import { formatUnitsExact } from "@/lib/utils/format";
-import type { HealthLine, Span, StewardRole } from "@/lib/vaults/health";
+import type { Health, HealthKey, Span, StewardRole } from "@/lib/vaults/health";
 import { yearlyOf } from "@/lib/vaults/health";
 import type { VaultYieldRead } from "@/lib/vaults/yield";
 
@@ -48,9 +48,14 @@ const spanInputs = (v: HealthReceiptVault, label: string, s: Span): ProvInput[] 
 ];
 
 /** The receipt of one line; null where the line states no read. */
-export function healthLineProv(line: HealthLine, v: HealthReceiptVault, chainBlock: number): Provenance | null {
+export function healthLineProv(
+  key: HealthKey,
+  health: Health,
+  v: HealthReceiptVault,
+  chainBlock: number,
+): Provenance | null {
   const contract = { name: v.name, address: v.address };
-  const b = line.basis;
+  const b = health[key];
   switch (b.kind) {
     case "none":
       return null;
@@ -59,7 +64,7 @@ export function healthLineProv(line: HealthLine, v: HealthReceiptVault, chainBlo
         kind: "derived",
         pclass: "state",
         source: { block: b.span.to.block },
-        summary: `Growing or shrinking — total assets went from ${amountOf(v, b.span.from)} on ${dayText(b.span.from.day)} to ${amountOf(v, b.span.to)} on ${dayText(b.span.to.day)}, each the vault's \`totalAssets()\` stored once a day in Rails's daily store as \`${v.assetsKey}\`. Within 1% either way reads as Steady.`,
+        summary: `Size — total assets went from ${amountOf(v, b.span.from)} on ${dayText(b.span.from.day)} to ${amountOf(v, b.span.to)} on ${dayText(b.span.to.day)}, each the vault's \`totalAssets()\` stored once a day in Rails's daily store as \`${v.assetsKey}\`.`,
         contract,
         via: "daily store · totalAssets() once per UTC day @ the day's last block",
         formula: b.change == null ? "from → to" : "to / from − 1",
@@ -72,7 +77,7 @@ export function healthLineProv(line: HealthLine, v: HealthReceiptVault, chainBlo
       return {
         kind: "derived",
         pclass: "state",
-        summary: `Series start — Rails's daily store holds \`${b.series === "price" ? v.priceKey : v.assetsKey}\` from ${dayText(b.firstDay)}, under the 30 days a change needs.`,
+        summary: `Series start — Rails's daily store holds \`${key === "yield" ? v.priceKey : v.assetsKey}\` from ${dayText(b.firstDay)}, under the 30 days a change needs.`,
         contract,
         via: "daily store · one read per UTC day",
       };
@@ -86,7 +91,7 @@ export function healthLineProv(line: HealthLine, v: HealthReceiptVault, chainBlo
         contract,
         via: `eth_call @ block ${n(chainBlock)}`,
       };
-    case "earning": {
+    case "yield": {
       const windows = b.windows.map((w, k) => ({
         label: `30 days to ${dayText(w.to.day)}`,
         value: `${pct(yearlyOf(w))} a year`,
@@ -97,7 +102,7 @@ export function healthLineProv(line: HealthLine, v: HealthReceiptVault, chainBlo
         kind: "derived",
         pclass: "state",
         source: { block: b.y30.to.block },
-        summary: `Earning steadily — one share's \`convertToAssets\`, stored once a day as \`${v.priceKey}\`, gives ${pct(b.yearly30)} a year over the ${b.y30.to.day - b.y30.from.day} days to ${dayText(b.y30.to.day)}${b.yearly90 != null && b.y90 ? ` and ${pct(b.yearly90)} over the ${b.y90.to.day - b.y90.from.day} days` : ""}. Steady when the highest 30-day window less the lowest is under a quarter of the 30-day figure, and never under one point; Flat when the share price does not move.`,
+        summary: `Yield — one share's \`convertToAssets\`, stored once a day as \`${v.priceKey}\`, gives ${pct(b.yearly30)} a year over the ${b.y30.to.day - b.y30.from.day} days to ${dayText(b.y30.to.day)}${b.yearly90 != null && b.y90 ? ` and ${pct(b.yearly90)} over the ${b.y90.to.day - b.y90.from.day} days` : ""}.`,
         contract,
         via: "daily store · convertToAssets(10 ** decimals) once per UTC day",
         formula: "(p1 / p0 − 1) × 365 / days",
@@ -113,7 +118,7 @@ export function healthLineProv(line: HealthLine, v: HealthReceiptVault, chainBlo
         kind: "derived",
         pclass: "state",
         source: { block: b.last.block },
-        summary: `Has it lost money — ${n(b.reads)} daily share-price reads from ${dayText(b.first.day)} to ${dayText(b.last.day)}, stored as \`${v.priceKey}\`, fell from one day to the next ${n(b.falls)} times.${b.worst ? ` The largest fall was ${pct(b.worst.change)}, from ${amountOf(v, b.worst.from)} to ${amountOf(v, b.worst.to)}.` : ""} A fall past 0.1% in a day reads as Yes.${b.lostAssets ? ` The vault's \`lostAssets()\` at block ${n(b.lostAssets.block)} is ${formatUnitsExact(b.lostAssets.raw, v.decimals)} ${v.assetSymbol}.` : ""}`,
+        summary: `Losses — ${n(b.reads)} daily share-price reads from ${dayText(b.first.day)} to ${dayText(b.last.day)}, stored as \`${v.priceKey}\`, fell from one day to the next ${n(b.falls)} times.${b.worst ? ` The largest fall was ${pct(b.worst.change)}, from ${amountOf(v, b.worst.from)} to ${amountOf(v, b.worst.to)}.` : ""}${b.lostAssets ? ` The vault's \`lostAssets()\` at block ${n(b.lostAssets.block)} is ${formatUnitsExact(b.lostAssets.raw, v.decimals)} ${v.assetSymbol}.` : ""}`,
         contract,
         via: "daily store · convertToAssets(10 ** decimals) once per UTC day",
         inputs: [
@@ -143,48 +148,63 @@ export function healthLineProv(line: HealthLine, v: HealthReceiptVault, chainBlo
         contract,
         via: `eth_call @ block ${n(b.lostAssets?.block ?? chainBlock)}`,
       };
-    case "exit": {
-      const e = b.exit;
-      if (e.kind === "cooldown")
-        return {
-          kind: "chain",
-          pclass: "state",
-          source: { block: e.block },
-          summary: `Cooldown — the stake token's cooldown is ${n(e.cooldownSeconds)} seconds and its unstake window ${n(e.windowSeconds)} seconds at block ${n(e.block)}.`,
-          contract,
-          via: `eth_call @ block ${n(e.block)}`,
-          inputs: [
-            { label: "getCooldown()", value: `${n(e.cooldownSeconds)} s`, kind: "chain", pclass: "state" },
-            { label: "getUnstakeWindow()", value: `${n(e.windowSeconds)} s`, kind: "chain", pclass: "state" },
-          ],
-        };
+    case "withdrawals": {
       const raw = (r: string) => `${formatUnitsExact(r, v.decimals)} ${v.assetSymbol}`;
-      if (e.kind === "idle")
-        return {
-          kind: "derived",
-          pclass: "state",
-          source: { block: e.block },
-          summary: `Idle share — the vault's \`totalIdle()\` is ${raw(e.idle)} of its \`totalAssets()\` ${raw(e.total)} at block ${n(e.block)}: the asset in the vault, ready for a withdrawal.`,
-          contract,
-          via: `eth_call @ block ${n(e.block)}`,
-          formula: "totalIdle / totalAssets",
-          inputs: [
-            { label: "totalIdle()", value: raw(e.idle), kind: "chain", pclass: "state" },
-            { label: "totalAssets()", value: raw(e.total), kind: "chain", pclass: "state" },
-          ],
-        };
+      const e = b.exit;
+      const inputs: ProvInput[] = [];
+      if (b.holder)
+        inputs.push(
+          {
+            label: `maxWithdraw(holder) · block ${n(b.holder.block)}`,
+            value: raw(b.holder.maxWithdraw),
+            kind: "chain",
+            pclass: "state",
+          },
+          {
+            label: `the holder's claim · block ${n(b.holder.block)}`,
+            value: raw(b.holder.claim),
+            kind: "chain",
+            pclass: "state",
+          },
+        );
+      if (e?.kind === "cooldown")
+        inputs.push(
+          { label: "getCooldown()", value: `${n(e.cooldownSeconds)} s`, kind: "chain", pclass: "state" },
+          { label: "getUnstakeWindow()", value: `${n(e.windowSeconds)} s`, kind: "chain", pclass: "state" },
+        );
+      if (e?.kind === "idle")
+        inputs.push(
+          { label: "totalIdle()", value: raw(e.idle), kind: "chain", pclass: "state" },
+          { label: "totalAssets()", value: raw(e.total), kind: "chain", pclass: "state" },
+        );
+      if (e?.kind === "queue")
+        inputs.push(
+          { label: "can be withdrawn", value: raw(e.withdrawable), kind: "derived" },
+          { label: "the queue's sum", value: raw(e.queueAssets), kind: "derived" },
+        );
+      const block = b.holder?.block ?? e?.block ?? chainBlock;
+      const parts = [
+        b.paused ? "The vault's `paused()` answers true." : "",
+        b.shutdown ? "The vault's `isShutdown()` answers true." : "",
+        b.holder
+          ? `The vault's \`maxWithdraw\` for this holder is ${raw(b.holder.maxWithdraw)} against a claim of ${raw(b.holder.claim)}.`
+          : "",
+        e?.kind === "queue"
+          ? `Rails's sum over the withdraw queue: in each market, the lesser of the vault's assets there and the market's supply less its borrow, from Morpho Blue's \`position\` and \`market\` accrued to the block, ${raw(e.withdrawable)} of the queue's ${raw(e.queueAssets)}.`
+          : e?.kind === "idle"
+            ? `The vault's \`totalIdle()\` is ${raw(e.idle)} of its \`totalAssets()\` ${raw(e.total)}.`
+            : e?.kind === "cooldown"
+              ? `The stake token's cooldown is ${n(e.cooldownSeconds)} seconds and its unstake window ${n(e.windowSeconds)} seconds.`
+              : "",
+      ];
       return {
         kind: "derived",
         pclass: "state",
-        source: { block: e.block },
-        summary: `Can leave today — Rails's sum over the vault's withdraw queue at block ${n(e.block)}: in each market, the lesser of the vault's assets there and the market's supply less its borrow, from Morpho Blue's \`position\` and \`market\`, each market accrued to the block. ${raw(e.withdrawable)} of the queue's ${raw(e.queueAssets)}.`,
+        source: { block },
+        summary: `Withdrawals — read at block ${n(block)}. ${parts.filter(Boolean).join(" ")}`,
         contract,
-        via: `eth_call @ block ${n(e.block)}`,
-        formula: "Σ min(vault's assets, supply − borrow) / Σ vault's assets",
-        inputs: [
-          { label: "can be withdrawn", value: raw(e.withdrawable), kind: "derived" },
-          { label: "the queue's sum", value: raw(e.queueAssets), kind: "derived" },
-        ],
+        via: `eth_call @ block ${n(block)}`,
+        inputs,
       };
     }
     case "steward":
@@ -192,7 +212,7 @@ export function healthLineProv(line: HealthLine, v: HealthReceiptVault, chainBlo
         kind: "chain",
         pclass: "state",
         source: { block: b.block },
-        summary: `Who runs it — the vault's \`${ROLE_CALL[b.role]}\` at block ${n(b.block)} is ${b.address}. No name is attested for it.`,
+        summary: `Steward — the vault's \`${ROLE_CALL[b.role]}\` at block ${n(b.block)} is ${b.address}. No name is attested for it.`,
         contract,
         via: `eth_call @ block ${n(b.block)}`,
         inputs: [{ label: ROLE_CALL[b.role], value: b.address, kind: "chain", pclass: "state" }],

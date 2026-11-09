@@ -14,7 +14,8 @@ import { formatCompact } from "@/lib/shared/format-compact";
 import type { ChainId } from "@/lib/shared/chains";
 import type { ServerRead } from "@/lib/shared/server-head-read";
 import type { VaultFamily } from "@/lib/vaults/families";
-import { healthLines, vaultHealth, type HealthInput } from "@/lib/vaults/health";
+import { vaultHealth, type HealthInput } from "@/lib/vaults/health";
+import { healthLines } from "@/lib/vaults/health-words";
 import { tooSmallToMeasure } from "@/lib/vaults/yield";
 import { loadVaultHealthSeries } from "@/lib/vaults/health-read";
 
@@ -26,7 +27,13 @@ export interface VaultHealthSectionProps {
   totalAssetsRaw: string | null;
   block: number;
   readBy?: ServerRead | null;
+  /** The holder's claim and `maxWithdraw` at the block, raw. */
+  holder?: HealthInput["holder"];
   exit: HealthInput["exit"];
+  paused?: boolean;
+  shutdown?: boolean;
+  /** The illiquid test's sentence, where it catches a market. */
+  caught?: string | null;
   lostAssets?: HealthInput["lostAssets"];
   steward: HealthInput["steward"];
   contracts: ReadContract[];
@@ -41,23 +48,28 @@ const WORDS = {
 export async function VaultHealthSection(p: VaultHealthSectionProps) {
   const address = p.vault.address.toLowerCase();
   const series = (await loadVaultHealthSeries([{ chainId: p.chainId, address }])).get(`${p.chainId}:${address}`);
-  const health = vaultHealth(
-    {
-      family: p.family,
-      assetSymbol: p.vault.assetSymbol,
-      decimals: p.vault.decimals,
-      price: series?.price ?? null,
-      assets: series?.assets ?? null,
-      tooSmall: p.totalAssetsRaw != null && tooSmallToMeasure(p.totalAssetsRaw),
-      exit: p.exit,
-      ...(p.lostAssets !== undefined ? { lostAssets: p.lostAssets } : {}),
-      steward: p.steward,
-    },
+  const health = vaultHealth({
+    family: p.family,
+    price: series?.price ?? null,
+    assets: series?.assets ?? null,
+    tooSmall: p.totalAssetsRaw != null && tooSmallToMeasure(p.totalAssetsRaw),
+    holder: p.holder ?? null,
+    exit: p.exit,
+    paused: p.paused,
+    shutdown: p.shutdown,
+    caught: p.caught ?? null,
+    ...(p.lostAssets !== undefined ? { lostAssets: p.lostAssets } : {}),
+    steward: p.steward,
+  });
+  const lines = healthLines(
+    health,
+    { family: p.family, assetSymbol: p.vault.assetSymbol, decimals: p.vault.decimals },
     WORDS,
   );
   return (
     <VaultHealth
-      lines={healthLines(health)}
+      lines={lines}
+      health={health}
       vault={{
         ...p.vault,
         address,

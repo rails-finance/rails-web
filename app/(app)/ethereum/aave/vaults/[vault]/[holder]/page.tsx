@@ -430,6 +430,12 @@ function HealthSection({ data }: { data: AaveEthereumVaultResponse }) {
             }
           : null
       }
+      holder={
+        data.holder?.claim && data.holder.maxWithdraw
+          ? { block: data.blockNumber, claim: data.holder.claim.raw, maxWithdraw: data.holder.maxWithdraw.raw }
+          : null
+      }
+      paused={data.sgho?.paused === true}
       steward={u?.owner ? { role: "umbrellaOwner", address: u.owner, block: data.blockNumber } : null}
       contracts={[
         {
