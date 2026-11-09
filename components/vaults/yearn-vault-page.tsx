@@ -53,6 +53,8 @@ import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 const CHAIN_ID = 1;
 const n = (v: number) => v.toLocaleString("en-US");
 const eth = (kind: "address" | "block", v: string | number) => explorerUrl(CHAIN_ID, kind, v);
+/** A strategy's cap at uint256's top: the role manager set none. */
+const MAX_UINT = (BigInt(1) << BigInt(256)) - BigInt(1);
 const UNREAD = <NotLoaded className="text-base font-normal text-rb-500" />;
 
 /** A span of seconds in a reader's words: whole days, else whole hours. */
@@ -238,11 +240,13 @@ export function YearnVaultPage({
       ),
       sub: (
         <>
-          #{s.position} · cap{" "}
+          #{s.position} ·{" "}
           {s.maxDebt ? (
-            <Prov info={yearnVaultStrategyCapProv(coords, s.address)}>{assetText(s.maxDebt, ad)}</Prov>
+            <Prov info={yearnVaultStrategyCapProv(coords, s.address)}>
+              {BigInt(s.maxDebt.raw) === MAX_UINT ? "no cap" : `cap ${assetText(s.maxDebt, ad)}`}
+            </Prov>
           ) : (
-            "not read"
+            "cap not read"
           )}
         </>
       ),
@@ -450,7 +454,7 @@ export function YearnVaultPage({
           <>
             The idle balance and the{" "}
             <Prov info={yearnVaultQueueProv(coords, data.strategies.length)}>
-              {n(data.strategies.length)} strategies
+              {n(data.strategies.length)} {data.strategies.length === 1 ? "strategy" : "strategies"}
             </Prov>{" "}
             of the default queue, in its order.
           </>
