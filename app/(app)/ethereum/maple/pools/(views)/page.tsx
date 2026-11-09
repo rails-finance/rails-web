@@ -16,17 +16,19 @@
 // fixed-term and an open-term LoanManager, with a FIFO queue between lenders
 // and the cash.
 //
+// Each pool card opens the pool's page (/ethereum/maple/pools/<pool>, ui-jobs
+// 549 step 4) and is its own section with a ⋮ (decision 0059).
+//
 // Server-rendered: a read-only aggregate with no interactivity to hydrate
 // for, so the first paint carries the real figures (the posture every
 // chain-lane view here takes).
 
-import { MaplePoolsView, MaplePoolsStamp } from "@/components/protocol/maple/maple-pools-view";
+import { MaplePoolsView } from "@/components/protocol/maple/maple-pools-view";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { resolveMaplePoolState, type MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { protocolForHref } from "@/lib/shared/protocols";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import Link from "next/link";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
@@ -34,8 +36,8 @@ import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 // ISR, ten minutes. This is a protocol aggregate, not a wallet's page: the
 // same render serves every visitor, so re-reading the contracts per request
 // bought nothing but RPC. Ten minutes is roughly fifty blocks of interest
-// accrual on figures quoted to the nearest percent. The header stamp names the
-// block the read happened at, so a cached page states its own age.
+// accrual on figures quoted to the nearest percent. Each card's read stamp
+// states the time of the read, so a cached page states its own age.
 export const revalidate = 600;
 
 export const metadata = {
@@ -58,11 +60,7 @@ export default async function MaplePoolsPage() {
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader
-          protocol={PROTOCOL}
-          title="Pools & what lenders can reach"
-          stamp={<MaplePoolsStamp pools={pools} />}
-        />
+        <SubPageHeader protocol={PROTOCOL} title="Pools & what lenders can reach" />
 
         {/* The pools are rows on the cross-protocol vault index (ui-jobs 39). */}
         <p className="-mt-3 mb-4 text-[13px]">
@@ -73,7 +71,7 @@ export default async function MaplePoolsPage() {
         <div data-skel-section="page-table">
           <MaplePoolsView pools={pools} />
         </div>
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+        {/* Each pool card arms the inspector from its ⋮; no page-wide toggle. */}
         <ProvInspectorLayer />
       </div>
     </div>

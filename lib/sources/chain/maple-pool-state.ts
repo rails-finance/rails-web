@@ -15,6 +15,8 @@
 //     split (the two LoanManagers are strategies too, so cash + Σ AUM ==
 //     totalAssets, verified exact 2026-07-14).
 //   • wmq.totalShares() — total shares waiting in the withdrawal queue.
+//   • pm.poolDelegate() — the manager that runs the pool's lending, the
+//     pool page's Steward.
 //
 // Degrades to an empty map when RPC is unset/down — callers must treat an
 // absent pool as "unvalued" and fall back to amounts-only (never assert a
@@ -40,11 +42,14 @@ const POOL_ABI = parseAbi([
 const PM_ABI = parseAbi([
   "function strategyListLength() view returns (uint256)",
   "function strategyList(uint256 index) view returns (address)",
+  "function poolDelegate() view returns (address)",
 ]);
 const STRAT_ABI = parseAbi(["function assetsUnderManagement() view returns (uint256)"]);
 const WMQ_ABI = parseAbi(["function totalShares() view returns (uint256)"]);
 const ERC20_ABI = parseAbi(["function balanceOf(address account) view returns (uint256)"]);
 
+/** Calls per pool in round 1. */
+const STRIDE = 9;
 const UNIT = BigInt(1_000_000); // 1.0 share / asset at 6 dp (no BigInt literals — ES2017 target)
 
 export interface MaplePoolState {
@@ -78,6 +83,8 @@ export interface MaplePoolState {
   strategiesAum: number;
   /** Shares waiting in the withdrawal queue (whole units). */
   queueShares: number;
+  /** The PoolManager's `poolDelegate()`, lowercased; null where it did not answer. */
+  poolDelegate: string | null;
   /** Raw twins for receipts. */
   raw: {
     navRate: string;
@@ -87,6 +94,9 @@ export interface MaplePoolState {
     unrealizedLosses: string;
     cash: string;
     queueShares: string;
+    fixedTermAum: string;
+    openTermAum: string;
+    strategiesAum: string;
   };
 }
 
@@ -124,6 +134,7 @@ export async function resolveMaplePoolState(): Promise<MaplePoolStateMap> {
           },
           { address: p.withdrawalManager as `0x${string}`, abi: WMQ_ABI, functionName: "totalShares" },
           { address: p.poolManager as `0x${string}`, abi: PM_ABI, functionName: "strategyListLength" },
+          { address: p.poolManager as `0x${string}`, abi: PM_ABI, functionName: "poolDelegate" },
         ] as const,
     );
     const r1 = (await client.multicall({ allowFailure: true, contracts: round1 })) as {
@@ -136,7 +147,7 @@ export async function resolveMaplePoolState(): Promise<MaplePoolStateMap> {
       [];
     const listOwners: { poolIdx: number }[] = [];
     MAPLE_POOLS.forEach((p, i) => {
-      const lenRes = r1[i * 8 + 7];
+      const lenRes = r1[i * STRIDE + 7];
       const len = lenRes?.status === "success" && lenRes.result != null ? Number(lenRes.result as bigint) : 0;
       for (let s = 0; s < len; s++) {
         listCalls.push({
@@ -173,19 +184,27 @@ export async function resolveMaplePoolState(): Promise<MaplePoolStateMap> {
         : [];
 
     MAPLE_POOLS.forEach((p, i) => {
-      const [totalAssets, totalSupply, unrealizedLosses, nav, exit, cash, queueShares] = r1.slice(i * 8, i * 8 + 7);
+      const [totalAssets, totalSupply, unrealizedLosses, nav, exit, cash, queueShares, , delegate] = r1.slice(
+        i * STRIDE,
+        (i + 1) * STRIDE,
+      );
       if (nav?.status !== "success" || nav.result == null || exit?.status !== "success" || exit.result == null) return; // no rate → skip pool entirely
-      let fixedTermAum = 0;
-      let openTermAum = 0;
-      let strategiesAum = 0;
+      let fixedRaw = BigInt(0);
+      let openRaw = BigInt(0);
+      let otherRaw = BigInt(0);
       r3.forEach((res, j) => {
         if (aumOwners[j].poolIdx !== i || res.status !== "success" || res.result == null) return;
-        const aum = toNum(res.result as bigint, p.decimals);
-        if (aumOwners[j].strategy === p.fixedTermLoanManager) fixedTermAum += aum;
-        else if (aumOwners[j].strategy === p.openTermLoanManager) openTermAum += aum;
-        else strategiesAum += aum;
+        const aum = res.result as bigint;
+        if (aumOwners[j].strategy === p.fixedTermLoanManager) fixedRaw += aum;
+        else if (aumOwners[j].strategy === p.openTermLoanManager) openRaw += aum;
+        else otherRaw += aum;
       });
+      const fixedTermAum = toNum(fixedRaw, p.decimals);
+      const openTermAum = toNum(openRaw, p.decimals);
+      const strategiesAum = toNum(otherRaw, p.decimals);
       const loansAum = fixedTermAum + openTermAum;
+      const delegateAddress =
+        delegate?.status === "success" && typeof delegate.result === "string" ? delegate.result.toLowerCase() : null;
       const val = (r: { status: string; result?: unknown } | undefined): bigint | null =>
         r?.status === "success" && r.result != null ? (r.result as bigint) : null;
       const ta = val(totalAssets);
@@ -208,6 +227,7 @@ export async function resolveMaplePoolState(): Promise<MaplePoolStateMap> {
         openTermAum,
         strategiesAum,
         queueShares: qs != null ? toNum(qs, p.decimals) : 0,
+        poolDelegate: delegateAddress,
         raw: {
           navRate: (nav.result as bigint).toString(),
           exitRate: (exit.result as bigint).toString(),
@@ -216,6 +236,9 @@ export async function resolveMaplePoolState(): Promise<MaplePoolStateMap> {
           unrealizedLosses: ul?.toString() ?? "0",
           cash: ca?.toString() ?? "0",
           queueShares: qs?.toString() ?? "0",
+          fixedTermAum: fixedRaw.toString(),
+          openTermAum: openRaw.toString(),
+          strategiesAum: otherRaw.toString(),
         },
       });
     });

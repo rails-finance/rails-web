@@ -19,7 +19,8 @@
 // family's market rosters, market pages and reserve pages, Dolomite's
 // markets page, f(x)'s pools roster and a pool's page, and Compound V3's
 // markets roster and a Comet's page on each chain, and Compound V2's and
-// Moonwell's markets pages with one market's page each.
+// Moonwell's markets pages with one market's page each, and Maple's pools
+// roster and a pool's page.
 //
 // Run:  npm run verify:preflight -- --warm <the pages>
 //       BASE=http://localhost:3078 node scripts/verify/verify-section-scopes.mjs
@@ -74,6 +75,10 @@ const ALL_PAGES = [
   "/ethereum/moonwell/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
   "/base/moonwell/markets",
   "/base/moonwell/markets/0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+  // Maple's pools roster, one ⋮ per pool card, and a pool's page on the vault
+  // grammar (ui-jobs 549 step 4).
+  "/ethereum/maple/pools",
+  "/ethereum/maple/pools/syrupusdc",
 ];
 const PAGES = process.env.PAGES ? process.env.PAGES.split(",").map((p) => p.trim()) : ALL_PAGES;
 

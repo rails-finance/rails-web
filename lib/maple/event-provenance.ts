@@ -798,6 +798,17 @@ export const poolLoanManagerAumProv = (
   via: `${term === "fixed-term" ? "FixedTermLoanManager" : "OpenTermLoanManager"}.assetsUnderManagement() — eth_call at head`,
 });
 
+/** The pool delegate: the address the PoolManager names. */
+export const poolDelegateProv = (poolSym: string, delegate: string, atBlockNum?: number): Provenance => ({
+  kind: "chain",
+  source: { block: atBlockNum },
+  pclass: "state",
+  verify: stateVerify("PoolManager.poolDelegate", atBlockNum ?? null),
+  summary: `${poolSym}'s pool delegate${atBlockNum ? ` at block ${atBlockNum}` : ""}: ${delegate}, the PoolManager's own \`poolDelegate()\`. The delegate funds and calls the pool's loans and marks a loan as impaired. An address: who holds it is stated nowhere on chain.`,
+  contract: { name: "Maple PoolManager", address: "" },
+  via: "PoolManager.poolDelegate() — eth_call at head",
+});
+
 /** The non-LoanManager strategies' leg — on-chain yield deployments. */
 export const poolStrategiesAumProv = (assetSym: string, atBlockNum?: number): Provenance => ({
   kind: "chain",

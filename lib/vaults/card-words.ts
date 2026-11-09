@@ -202,6 +202,60 @@ export const yearnVaultAssetsContent = (): LearnMoreContent => ({
   ],
 });
 
+const MAPLE_DOCS = { label: "docs.maple.finance: Lenders", url: "https://docs.maple.finance" };
+
+/** The Steward's tip on a Maple pool: its pool delegate. */
+export const MAPLE_DELEGATE_TIP =
+  "The pool delegate runs the pool's lending: it funds and calls loans, and marks a loan as impaired.";
+
+export const maplePoolCardContent = (): LearnMoreContent => ({
+  title: "How a Maple pool works",
+  intro:
+    "A Maple pool takes one stablecoin and lends it to institutional borrowers against collateral that custodians hold off the chain. A lender owns shares, and a share converts to more of the asset as borrowers pay interest.",
+  detailsHeading: "Key concepts:",
+  details: [
+    {
+      bold: "Pool delegate",
+      text: "the manager that runs the pool's lending: it funds loans, calls open-term loans and marks a loan as impaired.",
+    },
+    {
+      bold: "Exit rate",
+      text: "what one share pays on withdrawal. It equals the share price unless a loan is marked as impaired; then a lender who exits takes a part of the mark.",
+    },
+    {
+      bold: "Withdrawal queue",
+      text: "withdrawals wait in a queue, first in, first out, and are paid from the cash in the pool as it allows.",
+    },
+    {
+      bold: "Yield",
+      text: "Rails keeps no daily share-price series for Maple pools, so the card states no yield figure.",
+    },
+  ],
+  links: [MAPLE_DOCS],
+});
+
+export const maplePoolAssetsContent = (): LearnMoreContent => ({
+  title: "Where a Maple pool's assets are",
+  intro:
+    "The pool keeps some cash, which pays withdrawals, and lends the rest through two loan books and any other strategy it uses. Together they make the pool's total assets.",
+  detailsHeading: "Key concepts:",
+  details: [
+    { bold: "Liquid now", text: "the asset in the pool, the only part a withdrawal can be paid from at once." },
+    { bold: "Fixed-term loans", text: "loans that run to a maturity date: principal and the interest accrued so far." },
+    {
+      bold: "Open-term loans",
+      text: "loans with no maturity, which the pool delegate can call for repayment with notice.",
+    },
+    { bold: "Other strategies", text: "on-chain strategies the pool lends through, apart from its loans." },
+    {
+      bold: "Collateral",
+      text: "custodians hold the loans' collateral off the chain. The chain records the loan book as Maple keeps it.",
+    },
+    { bold: "Share of this vault", text: "a row's amount over the pool's total assets." },
+  ],
+  links: [MAPLE_DOCS],
+});
+
 /** The holder card's "?" (ui-jobs 407 step 4, 410), every family. */
 export const vaultHoldingContent = (
   assetSymbol: string,

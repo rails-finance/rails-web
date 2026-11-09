@@ -35,11 +35,13 @@
 //   /ethereum/yearn/vaults/<vault>           one vault's factsheet
 //   /ethereum/yearn/vaults/<vault>/<holder>  one holding — flows and timeline
 //
-// Maple's syrup pools keep their own pools page, which is where a pool's row on
-// the cross-protocol index links (survey 2026-10-20 §7.6). The index owns no
-// vault page (0028 point 8):
+// Maple's syrup pools live under Maple's `pools` tab, its noun, and each pool
+// has a page there, which is where a pool's row on the cross-protocol index
+// links (ui-jobs 549 step 4). The slug is the pool's catalogue key, its share
+// symbol lowercased ("syrupusdc"). The index owns no vault page (0028 point 8):
 //
 //   /ethereum/maple/pools                    Maple's pools, read from chain
+//   /ethereum/maple/pools/<pool>             one pool's page
 //   /vaults                                  every roster above, as one index
 //
 // The `vaults` segment itself is not spelled here: it is read off the roster
@@ -47,6 +49,7 @@
 // moving the tab moves every href below with it.
 
 import { protocolForHref } from "@/lib/shared/protocols";
+import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 
 /** One explorer's `vaults` sub-page route — the roster, and the parent of every
  *  vault page under it. Throws at load rather than forming a path from a
@@ -258,8 +261,8 @@ export function yearnVaultHref(vault: string, holder?: string): string {
   return holder ? `${path}/${encodeURIComponent(holder.toLowerCase())}` : path;
 }
 
-/** Maple's pools page (`/ethereum/maple/pools`), the page a Maple pool's row on
- *  the index opens. Read off the roster entry's `pools` sub-page. */
+/** Maple's pools page (`/ethereum/maple/pools`), the roster of pools. Read
+ *  off the roster entry's `pools` sub-page. */
 export function maplePoolsHref(): string {
   const sub = protocolForHref("/ethereum/maple")?.subPages.find((s) => s.segment === "pools");
   if (!sub) throw new Error(`/ethereum/maple has no "pools" sub-page on its roster entry.`);
@@ -270,3 +273,18 @@ export function maplePoolsHref(): string {
  *  vault the rosters above list, each row linking to its page under its
  *  protocol. It spans chains, so it sits under no chain. */
 export const VAULT_INDEX_HREF = "/vaults";
+
+/** One Maple pool's page, `/ethereum/maple/pools/<key>`: `pool` is the
+ *  catalogue key ("syrupusdc") or the pool's address. */
+export function maplePoolHref(pool: string): string {
+  const p = pool.toLowerCase();
+  const key = MAPLE_POOLS.find((x) => x.key === p || x.pool === p)?.key ?? p;
+  return `${maplePoolsHref()}/${key}`;
+}
+
+/** Maple's positions listing filtered to one pool (`/ethereum/maple?pool=syrupUSDC`). */
+export function maplePoolPositionsHref(pool: string): string {
+  const p = pool.toLowerCase();
+  const entry = MAPLE_POOLS.find((x) => x.key === p || x.pool === p);
+  return `/ethereum/maple?pool=${encodeURIComponent(entry?.symbol ?? pool)}`;
+}
