@@ -16,7 +16,8 @@
 //
 // Pages: the Morpho Base case-study vault, a Morpho Ethereum vault, the three
 // Aave vault families, a Yearn vault, the four family rosters, and the Aave
-// family's market rosters, market pages and reserve pages.
+// family's market rosters, market pages and reserve pages, and Dolomite's
+// markets page.
 //
 // Run:  npm run verify:preflight -- --warm <the pages>
 //       BASE=http://localhost:3078 node scripts/verify/verify-section-scopes.mjs
@@ -49,6 +50,8 @@ const ALL_PAGES = [
   "/base/aave-v3/markets/0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
   "/arbitrum/aave-v3/markets/0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
   "/ethereum/spark/markets/0x6b175474e89094c44da98b954eedeac495271d0f",
+  // Dolomite's one pool on the A2 shell: its head and its markets table.
+  "/ethereum/dolomite/markets",
 ];
 const PAGES = process.env.PAGES ? process.env.PAGES.split(",").map((p) => p.trim()) : ALL_PAGES;
 

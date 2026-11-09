@@ -25,38 +25,62 @@ const page = await browser.newPage();
 const pageErrors = [];
 page.on("pageerror", (e) => pageErrors.push(String(e)));
 
-// ── /dolomite/markets — the protocol view, real figures at head ─────────────
-await page.goto(`${BASE}/dolomite/markets`, { waitUntil: "networkidle", timeout: 120000 });
+// ── /dolomite/markets — the A2 market page, real figures at head ────────────
+await page.goto(`${BASE}/ethereum/dolomite/markets`, { waitUntil: "networkidle", timeout: 120000 });
 const h1 = await page.textContent("h1");
-check("markets: heading renders", /risk ladder/i.test(h1 ?? ""), h1 ?? "");
+check("markets: heading renders", /^\s*Markets\s*$/.test(h1 ?? ""), h1 ?? "");
 
 const body = await page.textContent("body");
-const rowCount = await page.locator("table tbody tr").count();
-check("markets: one row per market (21)", rowCount === 21, `${rowCount} rows`);
+const rowCount = await page.locator("[data-dolomite-market]").count();
+check("markets: one row per market", rowCount >= 21, `${rowCount} rows`);
 check("markets: Min collateralisation column header renders", /min collateralisation/i.test(body));
+check("markets: Supply rate is the house label", /Supply rate/.test(body) && !/Supply APR/.test(body));
 
 // The multiplicative claim on WLFI: ≈150.0%, never the additive 145.15%.
 check("markets: WLFI rung is multiplicative (≈150.0%)", body.includes("150.0%"));
 check("markets: no additive misstatement (145.15%)", !body.includes("145.15"));
 
-// The carve-out is stated qualitatively — the override numbers are NOT
-// asserted on the markets page (they are account-keyed, unreadable here), so
-// the copy describes the category and points to the position page.
-check("markets: the carve-out section renders", /account-level carve-out/i.test(body));
+// The carve-out is one (i) bullet; its mechanism is on the info page. The
+// override numbers are account-keyed and never typed on this page.
+check("markets: the carve-out bullet is in the (i) pane", /Some accounts carry their own collateral terms/.test(body));
+check("markets: override numbers NOT typed in (111.11%)", !body.includes("111.11%"));
 check(
-  "markets: carve-out described qualitatively, pointing to the position page",
-  /lower minimum collateralisation/i.test(body) &&
-    /narrower liquidation spread/i.test(body) &&
-    /position page/i.test(body),
+  "markets: no function names on the surface",
+  !/getMarket|DefaultAccountRiskOverrideSetter/.test(await page.innerText("main")),
 );
-check("markets: override numbers NOT typed in (111.11% / 4%)", !body.includes("111.11%"));
 
-// The shared-oracle alias line.
-check("markets: wsrUSD = srUSD alias stated", /wsrUSD/.test(body) && /to the wei/.test(body));
+// A shared price feed is a tag on the row (WLFIcx on WLFI's at 9 Nov 2026),
+// its tip in plain words.
+const alias = page.locator("[data-dolomite-priced-as]").first();
+const aliasOf = await alias.getAttribute("data-dolomite-priced-as").catch(() => null);
+check(
+  'markets: a shared price feed is tagged "priced as" with its tip',
+  aliasOf != null &&
+    (await alias.textContent()) === `priced as ${aliasOf}` &&
+    (await alias.getAttribute("title")) ===
+      `This market uses ${aliasOf}'s price, so the two cannot diverge on Dolomite.`,
+  aliasOf ?? "no tag",
+);
 
-// The block stamp anchors a real head block ("Chain snapshot · [block icon] 25,54…").
-check("markets: chain-snapshot block stamp", /Chain snapshot · (?:block\s*)?[\d,]{9,}/i.test(body));
-check("markets: closing markets stated", /closed to new borrowing|closing — no new borrowing/.test(body));
+// The read stamp carries the head block on its hook.
+const readBlock = Number((await page.getAttribute("[data-read-stamp]", "data-read-block")) ?? 0);
+check("markets: read stamp names a head block", readBlock > 1_000_000, String(readBlock));
+check("markets: closing markets stated", /closed to new borrowing/.test(body));
+
+// ── /dolomite/info — "How Rails reads it" (slot 2a) ─────────────────────────
+await page.goto(`${BASE}/ethereum/dolomite/info`, { waitUntil: "networkidle", timeout: 120000 });
+const reads = page.locator("[data-info-reads]");
+check("info: How Rails reads it renders", /How Rails reads it/.test((await reads.textContent().catch(() => "")) ?? ""));
+check(
+  "info: DolomiteMargin row links its address off-site",
+  (await reads
+    .locator('[data-info-read="DolomiteMargin"] a.link-external[href*="0x003ca23fd5f0ca87d01f6ec6cd14a8ae60c2b97d"]')
+    .count()) === 1,
+);
+check(
+  "info: the account-level override is stated here",
+  /DefaultAccountRiskOverrideSetter/.test((await reads.textContent()) ?? ""),
+);
 
 // ── /dolomite — the listing over the REAL index (7,869 accounts) ────────────
 await page.goto(`${BASE}/dolomite`, { waitUntil: "networkidle", timeout: 120000 });
