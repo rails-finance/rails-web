@@ -14,16 +14,32 @@
 // them): Underlying (the Rails label of the protocol behind the yield token,
 // lib/pendle/underlying.ts, "Not labelled" a value of its own), Maturity
 // (active by default; `?maturity=matured` or `all`), Asset. The search narrows
-// by market, PT, yield token, asset and address.
+// by market, PT, yield token, asset and any of the market's addresses.
+//
+// WALLET ROW (N1.1): a wallet address or ENS name that matches no market draws
+// one row above the table opening that wallet's Pendle positions; Enter in the
+// field opens it too, and ↓ moves focus to it. Every market, PT, YT, SY, yield token and asset address is
+// in the roster, and none of them is a wallet, so the check is the search over
+// every market whatever the facets: no read per keystroke. An ENS name resolves
+// on Enter or on the row.
 //
 // Every market figure keeps its receipt.
 
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from "react";
 import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { BlockRef } from "@/components/shared/block-ref";
-import { FrontDoorSearch } from "@/components/shared/front-door-search";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import { lookable, useLookup } from "@/components/shared/front-door-search";
 import { PendleTokenIcon } from "@/components/protocol/pendle/pendle-token-icon";
 import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
@@ -51,6 +67,7 @@ import {
   maturityDate,
   maturityWords,
   rate,
+  shortAddress,
   units,
 } from "@/lib/pendle/format";
 import {
@@ -166,6 +183,25 @@ function facetsFromSearch(search: string): Facets {
     asset: list("asset"),
     maturity: [maturity === "matured" || maturity === "all" ? maturity : MATURITY_DEFAULT],
   };
+}
+
+/** Whether a market answers the search: its names, its tokens' symbols, its
+ *  Rails label and every address it is built from. */
+function searchMatch(m: PendleRosterEntry, want: string): boolean {
+  const t = m.tokens;
+  return [
+    nameOf(m),
+    t.pt.symbol,
+    t.yieldToken.symbol,
+    assetOf(m),
+    underlyingOf(m),
+    t.market.address,
+    t.pt.address,
+    t.yt.address,
+    t.sy.address,
+    t.yieldToken.address,
+    t.asset.address,
+  ].some((x) => x != null && x.toLowerCase().includes(want));
 }
 
 function writeParams(next: Record<string, string | null>) {
@@ -305,18 +341,27 @@ export function PendleRosterView({
       (mat === "all" || maturityOf(m) === mat) &&
       ((s.facets.underlying?.length ?? 0) === 0 || s.facets.underlying.includes(underlyingOf(m))) &&
       ((s.facets.asset?.length ?? 0) === 0 || s.facets.asset.includes(assetOf(m))) &&
-      (want === "" ||
-        [
-          nameOf(m),
-          m.tokens.pt.symbol,
-          m.tokens.yieldToken.symbol,
-          assetOf(m),
-          m.tokens.market.address,
-          m.tokens.pt.address,
-          underlyingOf(m),
-        ].some((x) => x != null && x.toLowerCase().includes(want)));
+      (want === "" || searchMatch(m, want));
   };
   const shown = markets.filter(passesFor(state)).sort(comparator(sort, dir));
+
+  const typed = query.trim();
+  const walletKind = lookable(typed);
+  const wallet = walletKind != null && !markets.some((m) => searchMatch(m, needle)) ? walletKind : null;
+  const lookup = useLookup(pendleWalletHref);
+  const { setProblem } = lookup;
+  useEffect(() => setProblem(null), [typed, setProblem]);
+  const onSearchKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (wallet == null) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      document.querySelector<HTMLElement>("[data-pendle-wallet-row] :is(a, button)")?.focus();
+      return;
+    }
+    if (e.key !== "Enter" || lookup.resolving) return;
+    e.preventDefault();
+    void lookup.lookUp(typed);
+  };
 
   const criteria = [
     ...(maturityChoice !== "all" ? [maturityChoice === "active" ? "active markets" : "matured markets"] : []),
@@ -372,7 +417,7 @@ export function PendleRosterView({
           filters={state}
           onChange={onToolbar}
           sortOptions={[]}
-          searchPlaceholder="Market, token or address"
+          searchPlaceholder="Market, token, address or wallet"
           countNode={countNode}
           sheetCount={{ total: shown.length, noun: "markets" }}
           countFor={(draft) => markets.filter(passesFor(draft)).length}
@@ -389,6 +434,7 @@ export function PendleRosterView({
           }}
           viewMenu
           skel="pendle-roster-facets"
+          onSearchKeyDown={onSearchKeyDown}
         />
 
         {/* The chosen sort's note, below sm where no header carries it. */}
@@ -398,8 +444,12 @@ export function PendleRosterView({
           </p>
         )}
 
+        {wallet && <WalletRow typed={typed} kind={wallet} lookup={lookup} />}
+
         {shown.length === 0 ? (
-          <p className="text-[13px] text-rb-500">No market matches.</p>
+          wallet ? null : (
+            <p className="text-[13px] text-rb-500">No market matches.</p>
+          )
         ) : (
           <DataTable
             caption="Pendle markets on Ethereum; TVL and PT price are in each market's asset"
@@ -548,7 +598,47 @@ function Row({ m, block, at }: { m: PendleRosterEntry; block: number; at: number
   );
 }
 
-/** The search (H15) landing on a wallet's Pendle positions. */
-export function PendleWalletSearch() {
-  return <FrontDoorSearch href={(wallet) => pendleWalletHref(wallet)} />;
+const WALLET_ROW =
+  "flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-rb-200 bg-raised px-3 py-2.5 text-left text-sm text-foreground transition-colors duration-150 hover:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-rb-600";
+
+/** The search's wallet row (N1.1): a pasted address is a link; an ENS name
+ *  resolves on the press, the reason under the row where it does not. */
+function WalletRow({
+  typed,
+  kind,
+  lookup,
+}: {
+  typed: string;
+  kind: "address" | "ens";
+  lookup: ReturnType<typeof useLookup>;
+}) {
+  const label = (
+    <>
+      <span className="min-w-0 truncate">
+        {lookup.resolving ? "Looking up…" : `View ${kind === "ens" ? typed : shortAddress(typed)}’s Pendle positions`}
+      </span>
+      <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-[var(--text-link)]" aria-hidden="true" />
+    </>
+  );
+  return (
+    <div className="mb-4" data-pendle-wallet-row={kind}>
+      {kind === "address" ? (
+        <Link href={pendleWalletHref(typed)} className={WALLET_ROW}>
+          {label}
+        </Link>
+      ) : (
+        <button
+          type="button"
+          className={WALLET_ROW}
+          disabled={lookup.resolving}
+          onClick={() => void lookup.lookUp(typed)}
+        >
+          {label}
+        </button>
+      )}
+      <p className="mt-1.5 text-[13px] text-rb-500 empty:hidden" aria-live="polite">
+        {lookup.problem}
+      </p>
+    </div>
+  );
 }

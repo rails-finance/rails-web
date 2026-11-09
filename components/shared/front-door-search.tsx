@@ -64,7 +64,7 @@ const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 const ENS = /^[^\s]+\.eth$/i;
 
 /** What the lookup takes: an address as it is, or an ENS name to resolve. */
-const lookable = (raw: string): "address" | "ens" | null => {
+export const lookable = (raw: string): "address" | "ens" | null => {
   const typed = raw.trim();
   if (ADDRESS.test(typed)) return "address";
   return ENS.test(typed) && typed.length >= 7 ? "ens" : null;
@@ -220,8 +220,8 @@ export function SearchBox({
 }
 
 /** The lookup: an address passes as it is, an ENS name is resolved; either
- *  lands on `href(address)`. */
-function useLookup(href: (address: string) => string, onDone?: () => void) {
+ *  lands on `href(address)`. The Pendle roster's wallet row runs it too. */
+export function useLookup(href: (address: string) => string, onDone?: () => void) {
   const router = useRouter();
   const [problem, setProblem] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);

@@ -7,7 +7,7 @@
 // object and the toolbar reads/writes it. Holds no state of its own — the param
 // object (URL-backed) is the source of truth.
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { useHydrated } from "@/hooks/useHydrated";
 import { SearchBox } from "@/components/shared/front-door-search";
 import { FilterSections } from "@/components/shared/filter-bar/filter-sections";
@@ -54,6 +54,9 @@ export interface ListToolbarProps<F extends BaseListFilters> {
   countFor?: (draft: F) => number | Promise<number>;
   /** The sheet's noun for a draft, where the selection names it. */
   nounFor?: (draft: F) => string;
+  /** Keys in the search field, for a listing whose search does more than
+   *  filter (the Pendle roster's wallet row takes Enter). */
+  onSearchKeyDown?: (e: ReactKeyboardEvent<HTMLInputElement>) => void;
 }
 
 export function ListToolbar<F extends BaseListFilters>({
@@ -71,6 +74,7 @@ export function ListToolbar<F extends BaseListFilters>({
   countPending = false,
   countFor,
   nounFor,
+  onSearchKeyDown,
 }: ListToolbarProps<F>) {
   // Inert until this strip's handlers are attached — including the search box,
   // which pre-hydration accepts typing into a value React then overwrites from
@@ -97,6 +101,7 @@ export function ListToolbar<F extends BaseListFilters>({
           size="sm"
           anatomy="N1.1 H15"
           inputRef={searchRef}
+          onKeyDown={onSearchKeyDown}
           className="flex-1 min-w-[200px] max-sm:basis-full"
         />
         {/* Below sm the facets are one Filters button opening the sheet

@@ -860,8 +860,8 @@ function eventSlots(
       const becameZombie = minDebt != null && !wasZombie && preDebt >= minDebt && hasDebtAfter && debtAfter < minDebt;
       const why = wasZombie ? (
         <>
-          already a zombie, its debt under the {formatNumber(minDebt!)} {debt} minimum, so out of the rate queue and
-          reached as the branch&rsquo;s most recent zombie
+          already dormant, its debt under the {formatNumber(minDebt!)} {debt} minimum, so out of the rate queue and
+          reached as the branch&rsquo;s most recent dormant Trove
         </>
       ) : (
         <>among the branch&rsquo;s lowest interest rates at the time</>
@@ -969,8 +969,8 @@ function eventSlots(
           changed: [
             clause(
               <>
-                That cleared the Trove&rsquo;s debt entirely; it now holds only {collAfterFig()} of collateral and is a
-                zombie, out of the rate queue.
+                That cleared the Trove&rsquo;s debt entirely; it now holds only {collAfterFig()} of collateral and is
+                dormant, out of the rate queue.
               </>,
             ),
             ...redemptionContext,
@@ -1016,8 +1016,8 @@ function eventSlots(
             ? clause(
                 <>
                   This redemption left the debt under the branch&rsquo;s {formatNumber(minDebt!)} {debt} minimum, so the
-                  Trove is now a zombie, out of the rate queue. As the branch&rsquo;s most recent zombie, it is the
-                  first Trove the next redemption reaches.
+                  Trove is now dormant, out of the rate queue. As the branch&rsquo;s most recent dormant Trove, it is
+                  the first Trove the next redemption reaches.
                 </>,
               )
             : null,
@@ -1061,7 +1061,7 @@ function eventSlots(
               ? clause(
                   <>
                     A redemption that leaves a Trove under the branch&rsquo;s {formatNumber(minDebt)} {debt} minimum
-                    debt turns it into a zombie, out of the rate-ordered queue.
+                    debt makes it dormant, out of the rate-ordered queue.
                   </>,
                 )
               : null,

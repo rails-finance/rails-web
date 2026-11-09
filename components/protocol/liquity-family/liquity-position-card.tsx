@@ -624,7 +624,7 @@ export function useLiquityCardSlots({
       : v.status === "closed"
         ? { word: "Closed", tone: "muted" }
         : zombie
-          ? { word: "Zombie", tone: "muted" }
+          ? { word: "Dormant", tone: "muted" }
           : null;
 
   // The listing names the owner; the delegate shows under Interest rate.

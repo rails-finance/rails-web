@@ -29,6 +29,7 @@ export function TroveSummaryStack({
   debtInFront,
   trovesAhead,
   queueDebtTotal = null,
+  redeemedFirst = null,
   debtInFrontLoading,
   loadingStatus,
   viewHref,
@@ -44,6 +45,9 @@ export function TroveSummaryStack({
    *  so server-fed embeds (the home hero) can omit it; the pane then renders
    *  its queue bullets without the branch-debt and queue-share figures. */
   queueDebtTotal?: number | null;
+  /** A dormant Trove is the branch's lastZombieTroveId (the next redemption takes it first);
+   *  null where the pointer is unread. */
+  redeemedFirst?: boolean | null;
   debtInFrontLoading: boolean;
   loadingStatus: { message: string | null; snapshotDate?: number };
   /** Copy-this-view control, forwarded straight through to `LiquityPositionCard`
@@ -72,6 +76,7 @@ export function TroveSummaryStack({
     debtInFront,
     trovesAhead,
     queueDebtTotal,
+    redeemedFirst,
     surplus,
     debtAtClose,
   });
@@ -82,16 +87,20 @@ export function TroveSummaryStack({
   // The panel (TO-DO-position-card 322): the queue on the left, the yearly
   // cost on the right, where the card adds Liquidates at.
   const bandProps = { trove, liveState, debtInFront, trovesAhead, debtInFrontLoading };
-  // A zombie sits outside the branch's rate-sorted list, so it has no debt or
-  // Troves in front. With no debt a redemption cannot reach it; with debt it
-  // is reached only while it is the branch's most recent zombie (ui-jobs 456).
+  // A dormant Trove sits outside the branch's rate-sorted list. The next redemption takes it first
+  // when it is the branch's lastZombieTroveId; no redemption reaches any other.
   const zombieDebt = liveState?.debt.entire ?? trove.debt.current;
   const queueRows: PositionPanelRow[] = trove.isZombie
     ? [
         {
           id: "redemption",
           label: "Redemption",
-          value: zombieDebt > 0 ? "Outside the rate queue" : "Not redeemable",
+          value:
+            redeemedFirst === true
+              ? "Redeemed first"
+              : redeemedFirst === false || zombieDebt <= 0
+                ? "Not redeemable"
+                : "Outside the rate queue",
         },
       ]
     : [

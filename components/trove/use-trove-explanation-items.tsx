@@ -45,6 +45,8 @@ interface UseTroveExplanationItemsArgs {
    *  and branch-debt bullets read (the same live figure the compact
    *  RedemptionRunway's fill divides by). */
   queueDebtTotal?: number | null;
+  /** A dormant Trove is the branch's lastZombieTroveId; null where the pointer is unread. */
+  redeemedFirst?: boolean | null;
   /** A liquidated trove's collateral surplus, read at the head. */
   surplus?: LiquityTroveSurplus | null;
   /** A closed trove's debt just before the close, where the page knows it:
@@ -94,6 +96,7 @@ export function useTroveExplanationItems({
   debtInFront,
   trovesAhead,
   queueDebtTotal,
+  redeemedFirst,
   surplus,
   debtAtClose,
 }: UseTroveExplanationItemsArgs): TroveExplanation {
@@ -101,8 +104,8 @@ export function useTroveExplanationItems({
     if (trove.status === "liquidated") return buildLiquidatedItems(trove, surplus ?? null);
     if (trove.status === "closed")
       return buildClosedItems(trove, debtAtClose === 0 && trove.activity.redemptionCount > 0);
-    return buildOpenItems({ trove, liveState, prices, debtInFront, queueDebtTotal });
-  }, [trove, liveState, prices, debtInFront, trovesAhead, queueDebtTotal, surplus, debtAtClose]);
+    return buildOpenItems({ trove, liveState, prices, debtInFront, queueDebtTotal, redeemedFirst });
+  }, [trove, liveState, prices, debtInFront, trovesAhead, queueDebtTotal, redeemedFirst, surplus, debtAtClose]);
 }
 
 function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus | null): TroveExplanation {
@@ -269,6 +272,7 @@ function buildOpenItems({
   prices,
   debtInFront,
   queueDebtTotal,
+  redeemedFirst,
 }: UseTroveExplanationItemsArgs): TroveExplanation {
   const items: Bullet[] = [];
   const add = (group: Group, node: React.ReactNode) => items.push({ group, node });
@@ -563,20 +567,36 @@ function buildOpenItems({
   // mechanics are Layer-2 material in the "?" modal (the 2026-07-25
   // Layer-2-in-Layer-1 audit).
   if (trove.isZombie) {
-    // A zombie is outside the branch's rate-sorted list (ui-jobs 456).
+    // A dormant Trove is outside the branch's rate-sorted list; the next redemption takes it first
+    // only as the branch's lastZombieTroveId.
     add(
       "risk",
       displayDebt > 0 ? (
         <span key="zombie" className="text-rb-500">
-          A partial redemption left this Trove below the branch&rsquo;s minimum debt, which makes it a <H>zombie</H>:
-          out of the rate-ordered redemption queue. While it is the branch&rsquo;s most recent zombie, it is the first
-          Trove the next redemption reaches. The owner can close it to take back the collateral, or borrow back above
-          the minimum to rejoin the queue.
+          A partial redemption left this Trove below the branch&rsquo;s minimum debt, which makes it <H>dormant</H>: out
+          of the rate-ordered redemption queue.{" "}
+          {redeemedFirst === true ? (
+            <>
+              The TroveManager holds it as the branch&rsquo;s last dormant Trove (lastZombieTroveId), so the next
+              redemption on the branch takes it first.
+            </>
+          ) : redeemedFirst === false ? (
+            <>
+              A redemption reaches only the dormant Trove the TroveManager holds as lastZombieTroveId, and that is
+              another Trove, so no redemption reaches this one.
+            </>
+          ) : (
+            <>
+              While it is the branch&rsquo;s most recent dormant Trove, it is the first Trove the next redemption
+              reaches.
+            </>
+          )}{" "}
+          The owner can close it to take back the collateral, or borrow back above the minimum to rejoin the queue.
         </span>
       ) : (
         <span key="zombie" className="text-rb-500">
-          Redemption took all of its debt, which makes it a <H>zombie</H>. With no debt, a redemption cannot reach it
-          and there is nothing to liquidate. The owner can close it to take back the collateral, or borrow again.
+          Redemption took all of its debt, which makes it <H>dormant</H>. With no debt, a redemption cannot reach it and
+          there is nothing to liquidate. The owner can close it to take back the collateral, or borrow again.
         </span>
       ),
     );

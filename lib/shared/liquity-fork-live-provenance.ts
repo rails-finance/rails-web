@@ -337,8 +337,8 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
     debtInFrontProv: (sym) => ({
       kind: "chain-derived",
       pclass: "state",
-      verify: recompute("SortedTroves", "getFirst/getNext + TroveManager.getLatestTroveData"),
-      summary: `${cfg.stablecoin} debt redeemed before this trove. The sum of entire debt across the ${sym} branch troves sitting at LOWER interest rates (redemptions sweep the lowest user-set rate first in this family, not the lowest collateral ratio), from a live walk of the branch's own SortedTroves in its descending-rate order. Branch-scoped: cross-branch redemption routing splits by each branch's unbacked portion, and zombie troves (outside the list) are redeemed before everything in it.`,
+      verify: recompute("SortedTroves", "getFirst/getNext + TroveManager.getLatestTroveData + lastZombieTroveId"),
+      summary: `${cfg.stablecoin} debt redeemed before this trove. The entire debt of the ${sym} branch troves sitting at LOWER interest rates (redemptions sweep the lowest user-set rate first in this family, not the lowest collateral ratio), from a live walk of the branch's own SortedTroves in its descending-rate order, plus the Trove the TroveManager holds as lastZombieTroveId when it has debt: the one dormant Trove a redemption takes, before the whole list. Branch-scoped: cross-branch redemption routing splits by each branch's unbacked portion.`,
       contract: {
         name: `${cfg.protocolName} ${sym} SortedTroves`,
         address: cfg.branchBySymbol[sym]?.sortedTroves ?? "",
@@ -451,7 +451,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain",
       pclass: "state",
       verify: recompute("SortedTroves", "getSize"),
-      summary: `Troves in the ${sym} branch's redemption queue. SortedTroves.getSize at the latest block; the branch's own count of its listed troves. Zombie troves are NOT in this figure; they sit outside the list (and are counted separately here) because a partial redemption left them below the branch's minimum debt.`,
+      summary: `Troves in the ${sym} branch's redemption queue. SortedTroves.getSize at the latest block; the branch's own count of its listed troves. Dormant Troves are NOT in this figure; they sit outside the list (and are counted separately here) because a partial redemption left them below the branch's minimum debt.`,
       contract: {
         name: `${cfg.protocolName} ${sym} SortedTroves`,
         address: cfg.branchBySymbol[sym]?.sortedTroves ?? "",
@@ -463,8 +463,8 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       pclass: "state",
       verify: recompute("TroveManager", "getTroveStatus + getTroveIdsCount/getTroveFromTroveIdsArray"),
       summary:
-        `A zombie trove (status 4 on the ${sym} branch's TroveManager). A partial redemption left it below the branch minimum debt, so the protocol removed it from SortedTroves. While it still carries debt it is redeemed BEFORE everything in the list, so a debt-bearing zombie leads the queue here; one redeemed to zero debt keeps its collateral on the branch but stands outside every redemption path. Found through the TroveManager's trove-ids array (it enumerates every trove the branch has, listed or not), because a walk of the sorted list alone cannot see it.` +
-        (idsCapped ? ` The enumeration is bounded on this read, so the zombie count is a floor, not a census.` : ""),
+        `A dormant Trove (status 4, Zombie, on the ${sym} branch's TroveManager). A partial redemption left it below the branch minimum debt, so the protocol removed it from SortedTroves. The one the TroveManager holds as lastZombieTroveId is redeemed before everything in the list while it has debt, and leads the queue here; every other dormant Trove stands outside every redemption path and keeps its collateral on the branch. Found through the TroveManager's trove-ids array (it enumerates every trove the branch has, listed or not), because a walk of the sorted list alone cannot see it.` +
+        (idsCapped ? ` The enumeration is bounded on this read, so the dormant count is a floor, not a census.` : ""),
       contract: tmContract(sym),
       via: `${ROSTER_VIA} · TroveManager.getTroveIdsCount / getTroveFromTroveIdsArray + getTroveStatus @ head`,
     }),

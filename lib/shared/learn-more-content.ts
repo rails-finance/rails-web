@@ -1118,7 +1118,7 @@ export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams): Lea
     steps: [
       "It gives up collateral at the branch oracle price and sheds the same value of debt. Net value is preserved.",
       "Its collateral ratio RISES as a result.",
-      `A partial redemption that leaves the Trove below the minimum debt makes it a "zombie": outside the rate-ordered queue, redeemed first the next time redemptions route through the branch.`,
+      `A partial redemption that leaves the Trove below the minimum debt makes it dormant (Zombie in the contracts) and takes it out of the rate-ordered queue. The branch's most recent dormant Trove with debt left is redeemed first.`,
     ],
     links: forkLinks(p, "redemption"),
   };

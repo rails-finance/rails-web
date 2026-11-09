@@ -21,10 +21,12 @@ export function closingPriceInfo(collType: string): Provenance {
   };
 }
 
-/** The zombie flag's tip on the event card's head: fully redeemed, or below
- *  the minimum debt. */
-export function zombieTitle(cleared: boolean): string {
-  return troveWords(cleared ? "zombie_cleared_title" : "zombie_title");
+/** The dormant (contract: Zombie) flag's tip on the event card's head: fully redeemed, or below the
+ *  branch's minimum debt. */
+export function zombieTitle(cleared: boolean, minDebt: number, debtSymbol: string): string {
+  return cleared
+    ? troveWords("zombie_cleared_title")
+    : troveWords("zombie_title", { min_debt: minDebt.toLocaleString("en-US"), debt_symbol: debtSymbol });
 }
 
 /** The event card's price chip's tip. */

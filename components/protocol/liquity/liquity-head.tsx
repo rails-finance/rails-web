@@ -21,6 +21,7 @@ import { getBatchManagerName } from "@/lib/liquity/batch-managers";
 import { liquityL1Label, liquityT1Words, type LiquityT1Clause } from "@/lib/liquity/event-prose";
 import { L1_WORDS } from "@/lib/liquity/event-templates";
 import { zombieTitle } from "@/lib/liquity/trove-page-words";
+import { LIQUITY_MIN_DEBT } from "@/lib/liquity/trove-ops";
 import {
   collChangeProv,
   debtChangeProv,
@@ -79,7 +80,11 @@ function statusOf(operation: string): ChainTruthRowSpec["status"] {
 /** One clause of the timeline head, drawn. */
 function clauseNode(c: LiquityT1Clause, ctx: LiquityContext, coords: EventCoords) {
   if ("text" in c)
-    return c.zombie ? <span title={zombieTitle(ctx.stateAfter?.debt === 0)}>{c.text}</span> : <span>{c.text}</span>;
+    return c.zombie ? (
+      <span title={zombieTitle(ctx.stateAfter?.debt === 0, LIQUITY_MIN_DEBT, ctx.assetType ?? "BOLD")}>{c.text}</span>
+    ) : (
+      <span>{c.text}</span>
+    );
   if ("delegate" in c)
     return (
       <span>
@@ -210,7 +215,7 @@ function titleSpec(
     if (ctx.isZombieTrove)
       spec.zombie = {
         word: L1_WORDS.zombie,
-        title: zombieTitle(stateAfter.debt === 0),
+        title: zombieTitle(stateAfter.debt === 0, LIQUITY_MIN_DEBT, debtSym),
       };
   } else if (op === "liquidate") {
     spec.critical = true;

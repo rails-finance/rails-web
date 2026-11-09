@@ -95,8 +95,8 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
   }
   if (isZombie) {
     details.push({
-      bold: "Zombie Trove",
-      text: `a redemption can leave a Trove below its branch's minimum debt. It then leaves the rate-ordered queue: while it still owes ${debtSymbol}, the next redemption on the branch takes from it first; once its debt is zero there is nothing left to redeem. The owner can close it and take back the collateral${reserve ? ` and the ${reserve} liquidation reserve` : ""}.`,
+      bold: "Dormant Trove",
+      text: `a redemption can leave a Trove below its branch's minimum debt. It then leaves the rate-ordered queue: while it is the branch's most recent one still owing ${debtSymbol}, the next redemption on the branch takes from it first. The owner can bring its debt back above the minimum, which returns it to the queue, or close it and take back the collateral${reserve ? ` and the ${reserve} liquidation reserve` : ""}. The contracts tag it Zombie.`,
     });
   }
   details.push(

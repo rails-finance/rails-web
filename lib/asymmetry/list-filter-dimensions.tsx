@@ -64,7 +64,7 @@ export const ASYMMETRY_SORT_OPTIONS: SortOption[] = [
 // Open (the index can't see it; incomplete, never false).
 const STATUS_OPTIONS: FilterOptionDef[] = [
   { value: "open", label: "Open" },
-  { value: "zombie", label: "Zombie" },
+  { value: "zombie", label: "Dormant" },
   { value: "closed", label: "Closed" },
   { value: "liquidated", label: "Liquidated" },
 ];
