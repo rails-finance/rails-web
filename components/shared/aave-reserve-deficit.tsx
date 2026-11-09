@@ -2,7 +2,7 @@
 
 // The reserve page's Deficit section (anatomy M3.9): on any Aave V3 reserve
 // with a write-off held. The lead says in one sentence what the outstanding
-// deficit means, with Aave's source cited; then Written off · Covered ·
+// deficit means, Aave's sources in its figure's receipt; then Written off · Covered ·
 // Outstanding, each with its receipt; then the write-offs, largest first, ten
 // shown and the rest behind one row. Where the route holds the covers
 // (Ethereum), Covered is Σ DeficitCovered, then the covers table, the
@@ -34,7 +34,7 @@ import {
   writtenOffSumProv,
   type TxExplorer,
 } from "@/lib/shared/aave-reserve-reads-provenance";
-import { DEFICIT_SOURCES, type DeficitSourceKey } from "@/lib/aave-family/deficit-sources";
+import { deficitFigureProv } from "@/lib/aave-family/deficit-sources";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { shiftDecimal } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
@@ -42,29 +42,6 @@ import { fmtUsd } from "@/lib/aave-v4/format";
 
 const NOTE = "text-[13px] text-rb-500";
 const TOP = 10;
-
-/** Aave's sources for a sentence, as small links after it. */
-export function DeficitSources({ keys }: { keys: DeficitSourceKey[] }) {
-  return (
-    <span className="ml-1 whitespace-normal text-[11px] text-rb-500" data-deficit-sources={keys.join(" ")}>
-      (
-      {keys.map((k, i) => (
-        <span key={k}>
-          {i > 0 && ", "}
-          <a
-            href={DEFICIT_SOURCES[k].url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline dark:text-[var(--text-link)]"
-          >
-            {DEFICIT_SOURCES[k].label}
-          </a>
-        </span>
-      ))}
-      )
-    </span>
-  );
-}
 
 /** A raw amount in whole tokens. */
 const tokensOf = (raw: string, decimals: number | null): number | null =>
@@ -208,17 +185,17 @@ export function ReserveDeficitBody({
         {head.outstanding > 0 ? (
           <>
             Liquidations have left{" "}
-            <Prov info={head.outstandingProv}>
+            <Prov info={deficitFigureProv(head.outstandingProv)}>
               {tokenWords(head.outstanding)} {sym}
             </Prov>
             {usd && ` (${usd})`} of this reserve&apos;s loans with no borrower: suppliers are still owed it, and nobody
             owes it to the Pool.
-            <DeficitSources keys={["O2", "O3"]} />
           </>
         ) : (
           <>
-            Every write-off on this reserve has been covered.
-            <DeficitSources keys={["O5", "O6"]} />
+            <Prov info={deficitFigureProv(head.outstandingProv)}>
+              Every write-off on this reserve has been covered.
+            </Prov>
           </>
         )}
       </p>
