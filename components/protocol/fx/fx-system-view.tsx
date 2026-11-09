@@ -408,32 +408,36 @@ function ReconcileCard({ p, readBy }: { p: FxPoolSystem; readBy?: ServerRead | n
 
       <div className="mt-3 space-y-1.5 text-xs tabular-nums">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="shrink-0 text-rb-500">
+          <span className="min-w-0 text-rb-500">
             every tick&apos;s debt shares (units of the debt the pool tracks, each worth more as the debt index rises),
             added up
           </span>
-          <Prov
-            info={stampServerRead(
-              ladderReconcileProv(label, p.address, p.debtSharesReconcile, p.occupiedTicks),
-              readBy,
-            )}
-            value={p.tickDebtSharesSumRaw}
-          >
-            <span className="break-all text-right text-foreground">{p.tickDebtSharesSumRaw}</span>
-          </Prov>
+          <span className="min-w-0 text-right">
+            <Prov
+              info={stampServerRead(
+                ladderReconcileProv(label, p.address, p.debtSharesReconcile, p.occupiedTicks),
+                readBy,
+              )}
+              value={p.tickDebtSharesSumRaw}
+            >
+              <span className="break-all text-right text-foreground">{p.tickDebtSharesSumRaw}</span>
+            </Prov>
+          </span>
         </div>
         <div className="flex items-baseline justify-between gap-2 border-t border-rb-200 pt-1.5 dark:border-rb-700">
           <span className="shrink-0 text-foreground">= the pool&rsquo;s total debt shares</span>
-          <Prov
-            info={stampServerRead(
-              ladderReconcileProv(label, p.address, p.debtSharesReconcile, p.occupiedTicks),
-              readBy,
-            )}
-            value={p.totalDebtSharesRaw}
-            echo
-          >
-            <span className="break-all text-right text-foreground">{p.totalDebtSharesRaw}</span>
-          </Prov>
+          <span className="min-w-0 text-right">
+            <Prov
+              info={stampServerRead(
+                ladderReconcileProv(label, p.address, p.debtSharesReconcile, p.occupiedTicks),
+                readBy,
+              )}
+              value={p.totalDebtSharesRaw}
+              echo
+            >
+              <span className="break-all text-right text-foreground">{p.totalDebtSharesRaw}</span>
+            </Prov>
+          </span>
         </div>
       </div>
 
