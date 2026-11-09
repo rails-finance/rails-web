@@ -23,7 +23,8 @@
 //      own read at the stated block, wei-exact
 //   3  grouping: every funded row sits in the group of its catalogued asset;
 //      the group set == the distinct assets of funded vaults; inside every
-//      group the raw totals are non-increasing
+//      group the held totals (totalAssets less lostAssets, ui-jobs 543) are
+//      non-increasing
 //   4  funded + empty + unread == catalog size, and unread == 0
 //   5  the empty group is collapsed at rest, expands to exactly the stated N
 //      rows, and N == this script's own count of zero readings
@@ -306,6 +307,7 @@ const readRows = async () =>
       asset: el.getAttribute("data-asset"),
       family: el.getAttribute("data-family"),
       raw: el.getAttribute("data-total-assets-raw"),
+      held: el.getAttribute("data-held-assets-raw"),
       sharePriceRaw: el.getAttribute("data-share-price-raw"),
       groupAsset: el.closest("[data-asset-group]")?.getAttribute("data-asset-group") ?? null,
       inEmpty: Boolean(el.closest("[data-empty-rows]")),
@@ -373,11 +375,12 @@ check(
 );
 let disorder = 0;
 for (const asset of pageGroups) {
-  const inGroup = funded.filter((r) => r.groupAsset === asset).map((r) => BigInt(r.raw));
+  // Size ranks by what the vault holds, total assets less lost assets (ui-jobs 543).
+  const inGroup = funded.filter((r) => r.groupAsset === asset).map((r) => BigInt(r.held || r.raw));
   for (let i = 1; i < inGroup.length; i++) if (inGroup[i] > inGroup[i - 1]) disorder++;
 }
 check(
-  "3c inside every group the totals are non-increasing (largest first)",
+  "3c inside every group the held totals are non-increasing (largest first)",
   disorder === 0,
   `${disorder} out-of-order pairs across ${pageGroups.size} groups`,
 );
