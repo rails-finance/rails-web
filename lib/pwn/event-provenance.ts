@@ -439,8 +439,8 @@ export const flowCellProv = (side: "collateral" | "debt", sym: string, coords: P
   kind: "chain-derived",
   summary:
     side === "collateral"
-      ? `Collateral in escrow (${sym}) once this event had run: the terms' collateral, locked at the loan's creation and released by its repayment or the lender's default claim.`
-      : `Debt (${sym}) once this event had run: the terms' principal plus the interest they fix (v1.1: the repay total less the principal) or accrue by the minute (v1.2 and v1.3: the contract's sum), less what the repayment paid or the default claim cleared.`,
+      ? `Collateral in escrow (${sym}) once this event had run. The terms' collateral, locked at the loan's creation and released by its repayment or the lender's default claim.`
+      : `Debt (${sym}) once this event had run. The terms' principal plus the interest they fix (v1.1: the repay total less the principal) or accrue by the minute (v1.2 and v1.3: the contract's sum), less what the repayment paid or the default claim cleared.`,
   contract: contractFor(coords),
   via:
     side === "collateral"
@@ -454,6 +454,6 @@ export const flowCellBeforeProv = (side: "collateral" | "debt", sym: string, coo
   ...flowCellProv(side, sym, coords),
   summary:
     side === "collateral"
-      ? `Collateral in escrow (${sym}) just before this event: nothing before the creation, the terms' collateral after it.`
-      : `Debt (${sym}) just before this event: nothing before the creation; before a repayment or a default claim, the principal plus the interest built by then (stopped at the deadline).`,
+      ? `Collateral in escrow (${sym}) just before this event. Nothing before the creation, the terms' collateral after it.`
+      : `Debt (${sym}) just before this event. Nothing before the creation; before a repayment or a default claim, the principal plus the interest built by then (stopped at the deadline).`,
 });

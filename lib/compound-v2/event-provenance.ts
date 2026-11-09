@@ -526,7 +526,7 @@ export const externalActorProv = (
   kind: "chain-derived",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `This ${args.eventType.replace(/_/g, " ")} was executed by a third party: the position owner neither signed the transaction nor was the event's own party (${args.eventType === "repay" ? "the RepayBorrow payer — who provided the funds; on the cETH market this is often the Maximillion helper fronting a native-ETH repay" : "the event's emitted actor"}). Both facts are chain values${atBlock(coords)}; each is compared against the owner.`,
+  summary: `This ${args.eventType.replace(/_/g, " ")} was executed by a third party. The position owner neither signed the transaction nor was the event's own party (${args.eventType === "repay" ? "the RepayBorrow payer — who provided the funds; on the cETH market this is often the Maximillion helper fronting a native-ETH repay" : "the event's emitted actor"}). Both facts are chain values${atBlock(coords)}; each is compared against the owner.`,
   contract: ctokenContract(coords),
   via: `${COMPOUND_V2_VIA} · tx envelope from + ${args.eventType === "repay" ? "payer" : "minter"} param vs owner`,
   inputs: eventInputs(coords, [

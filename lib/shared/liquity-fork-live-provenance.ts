@@ -472,7 +472,7 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain-derived",
       pclass: "state",
       verify: recompute("SortedTroves", "getLast/getPrev + TroveManager.getLatestTroveData"),
-      summary: `${what} ${cappedShown ? `across the first ${cappedShown} troves of the ${sym} branch's queue (the walk's bound; the branch lists more behind them, at higher rates)` : `across the ${sym} branch's listed troves`}: the user-set rates read live from the branch's queue at this block. Borrowers set these rates themselves, so this describes what this branch's borrowers are currently choosing to pay; it is not a protocol-set rate.`,
+      summary: `${what} ${cappedShown ? `across the first ${cappedShown} troves of the ${sym} branch's queue (the walk's bound; the branch lists more behind them, at higher rates)` : `across the ${sym} branch's listed troves`}. The user-set rates read live from the branch's queue at this block. Borrowers set these rates themselves, so this describes what this branch's borrowers are currently choosing to pay; it is not a protocol-set rate.`,
       contract: tmContract(sym),
       via: `${ROSTER_VIA} · SortedTroves tail-first walk @ head · over getLatestTroveData.annualInterestRate`,
     }),

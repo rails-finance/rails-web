@@ -329,7 +329,7 @@ export const routerProxiedProv = (
   kind: "chain-derived",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `This ${args.eventType} was routed through Moonwell's WETH Router (native ETH in/out): the ${args.eventType === "mint" ? "Mint log's minter" : "Redeem log's redeemer"} param names the router, and the position owner is the ${args.eventType === "mint" ? "recipient" : "sender"} of the same-transaction router-leg mToken Transfer. Both logs are chain facts in this one transaction — routing, not a third-party action: the owner initiated it.`,
+  summary: `This ${args.eventType} was routed through Moonwell's WETH Router (native ETH in/out). The ${args.eventType === "mint" ? "Mint log's minter" : "Redeem log's redeemer"} param names the router, and the position owner is the ${args.eventType === "mint" ? "recipient" : "sender"} of the same-transaction router-leg mToken Transfer. Both logs are chain facts in this one transaction — routing, not a third-party action: the owner initiated it.`,
   contract: mtokenContract(coords),
   via: `${captureVia(coords)} · ${args.eventType === "mint" ? "Mint minter" : "Redeem redeemer"} = router + same-tx Transfer leg → owner`,
   inputs: eventInputs(coords, [
@@ -355,7 +355,7 @@ export const externalActorProv = (
   kind: "chain-derived",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `This ${args.eventType.replace(/_/g, " ")} was executed by a third party: the position owner neither signed the transaction nor was the event's own party (${args.eventType === "repay" ? "the RepayBorrow payer — who provided the funds" : "the event's emitted actor"}). Both facts are chain values${atBlock(coords)}; each is compared against the owner. Routed flows (the WETH Router) keep the owner as signer and contract-owned positions keep the owner as the event party — this event has the owner as neither.`,
+  summary: `This ${args.eventType.replace(/_/g, " ")} was executed by a third party. The position owner neither signed the transaction nor was the event's own party (${args.eventType === "repay" ? "the RepayBorrow payer — who provided the funds" : "the event's emitted actor"}). Both facts are chain values${atBlock(coords)}; each is compared against the owner. Routed flows (the WETH Router) keep the owner as signer and contract-owned positions keep the owner as the event party — this event has the owner as neither.`,
   contract: mtokenContract(coords),
   via: `${MOONWELL_INDEX_VIA} · tx envelope from + ${args.eventType === "repay" ? "payer" : "minter"} param vs owner`,
   inputs: eventInputs(coords, [

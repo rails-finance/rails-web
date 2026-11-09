@@ -290,6 +290,9 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   // CoW: trades, not positions (ui-jobs 489); it has no listing or census to
   // count, and the headline counts positions.
   "cow",
+  // Pendle: a wallet's PT, YT and LP per market, read when the wallet is
+  // visited; no census of holders, and nothing in a market is a loan.
+  "pendle",
   // Sky Savings, for the same reason: an sUSDS balance carries no debt and no
   // threshold (Miles, 2026-09-29, rails-ops TO-DO-sky-savings-scoping §6.1).
   // It has a listing all the same; this set keeps it out of the count.

@@ -126,7 +126,7 @@ export function TroveIdentityRow({
               e.stopPropagation();
               copy(troveId, setCopiedTrove);
             }}
-            aria-label={copiedTrove ? "Copied trove id" : "Copy trove id"}
+            aria-label={copiedTrove ? "Copied Trove id" : "Copy Trove id"}
             title={copiedTrove ? "Copied!" : "Copy"}
             className="text-rb-500 hover:text-foreground cursor-pointer"
           >

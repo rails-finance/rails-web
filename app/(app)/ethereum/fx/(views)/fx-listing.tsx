@@ -76,6 +76,8 @@ export function FxListing({ initialItems, initialTotal, initialKey, initialSearc
             data: r.data,
             total: r.pagination.total,
           })),
+        fetchCount: (filters) =>
+          fetchFxPositions({ ...fxFiltersToFetchParams(filters, 1), limit: 1 }).then((r) => r.pagination.total),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

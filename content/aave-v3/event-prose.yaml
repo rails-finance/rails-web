@@ -1594,7 +1594,7 @@ doc_urls:
 L5:
   supply:
     title: |-
-      How Supplying Works
+      How supplying works
     intro: |-
       Supplying deposits an asset into the Pool, which mints aTokens for it. The deposit earns the variable supply rate and, while on as collateral, backs borrowing.
     detailsHeading: |-
@@ -1636,7 +1636,7 @@ L5:
 
   withdraw:
     title: |-
-      How Withdrawing Works
+      How withdrawing works
     intro: |-
       Withdrawing returns supplied assets from the Pool to a wallet, burning the matching aTokens. It can go only as far as the collateral left keeps any debt covered.
     detailsHeading: |-
@@ -1675,7 +1675,7 @@ L5:
 
   borrow:
     title: |-
-      How Borrowing Works
+      How borrowing works
     intro: |-
       Borrowing draws an asset from the Pool against the account's collateral, minting debt tokens that accrue variable interest until repaid.
     detailsHeading: |-
@@ -1713,7 +1713,7 @@ L5:
 
   repay:
     title: |-
-      How Repaying Works
+      How repaying works
     intro: |-
       Repaying returns borrowed tokens to the Pool, burning the matching debt tokens. The debt falls, the health factor rises, and collateral is freed.
     detailsHeading: |-
@@ -1745,7 +1745,7 @@ L5:
 
   liquidation:
     title: |-
-      How Liquidations Work
+      How liquidations work
     intro: |-
       An account can be liquidated once its health factor falls below 1, when its collateral, counted up to each threshold, no longer covers its debt. Automated bots usually do it.
     detailsHeading: |-
@@ -1785,7 +1785,7 @@ L5:
 
   bad_debt:
     title: |-
-      How Bad Debt Is Written Off
+      How bad debt is written off
     intro: |-
       A liquidation can take the last of an account's collateral while some debt remains. The Pool then burns that debt and records it as a deficit on the reserve.
     detailsHeading: |-
@@ -1853,7 +1853,7 @@ L5:
 
   repay_with_collateral:
     title: |-
-      How Repaying with Collateral Works
+      How repaying with collateral works
     intro: |-
       Repaying with collateral pays a debt with the account's supply instead of tokens from the wallet. In one transaction, collateral is withdrawn, swapped for the debt asset and repaid.
     detailsHeading: |-
@@ -1892,7 +1892,7 @@ L5:
 
   collateral_swap:
     title: |-
-      How a Collateral Swap Works
+      How a collateral swap works
     intro: |-
       A collateral swap trades one supplied asset for another without either leaving the position. Part of a supply is withdrawn, swapped, and supplied back in one transaction.
     detailsHeading: |-
@@ -1924,7 +1924,7 @@ L5:
 
   collateral_swap_cow:
     title: |-
-      How a Collateral Swap Works
+      How a collateral swap works
     intro: |-
       A collateral swap trades one supplied asset for another without either leaving the position. The owner signs a CoW order, and the settlement makes the trade.
     detailsHeading: |-
@@ -1953,7 +1953,7 @@ L5:
 
   debt_swap:
     title: |-
-      How a Debt Swap Works
+      How a debt swap works
     intro: |-
       A debt swap changes which asset the position owes. In one transaction a new debt is opened, swapped for the old debt's asset and used to repay it.
     detailsHeading: |-
@@ -1989,7 +1989,7 @@ L5:
 
   debt_swap_cow:
     title: |-
-      How a Debt Swap Works
+      How a debt swap works
     intro: |-
       A debt swap changes which asset the position owes. The owner signs a CoW order, and one transaction borrows the new asset, sells it and repays the old debt.
     detailsHeading: |-
@@ -2021,7 +2021,7 @@ L5:
 
   withdraw_and_swap:
     title: |-
-      How Withdraw and Swap Works
+      How withdraw and swap works
     intro: |-
       Withdraw and swap takes supplied tokens out of the Pool and swaps them for another token in one transaction. The swapped tokens go to the wallet, outside the position.
     detailsHeading: |-
@@ -2049,7 +2049,7 @@ L5:
 
   fallback:
     title: |-
-      How Positions Work
+      How positions work
     intro: |-
       Aave V3 lets a wallet borrow against supplied collateral in one account, under a single health factor.
     intro_seamless: |-
@@ -2082,7 +2082,7 @@ L5:
 
   position_open:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This panel reads the account from the Pool at the current block: what it supplies, what it borrows and how well its debt is covered.
     detailsHeading: |-
@@ -2132,7 +2132,7 @@ L5:
 
   position_closed:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This account repaid its debt and withdrew its collateral. The panel shows each reserve's highest recorded balance over its life.
     detailsHeading: |-
@@ -2172,7 +2172,7 @@ L5:
 
   position_liquidated:
     title: |-
-      About This Position
+      About this position
     intro: |-
       Liquidation took collateral from this account after its health factor fell below 1. The panel shows each reserve's highest recorded balance over its life.
     detailsHeading: |-

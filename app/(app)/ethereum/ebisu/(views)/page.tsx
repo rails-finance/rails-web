@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export const metadata = listingMetadata({
-  title: "Explore Ebisu troves",
+  title: "Explore Ebisu Troves",
   canonicalPath: "/ethereum/ebisu",
   description:
     "Every Ebisu Trove on Ethereum: loans of the ebUSD stablecoin across five collateral types, with collateral, debt and full history.",

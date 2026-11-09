@@ -117,7 +117,7 @@ const fallProv = (
 const borrowableProv = (collSym: string, loanSym: string, m: MorphoHealthMove): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `The ${loanSym} the position could still borrow after this event: its ${collSym} collateral valued at the market oracle's price at the end of block ${m.priceBlock}, times the market's LLTV, less its debt. Morpho Blue has one line per market, so the LLTV is the borrow cap.`,
+  summary: `The ${loanSym} the position could still borrow after this event. Its ${collSym} collateral valued at the market oracle's price at the end of block ${m.priceBlock}, times the market's LLTV, less its debt. Morpho Blue has one line per market, so the LLTV is the borrow cap.`,
   formula: "collateral × price × LLTV − debt",
   inputs: [
     { label: "collateral", value: `${m.collAfter} ${collSym}`, kind: "chain", note: "row, after the event" },

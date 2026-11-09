@@ -103,7 +103,7 @@ const signedNum = (n: number): string => (n < 0 ? `−${formatNumber(Math.abs(n)
 /** fxUSD valued at its face. */
 const faceProv = (what: string, coords: FxCoords): Provenance => ({
   kind: "derived",
-  summary: `${what} in dollars: the fxUSD amount counted at $1, one fxUSD as one dollar. The dollar figure is not a market quote.`,
+  summary: `${what} in dollars. The fxUSD amount counted at $1, one fxUSD as one dollar. The dollar figure is not a market quote.`,
   formula: "fxUSD × $1",
   inputs:
     coords.blockNumber != null ? [{ label: "block", value: String(coords.blockNumber), kind: "chain" }] : undefined,
@@ -113,7 +113,7 @@ const faceProv = (what: string, coords: FxCoords): Provenance => ({
 const collUsdProv = (sym: string, amount: number, price: number, coords: FxCoords, at?: string): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `${sym} in dollars: the amount times the pool oracle's price per ${sym}${at ? ` ${at}` : coords.blockNumber != null ? ` at block ${coords.blockNumber}` : ""}.`,
+  summary: `${sym} in dollars. The amount times the pool oracle's price per ${sym}${at ? ` ${at}` : coords.blockNumber != null ? ` at block ${coords.blockNumber}` : ""}.`,
   formula: "amount × price",
   inputs: [
     { label: "amount", value: `${formatNumber(Math.abs(amount))} ${sym}`, kind: "chain" },
@@ -133,7 +133,7 @@ const prevCollProv = (sym: string, amount: number, coords: FxCoords): Provenance
 const debtLastProv = (coords: FxCoords): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `fxUSD debt at the position's previous event: getPosition's debt just before this event${coords.blockNumber != null ? ` (block ${coords.blockNumber - 1})` : ""} less the debt the pool moved since.`,
+  summary: `fxUSD debt at the position's previous event. getPosition's debt just before this event${coords.blockNumber != null ? ` (block ${coords.blockNumber - 1})` : ""} less the debt the pool moved since.`,
   formula: "debt before − moved since the previous event",
   contract: { name: "AaveFundingPool", address: coords.pool },
   inputs: [{ label: "moved since the previous event", kind: "chain-derived", pclass: "state" }],

@@ -1040,7 +1040,7 @@ doc_urls:
 L5:
   open:
     title: |-
-      How Opening a Position Works
+      How opening a position works
     intro: |-
       Opening a Position deposits pETH as collateral and can borrow the market's stablecoin against it. The position is an NFT, so it can change hands without being closed.
     detailsHeading: |-
@@ -1078,7 +1078,7 @@ L5:
 
   adjust:
     title: |-
-      How Adjusting a Position Works
+      How adjusting a position works
     intro: |-
       An adjustment adds or removes collateral, or borrows or repays debt, on an open position. Each one is a touch, which also writes in what built up since the previous touch.
     detailsHeading: |-
@@ -1117,7 +1117,7 @@ L5:
 
   close:
     title: |-
-      How Closing a Position Works
+      How closing a position works
     intro: |-
       Closing repays the whole debt and takes back the collateral. The position's NFT is burned and its escrowed gas compensation returns to the holder.
     detailsHeading: |-
@@ -1152,7 +1152,7 @@ L5:
 
   liquidation:
     title: |-
-      How Liquidations Work
+      How liquidations work
     intro: |-
       A position whose collateral ratio falls below the market's minimum can be liquidated by anyone. The stability pool, called the Earn Pool in the docs, repays the debt first.
     detailsHeading: |-
@@ -1191,7 +1191,7 @@ L5:
 
   transfer:
     title: |-
-      Transferring a Position
+      Transferring a position
     intro: |-
       A Polaris position is an NFT, so transferring it hands the whole position to a new holder without opening or closing anything.
     detailsHeading: |-
@@ -1212,7 +1212,7 @@ L5:
 
   fallback:
     title: |-
-      How a Position Changes
+      How a position changes
     intro: |-
       A Polaris position changes through a touch: an open, an adjustment, a close or a liquidation. Moving its NFT to another holder changes only who can act on it.
     detailsHeading: |-
@@ -1236,7 +1236,7 @@ L5:
 
   position_open:
     title: |-
-      About This Position
+      About this position
     intro: |-
       The lead says what the position holds and owes now. The bullets say what the figures mean for it.
     detailsHeading: |-
@@ -1278,7 +1278,7 @@ L5:
 
   position_closed:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This position is closed and its debt repaid. The card shows the most it ever held, and its NFT is burned.
     detailsHeading: |-
@@ -1310,7 +1310,7 @@ L5:
 
   position_liquidated:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This position was liquidated: its collateral ratio fell below the market's minimum and a liquidator closed it. Its NFT is burned.
     detailsHeading: |-
@@ -1345,7 +1345,7 @@ L5:
 
   market:
     title: |-
-      How a Polaris Market Works
+      How a Polaris market works
     intro: |-
       Polaris has one market per pAsset, each minted against pETH: USDp tracks the dollar and GOLDp tracks gold. Each market keeps separate accounting, an oracle feed and a stability pool.
     detailsHeading: |-
@@ -1383,7 +1383,7 @@ L5:
 
   price_gap:
     title: |-
-      How a Price Move Reaches a Position
+      How a price move reaches a position
     intro: |-
       A market note states something the market did while this position transacted nothing, and no count moves because of it. This kind states how the price feed moved between two touches.
     detailsHeading: |-
@@ -1422,7 +1422,7 @@ L5:
 
   rate_step:
     title: |-
-      How the Primary Rate Moves a Position
+      How the primary rate moves a position
     intro: |-
       A market note states something the market did while this position transacted nothing, and no count moves because of it. This kind states a step in the primary rate between two touches.
     detailsHeading: |-

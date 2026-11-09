@@ -144,7 +144,7 @@ function vaultIdentityLabel(v: MakerVaultView): string {
 function debtUsdProv(symbol: string, debt: number): Provenance {
   return {
     kind: "derived",
-    summary: `Debt value in USD: the ${symbol} debt at Maker's $1 par. The Vat counts one ${symbol} as one dollar, and the card states no market price for it.`,
+    summary: `Debt value in USD. The ${symbol} debt at Maker's $1 par. The Vat counts one ${symbol} as one dollar, and the card states no market price for it.`,
     formula: "debt × $1",
     inputs: [
       { label: "debt", value: `${formatNumber(debt)} ${symbol}`, kind: "chain-derived", pclass: "state" },

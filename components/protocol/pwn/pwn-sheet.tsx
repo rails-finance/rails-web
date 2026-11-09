@@ -141,15 +141,15 @@ export function pwnSheet({ ctx, coords, sides, timestamp, creation }: PwnSheetAr
     ...flowCellProv(side, sym, coords),
     summary:
       side === "collateral"
-        ? `Collateral in escrow (${sym}): what the loan held once its previous event had run, from the loan's replay over its terms.`
-        : `Debt (${sym}): what the borrower owed once the loan's previous event had run: the principal plus the interest the terms fix or accrue, to that event.`,
+        ? `Collateral in escrow (${sym}). What the loan held once its previous event had run, from the loan's replay over its terms.`
+        : `Debt (${sym}). What the borrower owed once the loan's previous event had run: the principal plus the interest the terms fix or accrue, to that event.`,
   });
   const beforeProv = (side: FlowSide, sym: string): Provenance => ({
     ...flowCellProv(side, sym, coords),
     summary:
       side === "collateral"
-        ? `Collateral in escrow (${sym}): what the loan held just before this event: nothing before the creation, the terms' collateral after it.`
-        : `Debt (${sym}): what the borrower owed just before this event: nothing before the creation; before a repayment or a default claim, the principal plus the interest built by then (stopped at the deadline).`,
+        ? `Collateral in escrow (${sym}). What the loan held just before this event: nothing before the creation, the terms' collateral after it.`
+        : `Debt (${sym}). What the borrower owed just before this event: nothing before the creation; before a repayment or a default claim, the principal plus the interest built by then (stopped at the deadline).`,
   });
 
   // ── Collateral ──

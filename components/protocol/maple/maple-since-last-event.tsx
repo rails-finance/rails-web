@@ -25,7 +25,7 @@ import { positionCurrentValueProv } from "@/lib/maple/event-provenance";
 const thenProv = (s: MapleSinceLastEvent): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `${s.assetSymbol} the position's ${s.poolSymbol} were worth just after its newest event (block ${s.lastBlock.toLocaleString("en-US")}): the shares held plus any in the withdrawal queue, times the pool's rate in that block. The same figure that event's row states as the claim after it.`,
+  summary: `${s.assetSymbol} the position's ${s.poolSymbol} were worth just after its newest event (block ${s.lastBlock.toLocaleString("en-US")}). The shares held plus any in the withdrawal queue, times the pool's rate in that block. The same figure that event's row states as the claim after it.`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
   via: "(shares + escrowed) × rate at the newest event's block",
   formula: "(shares + escrowed) × rate",
@@ -35,7 +35,7 @@ const thenProv = (s: MapleSinceLastEvent): Provenance => ({
 const interestProv = (s: MapleSinceLastEvent): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `${s.assetSymbol} the position's ${s.poolSymbol} earned since its newest event: the claim now less the claim that event left. Every share movement is an event, so the holding has not changed since; the difference is the pool's rate rising on it. The rows below state the interest between each pair of events; with this figure they add up to the interest on the card.`,
+  summary: `${s.assetSymbol} the position's ${s.poolSymbol} earned since its newest event. The claim now less the claim that event left. Every share movement is an event, so the holding has not changed since; the difference is the pool's rate rising on it. The rows below state the interest between each pair of events; with this figure they add up to the interest on the card.`,
   contract: { name: "Maple pool (ERC-4626)", address: "" },
   via: "claim now − claim after the newest event",
   formula: "claim now − claim then",

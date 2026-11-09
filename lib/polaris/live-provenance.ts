@@ -143,7 +143,7 @@ export function livePendingToSettleProv(
     kind: "chain-derived",
     pclass: "oracle",
     verify: recompute("the five pending getters and previewPrice()"),
-    summary: `What settles into the position at its next touch, as one figure in ${stable} at the latest block: the pending stability gain less the pending interest, plus the pending PSM share (its pETH at the feed less its debt) and the pending reward pETH at the feed. Each leg is the cdpManager's own getter; the netting is computed in the browser.`,
+    summary: `What settles into the position at its next touch, as one figure in ${stable} at the latest block. The pending stability gain less the pending interest, plus the pending PSM share (its pETH at the feed less its debt) and the pending reward pETH at the feed. Each leg is the cdpManager's own getter; the netting is computed in the browser.`,
     contract: manager(market),
     via: `${LANE_VIA} · pending getters × previewPrice() @ head`,
     formula:

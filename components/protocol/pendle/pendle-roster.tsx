@@ -6,7 +6,7 @@
 // D1 one-line rows (`rowHeight="one"`); D2 sortable headers, the sort in `?sort=` and `?dir=`, each
 // written only off its default (maturity, soonest first); D3 the market pinned
 // while the table scrolls sideways; D4 the whole row opens the market's page;
-// D6 cards below sm, with a select and a direction button for the sort. No
+// D6 cards below sm, sorted from the toolbar (N1.3, `mobileSort`). No
 // lead zone: one protocol on one chain. Worked example: the vault index table
 // (components/vaults/vault-index-table.tsx, V6).
 //
@@ -296,21 +296,27 @@ export function PendleRosterView({
 
   const needle = query.trim().toLowerCase();
   const maturityChoice = facets.maturity?.[0] ?? MATURITY_DEFAULT;
-  const passes = (m: PendleRosterEntry) =>
-    (maturityChoice === "all" || maturityOf(m) === maturityChoice) &&
-    ((facets.underlying?.length ?? 0) === 0 || facets.underlying.includes(underlyingOf(m))) &&
-    ((facets.asset?.length ?? 0) === 0 || facets.asset.includes(assetOf(m))) &&
-    (needle === "" ||
-      [
-        nameOf(m),
-        m.tokens.pt.symbol,
-        m.tokens.yieldToken.symbol,
-        assetOf(m),
-        m.tokens.market.address,
-        m.tokens.pt.address,
-        underlyingOf(m),
-      ].some((s) => s != null && s.toLowerCase().includes(needle)));
-  const shown = markets.filter(passes).sort(comparator(sort, dir));
+  /** The filter for a selection: the shown rows, and the phone sheet's staged
+   *  count. */
+  const passesFor = (s: RosterFilters) => {
+    const want = s.q.trim().toLowerCase();
+    const mat = s.facets.maturity?.[0] ?? MATURITY_DEFAULT;
+    return (m: PendleRosterEntry) =>
+      (mat === "all" || maturityOf(m) === mat) &&
+      ((s.facets.underlying?.length ?? 0) === 0 || s.facets.underlying.includes(underlyingOf(m))) &&
+      ((s.facets.asset?.length ?? 0) === 0 || s.facets.asset.includes(assetOf(m))) &&
+      (want === "" ||
+        [
+          nameOf(m),
+          m.tokens.pt.symbol,
+          m.tokens.yieldToken.symbol,
+          assetOf(m),
+          m.tokens.market.address,
+          m.tokens.pt.address,
+          underlyingOf(m),
+        ].some((x) => x != null && x.toLowerCase().includes(want)));
+  };
+  const shown = markets.filter(passesFor(state)).sort(comparator(sort, dir));
 
   const criteria = [
     ...(maturityChoice !== "all" ? [maturityChoice === "active" ? "active markets" : "matured markets"] : []),
@@ -368,49 +374,29 @@ export function PendleRosterView({
           sortOptions={[]}
           searchPlaceholder="Market, token or address"
           countNode={countNode}
+          sheetCount={{ total: shown.length, noun: "markets" }}
+          countFor={(draft) => markets.filter(passesFor(draft)).length}
+          // Below sm the header row is hidden (D6) and the toolbar's sort
+          // writes the same params as a header press.
+          mobileSort={{
+            options: COLUMNS.map((c) => ({ value: c.key, label: c.label })),
+            sortBy: sort,
+            sortOrder: dir,
+            onChange: (key, order) => {
+              const k = key as SortKey;
+              writeSort(k, k === sort ? order : COLUMNS.find((c) => c.key === k)!.first);
+            },
+          }}
           viewMenu
           skel="pendle-roster-facets"
         />
 
-        {/* Below sm the header row is hidden (D6): a select and a direction
-            button write the same params. */}
-        <div className="mb-3 sm:hidden" data-mobile-sort="">
-          <div className="flex items-center gap-2">
-            <label className="flex items-center gap-2 text-[12px] text-rb-500">
-              Sort by
-              <select
-                value={sort}
-                onChange={(e) => {
-                  const key = e.target.value as SortKey;
-                  writeSort(key, COLUMNS.find((c) => c.key === key)!.first);
-                }}
-                className="rounded-md border border-rb-200 bg-background px-2 py-1 text-base text-foreground dark:border-rb-700"
-                aria-describedby={SORT_NOTE[sort] ? "pendle-mobile-sort-note" : undefined}
-              >
-                {COLUMNS.map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              onClick={() => writeSort(sort, dir === "asc" ? "desc" : "asc")}
-              className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-rb-200 px-2 py-1 text-[12px] text-foreground focus-ring dark:border-rb-700"
-              aria-label={dir === "asc" ? "Ascending; switch to descending" : "Descending; switch to ascending"}
-              data-mobile-sort-dir={dir}
-            >
-              <span aria-hidden>{dir === "asc" ? "▲" : "▼"}</span>
-              {column.numeric ? (dir === "asc" ? "Low first" : "High first") : dir === "asc" ? "A to Z" : "Z to A"}
-            </button>
-          </div>
-          {SORT_NOTE[sort] && (
-            <p id="pendle-mobile-sort-note" className="mt-1.5 text-[12px] text-rb-500" data-mobile-sort-note="">
-              {SORT_NOTE[sort]}
-            </p>
-          )}
-        </div>
+        {/* The chosen sort's note, below sm where no header carries it. */}
+        {SORT_NOTE[sort] && (
+          <p className="mb-3 text-[12px] text-rb-500 sm:hidden" data-mobile-sort-note="">
+            {SORT_NOTE[sort]}
+          </p>
+        )}
 
         {shown.length === 0 ? (
           <p className="text-[13px] text-rb-500">No market matches.</p>

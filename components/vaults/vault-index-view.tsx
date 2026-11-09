@@ -14,7 +14,7 @@
 import Link from "next/link";
 import { ProvUnscoped } from "@/components/shared/provenance";
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
-import { VaultIndexTable } from "@/components/vaults/vault-index-table";
+import { VaultIndexTable, useVaultIndexSort } from "@/components/vaults/vault-index-table";
 import { isoSeconds, RosterBlock, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { protocolForPathname } from "@/lib/shared/protocols";
@@ -113,6 +113,7 @@ export function VaultIndexView({
     : [];
   // `?network=` and `?protocol=` (written by the roster, which keeps its
   // facets in the URL here) choose those facets on arrival, as `?asset=` does.
+  const indexSort = useVaultIndexSort(initialSearch ?? "");
   const arrival = new URLSearchParams(initialSearch ?? "");
   const chosen = (id: string, known: string[]) =>
     (arrival.get(id) ?? "")
@@ -191,6 +192,7 @@ export function VaultIndexView({
           holdersHrefOf={vaultIndexHoldersHref}
           receiptsOf={() => ({})}
           hooksOf={hooksOf}
+          mobileSort={indexSort.mobileSort}
           table={(rows, part) => (
             <VaultIndexTable
               rows={rows}

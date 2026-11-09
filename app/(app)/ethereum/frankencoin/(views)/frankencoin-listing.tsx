@@ -85,6 +85,10 @@ export function FrankencoinListing({ initialItems, initialTotal, initialKey, ini
             data: r.data,
             total: r.pagination.total,
           })),
+        fetchCount: (filters) =>
+          fetchFrankencoinPositions({ ...frankencoinFiltersToFetchParams(filters, 1), limit: 1 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

@@ -124,8 +124,8 @@ export const reconcileProv = (reconciles: boolean, ilkCount: number): Provenance
   kind: "chain-derived",
   pclass: "state",
   summary: reconciles
-    ? `The Vat's own identity, checked at this block: sum every ilk's debt, add the DAI that has no collateral behind it, and you have every DAI in existence — exactly, to the last rad (10^-45 DAI). Nothing is rounded to make it close. That the ${ilkCount} rows below account for all of it is what makes the decomposition trustworthy.`
-    : `The Vat's own identity does NOT close at this block: summing every ilk's debt and adding the uncollateralized DAI leaves a gap against Vat.debt. That means this read is not accounting for every DAI in existence — most likely an ilk carrying debt that IlkRegistry.list() no longer returns. The decomposition below is incomplete by the residual shown, and should be read as such.`,
+    ? `The Vat's own identity, checked at this block. Sum every ilk's debt, add the DAI that has no collateral behind it, and you have every DAI in existence — exactly, to the last rad (10^-45 DAI). Nothing is rounded to make it close. That the ${ilkCount} rows below account for all of it is what makes the decomposition trustworthy.`
+    : `The Vat's own identity does NOT close at this block. Summing every ilk's debt and adding the uncollateralized DAI leaves a gap against Vat.debt. That means this read is not accounting for every DAI in existence — most likely an ilk carrying debt that IlkRegistry.list() no longer returns. The decomposition below is incomplete by the residual shown, and should be read as such.`,
   contract: VAT,
   via: `${SYSTEM_VIA} · exact BigInt check in rad, before any rounding`,
   // Every identifier here must be carried by a traced input below — the

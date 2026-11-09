@@ -551,7 +551,7 @@ export const peakLegProv = (
     ? {
         kind: "derived",
         pclass: "state",
-        summary: `The highest ${sym} ${leg} this position ever held: the largest of the vault's settled balances just before and just after each of its rows, from mint to close. Each is the resolver's figure at the row's block, interest included, so a ${side === "supply" ? "peak reached as the collateral earned" : "peak reached as interest built up before a repay"} counts. The collateral and debt peaks can fall on different dates. A token amount in the vault's leg; Fluid runs no USD feed.`,
+        summary: `The highest ${sym} ${leg} this position ever held. The largest of the vault's settled balances just before and just after each of its rows, from mint to close. Each is the resolver's figure at the row's block, interest included, so a ${side === "supply" ? "peak reached as the collateral earned" : "peak reached as interest built up before a repay"} counts. The collateral and debt peaks can fall on different dates. A token amount in the vault's leg; Fluid runs no USD feed.`,
         contract: RESOLVER_CONTRACT,
         via: `max over the position's rows of the settled ${side} before and after (VaultPositionsResolver at each row's block, less later same-block deltas) · mint → close`,
         inputs: eventInputs(coords),
@@ -559,7 +559,7 @@ export const peakLegProv = (
     : {
         kind: "derived",
         pclass: "indexed",
-        summary: `The highest ${sym} ${leg} this position ever recorded: the maximum of the leg's running balance after each captured event, the operate deltas plus every liquidation-attribution row, from mint to close. Interest accrues between events with no log of its own (a Fluid ${side === "supply" ? "collateral leg earns" : "debt leg pays"} continuously), so the true peak can sit above this figure; the settled figures replace it once every row has been read at its block. A token amount in the vault's leg; Fluid runs no USD feed.`,
+        summary: `The highest ${sym} ${leg} this position ever recorded. The maximum of the leg's running balance after each captured event, the operate deltas plus every liquidation-attribution row, from mint to close. Interest accrues between events with no log of its own (a Fluid ${side === "supply" ? "collateral leg earns" : "debt leg pays"} continuously), so the true peak can sit above this figure; the settled figures replace it once every row has been read at its block. A token amount in the vault's leg; Fluid runs no USD feed.`,
         contract: vaultContract(coords),
         via: `${FLUID_VIA} · max(${side === "supply" ? "col" : "debt"}_after) across the position's captured events · mint → close`,
         inputs: eventInputs(coords),
@@ -593,7 +593,7 @@ export const externalActorProv = (
   kind: "chain-derived",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `This ${args.eventType.replace(/_/g, " ")} was executed by a third party: the position owner neither signed the transaction nor was the operate's initiator (the vault call's msg.sender). Both facts are chain values${atBlock(coords)}; each is compared against the owner at this event. Routed flows keep the owner as signer and contract-owned positions keep the owner as initiator — this event has the owner as neither.`,
+  summary: `This ${args.eventType.replace(/_/g, " ")} was executed by a third party. The position owner neither signed the transaction nor was the operate's initiator (the vault call's msg.sender). Both facts are chain values${atBlock(coords)}; each is compared against the owner at this event. Routed flows keep the owner as signer and contract-owned positions keep the owner as initiator — this event has the owner as neither.`,
   contract: vaultContract(coords),
   via: `${FLUID_VIA} · tx envelope from + LogOperate initiator vs owner`,
   inputs: eventInputs(coords, [
