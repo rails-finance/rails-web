@@ -64,6 +64,7 @@ import {
 } from "@/lib/aave-v4/market-provenance";
 import { v4HeldLine, v4ReserveChanges } from "@/lib/aave-v4/config-words";
 import { v4ChangeExplain } from "@/lib/aave-v4/config-explain";
+import { compactFigure } from "@/lib/shared/compact-figure";
 import { v4ParametersLearnMore } from "@/lib/aave-v4/learn-more-parameters";
 import { formatDate } from "@/lib/date";
 import {
@@ -75,7 +76,7 @@ import {
 } from "@/components/protocol/aave-v4/aave-v4-market-parts";
 import { headQuery, namesOf, PREMIUM_LINE, protocolOf, RATE_TIP, useV4Stored } from "@/lib/aave-v4/product";
 import { chainMeta, explorerUrl } from "@/lib/shared/chains";
-import { formatCompact, formatCompactTitled } from "@/lib/shared/format-compact";
+import { formatCompactTitled } from "@/lib/shared/format-compact";
 import { ratePercentText } from "@/lib/shared/rate-percent";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import type { Loadable, ProductHead, ProductSection, RateCurveModel, Missing } from "@/lib/shared/product/model";
@@ -555,7 +556,7 @@ function changesSection(
   const sideName = (side: "spoke" | "hub") => (side === "spoke" ? `${names.spoke} spoke` : `${names.hub} hub`);
   const explorer = chainMeta(d.chainId).explorerName;
   const items = changes.map((c) => ({
-    ...v4ChangeExplain(c, { ...names, compact: formatCompact }),
+    ...v4ChangeExplain(c, { ...names, compact: compactFigure }),
     kind: c.row.kind,
     block: c.row.block,
     logIndex: c.row.logIndex,

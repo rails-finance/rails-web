@@ -19,7 +19,7 @@ import type { ReserveChange } from "./aave-reserve-config-words";
 
 export interface ReserveExplainNames {
   symbol: string;
-  /** The house compact figure (lib/shared/format-compact.ts `formatCompact`). */
+  /** The compact figure (lib/shared/compact-figure.ts `compactFigure`). */
   compact: (n: number) => string;
 }
 

@@ -4,6 +4,7 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
+import { compactFigure } from "../../lib/shared/compact-figure.ts";
 import { v4ReserveChanges } from "../../lib/aave-v4/config-words.ts";
 import { v4ChangeExplain } from "../../lib/aave-v4/config-explain.ts";
 
@@ -51,6 +52,11 @@ const terms = (key, collateralFactor) => ({
 });
 const LISTING = "0xlisting";
 const logs = [
+  at(24720899, "liquidation-config", {
+    targetHealthFactor: "1000000000000000000",
+    healthFactorForMaxBonus: "0",
+    liquidationBonusFactor: "0",
+  }),
   at(24722784, "rate-curve", curve(400, 2000), "0xcurve"),
   at(24722784, "asset-config", asset("0"), "0xcurve"),
   at(24722784, "asset-config", asset("1000"), "0xcurve"),
@@ -69,8 +75,7 @@ const logs = [
 ];
 const log = { chainId: 1, spoke: "main", hub: "core", held: {}, units: {}, notes: [], logs };
 const changes = v4ReserveChanges(log, { symbol: "USDC", hub: "Core", spokeAddress: "0xs", hubAddress: "0xh" });
-const compact = (v) => `${(v / 1e6).toFixed(1)}M`;
-const n = { symbol: "USDC", spoke: "Main", hub: "Core", compact };
+const n = { symbol: "USDC", spoke: "Main", hub: "Core", compact: compactFigure };
 const at1 = (block, kind) =>
   v4ChangeExplain(
     changes.find((c) => c.row.block === block && c.row.kind === kind),
@@ -85,11 +90,11 @@ test("the head names what moved, with the figure", () => {
   assert.equal(head(24723024, "reserve-added"), "Listed|");
   assert.equal(head(24723024, "price-source"), "Price source set|");
   assert.equal(head(24723145, "credit-line"), "Credit line off|");
-  assert.equal(head(25552732, "credit-line"), "Credit line on, caps raised|1.3M → 15.0M USDC");
-  assert.equal(head(25876677, "credit-line"), "Add cap raised|15.0M → 18.0M USDC");
+  assert.equal(head(25552732, "credit-line"), "Credit line on, caps raised|1.25M → 15M USDC");
+  assert.equal(head(25876677, "credit-line"), "Add cap raised|15M → 18M USDC");
   assert.equal(head(26301157, "reserve-config"), "Frozen|");
   assert.equal(head(26305337, "dynamic-added"), "Collateral factor lowered|78% → 0%");
-  assert.equal(head(26337526, "credit-line"), "Draw cap raised|15.0M → 40.0M USDC");
+  assert.equal(head(26337526, "credit-line"), "Draw cap raised|15M → 40M USDC");
   assert.equal(head(26337526, "rate-curve"), "Rate curve changed|");
   assert.equal(head(24722784, "rate-curve"), "Rate curve set|");
 });
@@ -112,7 +117,7 @@ test("each row is read against the row before it of its kind", () => {
 test("the bullets say what the setting does and what the change means", () => {
   assert.deepEqual(at1(26337526, "credit-line").bullets, [
     "The draw cap is the most USDC borrowers on Main can owe the Core hub, in total.",
-    "Raising the draw cap by 25.0M, to 40.0M USDC, adds that much room for borrowing on Main.",
+    "Raising the draw cap by 25M, to 40M USDC, adds that much room for borrowing on Main.",
   ]);
   assert.ok(at1(26337526, "rate-curve").bullets.includes("At 92% usage the rate is now 5%, from 4%."));
   assert.deepEqual(at1(26305337, "dynamic-added").bullets, [
@@ -127,4 +132,29 @@ test("the bullets say what the setting does and what the change means", () => {
     "While the line is off, the Core hub stops Main's USDC supplies, withdrawals, borrows and repayments.",
     "Positions on Main stay as they are until the line is back on.",
   ]);
+});
+
+test("a setting's figure keeps its value to two places, no trailing zeros", () => {
+  assert.equal(compactFigure(1_250_000), "1.25M");
+  assert.equal(compactFigure(40_000_000), "40M");
+  assert.equal(compactFigure(12_500_000), "12.5M");
+  assert.equal(compactFigure(375_000), "375K");
+  assert.equal(compactFigure(2_600_000_000), "2.6B");
+  assert.equal(compactFigure(999_999), "1M");
+});
+
+test("a first reserve-config row states its values, then what collateral risk does", () => {
+  assert.deepEqual(at1(24723024, "reserve-config").bullets, [
+    "Main lends USDC: borrowing is on.",
+    "USDC's collateral risk on Main is 0%.",
+    "A liquidator may take seized USDC as USDC supplied on Main, earning interest, in place of the tokens.",
+    "Collateral risk sets the premium a borrower pays on top of the drawn rate when USDC backs the loan.",
+  ]);
+});
+
+test("the spoke's first liquidation settings are its defaults", () => {
+  const first = changes.filter((c) => c.row.kind === "liquidation-config").at(-1);
+  const e = v4ChangeExplain(first, n);
+  assert.equal(e.headline, "Liquidation settings at their defaults");
+  assert.equal(e.bullets[0], "Main took its default liquidation settings when it was set up.");
 });

@@ -17,7 +17,8 @@
 //                          LiquidationLogic.sol 533–560
 //   collateral risk        ISpoke.sol 41; Spoke.sol 795–803 (the risk premium)
 //   collateral terms       ISpoke.sol 70–72
-//   liquidation settings   ISpoke.sol 80–82; LiquidationLogic.sol 312–333
+//   liquidation settings   ISpoke.sol 80–82; SpokeInstance.sol 23–32 (the
+//                          defaults `initialize` writes); LiquidationLogic.sol 312–333
 //                          (the bonus between its minimum and maximum), 795–812
 //                          (debt repaid to the target health factor)
 //   rate curve             AssetInterestRateStrategy.sol 102–137
@@ -31,7 +32,7 @@ export interface V4ExplainNames {
   symbol: string;
   spoke: string;
   hub: string;
-  /** The house compact figure (lib/shared/format-compact.ts `formatCompact`). */
+  /** The compact figure (lib/shared/compact-figure.ts `compactFigure`). */
   compact: (n: number) => string;
 }
 
@@ -128,7 +129,9 @@ const WORDS = {
     `Collateral risk sets the premium a borrower pays on top of the drawn rate when ${n.symbol} backs the loan.`,
   riskUp: (n: N) => `Borrowers who post ${n.symbol} as collateral on ${n.spoke} now pay a higher premium.`,
   riskDown: (n: N) => `Borrowers who post ${n.symbol} as collateral on ${n.spoke} now pay a lower premium.`,
-  reserveFirst: (n: N) => `${n.spoke} set ${n.symbol}'s flags and collateral risk.`,
+  reserveLends: (n: N) => `${n.spoke} lends ${n.symbol}: borrowing is on.`,
+  reserveNoLend: (n: N) => `Borrowing ${n.symbol} on ${n.spoke} is off.`,
+  reserveRisk: (n: N, p: string) => `${n.symbol}'s collateral risk on ${n.spoke} is ${p}.`,
   reserveSame: (n: N) => `${n.spoke} wrote ${n.symbol}'s settings again with the same values.`,
 
   priceSet: "Price source set",
@@ -158,6 +161,12 @@ const WORDS = {
   rewriteReach: "Every position on these terms takes the new values at once.",
 
   liqSet: "Liquidation settings set",
+  liqDefaults: "Liquidation settings at their defaults",
+  liqDefaultsWhat: (n: N) => `${n.spoke} took its default liquidation settings when it was set up.`,
+  liqDefaultsTarget:
+    "At the defaults, a liquidation repays enough debt to bring the position's health factor back to 1.00.",
+  liqDefaultsBonus:
+    "At the defaults, a liquidator's bonus grows from none at a health factor of 1 to the full maximum at 0.",
   liqChanged: "Liquidation settings changed",
   liqRestated: "Liquidation settings restated",
   liqScope: (n: N) => `These settings apply to every liquidation on ${n.spoke}, whatever the collateral.`,
@@ -211,7 +220,7 @@ const wad = (v: unknown) =>
 const dir = (a: number, b: number): Dir => (b > a ? "raised" : "lowered");
 const ZERO = "0x0000000000000000000000000000000000000000";
 
-/** A cap in the head's compact form, the symbol after: "40.0M USDC", "no cap". */
+/** A cap in the head's compact form, the symbol after: "40M USDC", "no cap". */
 const capFig = (n: N, v: unknown) => (String(v) === NO_CAP ? "no cap" : `${n.compact(Number(v))} ${n.symbol}`);
 /** "40.0M → 50.0M USDC", the symbol once where both sides are tokens. */
 const capMove = (n: N, a: unknown, b: unknown) =>
@@ -311,7 +320,18 @@ function creditLine(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow): Read {
 
 function reserveConfig(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow): Read {
   const side = "spoke" as const;
-  if (!prev) return { head: [{ summary: WORDS.reserveSet, side }], bullets: [WORDS.reserveFirst(n)] };
+  if (!prev) {
+    // The values as set, then what collateral risk does.
+    const bullets = [
+      ...(r.paused === true ? [WORDS.pausedStops(n)] : []),
+      ...(r.frozen === true ? [WORDS.frozenStops(n)] : []),
+      r.borrowable === true ? WORDS.reserveLends(n) : WORDS.reserveNoLend(n),
+      WORDS.reserveRisk(n, pct(bps(r.collateralRisk))),
+      r.receiveSharesEnabled === true ? WORDS.sharesOnWhat(n) : WORDS.sharesOffWhat(n),
+      WORDS.riskWhat(n),
+    ];
+    return { head: [{ summary: WORDS.reserveSet, side }], bullets };
+  }
   const head: V4ChangeHead[] = [];
   const bullets: string[] = [];
   const flip = (k: string, on: string, off: string, onB: string[], offB: string[]) => {
@@ -377,8 +397,23 @@ function collateralTerms(n: N, c: V4Change, prev: V4ConfigRow | undefined, r: V4
   return { head, bullets };
 }
 
+/** The settings a spoke's initializer writes before any are set: a target
+ *  health factor of 1 (WAD) and the bonus terms at zero (SpokeInstance.sol
+ *  23–32, `initialize`, emitting UpdateLiquidationConfig). */
+const DEFAULT_TARGET = "1000000000000000000";
+
 function liquidationConfig(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow): Read {
   const side = "spoke" as const;
+  if (
+    !prev &&
+    String(r.targetHealthFactor) === DEFAULT_TARGET &&
+    String(r.healthFactorForMaxBonus) === "0" &&
+    bps(r.liquidationBonusFactor) === 0
+  )
+    return {
+      head: [{ summary: WORDS.liqDefaults, side }],
+      bullets: [WORDS.liqDefaultsWhat(n), WORDS.liqDefaultsTarget, WORDS.liqDefaultsBonus],
+    };
   const target = lower(prev?.targetHealthFactor) !== lower(r.targetHealthFactor);
   const bonus =
     lower(prev?.healthFactorForMaxBonus) !== lower(r.healthFactorForMaxBonus) ||

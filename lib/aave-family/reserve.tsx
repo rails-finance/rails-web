@@ -42,6 +42,7 @@ import { ethereumVaultRosterHref } from "@/lib/vaults/routes";
 import { historyFrom, useReserveReads, type Read, type ReserveHistory } from "@/lib/api/fetch-aave-reserve-reads";
 import { heldLine, reserveChanges } from "@/lib/shared/aave-reserve-config-words";
 import { reserveChangesExplained } from "@/lib/shared/aave-reserve-config-explain";
+import { compactFigure } from "@/lib/shared/compact-figure";
 import { configChangeProv, holderAmountProv } from "@/lib/shared/aave-reserve-reads-provenance";
 import { formatDate } from "@/lib/date";
 import { chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
@@ -452,7 +453,7 @@ function changeItems(
   chainId: ChainId,
   configurator: string,
 ): ConfigChangeItem[] {
-  const explained = reserveChangesExplained(changes, { symbol, compact: formatCompact });
+  const explained = reserveChangesExplained(changes, { symbol, compact: compactFigure });
   const name = chainMeta(chainId).explorerName;
   return changes.map(({ row, words }, i) => ({
     ...explained[i],
