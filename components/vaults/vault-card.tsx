@@ -193,7 +193,7 @@ export function YieldBullets({ yieldFigure, rewards }: { yieldFigure?: VaultYiel
       ) : (
         <ExplainBullet>No yield figure: the daily series is under 30 days old or was not read.</ExplainBullet>
       )}
-      <ExplainBullet>It is net of fees taken inside the share; {rewards} are not counted.</ExplainBullet>
+      <ExplainBullet>The yield is net of fees taken inside the share; {rewards} are not counted.</ExplainBullet>
     </>
   );
 }

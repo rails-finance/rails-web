@@ -288,7 +288,7 @@ export function MaplePoolPage({
   const loansRaw = (BigInt(s.raw.fixedTermAum) + BigInt(s.raw.openTermAum)).toString();
   const explanation = (
     <div data-vault-explanation="">
-      <ExplainGroup title="Holdings">
+      <ExplainGroup title="Pool">
         <ExplainBullet>
           This pool holds{" "}
           <Fig>
@@ -305,38 +305,21 @@ export function MaplePoolPage({
           lent to Maple&rsquo;s borrowers.
         </ExplainBullet>
         <ExplainBullet>
-          One share is worth{" "}
+          The share price is{" "}
           <Fig>
             {assetText(raw(s.raw.navRate), d)} {unit}
-          </Fig>{" "}
-          and pays{" "}
+          </Fig>
+          , and it rises as borrowers pay interest.
+        </ExplainBullet>
+        <ExplainBullet>No yield figure: Rails keeps no daily share-price series for Maple pools.</ExplainBullet>
+      </ExplainGroup>
+      <ExplainGroup title="Withdrawals">
+        <ExplainBullet>
+          The exit rate is{" "}
           <Fig>
             {assetText(raw(s.raw.exitRate), d)} {unit}
           </Fig>{" "}
-          on withdrawal.
-        </ExplainBullet>
-      </ExplainGroup>
-      <ExplainGroup title="Risk">
-        {delegate && (
-          <ExplainBullet>
-            The pool delegate <Fig>{shortAddress(delegate)}</Fig> funds and calls the loans, and marks a loan as
-            impaired.
-          </ExplainBullet>
-        )}
-        <ExplainBullet>
-          Custodians hold the loans&rsquo; collateral off the chain, so the loan book is read as Maple records it.
-        </ExplainBullet>
-        <ExplainBullet>
-          {losses > ZERO ? (
-            <>
-              <Fig>
-                {assetText(raw(s.raw.unrealizedLosses), d)} {unit}
-              </Fig>{" "}
-              of loans are marked as impaired; a lender who exits now takes a part of it.
-            </>
-          ) : (
-            <>No loan is marked as impaired, so the exit rate equals the share price.</>
-          )}
+          a share, what a withdrawal pays.
         </ExplainBullet>
         <ExplainBullet>
           Withdrawals wait in a queue and are paid from the cash in the pool, first in, first out
@@ -354,9 +337,28 @@ export function MaplePoolPage({
           .
         </ExplainBullet>
       </ExplainGroup>
-      <ExplainGroup title="Rate">
-        <ExplainBullet>The share price rises as borrowers pay interest.</ExplainBullet>
-        <ExplainBullet>No yield figure: Rails keeps no daily share-price series for Maple pools.</ExplainBullet>
+      <ExplainGroup title="Risk">
+        <ExplainBullet>
+          {losses > ZERO ? (
+            <>
+              <Fig>
+                {assetText(raw(s.raw.unrealizedLosses), d)} {unit}
+              </Fig>{" "}
+              of loans are marked as impaired; a lender who exits now takes a part of it.
+            </>
+          ) : (
+            <>No loan is marked as impaired, so the exit rate equals the share price.</>
+          )}
+        </ExplainBullet>
+        {delegate && (
+          <ExplainBullet>
+            The pool delegate <Fig>{shortAddress(delegate)}</Fig> funds and calls the loans, and marks a loan as
+            impaired.
+          </ExplainBullet>
+        )}
+        <ExplainBullet>
+          Custodians hold the loans&rsquo; collateral off the chain, so the loan book is read as Maple records it.
+        </ExplainBullet>
       </ExplainGroup>
       <ExplainGroup title="History">
         <CreatedBullet chainId={MAINNET_CHAIN_ID} block={p.deployBlock > 0 ? p.deployBlock : null} by="Maple" />

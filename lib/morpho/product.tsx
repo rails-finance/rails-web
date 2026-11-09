@@ -16,7 +16,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
+import { ExplainBullet, ExplainGroup, ExplainSub, Fig } from "@/components/shared/explain-groups";
 import { readStampProv } from "@/components/shared/read-stamp";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { MarketPage } from "@/components/shared/product/market-page";
@@ -209,7 +209,7 @@ function MarketExplainer({ x }: { x: Ctx }) {
   const k = curveRead(x);
   return (
     <>
-      <ExplainGroup title="This market">
+      <ExplainGroup title="This reserve">
         <ExplainBullet>
           Suppliers lend {m.loanSymbol} here, and borrowers take it against {x.coll}. The market shares nothing with any
           other Morpho market.
@@ -219,12 +219,16 @@ function MarketExplainer({ x }: { x: Ctx }) {
             Suppliers have put in <Fig bold>{size(m.totalSupply)}</Fig>
             {m.totalBorrow > 0 ? (
               <>
-                , borrowers owe <Fig bold>{size(m.totalBorrow)}</Fig>, and{" "}
-                <Fig bold>{size(m.totalSupply - m.totalBorrow)}</Fig> can be withdrawn or borrowed now.
+                , and borrowers owe <Fig bold>{size(m.totalBorrow)}</Fig>.
               </>
             ) : (
               ", none of it borrowed."
             )}
+          </ExplainBullet>
+        )}
+        {m.amountsTrusted && (
+          <ExplainBullet>
+            <Fig bold>{size(m.totalSupply - m.totalBorrow)}</Fig> can be withdrawn or borrowed now.
           </ExplainBullet>
         )}
         <ExplainBullet>
@@ -235,21 +239,33 @@ function MarketExplainer({ x }: { x: Ctx }) {
       <ExplainGroup title="Rates">
         {m.borrowApr != null && (
           <ExplainBullet>
-            Borrowers pay <Fig bold>{ratePercentText(m.borrowApr)}</Fig> a year and suppliers earn{" "}
-            <Fig bold>{ratePercentText(m.supplyApr ?? 0)}</Fig>, both as APRs. The supply rate is the borrow rate times
-            utilisation <Fig bold>{pctText(m.utilization)}</Fig>
+            Suppliers earn <Fig bold>{ratePercentText(m.supplyApr ?? 0)}</Fig> a year, as an APR.
+          </ExplainBullet>
+        )}
+        {m.borrowApr != null && (
+          <ExplainBullet
+            sub={
+              k && (
+                <ExplainSub>
+                  The rate model aims for 90% utilisation. Above it the rates climb steeply and rise further every day;
+                  below it they ease. At 90% the borrow rate is <Fig bold>{ratePercentText(k.rat)}</Fig> now.
+                </ExplainSub>
+              )
+            }
+          >
+            Borrowers pay <Fig bold>{ratePercentText(m.borrowApr)}</Fig> a year, as an APR.
+          </ExplainBullet>
+        )}
+        {m.borrowApr != null && (
+          <ExplainBullet>
+            Utilisation <Fig bold>{pctText(m.utilization)}</Fig> is the share of the supply on loan. The supply rate is
+            the borrow rate times it
             {m.fee > 0 ? (
               <>
                 , less the <Fig bold>{pctText(m.fee, 0)}</Fig> fee
               </>
             ) : null}
             .
-          </ExplainBullet>
-        )}
-        {k && (
-          <ExplainBullet>
-            The rate model aims for 90% utilisation. Above it the rates climb steeply and rise further every day; below
-            it they ease. At 90% the borrow rate is <Fig bold>{ratePercentText(k.rat)}</Fig> now.
           </ExplainBullet>
         )}
       </ExplainGroup>
@@ -259,7 +275,9 @@ function MarketExplainer({ x }: { x: Ctx }) {
           oracle&apos;s price. Past that, anyone can repay the debt and take collateral worth{" "}
           <Fig bold>{pctText((m.liquidationIncentive ?? 1) - 1)}</Fig> more.
         </ExplainBullet>
-        <ExplainBullet>These terms were fixed when the market was created and never change.</ExplainBullet>
+        <ExplainBullet>
+          The market keeps its LLTV and incentive for its whole life, as set when it was created.
+        </ExplainBullet>
       </ExplainGroup>
     </>
   );

@@ -22,7 +22,7 @@
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
-import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
+import { ExplainBullet, ExplainGroup, ExplainSub, Fig } from "@/components/shared/explain-groups";
 import { readStampProv } from "@/components/shared/read-stamp";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading, type SectionMenuLink } from "@/components/shared/section-menu";
@@ -469,8 +469,8 @@ function RosterExplainer({ d }: { d: MorphoRosterData }) {
           different tokens do not compare.
         </ExplainBullet>
         <ExplainBullet>
-          Each group lists the markets that carry its book. Its page lists the rest: markets that repeat one pair, the
-          small ones and the never funded.
+          Each group lists the markets that carry its book. Each loan token&apos;s page lists the rest: markets that
+          repeat one pair, the small ones and the never funded.
         </ExplainBullet>
         <ExplainBullet>
           Sizes are as each market last settled; Morpho Blue adds interest only when a market is used.
@@ -636,16 +636,19 @@ function LoanTokenExplainer({ g, overIssued }: { g: MorphoLoanTokenViewData; ove
           liquidity: a supplier in one earns nothing from another.
         </ExplainBullet>
         {g.amountsTrusted && (
-          <ExplainBullet>
+          <ExplainBullet
+            sub={
+              overIssued && (
+                <ExplainSub>
+                  The books are more than the <Fig bold>{sz(g.loanTokenSupply ?? 0)}</Fig> that exists. Morpho Blue adds
+                  interest to a market&apos;s book without moving tokens, so a market left fully borrowed at a climbing
+                  rate grows its book past the token behind it.
+                </ExplainSub>
+              )
+            }
+          >
             Together suppliers have put in <Fig bold>{sz(g.totalSupply)}</Fig> and borrowers owe{" "}
             <Fig bold>{sz(g.totalBorrow)}</Fig>, as each market last settled.
-          </ExplainBullet>
-        )}
-        {overIssued && (
-          <ExplainBullet>
-            That is more than the <Fig bold>{sz(g.loanTokenSupply ?? 0)}</Fig> that exists. Morpho Blue adds interest to
-            a market&apos;s book without moving tokens, so a market left fully borrowed at a climbing rate grows its
-            book past the token behind it.
           </ExplainBullet>
         )}
       </ExplainGroup>
