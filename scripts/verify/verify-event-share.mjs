@@ -1431,6 +1431,10 @@ async function verifyFamilyOnce(
   const followed = await viewPage
     .waitForSelector(IN_TIMELINE, { timeout: 60000 })
     .then(() => viewPage.click(IN_TIMELINE, { timeout: 60000 }))
+    // The ⋮ entry (ui-jobs 535) navigates client-side: "domcontentloaded" has
+    // already fired on the event page, which carries the same data-event-id,
+    // so wait for the route to leave /event/ before reading the landed card.
+    .then(() => viewPage.waitForURL((u) => !u.pathname.includes("/event/"), { timeout: 60000 }))
     .then(() => viewPage.waitForLoadState("domcontentloaded"))
     .then(() => null)
     .catch((e) => String(e).split("\n")[0]);
