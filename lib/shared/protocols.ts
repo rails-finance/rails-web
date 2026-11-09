@@ -229,7 +229,10 @@ const SPECS: ProtocolSpec[] = [
     brand: 280,
     tags: ["Lend", "Borrow"],
     desc: "Multi-spoke lending with unified liquidity across asset classes",
-    subPages: [{ segment: "hubs", label: "Hub comparison", tab: "Hubs" }],
+    subPages: [
+      { segment: "markets", label: "Markets", tab: "Markets" },
+      { segment: "hubs", label: "Hubs", tab: "Hubs" },
+    ],
   },
   {
     // Aave V4's Base deployment — the Equities hub and its one spoke, Mag7:
@@ -245,7 +248,10 @@ const SPECS: ProtocolSpec[] = [
     protocolKey: "aave-v4",
     tags: ["Lend", "Borrow"],
     desc: "Aave V4 on Base: the Equities hub's Mag7 spoke, where Coinbase tokenized stocks back USDC loans, each stock price stated with when it was published",
-    subPages: [{ segment: "hubs", label: "Equities hub", tab: "Hub" }],
+    subPages: [
+      { segment: "markets", label: "Markets", tab: "Markets" },
+      { segment: "hubs", label: "Hubs", tab: "Hubs" },
+    ],
   },
   {
     // Aave's VAULT LAYER, and a third Aave row on Ethereum beside the two pool

@@ -148,6 +148,8 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/base/aave-v3/market", "/base/aave-v3/markets"],
   ["/ethereum/spark/market", "/ethereum/spark/markets"],
   ["/base/seamless/market", "/base/seamless/markets"],
+  ["/ethereum/aave-v4/market", "/ethereum/aave-v4/markets"],
+  ["/base/aave-v4/market", "/base/aave-v4/markets"],
 ];
 
 /** The deployed commit's date, for the sitemap's `lastmod`
