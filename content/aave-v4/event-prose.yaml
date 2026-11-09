@@ -1490,6 +1490,10 @@ L5:
       Lombard BTC takes LBTC, Lombard's staked BTC, as collateral and lends WBTC and cbBTC from the Core hub.
     intro_stablecoin_correlated: |-
       Stablecoin Correlated sits on the Global Dollar hub. It takes a Pendle principal token on USDG as collateral, borrows stablecoins there, and borrows USDG from Core.
+    intro_usdg_syrup: |-
+      USDG Syrup takes syrupUSDG as collateral and lends USDG and USDC from the Global Dollar hub. It borrows USDG from the Core hub too, over a capped credit line.
+    intro_usdg_paxg: |-
+      USDG PAXG takes PAXG, Paxos Gold, as collateral and lends USDG, all on the Global Dollar hub.
     intro_mag7: |-
       Mag7 is Aave V4's one market on Base. Coinbase tokenized stocks are its collateral, and USDC from the Equities hub is the one asset it lends.
     detailsHeading: |-
