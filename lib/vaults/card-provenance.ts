@@ -52,3 +52,40 @@ export const vaultVenueShareProv = (
     },
     readBy,
   );
+
+/** A venue of "Where the assets are": the contract or market it is, which the
+ *  table's surface names only by its asset or its name. `ids` are the
+ *  coordinates the surface leaves out (a Morpho market's id, a strategy's
+ *  address), each a labelled input. */
+export const vaultVenueProv = (
+  v: VaultSummary,
+  {
+    venue,
+    what,
+    via,
+    contract,
+    ids = [],
+  }: {
+    /** The venue as the table names it. */
+    venue: string;
+    /** One sentence: what the venue is, and what the vault holds there. */
+    what: string;
+    /** The call that names the venue: "withdrawQueue(i) · idToMarketParams(id)". */
+    via: string;
+    contract?: { name: string; address?: string };
+    ids?: { label: string; value: string }[];
+  },
+  readBy?: ServerRead | null,
+): Provenance =>
+  stampServerRead(
+    {
+      kind: "chain",
+      pclass: "state",
+      source: { block: v.readAt.block },
+      summary: `${venue} — ${what} Read at block ${n(v.readAt.block)}.`,
+      contract: contract ?? contractOf(v),
+      via: `chain · ${via} @ the pinned block`,
+      inputs: ids.map((i) => ({ label: i.label, value: i.value, kind: "chain" as const, pclass: "state" as const })),
+    },
+    readBy,
+  );

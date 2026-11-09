@@ -7,23 +7,21 @@
 // Holders is the census's, Yield the daily store's.
 
 import { serverReadOf } from "@/lib/shared/server-head-read";
-import Link from "next/link";
 import { ProvReceiptsScope, Prov, useReceiptRegistry } from "@/components/shared/provenance";
-import { BlockRef } from "@/components/shared/block-ref";
+import { readStampProv, SectionReadStamp } from "@/components/shared/read-stamp";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
 import { PanelFigure, type PositionPanelRow } from "@/components/shared/position-card-panel";
-import { VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
+import { CreatedBullet, VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
 import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
 import { VaultFinder } from "@/components/vaults/vault-finder";
 import { VaultStrip } from "@/components/vaults/vault-strip";
 import { VaultIlliquidMarkets } from "@/components/vaults/vault-illiquid";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
 import { explorerUrl } from "@/lib/shared/chains";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { assetText, pctText, shareText, shortAddress, shortId } from "@/lib/shared/vault-amount-text";
 import { StatAmount } from "@/components/vaults/stat-amount";
-import { morphoBasePositionHref, morphoBaseWalletHref } from "@/lib/morpho-base/routes";
-import { morphoLoanTokenHref } from "@/lib/morpho/market-routes";
+import { morphoBaseWalletHref } from "@/lib/morpho-base/routes";
+import { morphoLoanTokenHref, morphoMarketHref } from "@/lib/morpho/market-routes";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import {
   vaultAllocatedProv,
@@ -42,7 +40,8 @@ import type { MorphoBaseVaultResponse } from "@/lib/sources/chain/morpho-base-va
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { metaMorphoVaultsListingHref } from "@/lib/vaults/routes";
 import { morphoBaseVaultPageSummary } from "@/lib/vaults/summary";
-import { vaultStewardProv } from "@/lib/vaults/card-provenance";
+import { vaultStewardProv, vaultVenueProv } from "@/lib/vaults/card-provenance";
+import { vaultAssetsExports, type VaultExportModel } from "@/lib/vaults/card-export";
 import {
   morphoVaultAssetsContent,
   morphoVaultCardContent,
@@ -60,12 +59,6 @@ const CHAIN_WORDS = {
   8453: { explorer: "Basescan", app: "base" },
   1: { explorer: "Etherscan", app: "ethereum" },
 } as const;
-
-/** The vault's own position on one Blue market, on the chain's explorer. */
-const bluePositionHref = (chainId: 1 | 8453, vault: string, marketId: string) =>
-  chainId === 8453
-    ? morphoBasePositionHref(vault, marketId)
-    : `/ethereum/morpho/${marketId.replace(/^0x/, "").toLowerCase()}-${vault.toLowerCase()}`;
 
 /** Every Blue position the vault holds, on the chain's explorer. */
 const blueWalletHref = (chainId: 1 | 8453, vault: string) =>
@@ -125,7 +118,7 @@ export function MorphoBaseVaultPage({
     {
       id: "allocated",
       label: "Allocated in Morpho Blue",
-      tip: "The vault's supply positions summed, as Morpho Blue last settled each market. Total assets adds interest up to this block; no order between the two is asserted.",
+      tip: "The vault's supply in each Morpho Blue market, summed as Morpho Blue last settled them. Total assets adds the interest since, so either figure can be the larger.",
       asset,
       value: (
         <span data-figure="allocated">
@@ -138,7 +131,7 @@ export function MorphoBaseVaultPage({
     {
       id: "unaccrued",
       label: "Unaccrued interest",
-      tip: "Total assets minus the allocated sum: interest the vault counts to this block that the markets have not settled.",
+      tip: "Total assets minus the allocated sum: interest the vault counts that the markets have not settled yet.",
       asset,
       value: (
         <span data-figure="gap">
@@ -154,16 +147,10 @@ export function MorphoBaseVaultPage({
       sub: steward.role === "curator" ? "curator" : "owner",
       tip: steward.role === "curator" ? STEWARD_TIP.curator : STEWARD_TIP.owner,
       value: (
-        <a
-          href={base("address", steward.address)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-mono text-sm hover:underline"
-          data-steward={steward.address}
-          data-steward-role={steward.role}
-        >
+        // The short address alone: the steward's explorer page is a row of the ⋮.
+        <span className="font-mono text-sm" data-steward={steward.address} data-steward-role={steward.role}>
           <Prov info={vaultStewardProv(v, steward, coords.readBy)}>{shortAddress(steward.address)}</Prov>
-        </a>
+        </span>
       ),
     },
   ];
@@ -184,7 +171,15 @@ export function MorphoBaseVaultPage({
       ),
     });
 
+  const stewardWord = steward.role === "curator" ? "Curator" : "Owner";
   const links: VaultMenuLink[] = [
+    {
+      item: "own-positions",
+      title: "This vault's positions on Morpho Blue",
+      subtitle: "The vault as a Morpho Blue lender",
+      href: blueWalletHref(chainId, vault.address),
+      internal: true,
+    },
     {
       item: "vault-contract",
       title: "Vault contract",
@@ -208,11 +203,10 @@ export function MorphoBaseVaultPage({
       href: base("block", vault.createdBlock),
     },
     {
-      item: "own-positions",
-      title: "This vault's positions on Morpho Blue",
-      subtitle: "The vault as a Morpho Blue lender",
-      href: blueWalletHref(chainId, vault.address),
-      internal: true,
+      item: "steward",
+      title: `${stewardWord} on ${words.explorer}`,
+      subtitle: shortAddress(steward.address),
+      href: base("address", steward.address),
     },
     {
       item: "venue-page",
@@ -231,34 +225,38 @@ export function MorphoBaseVaultPage({
   const idle = legs.find((l) => l.isIdle);
   const rows: VaultAssetRow[] = legs.map((leg) => {
     const legCoords: MorphoVaultCoords = { ...coords, marketId: leg.id, collateralSymbol: leg.collateralSymbol };
+    const venue = leg.isIdle ? "Idle market" : (leg.collateralSymbol ?? shortId(leg.id));
     return {
       key: leg.id,
-      venue: leg.isIdle ? "Idle market" : (leg.collateralSymbol ?? shortId(leg.id)),
-      sub: (
+      venue,
+      href: morphoMarketHref(chainId, leg.loanToken, leg.id),
+      venueProv: vaultVenueProv(
+        v,
+        {
+          venue,
+          what: leg.isIdle
+            ? `the vault's idle market on Morpho Blue: a market with no collateral, no oracle and no rate model, where it holds ${unit} unlent.`
+            : `the Morpho Blue market lending ${unit} against ${leg.collateralSymbol ?? "its collateral"}, a market in the vault's withdraw queue.`,
+          via: "withdrawQueue(i) · idToMarketParams(id) · position(id, vault)",
+          contract: { name: "Morpho Blue", address: vault.morpho },
+          ids: [
+            { label: "market id", value: leg.id },
+            { label: "loan token", value: leg.loanToken },
+          ],
+        },
+        coords.readBy,
+      ),
+      sub: leg.isIdle ? (
+        "the vault's cash inside Morpho Blue"
+      ) : (
         <>
-          {!leg.isIdle && (
-            <>
-              LLTV <Prov info={vaultLegLltvProv(legCoords)}>{lltvText(leg.lltv)}</Prov> ·{" "}
-            </>
-          )}
-          <span className="font-mono">{shortId(leg.id)}</span>
+          LLTV <Prov info={vaultLegLltvProv(legCoords)}>{lltvText(leg.lltv)}</Prov>
         </>
       ),
       amount: leg.assets,
       amountProv: vaultLegAssetsProv(legCoords),
       share: leg.shareOfAllocated,
       shareProv: vaultLegShareProv(legCoords),
-      links: (
-        <span className="whitespace-nowrap">
-          <Link href={morphoLoanTokenHref(chainId, leg.loanToken)} className={PAGE_LINK} prefetch={false}>
-            {unit} markets
-          </Link>
-          <span className="mx-1.5 text-rb-500">·</span>
-          <Link href={bluePositionHref(chainId, vault.address, leg.id)} className={PAGE_LINK} prefetch={false}>
-            vault&rsquo;s position
-          </Link>
-        </span>
-      ),
       hooks: { "data-leg": leg.id },
     };
   });
@@ -302,18 +300,35 @@ export function MorphoBaseVaultPage({
         <YieldBullets yieldFigure={yieldFigure} rewards="rewards paid outside the share, such as MORPHO," />
       </ExplainGroup>
       <ExplainGroup title="History">
-        <ExplainBullet>
-          Created at block <Fig>{n(vault.createdBlock)}</Fig> by the MetaMorpho {vault.factory} factory.
-        </ExplainBullet>
+        <CreatedBullet
+          chainId={chainId}
+          block={vault.createdBlock > 0 ? vault.createdBlock : null}
+          by={`the MetaMorpho ${vault.factory} factory`}
+        />
         {v.census && (
           <ExplainBullet>
             <Fig>{n(v.census.holders)}</Fig> addresses have held a share; <Fig>{n(v.census.live)}</Fig> hold one at the
-            census block.
+            last census.
           </ExplainBullet>
         )}
       </ExplainGroup>
     </div>
   );
+
+  const exportModel: VaultExportModel = {
+    stats: [
+      ["Shares issued", `${shareText(data.totalSupply, vault.decimals)} ${vault.symbol}`],
+      ["Allocated in Morpho Blue", `${assetText(data.allocated, ad)} ${unit}`],
+      ["Unaccrued interest", `${assetText(data.gap, ad)} ${unit}`],
+      [`Steward (${steward.role})`, steward.address],
+      ...(lostStat ? ([["Lost assets", `${assetText(lostStat, ad)} ${unit}`]] as [string, string][]) : []),
+    ],
+    rows: legs.map((l) => [
+      `${l.isIdle ? "Idle market" : (l.collateralSymbol ?? shortId(l.id))} ${l.id}`,
+      assetText(l.assets, ad),
+      l.shareOfAllocated == null ? "" : pctText(l.shareOfAllocated),
+    ]),
+  };
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -340,28 +355,36 @@ export function MorphoBaseVaultPage({
         links={links}
         explanation={explanation}
         learnMore={morphoVaultCardContent()}
-        readAt={
-          <>
-            Read at <BlockRef block={data.blockNumber} chainId={chainId} />, on the vault and on the{" "}
-            <a href={base("address", vault.morpho)} target="_blank" rel="noopener noreferrer" className="link-external">
-              Morpho Blue singleton
-            </a>
-          </>
+        stamp={
+          <SectionReadStamp
+            chainId={chainId}
+            block={data.blockNumber}
+            readBy={coords.readBy}
+            info={(at) =>
+              readStampProv({
+                chainId,
+                block: data.blockNumber,
+                at,
+                readBy: coords.readBy,
+                what: "Every figure on this card and in where the assets are",
+                contracts: [
+                  {
+                    name: vault.name,
+                    address: vault.address,
+                    reads:
+                      "totalAssets(), totalSupply(), convertToAssets(), curator(), owner(), lostAssets(), withdrawQueue()",
+                  },
+                  {
+                    name: "Morpho Blue",
+                    address: vault.morpho,
+                    reads: "market(id), position(id, vault), idToMarketParams(id) for each market in the queue",
+                  },
+                ],
+              })
+            }
+          />
         }
-        exports={{
-          stats: [
-            ["Shares issued", `${shareText(data.totalSupply, vault.decimals)} ${vault.symbol}`],
-            ["Allocated in Morpho Blue", `${assetText(data.allocated, ad)} ${unit}`],
-            ["Unaccrued interest", `${assetText(data.gap, ad)} ${unit}`],
-            [`Steward (${steward.role})`, steward.address],
-            ...(lostStat ? ([["Lost assets", `${assetText(lostStat, ad)} ${unit}`]] as [string, string][]) : []),
-          ],
-          rows: legs.map((l) => [
-            `${l.isIdle ? "Idle market" : (l.collateralSymbol ?? shortId(l.id))} ${l.id}`,
-            assetText(l.assets, ad),
-            l.shareOfAllocated == null ? "" : pctText(l.shareOfAllocated),
-          ]),
-        }}
+        exports={exportModel}
       />
       <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
       <VaultAssets
@@ -372,11 +395,30 @@ export function MorphoBaseVaultPage({
         line={
           <>
             <PanelFigure>{n(funded.length)}</PanelFigure> of {n(legs.length)} markets in the withdraw queue hold a
-            balance at this block.
+            balance.
           </>
         }
-        shareTip="Each market's amount over the sum across the withdraw queue, as Morpho Blue last settled them at this block."
+        shareTip="Each market's amount over the sum across the withdraw queue."
         learnMore={morphoVaultAssetsContent()}
+        menu={{
+          links: [
+            {
+              item: "own-positions",
+              title: "This vault's positions on Morpho Blue",
+              subtitle: "The vault as a Morpho Blue lender",
+              href: blueWalletHref(chainId, vault.address),
+              internal: true,
+            },
+            {
+              item: "loan-token-markets",
+              title: `${unit} markets on Morpho Blue`,
+              subtitle: `Every market that lends ${unit}`,
+              href: morphoLoanTokenHref(chainId, vault.asset.address),
+              internal: true,
+            },
+          ],
+          exports: vaultAssetsExports(v, exportModel),
+        }}
       />
       <VaultFinder />
     </ProvReceiptsScope>

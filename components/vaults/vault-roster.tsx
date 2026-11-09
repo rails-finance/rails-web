@@ -37,6 +37,7 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { isoSeconds, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import { InfoDisclosureTrigger } from "@/components/shared/info-disclosure";
+import { SectionMenu, type SectionMenuLink } from "@/components/shared/section-menu";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { ListToolbar, type ListToolbarProps } from "@/components/shared/filter-bar/list-toolbar";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
@@ -90,6 +91,53 @@ export interface VaultRosterHead {
   readAt?: ReactNode;
   /** The cross-protocol index, linked after the sentence; null on the index. */
   indexHref?: string | null;
+  /** The roster's ⋮ at the right of the read-stamp row (`RosterMenu`): its
+   *  pages and "Inspect provenance" on the roster alone. Absent on the index,
+   *  which carries no provenance. */
+  menu?: ReactNode;
+}
+
+/** The roster's scope: its ⋮ arms the inspector on it alone. */
+export const ROSTER_SCOPE = "vault-roster";
+
+/** The family roster's ⋮: every holder, the index and the about page on
+ *  Rails, the protocol's docs, then Inspect provenance. */
+export function RosterMenu({
+  listingHref,
+  infoHref,
+  docs,
+}: {
+  listingHref: string | null;
+  infoHref: string | null;
+  docs?: { title: string; subtitle: string; href: string };
+}) {
+  const links: SectionMenuLink[] = [
+    ...(listingHref
+      ? [
+          {
+            item: "every-holder",
+            title: "Every holder",
+            subtitle: "The positions in these vaults",
+            href: listingHref,
+            internal: true,
+          },
+        ]
+      : []),
+    {
+      item: "vault-index",
+      title: "All vaults",
+      subtitle: "Every protocol's vaults on one table",
+      href: VAULT_INDEX_HREF,
+      internal: true,
+    },
+    ...(infoHref
+      ? [{ item: "info", title: "How this is built", subtitle: "About these vaults", href: infoHref, internal: true }]
+      : []),
+    ...(docs ? [{ item: "docs", ...docs }] : []),
+  ];
+  return (
+    <SectionMenu scope={ROSTER_SCOPE} title="Vaults" hint="Click a value on this roster to trace it" links={links} />
+  );
 }
 
 const rawOf = (v: VaultSummary) => BigInt(v.totalAssets?.raw ?? "0");
@@ -482,6 +530,7 @@ export function VaultRoster({
               label="about these vaults"
               ariaControls="vault-roster-intro"
             />
+            {head.menu && <span className="ml-auto">{head.menu}</span>}
           </div>
         )
       )}

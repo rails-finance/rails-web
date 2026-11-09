@@ -4,19 +4,31 @@
 // section under the vault card on every family. At its head the allocation
 // band (decision 0043 point 4, the one `band`; the plan in
 // lib/vaults/allocation-plan.ts), beneath it one table in the house style
-// (components/shared/data-table), Venue · Amount · Share of this vault · Links, in the source's own order with Idle as a row. "Share
+// (components/shared/data-table), Venue · Amount · Share of this vault, in the source's own order with Idle as a row. "Share
 // of this vault" is a fraction of one vault's book, both terms reads of the
 // vault at one block (survey §7.3); its header tip names the denominator. One
 // line under the heading; the rest is behind the section's "?".
 //
 // From sm every row is two lines, 64px (D1 `rowHeight="two"`): the venue over its
 // sub-label, each truncating with its full text in a `title` where it is
-// text. Amount carries the asset's mark (`AssetUnit`). Rows are unlinked: a
-// venue has no one Rails page (a Morpho market has two, a strategy or a
-// reserve none). Below sm each row is a card (D6): the venue across, Amount
-// and Share two-up under their names, the links on a line at the foot.
+// text. Amount carries the asset's mark (`AssetUnit`). A venue opens Rails's
+// page for it where there is one (a Morpho market, an Aave reserve, a Yearn
+// vault), else it is text; its contract and ids are the venue's receipt. The
+// section's ⋮ carries the Rails pages for the whole table, the exports and
+// "Inspect provenance" on this section alone (components/shared/section-menu.tsx).
+// Below sm each row is a card (D6): the venue across, Amount and Share two-up
+// under their names.
 
 import type { ReactNode } from "react";
+import Link from "next/link";
+import {
+  ProvSection,
+  SectionHeading,
+  SectionMenu,
+  type SectionMenuExports,
+  type SectionMenuLink,
+} from "@/components/shared/section-menu";
+import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { AllocationBar, type AllocationSegment } from "@/components/shared/ratio-bar";
 import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -41,6 +53,12 @@ export interface VaultAssetRow {
   key: string;
   /** The venue's name: a market's collateral, a strategy, the wrapped reserve. */
   venue: ReactNode;
+  /** Rails's page for the venue, where there is one. */
+  href?: string;
+  /** The venue's receipt: its contract, its market id. */
+  venueProv?: Provenance;
+  /** `data-*` hooks on the venue's name. */
+  venueHooks?: Record<string, string>;
   /** The venue's sub-label: a market's LLTV and id, a strategy's cap. */
   sub?: ReactNode;
   /** In the vault's asset; null where the read did not answer. */
@@ -51,12 +69,26 @@ export interface VaultAssetRow {
   /** Over the table's denominator; null where there is none to state. */
   share: number | null;
   shareProv?: Provenance;
-  links?: ReactNode;
   /** A row the band does not draw (a wrapper hop, which holds no amount of
    *  this vault's asset). */
   offBand?: boolean;
   /** `data-*` hooks a verifier reads. */
   hooks?: Record<string, string>;
+}
+
+/** The section's scope: its ⋮ arms the inspector on it alone. */
+export const ASSETS_SCOPE = "vault-assets";
+
+/** The venue: its receipt around the name, inside the link to its page. */
+function venueOf(r: VaultAssetRow): ReactNode {
+  const name = r.venueProv ? <Prov info={r.venueProv}>{r.venue}</Prov> : r.venue;
+  return r.href ? (
+    <Link href={r.href} className={PAGE_LINK} prefetch={false} data-venue-link="">
+      {name}
+    </Link>
+  ) : (
+    name
+  );
 }
 
 export function VaultAssets({
@@ -67,6 +99,7 @@ export function VaultAssets({
   line,
   shareTip,
   learnMore,
+  menu,
 }: {
   rows: VaultAssetRow[];
   assetSymbol: string;
@@ -78,6 +111,8 @@ export function VaultAssets({
   /** The "Share of this vault" header's read-more: what divides what. */
   shareTip: string;
   learnMore: LearnMoreContent;
+  /** The section ⋮'s rows above Inspect provenance. */
+  menu: { links?: SectionMenuLink[]; exports?: SectionMenuExports };
 }) {
   const banded = rows
     .map((r, order) => ({ r, order }))
@@ -121,21 +156,22 @@ export function VaultAssets({
   const shareHead = <HeadingTip text="Share of this vault" tip={shareTip} />;
 
   return (
-    <section
-      className="mb-6"
+    <ProvSection
+      scope={ASSETS_SCOPE}
+      className="mb-4"
       data-anatomy="V3"
       data-skel-section="vault-allocation"
       data-alloc-total={total.toString()}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-semibold text-foreground">Where the assets are</h2>
-          <p className="mt-1 text-[13px] text-rb-500" data-prov-exempt>
-            {line}
-          </p>
-        </div>
-        <LearnMore inline content={learnMore} ariaLabel="Where the assets are, learn more" />
-      </div>
+      <SectionHeading
+        title="Where the assets are"
+        help={<LearnMore inline content={learnMore} ariaLabel="Where the assets are, learn more" />}
+        menu={<SectionMenu scope={ASSETS_SCOPE} title="Where the assets are" {...menu} />}
+      >
+        <p className="mt-1 text-[13px] text-rb-500" data-prov-exempt>
+          {line}
+        </p>
+      </SectionHeading>
       <div className="mt-3 [&>div]:px-0">
         <AllocationBar
           segments={segments}
@@ -154,7 +190,6 @@ export function VaultAssets({
           <DataTableHeader label="Venue" />
           <DataTableHeader label="Amount" align="right" />
           <DataTableHeader align="right">{shareHead}</DataTableHeader>
-          <DataTableHeader label="Links" align="right" />
         </DataTableHead>
         <DataTableBody>
           {rows.map((r) => (
@@ -164,8 +199,9 @@ export function VaultAssets({
                   className="block text-foreground sm:truncate"
                   title={typeof r.venue === "string" ? r.venue : undefined}
                   data-cell="venue"
+                  {...r.venueHooks}
                 >
-                  {r.venue}
+                  {venueOf(r)}
                 </span>
                 {r.sub != null && (
                   <span
@@ -207,13 +243,10 @@ export function VaultAssets({
                   )}
                 </span>
               </DataTableCell>
-              <DataTableCell align="right" wide className="whitespace-nowrap max-sm:pt-0">
-                {r.links}
-              </DataTableCell>
             </DataTableRow>
           ))}
         </DataTableBody>
       </DataTable>
-    </section>
+    </ProvSection>
   );
 }

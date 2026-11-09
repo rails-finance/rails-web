@@ -68,3 +68,37 @@ export function vaultCardCsv(v: VaultSummary, y: VaultYield | undefined, m: Vaul
   ];
   return rows.map((r) => r.map(cell).join(",")).join("\n");
 }
+
+/** "Where the assets are" alone, for its section's ⋮. */
+export function vaultAssetsMarkdown(v: VaultSummary, m: VaultExportModel): string {
+  const name = v.name ?? v.catalogName ?? v.symbol ?? v.address;
+  return [
+    `# Where the assets are: ${name}`,
+    "",
+    `\`${v.address}\` · chain ${v.chainId} · read at block ${n(v.readAt.block)}`,
+    "",
+    `| Venue | Amount · ${v.asset.symbol} | Share of this vault |`,
+    "|---|---:|---:|",
+    ...m.rows.map(([a, b, c]) => `| ${a} | ${b} | ${c} |`),
+    "",
+    `Exported ${new Date().toISOString()}.`,
+  ].join("\n");
+}
+
+export function vaultAssetsCsv(v: VaultSummary, m: VaultExportModel): string {
+  const rows: string[][] = [
+    ["venue", `amount_${v.asset.symbol}`, "share_of_this_vault", "block"],
+    ...m.rows.map(([a, b, c]) => [a, b, c, String(v.readAt.block)]),
+  ];
+  return rows.map((r) => r.map(cell).join(",")).join("\n");
+}
+
+/** The section ⋮'s exports for "Where the assets are". */
+export const vaultAssetsExports = (v: VaultSummary, m: VaultExportModel) => ({
+  markdown: { build: () => vaultAssetsMarkdown(v, m), copySubtitle: "The table as Markdown, for an LLM" },
+  csv: {
+    filename: `${v.symbol ?? v.address}-where-the-assets-are-${v.readAt.block}.csv`,
+    build: () => vaultAssetsCsv(v, m),
+    subtitle: "One row per venue",
+  },
+});

@@ -28,8 +28,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { MorphoBaseVaultPage as MorphoBaseVaultPageView } from "@/components/vaults/morpho-base-vault-page";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { RailHeader } from "@/components/shared/rail-header";
@@ -122,7 +121,7 @@ export async function MetaMorphoVaultRoute({
           />
         )}
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+        {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
         <ProvInspectorLayer />
       </div>
     </div>

@@ -16,9 +16,10 @@
 
 import type { ReactNode } from "react";
 import type { ServerRead } from "@/lib/shared/server-head-read";
-import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { Prov } from "@/components/shared/provenance";
+import { ProvSection } from "@/components/shared/section-menu";
 import { isoSeconds, RosterBlock } from "@/components/vaults/roster-read-stamp";
-import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
+import { ROSTER_SCOPE, RosterMenu, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { AaveFirstPartySources } from "@/components/vaults/aave-first-party-sources";
 import { AAVE_FAMILY_LABEL } from "@/components/vaults/aave-vault-format";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -92,9 +93,8 @@ export function AaveVaultDirectoryView({
       chainId={MAINNET_CHAIN_ID}
     />
   );
-  const registry = useReceiptRegistry();
   return (
-    <ProvReceiptsScope registry={registry}>
+    <ProvSection scope={ROSTER_SCOPE} as="div">
       <VaultRoster
         initialSearch={initialSearch}
         readTime={readBy?.blockTime}
@@ -130,10 +130,21 @@ export function AaveVaultDirectoryView({
           ),
           listingHref: ethereumVaultsListingHref(),
           infoHref: `${ethereumVaultRosterHref()}/info`,
+          menu: (
+            <RosterMenu
+              listingHref={ethereumVaultsListingHref()}
+              infoHref={`${ethereumVaultRosterHref()}/info`}
+              docs={{
+                title: "Aave's documentation",
+                subtitle: "aave.com: Savings GHO",
+                href: "https://aave.com/docs/ecosystem/gho/sgho",
+              }}
+            />
+          ),
           drawer: <AaveRosterDrawer counts={counts} block={readBlock} />,
         }}
       />
-    </ProvReceiptsScope>
+    </ProvSection>
   );
 }
 

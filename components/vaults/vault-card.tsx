@@ -11,34 +11,32 @@
 // label opening its read-more (decision 0038). The family's stats, at most six
 // (decision 0040), with "Steward" for the role the contract names; addresses,
 // never a curator's name (decision 0017 point 5). The (i) and the "?" carry the
-// mechanic. The ⋮ holds the vault's addresses and pages, the exports and
-// "Inspect provenance".
+// mechanic. The read stamp sits at the right of the heading row. The ⋮ holds
+// Rails's pages, the off-site pages (the vault, its factory and steward on the
+// chain's explorer, the venue's app and docs), the exports and "Inspect
+// provenance" (components/shared/section-menu.tsx).
 
 import { useState, type ReactNode } from "react";
-import { Copy, Download, ExternalLink, FileText } from "lucide-react";
 import { PositionCard, type PositionCardStatus, type PositionPanelRow } from "@/components/shared/position-card";
 import { POSITION_CARD_MAX_STATS } from "@/components/shared/position-card-panel";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { Prov } from "@/components/shared/provenance";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { Icon } from "@/components/icons/icon";
-import { ToolsMenuItem } from "@/components/shared/tools-menu";
+import { SectionMenuRows, type SectionMenuLink } from "@/components/shared/section-menu";
 import { VaultLead, VaultPills, vaultHeads, type VaultRowReceipts } from "@/components/vaults/vault-heads";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import type { VaultSummary } from "@/lib/vaults/summary";
 import { yieldText, type VaultYield } from "@/lib/vaults/yield";
 import { ExplainBullet, Fig } from "@/components/shared/explain-groups";
+import { useBlockTime } from "@/components/shared/read-stamp";
+import { formatDate } from "@/lib/date";
+import type { ChainId } from "@/lib/shared/chains";
 import { vaultCardCsv, vaultCardMarkdown, type VaultExportModel } from "@/lib/vaults/card-export";
 
-/** A row of the ⋮ that opens a page: an explorer address, the venue's page. */
-export interface VaultMenuLink {
-  title: string;
-  subtitle: string;
-  href: string;
-  item: string;
-  /** A page on this site; absent or false opens in a new tab. */
-  internal?: boolean;
-}
+/** A row of the ⋮ that opens a page: a Rails page, an explorer address, the
+ *  venue's app, the docs. */
+export type VaultMenuLink = SectionMenuLink;
 
 export interface VaultCardProps {
   vault: VaultSummary;
@@ -50,14 +48,15 @@ export interface VaultCardProps {
   status: PositionCardStatus | null;
   /** The family's stats, in the card's order. */
   stats: PositionPanelRow[];
-  /** The ⋮'s identity rows: the vault's explorer page, the factory, the
-   *  created block, the venue's page, the official docs. */
+  /** The ⋮'s page rows: Rails's pages first, then the vault's explorer page,
+   *  the factory, the created block, the steward, the venue's app and docs. */
   links: VaultMenuLink[];
   /** The (i) pane's bullets. */
   explanation: ReactNode;
   learnMore: LearnMoreContent;
-  /** The line at the card's foot: the block the figures were read at. */
-  readAt: ReactNode;
+  /** The read stamp in the heading row ("Read 10:12 UTC", `SectionReadStamp`),
+   *  the block and the contracts read in its receipt. */
+  stamp: ReactNode;
   /** The stats and the table in words, for Copy, View as Markdown and
    *  Download CSV. */
   exports: VaultExportModel;
@@ -91,81 +90,6 @@ function CopyAddress({ address }: { address: string }) {
   );
 }
 
-/** The ⋮'s rows above "Inspect provenance": the vault's addresses and pages,
- *  then Copy, View as Markdown and Download CSV. */
-function MenuRows({
-  close,
-  links,
-  markdown,
-  csv,
-}: {
-  close: () => void;
-  links: VaultMenuLink[];
-  markdown: () => string;
-  csv: { filename: string; build: () => string };
-}) {
-  const [copied, setCopied] = useState(false);
-  const open = (text: string, type: string) => {
-    const url = URL.createObjectURL(new Blob([text], { type }));
-    window.open(url, "_blank", "noopener,noreferrer");
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-  };
-  return (
-    <>
-      {links.map((l) => (
-        <ToolsMenuItem
-          key={l.item}
-          icon={<ExternalLink size={16} />}
-          title={l.title}
-          subtitle={l.subtitle}
-          href={l.href}
-          external={!l.internal}
-          item={l.item}
-          onClick={close}
-        />
-      ))}
-      <ToolsMenuItem
-        icon={copied ? <Icon name="check" size={16} /> : <Copy size={16} />}
-        title="Copy"
-        subtitle={copied ? "Copied" : "The card as Markdown, for an LLM"}
-        copied={copied}
-        item="copy"
-        onClick={() =>
-          void navigator.clipboard.writeText(markdown()).then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-          })
-        }
-      />
-      <ToolsMenuItem
-        icon={<FileText size={16} />}
-        title="View as Markdown"
-        subtitle="Opens in a new tab"
-        item="markdown"
-        onClick={() => {
-          open(markdown(), "text/plain;charset=utf-8");
-          close();
-        }}
-      />
-      <ToolsMenuItem
-        icon={<Download size={16} />}
-        title="Download CSV"
-        subtitle="The figures and where the assets are"
-        item="csv"
-        onClick={() => {
-          const url = URL.createObjectURL(new Blob([csv.build()], { type: "text/csv;charset=utf-8" }));
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = csv.filename;
-          a.click();
-          setTimeout(() => URL.revokeObjectURL(url), 10000);
-          close();
-        }}
-      />
-    </>
-  );
-}
-
 export function VaultCard({
   vault: v,
   yieldFigure,
@@ -176,7 +100,7 @@ export function VaultCard({
   links,
   explanation,
   learnMore,
-  readAt,
+  stamp,
   exports,
   hooks,
   pillHooks,
@@ -230,14 +154,19 @@ export function VaultCard({
           band,
           counters: null,
           menu: {
-            leading: (close) => <MenuRows close={close} links={links} markdown={markdown} csv={csv} />,
+            leading: (close) => (
+              <SectionMenuRows
+                close={close}
+                links={links}
+                exports={{
+                  markdown: { build: markdown, copySubtitle: "The card as Markdown, for an LLM" },
+                  csv: { ...csv, subtitle: "The figures and where the assets are" },
+                }}
+              />
+            ),
             exports: null,
           },
-          foot: (
-            <p className="mt-4 text-[11px] text-rb-500" data-vault-read-at={v.readAt.block} data-prov-exempt>
-              {readAt}
-            </p>
-          ),
+          stamp: <span data-vault-read-at={v.readAt.block}>{stamp}</span>,
           explainer: { body: explanation },
           learnMore,
         }}
@@ -266,5 +195,17 @@ export function YieldBullets({ yieldFigure, rewards }: { yieldFigure?: VaultYiel
       )}
       <ExplainBullet>It is net of fees taken inside the share; {rewards} are not counted.</ExplainBullet>
     </>
+  );
+}
+
+/** The (i) pane's History line: "Created on 3 Mar 2024 by …", the date from
+ *  the creation block's time; until that answers, or where it fails, the
+ *  clause without it. */
+export function CreatedBullet({ chainId, block, by }: { chainId: ChainId; block: number | null; by: string }) {
+  const at = useBlockTime(chainId, block);
+  return (
+    <ExplainBullet data-vault-created={block != null ? String(block) : ""}>
+      Created{at != null && <> on {formatDate(new Date(at * 1000))}</>} by {by}.
+    </ExplainBullet>
   );
 }

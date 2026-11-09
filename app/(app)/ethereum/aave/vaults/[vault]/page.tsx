@@ -32,8 +32,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AaveEthereumVaultPage } from "@/components/vaults/aave-ethereum-vault-page";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -122,7 +121,7 @@ export default async function AaveEthereumVaultRoute({ params, searchParams }: P
           />
         )}
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+        {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
         <ProvInspectorLayer />
       </div>
     </div>

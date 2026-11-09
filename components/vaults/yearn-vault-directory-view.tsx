@@ -17,9 +17,10 @@
 
 import type { ReactNode } from "react";
 import type { ServerRead } from "@/lib/shared/server-head-read";
-import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { Prov } from "@/components/shared/provenance";
+import { ProvSection } from "@/components/shared/section-menu";
 import { isoSeconds, RosterBlock } from "@/components/vaults/roster-read-stamp";
-import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
+import { ROSTER_SCOPE, RosterMenu, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { yearnVaultHref, yearnVaultRosterHref } from "@/lib/vaults/routes";
 import {
   yearnAssetGroupCountProv,
@@ -102,9 +103,8 @@ export function YearnVaultDirectoryView({
       chainId={CHAIN_ID}
     />
   );
-  const registry = useReceiptRegistry();
   return (
-    <ProvReceiptsScope registry={registry}>
+    <ProvSection scope={ROSTER_SCOPE} as="div">
       <VaultRoster
         initialSearch={initialSearch}
         readTime={readBy?.blockTime}
@@ -144,10 +144,21 @@ export function YearnVaultDirectoryView({
           ),
           listingHref: null,
           infoHref: `${yearnVaultRosterHref()}/info`,
+          menu: (
+            <RosterMenu
+              listingHref={null}
+              infoHref={`${yearnVaultRosterHref()}/info`}
+              docs={{
+                title: "Yearn's documentation",
+                subtitle: "docs.yearn.fi: Introduction",
+                href: "https://docs.yearn.fi/getting-started/intro",
+              }}
+            />
+          ),
           drawer: <YearnRosterDrawer block={readBlock} />,
         }}
       />
-    </ProvReceiptsScope>
+    </ProvSection>
   );
 }
 

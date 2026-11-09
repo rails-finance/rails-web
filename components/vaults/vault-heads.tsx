@@ -64,8 +64,8 @@ export const YIELD_LABEL_TIP =
 
 /** The card's read-mores for the four headlines (decision 0038). */
 export const VAULT_HEAD_TIPS = {
-  totalAssets: "The vault's totalAssets(): everything its shares are a claim on, in its asset, at this block.",
-  sharePrice: "What one whole share converts to in the asset, answered by the vault's convertToAssets at this block.",
+  totalAssets: "Everything the vault's shares are a claim on, in its asset.",
+  sharePrice: "What one whole share of the vault converts to in its asset.",
   yield:
     "Rails's interpretation of two reads of the share price from the daily store, 30 days apart, annualised simply. Net of the fees the vault takes inside the share; rewards paid outside the share are not counted. No forecast.",
   holders:
@@ -163,7 +163,7 @@ export function IlliquidCaution({ vault: v, il, detail }: { vault: VaultSummary;
       <span data-illiquid-withdrawable={il.withdrawable}>
         {detail ? <Prov info={vaultWithdrawableProv(v, il)}>{out}</Prov> : out}
       </span>
-      {total != null ? ` of ${total}` : ""} {v.asset.symbol} can be withdrawn at block {n(il.block)}.
+      {total != null ? ` of ${total}` : ""} {v.asset.symbol} can be withdrawn.
     </span>
   );
 }
@@ -192,7 +192,7 @@ export function LostAssetsCaution({
       <span data-lost-assets={v.lostAssets.raw}>
         {detail ? withProv(receipts.lostAssets, text(v.lostAssets)) : text(v.lostAssets)}
       </span>{" "}
-      {v.asset.symbol} lost at block {n(v.readAt.block)}. The vault holds{" "}
+      {v.asset.symbol} of lost assets. The vault holds{" "}
       <span data-held-assets={heldRaw}>{detail ? withProv(receipts.heldAssets, text(held)) : text(held)}</span>{" "}
       {v.asset.symbol}; the share price has not been lowered for the loss, so the holders who withdraw last carry it.
     </span>
@@ -203,18 +203,17 @@ export function LostAssetsCaution({
  *  figures and gives every label its read-more; else the row's compact form. */
 type MeasuredYield = Extract<VaultYield, { yearly: number }>;
 
-/** The Yield subline's words: "share price +0.42% over the 30 days to block
- *  N", and the one-off move where there is one. */
+/** The Yield subline's words: "share price +0.42% over the last 30 days",
+ *  and the one-off move where there is one. The two reads' blocks are the
+ *  figure's receipt. */
 export const yieldSublineText = (y: MeasuredYield): string =>
-  `share price ${changeText(y.change)} over the ${y.days} days to block ${n(y.to.block)}${
+  `share price ${changeText(y.change)} over the last ${y.days} days${
     y.jump ? jumpTail(y.jump, (d) => formatDate(new Date(d * 86_400_000))) : ""
   }`;
 
-/** "The vault holds 0.000002 USDC at block N.": the too-small subline. */
+/** "The vault holds 0.000002 USDC.": the too-small subline. */
 export const tooSmallSentence = (v: VaultSummary): string =>
-  v.totalAssets
-    ? `The vault holds ${assetText(v.totalAssets, v.asset.decimals)} ${v.asset.symbol} at block ${n(v.readAt.block)}.`
-    : "";
+  v.totalAssets ? `The vault holds ${assetText(v.totalAssets, v.asset.decimals)} ${v.asset.symbol}.` : "";
 
 export function vaultHeads({
   vault: v,

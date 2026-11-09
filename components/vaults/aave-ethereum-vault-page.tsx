@@ -9,7 +9,8 @@
 
 import Link from "next/link";
 import { ProvReceiptsScope, Prov, useReceiptRegistry } from "@/components/shared/provenance";
-import { BlockRef } from "@/components/shared/block-ref";
+import { readStampProv, SectionReadStamp, type ReadContract } from "@/components/shared/read-stamp";
+import type { SectionMenuLink } from "@/components/shared/section-menu";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
 import { PanelFigure, type PositionPanelRow } from "@/components/shared/position-card-panel";
 import { VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
@@ -25,7 +26,9 @@ import { assetText, pctText, sharePriceText, shareText, shortAddress } from "@/l
 import { StatAmount } from "@/components/vaults/stat-amount";
 import { ethereumVaultHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
 import { aaveEthereumVaultPageSummary } from "@/lib/vaults/summary";
-import { vaultVenueShareProv } from "@/lib/vaults/card-provenance";
+import { vaultVenueProv, vaultVenueShareProv } from "@/lib/vaults/card-provenance";
+import { vaultAssetsExports } from "@/lib/vaults/card-export";
+import { ethereumAaveV3Market, reserveHref } from "@/lib/shared/aave-market-configs";
 import { aaveVaultAssetsContent, aaveVaultCardContent, SHARES_ISSUED_TIP, STEWARD_TIP } from "@/lib/vaults/card-words";
 import { measuredYield, type VaultYield } from "@/lib/vaults/yield";
 import type { AaveVaultAttestation } from "@/lib/aave-vaults/vault-catalog";
@@ -60,7 +63,7 @@ import {
 const n = (v: number) => v.toLocaleString("en-US");
 const eth = (kind: "address", v: string) => explorerUrl(MAINNET_CHAIN_ID, kind, v);
 const UNREAD = <NotLoaded className="text-base font-normal text-rb-500" />;
-const AAVE_V3_MARKET_HREF = "/ethereum/aave-v3/market";
+const AAVE_V3_CORE = ethereumAaveV3Market(null);
 
 /** A part over the vault's total, both raws read at one block. */
 const fraction = (part: RawAmount | null, total: RawAmount | null): number | null =>
@@ -125,6 +128,8 @@ export function AaveEthereumVaultPage({
     ["Shares issued", data.totalSupply && sd != null ? shareText(data.totalSupply, sd) : "not read"],
   ];
   const rows: VaultAssetRow[] = [];
+  /** The Rails pages "Where the assets are" opens from its ⋮. */
+  const assetLinks: SectionMenuLink[] = [];
   const exportRows: [string, string, string][] = [];
   const links: VaultMenuLink[] = [
     {
@@ -137,8 +142,8 @@ export function AaveEthereumVaultPage({
   let explanation: React.ReactNode = null;
   const holdersBullet = v.census && (
     <ExplainBullet>
-      <Fig>{n(v.census.holders)}</Fig> addresses have held a share; <Fig>{n(v.census.live)}</Fig> hold one at the census
-      block.
+      <Fig>{n(v.census.holders)}</Fig> addresses have held a share; <Fig>{n(v.census.live)}</Fig> hold one at the last
+      census.
     </ExplainBullet>
   );
   const sharePriceBullet = data.sharePrice && (
@@ -146,8 +151,8 @@ export function AaveEthereumVaultPage({
       A share converts to{" "}
       <Fig>
         {sharePriceText(data.sharePrice, ad)} {unit}
-      </Fig>{" "}
-      at this block.
+      </Fig>
+      .
     </ExplainBullet>
   );
 
@@ -173,7 +178,7 @@ export function AaveEthereumVaultPage({
       {
         id: "deposit-cap",
         label: "Deposit cap",
-        tip: "The most the vault takes in deposits, its supplyCap().",
+        tip: "The most the vault takes in deposits.",
         asset,
         value: fig(
           "sgho-supply-cap",
@@ -189,7 +194,7 @@ export function AaveEthereumVaultPage({
       {
         id: "remaining-capacity",
         label: "Remaining capacity",
-        tip: "What the vault answers to maxDeposit at this block: the room left under the cap.",
+        tip: "The room left under the deposit cap.",
         asset,
         value: fig(
           "sgho-capacity",
@@ -299,17 +304,11 @@ export function AaveEthereumVaultPage({
     stats.push({
       id: "wraps",
       label: "Wraps",
-      tip: "The aToken the wrapper holds, asked of the wrapper: a supply position in the Aave V3 Core market.",
+      tip: "The aToken the wrapper holds: a supply position in the Aave V3 Core market.",
       value: s.aToken ? (
-        <a
-          href={eth("address", s.aToken)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-mono text-sm hover:underline"
-          data-stata-atoken={s.aToken}
-        >
+        <span className="font-mono text-sm" data-stata-atoken={s.aToken}>
           <Prov info={aaveVaultATokenProv(coords)}>{shortAddress(s.aToken)}</Prov>
-        </a>
+        </span>
       ) : (
         UNREAD
       ),
@@ -318,26 +317,25 @@ export function AaveEthereumVaultPage({
     const share = fraction(s.aTokenBalance, data.totalAssets);
     rows.push({
       key: "atoken",
-      venue: (
-        <Link href={AAVE_V3_MARKET_HREF} className={PAGE_LINK} prefetch={false} data-link="aave-v3-market">
-          Aave V3 Core market
-        </Link>
+      venue: "Aave V3 Core market",
+      href: reserveHref(AAVE_V3_CORE, vault.asset.address),
+      venueHooks: { "data-link": "aave-v3-market" },
+      venueProv: vaultVenueProv(
+        v,
+        {
+          venue: "Aave V3 Core market",
+          what: `the ${unit} reserve of the Aave V3 Core market, where the wrapper holds its aToken as a supply position.`,
+          via: "aToken() · balanceOf(wrapper)",
+          ids: s.aToken ? [{ label: "aToken", value: s.aToken }] : [],
+        },
+        coords.readBy,
       ),
-      sub: s.aToken ? (
-        <span className="font-mono">
-          a{unit} {shortAddress(s.aToken)}
-        </span>
-      ) : undefined,
+      sub: `a${unit}, a supply position`,
       amount: s.aTokenBalance,
       amountProv: aaveStataATokenBalanceProv(coords, s.aToken),
       amountFigure: "stata-atoken-balance",
       share,
       shareProv: vaultVenueShareProv(v, "the aToken held", "totalAssets()", coords.readBy),
-      links: s.aToken ? (
-        <a href={eth("address", s.aToken)} target="_blank" rel="noopener noreferrer" className="link-external text-xs">
-          aToken
-        </a>
-      ) : undefined,
       hooks: { "data-asset-row": "atoken" },
     });
     exportRows.push([
@@ -345,6 +343,20 @@ export function AaveEthereumVaultPage({
       s.aTokenBalance ? assetText(s.aTokenBalance, ad) : "not read",
       share == null ? "" : pctText(share),
     ]);
+    if (s.aToken)
+      links.push({
+        item: "atoken",
+        title: "aToken on Etherscan",
+        subtitle: shortAddress(s.aToken),
+        href: eth("address", s.aToken),
+      });
+    assetLinks.push({
+      item: "reserve-page",
+      title: `The ${unit} reserve on Aave V3 Core`,
+      subtitle: "The reserve the wrapper supplies",
+      href: reserveHref(AAVE_V3_CORE, vault.asset.address),
+      internal: true,
+    });
     links.push({
       item: "docs",
       title: "Aave's documentation",
@@ -448,17 +460,14 @@ export function AaveEthereumVaultPage({
         sub: "owner",
         tip: STEWARD_TIP.umbrella,
         value: owner ? (
-          <a
-            href={eth("address", owner)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono text-sm hover:underline"
+          <span
+            className="font-mono text-sm"
             data-umbrella-owner={owner}
             data-steward={owner}
             data-steward-role="owner"
           >
             <Prov info={aaveUmbrellaOwnerProv(coords, owner)}>{shortAddress(owner)}</Prov>
-          </a>
+          </span>
         ) : (
           UNREAD
         ),
@@ -466,7 +475,7 @@ export function AaveEthereumVaultPage({
       {
         id: "reserve",
         label: "Reserve",
-        tip: "The Aave V3 reserve this token stands behind, and whether Umbrella reports a slashable deficit on it at this block.",
+        tip: "The Aave V3 reserve this token stands behind, and whether Umbrella reports a slashable deficit on it.",
         sub:
           u.reserveSlashable == null ? (
             "deficit not read"
@@ -483,7 +492,7 @@ export function AaveEthereumVaultPage({
       {
         id: "slashable",
         label: "Slashable",
-        tip: "The most a slashing may take at this block, read from the contract's configuration.",
+        tip: "The most a slashing may take, from the contract's configuration.",
         asset,
         value: fig(
           "umbrella-max-slashable",
@@ -513,17 +522,20 @@ export function AaveEthereumVaultPage({
     const assetVault = vault.assetVault;
     rows.push({
       key: "held",
-      venue: assetVault ? (
-        <Link
-          href={ethereumVaultHref(assetVault.address)}
-          className={PAGE_LINK}
-          prefetch={false}
-          data-catalogue-member={assetVault.address}
-        >
-          {unit}
-        </Link>
-      ) : (
-        unit
+      venue: unit,
+      ...(assetVault
+        ? { href: ethereumVaultHref(assetVault.address), venueHooks: { "data-catalogue-member": assetVault.address } }
+        : {}),
+      venueProv: vaultVenueProv(
+        v,
+        {
+          venue: unit,
+          what: `the ${unit} the stake token holds${reserve ? `, staked behind the ${reserve.symbol} reserve` : ""}.`,
+          via: "asset() · balanceOf(stake token)",
+          contract: { name: unit, address: vault.asset.address },
+          ids: [{ label: "token", value: vault.asset.address }],
+        },
+        coords.readBy,
       ),
       sub: reserve ? `staked behind the ${reserve.symbol} reserve` : "the stake",
       amount: u.assetHeld,
@@ -531,16 +543,6 @@ export function AaveEthereumVaultPage({
       amountFigure: "umbrella-asset-held",
       share,
       shareProv: vaultVenueShareProv(v, `the ${unit} the token holds`, "totalAssets()", coords.readBy),
-      links: (
-        <a
-          href={eth("address", vault.asset.address)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="link-external text-xs"
-        >
-          {unit}
-        </a>
-      ),
       hooks: { "data-asset-row": "held" },
     });
     exportRows.push([
@@ -553,6 +555,7 @@ export function AaveEthereumVaultPage({
       rows.push({
         key: "hop",
         venue: <>&rarr; {reserve?.symbol ?? "the reserve"}</>,
+        href: ethereumVaultHref(w.address),
         sub:
           w.sharePrice && w.decimals != null ? (
             <span>
@@ -570,11 +573,6 @@ export function AaveEthereumVaultPage({
         amount: null,
         share: null,
         offBand: true,
-        links: (
-          <Link href={ethereumVaultHref(w.address)} className={PAGE_LINK} prefetch={false}>
-            the wrapper
-          </Link>
-        ),
         hooks: { "data-wrapper-hop": w.address },
       });
       exportRows.push([
@@ -583,6 +581,21 @@ export function AaveEthereumVaultPage({
         "",
       ]);
     }
+    if (owner)
+      links.push({
+        item: "steward",
+        title: "Owner on Etherscan",
+        subtitle: shortAddress(owner),
+        href: eth("address", owner),
+      });
+    if (reserve)
+      assetLinks.push({
+        item: "reserve-page",
+        title: `The ${reserve.symbol} reserve on Aave V3 Core`,
+        subtitle: "The reserve this stake covers",
+        href: reserveHref(AAVE_V3_CORE, reserve.address),
+        internal: true,
+      });
     links.push(
       {
         item: "venue-page",
@@ -631,11 +644,31 @@ export function AaveEthereumVaultPage({
     );
   }
 
+  const vaultName = vault.name ?? vault.symbol ?? "the vault";
+  const readContracts: ReadContract[] = [
+    {
+      name: vaultName,
+      address: vault.address,
+      reads:
+        family === "sgho"
+          ? "totalAssets(), totalSupply(), convertToAssets(), supplyCap(), maxDeposit(), targetRate(), lastUpdate(), paused()"
+          : family === "stata"
+            ? "totalAssets(), totalSupply(), convertToAssets(), aToken()"
+            : "totalAssets(), totalSupply(), convertToAssets(), owner(), getCooldown(), getUnstakeWindow(), getMaxSlashableAssets()",
+    },
+    ...(vault.asset.address
+      ? [{ name: unit, address: vault.asset.address, reads: `balanceOf(${shortAddress(vault.address)})` }]
+      : []),
+    ...(data.stata?.aToken
+      ? [{ name: `a${unit}`, address: data.stata.aToken, reads: `balanceOf(${shortAddress(vault.address)})` }]
+      : []),
+  ];
+
   const status = data.sgho?.paused
     ? {
         word: "Paused",
         tone: "caution" as const,
-        tip: "The vault answers paused() true at this block, which zeroes every one of its max-* answers.",
+        tip: "The vault is paused: it takes no deposits and pays out no withdrawals.",
       }
     : null;
 
@@ -658,11 +691,23 @@ export function AaveEthereumVaultPage({
         links={links}
         explanation={explanation}
         learnMore={aaveVaultCardContent(family)}
-        readAt={
-          <>
-            Read at <BlockRef block={data.blockNumber} chainId={MAINNET_CHAIN_ID} />, on this vault and the contracts it
-            names
-          </>
+        stamp={
+          <SectionReadStamp
+            chainId={MAINNET_CHAIN_ID}
+            block={data.blockNumber}
+            blockTime={data.blockTimestamp || null}
+            readBy={coords.readBy}
+            info={(at) =>
+              readStampProv({
+                chainId: MAINNET_CHAIN_ID,
+                block: data.blockNumber,
+                at,
+                readBy: coords.readBy,
+                what: "Every figure on this card and in where the assets are",
+                contracts: readContracts,
+              })
+            }
+          />
         }
         exports={{ stats: exportStats, rows: exportRows }}
       />
@@ -684,8 +729,21 @@ export function AaveEthereumVaultPage({
             </>
           )
         }
-        shareTip="The row's amount over the vault's totalAssets(), both read at this block."
+        shareTip="The row's amount over the vault's total assets."
         learnMore={aaveVaultAssetsContent(family)}
+        menu={{
+          links: [
+            ...assetLinks,
+            {
+              item: "holders",
+              title: "This vault's holders",
+              subtitle: "Every address that holds a share",
+              href: ethereumVaultsListingHref({ vault: vault.address }),
+              internal: true,
+            },
+          ],
+          exports: vaultAssetsExports(v, { stats: exportStats, rows: exportRows }),
+        }}
       />
       <VaultFinder />
     </ProvReceiptsScope>

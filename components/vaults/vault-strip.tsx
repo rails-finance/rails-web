@@ -4,14 +4,18 @@
 // on the three vault pages, three tiles, Total assets · Share price · Holders.
 // Each tile is the series' change over the one window of lib/vaults/yield.ts
 // (the latest stored day against the stored day 30 days back, gaps widening
-// it), the sentence naming the two reads' block, and a line of the stored
-// days (reference/lifetime-price-chart.md ruling 3: one observation a day, a
-// gap where the store has no row, nothing interpolated). No absolute figure:
-// the number is the card's. The caption names the grain and the source once.
+// it) in a sentence, and a line of the stored days
+// (reference/lifetime-price-chart.md ruling 3: one observation a day, a gap
+// where the store has no row, nothing interpolated). No absolute figure: the
+// number is the card's. The two reads' blocks, the grain and the store are
+// each sentence's receipt; the section's ⋮ downloads the days as CSV and arms
+// the inspector on the section alone (components/shared/section-menu.tsx).
 
 import { Prov } from "@/components/shared/provenance";
+import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { formatDate } from "@/lib/date";
 import { assetText } from "@/lib/shared/vault-amount-text";
+import { formatUnitsExact } from "@/lib/utils/format";
 import { stripChangeProv, stripYoungProv, type StripTile } from "@/lib/vaults/strip-provenance";
 import { vaultHoldersProv } from "@/lib/vaults/row-provenance";
 import type { VaultSummary } from "@/lib/vaults/summary";
@@ -93,12 +97,12 @@ type Measured = Extract<SeriesWindow, { from: VaultYieldRead }>;
 
 /** The tile's sentence for a measured window. */
 function changeSentence(tile: StripTile, v: VaultSummary, w: Measured, jump?: VaultYieldJump) {
-  const tail = ` over the ${w.days} days to block ${n(w.to.block)}`;
+  const tail = ` over the last ${w.days} days`;
   if (w.change != null) {
     return `${changeText(w.change)}${tail}${jump ? jumpTail(jump, dayText) : ""}`;
   }
   // A window that starts at zero has no percentage; the move is stated.
-  if (BigInt(w.to.raw) === BigInt(0)) return `0 throughout the ${w.days} days to block ${n(w.to.block)}`;
+  if (BigInt(w.to.raw) === BigInt(0)) return `0 throughout the last ${w.days} days`;
   const to =
     tile === "holders"
       ? n(Number(w.to.raw))
@@ -163,10 +167,7 @@ function SeriesTile({
         <p className="mt-1 text-[13px] text-foreground" data-strip-sentence="">
           <Prov info={stripChangeProv(tile, v, series.key, w)}>{changeSentence(tile, v, w, jump)}</Prov>
         </p>
-        <Sparkline
-          points={w.points}
-          label={`${label}, one read a day over the ${w.days} days to block ${n(w.to.block)}`}
-        />
+        <Sparkline points={w.points} label={`${label}, one read a day over the last ${w.days} days`} />
       </Tile>
     );
   }
@@ -193,6 +194,53 @@ function SeriesTile({
   );
 }
 
+/** The section's scope: its ⋮ arms the inspector on it alone. */
+export const STRIP_SCOPE = "vault-strip";
+
+const pointsOf = (w: SeriesWindow): readonly VaultYieldRead[] => ("points" in w ? w.points : []);
+
+const stripHasDays = (s: VaultStripSeries) =>
+  [s.totalAssets, s.sharePrice, s.holders].some((x) => pointsOf(x.window).length > 0);
+
+const csvCell = (t: string) => (/[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t);
+
+/** The stored days as CSV: one row a day, each series' read and its block. */
+function stripCsv(v: VaultSummary, s: VaultStripSeries): string {
+  const d = v.asset.decimals;
+  const unit = (raw: string) => formatUnitsExact(raw, d);
+  const by = (w: SeriesWindow) => new Map(pointsOf(w).map((p) => [p.day, p]));
+  const ta = by(s.totalAssets.window);
+  const sp = by(s.sharePrice.window);
+  const ho = by(s.holders.window);
+  const days = [...new Set([...ta.keys(), ...sp.keys(), ...ho.keys()])].sort((a, b) => a - b);
+  const rows = [
+    [
+      "date",
+      `total_assets_${v.asset.symbol}`,
+      "total_assets_block",
+      `share_price_${v.asset.symbol}`,
+      "share_price_block",
+      "holders",
+      "holders_block",
+    ],
+    ...days.map((day) => {
+      const a = ta.get(day);
+      const p = sp.get(day);
+      const h = ho.get(day);
+      return [
+        new Date(day * 86_400_000).toISOString().slice(0, 10),
+        a ? unit(a.raw) : "",
+        a ? String(a.block) : "",
+        p ? unit(p.raw) : "",
+        p ? String(p.block) : "",
+        h ? h.raw : "",
+        h ? String(h.block) : "",
+      ];
+    }),
+  ];
+  return rows.map((r) => r.map(csvCell).join(",")).join("\n");
+}
+
 export function VaultStrip({
   vault: v,
   strip,
@@ -214,13 +262,37 @@ export function VaultStrip({
       <span data-strip-census="none">no census</span>
     ) : (
       <span data-strip-census={c.atBlock}>
-        <Prov info={vaultHoldersProv(v, c)}>{`${n(c.holders)} holders at the census block ${n(c.atBlock)}`}</Prov>; no
-        daily series yet
+        <Prov info={vaultHoldersProv(v, c)}>{`${n(c.holders)} holders at the last census`}</Prov>; no daily series yet
       </span>
     );
   return (
-    <section className="mb-6" data-anatomy="V5" data-vault-strip={v.address} data-skel-section="vault-strip">
-      <h2 className="text-sm font-semibold text-foreground">The last 30 days</h2>
+    <ProvSection
+      scope={STRIP_SCOPE}
+      className="mb-4"
+      data-anatomy="V5"
+      data-vault-strip={v.address}
+      data-skel-section="vault-strip"
+    >
+      <SectionHeading
+        title="The last 30 days"
+        menu={
+          <SectionMenu
+            scope={STRIP_SCOPE}
+            title="The last 30 days"
+            exports={
+              strip && stripHasDays(strip)
+                ? {
+                    csv: {
+                      filename: `${v.symbol ?? v.address}-last-30-days.csv`,
+                      build: () => stripCsv(v, strip),
+                      subtitle: "One row a day: total assets, share price, holders",
+                    },
+                  }
+                : undefined
+            }
+          />
+        }
+      />
       <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <SeriesTile tile="total-assets" label="Total assets" vault={v} series={strip?.totalAssets ?? null} />
         <SeriesTile
@@ -238,9 +310,6 @@ export function VaultStrip({
           none={holdersMeasured || holdersYoung ? undefined : holdersNone}
         />
       </div>
-      <p className="mt-2 text-[11px] text-rb-500" data-strip-caption="">
-        One read a day at the day&rsquo;s block, from Rails&rsquo;s daily store.
-      </p>
-    </section>
+    </ProvSection>
   );
 }

@@ -608,7 +608,10 @@ async function readVaultPage(vault, holder) {
     wrapperClaim: await figure("holder-wrapper-claim"),
     lookupError: await grab("[data-lookup-error]", "data-lookup-error"),
     ensNote: (await page.getByText("resolved through mainnet ENS").count()) > 0,
-    blockText: await grab("[data-vault-block]"),
+    stamp: {
+      block: await grab("[data-read-stamp]", "data-read-block"),
+      text: await grab("[data-read-stamp]"),
+    },
     bodyText: (await page.locator("main, body").first().innerText()).replace(/\s+/g, " "),
     // The page's words without the card's Yield headline and its (i) bullets:
     // decision 0047 puts Rails's marked yield figure there, and check 8b looks
@@ -1659,18 +1662,18 @@ check(
   layers === 0 ? "no [data-intro-layers] paragraph on /ethereum/aave/vaults/info" : `"${layersText.slice(0, 160)}…"`,
 );
 
-// ── 9: the locale is pinned ─────────────────────────────────────────────────
-// Every figure above was compared against a `toLocaleString("en-US")` of this
-// script's own read, so a runtime-locale format would already be red on 2e and
-// 6d. This names the one figure those do not cover — the block.
-const blockBad = SAMPLE.filter(
-  (v) => !PAGES.get(v).blockText?.includes(PAGES.get(v).blockNumber.toLocaleString("en-US")),
-);
+// ── 9: the read stamp ───────────────────────────────────────────────────────
+// The card states the time of its read ("Read 10:12 UTC") and keeps the block
+// in the stamp's receipt (ui-jobs 549/550), so the block is checked on the
+// stamp's hook and the surface on its words.
+const blockBad = SAMPLE.filter((v) => {
+  const p = PAGES.get(v);
+  return Number(p.stamp.block) !== p.blockNumber || !/^Read( \d{2}:\d{2} UTC)?/.test(p.stamp.text ?? "");
+});
 check(
-  "9  every page prints its block in en-US, not in the runtime's locale",
+  "9  every page's read stamp names the page's block in its receipt and states a time",
   blockBad.length === 0,
-  blockBad.map((v) => `${short(v)}: "${PAGES.get(v).blockText?.slice(0, 40)}…"`).join("; ") ||
-    `${SAMPLE.length} blocks`,
+  blockBad.map((v) => `${short(v)}: ${JSON.stringify(PAGES.get(v).stamp)}`).join("; ") || `${SAMPLE.length} stamps`,
 );
 
 // ── 10: the dev provenance tripwire ─────────────────────────────────────────

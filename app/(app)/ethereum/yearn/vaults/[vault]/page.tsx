@@ -19,8 +19,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { RailHeader } from "@/components/shared/rail-header";
 import { YearnVaultPage } from "@/components/vaults/yearn-vault-page";
 import { listingMetadata } from "@/lib/shared/page-metadata";
@@ -71,6 +70,11 @@ export default async function YearnVaultRoute({ params, searchParams }: Props) {
   if (typed) redirect(yearnVaultHref(address, typed));
 
   const [data, series] = await Promise.all([load(address), loadVaultPageSeries(YEARN_CHAIN_ID, address)]);
+  // The strategies that are Yearn vaults with a page here: "Where the assets
+  // are" opens them.
+  const paged = (
+    await Promise.all(data.strategies.map(async (s) => ((await isYearnRosterVault(s.address)) ? s.address : null)))
+  ).filter((a): a is string => a != null);
 
   return (
     <div className="min-h-screen">
@@ -84,10 +88,10 @@ export default async function YearnVaultRoute({ params, searchParams }: Props) {
             This vault could not be read from chain just now, so no figure is stated for it.
           </p>
         ) : (
-          <YearnVaultPage data={data} yieldFigure={series.yieldFigure} strip={series.strip} />
+          <YearnVaultPage data={data} yieldFigure={series.yieldFigure} strip={series.strip} pagedStrategies={paged} />
         )}
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+        {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
         <ProvInspectorLayer />
       </div>
     </div>

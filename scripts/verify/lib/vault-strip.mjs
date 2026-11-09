@@ -31,7 +31,6 @@ export async function readVaultStrip(page) {
     return {
       afterCard: strip.previousElementSibling?.getAttribute("data-anatomy") === "V2",
       beforeAssets: strip.nextElementSibling?.getAttribute("data-anatomy") === "V3",
-      caption: strip.querySelector("[data-strip-caption]")?.textContent?.trim() ?? null,
       tiles,
     };
   });
@@ -118,8 +117,9 @@ export function vaultStripChecks(check, id, strip, store, { chain, vault, census
       bad.push(`${t.tile}: change ${t.change} vs own ${ownChange}`);
     if (t.days !== own.days.join(","))
       bad.push(`${t.tile}: line days ${t.days?.split(",").length} vs store's ${own.days.length}`);
-    if (!t.sentence.includes(`block ${Number(t.toBlock).toLocaleString("en-US")}`))
-      bad.push(`${t.tile}: sentence "${t.sentence}" does not name block ${t.toBlock}`);
+    // The two reads' blocks are the sentence's receipt (ui-jobs 549/550): the
+    // surface names the window, never a block.
+    if (/\bblock\b/.test(t.sentence)) bad.push(`${t.tile}: sentence "${t.sentence}" names a block`);
   }
   check(
     `${id}b each tile's change, its two reads and its line's days equal the daily store's own answer`,
@@ -135,9 +135,9 @@ export function vaultStripChecks(check, id, strip, store, { chain, vault, census
     .map((t) => [t.tile, t.sentence.replace(STATED_BLOCK, "").replace(DATE, "").replace(WINDOW, "").replace(PCT, "")])
     .filter(([, rest]) => /\d/.test(rest));
   check(
-    `${id}c the strip prints no absolute figure: its sentences name changes, blocks and dates`,
-    figures.length === 0 && strip.caption != null && !/\d/.test(strip.caption),
-    figures.map(([t, rest]) => `${t}: "${rest}"`).join("; ") || `caption "${strip.caption}"`,
+    `${id}c the strip prints no absolute figure: its sentences name changes, windows and dates`,
+    figures.length === 0,
+    figures.map(([t, rest]) => `${t}: "${rest}"`).join("; ") || "no figure",
   );
 
   const holders = strip.tiles.find((t) => t.tile === "holders");

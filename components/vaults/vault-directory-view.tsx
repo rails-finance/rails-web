@@ -14,8 +14,9 @@
 
 import type { ReactNode } from "react";
 import type { ServerRead } from "@/lib/shared/server-head-read";
-import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
-import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
+import { Prov } from "@/components/shared/provenance";
+import { ProvSection } from "@/components/shared/section-menu";
+import { ROSTER_SCOPE, RosterMenu, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { isoSeconds, RosterBlock } from "@/components/vaults/roster-read-stamp";
 import {
   metaMorphoVaultHref,
@@ -96,9 +97,8 @@ export function VaultDirectoryView({
       chainId={chainId}
     />
   );
-  const registry = useReceiptRegistry();
   return (
-    <ProvReceiptsScope registry={registry}>
+    <ProvSection scope={ROSTER_SCOPE} as="div">
       <VaultRoster
         initialSearch={initialSearch}
         readTime={readBy?.blockTime}
@@ -131,10 +131,21 @@ export function VaultDirectoryView({
           ),
           listingHref: withCensus ? metaMorphoVaultsListingHref(chainId) : null,
           infoHref: `${metaMorphoVaultRosterHref(chainId)}/info`,
+          menu: (
+            <RosterMenu
+              listingHref={withCensus ? metaMorphoVaultsListingHref(chainId) : null}
+              infoHref={`${metaMorphoVaultRosterHref(chainId)}/info`}
+              docs={{
+                title: "Morpho's documentation",
+                subtitle: "docs.morpho.org: Vaults",
+                href: "https://docs.morpho.org/learn/concepts/vault/",
+              }}
+            />
+          ),
           drawer: <MorphoRosterDrawer block={readBlock} chain={chain} />,
         }}
       />
-    </ProvReceiptsScope>
+    </ProvSection>
   );
 }
 

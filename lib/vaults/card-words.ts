@@ -19,14 +19,13 @@ const YIELD_CONCEPT = {
 };
 
 export const STEWARD_TIP = {
-  curator: "The vault's curator(): the address that chooses which markets the vault lends to, and their caps.",
-  owner: "The vault's owner(). The vault names no curator(), so the owner chooses the markets and their caps.",
-  umbrella: "The stake token's owner(): the one address that can slash it.",
-  roleManager:
-    "The vault's role_manager(): the address that hands out every role over the vault, from adding a strategy to shutting it down.",
+  curator: "The address that chooses which markets the vault lends to, and their caps.",
+  owner: "The vault names no curator, so its owner chooses the markets and their caps.",
+  umbrella: "The stake token's owner: the one address that can slash it.",
+  roleManager: "The address that hands out every role over the vault, from adding a strategy to shutting it down.",
 } as const;
 
-export const SHARES_ISSUED_TIP = "The vault's totalSupply(): every share in existence at this block.";
+export const SHARES_ISSUED_TIP = "Every share of the vault in existence.";
 
 export const morphoVaultCardContent = (): LearnMoreContent => ({
   title: "How a MetaMorpho vault works",
@@ -65,7 +64,7 @@ export const morphoVaultAssetsContent = (): LearnMoreContent => ({
       bold: "Amount",
       text: "what the vault's supply shares in the market convert to, as Morpho Blue last settled the market.",
     },
-    { bold: "Share of this vault", text: "a market's amount over the sum across the queue, at the same block." },
+    { bold: "Share of this vault", text: "a market's amount over the sum across the queue." },
     { bold: "The band", text: "a market holding 2% or more draws on its own; the rest share the last segment." },
   ],
   links: [MORPHO_MARKET_DOCS],
@@ -91,7 +90,7 @@ export function aaveVaultCardContent(family: "sgho" | "stata" | "umbrella-stake"
           },
           {
             bold: "Deposit cap",
-            text: "the most the vault takes; remaining capacity is the vault's answer to maxDeposit.",
+            text: "the most the vault takes; remaining capacity is the room left under it.",
           },
           YIELD_CONCEPT,
         ]
@@ -114,7 +113,7 @@ export function aaveVaultCardContent(family: "sgho" | "stata" | "umbrella-stake"
             },
             {
               bold: "Slashable",
-              text: "the most a slashing may take at this block, read from the contract's configuration.",
+              text: "the most a slashing may take, from the contract's configuration.",
             },
             {
               bold: "Rewards",
@@ -147,13 +146,13 @@ export function aaveVaultAssetsContent(family: "sgho" | "stata" | "umbrella-stak
           : "The stake token holds its asset. Where that asset is a static aToken, one more hop reaches the reserve it covers.",
     detailsHeading: "Key concepts:",
     details: [
-      { bold: "Amount", text: "the asset's balanceOf at the vault's address, read at this block." },
-      { bold: "Share of this vault", text: "the amount over the vault's totalAssets() at the same block." },
+      { bold: "Amount", text: "how much of the asset the vault holds there." },
+      { bold: "Share of this vault", text: "the amount over the vault's total assets." },
       ...(family === "umbrella-stake"
         ? [
             {
               bold: "The hop",
-              text: "what one share of the wrapper converts to in the reserve's asset, at this block.",
+              text: "what one share of the wrapper converts to in the reserve's asset.",
             },
           ]
         : []),
@@ -178,7 +177,7 @@ export const yearnVaultCardContent = (): LearnMoreContent => ({
     },
     {
       bold: "Endorsed",
-      text: "Yearn's Registry endorses the vault at this block. Anyone may deploy from the factory, so the address identifies the vault.",
+      text: "Yearn's Registry endorses the vault. Anyone may deploy from the factory, so the address identifies the vault.",
     },
     YIELD_CONCEPT,
   ],
@@ -199,7 +198,7 @@ export const yearnVaultAssetsContent = (): LearnMoreContent => ({
       bold: "Outside the queue",
       text: "a strategy taken out of the queue keeps its debt until the vault pulls it back.",
     },
-    { bold: "Share of this vault", text: "a row's amount over the vault's totalAssets() at the same block." },
+    { bold: "Share of this vault", text: "a row's amount over the vault's total assets." },
   ],
 });
 

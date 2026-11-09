@@ -15,8 +15,7 @@
 // link; one address's holding opens from the vault page's finder (V4). The
 // rows are V1 vault rows (ui-jobs 407).
 import { serverReadOf } from "@/lib/shared/server-head-read";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { yearnVaultCardContent } from "@/lib/vaults/card-words";
 import { YearnVaultDirectoryView } from "@/components/vaults/yearn-vault-directory-view";
@@ -70,7 +69,7 @@ export default async function YearnVaultRosterPage({ searchParams }: { searchPar
           />
         </div>
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+        {/* The roster's ⋮ arms the inspector on it; no page-wide toggle. */}
         <ProvInspectorLayer />
       </div>
     </div>

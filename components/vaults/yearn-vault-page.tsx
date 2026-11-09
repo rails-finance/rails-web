@@ -8,11 +8,11 @@
 
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { ProvReceiptsScope, Prov, useReceiptRegistry } from "@/components/shared/provenance";
-import { BlockRef } from "@/components/shared/block-ref";
+import { readStampProv, SectionReadStamp } from "@/components/shared/read-stamp";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
 import type { PositionPanelRow } from "@/components/shared/position-card-panel";
 import { NotLoaded } from "@/components/shared/not-loaded";
-import { VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
+import { CreatedBullet, VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
 import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
 import { VaultFinder } from "@/components/vaults/vault-finder";
 import { VaultStrip } from "@/components/vaults/vault-strip";
@@ -21,7 +21,10 @@ import { explorerUrl } from "@/lib/shared/chains";
 import { assetText, pctText, shareText, shortAddress } from "@/lib/shared/vault-amount-text";
 import { StatAmount } from "@/components/vaults/stat-amount";
 import { yearnVaultPageSummary } from "@/lib/vaults/summary";
-import { vaultVenueShareProv } from "@/lib/vaults/card-provenance";
+import { vaultVenueProv, vaultVenueShareProv } from "@/lib/vaults/card-provenance";
+import { vaultAssetsExports, type VaultExportModel } from "@/lib/vaults/card-export";
+import { yearnVaultHref } from "@/lib/vaults/routes";
+import { YEARN_REGISTRY } from "@/lib/yearn/vault-catalog";
 import {
   SHARES_ISSUED_TIP,
   STEWARD_TIP,
@@ -72,8 +75,11 @@ export function YearnVaultPage({
   data,
   yieldFigure: storeYield,
   strip,
+  pagedStrategies = [],
 }: {
   data: YearnVaultResponse;
+  /** The strategies that are Yearn vaults with a page of their own here. */
+  pagedStrategies?: string[];
   yieldFigure?: VaultYield;
   /** The store's three daily series for the strip (V5); null where it did not answer. */
   strip: VaultStripSeries | null;
@@ -99,10 +105,11 @@ export function YearnVaultPage({
       {value}
     </span>
   );
+  // The short address alone: each role's explorer page is a row of the ⋮.
   const address = (a: string, role: "role manager" | "accountant") => (
-    <a href={eth("address", a)} target="_blank" rel="noopener noreferrer" className="font-mono text-sm hover:underline">
+    <span className="font-mono text-sm">
       <Prov info={yearnVaultRoleProv(coords, role)}>{shortAddress(a)}</Prov>
-    </a>
+    </span>
   );
 
   const stats: PositionPanelRow[] = [
@@ -126,7 +133,7 @@ export function YearnVaultPage({
     {
       id: "idle",
       label: "Idle",
-      tip: "The vault's totalIdle(): the part of its assets in the vault contract, which a withdrawal takes first.",
+      tip: "The part of the vault's assets held in the vault contract, which a withdrawal takes first.",
       asset,
       value: fig(
         "total-idle",
@@ -143,7 +150,7 @@ export function YearnVaultPage({
     {
       id: "deployed",
       label: "Deployed",
-      tip: "The vault's totalDebt(): what it records as lent to its strategies, updated when a strategy reports.",
+      tip: "What the vault records as lent to its strategies, updated when a strategy reports.",
       asset,
       value: fig(
         "total-debt",
@@ -160,7 +167,7 @@ export function YearnVaultPage({
     {
       id: "profit-unlock",
       label: "Profit unlock",
-      tip: "profitMaxUnlockTime(): how long a reported gain takes to reach the share price. A loss lands at once.",
+      tip: "How long a reported gain takes to reach the share price. A loss lands at once.",
       value: fig(
         "profit-unlock",
         undefined,
@@ -191,7 +198,7 @@ export function YearnVaultPage({
     {
       id: "accountant",
       label: "Accountant",
-      tip: "The vault's accountant(): the contract that charges its fees when a strategy reports.",
+      tip: "The contract that charges the vault's fees when a strategy reports.",
       value: fig(
         "accountant",
         undefined,
@@ -200,6 +207,7 @@ export function YearnVaultPage({
     },
   ];
 
+  const paged = new Set(pagedStrategies.map((a) => a.toLowerCase()));
   const queueDebt = data.strategies.reduce((acc, s) => acc + BigInt(s.currentDebt?.raw ?? "0"), BigInt(0));
   const outside = y.totalDebt == null ? null : BigInt(y.totalDebt.raw) - queueDebt;
   const amount = (raw: bigint): RawAmount => ({ raw: raw.toString(), value: Number(raw) / Math.pow(10, ad) });
@@ -217,10 +225,17 @@ export function YearnVaultPage({
     ...data.strategies.map((s) => ({
       key: s.address,
       venue: s.name ?? shortAddress(s.address),
-      links: (
-        <a href={eth("address", s.address)} target="_blank" rel="noopener noreferrer" className="link-external text-xs">
-          strategy
-        </a>
+      ...(paged.has(s.address.toLowerCase()) ? { href: yearnVaultHref(s.address) } : {}),
+      venueProv: vaultVenueProv(
+        v,
+        {
+          venue: s.name ?? shortAddress(s.address),
+          what: `the strategy at place ${s.position} of the vault's default queue, which the vault lends ${unit} to.`,
+          via: "get_default_queue() · strategies(strategy)",
+          contract: { name: s.name ?? "strategy", address: s.address },
+          ids: [{ label: "strategy", value: s.address }],
+        },
+        coords.readBy,
       ),
       sub: (
         <>
@@ -229,8 +244,7 @@ export function YearnVaultPage({
             <Prov info={yearnVaultStrategyCapProv(coords, s.address)}>{assetText(s.maxDebt, ad)}</Prov>
           ) : (
             "not read"
-          )}{" "}
-          · <span className="font-mono">{shortAddress(s.address)}</span>
+          )}
         </>
       ),
       amount: s.currentDebt,
@@ -275,6 +289,26 @@ export function YearnVaultPage({
       subtitle: `Block ${n(y.createdBlock)} on Etherscan`,
       href: eth("block", y.createdBlock),
     },
+    ...(y.roleManager
+      ? [
+          {
+            item: "steward",
+            title: "Role manager on Etherscan",
+            subtitle: shortAddress(y.roleManager),
+            href: eth("address", y.roleManager),
+          },
+        ]
+      : []),
+    ...(y.accountant
+      ? [
+          {
+            item: "accountant",
+            title: "Accountant on Etherscan",
+            subtitle: shortAddress(y.accountant),
+            href: eth("address", y.accountant),
+          },
+        ]
+      : []),
     { item: "venue-page", title: "On Yearn's site", subtitle: "yearn.fi", href: `https://yearn.fi/v3/1/${y.address}` },
     {
       item: "docs",
@@ -319,9 +353,11 @@ export function YearnVaultPage({
         <YieldBullets yieldFigure={yieldFigure} rewards="gauge rewards paid outside the share" />
       </ExplainGroup>
       <ExplainGroup title="History">
-        <ExplainBullet>
-          Created at block <Fig>{n(y.createdBlock)}</Fig> by the Yearn V3 {y.apiVersion} factory.
-        </ExplainBullet>
+        <CreatedBullet
+          chainId={CHAIN_ID}
+          block={y.createdBlock > 0 ? y.createdBlock : null}
+          by={`the Yearn V3 ${y.apiVersion} factory`}
+        />
       </ExplainGroup>
     </div>
   );
@@ -330,9 +366,35 @@ export function YearnVaultPage({
     ? {
         word: "Shut down",
         tone: "muted" as const,
-        tip: "The vault answers isShutdown() true at this block: it takes no deposits, and holders can still withdraw.",
+        tip: "The vault is shut down: it takes no deposits, and holders can still withdraw.",
       }
     : null;
+
+  const exportModel: VaultExportModel = {
+    stats: [
+      ["Shares issued", y.totalSupply ? shareText(y.totalSupply, y.shareDecimals ?? ad) : "not read"],
+      ["Idle", y.totalIdle ? `${assetText(y.totalIdle, ad)} ${unit}` : "not read"],
+      ["Deployed", y.totalDebt ? `${assetText(y.totalDebt, ad)} ${unit}` : "not read"],
+      ["Profit unlock", y.profitMaxUnlockTime != null ? spanWords(y.profitMaxUnlockTime) : "not read"],
+      ["Steward (role manager)", y.roleManager ?? "not read"],
+      ["Accountant", y.accountant ?? "none set"],
+    ],
+    rows: [
+      [
+        "Idle in the vault",
+        y.totalIdle ? assetText(y.totalIdle, ad) : "not read",
+        rows[0].share == null ? "" : pctText(rows[0].share),
+      ],
+      ...data.strategies.map((s, i): [string, string, string] => {
+        const share = rows[i + 1].share;
+        return [
+          `#${s.position} ${s.name ?? ""} ${s.address}`.trim(),
+          s.currentDebt ? assetText(s.currentDebt, ad) : "not read",
+          share == null ? "" : pctText(share),
+        ];
+      }),
+    ],
+  };
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -351,36 +413,32 @@ export function YearnVaultPage({
         links={links}
         explanation={explanation}
         learnMore={yearnVaultCardContent()}
-        readAt={
-          <>
-            Read at <BlockRef block={data.blockNumber} chainId={CHAIN_ID} />, on the vault and the Yearn V3 Registry
-          </>
+        stamp={
+          <SectionReadStamp
+            chainId={CHAIN_ID}
+            block={data.blockNumber}
+            readBy={coords.readBy}
+            info={(at) =>
+              readStampProv({
+                chainId: CHAIN_ID,
+                block: data.blockNumber,
+                at,
+                readBy: coords.readBy,
+                what: "Every figure on this card and in where the assets are",
+                contracts: [
+                  {
+                    name: y.name ?? y.censusName,
+                    address: y.address,
+                    reads:
+                      "totalAssets(), totalSupply(), convertToAssets(), totalIdle(), totalDebt(), profitMaxUnlockTime(), role_manager(), accountant(), isShutdown(), get_default_queue(), strategies(strategy)",
+                  },
+                  { name: "Yearn V3 Registry", address: YEARN_REGISTRY, reads: "isEndorsed(vault)" },
+                ],
+              })
+            }
+          />
         }
-        exports={{
-          stats: [
-            ["Shares issued", y.totalSupply ? shareText(y.totalSupply, y.shareDecimals ?? ad) : "not read"],
-            ["Idle", y.totalIdle ? `${assetText(y.totalIdle, ad)} ${unit}` : "not read"],
-            ["Deployed", y.totalDebt ? `${assetText(y.totalDebt, ad)} ${unit}` : "not read"],
-            ["Profit unlock", y.profitMaxUnlockTime != null ? spanWords(y.profitMaxUnlockTime) : "not read"],
-            ["Steward (role manager)", y.roleManager ?? "not read"],
-            ["Accountant", y.accountant ?? "none set"],
-          ],
-          rows: [
-            [
-              "Idle in the vault",
-              y.totalIdle ? assetText(y.totalIdle, ad) : "not read",
-              rows[0].share == null ? "" : pctText(rows[0].share),
-            ],
-            ...data.strategies.map((s, i): [string, string, string] => {
-              const share = rows[i + 1].share;
-              return [
-                `#${s.position} ${s.name ?? ""} ${s.address}`.trim(),
-                s.currentDebt ? assetText(s.currentDebt, ad) : "not read",
-                share == null ? "" : pctText(share),
-              ];
-            }),
-          ],
-        }}
+        exports={exportModel}
       />
       <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
       <VaultAssets
@@ -397,8 +455,9 @@ export function YearnVaultPage({
             of the default queue, in its order.
           </>
         }
-        shareTip="The row's amount over the vault's totalAssets(), both read at this block."
+        shareTip="The row's amount over the vault's total assets."
         learnMore={yearnVaultAssetsContent()}
+        menu={{ exports: vaultAssetsExports(v, exportModel) }}
       />
       <VaultFinder />
     </ProvReceiptsScope>

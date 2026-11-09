@@ -19,8 +19,7 @@
 // SERVER-ONLY.
 
 import { serverReadOf } from "@/lib/shared/server-head-read";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { morphoVaultCardContent } from "@/lib/vaults/card-words";
 import { VaultDirectoryView } from "@/components/vaults/vault-directory-view";
@@ -94,7 +93,7 @@ export async function MetaMorphoRosterPage({
           />
         </div>
 
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+        {/* The roster's ⋮ arms the inspector on it; no page-wide toggle. */}
         <ProvInspectorLayer />
       </div>
     </div>
