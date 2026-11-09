@@ -3,7 +3,14 @@
 // documentation (rails-ops reference/official-docs/compound-v2.md).
 
 import Link from "next/link";
-import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
+import {
+  GlossaryLink,
+  ProtocolInfoPage,
+  type InfoReads,
+  type InfoTerm,
+  type InfoView,
+} from "@/components/shared/protocol-info-page";
+import { COMPTROLLER_FAMILIES } from "@/lib/comptroller/families";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -89,6 +96,37 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   },
 ];
 
+const CV2 = COMPTROLLER_FAMILIES["compound-v2"];
+
+/** Slot 2a: the contracts behind the markets pages. */
+const reads: InfoReads = {
+  contracts: [
+    {
+      name: "Comptroller",
+      address: CV2.comptroller,
+      reads:
+        "the list of markets, the oracle it uses, the close factor and liquidation incentive, and for each market its collateral factor, borrow cap and whether supplying or borrowing is paused.",
+    },
+    {
+      name: "Each market's cToken",
+      reads:
+        "what is supplied, borrowed and held as cash, the reserves, the supply and borrow rates, the reserve factor and which rate model the market uses.",
+    },
+    {
+      name: "Price oracle",
+      address: CV2.oracle,
+      reads:
+        "each market's price, the one the Comptroller uses for liquidations, and whether a price feed stands behind it or governance stored a fixed price.",
+    },
+    {
+      name: "Each market's rate model",
+      reads:
+        "the base rate, multiplier, kink and jump multiplier that set the borrow rate, and the blocks a year the rates are counted over. The five oldest markets run the first model, which has no kink.",
+    },
+  ],
+  how: "The markets pages read these contracts through Rails's server at most every ten minutes, and a wallet page reads the wallet's markets at each load.",
+};
+
 const views: readonly [InfoView, ...InfoView[]] = [
   {
     heading: "Listing",
@@ -119,8 +157,9 @@ const views: readonly [InfoView, ...InfoView[]] = [
     heading: "Markets page",
     body: (
       <p>
-        The markets page lists every market the Comptroller holds, with how much is supplied and borrowed in each, and
-        flags the markets with a fixed price.{" "}
+        The markets page lists every market the Comptroller holds, with how much is supplied, borrowed and available in
+        each, its rates and its collateral factor, and flags the markets with a fixed price. Each market opens a page
+        with its rate curve and parameters.{" "}
         <Link href="/ethereum/compound-v2/markets" className={INLINE_LINK}>
           See every market
         </Link>
@@ -145,6 +184,7 @@ export default function InfoPage() {
         </>
       }
       glossary={glossary}
+      reads={reads}
       howItWorks={[
         <>
           Compound V2 is a pooled lending protocol. A market is a pool of one token that people supply and borrow. A

@@ -34,9 +34,6 @@ import type { MoonwellDeployment } from "@/lib/moonwell/asset-catalog";
  *  the fork's per-second accrual convention holds on both chains. */
 export const MOONWELL_BASE_COMPTROLLER = "0xfbb21d0380bee3312b33c4353c8936a0f13ef26c" as const;
 
-/** The chain every address here lives on. */
-export const MOONWELL_BASE_CHAIN_ID = BASE_CHAIN_ID;
-
 /** The Comptroller's first block — the floor of a whole-life event sweep, and
  *  what lets the timeline claim COMPLETENESS rather than a horizon: no market
  *  existed before the Comptroller did (the first three were listed at

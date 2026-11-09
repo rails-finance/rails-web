@@ -4,7 +4,15 @@
 // and the market view, each stated from that chain's roster (lib/compound*/asset-catalog.ts).
 
 import Link from "next/link";
-import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
+import {
+  GlossaryLink,
+  ProtocolInfoPage,
+  type InfoReadContract,
+  type InfoReads,
+  type InfoTerm,
+  type InfoView,
+} from "@/components/shared/protocol-info-page";
+import { cometDeploymentOf } from "@/lib/compound/deployments";
 import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -106,6 +114,57 @@ const LIQUIDATION_ITEM = (
   </>
 );
 
+// Slot 2a (decision 0059 point 6): the contracts the markets pages and
+// position pages read, and the roster facts that left the markets page.
+const CONFIGURATOR: Record<CompoundV3InfoDeployment, string> = {
+  ethereum: "0x316f9708bb98af7da9c68c1c3b5e79039cd336e3",
+  base: "0x45939657d1ca34a8fa39a924b71d28fe8431e581",
+  arbitrum: "0xb21b06d71c75973babde35b49ffdac3f82ad3775",
+};
+
+const ROSTER_NOTE: Record<CompoundV3InfoDeployment, string> = {
+  ethereum: "No contract lists a chain's Comets, so the roster is stated: the three Ethereum markets Rails indexes.",
+  base: "No contract lists a chain's Comets, so the roster is stated. A name will not settle it on Base: four different contracts answer to cUSDCv3 and one of them is Compound's. The five markets here are the ones Compound's Configurator deployed.",
+  arbitrum:
+    "No contract lists a chain's Comets, so the roster is stated: the four in Compound's own deployment records for Arbitrum, each answering to the same governor on chain.",
+};
+
+function readsFor(deployment: CompoundV3InfoDeployment): InfoReads {
+  const [first, ...rest] = cometDeploymentOf(deployment).markets;
+  const comets: [InfoReadContract, ...InfoReadContract[]] = [
+    {
+      name: `${first.label} (Comet)`,
+      address: first.comet,
+      reads:
+        "its supply and borrowing, utilisation, both rates and their kinks, reserves and their target, minimum borrow, and each collateral asset's factors, supply cap and total; for a wallet, its balance in the base asset and each collateral.",
+    },
+    ...rest.map((m) => ({ name: `${m.label} (Comet)`, address: m.comet, reads: `the same as ${first.label}.` })),
+  ];
+  return {
+    contracts: [
+      ...comets,
+      {
+        name: "Configurator",
+        address: CONFIGURATOR[deployment],
+        reads:
+          deployment === "base"
+            ? "the contract that deployed the five markets and through which governance sets their terms. Rails takes the markets it deployed as the roster, and reads each market's terms from its Comet."
+            : "the contract through which governance sets each market's terms. Rails reads those terms from each Comet.",
+      },
+      {
+        name: "Each asset's price feed",
+        reads:
+          "the Comet names one feed for its base asset and one for each collateral asset. Rails asks the Comet for each feed's price, the price its liquidations use. The WETH market prices in ETH.",
+      },
+    ],
+    how:
+      deployment === "arbitrum"
+        ? "The markets pages read every Comet from the chain at most every ten minutes, and a position page reads the wallet's market at each load."
+        : "The markets pages read every Comet through Rails's server at most every ten minutes, and a position page reads the wallet's market at each load.",
+    notes: [ROSTER_NOTE[deployment]],
+  };
+}
+
 function marketsView(href: string, body: string): InfoView {
   return {
     heading: "Market view",
@@ -139,6 +198,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
           </>
         }
         glossary={GLOSSARY}
+        reads={readsFor("ethereum")}
         howItWorks={[
           WHAT_IT_IS,
           <>Ethereum has three markets, with USDC, WETH and USDT as their base assets. {ONE_BASE_ASSET}</>,
@@ -197,13 +257,14 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
           <>
             The Rails Compound V3 explorer shows the accounts in Compound V3&apos;s five Base markets, whether still
             open or closed, and the full history of each one. It also shows{" "}
-            <Link href="/base/compound-v3/market" className={INLINE_LINK}>
+            <Link href="/base/compound-v3/markets" className={INLINE_LINK}>
               the markets
             </Link>{" "}
             themselves, with their interest rates and reserves.
           </>
         }
         glossary={GLOSSARY}
+        reads={readsFor("base")}
         howItWorks={[
           WHAT_IT_IS,
           <>
@@ -255,7 +316,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
             ),
           },
           marketsView(
-            "/base/compound-v3/market",
+            "/base/compound-v3/markets",
             "The market view shows each Base market with its base asset, collateral assets, interest rates and reserves.",
           ),
         ]}
@@ -278,6 +339,7 @@ export function CompoundV3InfoPage({ deployment }: { deployment: CompoundV3InfoD
         </>
       }
       glossary={GLOSSARY}
+      reads={readsFor("arbitrum")}
       howItWorks={[
         WHAT_IT_IS,
         <>

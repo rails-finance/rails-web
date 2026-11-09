@@ -76,6 +76,14 @@ function Term({ f }: { f: StructureFigure }) {
 
 /** A head's structure terms, in the band's foot before its notes. */
 function StructureTerms({ s }: { s: MarketStructure }) {
+  if (s.kind === "comet")
+    return (
+      <>
+        <Term f={s.kink} />
+        <Term f={s.reserves} />
+        <Term f={s.minBorrow} />
+      </>
+    );
   return (
     <>
       <Term f={s.ticks} />
@@ -108,11 +116,16 @@ export function ProductSectionBlock({ s }: { s: ProductSection }) {
 export function ProductHeadSection({
   head,
   heading,
+  titled = true,
   className = "mb-8",
 }: {
   head: ProductHead;
   /** The page's h1 row in place of the section heading (A3). */
   heading?: ReactNode;
+  /** False on a single-object page whose h1 names the object: the row keeps
+   *  the subtitle, read stamp, "?" and ⋮, and draws no repeated title (Miles,
+   *  9 Nov 2026). */
+  titled?: boolean;
   className?: string;
 }) {
   const title = head.title;
@@ -152,7 +165,7 @@ export function ProductHeadSection({
       data-anatomy={head.anatomy ? `${head.anatomy} R0` : "R0"}
       {...head.hooks}
     >
-      {heading ? (
+      {heading || !titled ? (
         <div className="flex items-start justify-between gap-3" data-section-heading="">
           <div className="min-w-0">
             {heading}

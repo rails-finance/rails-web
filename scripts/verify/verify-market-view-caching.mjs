@@ -34,6 +34,8 @@ const VIEWS = [
   { path: "/ethereum/aave-v3/markets", client: true, minFigures: 9 },
   { path: "/ethereum/spark/markets", client: true },
   { path: "/ethereum/compound-v2/markets" },
+  // Compound V3's rosters (R1) draw one head per Comet, five figures each; the
+  // collateral tables are on each Comet's page.
   { path: "/ethereum/compound-v3/markets" },
   { path: "/ethereum/dolomite/markets" },
   { path: "/ethereum/frankencoin/system" },
@@ -47,7 +49,7 @@ const VIEWS = [
   { path: "/ethereum/moonwell/markets" },
   { path: "/ethereum/morpho/markets" },
   { path: "/base/aave-v3/markets", client: true },
-  { path: "/base/compound-v3/market" },
+  { path: "/base/compound-v3/markets" },
   { path: "/base/moonwell/markets" },
   { path: "/base/morpho/markets" },
   { path: "/base/seamless/markets", client: true },

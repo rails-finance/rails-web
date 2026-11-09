@@ -127,8 +127,6 @@ export function marketOf(key: string): CometMarket {
 }
 
 /** Short, copy-friendly form of a wallet address. */
-export const shortAddress = (addr: string): string => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-
 // ── the deployment layer ─────────────────────────────────────────────────────
 // One Comet roster on one chain. The readers take this rather than reaching for
 // a module-level catalog, which is the whole of what separates Ethereum's
