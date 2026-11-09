@@ -210,9 +210,8 @@ export function ProductHeadSection({
       )}
       <div className="mt-3" {...head.bandHooks}>
         <VitalsBand
-          // A head with no purpose keeps the lead column, so stacked heads on a
-          // roster align their figures and links.
-          lead={lead ?? (aside ? <span aria-hidden /> : null)}
+          layout="row"
+          lead={lead}
           aside={aside}
           notes={
             head.structure || head.collateral || head.notes ? (
