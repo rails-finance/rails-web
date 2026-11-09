@@ -145,6 +145,10 @@ export interface MorphoBaseVaultDirectoryRow {
   /** The illiquid test at the pinned block (lib/vaults/illiquid.ts): null
    *  where the vault was read and not caught, absent where it was not read. */
   illiquid?: VaultIlliquid | null;
+  /** The withdraw queue's market ids at the pinned block, lowercased, read
+   *  with the illiquid test; absent where the vault holds nothing or the read
+   *  did not answer. */
+  queue?: string[];
 }
 
 export interface MorphoBaseVaultDirectoryResponse {
@@ -263,15 +267,18 @@ async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaul
     // same block. A failed read leaves the rows untested, never liquid.
     try {
       const funded = rows.filter((r) => r.totalAssets != null && BigInt(r.totalAssets.raw) > ZERO);
+      const queues = new Map<string, string[]>();
       const illiquid = await readMetaMorphoIlliquid(
         client,
         chainId,
         blockNumber,
         funded.map((r) => r.address.toLowerCase()),
+        queues,
       );
       for (const r of funded) {
         const key = r.address.toLowerCase();
         if (illiquid.has(key)) r.illiquid = illiquid.get(key)!;
+        if (queues.has(key)) r.queue = queues.get(key)!;
       }
     } catch (error) {
       console.error(`Morpho vault directory: the illiquid read failed (chain ${chainId}):`, error);
@@ -298,9 +305,9 @@ async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaul
 const isReadable = (d: MorphoBaseVaultDirectoryResponse) =>
   !d.chainStale && d.rows.some((r) => r.totalAssets != null && BigInt(r.totalAssets.raw) >= ZERO);
 
-// The arguments are part of the cache key, so each chain is its own entry; Base
-// keeps the key it had.
-const cachedDirectory = unstable_cache(readDirectory, ["morpho-base-vault-directory"], {
+// The arguments are part of the cache key, so each chain is its own entry. The
+// key's version moves when a row gains a field (the queue, ui-jobs 549 step 4).
+const cachedDirectory = unstable_cache(readDirectory, ["morpho-base-vault-directory", "2"], {
   revalidate: DIRECTORY_REVALIDATE_SECONDS,
 });
 

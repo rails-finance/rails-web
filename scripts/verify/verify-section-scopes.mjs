@@ -19,8 +19,9 @@
 // family's market rosters, market pages and reserve pages, Dolomite's
 // markets page, f(x)'s pools roster and a pool's page, and Compound V3's
 // markets roster and a Comet's page on each chain, and Compound V2's and
-// Moonwell's markets pages with one market's page each, and Maple's pools
-// roster and a pool's page.
+// Moonwell's markets pages with one market's page each, Maple's pools roster
+// and a pool's page, and a page per family with "Supplied by vaults" (the
+// Morpho market page, not yet on the shells, is held to that section alone).
 //
 // Run:  npm run verify:preflight -- --warm <the pages>
 //       BASE=http://localhost:3078 node scripts/verify/verify-section-scopes.mjs
@@ -28,6 +29,10 @@
 
 import { chromium } from "playwright";
 import { BASE, bypassHeaders } from "./lib/host.mjs";
+
+const USDC_CORE = "/ethereum/aave-v3/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+const MORPHO_BASE_MARKET =
+  "/base/morpho/markets/0x833589fcd6edb6e08f4c7c32d4f71b54bda02913/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836";
 
 const ALL_PAGES = [
   "/base/morpho/vaults/0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2",
@@ -79,8 +84,19 @@ const ALL_PAGES = [
   // grammar (ui-jobs 549 step 4).
   "/ethereum/maple/pools",
   "/ethereum/maple/pools/syrupusdc",
+  // "Supplied by vaults" (ui-jobs 549 step 4), one page per family: Aave V3
+  // Core's USDC reserve, and a Morpho Blue market on Base.
+  USDC_CORE,
+  MORPHO_BASE_MARKET,
 ];
 const PAGES = process.env.PAGES ? process.env.PAGES.split(",").map((p) => p.trim()) : ALL_PAGES;
+
+/** A page that must draw a section, waited for before the checks: the Aave
+ *  reserve page reads its vaults after its head. */
+const MUST_DRAW = { [USDC_CORE]: "supplied-by-vaults", [MORPHO_BASE_MARKET]: "supplied-by-vaults" };
+/** A page not yet on the shells, where only these sections are held to c and
+ *  d (a and b wait for its migration, ui-jobs 549 step 5). */
+const ONLY_SCOPES = { [MORPHO_BASE_MARKET]: ["supplied-by-vaults"] };
 
 let checked = 0;
 let failures = 0;
@@ -107,6 +123,9 @@ for (const path of PAGES) {
   await page.waitForSelector(".prov-locate-box", { timeout: 120_000 }).catch(() => {});
   await page.waitForLoadState("networkidle", { timeout: 60_000 }).catch(() => {});
   await page.waitForTimeout(2000);
+  const must = MUST_DRAW[path];
+  if (must) await page.waitForSelector(`[data-prov-scope="${must}"]`, { timeout: 120_000 }).catch(() => {});
+  const only = ONLY_SCOPES[path];
   const tag = path.replace(/0x([0-9a-f]{6})[0-9a-f]{34}/, "0x$1…");
 
   if (!check(`${tag}: the page answers`, status === 200, String(status))) {
@@ -114,9 +133,16 @@ for (const path of PAGES) {
     continue;
   }
 
+  if (must)
+    check(
+      `${tag}: draws "${must}"`,
+      (await page.locator(`[data-prov-scope="${must}"]`).count()) > 0,
+      "the section is not on the page",
+    );
+
   // a — no page-wide toggle.
   const toggles = await page.locator("button.prov-inspect-toggle:not(.prov-inspect-toggle-menu)").count();
-  check(`${tag} a: no page-wide inspect toggle`, toggles === 0, `${toggles} on the page`);
+  if (!only) check(`${tag} a: no page-wide inspect toggle`, toggles === 0, `${toggles} on the page`);
 
   // b — every traced value sits in a section scope.
   const tally = await page.evaluate(() => {
@@ -129,15 +155,16 @@ for (const path of PAGES) {
     ];
     return { total: boxes.length, orphans, scopes };
   });
-  check(
-    `${tag} b: every traced value sits inside a section scope`,
-    tally.total > 0 && tally.orphans.length === 0,
-    tally.orphans.length
-      ? `${tally.orphans.length} outside: ${tally.orphans.slice(0, 4).join(" | ")}`
-      : `${tally.total} values in ${tally.scopes.join(", ")}`,
-  );
+  if (!only)
+    check(
+      `${tag} b: every traced value sits inside a section scope`,
+      tally.total > 0 && tally.orphans.length === 0,
+      tally.orphans.length
+        ? `${tally.orphans.length} outside: ${tally.orphans.slice(0, 4).join(" | ")}`
+        : `${tally.total} values in ${tally.scopes.join(", ")}`,
+    );
 
-  for (const scope of tally.scopes) {
+  for (const scope of only ?? tally.scopes) {
     const section = page.locator(`[data-prov-scope="${scope}"]`).first();
     const trigger = section.locator(MENU_TRIGGERS).first();
     const row = page.locator(`[data-prov-scope-toggle="${scope}"]`).first();

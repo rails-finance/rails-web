@@ -256,6 +256,47 @@ export const maplePoolAssetsContent = (): LearnMoreContent => ({
   links: [MAPLE_DOCS],
 });
 
+/** "Supplied by vaults" on a market or reserve page: the "?" per family. */
+export function suppliedByContent(family: "morpho" | "aave"): LearnMoreContent {
+  return family === "morpho"
+    ? {
+        title: "Vaults in this market",
+        intro:
+          "A MetaMorpho vault lends one asset through the Morpho Blue markets in its withdraw queue. These are the vaults on Rails's MetaMorpho roster whose queue names this market.",
+        detailsHeading: "Key concepts:",
+        details: [
+          {
+            bold: "Amount",
+            text: "what the vault's supply in this market converts to, as Morpho Blue last settled the market.",
+          },
+          {
+            bold: "Steward",
+            text: "the curator, which chooses the vault's markets and caps; the owner where no curator is named.",
+          },
+          {
+            bold: "A vault at zero",
+            text: "a market can sit in a queue with nothing supplied: the curator may supply it later.",
+          },
+        ],
+        links: [MORPHO_VAULT_DOCS],
+      }
+    : {
+        title: "Vaults over this reserve",
+        intro:
+          "A static aToken wraps a supply position in this reserve. An Umbrella stake stands behind it: its owner can slash the stake to cover a deficit on the reserve.",
+        detailsHeading: "Key concepts:",
+        details: [
+          { bold: "Amount", text: "the wrapper's total assets; for a stake, what it holds in the reserve's asset." },
+          {
+            bold: "Counted twice",
+            text: "a stake over a static aToken holds the wrapper's shares, so its amount is also inside the wrapper's row.",
+          },
+          { bold: "Steward", text: "a stake's owner. A static aToken names none." },
+        ],
+        links: [AAVE_DOCS.stata, AAVE_DOCS["umbrella-stake"]],
+      };
+}
+
 /** The holder card's "?" (ui-jobs 407 step 4, 410), every family. */
 export const vaultHoldingContent = (
   assetSymbol: string,
