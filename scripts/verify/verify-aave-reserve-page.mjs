@@ -19,7 +19,7 @@
 //      0.01% of the supplied amount (DEFICIT_SHOWN_SHARE).
 //   5. The curve draws: its kink at the route's kink, today's point at the
 //      route's utilisation (none where nothing is supplied).
-//   6. Available's receipt opens in the inspector.
+//   6. Available's receipt opens in the inspector, armed from the head's ⋮.
 //   7. "A reserve of <market>" links that Pool's reserves view, and lands on
 //      its table.
 //   8. History (M3.4) agrees with GET /api/aave-family/reserve-history over the
@@ -42,7 +42,10 @@
 //   BASE=http://localhost:3000 node scripts/verify/verify-aave-reserve-page.mjs
 
 import { chromium } from "playwright";
-import { armInspector } from "./lib/prov-inspector.mjs";
+import { armScope } from "./lib/prov-inspector.mjs";
+
+/** Arm one section of the page from its ⋮ (no page-wide toggle, ui-jobs 549/550). */
+const arm = (page, scope) => armScope(page, scope, { menu: `[data-section-menu="${scope}"]` }).catch(() => false);
 
 /** The upstream market each fixture's reads name (lib/api/fetch-aave-reserve-reads.ts). */
 const API_MARKET = {
@@ -65,36 +68,36 @@ const WAIT = 180000;
 // three Pools share one route and are chosen with `?market=`).
 const FIXTURES = [
   {
-    market: "/ethereum/aave-v3/market?market=core",
-    base: "/ethereum/aave-v3/market",
+    market: "/ethereum/aave-v3/markets?market=core",
+    base: "/ethereum/aave-v3/markets",
     query: "",
     api: "/api/chain/aave-v3/market",
     symbol: "WETH",
   },
   {
-    market: "/ethereum/aave-v3/market?market=core",
-    base: "/ethereum/aave-v3/market",
+    market: "/ethereum/aave-v3/markets?market=core",
+    base: "/ethereum/aave-v3/markets",
     query: "",
     api: "/api/chain/aave-v3/market",
     symbol: "USDC",
   },
   {
-    market: "/ethereum/aave-v3/market?market=core",
-    base: "/ethereum/aave-v3/market",
+    market: "/ethereum/aave-v3/markets?market=core",
+    base: "/ethereum/aave-v3/markets",
     query: "",
     api: "/api/chain/aave-v3/market",
     symbol: "GHO",
   },
   {
-    market: "/ethereum/aave-v3/market?market=prime",
-    base: "/ethereum/aave-v3/market",
+    market: "/ethereum/aave-v3/markets?market=prime",
+    base: "/ethereum/aave-v3/markets",
     query: "?market=prime",
     api: "/api/chain/aave-v3/market?market=prime",
     symbol: "WETH",
   },
-  { market: "/ethereum/spark/market", api: "/api/chain/spark/market", symbol: "DAI" },
-  { market: "/base/seamless/market", api: "/api/chain/seamless/market", symbol: "USDC" },
-  { market: "/base/aave-v3/market", api: "/api/chain/aave-v3-base/market", symbol: "cbBTC" },
+  { market: "/ethereum/spark/markets", api: "/api/chain/spark/market", symbol: "DAI" },
+  { market: "/base/seamless/markets", api: "/api/chain/seamless/market", symbol: "USDC" },
+  { market: "/base/aave-v3/markets", api: "/api/chain/aave-v3-base/market", symbol: "cbBTC" },
   { market: "/arbitrum/aave-v3/markets", api: "/api/chain/aave-v3-arbitrum/market", symbol: "WETH" },
 ];
 
@@ -253,7 +256,7 @@ for (const f of FIXTURES) {
     );
 
   let pop = "";
-  if (await armInspector(page)) {
+  if (await arm(page, "reserve-head")) {
     await page.locator(`[data-vital="available"] [data-prov-pickable]`).first().click();
     await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
     pop = norm(
@@ -373,7 +376,8 @@ for (const f of FIXTURES) {
       `${ix.marks} marks for ${marked} changes`,
     );
     let hpop = "";
-    if (await armInspector(page)) {
+    await page.keyboard.press("Escape");
+    if (await arm(page, "reserve-history")) {
       await page.locator("[data-history-borrow]").first().click();
       await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
       hpop = norm(
@@ -431,7 +435,8 @@ for (const f of FIXTURES) {
     }
     check(`${tag} 10b refresh line under each table`, ix.refreshed === 2, String(ix.refreshed));
     let opop = "";
-    if (await armInspector(page)) {
+    await page.keyboard.press("Escape");
+    if (await arm(page, "reserve-suppliers")) {
       await page.locator('[data-holders="suppliers"] [data-holder-amount] [data-prov-pickable]').first().click();
       await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
       opop = norm(

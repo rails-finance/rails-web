@@ -15,7 +15,8 @@
 //      and nowhere else), its values are pickable and no value outside it is.
 //
 // Pages: the Morpho Base case-study vault, a Morpho Ethereum vault, the three
-// Aave vault families, a Yearn vault, and the four family rosters.
+// Aave vault families, a Yearn vault, the four family rosters, and the Aave
+// family's market rosters, market pages and reserve pages.
 //
 // Run:  npm run verify:preflight -- --warm <the pages>
 //       BASE=http://localhost:3078 node scripts/verify/verify-section-scopes.mjs
@@ -36,6 +37,18 @@ const ALL_PAGES = [
   "/ethereum/morpho/vaults",
   "/ethereum/aave/vaults",
   "/ethereum/yearn/vaults",
+  // The Aave family's market pages (A1, A2) and reserve pages (A3): the
+  // Ethereum roster, Core's page, and a reserve on each chain and on SparkLend.
+  "/ethereum/aave-v3/markets",
+  "/ethereum/aave-v3/markets?market=core",
+  "/base/aave-v3/markets",
+  "/arbitrum/aave-v3/markets",
+  "/ethereum/spark/markets",
+  "/base/seamless/markets",
+  "/ethereum/aave-v3/markets/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+  "/base/aave-v3/markets/0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+  "/arbitrum/aave-v3/markets/0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+  "/ethereum/spark/markets/0x6b175474e89094c44da98b954eedeac495271d0f",
 ];
 const PAGES = process.env.PAGES ? process.env.PAGES.split(",").map((p) => p.trim()) : ALL_PAGES;
 

@@ -20,19 +20,34 @@
 // that section wears `[data-prov-lit]`. The Liquity V2 Trove page has no
 // page-level tool: its card menu (C17) carries the card's row, so there
 // `openInspectorHome` and `armInspector` reach that row and the card's values
-// are the targets. `armScope` arms a named section from its control.
+// are the targets. `armScope` arms a named section from its control. A
+// product page (ui-jobs 549/550) has neither the toggle nor a Tools menu: there
+// the first section ⋮'s row stands in, and a check that wants a given
+// section's values arms it with `armScope`.
 
 export const INSPECTOR = "button.prov-inspect-toggle";
 export const TOOLS_TRIGGER = "[data-tools-menu] > button";
 export const HALO = ".prov-inspect-halo, [data-prov-lit]";
 export const SCOPE_TOGGLE = "[data-prov-scope-toggle]";
 const CARD_ROW = '[data-card-menu] [data-prov-scope-toggle="position-card"]';
+/** The first section ⋮ on a product page. */
+const SECTION_MENU = "[data-section-menu] button[aria-haspopup]";
 
 /** Put the toggle in the DOM: open the Tools menu where the page has one, and
  *  do nothing where the dock already carries the toggle. False means the page
  *  mounts no inspector at all — which is a finding, not a flake. */
 export async function openInspectorHome(page) {
   if (await page.$(INSPECTOR)) return true;
+  // A product page (rails-ops ui-jobs 549/550) has no page-wide toggle: each
+  // section's ⋮ carries its own "Inspect provenance". The first one stands in.
+  const section = await page.$(SECTION_MENU);
+  if (section && !(await page.$(TOOLS_TRIGGER))) {
+    for (let i = 0; i < 4; i++) {
+      await page.click(SECTION_MENU).catch(() => {});
+      if (await page.waitForSelector(SCOPE_TOGGLE, { timeout: 4_000 }).catch(() => null)) return true;
+    }
+    return Boolean(await page.$(SCOPE_TOGGLE));
+  }
   const trigger = await page.waitForSelector(TOOLS_TRIGGER, { timeout: 15_000 }).catch(() => null);
   if (!trigger) return false;
   // A click inside the hydration window is not answered late, it is lost
@@ -56,7 +71,11 @@ export async function armInspector(page) {
   // inside the hydration window and be lost (above). Press again until the
   // halo shows; the card row is re-opened first where the menu closed.
   for (let i = 0; i < 4; i++) {
-    const target = (await page.$(INSPECTOR)) ? INSPECTOR : CARD_ROW;
+    const target = (await page.$(INSPECTOR))
+      ? INSPECTOR
+      : (await page.$(CARD_ROW)) || !(await page.$(SECTION_MENU))
+        ? CARD_ROW
+        : SCOPE_TOGGLE;
     if (!(await page.$(target))) await openInspectorHome(page);
     await page.click(target).catch(() => {});
     if (await page.waitForSelector(HALO, { timeout: 4_000 }).catch(() => null)) return true;
@@ -70,6 +89,8 @@ export async function armInspector(page) {
  *  that section is a no-op. Returns whether the halo shows and the control
  *  reads pressed. */
 export async function armScope(page, scope, { menu = null } = {}) {
+  // A section ⋮ (`[data-section-menu]`) wraps its trigger a level down.
+  const trigger = (wrap) => wrap.locator(":scope > button, :scope button[aria-haspopup]").first();
   const sel = `[data-prov-scope-toggle="${scope}"]`;
   const pressed = async () =>
     (await page
@@ -81,8 +102,7 @@ export async function armScope(page, scope, { menu = null } = {}) {
   if (menu) {
     const wrap = typeof menu === "string" ? page.locator(menu).first() : menu;
     for (let i = 0; i < 4 && (await page.locator(sel).count()) === 0; i++) {
-      await wrap
-        .locator(":scope > button")
+      await trigger(wrap)
         .click()
         .catch(() => {});
       await page.waitForSelector(sel, { timeout: 4_000 }).catch(() => {});

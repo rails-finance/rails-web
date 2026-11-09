@@ -11,7 +11,9 @@
 // of them names the block it read at, so this verifier holds three things:
 //
 //   A. the block stamp renders — "Chain snapshot · [block icon] N" with a real
-//      number, the sentence a cached render leans on to state its own age;
+//      number, the sentence a cached render leans on to state its own age; on
+//      a migrated product page the read stamp ("Read 10:12 UTC") carries the
+//      block on its hook (`data-read-block`) and in its receipt;
 //   B. the figures render — the page's own table is on the page and the
 //      "Couldn't read the market from chain" state is not;
 //   C. the four Aave-family market routes answer with a shared-cache TTL, and
@@ -27,8 +29,8 @@ const base = process.env.BASE ?? `http://localhost:${PORT}`;
  *  own figures are on screen — the four Aave-family pages fetch client-side, so
  *  their table arrives after first paint. */
 const VIEWS = [
-  { path: "/ethereum/aave-v3/market", client: true },
-  { path: "/ethereum/spark/market", client: true },
+  { path: "/ethereum/aave-v3/markets", client: true },
+  { path: "/ethereum/spark/markets", client: true },
   { path: "/ethereum/compound-v2/markets" },
   { path: "/ethereum/compound-v3/markets" },
   { path: "/ethereum/dolomite/markets" },
@@ -40,11 +42,11 @@ const VIEWS = [
   { path: "/ethereum/maple/pools" },
   { path: "/ethereum/moonwell/markets" },
   { path: "/ethereum/morpho/markets" },
-  { path: "/base/aave-v3/market", client: true },
+  { path: "/base/aave-v3/markets", client: true },
   { path: "/base/compound-v3/market" },
   { path: "/base/moonwell/markets" },
   { path: "/base/morpho/markets" },
-  { path: "/base/seamless/market", client: true },
+  { path: "/base/seamless/markets", client: true },
 ];
 
 /** The market routes the four Aave-family pages read. */
@@ -80,6 +82,8 @@ const FIGURE = /\d{1,3}(?:,\d{3})+|\d+\.\d+%?|\d+(?:\.\d+)?[KMB]\b/g;
 for (const view of VIEWS) {
   await page.goto(`${base}${view.path}`, { waitUntil: "networkidle" });
   await page.waitForSelector('[data-skel-section="page-table"]', { timeout: 30000 }).catch(() => {});
+  // A client-read product page's figures arrive with its read stamp.
+  if (view.client) await page.waitForSelector("[data-read-stamp][data-read-block]", { timeout: 60000 }).catch(() => {});
   const text = await page.evaluate(() => document.body.innerText);
 
   // Non-greedy to the FIRST "block" after the stamp opens: several stamps name
@@ -88,8 +92,20 @@ for (const view of VIEWS) {
   // The block is a BlockRef (`f245752`), whose icon puts a line break before
   // the number in innerText.
   const stamp = text.match(/Chain snapshot[^\n]*?\s*(?:block\s*)?(\d[\d,]{4,})/);
-  const blockNumber = stamp ? Number(stamp[1].replace(/,/g, "")) : 0;
-  check(`${view.path}: names the block it read at`, blockNumber > 1_000_000, stamp ? `block ${stamp[1]}` : "no stamp");
+  // A migrated product page (ui-jobs 549/550) states the time of its read,
+  // "Read 10:12 UTC", with the block on the stamp's hook and in its receipt.
+  const readBlock = stamp
+    ? null
+    : await page
+        .waitForSelector("[data-read-stamp][data-read-block]", { timeout: view.client ? 60000 : 1000 })
+        .then((el) => el?.getAttribute("data-read-block"))
+        .catch(() => null);
+  const blockNumber = stamp ? Number(stamp[1].replace(/,/g, "")) : Number(readBlock ?? 0);
+  check(
+    `${view.path}: names the block it read at`,
+    blockNumber > 1_000_000,
+    stamp ? `block ${stamp[1]}` : readBlock ? `read stamp, block ${readBlock}` : "no stamp",
+  );
 
   const figures = text.match(FIGURE)?.length ?? 0;
   const broke = /Couldn.t read the market from chain|could not be read from chain/i.test(text);

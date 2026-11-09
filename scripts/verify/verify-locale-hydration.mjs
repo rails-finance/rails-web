@@ -45,7 +45,7 @@ const ROUTES = process.argv.slice(2).length
       "/coverage/ethereum",
       "/coverage/base",
       "/ethereum/morpho/markets",
-      "/ethereum/spark/market",
+      "/ethereum/spark/markets",
       "/ethereum/spark/0x1601843c5e9bc251a3272907010afa41fa18347e",
       "/ethereum/aave-v3/0x11111605b53ecef22726df86881e4d6d40b5ca11",
       "/ethereum/compound-v2/0x1a6bae20f70691ce1755a003c4560879b7798910",

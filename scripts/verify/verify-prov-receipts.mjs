@@ -1,7 +1,7 @@
 // Live in-browser verification of the market-surface provenance rollout — the
 // views whose figures registered as market-level receipts across the pilot and
-// the follow-on wave: /compound/markets, /aave-v3/market, /spark/market,
-// /base/aave-v3/market, /base/seamless/market, /compound-v2/markets,
+// the follow-on wave: /compound/markets, /aave-v3/markets, /spark/markets,
+// /base/aave-v3/markets, /base/seamless/markets, /compound-v2/markets,
 // /moonwell/markets, /morpho/markets, /fluid/vaults,
 // /llamalend/markets, /dolomite/markets, /aave-v4/hubs, /liquity-v2/branches.
 // Run against a dev server:  BASE=http://localhost:3000 node scripts/verify/verify-prov-receipts.mjs
@@ -55,10 +55,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const PAGES = [
   { name: "/ethereum/compound-v3/markets", path: "/ethereum/compound-v3/markets", strip: true },
-  { name: "/ethereum/aave-v3/market", path: "/ethereum/aave-v3/market", strip: true },
-  { name: "/ethereum/spark/market", path: "/ethereum/spark/market", strip: true },
-  { name: "/base/aave-v3/market", path: "/base/aave-v3/market", strip: true },
-  { name: "/base/seamless/market", path: "/base/seamless/market", strip: true },
+  { name: "/ethereum/aave-v3/markets", path: "/ethereum/aave-v3/markets", strip: true },
+  { name: "/ethereum/spark/markets", path: "/ethereum/spark/markets", strip: true },
+  { name: "/base/aave-v3/markets", path: "/base/aave-v3/markets", strip: true },
+  { name: "/base/seamless/markets", path: "/base/seamless/markets", strip: true },
   { name: "/ethereum/compound-v2/markets", path: "/ethereum/compound-v2/markets", strip: true },
   { name: "/ethereum/moonwell/markets", path: "/ethereum/moonwell/markets", strip: true },
   { name: "/ethereum/morpho/markets", path: "/ethereum/morpho/markets", strip: true },

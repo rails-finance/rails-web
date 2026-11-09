@@ -34,7 +34,7 @@
 //      in its Collateral cell; one with an eMode loan-to-value reads "eMode
 //      only"; one with an LTV reads "LTV% / LT%".
 //   9. No non-zero rate reads 0.00% (each page).
-//  11. /ethereum/aave-v3/market is the overview of Core, Prime and EtherFi:
+//  11. /ethereum/aave-v3/markets is the overview of Core, Prime and EtherFi:
 //      three panels, each linking its reserves view (`?market=`), and no
 //      reserves table.
 //  10. Available's receipt names the formula that applies (each page): every
@@ -49,7 +49,7 @@
 //   BASE=http://localhost:3000 node scripts/verify/verify-aave-market-caps.mjs
 
 import { chromium } from "playwright";
-import { armInspector } from "./lib/prov-inspector.mjs";
+import { armScope } from "./lib/prov-inspector.mjs";
 
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
@@ -57,11 +57,11 @@ const ROWS_TIMEOUT_MS = 180000;
 const FIELD_MAX = 2 ** 36 - 1;
 
 const PAGES = [
-  { name: "core", path: "/ethereum/aave-v3/market?market=core", api: "/api/chain/aave-v3/market" },
-  { name: "base", path: "/base/aave-v3/market", api: "/api/chain/aave-v3-base/market" },
+  { name: "core", path: "/ethereum/aave-v3/markets?market=core", api: "/api/chain/aave-v3/market" },
+  { name: "base", path: "/base/aave-v3/markets", api: "/api/chain/aave-v3-base/market" },
   { name: "arbitrum", path: "/arbitrum/aave-v3/markets", api: "/api/chain/aave-v3-arbitrum/market" },
-  { name: "spark", path: "/ethereum/spark/market", api: "/api/chain/spark/market" },
-  { name: "seamless", path: "/base/seamless/market", api: "/api/chain/seamless/market" },
+  { name: "spark", path: "/ethereum/spark/markets", api: "/api/chain/spark/market" },
+  { name: "seamless", path: "/base/seamless/markets", api: "/api/chain/seamless/market" },
 ];
 
 let failures = 0;
@@ -271,7 +271,9 @@ for (const p of PAGES) {
         ? /Pool\.getVirtualUnderlyingBalance\(asset\) at block \d+/
         : /supplied − borrowed; this Pool has no virtual balance/i;
     let text = "";
-    if (await armInspector(wide)) {
+    // The reserves section's ⋮ arms it (no page-wide toggle, ui-jobs 549/550).
+    const scope = await wide.locator("[data-reserves-section]").first().getAttribute("data-prov-scope");
+    if (scope && (await armScope(wide, scope, { menu: `[data-section-menu="${scope}"]` }).catch(() => false))) {
       await wide
         .locator("tr[data-reserve-row]")
         .first()
@@ -332,7 +334,7 @@ for (const p of PAGES) {
 // ── 11. The Ethereum overview: three panels, each linking its reserves ─────
 {
   const ov = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
-  await ov.goto(`${BASE}/ethereum/aave-v3/market`, NAV);
+  await ov.goto(`${BASE}/ethereum/aave-v3/markets`, NAV);
   await ov
     .waitForFunction(() => document.querySelectorAll("[data-market-reserves-link]").length >= 3, null, {
       timeout: ROWS_TIMEOUT_MS,
@@ -347,9 +349,9 @@ for (const p of PAGES) {
   );
   const rowsOnOverview = await ov.locator("tr[data-reserve-row]").count();
   const wantPanels = [
-    ["aave-v3", "/ethereum/aave-v3/market?market=core"],
-    ["aave-v3-prime", "/ethereum/aave-v3/market?market=prime"],
-    ["aave-v3-etherfi", "/ethereum/aave-v3/market?market=etherfi"],
+    ["aave-v3", "/ethereum/aave-v3/markets?market=core"],
+    ["aave-v3-prime", "/ethereum/aave-v3/markets?market=prime"],
+    ["aave-v3-etherfi", "/ethereum/aave-v3/markets?market=etherfi"],
   ];
   const okPanels =
     panels.length === 3 &&
