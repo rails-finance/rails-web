@@ -69,15 +69,16 @@ export function useCompareSelection() {
   return { ...s, toggle, clear };
 }
 
-/** Positioned above a linked row's cover (z-10), as the row's own controls are. */
+/** Above a linked row's cover (z-10), as the row's own controls are; the
+ *  caller positions it (`relative` in a cell, `absolute` on a card). */
 const TICK =
-  "relative z-10 inline-flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-rb-500 select-none hover:text-foreground focus-within:ring-2 focus-within:ring-teal-600 dark:focus-within:ring-teal-400";
+  "z-10 inline-flex cursor-pointer items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-rb-500 select-none hover:text-foreground focus-within:ring-2 focus-within:ring-teal-600 dark:focus-within:ring-teal-400";
 
 /** One vault's tick. `className` places it (a card's corner, a row's cell). */
 export function CompareTick({
   vaultKey,
   name,
-  className = "",
+  className = "relative",
 }: {
   vaultKey: string;
   name: string;
