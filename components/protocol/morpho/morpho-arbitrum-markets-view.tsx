@@ -15,7 +15,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { BlockRef } from "@/components/shared/block-ref";
 import { AssetUnit } from "@/components/shared/asset-unit";
-import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { TokenPairIcons } from "@/components/shared/token-pair-icons";
 import {
   DataTable,
   DataTableBody,
@@ -70,33 +70,6 @@ function Token({ symbol, address }: { symbol: string | null; address: string }) 
 
 const NUM = "whitespace-nowrap tabular-nums text-foreground";
 
-/** The loan token's mark at the house table's size (V6's 28px), the
- *  collateral's overlapping it where the market has one. */
-function PairIcons({ m }: { m: MorphoArbitrumMarketRow }) {
-  return (
-    <span className="flex shrink-0 items-center" aria-hidden data-prov-exempt="">
-      <TokenChipIcon
-        symbol={m.loanSymbol ?? shortAddr(m.loanToken)}
-        address={m.loanToken}
-        size={28}
-        filterable={false}
-        untitled
-      />
-      {m.collateralToken !== NONE && (
-        <span className="-ml-2 rounded-full ring-2 ring-[var(--surface-raised)] group-even/dt-row:ring-[var(--surface-sunken)]">
-          <TokenChipIcon
-            symbol={m.collateralSymbol ?? shortAddr(m.collateralToken)}
-            address={m.collateralToken}
-            size={28}
-            filterable={false}
-            untitled
-          />
-        </span>
-      )}
-    </span>
-  );
-}
-
 /** A size in the market's loan token, the token's mark after it. */
 function Size({ children, m }: { children: ReactNode; m: MorphoArbitrumMarketRow }) {
   return (
@@ -140,7 +113,14 @@ function MarketRow({
               {rank}
             </span>
           )}
-          <PairIcons m={m} />
+          <TokenPairIcons
+            first={{ symbol: m.loanSymbol ?? shortAddr(m.loanToken), address: m.loanToken }}
+            second={
+              m.collateralToken === NONE
+                ? null
+                : { symbol: m.collateralSymbol ?? shortAddr(m.collateralToken), address: m.collateralToken }
+            }
+          />
           <span>
             <Token symbol={m.loanSymbol} address={m.loanToken} />
             <span className="text-rb-400"> / </span>
