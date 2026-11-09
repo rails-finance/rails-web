@@ -3,17 +3,33 @@
 // timeline row's head (a verb summary and the figure that moved) and, opened,
 // plain-language bullets on what the setting does and what this change means
 // for a supplier or a borrower (components/shared/config-change-timeline.tsx).
-// The eMode kinds (asset-category, emode-*, category) state their words as the
-// head and carry no bullets yet. Every string is in WORDS; the logic below picks
-// and fills them. Pure: type imports only, so the unit test
-// (scripts/test/aave-reserve-config-explain.test.mjs) runs it under node.
+// The eMode kinds keep config-words' text as the head, except an isolation row
+// that restates its category's value, which says so. Every string is in WORDS;
+// the logic below picks and fills them. Pure: type imports only, so the unit
+// test (scripts/test/aave-reserve-config-explain.test.mjs) runs it under node.
 //
-// The facts, from aave-dao/aave-v3-origin src/contracts/protocol/libraries/
-// logic/ValidationLogic.sol (main, read 9 Nov 2026): supply 39–70 (active, not
-// paused, not frozen, under the supply cap; 0 is no cap), withdraw 72–83 and
-// repay 167–188 (active, not paused), borrow 103–157 (active, not paused, not
-// frozen, borrowing on, under the borrow cap), liquidation 253–300 (both
-// reserves active and not paused), transfer 436–438 (not paused).
+// The facts, from aave-dao/aave-v3-origin at 8305565 (src/contracts/protocol/):
+//   libraries/logic/ValidationLogic.sol: supply 39–70 (active, not paused, not
+//     frozen, under the supply cap; 0 is no cap), withdraw 72–83 and repay
+//     167–188 (active, not paused), borrow 103–157 (active, not paused, not
+//     frozen, borrowing on or, in eMode, borrowable in the category, 121–131;
+//     under the borrow cap), liquidation 253–300 (both reserves active and not
+//     paused), the ltvzero asset withdrawn first 398–429, transfer 436–438 (not
+//     paused), a reserve's LTV in eMode 524–549 (the category's LTV for its
+//     collateral, 0 for an ltvzero asset, 0 for other collateral in an isolated
+//     category, else the reserve's)
+//   libraries/logic/GenericLogic.sol 77–131: the category's liquidation
+//     threshold for its collateral
+//   libraries/logic/LiquidationLogic.sol 226–236: the category's bonus for its
+//     collateral
+//   libraries/types/DataTypes.sol 141–151: a category's terms, bitmaps and
+//     isolation
+//   pool/PoolConfigurator.sol 328–373 (setEModeCategory emits the category and
+//     its isolation together), 376–441 (collateral, borrowable, ltvzero)
+// and at v3.1.0 (e627c74, src/core/contracts/protocol/), where a reserve named
+// its one category: pool/PoolConfigurator.sol 453–470 (setAssetEModeCategory),
+// libraries/logic/GenericLogic.sol 117–146 and ValidationLogic.sol 219–221
+// (the category's terms for its assets; borrowing in eMode only those).
 
 import type { ReserveChange } from "./aave-reserve-config-words";
 
@@ -99,6 +115,39 @@ const WORDS = {
   borrowOff: "Borrowing turned off",
   borrowOnWhat: (n: N) => `The Pool lends ${n.symbol} again.`,
   borrowOffWhat: (n: N) => `The Pool stops lending ${n.symbol}; open loans stay open and can be repaid.`,
+
+  eModeWhat:
+    "An eMode category is a set of assets with its LTV, liquidation threshold and liquidation bonus; a borrower who chooses the category borrows on those terms.",
+  joined: (n: N, cat: string) =>
+    `Borrowers who choose ${cat} count ${n.symbol} at the category's LTV and liquidation threshold, and can borrow it there.`,
+  leftAll: (n: N) =>
+    `${n.symbol} belongs to no eMode category now: every borrower counts it at the reserve's LTV and liquidation threshold.`,
+  collateralOn: (n: N, cat: string) =>
+    `Borrowers who choose ${cat} count ${n.symbol} as collateral at the category's LTV and liquidation threshold.`,
+  collateralOff: (n: N, cat: string) => `Borrowers in ${cat} lose the category's terms on ${n.symbol} collateral.`,
+  borrowableOn: (n: N, cat: string) => `Borrowers who choose ${cat} can borrow ${n.symbol}.`,
+  borrowableOff: (n: N, cat: string) =>
+    `Borrowers in ${cat} can take no new ${n.symbol} loans; open loans stay open and can be repaid.`,
+  ltvzeroOn: (n: N, cat: string) =>
+    `For borrowers in ${cat}, ${n.symbol} supports no borrowing and still counts toward the health factor.`,
+  ltvzeroFirst: (n: N, cat: string) =>
+    `A borrower in ${cat} holding ${n.symbol} with other collateral must withdraw the ${n.symbol} first.`,
+  ltvzeroOff: (n: N, cat: string) => `Borrowers in ${cat} count ${n.symbol} at the category's LTV again.`,
+  isolatedWhat: (cat: string) =>
+    `${cat} is isolated: for its borrowers, only the category's collateral supports borrowing.`,
+  notIsolatedWhat: (cat: string) => `A borrower in ${cat} counts collateral outside the category at its reserve's LTV.`,
+  unIsolated: (cat: string) =>
+    `${cat} is no longer isolated: its borrowers count collateral outside the category at its reserve's LTV again.`,
+  isolationRestated: (words: string) => `${words}, restated`,
+  isolationWithTerms: "Each update to a category's terms writes its isolation again, in the same transaction.",
+  isolationSame: "The Pool wrote the category's isolation again with the same value.",
+  eLtv: (cat: string, per100: string) =>
+    `For borrowers in ${cat}, each $100 of the category's collateral supports up to $${per100} of borrowing.`,
+  eLt: (cat: string, per100: string) =>
+    `For borrowers in ${cat}, each $100 of the category's collateral counts as $${per100} toward the health factor.`,
+  eBonus: (cat: string, p: string) =>
+    `A liquidator of a position in ${cat} takes ${p} extra of the category's collateral over the debt repaid.`,
+  eSame: "The Pool wrote the category's terms again with the same values.",
 } as const;
 
 // ── Reading a change ────────────────────────────────────────────────────────
@@ -170,8 +219,76 @@ function collateral(n: N, prev: Record<string, number> | undefined, next: Record
   return { parts, bullets };
 }
 
-function readRow(n: N, c: ReserveChange, prevCollateral: Record<string, number> | undefined): Read {
+/** What the eMode rows are read against: each category's name, and its
+ *  terms and isolation as last written. */
+interface EModeState {
+  name: (id: unknown) => string;
+  terms: Map<number, Record<string, number>>;
+  isolated: Map<number, boolean>;
+  /** Transactions that wrote a category's terms, by "tx:category". */
+  termTxs: Set<string>;
+}
+
+function eModeRow(n: N, c: ReserveChange, e: EModeState): Read | null {
   const r = c.row;
+  const on = (v: unknown) => v === true;
+  const id = Number(r.categoryId);
+  const cat = e.name(r.categoryId);
+  switch (r.kind) {
+    case "asset-category": {
+      const to = Number(r.to);
+      return {
+        parts: [{ summary: c.words }],
+        bullets: [WORDS.eModeWhat, to === 0 ? WORDS.leftAll(n) : WORDS.joined(n, e.name(to))],
+      };
+    }
+    case "emode-collateral":
+      return {
+        parts: [{ summary: c.words }],
+        bullets: [WORDS.eModeWhat, on(r.collateral) ? WORDS.collateralOn(n, cat) : WORDS.collateralOff(n, cat)],
+      };
+    case "emode-borrowable":
+      return {
+        parts: [{ summary: c.words }],
+        bullets: [WORDS.eModeWhat, on(r.borrowable) ? WORDS.borrowableOn(n, cat) : WORDS.borrowableOff(n, cat)],
+      };
+    case "emode-ltvzero":
+      return {
+        parts: [{ summary: c.words }],
+        bullets: on(r.ltvzero) ? [WORDS.ltvzeroOn(n, cat), WORDS.ltvzeroFirst(n, cat)] : [WORDS.ltvzeroOff(n, cat)],
+      };
+    case "emode-isolation": {
+      const now = on(r.isolated);
+      const was = e.isolated.get(id);
+      const what = now ? WORDS.isolatedWhat(cat) : was === true ? WORDS.unIsolated(cat) : WORDS.notIsolatedWhat(cat);
+      if (e.isolated.get(id) !== now) return { parts: [{ summary: c.words }], bullets: [what] };
+      return {
+        parts: [{ summary: WORDS.isolationRestated(c.words) }],
+        bullets: [
+          e.termTxs.has(`${r.txHash}:${id}`) ? WORDS.isolationWithTerms : WORDS.isolationSame,
+          ...(now ? [WORDS.isolatedWhat(cat)] : []),
+        ],
+      };
+    }
+    case "category": {
+      const next = { ltv: Number(r.ltv), lt: Number(r.lt), bonus: Number(r.bonus) };
+      const prev = e.terms.get(id);
+      const per100 = (v: number) => String(v / 100);
+      const bullets: string[] = prev ? [] : [WORDS.eModeWhat];
+      if (!prev || prev.ltv !== next.ltv) bullets.push(WORDS.eLtv(cat, per100(next.ltv)));
+      if (!prev || prev.lt !== next.lt) bullets.push(WORDS.eLt(cat, per100(next.lt)));
+      if (!prev || prev.bonus !== next.bonus) bullets.push(WORDS.eBonus(cat, pct(next.bonus - 10_000)));
+      return { parts: [{ summary: c.words }], bullets: bullets.length ? bullets : [WORDS.eSame] };
+    }
+    default:
+      return null;
+  }
+}
+
+function readRow(n: N, c: ReserveChange, prevCollateral: Record<string, number> | undefined, e: EModeState): Read {
+  const r = c.row;
+  const eMode = eModeRow(n, c, e);
+  if (eMode) return eMode;
   const num = (k: string) => Number(r[k]);
   const on = (v: unknown) => v === true;
   switch (r.kind) {
@@ -228,7 +345,6 @@ function readRow(n: N, c: ReserveChange, prevCollateral: Record<string, number> 
         ? { parts: [{ summary: WORDS.borrowOn }], bullets: [WORDS.borrowOnWhat(n)] }
         : { parts: [{ summary: WORDS.borrowOff }], bullets: [WORDS.borrowOffWhat(n)] };
     default:
-      // The eMode kinds: their words, no bullets yet.
       return { parts: [{ summary: c.words }], bullets: [] };
   }
 }
@@ -236,11 +352,30 @@ function readRow(n: N, c: ReserveChange, prevCollateral: Record<string, number> 
 /** Every change (newest first, as `reserveChanges` gives them) explained, in the same order. */
 export function reserveChangesExplained(changes: ReserveChange[], n: N): ReserveChangeExplained[] {
   let lastCollateral: Record<string, number> | undefined;
+  // A category's name as config-words writes it: "PT-srUSDe Stablecoins (47)".
+  const labels = new Map<number, string>();
+  for (const { row } of changes)
+    if (row.kind === "category" && row.label) labels.set(Number(row.categoryId), String(row.label));
+  const e: EModeState = {
+    name: (v) => {
+      const id = Number(v);
+      const label = labels.get(id);
+      return label ? `${label} (${id})` : `eMode category ${id}`;
+    },
+    terms: new Map(),
+    isolated: new Map(),
+    termTxs: new Set(
+      changes.filter((c) => c.row.kind === "category").map((c) => `${c.row.txHash}:${Number(c.row.categoryId)}`),
+    ),
+  };
   const out: ReserveChangeExplained[] = [];
   for (const c of [...changes].reverse()) {
-    const read = readRow(n, c, lastCollateral);
-    if (c.row.kind === "collateral")
-      lastCollateral = { ltv: Number(c.row.ltv), lt: Number(c.row.lt), bonus: Number(c.row.bonus) };
+    const read = readRow(n, c, lastCollateral, e);
+    const r = c.row;
+    if (r.kind === "collateral") lastCollateral = { ltv: Number(r.ltv), lt: Number(r.lt), bonus: Number(r.bonus) };
+    if (r.kind === "category")
+      e.terms.set(Number(r.categoryId), { ltv: Number(r.ltv), lt: Number(r.lt), bonus: Number(r.bonus) });
+    if (r.kind === "emode-isolation") e.isolated.set(Number(r.categoryId), r.isolated === true);
     const figures = read.parts.filter((p) => p.figure);
     out.push({
       headline: read.parts.map((p, i) => (i ? low1(p.summary) : p.summary)).join(", "),
