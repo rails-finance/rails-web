@@ -19,7 +19,7 @@
  * dimension.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from "react";
 import {
   type FilterDimension,
   type RangeBounds,
@@ -90,9 +90,15 @@ interface RangeControlProps<F> {
   dim: FilterDimension<F>;
   filters: F;
   onChange: (next: F) => void;
+  /** Span the container (the phone filter sheet) in place of the panel's
+   *  fixed width. */
+  wide?: boolean;
+  /** Set to a function that writes a slider move still waiting on its pause
+   *  (the phone sheet calls it before Show, so a fast drag is kept). */
+  flushRef?: MutableRefObject<(() => void) | null>;
 }
 
-export function RangeControl<F>({ dim, filters, onChange }: RangeControlProps<F>) {
+export function RangeControl<F>({ dim, filters, onChange, wide = false, flushRef }: RangeControlProps<F>) {
   const spec = dim.range ?? { min: 1, max: 1000 };
   const stops = useMemo(() => rangeStops(spec), [spec.min, spec.max]); // eslint-disable-line react-hooks/exhaustive-deps
   const last = stops.length - 1;
@@ -121,9 +127,11 @@ export function RangeControl<F>({ dim, filters, onChange }: RangeControlProps<F>
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => void (timer.current && clearTimeout(timer.current)), []);
 
+  const pending = useRef<RangeBounds | null>(null);
   const commit = (b: RangeBounds) => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
+    pending.current = null;
     const { dim: d, filters: f, onChange: write } = latest.current;
     const next = encodeRange(b);
     if (next.join(",") === d.get(f).join(",")) return;
@@ -131,8 +139,19 @@ export function RangeControl<F>({ dim, filters, onChange }: RangeControlProps<F>
   };
   const commitLater = (b: RangeBounds) => {
     if (timer.current) clearTimeout(timer.current);
+    pending.current = b;
     timer.current = setTimeout(() => commit(b), COMMIT_DELAY_MS);
   };
+  useEffect(() => {
+    if (!flushRef) return;
+    flushRef.current = () => {
+      if (pending.current) commit(pending.current);
+    };
+    return () => {
+      flushRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- commit reads `latest`
+  }, [flushRef]);
 
   const minIdx = draft.min == null ? 0 : indexAtOrAbove(stops, draft.min);
   const maxIdx = draft.max == null ? last : indexAtOrBelow(stops, draft.max);
@@ -174,7 +193,11 @@ export function RangeControl<F>({ dim, filters, onChange }: RangeControlProps<F>
         : fmt(draft.max ?? stops[idx]);
 
   return (
-    <div className="px-4 pt-2 pb-3 w-64 max-w-full" data-range-control={dim.id} data-anatomy="N1.5">
+    <div
+      className={`px-4 pt-2 pb-3 ${wide ? "w-full" : "w-64 max-w-full"}`}
+      data-range-control={dim.id}
+      data-anatomy="N1.5"
+    >
       <div className="relative h-6">
         <div className="absolute inset-x-2 top-1/2 h-1 -translate-y-1/2 rounded-full bg-rb-200 dark:bg-rb-700" />
         <div

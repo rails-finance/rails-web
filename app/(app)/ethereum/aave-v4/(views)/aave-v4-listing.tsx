@@ -129,6 +129,8 @@ export function AaveV4Listing({ initialItems, initialTotal, initialKey, initialS
             data: r.rows,
             total: r.total,
           })),
+        fetchCount: (filters) =>
+          fetchAaveV4SpokePositions({ ...aaveV4FiltersToFetchParams(filters, 1), limit: 1 }).then((r) => r.total),
       })}
       onFilters={onFilters}
       initialItems={initialItems}

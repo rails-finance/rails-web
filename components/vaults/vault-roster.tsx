@@ -38,7 +38,7 @@ import Link from "next/link";
 import { isoSeconds, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import { InfoDisclosureTrigger } from "@/components/shared/info-disclosure";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
+import { ListToolbar, type ListToolbarProps } from "@/components/shared/filter-bar/list-toolbar";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
 import { DisclosureChevron } from "@/components/shared/expand-chevron";
@@ -188,6 +188,7 @@ export function VaultRoster({
   initialSearch = "",
   readTime,
   table,
+  mobileSort,
 }: {
   vaults: readonly VaultSummary[];
   /** Decision 0047's figure per lowercased vault address. */
@@ -221,6 +222,9 @@ export function VaultRoster({
   /** Draws the shown rows as a table in place of the cards, which then sorts
    *  them itself (the index, ui-jobs 538). */
   table?: (rows: VaultSummary[], part: "funded" | "empty") => ReactNode;
+  /** With `table`: the table's sort, drawn in the toolbar below sm where the
+   *  table stacks as cards (D6) and its headers are hidden. */
+  mobileSort?: ListToolbarProps<RosterFilters>["mobileSort"];
   /** Keep the facets in the URL, one param per facet id, comma-separated
    *  (the index, ui-jobs 538), so a saved view or a copied link keeps them. */
   facetsInUrl?: boolean;
@@ -379,11 +383,18 @@ export function VaultRoster({
   // the document and makes no request.
   const needle = query.trim().toLowerCase();
   const presetOn = show === "used";
-  const passes = (v: VaultSummary) =>
-    (!presetOn || inRosterPreset(v)) &&
-    all.every((f) => (filters[f.id]?.length ?? 0) === 0 || filters[f.id].includes(f.valueOf(v))) &&
-    (needle === "" ||
-      [v.name, v.catalogName, v.symbol, v.address].some((s) => s != null && s.toLowerCase().includes(needle)));
+  /** The filter for a selection: the shown rows, and the phone sheet's staged
+   *  count. */
+  const passesFor = (s: RosterFilters) => {
+    const want = s.q.trim().toLowerCase();
+    const preset = (s.show[0] ?? arrivalShow) === "used";
+    return (v: VaultSummary) =>
+      (!preset || inRosterPreset(v)) &&
+      all.every((f) => (s.facets[f.id]?.length ?? 0) === 0 || s.facets[f.id].includes(f.valueOf(v))) &&
+      (want === "" ||
+        [v.name, v.catalogName, v.symbol, v.address].some((x) => x != null && x.toLowerCase().includes(want)));
+  };
+  const passes = passesFor(state);
   const filtering = presetOn || needle !== "" || Object.values(filters).some((x) => x.length > 0);
 
   const fundedShown = useMemo(() => funded.filter(passes), [funded, filters, needle, presetOn]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -537,6 +548,9 @@ export function VaultRoster({
         sortOptions={table ? [] : sortOptions}
         searchPlaceholder="Vault name, symbol or address"
         countNode={countNode}
+        sheetCount={{ total: fundedShown.length, noun: "funded vaults" }}
+        countFor={(draft) => funded.filter(passesFor(draft)).length}
+        mobileSort={table ? mobileSort : undefined}
         // The view menu (N1.7: save this view, copy its link) where the URL
         // holds the whole view, facets included.
         viewMenu={facetsInUrl}

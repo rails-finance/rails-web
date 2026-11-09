@@ -46,6 +46,21 @@ export function rate(raw: string | null | undefined): number | null {
   return raw == null ? null : Number(shiftDecimal(raw, 18));
 }
 
+/**
+ * A 1e18-scaled rate between two tokens' smallest units, per whole token: Pendle's
+ * PT, YT and LP to SY rates are unit for unit, so a 6-decimal PT against an 18-decimal
+ * SY reads 10¹² too high without the shift.
+ */
+export function unitRate(
+  raw: string | null | undefined,
+  fromDecimals: number | null | undefined,
+  toDecimals: number | null | undefined,
+): number | null {
+  if (raw == null || fromDecimals == null || toDecimals == null) return null;
+  const places = 18 + toDecimals - fromDecimals;
+  return places >= 0 ? Number(shiftDecimal(raw, places)) : Number(raw) * 10 ** -places;
+}
+
 /** An APY fraction as "8.10%". */
 export function apyText(apy: number | null | undefined): string {
   return apy == null || !Number.isFinite(apy) ? "–" : `${(apy * 100).toFixed(2)}%`;
