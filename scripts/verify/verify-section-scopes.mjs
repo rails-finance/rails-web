@@ -92,9 +92,16 @@ const ALL_PAGES = [
   // Core's USDC reserve, and a Morpho Blue market on Base.
   USDC_CORE,
   MORPHO_BASE_MARKET,
-  // Morpho Blue's market page on Ethereum and Arbitrum (Base's is above).
+  // Morpho Blue's market page on Ethereum and Arbitrum (Base's is above), and
+  // on each chain the roster (R1, grouped by loan token) and a loan token's page.
   MORPHO_ETHEREUM_MARKET,
   MORPHO_ARBITRUM_MARKET,
+  "/ethereum/morpho/markets",
+  "/base/morpho/markets",
+  "/arbitrum/morpho/markets",
+  "/ethereum/morpho/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+  "/base/morpho/markets/0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+  "/arbitrum/morpho/markets/0xaf88d065e77c8cc2239327c5edb3a432268e5831",
 ];
 const PAGES = process.env.PAGES ? process.env.PAGES.split(",").map((p) => p.trim()) : ALL_PAGES;
 

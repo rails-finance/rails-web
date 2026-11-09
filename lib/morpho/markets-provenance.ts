@@ -407,3 +407,29 @@ export const morphoLiquidationIncentiveProv = (coords: MorphoMarketCoords): Prov
   via: `${LANE} · min(1.15, 1 / (1 − 0.3 × (1 − lltv)))`,
   formula: "min(1.15, 1 / (1 − 0.3 × (1 − lltv)))",
 });
+
+/** A market row's identity, on its collateral's name: the market id and the
+ *  five parameters it hashes, which the table leaves off its surface. */
+export const morphoMarketIdentityProv = (
+  coords: MorphoMarketCoords,
+  p: { collateralToken: string; oracle: string | null; irm: string | null; lltv: number },
+): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  verify: {
+    kind: "recompute",
+    text: "The market id is keccak256(abi.encode(params)); recompute it from these five, or call idToMarketParams(id) on Morpho Blue.",
+  },
+  summary: `The ${coords.collateralSymbol ?? "idle"} / ${coords.loanSymbol ?? "loan-token"} market. Its id is the hash of its loan token, collateral token, oracle, rate model and LLTV, fixed at creation. Enumerated from the CreateMarket log the roster was censused from.`,
+  contract: blueContract(coords),
+  via: `${LANE} · CreateMarket(id, params) · idToMarketParams(id)`,
+  inputs: [
+    { label: "market id", value: coords.marketId ?? "", kind: "chain", note: "keccak256 of the five parameters" },
+    { label: "loan token", value: coords.loanToken ?? "", kind: "chain" },
+    { label: "collateral token", value: p.collateralToken, kind: "chain" },
+    { label: "oracle", value: p.oracle ?? "none", kind: "chain" },
+    { label: "rate model", value: p.irm ?? "none", kind: "chain" },
+    { label: "lltv", value: `${(p.lltv * 100).toFixed(1)}%`, kind: "chain" },
+  ],
+});
