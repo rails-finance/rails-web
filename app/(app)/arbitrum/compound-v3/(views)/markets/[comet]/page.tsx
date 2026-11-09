@@ -7,14 +7,16 @@
 
 import { notFound } from "next/navigation";
 import { CompoundCometPage } from "@/lib/compound/product";
-import { cometData, cometMetadata, cometParams, isComet, loadComets } from "@/lib/compound/product-routes";
+import { cometData, cometMetadata, isComet, loadComets } from "@/lib/compound/product-routes";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 export const revalidate = 600;
-export const dynamicParams = false;
-
+// Rendered on first request and kept ten minutes, never at build: each Comet
+// page reads the whole deployment, and prerendering them all ran the build's
+// chain reads past the 60 s static-generation limit (9 Nov 2026). The route
+// guard below 404s an unknown key.
 export function generateStaticParams() {
-  return cometParams("arbitrum");
+  return [];
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ comet: string }> }) {
