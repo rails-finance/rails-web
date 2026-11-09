@@ -299,9 +299,3 @@ export function spokeSlugOfKey(key: string, name?: string): string {
   const named = Object.entries(SPOKE_NAME_TO_KEY).find(([n, k]) => k === key && slugifySpoke(n))?.[0];
   return slugifySpoke(named ?? name ?? "") ?? key.replace(/_/g, "-");
 }
-
-/** The api's spoke key from a URL slug; null for a slug this build has not heard of. */
-export function spokeKeyOfSlug(slug: string): string | null {
-  const name = spokeFromSlug(slug);
-  return name ? (SPOKE_NAME_TO_KEY[name] ?? null) : null;
-}

@@ -57,6 +57,15 @@ export const reserveCountProv = (spoke: string, count: number, c: StoredCoords):
   via: `${storedLane(c)} · one line per (hub, asset, spoke) · counted`,
 });
 
+/** A count of a hub's assets. */
+export const hubAssetCountProv = (hub: string, count: number, c: StoredCoords): Provenance => ({
+  kind: "chain",
+  pclass: "indexed",
+  source: { block: c.block ?? undefined },
+  summary: `${hub} hub assets. ${count} in all, each an asset the hub holds for at least one spoke's credit line${atStored(c)}.`,
+  via: `${storedLane(c)} · distinct assets over the hub's lines · counted`,
+});
+
 /** A spoke's open positions. */
 export const positionsProv = (spoke: string, c: StoredCoords): Provenance => ({
   kind: "derived",
