@@ -38,6 +38,9 @@ export interface VaultFamilyEntry {
   label: string;
   /** The same, for one vault. */
   singular: string;
+  /** What kind of vault it is, in words that hold across venues: the
+   *  index's Kind column (ui-jobs 553). */
+  kind: string;
   /** The census's word, or null where there is no census. */
   census: VaultCensusFamily | null;
   /** The served roster's family, where the box serves one. */
@@ -50,6 +53,7 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
     venue: "morpho",
     label: "MetaMorpho",
     singular: "MetaMorpho vault",
+    kind: "Curated vault",
     census: "morpho",
     served: "metamorpho",
   },
@@ -58,6 +62,7 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
     venue: "aave-v3",
     label: "Savings GHO",
     singular: "Savings GHO",
+    kind: "Aave wrapper",
     census: "sgho",
     served: null,
   },
@@ -66,6 +71,7 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
     venue: "aave-v3",
     label: "Static aTokens",
     singular: "Static aToken",
+    kind: "Aave wrapper",
     census: "stata",
     served: null,
   },
@@ -74,6 +80,7 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
     venue: "aave-v3",
     label: "Umbrella stake tokens",
     singular: "Umbrella stake token",
+    kind: "Aave stake",
     census: "umbrella-stake",
     served: null,
   },
@@ -82,6 +89,7 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
     venue: "yearn",
     label: "Yearn V3",
     singular: "Yearn V3 vault",
+    kind: "Allocator vault",
     census: null,
     served: "yearn-v3",
   },
@@ -90,6 +98,7 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
     venue: "maple",
     label: "Maple pools",
     singular: "Maple pool",
+    kind: "Credit pool",
     census: null,
     served: null,
   },
