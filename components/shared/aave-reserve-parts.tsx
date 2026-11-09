@@ -25,6 +25,7 @@ import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import { RevealTip } from "@/components/shared/reveal-tip";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
 import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { fmtUsd } from "@/lib/aave-v4/format";
@@ -376,8 +377,8 @@ export function reserveFigures({ r, vocab, assetHref }: RowProps) {
 function DetailLine({ term, children, title }: { term: string; children: React.ReactNode; title?: string }) {
   return (
     <div className="contents">
-      <dt className="text-rb-500" title={title}>
-        {term}
+      <dt className="text-rb-500" data-parameter-term={term}>
+        <HeadingTip text={term} tip={title} />
       </dt>
       <dd className="text-right tabular-nums text-foreground">{children}</dd>
     </div>
@@ -448,38 +449,65 @@ export function ReserveParameters({
   return (
     <div data-reserve-parameters="">
       <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]">
-        <DetailLine term="Oracle price" title="The price the market's oracle gives this asset, in USD">
+        <DetailLine
+          term="Oracle price"
+          title={`The USD price the market's oracle gives ${r.symbol}, used for every collateral and debt figure in the market.`}
+        >
           {price}
         </DetailLine>
-        <DetailLine term="Loan-to-value" title="The most a wallet can borrow against this reserve">
+        <DetailLine
+          term="Loan-to-value"
+          title={`The most a wallet can borrow against supplied ${r.symbol}, as a share of its value. At 0% it backs no new borrowing.`}
+        >
           <Prov info={vocab.reserveLtvProv(r.symbol, ltvBps)}>{bpsText(ltvBps)}%</Prov>
         </DetailLine>
-        <DetailLine term="Liquidation threshold" title="The share of its value that counts toward covering debt">
+        <DetailLine
+          term="Liquidation threshold"
+          title={`The share of supplied ${r.symbol}'s value that counts toward covering debt. A position can be liquidated once its debt passes its collateral counted at these shares.`}
+        >
           <Prov info={vocab.reserveLtProv(r.symbol)}>{bpsText(ltBps)}%</Prov>
         </DetailLine>
         {bonusBps > 10000 && (
-          <DetailLine term="Liquidation bonus" title="The extra collateral a liquidator receives">
+          <DetailLine
+            term="Liquidation bonus"
+            title={`The extra ${r.symbol}, over the value of the debt repaid, that a liquidator receives when it takes this collateral.`}
+          >
             <Prov info={vocab.reserveBonusProv(r.symbol, bonusBps)}>{bpsText(bonusBps - 10000)}%</Prov>
           </DetailLine>
         )}
-        <DetailLine term="Reserve factor" title={RF_TIP}>
+        <DetailLine
+          term="Reserve factor"
+          title={`The share of the interest ${r.symbol} borrowers pay that the protocol keeps. Suppliers earn the rest.`}
+        >
           <Prov info={vocab.reserveFactorProv(r.symbol)}>{pct(r.reserveFactor)}</Prov>
         </DetailLine>
-        <DetailLine term="Supply cap" title="Share of the supply cap in use, and the cap">
+        <DetailLine
+          term="Supply cap"
+          title={`The most ${r.symbol} that can be supplied to the reserve in total, and the share of it in use. Supplies stop when it is reached.`}
+        >
           <CapLine side="supply" c={r.supplyCapState} r={r} vocab={vocab} />
         </DetailLine>
-        <DetailLine term="Borrow cap" title="Share of the borrow cap in use, and the cap">
+        <DetailLine
+          term="Borrow cap"
+          title={`The most ${r.symbol} that can be borrowed from the reserve in total, and the share of it in use. Borrows stop when it is reached.`}
+        >
           <CapLine side="borrow" c={r.borrowCapState} r={r} vocab={vocab} />
         </DetailLine>
         {r.debtCeiling != null && (
-          <DetailLine term="Debt ceiling" title="Isolation mode: the most that can be borrowed against this reserve">
+          <DetailLine
+            term="Debt ceiling"
+            title={`${r.symbol} is isolated: a wallet using it as collateral can borrow only the assets the market allows in isolation, and all such wallets together up to this many dollars.`}
+          >
             <Prov info={vocab.isolatedProv(r.symbol, r.debtCeiling)}>
               ${r.debtCeiling.toLocaleString("en-US", { maximumFractionDigits: 0 })}
             </Prov>
           </DetailLine>
         )}
         {r.kink != null && r.rateStrategy && (
-          <DetailLine term="Kink" title="The utilisation at which the borrow rate starts to climb steeply">
+          <DetailLine
+            term="Kink"
+            title={`The share of the reserve's ${r.symbol} lent out at which the borrow rate starts to climb steeply.`}
+          >
             <Prov
               info={vocab.kinkProv(r.symbol, {
                 strategy: r.rateStrategy,
@@ -577,8 +605,6 @@ export function ReserveDetails({
     </>
   );
 }
-
-export const RF_TIP = "The share of the interest borrowers pay that the protocol keeps; suppliers get the rest";
 
 /** What a column header stands for, in its tip. */
 export const HEADER_TIP: Record<string, string> = {

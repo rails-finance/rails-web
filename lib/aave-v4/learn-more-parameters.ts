@@ -84,6 +84,13 @@ const WORDS = {
   ],
 };
 
+/** Each row's term to its sentence, for the press-to-explain on the row's
+ *  label: the same words as the "?" bullet. */
+export function v4ParameterTips(n: Names): Record<string, string> {
+  const all = [...Object.values(WORDS.spoke), ...Object.values(WORDS.hub)].map((w) => w(n));
+  return Object.fromEntries(all.map((d) => [d.bold, d.text]));
+}
+
 /** The rows the section draws: `published` and `paused` on Base, `curve` where the hub's curve was read. */
 export function v4ParametersLearnMore(
   n: Names,
