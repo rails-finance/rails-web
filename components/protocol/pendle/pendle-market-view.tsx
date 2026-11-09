@@ -44,6 +44,8 @@ export function PendleMarketView({
   const expired = live.expired === true;
   const marks = live.marks;
 
+  const markText = (raw: string, from: number | null, sy: number | null) =>
+    (unitRate(raw, from, sy) ?? 0).toLocaleString("en-US", { maximumFractionDigits: 4 });
   const markRow = (id: "pt" | "yt" | "lp", label: string, raw: string | null): PositionPanelRow => ({
     id: `mark-${id}`,
     label,
@@ -57,12 +59,7 @@ export function PendleMarketView({
               info={markProv(id.toUpperCase() as "PT" | "YT" | "LP", marks.source, marks.twapSeconds, m.block)}
               value={raw}
             >
-              {(unitRate(raw, id === "lp" ? t.market.decimals : t.pt.decimals, t.sy.decimals) ?? 0).toLocaleString(
-                "en-US",
-                {
-                  maximumFractionDigits: 4,
-                },
-              )}
+              {markText(raw, id === "lp" ? t.market.decimals : t.pt.decimals, t.sy.decimals)}
             </Prov>
           </PanelFigure>{" "}
           SY
