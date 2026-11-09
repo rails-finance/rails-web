@@ -216,3 +216,72 @@ export const fluidOraclePriceProv = stamped(fluidOraclePriceProv_);
 export const fluidVaultSizeProv = stamped(fluidVaultSizeProv_);
 export const fluidSmartLegProv = stamped(fluidSmartLegProv_);
 export const fluidVaultRateProv = stamped(fluidVaultRateProv_);
+
+// ── one vault's page (ui-jobs 549 step 7) ────────────────────────────────────
+
+/** A vault's identity: its address, id and type, the row's receipt on the
+ *  roster and the subtitle's on its page. */
+const fluidVaultIdentityProv_ = (vaultType: number, coords: FluidVaultCoords): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  verify: recompute("constantVariables", coords),
+  summary: `Fluid vault ${coords.vaultId ?? ""}${coords.pair ? ` (${coords.pair})` : ""} — minted by the VaultFactory, read through the VaultResolver${atBlock(coords)}. Its type (\`constantVariables.vaultType\` ${vaultType}) says which legs hold DEX pool shares: 10000 a plain pair (T1), 20000 smart collateral (T2), 30000 smart debt (T3), 40000 both (T4).`,
+  contract: vaultContract(coords),
+  via: ROSTER_VIA,
+  inputs: [
+    { label: "vault", value: coords.vault, kind: "chain", contract: vaultContract(coords) },
+    { label: "vault id", value: String(coords.vaultId ?? ""), kind: "chain" },
+    { label: "oracle", value: coords.oracle ?? "none", kind: "chain" },
+  ],
+});
+
+/** Open positions in one vault — vaultState.totalPositions. */
+const fluidVaultPositionsProv_ = (coords: FluidVaultCoords): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  verify: recompute("vaultState.totalPositions", coords),
+  summary: `Positions in the vault — its own \`vaultState.totalPositions\`${atBlock(coords)}: every position NFT the vault has minted and not burned.`,
+  contract: vaultContract(coords),
+  via: `${LANE} · getVaultEntireData(vault) · vaultState.totalPositions @ head`,
+});
+
+/** Σ totalPositions over the roster. */
+const fluidRosterPositionsProv_ = (coords: FluidVaultCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  summary: `Positions across the roster — Σ each vault's \`vaultState.totalPositions\`${atBlock(coords)}. Each leg a resolver read; the sum is ours.`,
+  contract: VAULT_RESOLVER_CONTRACT,
+  via: `${LANE} · Σ vaultState.totalPositions @ head`,
+  formula: "Σ totalPositions over the roster",
+});
+
+/** What borrowers can take now — limitsAndAvailability.borrowable. */
+const fluidBorrowableProv_ = (coords: FluidVaultCoords): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  verify: recompute("limitsAndAvailability.borrowable", coords),
+  summary: `Available to borrow — the resolver's \`limitsAndAvailability.borrowable\`${atBlock(coords)}, in ${coords.debtSym ?? "the debt token"}: the least of the vault's borrow limit at the Liquidity layer and the Liquidity layer's free balance of the token.`,
+  contract: VAULT_RESOLVER_CONTRACT,
+  via: `${LANE} · getVaultEntireData(vault) · limitsAndAvailability.borrowable @ head`,
+});
+
+/** The vault's aggregate ratio: total borrow ÷ (total supply × liquidate price). */
+const fluidVaultUsedProv_ = (coords: FluidVaultCoords): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  summary: `Used — the vault's total borrow ÷ (its total supply × the oracle's liquidate price)${atBlock(coords)}: the whole vault's debt as a share of its collateral's value, on the axis the ladder's rungs sit on. It is the vault's aggregate; one position can sit far above it.`,
+  contract: vaultContract(coords),
+  via: `${LANE} · totalBorrowVault ÷ (totalSupplyVault × configs.oraclePriceLiquidate) @ head`,
+  formula: "totalBorrowVault ÷ (totalSupplyVault × oraclePriceLiquidate)",
+});
+
+export const fluidVaultIdentityProv = stamped(fluidVaultIdentityProv_);
+export const fluidVaultPositionsProv = stamped(fluidVaultPositionsProv_);
+export const fluidRosterPositionsProv = stamped(fluidRosterPositionsProv_);
+export const fluidBorrowableProv = stamped(fluidBorrowableProv_);
+export const fluidVaultUsedProv = stamped(fluidVaultUsedProv_);
