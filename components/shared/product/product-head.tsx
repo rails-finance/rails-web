@@ -41,7 +41,7 @@ export function ToolsFor({ scope, title, tools }: { scope: string; title: string
 export function EntryLinks({ entries }: { entries: EntryLink[] }) {
   if (entries.length === 0) return null;
   return (
-    <div className="mt-auto flex flex-col gap-1 pt-3">
+    <div className="mt-auto flex flex-col gap-1 pt-3" data-anatomy="R6">
       {entries.map((e) => (
         <Link
           key={e.href + e.label}
@@ -98,7 +98,12 @@ export function ProductHeadSection({
       </>
     ) : null;
   return (
-    <ProvSection scope={head.scope} className={className} data-anatomy={head.anatomy} {...head.hooks}>
+    <ProvSection
+      scope={head.scope}
+      className={className}
+      data-anatomy={head.anatomy ? `${head.anatomy} R0` : "R0"}
+      {...head.hooks}
+    >
       {heading ? (
         <div className="flex items-start justify-between gap-3" data-section-heading="">
           <div className="min-w-0">

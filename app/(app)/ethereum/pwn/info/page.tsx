@@ -6,12 +6,29 @@ import Link from "next/link";
 import { GlossaryLink, ProtocolInfoPage, type InfoTerm } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 
 export const metadata = infoMetadata("pwn");
 
 const UL = "list-disc space-y-1 pl-5";
-const TH = "py-1 pr-3 text-left font-semibold text-foreground";
-const TD = "py-1 pr-3 align-top";
+
+/** The two contract sets side by side, on the house table (rails-ops ui-jobs
+ *  539: D1, D6 cards below sm), unlinked. */
+const CONTRACT_SETS: readonly (readonly [string, string, string])[] = [
+  ["v1.1", "A repayment total, fixed at the start.", "The lender extends alone, up to 30 days each time, at no cost."],
+  [
+    "v1.2 and v1.3",
+    "A yearly rate that builds up by the minute.",
+    "One party proposes 1 to 90 days, and the other party accepts.",
+  ],
+];
 
 const DOCS = "https://docs.pwn.xyz";
 const FAQ = `${DOCS}/faq`;
@@ -95,27 +112,28 @@ export default function InfoPage() {
           set of contracts, v1.1, and a newer set, v1.2 and v1.3, and each set has its own extension rule. The older
           contract fixes a <GlossaryLink term="Repayment total">repayment total</GlossaryLink>, and the newer ones
           charge a <GlossaryLink term="Yearly rate">yearly rate</GlossaryLink>.
-          <table className="mt-2 w-full text-left text-[13px]">
-            <thead>
-              <tr>
-                <th className={TH}>Contract</th>
-                <th className={TH}>Interest</th>
-                <th className={TH}>Extension</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className={TD}>v1.1</td>
-                <td className={TD}>A repayment total, fixed at the start.</td>
-                <td className={TD}>The lender extends alone, up to 30 days each time, at no cost.</td>
-              </tr>
-              <tr>
-                <td className={TD}>v1.2 and v1.3</td>
-                <td className={TD}>A yearly rate that builds up by the minute.</td>
-                <td className={TD}>One party proposes 1 to 90 days, and the other party accepts.</td>
-              </tr>
-            </tbody>
-          </table>
+          <DataTable className="mt-2" label="PWN's contract sets compared" stacked tableClassName="text-[13px]">
+            <DataTableHead>
+              <DataTableHeader label="Contract" />
+              <DataTableHeader label="Interest" />
+              <DataTableHeader label="Extension" />
+            </DataTableHead>
+            <DataTableBody>
+              {CONTRACT_SETS.map(([set, interest, extension]) => (
+                <DataTableRow key={set}>
+                  <DataTableCell rowHeader className="whitespace-nowrap font-semibold text-foreground">
+                    {set}
+                  </DataTableCell>
+                  <DataTableCell label="Interest" wide>
+                    {interest}
+                  </DataTableCell>
+                  <DataTableCell label="Extension" wide>
+                    {extension}
+                  </DataTableCell>
+                </DataTableRow>
+              ))}
+            </DataTableBody>
+          </DataTable>
         </>,
       ]}
       views={[

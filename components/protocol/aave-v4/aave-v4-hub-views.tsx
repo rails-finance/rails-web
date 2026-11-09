@@ -5,7 +5,9 @@
 //      supply composition and spokes.
 //   2. A cross-hub asset table — every (hub, asset) credit line flattened into
 //      one sortable list. This is the workbench: sort by supply / borrow / rate /
-//      utilisation, filter by class · hub · symbol.
+//      utilisation, filter by class · hub · symbol. On the house table
+//      (rails-ops ui-jobs 539: D1, D2, D6 cards below sm), unlinked: a row
+//      holds three listing links.
 // One filter set scopes both: the hub chips choose which band cards show and
 // which rows the table keeps; class + search narrow the table (the band keeps
 // its full composition — that describes the hub, not the filtered slice).
@@ -18,7 +20,15 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowUpDown, Ban, ChevronUp, ChevronDown } from "lucide-react";
+import { Ban } from "lucide-react";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import type { HubView, HubAssetAgg } from "@/lib/aave-v4/hub-view";
@@ -111,6 +121,16 @@ function UtilMini({ a, coords }: { a: HubAssetAgg; coords: HubProvCoords }) {
 }
 
 type SortKey = "asset" | "hub" | "lt" | "supplied" | "borrowed" | "rate" | "supplyApy" | "util";
+const SORT_LABEL: Record<SortKey, string> = {
+  asset: "Asset",
+  hub: "Hub",
+  lt: "LT",
+  supplied: "Supplied",
+  borrowed: "Borrowed",
+  rate: "Borrow rate",
+  supplyApy: "Supply APY",
+  util: "Utilisation",
+};
 
 export function AaveV4HubViews({ views, block }: { views: HubView[]; block?: number }) {
   // Hook first, before any state, so the receipts registry backing the whole
@@ -191,26 +211,16 @@ export function AaveV4HubViews({ views, block }: { views: HubView[]; block?: num
     setHubFilter(new Set());
   };
 
-  // Sortable header cell. A render helper, not a component, so it shares the
-  // parent's sort state without remounting on every keystroke.
-  const th = (label: string, k: SortKey, align: "left" | "right" = "left") => {
-    const active = sortKey === k;
-    const Caret = sortDir === "asc" ? ChevronUp : ChevronDown;
-    return (
-      <th className={`px-3 py-2 ${align === "right" ? "text-right" : "text-left"}`}>
-        <button
-          type="button"
-          onClick={() => toggleSort(k)}
-          className={`inline-flex items-center gap-1 text-[11px] uppercase tracking-wider transition-colors hover:text-foreground ${
-            active ? "text-foreground" : "text-rb-500"
-          } ${align === "right" ? "flex-row-reverse" : ""}`}
-        >
-          {label}
-          {active ? <Caret className="h-3 w-3" /> : <ArrowUpDown className="h-3 w-3 opacity-30" />}
-        </button>
-      </th>
-    );
-  };
+  // A sortable header (D2). A render helper, so it shares the parent's sort
+  // state.
+  const th = (k: SortKey, align: "left" | "right" = "left") => (
+    <DataTableHeader
+      label={SORT_LABEL[k]}
+      align={align}
+      sort={{ dir: sortKey === k ? sortDir : null, onSort: () => toggleSort(k), ariaLabel: `Sort by ${SORT_LABEL[k]}` }}
+    />
+  );
+  const numeric = sortKey !== "asset" && sortKey !== "hub";
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -275,21 +285,53 @@ export function AaveV4HubViews({ views, block }: { views: HubView[]; block?: num
           )}
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-rb-200 dark:border-rb-800">
-          <table className="w-full min-w-[760px] border-collapse">
-            <thead>
-              <tr className="bg-foreground/[0.03]">
-                {th("Asset", "asset")}
-                {th("Hub", "hub")}
-                {th("LT", "lt")}
-                {th("Supplied", "supplied", "right")}
-                {th("Borrowed", "borrowed", "right")}
-                {th("Borrow rate", "rate", "right")}
-                {th("Supply APY", "supplyApy", "right")}
-                {th("Utilisation", "util")}
-              </tr>
-            </thead>
-            <tbody>
+        <>
+          {/* Below sm the header row is hidden (D6): a select and a direction
+              button drive the same sort. */}
+          <div className="mb-2 flex items-center gap-2 sm:hidden" data-mobile-sort="">
+            <label className="flex items-center gap-2 text-[12px] text-rb-500">
+              Sort by
+              <select
+                value={sortKey}
+                onChange={(e) => {
+                  const k = e.target.value as SortKey;
+                  setSortKey(k);
+                  setSortDir(k === "asset" || k === "hub" ? "asc" : "desc");
+                }}
+                className="rounded-md border border-rb-200 bg-background px-2 py-1 text-base text-foreground dark:border-rb-800"
+              >
+                {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+                  <option key={k} value={k}>
+                    {SORT_LABEL[k]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+              className="rounded-md border border-rb-200 px-2 py-1 text-[12px] text-foreground dark:border-rb-800"
+            >
+              {numeric ? (sortDir === "asc" ? "Low first" : "High first") : sortDir === "asc" ? "A to Z" : "Z to A"}
+            </button>
+          </div>
+          <DataTable
+            label="Credit lines across the hubs"
+            stacked
+            rowHeight="two"
+            tableClassName="text-[13px] sm:min-w-[760px]"
+          >
+            <DataTableHead>
+              {th("asset")}
+              {th("hub")}
+              {th("lt")}
+              {th("supplied", "right")}
+              {th("borrowed", "right")}
+              {th("rate", "right")}
+              {th("supplyApy", "right")}
+              {th("util")}
+            </DataTableHead>
+            <DataTableBody>
               {sortedRows.map(({ hub, hubLabel, asset: a }) => {
                 const sUsd = fmtUsd(a.suppliedUsd);
                 const bUsd = fmtUsd(a.borrowedUsd);
@@ -297,35 +339,37 @@ export function AaveV4HubViews({ views, block }: { views: HubView[]; block?: num
                 const coords: HubProvCoords = { blockNumber: block, hubLabel };
                 const ltUniform = a.ltMin != null && a.ltMax != null && Math.abs(a.ltMin - a.ltMax) < 0.0001;
                 return (
-                  <tr
-                    key={`${a.symbol}-${hub}`}
-                    className="border-t border-rb-200 transition-colors hover:bg-foreground/[0.02] dark:border-rb-800"
-                  >
-                    <td className="px-3 py-2.5">
+                  <DataTableRow key={`${a.symbol}-${hub}`}>
+                    <DataTableCell rowHeader className="whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <TokenChipIcon symbol={a.symbol} address={a.underlying} size={20} filterable={false} />
                         <div className="leading-tight">
-                          <div className="text-[13px] font-medium text-foreground">{a.symbol}</div>
+                          <div className="font-medium text-foreground">{a.symbol}</div>
                           <div className="flex items-center gap-1 text-[11px] text-rb-500">
                             <ClassDot cls={a.cls} />
                             {a.classLabel}
                           </div>
                         </div>
                       </div>
-                    </td>
-                    <td className="px-3 py-2.5 text-[13px]">
+                    </DataTableCell>
+                    <DataTableCell label="Hub" className="whitespace-nowrap">
                       <Link href={listingHref(hub)} className={INLINE_LINK}>
                         {hubLabel}
                       </Link>
-                    </td>
-                    <td className="px-3 py-2.5 tabular-nums text-[13px] text-foreground/80">
+                    </DataTableCell>
+                    <DataTableCell label="LT" className="tabular-nums text-foreground/80">
                       {a.ltMin != null && a.ltMax != null ? (
                         <Prov info={hubLtRangeProv(a.symbol, a.spokeLeaves, ltUniform, coords)}>{ltDisplay(a)}</Prov>
                       ) : (
                         ltDisplay(a)
                       )}
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-[13px]" title={`Supplied ${sUsd.title}`}>
+                    </DataTableCell>
+                    <DataTableCell
+                      label="Supplied"
+                      align="right"
+                      className="tabular-nums"
+                      title={`Supplied ${sUsd.title}`}
+                    >
                       {a.suppliedUsd > 0 ? (
                         <Link href={listingHref(hub, { symbol: a.symbol, side: "supply" })} className={INLINE_LINK}>
                           <Prov info={hubAssetValueProv("supplied", a.symbol, coords)}>{sUsd.display}</Prov>
@@ -333,16 +377,20 @@ export function AaveV4HubViews({ views, block }: { views: HubView[]; block?: num
                       ) : (
                         <span className="text-rb-500">{sUsd.display}</span>
                       )}
-                    </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-[13px]" title={`Borrowed ${bUsd.title}`}>
+                    </DataTableCell>
+                    <DataTableCell
+                      label="Borrowed"
+                      align="right"
+                      className="tabular-nums"
+                      title={`Borrowed ${bUsd.title}`}
+                    >
                       {hasBorrow ? (
                         <Link href={listingHref(hub, { symbol: a.symbol, side: "borrow" })} className={INLINE_LINK}>
                           <Prov info={hubAssetValueProv("borrowed", a.symbol, coords)}>{bUsd.display}</Prov>
                         </Link>
                       ) : a.canBorrow === false ? (
-                        // Structurally not borrowable (collateral-only) — a no-entry
-                        // mark, distinct from a borrowable asset that just has no
-                        // draws yet.
+                        // Structurally not borrowable (collateral-only): a no-entry
+                        // mark, apart from a borrowable asset with no draws yet.
                         <span
                           className="inline-flex items-center justify-end gap-1 text-rb-500/70"
                           title="Not borrowable in this hub"
@@ -352,9 +400,11 @@ export function AaveV4HubViews({ views, block }: { views: HubView[]; block?: num
                       ) : (
                         <span className="text-rb-500">no borrows</span>
                       )}
-                    </td>
-                    <td
-                      className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80"
+                    </DataTableCell>
+                    <DataTableCell
+                      label="Borrow rate"
+                      align="right"
+                      className="tabular-nums text-foreground/80"
                       title="Current variable borrow rate (the hub's drawnRate)"
                     >
                       {hasBorrow && a.borrowApr != null ? (
@@ -364,9 +414,11 @@ export function AaveV4HubViews({ views, block }: { views: HubView[]; block?: num
                       ) : (
                         <span className="text-rb-500">—</span>
                       )}
-                    </td>
-                    <td
-                      className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80"
+                    </DataTableCell>
+                    <DataTableCell
+                      label="Supply APY"
+                      align="right"
+                      className="tabular-nums text-foreground/80"
                       title="Supplier yield: borrow rate × utilisation × (1 − liquidity fee)"
                     >
                       {a.supplyApr != null ? (
@@ -374,16 +426,16 @@ export function AaveV4HubViews({ views, block }: { views: HubView[]; block?: num
                       ) : (
                         <span className="text-rb-500">—</span>
                       )}
-                    </td>
-                    <td className="px-3 py-2.5">
+                    </DataTableCell>
+                    <DataTableCell label="Utilisation" wide className="whitespace-nowrap">
                       <UtilMini a={a} coords={coords} />
-                    </td>
-                  </tr>
+                    </DataTableCell>
+                  </DataTableRow>
                 );
               })}
-            </tbody>
-          </table>
-        </div>
+            </DataTableBody>
+          </DataTable>
+        </>
       )}
 
       <ProvenanceInfoTabs className="mt-6" />

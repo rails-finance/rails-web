@@ -184,7 +184,7 @@ export function SectionMenu({
 }) {
   const rows = (links?.length ?? 0) > 0 || exports?.markdown != null || exports?.csv != null;
   return (
-    <div className="-my-1 -mr-1 flex shrink-0" data-section-menu={scope}>
+    <div className="-my-1 -mr-1 flex shrink-0" data-anatomy="K1" data-section-menu={scope}>
       <ToolsMenu variant="panel" label={`${title} menu`} heading={title} provScope={{ id: scope, hint }}>
         {rows ? (close) => <SectionMenuRows close={close} links={links} exports={exports} /> : undefined}
       </ToolsMenu>

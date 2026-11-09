@@ -43,6 +43,16 @@ import { formatTinyNonZero } from "@/lib/utils/format";
 import type { ReactNode } from "react";
 
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
+import { AssetUnit } from "@/components/shared/asset-unit";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 import { InfoDisclosure } from "@/components/shared/info-disclosure";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { shortAddress } from "@/lib/compound/asset-catalog";
@@ -119,12 +129,6 @@ function Tip({
   );
 }
 
-/** The collateral table's columns, shared by the header row and every row so
- *  each header sits over its figures. Below lg the grid is off: rows wrap and
- *  the factors take a line of their own with labels inline. */
-const COLLATERAL_GRID =
-  "lg:grid lg:grid-cols-[6rem_minmax(15rem,1fr)_5.5rem_5rem_4.75rem_4.75rem_4.75rem] lg:items-center lg:gap-x-3";
-
 const CAP_TIP = "The share of the supply cap in use: amount supplied ÷ cap, both in the asset's own units.";
 const BORROW_TIP = "Collateral factor for borrowing: the share of this asset's value that can be borrowed against.";
 const LIQUIDATE_TIP =
@@ -132,37 +136,20 @@ const LIQUIDATE_TIP =
 const CREDITED_TIP =
   "Comet's liquidation factor: the share of this asset's value an account is credited at if it is absorbed. The protocol keeps the rest.";
 
-function CollateralHeader() {
-  const th = "text-[11px] uppercase tracking-wider text-rb-500";
+/** A column's name with its tip: over the column from lg, and as a card's
+ *  label below it (D6), where the tip opens from the start. */
+function TipLabel({ text, tip, align }: { text: string; tip: string; align: "start" | "end" }) {
   return (
-    <div className={`hidden border-b border-rb-300/40 px-1 pb-1.5 dark:border-rb-700/40 ${COLLATERAL_GRID} ${th}`}>
-      <span>Asset</span>
-      <span>Supplied</span>
-      <span className="text-right">Value</span>
-      <span className="text-right">
-        <Tip text={CAP_TIP} align="end">
-          <span className={TIPPED}>Cap used</span>
-        </Tip>
-      </span>
-      <span className="text-right">
-        <Tip text={BORROW_TIP} align="end">
-          <span className={TIPPED}>Borrow</span>
-        </Tip>
-      </span>
-      <span className="text-right">
-        <Tip text={LIQUIDATE_TIP} align="end">
-          <span className={TIPPED}>Liquidate</span>
-        </Tip>
-      </span>
-      <span className="text-right">
-        <Tip text={CREDITED_TIP} align="end">
-          <span className={TIPPED}>Credited</span>
-        </Tip>
-      </span>
-    </div>
+    <Tip text={tip} align={align}>
+      <span className={TIPPED}>{text}</span>
+    </Tip>
   );
 }
 
+const FIGURE_CELL = "whitespace-nowrap text-sm tabular-nums";
+
+/** One collateral asset as a row of the house table (D1, unlinked; D6 below
+ *  lg). The asset's own explorer link stays in the row header. */
 function CollateralRow({
   c,
   coords,
@@ -175,95 +162,148 @@ function CollateralRow({
   const unit = coords.quoteUnit ?? "USD";
   // Collateral-level coordinates: the same Comet proxy + block, this asset's id.
   const cc: CompoundMarketCoords = { ...coords, collateralSymbol: c.symbol, collateralAsset: c.asset };
-  const lbl = "text-rb-500 lg:hidden";
   return (
-    <div
-      className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-1 py-2 text-[13px] tabular-nums ${COLLATERAL_GRID}`}
-    >
-      <a
-        href={explorerUrl(chainId, "address", c.asset)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="min-w-0 flex-1 truncate font-medium text-foreground lg:flex-none"
-      >
-        {c.symbol}
-      </a>
-
-      {/* Supplied: the bar (supplied ÷ supply cap, both in the asset's own
-          units, one axis) and the amount. RatioBar carries the mt-2.5 its
-          card-tier callers want; these are rows, so the offset is zeroed
-          rather than the instrument re-drawn. */}
-      <div className="order-last flex basis-full items-center gap-3 lg:order-none lg:basis-auto">
-        <Tip
-          text={
-            c.capUsed != null
-              ? `Supply cap ${qty(c.supplyCap)} ${c.symbol}, ${pctText(c.capUsed, 0)} used. The bar is supplied ÷ cap.`
-              : "The supply cap is zero: no more of this asset can enter the market. What is supplied entered before the cap was set."
-          }
-          className="min-w-16 flex-1"
-        >
-          <div className="w-full [&>div]:mt-0">
-            {c.capUsed != null ? (
-              <RatioBar fill={c.capUsed} ticks={[]} />
-            ) : (
-              <div className="h-2.5 rounded-full bg-rb-200 dark:bg-rb-500/30" />
-            )}
-          </div>
-        </Tip>
-        <span className="shrink-0 whitespace-nowrap text-right text-foreground lg:w-36">
-          <Prov info={cvCollateralSuppliedProv(cc)}>
-            {qty(c.totalSupplied)} {c.symbol}
-          </Prov>
-        </span>
-      </div>
-
-      <span className="text-right text-rb-500">
-        <Prov info={cvCollateralValueProv(cc)}>{val(c.suppliedValue, unit)}</Prov>
-      </span>
-      {/* A ratio of two receipted figures (supplied, cap): no receipt of its own. */}
-      <span className="text-right text-rb-500" data-prov-exempt="">
-        {c.capUsed == null ? (
-          <Tip text="The supply cap is zero: no more can be added; what is in stays." align="end">
-            <span className={TIPPED}>Cap 0</span>
-          </Tip>
-        ) : c.capUsed > 1 ? (
-          <Tip
-            text="Governance lowered the supply cap below what is already supplied. Nothing more can enter until supply falls under the cap; what is in stays."
-            align="end"
+    <DataTableRow>
+      <DataTableCell rowHeader>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <TokenChipIcon symbol={c.symbol} address={c.asset} size={28} filterable={false} />
+          <a
+            href={explorerUrl(chainId, "address", c.asset)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="min-w-0 truncate text-sm font-medium text-foreground"
           >
-            <span className={TIPPED}>{pctText(c.capUsed, 0)}</span>
+            {c.symbol}
+          </a>
+        </div>
+      </DataTableCell>
+
+      <DataTableCell align="right" className={`${FIGURE_CELL} text-foreground`} label="Supplied">
+        <Prov info={cvCollateralSuppliedProv(cc)}>
+          <span className="inline-flex items-center gap-1">
+            {qty(c.totalSupplied)} <AssetUnit symbol={c.symbol} address={c.asset} />
+          </span>
+        </Prov>
+      </DataTableCell>
+
+      <DataTableCell align="right" className={`${FIGURE_CELL} text-rb-500`} label="Value">
+        <Prov info={cvCollateralValueProv(cc)}>{val(c.suppliedValue, unit)}</Prov>
+      </DataTableCell>
+
+      {/* Cap used: the bar (supplied ÷ supply cap, both in the asset's own
+          units, one axis) and its share. RatioBar carries the mt-2.5 its
+          card-tier callers want; this is a row, so the offset is zeroed
+          rather than the instrument re-drawn. */}
+      <DataTableCell
+        className={`${FIGURE_CELL} lg:w-[200px] lg:min-w-[150px]`}
+        label={<TipLabel text="Cap used" tip={CAP_TIP} align="start" />}
+      >
+        <div className="flex items-center gap-2.5">
+          <Tip
+            text={
+              c.capUsed != null
+                ? `Supply cap ${qty(c.supplyCap)} ${c.symbol}, ${pctText(c.capUsed, 0)} used. The bar is supplied ÷ cap.`
+                : "The supply cap is zero: no more of this asset can enter the market. What is supplied entered before the cap was set."
+            }
+            className="min-w-12 flex-1"
+          >
+            <div className="w-full [&>div]:mt-0">
+              {c.capUsed != null ? (
+                <RatioBar fill={c.capUsed} ticks={[]} />
+              ) : (
+                <div className="h-2.5 rounded-full bg-rb-200 dark:bg-rb-500/30" />
+              )}
+            </div>
           </Tip>
-        ) : (
-          pctText(c.capUsed, 0)
-        )}
-      </span>
+          {/* A ratio of two receipted figures (supplied, cap): no receipt of its own. */}
+          <span className="w-11 shrink-0 text-right text-rb-500" data-prov-exempt="">
+            {c.capUsed == null ? (
+              <Tip text="The supply cap is zero: no more can be added; what is in stays." align="end">
+                <span className={TIPPED}>Cap 0</span>
+              </Tip>
+            ) : c.capUsed > 1 ? (
+              <Tip
+                text="Governance lowered the supply cap below what is already supplied. Nothing more can enter until supply falls under the cap; what is in stays."
+                align="end"
+              >
+                <span className={TIPPED}>{pctText(c.capUsed, 0)}</span>
+              </Tip>
+            ) : (
+              pctText(c.capUsed, 0)
+            )}
+          </span>
+        </div>
+      </DataTableCell>
 
       {/* The factors, stated and never drawn on the utilisation bar (a different
           axis). A zero borrow factor is governance deprecating the asset for
-          NEW borrowing while it stays liquidation-eligible. Below lg the three
-          share a line under the row with their labels inline; from lg they are
-          columns under the headers. */}
-      <div className="order-last flex basis-full flex-wrap gap-x-4 gap-y-0.5 lg:contents">
-        <span className="text-foreground/80 lg:text-right">
-          <span className={lbl}>Borrow </span>
-          {c.borrowCollateralFactor === 0 ? (
-            <Tip text="Borrowing against this asset is switched off." align="end">
-              <span className={`${TIPPED} text-rb-500`}>Off</span>
-            </Tip>
-          ) : (
-            <Prov info={cvCollateralFactorProv("borrow", cc)}>{pctText(c.borrowCollateralFactor, 0)}</Prov>
-          )}
-        </span>
-        <span className="text-foreground/80 lg:text-right">
-          <span className={lbl}>Liquidate </span>
-          <Prov info={cvCollateralFactorProv("liquidate", cc)}>{pctText(c.liquidateCollateralFactor, 0)}</Prov>
-        </span>
-        <span className="text-foreground/80 lg:text-right">
-          <span className={lbl}>Credited </span>
-          <Prov info={cvCollateralFactorProv("liquidation", cc)}>{pctText(c.liquidationFactor, 0)}</Prov>
-        </span>
-      </div>
-    </div>
+          NEW borrowing while it stays liquidation-eligible. */}
+      <DataTableCell
+        align="right"
+        className={`${FIGURE_CELL} text-foreground/80`}
+        label={<TipLabel text="Borrow" tip={BORROW_TIP} align="start" />}
+      >
+        {c.borrowCollateralFactor === 0 ? (
+          <Tip text="Borrowing against this asset is switched off." align="end">
+            <span className={`${TIPPED} text-rb-500`}>Off</span>
+          </Tip>
+        ) : (
+          <Prov info={cvCollateralFactorProv("borrow", cc)}>{pctText(c.borrowCollateralFactor, 0)}</Prov>
+        )}
+      </DataTableCell>
+      <DataTableCell
+        align="right"
+        className={`${FIGURE_CELL} text-foreground/80`}
+        label={<TipLabel text="Liquidate" tip={LIQUIDATE_TIP} align="start" />}
+      >
+        <Prov info={cvCollateralFactorProv("liquidate", cc)}>{pctText(c.liquidateCollateralFactor, 0)}</Prov>
+      </DataTableCell>
+      <DataTableCell
+        align="right"
+        className={`${FIGURE_CELL} text-foreground/80`}
+        label={<TipLabel text="Credited" tip={CREDITED_TIP} align="start" />}
+      >
+        <Prov info={cvCollateralFactorProv("liquidation", cc)}>{pctText(c.liquidationFactor, 0)}</Prov>
+      </DataTableCell>
+    </DataTableRow>
+  );
+}
+
+/** The collateral list: the house table on the page canvas, under the
+ *  market's panel (M1's posture: a striped table never sits on a raised
+ *  ground). Kept in the contract's order. */
+function CollateralTable({
+  m,
+  coords,
+  chainId,
+}: {
+  m: CompoundV3MarketRow;
+  coords: CompoundMarketCoords;
+  chainId: ChainId;
+}) {
+  return (
+    <DataTable
+      label={`${m.baseSymbol} market collateral`}
+      tableClassName="lg:min-w-[860px]"
+      stacked
+      stackBelow="lg"
+      rowHeight="one"
+    >
+      <DataTableHead>
+        <DataTableHeader label="Asset" />
+        <DataTableHeader label="Supplied" align="right" />
+        <DataTableHeader label="Value" align="right" />
+        <DataTableHeader label={<TipLabel text="Cap used" tip={CAP_TIP} align="start" />} />
+        <DataTableHeader label={<TipLabel text="Borrow" tip={BORROW_TIP} align="end" />} align="right" />
+        <DataTableHeader label={<TipLabel text="Liquidate" tip={LIQUIDATE_TIP} align="end" />} align="right" />
+        <DataTableHeader label={<TipLabel text="Credited" tip={CREDITED_TIP} align="end" />} align="right" />
+      </DataTableHead>
+      <DataTableBody>
+        {m.collateral.map((c) => (
+          <CollateralRow key={c.asset} c={c} coords={coords} chainId={chainId} />
+        ))}
+      </DataTableBody>
+    </DataTable>
   );
 }
 
@@ -312,133 +352,138 @@ function MarketCard({
   const stat = "whitespace-nowrap";
   const k = "text-rb-500";
   return (
-    <div className="rounded-lg border border-rb-200 bg-rb-50 p-3 dark:border-rb-500/30 dark:bg-rb-500/5">
-      <div className="flex items-baseline justify-between gap-2">
-        <div className="min-w-0">
-          <span className="text-base font-semibold text-foreground">{m.baseSymbol}</span>{" "}
-          <a
-            href={explorerUrl(chainId, "address", m.comet)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="link-external text-[13px] text-rb-500"
-          >
-            {m.label} · {shortAddress(m.comet)}
-          </a>
-        </div>
-        <span className="shrink-0 text-base tabular-nums text-foreground">
-          <Prov info={cvMarketValueProv("supplied", coords)}>{val(m.totalSupplyValue, m.quoteUnit)}</Prov>
-        </span>
-      </div>
-
-      <div className="mt-0.5 text-[13px] tabular-nums text-rb-500">
-        <Prov info={cvMarketBaseProv("supplied", coords)}>
-          {qty(m.totalSupplyBase)} {m.baseSymbol}
-        </Prov>{" "}
-        supplied · <Prov info={cvMarketBaseProv("borrowed", coords)}>{qty(m.totalBorrowBase)}</Prov> borrowed
-        {m.quoteUnit === "ETH" && (
-          <>
-            {" · "}
-            <Tip text="This market's price feeds quote in ETH, its base asset's own unit, so its values are stated in ETH and not converted.">
-              <span className={`text-foreground ${TIPPED}`}>quoted in ETH</span>
-            </Tip>
-          </>
-        )}
-      </div>
-
-      <RatioBar fill={m.utilization} ticks={ticks} />
-
-      {/* Label, then figure: the label muted, the figure in foreground. */}
-      <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-[13px] tabular-nums">
-        <Tip text="Comet.getUtilization: totalBorrow ÷ totalSupply of the base, the contract's arithmetic.">
-          <span className={stat}>
-            <span className={`${k} ${TIPPED}`}>Utilised</span>{" "}
-            <Prov info={cvUtilizationProv(coords)}>
-              <span className="text-foreground">{pctText(m.utilization)}</span>
-            </Prov>
+    <div>
+      <div className="rounded-lg border border-rb-200 bg-rb-50 p-3 dark:border-rb-500/30 dark:bg-rb-500/5">
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="min-w-0">
+            <span className="text-base font-semibold text-foreground">{m.baseSymbol}</span>{" "}
+            <a
+              href={explorerUrl(chainId, "address", m.comet)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="link-external text-[13px] text-rb-500"
+            >
+              {m.label} · {shortAddress(m.comet)}
+            </a>
+          </div>
+          <span className="shrink-0 text-base tabular-nums text-foreground">
+            <Prov info={cvMarketValueProv("supplied", coords)}>{val(m.totalSupplyValue, m.quoteUnit)}</Prov>
           </span>
-        </Tip>
-        {/* Over 100% is a real reading, not a rendering fault: the borrow index
+        </div>
+
+        <div className="mt-0.5 text-[13px] tabular-nums text-rb-500">
+          <Prov info={cvMarketBaseProv("supplied", coords)}>
+            {qty(m.totalSupplyBase)} {m.baseSymbol}
+          </Prov>{" "}
+          supplied · <Prov info={cvMarketBaseProv("borrowed", coords)}>{qty(m.totalBorrowBase)}</Prov> borrowed
+          {m.quoteUnit === "ETH" && (
+            <>
+              {" · "}
+              <Tip text="This market's price feeds quote in ETH, its base asset's own unit, so its values are stated in ETH and not converted.">
+                <span className={`text-foreground ${TIPPED}`}>quoted in ETH</span>
+              </Tip>
+            </>
+          )}
+        </div>
+
+        <RatioBar fill={m.utilization} ticks={ticks} />
+
+        {/* Label, then figure: the label muted, the figure in foreground. */}
+        <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-[13px] tabular-nums">
+          <Tip text="Comet.getUtilization: totalBorrow ÷ totalSupply of the base, the contract's arithmetic.">
+            <span className={stat}>
+              <span className={`${k} ${TIPPED}`}>Utilised</span>{" "}
+              <Prov info={cvUtilizationProv(coords)}>
+                <span className="text-foreground">{pctText(m.utilization)}</span>
+              </Prov>
+            </span>
+          </Tip>
+          {/* Over 100% is a real reading, not a rendering fault: the borrow index
             outruns the supply index by the spread between the two rates, so
             what borrowers owe can exceed what lenders are owed. The difference
             is the market's reserve line, stated below. Base's cWETHv3 sits
             here; no Ethereum market does, which is why this says what it means
             rather than leaving a full bar to be read as a shortfall. */}
-        {m.utilization > 1 && (
-          <Tip text="What borrowers owe of the base exceeds what lenders are owed. The gap is the spread between the borrow and supply rates, which accrues to the market's reserve line rather than to lenders, so the market's reserves are growing.">
-            <span className={`text-foreground ${TIPPED}`}>borrowed above supplied</span>
+          {m.utilization > 1 && (
+            <Tip text="What borrowers owe of the base exceeds what lenders are owed. The gap is the spread between the borrow and supply rates, which accrues to the market's reserve line rather than to lenders, so the market's reserves are growing.">
+              <span className={`text-foreground ${TIPPED}`}>borrowed above supplied</span>
+            </Tip>
+          )}
+          <Tip text="The utilisation where the rate curves turn steep: above it, borrowing costs rise fast to draw lenders in and borrowers out.">
+            <span className={stat}>
+              <span className={`${k} ${TIPPED}`}>Kink</span>{" "}
+              <span className="text-foreground">
+                <Prov info={cvKinkProv("borrow", coords)}>{pctText(m.borrowKink, 0)}</Prov>
+                {!sameKink && (
+                  <>
+                    {" / supply "}
+                    <Prov info={cvKinkProv("supply", coords)}>{pctText(m.supplyKink, 0)}</Prov>
+                  </>
+                )}
+              </span>
+            </span>
           </Tip>
-        )}
-        <Tip text="The utilisation where the rate curves turn steep: above it, borrowing costs rise fast to draw lenders in and borrowers out.">
-          <span className={stat}>
-            <span className={`${k} ${TIPPED}`}>Kink</span>{" "}
-            <span className="text-foreground">
-              <Prov info={cvKinkProv("borrow", coords)}>{pctText(m.borrowKink, 0)}</Prov>
-              {!sameKink && (
-                <>
-                  {" / supply "}
-                  <Prov info={cvKinkProv("supply", coords)}>{pctText(m.supplyKink, 0)}</Prov>
-                </>
-              )}
+          <Tip text="Comet.getBorrowRate at the current utilisation, annualized from the contract's per-second rate.">
+            <span className={stat}>
+              <span className={`${k} ${TIPPED}`}>Borrow rate</span>{" "}
+              <span className="text-foreground">
+                <Prov info={cvRateProv("borrow", coords)}>{pctText(m.borrowApr, 2)}</Prov>
+              </span>
             </span>
-          </span>
-        </Tip>
-        <Tip text="Comet.getBorrowRate at the current utilisation, annualized from the contract's per-second rate.">
-          <span className={stat}>
-            <span className={`${k} ${TIPPED}`}>Borrow rate</span>{" "}
-            <span className="text-foreground">
-              <Prov info={cvRateProv("borrow", coords)}>{pctText(m.borrowApr, 2)}</Prov>
+          </Tip>
+          <Tip text="Comet.getSupplyRate at the current utilisation, annualized from the contract's per-second rate.">
+            <span className={stat}>
+              <span className={`${k} ${TIPPED}`}>Supply rate</span>{" "}
+              <span className="text-foreground">
+                <Prov info={cvRateProv("supply", coords)}>{pctText(m.supplyApr, 2)}</Prov>
+              </span>
             </span>
-          </span>
-        </Tip>
-        <Tip text="Comet.getSupplyRate at the current utilisation, annualized from the contract's per-second rate.">
-          <span className={stat}>
-            <span className={`${k} ${TIPPED}`}>Supply rate</span>{" "}
-            <span className="text-foreground">
-              <Prov info={cvRateProv("supply", coords)}>{pctText(m.supplyApr, 2)}</Prov>
-            </span>
-          </span>
-        </Tip>
-      </div>
+          </Tip>
+        </div>
 
-      <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[13px] tabular-nums">
-        <Tip text="Comet.getReserves against Comet.targetReserves. Below the target the market sells absorbed collateral at its configured discount to refill the line; at or above it, those sales stop. The line is signed and can run negative.">
-          {/* The reserve line is a quantity of the BASE asset, a signed integer
+        <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-[13px] tabular-nums">
+          <Tip text="Comet.getReserves against Comet.targetReserves. Below the target the market sells absorbed collateral at its configured discount to refill the line; at or above it, those sales stop. The line is signed and can run negative.">
+            {/* The reserve line is a quantity of the BASE asset, a signed integer
               of base units, which is what its receipt says. It is stated in
               that asset and not run through the market's oracle: on a market
               whose base is not its numeraire the two are different numbers,
               and cAEROv3 is that market (539.9K AERO is not $539.9K). */}
-          <span>
-            <span className={`${k} ${TIPPED}`}>Reserves</span>{" "}
-            <Prov info={cvReservesProv("line", coords)}>
-              <span className="text-foreground">
-                {qty(m.reservesBase)} {m.baseSymbol}
-              </span>
-            </Prov>{" "}
-            <span className={k}>of</span>{" "}
-            <Prov info={cvReservesProv("target", coords)}>
-              <span className="text-foreground">
-                {qty(m.targetReservesBase)} {m.baseSymbol}
-              </span>
-            </Prov>{" "}
-            <span className={k}>target</span>
-            {m.reservesOfTarget != null && <span className="text-foreground"> ({pctText(m.reservesOfTarget, 0)})</span>}
-          </span>
-        </Tip>
-        <Tip text="The smallest debt a new borrow may leave; repayments may leave less.">
-          <span className={stat}>
-            <span className={`${k} ${TIPPED}`}>Min borrow</span>{" "}
-            <span className="text-foreground">
-              <Prov info={cvBaseBorrowMinProv(coords)}>
-                {qty(m.baseBorrowMin)} {m.baseSymbol}
-              </Prov>
+            <span>
+              <span className={`${k} ${TIPPED}`}>Reserves</span>{" "}
+              <Prov info={cvReservesProv("line", coords)}>
+                <span className="text-foreground">
+                  {qty(m.reservesBase)} {m.baseSymbol}
+                </span>
+              </Prov>{" "}
+              <span className={k}>of</span>{" "}
+              <Prov info={cvReservesProv("target", coords)}>
+                <span className="text-foreground">
+                  {qty(m.targetReservesBase)} {m.baseSymbol}
+                </span>
+              </Prov>{" "}
+              <span className={k}>target</span>
+              {m.reservesOfTarget != null && (
+                <span className="text-foreground"> ({pctText(m.reservesOfTarget, 0)})</span>
+              )}
             </span>
-            {/* One base unit (1e-6 USDC on Base's cUSDCv3, the deployment's
+          </Tip>
+          <Tip text="The smallest debt a new borrow may leave; repayments may leave less.">
+            <span className={stat}>
+              <span className={`${k} ${TIPPED}`}>Min borrow</span>{" "}
+              <span className="text-foreground">
+                <Prov info={cvBaseBorrowMinProv(coords)}>
+                  {qty(m.baseBorrowMin)} {m.baseSymbol}
+                </Prov>
+              </span>
+              {/* One base unit (1e-6 USDC on Base's cUSDCv3, the deployment's
                 borrowMin of 1e0) is a minimum in name only. */}
-            {m.baseBorrowMin > 0 && m.baseBorrowMin <= 1e-6 && <span className={k}> (no practical minimum)</span>}
-          </span>
-        </Tip>
+              {m.baseBorrowMin > 0 && m.baseBorrowMin <= 1e-6 && <span className={k}> (no practical minimum)</span>}
+            </span>
+          </Tip>
+        </div>
       </div>
 
+      {/* The collateral, on the page canvas under the panel. */}
       <div className="mt-4">
         <div className="text-[13px] font-medium text-foreground">
           Collateral: {m.collateral.length} assets,{" "}
@@ -467,12 +512,7 @@ function MarketCard({
           </div>
         </InfoDisclosure>
         <div className="mt-2">
-          <CollateralHeader />
-          <div className="divide-y divide-rb-300/25 dark:divide-rb-700/25">
-            {m.collateral.map((c) => (
-              <CollateralRow key={c.asset} c={c} coords={coords} chainId={chainId} />
-            ))}
-          </div>
+          <CollateralTable m={m} coords={coords} chainId={chainId} />
         </div>
       </div>
     </div>
@@ -637,7 +677,7 @@ export function CompoundMarketsView({
           <span className="text-foreground">quoted in ETH</span> prices its assets in ETH, so its values are in ETH.
         </p>
       </InfoDisclosure>
-      <div className="grid gap-3">
+      <div className="grid gap-8">
         {data.markets.map((m) => (
           <MarketCard key={m.comet} m={m} block={data.blockNumber} chainId={chainId} readBy={readBy} />
         ))}

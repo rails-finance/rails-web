@@ -54,7 +54,7 @@ export function SectionExplainer({
       viewHref={slot.viewHref}
       explanationDefaultOpen={slot.defaultOpen}
       onExplanationToggle={slot.onToggle}
-      anatomy={anatomy}
+      anatomy={{ ...anatomy, explanation: anatomy?.explanation ? `${anatomy.explanation} K3` : "K3" }}
       label={label}
     />
   );

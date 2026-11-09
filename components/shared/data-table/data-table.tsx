@@ -9,7 +9,8 @@
 // `<th scope="row">` cell. Each row reads as one rounded block: the table is
 // `border-separate` with no horizontal spacing and a small vertical gap, the
 // stripe lies on the cells, and only the first and last cells round their
-// outer corners. Stripes alternate the raised and sunken surfaces; a hovered
+// outer corners. Stripes alternate the raised and sunken surfaces (a row may
+// name its own, `DataTableRow stripe`, where drawer rows break the count); a hovered
 // row keeps its ground and takes a thin neutral border (`--edge-row-hover`),
 // drawn as a linked row's is. The frame scrolls sideways inside itself,
 // never the page; a pinned cell carries its row's stripe.
@@ -72,8 +73,13 @@ export const DATA_TABLE_PAD = "px-2 py-2.5 sm:px-3";
  *  light, rb-600 in dark); the caller adds its size and case. */
 export const DATA_TABLE_PILL = "rounded-sm bg-background text-foreground/80 dark:bg-rb-600 dark:text-foreground/70";
 
-/** The row block's surfaces and corners, on every body cell. */
-const CELL_SURFACE = "group-odd/dt-row:bg-raised group-even/dt-row:bg-sunken first:rounded-l-2xl last:rounded-r-2xl";
+/** The row block's corners, on every body cell. */
+const CELL_CORNERS = "first:rounded-l-2xl last:rounded-r-2xl";
+/** The row's ground: odd rows raised, even rows sunken, read off the <tr>'s
+ *  place in the body; or the stripe the row names (`DataTableRow stripe`). */
+const STRIPE_BY_PLACE = "group-odd/dt-row:bg-raised group-even/dt-row:bg-stripe";
+const STRIPE_GROUND = { raised: "bg-raised", sunken: "bg-stripe" } as const;
+export type DataTableStripe = keyof typeof STRIPE_GROUND;
 
 /** The row's hover border, drawn by each cell's ::after along its top and
  *  bottom and by the end cells round their outer sides and corners, so the
@@ -88,6 +94,9 @@ const LINKED_EDGE = "group-hover/dt-row:after:border-blue-500 group-focus-within
 
 /** The row's link, which each cell's cover repeats. */
 const RowHref = createContext<string | null>(null);
+
+/** The row's named stripe, where it sets one. */
+const RowStripe = createContext<DataTableStripe | null>(null);
 
 /** The table reads as cards below sm (D6): its parts carry explicit roles,
  *  since a reflowed table loses its own. */
@@ -278,24 +287,30 @@ const LINKED_ROW =
   "[&_a:not([data-row-cover])]:relative [&_a:not([data-row-cover])]:z-10 [&_button]:relative [&_button]:z-10 [&_[role=button]]:relative [&_[role=button]]:z-10";
 
 /** A body row: the block the cells draw. `href`: the whole row opens it, and
- *  one cell holds a `DataTableRowLink` to the same place. */
+ *  one cell holds a `DataTableRowLink` to the same place. `stripe`: the row's
+ *  ground, for a body whose rows do not alternate by place (a row with a
+ *  drawer row under it, hidden or shown); without it odd rows are raised and
+ *  even rows sunken. A stacked card (D6) still stripes by place. */
 export function DataTableRow({
   href,
+  stripe,
   className = "",
   children,
   ...rest
-}: HTMLAttributes<HTMLTableRowElement> & { href?: string }) {
+}: HTMLAttributes<HTMLTableRowElement> & { href?: string; stripe?: DataTableStripe }) {
   const stacked = useContext(Stacked);
   return (
     <RowHref.Provider value={href ?? null}>
-      <tr
-        role={stacked ? "row" : undefined}
-        className={`group/dt-row ${href ? LINKED_ROW : ""} ${className}`}
-        data-anatomy={href ? "D4" : undefined}
-        {...rest}
-      >
-        {children}
-      </tr>
+      <RowStripe.Provider value={stripe ?? null}>
+        <tr
+          role={stacked ? "row" : undefined}
+          className={`group/dt-row ${href ? LINKED_ROW : ""} ${className}`}
+          data-anatomy={href ? "D4" : undefined}
+          {...rest}
+        >
+          {children}
+        </tr>
+      </RowStripe.Provider>
     </RowHref.Provider>
   );
 }
@@ -361,8 +376,9 @@ export function DataTableCell({
   const href = useContext(RowHref);
   const stacked = useContext(Stacked);
   const height = useContext(RowHeight);
+  const stripe = useContext(RowStripe);
   const named = stacked && label ? <span className="dt-cell-label">{label}</span> : null;
-  const cls = `${CELL_SURFACE} ${valign === "middle" || height ? "align-middle" : "align-top"} ${height} ${wide ? "dt-cell-wide" : ""} ${sticky ? "" : "relative"} ${ROW_EDGE} ${href ? LINKED_EDGE : PLAIN_EDGE} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
+  const cls = `${stripe ? STRIPE_GROUND[stripe] : STRIPE_BY_PLACE} ${CELL_CORNERS} ${valign === "middle" || height ? "align-middle" : "align-top"} ${height} ${wide ? "dt-cell-wide" : ""} ${sticky ? "" : "relative"} ${ROW_EDGE} ${href ? LINKED_EDGE : PLAIN_EDGE} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
     sticky ? `${sticky} z-10` : ""
   } ${className}`;
   const cover = href ? <RowCover href={href} /> : null;
