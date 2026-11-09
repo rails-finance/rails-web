@@ -778,7 +778,7 @@ const SYSTEM = [
   },
   {
     id: "compound-v3-base-market",
-    match: re(`/base/compound-v3/market`),
+    match: re(`/base/compound-v3/markets`),
     routes: () => ["/api/chain/compound-base/markets"],
   },
   {

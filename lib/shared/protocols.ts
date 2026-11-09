@@ -353,7 +353,7 @@ const SPECS: ProtocolSpec[] = [
     protocolKey: "compound",
     tags: ["Lend", "Borrow"],
     desc: "Compound V3's Base deployment: five Comets read live, and a wallet's standing in every one of them found by asking each market",
-    subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
+    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
     // Compound V3 on Arbitrum One, position-first (rails-ops

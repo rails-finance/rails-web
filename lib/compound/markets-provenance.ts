@@ -30,6 +30,7 @@
 
 import type { Provenance } from "@/components/shared/provenance";
 import { stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
+import { chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
 
 const LANE = "live Comet reads (/compound/markets)";
 
@@ -228,6 +229,25 @@ const cvCollateralValueProvUnstamped = (coords: CompoundMarketCoords): Provenanc
   ],
 });
 
+/** One collateral asset's identity — the token the Comet's roster names
+ *  (getAssetInfo), linked on the chain's explorer. The product page keeps the
+ *  link off its surface (rails-ops decision 0059 point 2); it lives here. */
+const cvCollateralIdentityProvUnstamped = (chainId: ChainId, coords: CompoundMarketCoords): Provenance => {
+  const sym = coords.collateralSymbol ?? "This asset";
+  const token = coords.collateralAsset ?? "";
+  const explorer = chainMeta(chainId).explorerName;
+  return {
+    kind: "chain",
+    pclass: "state",
+    source: { block: coords.blockNumber },
+    verify: { kind: "etherscan", href: explorerUrl(chainId, "address", token), text: `${sym} token on ${explorer}` },
+    summary: `${sym} is collateral in the ${coords.baseSymbol ?? "base"} Comet. The market's \`getAssetInfo\`${atBlock(coords)} names its token, ${token}, with its price feed, scale, factors and supply cap. The symbol is the token's own ERC-20 read.`,
+    contract: cometContract(coords),
+    via: `${LANE} · Comet.getAssetInfo(i) · asset @ head`,
+    inputs: [{ label: "token", value: token, kind: "chain", pclass: "state", note: "getAssetInfo(i).asset" }],
+  };
+};
+
 /** A collateral asset's governance factor — borrowCollateralFactor /
  *  liquidateCollateralFactor / liquidationFactor, off getAssetInfo. */
 const cvCollateralFactorProvUnstamped = (
@@ -257,23 +277,6 @@ const cvCollateralFactorProvUnstamped = (
   };
 };
 
-// ── roster summary (block-level; no single contract) ─────────────────────────
-
-/** A quote-unit total over the markets sharing one unit — Σ of the per-market
- *  values (never blended across units). */
-const cvSummaryValueProvUnstamped = (
-  side: "supplied" | "borrowed",
-  unit: string,
-  coords: CompoundMarketCoords,
-): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  source: { block: coords.blockNumber },
-  summary: `${unit === "USD" ? "Dollar-market" : `${unit}-market`} ${side} — Σ over the markets quoting in ${unit} of each one's ${side} value${atBlock(coords)} (base total × its own oracle price). One unit per sum: markets in other units stand apart, never blended into this figure.`,
-  via: `${LANE} · Σ per-market ${side} value over the ${unit} markets @ head`,
-  formula: `Σ ${unit}-market ${side} value`,
-});
-
 // ── the exported builders, stamped with who read the block ──────────────────
 
 /** A builder's receipt, stamped with the read its coordinates (the last argument) carry. */
@@ -298,4 +301,4 @@ export const cvCollateralBackingProv = stamped(cvCollateralBackingProvUnstamped)
 export const cvCollateralSuppliedProv = stamped(cvCollateralSuppliedProvUnstamped);
 export const cvCollateralValueProv = stamped(cvCollateralValueProvUnstamped);
 export const cvCollateralFactorProv = stamped(cvCollateralFactorProvUnstamped);
-export const cvSummaryValueProv = stamped(cvSummaryValueProvUnstamped);
+export const cvCollateralIdentityProv = stamped(cvCollateralIdentityProvUnstamped);

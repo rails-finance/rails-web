@@ -896,7 +896,7 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/base/compound-v3/market",
+    "page": "/base/compound-v3/markets",
     "chain": "base",
     "protocol": "compound-v3",
     "state": "system",
