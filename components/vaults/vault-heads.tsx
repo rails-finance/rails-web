@@ -147,7 +147,7 @@ const withProv = (info: Provenance | undefined, text: string) => (info ? <Prov i
 
 /** The Yield slot's caution on an illiquid vault (ui-jobs 540): which markets
  *  hold it, and what can be withdrawn at the read block. `detail` prints the
- *  full figures with the receipt; the row, the compact form. */
+ *  full figures; the row, the compact form. Both carry the receipt (ui-jobs 551). */
 export function IlliquidCaution({ vault: v, il, detail }: { vault: VaultSummary; il: VaultIlliquid; detail: boolean }) {
   const raw = BigInt(il.withdrawable);
   const amount = { raw: il.withdrawable, value: Number(raw) / 10 ** v.asset.decimals };
@@ -161,7 +161,7 @@ export function IlliquidCaution({ vault: v, il, detail }: { vault: VaultSummary;
     <span className="mt-1 block" data-yield-illiquid={il.markets.map((m) => m.id).join(" ")}>
       {illiquidSentence(il)}{" "}
       <span data-illiquid-withdrawable={il.withdrawable}>
-        {detail ? <Prov info={vaultWithdrawableProv(v, il)}>{out}</Prov> : out}
+        <Prov info={vaultWithdrawableProv(v, il)}>{out}</Prov>
       </span>
       {total != null ? ` of ${total}` : ""} {v.asset.symbol} can be withdrawn.
     </span>
@@ -170,8 +170,8 @@ export function IlliquidCaution({ vault: v, il, detail }: { vault: VaultSummary;
 
 /** The Total assets slot's caution on a vault whose total includes lost assets
  *  (ui-jobs 543): what was lost and what the vault holds, at the read block.
- *  `detail` prints the full figures with their receipts; the row, the compact
- *  form. The words are lib/vaults/lost-assets.ts `lostAssetsSentence`. */
+ *  `detail` prints the full figures; the row, the compact form. Both carry the
+ *  receipts (ui-jobs 551). The words are lib/vaults/lost-assets.ts `lostAssetsSentence`. */
 export function LostAssetsCaution({
   vault: v,
   receipts,
@@ -188,13 +188,10 @@ export function LostAssetsCaution({
   const text = (a: { raw: string; value: number }) => (detail ? assetText(a, d) : formatCompact(a.value));
   return (
     <span className="block" data-total-assets-lost="">
-      Includes{" "}
-      <span data-lost-assets={v.lostAssets.raw}>
-        {detail ? withProv(receipts.lostAssets, text(v.lostAssets)) : text(v.lostAssets)}
-      </span>{" "}
+      Includes <span data-lost-assets={v.lostAssets.raw}>{withProv(receipts.lostAssets, text(v.lostAssets))}</span>{" "}
       {v.asset.symbol} of lost assets. The vault holds{" "}
-      <span data-held-assets={heldRaw}>{detail ? withProv(receipts.heldAssets, text(held)) : text(held)}</span>{" "}
-      {v.asset.symbol}; the share price has not been lowered for the loss, so the holders who withdraw last carry it.
+      <span data-held-assets={heldRaw}>{withProv(receipts.heldAssets, text(held))}</span> {v.asset.symbol}; the share
+      price has not been lowered for the loss, so the holders who withdraw last carry it.
     </span>
   );
 }

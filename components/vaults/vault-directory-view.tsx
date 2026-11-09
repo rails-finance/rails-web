@@ -31,6 +31,8 @@ import {
   vaultDirectoryGroupCountProv,
   vaultDirectoryNameProv,
   vaultDirectorySharePriceProv,
+  vaultHeldAssetsProv,
+  vaultLostAssetsProv,
   vaultDirectoryTotalAssetsProv,
   type MorphoVaultCoords,
 } from "@/lib/morpho-base/vault-provenance";
@@ -115,6 +117,15 @@ export function VaultDirectoryView({
           name: vaultDirectoryNameProv(rowCoords(v)),
           totalAssets: vaultDirectoryTotalAssetsProv(rowCoords(v)),
           sharePrice: vaultDirectorySharePriceProv(rowCoords(v)),
+          ...(v.lostAssets && v.totalAssets
+            ? {
+                lostAssets: vaultLostAssetsProv(rowCoords(v)),
+                heldAssets: vaultHeldAssetsProv(rowCoords(v), {
+                  totalAssets: v.totalAssets.raw,
+                  lostAssets: v.lostAssets.raw,
+                }),
+              }
+            : {}),
         })}
         hooksOf={(v) => ({ "data-family": v.release ?? "" })}
         groupCountProv={(assetSymbol, count) => vaultDirectoryGroupCountProv({ ...coords, assetSymbol }, count)}
