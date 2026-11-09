@@ -557,23 +557,6 @@ console.log(`· ${candidates.length} addresses have touched the shares; ${holder
 const LARGEST = holders[0]?.address ?? null;
 const DUST = holders.length > 1 ? holders[holders.length - 1].address : null;
 
-// ── an address with NO code, discovered rather than fixtured ────────────────
-// The page states what the holder address is from its own `eth_getCode`, and the
-// "no code" branch needs a holder that genuinely has none. Which addresses those
-// are is a fact about this vault at this block, so it is read here: the holders
-// already found, largest first, until one comes back empty. Capped, because the
-// check needs ONE and each candidate costs a call — on a vault whose holders are
-// all contracts the check reports SKIP with the cap it searched, not a PASS.
-const EOA_SCAN = 80;
-let EOA_HOLDER = null;
-for (const h of holders.slice(0, EOA_SCAN)) {
-  const code = await client.getCode({ address: h.address, blockNumber: sweepAt });
-  if (!code || code === "0x") {
-    EOA_HOLDER = h.address;
-    break;
-  }
-}
-
 const browser = await chromium.launch();
 const context = await browser.newContext();
 const page = await context.newPage();
@@ -587,23 +570,6 @@ const figure = async (name) => {
   const value = page.locator(`[data-figure="${name}"] [data-figure-value]`);
   if ((await value.count()) > 0) return (await value.first().textContent())?.trim();
   return (await page.locator(`[data-figure="${name}"]`).first().textContent())?.trim();
-};
-
-/** The holder-shape sentence as a reader sees it, or a stated absence. Count-
- *  guarded: a line the page never drew is a red check, never a locator timeout. */
-const shapeLine = async () => {
-  const loc = page.locator('[data-figure="holder-shape"]');
-  return (await loc.count()) ? (await loc.innerText()).replace(/\s+/g, " ").trim() : "(no shape line rendered)";
-};
-/** The two accessors check 12 reads on the HOLDER address — this script's own
- *  reads, so the expectation never comes from the page. */
-const HOLDER_ABI = parseAbi(["function asset() view returns (address)", "function symbol() view returns (string)"]);
-const tryRead = async (address, functionName, blockNumber) => {
-  try {
-    return await client.readContract({ address, abi: HOLDER_ABI, functionName, blockNumber });
-  } catch {
-    return null;
-  }
 };
 
 /** The block the page STATES, from the stamp a reader sees — check 2's subject. */
@@ -757,10 +723,9 @@ if (LARGEST == null) {
   skip("5  the largest holder's attributed exposure", "no address holds a non-zero balance at this block");
 } else {
   await page.goto(href(LARGEST), { waitUntil: "domcontentloaded" });
-  // ui-jobs 407 step 4: the holder card states the shares (wei on its frame),
-  // and the per-market slice is its "Claim by market" stat, whose rows draw
-  // when the stat is opened.
-  await page.locator('[data-position-card] [data-figure="holder-shares"]').first().waitFor({ timeout: 120_000 });
+  // The holder card (V8, ui-jobs 553) carries the shares in wei on its frame;
+  // the per-market slice left it for the vault page's assets section.
+  await page.locator('[data-position-card] [data-figure="holder-claim"]').first().waitFor({ timeout: 120_000 });
   const hBlock = await statedBlock();
   const hOwn = await readVaultAt(hBlock);
   const hShares = await read("balanceOf", [LARGEST], hBlock);
@@ -771,88 +736,9 @@ if (LARGEST == null) {
     pageShares === hShares.toString(),
     `page ${pageShares} vs own ${hShares}`,
   );
-  await page
-    .locator('[data-stat-breakdown-toggle="by-market"]')
-    .first()
-    .click({ timeout: 10_000 })
-    .catch(() => {});
-  await page.waitForTimeout(400);
-  let rowsSum = BigInt(0);
-  for (const leg of hOwn.legs) {
-    const expected = (hShares * leg.assets) / hOwn.totalSupply;
-    const cellLoc = page.locator(`[data-holder-markets] [data-exposure-leg="${leg.id}"] [data-cell="attributed"]`);
-    const cell = (await cellLoc.count()) ? await cellLoc.first().getAttribute("data-attributed-raw") : null;
-    if (cell != null) rowsSum += BigInt(cell);
-    check(
-      `5-${leg.id.slice(0, 8)} attributed = floor(shares × leg ÷ totalSupply)`,
-      cell === expected.toString(),
-      `${cell ?? "(no row for this leg)"} vs ${expected}`,
-    );
-  }
-  const attributedTotal = hOwn.legs.reduce((s, l) => s + (hShares * l.assets) / hOwn.totalSupply, BigInt(0));
-  const pageAttrTotal = await page
-    .locator('[data-figure="attributed-total"]')
-    .first()
-    .getAttribute("data-attributed-total-raw");
-  check(
-    "5g the attributed total is the Σ of the rows, recomputed here, and the panel's rows sum to it",
-    pageAttrTotal === attributedTotal.toString() && rowsSum === attributedTotal,
-    `stated ${pageAttrTotal}, rows ${rowsSum}, own ${attributedTotal}`,
-  );
-  await page.keyboard.press("Escape").catch(() => {});
-
-  // ── 12: what the page says this address IS ────────────────────────────────
-  // The page reads the holder's own code and states the shape it found. The
-  // expectation is this script's OWN `eth_getCode` at the block the page names —
-  // the one thing that can contradict the sentence — and the two directions are
-  // asserted against each other, so a page printing both forms is not green on a
-  // test that only looks for one.
-  const lShape = await shapeLine();
-  const lCode = await client.getCode({ address: LARGEST, blockNumber: hBlock });
-  const hasCode = Boolean(lCode && lCode !== "0x");
-  const saysContract = /is a (contract|Safe|proxy to)/.test(lShape);
-  const saysNoCode = lShape.includes("has no code");
-  check(
-    "12a the shape line agrees with this script's own eth_getCode at the page's block",
-    hasCode ? saysContract && !saysNoCode : saysNoCode && !saysContract,
-    `own code ${hasCode ? `${(lCode.length - 2) / 2} bytes` : "empty"} — "${lShape}"`,
-  );
-  // And when the address answers ERC-4626's `asset()`, the sentence must name
-  // the token this script read there — by the symbol the token itself answers,
-  // or as this vault's own shares when the asset IS this vault.
-  const lAsset = (await tryRead(LARGEST, "asset", hBlock))?.toLowerCase() ?? null;
-  if (!lAsset)
-    skip("12b the shape line names the asset this script's own asset() read", "the address answers no asset()");
-  else if (lAsset === VAULT)
-    check(
-      "12b the shape line names the asset this script's own asset() read",
-      lShape.includes("this vault's own shares"),
-      `asset() ${lAsset} is this vault — "${lShape}"`,
-    );
-  else {
-    const lAssetSymbol = await tryRead(lAsset, "symbol", hBlock);
-    if (!lAssetSymbol)
-      skip("12b the shape line names the asset this script's own asset() read", `${lAsset} answers no symbol()`);
-    else
-      check(
-        "12b the shape line names the asset this script's own asset() read",
-        lShape.includes(lAssetSymbol),
-        `asset() ${lAsset} symbol() "${lAssetSymbol}" — "${lShape}"`,
-      );
-  }
-  // The sentence's block-bearing clause is a traced figure, so it must sit
-  // INSIDE the receipts scope — which is what 11a/11b's tripwire count rests on
-  // (an uncovered value is only counted where the scope reaches). Dev-only: the
-  // coverage stamp is not rendered in a production build.
-  if (!armed) skip("12c the shape line's verdict is covered by a receipt", "the dev prov tripwire is not mounted");
-  else {
-    const covered = await page.locator('[data-figure="holder-shape"] [data-prov-covered]').count();
-    check(
-      "12c the shape line's verdict is covered by a receipt",
-      covered === 1,
-      `${covered} covered spans in the line`,
-    );
-  }
+  // 5b–5g and 12 retired with the holder card's Claim by market and shape
+  // line (V8, decision 0059 point 1); 5h and 5i keep the served attribution
+  // wei-exact.
 
   // Wei-exact again, for the attribution itself.
   {
@@ -887,36 +773,7 @@ else {
   check("11b no uncovered figure with a holder", uncovered === 0, `${uncovered} marked`);
 }
 
-// ── 13: a holder with no code ───────────────────────────────────────────────
-// The other half of the shape branch, on an address this run found for itself.
-// Both halves matter: a page that printed "is a contract" for everything would
-// be green on check 12a alone wherever the largest holder happens to be one.
-if (EOA_HOLDER == null) {
-  skip(
-    "13 a holder with no code reads as an externally owned account",
-    `none of the largest ${Math.min(EOA_SCAN, holders.length)} holders has empty code at block ${sweepAt}`,
-  );
-} else {
-  await page.goto(href(EOA_HOLDER), { waitUntil: "domcontentloaded" });
-  await page.waitForSelector("[data-position-card]", { timeout: 120_000 });
-  const eBlock = await statedBlock();
-  const eCode = await client.getCode({ address: EOA_HOLDER, blockNumber: eBlock });
-  const eEmpty = !eCode || eCode === "0x";
-  const eLine = await shapeLine();
-  check("13a the fixture still has no code at the page's own block", eEmpty, `${EOA_HOLDER} at block ${eBlock}`);
-  if (!eEmpty)
-    // Code was deployed to it between the sweep and this read. Asserting the
-    // no-code line now would be a check about the fixture that could only fail.
-    skip("13b the page states no code, naming the block", `the address has code at block ${eBlock}`);
-  else
-    check(
-      "13b the page states no code, naming the block",
-      eLine.includes("has no code at block") &&
-        eLine.includes(Number(eBlock).toLocaleString("en-US")) &&
-        eLine.includes("externally owned account"),
-      eLine,
-    );
-}
+// ── 13: retired with the holder card's shape line (V8, ui-jobs 553) ────────
 
 // ── 6: the smallest holder ──────────────────────────────────────────────────
 // WHICH READING IS RIGHT IS THIS SCRIPT'S OWN ARITHMETIC, not the page's. The
@@ -935,35 +792,30 @@ if (DUST == null) {
   // carries the same figure names, so an unscoped `[data-figure="holder-…"]`
   // matches twice on any address the census has a row for.
   const exposure = page.locator("[data-position-card]");
-  await exposure.locator('[data-figure="holder-shares"]').first().waitFor({ timeout: 120_000 });
+  await exposure.locator('[data-figure="holder-claim"]').first().waitFor({ timeout: 120_000 });
   const dBlock = await statedBlock();
   const dOwn = await readVaultAt(dBlock);
   const dShares = await read("balanceOf", [DUST], dBlock);
   const dFraction = dOwn.totalSupply === BigInt(0) ? 0 : Number(dShares) / Number(dOwn.totalSupply);
-  // The share of the vault's headline, with its subline (the wei count of a dust
-  // holding, or the shares issued).
-  const dText = (await exposure.locator('[data-card-head="share-of-vault"]').innerText()).replace(/\s+/g, " ");
+  // The share of the vault, beneath Worth now (V8): a percentage at reading
+  // precision, or the dust floor.
   const dPct = (await exposure.locator('[data-figure="holder-fraction"]').innerText()).replace(/\s+/g, " ");
   const dRaw = await exposure.getAttribute("data-shares-raw");
-  if (dFraction < 1e-6) {
-    check(
-      "6a the page states the exact share count in wei",
-      dShares > BigInt(0) && dText.includes(`${dShares.toString()} wei of shares`),
-      `balanceOf ${dShares}, fraction ${dFraction}, card reads "${dText}"`,
-    );
-    check("6b the share of the vault reads as a floor, not a zero", dPct.includes("less than 0.0001%"), dPct);
-  } else {
-    check(
-      "6c the share count is stated, not floored to an exact-wei sentence",
-      dRaw === dShares.toString() && !dText.includes("wei of shares"),
-      `balanceOf ${dShares}, fraction ${dFraction}, card reads "${dText}"`,
-    );
+  const a = dFraction * 100;
+  const want = `${a >= 1 ? a.toFixed(1) : a.toPrecision(2)}% of the vault`;
+  check(
+    "6c the card's raw share count is this script's balanceOf",
+    dRaw === dShares.toString(),
+    `${dRaw} vs ${dShares}`,
+  );
+  if (dFraction < 1e-6)
+    check("6b the share of the vault reads as a floor, not a zero", dPct.includes("under 0.0001%"), dPct);
+  else
     check(
       "6d the share of the vault is a percentage, not the dust floor",
-      dPct.includes(`${(dFraction * 100).toPrecision(4)}%`) && !dPct.includes("less than 0.0001%"),
-      `${dPct} vs own ${(dFraction * 100).toPrecision(4)}%`,
+      dPct === want && !dPct.includes("under 0.0001%"),
+      `${dPct} vs own ${want}`,
     );
-  }
 }
 
 // ── 7: an address with no shares ────────────────────────────────────────────
@@ -974,8 +826,8 @@ const zShares = await read("balanceOf", [NO_SHARES], zBlock);
 check("7a the fixture really holds nothing at the page's block", zShares === BigInt(0), `balanceOf ${zShares}`);
 // Guarded by a count: a MISSING line must be a red check, not a locator timeout
 // that ends the run before checks 8 to 10 are reached.
-// ui-jobs 407 step 4: no shares is the holder card's closed state, with the
-// balance it read.
+// No shares is the holder card's closed state (it held once) or its never
+// state (V8, ui-jobs 553), with the balance it read.
 const zCard = page.locator("[data-position-card]").first();
 const zStatus = (await zCard.count()) ? await zCard.getAttribute("data-status") : null;
 const zRaw = (await zCard.count()) ? await zCard.getAttribute("data-shares-raw") : null;
@@ -985,8 +837,8 @@ if (zShares > BigInt(0)) {
   skip("7b the page states the no-shares line, naming the block", `the fixture holds ${zShares} at this block`);
 } else {
   check(
-    "7b the card reads closed, with the zero balance it read",
-    zStatus === "closed" && zRaw === "0",
+    "7b the card reads closed or never held, with the zero balance it read",
+    (zStatus === "closed" || zStatus === "never") && zRaw === "0",
     `status ${zStatus}, shares ${zRaw} at block ${zBlock}`,
   );
 }

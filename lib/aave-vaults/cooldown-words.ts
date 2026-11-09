@@ -13,27 +13,11 @@
 // import it — one wording, one place to change it.
 
 import { utcInstant } from "@/components/vaults/aave-vault-format";
-import { shareText } from "@/lib/shared/vault-amount-text";
 import type { AaveVaultHolderReading } from "@/lib/sources/chain/aave-ethereum-vault";
 
 export type AaveVaultCooldown = NonNullable<AaveVaultHolderReading["cooldown"]>;
 
-/** The cooldown, said as the state the block's own clock puts it in. */
-export function cooldownSentence(cooldown: AaveVaultCooldown, shareDecimals: number): string {
-  const covers = `${shareText(cooldown.amount, shareDecimals)} shares`;
-  switch (cooldown.state) {
-    case "none":
-      return "No cooldown is recorded for this address at this block";
-    case "waiting":
-      return `A cooldown is running for ${covers}, and ends ${utcInstant(cooldown.endOfCooldown)}`;
-    case "open":
-      return `A cooldown for ${covers} has ended and its redemption window is open until ${utcInstant(cooldown.endOfCooldown + cooldown.withdrawalWindow)}`;
-    case "expired":
-      return `A cooldown for ${covers} ended ${utcInstant(cooldown.endOfCooldown)} and its redemption window has since passed`;
-  }
-}
-
-/** The same state in a few words, for the holder card's Cooldown stat. */
+/** The cooldown state in a few words, for the holder card's Cooldown line. */
 export function cooldownWords(cooldown: AaveVaultCooldown): string {
   switch (cooldown.state) {
     case "none":

@@ -297,32 +297,32 @@ export function suppliedByContent(family: "morpho" | "aave"): LearnMoreContent {
       };
 }
 
-/** The holder card's "?" (ui-jobs 407 step 4, 410), every family. */
-export const vaultHoldingContent = (
+/** The holder pages' position card's "?" (V8, ui-jobs 553), every family. */
+export const vaultPlainHoldingContent = (
   assetSymbol: string,
   shareSymbol: string,
-  census: boolean,
   rewards: string,
 ): LearnMoreContent => ({
   title: "What a holding is",
-  intro: `A holding is one address's ${shareSymbol} in one vault. Every figure on the card is a read of the vault at a block the card names, in ${shareSymbol} or in ${assetSymbol}.`,
-  detailsHeading: "The headlines:",
+  intro: `A holding is one address's ${shareSymbol} in one vault. The vault's shares grow in ${assetSymbol} as the vault earns, so the card counts everything in ${assetSymbol}.`,
+  detailsHeading: "The figures:",
   details: [
-    { bold: "Balance", text: `the vault's balanceOf() for this address, in ${shareSymbol}.` },
-    { bold: "Share of the vault", text: "that balance over the vault's totalSupply(), both read at the same block." },
     {
-      bold: "Claim",
-      text: `the vault's convertToAssets() of that balance, in ${assetSymbol}.${census ? " Beneath it, the census's dollar value at its block, through Aave V3's oracle, where the oracle prices the asset." : ""}`,
+      bold: "Put in",
+      text: `every deposit, and every share received from another address at its worth that day.`,
     },
     {
-      bold: "Earned",
-      text: `the claim plus every amount that left, minus every amount that came in, in ${assetSymbol}. Deposits and withdrawals are the amounts the vault's events state; shares that arrived or left by transfer are valued at the share price read at that block. ${rewards[0].toUpperCase()}${rewards.slice(1)} are not counted. No figure where the replay of the address's transfers misses its balanceOf, or a transfer's share price did not answer.`,
+      bold: "Taken out",
+      text: `every withdrawal, and every share sent to another address at its worth that day.`,
     },
+    { bold: "Worth now", text: `what the shares convert to in ${assetSymbol} at the card's read.` },
+    {
+      bold: "Profit or loss",
+      text: `worth now plus what was taken out, minus what was put in. ${rewards[0].toUpperCase()}${rewards.slice(1)} are left out. Where one of the amounts could not be read, no figure is stated.`,
+    },
+    { bold: "The line", text: `the holding's worth at one read a day, from its first day to the card's read.` },
   ],
-  extraParagraphs: [
-    "Earned is a sum with no window: nothing here is annualised.",
-    "A zero is a reading; a call that did not answer is said in words.",
-  ],
+  extraParagraphs: ["These are readings of the past. Nothing here is a forecast or annualised."],
 });
 
 /** The rewards each family pays outside the share, which Earned leaves out. */
