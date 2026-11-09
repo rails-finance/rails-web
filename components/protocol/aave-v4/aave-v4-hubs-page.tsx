@@ -193,6 +193,7 @@ function hubHead(s: V4Stored, h: V4Hub, prices: Prices): ProductHead {
       body: null,
       label: "Show hub explanation",
     },
+    anatomy: "M5.1",
     bandHooks: { "data-hub-panel": h.key },
   };
 }
@@ -245,6 +246,7 @@ function CreditLines({ s, a, prices }: { s: V4Stored; a: V4HubAsset; prices: Pri
       label={`${a.symbol} credit lines`}
       tableClassName="min-w-[640px] text-[12px]"
       data-credit-lines={a.symbol}
+      data-anatomy="M5.3"
     >
       <DataTableHead>
         <DataTableHeader label="Spoke" />
@@ -417,6 +419,7 @@ function HubAssets({ s, h, prices }: { s: V4Stored; h: V4Hub; prices: Prices }) 
       tableClassName="lg:min-w-[900px]"
       className="mt-4"
       data-hub-assets={h.key}
+      data-anatomy="M5.2"
     >
       <DataTableHead>
         <DataTableHeader label="Asset" />
@@ -517,7 +520,7 @@ function HubsBody({ d }: { d: V4Deployment }) {
             <HubAssets s={stored.data} h={h} prices={prices!} />
           </div>
         ))}
-        <ProvSection scope="hub-matrix" className="mb-8" data-hub-matrix-section="">
+        <ProvSection scope="hub-matrix" className="mb-8" data-anatomy="M5.4" data-hub-matrix-section="">
           <SectionHeading
             title="Credit lines by hub and spoke"
             menu={
@@ -550,7 +553,7 @@ function HubsBody({ d }: { d: V4Deployment }) {
       </>
     );
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen" data-anatomy="M5">
       <div className="py-8" data-skel-section="page-table">
         <SubPageHeader
           protocol={protocolOf(d)}
