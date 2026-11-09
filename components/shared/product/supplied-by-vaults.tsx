@@ -128,6 +128,7 @@ export function SuppliedByVaults({
     <ProvSection
       scope={SUPPLIED_BY_SCOPE}
       className="mb-6 mt-6"
+      data-anatomy="R3.1"
       data-supplied-by={read.rows.length.toString()}
       data-skel-section="supplied-by-vaults"
     >
