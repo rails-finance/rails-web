@@ -3,7 +3,15 @@
 // documentation (docs.dolomite.io).
 
 import Link from "next/link";
-import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
+import {
+  GlossaryLink,
+  ProtocolInfoPage,
+  type InfoReads,
+  type InfoTerm,
+  type InfoView,
+} from "@/components/shared/protocol-info-page";
+import { DOLOMITE_ADDRESSES } from "@/lib/dolomite/asset-catalog";
+import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -98,9 +106,8 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <p>
         The markets page lists every market with its minimum collateralization, price, supplied and borrowed amounts,
-        borrow rate and supply APR (the yearly rate lenders earn). It also shows the spread (the liquidation penalty for
-        that market) and utilization (the share of supplied tokens that is lent out). The risk ladder on that page shows
-        how each market raises the minimum collateralization.{" "}
+        borrow rate and supply rate. It also shows the spread (the liquidation penalty for that market) and utilization
+        (the share of supplied tokens that is lent out). A market&apos;s premiums show under the figures they raise.{" "}
         <Link href="/ethereum/dolomite/markets" className={INLINE_LINK}>
           Open the markets page to see them all
         </Link>
@@ -109,6 +116,44 @@ const views: readonly [InfoView, ...InfoView[]] = [
     ),
   },
 ];
+
+const reads: InfoReads = {
+  contracts: [
+    {
+      name: "DolomiteMargin",
+      address: DOLOMITE_ADDRESSES.MARGIN,
+      reads:
+        "the market list, each market's token, price, supplied and borrowed amounts, rates, premiums and whether it is closing; the global minimum collateralization and liquidation spread; and each account's balances and the terms it is judged by.",
+    },
+    {
+      name: "Each market's token",
+      reads: "its symbol and decimals, so amounts and prices read in whole tokens.",
+    },
+  ],
+  how: "The markets page reads DolomiteMargin at most every ten minutes, and an account page reads it at each load. Account histories come from Rails's server store of Dolomite's events.",
+  notes: [
+    <>
+      Some accounts are judged on different terms from the markets table. DolomiteMargin names a{" "}
+      <a
+        href={explorerUrl(MAINNET_CHAIN_ID, "address", DOLOMITE_ADDRESSES.DEFAULT_RISK_OVERRIDE_SETTER)}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="link-external"
+      >
+        DefaultAccountRiskOverrideSetter
+      </a>
+      , which gives an account whose assets fit a category (<GlossaryLink term="E-Mode">E-Mode</GlossaryLink>, such as a
+      staked ETH against ETH pair) a lower minimum collateralization, a narrower liquidation spread and no market
+      premiums. The override is looked up by account, so the markets page cannot show it; each account page reads its
+      account&apos;s terms and shows them.
+    </>,
+    <>
+      Rails checks every market&apos;s price against the others. Where two markets report the same price to the last
+      unit, the second uses the first&apos;s price feed, and the markets page tags it &ldquo;priced as&rdquo; the first.
+      Every other market&apos;s price moves on its own feed.
+    </>,
+  ],
+};
 
 export default function InfoPage() {
   return (
@@ -146,6 +191,7 @@ export default function InfoPage() {
           <GlossaryLink term="Liquidation">liquidated</GlossaryLink>, which closes part or all of its debt.
         </>,
       ]}
+      reads={reads}
       views={views}
       search="You can search by owner address. The listing filters by Status, Supplied, Borrowed, Account, History, Debt (USD), Collateral (USD) and Transactions, and sorts by Recent activity, Debt or Collateral."
       docs={{ label: "Dolomite documentation", href: DOCS }}
