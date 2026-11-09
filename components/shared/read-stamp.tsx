@@ -147,6 +147,7 @@ export function SectionReadStamp({
   return (
     <span
       className={`whitespace-nowrap text-[11px] tabular-nums ${stored ? "text-tone-caution" : "text-rb-500"}`}
+      data-anatomy="K2"
       data-read-stamp=""
       data-read-block={block}
       data-read-at={at ?? ""}

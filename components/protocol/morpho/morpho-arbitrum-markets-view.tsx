@@ -7,11 +7,23 @@
 // stable or WETH ranked by supply in dollars, every other funded market listed
 // in its own loan token, and the markets with nothing supplied behind a
 // disclosure. The census block is stated, since a market created after it is
-// not in the table.
+// not in the table. Each table on the house table (rails-ops ui-jobs 539: D1,
+// D6 cards below sm), unsorted (the census's order) and unlinked (a market
+// has no Rails page here); sizes carry the loan token's mark (`AssetUnit`).
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { BlockRef } from "@/components/shared/block-ref";
+import { AssetUnit } from "@/components/shared/asset-unit";
+import { TokenPairIcons } from "@/components/shared/token-pair-icons";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 import { amount, pctText } from "@/lib/morpho/markets-format";
 import { shortMarketId } from "@/lib/morpho/asset-catalog";
 import { explorerUrl } from "@/lib/shared/chains";
@@ -30,11 +42,7 @@ import type {
 
 const ROUTE = "/api/chain/morpho-arbitrum/markets";
 
-const TH = "py-2 pr-3 font-normal";
-const TH_NUM = `${TH} text-right`;
-const TD = "py-2 pr-3 whitespace-nowrap";
-const TD_NUM = `${TD} text-right tabular-nums text-foreground`;
-
+const NONE = "0x0000000000000000000000000000000000000000";
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 function usd(n: number): string {
@@ -46,7 +54,7 @@ function usd(n: number): string {
 
 /** A token by its symbol where it has one, by its address where it does not. */
 function Token({ symbol, address }: { symbol: string | null; address: string }) {
-  if (address === "0x0000000000000000000000000000000000000000") return <span className="text-rb-400">none</span>;
+  if (address === NONE) return <span className="text-rb-400">none</span>;
   return (
     <a
       href={explorerUrl(MORPHO_ARBITRUM_CHAIN_ID, "address", address)}
@@ -57,6 +65,18 @@ function Token({ symbol, address }: { symbol: string | null; address: string }) 
     >
       {symbol ?? <span className="font-mono">{shortAddr(address)}</span>}
     </a>
+  );
+}
+
+const NUM = "whitespace-nowrap tabular-nums text-foreground";
+
+/** A size in the market's loan token, the token's mark after it. */
+function Size({ children, m }: { children: ReactNode; m: MorphoArbitrumMarketRow }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {children}
+      <AssetUnit symbol={m.loanSymbol ?? shortAddr(m.loanToken)} address={m.loanToken} named={m.loanSymbol != null} />
+    </span>
   );
 }
 
@@ -79,76 +99,117 @@ function MarketRow({
     loanToken: m.loanToken,
   };
   return (
-    <tr className="border-b border-rb-200/60 dark:border-rb-500/20" data-morpho-market={m.id}>
+    <DataTableRow data-morpho-market={m.id}>
       {rank != null && (
-        <td className={`${TD} text-rb-500 tabular-nums`} data-prov-exempt="">
+        // On a card (D6) the rank moves into the pair's line.
+        <DataTableCell className="w-8 tabular-nums text-rb-500 max-sm:hidden!" data-prov-exempt="">
           {rank}
-        </td>
+        </DataTableCell>
       )}
-      <td className={TD}>
-        <Token symbol={m.loanSymbol} address={m.loanToken} />
-        <span className="text-rb-400"> / </span>
-        <Token symbol={m.collateralSymbol} address={m.collateralToken} />
-      </td>
-      <td className={TD_NUM}>
+      <DataTableCell rowHeader className="whitespace-nowrap text-foreground">
+        <span className="flex items-center gap-2.5">
+          {rank != null && (
+            <span className="tabular-nums text-rb-500 sm:hidden" data-prov-exempt="">
+              {rank}
+            </span>
+          )}
+          <TokenPairIcons
+            first={{ symbol: m.loanSymbol ?? shortAddr(m.loanToken), address: m.loanToken }}
+            second={
+              m.collateralToken === NONE
+                ? null
+                : { symbol: m.collateralSymbol ?? shortAddr(m.collateralToken), address: m.collateralToken }
+            }
+          />
+          <span>
+            <Token symbol={m.loanSymbol} address={m.loanToken} />
+            <span className="text-rb-400"> / </span>
+            <Token symbol={m.collateralSymbol} address={m.collateralToken} />
+          </span>
+        </span>
+      </DataTableCell>
+      <DataTableCell label="LLTV" align="right" className={NUM}>
         <Prov info={lltvProv(coords)}>{pctText(m.lltv)}</Prov>
-      </td>
-      <td className={TD_NUM}>
+      </DataTableCell>
+      <DataTableCell label="Supplied" align="right" className={NUM}>
         {m.supply == null ? (
           <span className="text-rb-400">decimals unread</span>
         ) : (
-          <>
-            <Prov info={sizeProv("supplied", coords)}>{amount(m.supply)}</Prov>{" "}
-            <span className="text-rb-500">{unit}</span>
-          </>
+          <Size m={m}>
+            <Prov info={sizeProv("supplied", coords)}>{amount(m.supply)}</Prov>
+          </Size>
         )}
-      </td>
+      </DataTableCell>
       {rank != null && (
-        <td className={TD_NUM}>
+        <DataTableCell label="In dollars" align="right" className={NUM}>
           {m.supplyUsd != null && price != null ? (
             <Prov info={supplyUsdProv(coords, price)}>{usd(m.supplyUsd)}</Prov>
           ) : (
             "—"
           )}
-        </td>
+        </DataTableCell>
       )}
-      <td className={TD_NUM}>
+      <DataTableCell label="Borrowed" align="right" className={NUM}>
         {m.borrow == null ? (
           "—"
         ) : (
-          <>
-            <Prov info={sizeProv("borrowed", coords)}>{amount(m.borrow)}</Prov>{" "}
-            <span className="text-rb-500">{unit}</span>
-          </>
+          <Size m={m}>
+            <Prov info={sizeProv("borrowed", coords)}>{amount(m.borrow)}</Prov>
+          </Size>
         )}
-      </td>
-      <td className={TD_NUM}>
+      </DataTableCell>
+      <DataTableCell label="Used" align="right" className={NUM}>
         {m.utilization == null ? "—" : <Prov info={utilizationProv(coords)}>{pctText(m.utilization, 0)}</Prov>}
-      </td>
-      <td className={`${TD} font-mono text-rb-500`} title={m.id}>
-        {shortMarketId(m.id)}
+      </DataTableCell>
+      <DataTableCell label="Market" className="whitespace-nowrap text-rb-500">
+        <span className="font-mono" title={m.id}>
+          {shortMarketId(m.id)}
+        </span>
         {m.excluded === "exceeds-token-supply" && (
-          <span className="ml-2 font-sans text-amber-600 dark:text-amber-400">supply above the token&rsquo;s own</span>
+          <span className="ml-2 text-amber-600 dark:text-amber-400">supply above the token&rsquo;s own</span>
         )}
-      </td>
-    </tr>
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 
-function Head({ ranked }: { ranked: boolean }) {
+/** One of the page's three tables. */
+function MarketsTable({
+  label,
+  rows,
+  block,
+  loanUsd,
+}: {
+  label: string;
+  rows: MorphoArbitrumMarketRow[];
+  block: number;
+  /** The ranked table: a rank and a dollar column, each loan token's price. */
+  loanUsd?: Record<string, number>;
+}) {
+  const ranked = loanUsd != null;
   return (
-    <thead>
-      <tr className="border-b border-rb-200 text-left text-[11px] uppercase tracking-wider text-rb-500 dark:border-rb-500/30">
-        {ranked && <th className={TH}>#</th>}
-        <th className={TH}>Loan / collateral</th>
-        <th className={TH_NUM}>LLTV</th>
-        <th className={TH_NUM}>Supplied</th>
-        {ranked && <th className={TH_NUM}>In dollars</th>}
-        <th className={TH_NUM}>Borrowed</th>
-        <th className={TH_NUM}>Used</th>
-        <th className={TH}>Market</th>
-      </tr>
-    </thead>
+    <DataTable
+      label={label}
+      stacked
+      rowHeight="one"
+      tableClassName={`text-sm ${ranked ? "sm:min-w-[48rem]" : "sm:min-w-[44rem]"}`}
+    >
+      <DataTableHead>
+        {ranked && <DataTableHeader label="#" />}
+        <DataTableHeader label="Loan / collateral" />
+        <DataTableHeader label="LLTV" align="right" />
+        <DataTableHeader label="Supplied" align="right" />
+        {ranked && <DataTableHeader label="In dollars" align="right" />}
+        <DataTableHeader label="Borrowed" align="right" />
+        <DataTableHeader label="Used" align="right" />
+        <DataTableHeader label="Market" />
+      </DataTableHead>
+      <DataTableBody>
+        {rows.map((m, i) => (
+          <MarketRow key={m.id} m={m} block={block} rank={ranked ? i + 1 : undefined} price={loanUsd?.[m.loanToken]} />
+        ))}
+      </DataTableBody>
+    </DataTable>
   );
 }
 
@@ -198,16 +259,7 @@ export function MorphoArbitrumMarketsView() {
             {excluded > 0 &&
               ` ${excluded === 1 ? "One market" : `${excluded} markets`} in these tokens ${excluded === 1 ? "reports" : "report"} more supplied than the token's whole supply on Arbitrum, and ${excluded === 1 ? "is" : "are"} listed below instead.`}
           </p>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[48rem] text-[12px]">
-              <Head ranked />
-              <tbody>
-                {data.ranked.map((m, i) => (
-                  <MarketRow key={m.id} m={m} block={block} rank={i + 1} price={data.loanUsd[m.loanToken]} />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <MarketsTable label="Largest markets in dollars" rows={data.ranked} block={block} loanUsd={data.loanUsd} />
         </div>
 
         <div>
@@ -215,16 +267,7 @@ export function MorphoArbitrumMarketsView() {
           <p className="mb-3 text-[12px] text-rb-500">
             Each in its own loan token, by token and then size. These sizes are not compared across tokens.
           </p>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[44rem] text-[12px]">
-              <Head ranked={false} />
-              <tbody>
-                {data.unranked.map((m) => (
-                  <MarketRow key={m.id} m={m} block={block} />
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <MarketsTable label="Every other funded market" rows={data.unranked} block={block} />
         </div>
 
         {data.empty.length > 0 && (
@@ -233,15 +276,8 @@ export function MorphoArbitrumMarketsView() {
               <span data-prov-exempt="">{data.empty.length.toLocaleString("en-US")}</span> markets with nothing supplied
               at block {block.toLocaleString("en-US")}
             </summary>
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[44rem] text-[12px]">
-                <Head ranked={false} />
-                <tbody>
-                  {data.empty.map((m) => (
-                    <MarketRow key={m.id} m={m} block={block} />
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-3">
+              <MarketsTable label="Markets with nothing supplied" rows={data.empty} block={block} />
             </div>
           </details>
         )}

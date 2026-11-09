@@ -23,10 +23,20 @@ import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared
 import { WalletLookup } from "@/components/shared/wallet-lookup";
 import { StartHereLine } from "@/components/start/start-here-line";
 import { WalletPositionCard, atRisk, protocolId } from "@/components/wallet/wallet-position-card";
-import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { Icon } from "@/components/icons/icon";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
-import { RowZone, hueStyle } from "@/components/shared/row-zone";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableLeadCell,
+  DataTableLeadHeader,
+  DataTableLeadMark,
+  DataTableRow,
+  DataTableRowLink,
+} from "@/components/shared/data-table/data-table";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { formatCompactUsd } from "@/lib/shared/format-compact";
 import { formatDate } from "@/lib/date";
@@ -36,16 +46,6 @@ import type { CowWalletEntry } from "@/lib/cow/types";
 import type { WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
-/** A closed row's panel, and the closed table header's. */
-const ROW_PANEL = "rounded-2xl border border-rb-300/40 bg-raised dark:border-rb-700/40";
-/** A closed row's link: the panel with the open cards' blue border on hover
- *  (POSITION_CARD_FRAME_BOX) and on keyboard focus. */
-const ROW_LINK = `${ROW_PANEL} transition-colors hover:border-blue-500 focus-visible:border-blue-500 dark:hover:border-blue-500 dark:focus-visible:border-blue-500`;
-/** A History row's link (W4): the frame and its border over the protocol's
- *  hue, the body's ground an element after the zone whose left corners round
- *  over the hue (D5's curve). */
-const HISTORY_LINK =
-  "overflow-hidden rounded-2xl border border-rb-300/40 bg-clip-padding transition-colors hover:border-blue-500 focus-visible:border-blue-500 dark:border-rb-700/40 dark:hover:border-blue-500 dark:focus-visible:border-blue-500";
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
@@ -160,8 +160,6 @@ function lifetime(from?: number, to?: number): string | null {
   return m ? `${y} yr ${m} mo` : `${y} yr`;
 }
 
-const HISTORY_GRID = "grid grid-cols-[95px_110px_170px_120px_minmax(0,1fr)_minmax(0,1fr)_110px] gap-4";
-
 /** A closed row's transaction count behind the card foot's ⇄ glyph. */
 function TxCount({ n }: { n: number }) {
   return (
@@ -196,138 +194,86 @@ function History({ closed }: { closed: WalletPosition[] }) {
         </h2>
         {counts.length > 0 && <span className="text-xs text-rb-500">{counts.join(" · ")}</span>}
       </div>
-      {/* Below sm each closed position is a short block; the table from sm up. */}
-      <ul className="flex flex-col gap-3 sm:hidden" aria-label="Closed positions">
-        {rows.map((p) => {
-          const h = p.history ?? {};
-          const life = lifetime(h.openedAt, h.closedAt);
-          return (
-            <li key={`${p.chain}:${p.family}:${p.positionId}`}>
-              {/* The open cards' phone form (C20.1): the hue's 6px edge, the
-                  mark and name at the left of the first line, the chain's
-                  glyph at its right. */}
-              <Link
+      {/* The house table (rails-ops ui-jobs 539): D1, D4 (each row opens its
+          position), D5 (the protocol's zone) and D6 cards below sm. */}
+      <DataTable label="Closed positions" stacked rowHeight="two" tableClassName="text-sm sm:min-w-[860px]">
+        <DataTableHead>
+          <DataTableLeadHeader />
+          <DataTableHeader label="Closed" />
+          <DataTableHeader label="Protocol" />
+          <DataTableHeader label="Outcome" />
+          <DataTableHeader label="Size at close" />
+          <DataTableHeader label="Result" />
+          <DataTableHeader label="Lifetime" align="right" />
+        </DataTableHead>
+        <DataTableBody>
+          {rows.map((p) => {
+            const h = p.history ?? {};
+            const life = lifetime(h.openedAt, h.closedAt);
+            return (
+              <DataTableRow
+                key={`${p.chain}:${p.family}:${p.positionId}`}
                 href={p.href}
-                prefetch={false}
-                className={`${HISTORY_LINK} flex bg-brand-edge text-sm`}
-                style={hueStyle(protocolId(p))}
+                data-history-row={p.positionId}
+                data-family={p.family}
               >
-                <span className="w-[6px] shrink-0 self-stretch bg-brand-edge" />
-                <span className="flex min-w-0 flex-1 flex-col gap-1 rounded-l-2xl bg-raised py-3 pl-5 pr-4">
-                  <span className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-zone">
-                      <ProtocolIcon id={protocolId(p)} className="h-4 w-4 shrink-0 text-rb-500" />
-                      {p.familyName}
-                    </span>
-                    <span
-                      className={`ml-auto rounded-xs px-2 py-0.5 text-xs font-bold tracking-wider ${OUTCOME_TONE[p.status] ?? OUTCOME_TONE.closed}`}
-                    >
-                      {p.status.toUpperCase()}
-                    </span>
-                    <span className="flex items-center text-brand-zone">
-                      <ChainGlyph id={p.chain} className="h-4 w-4 shrink-0" />
-                      <span className="sr-only">{chainMeta(p.chain).name}</span>
+                <DataTableLeadCell protocol={protocolId(p)} protocolName={p.familyName} chain={p.chain} />
+                <DataTableCell label="Closed" className="whitespace-nowrap text-foreground/80">
+                  {h.closedAt != null ? formatDate(h.closedAt) : "—"}
+                </DataTableCell>
+                {/* First on a card, where the row header spans the card. */}
+                <DataTableCell rowHeader className="max-sm:-order-1 sm:max-w-[13rem]">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <DataTableLeadMark protocol={protocolId(p)} chain={p.chain} />
+                    <span className="flex min-w-0 flex-col">
+                      <DataTableRowLink href={p.href} className="truncate font-medium">
+                        {p.familyName}
+                      </DataTableRowLink>
+                      {p.market && (
+                        <span className="truncate text-xs uppercase tracking-wide text-rb-500">{p.market}</span>
+                      )}
                     </span>
                   </span>
-                  <span className="text-xs text-rb-500">
-                    {[p.market, h.closedAt != null ? `closed ${formatDate(h.closedAt)}` : null]
-                      .filter(Boolean)
-                      .join(" · ")}
+                </DataTableCell>
+                <DataTableCell label="Outcome" className="whitespace-nowrap">
+                  <span
+                    className={`rounded-xs px-2 py-0.5 text-xs font-bold tracking-wider ${OUTCOME_TONE[p.status] ?? OUTCOME_TONE.closed}`}
+                  >
+                    {p.status.toUpperCase()}
                   </span>
-                  {(h.size || h.result) && (
-                    <span className="text-xs text-foreground/80">
-                      {[h.size ? `${h.size}${h.sizeNote ? ` (${h.sizeNote})` : ""}` : null, h.result]
-                        .filter(Boolean)
-                        .join(" · ")}
+                </DataTableCell>
+                {/* A cell with nothing to say stays empty, so a card leaves it out. */}
+                <DataTableCell label={h.size ? "Size at close" : undefined} className="sm:max-w-[14rem]">
+                  {h.size && (
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate">{h.size}</span>
+                      {h.sizeNote && <span className="truncate text-xs text-rb-500">{h.sizeNote}</span>}
                     </span>
                   )}
-                  {(life || h.txCount != null) && (
-                    <span className="text-xs text-rb-500">
-                      {life}
-                      {life && h.txCount != null && " · "}
-                      {h.txCount != null && <TxCount n={h.txCount} />}
+                </DataTableCell>
+                <DataTableCell label={h.result ? "Result" : undefined} className="sm:max-w-[14rem]">
+                  {h.result && (
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate">{h.result}</span>
+                      {h.resultNote && <span className="truncate text-xs text-rb-500">{h.resultNote}</span>}
                     </span>
                   )}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-      <div className="hidden sm:block">
-        <div className="overflow-x-auto">
-          <div className="flex min-w-[860px] flex-col gap-3" role="table" aria-label="Closed positions">
-            <div
-              role="row"
-              className={`${HISTORY_GRID} border border-transparent py-3 pr-5 text-xs font-semibold uppercase tracking-wide text-rb-500`}
-            >
-              <div role="columnheader" aria-hidden="true" />
-              <div role="columnheader">Closed</div>
-              <div role="columnheader">Protocol</div>
-              <div role="columnheader">Outcome</div>
-              <div role="columnheader">Size at close</div>
-              <div role="columnheader">Result</div>
-              <div role="columnheader" className="text-right">
-                Lifetime
-              </div>
-            </div>
-            {rows.map((p) => {
-              const h = p.history ?? {};
-              const life = lifetime(h.openedAt, h.closedAt);
-              return (
-                <Link
-                  key={`${p.chain}:${p.family}:${p.positionId}`}
-                  href={p.href}
-                  prefetch={false}
-                  role="row"
-                  className={`${HISTORY_GRID} relative isolate items-center ${HISTORY_LINK} bg-brand-zone py-3 pr-5 text-sm`}
-                  style={hueStyle(protocolId(p))}
-                  data-history-row={p.positionId}
-                  data-family={p.family}
-                >
-                  <div role="cell" className="-my-3 flex self-stretch">
-                    <RowZone id={protocolId(p)} chain={p.chain} />
-                  </div>
-                  {/* The body's ground, from the zone's edge: the hue shows at its left corners. */}
-                  <span aria-hidden className="absolute inset-y-0 right-0 left-[95px] -z-10 rounded-l-2xl bg-raised" />
-                  <div role="cell" className="text-foreground/80">
-                    {h.closedAt != null ? formatDate(h.closedAt) : "—"}
-                  </div>
-                  <div role="cell" className="flex min-w-0 flex-col">
-                    <span className="font-medium text-foreground">{p.familyName}</span>
-                    {p.market && (
-                      <span className="truncate text-xs uppercase tracking-wide text-rb-500">{p.market}</span>
-                    )}
-                  </div>
-                  <div role="cell">
-                    <span
-                      className={`rounded-xs px-2 py-0.5 text-xs font-bold tracking-wider ${OUTCOME_TONE[p.status] ?? OUTCOME_TONE.closed}`}
-                    >
-                      {p.status.toUpperCase()}
-                    </span>
-                  </div>
-                  <div role="cell" className="flex min-w-0 flex-col">
-                    <span className="truncate">{h.size ?? ""}</span>
-                    {h.sizeNote && <span className="text-xs text-rb-500">{h.sizeNote}</span>}
-                  </div>
-                  <div role="cell" className="flex min-w-0 flex-col">
-                    <span className="truncate">{h.result ?? ""}</span>
-                    {h.resultNote && <span className="text-xs text-rb-500">{h.resultNote}</span>}
-                  </div>
-                  <div role="cell" className="flex flex-col text-right">
+                </DataTableCell>
+                <DataTableCell label="Lifetime" align="right" className="whitespace-nowrap">
+                  <span className="flex flex-col items-end max-sm:items-start">
                     <span>{life ?? ""}</span>
                     {h.txCount != null && (
                       <span className="text-xs text-rb-500">
                         <TxCount n={h.txCount} />
                       </span>
                     )}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </div>
+                  </span>
+                </DataTableCell>
+              </DataTableRow>
+            );
+          })}
+        </DataTableBody>
+      </DataTable>
     </section>
   );
 }
@@ -369,48 +315,26 @@ function Trades({ address, cow }: { address: string; cow: Promise<CowWalletEntry
       <h2 id="wallet-trades" className={`${H2} mb-3`}>
         Trades
       </h2>
-      {/* Below sm the History table's phone form: the hue's 6px edge, the
-          mark and name, the chain's glyph at the right. */}
-      <Link
-        href={cowHref(address)}
-        prefetch={false}
-        aria-label={label}
-        className={`${ROW_LINK} flex overflow-hidden text-sm sm:hidden`}
-        data-wallet-trades-row="cow"
-      >
-        <span className="w-[6px] shrink-0 self-stretch bg-brand-edge" style={hueStyle("cow")} />
-        <span className="flex min-w-0 flex-1 flex-col gap-1 py-3 pl-5 pr-4">
-          <span className="flex items-center gap-2">
-            <span
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-zone"
-              style={hueStyle("cow")}
-            >
-              <ProtocolIcon id="cow" className="h-4 w-4 shrink-0 text-rb-500" />
-              CoW
-            </span>
-            <span className="ml-auto flex items-center text-brand-zone" style={hueStyle("cow")}>
-              <ChainGlyph id={COW_CHAIN} className="h-4 w-4 shrink-0" />
-              <span className="sr-only">{chainMeta(COW_CHAIN).name}</span>
-            </span>
-          </span>
-          <span className="text-xs text-foreground/80">{count}</span>
-          {dates && <span className="text-xs text-rb-500">{dates}</span>}
-        </span>
-      </Link>
-      <Link
-        href={cowHref(address)}
-        prefetch={false}
-        aria-label={label}
-        className={`hidden grid-cols-[95px_170px_minmax(0,1fr)_auto] items-center gap-4 sm:grid ${ROW_LINK} py-3 pr-5 text-sm`}
-        data-wallet-trades-row="cow"
-      >
-        <span className="-my-3 flex self-stretch">
-          <RowZone id="cow" chain={COW_CHAIN} />
-        </span>
-        <span className="font-medium text-foreground">CoW</span>
-        <span>{count}</span>
-        <span className="text-right text-foreground/80">{dates}</span>
-      </Link>
+      {/* One row on the History table's chrome (W4: D1, D4, D5, D6). */}
+      <DataTable label="Trades" stacked rowHeight="one" tableClassName="text-sm">
+        <DataTableBody>
+          <DataTableRow href={cowHref(address)} data-wallet-trades-row="cow">
+            <DataTableLeadCell protocol="cow" protocolName="CoW" chain={COW_CHAIN} />
+            <DataTableCell rowHeader className="whitespace-nowrap">
+              <span className="flex items-center gap-2">
+                <DataTableLeadMark protocol="cow" chain={COW_CHAIN} />
+                <DataTableRowLink href={cowHref(address)} aria-label={label} className="font-medium">
+                  CoW
+                </DataTableRowLink>
+              </span>
+            </DataTableCell>
+            <DataTableCell className="w-full whitespace-nowrap">{count}</DataTableCell>
+            <DataTableCell align="right" className="text-foreground/80 max-sm:text-rb-500 sm:whitespace-nowrap">
+              {dates}
+            </DataTableCell>
+          </DataTableRow>
+        </DataTableBody>
+      </DataTable>
     </section>
   );
 }

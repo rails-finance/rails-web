@@ -2,7 +2,9 @@
 
 // Dolomite protocol view — every listed market and the risk ladder over it,
 // in the Aave-V3-family table shape (components/shared/aave-reserve-parts.tsx):
-// a summary line, then every market as one sortable row rather than a card.
+// a summary line, then every market as one sortable row on the house table
+// (rails-ops ui-jobs 539: D1, D2, D6 cards below lg, as M1), unlinked: a
+// market has no Rails page.
 // ----------------------------------------------------------------------------
 // Provenance: the whole view owns ONE <ProvReceiptsScope> (the scoped pilots'
 // posture — the figures are one block's reading of one core contract, so they
@@ -44,8 +46,16 @@
 
 import { formatTinyNonZero } from "@/lib/utils/format";
 import { useMemo, useState } from "react";
-import { ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import {
+  DATA_TABLE_PILL,
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 import { shortAddress, DOLOMITE_ADDRESSES, formatDolomitePrice } from "@/lib/dolomite/asset-catalog";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { serverReadAt, serverReadVia, type ServerRead } from "@/lib/shared/server-head-read";
@@ -69,6 +79,7 @@ import type { DolomiteMarketRow, DolomiteMarketsResponse } from "@/lib/sources/c
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { BlockRef } from "@/components/shared/block-ref";
 
+const NUM = "whitespace-nowrap tabular-nums text-foreground";
 const pctText = (f: number | null, dp = 1) => (f == null ? "—" : `${(f * 100).toFixed(dp)}%`);
 /** A premium as a percentage without trailing zeros ("200%", "27.5%"). */
 const premiumText = (f: number) => `${Number((f * 100).toFixed(1))}%`;
@@ -150,16 +161,16 @@ function MarketRow({
 
   return (
     <ProvReceiptsScope registry={registry} bounds={false}>
-      <tr className="border-t border-rb-200 transition-colors hover:bg-foreground/[0.02] dark:border-rb-800">
-        <td className="px-3 py-2.5">
-          <div className="flex items-center gap-2">
-            <TokenChipIcon symbol={m.symbol} address={m.token} size={20} filterable={false} />
-            <div className="leading-tight">
-              <div className="flex items-center gap-1.5 text-[13px] font-medium text-foreground">
+      <DataTableRow data-dolomite-market={m.marketId}>
+        <DataTableCell rowHeader className="whitespace-nowrap">
+          <div className="flex items-center gap-2.5">
+            <TokenChipIcon symbol={m.symbol} address={m.token} size={28} filterable={false} />
+            <div className="min-w-0 leading-tight">
+              <div className="flex items-center gap-1.5 font-semibold text-foreground">
                 {m.symbol}
                 {m.isClosing && (
                   <span
-                    className="text-[10px] uppercase tracking-wide text-rb-500"
+                    className={`${DATA_TABLE_PILL} px-1.5 py-0.5 text-[11px] font-normal`}
                     title="Closing: no new borrowing; existing debt still runs and the supply still earns"
                   >
                     closing
@@ -176,15 +187,15 @@ function MarketRow({
               </a>
             </div>
           </div>
-        </td>
-        <td className="px-3 py-2.5 tabular-nums text-[13px] text-foreground/80">
+        </DataTableCell>
+        <DataTableCell label="Min collateralisation" className="tabular-nums text-foreground">
           <Prov info={dolMinCollatProv(coords)}>{pctText(m.minCollateralization, 1)}</Prov>
           <div className="mt-1 flex items-center gap-1.5">
             <MiniBar
               frac={m.minCollateralization / axisMax}
               title={`${pctText(m.minCollateralization, 1)} minimum collateralisation, on the roster's shared axis`}
             />
-            <span className="whitespace-nowrap text-[10px] font-normal text-rb-500">
+            <span className="whitespace-nowrap text-[11px] text-rb-500">
               {m.marginPremium > 0 ? (
                 <Prov info={dolMarginPremiumProv(coords)}>{pctText(m.marginPremium, 1)} margin premium</Prov>
               ) : (
@@ -192,28 +203,34 @@ function MarketRow({
               )}
             </span>
           </div>
-        </td>
-        <td className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80" title={priceTitle}>
+        </DataTableCell>
+        <DataTableCell label="Price" align="right" className={NUM} title={priceTitle}>
           {m.priceUsd != null ? (
             <Prov info={dolMarketPriceProv(coords)}>{fmtPrice(m.priceUsd)}</Prov>
           ) : (
             <span className="text-rb-500">—</span>
           )}
-        </td>
-        <td
-          className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80"
+        </DataTableCell>
+        <DataTableCell
+          label="Supplied"
+          align="right"
+          className={NUM}
           title={`${tokenAmount(m.totalSupplyUnderlying, m.symbol)} supplied`}
         >
           <Prov info={dolMarketValueProv("supplied", coords)}>{usd(m.totalSupplyUsd)}</Prov>
-        </td>
-        <td
-          className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80"
+        </DataTableCell>
+        <DataTableCell
+          label="Borrowed"
+          align="right"
+          className={NUM}
           title={`${tokenAmount(m.totalBorrowUnderlying, m.symbol)} borrowed`}
         >
           <Prov info={dolMarketValueProv("borrowed", coords)}>{usd(m.totalBorrowUsd)}</Prov>
-        </td>
-        <td
-          className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80"
+        </DataTableCell>
+        <DataTableCell
+          label="Borrow rate"
+          align="right"
+          className={NUM}
           title="Current borrow APR, read live from the core"
         >
           {m.borrowAprPct != null ? (
@@ -221,9 +238,11 @@ function MarketRow({
           ) : (
             <span className="text-rb-500">—</span>
           )}
-        </td>
-        <td
-          className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80"
+        </DataTableCell>
+        <DataTableCell
+          label="Supply APR"
+          align="right"
+          className={NUM}
           title="Current supply APR, derived from the core's own borrow rate, utilisation and earnings share"
         >
           {m.supplyAprPct != null ? (
@@ -231,24 +250,26 @@ function MarketRow({
           ) : (
             <span className="text-rb-500">—</span>
           )}
-        </td>
-        <td
-          className="px-3 py-2.5 text-right tabular-nums text-[13px] text-foreground/80"
+        </DataTableCell>
+        <DataTableCell
+          label="Spread"
+          align="right"
+          className={NUM}
           title="The liquidation spread when this market is seized: the collateral a liquidator takes is worth the debt it repays plus this bonus"
         >
           <Prov info={dolMarketSpreadProv(coords)}>{pctText(m.liquidationSpread, 1)}</Prov>
-          <div className="mt-1 whitespace-nowrap text-[10px] font-normal text-rb-500">
+          <div className="mt-1 text-[11px] text-rb-500">
             {m.spreadPremium > 0 ? (
               <Prov info={dolSpreadPremiumProv(coords)}>{premiumText(m.spreadPremium)} spread premium</Prov>
             ) : (
               "no spread premium"
             )}
           </div>
-        </td>
-        <td className="px-3 py-2.5">
+        </DataTableCell>
+        <DataTableCell label="Utilisation" wide className="whitespace-nowrap">
           <UtilMini m={m} />
-        </td>
-      </tr>
+        </DataTableCell>
+      </DataTableRow>
     </ProvReceiptsScope>
   );
 }
@@ -263,6 +284,18 @@ type SortKey =
   | "supplyApy"
   | "spread"
   | "util";
+
+const SORT_LABEL: Record<SortKey, string> = {
+  asset: "Asset",
+  minCollat: "Min collateralisation",
+  price: "Price",
+  supplied: "Supplied",
+  borrowed: "Borrowed",
+  borrowRate: "Borrow rate",
+  supplyApy: "Supply APR",
+  spread: "Spread",
+  util: "Utilisation",
+};
 
 export function DolomiteMarketsStamp({ data }: { data: DolomiteMarketsResponse }) {
   if (data.chainStale || data.blockNumber === 0) return null;
@@ -350,25 +383,17 @@ export function DolomiteMarketsView({ data }: { data: DolomiteMarketsResponse })
 
   const s = data.summary;
 
-  // Sortable header cell — the Aave-family table's render helper, not a
-  // component, so it shares the parent's sort state without remounting.
-  const th = (label: string, k: SortKey, align: "left" | "right" = "left") => {
-    const active = sortKey === k;
-    const Caret = sortDir === "asc" ? ChevronUp : ChevronDown;
-    return (
-      <th className={`px-3 py-2 ${align === "right" ? "text-right" : "text-left"}`}>
-        <button
-          type="button"
-          onClick={() => toggleSort(k)}
-          className={`inline-flex items-center gap-1 text-[11px] uppercase tracking-wider transition-colors hover:text-foreground ${
-            active ? "text-foreground" : "text-rb-500"
-          } ${align === "right" ? "flex-row-reverse" : ""}`}
-        >
-          {label}
-          {active ? <Caret className="h-3 w-3" /> : <ArrowUpDown className="h-3 w-3 opacity-30" />}
-        </button>
-      </th>
-    );
+  // A sortable header (D2), sharing the parent's sort state.
+  const th = (k: SortKey, align: "left" | "right" = "left") => (
+    <DataTableHeader
+      label={SORT_LABEL[k]}
+      align={align}
+      sort={{ dir: sortKey === k ? sortDir : null, onSort: () => toggleSort(k), ariaLabel: `Sort by ${SORT_LABEL[k]}` }}
+    />
+  );
+  const pickSort = (k: SortKey) => {
+    setSortKey(k);
+    setSortDir(k === "asset" ? "asc" : "desc");
   };
 
   return (
@@ -438,28 +463,61 @@ export function DolomiteMarketsView({ data }: { data: DolomiteMarketsResponse })
         spread premium).
       </p>
 
-      <div className="overflow-x-auto rounded-lg border border-rb-200 dark:border-rb-800">
-        <table className="w-full min-w-[980px] border-collapse">
-          <thead>
-            <tr className="bg-foreground/[0.03]">
-              {th("Asset", "asset")}
-              {th("Min collateralisation", "minCollat")}
-              {th("Price", "price", "right")}
-              {th("Supplied", "supplied", "right")}
-              {th("Borrowed", "borrowed", "right")}
-              {th("Borrow rate", "borrowRate", "right")}
-              {th("Supply APR", "supplyApy", "right")}
-              {th("Spread", "spread", "right")}
-              {th("Utilisation", "util")}
-            </tr>
-          </thead>
-          <tbody>
-            {sortedMarkets.map((m) => (
-              <MarketRow key={m.marketId} m={m} axisMax={axisMax} block={data.blockNumber} readBy={readBy} />
+      {/* Below lg the header row is hidden (D6): a select and a direction
+          button drive the same sort. */}
+      <div className="mb-2 flex items-center gap-2 lg:hidden" data-mobile-sort="">
+        <label className="flex items-center gap-2 text-[12px] text-rb-500">
+          Sort by
+          <select
+            value={sortKey}
+            onChange={(e) => pickSort(e.target.value as SortKey)}
+            className="rounded-md border border-rb-200 bg-background px-2 py-1 text-base text-foreground sm:text-[12px] dark:border-rb-800"
+          >
+            {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+              <option key={k} value={k}>
+                {SORT_LABEL[k]}
+              </option>
             ))}
-          </tbody>
-        </table>
+          </select>
+        </label>
+        <button
+          type="button"
+          onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+          className="rounded-md border border-rb-200 px-2 py-1 text-[12px] text-foreground dark:border-rb-800"
+        >
+          {sortKey === "asset"
+            ? sortDir === "asc"
+              ? "A to Z"
+              : "Z to A"
+            : sortDir === "asc"
+              ? "Low first"
+              : "High first"}
+        </button>
       </div>
+      <DataTable
+        label="Dolomite markets"
+        stacked
+        stackBelow="lg"
+        rowHeight="two"
+        tableClassName="text-sm lg:min-w-[980px]"
+      >
+        <DataTableHead>
+          {th("asset")}
+          {th("minCollat")}
+          {th("price", "right")}
+          {th("supplied", "right")}
+          {th("borrowed", "right")}
+          {th("borrowRate", "right")}
+          {th("supplyApy", "right")}
+          {th("spread", "right")}
+          {th("util")}
+        </DataTableHead>
+        <DataTableBody>
+          {sortedMarkets.map((m) => (
+            <MarketRow key={m.marketId} m={m} axisMax={axisMax} block={data.blockNumber} readBy={readBy} />
+          ))}
+        </DataTableBody>
+      </DataTable>
 
       <section className="mt-8">
         <h2 className="text-sm font-semibold text-foreground">The account-level carve-out</h2>

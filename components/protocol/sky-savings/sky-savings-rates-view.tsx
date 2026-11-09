@@ -2,10 +2,20 @@
 
 // The Savings Rate history: every File('ssr') the sUSDS contract emitted, the
 // share price and rate at the sealed block, and the PSM price of USDS. Each
-// rate is stated at the block that set it; nothing is drawn between two.
+// rate is stated at the block that set it; nothing is drawn between two. The
+// history on the house table (rails-ops ui-jobs 539: D1, D6 cards below sm),
+// newest first and unlinked.
 
 import { ProvReceiptsScope, Prov, useReceiptRegistry } from "@/components/shared/provenance";
 import { BlockRef } from "@/components/shared/block-ref";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 import { formatDate } from "@/lib/date";
 import { explorerUrl } from "@/lib/shared/chains";
 import { SKY_CHAIN_ID, SUSDS, USDS } from "@/lib/sky-savings/constants";
@@ -52,44 +62,50 @@ export function SkySavingsRatesView({ rates }: { rates: SkyRates }) {
           At <BlockRef block={asOf.block} chainId={SKY_CHAIN_ID} />.
         </p>
 
-        <div className="overflow-x-auto rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised">
-          <table className="w-full min-w-[520px] text-sm tabular-nums" data-sky-rate-history={rows.length}>
-            <thead>
-              <tr className="text-left text-[11px] uppercase tracking-wider text-rb-500">
-                <th className="px-4 py-2.5 font-medium">Date</th>
-                <th className="px-4 py-2.5 font-medium">Block</th>
-                <th className="px-4 py-2.5 font-medium text-right">From</th>
-                <th className="px-4 py-2.5 font-medium text-right">To</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const to = pctString(r.annualRate);
-                return (
-                  <tr key={r.txHash} className="border-t border-rb-300/40 dark:border-rb-700/40">
-                    <td className="px-4 py-2 text-foreground/80">{formatDate(r.timestamp)}</td>
-                    <td className="px-4 py-2">
-                      <a
-                        href={explorerUrl(SKY_CHAIN_ID, "tx", r.txHash)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="link-muted"
-                      >
-                        {r.blockNumber.toLocaleString("en-US")}
-                      </a>
-                    </td>
-                    <td className="px-4 py-2 text-right text-rb-500">{pctString(r.previousAnnualRate)}</td>
-                    <td className="px-4 py-2 text-right font-semibold text-foreground">
-                      <Prov info={rateChangeProv(r.blockNumber, r.txHash, r.ssr, to)} value={to}>
-                        <span>{to}</span>
-                      </Prov>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          label="Savings Rate changes, newest first"
+          stacked
+          rowHeight="one"
+          tableClassName="text-sm tabular-nums sm:min-w-[520px]"
+          data-sky-rate-history={rows.length}
+        >
+          <DataTableHead>
+            <DataTableHeader label="Date" />
+            <DataTableHeader label="Block" />
+            <DataTableHeader label="From" align="right" />
+            <DataTableHeader label="To" align="right" />
+          </DataTableHead>
+          <DataTableBody>
+            {rows.map((r) => {
+              const to = pctString(r.annualRate);
+              return (
+                <DataTableRow key={r.txHash}>
+                  <DataTableCell rowHeader className="whitespace-nowrap text-foreground">
+                    {formatDate(r.timestamp)}
+                  </DataTableCell>
+                  <DataTableCell label="Block" className="whitespace-nowrap">
+                    <a
+                      href={explorerUrl(SKY_CHAIN_ID, "tx", r.txHash)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="link-muted"
+                    >
+                      {r.blockNumber.toLocaleString("en-US")}
+                    </a>
+                  </DataTableCell>
+                  <DataTableCell label="From" align="right" className="whitespace-nowrap text-rb-500">
+                    {pctString(r.previousAnnualRate)}
+                  </DataTableCell>
+                  <DataTableCell label="To" align="right" className="whitespace-nowrap text-foreground">
+                    <Prov info={rateChangeProv(r.blockNumber, r.txHash, r.ssr, to)} value={to}>
+                      <span className="font-semibold">{to}</span>
+                    </Prov>
+                  </DataTableCell>
+                </DataTableRow>
+              );
+            })}
+          </DataTableBody>
+        </DataTable>
       </div>
     </ProvReceiptsScope>
   );

@@ -56,7 +56,13 @@ export type ValueHeldRoster = {
 /** Where a line of the figure sits: its chain, its surface ("vaults" for the
  *  vault surface of an explorer that also has markets) and the page its
  *  positions are listed on (the vaults page for a vault surface). */
-export type ValueHeldPlace = { chainId: number; surface: string | null; href: string | null };
+export type ValueHeldPlace = {
+  /** The explorer's `protocols.ts` id: the row's lead zone on /about/figures. */
+  protocol: string;
+  chainId: number;
+  surface: string | null;
+  href: string | null;
+};
 
 export type ValueHeldRow = ValueHeldPlace & {
   key: string;
@@ -184,6 +190,7 @@ export function settleValueHeld(data: ValueHeldData | null | undefined, roster: 
       // "Morpho Blue Base vaults": the surface reads after the chain.
       const chainName = row.surface === "vaults" ? `${entry.chainName} vaults` : entry.chainName;
       const place: ValueHeldPlace = {
+        protocol: entry.id,
         chainId: entry.chainId,
         surface: row.surface ?? null,
         href: (row.surface === "vaults" ? entry.vaultsHref : undefined) ?? entry.href ?? null,
