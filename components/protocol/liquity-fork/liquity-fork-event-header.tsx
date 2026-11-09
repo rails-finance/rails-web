@@ -70,7 +70,12 @@ function clauseNode(
   coords: LiquityForkCoords,
   builders: LiquityForkHeaderBuilders,
 ) {
-  if ("text" in c) return c.zombie ? <span title={zombieTitle(!!c.cleared)}>{c.text}</span> : <span>{c.text}</span>;
+  if ("text" in c)
+    return c.zombie && builders.minDebt != null ? (
+      <span title={zombieTitle(!!c.cleared, builders.minDebt, builders.debtSymbol)}>{c.text}</span>
+    ) : (
+      <span>{c.text}</span>
+    );
   if ("delegate" in c)
     return (
       <span>

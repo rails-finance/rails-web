@@ -348,15 +348,15 @@ export function LiquityForkPositionExplanation({
     bullets.push(
       hasDebt ? (
         <span key="zombie">
-          A partial redemption left this Trove below the branch&rsquo;s minimum debt, which makes it a <H>zombie</H>:
-          out of the rate-ordered redemption queue. While it is the branch&rsquo;s most recent zombie, it is the first
-          Trove the next redemption on the branch reaches. The owner can close it to take back the collateral
+          A partial redemption left this Trove below the branch&rsquo;s minimum debt, which makes it <H>dormant</H>: out
+          of the rate-ordered redemption queue. While it is the branch&rsquo;s most recent dormant Trove, it is the
+          first Trove the next redemption on the branch reaches. The owner can close it to take back the collateral
           {reserve ? <> and the {reserve} liquidation reserve</> : null}, or borrow back above the minimum to rejoin the
           queue.
         </span>
       ) : (
         <span key="zombie">
-          Redemption cancelled all of its debt, which leaves it a <H>zombie</H>: outside the redemption queue. With no
+          Redemption cancelled all of its debt, which leaves it <H>dormant</H>: outside the redemption queue. With no
           debt, a redemption cannot reach it and there is nothing to liquidate. Closing the Trove returns the{" "}
           <H>
             <AmountText value={chain.entireColl} /> {chain.symbol}

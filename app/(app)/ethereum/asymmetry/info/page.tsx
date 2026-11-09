@@ -37,9 +37,9 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
     ],
   },
   {
-    term: "Zombie",
+    term: "Dormant Trove",
     definition:
-      "A Trove is a zombie when a redemption has cut its debt below the 2,000 USDaf minimum. Such a Trove switches to a dormant mode, in which the redemption queue no longer treats it like the other Troves. Raising its debt above the minimum again ends that mode.",
+      "A Trove is dormant when a redemption has cut its debt below the 2,000 USDaf minimum. It leaves the redemption queue, save the branch's most recent dormant Trove with debt left, which is redeemed first. Raising its debt above the minimum again returns it to the queue. The contracts tag it Zombie.",
     sources: [
       { label: "If my Trove is redeemed", href: `${DOCS}/redemptions#what-happens-if-my-trove-gets-redeemed` },
       { label: "Minimum borrow amount", href: `${DOCS}/borrowing#is-there-a-minimum-borrow-amount` },
@@ -86,7 +86,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
         </li>
         <li>
           The owner sets the interest rate, or the batch manager sets it when the owner has delegated it. A status is
-          Open, Zombie, Closed or Liquidated.
+          Open, Dormant, Closed or Liquidated.
         </li>
       </ul>
     ),
@@ -140,8 +140,8 @@ export default function InfoPage() {
           it for many Troves at once.
         </>,
         <>
-          A redemption that cuts a Trove&apos;s debt below the 2,000 USDaf minimum makes it a{" "}
-          <GlossaryLink term="Zombie">zombie</GlossaryLink>. A Trove whose{" "}
+          A redemption that cuts a Trove&apos;s debt below the 2,000 USDaf minimum makes it{" "}
+          <GlossaryLink term="Dormant Trove">dormant</GlossaryLink>. A Trove whose{" "}
           <GlossaryLink term="Collateral ratio">collateral ratio</GlossaryLink> falls below its branch&apos;s minimum
           can be <GlossaryLink term="Liquidation">liquidated</GlossaryLink>.
         </>,

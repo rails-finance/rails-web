@@ -169,8 +169,8 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
       if (live.status === "zombie") {
         lines.push(
           live.entireDebt > 0
-            ? `- **Redemption queue:** ZOMBIE: a partial redemption left the trove below the minimum debt; it sits outside the rate-ordered queue and is redeemed FIRST when redemptions next route through this branch`
-            : `- **Redemption queue:** ZOMBIE: redemption cancelled all of its debt; it sits outside the queue with nothing left to redeem, and closing it returns its ${coll} to the owner`,
+            ? `- **Redemption queue:** Dormant (Zombie in the contracts): a partial redemption left the Trove below the minimum debt; it sits outside the rate-ordered queue and is redeemed FIRST when redemptions next route through this branch`
+            : `- **Redemption queue:** Dormant (Zombie in the contracts): redemption cancelled all of its debt; it sits outside the queue with nothing left to redeem, and closing it returns its ${coll} to the owner`,
         );
       } else if (live.debtInFront != null) {
         lines.push(

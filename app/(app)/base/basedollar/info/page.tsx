@@ -87,9 +87,9 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
     ],
   },
   {
-    term: "Zombie",
+    term: "Dormant Trove",
     definition:
-      "A Zombie is an open Trove whose debt a redemption has repaid below the minimum debt, the smallest debt Basedollar's contracts allow a Trove to hold. The Trove stays open, and its owner can still repay it or close it. Redemptions take from a Zombie before the interest-rate order applies.",
+      "A dormant Trove is an open Trove whose debt a redemption has repaid below the minimum debt, the smallest debt Basedollar's contracts allow a Trove to hold. It leaves the redemption queue, save the branch's most recent dormant Trove with debt left, which redemptions take from before the interest-rate order applies. Its owner can bring the debt back above the minimum or close it. The contracts tag it Zombie.",
     sources: [
       { label: "Minimum debt (Liquity V2 FAQ)", href: BORROWING + "#is-there-a-minimum-debt" },
       {
@@ -106,7 +106,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <ul className={UL}>
         <li>Each row is one Trove, with its collateral, its BD debt and the interest rate its borrower chose.</li>
-        <li>A row also shows the Trove&apos;s status: Open, Zombie, Closed or Liquidated.</li>
+        <li>A row also shows the Trove&apos;s status: Open, Dormant, Closed or Liquidated.</li>
         <li>
           You can search by Trove id, collateral or owner. Status keeps the Troves with the statuses you pick, and
           Collateral keeps the Troves held in the branch tokens you pick.
@@ -188,8 +188,8 @@ export default function InfoPage() {
         </>,
         <>
           Basedollar&apos;s contracts set the minimum debt of a Trove at 200 BD. A redemption repays part of a
-          Trove&apos;s debt, and when that leaves an open Trove below the floor, the Trove is a{" "}
-          <GlossaryLink term="Zombie">Zombie</GlossaryLink>.
+          Trove&apos;s debt, and when that leaves an open Trove below the floor, the Trove is{" "}
+          <GlossaryLink term="Dormant Trove">dormant</GlossaryLink>.
         </>,
       ]}
       glossary={glossary}

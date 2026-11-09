@@ -219,7 +219,7 @@ function BranchCard({
                 <Prov info={vocab.zombieProv(sym, branch.idsCapped)}>
                   {branch.idsCapped ? `≥${branch.zombieCount}` : branch.zombieCount}
                 </Prov>{" "}
-                zombie{branch.zombieCount === 1 ? "" : "s"}
+                dormant
               </span>
             )}
           </div>
@@ -286,7 +286,7 @@ function BranchCard({
               // trove was redeemed to zero debt (a debt-bearing zombie rides
               // the queue) — the branch still holds their collateral.
               branch.zombieCount > 0
-              ? "This branch's remaining troves are zombies with no debt left, so there is no total collateral ratio to state."
+              ? "This branch's remaining Troves are dormant with no debt left, so there is no total collateral ratio to state."
               : "No troves on this branch, so there is no total collateral ratio to state."
             : "This branch's oracle didn't answer on this read, so its total collateral ratio is withheld rather than estimated."}
         </p>
@@ -392,10 +392,10 @@ export function LiquityForkBranchesView({
         </p>
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
           A branch&rsquo;s queue is its troves in rate order, which is the listing sorted that way. One link per branch
-          below. Two things that order leaves out: a trove redeemed below the minimum debt drops out of the sorted list
-          and is redeemed ahead of everything in it, whatever rate it carries, so those sit under the listing&rsquo;s
-          Zombie status rather than in these links; and how much is redeemed before any one trove is stated on that
-          trove&rsquo;s own page.
+          below. Two things that order leaves out: a Trove redeemed below the minimum debt drops out of the sorted list,
+          and the branch&rsquo;s most recent one with debt left is redeemed ahead of everything in it, whatever rate it
+          carries, so those sit under the listing&rsquo;s Dormant status rather than in these links; and how much is
+          redeemed before any one trove is stated on that trove&rsquo;s own page.
         </p>
         {queued.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">

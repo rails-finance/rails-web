@@ -568,15 +568,15 @@ function buildOpenItems({
       "risk",
       displayDebt > 0 ? (
         <span key="zombie" className="text-rb-500">
-          A partial redemption left this Trove below the branch&rsquo;s minimum debt, which makes it a <H>zombie</H>:
-          out of the rate-ordered redemption queue. While it is the branch&rsquo;s most recent zombie, it is the first
-          Trove the next redemption reaches. The owner can close it to take back the collateral, or borrow back above
-          the minimum to rejoin the queue.
+          A partial redemption left this Trove below the branch&rsquo;s minimum debt, which makes it <H>dormant</H>: out
+          of the rate-ordered redemption queue. While it is the branch&rsquo;s most recent dormant Trove, it is the
+          first Trove the next redemption reaches. The owner can close it to take back the collateral, or borrow back
+          above the minimum to rejoin the queue.
         </span>
       ) : (
         <span key="zombie" className="text-rb-500">
-          Redemption took all of its debt, which makes it a <H>zombie</H>. With no debt, a redemption cannot reach it
-          and there is nothing to liquidate. The owner can close it to take back the collateral, or borrow again.
+          Redemption took all of its debt, which makes it <H>dormant</H>. With no debt, a redemption cannot reach it and
+          there is nothing to liquidate. The owner can close it to take back the collateral, or borrow again.
         </span>
       ),
     );

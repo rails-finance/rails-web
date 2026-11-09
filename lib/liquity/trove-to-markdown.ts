@@ -114,7 +114,7 @@ export function troveSummaryMarkdown(args: TroveMarkdownArgs): string[] {
   lines.push("");
 
   const owner = trove.status === "open" ? trove.owner : trove.lastOwner;
-  lines.push(`- **Status:** ${statusLabel(trove.status)}${trove.isZombie ? " (zombie — debt below the minimum)" : ""}`);
+  lines.push(`- **Status:** ${statusLabel(trove.status)}${trove.isZombie ? " (dormant, debt below the minimum)" : ""}`);
   if (owner) lines.push(`- **Owner:** ${trove.ownerEns ? `${trove.ownerEns} (${owner})` : owner}`);
   lines.push(`- **Collateral type:** ${ct}`);
   lines.push(`- **Trove ID:** ${trove.id}`);

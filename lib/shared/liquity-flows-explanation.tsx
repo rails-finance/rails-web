@@ -53,9 +53,9 @@ export function LiquityFlowsNote({
       <p>
         The bars and the sums cover every life of this Trove: a closed life&apos;s flows stay in the bars and the line
         reads zero while the Trove is closed
-        {lives > 1 ? ` (it has had ${lives} lives)` : ""}. A zombie Trove, redeemed below the minimum debt, still holds
+        {lives > 1 ? ` (it has had ${lives} lives)` : ""}. A dormant Trove, redeemed below the minimum debt, still holds
         its collateral and owes its debt, so both stay solid on the bars until its owner closes it or brings it back
-        above the minimum{zombie ? "; this Trove is a zombie now" : ""}.
+        above the minimum{zombie ? "; this Trove is dormant now" : ""}.
       </p>
     </div>
   );
