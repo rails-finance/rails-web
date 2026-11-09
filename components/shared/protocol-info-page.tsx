@@ -69,7 +69,7 @@ export const READS_HEADING = "How Rails reads it";
 function InfoReadsSection({ reads, chainId }: { reads: InfoReads; chainId: ChainId }) {
   const chain = reads.chainId ?? chainId;
   return (
-    <section data-info-reads="">
+    <section data-anatomy="I8" data-info-reads="">
       <h2 className={H}>{READS_HEADING}</h2>
       <ul className={UL}>
         {reads.contracts.map((c) => (
