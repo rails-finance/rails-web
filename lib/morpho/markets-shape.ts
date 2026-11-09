@@ -336,6 +336,8 @@ export interface MorphoMarketViewData {
   oraclePrice: number | null;
   oracleFeeds: MorphoOracleFeed[] | null;
   oraclePublishedAt: number | null;
+  /** `rateAtTarget(id)` as stored, per second in WAD; null off the AdaptiveCurveIRM. */
+  rateAtTarget: string | null;
 }
 
 /** The header's props from a successful read; null when the read failed. */
@@ -350,5 +352,6 @@ export function marketViewData(resp: MorphoMarketChainResponse): MorphoMarketVie
     oraclePrice: resp.oraclePrice,
     oracleFeeds: resp.oracleFeeds,
     oraclePublishedAt: resp.oraclePublishedAt,
+    rateAtTarget: resp.rateAtTarget,
   };
 }

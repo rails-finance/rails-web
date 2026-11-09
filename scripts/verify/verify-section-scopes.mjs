@@ -33,6 +33,10 @@ import { BASE, bypassHeaders } from "./lib/host.mjs";
 const USDC_CORE = "/ethereum/aave-v3/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
 const MORPHO_BASE_MARKET =
   "/base/morpho/markets/0x833589fcd6edb6e08f4c7c32d4f71b54bda02913/0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836";
+const MORPHO_ETHEREUM_MARKET =
+  "/ethereum/morpho/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48/0xb323495f7e4148be5643a4ea4a8221eef163e4bccfdedc2a6f4696baacbc86cc";
+const MORPHO_ARBITRUM_MARKET =
+  "/arbitrum/morpho/markets/0xaf88d065e77c8cc2239327c5edb3a432268e5831/0x5dd281933e74e576825deda2f28764f1ad3818faa485cbefc808bef0fc1518e5";
 
 const ALL_PAGES = [
   "/base/morpho/vaults/0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2",
@@ -88,15 +92,22 @@ const ALL_PAGES = [
   // Core's USDC reserve, and a Morpho Blue market on Base.
   USDC_CORE,
   MORPHO_BASE_MARKET,
+  // Morpho Blue's market page on Ethereum and Arbitrum (Base's is above).
+  MORPHO_ETHEREUM_MARKET,
+  MORPHO_ARBITRUM_MARKET,
 ];
 const PAGES = process.env.PAGES ? process.env.PAGES.split(",").map((p) => p.trim()) : ALL_PAGES;
 
 /** A page that must draw a section, waited for before the checks: the Aave
  *  reserve page reads its vaults after its head. */
-const MUST_DRAW = { [USDC_CORE]: "supplied-by-vaults", [MORPHO_BASE_MARKET]: "supplied-by-vaults" };
-/** A page not yet on the shells, where only these sections are held to c and
- *  d (a and b wait for its migration, ui-jobs 549 step 5). */
-const ONLY_SCOPES = { [MORPHO_BASE_MARKET]: ["supplied-by-vaults"] };
+const MUST_DRAW = {
+  [USDC_CORE]: "supplied-by-vaults",
+  [MORPHO_BASE_MARKET]: "supplied-by-vaults",
+  [MORPHO_ETHEREUM_MARKET]: "supplied-by-vaults",
+};
+/** A page where only these sections are held to c and d, a and b waiting for
+ *  its migration. None now; kept for the next page that needs it. */
+const ONLY_SCOPES = {};
 
 let checked = 0;
 let failures = 0;
