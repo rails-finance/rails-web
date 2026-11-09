@@ -27,9 +27,6 @@ export const cometData = (data: CompoundV3MarketsResponse, key: string): Compoun
 export const isComet = (chain: CompoundDeploymentKey, key: string) =>
   cometDeploymentOf(chain).markets.some((m) => m.key === key);
 
-export const cometParams = (chain: CompoundDeploymentKey) =>
-  cometDeploymentOf(chain).markets.map((m) => ({ comet: m.key }));
-
 export function compoundMarketsMetadata(chain: CompoundDeploymentKey): Metadata {
   const n = cometDeploymentOf(chain).markets.length;
   return listingMetadata({
