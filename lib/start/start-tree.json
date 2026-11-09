@@ -64,6 +64,13 @@
           "to": { "node": "browse" }
         },
         {
+          "slug": "asset",
+          "label": "Have an asset?",
+          "crumb": "I have an asset",
+          "line": "The vaults that take it, with their size, yield and withdrawals.",
+          "to": { "node": "asset" }
+        },
+        {
           "slug": "site-down",
           "label": "Is a protocol's site down?",
           "crumb": "Site down",
@@ -76,6 +83,30 @@
           "crumb": "New to DeFi",
           "line": "Wallets, positions and how Rails reads them, in five short parts.",
           "to": { "node": "browse", "intro": "learn" }
+        }
+      ]
+    },
+    "asset": {
+      "title": "I have an asset",
+      "question": "Which kind?",
+      "options": [
+        {
+          "slug": "stablecoins",
+          "label": "Stablecoins",
+          "line": "Dollar tokens and their savings forms.",
+          "to": { "coins": "stablecoins" }
+        },
+        {
+          "slug": "eth",
+          "label": "ETH",
+          "line": "ETH and its staked forms.",
+          "to": { "coins": "eth" }
+        },
+        {
+          "slug": "btc",
+          "label": "BTC",
+          "line": "Wrapped and bridged bitcoin.",
+          "to": { "coins": "btc" }
         }
       ]
     },
@@ -199,18 +230,36 @@
       "heading": "Explorers that sort positions by how close they are to liquidation",
       "line": "Each list opens with the positions closest to liquidation first.",
       "sorts": [
-        { "sortBy": "ratio", "sortOrder": "asc" },
-        { "sortBy": "healthFactor", "sortOrder": "asc" },
-        { "sortBy": "debtRatio", "sortOrder": "desc" }
+        {
+          "sortBy": "ratio",
+          "sortOrder": "asc"
+        },
+        {
+          "sortBy": "healthFactor",
+          "sortOrder": "asc"
+        },
+        {
+          "sortBy": "debtRatio",
+          "sortOrder": "desc"
+        }
       ]
     },
     "liquidated": {
       "heading": "Explorers that list liquidated positions",
       "line": "Each list opens on positions that have been liquidated, latest activity first.",
       "history": [
-        { "param": "liq", "value": "liquidated" },
-        { "param": "liq", "value": "with" },
-        { "param": "liquidations", "value": "with" }
+        {
+          "param": "liq",
+          "value": "liquidated"
+        },
+        {
+          "param": "liq",
+          "value": "with"
+        },
+        {
+          "param": "liquidations",
+          "value": "with"
+        }
       ],
       "status": "liquidated"
     }

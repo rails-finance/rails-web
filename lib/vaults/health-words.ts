@@ -117,6 +117,9 @@ const ROLE_SENTENCE: Record<StewardRole, string> = {
   umbrellaOwner: "The one address that can slash the stake.",
 };
 
+/** "Curator". */
+export const stewardRole = (role: StewardRole): string => ROLE_NOUN[role];
+
 /** "Curator 0x9e33…0585". */
 export const stewardText = (role: StewardRole, address: string): string => `${ROLE_NOUN[role]} ${shortHex(address)}`;
 
@@ -337,8 +340,10 @@ export const ASSET_DOOR = {
     steward: "Steward",
     withdrawals: "Withdrawals",
     paused: "Paused",
-    cooldown: "After a cooldown",
-    withdrawable: (share: number) => `${flooredPct(share)} withdrawable`,
+    cooldown: "Cooldown",
+    cooldownSub: "before a withdrawal",
+    withdrawable: (share: number) => flooredPct(share),
+    withdrawableSub: "withdrawable",
     notRead: "Not read here",
   },
 };
