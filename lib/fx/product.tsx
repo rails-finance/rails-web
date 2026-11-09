@@ -933,7 +933,7 @@ function sections(c: Ctx, s: MarketStructure): ProductSection[] {
   return [
     {
       scope: scope("prices"),
-      anatomy: "",
+      anatomy: "X1",
       title: "Prices",
       learnMore: ORACLE_HELP(p),
       raised: "narrow",
@@ -952,7 +952,7 @@ function sections(c: Ctx, s: MarketStructure): ProductSection[] {
     },
     {
       scope: scope("ladder"),
-      anatomy: "",
+      anatomy: "X2",
       title: "The tick ladder",
       learnMore: null,
       raised: true,
@@ -961,7 +961,7 @@ function sections(c: Ctx, s: MarketStructure): ProductSection[] {
     },
     {
       scope: scope("reconcile"),
-      anatomy: "",
+      anatomy: "X3",
       title: "Every debt share accounted for",
       raised: "narrow",
       tools: inspect,
@@ -969,7 +969,7 @@ function sections(c: Ctx, s: MarketStructure): ProductSection[] {
     },
     {
       scope: scope("funding"),
-      anatomy: "",
+      anatomy: "X4",
       title: "Funding and fees",
       raised: true,
       tools: inspect,
@@ -977,7 +977,7 @@ function sections(c: Ctx, s: MarketStructure): ProductSection[] {
     },
     {
       scope: scope("capacity"),
-      anatomy: "",
+      anatomy: "X5",
       title: "Capacity",
       raised: true,
       tools: {
@@ -994,7 +994,7 @@ function sections(c: Ctx, s: MarketStructure): ProductSection[] {
     },
     {
       scope: scope("ticks"),
-      anatomy: "",
+      anatomy: "X6",
       title: "Ticks",
       tools: {
         exports: {
