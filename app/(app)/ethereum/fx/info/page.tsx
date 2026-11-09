@@ -4,7 +4,8 @@
 // fxprotocol.gitbook.io, the host content/official-docs.json lists for fx.
 
 import Link from "next/link";
-import { GlossaryLink, ProtocolInfoPage, type InfoTerm } from "@/components/shared/protocol-info-page";
+import { GlossaryLink, ProtocolInfoPage, type InfoReads, type InfoTerm } from "@/components/shared/protocol-info-page";
+import { FX_ADDRESSES } from "@/lib/fx/asset-catalog";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -98,6 +99,48 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   },
 ];
 
+// Slot 2a (decision 0059 point 6): the contracts and oracle mechanics that
+// left the pools pages.
+const reads: InfoReads = {
+  contracts: [
+    {
+      name: "The wstETH pool",
+      address: FX_ADDRESSES.WSTETH_POOL,
+      reads:
+        "its collateral and debt, the indexes funding and bad debt move, its debt ratio lines and bonuses, every tick holding debt and the debt and collateral in it, the position count, and each position's collateral, debt and tick. The pool also mints the positions as NFTs.",
+    },
+    {
+      name: "The WBTC pool",
+      address: FX_ADDRESSES.WBTC_POOL,
+      reads: "the same as the wstETH pool.",
+    },
+    {
+      name: "Each pool's price oracle",
+      reads:
+        "three prices for the pool's collateral. The anchor is a Chainlink price feed's reading; the min and max are the lowest and highest of it and the prices on trading venues, each falling back to the anchor when a venue's price strays too far. The pool judges borrowing, rebalancing and liquidation at the min price, a position's debt ratio at the anchor, and redemption at the max.",
+    },
+    {
+      name: "Each pool's configuration",
+      reads: "the funding rate, the default fees and whether redemption is open.",
+    },
+    {
+      name: "PoolManager",
+      address: FX_ADDRESSES.POOL_MANAGER,
+      reads: "each pool's caps on collateral and debt.",
+    },
+  ],
+  how: "The pools pages read both pools at most every ten minutes, and a position page reads its pool at each load. Position histories come from Rails's server store of f(x)'s events.",
+  notes: [
+    <>
+      Rails checks each pool&apos;s ticks against its total on every read: the debt shares in every tick add up to the
+      pool&apos;s total debt shares, compared as whole numbers before any rounding. The collateral differs by what
+      positions with no debt hold, since a position with no debt sits in no tick. A tick holding less than a billionth
+      of an fxUSD is one the pool&apos;s rebalance and liquidation skip; the pool page counts these ticks and leaves
+      them out of its drawing.
+    </>,
+  ],
+};
+
 export default function InfoPage() {
   return (
     <ProtocolInfoPage
@@ -107,11 +150,11 @@ export default function InfoPage() {
           The Rails f(x) explorer shows every long position that has borrowed fxUSD against wstETH or WBTC in f(x)
           Protocol V2 on Ethereum, whether still open or closed, and the full history of each one. It also shows each of
           the two pools,{" "}
-          <Link href="/ethereum/fx/pools#wsteth" className={INLINE_LINK}>
+          <Link href="/ethereum/fx/pools/wsteth" className={INLINE_LINK}>
             one for wstETH
           </Link>{" "}
           and{" "}
-          <Link href="/ethereum/fx/pools#wbtc" className={INLINE_LINK}>
+          <Link href="/ethereum/fx/pools/wbtc" className={INLINE_LINK}>
             one for WBTC
           </Link>
           , as a whole: its totals and the ticks that group its positions.
@@ -134,6 +177,7 @@ export default function InfoPage() {
         </>,
         "A rebalance or a liquidation repays debt from the position's collateral. The owner keeps the fxUSD that was borrowed. The position's NFT also stays with its owner after the position closes, and the owner can add collateral to it again.",
       ]}
+      reads={reads}
       search="You can search by holder address or position number. The listing filters by status, pool, size and transactions, and sorts by recent activity, collateral, debt, debt ratio, event count or creation."
       views={[
         {
@@ -173,18 +217,22 @@ export default function InfoPage() {
           ),
         },
         {
-          heading: "Pools page",
+          heading: "Pools",
           body: (
-            <p>
-              The pools page shows each pool&apos;s totals, funding rate and oracle prices. Under them is the
-              pool&apos;s tick ladder, a drawing of each tick&apos;s debt along the debt ratio, set against the pool's
-              borrow cap, which limits how much can be borrowed, and the rebalance and liquidation lines. A table lists
-              every tick, and the debt of the ticks adds up to the pool&apos;s total.{" "}
-              <Link href="/ethereum/fx/pools" className={INLINE_LINK}>
-                See the pools and their tick ladders
-              </Link>
-              .
-            </p>
+            <ul className={UL}>
+              <li>
+                <Link href="/ethereum/fx/pools" className={INLINE_LINK}>
+                  The pools page
+                </Link>{" "}
+                shows each pool&apos;s collateral, fxUSD debt, funding rate, debt ratio and the debt ratios its keepers
+                rebalance and liquidate from.
+              </li>
+              <li>
+                Each pool&apos;s page adds its three oracle prices, its tick ladder, a drawing of each tick&apos;s debt
+                along the debt ratio, and a table of every tick. The debt in the ticks adds up to the pool&apos;s total,
+                and the page says so.
+              </li>
+            </ul>
           ),
         },
       ]}
