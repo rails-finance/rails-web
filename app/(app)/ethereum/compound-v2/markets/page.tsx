@@ -1,70 +1,32 @@
-// Compound V2 protocol view (/compound-v2/markets) — every market the
-// Comptroller lists and the state of the money in it, read live at one head
-// block. This is the `views` cell of Compound V2's row.
+// Compound V2's markets page (/ethereum/compound-v2/markets), archetype R2 on
+// the shared product shell (rails-ops ui-jobs 549/550; decision 0059): one
+// Comptroller, so the Markets tab opens the market page directly, one row per
+// cToken. The figures are one head-block read of the Comptroller, each
+// cToken, the oracle and the rate models; lib/comptroller/ maps them.
 //
-// It sits ALONGSIDE the position explorer rather than instead of it, the same
-// shape as /aave-v3/markets, /morpho/markets and /fluid/vaults: the explorer
-// answers "what happened to this wallet", this answers "what is the protocol".
-// This page reads no index — it is one head-block read of the protocol's own
-// contracts, and stays that way when the explorer lands.
-//
-// ⚠️ /compound-v2 (the explorer listing) does not exist yet — the onboard that
-// builds it is in flight. Nothing here may link to it until it does, and the
-// roster entry points at THIS page meanwhile (see lib/shared/protocols.ts).
-//
-// The claim it makes is Compound V2's own condition: the money is parked. $106M
-// supplied against $12.4M borrowed, two markets carrying 94.5% of the borrowing
-// that remains, and 8 of the 20 already switched off as collateral. That is why
-// every bar sits nearly empty against its own rate model's kink.
-//
-// Server-rendered: a read-only aggregate with no interactivity to hydrate for,
-// so the first paint carries the real figures (the Fluid vaults view's posture).
+// Server-rendered: the first paint carries the figures. ISR, ten minutes: a
+// protocol aggregate serves every visitor the same render, and the head's read
+// stamp states the time of the read behind a cached page.
 
-import {
-  CompoundV2MarketsView,
-  CompoundV2MarketsStamp,
-} from "@/components/protocol/compound-v2/compound-v2-markets-view";
-import { SubPageHeader } from "@/components/shared/sub-page-header";
+import { ComptrollerMarketsPage } from "@/lib/comptroller/product";
+import { fromCompoundV2 } from "@/lib/comptroller/markets";
 import { loadCompoundV2Markets } from "@/lib/sources/chain/compound-v2-markets";
-import { protocolForHref } from "@/lib/shared/protocols";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
-// ISR, ten minutes. This is a protocol aggregate, not a wallet's page: the
-// same render serves every visitor, so re-reading the contracts per request
-// bought nothing but RPC. Ten minutes is roughly fifty blocks of interest
-// accrual on figures quoted to the nearest percent. The header stamp names the
-// block the read happened at, so a cached page states its own age.
 export const revalidate = 600;
 
 export const metadata = {
   title: "Compound V2 markets",
-  description:
-    "Every Compound V2 market: what it holds, how little of it is borrowed, and which markets no longer back borrowing at all.",
+  description: "Every Compound V2 market on Ethereum: its size, rates, collateral factor and what is still open.",
 };
 
-const PROTOCOL = protocolForHref("/ethereum/compound-v2")!;
-
-export default async function CompoundV2MarketsPage() {
-  // Straight to the loader rather than through this deployment's own
-  // /api/chain/compound-v2/markets route — same code, one less hop on the server.
-  const data = await loadCompoundV2Markets();
-
+export default async function CompoundV2MarketsRoute() {
+  const read = fromCompoundV2(await loadCompoundV2Markets());
   return (
-    <div className="min-h-screen">
-      <div className="py-8">
-        <SubPageHeader
-          protocol={PROTOCOL}
-          title="Markets & the money parked in them"
-          stamp={<CompoundV2MarketsStamp data={data} />}
-        />
-
-        <div data-skel-section="page-table">
-          <CompoundV2MarketsView data={data} />
-        </div>
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
-        <ProvInspectorLayer />
-      </div>
-    </div>
+    <>
+      <ComptrollerMarketsPage read={read} />
+      {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
+      <ProvInspectorLayer />
+    </>
   );
 }

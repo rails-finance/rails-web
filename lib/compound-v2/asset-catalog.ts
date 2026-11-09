@@ -34,8 +34,6 @@
  *     sentinel gets in lib/fluid/asset-catalog.ts.
  */
 
-export const shortAddress = (addr: string): string => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-
 /** The Comptroller — the authority on which markets are listed, and the
  *  contract whose oracle prices them. */
 export const COMPOUND_V2_ADDRESSES = {

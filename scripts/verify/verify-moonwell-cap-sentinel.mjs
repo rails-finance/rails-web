@@ -6,14 +6,13 @@
 // governance closes a market to new borrowing or supply by setting the cap to
 // the smallest positive amount instead: one base unit (1 wei for an
 // 18-decimal token, 1e-6 for USDC). After the 2026-08-27 MAMO incident
-// Moonwell set every one of its 21 Base borrow caps and 6 supply caps that
-// way. Until 2026-09-03 the markets page printed those as a token amount in
-// exponent notation with a share used in the 1e23% range, and the borrow side
-// carried no "closed" phrase at all. Now a one-base-unit cap renders as
-// "borrow cap one base unit · closed to new borrowing" (no share), the borrow
-// side says "closed to new borrowing" whenever borrowing has reached its cap,
-// and the summary line counts the markets closed to new borrowing beside the
-// supply count it already carried.
+// Moonwell set every one of its 21 Base borrow caps and several supply caps
+// that way. The page names a one-unit cap "closed" and quotes no share.
+//
+// Since ui-jobs 549 step 3 the page is the shared market page (R2): one row
+// per mToken, a cap pill under the size it limits (`data-caps`), and the
+// head's notes counting what every market shares once (`data-market-note`).
+// A market's page (R3) states each cap in its Parameters.
 //
 // The fixture is whatever the markets route says at head — check 0 reads it
 // and demands at least one market on each side with a one-base-unit cap and
@@ -24,18 +23,14 @@
 //   0. Precondition — the route carries a one-unit borrow cap, a one-unit
 //      supply cap, and a real supply cap under 100% used.
 //   1. No exponent notation anywhere on the page.
-//   2. The one-unit borrow market's card reads "borrow cap one base unit ·
-//      closed to new borrowing".
-//   3. The one-unit supply market's card reads "supply cap one base unit ·
-//      closed to new supply".
-//   4. The summary line counts the markets closed to new borrowing, and the
+//   2. The one-unit borrow market reads closed: its row's borrow pill says
+//      "cap closed", or (when every market shares it) the head's note counts
+//      every market closed to new borrowing.
+//   3. The one-unit supply market's row reads "cap closed" under Supplied.
+//   4. The head's note counts the markets closed to new borrowing, and the
 //      count equals the route's (one-unit cap, or borrowed at/over the cap).
-//   5. Control — the real-capped market still reads "supply cap <amount> ·
-//      N.N% used".
-//
-// Proved it can fail 2026-09-03: against the deployed site before the fix
-// (BASE=https://rails-web-onboarding.vercel.app), checks 1–4 FAIL while 0 and
-// 5 PASS. Against a dev server on the fix: ALL PASS.
+//   5. Control — the real-capped market's page states its share and the cap
+//      ("N.N% of <amount> <SYM>") under Parameters' Supply cap.
 //
 // Run:
 //   BASE=http://localhost:3000 node scripts/verify/verify-moonwell-cap-sentinel.mjs
@@ -103,18 +98,21 @@ const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const page = await ctx.newPage();
 await page.goto(`${BASE}${MARKETS}`, NAV);
-await page.getByText("borrow cap", { exact: false }).first().waitFor({ timeout: PAGE_TIMEOUT_MS });
+await page.locator("[data-reserve-row]").first().waitFor({ timeout: PAGE_TIMEOUT_MS });
 
 const norm = (s) => (s ?? "").replace(/\s+/g, " ").trim();
-// The card is the nearest ancestor of the market's explorer link that carries
-// its caps line.
-async function cardText(m) {
-  const link = page.locator(`a[href*="${m.mToken}" i]`).first();
-  const card = link.locator(
-    'xpath=ancestor::div[.//text()[contains(., "borrow cap")] or .//text()[contains(., "supply cap")]][1]',
+const rowOf = (m) => page.locator(`[data-comptroller-market="${m.mToken.toLowerCase()}"]`).first();
+const noteCount = async (key) => {
+  const t = norm(
+    await page
+      .locator(`[data-market-note="${key}"]`)
+      .first()
+      .textContent()
+      .catch(() => ""),
   );
-  return norm(await card.textContent());
-}
+  const n = /^(All|\d+)/.exec(t)?.[1];
+  return n === "All" ? ms.length : n != null ? Number(n) : null;
+};
 
 // ── 1. No exponent notation ───────────────────────────────────────────────
 {
@@ -125,40 +123,57 @@ async function cardText(m) {
 
 // ── 2/3. One-unit caps named as closed doors ──────────────────────────────
 {
-  const t = await cardText(borrowOne);
+  const pill = norm(
+    await rowOf(borrowOne)
+      .locator('[data-caps="borrow"]')
+      .first()
+      .textContent()
+      .catch(() => ""),
+  );
+  const n = await noteCount("closed-to-borrow");
   check(
-    `2  ${borrowOne.underlyingSymbol} card: borrow cap one base unit · closed to new borrowing`,
-    /borrow cap one base unit · closed to new borrowing/.test(t) && !/borrow cap one base unit · .*% used/.test(t),
-    t.slice(t.indexOf("borrow cap"), t.indexOf("borrow cap") + 70),
+    `2  ${borrowOne.underlyingSymbol}: borrow cap reads closed`,
+    pill === "cap closed" || n === ms.length,
+    pill ? `row pill "${pill}"` : `head note counts ${n} of ${ms.length}`,
   );
 }
 {
-  const t = await cardText(supplyOne);
+  const pill = norm(
+    await rowOf(supplyOne)
+      .locator('[data-caps="supply"]')
+      .first()
+      .textContent()
+      .catch(() => ""),
+  );
   check(
-    `3  ${supplyOne.underlyingSymbol} card: supply cap one base unit · closed to new supply`,
-    /supply cap one base unit · closed to new supply/.test(t) && !/supply cap one base unit · .*% used/.test(t),
-    t.slice(t.indexOf("supply cap"), t.indexOf("supply cap") + 70),
+    `3  ${supplyOne.underlyingSymbol} row: supply pill reads "cap closed"`,
+    pill === "cap closed",
+    pill || "(no pill)",
   );
 }
 
-// ── 4. Summary counts the markets closed to new borrowing ─────────────────
+// ── 4. The head counts the markets closed to new borrowing ────────────────
 {
-  const body = norm(await page.evaluate(() => document.body.innerText));
-  const m = /(\d+) markets? (?:is|are) closed to new borrowing by (?:its|their) own caps?/.exec(body);
+  const n = await noteCount("closed-to-borrow");
   check(
-    "4  summary counts markets closed to new borrowing",
-    m != null && Number(m[1]) === closedToBorrow,
-    `page ${m?.[1] ?? "(none)"} vs route ${closedToBorrow}`,
+    "4  head note counts markets closed to new borrowing",
+    n === closedToBorrow,
+    `page ${n ?? "(none)"} vs route ${closedToBorrow}`,
   );
 }
 
-// ── 5. Control: a real cap still states its share ─────────────────────────
+// ── 5. Control: a real cap states its share and the cap on the market's page ──
 {
-  const t = await cardText(realSupply);
+  const key = realSupply.underlying.toLowerCase();
+  const keyed =
+    ms.filter((m) => m.underlying?.toLowerCase() === key).length === 1 ? key : realSupply.mToken.toLowerCase();
+  await page.goto(`${BASE}${MARKETS}/${keyed}`, NAV);
+  await page.locator("[data-reserve-parameters]").first().waitFor({ timeout: PAGE_TIMEOUT_MS });
+  const t = norm(await page.locator("[data-reserve-parameters]").first().textContent());
   check(
-    `5  ${realSupply.underlyingSymbol} card: real supply cap states its share`,
-    new RegExp(`supply cap [\\d,.]+ ${realSupply.underlyingSymbol} · \\d+\\.\\d% used`).test(t),
-    t.slice(t.indexOf("supply cap"), t.indexOf("supply cap") + 60),
+    `5  ${realSupply.underlyingSymbol} page: supply cap states its share and the cap`,
+    new RegExp(`Supply cap\\s*\\d+(\\.\\d)?% of [\\d.,]+[KMB]? ${realSupply.underlyingSymbol}`).test(t),
+    t.slice(t.indexOf("Supply cap"), t.indexOf("Supply cap") + 50),
   );
 }
 

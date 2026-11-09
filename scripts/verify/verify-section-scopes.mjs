@@ -18,7 +18,8 @@
 // Aave vault families, a Yearn vault, the four family rosters, and the Aave
 // family's market rosters, market pages and reserve pages, Dolomite's
 // markets page, f(x)'s pools roster and a pool's page, and Compound V3's
-// markets roster and a Comet's page on each chain.
+// markets roster and a Comet's page on each chain, and Compound V2's and
+// Moonwell's markets pages with one market's page each.
 //
 // Run:  npm run verify:preflight -- --warm <the pages>
 //       BASE=http://localhost:3078 node scripts/verify/verify-section-scopes.mjs
@@ -65,6 +66,14 @@ const ALL_PAGES = [
   "/base/compound-v3/markets/weth",
   "/arbitrum/compound-v3/markets",
   "/arbitrum/compound-v3/markets/usdc",
+  // The Comptroller family's one-market explorers (R2) and a market's page
+  // (R3) on each: Compound V2's USDC, Moonwell's USDC on Ethereum and Base.
+  "/ethereum/compound-v2/markets",
+  "/ethereum/compound-v2/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+  "/ethereum/moonwell/markets",
+  "/ethereum/moonwell/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+  "/base/moonwell/markets",
+  "/base/moonwell/markets/0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
 ];
 const PAGES = process.env.PAGES ? process.env.PAGES.split(",").map((p) => p.trim()) : ALL_PAGES;
 
