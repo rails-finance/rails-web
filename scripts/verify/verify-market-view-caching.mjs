@@ -29,7 +29,9 @@ const base = process.env.BASE ?? `http://localhost:${PORT}`;
  *  own figures are on screen — the four Aave-family pages fetch client-side, so
  *  their table arrives after first paint. */
 const VIEWS = [
-  { path: "/ethereum/aave-v3/markets", client: true },
+  // The overview (M4) draws three panels of three figures; its chain-snapshot
+  // lines' block numbers, once counted here, are in the read stamp's receipt.
+  { path: "/ethereum/aave-v3/markets", client: true, minFigures: 9 },
   { path: "/ethereum/spark/markets", client: true },
   { path: "/ethereum/compound-v2/markets" },
   { path: "/ethereum/compound-v3/markets" },
@@ -109,7 +111,11 @@ for (const view of VIEWS) {
 
   const figures = text.match(FIGURE)?.length ?? 0;
   const broke = /Couldn.t read the market from chain|could not be read from chain/i.test(text);
-  check(`${view.path}: renders its figures`, figures >= 10 && !broke, `${figures} formatted figures`);
+  check(
+    `${view.path}: renders its figures`,
+    figures >= (view.minFigures ?? 10) && !broke,
+    `${figures} formatted figures`,
+  );
 }
 
 // ── C — the market routes declare a shared-cache TTL ─────────────────────────
