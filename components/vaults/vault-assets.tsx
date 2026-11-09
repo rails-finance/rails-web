@@ -12,8 +12,8 @@
 // From sm every row is two lines, 64px (D1 `rowHeight="two"`): the venue over its
 // sub-label, each truncating with its full text in a `title` where it is
 // text. Amount carries the asset's mark (`AssetUnit`). A venue opens Rails's
-// page for it where there is one (a Morpho market, an Aave reserve, a Yearn
-// vault), else it is text; its contract and ids are the venue's receipt. The
+// page for it where there is one (a Morpho market, an Aave reserve, a Yearn or
+// MetaMorpho vault), else it is text; its contract and ids are the venue's receipt. The
 // section's ⋮ carries the Rails pages for the whole table, the exports and
 // "Inspect provenance" on this section alone (components/shared/section-menu.tsx).
 // Below sm each row is a card (D6): the venue across, Amount and Share two-up

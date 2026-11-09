@@ -23,7 +23,6 @@ import { StatAmount } from "@/components/vaults/stat-amount";
 import { yearnVaultPageSummary } from "@/lib/vaults/summary";
 import { vaultVenueProv, vaultVenueShareProv } from "@/lib/vaults/card-provenance";
 import { vaultAssetsExports, type VaultExportModel } from "@/lib/vaults/card-export";
-import { yearnVaultHref } from "@/lib/vaults/routes";
 import { YEARN_REGISTRY } from "@/lib/yearn/vault-catalog";
 import {
   SHARES_ISSUED_TIP,
@@ -75,11 +74,12 @@ export function YearnVaultPage({
   data,
   yieldFigure: storeYield,
   strip,
-  pagedStrategies = [],
+  strategyPages = {},
 }: {
   data: YearnVaultResponse;
-  /** The strategies that are Yearn vaults with a page of their own here. */
-  pagedStrategies?: string[];
+  /** Rails's page for each strategy that is a roster vault (a Yearn V3 vault,
+   *  a MetaMorpho vault on Ethereum), by lowercased address. */
+  strategyPages?: Record<string, string>;
   yieldFigure?: VaultYield;
   /** The store's three daily series for the strip (V5); null where it did not answer. */
   strip: VaultStripSeries | null;
@@ -207,7 +207,6 @@ export function YearnVaultPage({
     },
   ];
 
-  const paged = new Set(pagedStrategies.map((a) => a.toLowerCase()));
   const queueDebt = data.strategies.reduce((acc, s) => acc + BigInt(s.currentDebt?.raw ?? "0"), BigInt(0));
   const outside = y.totalDebt == null ? null : BigInt(y.totalDebt.raw) - queueDebt;
   const amount = (raw: bigint): RawAmount => ({ raw: raw.toString(), value: Number(raw) / Math.pow(10, ad) });
@@ -225,7 +224,7 @@ export function YearnVaultPage({
     ...data.strategies.map((s) => ({
       key: s.address,
       venue: s.name ?? shortAddress(s.address),
-      ...(paged.has(s.address.toLowerCase()) ? { href: yearnVaultHref(s.address) } : {}),
+      ...(strategyPages[s.address.toLowerCase()] ? { href: strategyPages[s.address.toLowerCase()] } : {}),
       venueProv: vaultVenueProv(
         v,
         {
