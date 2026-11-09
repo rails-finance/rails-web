@@ -896,23 +896,9 @@ check(
   `${OTHER_SERVED} status ${res9c?.status()}`,
 );
 
-// ── 10: the caveat ──────────────────────────────────────────────────────────
-// It rides with the exposure section, so it is read on a page that has one: the
-// largest holder where there is one, and the no-shares reading where there is
-// not — the caveat must be there either way.
-await page.goto(href(LARGEST ?? NO_SHARES), { waitUntil: "domcontentloaded" });
-// ui-jobs 407 step 4: the caveat box is gone; the holder card's (i) carries
-// one sentence on how the slice is attributed, and each row's receipt the rest.
-await page.waitForSelector("[data-position-card]", { timeout: 120_000 });
-const caveatLoc = page.locator("[data-attribution-explanation]");
-const caveat = (await caveatLoc.count()) ? ((await caveatLoc.first().textContent()) ?? "").replace(/\s+/g, " ") : "";
-if (LARGEST == null) skip("10 the card's (i) says how the slice is attributed", "no holder at this block");
-else
-  check(
-    "10 the card's (i) says how the slice is attributed",
-    caveat.includes("share of the vault") && caveat.includes("each market"),
-    caveat.slice(0, 200) || "(no attribution sentence)",
-  );
+// 10 (the card's attribution sentence, `[data-attribution-explanation]`) retired
+// with the holder card's Claim by market (V8, ui-jobs 553): the plain card draws
+// no per-market slice to attribute; 5h and 5i keep the served attribution.
 
 await browser.close();
 console.log(

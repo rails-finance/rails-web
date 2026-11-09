@@ -828,6 +828,13 @@ async function readPage(vault, holder, { expandRows = false } = {}) {
     // The holder card's Cooldown line, its label and its value.
     holderCooldownText: await text("[data-position-card] p:has([data-figure='holder-cooldown'])"),
     bodyText: (await page.locator("body").innerText()).replace(/\s+/g, " "),
+    // The vault's readout (V7, ui-jobs 553) states the vault's 30-day yield as a
+    // yearly rate (decision 0047); 8b reads the rest of the page.
+    bodyTextOutsideReadout: await page.evaluate(() => {
+      const readout = document.querySelector("[data-vault-health]");
+      const t = document.body.innerText;
+      return (readout ? t.replace(readout.innerText, " ") : t).replace(/\s+/g, " ");
+    }),
     cardStatus: await attr("[data-position-card]", "data-status"),
     timelineText: (await page.locator("[data-vault-timeline]").count())
       ? (await page.locator("[data-vault-timeline]").first().innerText()).replace(/\s+/g, " ")
@@ -1634,12 +1641,12 @@ for (const f of FIXTURES) {
     bad8a.push(
       `${short(f.vault)}/${short(f.holder)}: ${figures.length} dollar figure(s) (${figures.join(", ") || "none"}) on a ${p.cardStatus ?? "?"} card${suffix ? `; "${suffix[0]}"` : ""}`,
     );
-  const ret = p.bodyText.match(RETURN_RE);
+  const ret = p.bodyTextOutsideReadout.match(RETURN_RE);
   if (ret) bad8b.push(`${short(f.vault)}/${short(f.holder)}: "${ret[0]}"`);
 }
 check("8a no sampled page carries a dollar figure", bad8a.length === 0, bad8a.join(", ") || `${FIXTURES.length} pages`);
 check(
-  "8b no APY, no annualised figure and no rate of return",
+  "8b no APY, no annualised figure and no rate of return outside the vault's readout",
   bad8b.length === 0,
   bad8b.join(", ") || `${FIXTURES.length} pages`,
 );
