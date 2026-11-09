@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Ban } from "lucide-react";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { readStampProv } from "@/components/shared/read-stamp";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
 import { CLASS_ORDER } from "@/components/shared/aave-reserve-parts";
@@ -24,9 +24,10 @@ import { MarketPage } from "@/components/shared/product/market-page";
 import { MarketRoster } from "@/components/shared/product/market-roster";
 import { positionEntry } from "@/components/shared/product/position-entry";
 import { PricesProvider, usePrices, useRequestPrices } from "@/lib/shared/prices-context";
+import { listSymbols, NO_PRICE_HINT } from "@/lib/aave-v4/unpriced";
 import { fetchAaveV4Hubs } from "@/lib/api/fetch-aave-v4-hubs";
 import { useV4Heads, type V4Read, type V4ReserveHead } from "@/lib/api/fetch-aave-v4-reserve";
-import { AAVE_V4_BASE_API_ROOT } from "@/lib/aave-v4/deployment-routes";
+import { AAVE_V4_BASE_API_ROOT, AAVE_V4_ORACLE_ROUTE } from "@/lib/aave-v4/deployment-routes";
 import { aaveV4Modal, aaveV4PositionModal } from "@/lib/aave-v4/event-templates";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { ASSET_CLASS_COLOR, ASSET_CLASS_TITLE } from "@/lib/aave-v4/asset-class";
@@ -34,6 +35,8 @@ import {
   andList,
   hubsHref,
   marketsHref,
+  priceBook,
+  pricedSum,
   reserveHref,
   settleHead,
   spokeHref,
@@ -41,7 +44,10 @@ import {
   storedFromBase,
   storedFromHubs,
   V4_HUB_LABEL,
+  type PricedSum,
   type V4BaseReserves,
+  type V4Price,
+  type V4PriceBook,
   type V4Deployment,
   type V4HubKey,
   type V4Line,
@@ -56,6 +62,7 @@ import {
   headValueProv,
   liquidationConfigProv,
   positionsProv,
+  pricedAmountProv,
   reserveCountProv,
   spokeValueProv,
   storedAmountProv,
@@ -146,8 +153,59 @@ function storedReadAt(s: V4Stored, what: string) {
   };
 }
 
-/** A line's price: Base's stored oracle price, else the market feed. */
-const priceOf = (l: V4Line, prices: Record<string, number>) => l.base?.price ?? prices[l.underlying] ?? null;
+/** The deployment's price book: the spoke oracle's prices (Ethereum: `/api/oracle/aave-v4`;
+ *  Base: stored with each row), the market feed (DefiLlama) only for an asset the oracle
+ *  holds none for. Null until the oracle read settles, so no figure shows at a feed price
+ *  first and moves to the oracle's after. Call under a `PricesProvider`. */
+export function useV4PriceBook(s: V4Stored | null): V4PriceBook | null {
+  const eth = s?.d.chain === "ethereum";
+  const [oracle, setOracle] = useState<
+    { prices: Record<string, { usd: number }>; block: number | null } | null | "failed"
+  >(null);
+  useEffect(() => {
+    if (!eth) return;
+    let live = true;
+    fetch(AAVE_V4_ORACLE_ROUTE)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((b: { success?: boolean; prices?: Record<string, { usd: number }>; blockNumber?: number } | null) => {
+        if (!live) return;
+        setOracle(b?.success && b.prices ? { prices: b.prices, block: b.blockNumber ?? null } : "failed");
+      })
+      .catch(() => live && setOracle("failed"));
+    return () => {
+      live = false;
+    };
+  }, [eth]);
+  const held = oracle && oracle !== "failed" ? oracle : null;
+  const missing = useMemo(
+    () => (s && eth && oracle ? [...new Set(s.lines.map((l) => l.underlying))].filter((a) => !held?.prices[a]) : []),
+    [s, eth, oracle, held],
+  );
+  useRequestPrices(missing);
+  const market = usePrices();
+  return useMemo(() => {
+    if (!s) return null;
+    if (eth && oracle == null) return null;
+    return priceBook(s, held, market);
+  }, [s, eth, oracle, held, market]);
+}
+
+/** A USD total, with what it leaves out under it. */
+export function PricedTotal({ sum, info }: { sum: PricedSum; info: Provenance }) {
+  const t = fmtUsd(sum.usd);
+  return (
+    <>
+      <Prov info={info}>
+        <span title={t.title}>{t.display}</span>
+      </Prov>
+      {sum.unpriced.length > 0 && (
+        <span className="block text-[11px] font-normal text-rb-500" data-prov-exempt="" data-total-partial="">
+          leaves out {listSymbols(sum.unpriced)}: {NO_PRICE_HINT}
+        </span>
+      )}
+    </>
+  );
+}
 
 /** "Draws from the Core and Prime hubs", each hub linking the Hubs page. */
 export function StructureLine({ d, hubs }: { d: V4Deployment; hubs: V4HubKey[] }) {
@@ -196,18 +254,19 @@ function spokeLinks(d: V4Deployment, sp: V4Spoke, roster: boolean): SectionMenuL
 
 interface RosterSpoke {
   sp: V4Spoke;
-  supplied: number;
-  borrowed: number;
+  supplied: PricedSum;
+  borrowed: PricedSum;
 }
 
-function rosterOf(s: V4Stored, prices: Record<string, number>): RosterSpoke[] {
+function rosterOf(s: V4Stored, book: V4PriceBook): RosterSpoke[] {
+  const sum = (sp: V4Spoke, side: "supplied" | "borrowed") =>
+    pricedSum(
+      sp.lines.map((l) => ({ underlying: l.underlying, symbol: l.symbol, tokens: l[side] })),
+      book,
+    );
   return s.spokes
-    .map((sp) => ({
-      sp,
-      supplied: sp.lines.reduce((a, l) => a + l.supplied * (priceOf(l, prices) ?? 0), 0),
-      borrowed: sp.lines.reduce((a, l) => a + l.borrowed * (priceOf(l, prices) ?? 0), 0),
-    }))
-    .sort((a, b) => b.supplied - a.supplied);
+    .map((sp) => ({ sp, supplied: sum(sp, "supplied"), borrowed: sum(sp, "borrowed") }))
+    .sort((a, b) => b.supplied.usd - a.supplied.usd);
 }
 
 function rosterMarkdown(r: RosterSpoke, s: V4Stored): string {
@@ -217,8 +276,8 @@ function rosterMarkdown(r: RosterSpoke, s: V4Stored): string {
     ...(purposeOf(r.sp.name) ? [purposeOf(r.sp.name)!, ""] : []),
     `- Draws from: ${andList(r.sp.hubs.map((h) => V4_HUB_LABEL[h]))}`,
     `- Reserves: ${r.sp.lines.length}`,
-    `- Supplied: ${fmtUsd(r.supplied).display}`,
-    `- Borrowed: ${fmtUsd(r.borrowed).display}`,
+    `- Supplied: ${fmtUsd(r.supplied.usd).display}${r.supplied.unpriced.length ? ` (leaves out ${listSymbols(r.supplied.unpriced)})` : ""}`,
+    `- Borrowed: ${fmtUsd(r.borrowed.usd).display}${r.borrowed.unpriced.length ? ` (leaves out ${listSymbols(r.borrowed.unpriced)})` : ""}`,
     ...(r.sp.positions != null ? [`- Positions: ${r.sp.positions.toLocaleString("en-US")}`] : []),
     "",
     s.block != null ? `Stored from the hub contracts at block ${s.block.toLocaleString("en-US")}.` : "",
@@ -229,9 +288,8 @@ function rosterHead(s: V4Stored, r: RosterSpoke): ProductHead {
   const { sp } = r;
   const d = s.d;
   const c = coordsOf(s);
-  const priced = d.chain === "base" ? "oracle" : "offchain";
-  const sup = fmtUsd(r.supplied);
-  const bor = fmtUsd(r.borrowed);
+  const sup = fmtUsd(r.supplied.usd);
+  const bor = fmtUsd(r.borrowed.usd);
   const listing = spokePositionsHref(d, sp.key);
   const entries = [
     { label: `View ${sp.name} reserves`, href: spokeHref(d, sp.slug), hooks: { "data-market-reserves-link": "" } },
@@ -247,13 +305,13 @@ function rosterHead(s: V4Stored, r: RosterSpoke): ProductHead {
       slot: "sizeIn",
       label: "Supplied",
       tip: sup.title,
-      value: <Prov info={storedValueProv("supplied", sp.name, c, priced)}>{sup.display}</Prov>,
+      value: <PricedTotal sum={r.supplied} info={storedValueProv("supplied", sp.name, c, r.supplied)} />,
     },
     {
       slot: "sizeOut",
       label: "Borrowed",
       tip: bor.title,
-      value: <Prov info={storedValueProv("borrowed", sp.name, c, priced)}>{bor.display}</Prov>,
+      value: <PricedTotal sum={r.borrowed} info={storedValueProv("borrowed", sp.name, c, r.borrowed)} />,
     },
     ...(sp.positions != null
       ? [
@@ -305,16 +363,17 @@ function rosterHead(s: V4Stored, r: RosterSpoke): ProductHead {
 function RosterBody({ d }: { d: V4Deployment }) {
   const stored = useV4Stored(d);
   const s = stored.state === "ok" ? stored.data : null;
-  useRequestPrices(s && d.chain === "ethereum" ? s.lines.map((l) => l.underlying) : []);
-  const prices = usePrices();
-  const roster = useMemo(() => (s ? rosterOf(s, prices) : []), [s, prices]);
+  const book = useV4PriceBook(s);
+  const roster = useMemo(() => (s && book ? rosterOf(s, book) : []), [s, book]);
   const byKey = new Map(roster.map((r) => [r.sp.slug, r]));
   const useMarket = (k: string): Loadable<MarketModel> => {
     if (stored.state !== "ok") return stored.state === "loading" ? stored : { state: "error", message: stored.message };
-    const r = byKey.get(k)!;
+    const r = byKey.get(k);
+    if (!r) return { state: "loading" };
     return { state: "ok", data: { head: rosterHead(stored.data, r), reserves: EMPTY_TABLE } };
   };
-  const markets = s ? roster.map((r) => ({ key: r.sp.slug, name: r.sp.name })) : [{ key: "spokes", name: "Spokes" }];
+  const markets =
+    s && book ? roster.map((r) => ({ key: r.sp.slug, name: r.sp.name })) : [{ key: "spokes", name: "Spokes" }];
   return (
     <MarketRoster
       header={{ protocol: protocolOf(d), title: "Markets", learnMore: aaveV4Modal("hubs") }}
@@ -354,7 +413,19 @@ export interface V4Row {
   line: V4Line;
   f: V4ReserveFigures | null;
   names: V4Names;
+  /** This spoke's oracle price from the head read, else the deployment's price book. */
+  price: V4Price | null;
 }
+
+/** The rows' prices as a book, for their USD totals. */
+const rowBook =
+  (rows: V4Row[]): V4PriceBook =>
+  (a) =>
+    rows.find((r) => r.line.underlying === a.toLowerCase())?.price ?? null;
+
+/** A row's token amounts: the head read's, else the stored line's. */
+const rowTokens = (r: V4Row, side: "supplied" | "borrowed") =>
+  side === "supplied" ? (r.f?.spokeSupplied ?? r.line.supplied) : (r.f?.spokeBorrowed ?? r.line.borrowed);
 
 export const namesOf = (sp: V4Spoke, l: V4Line): V4Names => ({
   symbol: l.symbol,
@@ -372,6 +443,9 @@ const MUTED = "text-rb-500";
 function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): ReserveRowModel {
   const { line: l, f, names } = x;
   const key = `${l.underlying}:${l.hub}`;
+  const usd = x.price?.usd ?? null;
+  /** A head amount's receipt, revalued at the book's price where this spoke's oracle gave none. */
+  const valued = (info: Provenance) => (f?.price == null ? pricedAmountProv(info, l.symbol, x.price) : info);
   const tok = (n: number) => {
     const t = formatCompactTitled(n);
     return `${t.display} ${l.symbol}`;
@@ -379,9 +453,9 @@ function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): Reserve
   // The stored figures stand in where the head read did not answer.
   const supplied = f ? (
     (() => {
-      const a = amountText(f.spokeSupplied, f.price, l.symbol);
+      const a = amountText(f.spokeSupplied, usd, l.symbol);
       return (
-        <Prov info={headValueProv(f, "spoke", "supplied", names)}>
+        <Prov info={valued(headValueProv(f, "spoke", "supplied", names))}>
           <span title={a.title}>{a.display}</span>
         </Prov>
       );
@@ -395,9 +469,9 @@ function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): Reserve
     borrowedTokens > 0 ? (
       f ? (
         (() => {
-          const a = amountText(f.spokeBorrowed, f.price, l.symbol);
+          const a = amountText(f.spokeBorrowed, usd, l.symbol);
           return (
-            <Prov info={headValueProv(f, "spoke", "borrowed", names)}>
+            <Prov info={valued(headValueProv(f, "spoke", "borrowed", names))}>
               <span title={a.title}>{a.display}</span>
             </Prov>
           );
@@ -423,7 +497,7 @@ function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): Reserve
       —
     </span>
   );
-  const avail = f ? amountText(f.available, f.price, l.symbol) : null;
+  const avail = f ? amountText(f.available, usd, l.symbol) : null;
   const cf = f?.collateralFactor ?? l.collateralFactor;
   return {
     key,
@@ -445,14 +519,14 @@ function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): Reserve
     },
     hooks: { "data-reserve-hub": l.hub },
     cells: {
-      supplied: { sort: f ? f.spokeSupplied * (f.price ?? 0) : l.supplied, node: supplied },
-      borrowed: { sort: f ? f.spokeBorrowed * (f.price ?? 0) : l.borrowed, node: borrowed },
+      supplied: { sort: rowTokens(x, "supplied") * (usd ?? 0), node: supplied },
+      borrowed: { sort: rowTokens(x, "borrowed") * (usd ?? 0), node: borrowed },
       available: {
-        sort: f ? f.available * (f.price ?? 0) : -1,
+        sort: f ? f.available * (usd ?? 0) : -1,
         title: "The hub's liquidity, capped by what the draw cap leaves this spoke",
         node:
           f && avail && borrowable !== false ? (
-            <Prov info={availableProv(f, names)}>
+            <Prov info={valued(availableProv(f, names))}>
               <span title={avail.title}>{avail.display}</span>
             </Prov>
           ) : (
@@ -515,7 +589,7 @@ function reservesCsv(rows: V4Row[]): string {
     "collateral_factor",
     "credit_used",
   ];
-  const lines = rows.map(({ line: l, f }) =>
+  const lines = rows.map(({ line: l, f, price }) =>
     [
       l.symbol,
       l.underlying,
@@ -523,7 +597,7 @@ function reservesCsv(rows: V4Row[]): string {
       f?.spokeSupplied ?? l.supplied,
       f?.spokeBorrowed ?? l.borrowed,
       f?.available ?? "",
-      f?.price ?? "",
+      price?.usd ?? "",
       f?.supplyApr ?? "",
       f?.drawnApr ?? "",
       f?.collateralFactor ?? l.collateralFactor ?? "",
@@ -623,7 +697,7 @@ function reservesTable(d: V4Deployment, sp: V4Spoke, rows: V4Row[], c: StoredCoo
 /** "Draws from" with each hub's share of the spoke's borrowing. */
 function DrawsFrom({ d, sp, rows }: { d: V4Deployment; sp: V4Spoke; rows: V4Row[] }) {
   const owed = (h: V4HubKey) =>
-    rows.filter((r) => r.line.hub === h && r.f).reduce((a, r) => a + r.f!.spokeBorrowed * (r.f!.price ?? 0), 0);
+    rows.filter((r) => r.line.hub === h).reduce((a, r) => a + rowTokens(r, "borrowed") * (r.price?.usd ?? 0), 0);
   const total = sp.hubs.reduce((a, h) => a + owed(h), 0);
   return (
     <div data-prov-exempt="">
@@ -662,8 +736,8 @@ function LiquidationLine({ f, spoke }: { f: V4ReserveFigures; spoke: string }) {
 }
 
 function spokeMarkdown(sp: V4Spoke, rows: V4Row[], block: number): string {
-  const lines = rows.map(({ line: l, f }) => {
-    const a = (n: number) => amountText(n, f?.price ?? null, l.symbol).display;
+  const lines = rows.map(({ line: l, f, price }) => {
+    const a = (n: number) => amountText(n, price?.usd ?? null, l.symbol).display;
     return `- ${l.symbol} (${V4_HUB_LABEL[l.hub]}): supplied ${a(f?.spokeSupplied ?? l.supplied)}, borrowed ${a(f?.spokeBorrowed ?? l.borrowed)}${f?.supplyApr != null ? `, supply rate ${ratePercentText(f.supplyApr)}` : ""}${f?.drawnApr != null ? `, borrow rate ${ratePercentText(f.drawnApr)}` : ""}`;
   });
   return [
@@ -683,10 +757,16 @@ function spokeHead(d: V4Deployment, s: V4Stored, sp: V4Spoke, rows: V4Row[]): Pr
   const read = rows.filter((r) => r.f);
   const first = read[0]?.f ?? null;
   const block = Math.max(0, ...read.map((r) => r.f!.block));
-  const supplied = read.reduce((a, r) => a + r.f!.spokeSupplied * (r.f!.price ?? 0), 0);
-  const borrowed = read.reduce((a, r) => a + r.f!.spokeBorrowed * (r.f!.price ?? 0), 0);
-  const sup = fmtUsd(supplied);
-  const bor = fmtUsd(borrowed);
+  const book = rowBook(rows);
+  const sumOf = (side: "supplied" | "borrowed") =>
+    pricedSum(
+      rows.map((r) => ({ underlying: r.line.underlying, symbol: r.line.symbol, tokens: rowTokens(r, side) })),
+      book,
+    );
+  const supSum = sumOf("supplied");
+  const borSum = sumOf("borrowed");
+  const sup = fmtUsd(supSum.usd);
+  const bor = fmtUsd(borSum.usd);
   const listing = spokePositionsHref(d, sp.key);
   const contracts = first
     ? [
@@ -713,13 +793,13 @@ function spokeHead(d: V4Deployment, s: V4Stored, sp: V4Spoke, rows: V4Row[]): Pr
       slot: "sizeIn",
       label: "Supplied",
       tip: sup.title,
-      value: <Prov info={spokeValueProv(sp.name, "supplied", block, read.length)}>{sup.display}</Prov>,
+      value: <PricedTotal sum={supSum} info={spokeValueProv(sp.name, "supplied", block, read.length, supSum)} />,
     },
     {
       slot: "sizeOut",
       label: "Borrowed",
       tip: bor.title,
-      value: <Prov info={spokeValueProv(sp.name, "borrowed", block, read.length)}>{bor.display}</Prov>,
+      value: <PricedTotal sum={borSum} info={spokeValueProv(sp.name, "borrowed", block, read.length, borSum)} />,
     },
     ...(sp.positions != null
       ? [
@@ -800,28 +880,40 @@ function spokeHead(d: V4Deployment, s: V4Stored, sp: V4Spoke, rows: V4Row[]): Pr
 }
 
 /** A spoke's rows, once every head read has settled. */
-export function useSpokeRows(sp: V4Spoke | null): Loadable<V4Row[]> {
+export function useSpokeRows(sp: V4Spoke | null, book: V4PriceBook | null): Loadable<V4Row[]> {
   const qs = useMemo(() => (sp ? sp.lines.map((l) => headQuery(sp, l)) : null), [sp]);
   const heads = useV4Heads(qs);
   if (!sp) return { state: "loading" };
-  if (!heads) return { state: "loading" };
+  if (!heads || !book) return { state: "loading" };
   if (heads.every((h) => h.state !== "ok"))
     return { state: "error", message: "The head read failed for every reserve: reload to retry." };
   return {
     state: "ok",
     data: sp.lines.map((l, i) => {
       const h = heads[i] as V4Read<V4ReserveHead>;
-      return { line: l, f: h.state === "ok" ? settleHead(h.data) : null, names: namesOf(sp, l) };
+      const f = h.state === "ok" ? settleHead(h.data) : null;
+      const price: V4Price | null =
+        f?.price != null ? { usd: f.price, via: "oracle", spoke: sp.name, block: f.block } : book(l.underlying);
+      return { line: l, f, names: namesOf(sp, l), price };
     }),
   };
 }
 
 /** The spoke page: its head, then its reserves. */
 export function AaveV4SpokePage({ d, slug }: { d: V4Deployment; slug: string }) {
+  return (
+    <PricesProvider>
+      <SpokeBody d={d} slug={slug} />
+    </PricesProvider>
+  );
+}
+
+function SpokeBody({ d, slug }: { d: V4Deployment; slug: string }) {
   const stored = useV4Stored(d);
   const s = stored.state === "ok" ? stored.data : null;
   const sp = s?.spokes.find((x) => x.slug === slug) ?? null;
-  const rows = useSpokeRows(sp);
+  const book = useV4PriceBook(s);
+  const rows = useSpokeRows(sp, book);
   let market: Loadable<MarketModel>;
   if (stored.state === "error") market = stored;
   else if (!s) market = { state: "loading" };

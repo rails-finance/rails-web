@@ -33,7 +33,7 @@ import {
   DataTableHeader,
   DataTableRow,
 } from "@/components/shared/data-table/data-table";
-import { PricesProvider, usePrices, useRequestPrices } from "@/lib/shared/prices-context";
+import { PricesProvider } from "@/lib/shared/prices-context";
 import { aaveV4Modal } from "@/lib/aave-v4/event-templates";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { formatCompact } from "@/lib/shared/format-compact";
@@ -42,6 +42,7 @@ import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import {
   hubsOf,
   marketsHref,
+  pricedSum,
   reserveHref,
   spokeHref,
   V4_HUB_ORDER,
@@ -49,11 +50,13 @@ import {
   type V4Hub,
   type V4HubAsset,
   type V4Line,
+  type V4PriceBook,
   type V4Stored,
 } from "@/lib/aave-v4/markets";
 import {
   hubAssetCountProv,
   hubPositionsProv,
+  pricedAmountProv,
   storedAmountProv,
   storedRateProv,
   storedRatioProv,
@@ -63,15 +66,14 @@ import {
   type StoredCoords,
 } from "@/lib/aave-v4/market-provenance";
 import { pctText } from "@/components/protocol/aave-v4/aave-v4-market-parts";
-import { protocolOf, useV4Stored } from "@/lib/aave-v4/product";
+import { PricedTotal, protocolOf, useV4PriceBook, useV4Stored } from "@/lib/aave-v4/product";
 import type { HeadFigure, ProductHead } from "@/lib/shared/product/model";
 
 const NUM = "whitespace-nowrap tabular-nums text-[13px]";
 const MUTED = "text-rb-500";
-type Prices = Record<string, number>;
+type Prices = V4PriceBook;
 
-const priceOf = (l: { underlying: string; base?: { price: number } }, prices: Prices) =>
-  l.base?.price ?? prices[l.underlying] ?? null;
+const priceOf = (l: { underlying: string }, book: Prices) => book(l.underlying)?.usd ?? null;
 
 function usd(tokens: number, price: number | null, symbol: string): { display: string; title: string } {
   if (tokens === 0) return { display: price != null ? "$0" : `0 ${symbol}`, title: "None" };
@@ -97,11 +99,18 @@ function readAtOf(s: V4Stored, what: string) {
 
 function hubHead(s: V4Stored, h: V4Hub, prices: Prices): ProductHead {
   const c: StoredCoords = { chainId: s.d.chainId, block: s.block };
-  const priced = s.d.chain === "base" ? "oracle" : "offchain";
-  const supplied = h.assets.reduce((a, x) => a + x.supplied * (priceOf(x.lines[0], prices) ?? 0), 0);
-  const borrowed = h.assets.reduce((a, x) => a + x.borrowed * (priceOf(x.lines[0], prices) ?? 0), 0);
+  const sumOf = (side: "supplied" | "borrowed") =>
+    pricedSum(
+      h.assets.map((x) => ({ underlying: x.underlying, symbol: x.symbol, tokens: x[side] })),
+      prices,
+    );
+  const supSum = sumOf("supplied");
+  const borSum = sumOf("borrowed");
+  const supplied = supSum.usd;
+  const borrowed = borSum.usd;
   const sup = fmtUsd(supplied);
   const bor = fmtUsd(borrowed);
+  const partial = supSum.unpriced.length > 0 || borSum.unpriced.length > 0;
   const n = h.spokes.length;
   const figures: HeadFigure[] = [
     {
@@ -113,15 +122,15 @@ function hubHead(s: V4Stored, h: V4Hub, prices: Prices): ProductHead {
       slot: "sizeIn",
       label: "Supplied",
       tip: sup.title,
-      value: <Prov info={storedValueProv("supplied", `The ${h.label} hub`, c, priced)}>{sup.display}</Prov>,
+      value: <PricedTotal sum={supSum} info={storedValueProv("supplied", `The ${h.label} hub`, c, supSum)} />,
     },
     {
       slot: "sizeOut",
       label: "Borrowed",
       tip: bor.title,
-      value: <Prov info={storedValueProv("borrowed", `The ${h.label} hub`, c, priced)}>{bor.display}</Prov>,
+      value: <PricedTotal sum={borSum} info={storedValueProv("borrowed", `The ${h.label} hub`, c, borSum)} />,
     },
-    ...(supplied > 0
+    ...(supplied > 0 && !partial
       ? [
           {
             slot: "usage" as const,
@@ -229,7 +238,8 @@ const capText = (cap: number | null, symbol: string) =>
 
 function CreditLines({ s, a, prices }: { s: V4Stored; a: V4HubAsset; prices: Prices }) {
   const c: StoredCoords = { chainId: s.d.chainId, block: s.block };
-  const price = priceOf(a.lines[0], prices);
+  const p = prices(a.underlying);
+  const price = p?.usd ?? null;
   return (
     <DataTable
       label={`${a.symbol} credit lines`}
@@ -263,7 +273,7 @@ function CreditLines({ s, a, prices }: { s: V4Stored; a: V4HubAsset; prices: Pri
                 <Prov info={storedAmountProv("add cap", scope, c)}>{capText(l.addCap, a.symbol)}</Prov>
               </DataTableCell>
               <DataTableCell align="right" className={NUM}>
-                <Prov info={storedAmountProv("supplied", scope, c)}>
+                <Prov info={pricedAmountProv(storedAmountProv("supplied", scope, c), a.symbol, p)}>
                   <span title={sup.title}>{sup.display}</span>
                 </Prov>
               </DataTableCell>
@@ -271,7 +281,7 @@ function CreditLines({ s, a, prices }: { s: V4Stored; a: V4HubAsset; prices: Pri
                 <Prov info={storedAmountProv("draw cap", scope, c)}>{capText(l.drawCap, a.symbol)}</Prov>
               </DataTableCell>
               <DataTableCell align="right" className={NUM}>
-                <Prov info={storedAmountProv("borrowed", scope, c)}>
+                <Prov info={pricedAmountProv(storedAmountProv("borrowed", scope, c), a.symbol, p)}>
                   <span title={drawn.title}>{drawn.display}</span>
                 </Prov>
               </DataTableCell>
@@ -304,7 +314,8 @@ function AssetRow({ s, h, a, prices }: { s: V4Stored; h: V4Hub; a: V4HubAsset; p
   const registry = useReceiptRegistry();
   const c: StoredCoords = { chainId: s.d.chainId, block: s.block };
   const scope = `${a.symbol} on the ${h.label} hub`;
-  const price = priceOf(a.lines[0], prices);
+  const p = prices(a.underlying);
+  const price = p?.usd ?? null;
   const cell = (node: ReactNode, label: string) => (
     <DataTableCell align="right" className={NUM} label={label}>
       {node}
@@ -313,7 +324,7 @@ function AssetRow({ s, h, a, prices }: { s: V4Stored; h: V4Hub; a: V4HubAsset; p
   const amount = (what: "supplied" | "borrowed" | "liquidity", tokens: number) => {
     const v = usd(tokens, price, a.symbol);
     return (
-      <Prov info={storedAmountProv(what, scope, c)}>
+      <Prov info={pricedAmountProv(storedAmountProv(what, scope, c), a.symbol, p)}>
         <span title={v.title}>{v.display}</span>
       </Prov>
     );
@@ -492,19 +503,18 @@ function Matrix({ s }: { s: V4Stored }) {
 function HubsBody({ d }: { d: V4Deployment }) {
   const stored = useV4Stored(d);
   const s = stored.state === "ok" ? stored.data : null;
-  useRequestPrices(s && d.chain === "ethereum" ? s.lines.map((l) => l.underlying) : []);
-  const prices = usePrices();
+  const prices = useV4PriceBook(s);
   const hubs = useMemo(() => (s ? hubsOf(s) : []), [s]);
   let body: ReactNode;
-  if (stored.state === "loading") body = <SkeletonBlock height={480} />;
+  if (stored.state === "loading" || (stored.state === "ok" && !prices)) body = <SkeletonBlock height={480} />;
   else if (stored.state === "error") body = <ProductFailed what="the hubs" message={stored.message} />;
   else
     body = (
       <>
         {hubs.map((h) => (
           <div key={h.key} id={`hub-${h.key}`} className="mb-10 scroll-mt-20" data-hub={h.key}>
-            <ProductHeadSection head={hubHead(stored.data, h, prices)} className="mb-0" />
-            <HubAssets s={stored.data} h={h} prices={prices} />
+            <ProductHeadSection head={hubHead(stored.data, h, prices!)} className="mb-0" />
+            <HubAssets s={stored.data} h={h} prices={prices!} />
           </div>
         ))}
         <ProvSection scope="hub-matrix" className="mb-8" data-hub-matrix-section="">

@@ -520,3 +520,66 @@ export function hubsOf(s: V4Stored): V4Hub[] {
     ];
   });
 }
+
+// ── Prices ───────────────────────────────────────────────────────────────────
+// Every USD figure prices a token at the spoke oracle's getReservePrice where
+// one is held (Ethereum: `/api/oracle/aave-v4`; Base: the stored row), and at
+// the off-chain market feed (DefiLlama) only where the oracle holds none. An
+// asset with neither is unpriced: it joins no USD total, and the total says so.
+
+export interface V4Price {
+  usd: number;
+  via: "oracle" | "market";
+  /** A spoke listing the asset, whose oracle answers for it (oracle prices). */
+  spoke?: string;
+  block?: number | null;
+}
+
+export type V4PriceBook = (underlying: string) => V4Price | null;
+
+export function priceBook(
+  s: V4Stored,
+  oracle: { prices: Record<string, { usd: number }>; block: number | null } | null,
+  market: Record<string, number>,
+): V4PriceBook {
+  const spokeOf = new Map<string, string>();
+  for (const sp of [...s.spokes].sort((a, b) => a.name.localeCompare(b.name)))
+    for (const l of sp.lines) if (!spokeOf.has(l.underlying)) spokeOf.set(l.underlying, sp.name);
+  const base = new Map(s.lines.filter((l) => l.base).map((l) => [l.underlying, l.base!]));
+  return (underlying) => {
+    const a = underlying.toLowerCase();
+    const b = base.get(a);
+    if (b) return { usd: b.price, via: "oracle", spoke: spokeOf.get(a), block: b.block };
+    const o = oracle?.prices[a]?.usd;
+    if (o != null && Number.isFinite(o)) return { usd: o, via: "oracle", spoke: spokeOf.get(a), block: oracle?.block };
+    const m = market[a];
+    return m != null && Number.isFinite(m) ? { usd: m, via: "market" } : null;
+  };
+}
+
+/** A USD total over token amounts: the priced part, and what it leaves out. */
+export interface PricedSum {
+  usd: number;
+  /** Symbols priced at the market feed. */
+  market: string[];
+  /** Symbols with a balance and no price, left out of `usd`. */
+  unpriced: string[];
+}
+
+export function pricedSum(
+  items: { underlying: string; symbol: string; tokens: number }[],
+  book: V4PriceBook,
+): PricedSum {
+  const out: PricedSum = { usd: 0, market: [], unpriced: [] };
+  for (const it of items) {
+    if (it.tokens <= 0) continue;
+    const p = book(it.underlying);
+    if (!p) {
+      if (!out.unpriced.includes(it.symbol)) out.unpriced.push(it.symbol);
+      continue;
+    }
+    out.usd += it.tokens * p.usd;
+    if (p.via === "market" && !out.market.includes(it.symbol)) out.market.push(it.symbol);
+  }
+  return out;
+}

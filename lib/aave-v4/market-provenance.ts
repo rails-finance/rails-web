@@ -16,7 +16,7 @@
 // the page.
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
-import type { V4ReserveFigures } from "@/lib/aave-v4/markets";
+import type { PricedSum, V4Price, V4ReserveFigures } from "@/lib/aave-v4/markets";
 
 const STORED_ETH = "GET /api/aave-v4/hubs";
 const STORED_BASE = "GET /api/aave-v4-base/reserves";
@@ -82,35 +82,97 @@ export const hubPositionsProv = (hub: string, c: StoredCoords): Provenance => ({
   via: `${storedLane(c)} · position table · counted per home hub`,
 });
 
+const list = (xs: string[]) =>
+  xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+
+const usdText = (x: number) => `$${x.toLocaleString("en-US", { maximumFractionDigits: 6 })}`;
+
+/** The price leaf of a USD figure: the spoke oracle, or the market feed where the oracle holds none. */
+function priceLeaf(symbol: string, p: V4Price): ProvInput {
+  return p.via === "oracle"
+    ? {
+        label: "price",
+        value: usdText(p.usd),
+        kind: "chain",
+        pclass: "oracle",
+        note: `the spoke oracle's getReservePrice${p.spoke ? `, as the ${p.spoke} spoke's oracle answers it` : ""}${p.block != null ? ` at block ${n(p.block)}` : ""}; every spoke listing ${symbol} points at the same source`,
+      }
+    : {
+        label: "price",
+        value: usdText(p.usd),
+        kind: "offchain",
+        pclass: "offchain",
+        note: `an off-chain market feed (DefiLlama): the spoke oracle holds no price for ${symbol}`,
+      };
+}
+
 /** A total of stored amounts valued in USD: a spoke's or a hub's supplied or borrowed. */
 export function storedValueProv(
   side: "supplied" | "borrowed",
   scope: string,
   c: StoredCoords,
-  priced: "offchain" | "oracle",
+  sum: PricedSum,
 ): Provenance {
   const getter = side === "supplied" ? "getSpokeAddedAssets" : "getSpokeTotalOwed";
   const words =
     side === "supplied"
-      ? "what suppliers have added (Aave's added assets)"
-      : "what borrowers owe, drawn and premium, with interest";
-  const price =
-    priced === "oracle"
-      ? "the spoke oracle's price stored with the row"
-      : "an off-chain market price (DefiLlama), so the dollar figure is as firm as that feed";
+      ? "What suppliers have added (Aave's added assets)"
+      : "What borrowers owe, drawn and premium, with interest";
+  const one = sum.market.length === 1;
+  const market = sum.market.length
+    ? ` ${list(sum.market)} ${one ? "has" : "have"} no oracle price and ${one ? "is" : "are"} valued at an off-chain market feed (DefiLlama).`
+    : "";
+  const gap = sum.unpriced.length ? ` The total leaves out ${list(sum.unpriced)}, which no price source holds.` : "";
+  const inputs: ProvInput[] = [
+    { label: "amount", kind: "chain", pclass: "indexed", note: `the hub's ${getter}, stored` },
+    {
+      label: "price",
+      kind: "chain",
+      pclass: "oracle",
+      note: "the spoke oracle's getReservePrice (GET /api/oracle/aave-v4; on Base, stored with the row)",
+    },
+  ];
+  if (sum.market.length)
+    inputs.push({
+      label: "market price",
+      value: list(sum.market),
+      kind: "offchain",
+      pclass: "offchain",
+      note: "DefiLlama, where the oracle holds none",
+    });
+  if (sum.unpriced.length)
+    inputs.push({
+      label: "left out",
+      value: list(sum.unpriced),
+      kind: "offchain",
+      pclass: "offchain",
+      note: "no price source",
+    });
   return {
-    kind: priced === "oracle" ? "chain-derived" : "derived",
-    pclass: priced === "oracle" ? "indexed" : "offchain",
+    kind: sum.market.length ? "derived" : "chain-derived",
+    pclass: sum.market.length ? "offchain" : "oracle",
     source: { block: c.block ?? undefined },
-    summary: `${scope} ${side}. ${words[0].toUpperCase()}${words.slice(1)}, from the hub's line for each spoke and asset${atStored(c)}, each amount valued at ${price}, then added up.`,
-    via: `${storedLane(c)} · hub ${getter}(assetId, spoke) per line · × price · summed`,
+    summary: `${scope} ${side}${sum.unpriced.length ? " (partial)" : ""}. ${words}, from the hub's line for each spoke and asset${atStored(c)}, each amount valued at the spoke oracle's price, then added up.${market}${gap}`,
+    via: `${storedLane(c)} · hub ${getter}(assetId, spoke) per line · × spoke oracle getReservePrice · summed`,
     formula: "Σ (amount × price)",
-    inputs: [
-      { label: "amount", kind: "chain", pclass: "indexed", note: `the hub's ${getter}, stored` },
-      priced === "oracle"
-        ? { label: "price", kind: "chain", pclass: "oracle", note: "the spoke oracle's getReservePrice, stored" }
-        : { label: "price", kind: "offchain", pclass: "offchain", note: "an off-chain market feed (DefiLlama)" },
-    ],
+    inputs,
+  };
+}
+
+/** A token amount's receipt, revalued in USD at its price. */
+export function pricedAmountProv(amount: Provenance, symbol: string, p: V4Price | null): Provenance {
+  if (!p) return amount;
+  const oracle = p.via === "oracle";
+  const [head, ...rest] = amount.summary.split(". ");
+  const body = rest.join(". ");
+  return {
+    ...amount,
+    kind: oracle ? "chain-derived" : "derived",
+    pclass: oracle ? "oracle" : "offchain",
+    summary: `${head}, in USD. ${body} Valued at ${oracle ? "the spoke oracle's price" : "an off-chain market price (DefiLlama), the oracle holding none"}.`,
+    via: `${amount.via} · × ${oracle ? "spoke oracle getReservePrice" : "DefiLlama price"}`,
+    formula: "amount × price",
+    inputs: [{ label: "amount", kind: "chain", pclass: "indexed", note: amount.via }, priceLeaf(symbol, p)],
   };
 }
 
@@ -261,13 +323,23 @@ export function headValueProv(
 }
 
 /** A sum of head amounts over a spoke's reserves. */
-export function spokeValueProv(spoke: string, what: "supplied" | "borrowed", block: number, count: number): Provenance {
+export function spokeValueProv(
+  spoke: string,
+  what: "supplied" | "borrowed",
+  block: number,
+  count: number,
+  sum: PricedSum,
+): Provenance {
   const call = what === "supplied" ? "getSpokeAddedAssets" : "getSpokeTotalOwed";
+  const market = sum.market.length
+    ? ` ${list(sum.market)} had no price from the spoke's oracle and ${sum.market.length === 1 ? "is" : "are"} valued at an off-chain market feed (DefiLlama).`
+    : "";
+  const gap = sum.unpriced.length ? ` The total leaves out ${list(sum.unpriced)}, which no price source holds.` : "";
   return {
-    kind: "chain-derived",
-    pclass: "oracle",
+    kind: sum.market.length ? "derived" : "chain-derived",
+    pclass: sum.market.length ? "offchain" : "oracle",
     source: { block },
-    summary: `${spoke} ${what}. Each of its ${count} reserves' ${what === "supplied" ? "added assets" : "owed, drawn and premium,"} on the hub it draws from, read near block ${n(block)} and valued at the spoke oracle's price, then added up.`,
+    summary: `${spoke} ${what}${sum.unpriced.length ? " (partial)" : ""}. Each of its ${count} reserves' ${what === "supplied" ? "added assets" : "owed, drawn and premium,"} on the hub it draws from, read near block ${n(block)} and valued at the spoke oracle's price, then added up.${market}${gap}`,
     via: `${HEAD} per reserve · hub ${call}(assetId, spoke) × oracle getReservePrice · summed`,
     formula: "Σ (amount × price)",
   };
