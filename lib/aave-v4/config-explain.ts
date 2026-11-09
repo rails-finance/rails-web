@@ -24,6 +24,7 @@
 //   rate curve             AssetInterestRateStrategy.sol 102–137
 
 import type { V4Change, V4ChangeSide, V4ConfigRow } from "./config-words";
+import type { ChangeGlyph, ChangeMark } from "../shared/change-mark";
 
 /** config-words.ts V4_NO_CAP: 2^40 − 1 whole tokens (Hub.sol MAX_ALLOWED_SPOKE_CAP). */
 const NO_CAP = "1099511627775";
@@ -41,11 +42,15 @@ interface V4ChangeHead {
   summary: string;
   figure?: string;
   side: V4ChangeSide;
+  /** The node's mark for this move; none, the neutral sliders. */
+  mark?: ChangeMark;
 }
 
 /** A change's head line, its figure and what it means. */
 export interface V4ChangeExplained {
   headline: string;
+  /** The node's mark: the first move's family, direction and tone. */
+  mark: ChangeMark;
   figure?: string;
   bullets: string[];
 }
@@ -220,6 +225,16 @@ const wad = (v: unknown) =>
 const dir = (a: number, b: number): Dir => (b > a ? "raised" : "lowered");
 const ZERO = "0x0000000000000000000000000000000000000000";
 
+/** A node's mark. */
+const mark = (glyph: ChangeGlyph, direction?: "up" | "down", tone?: "caution"): ChangeMark => ({
+  glyph,
+  ...(direction ? { direction } : {}),
+  ...(tone ? { tone } : {}),
+});
+const arrow = (d: Dir | string) => (d === "raised" ? "up" : d === "lowered" ? "down" : undefined);
+/** One arrow for several moves: their common direction, none where they differ. */
+const common = (ds: ("up" | "down")[]) => (ds.length && ds.every((d) => d === ds[0]) ? ds[0] : undefined);
+
 /** A cap in the head's compact form, the symbol after: "40M USDC", "no cap". */
 const capFig = (n: N, v: unknown) => (String(v) === NO_CAP ? "no cap" : `${n.compact(Number(v))} ${n.symbol}`);
 /** "40.0M → 50.0M USDC", the symbol once where both sides are tokens. */
@@ -252,7 +267,8 @@ function capChange(n: N, which: "add" | "draw", a: unknown, b: unknown): { head:
       : which === "add"
         ? WORDS.addLowered(n, to)
         : WORDS.drawLowered(n, to);
-  return { head: { summary: name(d), figure: capMove(n, a, b), side: "hub" }, bullet };
+  const up = d === "removed" ? "up" : arrow(d);
+  return { head: { summary: name(d), figure: capMove(n, a, b), side: "hub", mark: mark("gauge", up) }, bullet };
 }
 
 type Read = { head: V4ChangeHead[]; bullets: string[] };
@@ -267,6 +283,7 @@ function creditLine(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow): Read {
           summary: WORDS.lineSet,
           figure: same ? capFig(n, r.addCap) : `add ${capFig(n, r.addCap)}, draw ${capFig(n, r.drawCap)}`,
           side,
+          mark: mark("gauge"),
         },
       ],
       bullets: [WORDS.lineWhat(n), WORDS.lineFirst(n, capFig(n, r.addCap), capFig(n, r.drawCap))],
@@ -275,11 +292,19 @@ function creditLine(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow): Read {
   const head: V4ChangeHead[] = [];
   const bullets: string[] = [];
   if (Boolean(prev.active) !== Boolean(r.active)) {
-    head.push({ summary: r.active === true ? WORDS.lineOn : WORDS.lineOff, side });
+    head.push({
+      summary: r.active === true ? WORDS.lineOn : WORDS.lineOff,
+      side,
+      mark: r.active === true ? mark("plug") : mark("unplug", undefined, "caution"),
+    });
     bullets.push(...(r.active === true ? [WORDS.lineAgain(n)] : [WORDS.lineStops(n), WORDS.lineStays(n)]));
   }
   if (Boolean(prev.halted) !== Boolean(r.halted)) {
-    head.push({ summary: r.halted === true ? WORDS.lineHalted : WORDS.lineResumed, side });
+    head.push({
+      summary: r.halted === true ? WORDS.lineHalted : WORDS.lineResumed,
+      side,
+      mark: r.halted === true ? mark("unplug", undefined, "caution") : mark("plug"),
+    });
     bullets.push(r.halted === true ? WORDS.haltStops(n) : WORDS.lineAgain(n));
   }
   const addMoved = String(prev.addCap) !== String(r.addCap);
@@ -292,6 +317,7 @@ function creditLine(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow): Read {
       summary: WORDS.caps(both ? (up ? "raised" : "lowered") : "changed"),
       figure: sameMove ? capMove(n, prev.addCap, r.addCap) : capsApart(n, prev, r),
       side,
+      mark: mark("gauge", both ? (up ? "up" : "down") : undefined),
     });
     bullets.push(WORDS.addWhat(n), WORDS.drawWhat(n));
     const bounded = [prev.addCap, r.addCap, prev.drawCap, r.drawCap].every((v) => String(v) !== NO_CAP);
@@ -334,19 +360,52 @@ function reserveConfig(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow): Rea
   }
   const head: V4ChangeHead[] = [];
   const bullets: string[] = [];
-  const flip = (k: string, on: string, off: string, onB: string[], offB: string[]) => {
+  const flip = (
+    k: string,
+    on: string,
+    off: string,
+    onB: string[],
+    offB: string[],
+    marks: [ChangeMark, ChangeMark] = [mark("sliders"), mark("sliders")],
+  ) => {
     if (Boolean(prev[k]) === Boolean(r[k])) return;
-    head.push({ summary: r[k] === true ? on : off, side });
+    head.push({ summary: r[k] === true ? on : off, side, mark: marks[r[k] === true ? 0 : 1] });
     bullets.push(...(r[k] === true ? onB : offB));
   };
-  flip("paused", WORDS.paused, WORDS.unpaused, [WORDS.pausedStops(n)], [WORDS.unpausedAgain(n)]);
-  flip("frozen", WORDS.frozen, WORDS.unfrozen, [WORDS.frozenStops(n), WORDS.frozenGoesOn], [WORDS.unfrozenAgain(n)]);
-  flip("borrowable", WORDS.borrowOn, WORDS.borrowOff, [WORDS.borrowOnWhat(n)], [WORDS.borrowOffWhat(n)]);
+  flip(
+    "paused",
+    WORDS.paused,
+    WORDS.unpaused,
+    [WORDS.pausedStops(n)],
+    [WORDS.unpausedAgain(n)],
+    [mark("pause", undefined, "caution"), mark("play")],
+  );
+  flip(
+    "frozen",
+    WORDS.frozen,
+    WORDS.unfrozen,
+    [WORDS.frozenStops(n), WORDS.frozenGoesOn],
+    [WORDS.unfrozenAgain(n)],
+    [mark("snowflake", undefined, "caution"), mark("snowflake")],
+  );
+  flip(
+    "borrowable",
+    WORDS.borrowOn,
+    WORDS.borrowOff,
+    [WORDS.borrowOnWhat(n)],
+    [WORDS.borrowOffWhat(n)],
+    [mark("plug"), mark("unplug", undefined, "caution")],
+  );
   flip("receiveSharesEnabled", WORDS.sharesOn, WORDS.sharesOff, [WORDS.sharesOnWhat(n)], [WORDS.sharesOffWhat(n)]);
   const a = bps(prev.collateralRisk);
   const b = bps(r.collateralRisk);
   if (a !== b) {
-    head.push({ summary: WORDS.risk(dir(a, b)), figure: `${pct(a)} → ${pct(b)}`, side });
+    head.push({
+      summary: WORDS.risk(dir(a, b)),
+      figure: `${pct(a)} → ${pct(b)}`,
+      side,
+      mark: mark("shield", arrow(dir(a, b))),
+    });
     bullets.push(WORDS.riskWhat(n), b > a ? WORDS.riskUp(n) : WORDS.riskDown(n));
   }
   if (!head.length) return { head: [{ summary: WORDS.reserveRestated, side }], bullets: [WORDS.reserveSame(n)] };
@@ -356,10 +415,16 @@ function reserveConfig(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow): Rea
 function priceSource(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow): Read {
   const side = "spoke" as const;
   if (!prev)
-    return { head: [{ summary: WORDS.priceSet, side }], bullets: [WORDS.priceWhat(n), WORDS.priceFollowsFirst(n)] };
+    return {
+      head: [{ summary: WORDS.priceSet, side, mark: mark("radio-tower") }],
+      bullets: [WORDS.priceWhat(n), WORDS.priceFollowsFirst(n)],
+    };
   if (lower(prev.source) === lower(r.source))
     return { head: [{ summary: WORDS.priceRestated, side }], bullets: [WORDS.priceSame(n)] };
-  return { head: [{ summary: WORDS.priceChanged, side }], bullets: [WORDS.priceWhat(n), WORDS.priceFollows(n)] };
+  return {
+    head: [{ summary: WORDS.priceChanged, side, mark: mark("radio-tower") }],
+    bullets: [WORDS.priceWhat(n), WORDS.priceFollows(n)],
+  };
 }
 
 function collateralTerms(n: N, c: V4Change, prev: V4ConfigRow | undefined, r: V4ConfigRow): Read {
@@ -368,7 +433,7 @@ function collateralTerms(n: N, c: V4Change, prev: V4ConfigRow | undefined, r: V4
   const cfBullet = (v: number) => (v === 0 ? WORDS.cfNone(n) : WORDS.cfSome(n, pct(v), String(v / 100)));
   if (!prev)
     return {
-      head: [{ summary: rewrite ? WORDS.termsRewritten : WORDS.termsSet, side }],
+      head: [{ summary: rewrite ? WORDS.termsRewritten : WORDS.termsSet, side, mark: mark("shield") }],
       bullets: [WORDS.cfWhat(n), cfBullet(bps(r.collateralFactor))],
     };
   const head: V4ChangeHead[] = [];
@@ -378,8 +443,10 @@ function collateralTerms(n: N, c: V4Change, prev: V4ConfigRow | undefined, r: V4
     const b = bps(r[k]);
     if (a === b) return;
     head.push({ summary: name(dir(a, b)), figure: `${show(a)} → ${show(b)}`, side });
+    moves.push(b > a ? "up" : "down");
     bullets.push(what, now);
   };
+  const moves: ("up" | "down")[] = [];
   const cf = bps(r.collateralFactor);
   move("collateralFactor", WORDS.cf, pct, WORDS.cfWhat(n), cfBullet(cf));
   const bonus = (v: number) => pct(v - 10_000);
@@ -393,6 +460,8 @@ function collateralTerms(n: N, c: V4Change, prev: V4ConfigRow | undefined, r: V4
   move("liquidationFee", WORDS.liqFee, pct, WORDS.liqFeeWhat, WORDS.liqFeeNow(pct(bps(r.liquidationFee))));
   if (!head.length) head.push({ summary: rewrite ? WORDS.termsRewritten : WORDS.termsSame, side });
   else if (rewrite) head.unshift({ summary: WORDS.termsRewritten, side });
+  // Collateral terms take an arrow where every moved term went one way.
+  if (moves.length) head[0].mark = mark("shield", common(moves));
   if (rewrite) bullets.push(WORDS.rewriteReach);
   return { head, bullets };
 }
@@ -411,7 +480,7 @@ function liquidationConfig(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow):
     bps(r.liquidationBonusFactor) === 0
   )
     return {
-      head: [{ summary: WORDS.liqDefaults, side }],
+      head: [{ summary: WORDS.liqDefaults, side, mark: mark("shield-alert") }],
       bullets: [WORDS.liqDefaultsWhat(n), WORDS.liqDefaultsTarget, WORDS.liqDefaultsBonus],
     };
   const target = lower(prev?.targetHealthFactor) !== lower(r.targetHealthFactor);
@@ -423,7 +492,7 @@ function liquidationConfig(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow):
   const bullets = [WORDS.liqScope(n)];
   if (target || !prev) bullets.push(WORDS.liqTarget(wad(r.targetHealthFactor)));
   if (bonus) bullets.push(WORDS.liqBonus(pct(bps(r.liquidationBonusFactor)), wad(r.healthFactorForMaxBonus)));
-  return { head: [{ summary: prev ? WORDS.liqChanged : WORDS.liqSet, side }], bullets };
+  return { head: [{ summary: prev ? WORDS.liqChanged : WORDS.liqSet, side, mark: mark("shield-alert") }], bullets };
 }
 
 function assetConfig(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow): Read {
@@ -431,12 +500,20 @@ function assetConfig(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow): Read 
   const fee = bps(r.liquidityFee);
   const share = [WORDS.feeWhat(n), WORDS.feeShare(n, pct(fee), pct(10_000 - fee))];
   if (!prev)
-    return { head: [{ summary: WORDS.feeSet, figure: pct(fee), side }], bullets: [...share, WORDS.feeFirstAlso] };
+    return {
+      head: [{ summary: WORDS.feeSet, figure: pct(fee), side, mark: mark("rate") }],
+      bullets: [...share, WORDS.feeFirstAlso],
+    };
   const head: V4ChangeHead[] = [];
   const bullets: string[] = [];
   const was = bps(prev.liquidityFee);
   if (was !== fee) {
-    head.push({ summary: WORDS.fee(dir(was, fee)), figure: `${pct(was)} → ${pct(fee)}`, side });
+    head.push({
+      summary: WORDS.fee(dir(was, fee)),
+      figure: `${pct(was)} → ${pct(fee)}`,
+      side,
+      mark: mark("rate", arrow(dir(was, fee))),
+    });
     bullets.push(...share);
   }
   if (lower(prev.irStrategy) !== lower(r.irStrategy)) {
@@ -467,7 +544,7 @@ function rateCurve(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow): Read {
   const now = pts(r);
   if (!prev)
     return {
-      head: [{ summary: WORDS.curveSet, side }],
+      head: [{ summary: WORDS.curveSet, side, mark: mark("rate") }],
       bullets: [WORDS.curveWhat(n), WORDS.curveShape(pct(now.base), pct(now.opt), pct(now.atOpt), pct(now.full))],
     };
   const was = pts(prev);
@@ -477,8 +554,13 @@ function rateCurve(n: N, prev: V4ConfigRow | undefined, r: V4ConfigRow): Read {
   if (was.atOpt !== now.atOpt) bullets.push(WORDS.curveAtOpt(pct(now.opt), pct(now.atOpt), pct(was.atOpt)));
   if (was.full !== now.full) bullets.push(WORDS.curveFull(pct(now.full), pct(was.full)));
   if (!bullets.length) return { head: [{ summary: WORDS.curveRestated, side }], bullets: [WORDS.curveSame(n)] };
+  // The arrow where every point of the curve moved one way and its turn stayed.
+  const pointMoves = (["base", "atOpt", "full"] as const)
+    .filter((k) => was[k] !== now[k])
+    .map((k) => (now[k] > was[k] ? ("up" as const) : ("down" as const)));
+  const curveArrow = was.opt === now.opt ? common(pointMoves) : undefined;
   return {
-    head: [{ summary: WORDS.curveChanged, side }],
+    head: [{ summary: WORDS.curveChanged, side, mark: mark("rate", curveArrow) }],
     bullets: [WORDS.curveWhat(n), ...bullets, WORDS.curveReach(n)],
   };
 }
@@ -488,7 +570,7 @@ function readChange(n: N, c: V4Change): Read {
   const { prev, row: r } = c;
   switch (r.kind) {
     case "reserve-added":
-      return { head: [{ summary: WORDS.listed, side: "spoke" }], bullets: WORDS.listing(n) };
+      return { head: [{ summary: WORDS.listed, side: "spoke", mark: mark("list-plus") }], bullets: WORDS.listing(n) };
     case "credit-line":
       return creditLine(n, prev, r);
     case "reserve-config":
@@ -518,6 +600,7 @@ export function v4ChangeExplain(c: V4Change, n: V4ExplainNames): V4ChangeExplain
   const figures = head.filter((h) => h.figure);
   return {
     headline: head.map((h, i) => (i ? low1(h.summary) : h.summary)).join(", "),
+    mark: head[0]?.mark ?? mark("sliders"),
     ...(figures.length === 1 ? { figure: figures[0].figure } : {}),
     bullets,
   };

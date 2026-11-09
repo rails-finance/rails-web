@@ -44,7 +44,9 @@
 //      each head states the change with its side's tag; the newest row opens
 //      to its explanation, and its Figures carry the receipt naming its event;
 //      the Parameters section's "?" (M3.5) opens the plain-words panel, the
-//      spoke's rows then the hub's. On Base the one line.
+//      spoke's rows then the hub's; on Main USDC the 29 Oct freeze's node is a
+//      snowflake in the warning tone and the 6 Nov draw-cap raise's a gauge
+//      with the up arrow. On Base the one line.
 //
 // Run:
 //   BASE=http://localhost:3000 node scripts/verify/verify-aave-reserve-page.mjs
@@ -595,6 +597,29 @@ for (const f of V4_FIXTURES) {
       heads.every((h) => /[A-Za-z]{4}/.test(h.words) && h.tag === h.side && /(spoke|hub)/.test(h.words)),
     heads[0] ? `${norm(heads[0].words)} [${heads[0].tag}]` : "no rows",
   );
+  // The node's mark (Main USDC): the 29 Oct freeze a snowflake in the warning
+  // tone, the 6 Nov draw-cap raise a gauge with the up arrow.
+  if (f.path.includes("/main/0xa0b8")) {
+    const marks = await page.evaluate(() =>
+      Object.fromEntries(
+        [...document.querySelectorAll('[data-anatomy~="M3.6"] [data-change-row]')].map((r) => [
+          `${r.getAttribute("data-change-block")}:${r.getAttribute("data-change-kind")}`,
+          [
+            r.getAttribute("data-change-glyph"),
+            r.getAttribute("data-change-direction"),
+            r.getAttribute("data-change-tone"),
+            Boolean(r.querySelector(`[data-spine-change-glyph="${r.getAttribute("data-change-glyph")}"]`)),
+          ].join("|"),
+        ]),
+      ),
+    );
+    check(
+      `${tag} 11g the freeze's node is a snowflake in the warning tone, the draw-cap raise a gauge going up`,
+      marks["26301157:reserve-config"] === "snowflake||caution|true" &&
+        marks["26355192:credit-line"] === "gauge|up||true",
+      `${marks["26301157:reserve-config"]} / ${marks["26355192:credit-line"]}`,
+    );
+  }
   // Opened (T2, T3): the Explanation first, then the Figures with the receipt.
   const first = page.locator('[data-anatomy~="M3.6"] [data-change-row]').first();
   let bullets = 0;

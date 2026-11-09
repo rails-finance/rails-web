@@ -4,7 +4,10 @@
 // forks, Aave V4): the spine and rows of a position's Activity timeline (L3),
 // one row a change, newest first, each a T1 card on the shared event-card shell
 // (components/shared/event-card.tsx), as CoW's trades are. The node is the
-// protocol change's sliders with the governance badge; the head is the change
+// protocol change's with the governance badge, its glyph the setting's family,
+// an arrow where a cap, a rate or the collateral terms moved one way, and the
+// warning tone where a change stopped something (`ChangeMark`, from the same
+// generator as the words); the head is the change
 // in plain words with the figure that moved, then where it was set and the
 // time, the date on a day's first row. Opened (T2, T3): the Explanation, what
 // the setting does and what this change means for suppliers and borrowers,
@@ -20,6 +23,7 @@ import { ExplainBullet } from "@/components/shared/explain-groups";
 import { SpineLine } from "@/components/shared/spine-line";
 import { EventCaptionContext, SpineViewProvider } from "@/components/shared/mobile-spine";
 import type { Provenance } from "@/components/shared/provenance";
+import type { ChangeMark } from "@/lib/shared/change-mark";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 
@@ -43,6 +47,8 @@ export interface ConfigChangeItem {
   receipt: Provenance;
   /** What the setting does and what this change means; none, no Explanation. */
   bullets: string[];
+  /** The node: the setting's family, the way it moved, the warning tone. */
+  mark: ChangeMark;
 }
 
 const utcDay = (ts: number) => Math.floor(ts / 86_400);
@@ -58,7 +64,14 @@ function ChangeRow({ c, family, isLast }: { c: ConfigChangeItem; family: string;
       blockNumber: c.block,
       timestamp: c.timestamp,
     },
-    spine: { icon: "protocol-change", actor: "governance", isLast },
+    spine: {
+      icon: "protocol-change",
+      actor: "governance",
+      isLast,
+      changeGlyph: c.mark.glyph,
+      ...(c.mark.direction ? { iconDirection: c.mark.direction } : {}),
+      ...(c.mark.tone ? { changeTone: c.mark.tone } : {}),
+    },
     head: {
       label: c.headline,
       deltas: [],
@@ -94,6 +107,9 @@ function ChangeRow({ c, family, isLast }: { c: ConfigChangeItem; family: string;
       data-change-kind={c.kind}
       data-change-block={c.block}
       data-change-words={c.words}
+      data-change-glyph={c.mark.glyph}
+      data-change-direction={c.mark.direction ?? ""}
+      data-change-tone={c.mark.tone ?? ""}
       {...(c.setOn ? { "data-change-side": c.setOn.side } : {})}
     >
       <EventCard slots={slots} avatar={null} />

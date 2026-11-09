@@ -32,6 +32,7 @@
 // (the category's terms for its assets; borrowing in eMode only those).
 
 import type { ReserveChange } from "./aave-reserve-config-words";
+import type { ChangeGlyph, ChangeMark } from "./change-mark";
 
 export interface ReserveExplainNames {
   symbol: string;
@@ -41,6 +42,8 @@ export interface ReserveExplainNames {
 
 export interface ReserveChangeExplained {
   headline: string;
+  /** The node's mark: the change's family, direction and tone. */
+  mark: ChangeMark;
   figure?: string;
   bullets: string[];
 }
@@ -157,7 +160,17 @@ const dir = (a: number, b: number): Dir => (b > a ? "raised" : "lowered");
 const usd = (cents: string) => `$${(Number(cents) / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 const low1 = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
-type Read = { parts: { summary: string; figure?: string }[]; bullets: string[] };
+type Read = { parts: { summary: string; figure?: string }[]; bullets: string[]; mark?: ChangeMark };
+
+/** A node's mark. */
+const mark = (glyph: ChangeGlyph, direction?: "up" | "down", tone?: "caution"): ChangeMark => ({
+  glyph,
+  ...(direction ? { direction } : {}),
+  ...(tone ? { tone } : {}),
+});
+/** One arrow for several moves: their common direction, none where they differ. */
+const common = (ds: ("up" | "down")[]) => (ds.length && ds.every((d) => d === ds[0]) ? ds[0] : undefined);
+const way = (a: number, b: number) => (b > a ? ("up" as const) : ("down" as const));
 
 /** A cap row (0 no cap, 1 closed). */
 function cap(n: N, which: "supply" | "borrow", oldV: string, newV: string): Read {
@@ -171,22 +184,29 @@ function cap(n: N, which: "supply" | "borrow", oldV: string, newV: string): Read
   if (newV === "1")
     return {
       parts: [{ summary: WORDS.cap(name, "closed"), figure }],
+      mark: mark("gauge", "down"),
       bullets: [what, which === "supply" ? WORDS.supplyClosed(n) : WORDS.borrowClosed(n)],
     };
   if (newV === "0")
     return {
       parts: [{ summary: WORDS.cap(name, "removed"), figure }],
+      mark: mark("gauge", "up"),
       bullets: [what, which === "supply" ? WORDS.supplyOpen : WORDS.borrowOpen],
     };
   if (oldV === newV) return { parts: [{ summary: `${name} restated`, figure: fig(newV) }], bullets: [what] };
   const stops = which === "supply" ? WORDS.supplyStops(fig(newV)) : WORDS.borrowStops(fig(newV));
-  if (oldV === "0") return { parts: [{ summary: WORDS.cap(name, "set"), figure }], bullets: [what, stops] };
+  if (oldV === "0")
+    return { parts: [{ summary: WORDS.cap(name, "set"), figure }], bullets: [what, stops], mark: mark("gauge") };
   const d = dir(Number(oldV), Number(newV));
   const raised = (which === "supply" ? WORDS.supplyRaised : WORDS.borrowRaised)(
     n.compact(Number(newV) - Number(oldV)),
     fig(newV),
   );
-  return { parts: [{ summary: WORDS.cap(name, d), figure }], bullets: [what, d === "raised" ? raised : stops] };
+  return {
+    parts: [{ summary: WORDS.cap(name, d), figure }],
+    bullets: [what, d === "raised" ? raised : stops],
+    mark: mark("gauge", d === "raised" ? "up" : "down"),
+  };
 }
 
 function collateral(n: N, prev: Record<string, number> | undefined, next: Record<string, number>): Read {
@@ -196,6 +216,7 @@ function collateral(n: N, prev: Record<string, number> | undefined, next: Record
   if (!prev)
     return {
       parts: [{ summary: WORDS.termsSet }],
+      mark: mark("shield"),
       bullets: [WORDS.ltvWhat(n), ltvBullet(next.ltv), WORDS.ltWhat(n), ltBullet(next.lt)],
     };
   const parts: Read["parts"] = [];
@@ -216,7 +237,8 @@ function collateral(n: N, prev: Record<string, number> | undefined, next: Record
     bullets.push(WORDS.bonusWhat(n), WORDS.bonusNow(bonus(next.bonus)));
   }
   if (!parts.length) return { parts: [{ summary: WORDS.termsSame }], bullets: [WORDS.termsSameWhat] };
-  return { parts, bullets };
+  const moves = (["ltv", "lt", "bonus"] as const).filter((k) => prev[k] !== next[k]).map((k) => way(prev[k], next[k]));
+  return { parts, bullets, mark: mark("shield", common(moves)) };
 }
 
 /** What the eMode rows are read against: each category's name, and its
@@ -239,29 +261,33 @@ function eModeRow(n: N, c: ReserveChange, e: EModeState): Read | null {
       const to = Number(r.to);
       return {
         parts: [{ summary: c.words }],
+        mark: mark("layers"),
         bullets: [WORDS.eModeWhat, to === 0 ? WORDS.leftAll(n) : WORDS.joined(n, e.name(to))],
       };
     }
     case "emode-collateral":
       return {
         parts: [{ summary: c.words }],
+        mark: mark("layers"),
         bullets: [WORDS.eModeWhat, on(r.collateral) ? WORDS.collateralOn(n, cat) : WORDS.collateralOff(n, cat)],
       };
     case "emode-borrowable":
       return {
         parts: [{ summary: c.words }],
+        mark: mark("layers"),
         bullets: [WORDS.eModeWhat, on(r.borrowable) ? WORDS.borrowableOn(n, cat) : WORDS.borrowableOff(n, cat)],
       };
     case "emode-ltvzero":
       return {
         parts: [{ summary: c.words }],
+        mark: mark("layers"),
         bullets: on(r.ltvzero) ? [WORDS.ltvzeroOn(n, cat), WORDS.ltvzeroFirst(n, cat)] : [WORDS.ltvzeroOff(n, cat)],
       };
     case "emode-isolation": {
       const now = on(r.isolated);
       const was = e.isolated.get(id);
       const what = now ? WORDS.isolatedWhat(cat) : was === true ? WORDS.unIsolated(cat) : WORDS.notIsolatedWhat(cat);
-      if (e.isolated.get(id) !== now) return { parts: [{ summary: c.words }], bullets: [what] };
+      if (e.isolated.get(id) !== now) return { parts: [{ summary: c.words }], bullets: [what], mark: mark("layers") };
       return {
         parts: [{ summary: WORDS.isolationRestated(c.words) }],
         bullets: [
@@ -278,7 +304,11 @@ function eModeRow(n: N, c: ReserveChange, e: EModeState): Read | null {
       if (!prev || prev.ltv !== next.ltv) bullets.push(WORDS.eLtv(cat, per100(next.ltv)));
       if (!prev || prev.lt !== next.lt) bullets.push(WORDS.eLt(cat, per100(next.lt)));
       if (!prev || prev.bonus !== next.bonus) bullets.push(WORDS.eBonus(cat, pct(next.bonus - 10_000)));
-      return { parts: [{ summary: c.words }], bullets: bullets.length ? bullets : [WORDS.eSame] };
+      if (!bullets.length) return { parts: [{ summary: c.words }], bullets: [WORDS.eSame] };
+      const moves = prev
+        ? (["ltv", "lt", "bonus"] as const).filter((k) => prev[k] !== next[k]).map((k) => way(prev[k], next[k]))
+        : [];
+      return { parts: [{ summary: c.words }], bullets, mark: mark("shield", common(moves)) };
     }
     default:
       return null;
@@ -300,6 +330,7 @@ function readRow(n: N, c: ReserveChange, prevCollateral: Record<string, number> 
       const [a, b] = [num("old"), num("new")];
       return {
         parts: [{ summary: WORDS.reserveFactor(dir(a, b)), figure: `${pct(a)} → ${pct(b)}` }],
+        mark: mark("rate", way(a, b)),
         bullets: [WORDS.reserveFactorWhat, WORDS.reserveFactorShare(n, pct(b), pct(10_000 - b))],
       };
     }
@@ -307,6 +338,7 @@ function readRow(n: N, c: ReserveChange, prevCollateral: Record<string, number> 
       const [a, b] = [num("old"), num("new")];
       return {
         parts: [{ summary: WORDS.protocolFee(dir(a, b)), figure: `${pct(a)} → ${pct(b)}` }],
+        mark: mark("rate", way(a, b)),
         bullets: [WORDS.protocolFeeWhat, WORDS.protocolFeeNow(pct(b))],
       };
     }
@@ -318,6 +350,7 @@ function readRow(n: N, c: ReserveChange, prevCollateral: Record<string, number> 
       if (b === "0")
         return {
           parts: [{ summary: WORDS.ceiling("removed"), figure: `${fig(a)} → none` }],
+          mark: mark("gauge"),
           bullets: [WORDS.ceilingWhat(n), WORDS.ceilingGone(n)],
         };
       const d = a === "0" ? "set" : a === b ? null : dir(Number(a), Number(b));
@@ -326,24 +359,37 @@ function readRow(n: N, c: ReserveChange, prevCollateral: Record<string, number> 
           { summary: d ? WORDS.ceiling(d) : "Debt ceiling restated", figure: d ? `${fig(a)} → ${fig(b)}` : fig(b) },
         ],
         bullets: [WORDS.ceilingWhat(n), WORDS.ceilingStops(n, usd(b))],
+        mark: d ? mark("gauge", d === "set" ? undefined : d === "raised" ? "up" : "down") : mark("sliders"),
       };
     }
     case "frozen":
       return on(r.frozen)
-        ? { parts: [{ summary: WORDS.frozen }], bullets: [WORDS.frozenStops(n), WORDS.frozenGoesOn] }
-        : { parts: [{ summary: WORDS.unfrozen }], bullets: [WORDS.unfrozenAgain(n)] };
+        ? {
+            parts: [{ summary: WORDS.frozen }],
+            bullets: [WORDS.frozenStops(n), WORDS.frozenGoesOn],
+            mark: mark("snowflake", undefined, "caution"),
+          }
+        : { parts: [{ summary: WORDS.unfrozen }], bullets: [WORDS.unfrozenAgain(n)], mark: mark("snowflake") };
     case "paused":
       return on(r.paused)
-        ? { parts: [{ summary: WORDS.paused }], bullets: [WORDS.pausedStops(n)] }
-        : { parts: [{ summary: WORDS.unpaused }], bullets: [WORDS.unpausedAgain(n)] };
+        ? {
+            parts: [{ summary: WORDS.paused }],
+            bullets: [WORDS.pausedStops(n)],
+            mark: mark("pause", undefined, "caution"),
+          }
+        : { parts: [{ summary: WORDS.unpaused }], bullets: [WORDS.unpausedAgain(n)], mark: mark("play") };
     case "active":
       return on(r.active)
-        ? { parts: [{ summary: WORDS.activated }], bullets: [WORDS.activeWhat(n)] }
-        : { parts: [{ summary: WORDS.deactivated }], bullets: [WORDS.inactiveWhat(n)] };
+        ? { parts: [{ summary: WORDS.activated }], bullets: [WORDS.activeWhat(n)], mark: mark("plug") }
+        : { parts: [{ summary: WORDS.deactivated }], bullets: [WORDS.inactiveWhat(n)], mark: mark("unplug") };
     case "borrowing":
       return on(r.enabled)
-        ? { parts: [{ summary: WORDS.borrowOn }], bullets: [WORDS.borrowOnWhat(n)] }
-        : { parts: [{ summary: WORDS.borrowOff }], bullets: [WORDS.borrowOffWhat(n)] };
+        ? { parts: [{ summary: WORDS.borrowOn }], bullets: [WORDS.borrowOnWhat(n)], mark: mark("plug") }
+        : {
+            parts: [{ summary: WORDS.borrowOff }],
+            bullets: [WORDS.borrowOffWhat(n)],
+            mark: mark("unplug", undefined, "caution"),
+          };
     default:
       return { parts: [{ summary: c.words }], bullets: [] };
   }
@@ -379,6 +425,7 @@ export function reserveChangesExplained(changes: ReserveChange[], n: N): Reserve
     const figures = read.parts.filter((p) => p.figure);
     out.push({
       headline: read.parts.map((p, i) => (i ? low1(p.summary) : p.summary)).join(", "),
+      mark: read.mark ?? mark("sliders"),
       ...(figures.length === 1 ? { figure: figures[0].figure } : {}),
       bullets: read.bullets,
     });

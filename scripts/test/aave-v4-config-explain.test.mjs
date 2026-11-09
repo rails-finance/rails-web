@@ -72,6 +72,14 @@ const logs = [
   at(26305337, "dynamic-added", terms(1, "0")),
   at(26337526, "rate-curve", curve(500, 2000), "0xboth"),
   at(26337526, "credit-line", credit("18000000", "40000000"), "0xboth"),
+  at(26340000, "reserve-config", flags(false)),
+  at(26341000, "dynamic-added", {
+    key: 2,
+    collateralFactor: "500",
+    maxLiquidationBonus: "10400",
+    liquidationFee: "1000",
+  }),
+  at(26342000, "reserve-config", { ...flags(false), borrowable: false }),
 ];
 const log = { chainId: 1, spoke: "main", hub: "core", held: {}, units: {}, notes: [], logs };
 const changes = v4ReserveChanges(log, { symbol: "USDC", hub: "Core", spokeAddress: "0xs", hubAddress: "0xh" });
@@ -157,4 +165,32 @@ test("the spoke's first liquidation settings are its defaults", () => {
   const e = v4ChangeExplain(first, n);
   assert.equal(e.headline, "Liquidation settings at their defaults");
   assert.equal(e.bullets[0], "Main took its default liquidation settings when it was set up.");
+});
+
+test("each change's node mark: family, direction, tone", () => {
+  const m = (block, kind) => {
+    const k = at1(block, kind).mark;
+    return [k.glyph, k.direction ?? "", k.tone ?? ""].join("|");
+  };
+  assert.equal(m(24723024, "reserve-added"), "list-plus||");
+  assert.equal(m(24723024, "price-source"), "radio-tower||");
+  assert.equal(m(24723024, "reserve-config"), "sliders||");
+  assert.equal(m(24723024, "dynamic-added"), "shield||");
+  assert.equal(m(24723022, "credit-line"), "gauge||");
+  assert.equal(m(24723145, "credit-line"), "unplug||caution");
+  // Line on and caps raised: the first move's family.
+  assert.equal(m(25552732, "credit-line"), "plug||");
+  assert.equal(m(25876677, "credit-line"), "gauge|up|");
+  assert.equal(m(26337526, "credit-line"), "gauge|up|");
+  assert.equal(m(26301157, "reserve-config"), "snowflake||caution");
+  assert.equal(m(26340000, "reserve-config"), "snowflake||");
+  assert.equal(m(26342000, "reserve-config"), "unplug||caution");
+  assert.equal(m(26305337, "dynamic-added"), "shield|down|");
+  // The collateral factor up, the bonus down: no arrow.
+  assert.equal(m(26341000, "dynamic-added"), "shield||");
+  assert.equal(m(24722784, "rate-curve"), "rate||");
+  assert.equal(m(26337526, "rate-curve"), "rate|up|");
+  assert.equal(m(24720899, "liquidation-config"), "shield-alert||");
+  const fees = changes.filter((c) => c.row.kind === "asset-config").map((c) => v4ChangeExplain(c, n).mark);
+  assert.deepEqual(fees, [{ glyph: "rate", direction: "up" }, { glyph: "rate" }]);
 });

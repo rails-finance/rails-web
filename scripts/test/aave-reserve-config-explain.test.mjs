@@ -151,3 +151,42 @@ test("isolation off: first written, and turned off", () => {
     "A borrower in eMode category 45 counts collateral outside the category at its reserve's LTV.",
   ]);
 });
+
+test("each change's node mark: family, direction, tone", () => {
+  const m = (e) => [e.mark.glyph, e.mark.direction ?? "", e.mark.tone ?? ""].join("|");
+  assert.deepEqual(out.map(m), [
+    "layers||",
+    "unplug||caution",
+    "snowflake||caution",
+    "rate|up|",
+    "gauge|up|",
+    "gauge|up|",
+    "shield|down|",
+    "shield||",
+  ]);
+  assert.deepEqual(ex.map(m), [
+    "sliders||",
+    "shield|down|",
+    "layers||",
+    "layers||",
+    "layers||",
+    "layers||",
+    "layers||",
+    "layers||",
+    "shield||",
+  ]);
+  const flags = [
+    { row: row(54, "paused", { paused: false }), words: "Unpaused" },
+    { row: row(53, "paused", { paused: true }), words: "Paused" },
+    { row: row(52, "frozen", { frozen: false }), words: "Unfrozen" },
+    { row: row(51, "active", { active: true }), words: "Activated" },
+    { row: row(50, "borrow-cap", { old: "3000000", new: "2000000" }), words: "Borrow cap 3,000,000 → 2,000,000 USDC" },
+  ];
+  assert.deepEqual(reserveChangesExplained(flags, { symbol: "USDC", compact: compactFigure }).map(m), [
+    "play||",
+    "pause||caution",
+    "snowflake||",
+    "plug||",
+    "gauge|down|",
+  ]);
+});
