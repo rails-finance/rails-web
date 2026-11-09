@@ -226,10 +226,14 @@ function PoolExplainer({ p }: { p: FxPoolSystem }) {
         <ExplainBullet>
           Each position locks {p.tokenSymbol} and borrows fxUSD against it, a leveraged long on {p.normalizedSymbol}.
         </ExplainBullet>
+        <ExplainBullet>
+          The funding rate is <Fig bold>{pctOf(p.fundingRatioAnnual, 2)}</Fig> a year, charged on every position&rsquo;s
+          collateral; it follows Aave&rsquo;s borrow rate.
+        </ExplainBullet>
         {ratio != null && (
           <ExplainBullet>
-            Its debt ratio <Fig bold>{pctOf(ratio, 1)}</Fig> is that debt over the collateral&rsquo;s value at the
-            anchor price.
+            The pool&rsquo;s debt ratio <Fig bold>{pctOf(ratio, 1)}</Fig> is that debt over the collateral&rsquo;s value
+            at the anchor price.
           </ExplainBullet>
         )}
         <ExplainBullet>
@@ -248,11 +252,7 @@ function PoolExplainer({ p }: { p: FxPoolSystem }) {
           From <Fig bold>{pctOf(p.liquidateRatio, 0)}</Fig> the whole tick can be liquidated.
         </ExplainBullet>
       </ExplainGroup>
-      <ExplainGroup title="Costs">
-        <ExplainBullet>
-          The funding rate is <Fig bold>{pctOf(p.fundingRatioAnnual, 2)}</Fig> a year, charged on every position&rsquo;s
-          collateral; it follows Aave&rsquo;s borrow rate.
-        </ExplainBullet>
+      <ExplainGroup title="Limits">
         {p.borrowPaused && <ExplainBullet>Borrowing is paused.</ExplainBullet>}
         <ExplainBullet>{redemptionWords(p)}.</ExplainBullet>
       </ExplainGroup>

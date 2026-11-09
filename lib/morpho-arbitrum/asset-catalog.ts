@@ -25,14 +25,3 @@ export const MORPHO_ARBITRUM_CHAIN_ID = ARBITRUM_CHAIN_ID;
 /** The singleton's creation block (2025-01-17). The history rails-server
  *  serves runs from here, which is what lets it claim a whole life. */
 export const MORPHO_ARBITRUM_DEPLOY_BLOCK = 296_446_593;
-
-/** The loan tokens the markets page ranks markets in: the dollar stables and
- *  WETH that the Aave V3 Arbitrum oracle prices, so a supply in any of them
- *  converts to dollars from a chain read. Keyed on the lowercase address. */
-export const MORPHO_ARBITRUM_RANKED_LOAN_TOKENS: Readonly<Record<string, string>> = {
-  "0xaf88d065e77c8cc2239327c5edb3a432268e5831": "USDC",
-  "0xff970a61a04b1ca14834a43f5de4533ebddb5cc8": "USDC.e",
-  "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9": "USD₮0",
-  "0xda10009cbd5d07dd0cecc66161fc93d7c9000da1": "DAI",
-  "0x82af49447d8a07e3bd95bd0d56f35241523fbab1": "WETH",
-};

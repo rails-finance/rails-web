@@ -18,7 +18,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
+import { ExplainBullet, ExplainGroup, ExplainSub, Fig } from "@/components/shared/explain-groups";
 import { readStampProv } from "@/components/shared/read-stamp";
 import { Prov } from "@/components/shared/provenance";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
@@ -1010,7 +1010,7 @@ function MarketExplainer({ x, m }: { x: Ctx; m: ComptrollerMarket }) {
   const borrowCap = capOf(x, m, "borrow");
   return (
     <>
-      <ExplainGroup title="This market">
+      <ExplainGroup title="This reserve">
         <ExplainBullet>
           The {m.symbol} market holds <Fig bold>{size(m.supplied)}</Fig>
           {m.borrowed > 0 ? (
@@ -1024,29 +1024,40 @@ function MarketExplainer({ x, m }: { x: Ctx; m: ComptrollerMarket }) {
         <ExplainBullet>
           <Fig bold>{size(m.cash)}</Fig> is in the market now, available to withdraw or borrow.
         </ExplainBullet>
-        {u != null && (
-          <ExplainBullet>
-            Utilisation <Fig bold>{pct(u, 0)}</Fig> is the share of the supply on loan.
-            {u > 1 ? " It passes 100% when the reserves are larger than the cash left." : ""}
-          </ExplainBullet>
-        )}
       </ExplainGroup>
       <ExplainGroup title="Rates">
-        {m.supplyApr != null && m.supplied > 0 && (
-          <ExplainBullet>
+        {m.supplyApr != null && m.supplied > 0 ? (
+          <ExplainBullet
+            sub={
+              m.reserveFactor != null && (
+                <ExplainSub>
+                  {m.reserveFactor >= 0.9999
+                    ? "The market keeps all of the borrowers' interest as reserves, so suppliers earn nothing."
+                    : `The supply rate is the borrow rate times utilisation, less the ${pct(m.reserveFactor, 0)} reserve factor.`}
+                </ExplainSub>
+              )
+            }
+          >
             Suppliers earn <Fig bold>{ratePercentText(m.supplyApr)}</Fig> a year, as an APR.
           </ExplainBullet>
+        ) : (
+          m.reserveFactor != null && (
+            <ExplainBullet>
+              {m.reserveFactor >= 0.9999
+                ? "The market keeps all of the borrowers' interest as reserves, so suppliers earn nothing."
+                : `The supply rate is the borrow rate times utilisation, less the ${pct(m.reserveFactor, 0)} reserve factor.`}
+            </ExplainBullet>
+          )
         )}
         {m.borrowApr != null && m.borrowed > 0 && (
           <ExplainBullet>
             Borrowers pay <Fig bold>{ratePercentText(m.borrowApr)}</Fig> a year, as an APR.
           </ExplainBullet>
         )}
-        {m.reserveFactor != null && (
+        {u != null && (
           <ExplainBullet>
-            {m.reserveFactor >= 0.9999
-              ? "The market keeps all of the borrowers' interest as reserves, so suppliers earn nothing."
-              : `The supply rate is the borrow rate times utilisation, less the ${pct(m.reserveFactor, 0)} reserve factor.`}
+            Utilisation <Fig bold>{pct(u, 0)}</Fig> is the share of the supply on loan.
+            {u > 1 ? " It passes 100% when the reserves are larger than the cash left." : ""}
           </ExplainBullet>
         )}
       </ExplainGroup>

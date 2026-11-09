@@ -5,13 +5,16 @@
 //
 //   O  aave-dao/aave-v3-origin @ 8305565a
 //   U  aave-dao/aave-umbrella  @ c279bf14
+//   A  aave-dao/aave-address-book @ 96661422
 //   D  aave.com/docs, read 9 Nov 2026
 
 import type { LearnMoreLink } from "@/components/shared/learn-more-modal";
+import type { Provenance } from "@/components/shared/provenance";
 
 const ORIGIN = "https://github.com/aave-dao/aave-v3-origin/blob/8305565ae342f1773c42cd2e4593f175fe5968a0/src/contracts";
 const UMBRELLA =
   "https://github.com/aave-dao/aave-umbrella/blob/c279bf145eb58e013fd24f97b10e4bf6058236a1/src/contracts";
+const BOOK = "https://github.com/aave-dao/aave-address-book/blob/9666142204e49410aad9124502564a2fb6187698/src";
 
 export const DEFICIT_SOURCES = {
   /** DeficitCreated and its NatSpec. */
@@ -55,6 +58,20 @@ export const DEFICIT_SOURCES = {
   },
   /** slash raises the pending deficit. */
   U3: { label: "Umbrella.sol L128-146", url: `${UMBRELLA}/umbrella/Umbrella.sol#L128-L146` },
+  /** COVERAGE_MANAGER_ROLE: plain AccessControl, so its holders are read from RoleGranted and RoleRevoked. */
+  U4: {
+    label: "UmbrellaConfiguration.sol L26-45",
+    url: `${UMBRELLA}/umbrella/UmbrellaConfiguration.sol#L26-L45`,
+  },
+  /** The super admin is granted the role at initialisation. */
+  U5: {
+    label: "UmbrellaConfiguration.sol L86-89",
+    url: `${UMBRELLA}/umbrella/UmbrellaConfiguration.sol#L86-L89`,
+  },
+  /** Aave's address book: Aave governance's level 1 executor on Ethereum. */
+  A1: { label: "GovernanceV3Ethereum.sol L54-55", url: `${BOOK}/GovernanceV3Ethereum.sol#L54-L55` },
+  /** Aave's address book: the deficit offset clinic steward on Ethereum. */
+  A2: { label: "UmbrellaEthereum.sol L43-45", url: `${BOOK}/UmbrellaEthereum.sol#L43-L45` },
   /** Pool docs: getReserveDeficit and eliminateReserveDeficit. */
   D1: { label: "Aave docs: Pool", url: "https://aave.com/docs/aave-v3/smart-contracts/pool" },
   /** Umbrella docs: slashing and deficit protection. */
@@ -66,3 +83,31 @@ export type DeficitSourceKey = keyof typeof DEFICIT_SOURCES;
 /** The sources as learn-more links. */
 export const deficitLinks = (...keys: DeficitSourceKey[]): LearnMoreLink[] =>
   keys.map((k) => ({ label: DEFICIT_SOURCES[k].label, url: DEFICIT_SOURCES[k].url }));
+
+/** The pane's deficit figure: the getter's receipt, with the source behind each sub-bullet under it
+ *  (explanation-copy-charter §4: no sources on the face of a pane). */
+export function deficitFigureProv(base: Provenance): Provenance {
+  const leaf = (k: DeficitSourceKey, note: string) => ({
+    label: DEFICIT_SOURCES[k].label,
+    kind: "offchain" as const,
+    pclass: "offchain" as const,
+    note,
+    verify: { kind: "link" as const, href: DEFICIT_SOURCES[k].url, text: DEFICIT_SOURCES[k].label },
+  });
+  return {
+    ...base,
+    inputs: [
+      ...(base.inputs ?? []),
+      leaf("O2", "a liquidation that leaves no collateral burns the borrower's whole debt"),
+      leaf("O3", "the part not repaid is added to the deficit: DeficitCreated"),
+      leaf("O7", "the deficit is a count of underlying tokens: it earns no interest"),
+      leaf("O5", "a cover lowers it: DeficitCovered"),
+      leaf("O6", "only the Umbrella can cover it: eliminateReserveDeficit, onlyUmbrella"),
+      leaf("D1", "Aave's Pool docs on getReserveDeficit and eliminateReserveDeficit"),
+      leaf("U1", "Umbrella takes the funds from its caller, then calls the Pool"),
+      leaf("U2", "the DAO's deficit offset and the other covers"),
+      leaf("U3", "a slash of the reserve's stake token raises the pending deficit"),
+      leaf("D3", "Aave's Umbrella docs: the offset first, then slashing"),
+    ],
+  };
+}
