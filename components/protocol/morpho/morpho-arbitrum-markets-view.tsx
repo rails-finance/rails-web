@@ -15,6 +15,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { BlockRef } from "@/components/shared/block-ref";
 import { AssetUnit } from "@/components/shared/asset-unit";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import {
   DataTable,
   DataTableBody,
@@ -41,6 +42,7 @@ import type {
 
 const ROUTE = "/api/chain/morpho-arbitrum/markets";
 
+const NONE = "0x0000000000000000000000000000000000000000";
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 function usd(n: number): string {
@@ -52,7 +54,7 @@ function usd(n: number): string {
 
 /** A token by its symbol where it has one, by its address where it does not. */
 function Token({ symbol, address }: { symbol: string | null; address: string }) {
-  if (address === "0x0000000000000000000000000000000000000000") return <span className="text-rb-400">none</span>;
+  if (address === NONE) return <span className="text-rb-400">none</span>;
   return (
     <a
       href={explorerUrl(MORPHO_ARBITRUM_CHAIN_ID, "address", address)}
@@ -67,6 +69,33 @@ function Token({ symbol, address }: { symbol: string | null; address: string }) 
 }
 
 const NUM = "whitespace-nowrap tabular-nums text-foreground";
+
+/** The loan token's mark at the house table's size (V6's 28px), the
+ *  collateral's overlapping it where the market has one. */
+function PairIcons({ m }: { m: MorphoArbitrumMarketRow }) {
+  return (
+    <span className="flex shrink-0 items-center" aria-hidden data-prov-exempt="">
+      <TokenChipIcon
+        symbol={m.loanSymbol ?? shortAddr(m.loanToken)}
+        address={m.loanToken}
+        size={28}
+        filterable={false}
+        untitled
+      />
+      {m.collateralToken !== NONE && (
+        <span className="-ml-2 rounded-full ring-2 ring-[var(--surface-raised)] group-even/dt-row:ring-[var(--surface-sunken)]">
+          <TokenChipIcon
+            symbol={m.collateralSymbol ?? shortAddr(m.collateralToken)}
+            address={m.collateralToken}
+            size={28}
+            filterable={false}
+            untitled
+          />
+        </span>
+      )}
+    </span>
+  );
+}
 
 /** A size in the market's loan token, the token's mark after it. */
 function Size({ children, m }: { children: ReactNode; m: MorphoArbitrumMarketRow }) {
@@ -105,14 +134,19 @@ function MarketRow({
         </DataTableCell>
       )}
       <DataTableCell rowHeader className="whitespace-nowrap text-foreground">
-        {rank != null && (
-          <span className="mr-2 tabular-nums text-rb-500 sm:hidden" data-prov-exempt="">
-            {rank}
+        <span className="flex items-center gap-2.5">
+          {rank != null && (
+            <span className="tabular-nums text-rb-500 sm:hidden" data-prov-exempt="">
+              {rank}
+            </span>
+          )}
+          <PairIcons m={m} />
+          <span>
+            <Token symbol={m.loanSymbol} address={m.loanToken} />
+            <span className="text-rb-400"> / </span>
+            <Token symbol={m.collateralSymbol} address={m.collateralToken} />
           </span>
-        )}
-        <Token symbol={m.loanSymbol} address={m.loanToken} />
-        <span className="text-rb-400"> / </span>
-        <Token symbol={m.collateralSymbol} address={m.collateralToken} />
+        </span>
       </DataTableCell>
       <DataTableCell label="LLTV" align="right" className={NUM}>
         <Prov info={lltvProv(coords)}>{pctText(m.lltv)}</Prov>
@@ -174,7 +208,12 @@ function MarketsTable({
 }) {
   const ranked = loanUsd != null;
   return (
-    <DataTable label={label} stacked tableClassName={`text-[12px] ${ranked ? "sm:min-w-[48rem]" : "sm:min-w-[44rem]"}`}>
+    <DataTable
+      label={label}
+      stacked
+      rowHeight="one"
+      tableClassName={`text-sm ${ranked ? "sm:min-w-[48rem]" : "sm:min-w-[44rem]"}`}
+    >
       <DataTableHead>
         {ranked && <DataTableHeader label="#" />}
         <DataTableHeader label="Loan / collateral" />
