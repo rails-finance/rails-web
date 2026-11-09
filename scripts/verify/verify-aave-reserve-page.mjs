@@ -37,9 +37,14 @@
 //      opens, and a press on a row's amount cell lands on its position. Base
 //      and Seamless state "Not ranked yet on Base.", Arbitrum "Not indexed yet
 //      on Arbitrum.".
+//  11. Aave V4 (lib/aave-v4/reserve.tsx): the change log (M3.6) lists
+//      GET /api/aave-v4/reserve/config-log's rows newest first, the first ten,
+//      each with words and its side (spoke or hub), the held line under it and
+//      a row's receipt naming its event; on Base the one line.
 //
 // Run:
 //   BASE=http://localhost:3000 node scripts/verify/verify-aave-reserve-page.mjs
+//   (V4_ONLY=1 runs check 11 alone.)
 
 import { chromium } from "playwright";
 import { armScope } from "./lib/prov-inspector.mjs";
@@ -123,7 +128,7 @@ const pctOf = (t) => {
 
 const browser = await chromium.launch();
 const routes = new Map();
-for (const f of FIXTURES) {
+for (const f of process.env.V4_ONLY ? [] : FIXTURES) {
   if (!routes.has(f.api)) routes.set(f.api, await (await fetch(`${BASE}${f.api}`)).json());
   const data = routes.get(f.api);
   const r = data.reserves?.find((x) => x.symbol === f.symbol);
@@ -483,6 +488,91 @@ for (const f of FIXTURES) {
     await page.waitForURL(at, { timeout: 120000 }).catch(() => {});
     check(`${tag} 10d a press on a holder row lands on its position`, at(new URL(page.url())), page.url());
   }
+  await page.close();
+}
+
+// ── 11. Aave V4's change log (M3.6) ────────────────────────────────────────────
+const V4_FIXTURES = [
+  {
+    path: "/ethereum/aave-v4/markets/main/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    q: "spoke=main&asset=0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48&hub=core",
+  },
+  {
+    path: "/ethereum/aave-v4/markets/usdg-paxg/0xe343167631d89b6ffc58b88d6b7fb0228795491d",
+    q: "spoke=usdg_paxg&asset=0xe343167631d89b6ffc58b88d6b7fb0228795491d",
+  },
+  {
+    path: "/ethereum/aave-v4/markets/bluechip/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48?hub=core",
+    q: "spoke=bluechip&asset=0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48&hub=core",
+  },
+  { path: "/base/aave-v4/markets/mag7/0xb200000000000000000000c2e324d24d7eecd1fb", q: null },
+];
+const V4_SHOWN = 10;
+const V4_HUB_KINDS = new Set(["asset-config", "credit-line", "rate-curve"]);
+for (const f of V4_FIXTURES) {
+  const tag = `V4 ${f.path}`;
+  const cfg = f.q ? await (await fetch(`${BASE}/api/aave-v4/reserve/config-log?${f.q}`)).json() : null;
+  const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
+  await page.goto(`${BASE}${f.path}`, NAV);
+  // The section draws before its read settles: wait for rows, the empty line or a stated gap.
+  await page
+    .waitForSelector(
+      '[data-anatomy~="M3.6"] :is(tr[data-change-row], [data-change-log-empty], [data-reserve-not-indexed], [data-reserve-read-failed])',
+      { timeout: WAIT },
+    )
+    .catch(() => {});
+  const got = await page.evaluate(() => {
+    const s = document.querySelector('[data-anatomy~="M3.6"]');
+    return {
+      rows: [...(s?.querySelectorAll("tr[data-change-row]") ?? [])].map((tr) => ({
+        block: Number(tr.getAttribute("data-change-block")),
+        kind: tr.getAttribute("data-change-kind"),
+        side: tr.getAttribute("data-change-side"),
+        words: tr.querySelector("[data-change-words]")?.textContent ?? "",
+      })),
+      held: s?.querySelector("[data-change-log-held]")?.textContent ?? null,
+      empty: Boolean(s?.querySelector("[data-change-log-empty]")),
+      notIndexed: s?.querySelector("[data-reserve-not-indexed]")?.textContent ?? null,
+    };
+  });
+  if (!cfg) {
+    check(
+      `${tag} 11a Base states the one line`,
+      /not indexed Aave V4's configuration changes on Base yet/.test(got.notIndexed ?? "") && got.rows.length === 0,
+      norm(got.notIndexed),
+    );
+    await page.close();
+    continue;
+  }
+  const want = [...(cfg.logs ?? [])].reverse().slice(0, V4_SHOWN);
+  check(
+    `${tag} 11a rows match the route, newest first, each with words and its side`,
+    (cfg.logs?.length ?? 0) === 0
+      ? got.empty
+      : got.rows.length === want.length &&
+          want.every(
+            (l, i) =>
+              got.rows[i]?.block === l.block &&
+              got.rows[i]?.kind === l.kind &&
+              got.rows[i]?.side === (V4_HUB_KINDS.has(l.kind) ? "hub" : "spoke") &&
+              got.rows[i]?.words,
+          ),
+    `${got.rows.length} rows vs ${want.length}; first ${got.rows[0]?.block} ${got.rows[0]?.kind} "${got.rows[0]?.words}"`,
+  );
+  check(`${tag} 11b the held line`, /held from|not held/.test(got.held ?? ""), norm(got.held));
+  let pop = "";
+  if (got.rows.length && (await arm(page, "reserve-changes"))) {
+    await page.locator('[data-anatomy~="M3.6"] tr[data-change-row] [data-prov-pickable]').first().click();
+    await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
+    pop = norm(
+      await page
+        .locator(".prov-inspect-pop")
+        .first()
+        .innerText()
+        .catch(() => ""),
+    );
+  }
+  check(`${tag} 11c a row's receipt names its event`, /event at block/.test(pop), pop.slice(0, 120));
   await page.close();
 }
 

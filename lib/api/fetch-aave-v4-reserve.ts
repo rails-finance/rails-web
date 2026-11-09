@@ -4,10 +4,13 @@
 // app/api/aave-v4/reserve/[read]/route.ts to rails-server:
 //   head    the spoke reserve at the head block (services/aave-v4-reserve-head.ts);
 //   holders its ten largest suppliers and borrowers (services/aave-v4-reserve-holders.ts);
-//   history the hub asset's daily drawn rate (services/aave-v4-hub-asset-history.ts).
+//   history the hub asset's daily drawn rate (services/aave-v4-hub-asset-history.ts);
+//   config-log the reserve's configuration changes (services/aave-v4-reserve-config-log.ts),
+//           shaped as lib/aave-v4/config-words.ts `V4ConfigLog`.
 // The shapes are the upstream's. Client only: the bearer token stays in the route.
 
 import { useEffect, useState } from "react";
+export type { V4ConfigLog } from "@/lib/aave-v4/config-words";
 
 /** The head read of one spoke reserve: decimal strings at one block. */
 export interface V4ReserveHead {
@@ -112,9 +115,11 @@ export type V4Read<T> =
 
 const READ_MS = 35_000;
 
-/** One read of the three, settled into a `V4Read`. */
+type V4ReadName = "head" | "holders" | "history" | "config-log";
+
+/** One read of the four, settled into a `V4Read`. */
 export async function getV4Read<T>(
-  read: "head" | "holders" | "history",
+  read: V4ReadName,
   q: Record<string, string>,
   signal?: AbortSignal,
 ): Promise<V4Read<T>> {
@@ -136,7 +141,7 @@ export async function getV4Read<T>(
 }
 
 /** One read, started on mount and again when its question changes; null asks nothing. */
-export function useV4Read<T>(read: "head" | "holders" | "history", q: Record<string, string> | null): V4Read<T> {
+export function useV4Read<T>(read: V4ReadName, q: Record<string, string> | null): V4Read<T> {
   const [out, setOut] = useState<V4Read<T>>({ state: "loading" });
   const key = q ? new URLSearchParams(q).toString() : "";
   useEffect(() => {

@@ -9,7 +9,8 @@
 //        and Utilisation (the hub), each figure naming its side;
 //   M3.3 the rate curve, the hub strategy's constants and the premium;
 //   M3.4 the hub asset's daily drawn rate; M3.5 the spoke's and the hub's
-//        parameters; M3.6 one line (Rails has not indexed V4's configuration events);
+//        parameters; M3.6 the spoke's and the hub's configuration changes, newest
+//        first (lib/aave-v4/config-words.ts; one line on Base, not indexed there);
 //   M3.7, M3.8 the largest suppliers and borrowers of this spoke reserve.
 // The head is one read (`/api/at-block/aave-v4/reserve`); a token the spoke lists
 // from two hubs needs `?hub=`, and without it the page asks which.
@@ -25,10 +26,12 @@ import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { RateCurve } from "@/components/shared/product/rate-curve";
 import { HoldersTable } from "@/components/shared/product/position-entry";
+import { ReserveChangeLog } from "@/components/shared/aave-reserve-tables";
 import { ReservePage, type ReservePageData } from "@/components/shared/product/reserve-page";
 import { AaveV4DrawnRateHistory, type HistorySpan } from "@/components/protocol/aave-v4/aave-v4-drawn-rate-history";
 import {
   useV4Read,
+  type V4ConfigLog,
   type V4History,
   type V4Holders,
   type V4Read,
@@ -50,14 +53,17 @@ import {
 } from "@/lib/aave-v4/markets";
 import {
   availableProv,
-  configChangesProv,
+  configChangesBaseProv,
   curveProv,
   drawnRateProv,
   headValueProv,
   holderAmountProv,
   supplyRateProv,
   utilisationProv,
+  v4ConfigChangeProv,
 } from "@/lib/aave-v4/market-provenance";
+import { v4HeldLine, v4ReserveChanges } from "@/lib/aave-v4/config-words";
+import { formatDate } from "@/lib/date";
 import {
   amountText,
   pctText,
@@ -66,7 +72,7 @@ import {
   type V4Names,
 } from "@/components/protocol/aave-v4/aave-v4-market-parts";
 import { headQuery, namesOf, PREMIUM_LINE, protocolOf, RATE_TIP, useV4Stored } from "@/lib/aave-v4/product";
-import { chainMeta } from "@/lib/shared/chains";
+import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 import { formatCompactTitled } from "@/lib/shared/format-compact";
 import { ratePercentText } from "@/lib/shared/rate-percent";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -509,6 +515,100 @@ function indexedSections(
   return { history, holders };
 }
 
+/** M3.6: the spoke's and the hub's configuration changes, newest first; on
+ *  Base one line, the route holding Ethereum's tables only. */
+function changesSection(
+  d: V4Deployment,
+  sp: V4Spoke,
+  f: V4ReserveFigures,
+  names: V4Names,
+  q: V4Read<V4ConfigLog>,
+  history: V4History | null,
+): ProductSection {
+  const base: Omit<ProductSection, "body" | "tools"> = {
+    scope: "reserve-changes",
+    anatomy: "M3.6",
+    title: "Configuration changes",
+  };
+  if (d.chain === "base")
+    return {
+      ...base,
+      tools: {},
+      body: (
+        <p className={NOTE} data-reserve-not-indexed="">
+          <Prov info={configChangesBaseProv(f, names)}>
+            Rails has not indexed Aave V4&apos;s configuration changes on Base yet.
+          </Prov>
+        </p>
+      ),
+    };
+  if (q.state !== "ok") return { ...base, tools: {}, body: missingLine(q, "configuration changes", 240) };
+  const log = q.data;
+  const changes = v4ReserveChanges(log, {
+    symbol: names.symbol,
+    hub: names.hub,
+    spokeAddress: f.spokeAddress,
+    hubAddress: f.hubAddress,
+  }).map((c) => ({ ...c, setOn: c.side === "spoke" ? `${names.spoke} spoke` : `${names.hub} hub` }));
+  const explorer = chainMeta(d.chainId).explorerName;
+  const dateOf = (block: number) => {
+    const p = history?.points.find((x) => x.closeBlock >= block);
+    return p && p.date !== history?.points[0]?.date ? formatDate(p.date) : null;
+  };
+  const held = v4HeldLine(log, names, dateOf);
+  return {
+    ...base,
+    tools: {
+      exports: {
+        csv: {
+          filename: `aave-v4-${sp.slug}-${names.symbol}-changes.csv`,
+          build: () =>
+            csvRows(
+              ["timestamp", "block", "transaction", "log_index", "set_on", "kind", "change"],
+              changes.map(({ row, words, setOn }) => [
+                row.timestamp,
+                row.block,
+                row.txHash,
+                row.logIndex,
+                setOn,
+                row.kind,
+                `"${words.replace(/"/g, '""')}"`,
+              ]),
+            ),
+          subtitle: "Every change held, newest first",
+        },
+      },
+    },
+    body: (
+      <>
+        <ReserveChangeLog
+          changes={changes}
+          chainId={d.chainId}
+          held=""
+          automatorNote={false}
+          setOn
+          pageSize={10}
+          receipt={(c) =>
+            v4ConfigChangeProv(c, names, {
+              block: explorerUrl(d.chainId, "block", c.row.block),
+              tx: explorerUrl(d.chainId, "tx", c.row.txHash),
+              name: explorer,
+            })
+          }
+        />
+        <p className={`${NOTE} mt-2`} data-change-log-held="">
+          {held}
+        </p>
+        {log.notes.map((n) => (
+          <p key={n} className={`${NOTE} mt-1`} data-change-log-note="">
+            {n}
+          </p>
+        ))}
+      </>
+    ),
+  };
+}
+
 /** Which hub, where the spoke lists the token from two. */
 function HubChoice({ d, sp, lines }: { d: V4Deployment; sp: V4Spoke; lines: V4Line[] }) {
   const protocol = protocolOf(d);
@@ -578,6 +678,10 @@ export function AaveV4ReservePage({
     d.chain === "ethereum" && line ? { hub: line.hub, asset: addr, ...(from ? { from } : {}) } : null,
   );
   const holders = useV4Read<V4Holders>("holders", sp && line ? headQuery(sp, line) : null);
+  const configLog = useV4Read<V4ConfigLog>(
+    "config-log",
+    d.chain === "ethereum" && sp && line ? headQuery(sp, line) : null,
+  );
   const [kept, setKept] = useState<V4History | null>(null);
   useEffect(() => {
     if (history.state === "ok") setKept(history.data);
@@ -671,20 +775,7 @@ export function AaveV4ReservePage({
             },
             body: <V4Parameters f={f} line={line} names={names} />,
           },
-          {
-            scope: "reserve-changes",
-            anatomy: "M3.6",
-            title: "Configuration changes",
-            tools: {},
-            body: (
-              <p className={NOTE} data-reserve-changes-none="">
-                <Prov info={configChangesProv(f, names)}>
-                  Rails has not indexed Aave V4&apos;s configuration changes yet, so this reserve&apos;s changes are not
-                  listed.
-                </Prov>
-              </p>
-            ),
-          },
+          changesSection(d, sp, f, names, configLog, kept),
           ...holderSections,
         ],
       },
