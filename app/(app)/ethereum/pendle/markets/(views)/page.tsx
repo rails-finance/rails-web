@@ -12,7 +12,7 @@ import { listingMetadata } from "@/lib/shared/page-metadata";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { readPendleRoster } from "@/lib/sources/api/pendle";
 import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
-import { PendleRosterView, PendleWalletSearch } from "@/components/protocol/pendle/pendle-roster";
+import { PendleRosterView } from "@/components/protocol/pendle/pendle-roster";
 import { PendleReadNotice } from "@/components/protocol/pendle/pendle-read-notice";
 
 export const dynamic = "force-dynamic";
@@ -35,9 +35,6 @@ export default async function PendleMarketsPage({ searchParams }: { searchParams
     <div className="min-h-screen">
       <div className="py-8">
         <SubPageHeader protocol={PROTOCOL} title="Markets" />
-        <div className="mb-8 max-w-xl">
-          <PendleWalletSearch />
-        </div>
         {read.ok ? (
           <PendleRosterView roster={read.data} at={at} initialSearch={initialSearch} />
         ) : (
