@@ -38,6 +38,7 @@ import {
   DataTableHead,
   DataTableHeader,
   DataTableRow,
+  DataTableRowLink,
 } from "@/components/shared/data-table/data-table";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -349,26 +350,25 @@ function ilkProtocol(ilk: string): string | null {
 function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null }) {
   const showPrice = row.priceUsd != null && (row.group === "vault" || row.group === "rwa");
 
+  // `ilk`, singular — the listing dimension's URL param (its `id` is "ilks"
+  // and the API client's param is "ilks", but neither is what
+  // decodeListFilters reads). A wrong param doesn't error: the filter is
+  // simply ignored and the reader lands on the unfiltered roster believing
+  // it's this ilk's. A user vault type's whole row opens it (D4).
+  const href = row.userVaultType ? `/ethereum/makerdao?ilk=${encodeURIComponent(row.ilk)}` : undefined;
+
   return (
-    <DataTableRow data-maker-ilk={row.ilk}>
+    <DataTableRow data-maker-ilk={row.ilk} href={href}>
       {/* Ilk */}
       <DataTableCell rowHeader className="min-w-0">
         <div className="flex items-center gap-2.5">
           <TokenPairIcons first={{ symbol: ilkMarkSymbol(row) }} protocol={ilkProtocol(row.ilk)} fixed />
           <div className="min-w-0">
             <div className="flex items-baseline gap-1.5">
-              {row.userVaultType ? (
-                // `ilk`, singular — the listing dimension's URL param (its `id` is
-                // "ilks" and the API client's param is "ilks", but neither is what
-                // decodeListFilters reads). A wrong param doesn't error: the filter
-                // is simply ignored and the reader lands on the unfiltered roster
-                // believing it's this ilk's.
-                <Link
-                  href={`/ethereum/makerdao?ilk=${encodeURIComponent(row.ilk)}`}
-                  className="truncate text-blue-600 dark:text-[var(--text-link)] hover:underline"
-                >
+              {href ? (
+                <DataTableRowLink href={href} className="truncate">
                   {row.ilk}
-                </Link>
+                </DataTableRowLink>
               ) : (
                 <Prov info={stampHeadRead(ilkGroupProv(row.ilk, row.cls), readBy)}>
                   <span className="truncate text-foreground">{row.ilk}</span>
