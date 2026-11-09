@@ -30,6 +30,7 @@ const PROPER = new Set([
   "Compound",
   "Dolomite",
   "Equities",
+  "Etherscan",
   "Ethereum",
   "Fluid",
   "Frankencoin",
