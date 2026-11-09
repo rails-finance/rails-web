@@ -167,7 +167,7 @@ export function ProtocolRow() {
             )}
             <Link
               href={`/coverage/${CHAINS[chainId].slug}`}
-              className="ml-auto shrink-0 rounded-sm px-2 py-1 text-sm font-medium text-blue-600 underline-offset-4 hover:underline focus-ring dark:text-blue-400"
+              className="ml-auto shrink-0 rounded-sm px-2 py-1 text-sm font-medium text-blue-600 underline-offset-4 hover:underline focus-ring dark:text-[var(--text-link)]"
               data-home-coverage=""
             >
               See detailed coverage <span>→</span>

@@ -42,7 +42,7 @@ export default async function Home() {
           bottom so the iframe content feathers into it. ═══ */}
       {/* via == to pins the bottom half to a constant color, so the frame's
           bottom fade (which ends on the same background/rb-800 stop) melts
-          into it with no seam. The light floor is the app's own canvas, so the
+          into it with no seam. The light floor is the app's canvas, so the
           marketing page hands off to the paper the product is drawn on rather
           than bottoming out darker than it.
           ⚠️ `background` is the ONE stop that follows html.dark: it is
@@ -114,7 +114,7 @@ export default async function Home() {
           <div className="max-w-7xl mx-auto px-4 pt-16 pb-16">
             <div className="mb-6">
               <h2 className="mb-10 text-3xl font-semibold tracking-tight text-foreground">
-                <span className="marketing">DeFi</span> for everyone
+                <span className="text-[var(--marketing)] dark:text-rb-500">DeFi</span> for everyone
               </h2>
             </div>
 

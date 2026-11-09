@@ -154,7 +154,7 @@ export const psmShareNetProv = (
     kind: "chain-derived",
     pclass: "oracle",
     verify: txVerify(coords),
-    summary: `The PSM share this touch settled, as one figure in ${stable}${atBlock(coords)}: the pETH it ${vals.coll < 0 ? "took" : "added"} (\`_mintRedeemCollGain\`) at the feed's \`previewPrice()\` for this block, less the debt it ${vals.debt < 0 ? "cleared" : "added"} (\`_mintRedeemDebtGain\`). The share is the net of every PSM mint and redemption since the position's previous touch; at the price the PSM used it is close to even, so the figure is what the price moved in between. The two legs stand on the event's sheet.`,
+    summary: `The PSM share this touch settled, as one figure in ${stable}${atBlock(coords)}. The pETH it ${vals.coll < 0 ? "took" : "added"} (\`_mintRedeemCollGain\`) at the feed's \`previewPrice()\` for this block, less the debt it ${vals.debt < 0 ? "cleared" : "added"} (\`_mintRedeemDebtGain\`). The share is the net of every PSM mint and redemption since the position's previous touch; at the price the PSM used it is close to even, so the figure is what the price moved in between. The two legs stand on the event's sheet.`,
     contract: managerContract(coords),
     via: `${POLARIS_VIA} · CDPUpdated · ${fieldSeg(LOG_FIELD.mintRedeemCollGain, vals.collRaw)} × polaris_oracle_at_block · ${fieldSeg("previewPrice()", vals.priceRaw)} − ${fieldSeg(LOG_FIELD.mintRedeemDebtGain, vals.debtRaw)}`,
     formula: "_mintRedeemCollGain × previewPrice() at block − _mintRedeemDebtGain",

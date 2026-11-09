@@ -14,7 +14,7 @@
 
 import { IndexNotice } from "@/components/shared/index-notice";
 import Link from "next/link";
-import { Suspense, use, type CSSProperties } from "react";
+import { Suspense, use } from "react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { WalletHeading } from "@/components/shared/wallet-heading";
 import { PROFILE_CLEARANCE } from "@/lib/shared/ui-grammar";
@@ -26,7 +26,7 @@ import { WalletPositionCard, atRisk, protocolId } from "@/components/wallet/wall
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { Icon } from "@/components/icons/icon";
 import { ChainGlyph } from "@/components/icons/chain-glyphs";
-import { protocolBrand } from "@/lib/shared/protocols";
+import { RowZone, hueStyle } from "@/components/shared/row-zone";
 import { ReadStamp } from "@/components/wallet/read-stamp";
 import { formatCompactUsd } from "@/lib/shared/format-compact";
 import { formatDate } from "@/lib/date";
@@ -41,6 +41,11 @@ const ROW_PANEL = "rounded-2xl border border-rb-300/40 bg-raised dark:border-rb-
 /** A closed row's link: the panel with the open cards' blue border on hover
  *  (POSITION_CARD_FRAME_BOX) and on keyboard focus. */
 const ROW_LINK = `${ROW_PANEL} transition-colors hover:border-blue-500 focus-visible:border-blue-500 dark:hover:border-blue-500 dark:focus-visible:border-blue-500`;
+/** A History row's link (W4): the frame and its border over the protocol's
+ *  hue, the body's ground an element after the zone whose left corners round
+ *  over the hue (D5's curve). */
+const HISTORY_LINK =
+  "overflow-hidden rounded-2xl border border-rb-300/40 bg-clip-padding transition-colors hover:border-blue-500 focus-visible:border-blue-500 dark:border-rb-700/40 dark:hover:border-blue-500 dark:focus-visible:border-blue-500";
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
 
 const pct = (x: number) => `${(x * 100).toFixed(1)}%`;
@@ -168,32 +173,6 @@ function TxCount({ n }: { n: number }) {
   );
 }
 
-/** The protocol's brand hue for the zone and edge tokens; a grey zone where
- *  the roster has none. */
-function hueStyle(id: string): CSSProperties {
-  const hue = protocolBrand(id)?.hue ?? null;
-  return { "--brand-hue": hue ?? 0, ...(hue == null ? { "--brand-strength": 0 } : {}) } as CSSProperties;
-}
-
-/** A row's lead on the History table and the Trades row: the protocol's mark
- *  and the chain's glyph on the protocol's tint, as the card's sidebar draws
- *  them (C20). Spans the row's height from its left edge. */
-function RowZone({ id, chain }: { id: string; chain: ChainId }) {
-  return (
-    <span
-      className="flex w-[95px] shrink-0 items-center justify-evenly self-stretch rounded-l-[15px] bg-brand-zone"
-      style={hueStyle(id)}
-      data-closed-zone={id}
-    >
-      <ProtocolIcon id={id} className="h-[18px] w-[18px] shrink-0 text-brand-mark [&:is(img)]:grayscale" />
-      <span className="flex items-center text-brand-zone">
-        <ChainGlyph id={chain} className="h-[18px] w-[18px] shrink-0" />
-        <span className="sr-only">{chainMeta(chain).name}</span>
-      </span>
-    </span>
-  );
-}
-
 function History({ closed }: { closed: WalletPosition[] }) {
   const rows = [...closed].sort((a, b) => (b.history?.closedAt ?? 0) - (a.history?.closedAt ?? 0));
   const counts = (["liquidated", "redeemed", "closed"] as const)
@@ -227,9 +206,14 @@ function History({ closed }: { closed: WalletPosition[] }) {
               {/* The open cards' phone form (C20.1): the hue's 6px edge, the
                   mark and name at the left of the first line, the chain's
                   glyph at its right. */}
-              <Link href={p.href} prefetch={false} className={`${ROW_LINK} flex overflow-hidden text-sm`}>
-                <span className="w-[6px] shrink-0 self-stretch bg-brand-edge" style={hueStyle(protocolId(p))} />
-                <span className="flex min-w-0 flex-1 flex-col gap-1 py-3 pl-5 pr-4">
+              <Link
+                href={p.href}
+                prefetch={false}
+                className={`${HISTORY_LINK} flex bg-brand-edge text-sm`}
+                style={hueStyle(protocolId(p))}
+              >
+                <span className="w-[6px] shrink-0 self-stretch bg-brand-edge" />
+                <span className="flex min-w-0 flex-1 flex-col gap-1 rounded-l-2xl bg-raised py-3 pl-5 pr-4">
                   <span className="flex items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-zone">
                       <ProtocolIcon id={protocolId(p)} className="h-4 w-4 shrink-0 text-rb-500" />
@@ -296,13 +280,16 @@ function History({ closed }: { closed: WalletPosition[] }) {
                   href={p.href}
                   prefetch={false}
                   role="row"
-                  className={`${HISTORY_GRID} items-center ${ROW_LINK} py-3 pr-5 text-sm`}
+                  className={`${HISTORY_GRID} relative isolate items-center ${HISTORY_LINK} bg-brand-zone py-3 pr-5 text-sm`}
+                  style={hueStyle(protocolId(p))}
                   data-history-row={p.positionId}
                   data-family={p.family}
                 >
                   <div role="cell" className="-my-3 flex self-stretch">
                     <RowZone id={protocolId(p)} chain={p.chain} />
                   </div>
+                  {/* The body's ground, from the zone's edge: the hue shows at its left corners. */}
+                  <span aria-hidden className="absolute inset-y-0 right-0 left-[95px] -z-10 rounded-l-2xl bg-raised" />
                   <div role="cell" className="text-foreground/80">
                     {h.closedAt != null ? formatDate(h.closedAt) : "—"}
                   </div>
@@ -507,7 +494,7 @@ export function WalletView({
             address={address}
             className="mt-6"
             // The address menu a position page draws (ui-jobs 430): Copy the
-            // address and Bookmark it; no View the wallet on the wallet view.
+            // address and Bookmark it; no View wallet on the wallet view.
             title={<WalletMenu wallet={address} ensName={ensName} heading view={false} />}
             lines={
               <>
@@ -607,7 +594,7 @@ export function WalletView({
  *  them here. To remove once Arbitrum history is indexed like Ethereum's and
  *  Base's (ui-jobs 522). */
 function ArbitrumNote({ address }: { address: string }) {
-  const link = "text-blue-600 hover:underline dark:text-blue-400";
+  const link = "text-blue-600 hover:underline dark:text-[var(--text-link)]";
   return (
     <p className="flex items-start gap-2 text-xs text-rb-500" data-wallet-arbitrum-note="">
       <ChainGlyph id={ARBITRUM_CHAIN_ID} className="mt-px h-3.5 w-3.5 shrink-0" />

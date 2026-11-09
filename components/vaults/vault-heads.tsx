@@ -19,8 +19,10 @@ import { formatDate } from "@/lib/date";
 import { assetText, sharePriceText } from "@/lib/shared/vault-amount-text";
 import type { VaultStanding, VaultSummary } from "@/lib/vaults/summary";
 import type { VaultFamily } from "@/lib/vaults/families";
-import { changeText, yieldText, type VaultYield } from "@/lib/vaults/yield";
-import { vaultHoldersProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
+import { changeText, jumpTail, measuredYield, yieldText, type VaultYield } from "@/lib/vaults/yield";
+import { vaultHoldersProv, vaultWithdrawableProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
+import { illiquidSentence, type VaultIlliquid } from "@/lib/vaults/illiquid";
+import { heldAssetsRaw } from "@/lib/vaults/lost-assets";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -29,6 +31,10 @@ export interface VaultRowReceipts {
   name?: Provenance;
   totalAssets?: Provenance;
   sharePrice?: Provenance;
+  /** The Total assets caution's two figures (ui-jobs 543): `lostAssets()` and
+   *  what the vault holds. */
+  lostAssets?: Provenance;
+  heldAssets?: Provenance;
   standing?: Partial<Record<VaultStanding, Provenance>>;
 }
 
@@ -37,6 +43,8 @@ export const STANDING_WORD: Record<VaultStanding, string> = {
   "shut-down": "shut down",
   paused: "paused",
   "address-book": "in Aave’s address book",
+  illiquid: "illiquid",
+  "lost-assets": "lost assets",
 };
 
 const VENUE: Record<VaultFamily, VaultVenue> = {
@@ -137,11 +145,80 @@ function InAsset({ v, children, exact }: { v: VaultSummary; children: ReactNode;
 
 const withProv = (info: Provenance | undefined, text: string) => (info ? <Prov info={info}>{text}</Prov> : text);
 
+/** The Yield slot's caution on an illiquid vault (ui-jobs 540): which markets
+ *  hold it, and what can be withdrawn at the read block. `detail` prints the
+ *  full figures with the receipt; the row, the compact form. */
+export function IlliquidCaution({ vault: v, il, detail }: { vault: VaultSummary; il: VaultIlliquid; detail: boolean }) {
+  const raw = BigInt(il.withdrawable);
+  const amount = { raw: il.withdrawable, value: Number(raw) / 10 ** v.asset.decimals };
+  const out = detail ? assetText(amount, v.asset.decimals) : formatCompact(amount.value);
+  const total = v.totalAssets
+    ? detail
+      ? assetText(v.totalAssets, v.asset.decimals)
+      : formatCompact(v.totalAssets.value)
+    : null;
+  return (
+    <span className="mt-1 block" data-yield-illiquid={il.markets.map((m) => m.id).join(" ")}>
+      {illiquidSentence(il)}{" "}
+      <span data-illiquid-withdrawable={il.withdrawable}>
+        {detail ? <Prov info={vaultWithdrawableProv(v, il)}>{out}</Prov> : out}
+      </span>
+      {total != null ? ` of ${total}` : ""} {v.asset.symbol} can be withdrawn at block {n(il.block)}.
+    </span>
+  );
+}
+
+/** The Total assets slot's caution on a vault whose total includes lost assets
+ *  (ui-jobs 543): what was lost and what the vault holds, at the read block.
+ *  `detail` prints the full figures with their receipts; the row, the compact
+ *  form. The words are lib/vaults/lost-assets.ts `lostAssetsSentence`. */
+export function LostAssetsCaution({
+  vault: v,
+  receipts,
+  detail,
+}: {
+  vault: VaultSummary;
+  receipts: VaultRowReceipts;
+  detail: boolean;
+}) {
+  if (!v.totalAssets || !v.lostAssets) return null;
+  const d = v.asset.decimals;
+  const heldRaw = heldAssetsRaw(v.totalAssets.raw, v.lostAssets.raw).toString();
+  const held = { raw: heldRaw, value: Number(heldRaw) / 10 ** d };
+  const text = (a: { raw: string; value: number }) => (detail ? assetText(a, d) : formatCompact(a.value));
+  return (
+    <span className="block" data-total-assets-lost="">
+      Includes{" "}
+      <span data-lost-assets={v.lostAssets.raw}>
+        {detail ? withProv(receipts.lostAssets, text(v.lostAssets)) : text(v.lostAssets)}
+      </span>{" "}
+      {v.asset.symbol} lost at block {n(v.readAt.block)}. The vault holds{" "}
+      <span data-held-assets={heldRaw}>{detail ? withProv(receipts.heldAssets, text(held)) : text(held)}</span>{" "}
+      {v.asset.symbol}; the share price has not been lowered for the loss, so the holders who withdraw last carry it.
+    </span>
+  );
+}
+
 /** The four headlines. `detail`: the card, which prints the print rules' full
  *  figures and gives every label its read-more; else the row's compact form. */
+type MeasuredYield = Extract<VaultYield, { yearly: number }>;
+
+/** The Yield subline's words: "share price +0.42% over the 30 days to block
+ *  N", and the one-off move where there is one. */
+export const yieldSublineText = (y: MeasuredYield): string =>
+  `share price ${changeText(y.change)} over the ${y.days} days to block ${n(y.to.block)}${
+    y.jump ? jumpTail(y.jump, (d) => formatDate(new Date(d * 86_400_000))) : ""
+  }`;
+
+/** "The vault holds 0.000002 USDC at block N.": the too-small subline. */
+export const tooSmallSentence = (v: VaultSummary): string =>
+  v.totalAssets
+    ? `The vault holds ${assetText(v.totalAssets, v.asset.decimals)} ${v.asset.symbol} at block ${n(v.readAt.block)}.`
+    : "";
+
 export function vaultHeads({
   vault: v,
-  yieldFigure,
+  yieldFigure: storeYield,
   holdersHref,
   receipts,
   detail = false,
@@ -182,6 +259,9 @@ export function vaultHeads({
           </InAsset>
         </span>
       ) : null,
+      ...(v.standing.includes("lost-assets")
+        ? { sub: <LostAssetsCaution vault={v} receipts={receipts} detail={detail} /> }
+        : {}),
     },
     {
       id: "share-price",
@@ -204,7 +284,9 @@ export function vaultHeads({
 
   // The slot draws whatever the store answers, so the four headlines align
   // (decision 0047 point 4): a figure where the store measures 30 days, else
-  // no figure and a subline saying why. The interpretation tip goes with the label.
+  // no figure and a subline saying why; a vault under the dust floor is too
+  // small to measure (ui-jobs 542). The interpretation tip goes with the label.
+  const yieldFigure = measuredYield(storeYield, v.totalAssets?.raw);
   if (yieldFigure && "yearly" in yieldFigure) {
     heads.push({
       id: "yield",
@@ -222,10 +304,35 @@ export function vaultHeads({
         </span>
       ),
       sub: (
-        <span {...(yieldFigure.jump ? { "data-yield-jump-day": String(yieldFigure.jump.day) } : {})}>
-          {`share price ${changeText(yieldFigure.change)} over the ${yieldFigure.days} days to block ${n(yieldFigure.to.block)}`}
-          {yieldFigure.jump &&
-            `, ${changeText(yieldFigure.jump.change)} of it on ${formatDate(new Date(yieldFigure.jump.day * 86_400_000))}`}
+        <span
+          {...(yieldFigure.jump
+            ? {
+                "data-yield-jump-day": String(yieldFigure.jump.day),
+                ...(yieldFigure.jump.fromDay != null
+                  ? { "data-yield-jump-from": String(yieldFigure.jump.fromDay) }
+                  : {}),
+              }
+            : {})}
+        >
+          {yieldSublineText(yieldFigure)}
+          {v.illiquid && <IlliquidCaution vault={v} il={v.illiquid} detail={detail} />}
+        </span>
+      ),
+    });
+  } else if (yieldFigure?.none === "too-small" && v.totalAssets) {
+    heads.push({
+      id: "yield",
+      label: "Yield",
+      labelTip: detail ? VAULT_HEAD_TIPS.yield : undefined,
+      value: (
+        <span className="text-[15px] font-normal text-rb-500" data-cell="yield" data-yield-none="too-small">
+          too small to measure
+        </span>
+      ),
+      sub: (
+        <span data-yield-too-small={v.totalAssets.raw}>
+          {tooSmallSentence(v)}
+          {v.illiquid && <IlliquidCaution vault={v} il={v.illiquid} detail={detail} />}
         </span>
       ),
     });
@@ -243,6 +350,7 @@ export function vaultHeads({
             : yieldFigure == null
               ? "daily series not read"
               : "no daily series yet"}
+          {v.illiquid && <IlliquidCaution vault={v} il={v.illiquid} detail={detail} />}
         </span>
       ),
     });
@@ -258,7 +366,7 @@ export function vaultHeads({
         <Link
           href={holdersHref}
           prefetch={false}
-          className="pointer-events-auto hover:text-blue-600 dark:hover:text-blue-400"
+          className="pointer-events-auto hover:text-blue-600 dark:hover:text-[var(--text-link)]"
           data-cell="holders"
           data-positions-link={v.address}
           data-link="vault-positions"

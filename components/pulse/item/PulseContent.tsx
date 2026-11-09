@@ -64,7 +64,7 @@ export function PulseContent({ event }: { event: TimelineEvent }) {
             </div>
             {event.postUrl && (
               <ArrowUpRight
-                className="size-4 text-rb-500 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors"
+                className="size-4 text-rb-500 group-hover:text-blue-600 dark:group-hover:text-[var(--text-link)] transition-colors"
                 aria-hidden="true"
               />
             )}
@@ -159,7 +159,9 @@ export function PulseContent({ event }: { event: TimelineEvent }) {
           {event.postUrl && (
             <ArrowUpRight
               className={`size-4 text-rb-500 transition-colors ${
-                isInternal ? "group-hover:text-blue-600 dark:group-hover:text-blue-400" : "group-hover:text-pink-500"
+                isInternal
+                  ? "group-hover:text-blue-600 dark:group-hover:text-[var(--text-link)]"
+                  : "group-hover:text-pink-500"
               }`}
               aria-hidden="true"
             />
@@ -245,7 +247,7 @@ function getHighlightIcon(type?: TimelineEngagementType) {
     case "repost":
       return <MetricIcons.repost className="size-3 text-green-500" />;
     case "reply":
-      return <MetricIcons.reply className="size-3 text-blue-600 dark:text-blue-400" />;
+      return <MetricIcons.reply className="size-3 text-blue-600 dark:text-[var(--text-link)]" />;
     case "quote":
       return <QuoteIcon className="size-3 text-green-500" />;
     default:

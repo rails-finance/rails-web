@@ -93,7 +93,7 @@ export function MaplePoolStatsBand({ poolState }: { poolState: Record<string, Ma
                     label="Deployed to loans"
                     note={
                       pctLoans != null ? (
-                        <span title="Principal + accrued interest of the institutional loan book — collateral custodied off-chain; open the receipt">
+                        <span title="Principal + accrued interest of the institutional loan book, collateral custodied off-chain; open the receipt">
                           {pctLoans.toFixed(1)}% · off-chain custody
                         </span>
                       ) : undefined
@@ -140,7 +140,7 @@ export function MaplePoolStatsBand({ poolState }: { poolState: Record<string, Ma
                       )}
                     >
                       <span>
-                        impairment live: {formatCompactTitled(s.unrealizedLosses).display} {cat.assetSymbol} marked —
+                        impairment live: {formatCompactTitled(s.unrealizedLosses).display} {cat.assetSymbol} marked:
                         exits realize it
                       </span>
                     </Prov>

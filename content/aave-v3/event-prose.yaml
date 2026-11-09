@@ -180,6 +180,10 @@ placeholders:
     rounding: text
     means: |-
       The symbol of what a swap received.
+  returned:
+    rounding: token
+    means: |-
+      What came back unsold of the aTokens a partial fill sent.
   venue:
     rounding: text
     means: |-
@@ -1312,6 +1316,11 @@ templates:
           sold
         text: |-
           Rails paired the two from the receipt; no protocol log joins them. The figures show {brand}'s side: one aToken transfer.
+      tout.paired_part:
+        when: |-
+          sold, and some of the aTokens sent came back in the same transaction
+        text: |-
+          Rails paired the two from the receipt; {returned} {symbol} came back unsold. The figures show {brand}'s side: one aToken transfer.
     order:
       [
         tout.what,
@@ -1319,6 +1328,7 @@ templates:
         tout.named,
         tout.sold,
         tout.paired,
+        tout.paired_part,
         off.switched,
         hf.under,
         hf.close,
@@ -1338,7 +1348,7 @@ templates:
         prior.plain,
       ]
     groups:
-      happened: [tout.what, tout.staked, tout.named, tout.sold, tout.paired, off.switched]
+      happened: [tout.what, tout.staked, tout.named, tout.sold, tout.paired, tout.paired_part, off.switched]
       leaves:
         [
           hf.under,
@@ -1360,7 +1370,7 @@ templates:
         ]
     alternates:
       - [tout.what, tout.sold]
-      - [tout.named, tout.paired]
+      - [tout.named, tout.paired, tout.paired_part]
       - [
           hf.under,
           hf.close,
@@ -1584,7 +1594,7 @@ doc_urls:
 L5:
   supply:
     title: |-
-      How Supplying Works
+      How supplying works
     intro: |-
       Supplying deposits an asset into the Pool, which mints aTokens for it. The deposit earns the variable supply rate and, while on as collateral, backs borrowing.
     detailsHeading: |-
@@ -1626,7 +1636,7 @@ L5:
 
   withdraw:
     title: |-
-      How Withdrawing Works
+      How withdrawing works
     intro: |-
       Withdrawing returns supplied assets from the Pool to a wallet, burning the matching aTokens. It can go only as far as the collateral left keeps any debt covered.
     detailsHeading: |-
@@ -1665,7 +1675,7 @@ L5:
 
   borrow:
     title: |-
-      How Borrowing Works
+      How borrowing works
     intro: |-
       Borrowing draws an asset from the Pool against the account's collateral, minting debt tokens that accrue variable interest until repaid.
     detailsHeading: |-
@@ -1703,7 +1713,7 @@ L5:
 
   repay:
     title: |-
-      How Repaying Works
+      How repaying works
     intro: |-
       Repaying returns borrowed tokens to the Pool, burning the matching debt tokens. The debt falls, the health factor rises, and collateral is freed.
     detailsHeading: |-
@@ -1735,7 +1745,7 @@ L5:
 
   liquidation:
     title: |-
-      How Liquidations Work
+      How liquidations work
     intro: |-
       An account can be liquidated once its health factor falls below 1, when its collateral, counted up to each threshold, no longer covers its debt. Automated bots usually do it.
     detailsHeading: |-
@@ -1775,7 +1785,7 @@ L5:
 
   bad_debt:
     title: |-
-      How Bad Debt Is Written Off
+      How bad debt is written off
     intro: |-
       A liquidation can take the last of an account's collateral while some debt remains. The Pool then burns that debt and records it as a deficit on the reserve.
     detailsHeading: |-
@@ -1807,7 +1817,7 @@ L5:
 
   transfer:
     title: |-
-      How Position Transfers Work
+      How position transfers work
     intro: |-
       Supplied balances are aTokens, which move between accounts like any token. A transfer hands supply to another account without leaving the Pool.
     detailsHeading: |-
@@ -1817,10 +1827,6 @@ L5:
           Not a deposit or withdrawal
         text: |-
           custody changes hands and no new value enters the Pool, so the lifetime flows give it a separate row.
-      - bold: |-
-          Two accounts, one move
-        text: |-
-          one transfer is an out-leg on the sender and an in-leg on the recipient.
       - bold: |-
           Health still enforced
         text: |-
@@ -1833,6 +1839,10 @@ L5:
           Who receives it
         text: |-
           the chain does not say whether the receiving account has the same owner.
+      - bold: |-
+          Through a third party
+        text: |-
+          supply sent to a swap or bridge router leaves the position, and the router swaps or bridges it and passes the output on.
     links:
       - label: |-
           aTokens
@@ -1843,7 +1853,7 @@ L5:
 
   repay_with_collateral:
     title: |-
-      How Repaying with Collateral Works
+      How repaying with collateral works
     intro: |-
       Repaying with collateral pays a debt with the account's supply instead of tokens from the wallet. In one transaction, collateral is withdrawn, swapped for the debt asset and repaid.
     detailsHeading: |-
@@ -1882,7 +1892,7 @@ L5:
 
   collateral_swap:
     title: |-
-      How a Collateral Swap Works
+      How a collateral swap works
     intro: |-
       A collateral swap trades one supplied asset for another without either leaving the position. Part of a supply is withdrawn, swapped, and supplied back in one transaction.
     detailsHeading: |-
@@ -1914,7 +1924,7 @@ L5:
 
   collateral_swap_cow:
     title: |-
-      How a Collateral Swap Works
+      How a collateral swap works
     intro: |-
       A collateral swap trades one supplied asset for another without either leaving the position. The owner signs a CoW order, and the settlement makes the trade.
     detailsHeading: |-
@@ -1943,7 +1953,7 @@ L5:
 
   debt_swap:
     title: |-
-      How a Debt Swap Works
+      How a debt swap works
     intro: |-
       A debt swap changes which asset the position owes. In one transaction a new debt is opened, swapped for the old debt's asset and used to repay it.
     detailsHeading: |-
@@ -1979,7 +1989,7 @@ L5:
 
   debt_swap_cow:
     title: |-
-      How a Debt Swap Works
+      How a debt swap works
     intro: |-
       A debt swap changes which asset the position owes. The owner signs a CoW order, and one transaction borrows the new asset, sells it and repays the old debt.
     detailsHeading: |-
@@ -2011,7 +2021,7 @@ L5:
 
   withdraw_and_swap:
     title: |-
-      How Withdraw and Swap Works
+      How withdraw and swap works
     intro: |-
       Withdraw and swap takes supplied tokens out of the Pool and swaps them for another token in one transaction. The swapped tokens go to the wallet, outside the position.
     detailsHeading: |-
@@ -2039,7 +2049,7 @@ L5:
 
   fallback:
     title: |-
-      How Positions Work
+      How positions work
     intro: |-
       Aave V3 lets a wallet borrow against supplied collateral in one account, under a single health factor.
     intro_seamless: |-
@@ -2072,7 +2082,7 @@ L5:
 
   position_open:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This panel reads the account from the Pool at the current block: what it supplies, what it borrows and how well its debt is covered.
     detailsHeading: |-
@@ -2122,7 +2132,7 @@ L5:
 
   position_closed:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This account repaid its debt and withdrew its collateral. The panel shows each reserve's highest recorded balance over its life.
     detailsHeading: |-
@@ -2162,7 +2172,7 @@ L5:
 
   position_liquidated:
     title: |-
-      About This Position
+      About this position
     intro: |-
       Liquidation took collateral from this account after its health factor fell below 1. The panel shows each reserve's highest recorded balance over its life.
     detailsHeading: |-
@@ -2219,27 +2229,27 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Utilisation and rates
+          Available
         text: |-
-          borrowed divided by supplied; the rate climbs steeply past the kink, the tick on the blue utilisation bar.
-      - bold: |-
-          Loan-to-value (LTV)
-        text: |-
-          the most a wallet can borrow against a reserve, as a share of its value; at 0 the reserve backs no new borrowing.
-      - bold: |-
-          Liquidation threshold (LT)
-        text: |-
-          the share of a reserve's value that counts toward covering debt; a reserve with none cannot be collateral.
-      - bold: |-
-          Liquidation bonus
-        text: |-
-          the extra collateral a liquidator receives, as a share of the debt repaid.
-      - bold: |-
-          Caps and closed reserves
-        text: |-
-          a cap of one token closes that side, and a frozen or paused reserve takes no new supply or borrowing.
+          the underlying the Pool holds for a reserve, what suppliers can withdraw and borrowers can take; a liquidation's deficit leaves it below supplied less borrowed.
         text_seamless: |-
-          a frozen reserve takes no new supply or borrowing, and still accrues interest and can be liquidated.
+          supplied less borrowed: what suppliers can withdraw and borrowers can take.
+      - bold: |-
+          Supply rate, borrow rate and utilisation
+        text: |-
+          the yearly rates paid and charged; utilisation is borrowed divided by supplied, and the rate climbs past the kink, the tick on the blue bar.
+      - bold: |-
+          Collateral
+        text: |-
+          loan-to-value / liquidation threshold; "Not collateral" at a loan-to-value of 0, "eMode only" where an eMode category lends one.
+      - bold: |-
+          Caps near binding
+        text: |-
+          a pill under Supplied or Borrowed from 90% of a cap in use; "cap closed" and "borrowing off" mark a closed side.
+      - bold: |-
+          Details
+        text: |-
+          each row's Details opens the oracle price, reserve factor, liquidation bonus, kink and eMode categories.
     links:
       - label: |-
           Reserve parameters

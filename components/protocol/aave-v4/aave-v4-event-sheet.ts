@@ -168,7 +168,7 @@ const priceInput = (sym: string, p: Price, what = `${sym} price`): ProvInput => 
 const atBlockUsdProv = (sym: string, what: string, amount: string, p: Price): Provenance => ({
   kind: isOnChainPriceSource(p.source) ? "chain-derived" : "derived",
   pclass: isOnChainPriceSource(p.source) ? "oracle" : "offchain",
-  summary: `${what}, in US dollars — the amount times the ${sym} price at this block.`,
+  summary: `${what}, in US dollars. The amount times the ${sym} price at this block.`,
   formula: "amount × price",
   inputs: [{ label: "amount", value: `${amount} ${sym}`, kind: "chain-derived", pclass: "state" }, priceInput(sym, p)],
 });
@@ -220,7 +220,7 @@ const priceNote = (p: Price | undefined) =>
 
 const sinceProv = (what: string): Provenance => ({
   kind: "derived",
-  summary: `${what} since the previous event — the figure once this event had run, less the figure once the previous event on this spoke had run.`,
+  summary: `${what} since the previous event. The figure once this event had run, less the figure once the previous event on this spoke had run.`,
   formula: "after − after the previous event",
 });
 
@@ -307,7 +307,7 @@ function sheetSide({
         usd: {
           text: sheetUsd(last.usd),
           info: sumProv(
-            `The ${side} once the previous event on this spoke had run, in US dollars — each asset's balance in that event's snapshot times its price at that block, added up.`,
+            `The ${side} once the previous event on this spoke had run, in US dollars. Each asset's balance in that event's snapshot times its price at that block, added up.`,
             last.priced,
           ),
         },
@@ -361,7 +361,7 @@ function sheetSide({
               info: {
                 kind: "chain-derived",
                 pclass: "oracle",
-                summary: `Interest on the ${side} since the previous event, in US dollars — every asset's interest at its price at this block, added up.`,
+                summary: `Interest on the ${side} since the previous event, in US dollars. Every asset's interest at its price at this block, added up.`,
                 formula: "Σ interest × price",
               },
             }
@@ -382,7 +382,7 @@ function sheetSide({
             info: {
               kind: "chain-derived",
               pclass: "oracle",
-              summary: `Market move on the ${side} since the previous event — the total before this event, less the total once the previous event had run and the interest since, all in US dollars: the change the prices made to the balances held between the two. No token moved.`,
+              summary: `Market move on the ${side} since the previous event. The total before this event, less the total once the previous event had run and the interest since, all in US dollars: the change the prices made to the balances held between the two. No token moved.`,
               formula: "before this event − last event − interest since",
               inputs: beforeSum.priced.flatMap(({ item, price }) => {
                 const sym = aaveV4DisplaySymbol(item.symbol);
@@ -405,7 +405,7 @@ function sheetSide({
         usd: {
           text: sheetUsd(beforeSum.usd),
           info: sumProv(
-            `The ${side} just before this event, in US dollars — each asset's balance before it times its price at this block, added up.`,
+            `The ${side} just before this event, in US dollars. Each asset's balance before it times its price at this block, added up.`,
             beforeSum.priced,
           ),
         },
@@ -494,7 +494,7 @@ function sheetSide({
           ? {
               text: sheetUsd(total.usd),
               info: sumProv(
-                `The ${side} after this event, in US dollars — each asset's balance in the spoke's snapshot times its price at this block, added up.`,
+                `The ${side} after this event, in US dollars: each asset's balance in the spoke's snapshot times its price at this block, added up.`,
                 total.priced,
               ),
             }
@@ -573,7 +573,7 @@ export function aaveV4Sheet({
               info: {
                 kind: "chain-derived",
                 summary:
-                  "Collateral can fall — how far the collateral's total value can fall, the debt's value held, before the health factor reaches 1 and the position can be liquidated: one less one over the health factor after this event.",
+                  "Collateral can fall. How far the collateral's total value can fall, the debt's value held, before the health factor reaches 1 and the position can be liquidated; one less one over the health factor after this event.",
                 formula: "1 − 1 ÷ health factor",
                 inputs: [{ label: "health factor", value: hfText, kind: "chain", pclass: "state" }],
               },
@@ -617,7 +617,7 @@ export function aaveV4Sheet({
               info: {
                 kind: "derived",
                 summary:
-                  "Loan to value after this event — the debt's dollar value divided by the supplied assets' dollar value, each from the spoke's snapshot at the prices at this block.",
+                  "Loan to value after this event. The debt's dollar value divided by the supplied assets' dollar value, each from the spoke's snapshot at the prices at this block.",
                 via: "debt USD ÷ supplied USD",
                 formula: "Σ(debt × price) ÷ Σ(supplied × price)",
               },
@@ -644,7 +644,7 @@ export function aaveV4Sheet({
                 ? {
                     kind: "derived",
                     summary:
-                      "Still borrowable — what the position can borrow before its health factor reaches 1: the debt in dollars times the health factor less one, the health factor from the spoke at the end of this event's block.",
+                      "Still borrowable. What the position can borrow before its health factor reaches 1: the debt in dollars times the health factor less one, the health factor from the spoke at the end of this event's block.",
                     formula: "debt USD × (health factor − 1)",
                     inputs: [
                       { label: "debt", value: sheetUsd(debt.usd ?? 0), kind: "chain-derived", pclass: "oracle" },
@@ -654,7 +654,7 @@ export function aaveV4Sheet({
                 : {
                     kind: "derived",
                     summary:
-                      "Still borrowable — with no debt, the collateral in dollars times the collateral factor the spoke weighs it by, from getUserAccountData at the end of this event's block.",
+                      "Still borrowable. With no debt, the collateral in dollars times the collateral factor the spoke weighs it by, from getUserAccountData at the end of this event's block.",
                     formula: "collateral USD × collateral factor",
                     inputs: [
                       { label: "collateral", value: sheetUsd(coll.usd ?? 0), kind: "chain-derived", pclass: "oracle" },
@@ -683,7 +683,7 @@ export function aaveV4Sheet({
               info: {
                 kind: "chain",
                 pclass: "state",
-                summary: `Liquidation threshold — the collateral factor the spoke weighs this position's collateral by, each asset's weighted by its value: getUserAccountData's avgCollateralFactor at the end of block ${read.block.toLocaleString("en-US")}.`,
+                summary: `Liquidation threshold. The collateral factor the spoke weighs this position's collateral by, each asset's weighted by its value: getUserAccountData's avgCollateralFactor at the end of block ${read.block.toLocaleString("en-US")}.`,
                 via: `GET /api/chain/aave-v4/health-factor · spoke getUserAccountData @ block ${read.block} · avgCollateralFactor`,
               },
             }

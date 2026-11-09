@@ -102,9 +102,9 @@
 // of the sUSDS price, today the card's, no level, the how-to-read naming chi.
 // The forks and Polaris (step 6, `level`, `checkLevelView`): Ebisu WBTC 3876
 // (liquidated) and weETH 1065 (closed), whose level steps by the two minimums'
-// ratio on 4 Jan 2026, Ebisu stcUSD 6774, Asymmetry scrvUSD 2145 and Basedollar
-// cbETH 6846 (open: today's level the card's "Liquidates at"), Asymmetry ysyBOLD
-// 4577 and Basedollar wstETH 1150 (closed: the level ends that day), Polaris USDp
+// ratio on 4 Jan 2026, Ebisu stcUSD 6774 and Basedollar cbETH 6846 (open:
+// today's level the card's "Liquidates at"), Asymmetry ysyBOLD 4577, scrvUSD 2145
+// and Basedollar wstETH 1150 (closed: the level ends that day), Polaris USDp
 // 2420 and GOLDp 18 (open: today's level the card's price × 115 % ÷ its ratio),
 // USDp 3732 and GOLDp 29 (liquidated); the how-to-read names the minimum.
 // LlamaLend (step 6, `band`, `checkBand`): wstETH 0x95f1 (open), CRV 0x1aa5
@@ -876,11 +876,12 @@ const PAGES = [
     level: { asset: "stcUSD", card: "liquidates-at", help: ["115% minimum, which no governance log has moved"] },
   },
   {
-    id: "asymmetry scrvusd 2145",
-    ...forkPace("asymmetry", "scrvUSD", "USDaf", "today"),
+    // Closed on 8 Nov 2026 00:10 UTC (day 20765): no "Liquidates at" since.
+    id: "asymmetry scrvusd 2145 (closed)",
+    ...forkPace("asymmetry", "scrvUSD", "USDaf", "last"),
     path: "/ethereum/asymmetry/scrvusd/21455407195608252231693499135014282170032223495298941722085434215551435526302",
     lwOnly: true,
-    level: { asset: "scrvUSD", card: "liquidates-at", help: ["today's 110% minimum, held across the life"] },
+    level: { asset: "scrvUSD", endDay: 20765, help: ["today's 110% minimum, held across the life"] },
   },
   {
     id: "asymmetry ysybold 4577 (closed)",

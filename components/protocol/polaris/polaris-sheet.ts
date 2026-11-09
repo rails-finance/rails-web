@@ -145,8 +145,8 @@ export function polarisSheet(
     pclass: "oracle",
     summary:
       token === "coll"
-        ? `${what} in US dollars — the pETH times the market's feed price for pETH in ${stable}, times ${stable}'s price in dollars (${prevUnit?.words}), at the previous event's block.`
-        : `${what} in US dollars — the ${stable} times its price in dollars (${prevUnit?.words}) at the previous event's block.`,
+        ? `${what} in US dollars. The pETH times the market's feed price for pETH in ${stable}, times ${stable}'s price in dollars (${prevUnit?.words}), at the previous event's block.`
+        : `${what} in US dollars. The ${stable} times its price in dollars (${prevUnit?.words}) at the previous event's block.`,
     formula: token === "coll" ? `pETH × pETH price in ${stable} × ${stable} in USD` : `${stable} × ${stable} in USD`,
     via: "polaris_oracle_at_block",
     inputs: [
@@ -175,7 +175,7 @@ export function polarisSheet(
         info: {
           kind: "chain-derived",
           pclass: "oracle",
-          summary: `Market move on the ${what} since the last event — the ${token === "coll" ? "pETH" : stable} held between the two events, valued at this event's prices less the previous event's. No token moved.`,
+          summary: `Market move on the ${what} since the last event. The ${token === "coll" ? "pETH" : stable} held between the two events, valued at this event's prices less the previous event's. No token moved.`,
           formula: "held × (price at this event − price at the previous event)",
           via: "polaris_oracle_at_block",
           inputs: [
@@ -208,8 +208,8 @@ export function polarisSheet(
     pclass: "oracle",
     summary:
       token === "coll"
-        ? `${what} in US dollars — the pETH times the market's feed price for pETH in ${stable}, times ${stable}'s price in dollars (${unit?.words}), at this block.`
-        : `${what} in US dollars — the ${stable} times its price in dollars (${unit?.words}) at this block.`,
+        ? `${what} in US dollars. The pETH times the market's feed price for pETH in ${stable}, times ${stable}'s price in dollars (${unit?.words}), at this block.`
+        : `${what} in US dollars. The ${stable} times its price in dollars (${unit?.words}) at this block.`,
     formula: token === "coll" ? `pETH × pETH price in ${stable} × ${stable} in USD` : `${stable} × ${stable} in USD`,
     via: "polaris_oracle_at_block",
     inputs: [
@@ -417,7 +417,7 @@ export function polarisSheet(
   const debtBeforeEventProv: Provenance = {
     kind: "derived",
     pclass: "indexed",
-    summary: `${stable} owed immediately before this event — the debt the previous event recorded plus the interest charged into it at this event.`,
+    summary: `${stable} owed immediately before this event. The debt the previous event recorded plus the interest charged into it at this event.`,
     formula: "debt at the previous event + interest charged",
     contract: manager,
     inputs: [
@@ -536,7 +536,7 @@ export function polarisSheet(
   const liqProv = (what: string, coll: number, debt: number): Provenance => ({
     kind: "chain-derived",
     pclass: "state",
-    summary: `${what} — the price of pETH, in ${stable}, at which this position's collateral ratio meets the market's normal-mode minimum, ${mcr.label}: the debt times the minimum ratio, divided by the collateral. A defensive-mode minimum (150%) in force at a past block is not indexed.`,
+    summary: `${what}. The price of pETH, in ${stable}, at which this position's collateral ratio meets the market's normal-mode minimum, ${mcr.label}: the debt times the minimum ratio, divided by the collateral. A defensive-mode minimum (150%) in force at a past block is not indexed.`,
     formula: "debt × minimum ratio ÷ collateral",
     contract: manager,
     inputs: [
@@ -581,7 +581,7 @@ export function polarisSheet(
               info: {
                 kind: "derived",
                 summary:
-                  "Liquidation price change at this event — the price after this event less the price on the figures before it.",
+                  "Liquidation price change at this event. The price after this event less the price on the figures before it.",
                 formula: "price after − price before",
               },
             }
@@ -607,7 +607,7 @@ export function polarisSheet(
               info: {
                 kind: "derived",
                 summary:
-                  "Primary rate change since the previous event — the rate in force at this event less the rate in force at the previous one, in percentage points.",
+                  "Primary rate change since the previous event. The rate in force at this event less the rate in force at the previous one, in percentage points.",
                 formula: "rate now − rate at the previous event",
               },
             }
@@ -648,7 +648,7 @@ export function polarisParamStats(coords: PolarisCoords): SheetStat[] {
       kind: "recompute",
       text: `To check: ask any Sepolia node for the cdpManager's ${mcr.fn}; it returns ${mcr.raw} (1e18 = 100%).`,
     },
-    summary: `The market's minimum collateral ratio in normal mode — the cdpManager's \`${mcr.fn}\`, ${mcr.label}. A constant of the deployment; a defensive-mode minimum (150%) in force at a past block is not indexed, so every row compares against this one.`,
+    summary: `The market's minimum collateral ratio in normal mode. The cdpManager's \`${mcr.fn}\`, ${mcr.label}. A constant of the deployment; a defensive-mode minimum (150%) in force at a past block is not indexed, so every row compares against this one.`,
     contract: manager,
     via: `${mcr.fn} ÷ 1e18 (read at block ${POLARIS_LIQ_CONSTANTS.readAtBlock}, identical on both markets)`,
   };

@@ -6,6 +6,7 @@
 import type { Provenance } from "@/components/shared/provenance";
 import type { VaultSummary } from "@/lib/vaults/summary";
 import type { VaultYield } from "@/lib/vaults/yield";
+import type { VaultIlliquid } from "@/lib/vaults/illiquid";
 import { formatUnitsExact } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
 
@@ -21,7 +22,7 @@ export const vaultYieldProv = (v: VaultSummary, y: Measured): Provenance => {
     kind: "derived",
     pclass: "state",
     source: { block: y.to.block },
-    summary: `Yield — Rails's figure: the share price's growth over the ${y.days} days to block ${n(y.to.block)}, annualised simply. One share was ${at(y.from)} and ${at(y.to)}, each the vault's \`convertToAssets\` stored once a day in the daily price store. It is net of the fees the vault takes inside the share; rewards paid outside the share are not in it, and it is no forecast.${y.jump ? ` One day carries most of the move: ${(y.jump.change * 100).toFixed(2)}% between two stored days, on ${formatDate(new Date(y.jump.day * 86_400_000))}.` : ""}`,
+    summary: `Yield — Rails's figure: the share price's growth over the ${y.days} days to block ${n(y.to.block)}, annualised simply. One share was ${at(y.from)} and ${at(y.to)}, each the vault's \`convertToAssets\` stored once a day in the daily price store. It is net of the fees the vault takes inside the share; rewards paid outside the share are not in it, and it is no forecast.${y.jump ? ` ${y.jump.fromDay != null ? "A span of days" : "One day"} carries most of the move: ${(y.jump.change * 100).toFixed(2)}% between two stored days, ${y.jump.fromDay != null ? `from ${formatDate(new Date(y.jump.fromDay * 86_400_000))} to ${formatDate(new Date(y.jump.day * 86_400_000))}` : `on ${formatDate(new Date(y.jump.day * 86_400_000))}`}.` : ""}`,
     contract: { name: v.name ?? v.catalogName ?? "vault", address: v.address },
     via: "daily price store · convertToAssets(10 ** decimals) once per UTC day @ the day's last block",
     formula: `(p1 / p0 − 1) × 365 / ${y.days}`,
@@ -57,4 +58,22 @@ export const vaultHoldersProv = (v: VaultSummary, c: NonNullable<VaultSummary["c
   summary: `Holders — ${n(c.holders)} address${c.holders === 1 ? " has" : "es have"} held a share of this vault, ${n(c.live)} holding one at census block ${n(c.atBlock)}: every address either side of a \`Transfer\` it has emitted. A floor: an address is often a wrapper or a contract holding for others. ${c.sumMatches ? "Σ `balanceOf` over the set equalled `totalSupply()` at that block, so the set is whole." : "Σ `balanceOf` over the set did not equal `totalSupply()` at that block, so the set is not stated as whole."}`,
   contract: { name: v.name ?? v.catalogName ?? v.symbol ?? "vault", address: v.address },
   via: "vault census · eth_getLogs(Transfer) @ the census block",
+});
+
+/** Can be withdrawn: the illiquid test's sum over the withdraw queue
+ *  (lib/vaults/illiquid.ts, ui-jobs 540). */
+export const vaultWithdrawableProv = (v: VaultSummary, il: VaultIlliquid): Provenance => ({
+  kind: "derived",
+  pclass: "state",
+  source: { block: il.block },
+  summary: `Can be withdrawn — Rails's sum over the vault's withdraw queue at block ${n(il.block)}: in each market, the lesser of the vault's assets there and the market's supply less its borrow, from Morpho Blue's \`position\` and \`market\`. ${il.markets.map((m) => `The ${m.collateralSymbol ?? m.id.slice(0, 10)} market holds ${(m.share * 100).toFixed(1)}% of the queue and is ${(m.utilisation * 100).toFixed(2)}% borrowed, its rate at target at the AdaptiveCurveIRM's maximum.`).join(" ")}`,
+  contract: { name: v.name ?? v.catalogName ?? "vault", address: v.address },
+  via: "withdrawQueue(i) · Morpho Blue position(id, vault), market(id) · AdaptiveCurveIRM rateAtTarget(id) @ one block",
+  formula: "Σ min(vault's assets in the market, totalSupplyAssets − totalBorrowAssets)",
+  scaling: {
+    raw: il.withdrawable,
+    from: "call",
+    places: v.asset.decimals,
+    why: `${v.asset.symbol} has ${v.asset.decimals} decimals`,
+  },
 });

@@ -9,10 +9,10 @@
 // the section's front door can list what the catalogue holds, grouped by asset
 // and ordered by size, with every figure a slot read at one stated block.
 //
-// THE SHAPE OF THE READ. One `eth_blockNumber`, then SIX calls per vault
+// THE SHAPE OF THE READ. One `eth_blockNumber`, then SEVEN calls per vault
 // batched through Multicall3 in DIRECTORY_REQUESTS chunks, all at that block,
 // in parallel. The holder sweep beside this one does 505 × `balanceOf` in two
-// requests; this is six calls per vault and one of them — `totalAssets()` —
+// requests; this is seven calls per vault and one of them — `totalAssets()` —
 // walks the vault's whole supply queue, so the chunks are smaller to keep each
 // request's gas well inside what a node will serve. Then one `resolveErc20Meta`
 // over the 54 distinct asset addresses, which is cached for the life of the
@@ -24,8 +24,12 @@
 // asset this catalog holds (≤18 decimals — true of all 54), because MetaMorpho's
 // `DECIMALS_OFFSET` pads a lower-decimal asset up to 18 and adds nothing to one
 // already at 18. `totalSupply` above already assumes this (`amount(_, 18)`); this
-// read keeps the same assumption rather than adding a seventh call to confirm it
-// per vault. Same call as the per-vault page's `vaultSharePriceProv`.
+// read keeps the same assumption rather than adding a call to confirm it per
+// vault. Same call as the per-vault page's `vaultSharePriceProv`.
+//
+// THE SEVENTH CALL is `lostAssets()` (ui-jobs 543): a storage read on V1.1,
+// cheap beside `totalAssets()`, so the chunk count stands. A V1.0 vault
+// reverts on it, and a revert or a failure is null on the row, never zero.
 //
 // CACHED FOR FIVE MINUTES, WITH THE BLOCK STATED. The directory is the same
 // question for every reader and it is the section's most expensive read, so it
@@ -59,6 +63,8 @@ import { vaultHeadClient } from "@/lib/sources/api/head-reads-client";
 import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta } from "./erc20-meta";
+import { readMetaMorphoIlliquid } from "./metamorpho-illiquid";
+import type { VaultIlliquid } from "@/lib/vaults/illiquid";
 import type { RawAmount } from "./morpho-base-vault";
 import { type MorphoBaseVaultFactory } from "@/lib/morpho-base/vault-catalog";
 import {
@@ -77,15 +83,16 @@ const DIRECTORY_ABI = parseAbi([
   "function curator() view returns (address)",
   "function owner() view returns (address)",
   "function convertToAssets(uint256) view returns (uint256)",
+  "function lostAssets() view returns (uint256)",
 ]);
-const CALLS = ["name", "totalAssets", "totalSupply", "curator", "owner", "convertToAssets"] as const;
+const CALLS = ["name", "totalAssets", "totalSupply", "curator", "owner", "convertToAssets", "lostAssets"] as const;
 
 /** One whole share, in the vault's own 18-decimal share units — see the header
  *  note on why the exponent is fixed rather than read per vault. */
 const ONE_SHARE = BigInt(10) ** BigInt(18);
 
 /** How many Multicall3 requests the census is split across. Ten of ~50 vaults
- *  (~250 calls each) keeps a request's gas — dominated by `totalAssets()`
+ *  (~350 calls each; `lostAssets()` adds a storage read per vault) keeps a request's gas — dominated by `totalAssets()`
  *  walking up to twenty legs per vault — well inside a node's `eth_call` cap;
  *  `batchSize: 0` stops viem splitting further on its own size heuristic, so
  *  the count is a fact about the code. */
@@ -132,6 +139,12 @@ export interface MorphoBaseVaultDirectoryRow {
   curator: string | null;
   /** `owner()`, or null when the call did not answer. */
   owner: string | null;
+  /** `lostAssets()` at the pinned block, in the asset's units. Null where the
+   *  call reverted (V1.0 keeps no such ledger) or did not answer. */
+  lostAssets: RawAmount | null;
+  /** The illiquid test at the pinned block (lib/vaults/illiquid.ts): null
+   *  where the vault was read and not caught, absent where it was not read. */
+  illiquid?: VaultIlliquid | null;
 }
 
 export interface MorphoBaseVaultDirectoryResponse {
@@ -195,6 +208,7 @@ async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaul
               functionName: "convertToAssets",
               args: [ONE_SHARE],
             },
+            { address: v.address as `0x${string}`, abi: DIRECTORY_ABI, functionName: "lostAssets" },
           ]),
           batchSize: 0,
           allowFailure: true,
@@ -222,6 +236,7 @@ async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaul
         const sharePriceRaw = at("convertToAssets") as bigint | undefined;
         const curatorRaw = (at("curator") as string | undefined)?.toLowerCase();
         const ownerRaw = (at("owner") as string | undefined)?.toLowerCase();
+        const lostAssetsRaw = at("lostAssets") as bigint | undefined;
         rows.push({
           address: vault.address,
           factory: vault.factory,
@@ -239,9 +254,28 @@ async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaul
           sharePrice: sharePriceRaw == null || !assetScaled ? null : amount(sharePriceRaw, decimals),
           curator: curatorRaw == null || curatorRaw === ZERO_ADDR ? null : curatorRaw,
           owner: ownerRaw ?? null,
+          lostAssets: lostAssetsRaw == null || !assetScaled ? null : amount(lostAssetsRaw, decimals),
         });
       }),
     );
+
+    // The illiquid test (ui-jobs 540) on every vault holding assets, at the
+    // same block. A failed read leaves the rows untested, never liquid.
+    try {
+      const funded = rows.filter((r) => r.totalAssets != null && BigInt(r.totalAssets.raw) > ZERO);
+      const illiquid = await readMetaMorphoIlliquid(
+        client,
+        chainId,
+        blockNumber,
+        funded.map((r) => r.address.toLowerCase()),
+      );
+      for (const r of funded) {
+        const key = r.address.toLowerCase();
+        if (illiquid.has(key)) r.illiquid = illiquid.get(key)!;
+      }
+    } catch (error) {
+      console.error(`Morpho vault directory: the illiquid read failed (chain ${chainId}):`, error);
+    }
 
     return {
       chainId,

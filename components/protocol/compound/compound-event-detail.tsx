@@ -90,7 +90,7 @@ function dustBefore(
     beforeExact: "0",
     beforeProv: {
       ...t.beforeProv,
-      summary: `Balance before — 0. After minus the change lands within one unit (${unit} ${sym}) of zero: Comet rounds a balance's present value down, so a flat balance reads one unit either side of zero. Shown as 0.`,
+      summary: `Balance before: 0. After minus the change lands within one unit (${unit} ${sym}) of zero: Comet rounds a balance's present value down, so a flat balance reads one unit either side of zero. Shown as 0.`,
     },
   };
 }
@@ -215,7 +215,7 @@ export function useCompoundCells({
         changeExact: `${sign}${mag}`,
         changeProv: {
           kind: "chain-derived",
-          summary: `${baseSym} ${owed ? "owed" : "lent"} change at ${at} — the ${owed ? "amount owed" : "balance lent"} after less the one before: the base crossed zero, so the move splits between the two cells.`,
+          summary: `${baseSym} ${owed ? "owed" : "lent"} change at ${at}. The ${owed ? "amount owed" : "balance lent"} after less the one before: the base crossed zero, so the move splits between the two cells.`,
           formula: "after − before",
         },
         shownAsIs: true,

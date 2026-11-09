@@ -120,7 +120,7 @@ export function liquityForkEconomicsExplanation(
         {outcome.collValueAtRedemption != null ? (
           <>
             , worth {strong(formatUsdValue(outcome.collValueAtRedemption))} at {name}&apos;s price when each redemption
-            happened — a net {strong(signedUsd(outcome.debtCleared - outcome.collValueAtRedemption))} to the borrower.
+            happened, a net {strong(signedUsd(outcome.debtCleared - outcome.collValueAtRedemption))} to the borrower.
           </>
         ) : (
           <>.</>
@@ -170,21 +170,21 @@ export function liquityForkEconomicsExplanation(
       bullets.push(<span key="liq-reserve">{reserve} is held in reserve and refunded when the trove is closed.</span>);
     }
   } else if (bullets.length > 0) {
-    bullets.push(<span key="closed">The trove is closed — no collateral or debt remain.</span>);
+    bullets.push(<span key="closed">The trove is closed. No collateral or debt remain.</span>);
   }
 
   bullets.push(
     <span key="mechanic">
-      {name} is a Liquity V2 fork: this trove carries an interest rate — set by its owner or delegated to a batch
-      manager — that accrues into the debt, and redemptions sweep the branch&apos;s lowest rates first.
+      {name} is a Liquity V2 fork: this trove carries an interest rate (set by its owner or delegated to a batch
+      manager) that accrues into the debt, and redemptions sweep the branch&apos;s lowest rates first.
     </span>,
   );
 
   if (!valued) {
     bullets.push(
       <span key="unvalued">
-        Amounts are shown in token units — the branch&apos;s own oracle price wasn&apos;t available on this load, so no
-        dollar total is shown.
+        Amounts are shown in token units because the branch&apos;s oracle price wasn&apos;t available on this load, so
+        no dollar total is shown.
       </span>,
     );
   }
@@ -218,7 +218,7 @@ export function liquityForkRedemptionOutcome(
   const atRedemption = o.debtCleared - o.collValueAtRedemption;
   const realizedProv: Provenance = {
     kind: "derived",
-    summary: `Redemption net outcome — the ${debtSymbol} debt that redemptions cleared, counted at $1 each, minus the dollar value of the collateral they took at the price ${name}'s branch emitted in each Redemption log.`,
+    summary: `Redemption net outcome. The ${debtSymbol} debt that redemptions cleared, counted at $1 each, minus the dollar value of the collateral they took at the price ${name}'s branch emitted in each Redemption log.`,
     via: "added up across the trove's redemptions",
     formula: "debt cleared − collateral value at redemption",
     inputs: [
@@ -237,7 +237,7 @@ export function liquityForkRedemptionOutcome(
     o.currentPrice != null
       ? {
           kind: "derived",
-          summary: `Redemption net outcome at the latest block's price — the ${debtSymbol} debt that redemptions cleared, counted at $1 each, minus the collateral they took valued at the branch's price at the latest block.`,
+          summary: `Redemption net outcome at the latest block's price. The ${debtSymbol} debt that redemptions cleared, counted at $1 each, minus the collateral they took valued at the branch's price at the latest block.`,
           via: "added up across the trove's redemptions",
           formula: "debt cleared − collateral taken × current price",
           inputs: [
@@ -302,7 +302,7 @@ export function liquityForkEconomicsContent({
     steps: [
       "Deposited, withdrawn, borrowed and repaid are summed from the trove's own signed balance deltas, event by event.",
       'Debt increases counted as "borrowed" include new draws, the one-time upfront fee, and interest applied whenever an operation touched the trove.',
-      "Redemptions and liquidations are kept apart from voluntary flows — each is its own bar.",
+      "Redemptions and liquidations are kept apart from voluntary flows, each in its own bar.",
       "USD values use the branch's oracle price for collateral, and appear only once that on-chain price has loaded.",
       "The borrower's net outcome from redemptions sets the debt they cleared against the collateral they took, valued at the price each Redemption log emitted, and again at the latest block's price.",
     ],
@@ -310,11 +310,11 @@ export function liquityForkEconomicsContent({
     details: [
       {
         bold: "User-set (or delegated) interest",
-        text: "each trove carries its own annual rate — set by the borrower or a batch manager they delegate to — accruing continuously into the debt.",
+        text: "each trove carries its own annual rate (set by the borrower or a batch manager they delegate to), accruing continuously into the debt.",
       },
       {
         bold: "Redemption queue",
-        text: `${debtSymbol} holders can redeem at $1 face against the branch's lowest-rate troves first — a peg mechanism, not a penalty.`,
+        text: `${debtSymbol} holders can redeem at $1 face against the branch's lowest-rate troves first. This is a peg mechanism, not a penalty.`,
       },
     ],
     links: docsLinks && docsLinks.length > 0 ? docsLinks : undefined,

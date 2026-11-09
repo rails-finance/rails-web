@@ -349,7 +349,7 @@ function MarketCard({
 
       {/* Label, then figure: the label muted, the figure in foreground. */}
       <div className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-[13px] tabular-nums">
-        <Tip text="Comet.getUtilization: totalBorrow ÷ totalSupply of the base, the contract's own arithmetic.">
+        <Tip text="Comet.getUtilization: totalBorrow ÷ totalSupply of the base, the contract's arithmetic.">
           <span className={stat}>
             <span className={`${k} ${TIPPED}`}>Utilised</span>{" "}
             <Prov info={cvUtilizationProv(coords)}>
@@ -441,7 +441,7 @@ function MarketCard({
 
       <div className="mt-4">
         <div className="text-[13px] font-medium text-foreground">
-          Collateral — {m.collateral.length} assets,{" "}
+          Collateral: {m.collateral.length} assets,{" "}
           <Prov info={cvCollateralBackingProv(coords)}>{val(m.totalCollateralValue, m.quoteUnit)}</Prov> backing{" "}
           <Prov info={cvMarketValueProv("borrowed", coords)}>{val(m.totalBorrowValue, m.quoteUnit)}</Prov> borrowed
         </div>
@@ -561,7 +561,7 @@ export function CompoundMarketsView({
             // stamp says so), not a per-figure read.
             value: <span data-prov-exempt="">{s.total}</span>,
             title:
-              "The roster the explorer indexes — Comet exposes no on-chain call that enumerates its markets, so this count is stated from the catalog, not read.",
+              "The roster the explorer indexes: Comet exposes no on-chain call that enumerates its markets, so this count is stated from the catalog.",
           },
           {
             slot: "sizeIn",
@@ -612,7 +612,7 @@ export function CompoundMarketsView({
               </>
             ),
             title:
-              "Σ borrowed ÷ Σ supplied across the dollar-quoted markets only, both in USD — the WETH market is a separate numeraire and Comet publishes no combined ratio, so none is stated. A ratio of two receipted figures, not a distinct chain read.",
+              "Σ borrowed ÷ Σ supplied across the dollar-quoted markets only, both in USD. The WETH market is a separate numeraire and Comet publishes no combined ratio, so none is stated. A ratio of two receipted figures.",
           },
         ]}
         notes={
@@ -620,7 +620,7 @@ export function CompoundMarketsView({
           // the markets' own rosters, not a single chain figure.
           <span
             data-prov-exempt=""
-            title="Distinct collateral assets configured across the roster — a count over each market's own getAssetInfo roster, not a single chain read."
+            title="Distinct collateral assets configured across the roster: a count over each market's getAssetInfo roster."
           >
             <span className="text-foreground">{s.collateralAssets}</span> collateral assets configured
           </span>

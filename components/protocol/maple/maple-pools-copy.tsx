@@ -50,7 +50,7 @@ export function MapleLoansNote() {
 export function MapleResidualNote({ display, symbol, over }: { display: string; symbol: string; over: boolean }) {
   return (
     <div className="mt-1.5 text-[11px] text-rb-500">
-      the split above reads {display} {symbol} {over ? "over" : "short of"} the pool&rsquo;s stated value — a strategy
+      the split above reads {display} {symbol} {over ? "over" : "short of"} the pool&rsquo;s stated value: a strategy
       leg did not resolve at this block
     </div>
   );

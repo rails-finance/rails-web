@@ -19,7 +19,7 @@ export async function MetaMorphoVaultNotFound({ chainId }: { chainId: MetaMorpho
       backLabel={`All vaults on ${chain}`}
     >
       The Vaults tab serves every MetaMorpho vault this site has catalogued on {chain} —{" "}
-      {roster.vaults.length.toLocaleString("en-US")} at the last census — and no others. A vault deployed without one of
+      {roster.vaults.length.toLocaleString("en-US")} at the last census, and no others. A vault deployed without one of
       the two MetaMorpho factories emits no creation event and is absent from that census; an address missing here may
       still be a vault, it simply has no page.
     </RouteNotFound>

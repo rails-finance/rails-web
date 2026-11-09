@@ -122,7 +122,7 @@ function WalletPillInner({
   // truncated, and a clipped name with no way to read it in full would be worse
   // than the hex it replaced.
   const labelTip = vault
-    ? `${vault.name} — a MetaMorpho vault · ${wallet}`
+    ? `${vault.name}, a MetaMorpho vault · ${wallet}`
     : href && hrefOverride && hrefLabel
       ? `${hrefLabel} · ${name ?? wallet}`
       : name
@@ -150,7 +150,7 @@ function WalletPillInner({
       // this pill points without navigating — the click itself (via
       // router.push above) is what a viewer actually triggers.
       data-vault-href={vault ? vault.href : undefined}
-      className={`${labelClass} hover:text-blue-600 dark:hover:text-blue-400 transition-colors cursor-pointer`}
+      className={`${labelClass} hover:text-blue-600 dark:hover:text-[var(--text-link)] transition-colors cursor-pointer`}
     >
       {label}
     </button>

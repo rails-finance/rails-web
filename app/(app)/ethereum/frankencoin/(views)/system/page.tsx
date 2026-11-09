@@ -37,7 +37,7 @@ export const revalidate = 600;
 export const metadata = {
   title: "Frankencoin system",
   description:
-    "Frankencoin's system state — the ZCHF supply, the equity and reserve capital behind it, the Leadrate, and the challenge-auction enforcement record.",
+    "Frankencoin's system state: the ZCHF supply, the equity and reserve capital behind it, the Leadrate, and the challenge-auction enforcement record.",
 };
 
 const PROTOCOL = protocolForHref("/ethereum/frankencoin")!;

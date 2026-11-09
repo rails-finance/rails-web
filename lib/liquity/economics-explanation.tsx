@@ -280,9 +280,7 @@ export function LiquityFlowsExplanation({
             <Fig>{n(lives)}</Fig> lives; a closed life&apos;s flows stay in the bars
           </ExplainBullet>
         )}
-        {meta.isZombie && (
-          <ExplainBullet>A zombie: redeemed below the minimum debt, both bars stay solid</ExplainBullet>
-        )}
+        {meta.isZombie && <ExplainBullet>Dormant: redeemed below the minimum debt, both bars stay solid</ExplainBullet>}
         {unpriced > 0 && (
           <ExplainBullet>
             <Fig>{n(unpriced)}</Fig> event{unpriced === 1 ? "" : "s"} without a price take the nearest earlier one

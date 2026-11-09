@@ -2,8 +2,8 @@
 
 // One vault roster (rails-ops ui-jobs 407, V1): the rows of one family's
 // vaults, grouped by asset, under one set of controls. The cross-protocol
-// index (ui-jobs 39) is the same roster over the union, each row's sidebar
-// naming its protocol and chain, and one read stamp for the oldest roster.
+// index (ui-jobs 39) is the same roster over the union, its rows drawn as the
+// index's table (`table`, ui-jobs 538), and one read stamp for the oldest roster.
 // ----------------------------------------------------------------------------
 // Every roster draws the same thing: the listings' toolbar (search, the Asset
 // facet and the family's own facets, the preset, the sort), one group per
@@ -21,7 +21,8 @@
 // THREE RULES THE LAYOUT KEEPS:
 //  1. NO CROSS-ASSET ORDER, NO USD. Rows inside a group sort by the chosen key:
 //     Holders (census current holders, most first; vaults with no census
-//     after), Size (`totalAssets` raw) or Newest (`createdBlock`), size the
+//     after), Size (what the vault holds: `totalAssets` less `lostAssets`, raw)
+//     or Newest (`createdBlock`), size the
 //     tie-break inside a group. Groups follow their first row under Holders
 //     and Newest, compared on that key alone, and by vault count under Size;
 //     then by symbol. Two quantities of one token are the only amounts compared.
@@ -37,12 +38,11 @@ import Link from "next/link";
 import { isoSeconds, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import { InfoDisclosureTrigger } from "@/components/shared/info-disclosure";
 import { Prov, type Provenance } from "@/components/shared/provenance";
-import { ListToolbar } from "@/components/shared/filter-bar/list-toolbar";
+import { ListToolbar, type ListToolbarProps } from "@/components/shared/filter-bar/list-toolbar";
 import type { SortOption } from "@/components/shared/filter-bar/sort-control";
 import type { FilterDimension } from "@/components/shared/filter-bar/types";
 import { DisclosureChevron } from "@/components/shared/expand-chevron";
 import { VaultRow, type VaultRowReceipts } from "@/components/vaults/vault-row";
-import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
@@ -51,11 +51,15 @@ import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
 import { vaultRosterShownProv } from "@/lib/vaults/roster-provenance";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
+import { heldAssetsRaw } from "@/lib/vaults/lost-assets";
 import type { VaultYield } from "@/lib/vaults/yield";
 import { ROSTER_HOLDERS_MIN, inRosterPreset } from "@/lib/vaults/roster-preset";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const ZERO = BigInt(0);
+
+/** A count with its receipt where the roster states one. */
+const withProv = (info: Provenance | undefined, text: string) => (info ? <Prov info={info}>{text}</Prov> : text);
 
 /** One facet beyond Asset: a dimension every vault has one value on. */
 export interface VaultRosterFacet {
@@ -89,6 +93,8 @@ export interface VaultRosterHead {
 }
 
 const rawOf = (v: VaultSummary) => BigInt(v.totalAssets?.raw ?? "0");
+/** Size's key: what the vault holds, its stated total less `lostAssets` (ui-jobs 543). */
+const heldOf = (v: VaultSummary) => (v.totalAssets ? heldAssetsRaw(v.totalAssets.raw, v.lostAssets?.raw) : BigInt(0));
 
 /** Has the vault a signal the preset reads: a census, or Yearn's endorsement. */
 const hasSignal = (v: VaultSummary) => v.census != null || v.family === "yearn-v3";
@@ -120,7 +126,7 @@ function primaryCmp(sort: SortKey, dir: number) {
 function rowCmp(sort: SortKey, dir: number) {
   const primary = primaryCmp(sort, dir);
   return (a: VaultSummary, b: VaultSummary) =>
-    primary(a, b) || dir * bigCmp(rawOf(b), rawOf(a)) || a.address.localeCompare(b.address);
+    primary(a, b) || dir * bigCmp(heldOf(b), heldOf(a)) || a.address.localeCompare(b.address);
 }
 
 interface AssetGroup {
@@ -173,19 +179,19 @@ export function VaultRoster({
   holdersHrefOf,
   receiptsOf,
   hooksOf,
-  chainOf,
-  yieldKeyOf,
   assetFacet,
   groupCountProv,
   emptyCountProv,
   head,
   initialFilters,
+  facetsInUrl = false,
   initialSearch = "",
   readTime,
-  edgeOf,
+  table,
+  mobileSort,
 }: {
   vaults: readonly VaultSummary[];
-  /** Decision 0047's figure per lowercased vault address (or `yieldKeyOf`). */
+  /** Decision 0047's figure per lowercased vault address. */
   yields: Record<string, VaultYield>;
   chainId: ChainId;
   /** The block every row was read at; 0 on the index, whose rosters each
@@ -199,14 +205,11 @@ export function VaultRoster({
   holdersHrefOf: ((v: VaultSummary) => string | null) | null;
   receiptsOf: (v: VaultSummary) => VaultRowReceipts;
   hooksOf?: (v: VaultSummary) => Record<string, string>;
-  /** The chain's word after a group's symbol ("on Base"), on the index only. */
-  chainOf?: (v: VaultSummary) => string;
-  /** The key a vault's Yield is held under; the address where absent. */
-  yieldKeyOf?: (v: VaultSummary) => string;
   /** In place of the Asset facet (the index's Token, by symbol across chains). */
   assetFacet?: VaultRosterFacet;
-  groupCountProv: (assetSymbol: string, count: number, chainId: number) => Provenance;
-  emptyCountProv: (count: number) => Provenance;
+  /** The counts' receipts; absent on the index, which states none (ui-jobs 538). */
+  groupCountProv?: (assetSymbol: string, count: number, chainId: number) => Provenance;
+  emptyCountProv?: (count: number) => Provenance;
   head: VaultRosterHead;
   /** The facets chosen on arrival (the index's `?asset=`, ui-jobs 482). */
   initialFilters?: Filters;
@@ -216,9 +219,15 @@ export function VaultRoster({
   /** The read block's time, seconds (rails-server's stamp); else the loader's
    *  read time. */
   readTime?: number | null;
-  /** The row's sidebar (C20) where the page is on no roster's route: the
-   *  index names each row's protocol and chain. */
-  edgeOf?: (v: VaultSummary) => PositionCardEdge | null;
+  /** Draws the shown rows as a table in place of the cards, which then sorts
+   *  them itself (the index, ui-jobs 538). */
+  table?: (rows: VaultSummary[], part: "funded" | "empty") => ReactNode;
+  /** With `table`: the table's sort, drawn in the toolbar below sm where the
+   *  table stacks as cards (D6) and its headers are hidden. */
+  mobileSort?: ListToolbarProps<RosterFilters>["mobileSort"];
+  /** Keep the facets in the URL, one param per facet id, comma-separated
+   *  (the index, ui-jobs 538), so a saved view or a copied link keeps them. */
+  facetsInUrl?: boolean;
 }) {
   const [introOpen, setIntroOpen] = useState(false);
   const [filters, setFilters] = useState<Filters>(initialFilters ?? {});
@@ -289,6 +298,24 @@ export function VaultRoster({
       : defaultSort;
   const sortOrder: "asc" | "desc" = sp.get("sortOrder") === "asc" ? "asc" : "desc";
   const dir = sortOrder === "desc" ? 1 : -1;
+  /** The facets, written to the URL too where the roster keeps them there. */
+  const setFacets = useCallback(
+    (next: Filters) => {
+      setFilters(next);
+      if (!facetsInUrl) return;
+      const p = new URLSearchParams(window.location.search);
+      for (const f of all) {
+        const values = next[f.id] ?? [];
+        if (values.length > 0) p.set(f.id, values.join(","));
+        else p.delete(f.id);
+      }
+      const qs = p.toString().replace(/%2C/gi, ",");
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+      notifyUrlChanged();
+    },
+    [facetsInUrl, all],
+  );
+
   const writeUrl = useCallback(
     (next: { show: string; sortBy: string; sortOrder: string }) => {
       const p = new URLSearchParams(window.location.search);
@@ -306,7 +333,7 @@ export function VaultRoster({
   const state: RosterFilters = { q: query, sortBy: sort, sortOrder, facets: filters, show: [show] };
   const onToolbar = (next: RosterFilters) => {
     if (next.q !== query) setQuery(next.q);
-    if (next.facets !== filters) setFilters(next.facets);
+    if (next.facets !== filters) setFacets(next.facets);
     const nextShow = next.show[0] ?? arrivalShow;
     if (nextShow !== show || next.sortBy !== sort || next.sortOrder !== sortOrder)
       writeUrl({ show: nextShow, sortBy: next.sortBy, sortOrder: next.sortOrder });
@@ -356,11 +383,18 @@ export function VaultRoster({
   // the document and makes no request.
   const needle = query.trim().toLowerCase();
   const presetOn = show === "used";
-  const passes = (v: VaultSummary) =>
-    (!presetOn || inRosterPreset(v)) &&
-    all.every((f) => (filters[f.id]?.length ?? 0) === 0 || filters[f.id].includes(f.valueOf(v))) &&
-    (needle === "" ||
-      [v.name, v.catalogName, v.symbol, v.address].some((s) => s != null && s.toLowerCase().includes(needle)));
+  /** The filter for a selection: the shown rows, and the phone sheet's staged
+   *  count. */
+  const passesFor = (s: RosterFilters) => {
+    const want = s.q.trim().toLowerCase();
+    const preset = (s.show[0] ?? arrivalShow) === "used";
+    return (v: VaultSummary) =>
+      (!preset || inRosterPreset(v)) &&
+      all.every((f) => (s.facets[f.id]?.length ?? 0) === 0 || s.facets[f.id].includes(f.valueOf(v))) &&
+      (want === "" ||
+        [v.name, v.catalogName, v.symbol, v.address].some((x) => x != null && x.toLowerCase().includes(want)));
+  };
+  const passes = passesFor(state);
   const filtering = presetOn || needle !== "" || Object.values(filters).some((x) => x.length > 0);
 
   const fundedShown = useMemo(() => funded.filter(passes), [funded, filters, needle, presetOn]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -396,27 +430,17 @@ export function VaultRoster({
     </span>
   );
 
-  const row = (v: VaultSummary) => {
-    const drawn = (
-      <VaultRow
-        key={v.address}
-        vault={v}
-        yieldFigure={yields[yieldKeyOf ? yieldKeyOf(v) : v.address]}
-        href={hrefOf(v)}
-        holdersHref={holdersHrefOf ? holdersHrefOf(v) : null}
-        receipts={receiptsOf(v)}
-        hooks={hooksOf?.(v)}
-      />
-    );
-    const edge = edgeOf?.(v);
-    return edge ? (
-      <PositionCardEdgeContext.Provider key={v.address} value={edge}>
-        {drawn}
-      </PositionCardEdgeContext.Provider>
-    ) : (
-      drawn
-    );
-  };
+  const row = (v: VaultSummary) => (
+    <VaultRow
+      key={v.address}
+      vault={v}
+      yieldFigure={yields[v.address]}
+      href={hrefOf(v)}
+      holdersHref={holdersHrefOf ? holdersHrefOf(v) : null}
+      receipts={receiptsOf(v)}
+      hooks={hooksOf?.(v)}
+    />
+  );
 
   // On the index every roster has its own block, so a group says "at its block".
   const atBlock = blockNumber > 0 ? "at this block" : "at its roster’s block";
@@ -521,9 +545,15 @@ export function VaultRoster({
         dimensions={dimensions}
         filters={state}
         onChange={onToolbar}
-        sortOptions={sortOptions}
+        sortOptions={table ? [] : sortOptions}
         searchPlaceholder="Vault name, symbol or address"
         countNode={countNode}
+        sheetCount={{ total: fundedShown.length, noun: "funded vaults" }}
+        countFor={(draft) => funded.filter(passesFor(draft)).length}
+        mobileSort={table ? mobileSort : undefined}
+        // The view menu (N1.7: save this view, copy its link) where the URL
+        // holds the whole view, facets included.
+        viewMenu={facetsInUrl}
         skel={`${skel}-facets`}
       />
 
@@ -534,33 +564,35 @@ export function VaultRoster({
             {blockNumber > 0 ? `No funded vault matches at block ${n(blockNumber)}.` : "No funded vault matches."}
           </p>
         )}
-        {groups.map((g) => (
-          <section
-            key={`${g.chainId}:${g.asset.address}`}
-            className="mb-6"
-            data-asset-group={g.asset.address}
-            data-asset-group-chain={g.chainId}
-          >
-            <h2 className="mb-2 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-foreground">
-              <a
-                href={explorerUrl(g.chainId as ChainId, "address", g.asset.address)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={g.asset.named ? "" : "font-mono"}
-              >
-                {g.asset.symbol}
-              </a>
-              {chainOf && <span className="font-normal text-rb-500">on {chainOf(g.rows[0])}</span>}
-              <span className="text-[12px] font-normal text-rb-500" data-figure="group-count">
-                <Prov info={groupCountProv(g.asset.symbol, g.rows.length, g.chainId)}>
-                  {g.rows.length === 1 ? "1 vault" : `${n(g.rows.length)} vaults`}
-                </Prov>
-                {filtering ? " shown" : ""}
-              </span>
-            </h2>
-            <div className="flex flex-col gap-3">{g.rows.map(row)}</div>
-          </section>
-        ))}
+        {table && fundedShown.length > 0 && table(fundedShown, "funded")}
+        {!table &&
+          groups.map((g) => (
+            <section
+              key={`${g.chainId}:${g.asset.address}`}
+              className="mb-6"
+              data-asset-group={g.asset.address}
+              data-asset-group-chain={g.chainId}
+            >
+              <h2 className="mb-2 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold text-foreground">
+                <a
+                  href={explorerUrl(g.chainId as ChainId, "address", g.asset.address)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={g.asset.named ? "" : "font-mono"}
+                >
+                  {g.asset.symbol}
+                </a>
+                <span className="text-[12px] font-normal text-rb-500" data-figure="group-count">
+                  {withProv(
+                    groupCountProv?.(g.asset.symbol, g.rows.length, g.chainId),
+                    g.rows.length === 1 ? "1 vault" : `${n(g.rows.length)} vaults`,
+                  )}
+                  {filtering ? " shown" : ""}
+                </span>
+              </h2>
+              <div className="flex flex-col gap-3">{g.rows.map(row)}</div>
+            </section>
+          ))}
       </div>
 
       {/* ── the vaults that hold nothing: a reading, behind one disclosure ── */}
@@ -574,11 +606,12 @@ export function VaultRoster({
           >
             <DisclosureChevron isOpen={emptyOpen} />
             <span data-figure="empty-count">
-              <Prov info={emptyCountProv(emptyRows.length)}>
-                {emptyRows.length === 1
+              {withProv(
+                emptyCountProv?.(emptyRows.length),
+                emptyRows.length === 1
                   ? `1 vault holds nothing ${atBlock}`
-                  : `${n(emptyRows.length)} vaults hold nothing ${atBlock}`}
-              </Prov>
+                  : `${n(emptyRows.length)} vaults hold nothing ${atBlock}`,
+              )}
             </span>
             {filtering && emptyShown.length !== emptyRows.length && (
               <span className="text-[12px] font-normal text-rb-500">· {n(emptyShown.length)} shown</span>
@@ -588,6 +621,8 @@ export function VaultRoster({
             <div className="mt-3 flex flex-col gap-3" data-empty-rows>
               {emptyShown.length === 0 ? (
                 <p className="text-[13px] text-rb-500">No empty vault matches.</p>
+              ) : table ? (
+                table(emptyShown, "empty")
               ) : (
                 emptyShown.map(row)
               )}

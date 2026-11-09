@@ -417,7 +417,7 @@ export default function MorphoPositionView({
         address: v.collateralToken,
         price: oracle,
         unit: oracle ? v.loanSymbol : undefined,
-        label: `${v.collateralSymbol} in ${v.loanSymbol} (the market's own oracle)`,
+        label: `${v.collateralSymbol} in ${v.loanSymbol} (the market's oracle)`,
       });
     }
     out.push({ symbol: v.loanSymbol, address: v.loanToken, label: `${v.loanSymbol}, the market's loan token` });
@@ -440,7 +440,7 @@ export default function MorphoPositionView({
           address: v.collateralToken,
           price,
           unit: v.loanSymbol,
-          label: `${collateralSymbol} in ${v.loanSymbol} (the market's own oracle)`,
+          label: `${collateralSymbol} in ${v.loanSymbol} (the market's oracle)`,
         },
         { symbol: v.loanSymbol, address: v.loanToken, label: `${v.loanSymbol}, the market's loan token` },
       ];

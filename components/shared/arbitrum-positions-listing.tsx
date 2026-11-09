@@ -143,7 +143,7 @@ const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
       source: { block: blockOf(row) },
       via: `GET /api/chain/compound-arbitrum/wallet at block ${blockOf(row)}, ${RECORDED}`,
       formula: "Σ Comet figure × Comet getPrice",
-      summary: `${what} in dollars across the four Comets — each balance read from its Comet at block ${blockOf(row)} and priced at that Comet's getPrice, the WETH Comet's ETH figures converted at the USDC Comet's WETH feed.`,
+      summary: `${what} in dollars across the four Comets. Each balance read from its Comet at block ${blockOf(row)} and priced at that Comet's getPrice, the WETH Comet's ETH figures converted at the USDC Comet's WETH feed.`,
       verify: { kind: "recompute", text: `Re-read each Comet's balances and getPrice at block ${blockOf(row)}` },
     }),
   },
@@ -158,7 +158,7 @@ const FAMILIES: Record<ArbitrumPositionsFamily, FamilyConfig> = {
       contract: { name: "Morpho Blue (Arbitrum)", address: MORPHO_ARBITRUM_BLUE },
       via: `GET /api/chain/morpho-arbitrum/wallet at block ${blockOf(row)}, ${RECORDED}`,
       formula: "Σ market figure × loan token price",
-      summary: `${what} in dollars — each held market's figure in its loan token, read from the singleton at block ${blockOf(row)}, times the loan token's price on the Aave V3 Arbitrum oracle at that block, summed over the markets that oracle prices.`,
+      summary: `${what} in dollars. Each held market's figure in its loan token, read from the singleton at block ${blockOf(row)}, times the loan token's price on the Aave V3 Arbitrum oracle at that block, summed over the markets that oracle prices.`,
       verify: {
         kind: "recompute",
         text: `To check: ask any Arbitrum archive node for Morpho.position and Morpho.market at block ${blockOf(row)}.`,
@@ -391,7 +391,7 @@ function cometReceipt(what: string, row: ArbitrumReadRow, c: CometCard): Provena
     contract: { name: `Compound V3 ${c.label} Comet (Arbitrum)`, address: c.market.comet },
     via: `${c.label} Comet.userBasic / collateralBalanceOf(${row.wallet}) at block ${block}, ${RECORDED}`,
     formula: "Comet figure × Comet getPrice",
-    summary: `${what} in dollars in the ${c.label} Comet — read from it at block ${block} and priced at its getPrice${c.key === "weth" ? ", the ETH figure converted at the USDC Comet's WETH feed" : ""}.`,
+    summary: `${what} in dollars in the ${c.label} Comet. Read from it at block ${block} and priced at its getPrice${c.key === "weth" ? ", the ETH figure converted at the USDC Comet's WETH feed" : ""}.`,
     verify: {
       kind: "recompute",
       text: `Re-read userBasic, collateralBalanceOf and getPrice on ${c.market.comet} at block ${block}`,

@@ -308,7 +308,7 @@ function WeeksHeatmap({
   windowDays,
   value,
   onChange,
-  title = "Transaction Heatmap",
+  title = "Transaction heatmap",
   chrome = "card",
   extent,
   select = "range",
@@ -575,7 +575,7 @@ function WeeksHeatmap({
           </div>
           {grid.summarising && (
             <div className="mt-2 text-[10px] text-rb-500">
-              Days before {fmtFullDate(grid.windowMinDay)} are the opening balance — counted in the index, summarised
+              Days before {fmtFullDate(grid.windowMinDay)} are the opening balance, counted in the index, summarised
               rather than listed, and not filterable.
             </div>
           )}
@@ -649,7 +649,7 @@ function MonthsHeatmap({
   clearPicked,
   value,
   onChange,
-  title = "Transaction Heatmap",
+  title = "Transaction heatmap",
   chrome = "card",
   extent,
   select = "range",
@@ -891,7 +891,7 @@ function MonthsHeatmap({
               const title = !cell.inLifetime
                 ? ""
                 : picked
-                  ? `${label} · showing — press to clear`
+                  ? `${label} · showing, press to clear`
                   : reachable
                     ? `${label} · read from the index`
                     : cell.summarised
@@ -964,7 +964,7 @@ function MonthsHeatmap({
           ) : (
             <span>
               Months before {MONTH_NAMES[grid.windowMinIdx % 12]} {Math.floor(grid.windowMinIdx / 12)} are the opening
-              balance — counted in the index, summarised rather than listed, and not filterable.
+              balance, counted in the index, summarised rather than listed, and not filterable.
             </span>
           )
         ) : (

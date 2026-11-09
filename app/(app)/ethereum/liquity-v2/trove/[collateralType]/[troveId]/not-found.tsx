@@ -10,7 +10,7 @@ export default function TroveNotFound() {
       backHref="/ethereum/liquity-v2"
       backLabel="Browse Liquity V2 troves"
     >
-      A trove is keyed by both. The branch names which market segment holds it — ETH, wstETH or rETH — and an id that
+      A trove is keyed by both. The branch names which market segment holds it, ETH, wstETH or rETH, and an id that
       exists under one branch is not the same trove under another.
     </RouteNotFound>
   );

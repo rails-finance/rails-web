@@ -45,6 +45,10 @@ export function MoonwellListing({ initialItems, initialTotal, initialKey, initia
             data: r.data,
             total: r.pagination.total,
           })),
+        fetchCount: (filters) =>
+          fetchMoonwellPositions({ ...moonwellFiltersToFetchParams(filters, 1), limit: 1 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

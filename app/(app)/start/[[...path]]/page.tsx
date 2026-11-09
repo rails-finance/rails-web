@@ -144,7 +144,10 @@ async function Results({ results, group }: { results: ResultsKey; group?: GroupK
               <span className="hidden min-w-0 flex-1 sm:block">
                 <ResultLine row={row} results={results} />
               </span>
-              <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+              <ArrowRight
+                className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-[var(--text-link)]"
+                aria-hidden="true"
+              />
             </Link>
           </li>
         ))}
@@ -213,7 +216,10 @@ async function Coins({ group }: { group: GroupKey }) {
           ))}
         </span>
         <span className="text-base font-medium text-foreground">All {groupPhrase(group)}</span>
-        <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+        <ArrowRight
+          className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-[var(--text-link)]"
+          aria-hidden="true"
+        />
       </Link>
       <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {rows.map((c) => (
@@ -228,7 +234,10 @@ async function Coins({ group }: { group: GroupKey }) {
               <span className="text-sm text-rb-500">
                 {c.count.toLocaleString("en-US")} {c.count === 1 ? "vault" : "vaults"}
               </span>
-              <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" aria-hidden="true" />
+              <ArrowRight
+                className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-[var(--text-link)]"
+                aria-hidden="true"
+              />
             </Link>
           </li>
         ))}

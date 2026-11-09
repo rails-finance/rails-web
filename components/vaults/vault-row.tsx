@@ -25,6 +25,7 @@ import Link from "next/link";
 import { PositionCard } from "@/components/shared/position-card";
 import { Prov } from "@/components/shared/provenance";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
+import { heldAssetsRaw } from "@/lib/vaults/lost-assets";
 import type { VaultSummary } from "@/lib/vaults/summary";
 import type { VaultYield } from "@/lib/vaults/yield";
 import { VaultLead, VaultPills, vaultHeads, type VaultRowReceipts } from "@/components/vaults/vault-heads";
@@ -82,6 +83,7 @@ export function VaultRow({
       data-group={raw === "" ? "unread" : BigInt(raw) > BigInt(0) ? "funded" : "empty"}
       data-asset={v.asset.address}
       data-total-assets-raw={raw}
+      data-held-assets-raw={raw === "" ? "" : heldAssetsRaw(raw, v.lostAssets?.raw).toString()}
       data-share-price-raw={v.sharePrice?.raw ?? ""}
       data-vault-family={v.family}
       data-holders-live={v.census?.live ?? ""}

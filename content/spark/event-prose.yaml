@@ -1007,7 +1007,7 @@ doc_urls:
 L5:
   supply:
     title: |-
-      How Supplying Works
+      How supplying works
     intro: |-
       Supplying deposits an asset into SparkLend's Pool and mints spTokens to the wallet. The balance earns the reserve's supply rate, paid by borrowers.
     detailsHeading: |-
@@ -1038,7 +1038,7 @@ L5:
 
   withdraw:
     title: |-
-      How Withdrawing Works
+      How withdrawing works
     intro: |-
       Withdrawing burns spTokens and returns the asset, interest included, from SparkLend's Pool to the wallet.
     detailsHeading: |-
@@ -1066,7 +1066,7 @@ L5:
 
   borrow:
     title: |-
-      How Borrowing Works
+      How borrowing works
     intro: |-
       Borrowing draws an asset from the Pool against the account's collateral and mints variable debt that grows with interest until repaid.
     detailsHeading: |-
@@ -1104,7 +1104,7 @@ L5:
 
   repay:
     title: |-
-      How Repaying Works
+      How repaying works
     intro: |-
       Repaying returns the borrowed asset to the Pool and burns the matching debt, interest included. Anyone may repay for an account.
     detailsHeading: |-
@@ -1135,7 +1135,7 @@ L5:
 
   liquidation:
     title: |-
-      How Liquidations Work
+      How liquidations work
     intro: |-
       A SparkLend account can be liquidated once its health factor falls below 1: its collateral no longer covers its debt at the oracle's prices. Anyone may liquidate it, and bots usually do.
     extraParagraphs:
@@ -1156,7 +1156,7 @@ L5:
 
   transfer:
     title: |-
-      How spToken Transfers Work
+      How spToken transfers work
     intro: |-
       Supplied balances on SparkLend are spTokens, ERC-20 tokens that can move between accounts. A transfer hands a supplied balance to another account without leaving the Pool.
     detailsHeading: |-
@@ -1184,7 +1184,7 @@ L5:
 
   fallback:
     title: |-
-      How SparkLend Positions Work
+      How SparkLend positions work
     intro: |-
       SparkLend, a lending market built by Spark on Aave V3's design, lets a wallet supply assets as collateral and borrow against them in one account.
     detailsHeading: |-
@@ -1215,7 +1215,7 @@ L5:
 
   position_open:
     title: |-
-      About This Position
+      About this position
     intro: |-
       A SparkLend position is one wallet's account on the Pool: what it supplied, what it borrowed against that, and how safely the debt is covered.
     detailsHeading: |-
@@ -1257,7 +1257,7 @@ L5:
 
   position_supply:
     title: |-
-      About This Position
+      About this position
     intro: |-
       A SparkLend position is one wallet's account on the SparkLend Pool. This one supplies assets and owes nothing, so it has no health factor and cannot be liquidated.
     detailsHeading: |-
@@ -1285,7 +1285,7 @@ L5:
 
   position_closed:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This account has repaid its debt and withdrawn its collateral. Its card shows the most each reserve ever held or owed.
     detailsHeading: |-
@@ -1309,7 +1309,7 @@ L5:
 
   position_liquidated:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This account was liquidated at least once, when its health factor fell below 1, and holds nothing now. Its card shows the most each reserve ever held or owed.
     detailsHeading: |-
@@ -1344,25 +1344,25 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Reserve
+          Available
         text: |-
-          one listed asset in the Pool, with its supplied balance, its variable debt and the governance-set risk parameters.
+          supplied less borrowed: what suppliers can withdraw and borrowers can take.
       - bold: |-
-          Utilisation and rates
+          Supply rate, borrow rate and utilisation
         text: |-
-          utilisation is borrowed ÷ supplied, the bar's blue fill, with the reserve's kink as a tick; rates rise with it, and Sky governance sets some.
+          the yearly rates paid and charged, some set by Sky governance; utilisation is borrowed ÷ supplied, the blue bar, its tick the kink.
       - bold: |-
-          Limits
+          Collateral
         text: |-
-          loan-to-value caps what a wallet can borrow against a reserve, the liquidation threshold counts toward covering debt, and the bonus pays liquidators.
+          loan-to-value / liquidation threshold; "Not collateral" at a loan-to-value of 0, "eMode only" where an eMode category lends one.
       - bold: |-
-          Caps used
+          Caps near binding
         text: |-
-          how much of each side's cap is in use; Sky governance sets the caps and the Cap Automator scales them with market depth.
+          a pill under Supplied or Borrowed from 90% of a cap, against the Cap Automator's maximum; "cap closed" and "borrowing off" mark a closed side.
       - bold: |-
-          Closed reserves
+          Details
         text: |-
-          a frozen reserve takes no new supply or borrowing while withdrawals and repayments continue; a deprecated one still works in full.
+          each row's Details opens the oracle price, reserve factor, liquidation bonus, kink and eMode categories.
     links:
       - label: |-
           Active, deprecated and frozen markets

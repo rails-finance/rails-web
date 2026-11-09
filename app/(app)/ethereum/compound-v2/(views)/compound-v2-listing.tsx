@@ -45,6 +45,10 @@ export function CompoundV2Listing({ initialItems, initialTotal, initialKey, init
             data: r.data,
             total: r.pagination.total,
           })),
+        fetchCount: (filters) =>
+          fetchCompoundV2Positions({ ...compoundV2FiltersToFetchParams(filters, 1), limit: 1 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

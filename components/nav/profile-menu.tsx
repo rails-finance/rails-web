@@ -362,7 +362,7 @@ export function ProfileMenu() {
                   href={BOOKMARKS_PATH}
                   role="menuitem"
                   onClick={() => close(false)}
-                  className={`${ITEM} text-blue-600 dark:text-blue-400`}
+                  className={`${ITEM} text-blue-600 dark:text-[var(--text-link)]`}
                   data-profile-menu-manage=""
                 >
                   <Settings className="size-4 shrink-0" aria-hidden="true" />

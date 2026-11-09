@@ -140,7 +140,7 @@ export function liquityV2ListDimensions(
       // explorer's filter says Open/Closed/Liquidated); the wire value stays
       // "active" — it is what the server resolves.
       { value: "active", label: "Open" },
-      { value: "zombie", label: "Zombie" },
+      { value: "zombie", label: "Dormant" },
       { value: "closed", label: "Closed" },
       { value: "liquidated", label: "Liquidated" },
     ],

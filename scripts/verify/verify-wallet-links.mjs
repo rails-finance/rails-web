@@ -46,13 +46,13 @@ const ROW = 'a[class~="group/listing-row"]';
 // cannot fail, so it was only ever noise.)
 const FILTER_BTN = 'button[aria-label^="Filter positions by wallet"]';
 // On a position page the owner's wallet is its address menu (ui-jobs 271,
-// `components/shared/wallet-menu.tsx`), whose "View the wallet" row opens the
+// `components/shared/wallet-menu.tsx`), whose "View wallet" row opens the
 // wallet view, `/wallet/<address>` (rails-ops decision 0051). For those
 // explorers the run asserts that landing, then loads `<route>?q=<address>`
 // itself to prove the listing filters. The listings that draw a pill of their
 // own (Liquity V2, Aave V4) keep the filter button and its `?q=` link.
 const OWNER_MENU = '[data-wallet-menu] button[aria-haspopup="menu"]';
-const OWNER_MENU_WALLET = '[data-wallet-menu] [role="menuitem"]:has-text("View the wallet")';
+const OWNER_MENU_WALLET = '[data-wallet-menu] [role="menuitem"]:has-text("View wallet")';
 // Since fb80809a the menu carries the page it opened from as `?from=`, so
 // the wallet view can link back to its explorer.
 const WALLET_VIEW = /^\/wallet\/(0x[0-9a-f]{40})(?:\?from=([^&]*))?$/;
@@ -123,6 +123,17 @@ async function countRows() {
   }
   await page.waitForTimeout(800);
   return page.locator(ROW).count();
+}
+
+/** The listing's whole count (N1.6 `data-result-count`), or null where the
+ *  listing draws none. */
+async function resultTotal() {
+  const v = await page
+    .locator("[data-result-count]")
+    .first()
+    .getAttribute("data-result-count", { timeout: 2000 })
+    .catch(() => null);
+  return v == null || v === "" ? null : Number(v);
 }
 
 /**
@@ -218,7 +229,11 @@ async function waitForFilteredCount(full, timeoutMs = 45000) {
   let last = full;
   while (Date.now() < deadline) {
     // Don't sample mid-refetch: aria-busy true means rows are being replaced.
-    const busy = (await results.count()) > 0 ? await results.getAttribute("aria-busy") : null;
+    // An [aria-busy] element can leave the DOM between the count and the read;
+    // a bare getAttribute then waits out the 90 s default for one to come back
+    // (frankencoin, whose filtered page stays full and keeps this loop polling).
+    const busy =
+      (await results.count()) > 0 ? await results.getAttribute("aria-busy", { timeout: 1000 }).catch(() => null) : null;
     if (busy !== "true") {
       last = await page.locator(ROW).count();
       if (last >= 1 && last < full) return { count: last, settled: true };
@@ -238,6 +253,7 @@ for (const { slug, route, onListing } of subjects) {
     const landed = new URL(page.url()).pathname;
     check(`${slug}: serves its chain-scoped listing route`, landed === route, `landed on ${landed}`);
     const full = await countRows();
+    const fullTotal = await resultTotal();
     check(`${slug}: listing renders rows`, full > 0, `${full} rows (full)`);
     if (full === 0) continue;
 
@@ -313,23 +329,28 @@ for (const { slug, route, onListing } of subjects) {
     const { count: filtered, settled } = await waitForFilteredCount(full);
     // A wallet that holds a page or more here (a Frankencoin minter with 20+
     // positions) fills the filtered page to `full`; the filter is then proven
-    // by every row carrying the wallet instead. Some listing cards don't
-    // render the owner as visible text, so that read is only a second proof,
-    // never a second requirement.
+    // by every row carrying the wallet instead, or by the listing's whole
+    // count falling (a MakerDAO wallet with 21 vaults, its rows naming its ENS
+    // name, 7 Nov 2026). Some listing cards don't render the owner as visible
+    // text, so that read is only a second proof, never a second requirement.
     const tail = q.length >= 6 ? q.slice(-4).toLowerCase() : null;
     const bodies = filtered > 0 ? await page.locator(ROW).allInnerTexts() : [];
     const matched = tail ? bodies.filter((t) => t.toLowerCase().includes(tail)).length : 0;
     const everyRowIsTheWallet = tail !== null && bodies.length > 0 && matched === bodies.length;
+    const filteredTotal = settled ? null : await resultTotal();
+    const totalFell = fullTotal != null && filteredTotal != null && filteredTotal >= 1 && filteredTotal < fullTotal;
     check(
       `${slug}: FILTERED count < full (proves ?q= is honored)`,
-      filtered >= 1 && (filtered < full || everyRowIsTheWallet),
+      filtered >= 1 && (filtered < full || everyRowIsTheWallet || totalFell),
       settled
         ? `filtered=${filtered} vs full=${full}  q=${q}`
         : everyRowIsTheWallet
           ? `a full page of ${filtered}, every row the wallet's  q=${q}`
-          : `NOT SETTLED — still ${filtered} of ${full} when the wait expired, so the filter was never` +
-            ` observed to apply. Re-run this explorer alone before recording it: a busy box looks like` +
-            ` an ignored ?q= here.  q=${q}`,
+          : totalFell
+            ? `a full page of ${filtered}, the listing's count ${filteredTotal} of ${fullTotal}  q=${q}`
+            : `NOT SETTLED — still ${filtered} of ${full} when the wait expired, so the filter was never` +
+              ` observed to apply. Re-run this explorer alone before recording it: a busy box looks like` +
+              ` an ignored ?q= here.  q=${q}`,
     );
 
     // 3c) Informational: how many filtered rows visibly carry the wallet's

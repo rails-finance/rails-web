@@ -8,6 +8,7 @@ import { GlossaryLink, ProtocolInfoPage } from "@/components/shared/protocol-inf
 import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
 import { moonwellGlossary } from "@/lib/moonwell/event-templates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { MoonwellBorrowFrozenNote } from "@/components/protocol/moonwell/moonwell-borrow-frozen-note";
 
 const UL = "list-disc space-y-1 pl-5";
 
@@ -91,15 +92,18 @@ export function MoonwellInfoPage({ deployment }: { deployment: MoonwellInfoDeplo
         {
           heading: "Markets view",
           body: (
-            <p>
-              The markets view shows each market with what it holds, its borrowed share and its supply and borrow rates.
-              A supply cap is the most the market accepts in deposits and a borrow cap is the most that can be borrowed,
-              and at a cap new supply or new borrowing is refused.{" "}
-              <Link href={`${route}/markets`} className={INLINE_LINK}>
-                Use the markets link
-              </Link>{" "}
-              to open it.
-            </p>
+            <>
+              <p>
+                The markets view shows each market with what it holds, its borrowed share and its supply and borrow
+                rates. A supply cap is the most the market accepts in deposits and a borrow cap is the most that can be
+                borrowed, and at a cap new supply or new borrowing is refused.{" "}
+                <Link href={`${route}/markets`} className={INLINE_LINK}>
+                  Use the markets link
+                </Link>{" "}
+                to open it.
+              </p>
+              {base && <MoonwellBorrowFrozenNote className="mt-2" />}
+            </>
           ),
         },
       ]}

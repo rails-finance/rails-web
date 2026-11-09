@@ -20,13 +20,17 @@ import {
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { readListQuery } from "@/lib/shared/list-filter";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
 export const maxDuration = 30;
 
-export const metadata = listingMetadata({ title: "Explore Liquity V1 troves", canonicalPath: "/ethereum/liquity-v1" });
+export const metadata = listingMetadata({
+  title: "Explore Liquity V1 Troves",
+  canonicalPath: "/ethereum/liquity-v1",
+  description:
+    "Every Liquity V1 Trove on Ethereum: interest-free LUSD loans against ETH, with collateral, debt and full history.",
+});
 
 async function LiquityV1ListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
   const dims = liquityV1ListDimensions();
@@ -52,4 +56,4 @@ async function LiquityV1ListingPage({ searchParams }: { searchParams: Promise<Ra
   return <LiquityV1Listing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/ethereum/liquity-v1", LiquityV1ListingPage);
+export default LiquityV1ListingPage;

@@ -143,7 +143,7 @@ function FiguresLink() {
   return (
     <Link
       href="/about/figures"
-      className="mt-4 text-sm font-medium text-blue-600 underline-offset-4 hover:underline dark:text-blue-400"
+      className="mt-4 text-sm font-medium text-blue-600 underline-offset-4 hover:underline dark:text-[var(--text-link)]"
       data-anatomy="S3.3"
     >
       How these are counted <span>→</span>

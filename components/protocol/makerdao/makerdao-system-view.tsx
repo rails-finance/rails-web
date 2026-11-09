@@ -108,12 +108,12 @@ const GROUP_META: Record<MakerIlkGroup, { label: string; blurb: string }> = {
   vault: {
     label: "Vault types",
     blurb:
-      "The ilks a wallet can actually open a vault in: lock collateral, draw DAI, pay the fee, get liquidated if the ratio slips. These are the only rows where the liquidation ratio, the fee and the dust floor are risk settings someone chose — and they are what this explorer indexes.",
+      "The ilks a wallet can open a vault in: lock collateral, draw DAI, pay the fee, get liquidated if the ratio slips. These are the only rows where the liquidation ratio, the fee and the dust floor are risk settings someone chose, and they are what this explorer indexes.",
   },
   psm: {
-    label: "Peg Stability Modules",
+    label: "Peg stability modules",
     blurb:
-      "Swap DAI for a stablecoin at par, 1:1, out of inventory the module itself holds — the DAI is minted the moment someone swaps in. Nobody borrows here, so the 100% ratio and 0% fee below are not lenient settings; they are the absence of a loan to price.",
+      "Swap DAI for a stablecoin at par, 1:1, out of inventory the module holds. The DAI is minted the moment someone swaps in. Nobody borrows here, so the 100% ratio and 0% fee below are not lenient settings; they are the absence of a loan to price.",
   },
   allocator: {
     label: "Allocators",
@@ -123,17 +123,17 @@ const GROUP_META: Record<MakerIlkGroup, { label: string; blurb: string }> = {
   rwa: {
     label: "Real-world assets",
     blurb:
-      "A single token stands in for an off-chain credit agreement. The price is a nominal valuation governance posts, not a market quote — which is why these figures run to eight digits against one unit of collateral.",
+      "A single token stands in for an off-chain credit agreement. The price is a nominal valuation governance posts, not a market quote, which is why these figures run to eight digits against one unit of collateral.",
   },
   d3m: {
     label: "Direct deposit",
     blurb:
-      "D3M modules mint DAI straight into another lending protocol to target a rate there, unwinding as that rate moves. Teleport is the cross-domain fast-withdrawal ilk.",
+      "D3M modules mint DAI into another lending protocol to target a rate there, unwinding as that rate moves. Teleport is the cross-domain fast-withdrawal ilk.",
   },
   delisted: {
     label: "Delisted",
     blurb:
-      "Wound down and dropped from the IlkRegistry — but the Vat keeps an ilk's slot forever, and each of these still carries a wei of debt nobody will ever repay, since clearing it costs more gas than it settles. They are on this page because the Vat's identity does not close without them.",
+      "Wound down and dropped from the IlkRegistry, but the Vat keeps an ilk's slot forever, and each of these still carries a wei of debt nobody will ever repay, since clearing it costs more gas than it settles. They are on this page because the Vat's identity does not close without them.",
   },
 };
 
@@ -195,7 +195,7 @@ function VatCard({ data, readBy }: { data: MakerSystemChainResponse; readBy?: Se
       )}
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-        The Vat&apos;s internal ledger, not DAI&apos;s token supply — the ERC-20 figure is only the portion withdrawn
+        The Vat&apos;s internal ledger, not DAI&apos;s token supply: the ERC-20 figure is only the portion withdrawn
         through a Join. Governance sets the global ceiling directly, so unlike a per-ilk line it measures something.
       </p>
     </div>
@@ -252,7 +252,7 @@ function ReconcileCard({ data, readBy }: { data: MakerSystemChainResponse; readB
             </span>
           ) : (
             <span className="text-red-500">
-              Does not reconcile — <AmountText value={Math.abs(data.residualDai)} /> {DEBT_SYMBOL} of the Vat&apos;s
+              Does not reconcile: <AmountText value={Math.abs(data.residualDai)} /> {DEBT_SYMBOL} of the Vat&apos;s
               total is unaccounted for below. An ilk carrying debt is missing from this read.
             </span>
           )}
@@ -282,7 +282,7 @@ function VowCard({ data, readBy }: { data: MakerSystemChainResponse; readBy?: Se
       </div>
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-        Every DAI of the uncollateralized total is charged here as <code>sin</code> in the same call that mints it — a
+        Every DAI of the uncollateralized total is charged here as <code>sin</code> in the same call that mints it: a
         debt the protocol owes itself, from liquidation shortfalls and the savings rate&apos;s accrual. The surplus
         buffer, built from stability fees and penalties, is what heals it.
       </p>
@@ -304,7 +304,7 @@ function CompositionBar({ data }: { data: MakerSystemChainResponse }) {
             key={g.group}
             className={g.group === "vault" ? "bg-blue-500" : "bg-rb-300 dark:bg-rb-600"}
             style={{ width: `${(g.share ?? 0) * 100}%` }}
-            title={`${GROUP_META[g.group].label} — ${ratio(g.share ?? 0)}`}
+            title={`${GROUP_META[g.group].label}: ${ratio(g.share ?? 0)}`}
           />
         ))}
     </div>
@@ -329,7 +329,7 @@ function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null 
             // believing it's this ilk's.
             <Link
               href={`/ethereum/makerdao?ilk=${encodeURIComponent(row.ilk)}`}
-              className="truncate text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              className="truncate text-xs text-blue-600 dark:text-[var(--text-link)] hover:underline"
             >
               {row.ilk}
             </Link>
@@ -569,8 +569,8 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
       <section className="mt-8">
         <h2 className="text-sm font-semibold text-foreground">What mints it</h2>
         <p className="mt-1.5 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-          Maker is not one market — it is a set of isolated ilks that mint one currency against a shared ceiling. Most
-          of them are not a place a wallet can borrow.
+          Maker is not one market: it is a set of isolated ilks that mint one currency against a shared ceiling. Most of
+          them are not a place a wallet can borrow.
         </p>
 
         <div className="mt-3 rounded-xl bg-raised px-4 py-3.5">
@@ -650,7 +650,7 @@ export function MakerSystemView({ data }: { data: MakerSystemChainResponse }) {
         </div>
         <p className="mt-1.5 max-w-3xl text-[13px] leading-relaxed text-rb-500">
           Every ilk on the terms governance set for it. There is no utilisation column: Maker mints DAI rather than
-          lending it out, so nothing here responds to how much is drawn — and where the DssAutoLine manages the ceiling
+          lending it out, so nothing here responds to how much is drawn, and where the DssAutoLine manages the ceiling
           it holds <code>line</code> just above current debt, which would make <code>debt ÷ line</code> a restatement of
           the gap.
         </p>

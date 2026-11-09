@@ -199,7 +199,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `Collateral moved by this act — the amount the contract logged for the operation. Collateral passed on from a liquidated Trove on the same touch is logged as a separate figure.`,
+    summary: `Collateral moved by this act. The amount the contract logged for the operation. Collateral passed on from a liquidated Trove on the same touch is logged as a separate figure.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · TroveOperation log · _collChangeFromOperation · ÷10^${collDecimals(coords)}`,
     inputs: [
@@ -222,8 +222,8 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     verify: txVerify(coords),
     summary:
       vals.leg === "debt"
-        ? `${cfg.stablecoin} debt this Trove received from a liquidation on its branch — the part of a liquidated Trove's debt the Stability Pool could not absorb, shared among the branch's other Troves in proportion to their collateral, and added to this Trove when it was next touched.`
-        : `Collateral this Trove received from a liquidation on its branch, with the debt above — the liquidated Trove's collateral that went with its redistributed debt, shared in the same proportion.`,
+        ? `${cfg.stablecoin} debt this Trove received from a liquidation on its branch. The part of a liquidated Trove's debt the Stability Pool could not absorb, shared among the branch's other Troves in proportion to their collateral, and added to this Trove when it was next touched.`
+        : `Collateral this Trove received from a liquidation on its branch, with the debt above. The liquidated Trove's collateral that went with its redistributed debt, shared in the same proportion.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · TroveOperation log · ${vals.leg === "debt" ? "_debtIncreaseFromRedist · ÷10^18" : `_collIncreaseFromRedist · ÷10^${collDecimals(coords)}`}`,
     inputs: [
@@ -242,7 +242,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain-derived",
     pclass: "indexed",
     verify: txVerify(coords),
-    summary: `Collateral moved by this operation — the balance the contract logged after this event, minus the balance it logged at the Trove's previous change.`,
+    summary: `Collateral moved by this operation. The balance the contract logged after this event, minus the balance it logged at the Trove's previous change.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · ${originDeltaSeg(origin, `TroveUpdated logs · Δ_coll · ÷10^${collDecimals(coords)}`)}`,
     formula: "coll after − coll before",
@@ -275,7 +275,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `${cfg.stablecoin} debt moved by this act — the amount the contract logged for the operation: what was borrowed, repaid, redeemed or cleared. Interest accrued since the Trove's last change, the upfront fee and any debt passed on from a liquidated Trove are logged as separate figures.`,
+    summary: `${cfg.stablecoin} debt moved by this act. The amount the contract logged for the operation; what was borrowed, repaid, redeemed or cleared. Interest accrued since the Trove's last change, the upfront fee and any debt passed on from a liquidated Trove are logged as separate figures.`,
     contract: ops.redemption ? redemptionContract(coords) : troveManagerContract(coords),
     via: `${streamVia()} · TroveOperation log · _debtChangeFromOperation · ÷10^18`,
     inputs: [
@@ -295,8 +295,8 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     pclass: "indexed",
     verify: txVerify(coords),
     summary: coords.isBatched
-      ? `${cfg.stablecoin} debt moved by this operation — this Trove's share of its batch's debt after this event, minus its debt at the Trove's previous change. The share is the Trove's debt shares divided by the batch's total shares, times the batch's debt.`
-      : `${cfg.stablecoin} debt moved by this operation — the debt the contract logged after this event, minus the debt it logged at the Trove's previous change.`,
+      ? `${cfg.stablecoin} debt moved by this operation. This Trove's share of its batch's debt after this event, minus its debt at the Trove's previous change. The share is the Trove's debt shares divided by the batch's total shares, times the batch's debt.`
+      : `${cfg.stablecoin} debt moved by this operation. The debt the contract logged after this event, minus the debt it logged at the Trove's previous change.`,
     contract: troveManagerContract(coords),
     // A batched row's debt is derived (no envelope, by design) — the Δ via
     // states the shares derivation instead of claiming a log param.
@@ -336,7 +336,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `Collateral after this event — every time a Trove changes, the contract logs its full ${collSym(coords)} balance. This is that balance after this event.`,
+    summary: `Collateral after this event. Every time a Trove changes, the contract logs its full ${collSym(coords)} balance. This is that balance after this event.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · ${originSeg(origin, `TroveUpdated log · coll · ÷10^${collDecimals(coords)}`)}`,
     scaling: scalingOf(origin, { token: collSym(coords) }),
@@ -348,8 +348,8 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     pclass: coords.isBatched ? "indexed" : "emitted",
     verify: txVerify(coords),
     summary: coords.isBatched
-      ? `${cfg.stablecoin} debt after this event — ${batchDebtSentence("this event")}`
-      : `${cfg.stablecoin} debt after this event — every time a Trove changes, the contract logs its full debt, with interest added up to that moment. This is that debt after this event.`,
+      ? `${cfg.stablecoin} debt after this event. ${batchDebtSentence("this event")}`
+      : `${cfg.stablecoin} debt after this event. Every time a Trove changes, the contract logs its full debt, with interest added up to that moment. This is that debt after this event.`,
     contract: troveManagerContract(coords),
     // Batched rows carry NO debt envelope (derived) → the shares-derivation
     // via renders; regular rows' envelope states the TroveUpdated param.
@@ -373,7 +373,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
   const collBeforeProv = (coords: LiquityForkCoords, origin?: OriginEnvelope | null): Provenance => ({
     kind: "chain",
     pclass: "indexed",
-    summary: `Collateral before this event — the full balance the contract logged at this Trove's previous change, or zero if this is its first.`,
+    summary: `Collateral before this event. The full balance the contract logged at this Trove's previous change, or zero if this is its first.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · ${originSeg(origin, `previous TroveUpdated log · coll · ÷10^${collDecimals(coords)}`, true)}`,
     scaling: scalingOf(origin, { token: collSym(coords) }),
@@ -389,7 +389,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
       ? {
           kind: "chain-derived",
           pclass: "indexed",
-          summary: `${cfg.stablecoin} debt before this event — at its previous change this Trove was in a batch. ${batchDebtSentence("that change")}`,
+          summary: `${cfg.stablecoin} debt before this event. At its previous change this Trove was in a batch. ${batchDebtSentence("that change")}`,
           contract: troveManagerContract(coords),
           via: `${streamVia()} · previous BatchedTroveUpdated log · _batchDebtShares ÷ BatchUpdated _totalDebtShares × _debt`,
           inputs: eventInputs(coords),
@@ -397,7 +397,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
       : {
           kind: "chain",
           pclass: "indexed",
-          summary: `${cfg.stablecoin} debt before this event — the full debt the contract logged at this Trove's previous change, or zero if this is its first.`,
+          summary: `${cfg.stablecoin} debt before this event. The full debt the contract logged at this Trove's previous change, or zero if this is its first.`,
           contract: troveManagerContract(coords),
           via: `${streamVia()} · ${originSeg(origin, "previous TroveUpdated log · debt · ÷10^18", true)}`,
           scaling: scalingOf(origin, { token: cfg.stablecoin }),
@@ -440,7 +440,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
             ? `To check: ask an archive node for the branch PriceFeed's lastGoodPrice at block ${coords.blockNumber}.`
             : "To check: ask any node for the branch PriceFeed's lastGoodPrice.",
       },
-      summary: `${collSym(coords)} price at this block — the US-dollar price the branch's PriceFeed contract held at the end of this block. A liquidation or a redemption updates that price before it acts, so this is the price the branch last used in the block. ${priceScaleSentence(coords)}`,
+      summary: `${collSym(coords)} price at this block. The US-dollar price the branch's PriceFeed contract held at the end of this block. A liquidation or a redemption updates that price before it acts, so this is the price the branch last used in the block. ${priceScaleSentence(coords)}`,
       contract: { name: pf.name, address: pf.address },
       via: `PriceFeed.lastGoodPrice() at the event's block, ÷10^${36 - pf.decimals}`,
       inputs: [
@@ -466,7 +466,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `Upfront fee added to the debt — a one-off fee ${cfg.protocolName} adds to a Trove's debt when it opens, borrows more or joins a batch (about a week of the branch's average interest), and when the owner changes the rate soon after the last change. Nothing is paid at the time; the fee becomes part of what the Trove owes.`,
+    summary: `Upfront fee added to the debt. A one-off fee ${cfg.protocolName} adds to a Trove's debt when it opens, borrows more or joins a batch (about a week of the branch's average interest), and when the owner changes the rate soon after the last change. Nothing is paid at the time; the fee becomes part of what the Trove owes.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · TroveOperation log · _debtIncreaseFromUpfrontFee · ÷10^18`,
     inputs: [
@@ -497,7 +497,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain-derived",
     pclass: "indexed",
     verify: txVerify(coords),
-    summary: `Interest accrued since the Trove's last change — the contract does not log this figure, but it logs every other reason the debt moved: the owner's borrowing or repayment, the upfront fee, and any share of a liquidated Trove's debt passed to this one. The interest is the change in debt minus those.${vals.batched ? " On a batched Trove the debt is its share of the batch's debt, so the figure also carries its share of the batch's management fee and of any fee the batch paid for an early rate change." : ""}`,
+    summary: `Interest accrued since the Trove's last change. The contract does not log this figure, but it logs every other reason the debt moved: the owner's borrowing or repayment, the upfront fee, and any share of a liquidated Trove's debt passed to this one. The interest is the change in debt minus those.${vals.batched ? " On a batched Trove the debt is its share of the batch's debt, so the figure also carries its share of the batch's management fee and of any fee the batch paid for an early rate change." : ""}`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · TroveUpdated Δ_debt − TroveOperation legs · ÷10^18`,
     formula: "debt change − borrower's move − upfront fee − redistribution",
@@ -540,7 +540,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `Redemption fee left in this Trove — the redeemer pays the fee in ${collSym(coords)}, and it stays in this Trove. The Trove gives up collateral worth the debt it sheds and keeps this fee on top.`,
+    summary: `Redemption fee left in this Trove. The redeemer pays the fee in ${collSym(coords)}, and it stays in this Trove. The Trove gives up collateral worth the debt it sheds and keeps this fee on top.`,
     contract: redemptionContract(coords),
     via: `${streamVia()} · RedemptionFeePaidToTrove log · _ETHFee · ÷10^${collDecimals(coords)}`,
     inputs: [
@@ -560,7 +560,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The whole redemption on this branch — how much ${cfg.stablecoin} this redemption asked the branch to redeem, and how much the branch redeemed. A redemption takes from the branch's Troves in order of lowest interest rate, so this Trove's figures are one part of it.`,
+    summary: `The whole redemption on this branch. How much ${cfg.stablecoin} this redemption asked the branch to redeem, and how much the branch redeemed. A redemption takes from the branch's Troves in order of lowest interest rate, so this Trove's figures are one part of it.`,
     contract: redemptionContract(coords),
     via: `${streamVia()} · Redemption log · _actualBoldAmount / _attemptedBoldAmount · ÷10^18`,
     inputs: [
@@ -590,7 +590,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `${collSym(coords)} price for this redemption — the price the branch checked each Trove's collateral ratio against, logged with the redemption. The CollateralRegistry contract reads it from the branch's PriceFeed just before redeeming. The collateral paid out is priced at the redemption price, which a PriceFeed combining several sources can set above this one. ${priceScaleSentence(coords)}`,
+    summary: `${collSym(coords)} price for this redemption. The price the branch checked each Trove's collateral ratio against, logged with the redemption. The CollateralRegistry contract reads it from the branch's PriceFeed just before redeeming. The collateral paid out is priced at the redemption price, which a PriceFeed combining several sources can set above this one. ${priceScaleSentence(coords)}`,
     contract: redemptionContract(coords),
     via: `${streamVia()} · Redemption log · _price · ÷10^${36 - collDecimals(coords)}`,
     inputs: [
@@ -611,7 +611,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     pclass: "oracle",
     formula: "collateral × price at block",
     verify: txVerify(coords),
-    summary: `Value of the liquidated collateral — the Trove's whole ${collSym(coords)} balance as the contract logged it at the Trove's previous change, times the branch's price at this block. ${cfg.protocolName} liquidates a Trove's whole balance. A share of an earlier liquidation passed to this Trove since that change is missing from the logged balance.`,
+    summary: `Value of the liquidated collateral. The Trove's whole ${collSym(coords)} balance as the contract logged it at the Trove's previous change, times the branch's price at this block. ${cfg.protocolName} liquidates a Trove's whole balance. A share of an earlier liquidation passed to this Trove since that change is missing from the logged balance.`,
     contract: troveManagerContract(coords),
     via: "collateral × lastGoodPrice at block",
     inputs: [
@@ -643,8 +643,8 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     formula: "debt at $1 redemption face value",
     verify: txVerify(coords),
     summary: vals.fromOperation
-      ? `Value of the cleared debt — the ${cfg.stablecoin} debt the liquidation cleared, as its TroveOperation log records it (the whole debt, interest accrued since the Trove's previous change included), counted at $1 per ${cfg.stablecoin}. The contract's collateral-ratio check counts each ${cfg.stablecoin} as one dollar, and redemptions hold it to that value.`
-      : `Value of the cleared debt — the Trove's whole ${cfg.stablecoin} debt as the contract logged it at the Trove's previous change, counted at $1 per ${cfg.stablecoin}. The contract's collateral-ratio check counts each ${cfg.stablecoin} as one dollar, and redemptions hold it to that value. Interest accrued since that change is missing from the logged debt.`,
+      ? `Value of the cleared debt. The ${cfg.stablecoin} debt the liquidation cleared, as its TroveOperation log records it (the whole debt, interest accrued since the Trove's previous change included), counted at $1 per ${cfg.stablecoin}. The contract's collateral-ratio check counts each ${cfg.stablecoin} as one dollar, and redemptions hold it to that value.`
+      : `Value of the cleared debt. The Trove's whole ${cfg.stablecoin} debt as the contract logged it at the Trove's previous change, counted at $1 per ${cfg.stablecoin}. The contract's collateral-ratio check counts each ${cfg.stablecoin} as one dollar, and redemptions hold it to that value. Interest accrued since that change is missing from the logged debt.`,
     contract: troveManagerContract(coords),
     via: vals.fromOperation
       ? `${streamVia()} · TroveOperation log · _debtChangeFromOperation · at $1 per ${cfg.stablecoin}`
@@ -672,32 +672,32 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
       collToPool: {
         param: "_collSentToSP",
         unit: collSym(coords),
-        summary: `Collateral sent to the Stability Pool — what the pool's depositors received for the debt they absorbed: that debt plus the branch's pool liquidation penalty, at the branch's price.`,
+        summary: `Collateral sent to the Stability Pool. What the pool's depositors received for the debt they absorbed; that debt plus the branch's pool liquidation penalty, at the branch's price.`,
       },
       collRedistributed: {
         param: "_collRedistributed",
         unit: collSym(coords),
-        summary: `Collateral redistributed — what went with the redistributed debt to the branch's other Troves: that debt plus the branch's redistribution penalty, at the branch's price.`,
+        summary: `Collateral redistributed. What went with the redistributed debt to the branch's other Troves; that debt plus the branch's redistribution penalty, at the branch's price.`,
       },
       gasComp: {
         param: "_collGasCompensation",
         unit: collSym(coords),
-        summary: `Gas compensation — the small part of the collateral paid to the liquidator.`,
+        summary: `Gas compensation. The small part of the collateral paid to the liquidator.`,
       },
       offset: {
         param: "_debtOffsetBySP",
         unit: cfg.stablecoin,
-        summary: `Debt the Stability Pool absorbed — the part of the liquidated debt the branch's Stability Pool deposits paid off, taking the matching collateral in exchange.`,
+        summary: `Debt the Stability Pool absorbed. The part of the liquidated debt the branch's Stability Pool deposits paid off, taking the matching collateral in exchange.`,
       },
       redistributed: {
         param: "_debtRedistributed",
         unit: cfg.stablecoin,
-        summary: `Debt redistributed — the part of the liquidated debt the Stability Pool could not absorb, passed with its collateral to the branch's other Troves in proportion to their collateral.`,
+        summary: `Debt redistributed. The part of the liquidated debt the Stability Pool could not absorb, passed with its collateral to the branch's other Troves in proportion to their collateral.`,
       },
       surplus: {
         param: "_collSurplus",
         unit: collSym(coords),
-        summary: `Collateral surplus — the collateral left after the debt and the liquidation penalty were covered. The contract credits it to the Trove's owner in the branch's CollSurplusPool, where the owner can claim it.`,
+        summary: `Collateral surplus. The collateral left after the debt and the liquidation penalty were covered. The contract credits it to the Trove's owner in the branch's CollSurplusPool, where the owner can claim it.`,
       },
     }[vals.leg];
     return {
@@ -724,7 +724,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     pclass: "oracle",
     formula: "collateral value ÷ cleared debt",
     verify: txVerify(coords),
-    summary: `Collateral ratio at liquidation — the Trove's whole collateral at the branch's price, divided by the debt the liquidation cleared, on the balances logged at its previous change. The contract gives the Stability Pool depositors (or, in a redistribution, the branch's other Troves) the debt plus the branch's liquidation penalty, pays the liquidator a small part of the collateral, and leaves anything above that for the owner to claim.${
+    summary: `Collateral ratio at liquidation. The Trove's whole collateral at the branch's price, divided by the debt the liquidation cleared, on the balances logged at its previous change. The contract gives the Stability Pool depositors (or, in a redistribution, the branch's other Troves) the debt plus the branch's liquidation penalty, pays the liquidator a small part of the collateral, and leaves anything above that for the owner to claim.${
       vals.mcrPct != null
         ? ` A Trove can be liquidated only below the branch's minimum collateral ratio of ${vals.mcrPct}%.`
         : ""
@@ -749,8 +749,8 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     pclass: "state",
     summary:
       vals.which === "pool"
-        ? `The branch's liquidation penalty on debt the Stability Pool absorbs: the pool receives that debt plus this share of it, in collateral at the branch's price.`
-        : `The branch's liquidation penalty on redistributed debt: the other Troves receive that debt plus this share of it, in collateral at the branch's price.`,
+        ? `The branch's liquidation penalty on debt the Stability Pool absorbs. The pool receives that debt plus this share of it, in collateral at the branch's price.`
+        : `The branch's liquidation penalty on redistributed debt. The other Troves receive that debt plus this share of it, in collateral at the branch's price.`,
     via: vals.source,
     inputs: [{ label: "penalty", value: vals.pct, kind: "chain", pclass: "state" }, ...eventInputs(coords)],
   });
@@ -763,7 +763,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
   const positionCollateralProv = (coords?: LiquityForkCoords): Provenance => ({
     kind: "chain",
     pclass: "emitted",
-    summary: `Collateral the Trove holds — the full balance the contract logged at the Trove's latest change. The balance moves only when the Trove changes, apart from any share of a liquidated Trove's collateral, which is added at its next change.`,
+    summary: `Collateral the Trove holds. The full balance the contract logged at the Trove's latest change. The balance moves only when the Trove changes, apart from any share of a liquidated Trove's collateral, which is added at its next change.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · ${
       coords?.isBatched ? "latest BatchedTroveUpdated log" : "latest TroveUpdated log"
@@ -781,7 +781,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
       ? {
           kind: "chain",
           pclass: "indexed",
-          summary: `Annual interest rate at the Trove's latest change — the rate of its batch, as the batch last logged it at or before that change. The batch manager can change the batch's rate between this Trove's changes; the Trove's page reads the current rate. The contract stores a rate as a fraction with 18 decimal places, shown here as a percentage.`,
+          summary: `Annual interest rate at the Trove's latest change. The rate of its batch, as the batch last logged it at or before that change. The batch manager can change the batch's rate between this Trove's changes; the Trove's page reads the current rate. The contract stores a rate as a fraction with 18 decimal places, shown here as a percentage.`,
           contract: troveManagerContract(coords),
           via: `${streamVia()} · BatchUpdated log (this Trove's batch, latest at or before its last change) · _annualInterestRate · ÷10^16`,
           ...latestSource(coords),
@@ -789,7 +789,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
       : {
           kind: "chain",
           pclass: "emitted",
-          summary: `Annual interest rate the Trove pays — the rate the contract logged at the Trove's latest change. Only a change to the Trove moves it. The contract stores a rate as a fraction with 18 decimal places, shown here as a percentage.`,
+          summary: `Annual interest rate the Trove pays. The rate the contract logged at the Trove's latest change. Only a change to the Trove moves it. The contract stores a rate as a fraction with 18 decimal places, shown here as a percentage.`,
           contract: troveManagerContract(coords),
           via: `${streamVia()} · latest TroveUpdated log · annual_interest_rate · ÷10^16`,
           ...latestSource(coords),
@@ -799,8 +799,8 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: coords?.isBatched ? "chain-derived" : "chain",
     pclass: coords?.isBatched ? "indexed" : "emitted",
     summary: coords?.isBatched
-      ? `${cfg.stablecoin} debt at the Trove's latest change — ${batchDebtSentence("that change")} The batch's debt moves with interest and whenever any Trove in the batch changes, so this figure can be well behind the live debt; the Trove's page reads the live figure.`
-      : `${cfg.stablecoin} debt at the Trove's latest change — the full debt the contract logged then. Interest accrues on it from that moment, so while the Trove is open it owes more than this.`,
+      ? `${cfg.stablecoin} debt at the Trove's latest change. ${batchDebtSentence("that change")} The batch's debt moves with interest and whenever any Trove in the batch changes, so this figure can be well behind the live debt; the Trove's page reads the live figure.`
+      : `${cfg.stablecoin} debt at the Trove's latest change. The full debt the contract logged then. Interest accrues on it from that moment, so while the Trove is open it owes more than this.`,
     contract: troveManagerContract(coords),
     via: coords?.isBatched
       ? `${streamVia()} · latest BatchedTroveUpdated log · _batchDebtShares ÷ BatchUpdated _totalDebtShares × _debt`
@@ -816,7 +816,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
   const peakCollateralProv = (coords?: LiquityForkCoords): Provenance => ({
     kind: "chain",
     pclass: "indexed",
-    summary: `Highest collateral over the Trove's life — the largest balance the contract logged for it after any of its changes. The highest debt beside it can come from a different change.`,
+    summary: `Highest collateral over the Trove's life. The largest balance the contract logged for it after any of its changes. The highest debt beside it can come from a different change.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · max(coll) over this Trove's TroveUpdated and BatchedTroveUpdated logs · ÷10^${collDecimals(coords)}`,
   });
@@ -824,7 +824,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
   const peakDebtProv = (coords?: LiquityForkCoords): Provenance => ({
     kind: "chain",
     pclass: "indexed",
-    summary: `Highest ${cfg.stablecoin} debt over the Trove's life — the largest debt the contract logged for it after any of its changes; while it was in a batch, its shares of the batch's debt. The highest collateral beside it can come from a different change.`,
+    summary: `Highest ${cfg.stablecoin} debt over the Trove's life. The largest debt the contract logged for it after any of its changes; while it was in a batch, its shares of the batch's debt. The highest collateral beside it can come from a different change.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · max(debt) over this Trove's TroveUpdated and BatchedTroveUpdated logs · ÷10^18`,
   });
@@ -869,7 +869,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     return {
       kind: "chain-derived",
       pclass: "indexed",
-      summary: `Lifetime ${flow} — ${flowStory(flow, collSym(coords))}, added up over the Trove's changes. Each change counts the balance after it minus the balance before${
+      summary: `Lifetime ${flow}. ${flowStory(flow, collSym(coords))}, added up over the Trove's changes. Each change counts the balance after it minus the balance before${
         debt ? "; while the Trove was in a batch, its debt is its shares of the batch's debt" : ""
       }. The figure shows only when all the flows add up to the Trove's latest balances.`,
       contract: troveManagerContract(coords),
@@ -889,7 +889,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
       kind: "chain",
       pclass: coords?.isBatched ? "indexed" : "emitted",
       verify: txVerify(coords),
-      summary: `Annual interest rate at this event — ${
+      summary: `Annual interest rate at this event. ${
         coords?.isBatched
           ? "the rate of this Trove's batch, as the batch last logged it at or before this event. The batch manager sets it for every Trove in the batch."
           : "the rate the contract logged for the Trove at this event."
@@ -926,7 +926,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
   ): Provenance => ({
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `Collateral value ${vals.which} this event in US dollars — the collateral ${vals.which} the event, times the price the branch's PriceFeed held for ${collSym(coords)} at this block.`,
+    summary: `Collateral value ${vals.which} this event in US dollars. The collateral ${vals.which} the event, times the price the branch's PriceFeed held for ${collSym(coords)} at this block.`,
     contract: cfg.priceFeedContract(coords.collateralType),
     formula: "collateral × price",
     inputs: [
@@ -947,8 +947,8 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     pclass: "oracle",
     summary:
       vals.which === "after"
-        ? `Collateral ratio after this event — the collateral's dollar value at the branch price for this block, divided by the debt.`
-        : `Collateral ratio before this event — the Trove's previous collateral and debt, valued at the same price as the ratio after, so the two differ only by what this event moved.`,
+        ? `Collateral ratio after this event. The collateral's dollar value at the branch price for this block, divided by the debt.`
+        : `Collateral ratio before this event. The Trove's previous collateral and debt, valued at the same price as the ratio after, so the two differ only by what this event moved.`,
     contract: cfg.priceFeedContract(coords.collateralType),
     formula: "collateral × price ÷ debt × 100",
     inputs: [
@@ -964,8 +964,8 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain",
     pclass: vals.batchRow ? "emitted" : "indexed",
     summary: vals.batchRow
-      ? `Annual interest rate before this change — the rate the batch logged on its previous update.`
-      : `Annual interest rate before this event — the rate the contract logged for the Trove at its previous change.`,
+      ? `Annual interest rate before this change. The rate the batch logged on its previous update.`
+      : `Annual interest rate before this event. The rate the contract logged for the Trove at its previous change.`,
     contract: troveManagerContract(coords),
     via: vals.batchRow
       ? `${streamVia()} · the batch's previous BatchUpdated log · _annualInterestRate · ÷10^16`
@@ -979,7 +979,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
   /** A year's interest at the rate after this event, on the debt after it. */
   const costPerYearProv = (coords: LiquityForkCoords, vals: { debt: string; rate: string }): Provenance => ({
     kind: "derived",
-    summary: `Interest cost per year — the debt after this event times the annual rate after it. A year's interest at this rate; the rate can change.`,
+    summary: `Interest cost per year. The debt after this event times the annual rate after it. A year's interest at this rate; the rate can change.`,
     formula: "debt × rate ÷ 100",
     inputs: [
       { label: "debt", value: opVal(vals.debt), kind: "chain", note: `${cfg.stablecoin}, after` },
@@ -1017,7 +1017,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain-derived",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `The Trove's debt at this change — its share of the batch's debt, which the batch logged with this change, interest and management fee included.`,
+    summary: `The Trove's debt at this change. Its share of the batch's debt, which the batch logged with this change, interest and management fee included.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · BatchUpdated log · _debt × shares ÷ _totalDebtShares · ÷10^18`,
     formula: "batch debt × Trove shares ÷ total shares",
@@ -1042,7 +1042,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain-derived",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `Premature-adjustment fee this Trove carried — the batch manager changed the rate inside the protocol's cooldown after its last change, so ${cfg.protocolName} added a fee to the batch's debt. Each member Trove carries it in proportion to its shares of the batch.`,
+    summary: `Premature-adjustment fee this Trove carried. The batch manager changed the rate inside the protocol's cooldown after its last change, so ${cfg.protocolName} added a fee to the batch's debt. Each member Trove carries it in proportion to its shares of the batch.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · BatchUpdated log · _debtIncreaseFromUpfrontFee × shares ÷ _totalDebtShares · ÷10^18`,
     formula: "batch fee × Trove shares ÷ total shares",
@@ -1066,7 +1066,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `Batch manager at this event — the address the owner handed control of the Trove's interest rate to, logged with the Trove's change. A Trove in a batch pays the rate its manager sets for the whole batch, plus the manager's annual fee. The manager cannot move the Trove's collateral or debt.`,
+    summary: `Batch manager at this event. The address the owner handed control of the Trove's interest rate to, logged with the Trove's change. A Trove in a batch pays the rate its manager sets for the whole batch, plus the manager's annual fee. The manager cannot move the Trove's collateral or debt.`,
     contract: troveManagerContract(coords),
     via: `${streamVia()} · BatchedTroveUpdated log · _interestBatchManager`,
     inputs: [

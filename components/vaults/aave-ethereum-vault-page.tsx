@@ -22,11 +22,12 @@ import { NotLoaded } from "@/components/shared/not-loaded";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { assetText, pctText, sharePriceText, shareText, shortAddress } from "@/lib/shared/vault-amount-text";
+import { StatAmount } from "@/components/vaults/stat-amount";
 import { ethereumVaultHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
 import { aaveEthereumVaultPageSummary } from "@/lib/vaults/summary";
 import { vaultVenueShareProv } from "@/lib/vaults/card-provenance";
 import { aaveVaultAssetsContent, aaveVaultCardContent, SHARES_ISSUED_TIP, STEWARD_TIP } from "@/lib/vaults/card-words";
-import type { VaultYield } from "@/lib/vaults/yield";
+import { measuredYield, type VaultYield } from "@/lib/vaults/yield";
 import type { AaveVaultAttestation } from "@/lib/aave-vaults/vault-catalog";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import type { AaveEthereumVaultResponse } from "@/lib/sources/chain/aave-ethereum-vault";
@@ -70,7 +71,7 @@ const fraction = (part: RawAmount | null, total: RawAmount | null): number | nul
 export function AaveEthereumVaultPage({
   data,
   census,
-  yieldFigure,
+  yieldFigure: storeYield,
   strip,
   attestation,
 }: {
@@ -85,6 +86,8 @@ export function AaveEthereumVaultPage({
   const { vault } = data;
   const family = vault.family;
   const v = aaveEthereumVaultPageSummary(data, attestation.kind === "book", census);
+  // A figure on total assets under the dust floor is too small to measure (ui-jobs 542).
+  const yieldFigure = measuredYield(storeYield, v.totalAssets?.raw);
   const unit = vault.asset.symbol;
   const ad = vault.asset.decimals;
   const sd = vault.shareDecimals;
@@ -109,7 +112,9 @@ export function AaveEthereumVaultPage({
       value: fig(
         "total-supply",
         data.totalSupply && sd != null ? (
-          <Prov info={aaveVaultTotalSupplyProv(coords, sd)}>{shareText(data.totalSupply, sd)}</Prov>
+          <Prov info={aaveVaultTotalSupplyProv(coords, sd)}>
+            <StatAmount amount={data.totalSupply} decimals={sd} symbol={vault.symbol ?? undefined} shares />
+          </Prov>
         ) : (
           UNREAD
         ),
@@ -156,7 +161,13 @@ export function AaveEthereumVaultPage({
         asset,
         value: fig(
           "sgho-asset-held",
-          s.assetHeld ? <Prov info={aaveSghoAssetHeldProv(coords)}>{assetText(s.assetHeld, ad)}</Prov> : UNREAD,
+          s.assetHeld ? (
+            <Prov info={aaveSghoAssetHeldProv(coords)}>
+              <StatAmount amount={s.assetHeld} decimals={ad} symbol={unit} />
+            </Prov>
+          ) : (
+            UNREAD
+          ),
         ),
       },
       {
@@ -166,7 +177,13 @@ export function AaveEthereumVaultPage({
         asset,
         value: fig(
           "sgho-supply-cap",
-          s.supplyCap ? <Prov info={aaveVaultSupplyCapProv(coords)}>{assetText(s.supplyCap, ad)}</Prov> : UNREAD,
+          s.supplyCap ? (
+            <Prov info={aaveVaultSupplyCapProv(coords)}>
+              <StatAmount amount={s.supplyCap} decimals={ad} symbol={unit} />
+            </Prov>
+          ) : (
+            UNREAD
+          ),
         ),
       },
       {
@@ -177,7 +194,9 @@ export function AaveEthereumVaultPage({
         value: fig(
           "sgho-capacity",
           s.remainingCapacity ? (
-            <Prov info={aaveSghoCapacityProv(coords)}>{assetText(s.remainingCapacity, ad)}</Prov>
+            <Prov info={aaveSghoCapacityProv(coords)}>
+              <StatAmount amount={s.remainingCapacity} decimals={ad} symbol={unit} />
+            </Prov>
           ) : (
             UNREAD
           ),
@@ -469,7 +488,9 @@ export function AaveEthereumVaultPage({
         value: fig(
           "umbrella-max-slashable",
           u.maxSlashable ? (
-            <Prov info={aaveUmbrellaMaxSlashableProv(coords)}>{assetText(u.maxSlashable, ad)}</Prov>
+            <Prov info={aaveUmbrellaMaxSlashableProv(coords)}>
+              <StatAmount amount={u.maxSlashable} decimals={ad} symbol={unit} />
+            </Prov>
           ) : (
             UNREAD
           ),
@@ -649,6 +670,7 @@ export function AaveEthereumVaultPage({
       <VaultAssets
         rows={rows}
         assetSymbol={unit}
+        assetAddress={asset.address}
         assetDecimals={ad}
         line={
           family === "sgho" ? (

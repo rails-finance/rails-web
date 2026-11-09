@@ -141,15 +141,15 @@ export function pwnSheet({ ctx, coords, sides, timestamp, creation }: PwnSheetAr
     ...flowCellProv(side, sym, coords),
     summary:
       side === "collateral"
-        ? `Collateral in escrow (${sym}) — what the loan held once its previous event had run, from the loan's replay over its terms.`
-        : `Debt (${sym}) — what the borrower owed once the loan's previous event had run: the principal plus the interest the terms fix or accrue, to that event.`,
+        ? `Collateral in escrow (${sym}). What the loan held once its previous event had run, from the loan's replay over its terms.`
+        : `Debt (${sym}). What the borrower owed once the loan's previous event had run: the principal plus the interest the terms fix or accrue, to that event.`,
   });
   const beforeProv = (side: FlowSide, sym: string): Provenance => ({
     ...flowCellProv(side, sym, coords),
     summary:
       side === "collateral"
-        ? `Collateral in escrow (${sym}) — what the loan held just before this event: nothing before the creation, the terms' collateral after it.`
-        : `Debt (${sym}) — what the borrower owed just before this event: nothing before the creation; before a repayment or a default claim, the principal plus the interest built by then (stopped at the deadline).`,
+        ? `Collateral in escrow (${sym}). What the loan held just before this event: nothing before the creation, the terms' collateral after it.`
+        : `Debt (${sym}). What the borrower owed just before this event: nothing before the creation; before a repayment or a default claim, the principal plus the interest built by then (stopped at the deadline).`,
   });
 
   // ── Collateral ──
@@ -273,7 +273,7 @@ export function pwnSheet({ ctx, coords, sides, timestamp, creation }: PwnSheetAr
           {
             ...flowCellProv("debt", ds, coords),
             kind: "derived",
-            summary: `Interest since the loan's previous event (${ds}) — the debt just before this event less the debt once the previous event had run — what the terms' APR added by the minute, stopped at the deadline.`,
+            summary: `Interest since the loan's previous event (${ds}). The debt just before this event less the debt once the previous event had run, what the terms' APR added by the minute, stopped at the deadline.`,
             formula: "debt before − debt after the previous event",
           },
           String(built),
@@ -351,7 +351,7 @@ export function pwnSheet({ ctx, coords, sides, timestamp, creation }: PwnSheetAr
         info: {
           ...flowCellProv("debt", ds, coords),
           kind: "chain",
-          summary: `The loan's state — where it stood once this event had run: ${
+          summary: `The loan's state. Where it stood once this event had run: ${
             kind === "paid_back"
               ? "repaid, the borrower paid the loan back and the collateral is released"
               : seized
@@ -374,7 +374,7 @@ export function pwnSheet({ ctx, coords, sides, timestamp, creation }: PwnSheetAr
                 ...flowCellProv("debt", ds, coords),
                 kind: "chain",
                 summary:
-                  "The loan's state before this event — running. A repayment is accepted only while the loan runs, before its deadline passes.",
+                  "The loan's state before this event: running. A repayment is accepted only while the loan runs, before its deadline passes.",
                 via: "captured PWN events (pwn_*) · LOANPaidBack log",
               },
             }

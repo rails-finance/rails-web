@@ -35,7 +35,7 @@ export function StructuredData() {
     "@type": "WebApplication",
     name: "Rails",
     applicationCategory: "FinanceApplication",
-    description: `Dedicated, on-chain-verifiable explorers for ${protocolCount} DeFi protocols on ${chainNames}, plus Polaris on Sepolia — every position replayed from the protocol's own on-chain events, with a receipt on every number.`,
+    description: `Dedicated, on-chain-verifiable explorers for ${protocolCount} DeFi protocols on ${chainNames}, plus Polaris on Sepolia, every position replayed from the protocol's on-chain events, with a receipt on every number.`,
     url: SITE_URL,
     operatingSystem: "Web",
     offers: {
@@ -51,7 +51,7 @@ export function StructuredData() {
     },
     featureList: [
       `Dedicated explorers for ${protocolCount} DeFi protocols on ${chainNames}, plus Polaris on Sepolia: ${LAUNCHED_PROTOCOL_VERSIONS.map((p) => p.label).join(", ")}`,
-      "Every open position in the protocol, searchable by wallet — not just your own",
+      "Every open position in the protocol, searchable by wallet",
       "Read-only: no wallet connection, no signatures",
       "On-chain-verifiable positions and balances, with no modeled state",
       "Plain-language event timelines",

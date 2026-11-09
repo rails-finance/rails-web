@@ -146,7 +146,7 @@ export const assetCardFigures = unstable_cache(
           amount: d.debt,
           unit: t.symbol,
           asOf: null,
-          title: `The debt of ${t.explorer}'s ${d.troves.toLocaleString("en-US")} open troves across the ${list(d.branches)} branches, as Rails stores them`,
+          title: `The debt of ${t.explorer}'s ${d.troves.toLocaleString("en-US")} open Troves across the ${list(d.branches)} branches, as Rails stores them`,
         },
       ]);
     });

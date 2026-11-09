@@ -165,8 +165,8 @@ export function polarisEventBody(
                   {" "}
                   to <LinkedAddress address={ctx.toAddr} />
                 </>
-              ) : null}{" "}
-              — the position&rsquo;s collateral and debt did not change.
+              ) : null}
+              : the position&rsquo;s collateral and debt did not change.
             </span>
           </Prov>
         </div>

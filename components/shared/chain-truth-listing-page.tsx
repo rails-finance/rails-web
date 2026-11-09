@@ -60,6 +60,10 @@ export interface ServerStrategy<T, F extends BaseListFilters, Ext = undefined> {
   /** Map the selection + page onto a backend fetch; returns the slice + total. */
   fetchPage: (filters: F, page: number) => Promise<{ data: T[]; total: number }>;
   itemsPerPage: number;
+  /** The total a selection would give, read as lightly as the endpoint allows
+   *  (a one-row page): the phone filter sheet's staged count. Without it the
+   *  sheet reads `fetchPage`'s total. */
+  fetchCount?: (filters: F) => Promise<number>;
   /** The listing's search box reads an address, an ENS name and, where
    *  `takesId`, a position id (lib/shared/listing-search.ts): a query it cannot
    *  read answers an empty page with a line saying what the box takes. */
@@ -441,6 +445,14 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   );
   const viewKey = strategy.kind === "server" ? serverViewKey : memoryViewKey;
 
+  // The phone sheet's staged count, by this listing's own filtering: the
+  // in-memory rows filtered, or the server's total for the first page.
+  const countFor = (draft: F): number | Promise<number> => {
+    const s = strategyRef.current;
+    if (s.kind === "memory") return applyListFilter(fetched, s.dimensions(fetched), draft, s.apply).length;
+    return s.fetchCount ? s.fetchCount(draft) : s.fetchPage(draft, 1).then((r) => r.total);
+  };
+
   const line = countLine?.(filters) ?? null;
   const pagination =
     strategy.kind === "server"
@@ -508,6 +520,8 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
         searchPlaceholder,
         // Every chain-truth listing can be saved as a view (N1.7, ui-jobs 521).
         viewMenu: true,
+        countFor,
+        nounFor: (draft: F) => (strategy.kind === "server" ? countLine?.(draft)?.noun : undefined) ?? noun,
       }}
     />
   );

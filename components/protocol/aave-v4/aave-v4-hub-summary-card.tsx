@@ -29,7 +29,7 @@ import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 // spoke. Full set always shown (never truncated): they wrap.
 const SPOKE_PILL =
   "inline-flex items-center gap-1 rounded-full border border-background bg-background px-2 py-0.5 text-[12px] " +
-  "text-foreground/80 transition-colors hover:border-blue-500/50 hover:text-blue-600 dark:hover:text-blue-400";
+  "text-foreground/80 transition-colors hover:border-blue-500/50 hover:text-blue-600 dark:hover:text-[var(--text-link)]";
 
 /** Listing URL filtered to one hub (`/ethereum/aave-v4?hubs=core`). `hub` is already the
  *  lowercase hub slug. */
@@ -79,7 +79,7 @@ export function AaveV4HubSummaryCard({ hub, block }: { hub: HubView; block?: num
       <div>
         <Link
           href={listingHref(hub.hub)}
-          className="text-base font-semibold text-foreground transition-colors hover:text-blue-600 dark:hover:text-blue-400"
+          className="text-base font-semibold text-foreground transition-colors hover:text-blue-600 dark:hover:text-[var(--text-link)]"
           title={`View positions in ${hub.label}`}
         >
           {hub.label}

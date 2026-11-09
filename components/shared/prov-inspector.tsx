@@ -65,7 +65,7 @@ export function ProvInspectorToggle({
     () => provInspector.getArmed() && provInspector.getScope() == null,
     () => false,
   );
-  const label = armed ? "Exit the provenance inspector" : "Provenance inspector — click any value to trace it";
+  const label = armed ? "Exit the provenance inspector" : "Provenance inspector: click any value to trace it";
   const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     const opener = variant === "dock" ? e.currentTarget : (openerRef?.current ?? null);
     provInspector.setArmed(!armed, null, opener);
@@ -99,7 +99,7 @@ export function ProvInspectorToggle({
       className="prov-inspect-toggle"
       aria-pressed={armed}
       aria-label={label}
-      title={armed ? "Exit the provenance inspector (Esc)" : "Provenance inspector — click any value to trace it"}
+      title={armed ? "Exit the provenance inspector (Esc)" : "Provenance inspector: click any value to trace it"}
       onClick={onClick}
     >
       <Crosshair aria-hidden />
@@ -118,6 +118,7 @@ export function ProvScopeToggle({
   scope,
   hint,
   onPick,
+  onArm,
   openerRef,
 }: {
   scope: string;
@@ -126,6 +127,9 @@ export function ProvScopeToggle({
   hint?: string;
   /** Called after the click, so the menu that holds the row can close. */
   onPick?: () => void;
+  /** Called as the row arms the scope: a timeline card opens on its Figures
+   *  so the values it traces are on screen (ui-jobs 535). */
+  onArm?: () => void;
   /** The control focus returns to when the mode is put down; where absent,
    *  the pressed button. */
   openerRef?: React.RefObject<HTMLElement | null>;
@@ -136,6 +140,7 @@ export function ProvScopeToggle({
     () => false,
   );
   const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (!pressed) onArm?.();
     provInspector.setArmed(!pressed, scope, openerRef?.current ?? e.currentTarget);
     onPick?.();
   };
@@ -149,9 +154,9 @@ export function ProvScopeToggle({
       data-prov-scope-toggle={scope}
       onClick={onClick}
     >
-      <Crosshair aria-hidden />
+      <Crosshair aria-hidden className={PROV_TEAL} />
       <span className="min-w-0">
-        <span className="block text-sm font-semibold text-foreground">
+        <span className={`block text-sm font-semibold ${PROV_TEAL}`}>
           {pressed ? SCOPE_WORDS.hide : SCOPE_WORDS.show}
         </span>
         <span className="block text-xs text-rb-500">{pressed ? SCOPE_WORDS.armed_hint : hint}</span>
@@ -159,6 +164,11 @@ export function ProvScopeToggle({
     </button>
   );
 }
+
+/** The provenance teal: the popover's border and the inspector's armed and
+ *  dotted marks (teal-600, teal-400 in dark; globals.css), on the menu row's
+ *  title and crosshair (ui-jobs 535). */
+const PROV_TEAL = "text-teal-600 dark:text-teal-400";
 
 /** The scoped row's words. */
 const SCOPE_WORDS = {
@@ -329,7 +339,7 @@ function InspectorPopover({ pin }: { pin: ProvInspectorPin }) {
         <button
           type="button"
           className="prov-rrow-dots"
-          title={`${involvedTitle} — what the colours mean`}
+          title={`${involvedTitle}, what the colours mean`}
           aria-label={`${involvedTitle}. What the colours mean`}
           aria-haspopup="dialog"
           onClick={() => setLadderOpen(true)}

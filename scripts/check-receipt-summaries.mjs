@@ -20,6 +20,10 @@
 //       plus one of its own: it is an instruction the reader can follow ("To
 //       check: ask any archive node for …"), never "Re-run the … eth_call".
 //
+//   H — the head (the text before splitSummary's cut) is a name clause: a ": "
+//       that opens a clause in it fails (scripts/summary-literals.mjs). Read on
+//       every summary under lib/, components/ and app/, both ternary arms.
+//
 // Name clauses behind a ${…} interpolation resolve at runtime and are
 // unjudgeable statically — they are SKIPPED and the count reported out loud,
 // so "all clear" never quietly means "two-thirds unchecked".
@@ -27,6 +31,7 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import { PLAIN_WORDS_PENDING } from "./plain-words-pending.mjs";
+import { headColon, literalRuns } from "./summary-literals.mjs";
 
 const files = execSync(
   `grep -rlE 'summary( =|:)|kind: "(recompute|etherscan|rollup|none)"' --include="*.ts" --include="*.tsx" lib components app`,
@@ -113,52 +118,12 @@ const C_KEEP = [
   },
 ];
 
-/** The literal texts of the expression starting at `from`: one entry per run of
- *  string/template literals joined by `+`. Stops at the `,` `;` or closer that
- *  ends the expression. A template's `\${…}` stays in the text as written. */
-function literalRuns(src, from) {
-  const runs = [];
-  let cur = null; // the run being joined, or null after any non-`+` token
-  let depth = 0;
-  let i = from;
-  while (i < src.length) {
-    const c = src[i];
-    if (c === '"' || c === "'" || c === "`") {
-      let j = i + 1;
-      let nest = 0;
-      while (j < src.length) {
-        if (src[j] === "\\") j++;
-        else if (c === "`" && src[j] === "$" && src[j + 1] === "{") nest++;
-        else if (c === "`" && nest > 0 && src[j] === "}") nest--;
-        else if (src[j] === c && nest === 0) break;
-        j++;
-      }
-      const lit = src.slice(i + 1, j);
-      if (cur === null) runs.push((cur = { text: lit, index: i }));
-      else cur.text += lit;
-      i = j + 1;
-      continue;
-    }
-    if (c === "/" && src[i + 1] === "/") {
-      i = src.indexOf("\n", i);
-      if (i < 0) break;
-      continue;
-    }
-    if ("([{".includes(c)) depth++;
-    else if (")]}".includes(c)) {
-      if (depth === 0) break;
-      depth--;
-    } else if ((c === "," || c === ";") && depth === 0) break;
-    if (c !== "+" && !/\s/.test(c)) cur = null;
-    i++;
-  }
-  return runs;
-}
-
 const plain = []; // rule C hits in enforced files
 const pendingHits = new Map(); // pending file -> hit count
 const keepUsed = new Set();
 let plainScanned = 0;
+const heads = []; // head rule hits
+let headsScanned = 0;
 let checkLinesScanned = 0;
 
 /** The `text:` of every verify object in `src` — a `{ kind: "<verify kind>", … }`
@@ -181,6 +146,8 @@ function scanPlainWords(f, src) {
       from: m.index + m[0].length,
       rules: [...CONTRAST, FILLER],
       check: false,
+      // A `summary:` in a comment is prose about a summary; the head rule passes it by.
+      comment: /^\s*(?:\/\/|\/?\*)/.test(src.slice(src.lastIndexOf("\n", m.index) + 1, m.index)),
     })),
     ...[...checkLineSites(src)].map((from) => ({ from, rules: [...CONTRAST, FILLER, ...OLD_CHECK_LINE], check: true })),
   ];
@@ -191,6 +158,11 @@ function scanPlainWords(f, src) {
       if (site.check) checkLinesScanned++;
       else plainScanned++;
       const line = src.slice(0, run.index).split("\n").length;
+      if (!site.check && !site.comment && run.lead) {
+        headsScanned++;
+        const head = headColon(run.text);
+        if (head) heads.push({ at: `${f}:${line}`, head });
+      }
       for (const re of site.rules) {
         for (const hit of text.matchAll(re.global ? re : new RegExp(re.source, re.flags + "g"))) {
           const kept = C_KEEP.findIndex((k) => {
@@ -260,6 +232,9 @@ show(
   plain,
   (r) => `"${r.word}" in: …${r.near}…`,
 );
+show('H — head runs into the body (a clause-opening ": " before splitSummary\'s cut; write ". ")', heads, (r) =>
+  r.head.slice(0, 120),
+);
 
 // The ratchet shrinks only: a pending file with nothing left to flag, or one
 // that is gone, must leave the list.
@@ -281,4 +256,6 @@ const left = [...pendingHits.values()].reduce((a, b) => a + b, 0);
 console.log(
   `rule C read ${plainScanned} summary texts and ${checkLinesScanned} check lines; ${C_KEEP.length} kept by name; ${PLAIN_WORDS_PENDING.length} files pending with ${left} phrases left to rewrite`,
 );
-if (repeat.length || truncate.length || plain.length || stalePending.length || staleKeep.length) process.exit(1);
+console.log(`head rule read ${headsScanned} summary heads`);
+if (heads.length || repeat.length || truncate.length || plain.length || stalePending.length || staleKeep.length)
+  process.exit(1);

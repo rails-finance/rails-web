@@ -330,11 +330,29 @@ export const poolCallerProv = (eventType: string, coords: V3Coords, caller: stri
  *  value transfer the transaction's internal transfers list (read from the
  *  stored call tree, or Alchemy's alchemy_getAssetTransfers).
  *  The `paired` leaf states the pairing as Rails' inference. */
+/** The pairing as Rails' inference, with the rulings that chose the leg
+ *  (lib/shared/tx-legs.ts): the largest of several, fee legs left out, a
+ *  partial fill. */
+function pairedNote(sale: RouterSale, sentSymbol: string, venueName: string): string {
+  const which =
+    sale.legsBack > 1
+      ? `the largest of the ${sale.legsBack} legs paid back to this wallet in this transaction (by USD value at the block, from Aave's oracle, where their tokens differ)`
+      : "the one leg paid back to this wallet in this transaction";
+  const fees =
+    sale.feeLegs > 0
+      ? ` ${sale.feeLegs === 1 ? "A smaller leg" : `${sale.feeLegs} smaller legs`} under 1% of it ${sale.feeLegs === 1 ? "was" : "were"} left out as ${sale.feeLegs === 1 ? "a fee" : "fees"}.`
+      : "";
+  const partial = sale.partial
+    ? ` Some of the ${sentSymbol} came back in the same transaction; the sale is the part that went.`
+    : "";
+  return `Rails' inference: ${which}, in a token other than the ${sentSymbol} it sent to ${venueName}.${fees}${partial} No protocol log joins the two legs.`;
+}
+
 export const saleLegProv = (sale: RouterSale, sentSymbol: string, coords: V3Coords): Provenance => {
   const chainId = coords.chainId ?? MAINNET_CHAIN_ID;
   const { leg } = sale;
   const venue = getProtocolContract(sale.via, chainId);
-  const venueName = venue?.name ?? "the contract";
+  const venueName = venue?.fullName ?? venue?.name ?? "the contract";
   const native = leg.source === "trace" || leg.source === "asset-transfers";
   const txHref = coords.txHash ? explorerUrl(chainId, native ? "tx" : "tx-logs", coords.txHash) : undefined;
   const legVerify: ProvVerify | undefined = txHref
@@ -368,7 +386,7 @@ export const saleLegProv = (sale: RouterSale, sentSymbol: string, coords: V3Coor
         value: "Rails paired it",
         kind: "derived",
         pclass: "indexed",
-        note: `Rails' inference: the one leg paid back to this wallet in this transaction, in a token other than the ${sentSymbol} it sent to ${venueName}. No protocol log joins the two legs.`,
+        note: pairedNote(sale, sentSymbol, venueName),
         ...(legVerify ? { verify: legVerify } : {}),
       },
     ]),
@@ -719,7 +737,7 @@ export const swapVenueProv = (coords: V3Coords, swap: AaveV3SwapDetail): Provena
 /** The sentence a receipt's summary adds for a named contract: growthepie's
  *  owner where it labels one, the verified source behind it. */
 export const knownContractSentence = (named: ProtocolContract): string =>
-  ` Rails names the address ${named.name}${named.growthepie?.owner ? `, which growthepie labels ${named.growthepie.owner}` : ""}: its verified contract source is \`${named.contractName}\`, ${named.role}.`;
+  ` Rails names the address ${named.fullName ?? named.name}${named.growthepie?.owner ? `, which growthepie labels ${named.growthepie.owner}` : ""}: its verified contract source is \`${named.contractName}\`, ${named.role}.`;
 
 /** The receipt leaves for a registry name, in the order the registry consults
  *  its sources (its header): growthepie's label where it has one, credited as
@@ -742,12 +760,23 @@ export const counterpartyNameInputs = (named: ProtocolContract, addressHref: str
     : []),
   {
     label: "name",
-    value: named.name,
+    value: named.entryName ?? named.name,
     kind: "offchain",
     pclass: "offchain",
     note: `Rails' registry of known contracts · verified source \`${named.contractName}\``,
     verify: { kind: "etherscan", href: `${addressHref}#code`, text: "Confirm the verified contract source" },
   },
+  ...(named.brandSource
+    ? [
+        {
+          label: "owner",
+          value: named.name,
+          kind: "offchain" as const,
+          pclass: "offchain" as const,
+          note: `The product the contract belongs to, from ${named.brandSource}`,
+        },
+      ]
+    : []),
 ];
 
 /** Supplied balance of a reserve AFTER this event = Σ supply/withdraw/transfer/seizure deltas.
@@ -1498,8 +1527,8 @@ export const aaveV3InterestCaptionProv = (side: "supply" | "debt"): Provenance =
   pclass: "indexed",
   summary:
     side === "supply"
-      ? "Supply interest inside the collateral balance above: per reserve, the interest added since the balance last started from zero (a balance under a cent counts as zero). Each row states the balance before and after it, so each row's before less the previous row's after is the interest between them, and the balance now less the last row's after is the interest since. Valued at the price the Pool's oracle reports now. Interest from before that start left with earlier withdrawals; the Lifetime flows panel counts all of it."
-      : "Borrow interest inside the debt balance above: per reserve, the interest added since the debt last started from zero. Each row states the debt before and after it, so each row's before less the previous row's after is the interest between them, and the debt now less the last row's after is the interest since. Valued at the price the Pool's oracle reports now. Interest from before that start was repaid; the Lifetime flows panel counts all of it.",
+      ? "Supply interest inside the collateral balance above. Per reserve, the interest added since the balance last started from zero (a balance under a cent counts as zero). Each row states the balance before and after it, so each row's before less the previous row's after is the interest between them, and the balance now less the last row's after is the interest since. Valued at the price the Pool's oracle reports now. Interest from before that start left with earlier withdrawals; the Lifetime flows panel counts all of it."
+      : "Borrow interest inside the debt balance above. Per reserve, the interest added since the debt last started from zero. Each row states the debt before and after it, so each row's before less the previous row's after is the interest between them, and the debt now less the last row's after is the interest since. Valued at the price the Pool's oracle reports now. Interest from before that start was repaid; the Lifetime flows panel counts all of it.",
   contract: POOL,
   via: "Σ (row before − previous row after) + (balance now − last row after), since the balance last started from zero, × IAaveOracle getAssetPrice, per reserve",
   formula: "interest since the balance started from zero × oracle price",

@@ -31,7 +31,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "PWN loan book",
   description:
-    "PWN's whole loan book — every peer-to-peer fixed-term loan ever struck: what stands open, what secures it, what it owes, and how the settled loans ended.",
+    "PWN's whole loan book, every peer-to-peer fixed-term loan ever struck: what stands open, what secures it, what it owes, and how the settled loans ended.",
 };
 
 const PROTOCOL = protocolForHref("/ethereum/pwn")!;

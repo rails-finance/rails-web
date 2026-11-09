@@ -109,7 +109,7 @@ assert(bText.includes("Highest recorded collateral"), "a borrower's supply colum
 // On Ethereum each row is the chain's balance, interest included, so the
 // principal-only footnote (the Base sweep's caveat) is not drawn here.
 assert(
-  !bText.includes("principal only — accrued interest not included"),
+  !bText.includes("principal only: accrued interest not included"),
   "an Ethereum debt column carries no principal-only footnote",
 );
 

@@ -3,11 +3,18 @@
 // Where the assets are (V3, rails-ops ui-jobs 407; survey 2026-10-20 §6): one
 // section under the vault card on every family. At its head the allocation
 // band (decision 0043 point 4, the one `band`; the plan in
-// lib/vaults/allocation-plan.ts), beneath it one table, Venue · Amount · Share
-// of this vault · Links, in the source's own order with Idle as a row. "Share
+// lib/vaults/allocation-plan.ts), beneath it one table in the house style
+// (components/shared/data-table), Venue · Amount · Share of this vault · Links, in the source's own order with Idle as a row. "Share
 // of this vault" is a fraction of one vault's book, both terms reads of the
 // vault at one block (survey §7.3); its header tip names the denominator. One
 // line under the heading; the rest is behind the section's "?".
+//
+// From sm every row is two lines, 64px (D1 `rowHeight="two"`): the venue over its
+// sub-label, each truncating with its full text in a `title` where it is
+// text. Amount carries the asset's mark (`AssetUnit`). Rows are unlinked: a
+// venue has no one Rails page (a Morpho market has two, a strategy or a
+// reserve none). Below sm each row is a card (D6): the venue across, Amount
+// and Share two-up under their names, the links on a line at the foot.
 
 import type { ReactNode } from "react";
 import { AllocationBar, type AllocationSegment } from "@/components/shared/ratio-bar";
@@ -15,6 +22,15 @@ import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { HeadingTip } from "@/components/shared/tip-label";
 import { NotLoaded } from "@/components/shared/not-loaded";
+import { AssetUnit } from "@/components/shared/asset-unit";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 import { assetText, pctText } from "@/lib/shared/vault-amount-text";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import { planAllocation } from "@/lib/vaults/allocation-plan";
@@ -46,6 +62,7 @@ export interface VaultAssetRow {
 export function VaultAssets({
   rows,
   assetSymbol,
+  assetAddress,
   assetDecimals,
   line,
   shareTip,
@@ -53,6 +70,8 @@ export function VaultAssets({
 }: {
   rows: VaultAssetRow[];
   assetSymbol: string;
+  /** The asset's mark after each amount. */
+  assetAddress: string;
   assetDecimals: number;
   /** The one line under the heading. */
   line: ReactNode;
@@ -99,6 +118,8 @@ export function VaultAssets({
     });
   }
 
+  const shareHead = <HeadingTip text="Share of this vault" tip={shareTip} />;
+
   return (
     <section
       className="mb-6"
@@ -122,56 +143,77 @@ export function VaultAssets({
           emptyLabel={total === BigInt(0) ? "Nothing to divide at this block." : undefined}
         />
       </div>
-      <table className="mt-2 w-full text-[12px]">
-        <thead>
-          <tr className="border-b border-rb-200 text-left text-[11px] uppercase tracking-wider text-rb-500 dark:border-rb-500/30">
-            <th className="py-2 pr-3 font-normal">Venue</th>
-            <th className="py-2 pr-3 text-right font-normal">Amount · {assetSymbol}</th>
-            <th className="py-2 text-right font-normal sm:pr-3">
-              <HeadingTip text="Share of this vault" tip={shareTip} />
-            </th>
-            <th className="hidden py-2 text-right font-normal sm:table-cell">Links</th>
-          </tr>
-        </thead>
-        <tbody>
+      <DataTable
+        className="mt-2"
+        tableClassName="text-[12px]"
+        label={`Where this vault's ${assetSymbol} is, by venue`}
+        stacked
+        rowHeight="two"
+      >
+        <DataTableHead>
+          <DataTableHeader label="Venue" />
+          <DataTableHeader label="Amount" align="right" />
+          <DataTableHeader align="right">{shareHead}</DataTableHeader>
+          <DataTableHeader label="Links" align="right" />
+        </DataTableHead>
+        <DataTableBody>
           {rows.map((r) => (
-            <tr key={r.key} className="border-b border-rb-200/60 align-top dark:border-rb-500/20" {...r.hooks}>
-              <td className="min-w-0 py-2 pr-3">
-                <span className="text-foreground" data-cell="venue">
+            <DataTableRow key={r.key} {...r.hooks}>
+              <DataTableCell rowHeader className="sm:w-full sm:max-w-0">
+                <span
+                  className="block text-foreground sm:truncate"
+                  title={typeof r.venue === "string" ? r.venue : undefined}
+                  data-cell="venue"
+                >
                   {r.venue}
                 </span>
-                {r.sub != null && <span className="block break-words text-[11px] text-rb-500">{r.sub}</span>}
-                {r.links && <span className="mt-0.5 block sm:hidden">{r.links}</span>}
-              </td>
-              <td
-                className="py-2 pr-3 text-right tabular-nums text-foreground"
-                data-cell="leg-assets"
-                {...(r.amountFigure ? { "data-figure": r.amountFigure } : {})}
-              >
+                {r.sub != null && (
+                  <span
+                    className="block text-[11px] [overflow-wrap:anywhere] text-rb-500 sm:truncate"
+                    title={typeof r.sub === "string" ? r.sub : undefined}
+                  >
+                    {r.sub}
+                  </span>
+                )}
+              </DataTableCell>
+              <DataTableCell label="Amount" align="right" className="whitespace-nowrap tabular-nums text-foreground">
                 {r.offBand ? (
-                  <span className="text-rb-500">—</span>
-                ) : r.amount == null ? (
-                  <NotLoaded />
-                ) : r.amountProv ? (
-                  <Prov info={r.amountProv}>{assetText(r.amount, assetDecimals)}</Prov>
+                  <span className="text-rb-500" data-cell="leg-assets">
+                    —
+                  </span>
                 ) : (
-                  assetText(r.amount, assetDecimals)
+                  <span className="inline-flex items-center gap-1.5">
+                    <span data-cell="leg-assets" {...(r.amountFigure ? { "data-figure": r.amountFigure } : {})}>
+                      {r.amount == null ? (
+                        <NotLoaded />
+                      ) : r.amountProv ? (
+                        <Prov info={r.amountProv}>{assetText(r.amount, assetDecimals)}</Prov>
+                      ) : (
+                        assetText(r.amount, assetDecimals)
+                      )}
+                    </span>
+                    {r.amount != null && <AssetUnit symbol={assetSymbol} address={assetAddress} />}
+                  </span>
                 )}
-              </td>
-              <td className="py-2 text-right tabular-nums text-rb-500 sm:pr-3" data-cell="leg-share">
-                {r.share == null ? (
-                  "—"
-                ) : r.shareProv ? (
-                  <Prov info={r.shareProv}>{pctText(r.share)}</Prov>
-                ) : (
-                  pctText(r.share)
-                )}
-              </td>
-              <td className="hidden py-2 text-right sm:table-cell">{r.links}</td>
-            </tr>
+              </DataTableCell>
+              <DataTableCell label={shareHead} align="right" className="whitespace-nowrap tabular-nums text-rb-500">
+                <span data-cell="leg-share">
+                  {r.share == null ? (
+                    "—"
+                  ) : r.shareProv ? (
+                    <Prov info={r.shareProv}>{pctText(r.share)}</Prov>
+                  ) : (
+                    pctText(r.share)
+                  )}
+                </span>
+              </DataTableCell>
+              <DataTableCell align="right" wide className="whitespace-nowrap max-sm:pt-0">
+                {r.links}
+              </DataTableCell>
+            </DataTableRow>
           ))}
-        </tbody>
-      </table>
+        </DataTableBody>
+      </DataTable>
     </section>
   );
 }

@@ -351,7 +351,7 @@ export default function FrankencoinPositionView({
   if (position == null) {
     return (
       <div className="py-8">
-        <p className="text-sm text-rb-500">Not a Frankencoin position — the key is not a contract address.</p>
+        <p className="text-sm text-rb-500">Not a Frankencoin position: the key is not a contract address.</p>
       </div>
     );
   }
@@ -411,7 +411,7 @@ export default function FrankencoinPositionView({
           <DetailBodySkeleton />
         ) : view == null ? (
           <div className="text-sm text-rb-500">
-            Nothing readable at this address — not a Frankencoin Position contract, or the chain read is unavailable.
+            Nothing readable at this address: not a Frankencoin Position contract, or the chain read is unavailable.
           </div>
         ) : (
           <>
@@ -486,8 +486,8 @@ export default function FrankencoinPositionView({
                 <IndexNotice onRetry={() => setTailTry((n) => n + 1)} />
               ) : indexPending && frankEvents.length === 0 ? (
                 <div className="rounded-2xl border border-rb-300/40 dark:border-rb-700/40 bg-raised px-5 py-4 text-sm text-rb-500">
-                  Event history pending — the indexed backend for this explorer is still being built. Everything above
-                  is read live from the position contract at the latest block.
+                  Event history pending: the indexed backend for this explorer is still being built. Everything above is
+                  read live from the position contract at the latest block.
                 </div>
               ) : (
                 <ChainTruthTimeline

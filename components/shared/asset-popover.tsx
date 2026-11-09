@@ -47,6 +47,8 @@ import { PRICELESS_WHY } from "@/lib/shared/asset-explorer";
 import { assetHref, NATIVE } from "@/lib/shared/asset-roster";
 import { usesWords, viaName, withVia } from "@/lib/shared/asset-via";
 import { viaForPathname, viaValue } from "@/lib/shared/asset-via-links";
+import { pendleMarketOfPt, type PtMarket } from "@/lib/pendle/pt-markets";
+import { pendleMarketHref } from "@/lib/pendle/routes";
 
 const WORDS = {
   about: (symbol: string) => `About ${symbol}`,
@@ -192,9 +194,32 @@ function AssetPanelBody({
           )}
         </dl>
       )}
+      {contract && <PendleMarketLine chain={chain} contract={contract} />}
       {(contract ?? (symbol === "ETH" ? NATIVE : null)) && (
         <AssetPageRow chain={chain} contract={contract ?? NATIVE} symbol={symbol} />
       )}
+    </div>
+  );
+}
+
+/** A Pendle PT's market page, once the roster's PTs are read; nothing for any
+ *  other token (a Spectra PT included). */
+function PendleMarketLine({ chain, contract }: { chain: ChainId; contract: string }) {
+  const [m, setM] = useState<PtMarket | null>(null);
+  useEffect(() => {
+    let live = true;
+    void pendleMarketOfPt(chain, contract).then((x) => live && setM(x));
+    return () => {
+      live = false;
+    };
+  }, [chain, contract]);
+  if (!m) return null;
+  const href = pendleMarketHref(m.market);
+  return (
+    <div className="border-t border-[var(--rb-tooltip-border)] pt-2" data-asset-popover-line="pendle-market">
+      <Link href={href} className="font-medium text-foreground hover:underline" data-asset-popover-pendle={m.market}>
+        Open its Pendle market →
+      </Link>
     </div>
   );
 }

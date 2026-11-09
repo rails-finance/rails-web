@@ -21,6 +21,7 @@ import {
 import { useWalletContext } from "@/components/nav/wallet-context";
 import { ChainTruthListingPage, serverStrategy } from "@/components/shared/chain-truth-listing-page";
 import { MoonwellPositionCard, viewFromSummary } from "@/components/protocol/moonwell/moonwell-position-card";
+import { MoonwellBorrowFrozenNote } from "@/components/protocol/moonwell/moonwell-borrow-frozen-note";
 import { MoonwellDeploymentProvider } from "@/lib/moonwell/deployment-context";
 import { makeListedMoonwellIdentity } from "@/lib/moonwell/swept-card-provenance";
 import {
@@ -140,7 +141,12 @@ export function MoonwellBaseListing({
               data: r.data,
               total: r.pagination.total,
             })),
+          fetchCount: (filters) =>
+            fetchMoonwellPositions({ ...moonwellBaseFiltersToFetchParams(filters, 1), limit: 1 }).then(
+              (r) => r.pagination.total,
+            ),
         })}
+        headerExtra={<MoonwellBorrowFrozenNote className="mt-3" />}
         onFilters={onFilters}
         initialItems={initialItems}
         initialTotal={initialTotal}

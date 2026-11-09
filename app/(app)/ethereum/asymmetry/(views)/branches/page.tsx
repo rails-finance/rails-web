@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Asymmetry branches",
   description:
-    "Asymmetry's seven collateral branches and the order redemption reaches them — each branch with its own oracle, minimum collateral ratio and terms.",
+    "Asymmetry's seven collateral branches and the order redemption reaches them, each branch with its own oracle, minimum collateral ratio and terms.",
 };
 
 const CFG: LiquityForkConfig = { protocol: "asymmetry", debtSymbol: DEBT_SYMBOL, branches: ASYMMETRY_BRANCHES };

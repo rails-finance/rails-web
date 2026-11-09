@@ -13,7 +13,6 @@ import {
 } from "@/lib/compound/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -22,6 +21,8 @@ export const maxDuration = 30;
 export const metadata = listingMetadata({
   title: "Explore Compound V3 positions",
   canonicalPath: "/ethereum/compound-v3",
+  description:
+    "Every Compound V3 account on Ethereum: what each wallet has lent, borrowed and put up as collateral in each market, with its full history.",
 });
 
 async function CompoundListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
@@ -47,4 +48,4 @@ async function CompoundListingPage({ searchParams }: { searchParams: Promise<Raw
   return <CompoundListing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/ethereum/compound-v3", CompoundListingPage);
+export default CompoundListingPage;

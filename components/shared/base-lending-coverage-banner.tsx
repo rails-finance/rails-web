@@ -102,8 +102,8 @@ export function BaseLendingCoverageBanner({
   if (c.historyComplete && unread === 0) {
     return (
       <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-        Every {noun} that ever touched {subject} is listed — {c.accountsTotal.toLocaleString("en-US")} of them, from{" "}
-        {subjectPossessive} first block — and each one&rsquo;s balances were read from the chain at the block its row
+        Every {noun} that ever touched {subject} is listed, {c.accountsTotal.toLocaleString("en-US")} of them, from{" "}
+        {subjectPossessive} first block, and each one&rsquo;s balances were read from the chain at the block its row
         names.
         {restsOnOpen ? (
           <>

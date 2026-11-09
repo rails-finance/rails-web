@@ -58,10 +58,10 @@ export function ProtocolIdentity({
     <Link href={entry.href} data-rail-identity={entry.id} className={`group inline-flex items-center ${s.gap}`}>
       <ProtocolIcon
         id={entry.id}
-        className={`${s.icon} shrink-0 text-foreground transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400`}
+        className={`${s.icon} shrink-0 text-foreground transition-colors group-hover:text-blue-600 dark:group-hover:text-[var(--text-link)]`}
       />
       <span
-        className={`${s.text} font-semibold text-foreground transition-colors group-hover:text-blue-600 dark:group-hover:text-blue-400`}
+        className={`${s.text} font-semibold text-foreground transition-colors group-hover:text-blue-600 dark:group-hover:text-[var(--text-link)]`}
       >
         {entry.label}
       </span>

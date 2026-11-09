@@ -22,7 +22,7 @@ export function forkMcrChanges(fork: LiquityForkLevel): FlowChange[] {
       prov: {
         kind: "chain",
         pclass: "emitted",
-        summary: `The branch's minimum collateral ratio (MCR), set to ${ratio(to)} from ${ratio(s.mcr)} by ${fork.name}'s branch manager at block ${s.untilBlock.toLocaleString("en-US")}${s.setBy ? `, log ${s.setBy.logIndex}` : ""}: parameter 0 of its parameter log, ${to} × 10¹⁸. The earlier value is MCR() read at the block before. A Trove of the branch is liquidated below it.`,
+        summary: `The branch's minimum collateral ratio (MCR), set to ${ratio(to)} from ${ratio(s.mcr)} by ${fork.name}'s branch manager at block ${s.untilBlock.toLocaleString("en-US")}${s.setBy ? `, log ${s.setBy.logIndex}` : ""}. Parameter 0 of its parameter log, ${to} × 10¹⁸. The earlier value is MCR() read at the block before. A Trove of the branch is liquidated below it.`,
         contract: {
           name: `${fork.name} branch manager`,
           ...(fork.branchManager ? { address: fork.branchManager } : {}),

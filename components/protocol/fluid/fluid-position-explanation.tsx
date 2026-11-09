@@ -62,16 +62,16 @@ function FluidClosedPositionExplanation({
   // there would hand the engine a closure the owner performed.
   const lead = v.fullyLiquidated ? (
     <>
-      This {pairText} position was emptied by liquidation — the vault&rsquo;s engine swept it to nothing, and nothing
+      This {pairText} position was emptied by liquidation. The vault&rsquo;s engine swept it to nothing, and nothing
       remains on either side:
     </>
   ) : v.wasLiquidated ? (
     <>
-      This {pairText} position ran its course and closed — the remaining collateral withdrawn and the debt repaid — with
+      This {pairText} position ran its course and closed, the remaining collateral withdrawn and the debt repaid, with
       liquidations in its record:
     </>
   ) : (
-    <>This {pairText} position ran its course and closed — the collateral withdrawn and the debt repaid:</>
+    <>This {pairText} position ran its course and closed. The collateral withdrawn and the debt repaid:</>
   );
 
   const list: React.ReactNode[] = [];
@@ -106,7 +106,7 @@ function FluidClosedPositionExplanation({
             . Each is its own highest point across the position&rsquo;s life, so the two can come from different dates.
           </>
         ) : (
-          <> — its highest point across the position&rsquo;s life.</>
+          <> : its highest point across the position&rsquo;s life.</>
         )}
       </>,
     );
@@ -114,7 +114,7 @@ function FluidClosedPositionExplanation({
   if (v.liquidationCount > 0) {
     list.push(
       <>
-        Liquidation sweeps hit it <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} — a Fluid
+        Liquidation sweeps hit it <H>{v.liquidationCount}</H> time{v.liquidationCount === 1 ? "" : "s"} : a Fluid
         liquidation is partial by design, clearing just enough each pass to restore the position&rsquo;s health
         {v.fullyLiquidated ? (
           <>, until the final sweep emptied it entirely.</>
@@ -135,7 +135,7 @@ function FluidClosedPositionExplanation({
   }
   list.push(
     <>
-      The position NFT stays with its owner after closing — a new deposit or borrow under #{v.nftId} reopens this same
+      The position NFT stays with its owner after closing. A new deposit or borrow under #{v.nftId} reopens this same
       timeline.
     </>,
   );
@@ -250,9 +250,9 @@ export function FluidPositionExplanation({
       clause(
         <>
           {liquidatedEmpty ? (
-            <>This position was emptied by liquidation — nothing remains on either side</>
+            <>This position was emptied by liquidation: nothing remains on either side</>
           ) : (
-            <>This position is closed — the collateral is withdrawn and the debt repaid</>
+            <>This position is closed: the collateral is withdrawn and the debt repaid</>
           )}
           {dustLeg ? (
             <>
@@ -260,8 +260,7 @@ export function FluidPositionExplanation({
               <H>
                 <AmountText value={dustLeg.n} /> {dustLeg.sym}
               </H>{" "}
-              still showing is rounding dust — a leftover from the vault&rsquo;s internal arithmetic, not a real
-              balance.
+              still showing is rounding dust: a leftover from the vault&rsquo;s internal arithmetic, not a real balance.
             </>
           ) : (
             <>.</>
@@ -302,11 +301,11 @@ export function FluidPositionExplanation({
   if (hasDebt && live && live.colValueInDebt != null) {
     list.push(
       <>
-        At the vault&rsquo;s own oracle, that collateral is worth <AmountText value={live.colValueInDebt} /> {debtSym}.
+        At the vault&rsquo;s oracle, that collateral is worth <AmountText value={live.colValueInDebt} /> {debtSym}.
       </>,
     );
   } else if (live && !hasDebt && !empty) {
-    list.push(<>With no debt it cannot be liquidated — the collateral simply earns the vault&rsquo;s supply rate.</>);
+    list.push(<>With no debt it cannot be liquidated: the collateral simply earns the vault&rsquo;s supply rate.</>);
   } else if (!live && view && !empty) {
     list.push(
       hasSettled ? (
@@ -329,7 +328,7 @@ export function FluidPositionExplanation({
     if (live.oraclePriceLiquidateDebtPerCol != null) {
       list.push(
         <>
-          Fluid uses no dollar prices — the vault&rsquo;s oracle prices {colSym} directly in {debtSym}:{" "}
+          Fluid uses no dollar prices: the vault&rsquo;s oracle prices {colSym} directly in {debtSym}:{" "}
           <H>
             1 {colSym} = {formatNumber(live.oraclePriceLiquidateDebtPerCol)} {debtSym}
           </H>{" "}
@@ -355,7 +354,7 @@ export function FluidPositionExplanation({
       list.push(
         <>
           {colSym} can fall about <H>{dropPct}%</H> against {debtSym} (to <AmountText value={live.liqPriceDebtPerCol} />{" "}
-          {debtSym}) before liquidation begins. A Fluid liquidation is partial by design — it clears just enough to make
+          {debtSym}) before liquidation begins. A Fluid liquidation is partial by design: it clears just enough to make
           the position healthy again.
         </>,
       );
@@ -364,7 +363,7 @@ export function FluidPositionExplanation({
   if (live && live.isLiquidated && !live.isEmpty) {
     list.push(
       <>
-        A liquidation has <H>swept part of this position</H> — the figures above already include what it took.
+        A liquidation has <H>swept part of this position</H>: the figures above already include what it took.
       </>,
     );
   }
@@ -375,8 +374,8 @@ export function FluidPositionExplanation({
           ? "Both legs are Fluid DEX pool shares, not single tokens"
           : live.isSmartCol
             ? "The collateral leg is Fluid DEX pool shares, not a single token"
-            : "The debt leg is Fluid DEX pool shares, not a single token"}{" "}
-        — amounts here are pool shares, and the vault&rsquo;s oracle prices the pair in those share units.
+            : "The debt leg is Fluid DEX pool shares, not a single token"}
+        : amounts here are pool shares, and the vault&rsquo;s oracle prices the pair in those share units.
       </>,
     );
   }
@@ -387,7 +386,7 @@ export function FluidPositionExplanation({
   if (rateBits.length > 0) {
     list.push(
       <>
-        Current vault rates: <H>{rateBits.join(", ")}</H> annual — they float with how heavily the vault is used.
+        Current vault rates: <H>{rateBits.join(", ")}</H> annual: they float with how heavily the vault is used.
       </>,
     );
   }
@@ -446,14 +445,14 @@ export function FluidPositionExplanation({
         {ext.external.toLocaleString("en-US")} {ext.external === 1 ? "was" : "were"} executed by a third-party address.
         Fluid has no delegation to grant: only the address holding the position&rsquo;s NFT may withdraw collateral or
         draw debt, and an ERC-721 approval does not stand in for it. Adding collateral or repaying debt, by contrast, is
-        open to anyone — so another address can pay into this position without asking, while the right to take anything
+        open to anyone, so another address can pay into this position without asking, while the right to take anything
         out moves only with the NFT itself.
         {ext.actors.length === 1
           ? leadName
             ? ` All of it ran through ${leadName}.`
             : " A single address accounts for all of it."
           : leadName
-            ? ` Most of it — ${ext.actors[0].count.toLocaleString("en-US")} events — ran through ${leadName}, with the remaining ${others.toLocaleString("en-US")} spread across ${ext.actors.length - 1} other address${ext.actors.length === 2 ? "" : "es"}${secondName ? `, one of them ${secondName}` : ""}.`
+            ? ` Most of it, ${ext.actors[0].count.toLocaleString("en-US")} events, ran through ${leadName}, with the remaining ${others.toLocaleString("en-US")} spread across ${ext.actors.length - 1} other address${ext.actors.length === 2 ? "" : "es"}${secondName ? `, one of them ${secondName}` : ""}.`
             : ` The work is spread across ${ext.actors.length} addresses, the most active of them accounting for ${ext.actors[0].count.toLocaleString("en-US")}.`}
       </span>,
     );

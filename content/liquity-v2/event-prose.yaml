@@ -447,7 +447,7 @@ L1_words:
   claimed: |-
     claimable, claimed
   zombie: |-
-    Zombie
+    Dormant
   # The gas compensation escrow, 0.0375 WETH, its own leg on the open and the
   # close (rails-ops TO-DO-ui-jobs 363).
   escrow_leg: |-
@@ -779,9 +779,9 @@ trove_words:
     the closing event’s collateral price
   # ── The event card's head: the zombie flag's tip ──
   zombie_cleared_title: |-
-    Zombie trove fully redeemed — debt cleared, collateral now claimable
+    Dormant Trove: debt fully redeemed, collateral left to withdraw
   zombie_title: |-
-    Zombie trove — debt below the minimum, redeemable until restored
+    Dormant Trove: debt below the {min_debt} {debt_symbol} minimum
   # ── The event card's price row: the chip's tip ──
   event_price_title: |-
     {coll_type} price at the time of this event
@@ -1218,7 +1218,7 @@ templates:
 
   - id: liquity2.adjust.combined
     title: |-
-      Adjust trove
+      Adjust Trove
     when: |-
       adjustTrove that moved both collateral and debt
     L5: adjust
@@ -1469,7 +1469,7 @@ templates:
         when: |-
           variant at_event, a zombie with no debt left
         text: |-
-          With no debt left, the trove stays open with its collateral as a zombie and accrues no interest.
+          With no debt left, the Trove stays open with its collateral, dormant and accruing no interest.
       redeem.zombie_zero_next:
         when: |-
           variant at_event, a zombie with no debt left
@@ -1479,7 +1479,7 @@ templates:
         when: |-
           variant at_event, a zombie with debt left
         text: |-
-          The debt left is below the {min_debt} {debt_symbol} minimum, so the trove is now a zombie.
+          The debt left is below the {min_debt} {debt_symbol} minimum, so the Trove is now dormant.
       redeem.zombie_low_next:
         when: |-
           variant at_event, a zombie with debt left
@@ -1673,7 +1673,7 @@ templates:
 
   - id: liquity2.open
     title: |-
-      Open trove
+      Open Trove
     when: |-
       openTrove or openTroveAndJoinBatch
     L5: open
@@ -1734,7 +1734,7 @@ templates:
 
   - id: liquity2.close
     title: |-
-      Close trove
+      Close Trove
     when: |-
       closeTrove
     L5: close
@@ -1998,7 +1998,7 @@ templates:
 L5:
   adjust:
     title: |-
-      How adjusting a trove works
+      How adjusting a Trove works
     intro: |-
       An adjustment changes a trove without closing it. The owner can add or withdraw collateral, borrow more BOLD, or repay some of the debt.
     extraParagraphs:
@@ -2053,9 +2053,9 @@ L5:
         text: |-
           a cut of the redeemed collateral that stays in the trove; it starts at 0.5% and rises with recent redemptions.
       - bold: |-
-          Zombie trove
+          Dormant Trove
         text: |-
-          a trove redeemed below 2,000 BOLD of debt stays open, dormant, until it is closed or borrows back above the minimum.
+          a Trove redeemed below 2,000 BOLD of debt, out of the redemption queue until its debt returns above the minimum; Liquity's contracts tag it Zombie.
     links:
       - label: |-
           What are redemptions?
@@ -2148,7 +2148,7 @@ L5:
 
   close:
     title: |-
-      How closing a trove works
+      How closing a Trove works
     intro: |-
       Closing a trove repays its entire debt and returns the collateral, ending the position.
     # A close with no debt left (a redemption cleared it): intro_zero_debt and
@@ -2248,7 +2248,7 @@ L5:
 
   transfer:
     title: |-
-      How trove transfers work
+      How Trove transfers work
     intro: |-
       A trove is an ERC-721 NFT, so its ownership can be transferred to another wallet like any other token.
     detailsHeading: |-
@@ -2276,7 +2276,7 @@ L5:
 
   fallback:
     title: |-
-      How Liquity V2 troves work
+      How Liquity V2 Troves work
     intro: |-
       Liquity V2 lets a borrower take out BOLD against collateral in a trove — a self-custodied position represented by an NFT.
     detailsHeading: |-

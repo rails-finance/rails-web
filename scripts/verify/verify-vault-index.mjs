@@ -24,17 +24,18 @@
 //   2  the Protocol facet narrows the rows to each protocol's count, every
 //      row shown that protocol's, and Reset restores them
 //   3  the Network facet narrows to Base: exactly Morpho on Base's rows
-//   4  every row's sidebar (C20) names its protocol and its chain
+//   4  every row's lead zone (D5) names its protocol and its chain
 //   5  a Maple row shows the Yield slot's "no daily series yet" state
 //   6  four rows' Total assets (each Morpho, Aave, Yearn, the largest each) equal
 //      the protocol roster's raw figure for the same vault at the same block
 //   7  every row links under its protocol, to a vault its roster lists; two
 //      links per protocol answer 200
 //   8  the rosters' heads link the index
-//   9  the dev provenance tripwire reports no uncovered figure (SKIP on a
-//      production build)
+//   9  the index draws no receipt and offers no provenance inspector (ui-jobs 538);
+//      every Total assets and Share price figure names its asset
 //  10  the default view (ui-jobs 485): the preset's rows against ?show=all,
-//      its chip, the counts line, its removal and Reset, the three sorts
+//      its chip, the counts line, its removal and Reset, and the table's
+//      sorts (ui-jobs 538: Holders by default, Total assets within each token)
 //  11  ?asset=ETH,WETH keeps the preset; a token it would empty lifts it
 // Sections 0 to 9 read /vaults?show=all and the rosters' ?show=all pages.
 
@@ -61,7 +62,7 @@ const skip = (name, why) => {
 };
 
 const PROTOCOLS = ["morpho", "aave", "yearn", "maple"];
-/** The rosters, by `protocol:chain`; `sidebar` is the roster entry C20 draws. */
+/** The rosters, by `protocol:chain`; `sidebar` is the roster entry the lead zone (D5) draws. */
 const ROSTER = {
   "morpho:8453": {
     protocol: "morpho",
@@ -216,8 +217,8 @@ const readRows = () =>
       group: el.getAttribute("data-group"),
       raw: el.getAttribute("data-total-assets-raw"),
       href: el.querySelector("[data-vault-link]")?.getAttribute("href") ?? el.querySelector("a")?.getAttribute("href"),
-      sidebar: el.querySelector("[data-card-sidebar]")?.getAttribute("data-card-sidebar") ?? null,
-      sidebarChain: el.querySelector("[data-card-sidebar-chain]")?.getAttribute("aria-label") ?? null,
+      sidebar: el.querySelector("[data-row-zone]")?.getAttribute("data-row-zone") ?? null,
+      sidebarChain: el.querySelector("[data-row-zone]")?.getAttribute("data-row-zone-chain") ?? null,
       yieldNone: el.querySelector("[data-yield-none]")?.getAttribute("data-yield-none") ?? null,
       yieldText: el.querySelector("[data-yield-none]")?.textContent?.trim() ?? null,
     })),
@@ -289,17 +290,17 @@ await openEmpty();
 await reset("Network");
 await openEmpty();
 
-// ── 4: the sidebar names each row's protocol and chain (C20) ─────────────
+// ── 4: the lead zone names each row's protocol and chain (D5) ────────────
 const NAME = { 1: "Ethereum", 8453: "Base" };
 const baseRow = rows.find((r) => r.chain === "8453");
 const ethRow = rows.find((r) => r.chain === "1");
 check(
-  "4a a Base row's sidebar names Base",
+  "4a a Base row's lead zone names Base",
   baseRow?.sidebarChain === "Base",
   `${baseRow?.address} → ${baseRow?.sidebarChain}`,
 );
 check(
-  "4b an Ethereum row's sidebar names Ethereum",
+  "4b an Ethereum row's lead zone names Ethereum",
   ethRow?.sidebarChain === "Ethereum",
   `${ethRow?.address} → ${ethRow?.sidebarChain}`,
 );
@@ -307,7 +308,7 @@ const wrongSidebar = rows.filter(
   (r) => r.group !== "unread" && (r.sidebarChain !== NAME[r.chain] || r.sidebar !== ROSTER[keyOf(r)]?.sidebar),
 );
 check(
-  "4c every drawn row's sidebar names its protocol and chain",
+  "4c every drawn row's lead zone names its protocol and chain",
   wrongSidebar.length === 0,
   `${wrongSidebar.length} wrong`,
 );
@@ -382,16 +383,46 @@ for (const k of KEYS) {
   );
 }
 
-// ── 9: the dev provenance tripwire ──────────────────────────────────────────
-if ((await page.locator("[data-prov-tripwire]").count()) > 0) {
-  const uncovered = await page.locator("[data-prov-uncovered]").count();
-  check("9  the dev provenance tripwire reports no uncovered figure", uncovered === 0, `${uncovered} uncovered`);
-} else {
-  skip("9  the dev provenance tripwire", "no tripwire bookends on this build (production renders none)");
+// ── 9: no receipts and no inspector (ui-jobs 538) ───────────────────────
+{
+  const receipts = await page
+    .locator("[data-vault-index] .prov-locate-box, [data-vault-index] [data-prov-covered]")
+    .count();
+  check("9a the index draws no receipt", receipts === 0, `${receipts} receipt spans`);
+  const tools = await page.locator("button.prov-inspect-toggle, [data-prov-tripwire]").count();
+  check("9b the page offers no provenance inspector", tools === 0, `${tools} inspector controls`);
+}
+
+// ── 9c: no figure reads unitless (decision 0028 point 8) ────────────────────
+{
+  const bad = await page
+    .locator("[data-vault-index] [data-cell='total-assets'], [data-vault-index] [data-cell='share-price']")
+    .evaluateAll(
+      (els) =>
+        els.filter((el) => {
+          const unit = el.querySelector("[data-asset-unit]");
+          if (!unit) return true;
+          const said = unit.querySelector("img")?.getAttribute("alt") ?? unit.textContent?.trim();
+          return !said || said !== unit.getAttribute("data-asset-unit");
+        }).length,
+    );
+  check(
+    "9c every Total assets and Share price figure names its asset (its mark or its symbol)",
+    bad === 0,
+    `${bad} without`,
+  );
 }
 
 // ── 10: the default view (ui-jobs 485) ──────────────────────────────────────
-await checkRosterView({ page, base: BASE, route: "/vaults", scope: "[data-vault-index]", check, tag: "10" });
+await checkRosterView({
+  page,
+  base: BASE,
+  route: "/vaults",
+  scope: "[data-vault-index]",
+  check,
+  tag: "10",
+  table: true,
+});
 
 // ── 11: a token link keeps the preset, and lifts it where it would empty ───
 {
@@ -416,14 +447,9 @@ await checkRosterView({ page, base: BASE, route: "/vaults", scope: "[data-vault-
   );
   // A token every vault of which the preset hides: the link opens on all of them.
   const full = (await open("?show=all")).rows.filter((r) => r.group === "funded");
+  // The table's rows by token (the Token facet's value, `data-token`).
   const bySymbol = new Map();
-  for (const g of await page.locator("[data-vault-index] [data-asset-group]").evaluateAll((els) =>
-    els.map((el) => ({
-      symbol: el.querySelector("h2 a")?.textContent?.trim(),
-      rows: [...el.querySelectorAll("[data-vault-row]")].map((r) => r.getAttribute("data-vault-row")),
-    })),
-  ))
-    bySymbol.set(g.symbol, [...(bySymbol.get(g.symbol) ?? []), ...g.rows]);
+  for (const r of full) bySymbol.set(r.token, [...(bySymbol.get(r.token) ?? []), r.address]);
   // A symbol that did not decode is an option by address, so it is left out.
   const hidden = [...bySymbol].find(
     ([symbol, addrs]) =>

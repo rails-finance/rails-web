@@ -976,11 +976,11 @@ const rawOrdered = sharesDesc.data.every(
 );
 check("L4a sortBy=shares desc is descending by the RAW census balance", rawOrdered, `${sharesDesc.data.length} rows`);
 check(
-  "L4b the section's about page states that the shares sort is in each vault's own units",
-  /own units/.test(dom.info) && /6, 8 and 18 decimals/.test(dom.info),
-  /own units/.test(dom.info) && /6, 8 and 18 decimals/.test(dom.info)
+  "L4b the section's about page states that the shares sort is in each vault's units",
+  /each vault.s units/.test(dom.info) && /6, 8 and 18 decimals/.test(dom.info),
+  /each vault.s units/.test(dom.info) && /6, 8 and 18 decimals/.test(dom.info)
     ? "/ethereum/aave/vaults/info names the decimals"
-    : `/ethereum/aave/vaults/info does not: "own units" ${/own units/.test(dom.info)}, "6, 8 and 18 decimals" ${/6, 8 and 18 decimals/.test(dom.info)}`,
+    : `/ethereum/aave/vaults/info does not: "each vault's units" ${/each vault.s units/.test(dom.info)}, "6, 8 and 18 decimals" ${/6, 8 and 18 decimals/.test(dom.info)}`,
 );
 
 const lastAct = await readRoute("chain=1&sortBy=lastActivity&sortOrder=desc&limit=20&overlay=0");

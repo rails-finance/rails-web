@@ -63,6 +63,8 @@ export interface VaultCardProps {
   exports: VaultExportModel;
   /** `data-*` hooks on the card's frame, which the family's verifier reads. */
   hooks?: Record<string, string>;
+  /** A full-width strip under the stats: an illiquid vault's markets (ui-jobs 540). */
+  band?: ReactNode;
   /** The family's identity hooks: on the standing pills. */
   pillHooks?: Parameters<typeof VaultPills>[0]["hooks"];
 }
@@ -178,6 +180,7 @@ export function VaultCard({
   exports,
   hooks,
   pillHooks,
+  band,
 }: VaultCardProps) {
   const markdown = () => vaultCardMarkdown(v, yieldFigure, exports);
   const csv = {
@@ -224,6 +227,7 @@ export function VaultCard({
           identity,
           heads: vaultHeads({ vault: v, yieldFigure, holdersHref, receipts, detail: true }),
           panel: [stats, []],
+          band,
           counters: null,
           menu: {
             leading: (close) => <MenuRows close={close} links={links} markdown={markdown} csv={csv} />,
@@ -251,6 +255,11 @@ export function YieldBullets({ yieldFigure, rewards }: { yieldFigure?: VaultYiel
         <ExplainBullet>
           Yield <Fig>{yieldText(yieldFigure.yearly)}</Fig> is Rails&rsquo;s figure from two share-price reads{" "}
           {yieldFigure.days} days apart.
+        </ExplainBullet>
+      ) : yieldFigure?.none === "too-small" ? (
+        <ExplainBullet>
+          No yield figure: the vault holds under 10,000 raw units of its asset, so one unit of rounding moves its share
+          price by more than 0.01%.
         </ExplainBullet>
       ) : (
         <ExplainBullet>No yield figure: the daily series is under 30 days old or was not read.</ExplainBullet>

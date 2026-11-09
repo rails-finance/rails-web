@@ -539,7 +539,7 @@ export default function MaplePositionView({
         >
           <p className="mt-3 max-w-2xl text-sm leading-relaxed text-rb-500">{infra.description}</p>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-rb-500">
-            Custody, not lending: the shares this contract holds are not a lender position — it never deposits or
+            Custody, not lending: the shares this contract holds are not a lender position, it never deposits or
             withdraws on its own. Transfers real lenders make to and from it appear on their own timelines as bridge
             transfers, with this escrow named as the counterparty.
           </p>
@@ -732,8 +732,8 @@ function ContractIdentityCard({
         >
           {wallet}
         </a>{" "}
-        — {label?.owner ? <>labelled {label.owner} by growthepie, </> : null}Etherscan-verified as{" "}
-        <span className="font-mono text-[13px]">{contractName}</span>.
+        ({label?.owner ? <>labelled {label.owner} by growthepie, </> : null}Etherscan-verified as{" "}
+        <span className="font-mono text-[13px]">{contractName}</span>).
       </p>
     </div>
   );

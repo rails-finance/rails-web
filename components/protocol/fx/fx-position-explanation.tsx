@@ -132,11 +132,10 @@ export function FxPositionExplanation({
     lead = v.everLiquidated ? (
       <>
         This position is closed after <H>{v.liquidationCount}</H> liquidation
-        {v.liquidationCount === 1 ? "" : "s"} — the pool&rsquo;s own figures stand at zero collateral and zero fxUSD
-        debt:
+        {v.liquidationCount === 1 ? "" : "s"} . The pool&rsquo;s figures stand at zero collateral and zero fxUSD debt:
       </>
     ) : (
-      <>This position is closed — the pool&rsquo;s own figures stand at zero collateral and zero fxUSD debt:</>
+      <>This position is closed. The pool&rsquo;s figures stand at zero collateral and zero fxUSD debt:</>
     );
 
     if (hasEvents) {
@@ -147,8 +146,8 @@ export function FxPositionExplanation({
             Its own events net to{" "}
             <H>
               <AmountText value={implied} /> fxUSD
-            </H>{" "}
-            — more debt left through its transactions than arrived, because other positions&rsquo; bad debt, which the
+            </H>
+            : more debt left through its transactions than arrived, because other positions&rsquo; bad debt, which the
             pool adds to every position, raised its debt with no transaction of its own and its repayments and
             liquidation cleared that too. The <AmountText value={Math.abs(diff)} /> fxUSD difference is that debt.
           </span>,
@@ -181,8 +180,8 @@ export function FxPositionExplanation({
     } else {
       bullets.push(
         <span key="no-events">
-          It has no recorded events — it was created by a path that logs nothing, so the pool&rsquo;s settled figures
-          are its whole record.
+          It has no recorded events: it was created by a path that logs nothing, so the pool&rsquo;s settled figures are
+          its whole record.
         </span>,
       );
     }
@@ -193,8 +192,8 @@ export function FxPositionExplanation({
       <ProseExplainer
         paragraph={
           <>
-            This position has no recorded events and the pool&rsquo;s own figures have not arrived yet, so there is
-            nothing to describe until they do.
+            This position has no recorded events and the pool&rsquo;s figures have not arrived yet, so there is nothing
+            to describe until they do.
           </>
         }
       />
@@ -203,11 +202,11 @@ export function FxPositionExplanation({
     // ── the pending mood: the pool's own figure hasn't arrived ──────────────
     lead =
       implied > 0 ? (
-        <>This position is borrowing fxUSD, with the pool&rsquo;s own current figures still to arrive:</>
+        <>This position is borrowing fxUSD, with the pool&rsquo;s current figures still to arrive:</>
       ) : (
         <>
-          This position&rsquo;s events show no outstanding fxUSD debt, and the pool&rsquo;s own current figures are
-          still to arrive:
+          This position&rsquo;s events show no outstanding fxUSD debt, and the pool&rsquo;s current figures are still to
+          arrive:
         </>
       );
 
@@ -218,15 +217,15 @@ export function FxPositionExplanation({
           <H>
             <AmountText value={implied} /> fxUSD
           </H>{" "}
-          of debt — a running total of what it borrowed and repaid, not the exact amount owed now.
+          of debt: a running total of what it borrowed and repaid, not the exact amount owed now.
         </span>,
       );
     }
     bullets.push(
       <span key="dashes">
-        Collateral, debt and the debt ratio show dashes until the pool&rsquo;s own figure arrives. f(x) moves every
-        position with pool-wide funding charged on its collateral, tick rebalances and write-offs that leave no event of
-        the position&rsquo;s own, so only the pool&rsquo;s figure can say what it holds now.
+        Collateral, debt and the debt ratio show dashes until the pool&rsquo;s figure arrives. f(x) moves every position
+        with pool-wide funding charged on its collateral, tick rebalances and write-offs that leave no event of the
+        position&rsquo;s own, so only the pool&rsquo;s figure can say what it holds now.
       </span>,
     );
   } else {
@@ -360,8 +359,8 @@ export function FxPositionExplanation({
           The position&rsquo;s own events net to{" "}
           <H>
             <AmountText value={implied} /> fxUSD
-          </H>{" "}
-          — more debt left through its transactions than arrived, because other positions&rsquo; bad debt, which the
+          </H>
+          : more debt left through its transactions than arrived, because other positions&rsquo; bad debt, which the
           pool adds to every position, raised its debt with no transaction of its own and its repayments and liquidation
           cleared that too. The <AmountText value={Math.abs(diff)} /> fxUSD difference is that debt.
         </span>,
@@ -399,8 +398,8 @@ export function FxPositionExplanation({
     } else {
       bullets.push(
         <span key="no-events">
-          It has no recorded events — it was created by a path that logs nothing, so the pool&rsquo;s own figures above
-          are its whole description.
+          It has no recorded events: it was created by a path that logs nothing, so the pool&rsquo;s figures above are
+          its whole description.
         </span>,
       );
     }
@@ -492,7 +491,7 @@ export function FxPositionExplanation({
             ? ` All of it ran through ${leadName}.`
             : " A single address accounts for all of it."
           : leadName
-            ? ` Most of it — ${ext.actors[0].count.toLocaleString("en-US")} events — ran through ${leadName}, with the remaining ${others.toLocaleString("en-US")} spread across ${ext.actors.length - 1} other address${ext.actors.length === 2 ? "" : "es"}${secondName ? `, one of them ${secondName}` : ""}.`
+            ? ` Most of it, ${ext.actors[0].count.toLocaleString("en-US")} events, ran through ${leadName}, with the remaining ${others.toLocaleString("en-US")} spread across ${ext.actors.length - 1} other address${ext.actors.length === 2 ? "" : "es"}${secondName ? `, one of them ${secondName}` : ""}.`
             : ` The work is spread across ${ext.actors.length} addresses, the most active of them accounting for ${ext.actors[0].count.toLocaleString("en-US")}.`}
       </span>,
     );

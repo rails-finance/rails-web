@@ -101,7 +101,7 @@ export function LiquityEventCard({
           onClick={(e) => e.stopPropagation()}
           onMouseEnter={() => setHoveredAddress?.(wallet.toLowerCase())}
           onMouseLeave={() => setHoveredAddress?.(null)}
-          className={`flex items-center rounded-full bg-sunken px-3 py-2 text-blue-600 dark:text-blue-400 transition-colors ${hoveredAddress === wallet.toLowerCase() ? "border-rb-500 dark:border-rb-500" : ""} hover:border-rb-500 dark:hover:border-rb-500`}
+          className={`flex items-center rounded-full bg-sunken px-3 py-2 text-blue-600 dark:text-[var(--text-link)] transition-colors ${hoveredAddress === wallet.toLowerCase() ? "border-rb-500 dark:border-rb-500" : ""} hover:border-rb-500 dark:hover:border-rb-500`}
         >
           <span className="inline-flex items-center gap-1.5 w-[140px]">
             <Facehash address={wallet} size={16} />

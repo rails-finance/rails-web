@@ -11,7 +11,7 @@ export default function MorphoLoanTokenNotFound() {
       backHref="/ethereum/morpho/markets"
       backLabel="Browse Morpho Blue markets"
     >
-      This page groups markets by the asset they lend, and the address in the URL is not one of them — either it is not
+      This page groups markets by the asset they lend, and the address in the URL is not one of them: either it is not
       an asset any market borrows against, or it is not an address at all.
     </RouteNotFound>
   );

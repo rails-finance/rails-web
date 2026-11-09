@@ -51,6 +51,10 @@ export interface ChainTruthListingFilter<F extends BaseListFilters> {
   searchPlaceholder?: string;
   /** Draw the ⋮ that saves this view (N1.7, ui-jobs 521). */
   viewMenu?: boolean;
+  /** The count a staged selection in that sheet would give. */
+  countFor?: (draft: F) => number | Promise<number>;
+  /** The noun for a staged selection in that sheet. */
+  nounFor?: (draft: F) => string;
 }
 
 /** The default failure state: a listing fetch rejected and the config
@@ -240,6 +244,9 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
           searchPlaceholder={filter.searchPlaceholder}
           count={count}
           viewMenu={filter.viewMenu}
+          countPending={loading || refreshing}
+          countFor={filter.countFor}
+          nounFor={filter.nounFor}
         />
       ) : (
         toolbar

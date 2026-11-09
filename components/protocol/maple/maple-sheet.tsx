@@ -165,7 +165,7 @@ export function mapleSheet({ ctx, coords, claim, addresses = {} }: MapleSheetArg
       label: SHEET_WORDS.last,
       amount: figure(fmt(before - interest), asset, {
         kind: "derived",
-        summary: `The claim once the pool's previous event had run — the claim just before this event less the interest since that event.`,
+        summary: `The claim once the pool's previous event had run. The claim just before this event less the interest since that event.`,
         via: "claim before − interest since the previous event",
         formula: "claim before − interest since previous event",
       }),

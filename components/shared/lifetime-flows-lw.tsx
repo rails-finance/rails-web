@@ -1401,7 +1401,7 @@ export function LifetimeFlowsLw({
           <span
             key={k}
             aria-hidden
-            className={`pointer-events-none absolute left-1 text-[10px] font-semibold leading-none ${k === "collateral" ? "text-blue-600 dark:text-blue-400" : "text-green-700 dark:text-green-400"}`}
+            className={`pointer-events-none absolute left-1 text-[10px] font-semibold leading-none ${k === "collateral" ? "text-blue-600 dark:text-[var(--text-link)]" : "text-green-700 dark:text-green-400"}`}
             style={{ top: sideTop(i) + 3 }}
             data-flow-line-side-top={k}
           >

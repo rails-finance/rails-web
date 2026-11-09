@@ -59,7 +59,7 @@ const TIPS = {
 function dollarProv(what: string, usds: string): Provenance {
   return {
     kind: "derived",
-    summary: `${what}, in US dollars — USDS is a dollar stablecoin, so each USDS is counted at $1.`,
+    summary: `${what}, in US dollars. USDS is a dollar stablecoin, so each USDS is counted at $1.`,
     formula: "USDS × $1",
     inputs: [
       { label: "USDS", value: `${usds} USDS`, kind: "chain-derived" },
@@ -173,7 +173,7 @@ export function skySavingsSheet({ c, coords, previous, sinceRaw }: SkySheetArgs)
         {
           kind: "chain-derived",
           pclass: "indexed",
-          summary: `Worth after the previous event (block ${previous.blockNumber.toLocaleString("en-US")}) — the sUSDS held then times the share price of that block.`,
+          summary: `Worth after the previous event (block ${previous.blockNumber.toLocaleString("en-US")}). The sUSDS held then times the share price of that block.`,
           formula: "shares × chi ÷ 10^27",
           inputs: [
             {

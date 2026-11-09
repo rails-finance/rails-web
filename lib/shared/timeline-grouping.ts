@@ -723,7 +723,7 @@ export function resolveFolder<R>(
       ok: false,
       code: "UNKNOWN_FOLDER",
       message:
-        "No folder with that id in this position's current answer. A folder id is scoped to the response it came in — an event arriving at the head, or a backfill below it, retires it — so re-read the timeline and use an id from that answer, or ask by event key.",
+        "No folder with that id in this position's current answer. A folder id is scoped to the response it came in (an event arriving at the head, or a backfill below it, retires it), so re-read the timeline and use an id from that answer, or ask by event key.",
     };
   }
   return { ok: true, folder, members: members.slice(0, folder.count) };

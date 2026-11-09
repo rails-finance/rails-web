@@ -107,7 +107,7 @@ const atPriceUsdProv = (
 ): Provenance => ({
   kind: "chain-derived",
   pclass: "oracle",
-  summary: `${what}, in US dollars — the amount times the Comet's oracle price for ${h.symbol} ${h.atBlock ? "at this event's block" : "at the nearest row whose block was read"}.`,
+  summary: `${what}, in US dollars. The amount times the Comet's oracle price for ${h.symbol} ${h.atBlock ? "at this event's block" : "at the nearest row whose block was read"}.`,
   formula: "amount × price",
   contract: cometContract(coords),
   inputs: [
@@ -135,7 +135,7 @@ function sideUsdProv(
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `${what} ${when === "previous" ? "at the last event" : `${when} this event`} — what the account ${side === "collateral" ? "posted and lent" : "owed"} ${at}, in US dollars: each asset's balance from the position's replay of its rows times the Comet's oracle price.`,
+    summary: `${what} ${when === "previous" ? "at the last event" : `${when} this event`}. What the account ${side === "collateral" ? "posted and lent" : "owed"} ${at}, in US dollars: each asset's balance from the position's replay of its rows times the Comet's oracle price.`,
     formula: "Σ balance × price",
     contract: cometContract(coords),
     via: "the position's replay of its rows (lib/compound/flows.ts)",
@@ -158,7 +158,7 @@ function sideUsdProv(
 /** What a figure became since the previous event. */
 const sinceProv = (what: string): Provenance => ({
   kind: "derived",
-  summary: `${what} since the previous event — the figure at this event less the figure at the previous one.`,
+  summary: `${what} since the previous event. The figure at this event less the figure at the previous one.`,
   formula: "now − at the previous event",
 });
 
@@ -259,8 +259,8 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
     pclass: "indexed",
     summary:
       when === "previous"
-        ? `${baseSym} owed once the account's previous event in this market had run — the base balance the position's replay of its rows holds at that row, interest to then included.`
-        : `${baseSym} owed just before this event — the base balance once the previous event had run plus the interest charged since, from the position's replay of its rows.`,
+        ? `${baseSym} owed once the account's previous event in this market had run. The base balance the position's replay of its rows holds at that row, interest to then included.`
+        : `${baseSym} owed just before this event. The base balance once the previous event had run plus the interest charged since, from the position's replay of its rows.`,
     formula:
       when === "previous"
         ? "−base balance at the previous row"
@@ -320,7 +320,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
               ? move!.info
               : {
                   kind: "chain-derived",
-                  summary: `${h.symbol} ${side === "debt" ? "owed" : h.base ? "lent" : "posted"} change at this event — the balance once the event had run less the balance just before it, from the position's replay of its rows.`,
+                  summary: `${h.symbol} ${side === "debt" ? "owed" : h.base ? "lent" : "posted"} change at this event. The balance once the event had run less the balance just before it, from the position's replay of its rows.`,
                   formula: "after − before",
                   contract: cometContract(coords),
                 },
@@ -378,7 +378,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
             info: {
               kind: "chain-derived",
               pclass: "state",
-              summary: `${side === "collateral" ? `Interest the lent ${baseSym} earned` : `Interest charged on the borrowed ${baseSym}`} since the account's previous event in this market — the balance just before this event less the balance once the previous event had run, as the rows state them. Comet accrues continuously and logs nothing for it.`,
+              summary: `${side === "collateral" ? `Interest the lent ${baseSym} earned` : `Interest charged on the borrowed ${baseSym}`} since the account's previous event in this market. The balance just before this event less the balance once the previous event had run, as the rows state them. Comet accrues continuously and logs nothing for it.`,
               formula: "before − previous after",
               contract: cometContract(coords),
             },
@@ -406,7 +406,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
               info: {
                 kind: "chain-derived",
                 pclass: "oracle",
-                summary: `Market move on the ${side} since the last event — the side's total just before this event, less its total once the previous event had run and the interest since, all in US dollars: the change the Comet's oracle prices made to the balances held between the two. No token moved.`,
+                summary: `Market move on the ${side} since the last event. The side's total just before this event, less its total once the previous event had run and the interest since, all in US dollars: the change the Comet's oracle prices made to the balances held between the two. No token moved.`,
                 formula: "before this event − last event − interest since",
                 contract: cometContract(coords),
                 inputs: hs
@@ -489,7 +489,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
               info: {
                 kind: "chain-derived",
                 pclass: "indexed",
-                summary: `${sole.symbol} ${side === "debt" ? "owed" : sole.base ? "lent" : "posted"} once this event had run — the balance the position's replay of its rows holds at this row.`,
+                summary: `${sole.symbol} ${side === "debt" ? "owed" : sole.base ? "lent" : "posted"} once this event had run. The balance the position's replay of its rows holds at this row.`,
                 formula: side === "debt" ? "−base balance at this row" : "balance at this row",
                 contract: cometContract(coords),
                 via: "the position's replay of its rows (lib/compound/flows.ts)",
@@ -539,7 +539,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
         info: {
           kind: "chain",
           pclass: "state",
-          summary: `The market's borrow rate a year just before this event — the Comet's getBorrowRate at its getUtilization, read at block ${ratePair.readBlock.toLocaleString("en-US")}, the block before.`,
+          summary: `The market's borrow rate a year just before this event. The Comet's getBorrowRate at its getUtilization, read at block ${ratePair.readBlock.toLocaleString("en-US")}, the block before.`,
           contract: cometContract(coords),
           via: `Comet · getBorrowRate(getUtilization()) · block ${ratePair.readBlock}`,
         },
@@ -588,7 +588,7 @@ export function compoundEventSheet(input: CompoundSheetInput): EventSheet | unde
                   info: {
                     kind: "chain" as const,
                     pclass: "state" as const,
-                    summary: `Borrow collateral factor — the share of ${h.symbol}'s value that counts toward the borrowing limit in this market, ${factorPct(f.borrow)}, read from the Comet's asset settings at block ${readBlock}, the block before the absorb.`,
+                    summary: `Borrow collateral factor. The share of ${h.symbol}'s value that counts toward the borrowing limit in this market, ${factorPct(f.borrow)}, read from the Comet's asset settings at block ${readBlock}, the block before the absorb.`,
                     contract: cometContract(coords),
                     via: `Comet.getAssetInfoByAddress(${h.symbol}) · block ${readBlock}`,
                   },

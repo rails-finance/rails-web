@@ -186,7 +186,7 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
             (reconcile.refetchDiffered
               ? " Both sweeps were run a second time and returned a different number of logs from the first, which is direct evidence of the lane answering one question two ways."
               : " Both sweeps were run a second time and returned the same number of logs.")}{" "}
-          The figures above this are unaffected — they are calls at block {n(timeline.blockNumber)}, not a replay.
+          The figures above this are unaffected: they are calls at block {n(timeline.blockNumber)}.
         </p>
       ) : onEventPage ? null : (
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-figure="timeline-reconciled">
@@ -214,7 +214,7 @@ export function YearnVaultTimeline({ timeline, vaultName, shareSymbol, assetSymb
             tl={tl}
             runs={runs}
             boundary={boundary}
-            toolbarLeading="replayed from this address's own transfers"
+            toolbarLeading="replayed from this address's transfers"
             emptyLabel="No share transfers of this vault name this address."
             // The card-open memory's namespace, as the ROW spells it
             // (`${persistPrefix}:${vaultAddress}:${event.id}`) less the id the

@@ -121,7 +121,7 @@ export function TimelineCoverageFooter({ coverage, sourceLabel }: TimelineCovera
               {g.from.toLocaleString("en-US")}–{g.to.toLocaleString("en-US")}
             </span>
           ))}
-          . Every event shown is real, but any event inside those blocks is missing from this list — and because the
+          . Every event shown is real, but any event inside those blocks is missing from this list, and because the
           running balances are replayed from the events, the before/after figures after a hole are short by whatever it
           hid. Reload to sweep again.
         </p>
@@ -146,17 +146,17 @@ export function TimelineCoverageFooter({ coverage, sourceLabel }: TimelineCovera
               earlier is outside what was read.
             </>
           )}{" "}
-          Everything shown is contiguous — the missing part is older, not in the middle — but the running balances on
-          the cards are replayed from what was read, so they start from nothing at that block rather than from whatever
-          the wallet already held.
+          Everything shown is contiguous (the missing part is older, not in the middle), but the running balances on the
+          cards are replayed from what was read, so they start from nothing at that block rather than from whatever the
+          wallet already held.
         </p>
       )}
       {undated > 0 && (
         <p className="mt-1.5">
           {undated.toLocaleString("en-US")} further {undated === 1 ? "event is" : "events are"} missing from this list
-          because the block {undated === 1 ? "it happened in" : "they happened in"} could not be dated — an event with
-          no timestamp has nowhere to sit on a timeline, and a placeholder date would read as a real one. The balances
-          and the totals above still count {undated === 1 ? "it" : "them"}. Reloading usually resolves it.
+          because the block {undated === 1 ? "it happened in" : "they happened in"} could not be dated: an event with no
+          timestamp has nowhere to sit on a timeline, and a placeholder date would read as a real one. The balances and
+          the totals above still count {undated === 1 ? "it" : "them"}. Reloading usually resolves it.
         </p>
       )}
     </div>

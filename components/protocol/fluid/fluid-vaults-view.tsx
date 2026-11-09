@@ -108,7 +108,7 @@ function LegSize({
   if (tokens && tokens.length > 0) {
     return (
       <span
-        title={`${value.toLocaleString("en-US", { maximumFractionDigits: 6 })} DEX shares — the pool's own per-share composition at this block, not a price`}
+        title={`${value.toLocaleString("en-US", { maximumFractionDigits: 6 })} DEX shares: the pool's per-share composition at this block, not a price`}
       >
         {tokens.map((t, i) => (
           <span key={i}>
@@ -208,7 +208,7 @@ function VaultRow({ v, block, readBy }: { v: FluidVaultRow; block: number; readB
                 {v.aggregateRatio != null && (
                   <span
                     data-prov-exempt=""
-                    title="The vault's aggregate is total borrow ÷ (total collateral × the vault's liquidate price) — all three inputs already traced in this row. A ratio of receipted figures, not any one position's ratio."
+                    title="The vault's aggregate is total borrow ÷ (total collateral × the vault's liquidate price). All three inputs already traced in this row. A ratio of receipted figures."
                   >
                     · {pctText(v.aggregateRatio, 1)} used
                   </span>
@@ -261,7 +261,7 @@ function VaultRow({ v, block, readBy }: { v: FluidVaultRow; block: number; readB
           ) : (
             <span
               className="text-rb-500"
-              title="On a smart leg the resolver's rate figure is only the vault's own rewards/fee component, not the full rate — so it is not stated."
+              title="On a smart leg the resolver's rate figure is only the vault's rewards/fee component, so it is not stated."
             >
               —
             </span>
@@ -273,7 +273,7 @@ function VaultRow({ v, block, readBy }: { v: FluidVaultRow; block: number; readB
           ) : (
             <span
               className="text-rb-500"
-              title="On a smart leg the resolver's rate figure is only the vault's own rewards/fee component, not the full rate — so it is not stated."
+              title="On a smart leg the resolver's rate figure is only the vault's rewards/fee component, so it is not stated."
             >
               —
             </span>
@@ -398,7 +398,7 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
             // — a Σ over per-vault reads, not one chain figure. Exempt, not
             // receipted, like the condition counts beneath it.
             value: <span data-prov-exempt="">{data.summary.total - data.summary.shells}</span>,
-            title: "Vaults with a collateral factor set — the ones that can hold a position.",
+            title: "Vaults with a collateral factor set: the ones that can hold a position.",
           },
         ]}
         notes={
@@ -409,7 +409,7 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
               <span
                 data-prov-exempt=""
                 className="text-foreground"
-                title="A count over each vault's own leg kind across the roster — not a single chain read."
+                title="A count over each vault's leg kind across the roster."
               >
                 {data.summary.tokenPair}
               </span>{" "}
@@ -417,7 +417,7 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
               <span
                 data-prov-exempt=""
                 className="text-foreground"
-                title="A count over each vault's own leg kind across the roster — not a single chain read."
+                title="A count over each vault's leg kind across the roster."
               >
                 {data.summary.smart}
               </span>{" "}
@@ -428,7 +428,7 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
                 <span
                   data-prov-exempt=""
                   className="text-foreground"
-                  title="A count over each vault's collateralFactor across the roster — not a single chain read."
+                  title="A count over each vault's collateralFactor across the roster."
                 >
                   {data.summary.shells}
                 </span>{" "}
@@ -452,7 +452,7 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
                 <span
                   data-prov-exempt=""
                   className="text-foreground"
-                  title="A count over each vault's own oracle price across the roster — not a single chain read."
+                  title="A count over each vault's oracle price across the roster."
                 >
                   {data.summary.oracleSilent}
                 </span>{" "}
@@ -513,9 +513,8 @@ export function FluidVaultsView({ data }: { data: FluidVaultsChainResponse }) {
           <p className="mt-1 max-w-3xl text-[11px] leading-relaxed text-rb-500">
             The factory minted {shells.length} vaults that governance never gave a ladder or an oracle. They hold
             nothing and can hold nothing: with no collateralFactor there is nothing to borrow against. They are listed
-            because the roster is the factory&rsquo;s, not ours — omitting them would state a smaller protocol than the
-            one on chain — but they carry no rungs, because a 0% rung would assert a risk parameter the vault does not
-            have.
+            because the roster is the factory&rsquo;s, so omitting them would state a smaller protocol than the one on
+            chain, but they carry no rungs, because a 0% rung would assert a risk parameter the vault does not have.
           </p>
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px] tabular-nums text-rb-500">
             {shells.map((v) => (

@@ -234,7 +234,7 @@ export function AaveV4HubViews({ views, block }: { views: HubView[]; block?: num
       <div className="mb-3">
         <h2 className="text-[11px] uppercase tracking-wider text-rb-500">Credit lines</h2>
         <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
-          Every asset&apos;s credit line across all hubs in one table — filter by class or hub, and sort any column.
+          Every asset&apos;s credit line across all hubs in one table, filter by class or hub, and sort any column.
         </p>
       </div>
 

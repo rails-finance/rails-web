@@ -11,7 +11,7 @@ export default function MorphoArbitrumPositionNotFound() {
       backHref="/arbitrum/morpho"
       backLabel="Look up another wallet on Morpho Blue Arbitrum"
     >
-      This page is one account in one market: a 20-byte address, and a market&rsquo;s 32-byte id — the keccak of its
+      This page is one account in one market: a 20-byte address, and a market&rsquo;s 32-byte id, the keccak of its
       parameters, 0x and 64 hex characters. The URL does not carry both.
     </RouteNotFound>
   );

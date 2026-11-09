@@ -60,7 +60,7 @@ function collUsdProv(sym: string, what: string, amount: number, price: number, c
   const base = collateralUsdProv(sym, formatExactDecimal(String(Math.abs(amount))), price);
   return {
     ...base,
-    summary: `${what} in US dollars — the ${sym} amount times the OSM price for the ilk at this event's block${atBlock(coords)}, Vat spot × Spotter mat.`,
+    summary: `${what} in US dollars. The ${sym} amount times the OSM price for the ilk at this event's block${atBlock(coords)}, Vat spot × Spotter mat.`,
     inputs: [...(base.inputs ?? []), ...eventInputs(coords)],
   };
 }
@@ -69,7 +69,7 @@ function collUsdProv(sym: string, what: string, amount: number, price: number, c
 function faceProv(sym: string, what: string): Provenance {
   return {
     kind: "derived",
-    summary: `${what} in US dollars — the ${sym} amount at its $1 face.`,
+    summary: `${what} in US dollars. The ${sym} amount at its $1 face.`,
     formula: "amount × $1",
   };
 }
@@ -78,7 +78,7 @@ function faceProv(sym: string, what: string): Provenance {
 function changeProv(what: string, formula: string): Provenance {
   return {
     kind: "derived",
-    summary: `${what} — the figure after this event less the figure just before it, at the OSM price of this block.`,
+    summary: `${what}. The figure after this event less the figure just before it, at the OSM price of this block.`,
     formula,
   };
 }
@@ -396,7 +396,7 @@ export function useMakerSheet(ctx: MakerDAOContext, coords: MakerCoords, open = 
               info: {
                 kind: "chain",
                 pclass: "state",
-                summary: `The least ${debtSym} a ${ctx.ilk} vault may owe while it owes anything — the Vat's dust for the ilk, read by eth_call${atBlock(coords)}.`,
+                summary: `The least ${debtSym} a ${ctx.ilk} vault may owe while it owes anything. The Vat's dust for the ilk, read by eth_call${atBlock(coords)}.`,
                 via: "Vat.ilks(ilk).dust at the event's block",
                 inputs: eventInputs(coords),
               },

@@ -43,7 +43,7 @@ function sentence(shape: HolderShape, block: number): { verdict: string; rest: s
       return { verdict: `is a Safe (${shape.version}) ${at}`, rest: "." };
     case "erc4626": {
       const asset = shape.assetIsVaultShares
-        ? "this vault's own shares"
+        ? "this vault's shares"
         : "assetSymbol" in shape && shape.assetSymbol
           ? shape.assetSymbol
           : shortAddress(shape.asset);

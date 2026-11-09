@@ -52,7 +52,7 @@ export const metadata = listingMetadata({
   title: "Vault positions on Base",
   canonicalPath: "/base/morpho/vaults/positions",
   description:
-    "Every address that holds — or has ever held — a share of a MetaMorpho vault catalogued on Base, live and closed, as position cards. Filter by vault, status and what the holding address is; shares, claim and share of the vault read from chain at one block.",
+    "Every address that holds (or has ever held) a share of a MetaMorpho vault catalogued on Base, live and closed, as position cards. Filter by vault, status and what the holding address is; shares, claim and share of the vault read from chain at one block.",
 });
 
 export default async function BaseVaultPositionsPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

@@ -12,7 +12,7 @@
 //   1  the bare directory's stated total equals the API's own `pagination.total`
 //      for the open params — the count is never read off the page under test;
 //   2  every card on the bare directory carries an open lifecycle pill (OPEN, or
-//      ZOMBIE on Liquity V2, which is an open trove redeemed below the floor);
+//      DORMANT on Liquity V2, which is an open trove redeemed below the floor);
 //   3  the bare directory draws no Status chip and no Reset link — the resting
 //      view is a contextual default, not a selection someone made;
 //   4  the bare directory's URL stays clean: no `status=` param;
@@ -110,8 +110,8 @@ async function api(path_, tries = 4) {
 
 // ── page helpers, shared by every explorer section ──────────────────────────
 
-const OPEN_PILLS = new Set(["OPEN", "ZOMBIE"]);
-const ALL_PILLS = new Set(["OPEN", "ZOMBIE", "CLOSED", "LIQUIDATED"]);
+const OPEN_PILLS = new Set(["OPEN", "DORMANT"]);
+const ALL_PILLS = new Set(["OPEN", "DORMANT", "CLOSED", "LIQUIDATED"]);
 
 /** Open a listing URL and wait for the toolbar to come alive. The strip carries
  *  `aria-busy` until its handlers are attached (ui-grammar's ctrlWaking); a
@@ -139,7 +139,7 @@ async function readPills(page, rowSel) {
     // accept it is each section's own business.
     const words = [
       "OPEN",
-      "ZOMBIE",
+      "DORMANT",
       "CLOSED",
       "LIQUIDATED",
       "NOT LOADED",
@@ -337,7 +337,7 @@ if (wants("Liquity V2")) {
     `page ${bareTotal.total} (${bareTotal.from}) vs API ${openTotal}→${openAfterBare} for status=active,zombie`,
   );
   check(
-    label("2. every card on the bare directory is open or zombie"),
+    label("2. every card on the bare directory is open or dormant"),
     barePills.length > 0 && barePills.every((p) => p != null && OPEN_PILLS.has(p)),
     `${barePills.length} rows: ${[...new Set(barePills)].join(", ") || "none"}`,
   );

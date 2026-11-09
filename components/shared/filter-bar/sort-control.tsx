@@ -48,7 +48,7 @@ export function SortControl({ options, sortBy, sortOrder, onChange }: SortContro
       <button
         onClick={() => onChange(sortBy, sortOrder === "asc" ? "desc" : "asc")}
         className={`${CTRL_GHOST} ${CTRL_OFF} w-8 h-8 rounded-md`}
-        aria-label={sortOrder === "asc" ? "Sort ascending — click to flip" : "Sort descending — click to flip"}
+        aria-label={sortOrder === "asc" ? "Sort ascending: click to flip" : "Sort descending: click to flip"}
         title={sortOrder === "asc" ? "Ascending" : "Descending"}
       >
         {sortOrder === "asc" ? <ArrowUp size={14} /> : <ArrowDown size={14} />}

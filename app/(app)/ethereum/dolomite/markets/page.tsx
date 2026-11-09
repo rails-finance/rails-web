@@ -36,7 +36,7 @@ export const revalidate = 600;
 export const metadata = {
   title: "Dolomite markets",
   description:
-    "Every Dolomite market and the protocol's own margin ladder over it — premiums, live rates and its own oracle prices.",
+    "Every Dolomite market and the protocol's margin ladder over it: premiums, live rates and its own oracle prices.",
 };
 
 const PROTOCOL = protocolForHref("/ethereum/dolomite")!;

@@ -95,7 +95,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
         <li>A row also shows the interest rate the borrower chose and the Trove&apos;s status.</li>
         <li>
           A Trove is Open, Closed or Liquidated. An Open Trove that a redemption has left below the minimum debt of
-          2,000 ebUSD, the smallest debt the protocol allows a Trove to hold, is marked Zombie.
+          2,000 ebUSD, the smallest debt the protocol allows a Trove to hold, is marked Dormant.
         </li>
       </ul>
     ),

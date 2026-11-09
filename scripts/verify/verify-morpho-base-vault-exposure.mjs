@@ -366,6 +366,10 @@ const sharesText = (raw, decimals) => {
   return raw !== BigInt(0) && parseFloat(text.replace(/,/g, "")) === 0 ? formatUnits(raw, decimals) : text;
 };
 
+// A vault card's stat (statText, ui-jobs 546): "0" at zero, "<0.000001" below it, else the rule given.
+const statOf = (raw, decimals, text) =>
+  raw === BigInt(0) ? "0" : Number(raw) / Math.pow(10, decimals) < 1e-6 ? "<0.000001" : text(raw, decimals);
+
 const read = (fn, args, blockNumber) =>
   client.readContract({ address: VAULT, abi: VAULT_ABI, functionName: fn, args, blockNumber });
 
@@ -650,8 +654,8 @@ check(
 const pageSupply = await figure("total-shares");
 check(
   "2b totalSupply on the page re-reads at that block",
-  pageSupply === sharesText(own.totalSupply, own.decimals),
-  `${pageSupply} vs own ${sharesText(own.totalSupply, own.decimals)}`,
+  pageSupply === statOf(own.totalSupply, own.decimals, sharesText),
+  `${pageSupply} vs own ${statOf(own.totalSupply, own.decimals, sharesText)}`,
 );
 const pagePrice = await figure("share-price");
 const ownPrice = await read("convertToAssets", [BigInt(10) ** BigInt(own.decimals)], block);
@@ -670,8 +674,8 @@ check(
 const pageAllocated = await figure("allocated");
 check(
   "3  Σ legs on the page equals this script's own Σ over position/market",
-  pageAllocated === assetText(own.allocated, own.assetDecimals),
-  `page ${pageAllocated} vs own ${assetText(own.allocated, own.assetDecimals)}`,
+  pageAllocated === statOf(own.allocated, own.assetDecimals, assetText),
+  `page ${pageAllocated} vs own ${statOf(own.allocated, own.assetDecimals, assetText)}`,
 );
 // The queue is however long this vault's queue is — one leg, six, twenty, none.
 // A page that drew a different number of rows would still sum correctly if the

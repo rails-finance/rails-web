@@ -8,12 +8,16 @@
  * a proper noun (PROPER below), an acronym or a token symbol (two or more capitals, or a
  * digit in it), or follows a colon.
  *
+ * The YAML families (content/<family>/event-prose.yaml) keep theirs under `L5.<key>.title`,
+ * read the same way.
+ *
  * Add a proper noun to PROPER (one word as its owner writes it) rather than lowercasing it.
  *
  *   node scripts/check-learn-more-titles.mjs
  */
 import fs from "node:fs";
 import path from "node:path";
+import { parse } from "yaml";
 
 const ROOTS = ["app", "components", "lib", "content"];
 // Multi-word names, removed before the words are checked.
@@ -25,6 +29,7 @@ const PROPER = new Set([
   "Base",
   "Compound",
   "Dolomite",
+  "Equities",
   "Ethereum",
   "Fluid",
   "Frankencoin",
@@ -114,6 +119,24 @@ for (const root of ROOTS) {
         if (hit.length) failures.push(`${f}:${src.slice(0, m.index).split("\n").length}  "${s}"  (${hit.join(", ")})`);
       }
     }
+  }
+}
+
+// The protocols whose learn-more content lives in YAML: content/<family>/event-prose.yaml, `L5.<key>.title`
+// (ui-jobs 534).
+for (const family of fs.readdirSync("content")) {
+  const f = path.join("content", family, "event-prose.yaml");
+  if (!fs.existsSync(f)) continue;
+  const src = fs.readFileSync(f, "utf8");
+  const l5 = parse(src)?.L5 ?? {};
+  for (const [key, entry] of Object.entries(l5)) {
+    const s = entry?.title;
+    if (typeof s !== "string") continue;
+    const hit = bad(s);
+    if (!hit.length) continue;
+    const at = src.indexOf(`\n  ${key}:\n`);
+    const line = at < 0 ? "?" : src.slice(0, at + 1).split("\n").length;
+    failures.push(`${f}:${line}  L5.${key}  "${s}"  (${hit.join(", ")})`);
   }
 }
 

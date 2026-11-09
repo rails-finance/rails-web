@@ -4,7 +4,6 @@ import { ALCHEMIX_ETHEREUM } from "@/lib/alchemix/lines";
 import { alchemixListingPageData } from "@/lib/alchemix/listing-page-data";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import type { RawSearchParams } from "@/lib/shared/listing-ssr";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 // Alchemix V3 on Ethereum — the alUSD and alETH lines.
 //
@@ -19,7 +18,7 @@ export function generateMetadata(): Metadata {
     title: "Explore Alchemix positions",
     canonicalPath: ALCHEMIX_ETHEREUM.basePath,
     description:
-      "Every Alchemix V3 position on the alUSD and alETH lines. Both lines have had a redemption, which moves every open position's debt at once, so each figure here is read from the contract at the block shown beside it.",
+      "Every Alchemix V3 self-repaying loan on Ethereum (alUSD and alETH): collateral and debt read from the contract, including what redemptions took.",
   });
 }
 
@@ -28,4 +27,4 @@ async function AlchemixEthereumListingPage({ searchParams }: { searchParams: Pro
   return <AlchemixListing deployment={ALCHEMIX_ETHEREUM} {...data} />;
 }
 
-export default withExplorerAbout("/ethereum/alchemix", AlchemixEthereumListingPage);
+export default AlchemixEthereumListingPage;

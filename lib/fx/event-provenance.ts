@@ -243,7 +243,7 @@ export const fxExternalActorProv = (facts: { owner: string; txFrom: string }, co
   kind: "chain-derived",
   pclass: "indexed",
   verify: txVerify(coords),
-  summary: `A third party executed this operation: the transaction sender (${facts.txFrom}) is not the owner in force at this block (${facts.owner}), AND that owner is an EOA (eth_getCode empty) — so a differing signer cannot be the owner acting through their own contract. f(x)'s Operate carries no caller param, so this owner-kind check stands in as the second marking fact; contract-owned positions (Safes, managers) are never marked on the signer alone.`,
+  summary: `A third party executed this operation. The transaction sender (${facts.txFrom}) is not the owner in force at this block (${facts.owner}), AND that owner is an EOA (eth_getCode empty) — so a differing signer cannot be the owner acting through their own contract. f(x)'s Operate carries no caller param, so this owner-kind check stands in as the second marking fact; contract-owned positions (Safes, managers) are never marked on the signer alone.`,
   contract: poolContract(coords),
   via: "tx sender vs owner-at-block (transfer lane) · owner eth_getCode",
   inputs: eventInputs(coords, [

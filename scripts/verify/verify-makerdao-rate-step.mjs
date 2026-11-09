@@ -1106,7 +1106,7 @@ check(
 // members, in the shipped wording, rather than read off the export.
 const stepsClause = (note) =>
   ` Stated as one stretch over ${note.steps.toLocaleString("en-US")} consecutive steps that all moved the ` +
-  `rate the same way — ` +
+  `rate the same way: ` +
   note.members
     .map((m) => `${blk(m.fromBlock)} → ${blk(m.toBlock)}, ${ratePct(m.fromValue)} → ${ratePct(m.toValue)}`)
     .join("; ") +

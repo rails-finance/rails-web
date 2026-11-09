@@ -49,6 +49,10 @@ export function LlamalendListing({ initialItems, initialTotal, initialKey, initi
             data: r.data,
             total: r.pagination.total,
           })),
+        fetchCount: (filters) =>
+          fetchLlamalendPositions({ ...llamalendFiltersToFetchParams(filters, 1), limit: 1 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       initialItems={initialItems}
       initialTotal={initialTotal}

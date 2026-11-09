@@ -86,7 +86,7 @@ export const AAVE_GSM_LIST_CALL = "GsmRegistry.getGsmList()";
 /** What a GSM is, in the book's own vocabulary: GHO's Stability Module — the
  *  peg facility that swaps GHO against a reserve at a set price. The page never
  *  says more than this about one. */
-const GSM_WHAT = "a GHO Stability Module — Aave's own peg facility for one reserve";
+const GSM_WHAT = "a GHO Stability Module, Aave's peg facility for one reserve";
 
 /** The addresses Aave's address book names one by one, as of the pinned commit,
  *  that hold positions in this section's vaults. NOT a list of everything the

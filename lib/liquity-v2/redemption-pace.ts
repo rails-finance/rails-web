@@ -130,8 +130,8 @@ export function branchRedemptionPace(src: PaceSource, body: unknown): ProtocolAc
       pclass: "indexed",
       summary:
         at.count === 0
-          ? `No redemption reached the ${branch} branch on ${dayWord} (UTC): the day has no Redemption log in the index.`
-          : `${unit} redeemed on the ${branch} branch on ${dayWord} (UTC), across every Trove on the branch: the sum of the ${at.count.toLocaleString("en-US")} TroveManager Redemption ${at.count === 1 ? "log's" : "logs'"} _actualBoldAmount, the ${unit} burned before the redemption fee.`,
+          ? `No redemption reached the ${branch} branch on ${dayWord} (UTC). The day has no Redemption log in the index.`
+          : `${unit} redeemed on the ${branch} branch on ${dayWord} (UTC), across every Trove on the branch. The sum of the ${at.count.toLocaleString("en-US")} TroveManager Redemption ${at.count === 1 ? "log's" : "logs'"} _actualBoldAmount, the ${unit} burned before the redemption fee.`,
       formula: "Σ _actualBoldAmount ÷ 10¹⁸ over the day's Redemption logs",
       via,
     }),

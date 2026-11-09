@@ -80,9 +80,9 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
     ],
   },
   {
-    term: "Zombie",
+    term: "Dormant Trove",
     definition:
-      "A zombie is a Trove that a redemption left with less than the 2,000 BOLD minimum debt, often none, because the redemption repaid part of its debt. A zombie leaves the redemption queue.",
+      "A dormant Trove is one that a redemption left with less than the 2,000 BOLD minimum debt, often none. It leaves the redemption queue, save the branch's most recent dormant Trove with debt left, which is redeemed first. Its owner can close it or bring the debt back above the minimum. Liquity's contracts tag it Zombie.",
     sources: [
       { label: "If my Trove is redeemed", href: REDEMPTIONS + "#what-happens-if-my-trove-gets-redeemed" },
       { label: "Minimum debt", href: BORROWING + "#is-there-a-minimum-debt" },
@@ -142,8 +142,8 @@ const views: readonly [InfoView, ...InfoView[]] = [
         </li>
         <li>A Trove in a batch shows the manager&apos;s name where Rails knows it.</li>
         <li>
-          A zombie is still open, so the listing marks it Open with a zombie mark. The listing without a search shows
-          the Open and zombie Troves, and a search shows Troves of every status.
+          A dormant Trove is still open, and the listing marks it Dormant. The listing without a search shows the Open
+          and Dormant Troves, and a search shows Troves of every status.
         </li>
       </ul>
     ),
@@ -226,8 +226,8 @@ export default function InfoPage() {
           Redemptions work through the <GlossaryLink term="Redemption queue">redemption queue</GlossaryLink>, lowest
           rate first, because a higher rate protects a Trove. A redeemed Trove&apos;s debt and collateral fall together,
           and the redemption fee stays with the Trove as extra collateral. A redemption that repays a Trove below the
-          minimum debt leaves a <GlossaryLink term="Zombie">zombie</GlossaryLink>, which the owner can close to collect
-          the collateral or borrow against again.
+          minimum debt leaves it <GlossaryLink term="Dormant Trove">dormant</GlossaryLink>, and the owner can close it
+          to collect the collateral or borrow against it again.
         </>,
         <>
           Liquity V2 has three <GlossaryLink term="Branch">branches</GlossaryLink>: WETH, wstETH and rETH, which are

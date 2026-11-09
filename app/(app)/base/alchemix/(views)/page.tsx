@@ -4,7 +4,6 @@ import { ALCHEMIX_BASE } from "@/lib/alchemix/lines";
 import { alchemixListingPageData } from "@/lib/alchemix/listing-page-data";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import type { RawSearchParams } from "@/lib/shared/listing-ssr";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 // Alchemix V3 on Base — the alUSDb line.
 //
@@ -22,7 +21,7 @@ export function generateMetadata(): Metadata {
     title: "Explore Alchemix positions",
     canonicalPath: ALCHEMIX_BASE.basePath,
     description:
-      "Every Alchemix V3 position on the alUSDb line. This line has had no redemption, so each figure here is replayed from the position's own events and is exact to the wei at the block shown beside it.",
+      "Every Alchemix V3 self-repaying loan on Base (alUSDb): collateral and debt for each position, exact to the last unit, with its full history.",
   });
 }
 
@@ -31,4 +30,4 @@ async function AlchemixBaseListingPage({ searchParams }: { searchParams: Promise
   return <AlchemixListing deployment={ALCHEMIX_BASE} {...data} />;
 }
 
-export default withExplorerAbout("/base/alchemix", AlchemixBaseListingPage);
+export default AlchemixBaseListingPage;

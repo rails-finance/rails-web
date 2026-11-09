@@ -1282,7 +1282,7 @@ export function marketNoteSentence(note: MarketNote): string {
   let sentence = f.steps
     ? `Over ${f.steps} of this position's own touches the ${note.marketSymbol} market's primary rate moved ` +
       `${f.fromRate} → ${f.toRate} per year, ${f.delta}, from its ${polarisEndLabel(note.from)} at block ` +
-      `${f.fromBlock} to its ${polarisEndLabel(note.to)} at block ${f.toBlock} — each step in between moved it ` +
+      `${f.fromBlock} to its ${polarisEndLabel(note.to)} at block ${f.toBlock}; each step in between moved it ` +
       `the same way, so they are stated as one stretch`
     : `The ${note.marketSymbol} market's primary rate moved ${f.fromRate} → ${f.toRate} per year, ${f.delta}, ` +
       `between this position's ${polarisEndLabel(note.from)} at block ${f.fromBlock} and its ` +
@@ -1369,7 +1369,7 @@ const mergedStepsClause = (note: RateStepNote): string => {
     .join("; ");
   return (
     ` Stated as one stretch over ${members.length.toLocaleString("en-US")} consecutive steps that all moved the ` +
-    `rate the same way — ${steps}.`
+    `rate the same way: ${steps}.`
   );
 };
 
@@ -1395,7 +1395,7 @@ export function marketNoteReceiptLine(note: MarketNote): string {
       `${formatBlock(note.to.block)}, tx ${note.to.txHash}, read by topic over the whole chain. Its words, raw: ` +
       `${Object.entries(note.fields)
         .map(([key, value]) => `${key} ${value}`)
-        .join(", ")}. It is not this address's event — it moved every holder's terms at once — so it is counted in ` +
+        .join(", ")}. It is not this address's event (it moved every holder's terms at once), so it is counted in ` +
       `nothing on the page.`
     );
   if (note.protocol === "makerdao") {
@@ -1412,7 +1412,7 @@ export function marketNoteReceiptLine(note: MarketNote): string {
             `drip at that fee), confirmed by the Jug's duty read at that block`
         : `this vault's ${makerRateEndLabel(p)} at block ${p.block}, tx ${p.txHash} log ${p.logIndex}`;
     };
-    return `- Receipt: rate before — ${namedMaker("from")}; rate after — ${namedMaker("to")}.${mergedStepsClause(note)}${groupedClause(note)}`;
+    return `- Receipt: rate before: ${namedMaker("from")}; rate after: ${namedMaker("to")}.${mergedStepsClause(note)}${groupedClause(note)}`;
   }
   if (isAaveFamily(note)) {
     // Both ends are the reserve's OWN ReserveDataUpdated — the Pool emits
@@ -1433,7 +1433,7 @@ export function marketNoteReceiptLine(note: MarketNote): string {
           `position's own transaction`
         : `this position's ${aaveFamilyEndLabel(note.to)} at block ${note.to.block}, tx ${note.to.txHash}, log ${note.to.logIndex}`;
     const later = note.live ? "rate now" : "rate before the position's next touch";
-    return `- Receipt: rate after the position's own action — ${after}; ${later} — ${before}.`;
+    return `- Receipt: rate after the position's own action: ${after}; ${later}: ${before}.`;
   }
   const named = (end: "from" | "to") => {
     if (end === "to" && note.live) return `the cdpManager's own rate, read live at block ${note.to.block}`;
@@ -1443,5 +1443,5 @@ export function marketNoteReceiptLine(note: MarketNote): string {
       ? `its PrimaryRateSet at block ${o.block}, tx ${o.txHash} log ${o.logIndex}`
       : `this position's ${polarisEndLabel(p)} at block ${p.block}, tx ${p.txHash} log ${p.logIndex}`;
   };
-  return `- Receipt: rate before — ${named("from")}; rate after — ${named("to")}.${mergedStepsClause(note)}`;
+  return `- Receipt: rate before: ${named("from")}; rate after: ${named("to")}.${mergedStepsClause(note)}`;
 }

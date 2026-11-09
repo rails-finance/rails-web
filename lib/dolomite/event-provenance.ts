@@ -528,7 +528,7 @@ export const externalActorProv = (
   kind: "chain-derived",
   pclass: "emitted",
   verify: txVerify(coords),
-  summary: `This ${args.eventType.replace(/_/g, " ")} was executed by a third party: the account owner neither signed the transaction nor was the event's own party. Both facts are chain values${atBlock(coords)}; each is compared against the owner. Dolomite owners are often Gnosis Safes or smart wallets whose operators act through modules — the owner rendered is Account.Info.owner, the contract's own key, with no hop.`,
+  summary: `This ${args.eventType.replace(/_/g, " ")} was executed by a third party. The account owner neither signed the transaction nor was the event's own party. Both facts are chain values${atBlock(coords)}; each is compared against the owner. Dolomite owners are often Gnosis Safes or smart wallets whose operators act through modules — the owner rendered is Account.Info.owner, the contract's own key, with no hop.`,
   contract: MARGIN,
   via: `${DOLOMITE_VIA} · tx envelope from + the event's own party vs owner`,
   inputs: eventInputs(coords, [
@@ -654,7 +654,7 @@ export const dolomitePeakParProv = (sym: string, side: "supply" | "debt"): Prove
 export const dolomitePeakTokenProv = (sym: string, side: "supply" | "debt"): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
-  summary: `The most ${sym} this account ever ${side === "supply" ? "held" : "owed"} on this market, in tokens: the highest balance just before or just after any of its events, each the row's par × the market's ${side === "supply" ? "supply" : "borrow"} index at that row's block (what getAccountWei reads there), interest included. No USD is stated: the oracle prices the present, not history.`,
+  summary: `The most ${sym} this account ever ${side === "supply" ? "held" : "owed"} on this market, in tokens. The highest balance just before or just after any of its events, each the row's par × the market's ${side === "supply" ? "supply" : "borrow"} index at that row's block (what getAccountWei reads there), interest included. No USD is stated: the oracle prices the present, not history.`,
   contract: MARGIN,
   via: `${DOLOMITE_VIA} · max(|par × index|) before and after each of this lane's legs`,
 });

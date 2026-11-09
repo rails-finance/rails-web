@@ -395,7 +395,7 @@ export default function DolomitePositionView({
   if (accountNumber == null) {
     return (
       <div className="py-8">
-        <p className="text-sm text-rb-500">Not a Dolomite account — the account number is not a uint256.</p>
+        <p className="text-sm text-rb-500">Not a Dolomite account: the account number is not a uint256.</p>
       </div>
     );
   }

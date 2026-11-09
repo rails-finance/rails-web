@@ -4,7 +4,8 @@
 // 390 px viewport every text field a page carries must compute to at least
 // 16px; at 1440 px the desktop sizes stay (the field sizes are printed, not
 // asserted). Sliders, the file picker, checkboxes and the display:none
-// honeypot do not count.
+// honeypot do not count. Below sm a listing's facets are the filter sheet,
+// opened with each of its sub-views.
 // Run: BASE=http://localhost:3086 node scripts/verify/verify-input-font-size.mjs
 import { chromium } from "playwright";
 
@@ -55,18 +56,42 @@ for (const [width, height] of [
     const seen = new Map();
     const note = (fs) => fs.forEach((f) => seen.set(`${f.tag}:${f.type}:${f.label}`, f));
     note(await readFields(page));
-    const buttons = page.locator(
-      '[data-skel-section="listing-toolbar"] button[aria-haspopup], [data-skel-section="listing-toolbar"] button[aria-expanded]',
-    );
-    const n = Math.min(await buttons.count(), 8);
-    for (let i = 0; i < n; i += 1) {
-      await buttons
-        .nth(i)
-        .click({ timeout: 3000 })
-        .catch(() => {});
-      await page.waitForTimeout(400);
+    const sheetButton = page.locator('[data-skel-section="listing-toolbar"] [data-filter-sheet-open]');
+    if (width < 640 && (await sheetButton.count())) {
+      // Below sm the facets are the filter sheet (N1, ui-jobs 544): its list
+      // draws the range fields in place, and each row opens a sub-view whose
+      // option search is read too.
+      await sheetButton.click({ timeout: 5000 });
+      await page.locator("[data-filter-sheet]").waitFor({ timeout: 5000 });
       note(await readFields(page));
+      const rows = await page
+        .locator("[data-filter-sheet-row]")
+        .evaluateAll((els) =>
+          els.filter((e) => e.getAttribute("role") !== "switch").map((e) => e.getAttribute("data-filter-sheet-row")),
+        );
+      for (const id of rows.slice(0, 8)) {
+        await page.locator(`[data-filter-sheet-row="${id}"]`).click({ timeout: 3000 });
+        await page.locator(`[data-filter-sheet-view="${id}"]`).waitFor({ timeout: 3000 });
+        note(await readFields(page));
+        await page.locator("[data-filter-sheet-back]").click();
+        await page.locator(`[data-filter-sheet-row="${id}"]`).waitFor({ timeout: 3000 });
+      }
       await page.keyboard.press("Escape");
+      await page.locator("[data-filter-sheet]").waitFor({ state: "detached", timeout: 5000 });
+    } else {
+      const buttons = page.locator(
+        '[data-skel-section="listing-toolbar"] button[aria-haspopup="menu"], [data-skel-section="listing-toolbar"] button[aria-expanded]:not([aria-haspopup="dialog"])',
+      );
+      const n = Math.min(await buttons.count(), 8);
+      for (let i = 0; i < n; i += 1) {
+        await buttons
+          .nth(i)
+          .click({ timeout: 3000 })
+          .catch(() => {});
+        await page.waitForTimeout(400);
+        note(await readFields(page));
+        await page.keyboard.press("Escape");
+      }
     }
     const fb = page.getByRole("button", { name: /send feedback/i }).first();
     if (await fb.count()) {

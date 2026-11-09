@@ -190,7 +190,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "aave-v3",
     brand: 336,
     tags: ["Lend", "Borrow"],
-    desc: "Single-pool lending — one cross-collateralised account per wallet",
+    desc: "Single-pool lending on Ethereum: one cross-collateralised account per wallet, valued at Aave's oracle, with every liquidation traced",
     subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
   },
   {
@@ -201,7 +201,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "aave-v3",
     protocolKey: "aave-v3",
     tags: ["Lend", "Borrow"],
-    desc: "Aave V3's Base deployment — a separate Pool with its own reserves and risk parameters, every wallet's account read whole from the contracts, no modeled state",
+    desc: "Aave V3's Base deployment, a separate Pool with its own reserves and risk parameters: every wallet's account read whole from the contracts",
     subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
   },
   {
@@ -216,7 +216,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "aave-v3",
     protocolKey: "aave-v3",
     tags: ["Lend", "Borrow"],
-    desc: "Aave V3's Arbitrum deployment — a separate Pool with its own reserves and risk parameters, any wallet's account read whole from the contracts, no modeled state",
+    desc: "Aave V3's Arbitrum deployment, a separate Pool with its own reserves and risk parameters: any wallet's account read whole from the contracts",
     frontDoor: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
@@ -244,7 +244,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "aave-v4",
     protocolKey: "aave-v4",
     tags: ["Lend", "Borrow"],
-    desc: "Aave V4's Base deployment — the Equities hub's Mag7 spoke, where Coinbase tokenized stocks back USDC loans, each account read from the spoke and each stock price stated with the time it was published",
+    desc: "Aave V4 on Base: the Equities hub's Mag7 spoke, where Coinbase tokenized stocks back USDC loans, each stock price stated with when it was published",
     subPages: [{ segment: "hubs", label: "Equities hub", tab: "Hub" }],
   },
   {
@@ -260,7 +260,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "aave",
     brand: 336,
     tags: ["Vaults", "Savings"],
-    desc: "Aave's own vault layer — savings GHO, Umbrella stake tokens and static aTokens, each vault's totals and share price read from chain at one block, and every address that holds one",
+    desc: "Aave's vaults (savings GHO, Umbrella stake tokens and static aTokens): each vault's size and share price, and every address that holds one",
     // No position listing: a holder's share in a vault is not a position in the
     // roster's sense (rails-ops decision 0027 call 2), so the rail's first tab
     // is this sub-page and `/ethereum/aave` opens on it.
@@ -279,7 +279,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "alchemix",
     brand: 50,
     tags: ["CDP", "Yield"],
-    desc: "Self-repaying loans against a yield-bearing vault token — each position's debt and collateral stated with the grade and the block they were settled at, and the line-wide redemptions that moved them",
+    desc: "Self-repaying loans against yield-bearing vault tokens: each position's debt and collateral, dated by block, and the redemptions that moved them",
     subPages: [{ segment: "lines", label: "Lines overview", tab: "Lines" }],
   },
   {
@@ -297,7 +297,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "alchemix",
     protocolKey: "alchemix",
     tags: ["CDP", "Yield"],
-    desc: "Alchemix V3's Base deployment — the alUSDb line, every position's debt and collateral replayed from its own events, with the block each figure was settled at stated beside it",
+    desc: "Alchemix V3 on Base: every position on the alUSDb line, its debt and collateral rebuilt from its events and dated by block",
     subPages: [{ segment: "lines", label: "Lines overview", tab: "Lines" }],
   },
   {
@@ -308,7 +308,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "asymmetry",
     brand: 240,
     tags: ["CDP"],
-    desc: "A Liquity V2 fork minting USDaf across seven collateral branches — each Trove's collateral and debt read straight from events, no modeled state",
+    desc: "A Liquity V2 fork minting USDaf across seven collateral branches: each Trove's collateral and debt read from events",
     subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
   },
   {
@@ -319,7 +319,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "compound-v2",
     brand: 160,
     tags: ["Lend", "Borrow"],
-    desc: "The original cToken markets replayed over six years — every account's supplies, borrows and liquidations from the contracts' own events, with the markets themselves read live at /compound-v2/markets",
+    desc: "The original cToken markets over six years: every account's supplies, borrows and liquidations, with the markets read live at /compound-v2/markets",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
@@ -330,7 +330,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "compound-v3",
     brand: 160,
     tags: ["Lend", "Borrow"],
-    desc: "Compound V3 markets replayed from events — signed base principal and each collateral asset traceable, no modeled state",
+    desc: "Compound V3 markets replayed from events: each account's signed base principal and every collateral asset traceable",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
@@ -346,7 +346,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "compound-v3",
     protocolKey: "compound",
     tags: ["Lend", "Borrow"],
-    desc: "Compound V3's Base deployment — five Comets read live, and a wallet's standing in every one of them found by asking each market directly",
+    desc: "Compound V3's Base deployment: five Comets read live, and a wallet's standing in every one of them found by asking each market",
     subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
   },
   {
@@ -361,7 +361,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "compound-v3",
     protocolKey: "compound",
     tags: ["Lend", "Borrow"],
-    desc: "Compound V3's Arbitrum deployment — four Comets read live, and any wallet's standing in each one read from the contracts at one block",
+    desc: "Compound V3's Arbitrum deployment: four Comets read live, and any wallet's standing in each one read from the contracts at one block",
     frontDoor: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
@@ -373,7 +373,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "dolomite",
     brand: 195,
     tags: ["Lend", "Borrow"],
-    desc: "Solo-fork margin accounts at the contract's own (owner, account number) grain — balances replayed from emitted absolutes, debt as negative balances, the account's own margin line read live including the LST/ETH override",
+    desc: "Dolomite margin accounts, one per owner and account number: balances and debts from the contract's events, each account's liquidation line read live",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
@@ -384,7 +384,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "basedollar",
     brand: 80,
     tags: ["CDP"],
-    desc: "A Liquity V2 fork on Base minting BD across five collateral branches — captured from Base directly, each Trove's collateral and debt read straight from events",
+    desc: "A Liquity V2 fork on Base minting BD across five collateral branches, captured from Base: each Trove's collateral and debt read from events",
     subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
   },
   {
@@ -395,7 +395,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "ebisu",
     brand: 350,
     tags: ["CDP"],
-    desc: "A Liquity V2 fork minting ebUSD across five collateral branches — each Trove's collateral and debt read straight from events, no modeled state",
+    desc: "A Liquity V2 fork minting ebUSD across five collateral branches: each Trove's collateral and debt read from events",
     subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
   },
   {
@@ -406,7 +406,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "fluid",
     brand: 260,
     tags: ["Lend", "Borrow", "CDP"],
-    desc: "Instadapp's vault positions as NFTs — composite deposit/borrow events chain-read, tick-swept liquidations attributed per position from the vault's own settlement views",
+    desc: "Fluid vault positions as NFTs: deposits and borrows from the chain, and each liquidation's effect on every position it touched",
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
   },
   {
@@ -417,7 +417,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "frankencoin",
     brand: 25,
     tags: ["Borrow", "CDP"],
-    desc: "Oracle-free ZCHF minting positions — each a contract of its own, owner-declared liquidation prices tested by two-phase challenge auctions, everything in native units",
+    desc: "Oracle-free ZCHF loans, each a separate contract whose owner declares the liquidation price, which anyone can challenge by auction, all in native units",
     subPages: [{ segment: "system", label: "System overview", tab: "System" }],
   },
   {
@@ -428,7 +428,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "fx",
     brand: 15,
     tags: ["Leverage", "CDP"],
-    desc: "Leveraged xPOSITIONs on wstETH and WBTC — every event chain-read, current state settled from the pool's own views, socialized funding reconciled explicitly",
+    desc: "Leveraged f(x) positions on wstETH and WBTC: every event from the chain, current state from the pools, and shared funding costs split per position",
     subPages: [{ segment: "pools", label: "Pools overview", tab: "Pools" }],
   },
   {
@@ -439,7 +439,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "liquity-v1",
     brand: 270,
     tags: ["Borrow"],
-    desc: "The original interest-free Trove — ETH collateral and exact LUSD debt emitted per event, no modeled state",
+    desc: "The original interest-free Trove: ETH collateral and exact LUSD debt emitted per event",
     subPages: [{ segment: "system", label: "System overview", tab: "System" }],
   },
   {
@@ -461,7 +461,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "llamalend",
     brand: 20,
     tags: ["Borrow"],
-    desc: "Curve's LLAMMA lending — isolated markets where liquidation is a band, not a line: soft-liquidation read live from the protocol's own state, cross-checked across two contracts",
+    desc: "Curve's LlamaLend markets, where liquidation happens gradually across a price band: each loan's soft-liquidation state read live and cross-checked",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
@@ -472,7 +472,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "makerdao",
     brand: 180,
     tags: ["CDP"],
-    desc: "Vaults read straight from the chain — every value traceable, no modeled state",
+    desc: "MakerDAO vaults and LockStake urns read from the chain, every value traceable",
     subPages: [{ segment: "system", label: "System overview", tab: "System" }],
   },
   {
@@ -483,7 +483,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "maple",
     brand: 30,
     tags: ["Lend", "RWA"],
-    desc: "Institutional credit pools, the lender's on-chain side — exact share balances, the withdrawal queue, and what is liquid now vs deployed to off-chain-custodied loans",
+    desc: "Maple's institutional credit pools from the lender's side: share balances, the withdrawal queue, and what is liquid now against what is lent out",
     subPages: [{ segment: "pools", label: "Pools overview", tab: "Pools" }],
   },
   {
@@ -494,7 +494,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "moonwell",
     brand: 250,
     tags: ["Lend", "Borrow"],
-    desc: "A Compound v2 fork newly on Ethereum — mToken balances replayed exactly, debt from emitted balances, no modeled state",
+    desc: "A Compound v2 fork newly on Ethereum: exact mToken balances replayed from events, debt from emitted balances",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
@@ -510,7 +510,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "moonwell",
     protocolKey: "moonwell",
     tags: ["Lend", "Borrow"],
-    desc: "Moonwell's Base deployment — twenty-one markets under one Comptroller, every account's standing read from the contracts themselves, no modeled state",
+    desc: "Moonwell's Base deployment: twenty-one markets under one Comptroller, every account's standing read from the contracts",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
@@ -521,7 +521,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "morpho",
     brand: 264,
     tags: ["Lend", "Borrow"],
-    desc: "Isolated lending markets replayed from events — positions reconstructed with zero modeled state",
+    desc: "Morpho Blue's isolated lending markets on Ethereum: every position replayed from events and priced in its market's loan token",
     // MetaMorpho on Ethereum hangs off this explorer as it does on Base
     // (decision 0028; rails-ops ui-jobs 486).
     subPages: [
@@ -542,7 +542,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "morpho",
     protocolKey: "morpho",
     tags: ["Lend", "Borrow"],
-    desc: "Morpho Blue's Base deployment — more than 4,300 isolated markets, every borrower position across them listed, and a wallet's whole standing found by asking the singleton directly",
+    desc: "Morpho Blue on Base: more than 4,300 isolated markets, every borrower listed, and any wallet's positions across all of them",
     // MetaMorpho is Morpho's own vault layer, so it is a view of this explorer
     // rather than a section beside it (rails-ops decision 0028): the tab lands
     // on the roster of vaults, and each vault's page and each holder's reading
@@ -564,9 +564,27 @@ const SPECS: ProtocolSpec[] = [
     slug: "morpho",
     protocolKey: "morpho",
     tags: ["Lend", "Borrow"],
-    desc: "Morpho Blue's Arbitrum deployment — 258 isolated markets censused from the singleton, any wallet's positions read from the contract at one block",
+    desc: "Morpho Blue's Arbitrum deployment: 258 isolated markets censused from the singleton, any wallet's positions read from the contract at one block",
     frontDoor: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+  },
+  {
+    // Pendle on Ethereum, phase 1: a wallet's PT, YT and LP per market at a
+    // pinned block, from the routers' events and chain reads. A Pendle market
+    // is not a share vault and holds no loan, so there is no position listing
+    // and no place in /vaults; `/ethereum/pendle` opens on the market roster.
+    id: "pendle",
+    session: "pendle",
+    label: "Pendle",
+    chainId: 1,
+    slug: "pendle",
+    // Hue 260, read off pendle.finance's favicon #1A2E4F (known-infrastructure's
+    // PENDLE_BAR).
+    brand: 260,
+    tags: ["Fixed yield", "Yield trading"],
+    desc: "A wallet's principal, yield and liquidity tokens in each Pendle market, valued at Pendle's oracle and read at one block",
+    positionListing: false,
+    subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
     // The first testnet explorer. A Sepolia figure is a test figure, and the
@@ -579,7 +597,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "polaris",
     brand: 220,
     tags: ["CDP", "Stablecoin"],
-    desc: "Polaris's Sepolia testnet — USDp and GOLDp minted against pETH, every position replayed from the market's own events, liquidations absorbed by the stability pools",
+    desc: "Polaris on the Sepolia testnet: USDp and GOLDp minted against pETH, every position from the market's events, liquidations absorbed by stability pools",
     subPages: [{ segment: "markets", label: "Markets overview", tab: "Markets" }],
   },
   {
@@ -590,7 +608,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "pwn",
     brand: 180,
     tags: ["P2P", "Fixed-term"],
-    desc: "Peer-to-peer fixed-term loans read straight from events — each loan's collateral, credit and terms traceable, no modeled state",
+    desc: "Peer-to-peer fixed-term loans read from events: each loan's collateral, credit and terms traceable",
     subPages: [{ segment: "book", label: "Loan book", tab: "Loan book" }],
   },
   {
@@ -601,7 +619,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "seamless",
     brand: 285,
     tags: ["Lend", "Borrow"],
-    desc: "An Aave V3 fork on Base, frozen since April 2025 — every position read whole from the contracts, and none of them can grow",
+    desc: "An Aave V3 fork on Base, frozen since April 2025: every position read whole from the contracts, and none of them can grow",
     subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
   },
   {
@@ -617,7 +635,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "sky-savings",
     brand: 280,
     tags: ["Savings"],
-    desc: "Every sUSDS holder on Ethereum — the balance, its worth in USDS and the interest earned to the wei, replayed from the token's logs and checked against the contract",
+    desc: "Every sUSDS holder on Ethereum: the balance, its worth in USDS and the interest earned, from the token's logs and checked against the contract",
     subPages: [{ segment: "rates", label: "Savings Rate history", tab: "Rate" }],
   },
   {
@@ -648,7 +666,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "spark",
     brand: 25,
     tags: ["Lend", "Borrow"],
-    desc: "An Aave V3 fork replayed from events — each reserve's principal traceable, no modeled state",
+    desc: "SparkLend, an Aave V3 fork, replayed from events: each reserve's principal traceable and valued at the Pool's oracle",
     subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
   },
   {
@@ -666,7 +684,7 @@ const SPECS: ProtocolSpec[] = [
     slug: "yearn",
     brand: 260,
     tags: ["Vaults", "Yield"],
-    desc: "Every vault the V3 factories made rather than the endorsed shortlist, each one's totals, share price and endorsement read from chain at one block",
+    desc: "Every vault the V3 factories made, endorsed or not, each one's totals, share price and endorsement read from chain at one block",
     // No position listing, for the reason Aave's vault layer has none: a
     // holder's share in a vault is not a position in the roster's sense
     // (rails-ops decision 0027 call 2), so the rail's first tab is this
@@ -853,6 +871,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "sky-savings": "Position",
   // A wallet's trades: the page titles name them, and nothing lists positions.
   cow: "Trades",
+  pendle: "Position",
 };
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",

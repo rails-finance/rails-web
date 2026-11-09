@@ -41,7 +41,9 @@ import { RevealTip } from "@/components/shared/reveal-tip";
 import type { ReactNode } from "react";
 
 /** The canonical slots, in the order they always render. */
-const SLOT_ORDER = ["roster", "sizeIn", "sizeOut", "usage", "population"] as const;
+// A single reserve's page (Aave M3.2) adds what is left to draw on (`sizeFree`)
+// and the two rates (`rateIn`, `rateOut`) between the sizes and usage.
+const SLOT_ORDER = ["roster", "sizeIn", "sizeOut", "sizeFree", "rateIn", "rateOut", "usage", "population"] as const;
 
 export type VitalSlot = (typeof SLOT_ORDER)[number];
 

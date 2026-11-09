@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Ebisu branches",
   description:
-    "Ebisu's five collateral branches and the order redemption reaches them — each branch with its own oracle, minimum collateral ratio and terms.",
+    "Ebisu's five collateral branches and the order redemption reaches them: each branch with its own oracle, minimum collateral ratio and terms.",
 };
 
 const CFG: LiquityForkConfig = { protocol: "ebisu", debtSymbol: DEBT_SYMBOL, branches: EBISU_BRANCHES };

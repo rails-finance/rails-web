@@ -22,9 +22,9 @@ export function PolarisFlowsNote({ facts, stable }: PolarisFlowsNoteProps): Reac
     <div className="space-y-2" data-polaris-flows-note="" data-anatomy="F14">
       <p>
         Every figure is in {stable}, the market&apos;s stablecoin: this is a testnet, and nothing on it has a market
-        price. Each pETH flow is converted at the market&apos;s own price feed at its block, the price the protocol
-        holds the debt against, so on the collateral side the last line, Market move and pETH built up since the last
-        event, is the change in that price since each flow, with the pETH built up since the position&apos;s last event.
+        price. Each pETH flow is converted at the market&apos;s price feed at its block, the price the protocol holds
+        the debt against, so on the collateral side the last line, Market move and pETH built up since the last event,
+        is the change in that price since each flow, with the pETH built up since the position&apos;s last event.
       </p>
       <p>
         Each event states the position&apos;s collateral and debt after it and every part that changed them, so each
@@ -86,7 +86,7 @@ export function polarisFlowsContent(stable: string): LearnMoreContent {
     details: [
       {
         bold: `${stable} units`,
-        text: "a testnet token has no market price, so the collateral is converted at the market's own price feed and every figure is in the market's stablecoin.",
+        text: "a testnet token has no market price, so the collateral is converted at the market's price feed and every figure is in the market's stablecoin.",
       },
       {
         bold: "Interest at each event",

@@ -84,6 +84,10 @@ export function CompoundBaseListing({
             data: r.data,
             total: r.pagination.total,
           })),
+        fetchCount: (filters) =>
+          fetchCompoundPositions({ ...compoundBaseFiltersToFetchParams(filters, 1), limit: 1 }).then(
+            (r) => r.pagination.total,
+          ),
       })}
       onFilters={onFilters}
       initialItems={initialItems}

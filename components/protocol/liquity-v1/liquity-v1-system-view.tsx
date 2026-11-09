@@ -113,7 +113,7 @@ function SystemCard({ data, readBy }: { data: LiquityV1SystemChainResponse; read
   // crossing it is not itself a liquidation.
   const ccrFill = data.tcr != null ? Math.min(1, data.tcr / data.ccr) : null;
   const ticks: RatioBarTick[] =
-    data.tcr != null ? [{ f: 1, kind: "neutral", title: `CCR ${ratio(data.ccr)} — recovery mode line` }] : [];
+    data.tcr != null ? [{ f: 1, kind: "neutral", title: `CCR ${ratio(data.ccr)}: recovery mode line` }] : [];
 
   return (
     <div className="rounded-xl bg-raised px-4 py-3.5">
@@ -152,8 +152,8 @@ function SystemCard({ data, readBy }: { data: LiquityV1SystemChainResponse; read
           </Prov>
           <span className="ml-1 text-rb-500">· {formatUsdValue(data.systemCollUsd)}</span>
         </Stat>
-        <Stat label="Open troves">
-          <Prov info={stampServerRead(systemLaneProv("Open troves", "getTroveOwnersCount()"), readBy)}>
+        <Stat label="Open Troves">
+          <Prov info={stampServerRead(systemLaneProv("Open Troves", "getTroveOwnersCount()"), readBy)}>
             {data.trovesCount}
           </Prov>
         </Stat>
@@ -163,7 +163,7 @@ function SystemCard({ data, readBy }: { data: LiquityV1SystemChainResponse; read
               systemLaneProv(
                 "Recovery mode",
                 "checkRecoveryMode(price)",
-                "The contract's own verdict at its own price — on below a 150% total collateral ratio, when the liquidation line rises from 110% to the TCR itself and borrowing is restricted",
+                "The contract's verdict at its own price: on below a 150% total collateral ratio, when the liquidation line rises from 110% to the TCR itself and borrowing is restricted",
               ),
               readBy,
             )}
@@ -183,13 +183,13 @@ function SystemCard({ data, readBy }: { data: LiquityV1SystemChainResponse; read
                 {ratio(data.tcr)}
               </Prov>
             </span>
-            <span>CCR {ratio(data.ccr)} — recovery mode</span>
+            <span>CCR {ratio(data.ccr)}: recovery mode</span>
           </div>
         </>
       )}
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-        One ETH market, one LUSD debt — there are no branches to compare and no per-market settings: every Trove here
+        One ETH market, one LUSD debt. There are no branches to compare and no per-market settings: every Trove here
         answers to the same {ratio(data.mcr)} minimum, the same price, and the same {ratio(data.ccr)} recovery line.
       </p>
     </div>
@@ -232,10 +232,10 @@ function StabilityPoolCard({ data, readBy }: { data: LiquityV1SystemChainRespons
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
         A liquidated Trove&rsquo;s debt is cleared against these deposits and its ETH handed to the depositors, at a
-        discount. What the pool can&rsquo;t absorb is redistributed to the remaining Troves instead — collateral and
-        debt both — so the pool&rsquo;s depth is what stands between a liquidation and everyone else&rsquo;s balance
-        sheet. The bar is the whole book against the pool, not a forecast: liquidations arrive one Trove at a time, and
-        only the ones below {ratio(data.mcr)} arrive at all.
+        discount. What the pool can&rsquo;t absorb is redistributed to the remaining Troves instead, collateral and debt
+        both, so the pool&rsquo;s depth is what stands between a liquidation and everyone else&rsquo;s balance sheet.
+        The bar is the whole book against the pool, not a forecast: liquidations arrive one Trove at a time, and only
+        the ones below {ratio(data.mcr)} arrive at all.
       </p>
     </div>
   );
@@ -281,7 +281,7 @@ function RatesCard({ data, readBy }: { data: LiquityV1SystemChainResponse; readB
         Liquity V1 charges <span className="text-foreground">no interest</span> and has no per-Trove rate. These three
         figures are the protocol&rsquo;s entire rate surface, and they are shared by every borrower: one base rate that
         redemptions push up and time decays back down, and the two one-time fees that derive from it. Liquity V2 and its
-        forks replaced this with a rate each borrower sets — which is also what orders their redemption queues. Here,
+        forks replaced this with a rate each borrower sets, which is also what orders their redemption queues. Here,
         nothing about the queue below is chosen.
       </p>
     </div>
@@ -392,16 +392,16 @@ export function LiquityV1SystemView({ data }: { data: LiquityV1SystemChainRespon
           <LearnMore content={liquityV1Modal("redemption")} inline />
         </div>
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-          Anyone holding {DEBT_SYMBOL} can redeem it against Liquity V1 for {COLLATERAL_SYMBOL} at $1 face value — the
+          Anyone holding {DEBT_SYMBOL} can redeem it against Liquity V1 for {COLLATERAL_SYMBOL} at $1 face value: the
           peg mechanism. Redemptions take the LOWEST collateral ratio first, so the queue is ordered by ratio, not by
           any rate: a Trove&rsquo;s place is an outcome of the {COLLATERAL_SYMBOL} price and its own collateral, and the
-          only way to move back is to add collateral or repay. Being redeemed isn&rsquo;t a penalty — the Trove gives up{" "}
+          only way to move back is to add collateral or repay. Being redeemed isn&rsquo;t a penalty: the Trove gives up{" "}
           {COLLATERAL_SYMBOL} and sheds the same value of debt, and its ratio rises as a result.
         </p>
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
           That queue is the Trove listing sorted by ratio, so it is shown there: the link below opens every open Trove,
           lowest ratio first, front of the queue at the top. Two things it leaves out, both because they need the{" "}
-          {COLLATERAL_SYMBOL} price the listing doesn&rsquo;t read — a Trove&rsquo;s own collateral ratio, and how much{" "}
+          {COLLATERAL_SYMBOL} price the listing doesn&rsquo;t read: a Trove&rsquo;s own collateral ratio, and how much{" "}
           {DEBT_SYMBOL} is redeemed before it. Both are on that Trove&rsquo;s own page.
         </p>
 

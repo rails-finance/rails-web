@@ -127,7 +127,7 @@ export function BookmarksPage() {
                       <p className="mt-4 text-sm">
                         <Link
                           href={walletHref(SAMPLE_WALLET)}
-                          className="rounded-sm text-blue-600 dark:text-blue-400 transition-colors hover:text-blue-600 focus-ring dark:hover:text-blue-400"
+                          className="rounded-sm text-blue-600 dark:text-[var(--text-link)] transition-colors hover:text-blue-600 focus-ring dark:hover:text-[var(--text-link)]"
                           data-bookmarks-sample=""
                         >
                           See a sample wallet →

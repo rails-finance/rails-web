@@ -808,7 +808,7 @@ doc_urls:
 L5:
   open:
     title: |-
-      How Opening a Trove Works
+      How opening a Trove works
     intro: |-
       A Liquity V1 Trove holds ETH as collateral and mints LUSD, a dollar stablecoin, against it. The loan charges no interest.
     stepsHeading: |-
@@ -853,7 +853,7 @@ L5:
 
   adjust:
     title: |-
-      How Adjusting a Trove Works
+      How adjusting a Trove works
     intro: |-
       An adjustment adds or withdraws ETH, borrows more LUSD or repays some of the debt, without closing the Trove.
     stepsHeading: |-
@@ -891,7 +891,7 @@ L5:
 
   close:
     title: |-
-      How Closing a Trove Works
+      How closing a Trove works
     intro: |-
       Closing repays the Trove's debt and returns all its ETH to the owner in one transaction.
     stepsHeading: |-
@@ -927,7 +927,7 @@ L5:
 
   redemption:
     title: |-
-      How Redemptions Work
+      How redemptions work
     intro: |-
       Anyone holding LUSD can swap it for ETH at $1 per LUSD, at the protocol's ETH price. This holds LUSD near a dollar.
     stepsHeading: |-
@@ -968,7 +968,7 @@ L5:
 
   liquidation:
     title: |-
-      How Liquidation Works
+      How liquidation works
     intro: |-
       Anyone can liquidate a Trove whose collateral ratio is below 110%. The whole Trove closes, and the owner keeps the LUSD borrowed but loses the ETH.
     stepsHeading: |-
@@ -1011,7 +1011,7 @@ L5:
 
   fallback:
     title: |-
-      How Liquity V1 Troves Work
+      How Liquity V1 Troves work
     intro: |-
       Liquity V1 lends LUSD against ETH with no interest. Each address holds one Trove at a time.
     detailsHeading: |-
@@ -1049,7 +1049,7 @@ L5:
 
   position_open:
     title: |-
-      About This Position
+      About this position
     intro: |-
       The card states what backs the LUSD debt now, and how close the Trove is to redemption and to liquidation.
     detailsHeading: |-
@@ -1091,7 +1091,7 @@ L5:
 
   position_closed:
     title: |-
-      About This Position
+      About this position
     intro: |-
       The owner closed this Trove: they repaid its debt and took back all its ETH. The card shows the most ETH and debt it held.
     detailsHeading: |-
@@ -1122,7 +1122,7 @@ L5:
 
   position_redeemed:
     title: |-
-      About This Position
+      About this position
     intro: |-
       Redemptions cleared the whole of this Trove's debt, which closed it. The card shows the ETH left for the owner while it is unclaimed.
     detailsHeading: |-
@@ -1153,7 +1153,7 @@ L5:
 
   position_liquidated:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This Trove was liquidated. The card shows the most ETH and LUSD debt it held.
     detailsHeading: |-

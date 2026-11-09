@@ -11,7 +11,6 @@ import {
 } from "@/lib/seamless/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -20,6 +19,8 @@ export const maxDuration = 30;
 export const metadata = listingMetadata({
   title: "Explore Seamless positions on Base",
   canonicalPath: "/base/seamless",
+  description:
+    "Every Seamless account on Base, a lending market closed to new deposits and loans since April 2025: what each wallet still holds and owes.",
 });
 
 async function SeamlessListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {
@@ -43,4 +44,4 @@ async function SeamlessListingPage({ searchParams }: { searchParams: Promise<Raw
   return <SeamlessListing {...initial} initialSearch={sp.toString()} />;
 }
 
-export default withExplorerAbout("/base/seamless", SeamlessListingPage);
+export default SeamlessListingPage;

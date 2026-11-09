@@ -661,7 +661,7 @@ doc_urls:
 L5:
   supply:
     title: |-
-      How Supplying Works
+      How supplying works
     intro: |-
       Supplying deposits an asset into a Moonwell market and mints mTokens, a transferable receipt, in exchange. The deposit earns the market's supply rate.
     detailsHeading: |-
@@ -692,7 +692,7 @@ L5:
 
   withdraw:
     title: |-
-      How Withdrawing Works
+      How withdrawing works
     intro: |-
       Withdrawing burns mTokens and returns the underlying asset to the wallet, as far as the market has liquidity and the remaining collateral covers any debt.
     detailsHeading: |-
@@ -716,7 +716,7 @@ L5:
 
   borrow:
     title: |-
-      How Borrowing Works
+      How borrowing works
     intro: |-
       Borrowing draws an asset against the account's supplied collateral. The debt accrues interest continuously, so it grows between events.
     detailsHeading: |-
@@ -751,7 +751,7 @@ L5:
 
   repay:
     title: |-
-      How Repaying Works
+      How repaying works
     intro: |-
       Repaying returns the borrowed asset to the market, clearing debt and restoring the account's borrowing headroom.
     detailsHeading: |-
@@ -779,7 +779,7 @@ L5:
 
   liquidation:
     title: |-
-      How Liquidations Work
+      How liquidations work
     intro: |-
       A Moonwell account becomes liquidatable when its credit remaining reaches zero: the debt is no longer covered by the collateral-factor-weighted supply. Anyone, in practice automated bots, can then liquidate it.
     extraParagraphs:
@@ -800,7 +800,7 @@ L5:
 
   transfer_in:
     title: |-
-      How Receiving mTokens Works
+      How receiving mTokens works
     intro: |-
       mTokens are ordinary ERC-20 tokens, so a Moonwell deposit can change hands without touching the market. Receiving them hands the underlying claim, and its collateral role, to the recipient.
     detailsHeading: |-
@@ -821,7 +821,7 @@ L5:
 
   transfer_out:
     title: |-
-      How Sending mTokens Works
+      How sending mTokens works
     intro: |-
       mTokens are ordinary ERC-20 tokens, so a Moonwell deposit can change hands without touching the market. Sending them hands the underlying claim, and its collateral role, to the recipient.
     detailsHeading: |-
@@ -845,7 +845,7 @@ L5:
 
   fallback:
     title: |-
-      How Moonwell Positions Work
+      How Moonwell positions work
     intro: |-
       Moonwell is a Compound-V2-compatible lending protocol: a wallet supplies assets into mToken markets and borrows against them, and the Comptroller pools everything into one account.
     detailsHeading: |-
@@ -869,7 +869,7 @@ L5:
 
   position_open:
     title: |-
-      About This Position
+      About this position
     intro: |-
       A Moonwell position is one wallet's account under a Comptroller: what it supplied, what it borrowed against that, and how safely the debt is covered.
     detailsHeading: |-
@@ -908,7 +908,7 @@ L5:
 
   position_supply:
     title: |-
-      About This Position
+      About this position
     intro: |-
       A Moonwell position is one wallet's account under a Comptroller. This one supplies assets and owes nothing, so there is nothing to liquidate.
     detailsHeading: |-
@@ -936,7 +936,7 @@ L5:
 
   position_closed:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This account has repaid all its debt and withdrawn its supply. The panel above shows the highest supply and debt each market reached.
     detailsHeading: |-
@@ -960,7 +960,7 @@ L5:
 
   position_liquidated:
     title: |-
-      About This Position
+      About this position
     intro: |-
       This account was liquidated at least once and has since closed, with nothing left supplied or borrowed. The panel above shows the highest supply and debt each market reached.
     detailsHeading: |-

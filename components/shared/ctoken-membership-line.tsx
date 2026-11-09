@@ -35,7 +35,7 @@ export function CTokenMembershipLine(p: {
   if (!m) return null;
   const info = {
     kind: "chain" as const,
-    summary: `Collateral membership — ${p.brand}'s Comptroller listed the markets this account had entered (getAssetsIn) at block ${m.block.toLocaleString("en-US")}; the collateral factor is markets(${p.symbol}) at the same block.`,
+    summary: `Collateral membership. ${p.brand}'s Comptroller listed the markets this account had entered (getAssetsIn) at block ${m.block.toLocaleString("en-US")}; the collateral factor is markets(${p.symbol}) at the same block.`,
     contract: p.comptroller,
     via: `getAssetsIn @ block ${m.block}`,
     verify: {

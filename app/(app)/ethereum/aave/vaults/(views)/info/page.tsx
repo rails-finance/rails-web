@@ -57,26 +57,26 @@ export default async function EthereumVaultsInfoPage() {
     <VaultsInfoPage chainId={MAINNET_CHAIN_ID} protocol={protocolForHref("/ethereum/aave")!}>
       <p data-intro-membership>
         Membership comes from the census and only from the census: every address named either side of any{" "}
-        <code>Transfer</code> a vault has ever emitted, swept whole rather than from a floor, and proven complete by Σ{" "}
-        <code>balanceOf</code> equalling <code>totalSupply()</code> wei-exact at the census block the listing states. A
-        sweep that came back short cannot pass that check, so a silent partial answer becomes a refused load and the
-        previous census stands. Transfers, first seen, last activity and what the holding address is all come from that
-        sweep, at that block. The one priced figure on a card, Value · USD, is the census&rsquo;s too and is explained
-        below; there is no rate and no yield anywhere in this section.
+        <code>Transfer</code> a vault has ever emitted, swept whole, and proven complete by Σ <code>balanceOf</code>{" "}
+        equalling <code>totalSupply()</code> wei-exact at the census block the listing states. A sweep that came back
+        short cannot pass that check, so a silent partial answer becomes a refused load and the previous census stands.
+        Transfers, first seen, last activity and what the holding address is all come from that sweep, at that block.
+        The one priced figure on a card, Value · USD, is the census&rsquo;s too and is explained below; there is no rate
+        and no yield anywhere in this section.
       </p>
       <p data-intro-sort>
         The listing rests on value. Each card&rsquo;s Value · USD is the census&rsquo;s figure at the census block: the
-        balance at that block through the vault&rsquo;s own <code>convertToAssets</code> and Aave V3&rsquo;s oracle on
+        balance at that block through the vault&rsquo;s <code>convertToAssets</code> and Aave V3&rsquo;s oracle on
         Ethereum (<code>IAaveOracle.getAssetPrice</code>) at the same block, the oracle and the block named on the
-        figure&rsquo;s receipt — computed once by the daily census and never read for a listing page, so it is what a
-        position was worth at that block and says nothing about now. Where a vault&rsquo;s asset is itself a wrapper the
+        figure&rsquo;s receipt. It is computed once by the daily census and never read for a listing page, so it is what
+        a position was worth at that block and says nothing about now. Where a vault&rsquo;s asset is a wrapper the
         oracle does not price directly (a stake token holds a static aToken), the census prices that wrapper&rsquo;s
-        underlying and converts through the wrapper&rsquo;s own <code>convertToAssets</code>, and the receipt states the
+        underlying and converts through the wrapper&rsquo;s <code>convertToAssets</code>, and the receipt states the
         hop. <UnpricedSentence census={census} /> The Size filter&rsquo;s brackets are whole-dollar lower bounds on that
-        value, and its Unpriced option is exactly the rows the oracle declined. Sorting by share of the vault orders
-        each row&rsquo;s balance over its own vault&rsquo;s supply at the census block, which compares across vaults;
-        sorting by shares sorts on the raw balance in each vault&rsquo;s own units — the share tokens here have 6, 8 and
-        18 decimals — so it orders raw share counts and not amounts of anything comparable.
+        value, and its Unpriced option is the rows the oracle declined. Sorting by share of the vault orders each
+        row&rsquo;s balance over its vault&rsquo;s supply at the census block, which compares across vaults; sorting by
+        shares sorts on the raw balance in each vault&rsquo;s units (the share tokens here have 6, 8 and 18 decimals),
+        so it orders raw share counts, which do not compare across vaults.
       </p>
       {/* THE TRAP, SAID ONCE. The two layers hold the same assets, and the only
           place that can be said without repeating it on every card is here. It
@@ -88,11 +88,11 @@ export default async function EthereumVaultsInfoPage() {
           the other direction on a stake token's own page). */}
       <p data-intro-layers>
         The section lists two layers of one machine, and a reader must not add them together. An Umbrella stake
-        token&rsquo;s own shares are a claim on a single position — the static aToken it is staked on — so that stake
-        token&rsquo;s holding of the wrapper and the stake token&rsquo;s own holders are the same assets at two heights
-        rather than two sets of assets. Nothing here sums them: the census line counts positions and Value · USD is per
-        row, so no total is rendered anywhere in this section. Each static aToken&rsquo;s page names the stake token
-        that holds it and the share it holds, and each stake token&rsquo;s page names the wrapper its own assets sit in.
+        token&rsquo;s shares are a claim on a single position, the static aToken it is staked on, so that stake
+        token&rsquo;s holding of the wrapper and the stake token&rsquo;s holders are the same assets at two heights.
+        Nothing here sums them: the census line counts positions and Value · USD is per row, so no total is rendered
+        anywhere in this section. Each static aToken&rsquo;s page names the stake token that holds it and the share it
+        holds, and each stake token&rsquo;s page names the wrapper its assets sit in.
       </p>
       {empty.length > 0 && (
         <p data-intro-empty>
@@ -104,8 +104,8 @@ export default async function EthereumVaultsInfoPage() {
               {c.symbol ?? c.vault}
             </span>
           ))}{" "}
-          as of block {n(empty[0].censusBlock)}. The sweep ran and returned no logs at all — a reading about those
-          vaults, not an absence of data about them.
+          as of block {n(empty[0].censusBlock)}. The sweep ran and returned no logs at all: those vaults have no history
+          to read.
         </p>
       )}
       {unproven.length > 0 && (
@@ -116,7 +116,7 @@ export default async function EthereumVaultsInfoPage() {
       )}
       <p data-intro-search>
         The search matches an address, or a fragment of one, against the holder. An address the census has never seen
-        has no row here — the listing answers no rows for it and records nothing about the search, because a set
+        has no row here: the listing answers no rows for it and records nothing about the search, because a set
         assembled from what visitors typed would be a public record of who looked at what.
       </p>
     </VaultsInfoPage>

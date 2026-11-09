@@ -17,7 +17,6 @@ import {
 } from "@/lib/moonwell-base/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, ssrHop, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { withExplorerAbout } from "@/components/shared/explorer-about";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -26,6 +25,8 @@ export const maxDuration = 30;
 export const metadata = listingMetadata({
   title: "Explore Moonwell positions on Base",
   canonicalPath: "/base/moonwell",
+  description:
+    "Every Moonwell account on Base: what each wallet has supplied and borrowed across 21 markets, and how close it is to liquidation.",
 });
 
 /** The facet roster for this request, or "unavailable" — it never rejects and
@@ -74,4 +75,4 @@ async function MoonwellBaseListingPage({ searchParams }: { searchParams: Promise
   return <MoonwellBaseListing {...initial} initialSearch={sp.toString()} initialRoster={roster} />;
 }
 
-export default withExplorerAbout("/base/moonwell", MoonwellBaseListingPage);
+export default MoonwellBaseListingPage;

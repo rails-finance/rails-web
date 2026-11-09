@@ -208,7 +208,7 @@ export function FlowMomentCard({
     a.grown
       ? {
           kind: "chain-derived",
-          summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when} — the balance the last event recorded on ${dayStamp(a.grown.recordedDay * DAY_S)}, grown by ${ACCRUAL[a.grown.basis]?.by ?? "the interest"} since: ${INDEX_OWNER[a.grown.basis]} ${INDEX_NAME[a.grown.basis][side]} at the close of ${date} over its value at that event. ${INDEX_CLAIM[a.grown.basis]}`,
+          summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when}. The balance the last event recorded on ${dayStamp(a.grown.recordedDay * DAY_S)}, grown by ${ACCRUAL[a.grown.basis]?.by ?? "the interest"} since: ${INDEX_OWNER[a.grown.basis]} ${INDEX_NAME[a.grown.basis][side]} at the close of ${date} over its value at that event. ${INDEX_CLAIM[a.grown.basis]}`,
           formula: "recorded balance × index at the close ÷ index at the event",
           inputs: indexInputs(side, a, a.grown),
         }
@@ -216,8 +216,8 @@ export function FlowMomentCard({
         ? {
             kind: "chain-derived",
             summary: sumStop
-              ? `${a.symbol} owed at ${when} — the debt the last event recorded on ${lastStamp}, plus the interest the contract's sum built on the principal to the deadline on ${sumStop}, where it stopped: the figure the chart's debt line states for that day.`
-              : `${a.symbol} owed at ${when} — the debt the last event recorded on ${lastStamp}, plus the interest the contract's sum builds on the principal to the end of the day, the figure the chart's debt line states for that day.`,
+              ? `${a.symbol} owed at ${when}. The debt the last event recorded on ${lastStamp}, plus the interest the contract's sum built on the principal to the deadline on ${sumStop}, where it stopped: the figure the chart's debt line states for that day.`
+              : `${a.symbol} owed at ${when}. The debt the last event recorded on ${lastStamp}, plus the interest the contract's sum builds on the principal to the end of the day, the figure the chart's debt line states for that day.`,
             formula: "recorded debt + principal × APR × whole minutes ÷ 5,256,000,000",
             inputs: [
               { label: "recorded debt", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
@@ -227,7 +227,7 @@ export function FlowMomentCard({
         : moment.sides[side].face && moment.accrual
           ? {
               kind: "chain-derived",
-              summary: `${a.symbol} owed at ${when} — the debt the last event recorded on ${lastStamp}, plus the interest its rate builds on it to the end of the day, the figure the chart's debt line states for that day.`,
+              summary: `${a.symbol} owed at ${when}. The debt the last event recorded on ${lastStamp}, plus the interest its rate builds on it to the end of the day, the figure the chart's debt line states for that day.`,
               formula: "recorded debt × (1 + annual rate × time ÷ 1 year)",
               inputs: [
                 { label: "recorded debt", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
@@ -247,7 +247,7 @@ export function FlowMomentCard({
             }
           : {
               kind: "chain",
-              summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when} — the balance the position's last event recorded on ${lastStamp}. No event changed it by then.`,
+              summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} at ${when}. The balance the position's last event recorded on ${lastStamp}. No event changed it by then.`,
               inputs: [
                 { label: "recorded balance", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },
               ],
@@ -256,7 +256,7 @@ export function FlowMomentCard({
     const g = a.grown as FlowGrowth;
     return {
       kind: "chain-derived",
-      summary: `${a.symbol} ${ACCRUAL[g.basis]?.what ?? `interest ${side === "collateral" ? "earned" : "owed"}`} to ${when} — from the event on ${dayStamp(g.recordedDay * DAY_S)}: the balance grown by ${INDEX_OWNER[g.basis]} ${INDEX_NAME[g.basis][side]}, less the balance that event recorded.${a.interestUsd != null ? " USD at the oracle price the index recorded for that day." : ""}`,
+      summary: `${a.symbol} ${ACCRUAL[g.basis]?.what ?? `interest ${side === "collateral" ? "earned" : "owed"}`} to ${when}. From the event on ${dayStamp(g.recordedDay * DAY_S)}: the balance grown by ${INDEX_OWNER[g.basis]} ${INDEX_NAME[g.basis][side]}, less the balance that event recorded.${a.interestUsd != null ? " USD at the oracle price the index recorded for that day." : ""}`,
       formula:
         a.interestUsd != null
           ? "recorded × (index at the close ÷ index at the event − 1) × price"
@@ -280,7 +280,7 @@ export function FlowMomentCard({
   };
   const usdProv = (a: MomentAsset): Provenance => ({
     kind: "chain-derived",
-    summary: `${a.symbol} in USD at ${when} — the balance at the oracle price the index recorded for that day.`,
+    summary: `${a.symbol} in USD at ${when}. The balance at the oracle price the index recorded for that day.`,
     formula: "balance × price at the day's end",
     pclass: "oracle",
     inputs: [
@@ -355,12 +355,12 @@ export function FlowMomentCard({
   const sinceDay = (a: MomentAsset) => a.grown?.recordedDay ?? moment.lastDay;
   const heldProv = (side: FlowSide, a: MomentAsset): Provenance => ({
     kind: "chain",
-    summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} — as the position's last event left it on ${dayStamp(sinceDay(a) * DAY_S)}.`,
+    summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"}. As the position's last event left it on ${dayStamp(sinceDay(a) * DAY_S)}.`,
     inputs: [{ label: "recorded balance", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" }],
   });
   const heldUsdProv = (side: FlowSide, a: MomentAsset): Provenance => ({
     kind: "chain-derived",
-    summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} in USD — as its last event left it on ${dayStamp(sinceDay(a) * DAY_S)}, at the oracle price recorded for ${date}.`,
+    summary: `${a.symbol} ${side === "collateral" ? "held" : "owed"} in USD. As its last event left it on ${dayStamp(sinceDay(a) * DAY_S)}, at the oracle price recorded for ${date}.`,
     formula: "recorded balance × price at the day's end",
     pclass: "oracle",
     inputs: [
@@ -379,15 +379,15 @@ export function FlowMomentCard({
       ? {
           kind: "chain-derived",
           summary: sumStop
-            ? `${a.symbol} interest owed to ${when} — the contract's sum on the principal from the start to the deadline on ${sumStop}; it stopped there.`
-            : `${a.symbol} interest owed to ${when} — the contract's sum on the principal from the start to the end of the day.`,
+            ? `${a.symbol} interest owed to ${when}. The contract's sum on the principal from the start to the deadline on ${sumStop}; it stopped there.`
+            : `${a.symbol} interest owed to ${when}. The contract's sum on the principal from the start to the end of the day.`,
           formula: "principal × APR × whole minutes ÷ 5,256,000,000",
           inputs: sumInputs(a.symbol),
         }
       : faceRateInterestProv(a);
   const faceRateInterestProv = (a: MomentAsset): Provenance => ({
     kind: "chain-derived",
-    summary: `${a.symbol} interest owed to ${when} — what the rate in force after the last event (${lastStamp}) builds on the debt that event recorded, to the end of the day.`,
+    summary: `${a.symbol} interest owed to ${when}. What the rate in force after the last event (${lastStamp}) builds on the debt that event recorded, to the end of the day.`,
     formula: "recorded debt × annual rate × time ÷ 1 year",
     inputs: [
       { label: "recorded debt", value: `${fmtPositionAmount(a.recorded)} ${a.symbol}`, kind: "chain" },

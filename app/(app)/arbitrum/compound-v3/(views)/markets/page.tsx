@@ -40,8 +40,8 @@ export default async function CompoundArbitrumMarketsPage() {
               rosterNote={
                 <>
                   The roster is the{" "}
-                  <span className="text-foreground">{data.summary.total} Comets Compound governance deployed here</span>{" "}
-                  — Comet exposes no call that enumerates its markets, so a roster is always stated. These are the four
+                  <span className="text-foreground">{data.summary.total} Comets Compound governance deployed here</span>
+                  . Comet exposes no call that enumerates its markets, so a roster is always stated. These are the four
                   in the comet repository&rsquo;s Arbitrum deployments, each answering to the same governor on chain
                 </>
               }

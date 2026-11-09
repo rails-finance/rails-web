@@ -7,7 +7,6 @@
 export const PLAIN_WORDS_PENDING = [
   "app/api/chain/morpho-base/holder-exposure/route.ts",
   "components/protocol/liquity-family/liquity-position-card.tsx",
-  "components/protocol/polaris/polaris-since-last-touch.tsx",
   "lib/aave-vaults/vault-provenance.ts",
   "lib/aave-vaults/vault-timeline-provenance.ts",
   "lib/compound-v2/event-provenance.ts",

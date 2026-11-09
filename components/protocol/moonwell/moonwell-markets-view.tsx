@@ -56,6 +56,7 @@ import type { MoonwellMarketRow, MoonwellMarketsResponse } from "@/lib/sources/c
 import { BlockRef } from "@/components/shared/block-ref";
 import { headReadOf, serverReadVia, type ServerRead } from "@/lib/shared/server-head-read";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { MoonwellBorrowFrozenNote } from "@/components/protocol/moonwell/moonwell-borrow-frozen-note";
 
 // A one-base-unit cap is the fork's closed door (see MoonwellMarketRow's
 // supplyCapOneUnit): named, not quoted as an amount or a share.
@@ -504,11 +505,7 @@ export function MoonwellMarketsView({
       />
 
       {chainId === BASE_CHAIN_ID && data.markets.length > 0 && data.markets.every((m) => m.borrowCapOneUnit) && (
-        <p className="mb-3 max-w-3xl text-[11px] leading-relaxed text-rb-500" data-borrow-cap-note="">
-          Every Base market is closed to new borrowing: Moonwell&rsquo;s borrow-cap guardian set all{" "}
-          {data.markets.length} borrow caps to one base unit on 27 Aug 2026 (block 50,519,338). Repaying and withdrawing
-          still work.
-        </p>
+        <MoonwellBorrowFrozenNote />
       )}
 
       {data.markets.some((m) => m.mintPaused || m.borrowPaused) && (
