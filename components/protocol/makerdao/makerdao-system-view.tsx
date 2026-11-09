@@ -29,6 +29,15 @@
 // one red is the reconcile FAILING — a fact about this read not accounting for
 // every DAI in existence, not a judgement about anyone's position.
 
+import {
+  DATA_TABLE_PILL,
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
@@ -147,7 +156,7 @@ const CEILING_LABEL: Record<MakerCeilingState, string> = {
 /** Neutral chip — informational, never a valence. */
 function Chip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded border border-rb-200 px-1 py-px text-[10px] font-medium text-rb-500 dark:border-rb-700">
+    <span className={`inline-flex items-center ${DATA_TABLE_PILL} px-1.5 py-0.5 text-[11px] font-medium`}>
       {children}
     </span>
   );
@@ -317,9 +326,9 @@ function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null 
   const showPrice = row.priceUsd != null && (row.group === "vault" || row.group === "rwa");
 
   return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 px-4 py-2.5 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_4.5rem_5rem] sm:items-baseline">
+    <DataTableRow data-maker-ilk={row.ilk}>
       {/* Ilk */}
-      <div className="col-span-2 min-w-0 sm:col-span-1">
+      <DataTableCell rowHeader className="min-w-0">
         <div className="flex items-baseline gap-1.5">
           {row.userVaultType ? (
             // `ilk`, singular — the listing dimension's URL param (its `id` is
@@ -329,13 +338,13 @@ function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null 
             // believing it's this ilk's.
             <Link
               href={`/ethereum/makerdao?ilk=${encodeURIComponent(row.ilk)}`}
-              className="truncate text-xs text-blue-600 dark:text-[var(--text-link)] hover:underline"
+              className="truncate text-blue-600 dark:text-[var(--text-link)] hover:underline"
             >
               {row.ilk}
             </Link>
           ) : (
             <Prov info={stampHeadRead(ilkGroupProv(row.ilk, row.cls), readBy)}>
-              <span className="truncate text-xs text-foreground">{row.ilk}</span>
+              <span className="truncate text-foreground">{row.ilk}</span>
             </Prov>
           )}
           <span className="shrink-0 text-[11px] text-rb-500">{row.collateralSymbol}</span>
@@ -364,11 +373,11 @@ function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null 
             )}
           </div>
         )}
-      </div>
+      </DataTableCell>
 
       {/* Debt */}
-      <div>
-        <div className="text-xs tabular-nums text-foreground">
+      <DataTableCell label="Debt">
+        <div className="tabular-nums text-foreground">
           <Prov
             info={stampHeadRead(ilkDebtProv(row.ilk, formatExact(row.art), row.rate), readBy)}
             value={formatExact(row.debtDai)}
@@ -381,10 +390,10 @@ function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null 
             <Prov info={stampHeadRead(ilkShareProv(row.ilk), readBy)}>{ratio(row.debtShare)}</Prov>
           </div>
         )}
-      </div>
+      </DataTableCell>
 
       {/* Ceiling */}
-      <div>
+      <DataTableCell label="Ceiling">
         <Prov info={stampHeadRead(ceilingProv(row.ilk, row.ceilingState), readBy)}>
           <Chip>{CEILING_LABEL[row.ceilingState]}</Chip>
         </Prov>
@@ -413,10 +422,10 @@ function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null 
             )}
           </div>
         )}
-      </div>
+      </DataTableCell>
 
       {/* Fee */}
-      <div className="text-xs tabular-nums text-foreground">
+      <DataTableCell label="Fee" className="tabular-nums text-foreground">
         {row.stabilityFeeApr != null ? (
           <Prov info={stampHeadRead(systemFeeProv(row.ilk), readBy)} value={formatExact(row.stabilityFeeApr * 100)}>
             {feePct(row.stabilityFeeApr)}
@@ -424,11 +433,11 @@ function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null 
         ) : (
           <span className="text-rb-400">—</span>
         )}
-      </div>
+      </DataTableCell>
 
       {/* Liquidation — mat over chop */}
-      <div>
-        <div className="text-xs tabular-nums text-foreground">
+      <DataTableCell label="Liquidation">
+        <div className="tabular-nums text-foreground">
           {row.matRatio != null ? (
             <Prov info={stampHeadRead(systemMatProv(row.ilk), readBy)} value={formatExact(row.matRatio * 100)}>
               {ratio(row.matRatio)}
@@ -463,8 +472,8 @@ function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null 
             floor
           </div>
         )}
-      </div>
-    </div>
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 
@@ -483,8 +492,10 @@ function GroupSection({
   if (!total || rows.length === 0) return null;
 
   return (
-    <div className="rounded-xl bg-raised">
-      <div className="border-b border-rb-200 px-4 py-3 dark:border-rb-700">
+    <div>
+      {/* The group's head over its ilks on the house table (rails-ops ui-jobs
+          539: D1, D6 cards below sm), unlinked, on the page's ground. */}
+      <div className="mb-2">
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-xs font-semibold text-foreground">{meta.label}</span>
           <span className="text-[11px] tabular-nums text-rb-500">
@@ -511,20 +522,20 @@ function GroupSection({
         <p className="mt-1.5 max-w-3xl text-[11px] leading-relaxed text-rb-500">{meta.blurb}</p>
       </div>
 
-      {/* Column headers — desktop only; the mobile rows carry their own shape. */}
-      <div className="hidden border-b border-rb-200 px-4 py-1.5 text-[10px] uppercase tracking-wider text-rb-400 sm:grid sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.2fr)_4.5rem_5rem] dark:border-rb-700">
-        <span>Ilk</span>
-        <span>Debt</span>
-        <span>Ceiling</span>
-        <span>Fee</span>
-        <span>Liquidation</span>
-      </div>
-
-      <div className="divide-y divide-rb-200 dark:divide-rb-700">
-        {rows.map((r) => (
-          <IlkRow readBy={readBy} key={r.ilk} row={r} />
-        ))}
-      </div>
+      <DataTable label={`${meta.label} ilks`} stacked tableClassName="text-sm sm:min-w-[40rem]">
+        <DataTableHead>
+          <DataTableHeader label="Ilk" />
+          <DataTableHeader label="Debt" />
+          <DataTableHeader label="Ceiling" />
+          <DataTableHeader label="Fee" />
+          <DataTableHeader label="Liquidation" />
+        </DataTableHead>
+        <DataTableBody>
+          {rows.map((r) => (
+            <IlkRow readBy={readBy} key={r.ilk} row={r} />
+          ))}
+        </DataTableBody>
+      </DataTable>
     </div>
   );
 }
