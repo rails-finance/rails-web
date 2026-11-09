@@ -1,8 +1,8 @@
 "use client";
 
 // The reserve page's rate curve (anatomy M3.3, ui-jobs 541 and 549): the
-// borrow rate and the supply rate against utilisation from 0 to 100%, the kink
-// marked where the model has one, and the reserve's point now, fed by value
+// borrow rate and the supply rate against utilisation from 0 to 100%, on two
+// slopes or on LlamaLend's semi-log curve, the kink marked where the model has one, and the reserve's point now, fed by value
 // (`RateCurveModel`): the two-slope constants, the reserve factor and where the reserve sits. The
 // supply curve is borrow × U × (1 − reserve factor). The curve's receipt sits
 // on the caption's "Now" line. Drawn in measured pixels so its type stays
@@ -22,7 +22,11 @@ const wholePercent = (v: number) => `${Math.round(v * 100).toLocaleString("en-US
 const PAD = { l: 44, r: 12, t: 12, b: 28 };
 
 /** The borrow rate at utilisation `u` on the two-slope curve. */
-export function borrowRateAt(u: number, c: { optimal: number; base: number; slope1: number; slope2: number }): number {
+export function borrowRateAt(
+  u: number,
+  c: { optimal: number; base: number; slope1: number; slope2: number; semilog?: { min: number; max: number } },
+): number {
+  if (c.semilog) return c.semilog.min > 0 ? c.semilog.min * (c.semilog.max / c.semilog.min) ** u : c.semilog.max * u;
   if (u <= c.optimal) return c.base + (c.optimal > 0 ? (c.slope1 * u) / c.optimal : 0);
   return c.base + c.slope1 + (c.optimal < 1 ? (c.slope2 * (u - c.optimal)) / (1 - c.optimal) : 0);
 }
