@@ -367,6 +367,9 @@ function Group({
   const tokenHref = morphoLoanTokenHref(r.chainId, g.loanToken);
   const id = `morpho-group-${g.loanToken}`;
   const more = g.markets - g.rows.length;
+  // A margin over the token's own supply, so a rounding tie is not a caution.
+  const overIssued =
+    g.amountsTrusted && g.loanTokenSupply != null && g.loanTokenSupply > 0 && g.totalSupply > g.loanTokenSupply * 1.001;
   return (
     <div className="border-t border-rb-200 py-2 first:border-t-0 dark:border-rb-800" data-morpho-group={g.loanToken}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -414,6 +417,15 @@ function Group({
             </>
           ) : (
             "sizes not stated"
+          )}
+          {overIssued && (
+            <span
+              className="text-caution-500"
+              title="These books stand above the amount of the token that exists; the token's page says why"
+            >
+              {" "}
+              · more than the token&apos;s supply
+            </span>
           )}
         </span>
       </div>
