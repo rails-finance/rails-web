@@ -104,6 +104,8 @@ export interface AaveMarketReserve {
   /** The reserve's outstanding deficit on a v3.3+ Pool (Pool.getReserveDeficit),
    *  token units; null where the Pool has no such getter. */
   deficit?: number | null;
+  /** The same in the token's smallest unit, as the getter returned it. */
+  deficitRaw?: string | null;
   /** The price source the market's oracle reads for this asset
    *  (IAaveOracle.getSourceOfAsset), lowercased; null where it does not answer. */
   oracleSource?: string | null;
