@@ -299,6 +299,47 @@ export const PAID_BY: Record<
   ReserveDeficitCovered: { words: "Aave's coverage manager, with no Umbrella stake set up", sources: ["U2", "U1"] },
 };
 
+/** Who holds Umbrella's coverage manager role on Ethereum: every RoleGranted and RoleRevoked for
+ *  COVERAGE_MANAGER_ROLE the Umbrella has emitted (none revoked), and hasRole true for each at `atBlock`.
+ *  The role is granted by governance and seldom changes, so it is read once and kept here with its block. */
+export const COVERAGE_MANAGERS = {
+  umbrella: "0xd400fc38ed4732893174325693a63c30ee3881a8",
+  role: "0x7022b05f273dfb770d16ebe344b0b38e1ef7bac12120a5cebc324be6acf18fe1",
+  atBlock: 26_379_534,
+  holders: [
+    {
+      address: "0x5300A1a15135EA4dc7aD5a167152C01EFc9b192A",
+      name: "Aave governance's level 1 executor",
+      granted: { block: 22_481_753, txHash: "0xea2e42074f0175aea982f1743e39ea6c59f919a5cf96585bc3ccbe8b4b14a820" },
+      source: "A1" as DeficitSourceKey,
+    },
+    {
+      address: "0x6c1DC85f2aE71C3DAcd6E44Bb57DEeF61b540a5A",
+      name: "Aave's deficit offset clinic steward",
+      granted: { block: 22_638_170, txHash: "0xaa900e1ac9ece8a1a0db38c111ccfe5b5fb735a838278995a7e6534a8fc32a63" },
+      source: "A2" as DeficitSourceKey,
+    },
+  ],
+};
+
+/** The coverage manager role's holders, as receipt lines, where the cover went through Ethereum's Umbrella. */
+function coverageManagerInputs(umbrella: string | null): NonNullable<Provenance["inputs"]> {
+  const m = COVERAGE_MANAGERS;
+  if (umbrella?.toLowerCase() !== m.umbrella) return [];
+  return [
+    ...m.holders.map((h) => ({
+      label: "coverage manager",
+      value: h.address,
+      kind: "chain" as const,
+      pclass: "state" as const,
+      note: `${h.name}: granted COVERAGE_MANAGER_ROLE (${m.role}) at block ${block(h.granted.block)}, tx ${h.granted.txHash}; Umbrella.hasRole true at block ${block(m.atBlock)}`,
+    })),
+    sourceLeaf("U4", "the role: plain AccessControl, holders read from RoleGranted and RoleRevoked"),
+    sourceLeaf("U5", "the super admin holds it from initialisation"),
+    ...m.holders.map((h) => sourceLeaf(h.source, `Aave's address book names ${h.address}`)),
+  ];
+}
+
 /** One cover: its DeficitCovered and the Umbrella event beside it. */
 export function coverProv(
   row: DeficitCover,
@@ -314,7 +355,11 @@ export function coverProv(
     source: { block: row.block, txHash: row.txHash },
     summary: `${symbol} covered — the Pool's DeficitCovered at block ${block(row.block)}, log ${row.logIndex} of transaction ${row.txHash}, emitted by the Pool ${d.pool}; its caller is ${row.caller}${c.umbrella && row.caller === c.umbrella ? " (Aave's Umbrella)" : ""}, and the transaction was sent by ${row.txFrom}. ${
       u
-        ? `Umbrella's ${u.event}, log ${u.logIndex} of the same transaction, says how it was paid: ${PAID_BY[u.event].words.toLowerCase()}.`
+        ? `Umbrella's ${u.event}, log ${u.logIndex} of the same transaction, says how it was paid: ${PAID_BY[u.event].words.toLowerCase()}.${
+            u.event === "ReserveDeficitCovered" && c.umbrella?.toLowerCase() === COVERAGE_MANAGERS.umbrella
+              ? ` At block ${block(COVERAGE_MANAGERS.atBlock)} the coverage manager role is held by ${COVERAGE_MANAGERS.holders.map((h) => `${h.name} (${h.address})`).join(" and ")}.`
+              : ""
+          }`
         : "No Umbrella cover event is paired with it in that transaction."
     }`,
     contract: { name: "Pool", address: d.pool },
@@ -340,6 +385,7 @@ export function coverProv(
               note: `emitted by the Umbrella ${c.umbrella}`,
             },
             ...PAID_BY[u.event].sources.map((k) => sourceLeaf(k, "who pays, in Aave's source")),
+            ...(u.event === "ReserveDeficitCovered" ? coverageManagerInputs(c.umbrella) : []),
           ]
         : []),
       sourceLeaf("O5", "the cover: deficit -= balanceWriteOff"),
