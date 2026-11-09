@@ -2550,7 +2550,9 @@ table.dt-stacked {
       background-color: var(--surface-child-row);
       padding-left: 1.25rem;
     }
-    & > tbody > tr[data-dt-parent] {
+    /* A parent of one spanning cell is a line across the list; one with
+       cells (D8's \`cells\` form) is a card like any row. */
+    & > tbody > tr[data-dt-parent]:not(:has(> td)) {
       display: block;
     }
     & > tbody > tr[data-dt-child] > * {

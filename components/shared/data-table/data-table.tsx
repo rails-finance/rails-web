@@ -568,14 +568,19 @@ export function DataTableRowMenu({ label, items }: { label: string; items: DataT
   );
 }
 
-/** A group's parent row (D8): one cell across the table, a chevron, the
- *  group's name and its figures; a press anywhere on the row opens or closes
- *  the group, whose rows follow it as `DataTableRow child`. The button holds
- *  the keyboard and `aria-expanded`. */
+/** A group's parent row (D8): a chevron, the group's name and its figures; a
+ *  press anywhere on the row opens or closes the group, whose rows follow it
+ *  as `DataTableRow child`. The button holds the keyboard and `aria-expanded`.
+ *  Two forms: `colSpan`, one cell across the table with the figures in
+ *  `summary` (a category); or `cells`, the group's own figures in the table's
+ *  columns after the name cell (`DataTableCell`s), in line with its rows (a
+ *  Morpho pair). `nameClassName` sets the name cell's classes in that form. */
 export function DataTableGroupRow({
   open,
   onToggle,
   colSpan,
+  cells,
+  nameClassName = "",
   label,
   summary,
   toggleHooks,
@@ -583,12 +588,33 @@ export function DataTableGroupRow({
 }: {
   open: boolean;
   onToggle: () => void;
-  colSpan: number;
   label: ReactNode;
   summary?: ReactNode;
   toggleHooks?: Record<`data-${string}`, string | undefined>;
-} & Omit<HTMLAttributes<HTMLTableRowElement>, "children" | "onClick">) {
+} & (
+  | { colSpan: number; cells?: never; nameClassName?: never }
+  | { cells: ReactNode; nameClassName?: string; colSpan?: never }
+) &
+  Omit<HTMLAttributes<HTMLTableRowElement>, "children" | "onClick">) {
   const stacked = useContext(Stacked);
+  const name = (
+    <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className="inline-flex cursor-pointer items-center gap-2 rounded-sm text-left text-[14px] font-semibold text-foreground focus-ring"
+        {...toggleHooks}
+      >
+        <ChevronRight
+          className={`h-4 w-4 shrink-0 text-rb-500 transition-transform ${open ? "rotate-90" : ""}`}
+          aria-hidden
+        />
+        {label}
+      </button>
+      {summary && <span className="text-[12px] tabular-nums text-rb-500">{summary}</span>}
+    </span>
+  );
   return (
     <tr
       role={stacked ? "row" : undefined}
@@ -596,33 +622,28 @@ export function DataTableGroupRow({
       data-dt-parent=""
       data-open={open ? "" : undefined}
       onClick={(e) => {
-        if ((e.target as HTMLElement).closest("button") == null) onToggle();
+        // A control in the row (the toggle, a receipt, a link) keeps its press.
+        if ((e.target as HTMLElement).closest("button, a, [role=button]") == null) onToggle();
       }}
       {...rest}
     >
-      <th
-        scope="row"
-        role={stacked ? "rowheader" : undefined}
-        colSpan={colSpan}
-        className={`relative text-left font-normal align-middle ${DATA_TABLE_PAD} sm:h-14 sm:py-0`}
-      >
-        <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={onToggle}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-sm text-left text-[14px] font-semibold text-foreground focus-ring"
-            {...toggleHooks}
-          >
-            <ChevronRight
-              className={`h-4 w-4 shrink-0 text-rb-500 transition-transform ${open ? "rotate-90" : ""}`}
-              aria-hidden
-            />
-            {label}
-          </button>
-          {summary && <span className="text-[12px] tabular-nums text-rb-500">{summary}</span>}
-        </span>
-      </th>
+      {cells == null ? (
+        <th
+          scope="row"
+          role={stacked ? "rowheader" : undefined}
+          colSpan={colSpan}
+          className={`relative text-left font-normal align-middle ${DATA_TABLE_PAD} sm:h-14 sm:py-0`}
+        >
+          {name}
+        </th>
+      ) : (
+        <>
+          <DataTableCell rowHeader valign="middle" className={nameClassName}>
+            {name}
+          </DataTableCell>
+          {cells}
+        </>
+      )}
     </tr>
   );
 }
