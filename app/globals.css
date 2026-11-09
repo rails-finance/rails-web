@@ -2415,9 +2415,6 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
   table.dt > * > tr > :last-child {
     padding-right: 1rem;
   }
-  table.dt > * > tr > :first-child[data-anatomy~="D5"] {
-    padding-left: 0.375rem;
-  }
   table.dt > tbody > tr > *::before,
   table.dt > tbody > tr > *::after {
     content: "";

@@ -382,7 +382,7 @@ export function DataTableLeadHeader({ sticky = "" }: { sticky?: string }) {
     <th
       scope="col"
       role={stacked ? "columnheader" : undefined}
-      className={`w-[100px] p-0 ${sticky ? `${sticky} z-10 bg-background` : ""}`}
+      className={`w-[124px] p-0 ${sticky ? `${sticky} z-10 bg-background` : ""}`}
     >
       <span className="sr-only">Protocol and chain</span>
     </th>
@@ -409,7 +409,7 @@ export function DataTableLeadCell({
       pad={false}
       sticky={sticky}
       valign="middle"
-      className="w-[100px] py-2! pr-1! pl-3!"
+      className="w-[124px] p-5!"
       style={hueStyle(protocol)}
       title={`${protocolName} on ${chainMeta(chain).name}`}
       data-anatomy="D5"
