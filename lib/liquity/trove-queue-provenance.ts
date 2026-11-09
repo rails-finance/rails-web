@@ -9,8 +9,10 @@
 // are read in ascending rate order from MultiTroveGetter
 // .getDebtPerInterestRateAscending; every entry at a rate ≤ this trove's is
 // summed and counted, then this trove's entire debt and its one place are
-// taken back out. The branch total is TroveManager.getEntireBranchDebt. All
-// reads are at the latest block.
+// taken back out. The Trove TroveManager.lastZombieTroveId names, the one dormant
+// Trove a redemption takes before the list, is added with one place when it has
+// debt. The branch total is TroveManager.getEntireBranchDebt. All reads are at
+// the latest block.
 
 import type { Provenance } from "@/components/shared/provenance";
 
@@ -21,8 +23,8 @@ const DIF_VIA = "MultiTroveGetter.getDebtPerInterestRateAscending() at the lates
 export function troveDebtInFrontProv(collateralType: string): Provenance {
   return {
     kind: "chain-derived",
-    summary: `Debt in front — the combined BOLD debt, interest included, of the other ${collateralType} troves that pay this trove's interest rate or less. A redemption takes from the lowest-rate troves first, so it works through this debt on its way to this trove.`,
-    formula: "Σ entireDebt of same-branch troves at rate ≤ this trove's",
+    summary: `Debt in front — the combined BOLD debt, interest included, of the other ${collateralType} troves that pay this trove's interest rate or less, and of the branch's last dormant Trove (lastZombieTroveId) when it has debt. A redemption takes that dormant Trove first, then the lowest-rate troves, so it works through this debt on its way to this trove.`,
+    formula: "Σ entireDebt of same-branch troves at rate ≤ this trove's + lastZombieTroveId's entireDebt",
     contract: { name: "MultiTroveGetter" },
     via: DIF_VIA,
   };
@@ -33,8 +35,8 @@ export function troveDebtInFrontProv(collateralType: string): Provenance {
 export function troveTrovesAheadProv(collateralType: string): Provenance {
   return {
     kind: "chain-derived",
-    summary: `Troves ahead — the number of other ${collateralType} troves that pay this trove's interest rate or less. A redemption reaches them first.`,
-    formula: "count of same-branch troves at rate ≤ this trove's",
+    summary: `Troves ahead — the number of other ${collateralType} troves that pay this trove's interest rate or less, and the branch's last dormant Trove when it has debt. A redemption reaches them first.`,
+    formula: "count of same-branch troves at rate ≤ this trove's, + 1 for lastZombieTroveId with debt",
     contract: { name: "MultiTroveGetter" },
     via: DIF_VIA,
   };

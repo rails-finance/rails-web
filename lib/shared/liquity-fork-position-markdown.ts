@@ -168,13 +168,15 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
         );
       if (live.status === "zombie") {
         lines.push(
-          live.entireDebt > 0
-            ? `- **Redemption queue:** Dormant (Zombie in the contracts): a partial redemption left the Trove below the minimum debt; it sits outside the rate-ordered queue and is redeemed FIRST when redemptions next route through this branch`
-            : `- **Redemption queue:** Dormant (Zombie in the contracts): redemption cancelled all of its debt; it sits outside the queue with nothing left to redeem, and closing it returns its ${coll} to the owner`,
+          live.redeemedFirst
+            ? `- **Redemption queue:** Dormant (Zombie in the contracts): a partial redemption left the Trove below the minimum debt; it is the branch's lastZombieTroveId, which the next redemption on this branch takes first`
+            : live.entireDebt > 0
+              ? `- **Redemption queue:** Dormant (Zombie in the contracts): below the minimum debt and not the branch's lastZombieTroveId, so no redemption reaches it`
+              : `- **Redemption queue:** Dormant (Zombie in the contracts): redemption cancelled all of its debt; it sits outside the queue with nothing left to redeem, and closing it returns its ${coll} to the owner`,
         );
       } else if (live.debtInFront != null) {
         lines.push(
-          `- **Redemption queue (this branch):** ${amt(live.debtInFront)} ${debtSymbol} of debt sits at the same or lower interest rate (${live.trovesAhead ?? 0} trove${(live.trovesAhead ?? 0) === 1 ? "" : "s"}), redeemed before this one; redemptions sweep the lowest user-set rates first at $1 face`,
+          `- **Redemption queue (this branch):** ${amt(live.debtInFront)} ${debtSymbol} of debt is redeemed before this one (${live.trovesAhead ?? 0} trove${(live.trovesAhead ?? 0) === 1 ? "" : "s"}): the branch's last dormant Trove (lastZombieTroveId) when it has debt, then the same or lower interest rates; redemptions take it at $1 face`,
         );
       }
       if (live.branchTcr != null)

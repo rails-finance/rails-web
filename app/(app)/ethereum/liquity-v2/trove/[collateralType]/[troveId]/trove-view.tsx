@@ -131,6 +131,7 @@ export default function TroveView({
     debtInFront,
     trovesAhead,
     queueDebtTotal,
+    lastZombieTroveId,
     loading: debtInFrontLoading,
   } = useDebtInFront(
     troveData?.status === "open" ? collateralType : undefined,
@@ -505,6 +506,7 @@ export default function TroveView({
         debtInFront={debtInFront}
         trovesAhead={trovesAhead}
         queueDebtTotal={queueDebtTotal}
+        redeemedFirst={lastZombieTroveId == null ? null : lastZombieTroveId === BigInt(troveId).toString()}
         debtInFrontLoading={debtInFrontLoading}
         surplus={surplus}
         exports={troveExports({

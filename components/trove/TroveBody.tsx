@@ -128,6 +128,8 @@ export interface TroveBodyProps {
   debtInFront: number | null;
   trovesAhead: number | null;
   queueDebtTotal?: number | null;
+  /** The dormant Trove is the branch's lastZombieTroveId; null where unread. */
+  redeemedFirst?: boolean | null;
   debtInFrontLoading: boolean;
   surplus?: LiquityTroveSurplus | null;
   /** The card ⋮'s export shapes; null draws the ⋮ with the identity rows and
@@ -175,6 +177,7 @@ export function TroveBody({
   debtInFront,
   trovesAhead,
   queueDebtTotal,
+  redeemedFirst,
   debtInFrontLoading,
   surplus,
   exports,
@@ -249,6 +252,7 @@ export function TroveBody({
           debtInFront={debtInFront}
           trovesAhead={trovesAhead}
           queueDebtTotal={queueDebtTotal}
+          redeemedFirst={redeemedFirst}
           debtInFrontLoading={debtInFrontLoading}
           viewHref={tl.viewHref}
           surplus={surplus}

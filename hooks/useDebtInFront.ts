@@ -8,6 +8,9 @@ interface DebtInFrontResult {
   /** The branch's entire debt (the whole redemption queue) — the redemption
    *  runway's denominator. Null on read failure. */
   queueDebtTotal: number | null;
+  /** TroveManager.lastZombieTroveId at the read ("0" for none): the one dormant Trove a
+   *  redemption takes before the sorted list. Null where the answer did not carry it. */
+  lastZombieTroveId: string | null;
   loading: boolean;
 }
 
@@ -35,6 +38,7 @@ export function useDebtInFront(
   const [debtInFront, setDebtInFront] = useState<number | null>(null);
   const [trovesAhead, setTrovesAhead] = useState<number | null>(null);
   const [queueDebtTotal, setQueueDebtTotal] = useState<number | null>(null);
+  const [lastZombieTroveId, setLastZombieTroveId] = useState<string | null>(null);
   // A read that has not happened yet is not a read that failed. `settled` turns
   // true only once the fetch resolves one way or the other, so a caller shows a
   // pending shimmer instead of asserting "unavailable" — which is what the trove
@@ -64,6 +68,7 @@ export function useDebtInFront(
           setDebtInFront(data.debtInFront);
           setTrovesAhead(typeof data.trovesAhead === "number" ? data.trovesAhead : null);
           setQueueDebtTotal(typeof data.queueDebtTotal === "number" ? data.queueDebtTotal : null);
+          setLastZombieTroveId(typeof data.lastZombieTroveId === "string" ? data.lastZombieTroveId : null);
         }
       } catch (err) {
         console.error("Error fetching debt in front:", err);
@@ -79,5 +84,5 @@ export function useDebtInFront(
     };
   }, [collateralType, interestRate, troveId]);
 
-  return { debtInFront, trovesAhead, queueDebtTotal, loading: willFetch && !settled };
+  return { debtInFront, trovesAhead, queueDebtTotal, lastZombieTroveId, loading: willFetch && !settled };
 }

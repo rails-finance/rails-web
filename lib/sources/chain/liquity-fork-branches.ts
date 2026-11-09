@@ -40,6 +40,7 @@ const TM_ABI = parseAbi([
   "function getEntireBranchColl() view returns (uint256)",
   "function getTroveIdsCount() view returns (uint256)",
   "function getTroveFromTroveIdsArray(uint256 index) view returns (uint256)",
+  "function lastZombieTroveId() view returns (uint256)",
 ]);
 // fetchPrice mutates on-chain; declared view so eth_call simulates it.
 const PF_ABI = parseAbi([
@@ -66,8 +67,8 @@ export interface LiquityForkQueueEntry {
   entireDebt: number;
   /** Entire collateral, same reckoning. */
   entireColl: number;
-  /** True for a zombie: below the minimum debt after a partial redemption, so
-   *  outside the sorted list and redeemed before everything in it. */
+  /** True for the branch's lastZombieTroveId: a dormant Trove a redemption takes before the
+   *  sorted list. No other dormant Trove is in the queue. */
   zombie: boolean;
   /** Σ entire debt of everything ahead of this trove in the queue — what
    *  redemptions consume before they reach it. */
@@ -209,6 +210,7 @@ async function loadBranch(
         atTm("getTroveIdsCount"),
         { address: st, abi: ST_ABI, functionName: "getLast" } as ContractFunctionParameters,
         { address: st, abi: ST_ABI, functionName: "getSize" } as ContractFunctionParameters,
+        atTm("lastZombieTroveId"),
       ],
     });
     const r = (i: number): unknown => (phase1[i].status === "success" ? phase1[i].result : null);
@@ -219,6 +221,7 @@ async function loadBranch(
     const idsCount = r(4) as bigint | null;
     const lastId = r(5) as bigint | null;
     const listSize = r(6) as bigint | null;
+    const lastZombieId = r(7) as bigint | null;
     // Aggregates are the row's reason to exist — without them there is no
     // branch to show (and nothing to walk).
     if (branchDebtRaw == null || branchCollRaw == null) return emptyBranch(b);
@@ -259,7 +262,11 @@ async function loadBranch(
 
     // Phase 3 — every trove's live data + status in one batch: the listed
     // queue and the unlisted candidates together.
-    const subjects = [...listed, ...unlisted];
+    const pointer =
+      lastZombieId != null && lastZombieId !== BigInt(0) && !allIds.some((x) => x === lastZombieId)
+        ? [lastZombieId]
+        : [];
+    const subjects = [...listed, ...unlisted, ...pointer];
     const datas =
       subjects.length > 0
         ? ((await client.multicall({
@@ -292,6 +299,7 @@ async function loadBranch(
         allIds,
         dataOf: (x) => dataBy.get(String(x)) ?? null,
         statusOf: (x) => statusBy.get(String(x)) ?? null,
+        lastZombieId,
       },
       IDS_CAP,
     );
