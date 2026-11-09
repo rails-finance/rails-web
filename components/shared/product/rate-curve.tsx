@@ -2,8 +2,8 @@
 
 // The reserve page's rate curve (anatomy M3.3, ui-jobs 541 and 549): the
 // borrow rate and the supply rate against utilisation from 0 to 100%, the kink
-// marked, and the reserve's point now, fed by value (`RateCurveModel`): the
-// two-slope constants, the reserve factor and where the reserve sits. The
+// marked where the model has one, and the reserve's point now, fed by value
+// (`RateCurveModel`): the two-slope constants, the reserve factor and where the reserve sits. The
 // supply curve is borrow × U × (1 − reserve factor). The curve's receipt sits
 // on the caption's "Now" line. Drawn in measured pixels so its type stays
 // legible at 375px. Neutral strokes: two series, no valence (color-grammar §1).
@@ -85,7 +85,7 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
             width={W}
             height={H}
             role="img"
-            aria-label={`${c.symbol} borrow and supply rate against utilisation; kink at ${Math.round(c.optimal * 100)}%${u != null ? `, now at ${Math.round(u * 100)}%` : ""}`}
+            aria-label={`${c.symbol} borrow and supply rate against utilisation${c.noKink ? "" : `; kink at ${Math.round(c.optimal * 100)}%`}${u != null ? `, now at ${Math.round(u * 100)}%` : ""}`}
             className="block text-foreground"
           >
             {ticks.map((t) => (
@@ -107,24 +107,28 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
                 {`${f * 100}%`}
               </text>
             ))}
-            {/* The kink. */}
-            <line
-              x1={x(c.optimal)}
-              x2={x(c.optimal)}
-              y1={PAD.t}
-              y2={PAD.t + ih}
-              strokeDasharray="3 3"
-              className="stroke-rb-400 dark:stroke-rb-500"
-              data-kink-line=""
-            />
-            <text
-              x={c.optimal > 0.7 ? x(c.optimal) - 4 : x(c.optimal) + 4}
-              y={PAD.t + 10}
-              textAnchor={c.optimal > 0.7 ? "end" : "start"}
-              className={axisText}
-            >
-              {`kink ${+(c.optimal * 100).toFixed(2)}%`}
-            </text>
+            {/* The kink, where the model has one. */}
+            {!c.noKink && (
+              <>
+                <line
+                  x1={x(c.optimal)}
+                  x2={x(c.optimal)}
+                  y1={PAD.t}
+                  y2={PAD.t + ih}
+                  strokeDasharray="3 3"
+                  className="stroke-rb-400 dark:stroke-rb-500"
+                  data-kink-line=""
+                />
+                <text
+                  x={c.optimal > 0.7 ? x(c.optimal) - 4 : x(c.optimal) + 4}
+                  y={PAD.t + 10}
+                  textAnchor={c.optimal > 0.7 ? "end" : "start"}
+                  className={axisText}
+                >
+                  {`kink ${+(c.optimal * 100).toFixed(2)}%`}
+                </text>
+              </>
+            )}
             <path d={supplyPath} fill="none" strokeWidth={1.5} strokeDasharray="5 3" className="stroke-rb-500" />
             <path d={borrowPath} fill="none" strokeWidth={2} className="stroke-current" />
             {u != null && (

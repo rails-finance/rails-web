@@ -264,9 +264,12 @@ export interface MarketModel {
 
 /** The rate model of a reserve, fed to the curve (M3.3) by value: rates and
  *  usage as fractions a year, the two-slope shape every Aave-family strategy
- *  shares. */
+ *  shares. A Comptroller jump-rate model is the same shape: the kink is
+ *  `optimal`, multiplier × kink is `slope1` and jump × (1 − kink) `slope2`. */
 export interface RateCurveModel {
   optimal: number;
+  /** The model has no kink (a straight or flat line): the curve draws none. */
+  noKink?: boolean;
   base: number;
   slope1: number;
   slope2: number;
