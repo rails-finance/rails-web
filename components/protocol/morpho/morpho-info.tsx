@@ -192,10 +192,13 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
             <Link href="/ethereum/morpho/markets" className={INLINE_LINK}>
               the markets
             </Link>
-            , with the borrowing limit that governs each.
+            , with the borrowing limit that governs each, and{" "}
+            <Link href="/ethereum/morpho/vaults" className={INLINE_LINK}>
+              the vaults
+            </Link>{" "}
+            that pool depositors&rsquo; tokens and lend them into several markets.
           </>
         }
-        notCovered="Morpho vaults, which pool depositors' tokens and lend them into several markets, aren't covered on Ethereum."
         glossary={glossary}
         howItWorks={[
           WHAT_IT_IS,
