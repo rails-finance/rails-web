@@ -29,6 +29,7 @@
 // one red is the reconcile FAILING — a fact about this read not accounting for
 // every DAI in existence, not a judgement about anyone's position.
 
+import { TokenPairIcons } from "@/components/shared/token-pair-icons";
 import {
   DATA_TABLE_PILL,
   DataTable,
@@ -322,6 +323,29 @@ function CompositionBar({ data }: { data: MakerSystemChainResponse }) {
 
 // ── Section 3 — the ilk roster ───────────────────────────────────────────────
 
+/** The protocol an ilk wraps, by its name, for the row's second mark: a PSM
+ *  is MakerDAO's own; a direct deposit or an allocator names the protocol it
+ *  lends through; a Uniswap pool share names Uniswap. Null where none applies
+ *  or the protocol has no mark. */
+function ilkMarkSymbol(row: MakerIlkRow): string {
+  // A PSM's gem is the stablecoin its name carries ("LITE-PSM-USDC-A" holds
+  // USDC, though the registry's symbol reads "LITE"); PAX is now USDP.
+  const psm = row.ilk.match(/^(?:LITE-)?PSM-([A-Z]+)-/)?.[1];
+  if (psm) return psm === "PAX" ? "USDP" : psm;
+  return row.collateralSymbol;
+}
+
+function ilkProtocol(ilk: string): string | null {
+  if (/^(LITE-)?PSM-/.test(ilk)) return "makerdao";
+  if (/^DIRECT-SPARK-MORPHO/.test(ilk)) return "morpho";
+  if (/^DIRECT-(SPK-)?AAVE/.test(ilk)) return "aave-v3";
+  if (/^(DIRECT-SPARK|ALLOCATOR-SPARK)/.test(ilk)) return "spark";
+  if (/^DIRECT-COMPV2/.test(ilk)) return "compound-v2";
+  if (/^GUNIV3/.test(ilk)) return "uniswap-v3";
+  if (/^UNIV2/.test(ilk)) return "uniswap";
+  return null;
+}
+
 function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null }) {
   const showPrice = row.priceUsd != null && (row.group === "vault" || row.group === "rwa");
 
@@ -329,50 +353,55 @@ function IlkRow({ row, readBy }: { row: MakerIlkRow; readBy?: ServerRead | null 
     <DataTableRow data-maker-ilk={row.ilk}>
       {/* Ilk */}
       <DataTableCell rowHeader className="min-w-0">
-        <div className="flex items-baseline gap-1.5">
-          {row.userVaultType ? (
-            // `ilk`, singular — the listing dimension's URL param (its `id` is
-            // "ilks" and the API client's param is "ilks", but neither is what
-            // decodeListFilters reads). A wrong param doesn't error: the filter
-            // is simply ignored and the reader lands on the unfiltered roster
-            // believing it's this ilk's.
-            <Link
-              href={`/ethereum/makerdao?ilk=${encodeURIComponent(row.ilk)}`}
-              className="truncate text-blue-600 dark:text-[var(--text-link)] hover:underline"
-            >
-              {row.ilk}
-            </Link>
-          ) : (
-            <Prov info={stampHeadRead(ilkGroupProv(row.ilk, row.cls), readBy)}>
-              <span className="truncate text-foreground">{row.ilk}</span>
-            </Prov>
-          )}
-          <span className="shrink-0 text-[11px] text-rb-500">{row.collateralSymbol}</span>
-        </div>
-        {showPrice && (
-          <div className="mt-0.5 text-[11px] tabular-nums text-rb-500">
-            <Prov
-              info={stampHeadRead(systemOsmPriceProv(row.ilk, row.collateralSymbol), readBy)}
-              value={formatExact(row.priceUsd as number)}
-            >
-              {priceUsd(row.priceUsd as number)}
-            </Prov>
-            {row.priceCap && (
-              <>
-                {" "}
-                <Prov
-                  info={stampHeadRead(systemPriceCapProv(row.ilk, row.collateralSymbol), readBy)}
-                  value={formatExact(row.priceCap.capUsd)}
+        <div className="flex items-center gap-2.5">
+          <TokenPairIcons first={{ symbol: ilkMarkSymbol(row) }} protocol={ilkProtocol(row.ilk)} fixed />
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-1.5">
+              {row.userVaultType ? (
+                // `ilk`, singular — the listing dimension's URL param (its `id` is
+                // "ilks" and the API client's param is "ilks", but neither is what
+                // decodeListFilters reads). A wrong param doesn't error: the filter
+                // is simply ignored and the reader lands on the unfiltered roster
+                // believing it's this ilk's.
+                <Link
+                  href={`/ethereum/makerdao?ilk=${encodeURIComponent(row.ilk)}`}
+                  className="truncate text-blue-600 dark:text-[var(--text-link)] hover:underline"
                 >
-                  <span>
-                    capped at {priceUsd(row.priceCap.capUsd)} by governance
-                    {row.priceCap.oracleUsd != null ? <>; oracle {priceUsd(row.priceCap.oracleUsd)}</> : null}
-                  </span>
+                  {row.ilk}
+                </Link>
+              ) : (
+                <Prov info={stampHeadRead(ilkGroupProv(row.ilk, row.cls), readBy)}>
+                  <span className="truncate text-foreground">{row.ilk}</span>
                 </Prov>
-              </>
+              )}
+              <span className="shrink-0 text-[11px] text-rb-500">{row.collateralSymbol}</span>
+            </div>
+            {showPrice && (
+              <div className="mt-0.5 text-[11px] tabular-nums text-rb-500">
+                <Prov
+                  info={stampHeadRead(systemOsmPriceProv(row.ilk, row.collateralSymbol), readBy)}
+                  value={formatExact(row.priceUsd as number)}
+                >
+                  {priceUsd(row.priceUsd as number)}
+                </Prov>
+                {row.priceCap && (
+                  <>
+                    {" "}
+                    <Prov
+                      info={stampHeadRead(systemPriceCapProv(row.ilk, row.collateralSymbol), readBy)}
+                      value={formatExact(row.priceCap.capUsd)}
+                    >
+                      <span>
+                        capped at {priceUsd(row.priceCap.capUsd)} by governance
+                        {row.priceCap.oracleUsd != null ? <>; oracle {priceUsd(row.priceCap.oracleUsd)}</> : null}
+                      </span>
+                    </Prov>
+                  </>
+                )}
+              </div>
             )}
           </div>
-        )}
+        </div>
       </DataTableCell>
 
       {/* Debt */}
