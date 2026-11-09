@@ -12,6 +12,7 @@ import {
   ethereumVaultHref,
   ethereumVaultRosterHref,
   ethereumVaultsListingHref,
+  maplePoolHref,
   maplePoolsHref,
   yearnVaultHref,
   yearnVaultRosterHref,
@@ -103,8 +104,8 @@ export function vaultIndexRosterHref(p: VaultIndexProtocol, chainId: number): st
         : maplePoolsHref();
 }
 
-/** The vault's page under its protocol (decision 0028 point 8); a Maple pool's
- *  is the pools page. */
+/** The vault's page under its protocol (decision 0028 point 8); a Maple
+ *  pool's under Maple's pools tab. */
 export function vaultIndexHref(v: VaultSummary): string {
   const p = vaultIndexProtocol(v);
   return p === "morpho"
@@ -113,7 +114,7 @@ export function vaultIndexHref(v: VaultSummary): string {
       ? ethereumVaultHref(v.address)
       : p === "yearn"
         ? yearnVaultHref(v.address)
-        : maplePoolsHref();
+        : maplePoolHref(v.address);
 }
 
 /** The positions listing filtered to this vault, where its roster has one. */

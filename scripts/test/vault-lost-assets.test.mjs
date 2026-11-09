@@ -44,7 +44,7 @@ test("held is totalAssets less lostAssets, or totalAssets where lostAssets is ab
 
 test("the caution's words", () => {
   assert.equal(
-    lostAssetsSentence({ lost: "819,089", held: "884.77", symbol: "USDS", block: 26373156 }),
-    "Includes 819,089 USDS lost at block 26,373,156. The vault holds 884.77 USDS; the share price has not been lowered for the loss, so the holders who withdraw last carry it.",
+    lostAssetsSentence({ lost: "819,089", held: "884.77", symbol: "USDS" }),
+    "Includes 819,089 USDS of lost assets. The vault holds 884.77 USDS; the share price has not been lowered for the loss, so the holders who withdraw last carry it.",
   );
 });

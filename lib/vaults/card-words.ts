@@ -202,6 +202,101 @@ export const yearnVaultAssetsContent = (): LearnMoreContent => ({
   ],
 });
 
+const MAPLE_DOCS = { label: "docs.maple.finance: Lenders", url: "https://docs.maple.finance" };
+
+/** The Steward's tip on a Maple pool: its pool delegate. */
+export const MAPLE_DELEGATE_TIP =
+  "The pool delegate runs the pool's lending: it funds and calls loans, and marks a loan as impaired.";
+
+export const maplePoolCardContent = (): LearnMoreContent => ({
+  title: "How a Maple pool works",
+  intro:
+    "A Maple pool takes one stablecoin and lends it to institutional borrowers against collateral that custodians hold off the chain. A lender owns shares, and a share converts to more of the asset as borrowers pay interest.",
+  detailsHeading: "Key concepts:",
+  details: [
+    {
+      bold: "Pool delegate",
+      text: "the manager that runs the pool's lending: it funds loans, calls open-term loans and marks a loan as impaired.",
+    },
+    {
+      bold: "Exit rate",
+      text: "what one share pays on withdrawal. It equals the share price unless a loan is marked as impaired; then a lender who exits takes a part of the mark.",
+    },
+    {
+      bold: "Withdrawal queue",
+      text: "withdrawals wait in a queue, first in, first out, and are paid from the cash in the pool as it allows.",
+    },
+    {
+      bold: "Yield",
+      text: "Rails keeps no daily share-price series for Maple pools, so the card states no yield figure.",
+    },
+  ],
+  links: [MAPLE_DOCS],
+});
+
+export const maplePoolAssetsContent = (): LearnMoreContent => ({
+  title: "Where a Maple pool's assets are",
+  intro:
+    "The pool keeps some cash, which pays withdrawals, and lends the rest through two loan books and any other strategy it uses. Together they make the pool's total assets.",
+  detailsHeading: "Key concepts:",
+  details: [
+    { bold: "Liquid now", text: "the asset in the pool, the only part a withdrawal can be paid from at once." },
+    { bold: "Fixed-term loans", text: "loans that run to a maturity date: principal and the interest accrued so far." },
+    {
+      bold: "Open-term loans",
+      text: "loans with no maturity, which the pool delegate can call for repayment with notice.",
+    },
+    { bold: "Other strategies", text: "on-chain strategies the pool lends through, apart from its loans." },
+    {
+      bold: "Collateral",
+      text: "custodians hold the loans' collateral off the chain. The chain records the loan book as Maple keeps it.",
+    },
+    { bold: "Share of this vault", text: "a row's amount over the pool's total assets." },
+  ],
+  links: [MAPLE_DOCS],
+});
+
+/** "Supplied by vaults" on a market or reserve page: the "?" per family. */
+export function suppliedByContent(family: "morpho" | "aave"): LearnMoreContent {
+  return family === "morpho"
+    ? {
+        title: "Vaults in this market",
+        intro:
+          "A MetaMorpho vault lends one asset through the Morpho Blue markets in its withdraw queue. These are the vaults on Rails's MetaMorpho roster whose queue names this market.",
+        detailsHeading: "Key concepts:",
+        details: [
+          {
+            bold: "Amount",
+            text: "what the vault's supply in this market converts to, as Morpho Blue last settled the market.",
+          },
+          {
+            bold: "Steward",
+            text: "the curator, which chooses the vault's markets and caps; the owner where no curator is named.",
+          },
+          {
+            bold: "A vault at zero",
+            text: "a market can sit in a queue with nothing supplied: the curator may supply it later.",
+          },
+        ],
+        links: [MORPHO_VAULT_DOCS],
+      }
+    : {
+        title: "Vaults over this reserve",
+        intro:
+          "A static aToken wraps a supply position in this reserve. An Umbrella stake stands behind it: its owner can slash the stake to cover a deficit on the reserve.",
+        detailsHeading: "Key concepts:",
+        details: [
+          { bold: "Amount", text: "the wrapper's total assets; for a stake, what it holds in the reserve's asset." },
+          {
+            bold: "Counted twice",
+            text: "a stake over a static aToken holds the wrapper's shares, so its amount is also inside the wrapper's row.",
+          },
+          { bold: "Steward", text: "a stake's owner. A static aToken names none." },
+        ],
+        links: [AAVE_DOCS.stata, AAVE_DOCS["umbrella-stake"]],
+      };
+}
+
 /** The holder pages' position card's "?" (V8, ui-jobs 553), every family. */
 export const vaultPlainHoldingContent = (
   assetSymbol: string,

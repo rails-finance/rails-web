@@ -8,10 +8,11 @@
 // the token the path names; anything else is the 404. The market's read and the
 // listing's first page are fetched together.
 
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { RailHeader } from "@/components/shared/rail-header";
+import { MorphoMarketVaults } from "@/components/protocol/morpho/morpho-market-vaults";
 import { MorphoMarketView } from "@/components/protocol/morpho/morpho-market-view";
 import { loadMorphoMarketFromChain } from "@/lib/sources/chain/morpho-markets";
 import { marketViewData } from "@/lib/morpho/markets-shape";
@@ -110,6 +111,17 @@ export default async function MorphoBaseMarketPage({ params, searchParams }: Par
             </>
           )}
         </header>
+
+        {view && data.market && (
+          <Suspense fallback={null}>
+            <MorphoMarketVaults
+              chainId={MORPHO_BASE_CHAIN_ID}
+              marketId={id}
+              asset={{ symbol: data.market.loanSymbol, address: token, decimals: data.market.loanDecimals }}
+              pair={`${data.market.loanSymbol} / ${data.market.collateralSymbol ?? "no collateral"}`}
+            />
+          </Suspense>
+        )}
 
         <MorphoBaseListing
           {...initial}

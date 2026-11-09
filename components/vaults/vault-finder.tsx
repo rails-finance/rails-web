@@ -6,12 +6,13 @@
 // is stated. It needs no JavaScript, so a submit made before React attaches is
 // a navigation.
 
-export function VaultFinder() {
+/** `noun`: what the page is, "vault" unless the protocol says "pool". */
+export function VaultFinder({ noun = "vault" }: { noun?: "vault" | "pool" }) {
   return (
     <section className="mb-6" data-anatomy="V4" data-skel-section="vault-lookup">
       <form method="get" className="flex max-w-xl flex-wrap items-center gap-2">
         <label htmlFor="vault-finder" className="w-full text-sm font-semibold text-foreground">
-          Find an address in this vault
+          Find an address in this {noun}
         </label>
         <input
           id="vault-finder"

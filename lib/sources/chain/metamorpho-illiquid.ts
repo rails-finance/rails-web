@@ -188,12 +188,16 @@ export async function readRatesAtTarget(
   return out;
 }
 
-/** The illiquid test over `vaults` at `blockNumber`, by lowercased address. */
+/** The illiquid test over `vaults` at `blockNumber`, by lowercased address.
+ *  `queues`, where given, receives each readable vault's withdraw queue (its
+ *  market ids, lowercased), which wave 2 reads anyway: the market pages'
+ *  "Supplied by vaults" section reads it off the directory. */
 export async function readMetaMorphoIlliquid(
   client: PublicClient,
   chainId: ChainId,
   blockNumber: bigint,
   vaults: readonly string[],
+  queuesOut?: Map<string, string[]>,
 ): Promise<Map<string, VaultLiquidity>> {
   const out = new Map<string, VaultLiquidity>();
   if (vaults.length === 0) return out;
@@ -234,6 +238,13 @@ export async function readMetaMorphoIlliquid(
     }
     queues.set(s.vault, [...(queues.get(s.vault) ?? []), id]);
   });
+  if (queuesOut)
+    for (const [v, q] of queues)
+      if (readable.has(v))
+        queuesOut.set(
+          v,
+          q.map((id) => id.toLowerCase()),
+        );
 
   // 3. Each distinct market once.
   const distinct = [...new Set([...queues.values()].flat())];

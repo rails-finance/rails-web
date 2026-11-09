@@ -35,6 +35,10 @@ import { HoldersTable } from "@/components/shared/product/position-entry";
 import { DeficitSources, ReserveDeficitBody, writeOffsCsv } from "@/components/shared/aave-reserve-deficit";
 import { deficitLearnMore } from "@/lib/aave-family/deficit-learn-more";
 import { ReservePage, type ReservePageData } from "@/components/shared/product/reserve-page";
+import { SuppliedByVaults } from "@/components/shared/product/supplied-by-vaults";
+import type { SuppliedByRead } from "@/lib/vaults/supplied-by";
+import { suppliedByContent } from "@/lib/vaults/card-words";
+import { ethereumVaultRosterHref } from "@/lib/vaults/routes";
 import { historyFrom, useReserveReads, type Read, type ReserveHistory } from "@/lib/api/fetch-aave-reserve-reads";
 import { heldLine, reserveChanges } from "@/lib/shared/aave-reserve-config-words";
 import { holderAmountProv } from "@/lib/shared/aave-reserve-reads-provenance";
@@ -652,6 +656,25 @@ export function AaveReservePage({ marketKey, asset }: { marketKey: AaveMarketKey
     () => (cr.state === "ok" && r ? reserveChanges(cr.data, r.symbol) : null),
     [cr, r?.symbol], // eslint-disable-line react-hooks/exhaustive-deps
   );
+  // "Supplied by vaults": Aave's vault roster is on Ethereum and wraps Core.
+  const vaultsFor = m.key === "aave-v3" && r ? { address: r.address, symbol: r.symbol, decimals: r.decimals } : null;
+  const [vaults, setVaults] = useState<SuppliedByRead | null>(null);
+  useEffect(() => {
+    if (!vaultsFor) return;
+    let live = true;
+    const qs = new URLSearchParams({
+      asset: vaultsFor.address,
+      symbol: vaultsFor.symbol,
+      decimals: String(vaultsFor.decimals),
+    });
+    fetch(`/api/chain/aave-vaults/supplied-by?${qs.toString()}`)
+      .then((res) => res.json() as Promise<SuppliedByRead>)
+      .then((read) => live && read.asset && setVaults(read))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [vaultsFor?.address, vaultsFor?.symbol, vaultsFor?.decimals]); // eslint-disable-line react-hooks/exhaustive-deps
   const protocol = protocolForHref(m.listingHref);
   if (!protocol) throw new Error(`aave-family reserve: no roster entry for ${m.listingHref}`);
   const vocab = vocabOf(m, read);
@@ -738,6 +761,26 @@ export function AaveReservePage({ marketKey, asset }: { marketKey: AaveMarketKey
         link: { label: `All ${m.marketLabel} reserves`, href: m.reservesHref },
       }}
       hooks={{ "data-reserve-page": asset.toLowerCase(), "data-market": m.key }}
+      suppliedBy={
+        vaults && r ? (
+          <SuppliedByVaults
+            read={vaults}
+            noun="reserve"
+            what={`the ${r.symbol} reserve of ${m.marketLabel}`}
+            line={`The static aTokens that supply this reserve and the Umbrella stakes that cover it, largest first.`}
+            learnMore={suppliedByContent("aave")}
+            links={[
+              {
+                item: "vault-roster",
+                title: "All Aave vaults",
+                subtitle: "The roster on Ethereum",
+                href: ethereumVaultRosterHref(),
+                internal: true,
+              },
+            ]}
+          />
+        ) : undefined
+      }
     />
   );
 }

@@ -157,6 +157,7 @@ export function FilterSheet<F>({
             className="inline-flex min-w-4 h-4 px-1 items-center justify-center rounded-full bg-teal-700 text-white dark:bg-teal-400 dark:text-rb-900 text-[10px] font-bold tabular-nums"
             aria-hidden="true"
             data-filter-sheet-count={active}
+            data-prov-exempt
           >
             {active}
           </span>

@@ -23,7 +23,9 @@ import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { RailHeader } from "@/components/shared/rail-header";
 import { YearnVaultPage } from "@/components/vaults/yearn-vault-page";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { yearnVaultHref } from "@/lib/vaults/routes";
+import { metaMorphoVaultHref, yearnVaultHref } from "@/lib/vaults/routes";
+import { metaMorphoRosterEntry } from "@/lib/metamorpho/vault-roster";
+import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { loadYearnEthereumVault } from "@/lib/sources/chain/yearn-ethereum-vault";
 import { isYearnRosterVault } from "@/lib/yearn/vault-roster";
 import { YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
@@ -70,11 +72,17 @@ export default async function YearnVaultRoute({ params, searchParams }: Props) {
   if (typed) redirect(yearnVaultHref(address, typed));
 
   const [data, series] = await Promise.all([load(address), loadVaultPageSeries(YEARN_CHAIN_ID, address)]);
-  // The strategies that are Yearn vaults with a page here: "Where the assets
-  // are" opens them.
-  const paged = (
-    await Promise.all(data.strategies.map(async (s) => ((await isYearnRosterVault(s.address)) ? s.address : null)))
-  ).filter((a): a is string => a != null);
+  // The strategies that are roster vaults with a page here (a Yearn V3 vault,
+  // a MetaMorpho vault on Ethereum): "Where the assets are" opens them.
+  const strategyPages: Record<string, string> = {};
+  await Promise.all(
+    data.strategies.map(async (s) => {
+      const a = s.address.toLowerCase();
+      if (await isYearnRosterVault(a)) strategyPages[a] = yearnVaultHref(a);
+      else if (await metaMorphoRosterEntry(MAINNET_CHAIN_ID, a))
+        strategyPages[a] = metaMorphoVaultHref(MAINNET_CHAIN_ID, a);
+    }),
+  );
 
   return (
     <div className="min-h-screen">
@@ -88,7 +96,12 @@ export default async function YearnVaultRoute({ params, searchParams }: Props) {
             This vault could not be read from chain just now, so no figure is stated for it.
           </p>
         ) : (
-          <YearnVaultPage data={data} yieldFigure={series.yieldFigure} strip={series.strip} pagedStrategies={paged} />
+          <YearnVaultPage
+            data={data}
+            yieldFigure={series.yieldFigure}
+            strip={series.strip}
+            strategyPages={strategyPages}
+          />
         )}
 
         {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}

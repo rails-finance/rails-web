@@ -7,7 +7,8 @@
 // vitals band, the (i)), then the family's sections in its order, each its own
 // receipts scope under a heading row with its ⋮: the rate curve (M3.3), the
 // history (M3.4), the parameters (M3.5), the change log (M3.6) and the largest
-// holders (M3.7, M3.8). The page mounts the inspector's layer; no page-wide
+// holders (M3.7, M3.8), then "Supplied by vaults" where the family has a
+// vault roster over the reserve. The page mounts the inspector's layer; no page-wide
 // toggle.
 
 import Link from "next/link";
@@ -37,6 +38,7 @@ export function ReservePage({
   missing,
   what,
   hooks,
+  suppliedBy,
 }: {
   protocol: ProtocolEntry;
   /** Where the back control falls back to: the market page. */
@@ -48,6 +50,9 @@ export function ReservePage({
   /** The market's name, for the failure line. */
   what: string;
   hooks?: Hooks;
+  /** "Supplied by vaults" (components/shared/product/supplied-by-vaults.tsx),
+   *  under the family's sections, where the reserve has vaults on a roster. */
+  suppliedBy?: ReactNode;
 }) {
   const data = reserve.state === "ok" ? reserve.data : null;
   const h1 = (
@@ -77,7 +82,15 @@ export function ReservePage({
         </Link>
       </div>
     );
-  else body = data.sections.map((s) => <ProductSectionBlock key={s.scope} s={s} />);
+  else
+    body = (
+      <>
+        {data.sections.map((s) => (
+          <ProductSectionBlock key={s.scope} s={s} />
+        ))}
+        {suppliedBy}
+      </>
+    );
 
   return (
     <div className="min-h-screen" data-anatomy="M3 R3" {...hooks}>

@@ -28,8 +28,8 @@
 //   5  a Maple row shows the Yield slot's "no daily series yet" state
 //   6  four rows' Total assets (each Morpho, Aave, Yearn, the largest each) equal
 //      the protocol roster's raw figure for the same vault at the same block
-//   7  every row links under its protocol, to a vault its roster lists; two
-//      links per protocol answer 200
+//   7  every row links under its protocol, to a vault its roster lists (a
+//      Maple pool to /ethereum/maple/pools/<key>); two links per protocol answer 200
 //   8  the rosters' heads link the index
 //   9  the index draws no receipt and offers no provenance inspector (ui-jobs 538);
 //      every Total assets and Share price figure names its asset
@@ -106,6 +106,8 @@ const ROSTER = {
   },
 };
 const KEYS = Object.keys(ROSTER);
+/** A Maple pool's catalogue key by its address: the slug of its page. */
+const MAPLE_KEY = {};
 const keyOf = (r) => `${r.protocol}:${r.chain}`;
 const LABEL = { morpho: "Morpho", aave: "Aave", yearn: "Yearn", maple: "Maple" };
 
@@ -165,6 +167,8 @@ for (const k of KEYS) {
   const src = fs.readFileSync(path.join(ROOT, "lib/maple/asset-catalog.ts"), "utf8");
   const body = src.slice(src.indexOf("export const MAPLE_POOLS"), src.indexOf("/** Pool key → catalog entry"));
   expected["maple:1"] = (body.match(/^\s+key: "/gm) || []).length;
+  // Each pool's page is /ethereum/maple/pools/<key> (ui-jobs 549 step 4).
+  for (const m of body.matchAll(/key: "([^"]+)",[\s\S]*?pool: "(0x[0-9a-f]{40})"/g)) MAPLE_KEY[m[2]] = m[1];
 }
 console.log(`rosters state: ${KEYS.map((k) => `${k} ${expected[k]}`).join(", ")}`);
 /** A protocol's rows across its rosters. */
@@ -352,20 +356,17 @@ for (const k of KEYS.filter((k) => ROSTER[k].protocol !== "maple")) {
     const R = ROSTER[keyOf(r)];
     if (!R) return true;
     if (!r.href) return true;
-    if (r.protocol === "maple") return r.href !== R.prefix;
+    if (r.protocol === "maple") return r.href !== `${R.prefix}/${MAPLE_KEY[r.address]}`;
     return r.href !== `${R.prefix}${r.address}`;
   });
   check("7a every row links to its vault under its protocol", bad.length === 0, `${bad.length} off-pattern`);
   const unlisted = rows.filter((r) => {
-    if (r.protocol === "maple") return false;
+    if (r.protocol === "maple")
+      return !(rosterPages[keyOf(r)]?.html ?? "").includes(`data-maple-pool-card="${MAPLE_KEY[r.address]}"`);
     const html = rosterPages[keyOf(r)]?.html ?? "";
     return !html.includes(`data-vault-row="${r.address}"`) && !html.includes(r.address);
   });
-  check(
-    "7b every non-Maple row is a vault its roster page lists",
-    unlisted.length === 0,
-    `${unlisted.length} unlisted`,
-  );
+  check("7b every row is a vault its roster page lists", unlisted.length === 0, `${unlisted.length} unlisted`);
   const sample = KEYS.flatMap((k) => [...new Set(byRoster[k].map((r) => r.href))].slice(0, 2));
   for (const href of sample) {
     const r = await fetch(`${BASE}${href}`, { signal: AbortSignal.timeout(300_000) });
