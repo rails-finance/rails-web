@@ -74,6 +74,8 @@ export interface CompareColumn {
   vault: VaultSummary;
   /** The family loader's block; null where it did not answer. */
   block: number | null;
+  /** When that read was taken (ISO); null where it did not answer. */
+  readAt: string | null;
   lines: HealthLine[];
   fees: CompareCell;
   exposure: CompareExposure;
@@ -103,6 +105,7 @@ const BPS = 10_000;
  *  fees and where its money is lent. */
 interface FamilyRead {
   block: number | null;
+  readAt: string | null;
   health: Pick<HealthInput, "exit" | "paused" | "shutdown" | "caught" | "lostAssets" | "steward">;
   fees: CompareCell;
   exposure: CompareExposure;
@@ -110,6 +113,7 @@ interface FamilyRead {
 
 const UNANSWERED: Omit<FamilyRead, "health"> = {
   block: null,
+  readAt: null,
   fees: FEE_WORDS.unanswered,
   exposure: { kind: "cell", cell: { headline: null, sentence: X.unanswered, read: false } },
 };
@@ -125,6 +129,7 @@ function fromSummary(v: VaultSummary): FamilyRead {
     : null;
   return {
     ...UNANSWERED,
+    readAt: v.readAt.timestamp,
     health: {
       exit: v.withdrawable ? { kind: "queue", ...v.withdrawable } : null,
       paused: v.standing.includes("paused"),
@@ -163,6 +168,7 @@ async function metaMorpho(v: VaultSummary): Promise<FamilyRead> {
   const l = d.liquidity;
   return {
     block: d.blockNumber,
+    readAt: new Date().toISOString(),
     health: {
       exit: l ? { kind: "queue", block: l.block, queueAssets: l.queueAssets, withdrawable: l.withdrawable } : null,
       caught: l?.illiquid ? illiquidSentence(l.illiquid) : null,
@@ -229,6 +235,7 @@ async function yearn(v: VaultSummary): Promise<FamilyRead> {
         ];
   return {
     block: d.blockNumber,
+    readAt: new Date().toISOString(),
     health: {
       exit:
         totalIdle && totalAssets
@@ -252,6 +259,7 @@ async function aave(v: VaultSummary): Promise<FamilyRead> {
   if (v.family === "sgho")
     return {
       block,
+      readAt: new Date().toISOString(),
       health: { exit: null, paused: d.sgho?.paused === true, steward: null },
       fees: FEE_WORDS.notRead,
       exposure: { kind: "cell", cell: { ...X.sgho, read: true } },
@@ -260,6 +268,7 @@ async function aave(v: VaultSummary): Promise<FamilyRead> {
     const u = d.umbrella;
     return {
       block,
+      readAt: new Date().toISOString(),
       health: {
         exit:
           u?.cooldownSeconds != null && u.unstakeWindowSeconds != null
@@ -281,6 +290,7 @@ async function aave(v: VaultSummary): Promise<FamilyRead> {
   }
   return {
     block,
+    readAt: new Date().toISOString(),
     health: { exit: null, steward: null },
     fees: FEE_WORDS.stata,
     exposure: {
@@ -305,6 +315,7 @@ async function maple(v: VaultSummary): Promise<FamilyRead> {
   const sum = parts.reduce((a, p) => a + p.amount, 0);
   return {
     block: s.blockNumber,
+    readAt: new Date().toISOString(),
     health: {
       exit: null,
       steward: s.poolDelegate ? { role: "poolDelegate", address: s.poolDelegate, block: s.blockNumber } : null,
@@ -412,7 +423,12 @@ export async function readCompare(keys: readonly string[]): Promise<CompareRead>
       chain: chainName(v.chainId),
       vault: v,
       block: r.block,
-      lines: healthLines(health, { family: v.family, assetSymbol: v.asset.symbol, decimals: v.asset.decimals }, WORDS),
+      readAt: r.readAt,
+      lines: healthLines(
+        health,
+        { family: v.family, assetSymbol: v.asset.symbol, decimals: v.asset.decimals, attestationSaid: true },
+        WORDS,
+      ),
       fees: r.fees,
       exposure: r.exposure,
       holders: holders[i],

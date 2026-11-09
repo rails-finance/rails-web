@@ -54,7 +54,12 @@ export interface HealthContext {
   family: VaultFamily;
   assetSymbol: string;
   decimals: number;
+  /** The page says once that stewards are shown by address (the comparison);
+   *  each line then leaves it out. */
+  attestationSaid?: boolean;
 }
+
+export const STEWARD_ATTESTATION = "Rails shows the address until a name for it is attested.";
 
 /** One line as the section draws it: the label, the measured figure with its
  *  window, then one sentence. `read` false draws it muted. */
@@ -299,7 +304,7 @@ export function healthLines(h: Health, c: HealthContext, f: HealthFormat): Healt
       : line(
           "steward",
           stewardText(st.role, st.address),
-          `${ROLE_SENTENCE[st.role]} Rails shows the address until a name for it is attested.`,
+          c.attestationSaid ? ROLE_SENTENCE[st.role] : `${ROLE_SENTENCE[st.role]} ${STEWARD_ATTESTATION}`,
         );
 
   return [size, yieldLine, withdrawalsLine(h.withdrawals, c, f), losses, steward];

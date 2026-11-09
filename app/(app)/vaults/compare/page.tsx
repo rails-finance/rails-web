@@ -13,7 +13,6 @@ import { VaultCompare } from "@/components/vaults/vault-compare";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { COMPARE_HREF, COMPARE_MIN, isCompareSort, parseCompareParam } from "@/lib/vaults/compare";
 import { COMPARE_PAGE, COMPARE_TITLE } from "@/lib/vaults/compare-words";
-import { HEALTH_DISCLAIMER } from "@/lib/vaults/health-words";
 import { readCompare } from "@/lib/vaults/compare-read";
 import { vaultIndexLaunched } from "@/lib/vaults/index-rosters";
 import { VAULT_INDEX_HREF } from "@/lib/vaults/routes";
@@ -47,7 +46,7 @@ export default async function VaultComparePage({
       <header className="mb-6">
         <h1 className="text-2xl font-semibold text-foreground">{COMPARE_TITLE}</h1>
         <p className="mt-2 max-w-2xl text-rb-500" data-compare-disclaimer="">
-          {HEALTH_DISCLAIMER}
+          {COMPARE_PAGE.lead}
         </p>
       </header>
       {notFound.length > 0 && (

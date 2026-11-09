@@ -4,14 +4,18 @@
 // words; this module adds Fees, Where the money is lent and Who holds it.
 // Each states a reading; nothing here rates, forecasts or recommends.
 //
-// Pure, with type imports only.
+// Pure: type imports, and the steward note from health-words.ts.
 
 import type { CompareSort } from "./compare";
 import type { VaultFamily } from "./families";
+import { STEWARD_ATTESTATION } from "./health-words";
 
 export const COMPARE_TITLE = "Compare vaults";
 
 export const COMPARE_PAGE = {
+  /** Said once, under the heading: the readout's line, with the read times
+   *  the columns show, and the steward note each column leaves out. */
+  lead: `Readings of the past at the times shown. Rails does not forecast, rate or recommend. ${STEWARD_ATTESTATION}`,
   sortLabel: "Sort by",
   sorts: {
     size: "Size",
@@ -24,7 +28,8 @@ export const COMPARE_PAGE = {
     range: "Vaults whose share price grew over the 30 days come first; the others follow.",
     mixed: "Vaults in different assets sort by asset first, then by size within each.",
   },
-  readAt: (block: number) => `Read at block ${block.toLocaleString("en-US")}`,
+  /** The column's read time; the block stays off the surface (decision 0059 point 4). */
+  readAt: (iso: string) => `Read ${new Date(iso).toISOString().slice(11, 16)} UTC`,
   unread: "The chain read did not answer",
   caption: "The chosen vaults side by side, a column each",
   fees: "Fees",

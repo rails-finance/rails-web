@@ -99,7 +99,7 @@ function VaultHead({ c }: { c: CompareColumn }) {
           {c.family} · {c.chain}
         </div>
         <div className={`text-xs ${MUTED} tabular-nums`} data-compare-block={c.block ?? ""}>
-          {c.block != null ? COMPARE_PAGE.readAt(c.block) : COMPARE_PAGE.unread}
+          {c.readAt != null ? COMPARE_PAGE.readAt(c.readAt) : COMPARE_PAGE.unread}
         </div>
       </div>
     </div>
