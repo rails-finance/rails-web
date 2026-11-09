@@ -21,7 +21,8 @@
 // markets roster and a Comet's page on each chain, and Compound V2's and
 // Moonwell's markets pages with one market's page each, Maple's pools roster
 // and a pool's page, LlamaLend's markets and Fluid's vaults with one page
-// each, and a page per family with "Supplied by vaults" (the
+// each, Pendle's markets roster and a market's page, and a page per family
+// with "Supplied by vaults" (the
 // Morpho market page, not yet on the shells, is held to that section alone).
 //
 // Run:  npm run verify:preflight -- --warm <the pages>
@@ -110,6 +111,10 @@ const ALL_PAGES = [
   // Fluid's vaults roster (R1, grouped by vault type) and a vault's page (R2).
   "/ethereum/fluid/vaults",
   "/ethereum/fluid/vaults/11",
+  // Pendle's markets roster (R1: the head, then the table with its toolbar)
+  // and a market's page (R2: the head, the tokens, the pool, router events).
+  "/ethereum/pendle/markets",
+  "/ethereum/pendle/markets/0x34280882267ffa6383b363e278b027be083bbe3b",
 ];
 const PAGES = process.env.PAGES ? process.env.PAGES.split(",").map((p) => p.trim()) : ALL_PAGES;
 
@@ -133,8 +138,10 @@ function check(name, ok, detail = "") {
   return ok;
 }
 
-/** A section's ⋮ triggers: a `SectionMenu`'s, or the position card's (C17). */
-const MENU_TRIGGERS = "[data-section-menu] button[aria-haspopup], [data-card-menu] > button[aria-haspopup]";
+/** A section's ⋮ triggers: a `SectionMenu`'s, the position card's (C17), or
+ *  an event card's (its own scope, as on Pendle's market page). */
+const MENU_TRIGGERS =
+  "[data-section-menu] button[aria-haspopup], [data-card-menu] > button[aria-haspopup], [data-event-head-menu] button[aria-haspopup]";
 
 const browser = await chromium.launch();
 
