@@ -16,7 +16,7 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
-import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { SkeletonBlock } from "@/components/shared/skeleton-card";
@@ -83,6 +83,7 @@ const Dot = ({ color }: { color: string }) => (
 /** One row: a keyed component so it owns its receipts registry. */
 function Row({ r, t }: { r: ReserveRowModel; t: ReserveTableModel }) {
   const registry = useReceiptRegistry();
+  const symbol = r.asset.receipt ? <Prov info={r.asset.receipt}>{r.asset.symbol}</Prov> : r.asset.symbol;
   return (
     <ProvReceiptsScope registry={registry} bounds={false}>
       <DataTableRow data-reserve-row={r.key} href={r.href} {...r.hooks}>
@@ -93,10 +94,10 @@ function Row({ r, t }: { r: ReserveRowModel; t: ReserveTableModel }) {
               <div className="flex flex-wrap items-center gap-x-1.5 text-[13px] font-medium text-foreground">
                 {r.href ? (
                   <DataTableRowLink href={r.href} data-reserve-link={r.key}>
-                    {r.asset.symbol}
+                    {symbol}
                   </DataTableRowLink>
                 ) : (
-                  r.asset.symbol
+                  symbol
                 )}
                 {r.asset.tags}
                 {r.asset.chips}

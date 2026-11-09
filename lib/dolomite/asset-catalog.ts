@@ -37,8 +37,6 @@ export const DOLOMITE_VALUE_SCALE = 1e36;
  *  per-block — Index.lastUpdate is a unix timestamp). Simple multiplication. */
 export const SECONDS_PER_YEAR = 31_536_000;
 
-export const shortAddress = (addr: string): string => `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-
 /** The WLFI frontend opens positions under this shared account-number constant
  *  (0x47 repeated) — many owners share it, so it names the frontend, not the
  *  position. Stored/compared in canonical decimal form. */

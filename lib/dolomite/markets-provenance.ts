@@ -33,6 +33,7 @@
 import type { Provenance } from "@/components/shared/provenance";
 import { stampHeadRead, type ServerRead } from "@/lib/shared/server-head-read";
 import { DOLOMITE_ADDRESSES } from "@/lib/dolomite/asset-catalog";
+import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 const LANE = "live DolomiteMargin reads (/dolomite/markets)";
 
@@ -90,6 +91,48 @@ export const dolRosterCountProv = stamped(
     summary: `Markets listed — the core's own \`getNumMarkets\`${atBlock(c)}. Dolomite's admin can list markets (LogAddMarket), so the roster size is read from the core, never a hardcoded count.`,
     contract: marginContract(),
     via: `${LANE} · DolomiteMargin.getNumMarkets @ head`,
+  }),
+);
+
+// ── per-market: identity ────────────────────────────────────────────────────
+
+/** A market's identity — its numeric id on the core and the token
+ *  `getMarketTokenAddress` names for it. The asset cell's receipt: the id and
+ *  the address leave the table's surface (decision 0059 point 1). */
+export const dolMarketIdentityProv = stamped(
+  (token: string, c: DolomiteMarketCoords): Provenance => ({
+    kind: "chain",
+    pclass: "state",
+    source: { block: c.blockNumber },
+    verify: {
+      kind: "etherscan",
+      href: explorerUrl(MAINNET_CHAIN_ID, "address", token),
+      text: `${sym(c)} token on Etherscan`,
+    },
+    summary: `${sym(c)} is ${mkt(c)} on DolomiteMargin. The core's \`getMarketTokenAddress\`${atBlock(c)} names its token, ${token}; the symbol and decimals are the token's own ERC-20 reads.`,
+    contract: marginContract(),
+    via: `${LANE} · getMarketTokenAddress(${c.marketId ?? "id"}) @ head`,
+    inputs: [
+      {
+        label: "market id",
+        value: String(c.marketId ?? ""),
+        kind: "chain",
+        pclass: "state",
+        note: "the core's numeric market key",
+      },
+      {
+        label: "token",
+        value: token,
+        kind: "chain",
+        pclass: "state",
+        contract: { name: sym(c), address: token },
+        verify: {
+          kind: "etherscan",
+          href: explorerUrl(MAINNET_CHAIN_ID, "address", token),
+          text: `${sym(c)} on Etherscan`,
+        },
+      },
+    ],
   }),
 );
 
