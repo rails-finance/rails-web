@@ -105,7 +105,16 @@ export interface StructureFigure {
 /** The slot where a protocol adds what is its own (survey §3.2's
  *  `MarketStructure`): one variant per structure, named for what it is. The
  *  head draws its terms under the band; a page section can draw the rest. */
-export type MarketStructure = TicksStructure | CometStructure | EraStructure | LadderStructure;
+export type MarketStructure = TicksStructure | CometStructure | EraStructure | LadderStructure | TokensStructure;
+
+/** Pendle: the market's other tokens beside the PT the band prices, each in
+ *  the market's asset: YT, LP and SY (survey §3.2's `tokens`). */
+export interface TokensStructure {
+  kind: "tokens";
+  yt: StructureFigure;
+  lp: StructureFigure;
+  sy: StructureFigure;
+}
 
 /** LlamaLend: the factory lineage a market was created by ("V1 lend market",
  *  "V1 mint market", "V2 market"), the roster's group level. */

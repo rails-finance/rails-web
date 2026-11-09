@@ -96,6 +96,14 @@ function StructureTerms({ s }: { s: MarketStructure }) {
       );
     case "eras":
       return <Term f={s.era} />;
+    case "tokens":
+      return (
+        <>
+          <Term f={s.yt} />
+          <Term f={s.lp} />
+          <Term f={s.sy} />
+        </>
+      );
     case "ladder":
       return (
         <>

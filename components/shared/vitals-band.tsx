@@ -43,8 +43,21 @@ import type { ReactNode } from "react";
 
 /** The canonical slots, in the order they always render. */
 // A single reserve's page (Aave M3.2) adds what is left to draw on (`sizeFree`)
-// and the two rates (`rateIn`, `rateOut`) between the sizes and usage.
-const SLOT_ORDER = ["roster", "sizeIn", "sizeOut", "sizeFree", "rateIn", "rateOut", "usage", "population"] as const;
+// and the two rates (`rateIn`, `rateOut`) between the sizes and usage. A
+// market of a token with a price and an end (Pendle) adds the token's price
+// after the rates (`price`) and the date it ends on last (`term`).
+const SLOT_ORDER = [
+  "roster",
+  "sizeIn",
+  "sizeOut",
+  "sizeFree",
+  "rateIn",
+  "rateOut",
+  "price",
+  "usage",
+  "population",
+  "term",
+] as const;
 
 export type VitalSlot = (typeof SLOT_ORDER)[number];
 
