@@ -51,7 +51,17 @@ export async function UniswapPositionPage({ version, id }: { version: UniswapVer
             fallbackHref={`${home}/${r.owner.toLowerCase()}`}
             showStamp={false}
             assets={[
-              // Quote per base, flipped where that reads below 0.001 (as the card's range does).
+              // The trigger leads with the position's worth; the pool's price follows in the
+              // dropdown, quote per base, flipped where that reads below 0.001.
+              {
+                symbol: p.quote.symbol,
+                address: p.quote.address,
+                price: p.valueNow,
+                unit: p.quote.symbol,
+                triggerLabel: "Worth",
+                label: `The position's worth in ${p.quote.symbol}, at the pool's price`,
+                info: cardProv("worth", { p, r }),
+              },
               p.price >= 0.001
                 ? {
                     symbol: p.base.symbol,
