@@ -18,6 +18,7 @@ import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-gr
 import { readStampProv } from "@/components/shared/read-stamp";
 import { Prov } from "@/components/shared/provenance";
 import { MarketPage } from "@/components/shared/product/market-page";
+import { DATA_TABLE_PILL } from "@/components/shared/data-table/data-table";
 import { positionEntry } from "@/components/shared/product/position-entry";
 import type { SectionMenuLink } from "@/components/shared/section-menu";
 import { formatTinyNonZero } from "@/lib/utils/format";
@@ -142,7 +143,7 @@ function Tags({ m }: { m: DolomiteMarketRow }) {
     <>
       {m.isClosing && (
         <span
-          className="text-[10px] uppercase tracking-wide text-rb-500"
+          className={`${DATA_TABLE_PILL} px-1 py-px text-[10px] uppercase tracking-wide`}
           title="Closing: no new borrowing; existing loans still run and the supply still earns"
           data-dolomite-closing=""
         >
@@ -151,7 +152,7 @@ function Tags({ m }: { m: DolomiteMarketRow }) {
       )}
       {m.priceAliasOf && (
         <span
-          className="whitespace-nowrap text-[11px] font-normal text-rb-500"
+          className={`${DATA_TABLE_PILL} whitespace-nowrap px-1 py-px text-[10px] font-normal`}
           title={`This market uses ${m.priceAliasOf.symbol}'s price, so the two cannot diverge on Dolomite.`}
           data-dolomite-priced-as={m.priceAliasOf.symbol}
         >
