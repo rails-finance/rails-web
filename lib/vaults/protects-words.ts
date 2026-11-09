@@ -15,7 +15,8 @@ export const PROTECTS_TITLE = "What protects it";
 export const UNDERNEATH_TITLE = "The protocol underneath";
 
 /** Said once on each vault page, in the first section's explanation slot. */
-export const PROTECTS_DISCLAIMER = "Readings at the block shown. Rails does not forecast, rate or recommend.";
+export const PROTECTS_DISCLAIMER =
+  "Readings of the past at the blocks shown. Rails does not forecast, rate or recommend.";
 
 export const PROTECTS_EXPLAINER = {
   label: "explanation of what protects it",
@@ -258,7 +259,7 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
     case "umbrella":
       return {
         label: "Cooldown",
-        headline: `${days(f.cooldown)} to unstake, then a ${dayAdj(f.window)} window`,
+        headline: `A ${dayAdj(f.cooldown)} cooldown, then ${days(f.window)} to unstake`,
         sentence:
           `Umbrella, ${shortHex(f.umbrella)}, can slash the stake when the Aave reserve it covers runs a deficit; ` +
           (f.govAdmin ? `Aave governance controls Umbrella ${govWait(f.gov)}.` : "who controls Umbrella was not read."),
@@ -269,10 +270,12 @@ export function protectsLine(f: ProtectsFact): ProtectsLine {
       return {
         label: "Upgrades",
         headline: w
-          ? `The pool delegate's upgrades wait ${days(w.delay)}, then a ${dayAdj(w.window)} window`
+          ? `The pool delegate's upgrades wait ${days(w.delay)}, then must run within ${days(w.window)}`
           : "The pool delegate's upgrades wait on Maple's timelock",
         sentence:
-          `The pool delegate, ${f.delegate ? shortHex(f.delegate) : "unread"}, runs the pool's lending; ` +
+          (f.delegate
+            ? `The pool delegate, ${shortHex(f.delegate)}, runs the pool's lending; `
+            : "The pool delegate runs the pool's lending; ") +
           `Maple's security admin, ${shortHex(f.securityAdmin)}, can upgrade without the wait.`,
         gap: "The deployed managers' versions are not matched to Maple's source on GitHub.",
       };
