@@ -15,6 +15,7 @@ import { WalletPanel } from "@/components/nav/wallet-panel";
 import { NavigationProgress } from "@/components/nav/navigation-progress";
 import { WalletContextProvider } from "@/components/nav/wallet-context";
 import { ThemeScript } from "@/components/ThemeScript";
+import { ASSET_SCOPE_SCRIPT } from "@/lib/shared/asset-preference";
 import { BetaStrip } from "@/components/shared/beta-strip";
 import { WorkInProgressStrip } from "@/components/shared/work-in-progress-strip";
 import { SITE_URL, TWITTER_HANDLE } from "@/lib/shared/page-metadata";
@@ -187,6 +188,10 @@ export default function RootLayout({
               "(function(){try{var d=document.documentElement.dataset;if(localStorage.getItem('rails-hero-seen'))d.heroSeen='1';if(sessionStorage.getItem('rails-tracks-seen'))d.tracksSeen='1'}catch(e){}})()",
           }}
         />
+        {/* The asset preference (ui-jobs 557): marks <html data-asset-scope>
+            before first paint, so a filtered list waits for its filter
+            rather than drawing whole first (globals.css). */}
+        <script dangerouslySetInnerHTML={{ __html: ASSET_SCOPE_SCRIPT }} />
       </head>
       <body
         className={`${dmSans.className} ${dmSans.variable} antialiased bg-background text-foreground min-h-screen flex flex-col overflow-x-hidden min-w-[320px]`}

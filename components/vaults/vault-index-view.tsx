@@ -22,6 +22,8 @@ import { protocolForPathname } from "@/lib/shared/protocols";
 import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { symbolsOfKeyword } from "@/lib/shared/asset-categories";
 import type { VaultSummary } from "@/lib/vaults/summary";
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { assetKey } from "@/lib/shared/asset-family";
 import type { VaultYield } from "@/lib/vaults/yield";
 import {
   chainName,
@@ -129,6 +131,10 @@ export function VaultIndexView({
     ...(protocols.length > 0 ? { protocol: protocols } : {}),
   };
 
+  // The asset preference (ui-jobs 557): a vault is kept when its asset or its
+  // share token is one of the reader's (sBOLD and ysyBOLD are share tokens).
+  const scoped = useScopedRows(vaults, (v) => [assetKey(v.chainId, v.asset.address), assetKey(v.chainId, v.address)]);
+
   const hooksOf = (v: VaultSummary) => ({
     "data-protocol": vaultIndexProtocol(v),
     "data-chain": String(v.chainId),
@@ -176,46 +182,49 @@ export function VaultIndexView({
     // The whole index is exempt from the coverage tripwire, its reason on the
     // element (the tripwire reads `data-prov-exempt`).
     <div data-prov-exempt={PROV_EXEMPT}>
+      <ScopeNote scoped={scoped} noun={["vault", "vaults"]} className="mb-2" />
       <ProvUnscoped>
-        <VaultRoster
-          initialSearch={initialSearch}
-          vaults={vaults}
-          yields={yields}
-          chainId={MAINNET_CHAIN_ID as ChainId}
-          blockNumber={0}
-          chainStale={rosters.every((r) => r.chainStale)}
-          skel="index"
-          facets={FACETS}
-          assetFacet={TOKEN_FACET}
-          initialFilters={initialFilters}
-          facetsInUrl
-          hrefOf={vaultIndexHref}
-          holdersHrefOf={vaultIndexHoldersHref}
-          receiptsOf={() => ({})}
-          hooksOf={hooksOf}
-          mobileSort={indexSort.mobileSort}
-          table={(rows, part) => (
-            <VaultIndexTable
-              rows={rows}
-              part={part}
-              initialSearch={initialSearch ?? ""}
-              yieldOf={(v) => yields[vaultIndexKey(v)]}
-              leadOf={(v) => LEAD_IDS[vaultIndexRosterKeyOf(v)] ?? null}
-              hrefOf={vaultIndexHref}
-              holdersHrefOf={vaultIndexHoldersHref}
-              hooksOf={hooksOf}
-            />
-          )}
-          head={{
-            census: null,
-            censusFigure: "index-census",
-            listingHref: null,
-            infoHref: null,
-            indexHref: null,
-            readAt,
-            drawer,
-          }}
-        />
+        <div {...scoped.listProps}>
+          <VaultRoster
+            initialSearch={initialSearch}
+            vaults={scoped.rows}
+            yields={yields}
+            chainId={MAINNET_CHAIN_ID as ChainId}
+            blockNumber={0}
+            chainStale={rosters.every((r) => r.chainStale)}
+            skel="index"
+            facets={FACETS}
+            assetFacet={TOKEN_FACET}
+            initialFilters={initialFilters}
+            facetsInUrl
+            hrefOf={vaultIndexHref}
+            holdersHrefOf={vaultIndexHoldersHref}
+            receiptsOf={() => ({})}
+            hooksOf={hooksOf}
+            mobileSort={indexSort.mobileSort}
+            table={(rows, part) => (
+              <VaultIndexTable
+                rows={rows}
+                part={part}
+                initialSearch={initialSearch ?? ""}
+                yieldOf={(v) => yields[vaultIndexKey(v)]}
+                leadOf={(v) => LEAD_IDS[vaultIndexRosterKeyOf(v)] ?? null}
+                hrefOf={vaultIndexHref}
+                holdersHrefOf={vaultIndexHoldersHref}
+                hooksOf={hooksOf}
+              />
+            )}
+            head={{
+              census: null,
+              censusFigure: "index-census",
+              listingHref: null,
+              infoHref: null,
+              indexHref: null,
+              readAt,
+              drawer,
+            }}
+          />
+        </div>
       </ProvUnscoped>
       <CompareBar />
     </div>

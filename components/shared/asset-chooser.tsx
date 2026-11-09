@@ -15,7 +15,9 @@
 // the add pill, Backspace in an empty field removes the last chosen token.
 //
 // The selection lives with the caller (the CoW wallet page keeps it in the URL
-// as ?token=0x…). Tried on CoW first (rails-ops decisions/0058); its use for
+// as ?token=0x…). An option with a `chain` is keyed `chain:address` (the asset
+// preference's chooser, ui-jobs 557, offers one token on several chains); CoW's
+// options carry none and are keyed by address. Tried on CoW first (rails-ops decisions/0058); its use for
 // the timeline's Assets filter and the roster's Token facet is Miles's call.
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
@@ -33,8 +35,10 @@ import {
 import { OVERLAY_HEADING, OVERLAY_SUBHEADING, RESET_LINK } from "@/lib/shared/ui-grammar";
 
 export interface AssetChooserOption {
-  /** Lowercased; the option's identity. */
+  /** Lowercased; the option's identity, with `chain` where given. */
   address: string;
+  /** The token's chain; the option is then keyed `chain:address`. */
+  chain?: number;
   /** null where the token's symbol was not read. */
   symbol: string | null;
   /** What the option reaches (the wallet's trades in this token). */
@@ -45,7 +49,7 @@ export interface AssetChooserOption {
 
 export interface AssetChooserProps {
   options: AssetChooserOption[];
-  /** Chosen addresses, in the order they were chosen. */
+  /** Chosen keys (`optionKey`), in the order they were chosen. */
   selected: string[];
   onChange: (next: string[]) => void;
   /** "Only between X and Y", offered while exactly two are chosen. */
@@ -53,8 +57,16 @@ export interface AssetChooserProps {
   onPairChange?: (next: boolean) => void;
   /** The control's name: the add pill's accessible name and the panel's heading. */
   label?: string;
-  /** What a count counts, for its tip ("trades"). */
-  countNoun?: string;
+  /** What a count counts, for its tip ("trades"); null draws no counts. */
+  countNoun?: string | null;
+  /** Draws the chosen tokens as pills; false where the caller lists them. */
+  pills?: boolean;
+  /** The heading over the most counted options. */
+  topLabel?: string;
+  /** The add pill's words with nothing chosen. */
+  addLabel?: string;
+  /** Chain names, for options with a `chain` that share a symbol. */
+  chainName?: (chain: number) => string;
   /** The count line, pinned in the phone sheet where the list behind is covered. */
   sheetStatus?: ReactNode;
   anatomy?: string;
@@ -67,9 +79,13 @@ export const ASSET_CHOOSER_TOP_MIN = 3;
 
 const shortAddress = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
+/** An option's identity: `chain:address` where it names its chain. */
+export const optionKey = (o: Pick<AssetChooserOption, "address" | "chain">) =>
+  o.chain == null ? o.address : `${o.chain}:${o.address}`;
+
 /** By count, most first, then by the latest use, then by address (a stable order, never shown as one). */
 function byCount(a: AssetChooserOption, b: AssetChooserOption): number {
-  return b.count - a.count || (b.last ?? 0) - (a.last ?? 0) || a.address.localeCompare(b.address);
+  return b.count - a.count || (b.last ?? 0) - (a.last ?? 0) || optionKey(a).localeCompare(optionKey(b));
 }
 
 function TokenMark({ o, size = 16 }: { o: AssetChooserOption; size?: number }) {
@@ -88,6 +104,10 @@ export function AssetChooser({
   onPairChange,
   label = "Tokens",
   countNoun = "trades",
+  pills = true,
+  addLabel = "Filter by token",
+  topLabel = "Most traded",
+  chainName,
   sheetStatus,
   anatomy,
 }: AssetChooserProps) {
@@ -101,7 +121,7 @@ export function AssetChooser({
   const listId = useId();
 
   const sorted = useMemo(() => [...options].sort(byCount), [options]);
-  const byAddress = useMemo(() => new Map(sorted.map((o) => [o.address, o])), [sorted]);
+  const byAddress = useMemo(() => new Map(sorted.map((o) => [optionKey(o), o])), [sorted]);
   // A symbol two tokens share: the pill and the row add the short address.
   const shared = useMemo(() => {
     const n = new Map<string, number>();
@@ -121,7 +141,7 @@ export function AssetChooser({
   const searchable = isOptionSearchable(sorted.length);
   const narrowed = useMemo(() => {
     const labelled = sorted.map((o) => ({ o, label: `${o.symbol ?? ""} ${o.address}` }));
-    const n = narrowOptions(labelled, searchable ? query : "", (x) => chosen.has(x.o.address));
+    const n = narrowOptions(labelled, searchable ? query : "", (x) => chosen.has(optionKey(x.o)));
     return {
       matched: n.matched.map((x) => x.o),
       also: n.alsoSelected.map((x) => x.o),
@@ -160,7 +180,11 @@ export function AssetChooser({
   }, [active, open]);
 
   const nameOf = (o: AssetChooserOption) =>
-    o.symbol ? (shared.has(o.symbol) ? `${o.symbol} ${shortAddress(o.address)}` : o.symbol) : shortAddress(o.address);
+    o.symbol
+      ? shared.has(o.symbol)
+        ? `${o.symbol} ${o.chain != null && chainName ? `on ${chainName(o.chain)}` : shortAddress(o.address)}`
+        : o.symbol
+      : shortAddress(o.address);
 
   function toggle(address: string) {
     onChange(chosen.has(address) ? selected.filter((a) => a !== address) : [...selected, address]);
@@ -188,7 +212,7 @@ export function AssetChooser({
     } else if (e.key === "Enter") {
       e.preventDefault();
       const pick = flat.length === 1 ? flat[0] : flat[active];
-      if (pick) toggle(pick.address);
+      if (pick) toggle(optionKey(pick));
     } else if (e.key === "Escape") {
       e.preventDefault();
       close();
@@ -202,7 +226,7 @@ export function AssetChooser({
   return (
     <div ref={ref} className="relative" data-anatomy={anatomy} data-asset-chooser="">
       <div className="flex flex-wrap items-center gap-2">
-        {selected.map((a) => {
+        {(pills ? selected : []).map((a) => {
           const o = byAddress.get(a) ?? { address: a, symbol: null, count: 0 };
           const name = nameOf(o);
           return (
@@ -229,16 +253,16 @@ export function AssetChooser({
           ref={addRef}
           type="button"
           onClick={() => setOpen((v) => !v)}
-          aria-label={selected.length ? `Add a token to the filter` : `Filter by token`}
+          aria-label={selected.length && pills ? `Add a token to the filter` : addLabel}
           aria-expanded={open}
           aria-haspopup="listbox"
           className="inline-flex h-7 items-center gap-1 rounded-full border border-dashed border-teal-500/60 px-2.5 text-xs font-semibold text-teal-600 transition-colors hover:bg-teal-500/10 dark:text-teal-400"
           data-asset-chooser-add=""
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-          {selected.length === 0 && <span>Filter by token</span>}
+          {(selected.length === 0 || !pills) && <span>{addLabel}</span>}
         </button>
-        {selected.length >= 2 && (
+        {pills && selected.length >= 2 && (
           <button type="button" onClick={() => onChange([])} className={RESET_LINK}>
             Clear
           </button>
@@ -293,16 +317,17 @@ export function AssetChooser({
     const row = (o: AssetChooserOption) => {
       index += 1;
       const i = index;
-      const on = chosen.has(o.address);
+      const key = optionKey(o);
+      const on = chosen.has(key);
       return (
         <div
-          key={o.address}
+          key={key}
           id={`${listId}-${i}`}
           role="option"
           aria-selected={on}
           data-option-index={i}
-          data-asset-option={o.address}
-          onClick={() => toggle(o.address)}
+          data-asset-option={key}
+          onClick={() => toggle(key)}
           onPointerMove={() => setActive(i)}
           className={`overlay-item !gap-2 !py-1.5 ${i === active ? "overlay-item-active" : ""}`}
         >
@@ -316,14 +341,19 @@ export function AssetChooser({
             ) : (
               <span className="shrink-0 text-rb-500">Symbol not read</span>
             )}
+            {o.chain != null && chainName && (
+              <span className="shrink-0 text-[11px] text-rb-500">{chainName(o.chain)}</span>
+            )}
             <span className="shrink-0 font-mono text-[11px] text-rb-500">{shortAddress(o.address)}</span>
           </span>
-          <span
-            className="shrink-0 text-xs tabular-nums text-rb-500"
-            title={`${o.count.toLocaleString("en-US")} ${countNoun}`}
-          >
-            {o.count.toLocaleString("en-US")}
-          </span>
+          {countNoun != null && (
+            <span
+              className="shrink-0 text-xs tabular-nums text-rb-500"
+              title={`${o.count.toLocaleString("en-US")} ${countNoun}`}
+            >
+              {o.count.toLocaleString("en-US")}
+            </span>
+          )}
         </div>
       );
     };
@@ -350,20 +380,20 @@ export function AssetChooser({
         </div>
         {showTop && (
           <div className="px-4 pb-2">
-            <div className={`${OVERLAY_SUBHEADING} mb-1.5`}>Most traded</div>
+            <div className={`${OVERLAY_SUBHEADING} mb-1.5`}>{topLabel}</div>
             <div className="flex flex-wrap gap-1.5">
               {top.map((o) => (
                 <button
-                  key={o.address}
+                  key={optionKey(o)}
                   type="button"
-                  onClick={() => toggle(o.address)}
-                  aria-pressed={chosen.has(o.address)}
+                  onClick={() => toggle(optionKey(o))}
+                  aria-pressed={chosen.has(optionKey(o))}
                   className={`inline-flex h-6 items-center gap-1 rounded-full border px-2 text-xs transition-colors ${
-                    chosen.has(o.address)
+                    chosen.has(optionKey(o))
                       ? "border-teal-500/60 bg-teal-500/15 text-teal-700 dark:text-teal-300"
                       : "border-rb-300 text-foreground hover:bg-rb-100 dark:border-rb-700 dark:hover:bg-rb-800"
                   }`}
-                  data-asset-top={o.address}
+                  data-asset-top={optionKey(o)}
                 >
                   <TokenMark o={o} size={14} />
                   {nameOf(o)}

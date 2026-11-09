@@ -25,11 +25,17 @@ import {
 } from "@/lib/shared/asset-explorer";
 import { chainName } from "@/lib/shared/asset-roster";
 import type { ChainId } from "@/lib/shared/chains";
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { assetKey } from "@/lib/shared/asset-family";
 
 const CATEGORY_NOTE = "Rails’ classification of the asset";
 
-export function AssetExplorer({ cards, initial }: { cards: AssetCard[]; initial: ExplorerState }) {
+export function AssetExplorer({ cards: allCards, initial }: { cards: AssetCard[]; initial: ExplorerState }) {
   const [state, setState] = useState(initial);
+  // The asset preference (ui-jobs 557): a card is kept when any of its chains'
+  // tokens is one of the reader's.
+  const scoped = useScopedRows(allCards, (c) => c.chains.map((x) => assetKey(x.chain, x.token)));
+  const cards = scoped.rows;
   const update = useCallback((next: Partial<ExplorerState>) => {
     setState((s) => {
       const n = { ...s, ...next };
@@ -61,7 +67,8 @@ export function AssetExplorer({ cards, initial }: { cards: AssetCard[]; initial:
   const count = state.view === "list" ? shown.filter((c) => c.row && !c.row.rowless).length : shown.length;
 
   return (
-    <div>
+    <div {...scoped.listProps}>
+      <ScopeNote scoped={scoped} noun={["asset", "assets"]} className="mb-3" />
       <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Category" data-anatomy="A5.5">
         {(["all", ...ASSET_CATEGORY_ORDER] as const).map((c) => {
           const n = c === "all" ? cards.length : (counts.get(c) ?? 0);

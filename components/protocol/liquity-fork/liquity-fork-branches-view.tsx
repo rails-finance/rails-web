@@ -37,6 +37,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
@@ -317,6 +318,9 @@ export interface LiquityForkBranchesViewProps {
   /** Divergent link wiring. Omit for the forks (their defaults); Liquity V2
    *  overrides the filter param and trove-path shape. */
   urls?: LiquityForkUrlWiring;
+  /** The asset preference (ui-jobs 557): each branch's keys, its collateral
+   *  and the stablecoin, by branch key (`branchScopeKeys`). */
+  scopeKeys?: Record<string, string[]>;
 }
 
 export function LiquityForkBranchesView({
@@ -325,6 +329,7 @@ export function LiquityForkBranchesView({
   basePath,
   learnMore,
   urls,
+  scopeKeys,
 }: LiquityForkBranchesViewProps) {
   const registry = useReceiptRegistry();
   const wiring: Required<LiquityForkUrlWiring> = { ...DEFAULT_WIRING, ...urls };
@@ -333,9 +338,13 @@ export function LiquityForkBranchesView({
   // An empty branch is real protocol state, not noise — but a roster where
   // most branches are unused buries the ones carrying debt. Default to the
   // branches with troves, and say exactly what's hidden.
-  const withTroves = useMemo(() => data.branches.filter((b) => b.queue.length > 0), [data.branches]);
-  const emptyCount = data.branches.length - withTroves.length;
-  const shown = showEmpty || withTroves.length === 0 ? data.branches : withTroves;
+  // A branch is kept when its collateral or the stablecoin is one of the
+  // reader's assets.
+  const scoped = useScopedRows(data.branches, (b) => scopeKeys?.[b.key] ?? []);
+  const branches = scoped.rows;
+  const withTroves = useMemo(() => branches.filter((b) => b.queue.length > 0), [branches]);
+  const emptyCount = branches.length - withTroves.length;
+  const shown = showEmpty || withTroves.length === 0 ? branches : withTroves;
   // A queue link is offered only where the SORTED LIST has something in it —
   // `listedCount`, not `queue.length`. The two differ on a branch whose only
   // queue member is a zombie (asymmetry's cbBTC18: 0 listed, 1 zombie): its
@@ -371,7 +380,8 @@ export function LiquityForkBranchesView({
             </button>
           )}
         </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ScopeNote scoped={scoped} noun={["branch", "branches"]} className="mt-1" />
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" {...scoped.listProps}>
           {shown.map((b) => (
             <BranchCard key={b.key} branch={b} data={data} hrefBase={basePath} wiring={wiring} />
           ))}

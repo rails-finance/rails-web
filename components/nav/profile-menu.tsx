@@ -29,7 +29,7 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, ChevronDown, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
+import { Bookmark, ChevronDown, ListFilter, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Facehash } from "@/components/shared/facehash";
@@ -39,6 +39,8 @@ import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
+import { OPEN_SCOPE_PANEL, useAssetScope } from "@/lib/shared/asset-scope";
+import { scopeSummary } from "@/components/shared/asset-scope-strip";
 import { CTRL_OFF, CTRL_ON, START_CTA } from "@/lib/shared/ui-grammar";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 
@@ -148,6 +150,7 @@ export function ProfileMenu() {
   const positions = useSavedLinks("position");
   const views = useSavedLinks("view");
   const pathname = usePathname();
+  const scope = useAssetScope();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [place, setPlace] = useState<{ top: number; right: number; phone: boolean } | null>(null);
@@ -358,6 +361,26 @@ export function ProfileMenu() {
               ))}
               {anything && <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />}
               <div className="py-1">
+                {/* The asset preference's way in (ui-jobs 557): opens its panel
+                    (components/shared/asset-scope-strip.tsx). */}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    close(false);
+                    window.dispatchEvent(new Event(OPEN_SCOPE_PANEL));
+                  }}
+                  className={ITEM}
+                  data-profile-menu-assets={scope.picks.length}
+                >
+                  <ListFilter className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="min-w-0 flex-1 truncate text-foreground">Your assets</span>
+                  <span className="shrink-0 truncate text-xs text-rb-500">
+                    {scope.picks.length
+                      ? scopeSummary(scope.picks).replace(/ and what's built on (it|them)$/, "")
+                      : "All"}
+                  </span>
+                </button>
                 <Link
                   href={BOOKMARKS_PATH}
                   role="menuitem"

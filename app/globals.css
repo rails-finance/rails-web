@@ -2549,3 +2549,10 @@ table.dt-stacked {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/* The asset preference (ui-jobs 557): with a preference or `?assets=` present
+   (html[data-asset-scope], set before first paint in app/layout.tsx), a
+   filtered list waits for its filter instead of drawing whole first. */
+html[data-asset-scope] [data-scope-list]:not([data-scope-ready]) {
+  visibility: hidden;
+}

@@ -7,6 +7,7 @@
 // LiquityForkBranchesView holds the presentation — Asymmetry renders the same
 // component off its own roster.
 
+import { branchScopeKeys } from "@/lib/shared/asset-family";
 import {
   LiquityForkBranchesView,
   LiquityForkBranchesStamp,
@@ -14,7 +15,7 @@ import {
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
 import type { LiquityForkConfig } from "@/lib/sources/chain/liquity-fork-position";
-import { EBISU_BRANCHES, DEBT_SYMBOL } from "@/lib/ebisu/asset-catalog";
+import { EBISU_BRANCHES, DEBT_ADDRESS, DEBT_SYMBOL } from "@/lib/ebisu/asset-catalog";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
@@ -46,6 +47,7 @@ export default async function EbisuBranchesPage() {
         />
 
         <LiquityForkBranchesView
+          scopeKeys={branchScopeKeys(1, EBISU_BRANCHES, DEBT_ADDRESS)}
           data={data}
           protocolName="Ebisu"
           basePath="/ethereum/ebisu"

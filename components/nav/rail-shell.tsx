@@ -28,6 +28,7 @@
 import type { ReactNode } from "react";
 import { ProfileMenu } from "@/components/nav/profile-menu";
 import { BrandRail } from "@/components/nav/brand-rail";
+import { AssetScopeStrip } from "@/components/shared/asset-scope-strip";
 
 export function RailShell({
   column,
@@ -42,6 +43,9 @@ export function RailShell({
     <>
       <BrandRail />
       <div className="flex flex-1 flex-col md:pl-14">
+        {/* The asset preference's chip (ui-jobs 557): a strip over the app
+            column while the preference is on, nothing while it is off. */}
+        {column === "app" && <AssetScopeStrip />}
         {column === "app" ? (
           <main className="relative mx-auto w-full max-w-7xl flex-1 px-4 md:-mt-[17px] md:px-6">
             <div className="absolute right-3.5 top-8 z-10 hidden md:block" data-profile-corner="">
