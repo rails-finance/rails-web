@@ -539,7 +539,7 @@ export function MorphoMarketsOverview({
   chainId?: ChainId;
 }) {
   // Hook first (before the early return), so the receipts registry is stable across renders
-  // regardless of the stale branch — the compound-markets-view / maple-pools-view order.
+  // regardless of the stale branch — the maple-pools-view order.
   const registry = useReceiptRegistry();
   if (data.chainStale) {
     return <p className="text-sm text-rb-500">The market roster could not be read from chain at this block.</p>;

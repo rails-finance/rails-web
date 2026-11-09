@@ -30,6 +30,7 @@ import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import type { StoredHeadRead } from "@/lib/shared/server-head-read";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { resolveErc20Meta, scaleRaw, assertDecimalsRead } from "./erc20-meta";
+import { jumpRateModel, type ComptrollerRateModel } from "@/lib/comptroller/rate-model";
 import {
   MOONWELL_MARKETS,
   MOONWELL_ADDRESSES,
@@ -244,7 +245,18 @@ const ROSTER_MTOKEN_ABI = parseAbi([
 const ROSTER_IRM_ABI = parseAbi([
   "function kink() view returns (uint256)",
   "function timestampsPerYear() view returns (uint256)",
+  // The jump-rate model's terms, per second (lib/comptroller/rate-model.ts).
+  "function baseRatePerTimestamp() view returns (uint256)",
+  "function multiplierPerTimestamp() view returns (uint256)",
+  "function jumpMultiplierPerTimestamp() view returns (uint256)",
 ]);
+const ROSTER_IRM_CALLS = [
+  "kink",
+  "timestampsPerYear",
+  "baseRatePerTimestamp",
+  "multiplierPerTimestamp",
+  "jumpMultiplierPerTimestamp",
+] as const;
 
 export interface MoonwellMarketRow {
   /** The mToken address — the key. */
@@ -320,6 +332,8 @@ export interface MoonwellMarketRow {
   /** The utilisation the rate curve turns at, as a fraction — per-market,
    *  never assumed; the roster does not share one. */
   kink: number | null;
+  /** The model's terms as annual fractions; null where the model does not answer them. */
+  rateModel: ComptrollerRateModel | null;
 }
 
 export interface MoonwellMarketsResponse {
@@ -482,10 +496,7 @@ async function readMarkets(client: PublicClient, deployment: MoonwellDeployment)
     ...atBlock,
     contracts: irmOf.flatMap((irm) => {
       const addr = (irm && !isZeroAddr(irm) ? irm : comptroller) as `0x${string}`;
-      return [
-        { address: addr, abi: ROSTER_IRM_ABI, functionName: "kink" },
-        { address: addr, abi: ROSTER_IRM_ABI, functionName: "timestampsPerYear" },
-      ] as const;
+      return ROSTER_IRM_CALLS.map((functionName) => ({ address: addr, abi: ROSTER_IRM_ABI, functionName }));
     }),
   })) as Res[];
 
@@ -557,8 +568,10 @@ async function readMarkets(client: PublicClient, deployment: MoonwellDeployment)
     // SECONDS_PER_YEAR when a model won't answer — per-timestamp is
     // wall-clock seconds by definition, so the constant is the convention
     // itself, not a guess about block cadence.
-    const kinkRaw = ok<bigint>(irmRes[i * 2]);
-    const tpyRaw = ok<bigint>(irmRes[i * 2 + 1]);
+    const irm = (k: (typeof ROSTER_IRM_CALLS)[number]) =>
+      ok<bigint>(irmRes[i * ROSTER_IRM_CALLS.length + ROSTER_IRM_CALLS.indexOf(k)]);
+    const kinkRaw = irm("kink");
+    const tpyRaw = irm("timestampsPerYear");
     const timestampsPerYear = tpyRaw != null && tpyRaw > ZERO ? Number(tpyRaw) : null;
     const apr = (r: Res | undefined): number | null => {
       const v = ok<bigint>(r);
@@ -606,6 +619,15 @@ async function readMarkets(client: PublicClient, deployment: MoonwellDeployment)
       interestRateModel: irmOf[i] && !isZeroAddr(irmOf[i]) ? getAddress(irmOf[i]!).toLowerCase() : null,
       timestampsPerYear,
       kink: kinkRaw != null && kinkRaw > ZERO ? Number(kinkRaw) / 1e18 : null,
+      rateModel: jumpRateModel(
+        {
+          base: irm("baseRatePerTimestamp"),
+          multiplier: irm("multiplierPerTimestamp"),
+          jump: irm("jumpMultiplierPerTimestamp"),
+          kink: kinkRaw,
+        },
+        timestampsPerYear ?? SECONDS_PER_YEAR,
+      ),
     };
   });
 

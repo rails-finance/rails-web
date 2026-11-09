@@ -7,7 +7,12 @@
 // api/src/services/aave-reserve-{history,config-log,holders}.ts). Client
 // only: the bearer token stays in the route.
 //
-// The three start together when the page mounts, apart from the market's head
+// The deficit's write-offs (M3.9) read rails-server's /api/aave/reserve-deficit
+// through app/api/aave/reserve-deficit/route.ts (rails-server
+// api/src/services/aave-reserve-deficit.ts), on the markets whose Pool keeps a
+// deficit: not SparkLend or Seamless.
+//
+// The reads start together when the page mounts, apart from the market's head
 // read, and each settles on its own: a failure or a timeout leaves that one
 // section a muted line.
 
@@ -25,10 +30,13 @@ const API_MARKET: Record<AaveMarketKey, string> = {
   "aave-v3-arbitrum": "arbitrum",
 };
 
+/** The markets whose Pool has no deficit getter (SparkLend's reverts; Seamless runs V3.0). */
+const NO_DEFICIT: ReadonlySet<AaveMarketKey> = new Set(["spark", "seamless"]);
+
 /** A market whose rows the box has not got: Arbitrum's lane, or Base's
  *  per-wallet positions for the holders. */
 interface NotHeld {
-  status: "not-indexed" | "not-ranked";
+  status: "not-indexed" | "not-ranked" | "no-deficit";
   reason: string;
 }
 
@@ -120,6 +128,50 @@ export interface ReserveHolders {
   leftOut: { suppliers: { wallet: string; amount: string; rule: string }[]; borrowers: { wallet: string }[] };
 }
 
+export interface DeficitToken {
+  address: string;
+  symbol: string | null;
+  decimals: number | null;
+}
+
+/** One DeficitCreated and the LiquidationCall it came from. Amounts are raw. */
+export interface WriteOff {
+  user: string;
+  writtenOff: { raw: string; decimals: number | null };
+  block: number;
+  /** Unix seconds. */
+  timestamp: number;
+  txHash: string;
+  /** The log's index within its transaction. */
+  logIndex: number;
+  /** The emitting Pool. */
+  pool: string;
+  liquidation: {
+    collateral: DeficitToken;
+    collateralSeized: string;
+    /** The debt token the liquidator repaid: this reserve's, or another the borrower owed. */
+    debtAsset: DeficitToken;
+    debtRepaid: string;
+    liquidator: string;
+    txFrom: string;
+    logIndex: number;
+  } | null;
+}
+
+export interface ReserveDeficit {
+  market: string;
+  chainId: number;
+  pool: string;
+  asset: DeficitToken;
+  source: string;
+  /** The first block the write-off table holds every log from. */
+  wholeFrom: number;
+  units: string;
+  totals: { count: number; writtenOff: string };
+  /** Largest first. */
+  rows: WriteOff[];
+}
+
 export type Read<T> =
   | { state: "loading" }
   | { state: "error" }
@@ -129,12 +181,12 @@ export type Read<T> =
 /** How long a read gets before its section gives up. */
 const READ_MS = 40_000;
 
-async function getRead<T>(read: string, q: Record<string, string>, signal: AbortSignal): Promise<Read<T>> {
+async function getRead<T>(path: string, q: Record<string, string>, signal: AbortSignal): Promise<Read<T>> {
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), READ_MS);
   signal.addEventListener("abort", () => ac.abort());
   try {
-    const res = await fetch(`/api/aave-family/${read}?${new URLSearchParams(q)}`, { signal: ac.signal });
+    const res = await fetch(`/api/${path}?${new URLSearchParams(q)}`, { signal: ac.signal });
     if (!res.ok) return { state: "error" };
     return settle<T>((await res.json()) as T & Partial<NotHeld>);
   } finally {
@@ -143,25 +195,27 @@ async function getRead<T>(read: string, q: Record<string, string>, signal: Abort
 }
 
 function settle<T>(body: T & Partial<NotHeld>): Read<T> {
-  if (body.status === "not-indexed" || body.status === "not-ranked") return { state: "not-held", status: body.status };
+  if (body.status === "not-indexed" || body.status === "not-ranked" || body.status === "no-deficit")
+    return { state: "not-held", status: body.status };
   return { state: "ok", data: body };
 }
 
-/** One read, started on mount and again when its question changes. */
-function useRead<T>(read: string, q: Record<string, string> | null): Read<T> {
+/** One read, started on mount and again when its question changes. `path`
+ *  under /api/; a null question reads nothing and stays loading. */
+function useRead<T>(path: string, q: Record<string, string> | null): Read<T> {
   const [out, setOut] = useState<Read<T>>({ state: "loading" });
   const key = q ? new URLSearchParams(q).toString() : "";
   useEffect(() => {
     if (!q) return;
     const ac = new AbortController();
     setOut({ state: "loading" });
-    getRead<T>(read, q, ac.signal)
+    getRead<T>(path, q, ac.signal)
       .then((r) => !ac.signal.aborted && setOut(r))
       .catch(() => !ac.signal.aborted && setOut({ state: "error" }));
     return () => ac.abort();
     // `key` is the question.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [read, key]);
+  }, [path, key]);
   return out;
 }
 
@@ -173,13 +227,18 @@ export function historyFrom(all: boolean): string | null {
   return d.toISOString().slice(0, 10);
 }
 
-/** The three reads for one reserve, in parallel. `from`: the history's first
+/** The reads for one reserve, in parallel; `deficit` is null on a Pool with no deficit. `from`: the history's first
  *  day (YYYY-MM-DD), or null for the reserve's whole history. */
 export function useReserveReads(key: AaveMarketKey, reserve: string, from: string | null) {
   const base = { market: API_MARKET[key], reserve: reserve.toLowerCase() };
   return {
-    history: useRead<ReserveHistory>("reserve-history", from ? { ...base, from } : base),
-    changes: useRead<ReserveConfigLog>("reserve-config-log", base),
-    holders: useRead<ReserveHolders>("reserve-holders", base),
+    history: useRead<ReserveHistory>("aave-family/reserve-history", from ? { ...base, from } : base),
+    changes: useRead<ReserveConfigLog>("aave-family/reserve-config-log", base),
+    holders: useRead<ReserveHolders>("aave-family/reserve-holders", base),
+    deficit: useRead<ReserveDeficit>(
+      "aave/reserve-deficit",
+      NO_DEFICIT.has(key) ? null : { market: base.market, asset: base.reserve },
+    ),
+    hasDeficit: !NO_DEFICIT.has(key),
   };
 }

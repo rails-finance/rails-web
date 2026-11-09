@@ -2,8 +2,8 @@
 
 // The reserve page's rate curve (anatomy M3.3, ui-jobs 541 and 549): the
 // borrow rate and the supply rate against utilisation from 0 to 100%, the kink
-// marked, and the reserve's point now, fed by value (`RateCurveModel`): the
-// two-slope constants, the reserve factor and where the reserve sits. The
+// marked where the model has one, and the reserve's point now, fed by value
+// (`RateCurveModel`): the two-slope constants, the reserve factor and where the reserve sits. The
 // supply curve is borrow × U × (1 − reserve factor). The curve's receipt sits
 // on the caption's "Now" line. Drawn in measured pixels so its type stays
 // legible at 375px. Neutral strokes: two series, no valence (color-grammar §1).
@@ -14,6 +14,11 @@ import { ratePercentText } from "@/lib/shared/rate-percent";
 import { isMissing, type Missing, type RateCurveModel } from "@/lib/shared/product/model";
 
 const H = 240;
+/** The rate axis stops at 100% a year; a curve that climbs past it (a jump
+ *  multiplier in the thousands of percent) leaves the chart, and the caption
+ *  states where it ends (Miles, 9 Nov 2026). */
+const RATE_CAP = 1;
+const wholePercent = (v: number) => `${Math.round(v * 100).toLocaleString("en-US")}%`;
 const PAD = { l: 44, r: 12, t: 12, b: 28 };
 
 /** The borrow rate at utilisation `u` on the two-slope curve. */
@@ -58,7 +63,9 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
   const rf = c.reserveFactor;
   const supplyAt = (u: number) => borrowRateAt(u, c) * u * (1 + (c.premium ?? 0)) * (1 - rf);
   const u = c.now.utilisation != null ? Math.min(1, c.now.utilisation) : null;
-  const top = Math.max(borrowRateAt(1, c), c.now.borrow, 0.0001);
+  const peak = borrowRateAt(1, c);
+  const offScale = peak > RATE_CAP;
+  const top = Math.max(Math.min(peak, RATE_CAP), c.now.borrow, 0.0001);
   const ticks = rateAxis(top);
   const yMax = ticks[ticks.length - 1];
 
@@ -76,6 +83,7 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
   const borrowPath = line((uu) => borrowRateAt(uu, c));
   const supplyPath = line(supplyAt);
   const axisText = "fill-rb-500 text-[11px]";
+  const clipId = `rate-curve-plot-${c.symbol.replace(/[^A-Za-z0-9]/g, "")}`;
 
   return (
     <figure data-rate-curve="" data-kink={c.optimal} data-now-u={u ?? ""} className="m-0">
@@ -85,7 +93,7 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
             width={W}
             height={H}
             role="img"
-            aria-label={`${c.symbol} borrow and supply rate against utilisation; kink at ${Math.round(c.optimal * 100)}%${u != null ? `, now at ${Math.round(u * 100)}%` : ""}`}
+            aria-label={`${c.symbol} borrow and supply rate against utilisation${c.noKink ? "" : `; kink at ${Math.round(c.optimal * 100)}%`}${u != null ? `, now at ${Math.round(u * 100)}%` : ""}`}
             className="block text-foreground"
           >
             {ticks.map((t) => (
@@ -107,26 +115,35 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
                 {`${f * 100}%`}
               </text>
             ))}
-            {/* The kink. */}
-            <line
-              x1={x(c.optimal)}
-              x2={x(c.optimal)}
-              y1={PAD.t}
-              y2={PAD.t + ih}
-              strokeDasharray="3 3"
-              className="stroke-rb-400 dark:stroke-rb-500"
-              data-kink-line=""
-            />
-            <text
-              x={c.optimal > 0.7 ? x(c.optimal) - 4 : x(c.optimal) + 4}
-              y={PAD.t + 10}
-              textAnchor={c.optimal > 0.7 ? "end" : "start"}
-              className={axisText}
-            >
-              {`kink ${+(c.optimal * 100).toFixed(2)}%`}
-            </text>
-            <path d={supplyPath} fill="none" strokeWidth={1.5} strokeDasharray="5 3" className="stroke-rb-500" />
-            <path d={borrowPath} fill="none" strokeWidth={2} className="stroke-current" />
+            {/* The kink, where the model has one. */}
+            {!c.noKink && (
+              <>
+                <line
+                  x1={x(c.optimal)}
+                  x2={x(c.optimal)}
+                  y1={PAD.t}
+                  y2={PAD.t + ih}
+                  strokeDasharray="3 3"
+                  className="stroke-rb-400 dark:stroke-rb-500"
+                  data-kink-line=""
+                />
+                <text
+                  x={c.optimal > 0.7 ? x(c.optimal) - 4 : x(c.optimal) + 4}
+                  y={PAD.t + 10}
+                  textAnchor={c.optimal > 0.7 ? "end" : "start"}
+                  className={axisText}
+                >
+                  {`kink ${+(c.optimal * 100).toFixed(2)}%`}
+                </text>
+              </>
+            )}
+            <clipPath id={clipId}>
+              <rect x={PAD.l} y={PAD.t - 2} width={iw} height={ih + 2} />
+            </clipPath>
+            <g clipPath={`url(#${clipId})`}>
+              <path d={supplyPath} fill="none" strokeWidth={1.5} strokeDasharray="5 3" className="stroke-rb-500" />
+              <path d={borrowPath} fill="none" strokeWidth={2} className="stroke-current" />
+            </g>
             {u != null && (
               <g data-now="">
                 <line
@@ -164,6 +181,12 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
           </svg>
           Supply rate
         </span>
+        {offScale && (
+          <span data-curve-offscale="">
+            The borrow rate leaves the chart above {wholePercent(yMax)} and reaches {wholePercent(peak)} at 100%
+            utilised.
+          </span>
+        )}
         <Prov info={c.receipt}>
           {u != null ? (
             <span data-now-caption="">

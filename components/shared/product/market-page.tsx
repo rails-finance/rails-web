@@ -283,13 +283,15 @@ export function MarketBody({
   market: Loadable<MarketModel>;
   /** The market's name, for the failure line. */
   what: string;
+  /** An R1 panel: the head alone, under its title. A market page (R2) is one
+   *  object named by its h1 and header, so its head draws no title. */
   headOnly?: boolean;
 }) {
   if (market.state === "loading") return headOnly ? <SkeletonBlock height={260} /> : <ProductLoading />;
   if (market.state === "error") return <ProductFailed what={what} message={market.message} />;
   return (
     <>
-      <ProductHeadSection head={market.data.head} />
+      <ProductHeadSection head={market.data.head} titled={headOnly} />
       {!headOnly && market.data.reserves && <ReserveTableSection t={market.data.reserves} />}
       {!headOnly && market.data.sections?.map((s) => <ProductSectionBlock key={s.scope} s={s} />)}
     </>

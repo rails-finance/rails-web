@@ -150,6 +150,7 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/base/seamless/market", "/base/seamless/markets"],
   ["/ethereum/aave-v4/market", "/ethereum/aave-v4/markets"],
   ["/base/aave-v4/market", "/base/aave-v4/markets"],
+  ["/base/compound-v3/market", "/base/compound-v3/markets"],
 ];
 
 /** The deployed commit's date, for the sitemap's `lastmod`
@@ -322,14 +323,6 @@ const nextConfig: NextConfig = {
         source: "/how-it-works",
         destination: "/about",
         permanent: true,
-      },
-      // Compound V3's Ethereum markets page is /markets; Base's is /market
-      // (the Base roster's own tab). The plural lands on it rather than on the
-      // wallet route, which would read "markets" as an address.
-      {
-        source: "/base/compound-v3/markets",
-        destination: "/base/compound-v3/market",
-        permanent: false,
       },
       // An f(x) position sits at /ethereum/fx/<pool>-<id>; a /positions/
       // segment in front of the slug (the shape other explorers use) lands
