@@ -6,23 +6,20 @@
 // draws them into these parts.
 // ----------------------------------------------------------------------------
 // A real <table>: a caption or label, `<th scope="col">` headers, an optional
-// `<th scope="row">` cell. Each row reads as one rounded block: the table is
-// `border-separate` with no horizontal spacing and a small vertical gap, the
-// stripe lies on the cells, and only the first and last cells round their
-// outer corners. Stripes alternate the raised and sunken surfaces (a row may
-// name its own, `DataTableRow stripe`, where drawer rows break the count); a hovered
-// row keeps its ground and takes a thin neutral border (`--edge-row-hover`),
-// drawn as a linked row's is. The frame scrolls sideways inside itself,
-// never the page; a pinned cell carries its row's stripe.
+// `<th scope="row">` cell. Rows sit on the page's ground, a hairline between
+// them (`--edge-row-line`). A hovered row lifts into a rounded block
+// (`--surface-row-hover`) inset evenly inside its row, and the hairlines above
+// and below it are not drawn while it is hovered, so nothing moves. The row
+// visuals live in `table.dt` (app/globals.css). The frame scrolls sideways
+// inside itself, never the page; a pinned cell carries the page's ground.
 //
 // A LINKED ROW. `DataTableRow href` with one `DataTableRowLink` in a cell
 // (the row's name, the one link a keyboard reaches). Every cell lays a hidden
 // copy of the link over itself (`tabIndex={-1}`, `aria-hidden`), so a press
 // anywhere on the row opens it: a cell, unlike a <tr>, positions reliably in
 // every engine. Other controls and armed receipts stand above the copies.
-// Hovered, or focused from the keyboard, the row takes the listing cards' blue
-// border (POSITION_CARD_FRAME_BOX), drawn by each cell along its top and
-// bottom and by the end cells round their outer corners, and its name stays
+// Hovered, or focused from the keyboard, the lifted block also takes the
+// listing cards' blue border (POSITION_CARD_FRAME_BOX), and its name stays
 // foreground: a clickable card takes the border, not blue text
 // (standards/color-grammar.md §4a).
 //
@@ -35,18 +32,16 @@
 // table too wide for a tablet). Below sm (or lg) the same <table>
 // reflows into cards by CSS (`.dt-stacked`, app/globals.css), with explicit
 // ARIA roles so a screen reader still reads rows of labelled cells: the
-// header row hides, the lead zone narrows to a 6px edge in the protocol's hue
-// (W4's pattern below sm), the row header spans the card, the other cells sit
-// two to a line, each with its `label`, a `wide` cell on a line of its own,
-// an empty cell not drawn. A table with no lead zone has no edge. Stripes,
-// corners, the gap, the linked row and its border carry over; pinning (D3)
-// does not apply.
+// header row hides, the lead zone narrows to a 4px bar in the protocol's hue,
+// the row header spans the card, the other cells sit two to a line, each with
+// its `label`, a `wide` cell on a line of its own, an empty cell not drawn.
+// The hairlines, the hover block and the linked row's border carry over;
+// pinning (D3) does not apply.
 //
 // THE LEAD COLUMN. Where rows span protocols or chains, each row opens with
 // the protocol's tinted zone (components/shared/row-zone.tsx, the wallet's
-// History lead): `DataTableLeadHeader` and `DataTableLeadCell`. Where the zone
-// meets the next cell the body's corners curve in over the hue (the frame is
-// `isolate`, so the hue behind them stays inside the table).
+// History lead), a rounded tile inset in its cell: `DataTableLeadHeader` and
+// `DataTableLeadCell`.
 
 import Link from "next/link";
 import {
@@ -69,34 +64,12 @@ type Align = "left" | "right";
 /** The cell's padding; a caller adds its own sizes and type. */
 export const DATA_TABLE_PAD = "px-2 py-2.5 sm:px-3";
 
-/** A pill or tag on a row: a ground apart from both stripes (the canvas in
- *  light, rb-600 in dark); the caller adds its size and case. */
-export const DATA_TABLE_PILL = "rounded-sm bg-background text-foreground/80 dark:bg-rb-600 dark:text-foreground/70";
-
-/** The row block's corners, on every body cell. */
-const CELL_CORNERS = "first:rounded-l-2xl last:rounded-r-2xl";
-/** The row's ground: odd rows raised, even rows sunken, read off the <tr>'s
- *  place in the body; or the stripe the row names (`DataTableRow stripe`). */
-const STRIPE_BY_PLACE = "group-odd/dt-row:bg-raised group-even/dt-row:bg-stripe";
-const STRIPE_GROUND = { raised: "bg-raised", sunken: "bg-stripe" } as const;
-export type DataTableStripe = keyof typeof STRIPE_GROUND;
-
-/** The row's hover border, drawn by each cell's ::after along its top and
- *  bottom and by the end cells round their outer sides and corners, so the
- *  row's height never moves. A sticky cell is positioned already. */
-const ROW_EDGE =
-  "after:pointer-events-none after:absolute after:inset-0 after:z-20 after:border-y after:border-transparent after:transition-colors after:content-[''] first:after:rounded-l-2xl first:after:border-l last:after:rounded-r-2xl last:after:border-r";
-/** An unlinked row's border: neutral, on hover only. */
-const PLAIN_EDGE = "group-hover/dt-row:after:border-[var(--edge-row-hover)]";
-/** A linked row's: blue-500 on hover and on keyboard focus; the cell holds
- *  its cover. */
-const LINKED_EDGE = "group-hover/dt-row:after:border-blue-500 group-focus-within/dt-row:after:border-blue-500";
+/** A pill or tag on a row: a ground that reads on the page and on the hover
+ *  block; the caller adds its size and case. */
+export const DATA_TABLE_PILL = "rounded-sm bg-rb-200 text-foreground/80 dark:bg-white/8 dark:text-foreground/70";
 
 /** The row's link, which each cell's cover repeats. */
 const RowHref = createContext<string | null>(null);
-
-/** The row's named stripe, where it sets one. */
-const RowStripe = createContext<DataTableStripe | null>(null);
 
 /** The table reads as cards below sm (D6): its parts carry explicit roles,
  *  since a reflowed table loses its own. */
@@ -105,8 +78,8 @@ const Stacked = createContext(false);
 /** D1's `rowHeight`, from sm (from lg where the table stacks below lg). The
  *  class names are written out for Tailwind to find. */
 const ROW_HEIGHT = {
-  sm: { one: "sm:h-14 sm:py-0", two: "sm:h-16 sm:py-0", three: "sm:h-19 sm:py-0" },
-  lg: { one: "lg:h-14 lg:py-0", two: "lg:h-16 lg:py-0", three: "lg:h-19 lg:py-0" },
+  sm: { one: "sm:h-15 sm:py-0", two: "sm:h-17 sm:py-0", three: "sm:h-20 sm:py-0" },
+  lg: { one: "lg:h-15 lg:py-0", two: "lg:h-17 lg:py-0", three: "lg:h-20 lg:py-0" },
 } as const;
 const RowHeight = createContext<string>("");
 
@@ -140,8 +113,8 @@ export function DataTable({
   stackBelow?: "sm" | "lg";
   /** From sm every row is one fixed height, each cell middle-aligned, the
    *  caller keeping its content inside it (a long name truncates): `one`
-   *  line, 56px (room for a 28px icon); `two`, 64px (a name over a one-line
-   *  sub-label); `three`, 76px (a bar over two lines of text). */
+   *  line, 60px (room for a 36px icon); `two`, 68px (a name over a one-line
+   *  sub-label); `three`, 80px (a bar over two lines of text). */
   rowHeight?: "one" | "two" | "three";
   tableClassName?: string;
   className?: string;
@@ -158,7 +131,7 @@ export function DataTable({
           {...frame}
         >
           <table
-            className={`w-full border-separate border-spacing-x-0 border-spacing-y-1 ${stacked ? "dt-stacked" : ""} ${stacked && stackBelow === "lg" ? "dt-stack-lg" : ""} ${tableClassName}`}
+            className={`dt w-full border-separate border-spacing-0 ${stacked ? "dt-stacked" : ""} ${stacked && stackBelow === "lg" ? "dt-stack-lg" : ""} ${tableClassName}`}
             aria-label={caption ? undefined : label}
             role={stacked ? "table" : undefined}
           >
@@ -255,7 +228,7 @@ export function DataTableHeader({
       role={stacked ? "columnheader" : undefined}
       aria-sort={sorted}
       data-anatomy={sort || ariaSort ? "D2" : undefined}
-      className={`${DATA_TABLE_PAD} pb-1.5 text-xs font-semibold whitespace-nowrap text-rb-500 ${
+      className={`${DATA_TABLE_PAD} pb-2 text-xs font-semibold whitespace-nowrap text-rb-500 ${
         align === "right" ? "text-right" : "text-left"
       } ${sticky ? `${sticky} z-10 bg-background` : ""} ${className}`}
       {...rest}
@@ -286,31 +259,28 @@ export function DataTableHeader({
 const LINKED_ROW =
   "[&_a:not([data-row-cover])]:relative [&_a:not([data-row-cover])]:z-10 [&_button]:relative [&_button]:z-10 [&_[role=button]]:relative [&_[role=button]]:z-10";
 
-/** A body row: the block the cells draw. `href`: the whole row opens it, and
- *  one cell holds a `DataTableRowLink` to the same place. `stripe`: the row's
- *  ground, for a body whose rows do not alternate by place (a row with a
- *  drawer row under it, hidden or shown); without it odd rows are raised and
- *  even rows sunken. A stacked card (D6) still stripes by place. */
+/** A body row. `href`: the whole row opens it, and one cell holds a
+ *  `DataTableRowLink` to the same place. `drawer`: the row opens under the row
+ *  before it (hidden or shown), so no hairline divides the two. */
 export function DataTableRow({
   href,
-  stripe,
+  drawer = false,
   className = "",
   children,
   ...rest
-}: HTMLAttributes<HTMLTableRowElement> & { href?: string; stripe?: DataTableStripe }) {
+}: HTMLAttributes<HTMLTableRowElement> & { href?: string; drawer?: boolean }) {
   const stacked = useContext(Stacked);
   return (
     <RowHref.Provider value={href ?? null}>
-      <RowStripe.Provider value={stripe ?? null}>
-        <tr
-          role={stacked ? "row" : undefined}
-          className={`group/dt-row ${href ? LINKED_ROW : ""} ${className}`}
-          data-anatomy={href ? "D4" : undefined}
-          {...rest}
-        >
-          {children}
-        </tr>
-      </RowStripe.Provider>
+      <tr
+        role={stacked ? "row" : undefined}
+        className={`group/dt-row ${href ? LINKED_ROW : ""} ${className}`}
+        data-anatomy={href ? "D4" : undefined}
+        data-dt-drawer={drawer ? "" : undefined}
+        {...rest}
+      >
+        {children}
+      </tr>
     </RowHref.Provider>
   );
 }
@@ -346,8 +316,8 @@ function RowCover({ href }: { href: string }) {
   );
 }
 
-/** A body cell. `rowHeader` draws `<th scope="row">`; `sticky` pins it with
- *  its stripe (`max-sm:sticky max-sm:left-0`). `pad={false}` drops the padding. */
+/** A body cell. `rowHeader` draws `<th scope="row">`; `sticky` pins it on
+ *  the page's ground (`max-sm:sticky max-sm:left-0`). `pad={false}` drops the padding. */
 export function DataTableCell({
   rowHeader = false,
   align = "left",
@@ -376,9 +346,8 @@ export function DataTableCell({
   const href = useContext(RowHref);
   const stacked = useContext(Stacked);
   const height = useContext(RowHeight);
-  const stripe = useContext(RowStripe);
   const named = stacked && label ? <span className="dt-cell-label">{label}</span> : null;
-  const cls = `${stripe ? STRIPE_GROUND[stripe] : STRIPE_BY_PLACE} ${CELL_CORNERS} ${valign === "middle" || height ? "align-middle" : "align-top"} ${height} ${wide ? "dt-cell-wide" : ""} ${sticky ? "" : "relative"} ${ROW_EDGE} ${href ? LINKED_EDGE : PLAIN_EDGE} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
+  const cls = `${valign === "middle" || height ? "align-middle" : "align-top"} ${height} ${wide ? "dt-cell-wide" : ""} ${sticky ? "bg-background" : "relative"} ${pad ? DATA_TABLE_PAD : ""} ${align === "right" ? "text-right" : "text-left"} ${
     sticky ? `${sticky} z-10` : ""
   } ${className}`;
   const cover = href ? <RowCover href={href} /> : null;
@@ -416,10 +385,8 @@ export function DataTableLeadHeader({ sticky = "" }: { sticky?: string }) {
 }
 
 /** The lead cell: the protocol's tinted zone with its mark and the chain's
- *  glyph, spanning the row's height, with the protocol's and the chain's
- *  names for a screen reader. The hue runs on under the next cell, whose left
- *  corners round over it (`.dt-lead` curve in globals.css), so the row's body
- *  reads as a panel set into the hue. */
+ *  glyph, a rounded tile inset in the row, with the protocol's and the
+ *  chain's names for a screen reader. */
 export function DataTableLeadCell({
   protocol,
   protocolName,
@@ -437,7 +404,7 @@ export function DataTableLeadCell({
     <DataTableCell
       pad={false}
       sticky={sticky}
-      className="relative h-px w-16 sm:w-[95px]"
+      className="relative h-px w-16 py-1.5! pl-1.5! sm:w-[95px]"
       style={hueStyle(protocol)}
       title={`${protocolName} on ${chainMeta(chain).name}`}
       data-anatomy="D5"
@@ -445,7 +412,7 @@ export function DataTableLeadCell({
       data-row-zone-chain={chainMeta(chain).name}
     >
       <span className="sr-only">{protocolName} on </span>
-      <RowZone id={protocol} chain={chain} className="h-full min-h-11 w-16 rounded-l-2xl sm:w-[95px]" />
+      <RowZone id={protocol} chain={chain} className="h-full min-h-11 w-full rounded-xl" />
     </DataTableCell>
   );
 }
