@@ -65,6 +65,7 @@ import { isYearnRosterVault, yearnRosterEntry } from "@/lib/yearn/vault-roster";
 import type { VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
 import { BlockRef } from "@/components/shared/block-ref";
 import { serverReadOf } from "@/lib/shared/server-head-read";
+import { VaultHealthSection } from "@/components/vaults/vault-health-section";
 
 // Every figure is a call at the head with the holder in the path — nothing
 // about this is cacheable across requests.
@@ -262,6 +263,38 @@ function HoldingCard({
   );
 }
 
+/** "How the vault is doing" (V7) from this page's read of the vault. */
+function HealthSection({ data }: { data: YearnVaultResponse }) {
+  const { vault } = data;
+  const name = vault.name ?? vault.censusName;
+  return (
+    <VaultHealthSection
+      chainId={YEARN_CHAIN_ID}
+      family="yearn-v3"
+      vault={{ address: vault.address, name, assetSymbol: vault.asset.symbol, decimals: vault.asset.decimals }}
+      totalAssetsRaw={vault.totalAssets?.raw ?? null}
+      block={data.blockNumber}
+      readBy={serverReadOf(data)}
+      exit={
+        vault.totalIdle && vault.totalAssets
+          ? { kind: "idle", block: data.blockNumber, idle: vault.totalIdle.raw, total: vault.totalAssets.raw }
+          : null
+      }
+      steward={vault.roleManager ? { role: "roleManager", address: vault.roleManager, block: data.blockNumber } : null}
+      contracts={[{ name, address: vault.address, reads: "totalAssets(), totalIdle(), role_manager()" }]}
+      links={[
+        {
+          title: "The vault's page",
+          subtitle: name,
+          href: yearnVaultHref(vault.address),
+          item: "vault-page",
+          internal: true,
+        },
+      ]}
+    />
+  );
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { vault, holder } = await params;
   const address = vault.toLowerCase();
@@ -391,6 +424,17 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
         )}
 
         {!data.chainStale && !onEventPage && data.holder && <HoldingCard data={data} holder={data.holder} />}
+        {!data.chainStale && !onEventPage && data.holder && (
+          <Suspense
+            fallback={
+              <div className="mb-6" data-skel-section="vault-health-pending">
+                <SkeletonBlock height={220} />
+              </div>
+            }
+          >
+            <HealthSection data={data} />
+          </Suspense>
+        )}
         {!data.chainStale && data.holder && (
           <HoldingReceiptsScope>
             <Suspense

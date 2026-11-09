@@ -78,6 +78,7 @@ import { AAVE_VAULT_TAIL_VERSION, type VaultTimelineCoords } from "@/lib/shared/
 import type { VaultPositionRow } from "@/lib/aave-vaults/vault-position";
 import { BlockRef } from "@/components/shared/block-ref";
 import { serverReadOf } from "@/lib/shared/server-head-read";
+import { VaultHealthSection } from "@/components/vaults/vault-health-section";
 
 // Every figure is a call at the head with the holder in the path — nothing
 // about this is cacheable across requests.
@@ -406,6 +407,50 @@ async function HoldingCardSection({ data, holder }: { data: AaveEthereumVaultRes
   );
 }
 
+/** "How the vault is doing" (V7) from this page's read of the vault. */
+function HealthSection({ data }: { data: AaveEthereumVaultResponse }) {
+  const { vault } = data;
+  const name = vault.name || shortAddr(vault.address);
+  const u = vault.family === "umbrella-stake" ? data.umbrella : null;
+  return (
+    <VaultHealthSection
+      chainId={MAINNET_CHAIN_ID}
+      family={vault.family}
+      vault={{ address: vault.address, name, assetSymbol: vault.asset.symbol, decimals: vault.asset.decimals }}
+      totalAssetsRaw={data.totalAssets?.raw ?? null}
+      block={data.blockNumber}
+      readBy={serverReadOf(data)}
+      exit={
+        u && u.cooldownSeconds != null && u.unstakeWindowSeconds != null
+          ? {
+              kind: "cooldown",
+              block: data.blockNumber,
+              cooldownSeconds: u.cooldownSeconds,
+              windowSeconds: u.unstakeWindowSeconds,
+            }
+          : null
+      }
+      steward={u?.owner ? { role: "umbrellaOwner", address: u.owner, block: data.blockNumber } : null}
+      contracts={[
+        {
+          name,
+          address: vault.address,
+          reads: u ? "totalAssets(), getCooldown(), getUnstakeWindow(), owner()" : "totalAssets()",
+        },
+      ]}
+      links={[
+        {
+          title: "The vault's page",
+          subtitle: name,
+          href: ethereumVaultHref(vault.address),
+          item: "vault-page",
+          internal: true,
+        },
+      ]}
+    />
+  );
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { vault, holder } = await params;
   const address = vault.toLowerCase();
@@ -586,6 +631,17 @@ export default async function AaveEthereumVaultPositionPage({ params }: Props) {
             }
           >
             <HoldingCardSection data={data} holder={data.holder.address} />
+          </Suspense>
+        )}
+        {!data.chainStale && !onEventPage && data.holder && (
+          <Suspense
+            fallback={
+              <div className="mb-6" data-skel-section="vault-health-pending">
+                <SkeletonBlock height={220} />
+              </div>
+            }
+          >
+            <HealthSection data={data} />
           </Suspense>
         )}
         {!data.chainStale && timelineSlot && <HoldingReceiptsScope>{timelineSlot}</HoldingReceiptsScope>}
