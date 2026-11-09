@@ -17,7 +17,8 @@
 // Pages: the Morpho Base case-study vault, a Morpho Ethereum vault, the three
 // Aave vault families, a Yearn vault, the four family rosters, and the Aave
 // family's market rosters, market pages and reserve pages, Dolomite's
-// markets page, and f(x)'s pools roster and a pool's page.
+// markets page, f(x)'s pools roster and a pool's page, and Compound V3's
+// markets roster and a Comet's page on each chain.
 //
 // Run:  npm run verify:preflight -- --warm <the pages>
 //       BASE=http://localhost:3078 node scripts/verify/verify-section-scopes.mjs
@@ -56,6 +57,14 @@ const ALL_PAGES = [
   // sections, each with its own ⋮.
   "/ethereum/fx/pools",
   "/ethereum/fx/pools/wsteth",
+  // Compound V3's markets roster (A1) on each chain and a Comet's page (A2):
+  // the head and its collateral, each with its own ⋮.
+  "/ethereum/compound-v3/markets",
+  "/ethereum/compound-v3/markets/usdc",
+  "/base/compound-v3/markets",
+  "/base/compound-v3/markets/weth",
+  "/arbitrum/compound-v3/markets",
+  "/arbitrum/compound-v3/markets/usdc",
 ];
 const PAGES = process.env.PAGES ? process.env.PAGES.split(",").map((p) => p.trim()) : ALL_PAGES;
 
