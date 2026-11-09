@@ -22,15 +22,6 @@
 
 import { morphoBaseVaultByAddress } from "@/lib/morpho-base/vault-catalog";
 
-/** Steakhouse Prime USDC — MetaMorpho V1.1, asset USDC, created at Base block
- *  33,636,844. The Morpho Base markets view links here as a worked example: a
- *  six-market withdraw queue where one leg (cbBTC/USDC) carries most of the
- *  book, an idle market beside four funded ones, and enough holders that the
- *  largest, the median and a 1-wei dust holder are three visibly different
- *  readings of the same arithmetic. Naming one address here is unrelated to
- *  which addresses the route serves — every catalogued vault does. */
-export const MORPHO_BASE_CASE_STUDY_VAULT = "0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2";
-
 /** True when this address is in the baked catalogue. Synchronous, for input
  *  classification in the browser; a page or route that serves a vault asks
  *  `isMorphoBaseRosterVault` (lib/morpho-base/vault-roster.ts), which also

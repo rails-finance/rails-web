@@ -267,23 +267,6 @@ export function overviewData(resp: MorphoMarketsChainResponse): MorphoMarketsOve
   };
 }
 
-/** What the chain-snapshot stamp needs — three scalars. The stamp is a client
- *  component; handed the whole response it would carry the roster across a
- *  second time (it did: 3 MB on Base, on a page that draws no market rows). */
-export function stampOf(resp: MorphoMarketsChainResponse): MorphoMarketsStampData {
-  return {
-    blockNumber: resp.blockNumber,
-    censusBlock: resp.censusBlock,
-    chainStale: resp.chainStale,
-    totalsSource: resp.totalsSource,
-  };
-}
-
-export type MorphoMarketsStampData = Pick<
-  MorphoMarketsChainResponse,
-  "blockNumber" | "censusBlock" | "chainStale" | "totalsSource"
->;
-
 /** Everything the per-token page's client view draws, and nothing else: the
  *  group's header scalars plus its shape. The never-funded rows — 2,887 of
  *  the USDC group's 3,157 on Base — cross as runs with counts, not as rows. */
@@ -336,6 +319,8 @@ export interface MorphoMarketViewData {
   oraclePrice: number | null;
   oracleFeeds: MorphoOracleFeed[] | null;
   oraclePublishedAt: number | null;
+  /** `rateAtTarget(id)` as stored, per second in WAD; null off the AdaptiveCurveIRM. */
+  rateAtTarget: string | null;
 }
 
 /** The header's props from a successful read; null when the read failed. */
@@ -350,5 +335,40 @@ export function marketViewData(resp: MorphoMarketChainResponse): MorphoMarketVie
     oraclePrice: resp.oraclePrice,
     oracleFeeds: resp.oracleFeeds,
     oraclePublishedAt: resp.oraclePublishedAt,
+    rateAtTarget: resp.rateAtTarget,
   };
+}
+
+// ── the roster table (R1) ────────────────────────────────────────────────────
+
+/** One loan token on the roster table: its summary and the markets that carry
+ *  its book (the per-token page's `material`); the rest are counted, and open
+ *  on the token's page. */
+export interface MorphoRosterGroup extends MorphoLoanGroupSummary {
+  rows: MorphoMarketRow[];
+}
+
+export type MorphoRosterData = Omit<MorphoMarketsChainResponse, "groups"> & {
+  /** Loan tokens with a funded market, most funded markets outside a family first. */
+  groups: MorphoRosterGroup[];
+  /** Loan tokens none of whose markets has ever held supply. */
+  unfundedTokens: number;
+};
+
+/** The roster table's props: each funded loan token with its material markets.
+ *  The never-funded and the dust stay on the server, counted. */
+export function rosterData(resp: MorphoMarketsChainResponse): MorphoRosterData {
+  const overview = overviewData(resp);
+  // Ordered by the funded markets outside any family, so a token whose count
+  // is one pair minted many times (Base's 720 cbBTC markets) does not lead.
+  const groups = resp.groups
+    .flatMap((g, i) => {
+      if (g.funded === 0) return [];
+      const shape = shapeLoanGroup(g);
+      const own = g.funded - shape.families.reduce((n, f) => n + f.markets.length, 0);
+      return [{ group: { ...overview.groups[i], rows: shape.material }, own }];
+    })
+    .sort((a, b) => b.own - a.own || b.group.funded - a.group.funded)
+    .map((x) => x.group);
+  return { ...resp, groups, unfundedTokens: resp.groups.length - groups.length };
 }

@@ -2,11 +2,14 @@
 
 // The reserve page's Deficit section (anatomy M3.9): on any Aave V3 reserve
 // with a write-off held. The lead says in one sentence what the outstanding
-// deficit means, with Aave's source cited; then Written off · Covered ·
+// deficit means, Aave's sources in its figure's receipt; then Written off · Covered ·
 // Outstanding, each with its receipt; then the write-offs, largest first, ten
-// shown and the rest behind one row; then a line on the cover events, which
-// Rails has not indexed. Covered is derived: written off less outstanding
-// (deficitCoveredProv states the rule and cites it).
+// shown and the rest behind one row. Where the route holds the covers
+// (Ethereum), Covered is Σ DeficitCovered, then the covers table, the
+// record's check against the Pool's getter, and the step chart
+// (aave-reserve-deficit-covers.tsx). Elsewhere Covered is derived, written off
+// less outstanding (deficitCoveredProv states the rule and cites it), and a
+// line says the cover events are not indexed.
 
 import { useState, type ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -21,14 +24,17 @@ import {
   DataTableRow,
 } from "@/components/shared/data-table/data-table";
 import type { ReserveDeficit, WriteOff, DeficitToken } from "@/lib/api/fetch-aave-reserve-reads";
+import { CoversTable, DeficitStepChart } from "@/components/shared/aave-reserve-deficit-covers";
 import {
+  coveredSumProv,
   deficitCoveredProv,
+  deficitIdentityProv,
   liquidationLegProv,
   writeOffProv,
   writtenOffSumProv,
   type TxExplorer,
 } from "@/lib/shared/aave-reserve-reads-provenance";
-import { DEFICIT_SOURCES, type DeficitSourceKey } from "@/lib/aave-family/deficit-sources";
+import { deficitFigureProv } from "@/lib/aave-family/deficit-sources";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { shiftDecimal } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
@@ -36,29 +42,6 @@ import { fmtUsd } from "@/lib/aave-v4/format";
 
 const NOTE = "text-[13px] text-rb-500";
 const TOP = 10;
-
-/** Aave's sources for a sentence, as small links after it. */
-export function DeficitSources({ keys }: { keys: DeficitSourceKey[] }) {
-  return (
-    <span className="ml-1 whitespace-normal text-[11px] text-rb-500" data-deficit-sources={keys.join(" ")}>
-      (
-      {keys.map((k, i) => (
-        <span key={k}>
-          {i > 0 && ", "}
-          <a
-            href={DEFICIT_SOURCES[k].url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline dark:text-[var(--text-link)]"
-          >
-            {DEFICIT_SOURCES[k].label}
-          </a>
-        </span>
-      ))}
-      )
-    </span>
-  );
-}
 
 /** A raw amount in whole tokens. */
 const tokensOf = (raw: string, decimals: number | null): number | null =>
@@ -181,7 +164,14 @@ export function ReserveDeficitBody({
     heldFrom == null && head.outstandingRaw != null
       ? (BigInt(d.totals.writtenOff) - BigInt(head.outstandingRaw)).toString()
       : null;
-  const covered = coveredRaw != null && !coveredRaw.startsWith("-") ? tokensOf(coveredRaw, dec) : null;
+  const held = d.covers?.status === "held" ? d.covers : null;
+  const covered = held
+    ? tokensOf(held.totals.covered, dec)
+    : coveredRaw != null && !coveredRaw.startsWith("-")
+      ? tokensOf(coveredRaw, dec)
+      : null;
+  const identity = held ? (d.identity ?? null) : null;
+  const whole = identity != null && head.outstandingRaw != null && identity.outstanding === head.outstandingRaw;
   const usd = head.priceUsd != null ? fmtUsd(head.outstanding * head.priceUsd).display : null;
   const shown = open ? d.rows : d.rows.slice(0, TOP);
   const rest = d.rows.slice(TOP);
@@ -195,17 +185,17 @@ export function ReserveDeficitBody({
         {head.outstanding > 0 ? (
           <>
             Liquidations have left{" "}
-            <Prov info={head.outstandingProv}>
+            <Prov info={deficitFigureProv(head.outstandingProv)}>
               {tokenWords(head.outstanding)} {sym}
             </Prov>
             {usd && ` (${usd})`} of this reserve&apos;s loans with no borrower: suppliers are still owed it, and nobody
             owes it to the Pool.
-            <DeficitSources keys={["O2", "O3"]} />
           </>
         ) : (
           <>
-            Every write-off on this reserve has been covered.
-            <DeficitSources keys={["O5", "O6"]} />
+            <Prov info={deficitFigureProv(head.outstandingProv)}>
+              Every write-off on this reserve has been covered.
+            </Prov>
           </>
         )}
       </p>
@@ -220,7 +210,7 @@ export function ReserveDeficitBody({
         <Figure label="Covered" hook="covered">
           {covered != null ? (
             <>
-              <Prov info={coveredProv}>{tokenWords(covered)}</Prov>{" "}
+              <Prov info={held ? coveredSumProv(sym, d, held) : coveredProv}>{tokenWords(covered)}</Prov>{" "}
               <span className="text-[12px] font-normal text-rb-500">{sym}</span>
             </>
           ) : (
@@ -306,7 +296,40 @@ export function ReserveDeficitBody({
         </button>
       )}
 
-      {covered == null ? (
+      {held ? (
+        <div className="mt-6" data-deficit-covers="held">
+          <h3 className="text-[14px] font-semibold text-foreground">Covered</h3>
+          {held.rows.length > 0 ? (
+            <CoversTable d={d} c={held} symbol={sym} ex={ex} />
+          ) : (
+            <p className={`${NOTE} mt-1`} data-deficit-covers-none="">
+              Nothing has been covered on this reserve.
+            </p>
+          )}
+          {identity && (
+            <p className={`${NOTE} mt-3`} data-deficit-identity={whole ? "whole" : "differs"}>
+              {whole ? (
+                <Prov info={deficitIdentityProv(sym, d, identity, { raw: head.outstandingRaw, block: head.block })}>
+                  Rails holds every write-off and cover on this reserve: written off less covered equals the Pool&apos;s
+                  deficit.
+                </Prov>
+              ) : (
+                <>
+                  Written off less covered is{" "}
+                  <Prov info={deficitIdentityProv(sym, d, identity, { raw: head.outstandingRaw, block: head.block })}>
+                    {tokenWords(tokensOf(identity.outstanding, dec) ?? 0)} {sym}
+                  </Prov>{" "}
+                  through block {identity.atBlock.toLocaleString("en-US")}; the Pool reports{" "}
+                  {tokenWords(head.outstanding)} {sym}. A write-off or cover after that block is not in this record yet.
+                </>
+              )}
+            </p>
+          )}
+          <h3 className="mt-6 text-[14px] font-semibold text-foreground">Outstanding over time</h3>
+          <p className={`${NOTE} mb-2`}>Each write-off steps it up and each cover steps it down.</p>
+          <DeficitStepChart d={d} c={held} symbol={sym} ex={ex} />
+        </div>
+      ) : covered == null ? (
         <p className={`${NOTE} mt-3`} data-deficit-covers="">
           Rails has not indexed Aave&apos;s deficit cover events yet, so who covered any of it is not listed.
         </p>

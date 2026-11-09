@@ -8,6 +8,8 @@
 
 import { powerOfTen, type Provenance } from "@/components/shared/provenance";
 import type {
+  DeficitCover,
+  DeficitCovers,
   HistoryPoint,
   ReserveDeficit,
   ReserveHistory,
@@ -281,6 +283,169 @@ export function deficitCoveredProv(
       sourceLeaf("O7", "the deficit: a uint128 in underlying tokens"),
       sourceLeaf("O3", "the write-off: deficit += outstandingDebt"),
       sourceLeaf("O5", "the cover: deficit -= balanceWriteOff"),
+    ],
+  };
+}
+
+type HeldCovers = Extract<DeficitCovers, { status: "held" }>;
+
+/** How each Umbrella cover event was paid, in plain words, and the sources that say so. */
+export const PAID_BY: Record<
+  DeficitCover["umbrella"] extends infer U ? (U extends { event: infer E } ? E & string : never) : never,
+  { words: string; sources: DeficitSourceKey[] }
+> = {
+  DeficitOffsetCovered: { words: "The Aave DAO, within the deficit offset", sources: ["U2", "D3"] },
+  PendingDeficitCovered: { words: "Umbrella stakers, from a slash of their stake", sources: ["U3", "U2", "D3"] },
+  ReserveDeficitCovered: { words: "Aave's coverage manager, with no Umbrella stake set up", sources: ["U2", "U1"] },
+};
+
+/** One cover: its DeficitCovered and the Umbrella event beside it. */
+export function coverProv(
+  row: DeficitCover,
+  symbol: string,
+  d: ReserveDeficit,
+  c: HeldCovers,
+  ex: TxExplorer,
+): Provenance {
+  const u = row.umbrella;
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    source: { block: row.block, txHash: row.txHash },
+    summary: `${symbol} covered — the Pool's DeficitCovered at block ${block(row.block)}, log ${row.logIndex} of transaction ${row.txHash}, emitted by the Pool ${d.pool}; its caller is ${row.caller}${c.umbrella && row.caller === c.umbrella ? " (Aave's Umbrella)" : ""}, and the transaction was sent by ${row.txFrom}. ${
+      u
+        ? `Umbrella's ${u.event}, log ${u.logIndex} of the same transaction, says how it was paid: ${PAID_BY[u.event].words.toLowerCase()}.`
+        : "No Umbrella cover event is paired with it in that transaction."
+    }`,
+    contract: { name: "Pool", address: d.pool },
+    via: `${DEFICIT_ROUTE} · DeficitCovered.amountCovered · ${c.source}`,
+    verify: { kind: "etherscan", href: ex.tx(row.txHash), text: `The transaction on ${ex.name}` },
+    scaling: scaled(row.amount.raw, row.amount.decimals, "amountCovered"),
+    inputs: [
+      { label: "block", value: block(row.block), kind: "chain", pclass: "emitted" },
+      {
+        label: "DeficitCovered log",
+        value: String(row.logIndex),
+        kind: "chain",
+        pclass: "emitted",
+        note: "index within the transaction",
+      },
+      ...(u
+        ? [
+            {
+              label: `${u.event} log`,
+              value: String(u.logIndex),
+              kind: "chain" as const,
+              pclass: "emitted" as const,
+              note: `emitted by the Umbrella ${c.umbrella}`,
+            },
+            ...PAID_BY[u.event].sources.map((k) => sourceLeaf(k, "who pays, in Aave's source")),
+          ]
+        : []),
+      sourceLeaf("O5", "the cover: deficit -= balanceWriteOff"),
+      sourceLeaf("O6", "only the Umbrella can cover"),
+    ],
+  };
+}
+
+/** Σ covered: the sum of the Pool's DeficitCovered logs for the asset. */
+export function coveredSumProv(symbol: string, d: ReserveDeficit, c: HeldCovers): Provenance {
+  return {
+    kind: "derived",
+    pclass: "indexed",
+    summary: `${symbol} covered — the sum of the ${c.totals.count.toLocaleString("en-US")} DeficitCovered logs the Pool ${d.pool} has emitted for ${symbol} from block ${block(c.wholeFrom)} to block ${block(c.toBlock)}, read from ${c.source}.`,
+    contract: { name: "Pool", address: d.pool },
+    via: `${DEFICIT_ROUTE} · Σ DeficitCovered.amountCovered`,
+    formula: "Σ amountCovered",
+    inputs: [
+      {
+        label: "amountCovered, summed",
+        value: c.totals.covered,
+        kind: "chain",
+        pclass: "emitted",
+        note: `${c.totals.count.toLocaleString("en-US")} DeficitCovered logs, in the token's smallest unit`,
+      },
+      sourceLeaf("O4", "DeficitCovered"),
+    ],
+  };
+}
+
+/** The record's check: Σ written off − Σ covered against the Pool's getter. */
+export function deficitIdentityProv(
+  symbol: string,
+  d: ReserveDeficit,
+  identity: NonNullable<ReserveDeficit["identity"]>,
+  outstanding: { raw: string | null; block: number | null },
+): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "indexed",
+    source: outstanding.block != null ? { block: outstanding.block } : undefined,
+    summary: `${symbol} outstanding by the record — Σ written off less Σ covered, through block ${block(identity.atBlock)}. A reserve's deficit is raised only by a write-off and lowered only by a cover, and earns no interest, so when Rails holds every one of both logs this equals Pool.getReserveDeficit.`,
+    contract: { name: "Pool", address: d.pool },
+    via: `${DEFICIT_ROUTE} identity · Σ amountCreated − Σ amountCovered`,
+    formula: "Σ written off − Σ covered = getReserveDeficit",
+    inputs: [
+      {
+        label: "Σ written off",
+        value: identity.writtenOff,
+        kind: "derived",
+        pclass: "indexed",
+        note: "Σ DeficitCreated.amountCreated, raw",
+      },
+      {
+        label: "Σ covered",
+        value: identity.covered,
+        kind: "derived",
+        pclass: "indexed",
+        note: "Σ DeficitCovered.amountCovered, raw",
+      },
+      {
+        label: "by the record",
+        value: identity.outstanding,
+        kind: "derived",
+        pclass: "indexed",
+        note: `raw, through block ${block(identity.atBlock)}`,
+      },
+      {
+        label: "outstanding",
+        value: outstanding.raw ?? undefined,
+        kind: "chain",
+        pclass: "state",
+        note: `Pool.getReserveDeficit(asset)${outstanding.block != null ? ` at block ${block(outstanding.block)}` : ""}, raw`,
+      },
+      sourceLeaf("O7", "the deficit: a uint128 in underlying tokens"),
+      sourceLeaf("O3", "the write-off: deficit += outstandingDebt"),
+      sourceLeaf("O5", "the cover: deficit -= balanceWriteOff"),
+    ],
+  };
+}
+
+/** The outstanding deficit after one step of the chart: the running sum of write-offs less covers. */
+export function deficitStepProv(
+  symbol: string,
+  d: ReserveDeficit,
+  step: { block: number; txHash: string; raw: string; runningRaw: string; kind: "write-off" | "cover" },
+  ex: TxExplorer,
+): Provenance {
+  return {
+    kind: "derived",
+    pclass: "indexed",
+    source: { block: step.block, txHash: step.txHash },
+    summary: `${symbol} outstanding after block ${block(step.block)} — every DeficitCreated for ${symbol} on the Pool ${d.pool} to that block, less every DeficitCovered; this step is a ${step.kind === "write-off" ? "write-off (DeficitCreated)" : "cover (DeficitCovered)"} in transaction ${step.txHash}.`,
+    contract: { name: "Pool", address: d.pool },
+    via: `${DEFICIT_ROUTE} · running Σ amountCreated − Σ amountCovered`,
+    verify: { kind: "etherscan", href: ex.tx(step.txHash), text: `The step's transaction on ${ex.name}` },
+    formula: "Σ written off − Σ covered, to the block",
+    inputs: [
+      {
+        label: step.kind === "write-off" ? "amountCreated" : "amountCovered",
+        value: step.raw,
+        kind: "chain",
+        pclass: "emitted",
+        note: "this step, raw",
+      },
+      { label: "outstanding after", value: step.runningRaw, kind: "derived", pclass: "indexed", note: "raw" },
     ],
   };
 }

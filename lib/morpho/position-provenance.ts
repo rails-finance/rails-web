@@ -72,15 +72,6 @@ export const capacityProv = (
     readBy,
   );
 
-/** The live read's endpoint on each chain — Base reads every position a
- *  wallet holds through one sweep, Ethereum one position at a time. */
-export const morphoLiveLane = (chainId: number): string =>
-  chainId === 8453
-    ? "GET /api/chain/morpho-base/wallet"
-    : chainId === 42161
-      ? "GET /api/chain/morpho-arbitrum/wallet"
-      : LANE;
-
 const ORACLE = (address: string) => ({ name: "Market oracle", address });
 
 /** The market's own oracle price at the read block. */

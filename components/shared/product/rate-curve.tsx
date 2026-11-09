@@ -64,10 +64,12 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
   const supplyAt = (u: number) => borrowRateAt(u, c) * u * (1 + (c.premium ?? 0)) * (1 - rf);
   const u = c.now.utilisation != null ? Math.min(1, c.now.utilisation) : null;
   const peak = borrowRateAt(1, c);
-  const offScale = peak > RATE_CAP;
   const top = Math.max(Math.min(peak, RATE_CAP), c.now.borrow, 0.0001);
   const ticks = rateAxis(top);
   const yMax = ticks[ticks.length - 1];
+  // Off the chart only where the axis stops short of the peak: a point now
+  // above the cap lifts the axis to it.
+  const offScale = peak > yMax + 1e-9;
 
   const W = Math.max(width, 280);
   const iw = W - PAD.l - PAD.r;
@@ -93,7 +95,7 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
             width={W}
             height={H}
             role="img"
-            aria-label={`${c.symbol} borrow and supply rate against utilisation${c.noKink ? "" : `; kink at ${Math.round(c.optimal * 100)}%`}${u != null ? `, now at ${Math.round(u * 100)}%` : ""}`}
+            aria-label={`${c.symbol} borrow and supply rate against utilisation${c.noKink ? "" : `; ${c.kinkLabel ?? "kink"} at ${Math.round(c.optimal * 100)}%`}${u != null ? `, now at ${Math.round(u * 100)}%` : ""}`}
             className="block text-foreground"
           >
             {ticks.map((t) => (
@@ -133,7 +135,7 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
                   textAnchor={c.optimal > 0.7 ? "end" : "start"}
                   className={axisText}
                 >
-                  {`kink ${+(c.optimal * 100).toFixed(2)}%`}
+                  {`${c.kinkLabel ?? "kink"} ${+(c.optimal * 100).toFixed(2)}%`}
                 </text>
               </>
             )}

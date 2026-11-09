@@ -801,7 +801,7 @@ const SYSTEM = [
   { id: "morpho-markets", match: re(`/ethereum/morpho/markets`), routes: () => ["/api/chain/morpho/markets"] },
   { id: "morpho-base-markets", match: re(`/base/morpho/markets`), routes: () => ["/api/chain/morpho-base/markets"] },
   {
-    // components/protocol/morpho/morpho-arbitrum-markets-view.tsx
+    // loadMorphoMarketsFromChain on the Arbitrum deployment.
     id: "morpho-arbitrum-markets",
     match: re(`/arbitrum/morpho/markets`),
     routes: () => ["/api/chain/morpho-arbitrum/markets"],
