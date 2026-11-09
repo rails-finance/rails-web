@@ -340,7 +340,7 @@ function reserveHead(
     },
     explainer: {
       body: <ReserveExplainer r={r} label={sentenceName(m.marketLabel)} />,
-      label: "Show reserve explanation",
+      label: "reserve explanation",
     },
     learnMore: null,
     anatomy: "M3.1",

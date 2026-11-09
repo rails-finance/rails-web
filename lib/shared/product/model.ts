@@ -97,7 +97,7 @@ export interface HeadFigure {
  *  (standards/explanation-copy-charter.md §3, §4). */
 export interface HeadExplainer {
   body: ReactNode | null;
-  /** The (i) button's noun: "Show market explanation". */
+  /** The (i) button's noun, after "Show" or "Hide": "market explanation". */
   label: string;
 }
 
@@ -177,6 +177,9 @@ export interface ReserveRowModel {
     chips?: ReactNode;
     /** The line under the symbol. */
     sub?: ReactNode;
+    /** The symbol's receipt: the row's identity (Dolomite's market id and
+     *  token address), linking the token. */
+    receipt?: Provenance;
     /** A control at the cell's right: the Details panel. */
     details?: ReactNode;
     sort?: SortKey;

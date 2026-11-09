@@ -329,7 +329,7 @@ function marketHead(m: AaveMarketConfig, read: AaveMarketRead, view: AaveMarketV
     entries,
     readAt: readAtOf(m, read, `Every figure in ${view.label}`),
     tools,
-    explainer: { body: <MarketExplainer view={view} />, label: "Show market explanation" },
+    explainer: { body: <MarketExplainer view={view} />, label: "market explanation" },
     bandHooks: { "data-market-panel": view.protocol },
   };
 }

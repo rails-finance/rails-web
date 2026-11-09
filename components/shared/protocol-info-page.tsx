@@ -17,8 +17,9 @@ import type { ReactNode } from "react";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { RailHeader } from "@/components/shared/rail-header";
 import { protocolForSession } from "@/lib/shared/protocols";
-import { CHAINS, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { CHAINS, explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { shortAddress } from "@/lib/shared/asset-roster";
 
 export interface InfoDocLink {
   label: string;
@@ -37,6 +38,70 @@ export interface InfoView {
   /** "Listing", "Position page", "System page": the view as the rail names it. */
   heading: string;
   body: ReactNode;
+}
+
+/** One contract Rails reads for an explorer (slot 2a). */
+export interface InfoReadContract {
+  /** The contract's name as the protocol calls it. */
+  name: string;
+  /** Linked off-site to the chain's explorer; absent for a set of contracts
+   *  ("each market's token"). */
+  address?: string;
+  /** What Rails reads from it, in plain words. */
+  reads: ReactNode;
+}
+
+/** Slot 2a, "How Rails reads it" (decision 0059 point 6). */
+export interface InfoReads {
+  /** The chain the addresses are on; the explorer's own where absent. */
+  chainId?: ChainId;
+  contracts: readonly [InfoReadContract, ...InfoReadContract[]];
+  /** One line on the read: live at each page load, or Rails's server store and how often. */
+  how: ReactNode;
+  /** Facts a researcher needs that the product pages no longer carry, a paragraph each. */
+  notes?: readonly ReactNode[];
+}
+
+export const READS_HEADING = "How Rails reads it";
+
+/** Slot 2a: one row per contract, its address linked off-site (pink), then the
+ *  line on the read and any notes. */
+function InfoReadsSection({ reads, chainId }: { reads: InfoReads; chainId: ChainId }) {
+  const chain = reads.chainId ?? chainId;
+  return (
+    <section data-anatomy="I8" data-info-reads="">
+      <h2 className={H}>{READS_HEADING}</h2>
+      <ul className={UL}>
+        {reads.contracts.map((c) => (
+          <li key={c.name} data-info-read={c.name}>
+            <span className="font-semibold text-foreground">{c.name}</span>
+            {c.address && (
+              <>
+                {" "}
+                <a
+                  href={explorerUrl(chain, "address", c.address)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link-external font-mono text-[12px]"
+                  title={`${c.address} on ${CHAINS[chain].explorerName}`}
+                >
+                  {shortAddress(c.address)}
+                </a>
+              </>
+            )}
+            {": "}
+            {c.reads}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2">{reads.how}</p>
+      {reads.notes?.map((n, i) => (
+        <p key={i} className="mt-2">
+          {n}
+        </p>
+      ))}
+    </section>
+  );
 }
 
 /** The glossary's heading: one word, one place to change it. */
@@ -100,6 +165,8 @@ export interface ProtocolInfoPageProps {
   glossary: readonly [InfoTerm, ...InfoTerm[]];
   /** Slot 3: how the protocol works, three or four items, the distinguishing feature first. */
   howItWorks: readonly [ReactNode, ...ReactNode[]];
+  /** Slot 2a, "How Rails reads it": omitted on an explorer that reads no contract directly. */
+  reads?: InfoReads;
   /** Slot 4: one section per view, each a few lines. */
   views: readonly [InfoView, ...InfoView[]];
   /** Slot 5: the search and filter line, only where the listing has them. */
@@ -115,6 +182,7 @@ export function ProtocolInfoPage({
   tracks,
   glossary,
   howItWorks,
+  reads,
   views,
   search,
   notCovered,
@@ -138,6 +206,8 @@ export function ProtocolInfoPage({
             <li key={i}>{item}</li>
           ))}
         </ul>
+
+        {reads && <InfoReadsSection reads={reads} chainId={chainId} />}
 
         <h2 id="glossary" className={`${H} scroll-mt-20`}>
           {GLOSSARY_HEADING}

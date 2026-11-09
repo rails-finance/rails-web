@@ -32,7 +32,7 @@ export function SectionExplainer({
   className = "mt-3",
 }: {
   slot: SectionExplainerSlot;
-  /** The (i) button's noun: "Show vault explanation". */
+  /** The (i) button's noun, after "Show" or "Hide": "vault explanation". */
   label: string;
   /** The section's "?" at the pane's foot. */
   learnMore?: LearnMoreContent | null;
