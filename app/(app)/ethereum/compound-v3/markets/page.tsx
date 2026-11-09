@@ -3,7 +3,7 @@
 // V3's row.
 //
 // It sits ALONGSIDE the position explorer rather than instead of it, the same
-// shape as /compound-v2/markets, /aave-v3/market, /morpho/markets and
+// shape as /compound-v2/markets, /aave-v3/markets, /morpho/markets and
 // /fluid/vaults: the explorer answers "what happened to this wallet", this
 // answers "what is the protocol". This page reads no index — it is one
 // head-block read of each market's own Comet contract.
@@ -11,8 +11,8 @@
 // The route is plural (/compound/markets, like /compound-v2/markets and
 // /morpho/markets) because Compound V3 IS several markets: each Comet is one
 // base asset with its own collateral roster, its own rate curve and its own
-// reserve line, and nothing is cross-collateralised between them. /aave-v3's
-// view is singular (/aave-v3/market) for the opposite reason — one Pool.
+// reserve line, and nothing is cross-collateralised between them. Every
+// explorer's roster segment is `markets` (rails-ops decision 0059 point 8).
 //
 // Server-rendered: a read-only aggregate with no interactivity to hydrate for,
 // so the first paint carries the real figures (the Compound V2 view's posture).

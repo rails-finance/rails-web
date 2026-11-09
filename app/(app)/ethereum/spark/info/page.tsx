@@ -20,7 +20,7 @@ export default function InfoPage() {
         <>
           The Rails SparkLend explorer shows the account of every wallet on SparkLend on Ethereum, whether still open,
           closed or liquidated, and the full history of each one. It also shows the{" "}
-          <Link href="/ethereum/spark/market" className={INLINE_LINK}>
+          <Link href="/ethereum/spark/markets" className={INLINE_LINK}>
             market as a whole
           </Link>
           : the size of every asset it lists, the interest rates suppliers earn and borrowers pay on it, and its risk
@@ -82,7 +82,7 @@ export default function InfoPage() {
             <p>
               The market page lists every asset in the Pool with its size, its supply and borrow rates and its risk
               settings, read live.{" "}
-              <Link href="/ethereum/spark/market" className={INLINE_LINK}>
+              <Link href="/ethereum/spark/markets" className={INLINE_LINK}>
                 See the SparkLend market
               </Link>
               .

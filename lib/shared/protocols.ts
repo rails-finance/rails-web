@@ -191,7 +191,7 @@ const SPECS: ProtocolSpec[] = [
     brand: 336,
     tags: ["Lend", "Borrow"],
     desc: "Single-pool lending on Ethereum: one cross-collateralised account per wallet, valued at Aave's oracle, with every liquidation traced",
-    subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
     id: "aave-v3-base",
@@ -202,7 +202,7 @@ const SPECS: ProtocolSpec[] = [
     protocolKey: "aave-v3",
     tags: ["Lend", "Borrow"],
     desc: "Aave V3's Base deployment, a separate Pool with its own reserves and risk parameters: every wallet's account read whole from the contracts",
-    subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
     // Aave V3 on Arbitrum One, position-first (rails-ops
@@ -620,7 +620,7 @@ const SPECS: ProtocolSpec[] = [
     brand: 285,
     tags: ["Lend", "Borrow"],
     desc: "An Aave V3 fork on Base, frozen since April 2025: every position read whole from the contracts, and none of them can grow",
-    subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
     // Sky Savings (sUSDS on Ethereum). Sky rebranded MakerDAO, and a saver is
@@ -667,7 +667,7 @@ const SPECS: ProtocolSpec[] = [
     brand: 25,
     tags: ["Lend", "Borrow"],
     desc: "SparkLend, an Aave V3 fork, replayed from events: each reserve's principal traceable and valued at the Pool's oracle",
-    subPages: [{ segment: "market", label: "Market overview", tab: "Market" }],
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
     // The first entry here whose WHOLE PRODUCT is vaults, and therefore a

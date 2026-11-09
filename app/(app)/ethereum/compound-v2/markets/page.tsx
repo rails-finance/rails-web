@@ -3,7 +3,7 @@
 // block. This is the `views` cell of Compound V2's row.
 //
 // It sits ALONGSIDE the position explorer rather than instead of it, the same
-// shape as /aave-v3/market, /morpho/markets and /fluid/vaults: the explorer
+// shape as /aave-v3/markets, /morpho/markets and /fluid/vaults: the explorer
 // answers "what happened to this wallet", this answers "what is the protocol".
 // This page reads no index — it is one head-block read of the protocol's own
 // contracts, and stays that way when the explorer lands.

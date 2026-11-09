@@ -206,7 +206,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // Liquidation forensics (2026-07-14): the valued two-leg breakdown — seized
   // vs cleared at the market's own oracle price AT the event's block (mig 092
   // capture), with the liquidator's realized premium derived from the pair.
-  // Protocol views (2026-07-15): /aave-v3/market — the Core Pool's full
+  // Protocol views (2026-07-15): /aave-v3/markets — the Core Pool's full
   // reserve roster (sizes, rates, risk config, oracle prices) read live from
   // the Pool + IAaveOracle; shares its whole surface with SparkLend's.
   // Market notes, rate-step kind (2026-09-06): a position page now states the
@@ -914,8 +914,8 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   }),
   // Liquidation forensics (2026-07-14): same valued two-leg treatment as Aave
   // V3 (single market — SparkLend's own oracle at the event's block).
-  // Protocol views (2026-07-15): /spark/market — the single SparkLend Pool's
-  // reserve roster read live, on the same shared surface as /aave-v3/market.
+  // Protocol views (2026-07-15): /spark/markets — the single SparkLend Pool's
+  // reserve roster read live, on the same shared surface as /aave-v3/markets.
   // Market notes, rate-step kind (2026-09-06): the same kind the Aave V3 row
   // above describes, read through the same selector and the same table —
   // SparkLend is an Aave V3 fork and its Pool emits the same

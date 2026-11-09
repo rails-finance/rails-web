@@ -113,7 +113,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
       <p>
         The market page shows each reserve with its size, rates, risk settings and price, and explains the supply and
         borrow caps and the frozen reserves.{" "}
-        <Link href="/base/seamless/market" className={INLINE_LINK}>
+        <Link href="/base/seamless/markets" className={INLINE_LINK}>
           Open the market page
         </Link>
         .
@@ -130,7 +130,7 @@ export default function InfoPage() {
         <>
           The Rails Seamless explorer shows every account in Seamless&apos;s lending market on Base, whether still open
           or closed, and the full history of each one. It also shows{" "}
-          <Link href="/base/seamless/market" className={INLINE_LINK}>
+          <Link href="/base/seamless/markets" className={INLINE_LINK}>
             the market
           </Link>{" "}
           itself: its assets, with their rates, risk settings and prices.

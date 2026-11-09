@@ -8,7 +8,7 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/ethereum/aave-v3/market",
+    "page": "/ethereum/aave-v3/markets",
     "chain": "ethereum",
     "protocol": "aave-v3",
     "state": "system",
@@ -96,7 +96,7 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/base/aave-v3/market",
+    "page": "/base/aave-v3/markets",
     "chain": "base",
     "protocol": "aave-v3",
     "state": "system",
@@ -2216,7 +2216,7 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/base/seamless/market",
+    "page": "/base/seamless/markets",
     "chain": "base",
     "protocol": "seamless",
     "state": "system",
@@ -2320,7 +2320,7 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/ethereum/spark/market",
+    "page": "/ethereum/spark/markets",
     "chain": "ethereum",
     "protocol": "spark",
     "state": "system",

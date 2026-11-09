@@ -193,8 +193,33 @@ for (const chainSlug of chainSlugs.values()) {
   }
 }
 
-// 4. No redirect points somewhere that isn't an explorer.
+// 4. No redirect points somewhere that isn't an explorer, or a page an
+//    explorer serves (a moved sub-page: `/ethereum/aave-v3/market` →
+//    `/ethereum/aave-v3/markets`, decision 0059 point 8), and a moved
+//    sub-page's old directory is gone, or the redirect would shadow it.
+/** Whether some page serves `href`, a `(group)` allowed at any level. */
+function hrefServed(href) {
+  let dirs = [APP_DIR];
+  for (const seg of href.split("/").filter(Boolean)) {
+    const next = [];
+    for (const d of dirs) {
+      if (!fs.existsSync(d)) continue;
+      if (fs.existsSync(path.join(d, seg))) next.push(path.join(d, seg));
+      for (const e of fs.readdirSync(d, { withFileTypes: true }))
+        if (e.isDirectory() && e.name.startsWith("(") && fs.existsSync(path.join(d, e.name, seg)))
+          next.push(path.join(d, e.name, seg));
+    }
+    dirs = next;
+  }
+  return dirs.some((d) => servesPage(d));
+}
 for (const row of legacy) {
+  const explorer = [...expected.keys()].find((href) => row.to === href || row.to.startsWith(`${href}/`));
+  if (explorer && row.to !== explorer) {
+    if (!hrefServed(row.to)) fail(`LEGACY_EXPLORER_PATHS sends ${row.from} to ${row.to}, which no page serves`);
+    if (hrefServed(row.from)) fail(`LEGACY_EXPLORER_PATHS moves ${row.from}, but a page still serves it`);
+    continue;
+  }
   if (!expected.has(row.to)) {
     fail(`LEGACY_EXPLORER_PATHS sends ${row.from} to ${row.to}, which is not any explorer's route`);
   }

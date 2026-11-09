@@ -761,15 +761,15 @@ const vaultDirectory = (directory, chainId) => () =>
 
 const SYSTEM = [
   // components/shared/aave-market-page.tsx, at each page's apiRoute.
-  { id: "aave-v3-market", match: re(`/ethereum/aave-v3/market`), routes: () => ["/api/chain/aave-v3/market"] },
-  { id: "aave-v3-base-market", match: re(`/base/aave-v3/market`), routes: () => ["/api/chain/aave-v3-base/market"] },
+  { id: "aave-v3-market", match: re(`/ethereum/aave-v3/markets`), routes: () => ["/api/chain/aave-v3/market"] },
+  { id: "aave-v3-base-market", match: re(`/base/aave-v3/markets`), routes: () => ["/api/chain/aave-v3-base/market"] },
   {
     id: "aave-v3-arbitrum-markets",
     match: re(`/arbitrum/aave-v3/markets`),
     routes: () => ["/api/chain/aave-v3-arbitrum/market"],
   },
-  { id: "spark-market", match: re(`/ethereum/spark/market`), routes: () => ["/api/chain/spark/market"] },
-  { id: "seamless-market", match: re(`/base/seamless/market`), routes: () => ["/api/chain/seamless/market"] },
+  { id: "spark-market", match: re(`/ethereum/spark/markets`), routes: () => ["/api/chain/spark/market"] },
+  { id: "seamless-market", match: re(`/base/seamless/markets`), routes: () => ["/api/chain/seamless/market"] },
   // loadCompoundV3Markets / loadCompoundV2Markets, served by the markets routes.
   {
     id: "compound-v3-markets",
