@@ -347,9 +347,6 @@ function MarketsExplainer({ data, coords }: { data: DolomiteMarketsResponse; coo
           Dolomite is one lending pool of <Fig bold>{s.total}</Fig> markets.
         </ExplainBullet>
         <ExplainBullet>
-          Anyone can supply an asset to earn interest, or borrow one against what they supply.
-        </ExplainBullet>
-        <ExplainBullet>
           Suppliers have put in <Fig bold>{usd(s.totalSuppliedUsd)}</Fig> and borrowers owe{" "}
           <Fig bold>{usd(s.totalBorrowedUsd)}</Fig>.
         </ExplainBullet>
@@ -358,6 +355,9 @@ function MarketsExplainer({ data, coords }: { data: DolomiteMarketsResponse; coo
             Utilisation <Fig bold>{pctText(s.utilisation)}</Fig> is the share of the supply on loan.
           </ExplainBullet>
         )}
+        <ExplainBullet>
+          Anyone can supply an asset to earn interest, or borrow one against what they supply.
+        </ExplainBullet>
       </ExplainGroup>
       <ExplainGroup title="Collateral" data-dolomite-premiums="">
         <ExplainBullet>
@@ -369,12 +369,12 @@ function MarketsExplainer({ data, coords }: { data: DolomiteMarketsResponse; coo
         </ExplainBullet>
         {s.withPremium > 0 && (
           <ExplainBullet>
-            <Fig bold>{s.withPremium}</Fig> markets carry a margin premium, which raises that minimum for any loan that
-            uses them.
+            <Fig bold>{s.withPremium}</Fig> markets carry a margin premium, which raises the minimum collateral for any
+            loan that uses them.
           </ExplainBullet>
         )}
         <ExplainBullet>
-          Some accounts carry their own collateral terms; the table shows each market&rsquo;s own.
+          Some accounts carry special collateral terms; the table shows each market&rsquo;s standard terms.
         </ExplainBullet>
       </ExplainGroup>
       <ExplainGroup title="Liquidation">
@@ -386,7 +386,9 @@ function MarketsExplainer({ data, coords }: { data: DolomiteMarketsResponse; coo
           </Fig>{" "}
           more, a penalty the borrower bears.
         </ExplainBullet>
-        <ExplainBullet>A market&rsquo;s spread premium raises that penalty when its collateral is taken.</ExplainBullet>
+        <ExplainBullet>
+          A market&rsquo;s spread premium raises the liquidation penalty when its collateral is taken.
+        </ExplainBullet>
       </ExplainGroup>
       {s.closing > 0 && (
         <ExplainGroup title="Closing">
