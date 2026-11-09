@@ -11,6 +11,15 @@
 //     "<token> · N markets" with the group's supplied, borrowed and utilisation
 //     in that token. The largest group opens on arrival. A group lists the
 //     markets that carry its book; the rest open on the token's page.
+//   • The default view (R1.1.3, Miles's agreement of 9 Nov 2026): on Ethereum
+//     and Base a group shows only the markets a vault on Rails's roster lends
+//     into (the vault directory's withdraw queues); "Show all markets" in the
+//     ⋮, or `?all=1`, shows every row. Heading counts, totals and the group
+//     order follow the view; the chain head always counts everything. Arbitrum
+//     has no vault roster, so every row shows there.
+//   • Markets in one group with one collateral and one LLTV share one row
+//     that opens in place (R1.1.1), each market saying what sets it apart; a
+//     market at the rate ceiling carries the tag (R1.1.2).
 //   • The loan-token page (/markets/<loanToken>): the token's head, the same
 //     table for its markets that carry the book, then the markets that repeat
 //     one pair, the small ones and the never funded.
@@ -20,7 +29,8 @@
 // oracle sit in the collateral cell's receipt.
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, Suspense, useMemo, useState, type ReactNode } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { ExplainBullet, ExplainGroup, ExplainSub, Fig } from "@/components/shared/explain-groups";
 import { readStampProv } from "@/components/shared/read-stamp";
@@ -39,6 +49,8 @@ import {
   DataTableHeader,
   DataTableRow,
   DataTableRowLink,
+  DATA_TABLE_PILL,
+  type DataTableStripe,
 } from "@/components/shared/data-table/data-table";
 import { ratePercentText } from "@/lib/shared/rate-percent";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -56,6 +68,9 @@ import {
   morphoLoanTokenSupplyProv,
   morphoMarketIdentityProv,
   morphoMarketSizeProv,
+  morphoPairTotalProv,
+  morphoPriceSourceProv,
+  morphoRateCeilingProv,
   morphoSupplyRateProv,
   morphoUtilizationProv,
   type MorphoMarketCoords,
@@ -65,6 +80,7 @@ import type {
   MorphoMarketFamily,
   MorphoRosterData,
   MorphoRosterGroup,
+  MorphoRosterRow,
 } from "@/lib/morpho/markets-shape";
 import type { MorphoMarketRow } from "@/lib/sources/chain/morpho-markets";
 import type { ProductHead, ReadAt } from "@/lib/shared/product/model";
@@ -154,17 +170,69 @@ function sortValue(m: MorphoMarketRow, k: SortKey): number | string {
   }
 }
 
-function sorted(rows: MorphoMarketRow[], s: Sort): MorphoMarketRow[] {
-  const sign = s.dir === "asc" ? 1 : -1;
-  return [...rows].sort((a, b) => {
-    const x = sortValue(a, s.key);
-    const y = sortValue(b, s.key);
-    return sign * (typeof x === "string" ? x.localeCompare(String(y)) : x - (y as number));
-  });
+/** "rate ceiling" beside a borrow rate (R1.1.2): the vault pages' illiquid
+ *  test on the market alone (lib/vaults/illiquid.ts `atRateCeiling`). */
+function CeilingTag({ m, c }: { m: MorphoRosterRow; c: MorphoMarketCoords }) {
+  if (!m.ceiling) return null;
+  return (
+    <span
+      className={`${DATA_TABLE_PILL} px-1.5 py-0.5 text-[11px] font-medium`}
+      title={CEILING_TIP}
+      data-anatomy="R1.1.2"
+      data-morpho-ceiling={m.id}
+    >
+      <Prov info={morphoRateCeilingProv(c, { ...m.ceiling, utilisation: m.utilization ?? 1 })}>rate ceiling</Prov>
+    </span>
+  );
 }
 
-/** One market: a keyed component so it owns its receipts registry. */
-function MarketRow({ m, r }: { m: MorphoMarketRow; r: Read }) {
+const CEILING_TIP =
+  "Fully lent out: the rate has climbed to the model's maximum, and suppliers may not be able to withdraw until borrowers repay.";
+
+const list = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+
+/** What sets each of a repeated pair's markets apart, by id, in words: the
+ *  feeds its oracle names ("priced by RSS / USD"), or "a separate price
+ *  source" where the oracle names none Rails can read. Where two lines would
+ *  read alike, each adds its place by size among them ("price source 1 of
+ *  2"). Contract addresses stay in the line's receipt (decision 0059 point 1). */
+function pairLines(markets: readonly MorphoRosterRow[]): Map<string, string> {
+  const base = markets.map((m) => {
+    const src = m.priceSource;
+    const named = (src?.feeds ?? []).map((f) => f.description).filter((d): d is string => d != null);
+    return src?.readable && named.length > 0 && named.length === src.feeds.length ? `priced by ${list(named)}` : null;
+  });
+  // `markets` is largest first, so the place among alike lines is by size.
+  return new Map(
+    markets.map((m, i) => {
+      const alike = markets.map((_, k) => k).filter((k) => base[k] === base[i]);
+      const place = alike.length > 1 ? `${alike.indexOf(i) + 1} of ${alike.length}` : null;
+      const line = base[i]
+        ? place
+          ? `${base[i]}, price source ${place}`
+          : base[i]
+        : place
+          ? `a separate price source, ${place}`
+          : "a separate price source";
+      return [m.id, line];
+    }),
+  );
+}
+
+/** One market: a keyed component so it owns its receipts registry. A child of
+ *  a repeated pair (`child`) is indented and says what sets it apart. */
+function MarketRow({
+  m,
+  r,
+  stripe,
+  child,
+}: {
+  m: MorphoRosterRow;
+  r: Read;
+  stripe?: DataTableStripe;
+  /** A child of a repeated pair: the line that sets it apart. */
+  child?: string;
+}) {
   const registry = useReceiptRegistry();
   const c = coordsOf(r, {
     marketId: m.id,
@@ -177,31 +245,48 @@ function MarketRow({ m, r }: { m: MorphoMarketRow; r: Read }) {
   const name = collateralName(m);
   return (
     <ProvReceiptsScope registry={registry} bounds={false}>
-      <DataTableRow href={href} data-morpho-market={m.id}>
+      <DataTableRow
+        href={href}
+        stripe={stripe}
+        data-morpho-market={m.id}
+        data-morpho-lent={m.lent ? "" : undefined}
+        data-morpho-pair-child={child != null ? "" : undefined}
+      >
         <DataTableCell rowHeader className="whitespace-nowrap">
-          <span className="flex items-center gap-2.5">
+          <span className={`flex items-center gap-2.5 ${child != null ? "sm:pl-7" : ""}`}>
             <TokenPairIcons
               first={
                 m.isIdle ? { symbol: m.loanSymbol, address: m.loanToken } : { symbol: name, address: m.collateralToken }
               }
               fixed
             />
-            <DataTableRowLink
-              href={href}
-              className={`text-[13px] font-medium ${m.isIdle || m.collateralNamed ? "" : "font-mono"}`}
-              data-morpho-market-link={m.id}
-            >
-              <Prov
-                info={morphoMarketIdentityProv(c, {
-                  collateralToken: m.collateralToken,
-                  oracle: m.oracle,
-                  irm: m.irm,
-                  lltv: m.lltv,
-                })}
+            <span className="flex min-w-0 flex-col">
+              <DataTableRowLink
+                href={href}
+                className={`text-[13px] font-medium ${m.isIdle || m.collateralNamed ? "" : "font-mono"}`}
+                data-morpho-market-link={m.id}
               >
-                {name}
-              </Prov>
-            </DataTableRowLink>
+                <Prov
+                  info={morphoMarketIdentityProv(c, {
+                    collateralToken: m.collateralToken,
+                    oracle: m.oracle,
+                    irm: m.irm,
+                    lltv: m.lltv,
+                  })}
+                >
+                  {name}
+                </Prov>
+              </DataTableRowLink>
+              {child != null && (
+                <span className="truncate text-[11px] text-rb-500" data-morpho-price-source={m.id}>
+                  <Prov
+                    info={morphoPriceSourceProv(c, { oracle: m.oracle, irm: m.irm, feeds: m.priceSource?.feeds ?? [] })}
+                  >
+                    {child}
+                  </Prov>
+                </span>
+              )}
+            </span>
           </span>
         </DataTableCell>
         <DataTableCell label="LLTV" align="right" className={NUM}>
@@ -234,11 +319,14 @@ function MarketRow({ m, r }: { m: MorphoMarketRow; r: Read }) {
           )}
         </DataTableCell>
         <DataTableCell label="Borrow rate" align="right" className={NUM}>
-          {m.borrowApr != null ? (
-            <Prov info={morphoBorrowRateProv(c)}>{ratePercentText(m.borrowApr)}</Prov>
-          ) : (
-            <span className="text-rb-500">none</span>
-          )}
+          <span className="inline-flex items-center gap-1.5">
+            <CeilingTag m={m} c={c} />
+            {m.borrowApr != null ? (
+              <Prov info={morphoBorrowRateProv(c)}>{ratePercentText(m.borrowApr)}</Prov>
+            ) : (
+              <span className="text-rb-500">none</span>
+            )}
+          </span>
         </DataTableCell>
         <DataTableCell label="Utilisation" align="right" className={NUM}>
           {m.utilization != null ? (
@@ -252,20 +340,161 @@ function MarketRow({ m, r }: { m: MorphoMarketRow; r: Read }) {
   );
 }
 
-/** One table of markets in one loan token. */
+/** Markets in one loan token with one collateral and one LLTV, differing only
+ *  in their oracle or rate model (R1.1.1): one row that opens in place. */
+interface Pair {
+  key: string;
+  /** Largest first. */
+  markets: MorphoRosterRow[];
+  totalSupply: number;
+  totalBorrow: number;
+}
+
+type Item = { kind: "market"; m: MorphoRosterRow } | { kind: "pair"; p: Pair };
+
+/** The table's items: each repeated pair run together, every other market alone. */
+function itemsOf(rows: readonly MorphoRosterRow[], collapse: boolean): Item[] {
+  if (!collapse) return rows.map((m) => ({ kind: "market", m }));
+  const by = new Map<string, MorphoRosterRow[]>();
+  for (const m of rows) {
+    const k = m.isIdle ? `idle:${m.id}` : `${m.collateralToken}:${m.lltv}`;
+    by.set(k, [...(by.get(k) ?? []), m]);
+  }
+  return [...by.entries()].map(([key, ms]): Item => {
+    if (ms.length === 1) return { kind: "market", m: ms[0] };
+    const markets = [...ms].sort((a, b) => b.totalSupply - a.totalSupply);
+    return {
+      kind: "pair",
+      p: {
+        key,
+        markets,
+        totalSupply: markets.reduce((s, m) => s + m.totalSupply, 0),
+        totalBorrow: markets.reduce((s, m) => s + m.totalBorrow, 0),
+      },
+    };
+  });
+}
+
+/** An item's sort value: a pair sorts on its summed supply and its largest market's rates. */
+function itemValue(it: Item, k: SortKey): number | string {
+  if (it.kind === "market") return sortValue(it.m, k);
+  return k === "supplied" ? it.p.totalSupply : sortValue(it.p.markets[0], k);
+}
+
+function PairRow({
+  p,
+  r,
+  stripe,
+  open,
+  onToggle,
+}: {
+  p: Pair;
+  r: Read;
+  stripe: DataTableStripe;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const registry = useReceiptRegistry();
+  const top = p.markets[0];
+  const name = collateralName(top);
+  const c = coordsOf(r, {
+    marketId: top.id,
+    loanSymbol: top.loanSymbol,
+    collateralSymbol: top.collateralSymbol,
+    irm: top.irm,
+    loanToken: top.loanToken,
+  });
+  const n = p.markets.length;
+  return (
+    <ProvReceiptsScope registry={registry} bounds={false}>
+      <DataTableRow stripe={stripe} data-anatomy="R1.1.1" data-morpho-pair={`${top.collateralToken}:${top.lltv}`}>
+        <DataTableCell rowHeader className="whitespace-nowrap">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={onToggle}
+            className="flex items-center gap-2.5 text-left"
+            data-morpho-pair-toggle={`${top.collateralToken}:${top.lltv}`}
+          >
+            <TokenPairIcons first={{ symbol: name, address: top.collateralToken }} fixed />
+            <span className="text-[13px] font-medium">
+              <span className={top.collateralNamed ? "" : "font-mono"}>{name}</span>
+              <span className="font-normal text-rb-500" data-prov-exempt="">
+                {" "}
+                · {n} markets
+              </span>
+            </span>
+            <ChevronRight
+              className={`h-3.5 w-3.5 shrink-0 text-rb-500 transition-transform ${open ? "rotate-90" : ""}`}
+              aria-hidden
+            />
+          </button>
+        </DataTableCell>
+        <DataTableCell label="LLTV" align="right" className={NUM}>
+          <Prov info={morphoLltvProv(c)}>{pctText(top.lltv)}</Prov>
+        </DataTableCell>
+        <DataTableCell label="Supplied" align="right" className={NUM}>
+          {top.amountsTrusted ? (
+            <span className="inline-flex flex-col items-start sm:items-end">
+              <span className="inline-flex items-center gap-1.5">
+                <Prov info={morphoPairTotalProv("supplied", c, n)}>{amount(p.totalSupply)}</Prov>
+                <AssetUnit symbol={top.loanSymbol} address={top.loanToken} />
+              </span>
+              <span className="text-[11px] text-rb-500">
+                <Prov info={morphoPairTotalProv("borrowed", c, n)}>{amount(p.totalBorrow)}</Prov> borrowed
+              </span>
+            </span>
+          ) : (
+            <span className="text-rb-500">not stated</span>
+          )}
+        </DataTableCell>
+        <DataTableCell label="Supply rate" align="right" className={NUM}>
+          {top.supplyApr != null ? (
+            <Prov info={morphoSupplyRateProv(c)}>{ratePercentText(top.supplyApr)}</Prov>
+          ) : (
+            <span className="text-rb-500">none</span>
+          )}
+        </DataTableCell>
+        <DataTableCell label="Borrow rate" align="right" className={NUM}>
+          <span className="inline-flex items-center gap-1.5">
+            <CeilingTag m={top} c={c} />
+            {top.borrowApr != null ? (
+              <Prov info={morphoBorrowRateProv(c)}>{ratePercentText(top.borrowApr)}</Prov>
+            ) : (
+              <span className="text-rb-500">none</span>
+            )}
+          </span>
+        </DataTableCell>
+        <DataTableCell label="Utilisation" align="right" className={NUM}>
+          {top.utilization != null ? (
+            <Prov info={morphoUtilizationProv(c)}>{pctText(top.utilization)}</Prov>
+          ) : (
+            <span className="text-rb-500">no supply</span>
+          )}
+        </DataTableCell>
+      </DataTableRow>
+    </ProvReceiptsScope>
+  );
+}
+
+/** One table of markets in one loan token. With `collapse`, markets that
+ *  repeat a pair run together into one row (R1.1.1). */
 function MarketsTable({
   rows,
   r,
   label,
   sort,
   onSort,
+  collapse = false,
 }: {
-  rows: MorphoMarketRow[];
+  rows: MorphoRosterRow[];
   r: Read;
   label: string;
   sort: Sort;
   onSort: (k: SortKey) => void;
+  collapse?: boolean;
 }) {
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
   const th = (k: SortKey, text: string, align: "left" | "right" = "left", tip?: string) => (
     <DataTableHeader
       key={k}
@@ -275,6 +504,15 @@ function MarketsTable({
       sort={{ dir: sort.key === k ? sort.dir : null, onSort: () => onSort(k), ariaLabel: `Sort by ${text}` }}
     />
   );
+  const sign = sort.dir === "asc" ? 1 : -1;
+  const items = itemsOf(rows, collapse).sort((a, b) => {
+    const x = itemValue(a, sort.key);
+    const y = itemValue(b, sort.key);
+    return sign * (typeof x === "string" ? x.localeCompare(String(y)) : x - (y as number));
+  });
+  // A pair's rows share its stripe, so the stripes count items.
+  const stripe = (i: number): DataTableStripe | undefined =>
+    collapse ? (i % 2 === 0 ? "raised" : "sunken") : undefined;
   return (
     <DataTable label={label} stacked rowHeight="one" tableClassName="text-[13px] sm:min-w-[40rem]">
       <DataTableHead>
@@ -282,9 +520,35 @@ function MarketsTable({
         {COLUMNS.map((c) => th(c.key, c.label, "right", c.tip))}
       </DataTableHead>
       <DataTableBody>
-        {sorted(rows, sort).map((m) => (
-          <MarketRow key={m.id} m={m} r={r} />
-        ))}
+        {items.map((it, i) =>
+          it.kind === "market" ? (
+            <MarketRow key={it.m.id} m={it.m} r={r} stripe={stripe(i)} />
+          ) : (
+            <Fragment key={it.p.key}>
+              <PairRow
+                p={it.p}
+                r={r}
+                stripe={stripe(i)!}
+                open={open.has(it.p.key)}
+                onToggle={() =>
+                  setOpen((s) => {
+                    const n = new Set(s);
+                    if (n.has(it.p.key)) n.delete(it.p.key);
+                    else n.add(it.p.key);
+                    return n;
+                  })
+                }
+              />
+              {open.has(it.p.key) &&
+                (() => {
+                  const lines = pairLines(it.p.markets);
+                  return it.p.markets.map((m) => (
+                    <MarketRow key={m.id} m={m} r={r} stripe={stripe(i)} child={lines.get(m.id) ?? ""} />
+                  ));
+                })()}
+            </Fragment>
+          ),
+        )}
       </DataTableBody>
     </DataTable>
   );
@@ -346,30 +610,83 @@ function marketsCsv(rows: MorphoMarketRow[]): string {
 
 // ── The roster (R1) ──────────────────────────────────────────────────────────
 
+/** A group as the view draws it: every row under "all", the markets a vault
+ *  lends into under the default view (R1.1.3), with the heading's count and
+ *  totals over what is shown. */
+interface GroupView {
+  g: MorphoRosterGroup;
+  rows: MorphoRosterRow[];
+  /** The heading's count: the shown markets, or every market under "all". */
+  count: number;
+  totalSupply: number;
+  totalBorrow: number;
+  /** The markets a vault lends into; null where the filter does not apply. */
+  lent: number | null;
+  /** The default view is in force on this group. */
+  filtered: boolean;
+}
+
+function groupViews(groups: MorphoRosterGroup[], filter: "lent" | "all" | "none"): GroupView[] {
+  if (filter !== "lent")
+    return groups.map((g) => ({
+      g,
+      rows: g.rows,
+      count: g.markets,
+      totalSupply: g.totalSupply,
+      totalBorrow: g.totalBorrow,
+      lent: filter === "all" ? g.rows.filter((m) => m.lent).length : null,
+      filtered: false,
+    }));
+  // The same order as under "all", over the markets shown: the ones outside a
+  // family first, then all of them.
+  return groups
+    .map((g) => {
+      const rows = g.rows.filter((m) => m.lent);
+      return {
+        g,
+        rows,
+        count: rows.length,
+        totalSupply: rows.reduce((s, m) => s + m.totalSupply, 0),
+        totalBorrow: rows.reduce((s, m) => s + m.totalBorrow, 0),
+        lent: rows.length,
+        filtered: true,
+      };
+    })
+    .filter((v) => v.rows.length > 0)
+    .sort((a, b) => b.g.lentOwn - a.g.lentOwn || b.rows.length - a.rows.length);
+}
+
+const VIEW_LINK = `cursor-pointer ${INLINE_LINK}`;
+
 /** A loan token's group: a disclosure whose heading states the token's book. */
 function Group({
-  g,
+  v,
   r,
   open,
   onToggle,
   sort,
   onSort,
+  onAll,
 }: {
-  g: MorphoRosterGroup;
+  v: GroupView;
   r: Read;
   open: boolean;
   onToggle: () => void;
   sort: Sort;
   onSort: (k: SortKey) => void;
+  onAll: (all: boolean) => void;
 }) {
+  const g = v.g;
   const c = coordsOf(r, { loanSymbol: g.loanSymbol, loanToken: g.loanToken });
-  const util = g.totalSupply > 0 ? g.totalBorrow / g.totalSupply : null;
+  const over = v.filtered ? v.count : undefined;
+  const util = v.totalSupply > 0 ? v.totalBorrow / v.totalSupply : null;
   const tokenHref = morphoLoanTokenHref(r.chainId, g.loanToken);
   const id = `morpho-group-${g.loanToken}`;
-  const more = g.markets - g.rows.length;
+  const more = g.markets - v.rows.length;
   // A margin over the token's own supply, so a rounding tie is not a caution.
   const overIssued =
-    g.amountsTrusted && g.loanTokenSupply != null && g.loanTokenSupply > 0 && g.totalSupply > g.loanTokenSupply * 1.001;
+    g.amountsTrusted && g.loanTokenSupply != null && g.loanTokenSupply > 0 && v.totalSupply > g.loanTokenSupply * 1.001;
+  const n = (x: number) => x.toLocaleString("en-US");
   return (
     <div className="border-t border-rb-200 py-2 first:border-t-0 dark:border-rb-800" data-morpho-group={g.loanToken}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -390,18 +707,18 @@ function Group({
             <span className="font-mono text-[11px] font-normal text-rb-500">{shortAddr(g.loanToken)}</span>
           )}
           <span className="font-normal text-rb-500" data-prov-exempt="">
-            · {g.markets.toLocaleString("en-US")} {g.markets === 1 ? "market" : "markets"}
+            · {n(v.count)} {v.count === 1 ? "market" : "markets"}
           </span>
         </button>
         <span className="text-[12px] tabular-nums text-rb-500">
           {g.amountsTrusted ? (
             <>
               <span className="text-foreground">
-                <Prov info={morphoGroupTotalProv("supplied", c)}>{amount(g.totalSupply)}</Prov>
+                <Prov info={morphoGroupTotalProv("supplied", c, over)}>{amount(v.totalSupply)}</Prov>
               </span>{" "}
               supplied ·{" "}
               <span className="text-foreground">
-                <Prov info={morphoGroupTotalProv("borrowed", c)}>{amount(g.totalBorrow)}</Prov>
+                <Prov info={morphoGroupTotalProv("borrowed", c, over)}>{amount(v.totalBorrow)}</Prov>
               </span>{" "}
               borrowed
               {util != null && (
@@ -409,7 +726,7 @@ function Group({
                   {" "}
                   ·{" "}
                   <span className="text-foreground">
-                    <Prov info={morphoGroupUtilizationProv(c)}>{pctText(util, 0)}</Prov>
+                    <Prov info={morphoGroupUtilizationProv(c, over)}>{pctText(util, 0)}</Prov>
                   </span>{" "}
                   utilised
                 </>
@@ -429,16 +746,43 @@ function Group({
           )}
         </span>
       </div>
+      {v.lent != null && (
+        <p className="mt-0.5 pl-5.5 text-[12px] text-rb-500" data-anatomy="R1.1.3" data-morpho-view-line="">
+          {v.filtered ? (
+            <>
+              Showing {n(v.count)} {v.count === 1 ? "market" : "markets"} a vault lends into
+              {g.rows.length > v.count && (
+                <>
+                  {" "}
+                  ·{" "}
+                  <button type="button" className={VIEW_LINK} onClick={() => onAll(true)} data-morpho-view-toggle="all">
+                    Show all {n(g.rows.length)}
+                  </button>
+                </>
+              )}
+            </>
+          ) : v.lent === g.rows.length ? (
+            "A vault lends into every market here."
+          ) : v.lent > 0 ? (
+            <>
+              A vault lends into {n(v.lent)} of these {n(g.rows.length)} ·{" "}
+              <button type="button" className={VIEW_LINK} onClick={() => onAll(false)} data-morpho-view-toggle="lent">
+                Show only those
+              </button>
+            </>
+          ) : (
+            "No vault on Rails's roster lends into these markets."
+          )}
+        </p>
+      )}
       {open && (
         <div id={id} className="mt-2">
-          {g.rows.length > 0 && (
-            <MarketsTable rows={g.rows} r={r} label={`${g.loanSymbol} markets`} sort={sort} onSort={onSort} />
+          {v.rows.length > 0 && (
+            <MarketsTable rows={v.rows} r={r} label={`${g.loanSymbol} markets`} sort={sort} onSort={onSort} collapse />
           )}
           <p className="mt-1 text-[13px]">
             <Link href={tokenHref} prefetch={false} className={INLINE_LINK} data-morpho-token-link={g.loanToken}>
-              {more > 0
-                ? `All ${g.markets.toLocaleString("en-US")} ${g.loanSymbol} markets, ${more.toLocaleString("en-US")} more`
-                : `${g.loanSymbol} markets`}{" "}
+              {more > 0 ? `All ${n(g.markets)} ${g.loanSymbol} markets, ${n(more)} more` : `${g.loanSymbol} markets`}{" "}
               <span aria-hidden>→</span>
             </Link>
           </p>
@@ -468,9 +812,20 @@ function RosterExplainer({ d }: { d: MorphoRosterData }) {
           A market measures in its loan token, so the table groups by loan token and totals only within one. Totals in
           different tokens do not compare.
         </ExplainBullet>
+        {d.vaults === "read" && (
+          <ExplainBullet>
+            By default each group shows the markets a vault on Rails&apos;s roster lends into, read from each
+            vault&apos;s withdraw queue. Show all markets, in the table&apos;s ⋮, adds the other markets that carry the
+            book.
+          </ExplainBullet>
+        )}
         <ExplainBullet>
-          Each group lists the markets that carry its book. Each loan token&apos;s page lists the rest: markets that
-          repeat one pair, the small ones and the never funded.
+          Each loan token&apos;s page lists every market: the ones that carry the book, markets that repeat one pair,
+          the small ones and the never funded.
+        </ExplainBullet>
+        <ExplainBullet>
+          Markets with one collateral and one LLTV that differ only in their oracle or rate model share one row; open it
+          for each market and its price source.
         </ExplainBullet>
         <ExplainBullet>
           Sizes are as each market last settled; Morpho Blue adds interest only when a market is used.
@@ -480,11 +835,32 @@ function RosterExplainer({ d }: { d: MorphoRosterData }) {
   );
 }
 
-export function MorphoRosterPage({ data, chainId }: { data: MorphoRosterData; chainId: ChainId }) {
+type RosterProps = { data: MorphoRosterData; chainId: ChainId };
+
+/** The roster reads `?all=1` from the URL; the static render, before the
+ *  params are known, draws the default view. */
+export function MorphoRosterPage(props: RosterProps) {
+  return (
+    <Suspense fallback={<RosterView {...props} all={false} />}>
+      <RosterWithParams {...props} />
+    </Suspense>
+  );
+}
+
+function RosterWithParams(props: RosterProps) {
+  const all = useSearchParams().get("all") === "1";
+  return <RosterView {...props} all={all} />;
+}
+
+function RosterView({ data, chainId, all }: RosterProps & { all: boolean }) {
   const root = `/${chainMeta(chainId).slug}/morpho`;
+  const pathname = usePathname();
   const r: Read = { chainId, block: data.blockNumber, fromLogs: data.totalsSource === "sieve" };
   const [sort, onSort] = useSort();
-  const [open, setOpen] = useState<Set<string>>(() => new Set(data.groups[0] ? [data.groups[0].loanToken] : []));
+  const filter = data.vaults !== "read" ? "none" : all ? "all" : "lent";
+  const views = useMemo(() => groupViews(data.groups, filter), [data.groups, filter]);
+  const hidden = filter === "lent" ? data.groups.length - views.length : 0;
+  const [open, setOpen] = useState<Set<string>>(() => new Set(views[0] ? [views[0].g.loanToken] : []));
   const toggle = (t: string) =>
     setOpen((p) => {
       const n = new Set(p);
@@ -492,7 +868,15 @@ export function MorphoRosterPage({ data, chainId }: { data: MorphoRosterData; ch
       else n.add(t);
       return n;
     });
-  const allRows = useMemo(() => data.groups.flatMap((g) => g.rows), [data.groups]);
+  const setAll = (on: boolean) => {
+    // The first group of the new view opens, as the largest does on arrival.
+    const first = groupViews(data.groups, on ? "all" : "lent")[0];
+    if (first) setOpen((p) => new Set([...p, first.g.loanToken]));
+    // The browser's history, which Next's useSearchParams follows: the view
+    // is the client's, so the server is not asked again.
+    window.history.replaceState(null, "", on ? `${pathname}?all=1` : pathname);
+  };
+  const shownRows = useMemo(() => views.flatMap((v) => v.rows), [views]);
   const blue = morphoBlueContract(chainId);
   const explorer = chainMeta(chainId).explorerName;
   const s = data.summary;
@@ -573,6 +957,7 @@ export function MorphoRosterPage({ data, chainId }: { data: MorphoRosterData; ch
               className="mb-8"
               data-anatomy="R1.1"
               data-morpho-markets-table=""
+              data-morpho-view={filter}
               data-skel-section="page-table"
             >
               <SectionHeading
@@ -582,10 +967,24 @@ export function MorphoRosterPage({ data, chainId }: { data: MorphoRosterData; ch
                     scope="markets-table"
                     title="Markets by loan token"
                     tools={{
+                      views:
+                        filter === "none"
+                          ? []
+                          : [
+                              {
+                                item: "show-all",
+                                title: "Show all markets",
+                                subtitle: all
+                                  ? "On: every market that carries the book"
+                                  : "Off: the markets a vault lends into",
+                                on: all,
+                                toggle: () => setAll(!all),
+                              },
+                            ],
                       exports: {
                         csv: {
                           filename: `morpho-${chainMeta(chainId).slug}-markets.csv`,
-                          build: () => marketsCsv(allRows),
+                          build: () => marketsCsv(shownRows),
                           subtitle: "The markets listed under every loan token",
                         },
                       },
@@ -594,22 +993,41 @@ export function MorphoRosterPage({ data, chainId }: { data: MorphoRosterData; ch
                 }
               >
                 <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
-                  Loan tokens with the most funded markets first. Open one for its markets.
+                  {filter === "lent"
+                    ? "Loan tokens with the most markets a vault lends into first. Open one for its markets."
+                    : "Loan tokens with the most funded markets first. Open one for its markets."}
                 </p>
+                {filter === "none" && (
+                  <p className="mt-0.5 max-w-2xl text-[12px] text-rb-500" data-morpho-view-line="">
+                    {data.vaults === "none"
+                      ? `Rails does not show ${chainMeta(chainId).name}'s vaults yet, so every market that carries the book is listed.`
+                      : "The vaults could not be read, so every market that carries the book is listed."}
+                  </p>
+                )}
               </SectionHeading>
               <div className="mt-3">
-                {data.groups.map((g) => (
+                {views.map((v) => (
                   <Group
-                    key={g.loanToken}
-                    g={g}
+                    key={v.g.loanToken}
+                    v={v}
                     r={r}
-                    open={open.has(g.loanToken)}
-                    onToggle={() => toggle(g.loanToken)}
+                    open={open.has(v.g.loanToken)}
+                    onToggle={() => toggle(v.g.loanToken)}
                     sort={sort}
                     onSort={onSort}
+                    onAll={setAll}
                   />
                 ))}
               </div>
+              {hidden > 0 && (
+                <p className="mt-3 text-[12px] text-rb-500" data-prov-exempt="" data-morpho-hidden-tokens="">
+                  {hidden.toLocaleString("en-US")} more loan {hidden === 1 ? "token is" : "tokens are"} in the full
+                  table ·{" "}
+                  <button type="button" className={VIEW_LINK} onClick={() => setAll(true)}>
+                    Show all markets
+                  </button>
+                </p>
+              )}
               {data.unfundedTokens > 0 && (
                 <p className="mt-3 text-[12px] text-rb-500" data-prov-exempt="">
                   {data.unfundedTokens.toLocaleString("en-US")} more loan tokens have markets that have never held

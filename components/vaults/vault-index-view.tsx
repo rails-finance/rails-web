@@ -15,6 +15,7 @@ import Link from "next/link";
 import { ProvUnscoped } from "@/components/shared/provenance";
 import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { VaultIndexTable, useVaultIndexSort } from "@/components/vaults/vault-index-table";
+import { CompareBar } from "@/components/vaults/compare-selection";
 import { isoSeconds, RosterBlock, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
 import { MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { protocolForPathname } from "@/lib/shared/protocols";
@@ -216,6 +217,7 @@ export function VaultIndexView({
           }}
         />
       </ProvUnscoped>
+      <CompareBar />
     </div>
   );
 }

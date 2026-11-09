@@ -49,6 +49,7 @@ export function ToolsMenuItem({
   expanded,
   internal,
   offsite,
+  checked,
 }: {
   icon: ReactNode;
   title: ReactNode;
@@ -69,6 +70,9 @@ export function ToolsMenuItem({
   /** A row that leaves Rails (the chain's explorer, the protocol's app or
    *  docs): its title and icon in the off-site pink (`--text-external`). */
   offsite?: boolean;
+  /** A switch row (the Morpho roster's "Show all markets"): its state, drawn
+   *  as `role="menuitemcheckbox"` with `aria-checked`. */
+  checked?: boolean;
 }) {
   const className =
     "flex items-start gap-3 mx-1 my-0.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]";
@@ -107,7 +111,15 @@ export function ToolsMenuItem({
     );
   }
   return (
-    <button type="button" onClick={onClick} disabled={disabled} role="menuitem" className={className} {...data}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      role={checked === undefined ? "menuitem" : "menuitemcheckbox"}
+      aria-checked={checked}
+      className={className}
+      {...data}
+    >
       {body}
     </button>
   );
@@ -118,7 +130,11 @@ export function ToolsMenuItem({
 function moveFocus(e: React.KeyboardEvent<HTMLElement>) {
   const keys = ["ArrowDown", "ArrowUp", "Home", "End"];
   if (!keys.includes(e.key)) return;
-  const items = [...e.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled])')];
+  const items = [
+    ...e.currentTarget.querySelectorAll<HTMLElement>(
+      '[role="menuitem"]:not([disabled]), [role="menuitemcheckbox"]:not([disabled])',
+    ),
+  ];
   if (items.length === 0) return;
   e.preventDefault();
   const at = items.indexOf(document.activeElement as HTMLElement);
@@ -234,7 +250,9 @@ export function ToolsMenu({
   useEffect(() => {
     if (!open) return;
     const t = window.setTimeout(() =>
-      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled])')?.focus({ preventScroll: true }),
+      menuRef.current
+        ?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]), [role="menuitemcheckbox"]:not([disabled])')
+        ?.focus({ preventScroll: true }),
     );
     return () => window.clearTimeout(t);
   }, [open, sheet]);
@@ -328,7 +346,7 @@ export function ToolsMenu({
                 role="menu"
                 aria-label={name}
                 onKeyDown={moveFocus}
-                className="-mx-4 [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:w-[calc(100%-0.5rem)]"
+                className="-mx-4 [&_[role=menuitem]]:min-h-11 [&_[role=menuitem]]:w-[calc(100%-0.5rem)] [&_[role=menuitemcheckbox]]:min-h-11 [&_[role=menuitemcheckbox]]:w-[calc(100%-0.5rem)]"
               >
                 {rows}
               </div>

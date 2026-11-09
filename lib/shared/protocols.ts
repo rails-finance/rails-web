@@ -676,6 +676,37 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
+    // Uniswap V3 and V4 on Ethereum (rails-ops ui-jobs 556): two versions,
+    // two entries. The route is a front door taking a wallet; its positions
+    // are at `<route>/<wallet>`, each opening `<route>/position/<id>`. A pool
+    // has no page yet, so there is no sub-page and no position listing. Reads
+    // come from rails-server's at-block routes (lib/api/fetch-uniswap.ts).
+    id: "uniswap-v3",
+    session: "uniswap-v3",
+    label: "Uniswap V3",
+    chainId: 1,
+    slug: "uniswap-v3",
+    // DRAFT: hue 4, read off Uniswap's pink #FF007A in oklch, the space this
+    // field takes (its HSL hue is 331).
+    brand: 4,
+    tags: ["Liquidity"],
+    desc: "Concentrated liquidity on Ethereum: a position's range, fees and pool over the last 30 days, read from the pool at two blocks",
+    positionListing: false,
+    subPages: [],
+  },
+  {
+    id: "uniswap-v4",
+    session: "uniswap-v4",
+    label: "Uniswap V4",
+    chainId: 1,
+    slug: "uniswap-v4",
+    brand: 4,
+    tags: ["Liquidity"],
+    desc: "Uniswap's singleton pools on Ethereum, hooks included: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    subPages: [],
+  },
+  {
     // The first entry here whose WHOLE PRODUCT is vaults, and therefore a
     // roster subject rather than a section (rails-ops decision 0027 point 2).
     // The `vaults` segment is kept although nothing else lives under this door,
@@ -878,6 +909,8 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   // A wallet's trades: the page titles name them, and nothing lists positions.
   cow: "Trades",
   pendle: "Position",
+  "uniswap-v3": "Position",
+  "uniswap-v4": "Position",
 };
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",
@@ -925,6 +958,8 @@ export function protocolIconSrc(id: string): string {
   const brand = id.replace(/-(base|arbitrum)$/, "");
   // Compound V3 on Arbitrum is keyed by its server lane, `compound-v3-arbitrum`;
   // its mark is Compound's, as Base's (`compound-base`) is.
+  // Uniswap V4 takes Uniswap's mark; the repo holds no V4 image of its own.
+  if (brand === "uniswap-v4") return "/icons/protocols/uniswap.png";
   return `/icons/protocols/${brand === "compound-v3" ? "compound" : brand}.png`;
 }
 

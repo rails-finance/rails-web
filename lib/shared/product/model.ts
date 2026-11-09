@@ -18,7 +18,7 @@
 import type { ReactNode } from "react";
 import type { Provenance } from "@/components/shared/provenance";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import type { SectionMenuExports, SectionMenuLink } from "@/components/shared/section-menu";
+import type { SectionMenuExports, SectionMenuLink, SectionMenuView } from "@/components/shared/section-menu";
 import type { VitalSlot } from "@/components/shared/vitals-band";
 import type { ChainId } from "@/lib/shared/chains";
 import type { ServerRead } from "@/lib/shared/server-head-read";
@@ -66,6 +66,8 @@ export interface ReadAt {
 export interface SectionTools {
   links?: SectionMenuLink[];
   exports?: SectionMenuExports;
+  /** Switch rows that change what the section shows, first in the ⋮. */
+  views?: SectionMenuView[];
   /** The armed hint: "Click a value in this section to trace it". */
   hint?: string;
 }

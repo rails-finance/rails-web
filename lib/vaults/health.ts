@@ -30,7 +30,7 @@ export const HEALTH_READ_DAYS = 130;
 
 export type HealthKey = "size" | "yield" | "withdrawals" | "losses" | "steward";
 
-export type StewardRole = "curator" | "owner" | "roleManager" | "umbrellaOwner";
+export type StewardRole = "curator" | "owner" | "roleManager" | "umbrellaOwner" | "poolDelegate";
 
 /** What the family's page read about the vault's own exit, at its block. */
 export type ExitInput =

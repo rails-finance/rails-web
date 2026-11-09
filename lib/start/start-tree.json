@@ -71,6 +71,13 @@
           "to": { "node": "asset" }
         },
         {
+          "slug": "pair",
+          "label": "Have two assets?",
+          "crumb": "I have two assets",
+          "line": "The Uniswap pools that take both, with their fees and size.",
+          "to": { "pairs": true }
+        },
+        {
           "slug": "site-down",
           "label": "Is a protocol's site down?",
           "crumb": "Site down",
