@@ -193,6 +193,8 @@ export interface DeficitCover {
   caller: string;
   txFrom: string;
   umbrella: { event: UmbrellaCoverEvent; logIndex: number } | null;
+  /** The address whose aTokens went to the caller in the cover's transaction; null where none is held (absent before the api carries it). */
+  paidBy?: string | null;
 }
 
 export interface StakeSlash {

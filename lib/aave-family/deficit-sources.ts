@@ -6,6 +6,7 @@
 //   O  aave-dao/aave-v3-origin @ 8305565a
 //   U  aave-dao/aave-umbrella  @ c279bf14
 //   A  aave-dao/aave-address-book @ 96661422
+//   P  aave-dao/aave-proposals-v3 @ ade09504, and Aave's governance site
 //   D  aave.com/docs, read 9 Nov 2026
 
 import type { LearnMoreLink } from "@/components/shared/learn-more-modal";
@@ -14,6 +15,8 @@ import type { Provenance } from "@/components/shared/provenance";
 const ORIGIN = "https://github.com/aave-dao/aave-v3-origin/blob/8305565ae342f1773c42cd2e4593f175fe5968a0/src/contracts";
 const UMBRELLA =
   "https://github.com/aave-dao/aave-umbrella/blob/c279bf145eb58e013fd24f97b10e4bf6058236a1/src/contracts";
+const PROPOSALS =
+  "https://github.com/aave-dao/aave-proposals-v3/blob/ade09504074d1e2ed0cc0b21f1cfc73a685e4bcb/src/20260423_Multi_LiquidateRsETHPositions";
 const BOOK = "https://github.com/aave-dao/aave-address-book/blob/9666142204e49410aad9124502564a2fb6187698/src";
 
 export const DEFICIT_SOURCES = {
@@ -72,6 +75,20 @@ export const DEFICIT_SOURCES = {
   A1: { label: "GovernanceV3Ethereum.sol L54-55", url: `${BOOK}/GovernanceV3Ethereum.sol#L54-L55` },
   /** Aave's address book: the deficit offset clinic steward on Ethereum. */
   A2: { label: "UmbrellaEthereum.sol L43-45", url: `${BOOK}/UmbrellaEthereum.sol#L43-L45` },
+  /** Proposal 478's text: the liquidations of the rsETH attacker's positions, the Recovery Guardian. */
+  P1: { label: "LiquidateRsETHPositions.md L23-56", url: `${PROPOSALS}/LiquidateRsETHPositions.md#L23-L56` },
+  /** The two Ethereum Core users the payloads liquidate. */
+  P2: {
+    label: "LiquidateRsETHConstants.sol L7-11",
+    url: `${PROPOSALS}/setup/LiquidateRsETHConstants.sol#L7-L11`,
+  },
+  /** The deficit offset raised before the liquidations; Umbrella's admin role granted to the Recovery Guardian after. */
+  P3: {
+    label: "LiquidateRsETHEthereumSetup.sol L59-69",
+    url: `${PROPOSALS}/mainnet/LiquidateRsETHEthereumSetup.sol#L59-L69`,
+  },
+  /** Proposal 478 on Aave's governance site. */
+  P4: { label: "Aave governance: proposal 478", url: "https://app.aave.com/governance/v3/proposal/?proposalId=478" },
   /** Pool docs: getReserveDeficit and eliminateReserveDeficit. */
   D1: { label: "Aave docs: Pool", url: "https://aave.com/docs/aave-v3/smart-contracts/pool" },
   /** Umbrella docs: slashing and deficit protection. */
