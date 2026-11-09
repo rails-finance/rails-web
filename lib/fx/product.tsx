@@ -76,7 +76,7 @@ import type {
   EntryLink,
   Loadable,
   MarketModel,
-  MarketStructure,
+  TicksStructure,
   ProductHead,
   ProductSection,
   ProductTerms,
@@ -161,7 +161,7 @@ const stamp = (c: Ctx, info: Parameters<typeof stampServerRead>[0]) => stampServ
 
 // ── The head ─────────────────────────────────────────────────────────────────
 
-function structureOf(c: Ctx): MarketStructure {
+function structureOf(c: Ctx): TicksStructure {
   const { p, label } = c;
   const leg = (which: "min" | "anchor" | "max", value: number) => (
     <Prov
@@ -461,8 +461,8 @@ const ORACLE_HELP = (p: FxPoolSystem): LearnMoreContent => ({
   links: [{ label: "f(x) docs", url: DOCS }],
 });
 
-function OracleLegs({ s }: { s: MarketStructure }) {
-  const row = (f: MarketStructure["oracle"]["min"], key: string) => (
+function OracleLegs({ s }: { s: TicksStructure }) {
+  const row = (f: TicksStructure["oracle"]["min"], key: string) => (
     <div className="flex items-baseline justify-between gap-3" data-fx-leg={key}>
       <span className="min-w-0 text-rb-500">
         <span className="text-foreground">{f.label}</span> · {f.tip?.toLowerCase()}
@@ -926,7 +926,7 @@ function Capacity({ c }: { c: Ctx }) {
 
 // ── The pool page's sections ─────────────────────────────────────────────────
 
-function sections(c: Ctx, s: MarketStructure): ProductSection[] {
+function sections(c: Ctx, s: TicksStructure): ProductSection[] {
   const { p } = c;
   const scope = (k: string) => `pool-${p.key}-${k}`;
   const inspect: SectionTools = {};
@@ -1020,7 +1020,7 @@ export function fxPoolModel(data: FxSystemChainResponse, key: FxPoolKey, overvie
   if (data.chainStale || data.blockNumber <= 0 || !p) return { state: "error", message: FAILED };
   const c = ctxOf(p, data);
   const h = head(c, overview);
-  return { state: "ok", data: { head: h, ...(overview ? {} : { sections: sections(c, h.structure!) }) } };
+  return { state: "ok", data: { head: h, ...(overview ? {} : { sections: sections(c, structureOf(c)) }) } };
 }
 
 const learnMore = fxEventFallbackContent();

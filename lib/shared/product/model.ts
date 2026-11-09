@@ -105,7 +105,18 @@ export interface StructureFigure {
 /** The slot where a protocol adds what is its own (survey §3.2's
  *  `MarketStructure`): one variant per structure, named for what it is. The
  *  head draws its terms under the band; a page section can draw the rest. */
-export type MarketStructure = {
+export type MarketStructure = TicksStructure | CometStructure;
+
+/** Compound V3: the base asset's terms beside its rates, in Compound's
+ *  words: the kink, the reserves against their target, the minimum borrow. */
+export interface CometStructure {
+  kind: "comet";
+  kink: StructureFigure;
+  reserves: StructureFigure;
+  minBorrow: StructureFigure;
+}
+
+export interface TicksStructure {
   /** f(x): a pool's ticks, the two debt ratios its keepers act from, and the
    *  oracle's three prices. */
   kind: "ticks";
@@ -119,7 +130,7 @@ export type MarketStructure = {
     anchor: StructureFigure;
     max: StructureFigure;
   };
-};
+}
 
 /** The (i) slot of a head: a status lead and grouped bullets
  *  (standards/explanation-copy-charter.md §3, §4). */

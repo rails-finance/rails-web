@@ -76,6 +76,14 @@ function Term({ f }: { f: StructureFigure }) {
 
 /** A head's structure terms, in the band's foot before its notes. */
 function StructureTerms({ s }: { s: MarketStructure }) {
+  if (s.kind === "comet")
+    return (
+      <>
+        <Term f={s.kink} />
+        <Term f={s.reserves} />
+        <Term f={s.minBorrow} />
+      </>
+    );
   return (
     <>
       <Term f={s.ticks} />
