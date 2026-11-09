@@ -16,7 +16,15 @@ import { SectionReadStamp } from "@/components/shared/read-stamp";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { SectionExplainer } from "@/components/shared/section-explainer";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
-import type { EntryLink, ProductHead, ReadAt, SectionTools } from "@/lib/shared/product/model";
+import type {
+  EntryLink,
+  MarketStructure,
+  ProductHead,
+  ProductSection,
+  ReadAt,
+  SectionTools,
+  StructureFigure,
+} from "@/lib/shared/product/model";
 
 /** "Read 10:12 UTC", or nothing while the read is out. */
 export function ReadStamp({ readAt }: { readAt: ReadAt | null }) {
@@ -54,6 +62,46 @@ export function EntryLinks({ entries }: { entries: EntryLink[] }) {
         </Link>
       ))}
     </div>
+  );
+}
+
+/** One structure term in the band's foot: "Rebalance from 88%". */
+function Term({ f }: { f: StructureFigure }) {
+  return (
+    <span title={f.tip} data-structure-term="" {...f.hooks}>
+      {f.label} <span className="text-foreground">{f.value}</span>
+    </span>
+  );
+}
+
+/** A head's structure terms, in the band's foot before its notes. */
+function StructureTerms({ s }: { s: MarketStructure }) {
+  return (
+    <>
+      <Term f={s.ticks} />
+      <Term f={s.rebalance} />
+      <Term f={s.liquidation} />
+    </>
+  );
+}
+
+/** One section under a head (A2's family sections, A3's sections): its own
+ *  receipts scope under a heading row with its "?" and ⋮. */
+export function ProductSectionBlock({ s }: { s: ProductSection }) {
+  const help = s.learnMore ? <LearnMore inline content={s.learnMore} ariaLabel={`${s.title}, learn more`} /> : null;
+  const body =
+    s.raised === "narrow" ? (
+      <div className="max-w-xl rounded-lg bg-raised p-4">{s.body}</div>
+    ) : s.raised ? (
+      <div className="rounded-lg bg-raised p-4">{s.body}</div>
+    ) : (
+      s.body
+    );
+  return (
+    <ProvSection scope={s.scope} className="mb-8" data-anatomy={s.anatomy || undefined} {...s.hooks}>
+      <SectionHeading title={s.title} help={help} menu={<ToolsFor scope={s.scope} title={s.title} tools={s.tools} />} />
+      <div className="mt-3">{body}</div>
+    </ProvSection>
   );
 }
 
@@ -127,7 +175,14 @@ export function ProductHeadSection({
           // roster align their figures and links.
           lead={lead ?? (aside ? <span aria-hidden /> : null)}
           aside={aside}
-          notes={head.notes}
+          notes={
+            head.structure || head.notes ? (
+              <>
+                {head.structure && <StructureTerms s={head.structure} />}
+                {head.notes}
+              </>
+            ) : undefined
+          }
           vitals={head.figures.map((f) =>
             f.slot === "usage"
               ? { slot: "usage" as const, label: f.label, value: f.value, title: f.tip ?? f.label, side: f.side }

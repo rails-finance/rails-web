@@ -409,11 +409,8 @@ function ratioRows(
             <PanelFigure>#{px.tick}</PanelFigure>
           </Prov>{" "}
           ·{" "}
-          <Link
-            href={`/ethereum/fx/pools?pool=${v.pool}&tick=${px.tick}#tick-${v.pool}-${px.tick}`}
-            className={INLINE_LINK}
-          >
-            find it on the pools page
+          <Link href={`/ethereum/fx/pools/${v.pool}?tick=${px.tick}#tick-${v.pool}-${px.tick}`} className={INLINE_LINK}>
+            find it on the pool page
           </Link>
         </>
       ),

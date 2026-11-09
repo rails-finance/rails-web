@@ -93,6 +93,34 @@ export interface HeadFigure {
   side?: string;
 }
 
+/** One term of a protocol's structure: its label in the protocol's words, the
+ *  value drawn with its <Prov>. */
+export interface StructureFigure {
+  label: string;
+  value: ReactNode;
+  tip?: string;
+  hooks?: Hooks;
+}
+
+/** The slot where a protocol adds what is its own (survey §3.2's
+ *  `MarketStructure`): one variant per structure, named for what it is. The
+ *  head draws its terms under the band; a page section can draw the rest. */
+export type MarketStructure = {
+  /** f(x): a pool's ticks, the two debt ratios its keepers act from, and the
+   *  oracle's three prices. */
+  kind: "ticks";
+  ticks: StructureFigure;
+  rebalance: StructureFigure;
+  liquidation: StructureFigure;
+  oracle: {
+    /** What each price is per: "USD per stETH". */
+    unit: string;
+    min: StructureFigure;
+    anchor: StructureFigure;
+    max: StructureFigure;
+  };
+};
+
 /** The (i) slot of a head: a status lead and grouped bullets
  *  (standards/explanation-copy-charter.md §3, §4). */
 export interface HeadExplainer {
@@ -123,6 +151,8 @@ export interface ProductHead {
   aside?: ReactNode;
   /** Links at the foot of the aside (or under the band where there is none). */
   entries?: EntryLink[];
+  /** The protocol's structure: its terms drawn under the band. */
+  structure?: MarketStructure;
   /** Lines under a figure that qualify it are part of the figure's value;
    *  qualifications of the whole band go here. */
   notes?: ReactNode;
@@ -213,10 +243,12 @@ export interface ReserveTableModel {
   tableClassName?: string;
 }
 
-/** One A2 page: its head, then its reserves. */
+/** One A2 page: its head, then its reserves, then the family's sections (an
+ *  f(x) pool, which has no reserves, has sections alone). */
 export interface MarketModel {
   head: ProductHead;
-  reserves: ReserveTableModel;
+  reserves?: ReserveTableModel;
+  sections?: ProductSection[];
 }
 
 /** The rate model of a reserve, fed to the curve (M3.3) by value: rates and

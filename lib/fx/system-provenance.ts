@@ -1,4 +1,5 @@
-// f(x) V2 SYSTEM-lane provenance vocabulary — the /fx/pools protocol view.
+// f(x) V2 SYSTEM-lane provenance vocabulary — the pools overview and each
+// pool's page (/ethereum/fx/pools, /ethereum/fx/pools/<pool>).
 // ----------------------------------------------------------------------------
 // The position lane (event-provenance.ts) traces one xPOSITION through captured
 // events and the settled sweep. This lane traces the OTHER direction: the
@@ -33,18 +34,6 @@ const STATE_VERIFY: ProvVerify = {
   text: "Re-run the eth_call against any node at the stamped block",
 };
 
-// ── The roster ───────────────────────────────────────────────────────────────
-
-export const poolRosterProv = (): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  summary:
-    "The pool roster — exactly two AaveFundingPools hang off the one PoolManager (wstETH and WBTC; chain-verified complete, two RegisterPool events ever). Each pool answers the manager's getPoolInfo with a live capacity, which is only ever set at registration — a roster proof that needs no log scan.",
-  contract: POOL_MANAGER,
-  via: `${SYSTEM_VIA} · PoolManager.getPoolInfo per pool @ the pinned block`,
-  verify: STATE_VERIFY,
-});
-
 // ── Pool totals (the pool's own getters) ─────────────────────────────────────
 
 export const poolCollateralProv = (label: string, address: string, normalizedSym: string): Provenance => ({
@@ -62,17 +51,6 @@ export const poolDebtProv = (label: string, address: string): Provenance => ({
   summary: `All fxUSD debt owed to the ${label} — the pool's own getTotalRawDebts view at the pinned block. An fxUSD token amount, not a USD figure (fxUSD is not $1-pinned). The tick ladder below decomposes this exactly: every debt share sits in one tick, and the sum is re-checked in integer share space on every read.`,
   contract: pool(label, address),
   via: `${SYSTEM_VIA} · pool.getTotalRawDebts() (eth_call)`,
-  verify: STATE_VERIFY,
-});
-
-export const totalDebtAllPoolsProv = (): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary:
-    "fxUSD debt summed across both pools. Debt is one unit system everywhere (fxUSD, 1e18), so this sum is safe — unlike collateral, which the two pools hold in different units and which is deliberately never summed here.",
-  contract: POOL_MANAGER,
-  via: `${SYSTEM_VIA} · Σ pool.getTotalRawDebts() across the roster`,
-  formula: "Σ getTotalRawDebts over both pools",
   verify: STATE_VERIFY,
 });
 
@@ -145,6 +123,28 @@ export const fundingCheckpointProv = (label: string, address: string): Provenanc
   verify: STATE_VERIFY,
 });
 
+/** The pool-wide debt ratio: all its debt over its collateral at the anchor. */
+export const poolDebtRatioProv = (label: string, address: string, oracleAddr: string): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `The ${label}'s debt ratio as a whole. Its total fxUSD debt over the value of its total collateral at the oracle's anchor price, the price a position's stated debt ratio is judged at. The pool's own totals and the oracle's anchor leg, all from the same pinned-block read.`,
+  contract: pool(label, address),
+  via: `${SYSTEM_VIA} · derived ratio at the anchor leg`,
+  formula: "getTotalRawDebts ÷ (getTotalRawCollaterals × anchor price)",
+  inputs: [
+    { label: "total raw debt", kind: "chain", pclass: "state", note: "pool.getTotalRawDebts()" },
+    { label: "total raw collateral", kind: "chain", pclass: "state", note: "pool.getTotalRawCollaterals()" },
+    {
+      label: "anchor price",
+      kind: "chain",
+      pclass: "oracle",
+      note: "oracle.getPrice() anchor leg",
+      contract: { name: "PriceOracle", address: oracleAddr },
+    },
+  ],
+  verify: STATE_VERIFY,
+});
+
 // ── The oracle's three legs ──────────────────────────────────────────────────
 
 export const oracleLegProv = (
@@ -158,7 +158,7 @@ export const oracleLegProv = (
   pclass: "oracle",
   summary:
     leg === "anchor"
-      ? `The oracle's ANCHOR leg — USD per NORMALIZED unit (${normalizedSym}, 1e18), read from the ${label}'s own price oracle at the pinned block. The leg a POSITION's stated debt ratio is judged at (chain-verified: getPositionDebtRatio == debts × 1e36 ÷ (colls × anchor), BigInt-exact). Not the leg this page's tick ratios use — ticks are judged the way the engines judge them, at the min leg.`
+      ? `The oracle's ANCHOR leg — USD per NORMALIZED unit (${normalizedSym}, 1e18), read from the ${label}'s own price oracle at the pinned block. The anchor is the oracle's Chainlink reading; the min and max legs are the lowest and highest of it and the on-chain spot prices, each falling back to the anchor when a spot price strays too far from it. The leg a POSITION's stated debt ratio is judged at (chain-verified: getPositionDebtRatio == debts × 1e36 ÷ (colls × anchor), BigInt-exact). Not the leg this page's tick ratios use — ticks are judged the way the engines judge them, at the min leg.`
       : leg === "min"
         ? `The oracle's MIN leg — the lowest of its price sources, USD per NORMALIZED unit (${normalizedSym}). The leg the protocol's own rebalance and liquidation sweeps judge a TICK at (its getLiquidatePrice getter returns exactly this leg), which is why every tick ratio on this page uses it and says so.`
         : `The oracle's MAX leg — the highest of its price sources, USD per NORMALIZED unit (${normalizedSym}). The leg redemption prices collateral at (getRedeemPrice returns exactly this leg): a redeemer surrenders fxUSD and receives collateral valued at the max, the leg least favorable to them.`,
@@ -255,17 +255,6 @@ export const occupiedTicksProv = (label: string, address: string): Provenance =>
   verify: STATE_VERIFY,
 });
 
-export const totalPositionsMintedProv = (): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  summary:
-    "Positions ever minted across both pools — Σ of each pool's own getNextPositionId minus one (ids are sequential from 1 per pool; each pool is its own ERC721). Everything ever opened.",
-  contract: POOL_MANAGER,
-  via: `${SYSTEM_VIA} · Σ pool.getNextPositionId() − 1 across the roster`,
-  formula: "Σ (getNextPositionId − 1) over both pools",
-  verify: STATE_VERIFY,
-});
-
 export const tickIdProv = (label: string, address: string, tick: number): Provenance => ({
   kind: "chain",
   pclass: "state",
@@ -355,7 +344,14 @@ export const tickShareProv = (label: string, address: string, tick: number): Pro
 
 // ── The reconciliation — the page's spine ────────────────────────────────────
 
-export const ladderReconcileProv = (label: string, address: string, ok: boolean, tickCount: number): Provenance => ({
+export const ladderReconcileProv = (
+  label: string,
+  address: string,
+  ok: boolean,
+  tickCount: number,
+  /** The two raw integers and their difference, where the caller has them. */
+  totals?: { ticks: string; pool: string },
+): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   summary: ok
@@ -365,8 +361,31 @@ export const ladderReconcileProv = (label: string, address: string, ok: boolean,
   via: `${SYSTEM_VIA} · derived check (integer share space)`,
   formula: "Σ tickTreeData debt shares over the bitmap == getDebtAndCollateralShares().debtShares",
   inputs: [
-    { label: "Σ tick debt shares", kind: "chain-derived", pclass: "state", note: "summed over every set bitmap bit" },
-    { label: "total debt shares", kind: "chain", pclass: "state", note: "pool.getDebtAndCollateralShares()" },
+    {
+      label: "Σ tick debt shares",
+      ...(totals ? { value: totals.ticks } : {}),
+      kind: "chain-derived",
+      pclass: "state",
+      note: "summed over every set bitmap bit",
+    },
+    {
+      label: "total debt shares",
+      ...(totals ? { value: totals.pool } : {}),
+      kind: "chain",
+      pclass: "state",
+      note: "pool.getDebtAndCollateralShares()",
+    },
+    ...(totals
+      ? [
+          {
+            label: "residual",
+            value: (BigInt(totals.pool) - BigInt(totals.ticks)).toString(),
+            kind: "chain-derived" as const,
+            pclass: "state" as const,
+            note: "total − Σ ticks, in raw integer shares",
+          },
+        ]
+      : []),
   ],
   verify: STATE_VERIFY,
 });

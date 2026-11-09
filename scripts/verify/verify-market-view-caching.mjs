@@ -37,7 +37,9 @@ const VIEWS = [
   { path: "/ethereum/compound-v3/markets" },
   { path: "/ethereum/dolomite/markets" },
   { path: "/ethereum/frankencoin/system" },
-  { path: "/ethereum/fx/pools" },
+  // f(x)'s roster (R1) draws two pool heads of five figures; the tick table
+  // that once filled this page is on each pool's page.
+  { path: "/ethereum/fx/pools", minFigures: 8 },
   { path: "/ethereum/liquity-v1/system" },
   { path: "/ethereum/llamalend/markets" },
   { path: "/ethereum/makerdao/system" },

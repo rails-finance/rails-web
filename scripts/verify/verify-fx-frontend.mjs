@@ -400,7 +400,7 @@ check(
   /both in this block/.test(p243.text) && /included above/.test(p243.text),
 );
 check("243 r3: dust after liquidation 1", /dust left/.test(p243.text), p243.figs.join(","));
-check("243 r3: the card names the position's tick", /\n#\d+ · find it on the pools page/.test(p243.text));
+check("243 r3: the card names the position's tick", /\n#\d+ · find it on the pool page/.test(p243.text));
 // The head is words (decision 0045): a tick's or the pool's totals are in the
 // Explanation, none on the row.
 check(
@@ -456,32 +456,63 @@ check("137: the unpaid 1.234 fxUSD is named", /did not cover the last 1\.234 fxU
 check("137: the reopened row says so", /Reopened position/.test(p137.text) && /Loan 2 of 2/.test(p137.text));
 check("137: 'seizure is quoted' copy is gone", !/quoted in the pool/.test(p137.text));
 
+// The pools roster (A1) and a pool's page (A2), ui-jobs 549/550.
 const pPools = await openAndRead("/ethereum/fx/pools");
+const pPool = await openAndRead("/ethereum/fx/pools/wsteth");
 check(
-  "pools: redemption state follows isRedeemAllowed",
-  terms.redeemAllowed
-    ? /redemption open/.test(pPools.text)
-    : /redemption closed: it opens only while fxUSD trades below its peg/.test(pPools.text),
+  "pools: redemption state follows isRedeemAllowed, on the roster and the pool page",
+  [pPools.text, pPool.text].every((t) =>
+    terms.redeemAllowed
+      ? /Redemption open/.test(t)
+      : /Redemption closed: it opens only while fxUSD trades below its peg/.test(t),
+  ),
+);
+check(
+  "pools: each head opens its pool's page",
+  /View wstETH pool/.test(pPools.text) && /View WBTC pool/.test(pPools.text),
+);
+check(
+  "pool page: the reconcile card says it in words, the raw share totals in its receipt",
+  /Reconciles: every debt share sits in one tick\./.test(pPool.text) && !/\d{20,}/.test(pPool.text),
+);
+check(
+  "pool page: no contract or feed names on the surface",
+  !/Chainlink|AaveFundingPool|getPrice|tickBitmap/.test(pPool.text),
 );
 {
   // wsteth-243's tick as its card states it today; a rebalance of the tick
   // moves the position to another one.
-  const tick243 = p243.text.match(/\n#(\d+) · find it on the pools page/)?.[1];
+  const tick243 = p243.text.match(/\n#(\d+) · find it on the pool page/)?.[1];
   check("pools r3: wsteth-243's card names its tick", tick243 != null);
   const pg = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
-  await pg.goto(BASE + `/ethereum/fx/pools?pool=wsteth&tick=${tick243}`, { waitUntil: "networkidle", timeout: 120000 });
+  await pg.goto(BASE + `/ethereum/fx/pools/wsteth?tick=${tick243}`, { waitUntil: "networkidle", timeout: 120000 });
   await pg.waitForTimeout(3000);
   const t = await pg
     .locator(`#tick-wsteth-${tick243}`)
     .innerText()
     .catch(() => "");
   check("pools r3: a linked tick is marked", /the position’s tick/.test(t), t.split("\n").join(" "));
+  // A link from before the pool pages opens the pool's page at the tick.
+  await pg.goto(BASE + `/ethereum/fx/pools?pool=wsteth&tick=${tick243}`, { waitUntil: "networkidle", timeout: 120000 });
+  await pg.waitForTimeout(3000);
+  check(
+    "pools r3: an old ?pool=&tick= link opens the pool's page",
+    new URL(pg.url()).pathname === "/ethereum/fx/pools/wsteth",
+    pg.url(),
+  );
   await pg.close();
 }
-check("pools: shorts are named as not covered", /short positions sit on a separate manager/.test(pPools.text));
+{
+  const info = await openAndRead("/ethereum/fx/info");
+  check("info: shorts are named as not covered", /short positions live in a separate part/.test(info.text));
+  check(
+    "info: How Rails reads it names the pools and the oracle",
+    /How Rails reads it/.test(info.text) && /Each pool’s price oracle|Each pool's price oracle/.test(info.text),
+  );
+}
 check(
-  "pools: default fees are stated",
-  pPools.text.includes(
+  "pool page: default fees are stated",
+  pPool.text.includes(
     `borrow ${(terms.fees.borrow * 100).toFixed(1)}% · repay ${(terms.fees.repay * 100).toFixed(1)}%`,
   ),
 );

@@ -16,31 +16,11 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { RailHeader } from "@/components/shared/rail-header";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { LearnMore } from "@/components/shared/learn-more-modal";
-import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { ProtocolEntry } from "@/lib/shared/protocols";
 import type { Hooks, Loadable, ProductHead, ProductSection, ReserveIdentity } from "@/lib/shared/product/model";
-import { ProductHeadSection, ToolsFor } from "@/components/shared/product/product-head";
+import { ProductHeadSection, ProductSectionBlock } from "@/components/shared/product/product-head";
 import { ProductFailed, ProductLoading } from "@/components/shared/product/market-page";
-
-/** One section under the head. */
-export function ProductSectionBlock({ s }: { s: ProductSection }) {
-  const help = s.learnMore ? <LearnMore inline content={s.learnMore} ariaLabel={`${s.title}, learn more`} /> : null;
-  const body =
-    s.raised === "narrow" ? (
-      <div className="max-w-xl rounded-lg bg-raised p-4">{s.body}</div>
-    ) : s.raised ? (
-      <div className="rounded-lg bg-raised p-4">{s.body}</div>
-    ) : (
-      s.body
-    );
-  return (
-    <ProvSection scope={s.scope} className="mb-8" data-anatomy={s.anatomy} {...s.hooks}>
-      <SectionHeading title={s.title} help={help} menu={<ToolsFor scope={s.scope} title={s.title} tools={s.tools} />} />
-      <div className="mt-3">{body}</div>
-    </ProvSection>
-  );
-}
 
 /** What the page has once the head read answers. */
 export interface ReservePageData {

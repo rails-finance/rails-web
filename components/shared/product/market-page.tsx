@@ -34,7 +34,7 @@ import {
   DataTableRowLink,
 } from "@/components/shared/data-table/data-table";
 import type { Loadable, MarketModel, ReserveRowModel, ReserveTableModel, SortKey } from "@/lib/shared/product/model";
-import { ProductHeadSection, ToolsFor } from "@/components/shared/product/product-head";
+import { ProductHeadSection, ProductSectionBlock, ToolsFor } from "@/components/shared/product/product-head";
 
 /** The page header every product page draws above its head. */
 export interface ProductPageHeader {
@@ -273,8 +273,8 @@ export function ProductFailed({ what, message }: { what: string; message: string
   );
 }
 
-/** A market's head and reserves, or its loading and failure states. With
- *  `headOnly` the reserves are left off (an A1 panel). */
+/** A market's head, its reserves and its sections, or its loading and failure
+ *  states. With `headOnly` all but the head are left off (an A1 panel). */
 export function MarketBody({
   market,
   what,
@@ -290,7 +290,8 @@ export function MarketBody({
   return (
     <>
       <ProductHeadSection head={market.data.head} />
-      {!headOnly && <ReserveTableSection t={market.data.reserves} />}
+      {!headOnly && market.data.reserves && <ReserveTableSection t={market.data.reserves} />}
+      {!headOnly && market.data.sections?.map((s) => <ProductSectionBlock key={s.scope} s={s} />)}
     </>
   );
 }
