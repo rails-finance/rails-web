@@ -200,10 +200,13 @@ export function storedAmountProv(
     kind: what === "liquidity" ? "chain-derived" : "chain",
     pclass: "indexed",
     source: { block: c.block ?? undefined },
-    summary: `${scope}, ${what}. ${words[what][0].toUpperCase()}${words[what].slice(1)}${atStored(c)}.`,
+    summary: `${scope}, ${what}. ${words[what][0].toUpperCase()}${words[what].slice(1)}${atStored(c)}.${what === "liquidity" ? ` ${ESTIMATE}` : ""}`,
     via: `${storedLane(c)} · ${via[what]}`,
   };
 }
+
+/** The stored hub figures that stand in for a head read. */
+const ESTIMATE = "An estimate from stored totals; each spoke's reserve page reads the exact figure at the head.";
 
 /** A stored ratio: utilisation, or credit used. */
 export function storedRatioProv(what: "utilisation" | "credit used", scope: string, c: StoredCoords): Provenance {
@@ -244,7 +247,7 @@ export function storedRateProv(
     kind: "chain-derived",
     pclass: "indexed",
     source: { block: c.block ?? undefined },
-    summary: `${scope}, supply rate. The drawn rate × borrowed ÷ supplied × (1 − liquidity fee), as an APR. Borrowed carries the premium, so the rate includes what borrowers pay above the drawn rate.`,
+    summary: `${scope}, supply rate. The drawn rate × borrowed ÷ supplied × (1 − liquidity fee), as an APR. Borrowed carries the premium, so the rate includes what borrowers pay above the drawn rate. ${ESTIMATE}`,
     via: `${storedLane(c)} · drawnRate × (Σ owed ÷ Σ added) × (1 − liquidityFee)`,
     formula: "drawn rate × utilisation × (1 − liquidity fee)",
   };
