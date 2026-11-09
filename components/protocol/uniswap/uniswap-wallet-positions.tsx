@@ -12,6 +12,7 @@ import { ArrowRight } from "lucide-react";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { fetchUniswapPositions } from "@/lib/api/fetch-uniswap";
 import { explorerHref } from "@/lib/shared/protocols";
+import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import type { UniswapVersion } from "@/lib/uniswap/types";
 import { FRONT_DOOR } from "@/lib/uniswap/words";
@@ -39,6 +40,7 @@ export async function UniswapWalletPositions({ version, wallet: raw }: { version
           session={session}
           fallbackHref={home}
           showStamp={false}
+          priceReason={ORACLE_USD_REASON[session]}
           owner={{ wallet, filterProtocol: null }}
           tools={false}
         />
