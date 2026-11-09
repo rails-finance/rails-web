@@ -498,3 +498,62 @@ export function morphoMarketFetchParams(
     offset: (page - 1) * MORPHO_ITEMS_PER_PAGE,
   };
 }
+
+// ── under AIM (asset isolation mode, ui-jobs 557) ────────────────────────────
+//
+// A position counts under AIM when its market's loan or collateral token is in
+// the AIM set (Miles, 9 Nov 2026). The route ANDs `loan` with `coll`
+// (rails-server routes/morpho.ts), so "either side" is asked as the `market`
+// CSV: the roster's markets touching the set, intersected with any market the
+// reader's selection names, the most-populated first and capped at
+// MORPHO_MARKET_CSV_CAP. AIM applies underneath the reader's facets, never
+// through the URL, so their chips narrow within it and turning AIM off leaves
+// no facet behind. A server `assets` param (approved, not built) would take
+// the AIM set whole and lift the cap.
+
+/** The markets AIM reaches on this listing, by population, and the symbols
+ *  that put them there. A side counts where any roster address under its
+ *  symbol has its `1:address` in the set. */
+export function morphoAimMarkets(
+  roster: MorphoMarketRosterResponse,
+  keys: ReadonlySet<string>,
+): { ids: string[]; symbols: string[] } {
+  const inSet = new Map<string, boolean>();
+  const symbolIn = (symbol: string | null) => {
+    if (!symbol) return false;
+    let v = inSet.get(symbol);
+    if (v == null) {
+      v = (roster.tokens[symbol] ?? []).some((a) => keys.has(`1:${a.toLowerCase()}`));
+      inSet.set(symbol, v);
+    }
+    return v;
+  };
+  const weight = new Map<string, number>();
+  const hit: MorphoMarketRosterEntry[] = [];
+  for (const m of roster.markets) {
+    const sides = [m.loanSymbol, m.collateralSymbol].filter((s): s is string => symbolIn(s));
+    if (sides.length === 0) continue;
+    hit.push(m);
+    for (const s of sides) weight.set(s, (weight.get(s) ?? 0) + m.positions);
+  }
+  return {
+    ids: idsByPopulation(hit),
+    symbols: [...weight].sort((a, b) => b[1] - a[1]).map(([s]) => s),
+  };
+}
+
+/** The fetch with AIM's markets under the reader's selection. Null where
+ *  nothing is left to ask. `truncated` says the cap cut the list. */
+export function withAimMarkets(
+  params: FetchMorphoPositionsParams,
+  aimIds: readonly string[],
+): { params: FetchMorphoPositionsParams | null; truncated: number } {
+  const bare = aimIds.map((id) => id.replace(/^0x/, "").toLowerCase());
+  const ids = params.market ? params.market.split(",").filter((id) => bare.includes(id.toLowerCase())) : bare;
+  if (ids.length === 0) return { params: null, truncated: 0 };
+  const carried = ids.slice(0, MORPHO_MARKET_CSV_CAP);
+  return {
+    params: { ...params, market: carried.join(",") },
+    truncated: ids.length - carried.length,
+  };
+}

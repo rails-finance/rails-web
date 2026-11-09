@@ -3,8 +3,7 @@
 // A list under the asset preference (ui-jobs 557): `useScopedRows` keeps the
 // rows that touch the reader's assets, and `ScopeNote` says what it hid,
 // "Showing 14 of 312 vaults · Show all". Show all lifts the filter on this
-// list until the page is left; the chip's "Show everything" turns the
-// preference off (components/shared/asset-scope-strip.tsx).
+// list until the page is left; the strip's "Turn off" ends AIM (components/shared/asset-scope-strip.tsx).
 
 import { useMemo, useState } from "react";
 import { useAssetScope } from "@/lib/shared/asset-scope";
@@ -66,11 +65,11 @@ export function ScopeNote<T>({
     <p className={`text-xs text-rb-500 ${className}`} data-scope-note="" data-shown={rows.length} data-total={total}>
       {peek ? (
         <>
-          Showing all {n(total)} {word} · {press("Only your assets", false)}
+          Showing all {n(total)} {word} · {press("AIM only", false)}
         </>
       ) : rows.length === 0 ? (
         <>
-          None of the {n(total)} {word} holds your assets · {press("Show all", true)}
+          None of the {n(total)} {word} holds an AIM asset · {press("Show all", true)}
         </>
       ) : (
         <>

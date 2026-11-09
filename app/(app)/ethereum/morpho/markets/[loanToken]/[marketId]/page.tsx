@@ -27,6 +27,7 @@ import {
 } from "@/lib/morpho/list-filter-dimensions";
 import { toURLSearchParams, ssrDecode, ssrInitial, type RawSearchParams } from "@/lib/shared/listing-ssr";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { AimGate } from "@/components/shared/aim-gate";
 
 export const dynamic = "force-dynamic";
 // The function limit the listing SSR bound sits under (lib/shared/listing-ssr.ts).
@@ -87,8 +88,13 @@ export default async function MorphoMarketPage({ params, searchParams }: Params)
 
   const pair = data.params.collateralToken === ZERO_ADDR ? "Idle market" : "Morpho Blue market";
 
+  // AIM (ui-jobs 557): the market counts where its loan or collateral token is in the set.
+  const aimKeys = [token, data.params.collateralToken.toLowerCase()]
+    .filter((a) => a !== ZERO_ADDR)
+    .map((a) => `${MAINNET_CHAIN_ID}:${a}`);
+
   return (
-    <>
+    <AimGate keys={aimKeys} what="This Morpho market">
       <MorphoMarketShell
         data={view}
         chainId={MAINNET_CHAIN_ID}
@@ -115,6 +121,6 @@ export default async function MorphoMarketPage({ params, searchParams }: Params)
         }
       />
       <ProvInspectorLayer />
-    </>
+    </AimGate>
   );
 }

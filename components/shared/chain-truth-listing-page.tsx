@@ -180,6 +180,10 @@ export interface ChainTruthListingPageProps<T, F extends BaseListFilters, Ext = 
   countLine?: (filters: F) => { noun?: string; note?: string } | null;
   /** Opt-in line under the empty state for the live selection; null for none. */
   emptyNote?: (filters: F) => ReactNode | null;
+  /** A locked chip drawn first in the chip row (AIM's, ui-jobs 557). */
+  chipsLead?: ReactNode;
+  /** In place of the result count at the chip row's end, given the count. */
+  countNode?: (total: number) => ReactNode;
 }
 
 export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefined>({
@@ -206,6 +210,8 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
   titleAs,
   countLine,
   emptyNote,
+  chipsLead,
+  countNode,
 }: ChainTruthListingPageProps<T, F, Ext>) {
   const searchParams = useUrlSearchParams(initialSearch ?? "");
 
@@ -522,6 +528,8 @@ export function ChainTruthListingPage<T, F extends BaseListFilters, Ext = undefi
         viewMenu: true,
         countFor,
         nounFor: (draft: F) => (strategy.kind === "server" ? countLine?.(draft)?.noun : undefined) ?? noun,
+        chipsLead,
+        countNode: countNode && !loading && error == null ? countNode(total) : undefined,
       }}
     />
   );

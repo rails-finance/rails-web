@@ -1,21 +1,22 @@
 "use client";
 
-// The asset preference's chip and panel (ui-jobs 557). With the preference on,
-// a strip across the top of the app column on every page, at every width:
-// "Showing WETH, BOLD and what's built on them · Change · Show everything".
-// Off, nothing: the way in is "Your assets" in the profile menu (H20), which
-// opens the same panel (OPEN_SCOPE_PANEL).
+// AIM, asset isolation mode (ui-jobs 557): the asset preference's strip and
+// panel. With AIM on, a strip across the top of the app column on every page,
+// at every width: "AIM · WETH, BOLD and what's built on them · Change · Turn
+// off". Off, nothing: the ways in are "AIM" in the profile menu (H20), which
+// opens the same panel (OPEN_SCOPE_PANEL), and the AIM button on a token row
+// of the search's dropdown (components/shared/aim-search-button.tsx).
 //
 // The panel lists each chosen asset with one switch, "And what's built on it",
 // and adds assets through AssetChooser. From `?assets=` the strip says the
-// assets came with the link, and "Keep as my assets" stores them.
+// assets came with the link, and "Keep" stores them in this browser.
 //
 // On an explorer's own pages the strip carries one more line where the
 // explorer is one the preference hides (lib/shared/explorer-scope.ts): its
 // chain holds none of the reader's assets, or it lists none of them, or Rails
 // has no asset list for it. The page itself still opens whole.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { protocolForPathname } from "@/lib/shared/protocols";
@@ -69,7 +70,7 @@ const OPTIONS: AssetChooserOption[] = SCOPE_TOKENS.map((t) => ({
   count: familyOf([{ chain: t.chain, token: t.token, builtOn: true }]).size,
 }));
 
-export function AssetScopeStrip() {
+export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" }) {
   const scope = useAssetScope();
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -79,11 +80,30 @@ export function AssetScopeStrip() {
   }, []);
   const on = scope.picks.length > 0;
 
+  // Home's header bar floats over the hero (components/nav/header-bar.tsx);
+  // the strip's height moves it down (globals.css, --aim-strip-h).
+  const stripRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = stripRef.current;
+    const root = document.documentElement;
+    if (!el) return;
+    const set = () => root.style.setProperty("--aim-strip-h", `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => {
+      ro.disconnect();
+      root.style.removeProperty("--aim-strip-h");
+    };
+  }, [on]);
+
   return (
     <>
       {on && (
         <div
-          className="border-b border-rb-200 bg-rb-100/60 md:mb-[17px] dark:border-rb-800 dark:bg-rb-900/60"
+          ref={stripRef}
+          // The app column's main pulls up 17px from md; the margin gives it back.
+          className={`border-b border-rb-200 bg-rb-100/60 dark:border-rb-800 dark:bg-rb-900/60 ${column === "app" ? "md:mb-[17px]" : ""}`}
           data-asset-scope-strip={scope.fromLink ? "link" : "stored"}
         >
           <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-2 gap-y-1 px-4 py-1.5 text-xs md:px-6">
@@ -92,7 +112,17 @@ export function AssetScopeStrip() {
               className="min-w-0 text-foreground"
               title={scope.picks.map((p) => `${symbolOf(p)} on ${chainName(p.chain)}`).join(", ")}
             >
-              {scope.fromLink ? <span className="text-rb-500">From this link: showing </span> : "Showing "}
+              <abbr
+                title="Asset isolation mode"
+                className="font-semibold text-teal-700 no-underline dark:text-teal-400"
+              >
+                AIM
+              </abbr>
+              {scope.fromLink && <span className="text-rb-500"> from this link</span>}
+              <span className="text-rb-500" aria-hidden="true">
+                {" "}
+                ·{" "}
+              </span>
               <span className="font-semibold">{scopeSummary(scope.picks)}</span>
             </span>
             <span className="text-rb-500" aria-hidden="true">
@@ -117,7 +147,7 @@ export function AssetScopeStrip() {
                   className={`font-semibold ${INPLACE_TEXT}`}
                   data-asset-scope-keep=""
                 >
-                  Keep as my assets
+                  Keep
                 </button>
               </>
             )}
@@ -130,7 +160,7 @@ export function AssetScopeStrip() {
               className={`font-semibold ${INPLACE_TEXT}`}
               data-asset-scope-clear=""
             >
-              Show everything
+              Turn off
             </button>
           </div>
           <ExplorerScopeLine keys={scope.keys} fromLink={scope.fromLink} />
@@ -151,9 +181,9 @@ function ExplorerScopeLine({ keys, fromLink }: { keys: Set<string> | null; fromL
   const chain = CHAINS[entry.chainId];
   const onChain = [...keys].some((k) => k.startsWith(`${entry.chainId}:`));
   const why = !onChain
-    ? `None of your assets is on ${chain.name}`
+    ? `No AIM asset is on ${chain.name}`
     : status === "none"
-      ? `${entry.label} lists none of your assets`
+      ? `${entry.label} lists no AIM asset`
       : `Rails has no asset list for ${entry.label} yet`;
   const link = fromLink ? new URLSearchParams(window.location.search).get("assets") : null;
   return (
@@ -166,7 +196,7 @@ function ExplorerScopeLine({ keys, fromLink }: { keys: Set<string> | null; fromL
         href={`/assets${link ? `?assets=${link.replace(/ /g, "+")}` : ""}`}
         className={`font-semibold ${INLINE_LINK}`}
       >
-        Where your assets are listed
+        Where AIM assets are listed
       </Link>
     </p>
   );
@@ -200,6 +230,9 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
 }
 
 const ADDS_SHOWN = 5;
+
+/** The one place the name is spelled out. */
+const PANEL_TITLE = "Asset isolation mode";
 
 function PickRow({
   pick,
@@ -326,7 +359,7 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
               className={RESET_LINK}
               data-asset-scope-panel-clear=""
             >
-              Show everything
+              Turn off AIM
             </button>
             <button
               type="button"
@@ -345,7 +378,7 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
         )}
         {scope.fromLink && (
           <button type="button" onClick={scope.keepLink} className={RESET_LINK}>
-            Keep as my assets
+            Keep in this browser
           </button>
         )}
         <button
@@ -361,7 +394,7 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
 
   if (isPhone)
     return (
-      <MobileSheet label="Your assets" onClose={onClose} header={<MobileSheetFilterHeader label="Your assets" />}>
+      <MobileSheet label={PANEL_TITLE} onClose={onClose} header={<MobileSheetFilterHeader label={PANEL_TITLE} />}>
         {body}
       </MobileSheet>
     );
@@ -371,11 +404,11 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
       <div className="absolute inset-0 bg-black/20" onClick={onClose} aria-hidden="true" />
       <div
         role="dialog"
-        aria-label="Your assets"
+        aria-label={PANEL_TITLE}
         className="overlay-panel absolute left-1/2 top-20 flex w-[26rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col"
       >
         <div className="flex items-center justify-between px-4 py-3">
-          <span className={OVERLAY_HEADING}>Your assets</span>
+          <span className={OVERLAY_HEADING}>{PANEL_TITLE}</span>
           <button
             type="button"
             onClick={onClose}

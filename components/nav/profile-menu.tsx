@@ -374,11 +374,11 @@ export function ProfileMenu() {
                   data-profile-menu-assets={scope.picks.length}
                 >
                   <ListFilter className="size-4 shrink-0" aria-hidden="true" />
-                  <span className="min-w-0 flex-1 truncate text-foreground">Your assets</span>
+                  <span className="min-w-0 flex-1 truncate text-foreground">AIM</span>
                   <span className="shrink-0 truncate text-xs text-rb-500">
                     {scope.picks.length
                       ? scopeSummary(scope.picks).replace(/ and what's built on (it|them)$/, "")
-                      : "All"}
+                      : "Off"}
                   </span>
                 </button>
                 <Link
