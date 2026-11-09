@@ -4,6 +4,7 @@
 
 import raw from "@/lib/start/start-tree.json";
 import { assetCategory, type AssetCategory } from "@/lib/shared/asset-categories";
+import { isPairKey, PAIRS, type PairKey } from "@/lib/uniswap/pairs";
 
 export type GroupKey = "eth" | "btc" | "stablecoins";
 export type ResultsKey = "borrow" | "near-liquidation" | "liquidated";
@@ -18,7 +19,9 @@ export type Destination =
   | { roster: RosterKey }
   | { vaults: GroupKey }
   /** A group's coins, each opening the vaults that hold it (ui-jobs 525). */
-  | { coins: GroupKey };
+  | { coins: GroupKey }
+  /** The pairs, each opening the Uniswap pools that take it (ui-jobs 556, door 2). */
+  | { pairs: true };
 
 export interface StartOption {
   slug: string;
@@ -125,7 +128,11 @@ export type Leaf =
   | { kind: "results"; results: ResultsKey; group?: GroupKey }
   | { kind: "coins"; group: GroupKey }
   /** One coin of a group's list: the vaults that take it (G9; ui-jobs 553). */
-  | { kind: "asset"; group: GroupKey; symbol: string };
+  | { kind: "asset"; group: GroupKey; symbol: string }
+  /** The pairs (ui-jobs 556, door 2). */
+  | { kind: "pairs" }
+  /** One pair: the hookless Uniswap pools that take it. */
+  | { kind: "pair"; pair: PairKey };
 
 export interface Resolved {
   /** Every level from the top of the tree down; with no leaf, the last one is
@@ -189,7 +196,15 @@ export function resolveStartPath(segments: string[]): Resolved | null {
       answers.push(symbol);
       return { levels, leaf: { kind: "asset", group: to.coins, symbol }, answers };
     }
+    // The pairs take one more segment: the pair (ui-jobs 556).
+    if ("pairs" in to && i === segments.length - 2) {
+      const pair = segments[i + 1];
+      if (!isPairKey(pair)) return null;
+      answers.push(`${PAIRS[pair].base} and ${PAIRS[pair].quote}`);
+      return { levels, leaf: { kind: "pair", pair }, answers };
+    }
     if (!last) return null;
+    if ("pairs" in to) return { levels, leaf: { kind: "pairs" }, answers };
     if ("roster" in to) return { levels, leaf: { kind: "roster", roster: to.roster }, answers };
     if ("results" in to) return { levels, leaf: { kind: "results", results: to.results, group: to.group }, answers };
     if ("coins" in to) return { levels, leaf: { kind: "coins", group: to.coins }, answers };

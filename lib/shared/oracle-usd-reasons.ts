@@ -38,4 +38,8 @@ export const ORACLE_USD_REASON: Record<string, string> = {
     "Sky has no price oracle for USDS, so amounts show in USDS and their dollar value goes through the LitePSM, Sky's USDS–USDC swap: one USDS is 1 ÷ (1 + exit fee) USDC, and the fee has been zero for the whole life of sUSDS. Lifetime flows count USDC as one dollar; the home page's value held prices it at the Aave V3 oracle.",
   yearn:
     "72 distinct assets across the roster and no per-asset feed to value them against, so every figure stays in the vault's asset and no two assets are ever added together",
+  "uniswap-v3":
+    "a pool prices itself: every figure is in the pool's quote token at the pool's price, and Uniswap runs no USD feed",
+  "uniswap-v4":
+    "a pool prices itself: every figure is in the pool's quote token at the pool's price, and Uniswap runs no USD feed",
 };

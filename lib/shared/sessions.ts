@@ -91,7 +91,11 @@ export type SessionProtocol =
   | "cow"
   // Pendle, at `/ethereum/pendle`: a wallet's PT, YT and LP per market, from
   // victoria's router capture and chain reads at a pinned block.
-  | "pendle";
+  | "pendle"
+  // Uniswap V3 and V4, at `/ethereum/uniswap-v3` and `/ethereum/uniswap-v4`:
+  // a position is an NFT id, read with its pool at two blocks (ui-jobs 556).
+  | "uniswap-v3"
+  | "uniswap-v4";
 
 /** What a saved entry is: a wallet, a position page or a listing view. */
 export type SavedKind = "wallet" | "position" | "view";
