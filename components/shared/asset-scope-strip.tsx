@@ -112,17 +112,9 @@ export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" })
               className="min-w-0 text-foreground"
               title={scope.picks.map((p) => `${symbolOf(p)} on ${chainName(p.chain)}`).join(", ")}
             >
-              <abbr
-                title="Asset isolation mode"
-                className="font-semibold text-teal-700 no-underline dark:text-teal-400"
-              >
-                AIM
-              </abbr>
-              {scope.fromLink && <span className="text-rb-500"> from this link</span>}
-              <span className="text-rb-500" aria-hidden="true">
-                {" "}
-                ·{" "}
-              </span>
+              <span className="font-semibold text-teal-700 dark:text-teal-400">
+                {scope.fromLink ? "From this link: focused on" : "Focused on"}
+              </span>{" "}
               <span className="font-semibold">{scopeSummary(scope.picks)}</span>
             </span>
             <span className="text-rb-500" aria-hidden="true">
@@ -147,7 +139,7 @@ export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" })
                   className={`font-semibold ${INPLACE_TEXT}`}
                   data-asset-scope-keep=""
                 >
-                  Keep
+                  Keep this focus
                 </button>
               </>
             )}
@@ -160,7 +152,7 @@ export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" })
               className={`font-semibold ${INPLACE_TEXT}`}
               data-asset-scope-clear=""
             >
-              Turn off
+              Show everything
             </button>
           </div>
           <ExplorerScopeLine keys={scope.keys} fromLink={scope.fromLink} />
@@ -181,9 +173,9 @@ function ExplorerScopeLine({ keys, fromLink }: { keys: Set<string> | null; fromL
   const chain = CHAINS[entry.chainId];
   const onChain = [...keys].some((k) => k.startsWith(`${entry.chainId}:`));
   const why = !onChain
-    ? `No AIM asset is on ${chain.name}`
+    ? `None of your assets is on ${chain.name}`
     : status === "none"
-      ? `${entry.label} lists no AIM asset`
+      ? `${entry.label} lists none of your assets`
       : `Rails has no asset list for ${entry.label} yet`;
   const link = fromLink ? new URLSearchParams(window.location.search).get("assets") : null;
   return (
@@ -196,7 +188,7 @@ function ExplorerScopeLine({ keys, fromLink }: { keys: Set<string> | null; fromL
         href={`/assets${link ? `?assets=${link.replace(/ /g, "+")}` : ""}`}
         className={`font-semibold ${INLINE_LINK}`}
       >
-        Where AIM assets are listed
+        Where your assets are listed
       </Link>
     </p>
   );
@@ -232,7 +224,7 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
 const ADDS_SHOWN = 5;
 
 /** The one place the name is spelled out. */
-const PANEL_TITLE = "Asset isolation mode";
+const PANEL_TITLE = "Focus";
 
 function PickRow({
   pick,
@@ -359,7 +351,7 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
               className={RESET_LINK}
               data-asset-scope-panel-clear=""
             >
-              Turn off AIM
+              Show everything
             </button>
             <button
               type="button"

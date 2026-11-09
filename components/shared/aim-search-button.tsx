@@ -97,11 +97,11 @@ export const AimSearchButton = forwardRef<
     return (
       <span
         className="inline-flex shrink-0 items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-teal-700 dark:text-teal-400"
-        title="Built on another AIM asset"
+        title="Built on another asset in your focus"
         data-aim-search="reached"
       >
         <Check className="size-3" aria-hidden="true" />
-        In AIM
+        In focus
       </span>
     );
 
@@ -113,7 +113,7 @@ export const AimSearchButton = forwardRef<
     scope.setPicks(tokens.map((t) => ({ ...t, builtOn: true })));
   };
 
-  const label = state === "off" ? `Turn on asset isolation for ${symbol}` : `Remove ${symbol} from asset isolation`;
+  const label = state === "off" ? `Focus Rails on ${symbol}` : `Remove ${symbol} from your focus`;
 
   return (
     <button
@@ -134,7 +134,7 @@ export const AimSearchButton = forwardRef<
       data-aim-search={state}
     >
       {state === "in" && <Check className="size-3" aria-hidden="true" />}
-      {state === "off" ? "AIM" : "In AIM"}
+      {state === "off" ? "Focus" : "In focus"}
     </button>
   );
 });

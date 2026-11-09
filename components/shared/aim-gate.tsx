@@ -2,7 +2,7 @@
 
 // AIM (asset isolation mode, ui-jobs 557) over one object's page: where the
 // object touches none of the AIM set, an empty state stands in for its
-// content, "This Morpho market is outside AIM (BOLD +4)", with Turn off AIM
+// content, "This Morpho market is outside your focus (BOLD +4)", with Turn off AIM
 // and Change AIM. Where it touches the set the page is whole, events included.
 //
 // The page passes the object's asset keys (`chain:address`, lowercased), the
@@ -32,11 +32,11 @@ export function AimGate({ keys, what, children }: { keys: string[]; what: string
   return (
     <div className="flex flex-col items-center gap-2 py-24 text-center" data-aim-gate="out">
       <p className="text-sm text-foreground">
-        {what} is outside AIM ({aimShort(scope.picks)})
+        {what} is outside your focus ({aimShort(scope.picks)})
       </p>
       <p className="flex items-center gap-2 text-sm">
         <button type="button" onClick={scope.clear} className={`font-semibold ${INPLACE_TEXT}`}>
-          Turn off AIM
+          Show everything
         </button>
         <span className="text-rb-500" aria-hidden="true">
           ·
@@ -46,7 +46,7 @@ export function AimGate({ keys, what, children }: { keys: string[]; what: string
           onClick={() => window.dispatchEvent(new Event(OPEN_SCOPE_PANEL))}
           className={`font-semibold ${INPLACE_TEXT}`}
         >
-          Change AIM
+          Change focus
         </button>
       </p>
     </div>

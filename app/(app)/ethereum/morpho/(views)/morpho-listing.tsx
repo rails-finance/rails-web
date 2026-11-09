@@ -144,17 +144,16 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
       type="button"
       onClick={() => window.dispatchEvent(new Event(OPEN_SCOPE_PANEL))}
       className="inline-flex items-center gap-1 rounded-full bg-teal-500/15 px-2.5 py-1 text-xs text-teal-800 transition-colors hover:bg-teal-500/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 dark:text-teal-200"
-      title={aim ? `Loan or collateral in AIM: ${aim.symbols.join(", ") || "none"}` : undefined}
-      aria-label={`AIM: ${aim?.symbols.join(", ") || "assets"}. Change asset isolation`}
+      title={aim ? `Loan or collateral in your focus: ${aim.symbols.join(", ") || "none"}` : undefined}
+      aria-label={`Focus: ${aim?.symbols.join(", ") || "assets"}. Change focus`}
       data-aim-chip={aim?.symbols.length ?? ""}
     >
       <Lock className="size-3" aria-hidden="true" />
-      AIM:{" "}
-      {aim == null
-        ? "…"
-        : aim.symbols.length === 0
-          ? "no market here"
-          : `${aim.symbols[0]}${aim.symbols.length > 1 ? ` +${aim.symbols.length - 1}` : ""}`}
+      {aim != null && aim.symbols.length === 0
+        ? "No market in your focus"
+        : `Focus: ${
+            aim == null ? "…" : `${aim.symbols[0]}${aim.symbols.length > 1 ? ` +${aim.symbols.length - 1}` : ""}`
+          }`}
     </button>
   ) : undefined;
 
@@ -175,15 +174,15 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
           if (peek)
             return (
               <span data-scope-note="" data-total={total}>
-                Showing all {n(total)} positions · {press("AIM only", false)}
+                Showing all {n(total)} positions · {press("Back to your focus", false)}
               </span>
             );
           return (
             <span data-scope-note="" data-shown={total} data-total={unscoped ?? ""}>
               {unscoped == null
-                ? `${n(total)} positions in AIM`
+                ? `${n(total)} positions in your focus`
                 : total === 0
-                  ? `None of the ${n(unscoped)} positions holds an AIM asset`
+                  ? `None of the ${n(unscoped)} positions holds an asset in your focus`
                   : `Showing ${n(total)} of ${n(unscoped)} positions`}{" "}
               · {press("Show all", true)}
             </span>

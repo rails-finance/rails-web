@@ -65,11 +65,11 @@ export function ScopeNote<T>({
     <p className={`text-xs text-rb-500 ${className}`} data-scope-note="" data-shown={rows.length} data-total={total}>
       {peek ? (
         <>
-          Showing all {n(total)} {word} · {press("AIM only", false)}
+          Showing all {n(total)} {word} · {press("Back to your focus", false)}
         </>
       ) : rows.length === 0 ? (
         <>
-          None of the {n(total)} {word} holds an AIM asset · {press("Show all", true)}
+          None of the {n(total)} {word} holds an asset in your focus · {press("Show all", true)}
         </>
       ) : (
         <>

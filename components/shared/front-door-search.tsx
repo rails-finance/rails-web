@@ -582,7 +582,7 @@ function useSuggestions(value: string, on: boolean) {
   );
   const noMatch = rows.length === 0 && typed !== "";
   const display: Suggestion[] = noMatch
-    ? [{ key: "none", kind: "Wallet", name: aim ? "No match in AIM" : "No match" }]
+    ? [{ key: "none", kind: "Wallet", name: aim ? "No match in your focus" : "No match" }]
     : rows;
   const openable = rows.filter(isOpenable);
   const active = openable.find((r) => r.key === activeKey) ?? null;
