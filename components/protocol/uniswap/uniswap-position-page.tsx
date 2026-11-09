@@ -17,7 +17,7 @@ import { explorerHref } from "@/lib/shared/protocols";
 import { poolPosition } from "@/lib/uniswap/position";
 import { cardProv } from "@/lib/uniswap/provenance";
 import type { UniswapVersion } from "@/lib/uniswap/types";
-import { POSITION_PAGE } from "@/lib/uniswap/words";
+import { POSITION_PAGE, num } from "@/lib/uniswap/words";
 
 /** One read per request: the metadata and the page share it. */
 export const loadUniswapPosition = cache((version: UniswapVersion, id: string) => fetchUniswapPosition(version, id));
@@ -58,6 +58,7 @@ export async function UniswapPositionPage({ version, id }: { version: UniswapVer
                 address: p.quote.address,
                 price: p.valueNow,
                 unit: p.quote.symbol,
+                figure: `${num(p.valueNow)} ${p.quote.symbol}`,
                 triggerLabel: "Worth",
                 label: `The position's worth in ${p.quote.symbol}, at the pool's price`,
                 info: cardProv("worth", { p, r }),
@@ -68,6 +69,7 @@ export async function UniswapPositionPage({ version, id }: { version: UniswapVer
                     address: p.base.address,
                     price: p.price,
                     unit: p.quote.symbol,
+                    figure: `${num(p.price)} ${p.quote.symbol}`,
                     label: `One ${p.base.symbol} in ${p.quote.symbol}, at the pool's price`,
                     info: cardProv("price", { p, r }),
                   }
@@ -76,6 +78,7 @@ export async function UniswapPositionPage({ version, id }: { version: UniswapVer
                     address: p.quote.address,
                     price: 1 / p.price,
                     unit: p.base.symbol,
+                    figure: `${num(1 / p.price)} ${p.base.symbol}`,
                     label: `One ${p.quote.symbol} in ${p.base.symbol}, at the pool's price`,
                     info: cardProv("price", { p, r }),
                   },
