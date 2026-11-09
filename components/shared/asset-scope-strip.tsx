@@ -112,7 +112,7 @@ export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" })
               className="min-w-0 text-foreground"
               title={scope.picks.map((p) => `${symbolOf(p)} on ${chainName(p.chain)}`).join(", ")}
             >
-              <span className="font-semibold text-teal-700 dark:text-teal-400">
+              <span className="text-rb-600 dark:text-rb-400">
                 {scope.fromLink ? "From this link: focused on" : "Focused on"}
               </span>{" "}
               <span className="font-semibold">{scopeSummary(scope.picks)}</span>
