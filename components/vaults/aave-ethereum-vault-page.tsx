@@ -555,6 +555,7 @@ export function AaveEthereumVaultPage({
       rows.push({
         key: "hop",
         venue: <>&rarr; {reserve?.symbol ?? "the reserve"}</>,
+        ...(reserve ? { icon: { symbol: reserve.symbol, address: reserve.address } } : {}),
         href: ethereumVaultHref(w.address),
         sub:
           w.sharePrice && w.decimals != null ? (
@@ -674,6 +675,7 @@ export function AaveEthereumVaultPage({
 
   return (
     <ProvReceiptsScope registry={registry}>
+      <VaultFinder />
       <VaultCard
         vault={v}
         yieldFigure={yieldFigure}
@@ -745,7 +747,6 @@ export function AaveEthereumVaultPage({
           exports: vaultAssetsExports(v, { stats: exportStats, rows: exportRows }),
         }}
       />
-      <VaultFinder />
     </ProvReceiptsScope>
   );
 }

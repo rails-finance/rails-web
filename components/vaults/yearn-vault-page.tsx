@@ -398,6 +398,7 @@ export function YearnVaultPage({
 
   return (
     <ProvReceiptsScope registry={registry}>
+      <VaultFinder />
       <VaultCard
         vault={v}
         yieldFigure={yieldFigure}
@@ -459,7 +460,6 @@ export function YearnVaultPage({
         learnMore={yearnVaultAssetsContent()}
         menu={{ exports: vaultAssetsExports(v, exportModel) }}
       />
-      <VaultFinder />
     </ProvReceiptsScope>
   );
 }

@@ -28,7 +28,6 @@ import {
   type SectionMenuExports,
   type SectionMenuLink,
 } from "@/components/shared/section-menu";
-import { PAGE_LINK } from "@/lib/shared/ui-grammar";
 import { AllocationBar, type AllocationSegment } from "@/components/shared/ratio-bar";
 import { LearnMore, type LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -42,7 +41,9 @@ import {
   DataTableHead,
   DataTableHeader,
   DataTableRow,
+  DataTableRowLink,
 } from "@/components/shared/data-table/data-table";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { assetText, pctText } from "@/lib/shared/vault-amount-text";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import { planAllocation } from "@/lib/vaults/allocation-plan";
@@ -55,6 +56,9 @@ export interface VaultAssetRow {
   venue: ReactNode;
   /** Rails's page for the venue, where there is one. */
   href?: string;
+  /** The venue's mark: a market's collateral, a hop's reserve. Absent, the
+   *  vault's asset (a strategy or an idle balance holds that). */
+  icon?: { symbol: string; address: string };
   /** The venue's receipt: its contract, its market id. */
   venueProv?: Provenance;
   /** `data-*` hooks on the venue's name. */
@@ -79,13 +83,14 @@ export interface VaultAssetRow {
 /** The section's scope: its ⋮ arms the inspector on it alone. */
 export const ASSETS_SCOPE = "vault-assets";
 
-/** The venue: its receipt around the name, inside the link to its page. */
+/** The venue: its receipt around the name. A row with a page opens it from
+ *  anywhere on the row (D4); the name is the one keyboard stop. */
 function venueOf(r: VaultAssetRow): ReactNode {
   const name = r.venueProv ? <Prov info={r.venueProv}>{r.venue}</Prov> : r.venue;
   return r.href ? (
-    <Link href={r.href} className={PAGE_LINK} prefetch={false} data-venue-link="">
+    <DataTableRowLink href={r.href} data-venue-link="">
       {name}
-    </Link>
+    </DataTableRowLink>
   ) : (
     name
   );
@@ -193,24 +198,34 @@ export function VaultAssets({
         </DataTableHead>
         <DataTableBody>
           {rows.map((r) => (
-            <DataTableRow key={r.key} {...r.hooks}>
+            <DataTableRow key={r.key} href={r.href} {...r.hooks}>
               <DataTableCell rowHeader className="sm:w-full sm:max-w-0">
-                <span
-                  className="block text-foreground sm:truncate"
-                  title={typeof r.venue === "string" ? r.venue : undefined}
-                  data-cell="venue"
-                  {...r.venueHooks}
-                >
-                  {venueOf(r)}
-                </span>
-                {r.sub != null && (
-                  <span
-                    className="block text-[11px] [overflow-wrap:anywhere] text-rb-500 sm:truncate"
-                    title={typeof r.sub === "string" ? r.sub : undefined}
-                  >
-                    {r.sub}
-                  </span>
-                )}
+                <div className="flex items-center gap-2">
+                  <TokenChipIcon
+                    symbol={r.icon?.symbol ?? assetSymbol}
+                    address={r.icon?.address ?? assetAddress}
+                    size={20}
+                    filterable={false}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <span
+                      className="block text-foreground sm:truncate"
+                      title={typeof r.venue === "string" ? r.venue : undefined}
+                      data-cell="venue"
+                      {...r.venueHooks}
+                    >
+                      {venueOf(r)}
+                    </span>
+                    {r.sub != null && (
+                      <span
+                        className="block text-[11px] [overflow-wrap:anywhere] text-rb-500 sm:truncate"
+                        title={typeof r.sub === "string" ? r.sub : undefined}
+                      >
+                        {r.sub}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </DataTableCell>
               <DataTableCell label="Amount" align="right" className="whitespace-nowrap tabular-nums text-foreground">
                 {r.offBand ? (

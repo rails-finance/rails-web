@@ -229,6 +229,7 @@ export function MorphoBaseVaultPage({
     return {
       key: leg.id,
       venue,
+      ...(leg.isIdle ? {} : { icon: { symbol: leg.collateralSymbol ?? venue, address: leg.collateralToken } }),
       href: morphoMarketHref(chainId, leg.loanToken, leg.id),
       venueProv: vaultVenueProv(
         v,
@@ -332,6 +333,7 @@ export function MorphoBaseVaultPage({
 
   return (
     <ProvReceiptsScope registry={registry}>
+      <VaultFinder />
       <VaultCard
         vault={v}
         yieldFigure={yieldFigure}
@@ -420,7 +422,6 @@ export function MorphoBaseVaultPage({
           exports: vaultAssetsExports(v, exportModel),
         }}
       />
-      <VaultFinder />
     </ProvReceiptsScope>
   );
 }
