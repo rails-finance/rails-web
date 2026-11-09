@@ -280,6 +280,25 @@ const atHead = (f: V4ReserveFigures) => ` at block ${n(f.block)}`;
 const hubContract = (f: V4ReserveFigures, hub: string) => ({ name: `${hub} hub`, address: f.hubAddress });
 const spokeContract = (f: V4ReserveFigures, spoke: string) => ({ name: `${spoke} spoke`, address: f.spokeAddress });
 
+/** Where this reserve's configuration changes live: on-chain, in the spoke's
+ *  and the hub's logs, which Rails has not indexed yet. */
+export function configChangesProv(f: V4ReserveFigures, o: { symbol: string; spoke: string; hub: string }): Provenance {
+  return {
+    kind: "chain",
+    summary: `Every change to ${o.symbol}'s settings on ${o.spoke} is an event on-chain. The ${o.spoke} spoke logs its reserve, dynamic and liquidation settings; the ${o.hub} hub logs the asset's settings and this spoke's credit line. Rails has not indexed these events yet.`,
+    contract: spokeContract(f, o.spoke),
+    inputs: [
+      {
+        label: `${o.spoke} spoke`,
+        value: f.spokeAddress,
+        kind: "chain",
+        note: "reserve, dynamic and liquidation settings",
+      },
+      { label: `${o.hub} hub`, value: f.hubAddress, kind: "chain", note: "asset settings and the spoke's credit line" },
+    ],
+  };
+}
+
 /** A token amount from the head read, valued at the spoke oracle's price. */
 export function headValueProv(
   f: V4ReserveFigures,

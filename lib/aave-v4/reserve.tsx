@@ -9,7 +9,7 @@
 //        and Utilisation (the hub), each figure naming its side;
 //   M3.3 the rate curve, the hub strategy's constants and the premium;
 //   M3.4 the hub asset's daily drawn rate; M3.5 the spoke's and the hub's
-//        parameters; M3.6 one line (no store holds V4 config history);
+//        parameters; M3.6 one line (Rails has not indexed V4's configuration events);
 //   M3.7, M3.8 the largest suppliers and borrowers of this spoke reserve.
 // The head is one read (`/api/at-block/aave-v4/reserve`); a token the spoke lists
 // from two hubs needs `?hub=`, and without it the page asks which.
@@ -50,6 +50,7 @@ import {
 } from "@/lib/aave-v4/markets";
 import {
   availableProv,
+  configChangesProv,
   curveProv,
   drawnRateProv,
   headValueProv,
@@ -677,7 +678,10 @@ export function AaveV4ReservePage({
             tools: {},
             body: (
               <p className={NOTE} data-reserve-changes-none="">
-                No store holds Aave V4 configuration history yet, so this reserve&apos;s changes are not listed.
+                <Prov info={configChangesProv(f, names)}>
+                  Rails has not indexed Aave V4&apos;s configuration changes yet, so this reserve&apos;s changes are not
+                  listed.
+                </Prov>
               </p>
             ),
           },
