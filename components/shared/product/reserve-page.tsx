@@ -7,7 +7,8 @@
 // vitals band, the (i)), then the family's sections in its order, each its own
 // receipts scope under a heading row with its ⋮: the rate curve (M3.3), the
 // history (M3.4), the parameters (M3.5), the change log (M3.6) and the largest
-// holders (M3.7, M3.8).
+// holders (M3.7, M3.8). The page mounts the inspector's layer; no page-wide
+// toggle.
 
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -16,6 +17,7 @@ import { RailHeader } from "@/components/shared/rail-header";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { LearnMore } from "@/components/shared/learn-more-modal";
 import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { ProtocolEntry } from "@/lib/shared/protocols";
 import type { Hooks, Loadable, ProductHead, ProductSection, ReserveIdentity } from "@/lib/shared/product/model";
 import { ProductHeadSection, ToolsFor } from "@/components/shared/product/product-head";
@@ -115,6 +117,8 @@ export function ReservePage({
         </header>
         {body}
       </div>
+      {/* Each section arms the inspector from its ⋮; the layer draws it. */}
+      <ProvInspectorLayer />
     </div>
   );
 }
