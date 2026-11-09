@@ -133,7 +133,7 @@ test("an asset joining a category, as collateral and as a borrowable asset", () 
 test("LTV zero in a category", () => {
   assert.deepEqual(ex[2].bullets, [
     `For borrowers in ${CAT}, USDC supports no borrowing and still counts toward the health factor.`,
-    `A borrower in ${CAT} holding USDC with other collateral must withdraw the USDC first.`,
+    `A borrower in ${CAT} holding USDC with other collateral must withdraw the USDC before withdrawing any other collateral.`,
   ]);
 });
 

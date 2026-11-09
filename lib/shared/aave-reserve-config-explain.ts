@@ -131,7 +131,7 @@ const WORDS = {
   ltvzeroOn: (n: N, cat: string) =>
     `For borrowers in ${cat}, ${n.symbol} supports no borrowing and still counts toward the health factor.`,
   ltvzeroFirst: (n: N, cat: string) =>
-    `A borrower in ${cat} holding ${n.symbol} with other collateral must withdraw the ${n.symbol} first.`,
+    `A borrower in ${cat} holding ${n.symbol} with other collateral must withdraw the ${n.symbol} before withdrawing any other collateral.`,
   ltvzeroOff: (n: N, cat: string) => `Borrowers in ${cat} count ${n.symbol} at the category's LTV again.`,
   isolatedWhat: (cat: string) =>
     `${cat} is isolated: for its borrowers, only the category's collateral supports borrowing.`,
