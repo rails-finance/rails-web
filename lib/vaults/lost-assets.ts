@@ -39,7 +39,10 @@ export function heldAssetsRaw(totalAssetsRaw: string, lostAssetsRaw: string | nu
   return lostAssetsRaw == null ? total : total - BigInt(lostAssetsRaw);
 }
 
-/** The caution, with the figures printed by the caller's formatter. */
-export function lostAssetsSentence(t: { lost: string; held: string; symbol: string; block: number }): string {
-  return `Includes ${t.lost} ${t.symbol} lost at block ${t.block.toLocaleString("en-US")}. The vault holds ${t.held} ${t.symbol}; the share price has not been lowered for the loss, so the holders who withdraw last carry it.`;
+/** The caution, with the figures printed by the caller's formatter: the
+ *  card's words (components/vaults/vault-heads.tsx `LostAssetsCaution`). The
+ *  read block belongs to the figures' receipts, so a caller's `block` is not
+ *  printed. */
+export function lostAssetsSentence(t: { lost: string; held: string; symbol: string; block?: number }): string {
+  return `Includes ${t.lost} ${t.symbol} of lost assets. The vault holds ${t.held} ${t.symbol}; the share price has not been lowered for the loss, so the holders who withdraw last carry it.`;
 }
