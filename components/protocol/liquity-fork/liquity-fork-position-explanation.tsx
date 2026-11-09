@@ -343,14 +343,25 @@ export function LiquityForkPositionExplanation({
   }
 
   if (chain.status === "zombie") {
-    // The TroveManager points its next redemption at a zombie only while the
-    // zombie still owes debt; one redeemed to zero has nothing left to give.
+    // The TroveManager points its next redemption at one dormant Trove, lastZombieTroveId, while
+    // that Trove owes debt; no redemption reaches any other.
     bullets.push(
       hasDebt ? (
         <span key="zombie">
           A partial redemption left this Trove below the branch&rsquo;s minimum debt, which makes it <H>dormant</H>: out
-          of the rate-ordered redemption queue. While it is the branch&rsquo;s most recent dormant Trove, it is the
-          first Trove the next redemption on the branch reaches. The owner can close it to take back the collateral
+          of the rate-ordered redemption queue.{" "}
+          {chain.redeemedFirst ? (
+            <>
+              The TroveManager holds it as the branch&rsquo;s last dormant Trove (lastZombieTroveId), so the next
+              redemption on the branch takes it first.
+            </>
+          ) : (
+            <>
+              A redemption reaches only the dormant Trove the TroveManager holds as lastZombieTroveId, and that is
+              another Trove, so no redemption reaches this one.
+            </>
+          )}{" "}
+          The owner can close it to take back the collateral
           {reserve ? <> and the {reserve} liquidation reserve</> : null}, or borrow back above the minimum to rejoin the
           queue.
         </span>

@@ -73,8 +73,10 @@ export interface TroveReads {
   icrRaw: bigint | null;
   /** The sorted list from getFirst (at most the walk cap); null where the walk failed. */
   walk: bigint[] | null;
-  /** A walked Trove's entire debt; null where its read failed. */
+  /** A walked Trove's entire debt, and the pointer's; null where its read failed. */
   entireDebtOf: (id: bigint) => bigint | null;
+  /** TroveManager.lastZombieTroveId (0 for none); null where unread. */
+  lastZombieId: bigint | null;
 }
 
 export function troveStub(
@@ -113,6 +115,7 @@ export function troveStub(
     branchColl: null,
     branchTcr: null,
     inSortedList: false,
+    redeemedFirst: false,
     debtInFront: null,
     trovesAhead: null,
     chainStale: true,
@@ -141,6 +144,9 @@ export function settleTrove(
   let trovesAhead: number | null = null;
   let inSortedList = false;
   let queueLen: number | null = null;
+  // A dormant Trove is redeemed only as the branch's lastZombieTroveId; every other one is out of
+  // every redemption (liquity/bold TroveManager.redeemCollateral).
+  const redeemedFirst = statusNum === 4 && r.lastZombieId === troveId && data.entireDebt > ZERO;
   if (priceRaw != null && priceRaw > ZERO) {
     if (data.entireDebt > ZERO && r.icrRaw != null) {
       // The contract returns max-uint for debtless troves; guard on scale.
@@ -157,16 +163,17 @@ export function settleTrove(
         const after = ids.slice(idx + 1);
         let sum = 0;
         let n = 0;
-        for (const x of after) {
+        // The lastZombieTroveId Trove is redeemed before the whole sorted list.
+        const ahead = r.lastZombieId != null && r.lastZombieId !== ZERO ? [...after, r.lastZombieId] : after;
+        for (const x of ahead) {
           const d = r.entireDebtOf(x);
-          if (d == null) continue;
+          if (d == null || d <= ZERO) continue;
           sum += Number(d) / debtScale;
           n++;
         }
         debtInFront = sum;
         trovesAhead = n;
-      } else if (statusNum === 4) {
-        // Zombie: outside the list, redeemed before everything in it.
+      } else if (redeemedFirst) {
         debtInFront = 0;
         trovesAhead = 0;
       }
@@ -218,6 +225,7 @@ export function settleTrove(
         ? (branchColl * priceUsd) / branchDebt
         : null,
     inSortedList,
+    redeemedFirst,
     debtInFront,
     trovesAhead,
     chainStale: false,
@@ -273,6 +281,8 @@ export interface BranchReads {
   allIds: bigint[];
   dataOf: (id: bigint) => RosterTroveRead | null;
   statusOf: (id: bigint) => number | null;
+  /** TroveManager.lastZombieTroveId (0 for none); null where unread. Its data is among dataOf's. */
+  lastZombieId: bigint | null;
 }
 
 /** One branch of the roster from its reads (the caps are the reader's). */
@@ -311,21 +321,14 @@ export function settleBranch(b: LiquityForkBranchConfig, r: BranchReads, idsCap:
     };
   };
 
-  // Zombies (status 4) lead the queue — a partial redemption left them below
-  // the minimum debt, and they are redeemed before the whole sorted list.
-  // The COUNT takes every status-4 trove; the QUEUE keeps only those still
-  // carrying debt (entry() drops zero-debt troves — nothing to redeem). A
-  // zombie redeemed to exactly zero is real branch state holding real
-  // collateral (asymmetry's scrvUSD zombie holds 40k), so it must count
-  // even though it stands outside every redemption path.
-  const zombies: LiquityForkQueueEntry[] = [];
+  // A redemption takes TroveManager.lastZombieTroveId first, while it has debt, then the sorted
+  // list; every other dormant (status 4) Trove is out of every redemption (liquity/bold
+  // TroveManager.redeemCollateral). The COUNT takes every status-4 Trove, debt or none: a dormant
+  // Trove at zero debt still holds collateral on the branch (asymmetry's scrvUSD one holds 40k).
   let zombieCount = 0;
-  for (const id of unlisted) {
-    if (r.statusOf(id) !== 4) continue; // closed / liquidated troves are not in any queue
-    zombieCount++;
-    const e = entry(id, true);
-    if (e) zombies.push(e);
-  }
+  for (const id of unlisted) if (r.statusOf(id) === 4) zombieCount++;
+  const pointer = r.lastZombieId != null && r.lastZombieId !== ZERO ? entry(r.lastZombieId, true) : null;
+  const zombies: LiquityForkQueueEntry[] = pointer ? [pointer] : [];
   // The listed queue in REDEMPTION order — the tail-first walk already
   // yielded it lowest-rate (redeemed first) to highest.
   const active: LiquityForkQueueEntry[] = [];

@@ -218,7 +218,7 @@ function openHeadlines(args: TroveMarkdownArgs): string[] {
     out.push(`- **Management fee:** ~${bold(annualMgmt / 365)}/day (~${bold(annualMgmt)}/year)`);
   }
   if (debtInFront !== null && debtInFront !== undefined) {
-    let difLine = `- **Debt in front:** ~${bold(debtInFront)} sits at the same or lower interest rate and is exposed to redemption alongside this trove`;
+    let difLine = `- **Debt in front:** ~${bold(debtInFront)} is redeemed before this trove: the troves at the same or lower interest rate, and the branch's last dormant Trove when it has debt`;
     if (trovesAhead !== null && trovesAhead !== undefined) {
       difLine += ` (${trovesAhead} other trove${trovesAhead !== 1 ? "s" : ""})`;
     }

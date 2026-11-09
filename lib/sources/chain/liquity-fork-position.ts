@@ -59,6 +59,7 @@ const TM_ABI = parseAbi([
   "function getTroveStatus(uint256 troveId) view returns (uint8)",
   "function getEntireBranchDebt() view returns (uint256)",
   "function getEntireBranchColl() view returns (uint256)",
+  "function lastZombieTroveId() view returns (uint256)",
 ]);
 // fetchPrice mutates on-chain; declared view so eth_call simulates it.
 const PF_ABI = parseAbi([
@@ -130,10 +131,13 @@ export interface LiquityForkTroveChainResponse {
   branchDebt: number | null;
   branchColl: number | null;
   branchTcr: number | null;
-  /** Redemption queue (branch-scoped): the debt sitting at LOWER interest
-   *  rates than this trove — redeemed before it. Zombie troves are outside
-   *  the list and redeemed first (debtInFront 0, inSortedList false). */
+  /** Redemption queue (branch-scoped): the debt redeemed before this Trove: the branch's
+   *  lastZombieTroveId Trove when it has debt, then the sorted list at lower rates. A dormant
+   *  Trove is outside the list (inSortedList false): redeemed first when it is the pointer
+   *  (debtInFront 0), out of every redemption otherwise (debtInFront null). */
   inSortedList: boolean;
+  /** This Trove is the branch's lastZombieTroveId, with debt: the next redemption takes it first. */
+  redeemedFirst: boolean;
   debtInFront: number | null;
   trovesAhead: number | null;
   /** True when the chain RPC read failed and we returned an empty stub. */
@@ -189,6 +193,7 @@ export async function loadLiquityForkTroveFromChain(
           atTm("getEntireBranchDebt"),
           atTm("getEntireBranchColl"),
           { address: st, abi: ST_ABI, functionName: "getFirst" } as ContractFunctionParameters,
+          atTm("lastZombieTroveId"),
         ],
       }),
     ]);
@@ -198,6 +203,7 @@ export async function loadLiquityForkTroveFromChain(
     const data = r(2) as TroveDataRead | null;
     const statusNum = r(3) as number | null;
     const firstId = r(6) as bigint | null;
+    const lastZombieId = r(7) as bigint | null;
     if (!data || statusNum == null) return troveStub(cfg, b, troveIdRaw);
 
     const priceRaw = fetched && fetched[0] > BigInt(0) ? fetched[0] : lastGood;
@@ -236,7 +242,12 @@ export async function loadLiquityForkTroveFromChain(
           })) as bigint;
         }
         const idx = ids.findIndex((x) => x === troveId);
-        const after = idx >= 0 ? ids.slice(idx + 1) : [];
+        // The pointer's Trove sits ahead of the whole list; its debt is read with the rest.
+        const pointer =
+          idx >= 0 && lastZombieId != null && lastZombieId !== BigInt(0) && lastZombieId !== troveId
+            ? [lastZombieId]
+            : [];
+        const after = idx >= 0 ? [...ids.slice(idx + 1), ...pointer] : [];
         if (after.length > 0) {
           const datas = (await client.multicall({
             allowFailure: true,
@@ -264,6 +275,7 @@ export async function loadLiquityForkTroveFromChain(
       icrRaw,
       walk,
       entireDebtOf: (x) => debts.get(x) ?? null,
+      lastZombieId,
     });
   } catch {
     return troveStub(cfg, b, troveIdRaw);

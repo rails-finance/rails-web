@@ -29,12 +29,12 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
   const right: PositionPanelRow[] = [];
 
   if (chain.status === "zombie") {
-    // A zombie is outside the rate-sorted list: with no debt a redemption cannot
-    // reach it; with debt it is reached only as the branch's most recent zombie.
+    // A dormant Trove is outside the rate-sorted list: redeemed first as the branch's
+    // lastZombieTroveId, out of every redemption otherwise.
     left.push({
       id: "redemption",
       label: "Redemption",
-      value: chain.entireDebt > 0 ? "Outside the rate queue" : "Not redeemable",
+      value: chain.redeemedFirst ? "Redeemed first" : "Not redeemable",
     });
   }
   if (chain.status === "active" && chain.debtInFront != null) {
