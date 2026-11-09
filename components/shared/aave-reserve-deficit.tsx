@@ -9,7 +9,9 @@
 // record's check against the Pool's getter, and the step chart
 // (aave-reserve-deficit-covers.tsx). Elsewhere Covered is derived, written off
 // less outstanding (deficitCoveredProv states the rule and cites it), and a
-// line says the cover events are not indexed.
+// line says the cover events are not indexed. A write-off from a liquidation
+// Aave governance carried out (GOVERNANCE_LIQUIDATIONS) gets one line naming
+// the proposal, its payloads and sources in the receipt.
 
 import { useState, type ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -29,6 +31,8 @@ import {
   coveredSumProv,
   deficitCoveredProv,
   deficitIdentityProv,
+  GOVERNANCE_LIQUIDATIONS,
+  governanceLiquidationProv,
   liquidationLegProv,
   writeOffProv,
   writtenOffSumProv,
@@ -177,6 +181,10 @@ export function ReserveDeficitBody({
   const rest = d.rows.slice(TOP);
   const restRaw = rest.reduce((s, w) => s + BigInt(w.writtenOff.raw), BigInt(0)).toString();
   const restTokens = tokensOf(restRaw, dec);
+  // A write-off from a liquidation Aave governance carried out: one line naming the proposal.
+  const govTx = [...new Set(d.rows.map((w) => w.txHash.toLowerCase()))].find((h) => GOVERNANCE_LIQUIDATIONS[h]);
+  const govProv = govTx ? governanceLiquidationProv(sym, d, govTx, ex) : null;
+  const govRows = govTx ? d.rows.filter((w) => w.txHash.toLowerCase() === govTx) : [];
   const coveredProv = deficitCoveredProv(sym, d, { raw: head.outstandingRaw, block: head.block }, coveredRaw);
 
   return (
@@ -296,6 +304,18 @@ export function ReserveDeficitBody({
         </button>
       )}
 
+      {govTx && govProv && govRows.length > 0 && (
+        <p className={`${NOTE} mt-3`} data-deficit-governance={GOVERNANCE_LIQUIDATIONS[govTx].proposal}>
+          <Prov info={govProv}>
+            {govRows.length === 1 ? "The write-off" : "The write-offs"} of{" "}
+            {formatDate(new Date(govRows[0].timestamp * 1000))}{" "}
+            {govRows.length === 1 ? "came from a liquidation" : "came from liquidations"} Aave governance carried out in
+            proposal {GOVERNANCE_LIQUIDATIONS[govTx].proposal}, against the attacker&apos;s positions after the April
+            2026 rsETH incident.
+          </Prov>
+        </p>
+      )}
+
       {held ? (
         <div className="mt-6" data-deficit-covers="held">
           <h3 className="text-[14px] font-semibold text-foreground">Covered</h3>
@@ -344,7 +364,7 @@ export function ReserveDeficitBody({
 }
 
 /** The write-offs and, where held, the covers as one CSV in chain order (`kind`: write_off | cover), raw
- *  amounts with their decimals. A cover's paid_by is the Umbrella event beside it. */
+ *  amounts with their decimals. A cover's paid_by is the Umbrella event beside it, its payer the address whose aTokens paid it. */
 export function writeOffsCsv(d: ReserveDeficit): string {
   const head = [
     "kind",
@@ -367,6 +387,7 @@ export function writeOffsCsv(d: ReserveDeficit): string {
     "caller",
     "paid_by",
     "umbrella_log_index",
+    "payer",
     "tx_from",
   ];
   type Row = { block: number; order: number; cells: unknown[] };
@@ -393,6 +414,7 @@ export function writeOffsCsv(d: ReserveDeficit): string {
         l?.debtAsset.decimals,
         l?.liquidator,
         l?.logIndex,
+        null,
         null,
         null,
         null,
@@ -426,6 +448,7 @@ export function writeOffsCsv(d: ReserveDeficit): string {
             r.caller,
             r.umbrella?.event,
             r.umbrella?.logIndex,
+            r.paidBy,
             r.txFrom,
           ],
         }))

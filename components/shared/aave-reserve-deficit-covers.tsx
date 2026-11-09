@@ -7,7 +7,8 @@
 // RULES.
 // - The covers table is on D1, newest first: Date · Covered · Paid by. "Paid
 //   by" is the Umbrella event beside the Pool's DeficitCovered, in words
-//   (PAID_BY); the addresses are in the receipts (decision 0059).
+//   (PAID_BY), led by the payer's name where its aTokens came from a known Aave
+//   address (paidByWords); the addresses are in the receipts (decision 0059).
 // - The step chart draws the running Σ written off − Σ covered: a write-off
 //   steps up, a cover steps down, and it ends at the record's outstanding. One
 //   series, one neutral stroke (color-grammar §1); a readout above follows the
@@ -30,7 +31,7 @@ import {
   DataTableRow,
 } from "@/components/shared/data-table/data-table";
 import type { DeficitCovers, ReserveDeficit } from "@/lib/api/fetch-aave-reserve-reads";
-import { PAID_BY, coverProv, deficitStepProv, type TxExplorer } from "@/lib/shared/aave-reserve-reads-provenance";
+import { coverProv, paidByWords, deficitStepProv, type TxExplorer } from "@/lib/shared/aave-reserve-reads-provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { shiftDecimal } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
@@ -100,7 +101,7 @@ export function CoversTable({
               </DataTableCell>
               <DataTableCell label="Paid by">
                 {r.umbrella ? (
-                  PAID_BY[r.umbrella.event].words
+                  paidByWords(r, d.chainId)
                 ) : (
                   <span className="text-rb-500">Not paired with an Umbrella event</span>
                 )}
