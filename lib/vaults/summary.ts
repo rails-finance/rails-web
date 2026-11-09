@@ -30,7 +30,7 @@ import type { MaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import type { MaplePool } from "@/lib/maple/asset-catalog";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { releaseLabel, type VaultFamily } from "@/lib/vaults/families";
-import type { VaultIlliquid } from "@/lib/vaults/illiquid";
+import type { VaultIlliquid, VaultLiquidity } from "@/lib/vaults/illiquid";
 import { hasLostAssets } from "@/lib/vaults/lost-assets";
 import { tooSmallToMeasure } from "@/lib/vaults/yield";
 
@@ -93,6 +93,10 @@ export interface VaultSummary {
   /** The markets that make a MetaMorpho vault illiquid, at the read block;
    *  absent where the vault is not caught or was not tested. */
   illiquid?: VaultIlliquid;
+  /** What can leave a MetaMorpho vault at the read block: the withdraw
+   *  queue's sum and the part of it its markets hold free (ui-jobs 553);
+   *  absent where it was not read. */
+  withdrawable?: Pick<VaultLiquidity, "block" | "queueAssets" | "withdrawable">;
   /** The block the vault was created in, where the catalogue holds it. */
   createdBlock: number | null;
   /** The position census for this vault: every address it counted, live and
@@ -108,6 +112,15 @@ const readAt = (d: { blockNumber: number; readAt: string }) => ({ block: d.block
 /** The "lost assets" standing's test, the dust floor applied. */
 const lostOf = (total: RawAmount | null, lost: RawAmount | null) =>
   hasLostAssets(total?.raw, lost?.raw, tooSmallToMeasure);
+
+/** A MetaMorpho read's liquidity as the summary carries it. */
+const liquidityOf = (l: VaultLiquidity | undefined): Pick<VaultSummary, "illiquid" | "withdrawable"> =>
+  l == null
+    ? {}
+    : {
+        ...(l.illiquid ? { illiquid: l.illiquid } : {}),
+        withdrawable: { block: l.block, queueAssets: l.queueAssets, withdrawable: l.withdrawable },
+      };
 
 /** Census rows by lowercased vault address. */
 export function censusByVault(rows: readonly VaultCensusRow[]): Map<string, VaultCensusRow> {
@@ -148,10 +161,10 @@ export function morphoBaseVaultSummary(
     lostAssets: r.lostAssets,
     steward: r.curator ? { role: "curator", address: r.curator } : r.owner ? { role: "owner", address: r.owner } : null,
     standing: [
-      ...(r.illiquid ? (["illiquid"] as const) : []),
+      ...(r.liquidity?.illiquid ? (["illiquid"] as const) : []),
       ...(lostOf(r.totalAssets, r.lostAssets) ? (["lost-assets"] as const) : []),
     ],
-    ...(r.illiquid ? { illiquid: r.illiquid } : {}),
+    ...liquidityOf(r.liquidity),
     createdBlock: r.createdBlock,
     census: censusOf(census),
     readAt: readAt(d),
@@ -302,10 +315,10 @@ export function morphoBaseVaultPageSummary(d: MorphoBaseVaultResponse, census: V
     lostAssets: d.lostAssets,
     steward: v.curator ? { role: "curator", address: v.curator } : { role: "owner", address: v.owner },
     standing: [
-      ...(d.illiquid ? (["illiquid"] as const) : []),
+      ...(d.liquidity?.illiquid ? (["illiquid"] as const) : []),
       ...(lostOf(d.totalAssets, d.lostAssets) ? (["lost-assets"] as const) : []),
     ],
-    ...(d.illiquid ? { illiquid: d.illiquid } : {}),
+    ...liquidityOf(d.liquidity),
     createdBlock: v.createdBlock,
     census: censusOf(census ?? undefined),
     readAt: { block: d.blockNumber, timestamp: "" },

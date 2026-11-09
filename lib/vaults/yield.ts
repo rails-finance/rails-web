@@ -105,6 +105,17 @@ function readOf(o: VaultSeriesObs, zeroIsRead: boolean): VaultYieldRead | null {
 const ratioOf = (a: VaultYieldRead, b: VaultYieldRead) =>
   Number((BigInt(b.raw) * SCALE) / BigInt(a.raw)) / Number(SCALE);
 
+/** Every stored read of one series, oldest first: the readout's longer
+ *  windows (lib/vaults/health.ts) read the same rows the window does. */
+export const seriesReads = (
+  series: VaultSeries | null | undefined,
+  { zeroIsRead = true }: { zeroIsRead?: boolean } = {},
+): VaultYieldRead[] =>
+  (series?.obs ?? [])
+    .map((o) => readOf(o, zeroIsRead))
+    .filter((r): r is VaultYieldRead => r != null)
+    .sort((a, b) => a.day - b.day);
+
 /** One series' 30-day window. `points` are the stored days the line draws:
  *  from `from` to `to`, or every stored day of a young series. */
 export type SeriesWindow =
@@ -129,10 +140,7 @@ export function seriesWindow(
   series: VaultSeries | null | undefined,
   { zeroIsRead = true }: { zeroIsRead?: boolean } = {},
 ): SeriesWindow {
-  const reads = (series?.obs ?? [])
-    .map((o) => readOf(o, zeroIsRead))
-    .filter((r): r is VaultYieldRead => r != null)
-    .sort((a, b) => a.day - b.day);
+  const reads = seriesReads(series, { zeroIsRead });
   if (reads.length === 0) return { none: "no-series" };
   const to = reads[reads.length - 1];
   const target = to.day - YIELD_WINDOW_DAYS;

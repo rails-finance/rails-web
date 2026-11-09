@@ -64,7 +64,7 @@ import { serverHeadStampAt } from "@/lib/sources/api/server-head-stamps";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { resolveErc20Meta } from "./erc20-meta";
 import { readMetaMorphoIlliquid } from "./metamorpho-illiquid";
-import type { VaultIlliquid } from "@/lib/vaults/illiquid";
+import type { VaultLiquidity } from "@/lib/vaults/illiquid";
 import type { RawAmount } from "./morpho-base-vault";
 import { type MorphoBaseVaultFactory } from "@/lib/morpho-base/vault-catalog";
 import {
@@ -142,9 +142,9 @@ export interface MorphoBaseVaultDirectoryRow {
   /** `lostAssets()` at the pinned block, in the asset's units. Null where the
    *  call reverted (V1.0 keeps no such ledger) or did not answer. */
   lostAssets: RawAmount | null;
-  /** The illiquid test at the pinned block (lib/vaults/illiquid.ts): null
-   *  where the vault was read and not caught, absent where it was not read. */
-  illiquid?: VaultIlliquid | null;
+  /** What can leave the vault at the pinned block, and the illiquid test's
+   *  caught markets (lib/vaults/illiquid.ts); absent where it was not read. */
+  liquidity?: VaultLiquidity;
 }
 
 export interface MorphoBaseVaultDirectoryResponse {
@@ -259,19 +259,20 @@ async function readDirectory(chainId: MetaMorphoChainId): Promise<MorphoBaseVaul
       }),
     );
 
-    // The illiquid test (ui-jobs 540) on every vault holding assets, at the
-    // same block. A failed read leaves the rows untested, never liquid.
+    // The illiquid test (ui-jobs 540) and what can leave (553) on every vault
+    // holding assets, at the same block. A failed read leaves the rows
+    // untested, never liquid.
     try {
       const funded = rows.filter((r) => r.totalAssets != null && BigInt(r.totalAssets.raw) > ZERO);
-      const illiquid = await readMetaMorphoIlliquid(
+      const liquidity = await readMetaMorphoIlliquid(
         client,
         chainId,
         blockNumber,
         funded.map((r) => r.address.toLowerCase()),
       );
       for (const r of funded) {
-        const key = r.address.toLowerCase();
-        if (illiquid.has(key)) r.illiquid = illiquid.get(key)!;
+        const l = liquidity.get(r.address.toLowerCase());
+        if (l) r.liquidity = l;
       }
     } catch (error) {
       console.error(`Morpho vault directory: the illiquid read failed (chain ${chainId}):`, error);

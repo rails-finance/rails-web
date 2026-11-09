@@ -22,6 +22,8 @@
 // holds far more than its stored totals say. Each leg's share is over the
 // queue's sum. What can be withdrawn is, per leg, the lesser of the vault's
 // assets there and the market's free liquidity (supply less borrow), summed.
+// That sum is stated for every vault tested (ui-jobs 553: "n% of it can leave
+// today"); the markets and the standing only where the test catches one.
 //
 // The borrow rate is the IRM's curve at the stored utilisation over the
 // adapted rate at target: at its maximum it cannot adapt higher, and at full utilisation it is the ceiling,
@@ -77,6 +79,19 @@ export interface IlliquidLegInput {
   settledUtilisation: number;
   /** `rateAtTarget(id)` as stored, per second in WAD; null where it was not read. */
   rateAtTarget: bigint | null;
+}
+
+/** What can leave a vault at a block, for every vault tested: the queue's
+ *  sum and the withdrawable part of it, and the markets that make it
+ *  illiquid where the test catches one. */
+export interface VaultLiquidity {
+  block: number;
+  /** Σ over the legs of the vault's assets, raw: the figure `totalAssets()` sums. */
+  queueAssets: string;
+  /** Σ over the legs of min(vault's assets, supply − borrow), raw. */
+  withdrawable: string;
+  /** Null where no market is caught. */
+  illiquid: VaultIlliquid | null;
 }
 
 /** A market the test caught. Amounts are raw strings in the vault's asset. */
@@ -198,13 +213,14 @@ export function borrowRateYearly(rateAtTarget: bigint, utilisation: number): num
 }
 
 /** The test over one vault's queue at one block, whose unix second is
- *  `timestamp`: null where no market is caught. */
+ *  `timestamp`: what can leave, and the caught markets (`illiquid`, null
+ *  where none is caught). Null where the queue holds nothing. */
 export function vaultIlliquid(
   chainId: number,
   block: number,
   timestamp: number,
   legs: readonly IlliquidLegInput[],
-): VaultIlliquid | null {
+): VaultLiquidity | null {
   const zero = ZERO;
   const sum = legs.reduce((s, l) => s + l.vaultAssets, zero);
   if (sum === zero) return null;
@@ -232,14 +248,24 @@ export function vaultIlliquid(
       });
     }
   }
-  if (markets.length === 0) return null;
+  const base = { block, queueAssets: sum.toString(), withdrawable: withdrawable.toString() };
+  if (markets.length === 0) return { ...base, illiquid: null };
   return {
-    block,
-    markets,
-    share: Number((caught * BigInt(1_000_000)) / sum) / 1_000_000,
-    withdrawable: withdrawable.toString(),
+    ...base,
+    illiquid: {
+      block,
+      markets,
+      share: Number((caught * BigInt(1_000_000)) / sum) / 1_000_000,
+      withdrawable: base.withdrawable,
+    },
   };
 }
+
+/** The withdrawable share of the queue, 0..1. */
+export const withdrawableShare = (l: Pick<VaultLiquidity, "queueAssets" | "withdrawable">): number =>
+  BigInt(l.queueAssets) === ZERO
+    ? 0
+    : Number((BigInt(l.withdrawable) * BigInt(1_000_000)) / BigInt(l.queueAssets)) / 1_000_000;
 
 // ── The words ───────────────────────────────────────────────────────────────
 

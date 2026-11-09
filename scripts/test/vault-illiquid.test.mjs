@@ -4,6 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   vaultIlliquid,
+  withdrawableShare,
   illiquidSentence,
   borrowRateYearly,
   MAX_RATE_AT_TARGET,
@@ -17,6 +18,8 @@ import {
 const IRM = ADAPTIVE_CURVE_IRM[8453];
 /** The block's timestamp: the legs' lastUpdate, so nothing adapts unless a test says so. */
 const T = 1_760_000_000;
+/** The caught markets alone, as the standing reads them. */
+const caught = (...args) => vaultIlliquid(...args)?.illiquid ?? null;
 const leg = (o) => ({
   id: "0x" + "11".repeat(32),
   collateralSymbol: "RLP",
@@ -43,16 +46,26 @@ const idle = (assets) =>
     rateAtTarget: null,
   });
 
+test("every vault tested states what can leave; only a caught one names markets", () => {
+  const liquid = vaultIlliquid(8453, 7, T, [
+    idle(950n),
+    leg({ vaultAssets: 50n, supplyAssets: 100n, borrowAssets: 80n }),
+  ]);
+  assert.deepEqual(liquid, { block: 7, queueAssets: "1000", withdrawable: "970", illiquid: null });
+  assert.equal(withdrawableShare(liquid), 0.97);
+  const stuck = vaultIlliquid(8453, 7, T, [idle(10n), leg({ vaultAssets: 990n })]);
+  assert.equal(stuck.withdrawable, "10");
+  assert.equal(stuck.illiquid.withdrawable, "10");
+  assert.equal(vaultIlliquid(8453, 7, T, []), null);
+});
+
 test("the ceiling is 800% a year", () => {
   assert.equal(Math.round(RATE_CEILING_YEARLY * 100), 800);
   assert.equal(Math.round(borrowRateYearly(MAX_RATE_AT_TARGET, 1) * 100), 800);
 });
 
 test("a market at full utilisation and the maximum rate, holding most of the vault, is caught", () => {
-  const il = vaultIlliquid(8453, 100, T, [
-    idle(10n),
-    leg({ vaultAssets: 990n, supplyAssets: 1000n, borrowAssets: 1000n }),
-  ]);
+  const il = caught(8453, 100, T, [idle(10n), leg({ vaultAssets: 990n, supplyAssets: 1000n, borrowAssets: 1000n })]);
   assert.ok(il);
   assert.equal(il.markets.length, 1);
   assert.equal(il.withdrawable, "10");
@@ -63,25 +76,25 @@ test("a market at full utilisation and the maximum rate, holding most of the vau
 });
 
 test("under 10% of the vault is not caught", () => {
-  assert.equal(vaultIlliquid(8453, 1, T, [idle(950n), leg({ vaultAssets: 50n })]), null);
+  assert.equal(caught(8453, 1, T, [idle(950n), leg({ vaultAssets: 50n })]), null);
 });
 
 test("99.8% borrowed is not caught; 99.9% is", () => {
-  assert.equal(vaultIlliquid(8453, 1, T, [leg({ vaultAssets: 500n, borrowAssets: 998n })]), null);
-  assert.ok(vaultIlliquid(8453, 1, T, [leg({ vaultAssets: 500n, borrowAssets: 999n })]));
+  assert.equal(caught(8453, 1, T, [leg({ vaultAssets: 500n, borrowAssets: 998n })]), null);
+  assert.ok(caught(8453, 1, T, [leg({ vaultAssets: 500n, borrowAssets: 999n })]));
 });
 
 test("a rate at target under the maximum is not caught", () => {
-  assert.equal(vaultIlliquid(8453, 1, T, [leg({ vaultAssets: 500n, rateAtTarget: MAX_RATE_AT_TARGET - 1n })]), null);
+  assert.equal(caught(8453, 1, T, [leg({ vaultAssets: 500n, rateAtTarget: MAX_RATE_AT_TARGET - 1n })]), null);
 });
 
 test("another IRM, or another chain's, is not caught", () => {
-  assert.equal(vaultIlliquid(8453, 1, T, [leg({ vaultAssets: 500n, irm: ADAPTIVE_CURVE_IRM[1] })]), null);
-  assert.equal(vaultIlliquid(1, 1, T, [leg({ vaultAssets: 500n })]), null);
+  assert.equal(caught(8453, 1, T, [leg({ vaultAssets: 500n, irm: ADAPTIVE_CURVE_IRM[1] })]), null);
+  assert.equal(caught(1, 1, T, [leg({ vaultAssets: 500n })]), null);
 });
 
 test("several markets read as one sentence, the utilisation floored", () => {
-  const il = vaultIlliquid(8453, 1, T, [
+  const il = caught(8453, 1, T, [
     leg({ id: "0xa", collateralSymbol: "USR", vaultAssets: 700n }),
     leg({ id: "0xb", collateralSymbol: "wstUSR", vaultAssets: 200n, supplyAssets: 10000n, borrowAssets: 9999n }),
     leg({ id: "0xc", collateralSymbol: "RLP", vaultAssets: 100n }),
@@ -96,8 +109,8 @@ test("several markets read as one sentence, the utilisation floored", () => {
 test("a full market's stored minimum adapts to the maximum in about 55 days", () => {
   const MIN = 1_000_000_000_000_000_000n / 1000n / 31_536_000n;
   const stale = leg({ vaultAssets: 500n, rateAtTarget: MIN });
-  assert.equal(vaultIlliquid(8453, 1, T + 50 * 86_400, [stale]), null);
-  const il = vaultIlliquid(8453, 1, T + 60 * 86_400, [stale]);
+  assert.equal(caught(8453, 1, T + 50 * 86_400, [stale]), null);
+  const il = caught(8453, 1, T + 60 * 86_400, [stale]);
   assert.ok(il);
   assert.equal(Math.round(il.markets[0].borrowRateYearly * 100), 800);
   assert.equal(adaptedRateAtTarget(MAX_RATE_AT_TARGET, 0.5, 365 * 86_400), MIN);
@@ -141,7 +154,7 @@ test("a market unsettled for months is weighed on its accrued totals (spDAI's sh
   // On the stored totals the full market is 25 of 1,025: under 10%.
   const storedShare = 25 / 1025;
   assert.ok(storedShare < 0.1);
-  const il = vaultIlliquid(8453, 1, now, [
+  const il = caught(8453, 1, now, [
     legOf("0xa", open, 800n * WAD * 1_000_000n, null),
     legOf("0xb", stuck, 25n * WAD * 1_000_000n, avgRate),
   ]);
