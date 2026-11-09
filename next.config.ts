@@ -129,6 +129,9 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/cow", "/ethereum/cow"],
   // Pendle never had a pre-0016 path; the row is for check:routes.
   ["/pendle", "/ethereum/pendle"],
+  // Uniswap never had a pre-0016 path; the rows are for check:routes.
+  ["/uniswap-v3", "/ethereum/uniswap-v3"],
+  ["/uniswap-v4", "/ethereum/uniswap-v4"],
   // Polaris never had a pre-0016 path; the row exists because check:routes
   // wants every explorer forwarded from its bare slug, and a bare /polaris is
   // the address anyone will guess.

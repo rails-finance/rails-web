@@ -49,7 +49,7 @@ export type VaultStanding = "endorsed" | "shut-down" | "paused" | "address-book"
  *  stake token's `owner()`, a Yearn V3 vault's `role_manager()`. An address:
  *  names wait on attestation (decision 0017 point 5). */
 export interface VaultSteward {
-  role: "curator" | "owner" | "roleManager";
+  role: "curator" | "owner" | "roleManager" | "poolDelegate";
   address: string;
 }
 
@@ -257,7 +257,8 @@ export const yearnVaultSummaries = (d: YearnVaultDirectoryResponse): VaultSummar
  *  (lib/sources/chain/maple-pool-state.ts): `totalAssets()`, `totalSupply()`
  *  and `convertToAssets(1e6)` at one block. `state` is absent where the read
  *  did not answer for this pool; its figures are then null. The pool's name is
- *  the share symbol the catalogue holds; there is no census and no steward. */
+ *  the share symbol the catalogue holds; there is no census. Its steward is
+ *  the pool delegate. */
 export function maplePoolSummary(
   p: MaplePool,
   state: MaplePoolState | undefined,
@@ -279,7 +280,7 @@ export function maplePoolSummary(
     totalSupply: state ? amount(state.raw.totalSupply, state.totalSupply) : null,
     sharePrice: state ? amount(state.raw.navRate, state.navRate) : null,
     lostAssets: null,
-    steward: null,
+    steward: state?.poolDelegate ? { role: "poolDelegate", address: state.poolDelegate } : null,
     standing: [],
     createdBlock: p.deployBlock,
     census: null,

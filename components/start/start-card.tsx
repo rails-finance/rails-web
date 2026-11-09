@@ -62,17 +62,22 @@ export function StartCard({
           ))}
         </span>
       )}
-      {tone === "answer" ? (
-        <ArrowDown className={`mt-auto h-4 w-4 transition-transform duration-150 ${t.arrow}`} aria-hidden="true" />
-      ) : (
-        <ArrowRight className={`mt-auto h-4 w-4 transition-transform duration-150 ${t.arrow}`} aria-hidden="true" />
-      )}
+      {/* The arrow keeps 12px from the line where a title runs to two lines in a
+          five-across row (G1 at 1440px) and the card has no room to spare. */}
+      <span className="mt-auto flex flex-col pt-3">
+        {tone === "answer" ? (
+          <ArrowDown className={`h-4 w-4 transition-transform duration-150 ${t.arrow}`} aria-hidden="true" />
+        ) : (
+          <ArrowRight className={`h-4 w-4 transition-transform duration-150 ${t.arrow}`} aria-hidden="true" />
+        )}
+      </span>
     </Link>
   );
 }
 
 /** The grid class for a row of `n` cards: one column on phones. */
 export function startGridCols(n: number): string {
+  if (n === 5) return "sm:grid-cols-2 lg:grid-cols-5";
   if (n >= 4) return "sm:grid-cols-2 lg:grid-cols-4";
   if (n === 2) return "sm:grid-cols-2";
   return "sm:grid-cols-3";

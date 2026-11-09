@@ -292,12 +292,42 @@ type HeldCovers = Extract<DeficitCovers, { status: "held" }>;
 /** How each Umbrella cover event was paid, in plain words, and the sources that say so. */
 export const PAID_BY: Record<
   DeficitCover["umbrella"] extends infer U ? (U extends { event: infer E } ? E & string : never) : never,
-  { words: string; sources: DeficitSourceKey[] }
+  { words: string; sources: DeficitSourceKey[]; tail: string | null }
 > = {
-  DeficitOffsetCovered: { words: "The Aave DAO, within the deficit offset", sources: ["U2", "D3"] },
-  PendingDeficitCovered: { words: "Umbrella stakers, from a slash of their stake", sources: ["U3", "U2", "D3"] },
-  ReserveDeficitCovered: { words: "Aave's coverage manager, with no Umbrella stake set up", sources: ["U2", "U1"] },
+  DeficitOffsetCovered: {
+    words: "The Aave DAO, within the deficit offset",
+    sources: ["U2", "D3"],
+    tail: "within the deficit offset",
+  },
+  // Stakers' slashed funds pay a pending deficit whoever moves them, so the payer's name does not replace these words.
+  PendingDeficitCovered: {
+    words: "Umbrella stakers, from a slash of their stake",
+    sources: ["U3", "U2", "D3"],
+    tail: null,
+  },
+  ReserveDeficitCovered: {
+    words: "Aave's coverage manager, with no Umbrella stake set up",
+    sources: ["U2", "U1"],
+    tail: "with no Umbrella stake set up",
+  },
 };
+
+/** The Aave addresses a cover's payer is named by on the face, Ethereum only, from Aave's address book. */
+export const KNOWN_PAYERS: Record<string, { name: string; source: DeficitSourceKey }> = {
+  "0x5300a1a15135ea4dc7ad5a167152c01efc9b192a": { name: "Aave governance's executor", source: "A1" },
+  "0x6c1dc85f2ae71c3dacd6e44bb57deef61b540a5a": { name: "Aave's deficit offset clinic steward", source: "A2" },
+};
+
+const knownPayer = (row: DeficitCover, chainId: number) =>
+  chainId === 1 && row.paidBy ? (KNOWN_PAYERS[row.paidBy.toLowerCase()] ?? null) : null;
+
+/** "Paid by" in words: the payer where it is a known Aave address and the event allows it, else the event's words. */
+export function paidByWords(row: DeficitCover, chainId: number): string | null {
+  if (!row.umbrella) return null;
+  const e = PAID_BY[row.umbrella.event];
+  const who = knownPayer(row, chainId);
+  return who && e.tail ? `${who.name}, ${e.tail}` : e.words;
+}
 
 /** Who holds Umbrella's coverage manager role on Ethereum: every RoleGranted and RoleRevoked for
  *  COVERAGE_MANAGER_ROLE the Umbrella has emitted (none revoked), and hasRole true for each at `atBlock`.
@@ -361,6 +391,10 @@ export function coverProv(
               : ""
           }`
         : "No Umbrella cover event is paired with it in that transaction."
+    }${
+      row.paidBy
+        ? ` The ${symbol} aTokens that paid it went to the caller from ${row.paidBy}${knownPayer(row, d.chainId) ? `, ${knownPayer(row, d.chainId)!.name} in Aave's address book` : ""}.`
+        : ""
     }`,
     contract: { name: "Pool", address: d.pool },
     via: `${DEFICIT_ROUTE} · DeficitCovered.amountCovered · ${c.source}`,
@@ -388,8 +422,107 @@ export function coverProv(
             ...(u.event === "ReserveDeficitCovered" ? coverageManagerInputs(c.umbrella) : []),
           ]
         : []),
+      ...(row.paidBy
+        ? [
+            {
+              label: "paid by",
+              value: row.paidBy,
+              kind: "chain" as const,
+              pclass: "emitted" as const,
+              note: `the aToken BalanceTransfer to ${row.caller} in transaction ${row.txHash}${knownPayer(row, d.chainId) ? `: ${knownPayer(row, d.chainId)!.name}` : ""}`,
+            },
+            sourceLeaf("U1", "Umbrella pulls the aTokens from its caller"),
+            ...(knownPayer(row, d.chainId)
+              ? [sourceLeaf(knownPayer(row, d.chainId)!.source, `Aave's address book names ${row.paidBy}`)]
+              : []),
+          ]
+        : []),
       sourceLeaf("O5", "the cover: deficit -= balanceWriteOff"),
       sourceLeaf("O6", "only the Umbrella can cover"),
+    ],
+  };
+}
+
+/** Write-offs from liquidations Aave governance carried out, by transaction (Ethereum). Read on chain at
+ *  block 26,379,674: Governance.getProposal(478) is Executed and lists Ethereum payloads 431 and 432;
+ *  PayloadsController.getPayloadById gives each its one action and its execution in this transaction. */
+export const GOVERNANCE_LIQUIDATIONS: Record<
+  string,
+  {
+    proposal: number;
+    readAt: number;
+    governance: string;
+    payloadsController: string;
+    payloads: { id: number; target: string; user: string }[];
+    executor: string;
+    sources: DeficitSourceKey[];
+  }
+> = {
+  "0xe2391ea418e16d70196ca3d77dfc836cca1096eebf65e423d52ad867b416478f": {
+    proposal: 478,
+    readAt: 26_379_674,
+    governance: "0x9AEE0B04504CeF83A65AC3f0e838D0593BCb2BC7",
+    payloadsController: "0xdAbad81aF85554E9ae636395611C58F7eC1aAEc5",
+    payloads: [
+      {
+        id: 431,
+        target: "0x0cD3138eFF780D1e6e6c2e3CD72405246861053c",
+        user: "0x1f4c1c2e610f089d6914c4448e6f21cb0db3adef",
+      },
+      {
+        id: 432,
+        target: "0x43EE256b82AC62A6B6b94Ae56dADF2c21cBCA12e",
+        user: "0x8d11aeac74267dd5c56d371bf4ae1afa174c2d49",
+      },
+    ],
+    executor: "0x5300A1a15135EA4dc7aD5a167152C01EFc9b192A",
+    sources: ["P1", "P2", "P3", "P4", "A1"],
+  },
+};
+
+const GOVERNANCE_SOURCE_NOTES: Partial<Record<DeficitSourceKey, string>> = {
+  P1: "the proposal: liquidate the rsETH attacker's positions on Ethereum Core and Arbitrum",
+  P2: "the two Ethereum Core positions it liquidates",
+  P3: "the deficit offset raised first; Umbrella's admin role to the Recovery Guardian after",
+  P4: "the proposal on Aave's governance site",
+  A1: "Aave governance's level 1 executor, the liquidator",
+};
+
+/** The receipt for the line naming a governance proposal behind a reserve's write-offs. */
+export function governanceLiquidationProv(
+  symbol: string,
+  d: ReserveDeficit,
+  txHash: string,
+  ex: TxExplorer,
+): Provenance | null {
+  const g = GOVERNANCE_LIQUIDATIONS[txHash.toLowerCase()];
+  if (!g || d.chainId !== 1) return null;
+  const rows = d.rows.filter((w) => w.txHash.toLowerCase() === txHash.toLowerCase());
+  return {
+    kind: "chain",
+    pclass: "state",
+    source: { block: rows[0]?.block ?? g.readAt, txHash },
+    summary: `${symbol} written off in transaction ${txHash}: Aave governance's proposal ${g.proposal} executed Ethereum payloads ${g.payloads.map((p) => p.id).join(" and ")} there, each liquidating one position through Aave governance's level 1 executor ${g.executor}. Before the liquidations the payload raised Umbrella's deficit offset for WETH by the positions' WETH debt, and after them it granted Umbrella's admin role to the Recovery Guardian multisig named in the proposal. Governance.getProposal(${g.proposal}) and PayloadsController.getPayloadById read at block ${block(g.readAt)}.`,
+    contract: { name: "Governance", address: g.governance },
+    via: `Governance.getProposal(${g.proposal}).payloads · PayloadsController.getPayloadById @ ${block(g.readAt)}`,
+    verify: { kind: "etherscan", href: ex.tx(txHash), text: `The transaction on ${ex.name}` },
+    inputs: [
+      ...g.payloads.map((p) => ({
+        label: `payload ${p.id}`,
+        value: p.target,
+        kind: "chain" as const,
+        pclass: "state" as const,
+        note: `liquidates ${p.user}; executed in this transaction`,
+        contract: { name: "PayloadsController", address: g.payloadsController },
+      })),
+      ...rows.map((w) => ({
+        label: "write-off",
+        value: w.writtenOff.raw,
+        kind: "chain" as const,
+        pclass: "emitted" as const,
+        note: `DeficitCreated for ${w.user}, log ${w.logIndex} of the transaction`,
+      })),
+      ...g.sources.map((k) => sourceLeaf(k, GOVERNANCE_SOURCE_NOTES[k] ?? "Aave's source")),
     ],
   };
 }
