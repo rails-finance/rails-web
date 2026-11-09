@@ -856,8 +856,8 @@ function spokeHead(d: V4Deployment, s: V4Stored, sp: V4Spoke, rows: V4Row[]): Pr
               <Fig bold>{sup.display}</Fig> and borrowers owe <Fig bold>{bor.display}</Fig>.
             </ExplainBullet>
             <ExplainBullet>
-              It draws from the {andList(sp.hubs.map((h) => V4_HUB_LABEL[h]))} {sp.hubs.length === 1 ? "hub" : "hubs"},
-              each over a credit line: an add cap and a draw cap per asset.
+              {sp.name} draws from the {andList(sp.hubs.map((h) => V4_HUB_LABEL[h]))}{" "}
+              {sp.hubs.length === 1 ? "hub" : "hubs"}, each over a credit line: an add cap and a draw cap per asset.
             </ExplainBullet>
           </ExplainGroup>
           <ExplainGroup title="How it works">

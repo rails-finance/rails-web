@@ -8,7 +8,8 @@
 // and in its tooltip), Vault (the asset's icon, the name linking the vault's
 // page under its protocol, the standing pills beneath where there are any),
 // then Total assets, Share price, Yield and Holders (the census's open
-// count). The figures print as the row prints them (vaultHeads, yieldText) as
+// count), Steward, and last the Compare tick (E2, ui-jobs 553 door 3). The
+// figures print as the row prints them (vaultHeads, yieldText) as
 // plain values: the index carries no receipts (Miles, 8 Nov 2026), and each
 // vault's page keeps them.
 //
@@ -66,6 +67,9 @@ import { illiquidSentence } from "@/lib/vaults/illiquid";
 import { heldAssetsRaw, lostAssetsSentence } from "@/lib/vaults/lost-assets";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { sharePriceText } from "@/lib/shared/vault-amount-text";
+import { CompareTick } from "@/components/vaults/compare-selection";
+import { compareKey } from "@/lib/vaults/compare";
+import { COMPARE_TICK } from "@/lib/vaults/compare-words";
 
 type SortKey = "vault" | "assets" | "price" | "yield" | "holders";
 
@@ -92,6 +96,7 @@ const STEWARD_ROLE: Record<NonNullable<VaultSummary["steward"]>["role"], string>
   curator: "Curator",
   owner: "Owner",
   roleManager: "Role manager",
+  poolDelegate: "Pool delegate",
 };
 
 /** How an amount in the vault's asset sorts: by token, then inside it. */
@@ -118,7 +123,6 @@ function pillTitle(st: VaultStanding, v: VaultSummary): string {
       lost: formatCompact(v.lostAssets.value),
       held: formatCompact(heldOf(v, v.totalAssets.raw)),
       symbol: v.asset.symbol,
-      block: v.readAt.block,
     });
   return STANDING_WORD[st];
 }
@@ -292,7 +296,7 @@ export function VaultIndexTable({
       )}
       <DataTable
         caption={`${part === "funded" ? "Vaults" : "Vaults that hold nothing"}; total assets and share price are in each vault’s asset`}
-        tableClassName="min-w-[860px] text-sm"
+        tableClassName="min-w-[940px] text-sm"
         stacked
         rowHeight="one"
       >
@@ -314,6 +318,7 @@ export function VaultIndexTable({
             />,
           ])}
           <DataTableHeader label="Steward" data-col-head="steward" />
+          <DataTableHeader label={COMPARE_TICK.label} data-col-head="compare" />
         </DataTableHead>
         <DataTableBody>
           {sorted.map((v) => {
@@ -494,6 +499,11 @@ export function VaultIndexTable({
                       <span className="sr-only">no steward read</span>
                     </span>
                   )}
+                </DataTableCell>
+                {/* The tick stands above the row's cover (E2); below sm it
+                    names itself, so the cell carries no label. */}
+                <DataTableCell valign="middle" className="whitespace-nowrap" data-col="compare">
+                  <CompareTick vaultKey={compareKey(v.chainId, v.address)} name={name ?? v.address} />
                 </DataTableCell>
               </DataTableRow>
             );

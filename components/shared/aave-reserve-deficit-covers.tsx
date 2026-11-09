@@ -12,6 +12,10 @@
 //   steps up, a cover steps down, and it ends at the record's outstanding. One
 //   series, one neutral stroke (color-grammar §1); a readout above follows the
 //   cursor, the last step otherwise, each figure with its receipt.
+// - Where one write-off is more than ZOOM_RATIO times the highest outstanding
+//   before its day (deficitZoom), a teal press shows the chart up to the day
+//   before it on its own linear scale ("Before 6 May 2026"); the full chart is
+//   the default.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { IChartApi, ISeriesApi, Time, UTCTimestamp } from "lightweight-charts";
@@ -30,6 +34,7 @@ import { PAID_BY, coverProv, deficitStepProv, type TxExplorer } from "@/lib/shar
 import { formatCompact } from "@/lib/shared/format-compact";
 import { shiftDecimal } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
+import { CTRL_GHOST, CTRL_OFF, CTRL_ON_ACCENT } from "@/lib/shared/ui-grammar";
 
 type HeldCovers = Extract<DeficitCovers, { status: "held" }>;
 
@@ -178,6 +183,25 @@ export function deficitDays(steps: Step[], nowS: number): Day[] {
   return out;
 }
 
+/** How many times the highest outstanding before it one write-off must be for the zoom to be offered. */
+const ZOOM_RATIO = BigInt(20);
+
+/** The zoom before the largest write-off: `end`, the number of days shown, and that write-off's day; null where no
+ *  single write-off dwarfs what came before it. */
+export function deficitZoom(steps: Step[], days: Day[]): { end: number; day: UTCTimestamp } | null {
+  let big = -1;
+  steps.forEach((s, i) => {
+    if (s.kind === "write-off" && (big < 0 || s.raw > steps[big].raw)) big = i;
+  });
+  if (big < 0) return null;
+  const at = days.findIndex((d) => d.last >= big);
+  if (at < 2) return null;
+  let peak = BigInt(0);
+  for (const d of days.slice(0, at)) if (d.last >= 0 && steps[d.last].running > peak) peak = steps[d.last].running;
+  if (peak <= BigInt(0) || steps[big].raw <= peak * ZOOM_RATIO) return null;
+  return { end: at, day: days[at].time };
+}
+
 const PALETTE = {
   fg: ["var(--foreground)"],
   text: ["var(--rb-500)"],
@@ -203,6 +227,7 @@ export function DeficitStepChart({
   const chart = useRef<IChartApi | null>(null);
   const series = useRef<ISeriesApi<"Line"> | null>(null);
   const [cursor, setCursor] = useState<number | null>(null);
+  const [zoomed, setZoomed] = useState(false);
   const steps = useMemo(() => deficitSteps(d, c), [d, c]);
   const dec = d.asset.decimals ?? 18;
   const tok = (raw: bigint) => Number(shiftDecimal(raw.toString(), dec));
@@ -266,7 +291,10 @@ export function DeficitStepChart({
     series.current?.applyOptions({ color: palette.fg });
   }, [palette, lib]);
 
-  const days = useMemo(() => deficitDays(steps, Math.floor(Date.now() / 1000)), [steps]);
+  const allDays = useMemo(() => deficitDays(steps, Math.floor(Date.now() / 1000)), [steps]);
+  const zoom = useMemo(() => deficitZoom(steps, allDays), [steps, allDays]);
+  const before = zoomed && zoom != null;
+  const days = zoomed && zoom != null ? allDays.slice(0, zoom.end) : allDays;
 
   useEffect(() => {
     const s = series.current;
@@ -282,6 +310,35 @@ export function DeficitStepChart({
 
   return (
     <div data-deficit-chart="" data-deficit-steps={steps.length}>
+      {zoom && (
+        <div
+          className="mb-2 flex gap-1 text-xs"
+          role="group"
+          aria-label="Span shown"
+          data-deficit-chart-zoom={before ? "before" : "all"}
+        >
+          {(
+            [
+              ["all", "All"],
+              ["before", `Before ${formatDate(zoom.day)}`],
+            ] as const
+          ).map(([key, label]) => {
+            const on = (key === "before") === before;
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setZoomed(key === "before")}
+                className={`${CTRL_GHOST} ${on ? CTRL_ON_ACCENT : CTRL_OFF} rounded px-2 py-0.5 tabular-nums`}
+                data-deficit-chart-zoom-option={key}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div
         className="mb-2 flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-xs tabular-nums text-rb-500"
         data-deficit-chart-readout=""
@@ -289,7 +346,7 @@ export function DeficitStepChart({
         {day && (
           <>
             <span className="text-foreground">{formatDate(day.time)}</span>
-            {cursor == null && <span>today</span>}
+            {cursor == null && !before && <span>today</span>}
             <span>
               Outstanding{" "}
               {step ? (

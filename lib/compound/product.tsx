@@ -26,7 +26,7 @@ import {
   DataTableHeader,
   DataTableRow,
 } from "@/components/shared/data-table/data-table";
-import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
+import { ExplainBullet, ExplainGroup, ExplainSub, Fig } from "@/components/shared/explain-groups";
 import { Prov } from "@/components/shared/provenance";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
 import { RevealTip } from "@/components/shared/reveal-tip";
@@ -288,23 +288,16 @@ function CometExplainer({ m }: { m: CompoundV3MarketRow }) {
           </Fig>
           , worth <Fig bold>{val(m.totalBorrowValue, m.quoteUnit)}</Fig>.
         </ExplainBullet>
-        <ExplainBullet>
-          Utilisation <Fig bold>{pctText(m.utilization)}</Fig> is the share of the supply on loan.
-        </ExplainBullet>
-        {m.utilization > 1 && (
-          <ExplainBullet>
-            Borrowers owe more than lenders are owed: the borrow rate runs ahead of the supply rate, and the difference
-            builds the reserves.
-          </ExplainBullet>
-        )}
         {m.quoteUnit === "ETH" && (
           <ExplainBullet>This market prices its assets in ETH, so its values are in ETH.</ExplainBullet>
         )}
       </ExplainGroup>
       <ExplainGroup title="Rates">
         <ExplainBullet>
-          Lenders earn <Fig bold>{pctText(m.supplyApr, 2)}</Fig> a year and borrowers pay{" "}
-          <Fig bold>{pctText(m.borrowApr, 2)}</Fig>.
+          Lenders earn <Fig bold>{pctText(m.supplyApr, 2)}</Fig> a year.
+        </ExplainBullet>
+        <ExplainBullet>
+          Borrowers pay <Fig bold>{pctText(m.borrowApr, 2)}</Fig> a year.
         </ExplainBullet>
         {sameKink(m) ? (
           <ExplainBullet>
@@ -318,6 +311,18 @@ function CometExplainer({ m }: { m: CompoundV3MarketRow }) {
             <Fig bold>{pctText(m.supplyKink, 0)}</Fig>.
           </ExplainBullet>
         )}
+        <ExplainBullet
+          sub={
+            m.utilization > 1 && (
+              <ExplainSub>
+                Borrowers owe more than lenders are owed: the borrow rate runs ahead of the supply rate, and the
+                difference builds the reserves.
+              </ExplainSub>
+            )
+          }
+        >
+          Utilisation <Fig bold>{pctText(m.utilization)}</Fig> is the share of the supply on loan.
+        </ExplainBullet>
       </ExplainGroup>
       <ExplainGroup title="Reserves">
         <ExplainBullet>
@@ -364,7 +369,7 @@ function CometExplainer({ m }: { m: CompoundV3MarketRow }) {
           )}
         </ExplainBullet>
         <ExplainBullet>
-          Collateral earns no interest; each asset sets how much can be borrowed against it.
+          Collateral assets earn no interest; each sets how much can be borrowed against it.
         </ExplainBullet>
       </ExplainGroup>
     </>

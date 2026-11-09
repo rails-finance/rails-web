@@ -416,9 +416,12 @@ function deficitSection(
     tools: {
       exports: {
         csv: {
-          filename: `${m.key}-${r.symbol}-write-offs.csv`,
+          filename: `${m.key}-${r.symbol}-${d.covers?.status === "held" ? "deficit" : "write-offs"}.csv`,
           build: () => writeOffsCsv(d),
-          subtitle: "Every write-off held, with its liquidation",
+          subtitle:
+            d.covers?.status === "held"
+              ? "Every write-off and cover held, in chain order"
+              : "Every write-off held, with its liquidation",
         },
       },
     },

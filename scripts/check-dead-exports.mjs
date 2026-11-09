@@ -29,7 +29,7 @@
 //     caller elsewhere, so reporting them is noise. A gate that always fails is
 //     as useless as one that cannot.
 //
-// The offline verifiers (`scripts/verify/**/*.ts`) are entries: a reference
+// The verifiers (`scripts/verify/**/*.mjs` and `.ts`) are entries: a reference
 // only a verifier calls, such as the scrubber's event-level adapter
 // (`aaveV3FlowTimeline`) the index's day rows are tested against, is used.
 //
@@ -43,6 +43,106 @@
 // imports and `npm run check:dead` must name it and exit 1.
 
 import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// ── Verifier imports ─────────────────────────────────────────────────────────
+// knip.json lists `scripts/verify/**/*.mjs` and `.ts` as entries, so an export
+// only a verifier imports counts as used (break-tested). The reverse is not
+// covered: a verifier import that no longer resolves, because the export was
+// deleted or the file moved, fails only when the verifier runs. This pass reads
+// every verifier's literal imports (static, and `await import()` with or
+// without a destructure) and names each one whose file or named export is gone.
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const EXTS = ["", ".ts", ".tsx", ".mjs", ".js", ".json", "/index.ts", "/index.tsx", "/index.js"];
+const walk = (d) =>
+  readdirSync(d).flatMap((n) => {
+    const f = join(d, n);
+    return statSync(f).isDirectory() ? walk(f) : /\.(mjs|ts)$/.test(n) ? [f] : [];
+  });
+const resolveSpec = (from, spec) => {
+  const base = spec.startsWith("@/")
+    ? join(ROOT, spec.slice(2))
+    : spec.startsWith(".")
+      ? resolve(dirname(from), spec)
+      : null;
+  if (!base) return null;
+  const swap = base.replace(/\.(m?js)$/, ".ts");
+  for (const c of [base, swap]) for (const e of EXTS) if (existsSync(c + e) && statSync(c + e).isFile()) return c + e;
+  return undefined;
+};
+const exportsOf = (file, seen = new Set()) => {
+  if (seen.has(file)) return { names: new Set(), all: false };
+  seen.add(file);
+  const src = readFileSync(file, "utf8");
+  const names = new Set();
+  let all = file.endsWith(".json");
+  for (const m of src.matchAll(
+    /^export\s+(?:declare\s+)?(?:async\s+)?(?:const|let|var|function\*?|class|type|interface|enum|abstract class)\s+([A-Za-z_$][\w$]*)/gm,
+  ))
+    names.add(m[1]);
+  for (const m of src.matchAll(/^export\s+(?:type\s+)?\{([^}]*)\}(\s+from\s+["']([^"']+)["'])?/gm))
+    for (const part of m[1].split(",")) {
+      const n = part
+        .trim()
+        .split(/\s+as\s+/)
+        .pop();
+      if (n) names.add(n);
+    }
+  if (/^export\s+default\b/m.test(src)) names.add("default");
+  for (const m of src.matchAll(/^export\s+\*\s+from\s+["']([^"']+)["']/gm)) {
+    const t = resolveSpec(file, m[1]);
+    if (t) {
+      const sub = exportsOf(t, seen);
+      sub.names.forEach((n) => names.add(n));
+      all ||= sub.all;
+    } else all = true;
+  }
+  return { names, all };
+};
+const verifierImportProblems = () => {
+  const problems = [];
+  const dir = join(ROOT, "scripts", "verify");
+  for (const f of walk(dir)) {
+    const src = readFileSync(f, "utf8").replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/.*$/gm, "$1");
+    const uses = [];
+    for (const m of src.matchAll(
+      /import\s+(type\s+)?([\w$]+\s*,\s*)?(?:\{([^}]*)\}|\*\s+as\s+[\w$]+|[\w$]+)?\s*from\s*["']([^"']+)["']/g,
+    ))
+      uses.push({ spec: m[4], named: m[1] ? [] : (m[3] ?? "").split(",") });
+    for (const m of src.matchAll(/(?:const\s+\{([^}]*)\}\s*=\s*)?await\s+import\(\s*["']([^"']+)["']\s*\)/g))
+      uses.push({ spec: m[2], named: (m[1] ?? "").split(",") });
+    for (const u of uses) {
+      const target = resolveSpec(f, u.spec);
+      const rel = f.slice(ROOT.length + 1);
+      if (target === undefined) {
+        problems.push(`${rel}: imports "${u.spec}", which resolves to no file`);
+        continue;
+      }
+      if (target === null || /\.json$/.test(target)) continue;
+      const ex = exportsOf(target);
+      for (const raw of u.named) {
+        const n = raw
+          .trim()
+          .split(/\s+as\s+|\s*:\s*/)[0]
+          .replace(/^type\s+/, "");
+        if (n && !ex.names.has(n) && !ex.all)
+          problems.push(`${rel}: imports { ${n} } from "${u.spec}", which does not export it`);
+      }
+    }
+  }
+  return problems;
+};
+const broken = verifierImportProblems();
+if (broken.length) {
+  console.log(broken.join("\n"));
+  console.log(
+    "\nFAIL — a verifier imports something the app no longer exports.\nRestore the export, or point the verifier at what replaced it.",
+  );
+  process.exit(1);
+}
 
 const run = spawnSync("npx", ["knip", "--reporter", "compact"], { encoding: "utf8" });
 const out = `${run.stdout ?? ""}${run.stderr ?? ""}`.trim();

@@ -343,17 +343,19 @@ export function ReserveDeficitBody({
   );
 }
 
-/** The write-offs as CSV, raw amounts with their decimals. */
+/** The write-offs and, where held, the covers as one CSV in chain order (`kind`: write_off | cover), raw
+ *  amounts with their decimals. A cover's paid_by is the Umbrella event beside it. */
 export function writeOffsCsv(d: ReserveDeficit): string {
   const head = [
+    "kind",
     "timestamp",
     "block",
     "transaction",
-    "deficit_log_index",
+    "log_index",
     "pool",
+    "amount_raw",
+    "amount_decimals",
     "user",
-    "written_off_raw",
-    "written_off_decimals",
     "collateral",
     "collateral_seized_raw",
     "collateral_decimals",
@@ -361,30 +363,73 @@ export function writeOffsCsv(d: ReserveDeficit): string {
     "debt_repaid_raw",
     "debt_repaid_decimals",
     "liquidator",
-    "tx_from",
     "liquidation_log_index",
+    "caller",
+    "paid_by",
+    "umbrella_log_index",
+    "tx_from",
   ];
-  const rows = d.rows.map((w) => {
+  type Row = { block: number; order: number; cells: unknown[] };
+  const writeOffs: Row[] = d.rows.map((w) => {
     const l = w.liquidation;
-    return [
-      w.timestamp,
-      w.block,
-      w.txHash,
-      w.logIndex,
-      w.pool,
-      w.user,
-      w.writtenOff.raw,
-      w.writtenOff.decimals,
-      l?.collateral.address,
-      l?.collateralSeized,
-      l?.collateral.decimals,
-      l?.debtAsset.address,
-      l?.debtRepaid,
-      l?.debtAsset.decimals,
-      l?.liquidator,
-      l?.txFrom,
-      l?.logIndex,
-    ];
+    return {
+      block: w.block,
+      order: w.logIndex,
+      cells: [
+        "write_off",
+        w.timestamp,
+        w.block,
+        w.txHash,
+        w.logIndex,
+        w.pool,
+        w.writtenOff.raw,
+        w.writtenOff.decimals,
+        w.user,
+        l?.collateral.address,
+        l?.collateralSeized,
+        l?.collateral.decimals,
+        l?.debtAsset.address,
+        l?.debtRepaid,
+        l?.debtAsset.decimals,
+        l?.liquidator,
+        l?.logIndex,
+        null,
+        null,
+        null,
+        l?.txFrom,
+      ],
+    };
   });
+  const covers: Row[] =
+    d.covers?.status === "held"
+      ? d.covers.rows.map((r) => ({
+          block: r.block,
+          order: 1e6 + r.logIndex,
+          cells: [
+            "cover",
+            r.timestamp,
+            r.block,
+            r.txHash,
+            r.logIndex,
+            d.pool,
+            r.amount.raw,
+            r.amount.decimals,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            r.caller,
+            r.umbrella?.event,
+            r.umbrella?.logIndex,
+            r.txFrom,
+          ],
+        }))
+      : [];
+  const rows = [...writeOffs, ...covers].sort((a, b) => a.block - b.block || a.order - b.order).map((r) => r.cells);
   return [head, ...rows].map((r) => r.map((v) => (v == null ? "" : String(v))).join(",")).join("\n");
 }
