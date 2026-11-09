@@ -1998,7 +1998,7 @@ templates:
 L5:
   adjust:
     title: |-
-      How adjusting a trove works
+      How adjusting a Trove works
     intro: |-
       An adjustment changes a trove without closing it. The owner can add or withdraw collateral, borrow more BOLD, or repay some of the debt.
     extraParagraphs:
@@ -2148,7 +2148,7 @@ L5:
 
   close:
     title: |-
-      How closing a trove works
+      How closing a Trove works
     intro: |-
       Closing a trove repays its entire debt and returns the collateral, ending the position.
     # A close with no debt left (a redemption cleared it): intro_zero_debt and
@@ -2248,7 +2248,7 @@ L5:
 
   transfer:
     title: |-
-      How trove transfers work
+      How Trove transfers work
     intro: |-
       A trove is an ERC-721 NFT, so its ownership can be transferred to another wallet like any other token.
     detailsHeading: |-
@@ -2276,7 +2276,7 @@ L5:
 
   fallback:
     title: |-
-      How Liquity V2 troves work
+      How Liquity V2 Troves work
     intro: |-
       Liquity V2 lets a borrower take out BOLD against collateral in a trove — a self-custodied position represented by an NFT.
     detailsHeading: |-
