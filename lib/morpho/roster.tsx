@@ -50,7 +50,7 @@ import {
   DataTableRow,
   DataTableRowLink,
   DATA_TABLE_PILL,
-  type DataTableStripe,
+  DataTableGroupRow,
 } from "@/components/shared/data-table/data-table";
 import { ratePercentText } from "@/lib/shared/rate-percent";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -224,12 +224,10 @@ function pairLines(markets: readonly MorphoRosterRow[]): Map<string, string> {
 function MarketRow({
   m,
   r,
-  stripe,
   child,
 }: {
   m: MorphoRosterRow;
   r: Read;
-  stripe?: DataTableStripe;
   /** A child of a repeated pair: the line that sets it apart. */
   child?: string;
 }) {
@@ -247,13 +245,13 @@ function MarketRow({
     <ProvReceiptsScope registry={registry} bounds={false}>
       <DataTableRow
         href={href}
-        stripe={stripe}
+        child={child != null}
         data-morpho-market={m.id}
         data-morpho-lent={m.lent ? "" : undefined}
         data-morpho-pair-child={child != null ? "" : undefined}
       >
         <DataTableCell rowHeader className="whitespace-nowrap">
-          <span className={`flex items-center gap-2.5 ${child != null ? "sm:pl-7" : ""}`}>
+          <span className="flex items-center gap-2.5">
             <TokenPairIcons
               first={
                 m.isIdle ? { symbol: m.loanSymbol, address: m.loanToken } : { symbol: name, address: m.collateralToken }
@@ -381,19 +379,7 @@ function itemValue(it: Item, k: SortKey): number | string {
   return k === "supplied" ? it.p.totalSupply : sortValue(it.p.markets[0], k);
 }
 
-function PairRow({
-  p,
-  r,
-  stripe,
-  open,
-  onToggle,
-}: {
-  p: Pair;
-  r: Read;
-  stripe: DataTableStripe;
-  open: boolean;
-  onToggle: () => void;
-}) {
+function PairRow({ p, r, open, onToggle }: { p: Pair; r: Read; open: boolean; onToggle: () => void }) {
   const registry = useReceiptRegistry();
   const top = p.markets[0];
   const name = collateralName(top);
@@ -407,15 +393,15 @@ function PairRow({
   const n = p.markets.length;
   return (
     <ProvReceiptsScope registry={registry} bounds={false}>
-      <DataTableRow stripe={stripe} data-anatomy="R1.1.1" data-morpho-pair={`${top.collateralToken}:${top.lltv}`}>
-        <DataTableCell rowHeader className="whitespace-nowrap">
-          <button
-            type="button"
-            aria-expanded={open}
-            onClick={onToggle}
-            className="flex items-center gap-2.5 text-left"
-            data-morpho-pair-toggle={`${top.collateralToken}:${top.lltv}`}
-          >
+      <DataTableGroupRow
+        open={open}
+        onToggle={onToggle}
+        data-anatomy="R1.1.1"
+        data-morpho-pair={`${top.collateralToken}:${top.lltv}`}
+        toggleHooks={{ "data-morpho-pair-toggle": `${top.collateralToken}:${top.lltv}` }}
+        nameClassName="whitespace-nowrap"
+        label={
+          <span className="flex items-center gap-2.5">
             <TokenPairIcons first={{ symbol: name, address: top.collateralToken }} fixed />
             <span className="text-[13px] font-medium">
               <span className={top.collateralNamed ? "" : "font-mono"}>{name}</span>
@@ -424,55 +410,55 @@ function PairRow({
                 · {n} markets
               </span>
             </span>
-            <ChevronRight
-              className={`h-3.5 w-3.5 shrink-0 text-rb-500 transition-transform ${open ? "rotate-90" : ""}`}
-              aria-hidden
-            />
-          </button>
-        </DataTableCell>
-        <DataTableCell label="LLTV" align="right" className={NUM}>
-          <Prov info={morphoLltvProv(c)}>{pctText(top.lltv)}</Prov>
-        </DataTableCell>
-        <DataTableCell label="Supplied" align="right" className={NUM}>
-          {top.amountsTrusted ? (
-            <span className="inline-flex flex-col items-start sm:items-end">
-              <span className="inline-flex items-center gap-1.5">
-                <Prov info={morphoPairTotalProv("supplied", c, n)}>{amount(p.totalSupply)}</Prov>
-                <AssetUnit symbol={top.loanSymbol} address={top.loanToken} />
-              </span>
-              <span className="text-[11px] text-rb-500">
-                <Prov info={morphoPairTotalProv("borrowed", c, n)}>{amount(p.totalBorrow)}</Prov> borrowed
-              </span>
-            </span>
-          ) : (
-            <span className="text-rb-500">not stated</span>
-          )}
-        </DataTableCell>
-        <DataTableCell label="Supply rate" align="right" className={NUM}>
-          {top.supplyApr != null ? (
-            <Prov info={morphoSupplyRateProv(c)}>{ratePercentText(top.supplyApr)}</Prov>
-          ) : (
-            <span className="text-rb-500">none</span>
-          )}
-        </DataTableCell>
-        <DataTableCell label="Borrow rate" align="right" className={NUM}>
-          <span className="inline-flex items-center gap-1.5">
-            <CeilingTag m={top} c={c} />
-            {top.borrowApr != null ? (
-              <Prov info={morphoBorrowRateProv(c)}>{ratePercentText(top.borrowApr)}</Prov>
-            ) : (
-              <span className="text-rb-500">none</span>
-            )}
           </span>
-        </DataTableCell>
-        <DataTableCell label="Utilisation" align="right" className={NUM}>
-          {top.utilization != null ? (
-            <Prov info={morphoUtilizationProv(c)}>{pctText(top.utilization)}</Prov>
-          ) : (
-            <span className="text-rb-500">no supply</span>
-          )}
-        </DataTableCell>
-      </DataTableRow>
+        }
+        cells={
+          <>
+            <DataTableCell label="LLTV" align="right" className={NUM}>
+              <Prov info={morphoLltvProv(c)}>{pctText(top.lltv)}</Prov>
+            </DataTableCell>
+            <DataTableCell label="Supplied" align="right" className={NUM}>
+              {top.amountsTrusted ? (
+                <span className="inline-flex flex-col items-start sm:items-end">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Prov info={morphoPairTotalProv("supplied", c, n)}>{amount(p.totalSupply)}</Prov>
+                    <AssetUnit symbol={top.loanSymbol} address={top.loanToken} />
+                  </span>
+                  <span className="text-[11px] text-rb-500">
+                    <Prov info={morphoPairTotalProv("borrowed", c, n)}>{amount(p.totalBorrow)}</Prov> borrowed
+                  </span>
+                </span>
+              ) : (
+                <span className="text-rb-500">not stated</span>
+              )}
+            </DataTableCell>
+            <DataTableCell label="Supply rate" align="right" className={NUM}>
+              {top.supplyApr != null ? (
+                <Prov info={morphoSupplyRateProv(c)}>{ratePercentText(top.supplyApr)}</Prov>
+              ) : (
+                <span className="text-rb-500">none</span>
+              )}
+            </DataTableCell>
+            <DataTableCell label="Borrow rate" align="right" className={NUM}>
+              <span className="inline-flex items-center gap-1.5">
+                <CeilingTag m={top} c={c} />
+                {top.borrowApr != null ? (
+                  <Prov info={morphoBorrowRateProv(c)}>{ratePercentText(top.borrowApr)}</Prov>
+                ) : (
+                  <span className="text-rb-500">none</span>
+                )}
+              </span>
+            </DataTableCell>
+            <DataTableCell label="Utilisation" align="right" className={NUM}>
+              {top.utilization != null ? (
+                <Prov info={morphoUtilizationProv(c)}>{pctText(top.utilization)}</Prov>
+              ) : (
+                <span className="text-rb-500">no supply</span>
+              )}
+            </DataTableCell>
+          </>
+        }
+      />
     </ProvReceiptsScope>
   );
 }
@@ -510,9 +496,6 @@ function MarketsTable({
     const y = itemValue(b, sort.key);
     return sign * (typeof x === "string" ? x.localeCompare(String(y)) : x - (y as number));
   });
-  // A pair's rows share its stripe, so the stripes count items.
-  const stripe = (i: number): DataTableStripe | undefined =>
-    collapse ? (i % 2 === 0 ? "raised" : "sunken") : undefined;
   return (
     <DataTable label={label} stacked rowHeight="one" tableClassName="text-[13px] sm:min-w-[40rem]">
       <DataTableHead>
@@ -520,15 +503,14 @@ function MarketsTable({
         {COLUMNS.map((c) => th(c.key, c.label, "right", c.tip))}
       </DataTableHead>
       <DataTableBody>
-        {items.map((it, i) =>
+        {items.map((it) =>
           it.kind === "market" ? (
-            <MarketRow key={it.m.id} m={it.m} r={r} stripe={stripe(i)} />
+            <MarketRow key={it.m.id} m={it.m} r={r} />
           ) : (
             <Fragment key={it.p.key}>
               <PairRow
                 p={it.p}
                 r={r}
-                stripe={stripe(i)!}
                 open={open.has(it.p.key)}
                 onToggle={() =>
                   setOpen((s) => {
@@ -542,9 +524,7 @@ function MarketsTable({
               {open.has(it.p.key) &&
                 (() => {
                   const lines = pairLines(it.p.markets);
-                  return it.p.markets.map((m) => (
-                    <MarketRow key={m.id} m={m} r={r} stripe={stripe(i)} child={lines.get(m.id) ?? ""} />
-                  ));
+                  return it.p.markets.map((m) => <MarketRow key={m.id} m={m} r={r} child={lines.get(m.id) ?? ""} />);
                 })()}
             </Fragment>
           ),
