@@ -43,7 +43,7 @@ export async function generateMetadata({
   searchParams: Promise<RawSearchParams>;
 }): Promise<Metadata> {
   const directory = listingMetadata({
-    title: "Explore Liquity V2 troves",
+    title: "Explore Liquity V2 Troves",
     canonicalPath: LIQUITY_V2_BASE_PATH,
     description: "Every Liquity V2 Trove on Ethereum, with its collateral, debt, interest rate and full history.",
   });

@@ -152,8 +152,8 @@ function SystemCard({ data, readBy }: { data: LiquityV1SystemChainResponse; read
           </Prov>
           <span className="ml-1 text-rb-500">· {formatUsdValue(data.systemCollUsd)}</span>
         </Stat>
-        <Stat label="Open troves">
-          <Prov info={stampServerRead(systemLaneProv("Open troves", "getTroveOwnersCount()"), readBy)}>
+        <Stat label="Open Troves">
+          <Prov info={stampServerRead(systemLaneProv("Open Troves", "getTroveOwnersCount()"), readBy)}>
             {data.trovesCount}
           </Prov>
         </Stat>

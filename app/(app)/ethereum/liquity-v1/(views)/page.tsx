@@ -26,7 +26,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export const metadata = listingMetadata({
-  title: "Explore Liquity V1 troves",
+  title: "Explore Liquity V1 Troves",
   canonicalPath: "/ethereum/liquity-v1",
   description:
     "Every Liquity V1 Trove on Ethereum: interest-free LUSD loans against ETH, with collateral, debt and full history.",

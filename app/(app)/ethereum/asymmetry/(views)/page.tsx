@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 export const metadata = listingMetadata({
-  title: "Explore Asymmetry troves",
+  title: "Explore Asymmetry Troves",
   canonicalPath: "/ethereum/asymmetry",
   description:
     "Every Asymmetry Trove on Ethereum: loans of the USDaf stablecoin across seven collateral types, with collateral, debt and full history.",

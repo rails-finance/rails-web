@@ -779,9 +779,9 @@ trove_words:
     the closing event’s collateral price
   # ── The event card's head: the zombie flag's tip ──
   zombie_cleared_title: |-
-    Zombie trove fully redeemed — debt cleared, collateral now claimable
+    Zombie Trove fully redeemed — debt cleared, collateral now claimable
   zombie_title: |-
-    Zombie trove — debt below the minimum, redeemable until restored
+    Zombie Trove — debt below the minimum, redeemable until restored
   # ── The event card's price row: the chip's tip ──
   event_price_title: |-
     {coll_type} price at the time of this event
@@ -1218,7 +1218,7 @@ templates:
 
   - id: liquity2.adjust.combined
     title: |-
-      Adjust trove
+      Adjust Trove
     when: |-
       adjustTrove that moved both collateral and debt
     L5: adjust
@@ -1673,7 +1673,7 @@ templates:
 
   - id: liquity2.open
     title: |-
-      Open trove
+      Open Trove
     when: |-
       openTrove or openTroveAndJoinBatch
     L5: open
@@ -1734,7 +1734,7 @@ templates:
 
   - id: liquity2.close
     title: |-
-      Close trove
+      Close Trove
     when: |-
       closeTrove
     L5: close
@@ -2053,7 +2053,7 @@ L5:
         text: |-
           a cut of the redeemed collateral that stays in the trove; it starts at 0.5% and rises with recent redemptions.
       - bold: |-
-          Zombie trove
+          Zombie Trove
         text: |-
           a trove redeemed below 2,000 BOLD of debt stays open, dormant, until it is closed or borrows back above the minimum.
     links:
