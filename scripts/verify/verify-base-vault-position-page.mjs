@@ -687,7 +687,6 @@ async function pageRead(browser, url, { expandRuns = false, growWindow = false, 
         .map((b) => `${b.innerText.trim()} ${b.getAttribute("aria-label") ?? ""}`.trim())
         .join(" | "),
       cardSharesRaw: q("[data-position-card]", "data-shares-raw"),
-      cardValueUsdE8: q("[data-position-card]", "data-value-usd-e8"),
       cardStatus: q("[data-position-card]", "data-status"),
       towerPresent: !!document.querySelector("[data-vault-flows-tower]"),
       tower: {
@@ -1666,19 +1665,19 @@ const banned = [
   ...f1Page.text.matchAll(
     // APY/APR case-SENSITIVELY: "Apr" is April, and an en-GB date is the house
     // form on every row of the timeline below.
-    /.{0,40}(\bAPY\b|\bAPR\b|per annum|annualised|annualized|\byield\b|\bprofit\b|P&L).{0,40}/g,
+    // "profit" left the list with the holder card's Profit or loss (decision
+    // 0048, ui-jobs 553): a sum over the holding's life, never a rate.
+    /.{0,40}(\bAPY\b|\bAPR\b|per annum|annualised|annualized|\byield\b|P&L).{0,40}/g,
   ),
 ];
-// Since mig 206 the card carries ONE dollar figure — Value · USD, the census's
-// oracle read at the census block — so "no dollar sign" became "no dollar
-// figure other than that stat": the count of `$` figures on the page equals one
-// for an open, priced card and zero otherwise.
+// The holder card (V8, ui-jobs 553) states every figure in the vault's asset
+// and carries no dollar figure, so the page carries none.
 const dollarFigures = (f1Page.text.match(/\$\s?\d[\d,.]*[KMB]?/g) ?? []).length;
-const expectedDollars = f1Page.cardStatus === "live" && f1Page.cardValueUsdE8 ? 1 : 0;
+const expectedDollars = 0;
 check(
-  "T11b0 the only dollar figure on the position page is the card's Value · USD stat",
+  "T11b0 the position page carries no dollar figure",
   dollarFigures === expectedDollars,
-  `${dollarFigures} dollar figure(s), card ${f1Page.cardStatus ?? "?"} with value ${f1Page.cardValueUsdE8 || "unpriced"}`,
+  `${dollarFigures} dollar figure(s)`,
 );
 check(
   "T11b no rate or yield anywhere on the position page",

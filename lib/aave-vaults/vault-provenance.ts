@@ -410,17 +410,6 @@ const aaveUmbrellaWrapperPriceProv_ = (c: AaveVaultCoords, wrapperSymbol: string
   via: `${LANE} · wrapper.convertToAssets(one whole share) @ the pinned block`,
 });
 
-/** The holder's claim carried through the wrapper into reserve units. */
-const aaveUmbrellaWrapperClaimProv_ = (c: AaveVaultCoords, wrapperSymbol: string): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute(`${wrapperSymbol}.convertToAssets(the holder's claim)`, c),
-  summary: `The same claim in ${reserveOf(c)} — the wrapper's own \`convertToAssets()\` applied to this holder's ${wrapperSymbol} claim${atBlock(c)}. Three reads in a row, each answered by the contract that owns the question: the stake token converts the holder's shares to ${wrapperSymbol}, the wrapper converts that to ${reserveOf(c)}. The figure is what the two contracts say at one block — not what a redemption would return, which depends on the cooldown and on nothing being slashed first.`,
-  contract: { name: wrapperSymbol },
-  via: `${LANE} · wrapper.convertToAssets(holder claim) @ the pinned block`,
-});
-
 // ── the holder ───────────────────────────────────────────────────────────────
 
 /** `balanceOf(holder)` — the one figure everything else on the holder half
@@ -455,17 +444,6 @@ const aaveVaultCooldownStateProv_ = (c: AaveVaultCoords): Provenance => ({
   summary: `Cooldown state — \`getStakerCooldown()\` for this address${atBlock(c)}: the amount it covers, when the cooldown ends and how long the window after it lasts, exactly as the token stores them. Which of the four states that is — none started, waiting, open, or passed — is a comparison against THIS BLOCK's own timestamp, read with the block, never against the reader's clock. Only one cooldown record exists per address at a time, and an outgoing transfer decays it.`,
   contract: vaultContract(c),
   via: `${LANE} · getStakerCooldown(holder) @ the pinned block`,
-});
-
-/** What the holding address IS — a mechanism, never an identity. */
-const aaveVaultHolderShapeProv_ = (c: AaveVaultCoords, kind: string, codeSize: number): Provenance => ({
-  kind: "chain",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  verify: recompute("eth_getCode(the holder)", c),
-  summary: `What this address is — \`eth_getCode\`${atBlock(c)} returned ${codeSize === 0 ? "no code" : `${codeSize} bytes`}, read as ${kind}. Every verdict here is a read: an empty answer is an externally owned account, a 23-byte \`0xef0100…\` code is the EIP-7702 delegation indicator, a released Safe singleton is an exact address match, an \`asset()\` plus a \`totalSupply()\` is a contract answering the ERC-4626 accessors, and an implementation slot is a pointer to another address to read. No app is named from any of it, and an address with a computed stake is not an identified person.`,
-  contract: { name: "the holding address", address: c.holder },
-  via: `${LANE} · eth_getCode(holder) @ the pinned block`,
 });
 
 /** THE NAME, and whose claim it is. A registry citation, not a reading of the
@@ -747,11 +725,9 @@ export const aaveUmbrellaMaxSlashableProv = withServerRead(aaveUmbrellaMaxSlasha
 export const aaveUmbrellaCustodyProv = withServerRead(aaveUmbrellaCustodyProv_);
 export const aaveUmbrellaOwnerProv = withServerRead(aaveUmbrellaOwnerProv_);
 export const aaveUmbrellaWrapperPriceProv = withServerRead(aaveUmbrellaWrapperPriceProv_);
-export const aaveUmbrellaWrapperClaimProv = withServerRead(aaveUmbrellaWrapperClaimProv_);
 export const aaveVaultHolderSharesProv = withServerRead(aaveVaultHolderSharesProv_);
 export const aaveVaultHolderFractionProv = withServerRead(aaveVaultHolderFractionProv_);
 export const aaveVaultCooldownStateProv = withServerRead(aaveVaultCooldownStateProv_);
-export const aaveVaultHolderShapeProv = withServerRead(aaveVaultHolderShapeProv_);
 export const aaveAttestedNameProv = withServerRead(aaveAttestedNameProv_);
 export const aaveVaultCatalogueMemberProv = withServerRead(aaveVaultCatalogueMemberProv_);
 export const aaveVaultCensusBalanceProv = withServerRead(aaveVaultCensusBalanceProv_);

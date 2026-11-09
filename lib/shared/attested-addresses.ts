@@ -158,15 +158,6 @@ export function attestedClause(a: AttestedAddress): string {
     : `${a.publisher} publishes \`${a.enumerator?.constant}\`, and that contract's own \`${a.enumerator?.call}\` returned this address`;
 }
 
-/** The same claim in PROSE, for the page's face — no backticks, because a
- *  sentence a reader reads is not a receipt's markdown. The receipt keeps the
- *  code-formatted form above. */
-export function attestedFaceClause(a: AttestedAddress): string {
-  return a.via === "book"
-    ? `${a.publisher} publishes this address as ${a.constant} in its own address book at commit ${a.commit.slice(0, 10)}`
-    : `${a.publisher} publishes ${a.enumerator?.constant}, and that contract's own ${a.enumerator?.call} returned this address`;
-}
-
 /** The constant's own short name — `GSM_USDT` out of `GhoEthereum.GSM_USDT`.
  *  What a card has room for; the qualified constant and the commit ride the
  *  receipt. */

@@ -40,26 +40,21 @@ import { SkeletonBlock } from "@/components/shared/skeleton-card";
 import { AaveVaultTimeline } from "@/components/vaults/aave-vault-timeline";
 import { VaultFlowsPanel } from "@/components/vaults/vault-flows-panel";
 import { vaultFlowTimeline } from "@/lib/vaults/vault-flows";
-import { vaultHoldingHistory, type VaultHoldingHistory } from "@/lib/vaults/earned";
-import { VaultHoldingCard } from "@/components/vaults/vault-holding-card";
-import { HoldingExplanation } from "@/components/vaults/holding-explanation";
+import { vaultHoldingHistory } from "@/lib/vaults/earned";
+import { VaultHoldingPlainCard } from "@/components/vaults/vault-holding-plain-card";
+import { loadHoldingWorth } from "@/lib/vaults/holding-worth-read";
+import type { PlainHoldingHistory } from "@/lib/vaults/holding-worth";
 import { HoldingReceiptsScope } from "@/components/vaults/holding-receipts-scope";
-import { HolderShapeLine } from "@/components/vaults/holder-shape-line";
 import { CatalogueMemberLink } from "@/components/vaults/aave-vault-holder-parts";
-import { ExplainBullet, Fig } from "@/components/shared/explain-groups";
-import { Prov } from "@/components/shared/provenance";
-import { HOLDING_REWARDS, vaultHoldingContent } from "@/lib/vaults/card-words";
+import { ExplainBullet } from "@/components/shared/explain-groups";
+import { cooldownWords } from "@/lib/aave-vaults/cooldown-words";
+import { HOLDING_REWARDS, vaultPlainHoldingContent } from "@/lib/vaults/card-words";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { LatestPrices, type LatestPriceAsset } from "@/components/shared/latest-prices";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { AAVE_FAMILY_SINGULAR } from "@/components/vaults/aave-vault-format";
-import { assetText } from "@/lib/shared/vault-amount-text";
-import { cooldownSentence, cooldownWords } from "@/lib/aave-vaults/cooldown-words";
 import {
-  aaveAttestedNameProv,
-  aaveUmbrellaWrapperClaimProv,
   aaveVaultCooldownStateProv,
-  aaveVaultHolderShapeProv,
   aaveVaultSharePriceProv,
   type AaveVaultCoords,
 } from "@/lib/aave-vaults/vault-provenance";
@@ -72,10 +67,8 @@ import { loadAaveEthereumVault, type AaveEthereumVaultResponse } from "@/lib/sou
 import { loadAaveEthereumVaultTimelineWithTail } from "@/lib/sources/chain/aave-ethereum-vault-timeline";
 import { computeVaultPositionEconomics } from "@/lib/aave-vaults/position-economics";
 import { fetchVaultTail, putVaultTail } from "@/lib/api/fetch-vault-tail";
-import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
 import { ssrHop } from "@/lib/shared/listing-ssr";
 import { AAVE_VAULT_TAIL_VERSION, type VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
-import type { VaultPositionRow } from "@/lib/aave-vaults/vault-position";
 import { BlockRef } from "@/components/shared/block-ref";
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { VaultHealthSection } from "@/components/vaults/vault-health-section";
@@ -211,7 +204,14 @@ const loadHistory = cache(async (data: AaveEthereumVaultResponse, holder: string
         vaultTimelineNoteProv(coords, n as AaveVaultNote),
       )
     : [];
-  return { timeline, economics, flowTimeline: withChanges(flowTimeline, changes), card };
+  return {
+    timeline,
+    economics,
+    flowTimeline: withChanges(flowTimeline, changes),
+    card,
+    allEvents,
+    replayed: economics != null && flowTimeline != null,
+  };
 });
 
 /** The Lifetime flows panel and the timeline, streamed in behind a Suspense
@@ -257,39 +257,16 @@ async function VaultTimelineSection({
   );
 }
 
-/** The holder card (components/vaults/vault-holding-card.tsx).
- *
- *  Its live figures are this page's reads at its block; its census figures
- *  (the transfer count, first seen, the dollar value, what the address is)
- *  come from the store through this deployment's listing proxy, where the
- *  census has a row. Earned is a promise over the history, so the card paints
- *  before the sweeps answer.
- *
- *  THE EXIT IS THE CONTRACT'S OWN FUNCTION, per family. sGHO and a static
- *  aToken redeem outright; an Umbrella stake token cannot be redeemed until a
- *  cooldown has been started and waited out, so its exit names both calls in
- *  the order they must happen. */
+/** The holder card (components/vaults/vault-holding-plain-card.tsx): this
+ *  page's reads at its block, and a promise over the history for the sums and
+ *  the worth line, so the card paints before the sweeps answer. An address
+ *  with no balance waits for the history, which says whether it ever held. */
 async function HoldingCardSection({ data, holder }: { data: AaveEthereumVaultResponse; holder: string }) {
   if (!data.holder) return null;
-  const hop = (await ssrHop()) ?? undefined;
-  let rows: VaultPositionRow[] = [];
-  try {
-    const page = await fetchVaultPositions({
-      chainId: MAINNET_CHAIN_ID,
-      vault: data.vault.address,
-      q: holder,
-      limit: 1,
-      ...hop,
-    });
-    rows = page.data;
-  } catch (error) {
-    console.error("The holder card's census row did not answer:", error);
-  }
-  const census = rows.find((r) => r.holder.toLowerCase() === holder.toLowerCase()) ?? null;
   const { vault } = data;
   const h = data.holder;
   const family = vault.family;
-  const sd = vault.shareDecimals ?? census?.shareDecimals ?? 18;
+  const sd = vault.shareDecimals ?? 18;
   const shareSymbol = vault.symbol ?? shortAddr(vault.address);
   const coords: AaveVaultCoords = {
     blockNumber: data.blockNumber,
@@ -301,18 +278,32 @@ async function HoldingCardSection({ data, holder }: { data: AaveEthereumVaultRes
     reserveSymbol: data.umbrella?.reserve?.symbol,
     holder: h.address,
   };
-  const history: Promise<VaultHoldingHistory> =
+  const unread = {
+    earned: { status: "unreplayed" as const, block: data.blockNumber },
+    firstSeen: null,
+    worth: null,
+  };
+  const history: Promise<PlainHoldingHistory> =
     vault.shareDecimals == null
-      ? Promise.resolve({ earned: { status: "unreplayed" as const, block: data.blockNumber }, firstSeen: null })
+      ? Promise.resolve(unread)
       : loadHistory(data, holder).then(
-          (r) => r.card,
-          () => ({ earned: { status: "unreplayed" as const, block: data.blockNumber }, firstSeen: null }),
+          async (r) => ({
+            ...r.card,
+            worth: await loadHoldingWorth(r.allEvents, {
+              chainId: MAINNET_CHAIN_ID,
+              vault: vault.address,
+              shareDecimals: sd,
+              replayed: r.replayed,
+              block: data.blockNumber,
+              blockTimestamp: r.timeline.blockTimestamp,
+              claimRaw: h.claim?.raw ?? null,
+            }),
+          }),
+          () => unread,
         );
-  const wrapper = data.umbrella?.wrapper;
-  const reserve = data.umbrella?.reserve;
-  const umbrella = family === "umbrella-stake";
+  const never = BigInt(h.shares.raw) === BigInt(0) && (await history).firstSeen == null;
   return (
-    <VaultHoldingCard
+    <VaultHoldingPlainCard
       coords={{
         readBy: serverReadOf(data),
         chainId: MAINNET_CHAIN_ID,
@@ -334,74 +325,32 @@ async function HoldingCardSection({ data, holder }: { data: AaveEthereumVaultRes
       claim={h.claim}
       totalSupply={data.totalSupply}
       dust={h.dust}
-      maxWithdraw={h.maxWithdraw}
-      maxRedeem={umbrella ? h.maxRedeem : undefined}
-      exit={umbrella ? "cooldown(), then redeem()" : "redeem()"}
+      never={never}
+      history={history}
       cooldown={
         h.cooldown
-          ? {
-              state: h.cooldown.state,
-              text: cooldownWords(h.cooldown),
-              sentence: cooldownSentence(h.cooldown, sd),
-              prov: aaveVaultCooldownStateProv(coords),
-            }
+          ? { state: h.cooldown.state, text: cooldownWords(h.cooldown), prov: aaveVaultCooldownStateProv(coords) }
           : undefined
       }
-      census={census}
-      history={history}
-      learnMore={vaultHoldingContent(vault.asset.symbol, shareSymbol, census != null, HOLDING_REWARDS[family])}
-      explanation={
-        <HoldingExplanation
-          blockNumber={data.blockNumber}
-          censusBlock={census?.census.block ?? null}
-          assetSymbol={vault.asset.symbol}
-          rewards={HOLDING_REWARDS[family]}
-          shape={
-            h.shape ? (
-              <HolderShapeLine
-                shape={h.shape}
-                blockNumber={data.blockNumber}
-                chainId={MAINNET_CHAIN_ID}
-                prov={aaveVaultHolderShapeProv(coords, h.shape.kind, h.shape.codeSize)}
-                nameProv={h.shape.kind === "attested" ? aaveAttestedNameProv(coords, h.shape.attested) : undefined}
-              />
-            ) : undefined
-          }
-          extra={
-            <>
-              {h.catalogued && (
-                <ExplainBullet data-figure="holder-catalogued">
-                  It is itself <CatalogueMemberLink vault={h.catalogued} coords={coords} what="This holder" />, one
-                  vault in Aave&rsquo;s layer holding another:{" "}
-                  <Link
-                    href={ethereumVaultsListingHref({ vault: h.catalogued.address })}
-                    className={PAGE_LINK}
-                    prefetch={false}
-                    data-link="holder-vault-holders"
-                    data-holder-vault-holders={h.catalogued.address}
-                  >
-                    its holders
-                  </Link>
-                  .
-                </ExplainBullet>
-              )}
-              {wrapper && h.claim && wrapper.holderClaim && (
-                <ExplainBullet>
-                  Through the wrapper the claim is{" "}
-                  <Fig>
-                    <span data-figure="holder-wrapper-claim">
-                      <Prov info={aaveUmbrellaWrapperClaimProv(coords, wrapper.symbol ?? "the wrapper")}>
-                        {assetText(wrapper.holderClaim, reserve?.decimals ?? vault.asset.decimals)}
-                      </Prov>
-                    </span>{" "}
-                    {reserve?.symbol ?? ""}
-                  </Fig>
-                  , a conversion at this block.
-                </ExplainBullet>
-              )}
-            </>
-          }
-        />
+      rewards={HOLDING_REWARDS[family]}
+      learnMore={vaultPlainHoldingContent(vault.asset.symbol, shareSymbol, HOLDING_REWARDS[family])}
+      extra={
+        h.catalogued ? (
+          <ExplainBullet data-figure="holder-catalogued">
+            It is itself <CatalogueMemberLink vault={h.catalogued} coords={coords} what="This holder" />, one vault in
+            Aave&rsquo;s layer holding another:{" "}
+            <Link
+              href={ethereumVaultsListingHref({ vault: h.catalogued.address })}
+              className={PAGE_LINK}
+              prefetch={false}
+              data-link="holder-vault-holders"
+              data-holder-vault-holders={h.catalogued.address}
+            >
+              its holders
+            </Link>
+            .
+          </ExplainBullet>
+        ) : undefined
       }
     />
   );
