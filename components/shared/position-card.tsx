@@ -75,7 +75,7 @@ import {
   useProvScopeLit,
   useReceiptRegistry,
 } from "@/components/shared/provenance";
-import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
+import { SectionExplainer, type SectionExplainerSlot } from "@/components/shared/section-explainer";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import {
   POSITION_CARD_MAX_HEADS,
@@ -150,16 +150,9 @@ export interface PositionCardHead {
   total?: { usd: number; info: Provenance };
 }
 
-/** The (i) Explanation at the foot of a detail card. */
-export interface PositionCardExplainer {
-  /** The pane's prose; `null` draws no (i). */
-  body: ReactNode | null;
-  /** Open the pane on mount (a surface that remembers it). */
-  defaultOpen?: boolean;
-  onToggle?: (open: boolean) => void;
-  /** The pane's copy-this-view link. */
-  viewHref?: () => string;
-}
+/** The (i) Explanation at the foot of a detail card, drawn through the
+ *  shared `SectionExplainer`. */
+export type PositionCardExplainer = SectionExplainerSlot;
 
 /** The export shapes on the card's ⋮: Copy Position, View as Markdown,
  *  Download CSV (`ExportMenu`'s props). */
@@ -228,9 +221,11 @@ interface PositionCardDetailCommon extends PositionCardSlotsCommon {
   menu: PositionCardMenu | null;
   /** A full-width strip beneath the panel (Morpho Base's allocation band). */
   band?: ReactNode;
-  /** A card-specific line at the foot, above the (i) row (a loading status,
-   *  a block stamp). */
+  /** A card-specific line at the foot, above the (i) row (a loading status). */
   foot?: ReactNode;
+  /** The read stamp at the right of the heading row, before the ⋮ (a vault
+   *  card's "Read 10:12 UTC", `SectionReadStamp`). */
+  stamp?: ReactNode;
 }
 
 /** An open position on its page: the panel is required (empty columns draw
@@ -902,6 +897,11 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
             {/* The page's price strip and recency stamp (H7.2, H6; ui-jobs
                     430), handed over by DetailTopRow. The negative margin keeps
                     the row at its text height. */}
+            {slots.stamp && (
+              <span className="flex shrink-0 items-center max-md:ml-auto" data-card-stamp="">
+                {slots.stamp}
+              </span>
+            )}
             <PositionCardStripSlot>
               {(strip) => (
                 <span
@@ -912,7 +912,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
                 </span>
               )}
             </PositionCardStripSlot>
-            {chainPill && <span className="max-md:ml-auto md:hidden">{chainPill}</span>}
+            {chainPill && <span className={`${slots.stamp ? "" : "max-md:ml-auto "}md:hidden`}>{chainPill}</span>}
           </span>
         ) : (
           ((!wallet && slots.tag) || (wallet && edge?.stamp) || chainPill) && (
@@ -1011,23 +1011,15 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
           <>
             {slots.band}
             {slots.foot}
-            <ProvenanceInfoTabs
-              className="mt-3"
+            <SectionExplainer
+              slot={slots.explainer}
               rowExtra={
                 counters ? <span className="ml-auto flex items-center gap-2 self-center">{counters}</span> : undefined
               }
-              // The (i) pane restates the live figures in words.
-              explanation={
-                slots.explainer.body == null ? undefined : closed ? (
-                  slots.explainer.body
-                ) : (
-                  <div data-nosnippet="">{slots.explainer.body}</div>
-                )
-              }
+              // The (i) pane restates the live figures in words; a closed
+              // card's are final, so search may quote them.
+              snippet={closed}
               learnMore={slots.learnMore}
-              viewHref={slots.explainer.viewHref}
-              explanationDefaultOpen={slots.explainer.defaultOpen}
-              onExplanationToggle={slots.explainer.onToggle}
               anatomy={CARD_ANATOMY}
               label={explanationLabel(slots.heading)}
             />

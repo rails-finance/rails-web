@@ -6,7 +6,8 @@
  * surface its own gaps, and a bare `<Prov>` tag proves nothing about it.
  *
  * This is a pure source-tree read: no RPC, no dev server. A file passes if
- * it contains a `<ProvReceiptsScope` usage, exports `PROV_EXEMPT = "<reason>"`,
+ * it contains a `<ProvReceiptsScope` or `<ProvSection` usage (a section ⋮'s
+ * scope, components/shared/section-menu.tsx), exports `PROV_EXEMPT = "<reason>"`,
  * or is named on the ALLOWLIST below with a reason comment. Anything else is
  * a silent gap the tripwire cannot see, and fails the gate.
  *
@@ -62,13 +63,13 @@ for (const file of files) {
   const name = path.basename(file, ".tsx");
   const source = fs.readFileSync(file, "utf8");
 
-  const hasScope = /<ProvReceiptsScope[\s>]/.test(source);
+  const hasScope = /<(?:ProvReceiptsScope|ProvSection)[\s>]/.test(source);
   const hasExempt = /export\s+const\s+PROV_EXEMPT\s*=\s*["'`]/.test(source);
   const allowlisted = Object.prototype.hasOwnProperty.call(ALLOWLIST, name);
 
   const cond = hasScope || hasExempt || allowlisted;
   const detail = hasScope
-    ? "has <ProvReceiptsScope>"
+    ? "has <ProvReceiptsScope> or <ProvSection>"
     : hasExempt
       ? "exports PROV_EXEMPT"
       : allowlisted

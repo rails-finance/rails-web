@@ -48,6 +48,7 @@ export function ToolsMenuItem({
   item,
   expanded,
   internal,
+  offsite,
 }: {
   icon: ReactNode;
   title: ReactNode;
@@ -65,16 +66,18 @@ export function ToolsMenuItem({
   /** A row that goes to another page of Rails: its title and icon in link
    *  blue (`--text-link`, ui-jobs 535). */
   internal?: boolean;
+  /** A row that leaves Rails (the chain's explorer, the protocol's app or
+   *  docs): its title and icon in the off-site pink (`--text-external`). */
+  offsite?: boolean;
 }) {
   const className =
     "flex items-start gap-3 mx-1 my-0.5 rounded-lg px-3 py-2 text-left transition-colors hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-[rgba(196,205,217,0.08)] dark:focus-visible:bg-[rgba(196,205,217,0.08)]";
+  const tone = internal ? "text-[var(--text-link)]" : offsite ? "text-[var(--text-external)]" : null;
   const body = (
     <>
-      <span className={`mt-0.5 shrink-0 ${internal ? "text-[var(--text-link)]" : "text-rb-500"}`}>{icon}</span>
+      <span className={`mt-0.5 shrink-0 ${tone ?? "text-rb-500"}`}>{icon}</span>
       <span className="min-w-0">
-        <span className={`block text-sm font-semibold ${internal ? "text-[var(--text-link)]" : "text-foreground"}`}>
-          {title}
-        </span>
+        <span className={`block text-sm font-semibold ${tone ?? "text-foreground"}`}>{title}</span>
         <span className="block text-xs text-rb-500">{subtitle}</span>
       </span>
     </>
