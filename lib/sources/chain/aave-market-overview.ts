@@ -632,6 +632,7 @@ async function readMarket(src: AaveMarketSource, clientOf: () => PublicClient): 
         accruedToTreasury: treasury,
         virtualBalance: virtualRaw != null ? scaleRaw(virtualRaw, decimals) : null,
         deficit: deficitOf.has(addr) ? scaleRaw(deficitOf.get(addr)!, decimals) : null,
+        deficitRaw: deficitOf.has(addr) ? deficitOf.get(addr)!.toString() : null,
         oracleSource: sourceOf.get(addr) ?? null,
         rateCurve,
         liquidationBonus: bonusBps > PRECISION_BPS ? (bonusBps - PRECISION_BPS) / PRECISION_BPS : null,

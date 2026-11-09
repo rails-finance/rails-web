@@ -1,12 +1,20 @@
-// Receipts for the reserve page's indexed reads (anatomy M3.4, M3.7, M3.8;
-// ui-jobs 541): a day-close rate and utilisation from rails-server's
-// reserve-history, and a holder's amount from reserve-holders. Each names the
+// Receipts for the reserve page's indexed reads (anatomy M3.4, M3.7, M3.8,
+// M3.9; ui-jobs 541): a day-close rate and utilisation from rails-server's
+// reserve-history, a holder's amount from reserve-holders, and the deficit's
+// write-offs from reserve-deficit. Each names the
 // route, its source and the rule the figure follows, so a reader can rebuild
 // it: the history's `source`, `dayClose` and `identity` are the route's own
 // sentences, quoted.
 
 import { powerOfTen, type Provenance } from "@/components/shared/provenance";
-import type { HistoryPoint, ReserveHistory, ReserveHolders } from "@/lib/api/fetch-aave-reserve-reads";
+import type {
+  HistoryPoint,
+  ReserveDeficit,
+  ReserveHistory,
+  ReserveHolders,
+  WriteOff,
+} from "@/lib/api/fetch-aave-reserve-reads";
+import { DEFICIT_SOURCES, type DeficitSourceKey } from "@/lib/aave-family/deficit-sources";
 
 const HISTORY_ROUTE = "GET /api/aave-family/reserve-history";
 const HOLDERS_ROUTE = "GET /api/aave-family/reserve-holders";
@@ -114,6 +122,165 @@ export function configChangeProv(
         pclass: "emitted",
         verify: { kind: "etherscan", href: explorer.block, text: `Block ${block(row.block)} on ${explorer.name}` },
       },
+    ],
+  };
+}
+
+const DEFICIT_ROUTE = "GET /api/aave/reserve-deficit";
+const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+/** Where a reader checks a log: the transaction on the chain's explorer. */
+export interface TxExplorer {
+  tx: (hash: string) => string;
+  name: string;
+}
+
+/** A source leaf: one line of Aave's code or docs, linked. */
+const sourceLeaf = (k: DeficitSourceKey, note: string) => ({
+  label: DEFICIT_SOURCES[k].label,
+  kind: "offchain" as const,
+  pclass: "offchain" as const,
+  note,
+  verify: { kind: "link" as const, href: DEFICIT_SOURCES[k].url, text: DEFICIT_SOURCES[k].label },
+});
+
+/** A raw amount's scaling, where the token's decimals are known. */
+const scaled = (raw: string, decimals: number | null, field: string) =>
+  decimals == null
+    ? undefined
+    : {
+        raw,
+        places: decimals,
+        why: `${field} is in the token's smallest unit, ${powerOfTen(decimals)} to one token`,
+      };
+
+/** One write-off: its DeficitCreated, and the LiquidationCall it pairs with. */
+export function writeOffProv(row: WriteOff, symbol: string, d: ReserveDeficit, ex: TxExplorer): Provenance {
+  const liq = row.liquidation;
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    source: { block: row.block, txHash: row.txHash },
+    summary: `${symbol} written off for ${short(row.user)} — the Pool's DeficitCreated at block ${block(row.block)}, log ${row.logIndex} of transaction ${row.txHash}, emitted by the Pool ${row.pool}. ${
+      liq
+        ? `It pairs with the LiquidationCall for the same borrower in that transaction, log ${liq.logIndex}, by liquidator ${liq.liquidator}; the transaction was sent by ${liq.txFrom}.`
+        : "No LiquidationCall for the same borrower is held in that transaction."
+    }`,
+    contract: { name: "Pool", address: row.pool },
+    via: `${DEFICIT_ROUTE} · DeficitCreated.amountCreated · ${d.source}`,
+    verify: { kind: "etherscan", href: ex.tx(row.txHash), text: `The transaction on ${ex.name}` },
+    scaling: scaled(row.writtenOff.raw, row.writtenOff.decimals, "amountCreated"),
+    inputs: [
+      { label: "block", value: block(row.block), kind: "chain", pclass: "emitted" },
+      {
+        label: "DeficitCreated log",
+        value: String(row.logIndex),
+        kind: "chain",
+        pclass: "emitted",
+        note: "index within the transaction",
+      },
+      ...(liq
+        ? [
+            {
+              label: "LiquidationCall log",
+              value: String(liq.logIndex),
+              kind: "chain" as const,
+              pclass: "emitted" as const,
+              note: "index within the transaction",
+            },
+          ]
+        : []),
+    ],
+  };
+}
+
+/** A paired liquidation's collateral seized, or the debt the liquidator repaid. */
+export function liquidationLegProv(leg: "seized" | "repaid", row: WriteOff, ex: TxExplorer): Provenance | null {
+  const liq = row.liquidation;
+  if (!liq) return null;
+  const t = leg === "seized" ? liq.collateral : liq.debtAsset;
+  const raw = leg === "seized" ? liq.collateralSeized : liq.debtRepaid;
+  const field = leg === "seized" ? "liquidatedCollateralAmount" : "debtToCover";
+  const sym = t.symbol ?? short(t.address);
+  return {
+    kind: "chain",
+    pclass: "emitted",
+    source: { block: row.block, txHash: row.txHash },
+    summary:
+      leg === "seized"
+        ? `${sym} seized from ${short(row.user)} — LiquidationCall's ${field} at block ${block(row.block)}, log ${liq.logIndex} of transaction ${row.txHash}: the collateral liquidator ${liq.liquidator} took.`
+        : `${sym} repaid by the liquidator — LiquidationCall's ${field} at block ${block(row.block)}, log ${liq.logIndex} of transaction ${row.txHash}: the debt liquidator ${liq.liquidator} paid for ${short(row.user)}.`,
+    contract: { name: "Pool", address: row.pool },
+    via: `${DEFICIT_ROUTE} · LiquidationCall.${field}`,
+    verify: { kind: "etherscan", href: ex.tx(row.txHash), text: `The transaction on ${ex.name}` },
+    scaling: scaled(raw, t.decimals, field),
+  };
+}
+
+/** Σ written off over a set of write-offs: the route's total, or the rows under the top ten. */
+export function writtenOffSumProv(
+  symbol: string,
+  d: ReserveDeficit,
+  part: { raw: string; count: number; label: "all" | "smaller" },
+): Provenance {
+  return {
+    kind: "derived",
+    pclass: "indexed",
+    summary:
+      part.label === "all"
+        ? `${symbol} written off — the sum of the ${part.count.toLocaleString("en-US")} DeficitCreated logs the Pool ${d.pool} has emitted for ${symbol} from block ${block(d.wholeFrom)}, read from ${d.source}.`
+        : `${symbol} in the smaller write-offs — the sum of the ${part.count.toLocaleString("en-US")} DeficitCreated logs below the ten largest, read from ${d.source}.`,
+    contract: { name: "Pool", address: d.pool },
+    via: `${DEFICIT_ROUTE} · Σ DeficitCreated.amountCreated`,
+    formula: "Σ amountCreated",
+    inputs: [
+      {
+        label: "amountCreated, summed",
+        value: part.raw,
+        kind: "chain",
+        pclass: "emitted",
+        note: `${part.count.toLocaleString("en-US")} DeficitCreated logs, in the token's smallest unit`,
+      },
+    ],
+  };
+}
+
+/** Covered: written off less outstanding, derived until the cover events are indexed. */
+export function deficitCoveredProv(
+  symbol: string,
+  d: ReserveDeficit,
+  outstanding: { raw: string | null; block: number | null },
+  coveredRaw: string | null,
+): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "indexed",
+    source: outstanding.block != null ? { block: outstanding.block } : undefined,
+    summary: `${symbol} covered, derived — Σ written off less the outstanding deficit. The deficit earns no interest: it is a count of underlying tokens (DataTypes.sol L54-55), raised only by a write-off (LiquidationLogic.sol L536-540) and lowered only by a cover (LiquidationLogic.sol L76-129). So the deficit now equals Σ created less Σ covered, and Σ covered is Σ created less the deficit now. Rails derives it this way until it indexes the Pool's DeficitCovered logs.`,
+    contract: { name: "Pool", address: d.pool },
+    via: `${DEFICIT_ROUTE} Σ amountCreated − Pool.getReserveDeficit(asset)${outstanding.block != null ? ` @ ${block(outstanding.block)}` : " @ head"}`,
+    formula: "Σ written off − outstanding",
+    inputs: [
+      ...(coveredRaw != null
+        ? [{ label: "covered, raw", value: coveredRaw, kind: "chain-derived" as const, pclass: "indexed" as const }]
+        : []),
+      {
+        label: "Σ written off",
+        value: d.totals.writtenOff,
+        kind: "derived",
+        pclass: "indexed",
+        note: "Σ DeficitCreated.amountCreated, raw",
+      },
+      {
+        label: "outstanding",
+        value: outstanding.raw ?? undefined,
+        kind: "chain",
+        pclass: "state",
+        note: `Pool.getReserveDeficit(asset)${outstanding.block != null ? ` at block ${block(outstanding.block)}` : ""}, raw`,
+      },
+      sourceLeaf("O7", "the deficit: a uint128 in underlying tokens"),
+      sourceLeaf("O3", "the write-off: deficit += outstandingDebt"),
+      sourceLeaf("O5", "the cover: deficit -= balanceWriteOff"),
     ],
   };
 }

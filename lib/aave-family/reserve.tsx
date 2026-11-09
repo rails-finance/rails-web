@@ -13,9 +13,10 @@
 //        capacity (cap less borrowed) where the supply side is closed
 //        (borrowRoomShows);
 //   M3.3 the rate curve, fed the strategy's constants by value;
-//   M3.4 the history, M3.5 the parameters, M3.6 the change log, M3.7 and M3.8
-//        the largest suppliers and borrowers.
-// M3.4 and M3.6 to M3.8 read rails-server's indexed routes
+//   M3.4 the history, M3.5 the parameters, M3.9 the deficit (on a reserve
+//        with a write-off held), M3.6 the change log, M3.7 and M3.8 the
+//        largest suppliers and borrowers.
+// M3.4 and M3.6 to M3.9 read rails-server's indexed routes
 // (lib/api/fetch-aave-reserve-reads.ts), started with the page and apart from
 // the head read; a read that fails leaves its section one muted line.
 
@@ -31,6 +32,8 @@ import { RateCurve } from "@/components/shared/product/rate-curve";
 import { ReserveHistoryChart, type HistoryRange } from "@/components/shared/aave-reserve-history";
 import { ReserveChangeLog } from "@/components/shared/aave-reserve-tables";
 import { HoldersTable } from "@/components/shared/product/position-entry";
+import { DeficitSources, ReserveDeficitBody, writeOffsCsv } from "@/components/shared/aave-reserve-deficit";
+import { deficitLearnMore } from "@/lib/aave-family/deficit-learn-more";
 import { ReservePage, type ReservePageData } from "@/components/shared/product/reserve-page";
 import { historyFrom, useReserveReads, type Read, type ReserveHistory } from "@/lib/api/fetch-aave-reserve-reads";
 import { heldLine, reserveChanges } from "@/lib/shared/aave-reserve-config-words";
@@ -173,9 +176,25 @@ function ReserveExplainer({ r, label }: { r: MarketReserveRow; label: string }) 
           </ExplainBullet>
         )}
         {deficitShows(r) && (
-          <ExplainBullet>
-            Deficit <Fig bold>{usd(r.deficit ?? 0)}</Fig> is debt a liquidation left uncovered, not yet repaid.
-          </ExplainBullet>
+          <>
+            <ExplainBullet>
+              Deficit <Fig bold>{usd(r.deficit ?? 0)}</Fig> is debt that liquidations wrote off when they left a
+              borrower no collateral.
+              <DeficitSources keys={["O2", "O3"]} />
+            </ExplainBullet>
+            <ExplainBullet>
+              It earns no interest, and stays as written off until it is covered.
+              <DeficitSources keys={["O7", "O3", "O5"]} />
+            </ExplainBullet>
+            <ExplainBullet>
+              Only Aave&apos;s Umbrella contract can cover it.
+              <DeficitSources keys={["O6", "D1"]} />
+            </ExplainBullet>
+            <ExplainBullet>
+              The DAO pays up to its set offset; beyond that, Umbrella stakers are slashed.
+              <DeficitSources keys={["U1", "U2", "U3", "D3"]} />
+            </ExplainBullet>
+          </>
         )}
         {borrowRoomShows(r) && c.state === "used" && (
           <ExplainBullet>
@@ -357,12 +376,76 @@ interface IndexedReads {
   onRange: (r: HistoryRange) => void;
 }
 
+/** M3.9: on a reserve with a write-off held; a skeleton or a failure line
+ *  while the read is out only where the head shows a deficit. */
+function deficitSection(
+  m: AaveMarketConfig,
+  r: MarketReserveRow,
+  x: IndexedReads,
+  vocab: AaveMarketVocab,
+  block: number | null,
+): ProductSection | null {
+  const dr = x.reads.deficit;
+  const shell = { scope: "reserve-deficit", anatomy: "M3.9", title: "Deficit", learnMore: deficitLearnMore() };
+  if (dr.state === "loading" || dr.state === "error") {
+    if (!x.reads.hasDeficit || !((r.deficit ?? 0) > 0)) return null;
+    return {
+      ...shell,
+      tools: {},
+      body:
+        dr.state === "loading" ? (
+          <SkeletonBlock height={240} />
+        ) : (
+          <p className={NOTE} data-reserve-read-failed="">
+            Couldn&apos;t read the write-offs. Reload to retry.
+          </p>
+        ),
+    };
+  }
+  if (dr.state !== "ok" || dr.data.totals.count === 0) return null;
+  const d = dr.data;
+  const explorer = chainMeta(m.chainId).explorerName;
+  return {
+    ...shell,
+    tools: {
+      exports: {
+        csv: {
+          filename: `${m.key}-${r.symbol}-write-offs.csv`,
+          build: () => writeOffsCsv(d),
+          subtitle: "Every write-off held, with its liquidation",
+        },
+      },
+    },
+    body: (
+      <ReserveDeficitBody
+        d={d}
+        head={{
+          symbol: r.symbol,
+          address: r.address,
+          priceUsd: r.priceUsd,
+          outstanding: r.deficit ?? 0,
+          outstandingRaw: r.deficitRaw ?? null,
+          block,
+          outstandingProv: vocab.reserveDeficitProv(r.symbol, false),
+        }}
+        ex={{ tx: (h) => explorerUrl(m.chainId, "tx", h), name: explorer }}
+        positionHref={(w) => `${m.listingHref}/${w}${m.marketQuery}`}
+        heldFrom={m.key === "aave-v3-base" ? BASE_WRITE_OFFS_FROM : null}
+      />
+    ),
+  };
+}
+
+/** Base's DeficitCreated rows are held from the 25 Oct 2026 Sieve restart (block 53,080,566). */
+const BASE_WRITE_OFFS_FROM = "25 Oct 2026";
+
 function indexedSections(
   m: AaveMarketConfig,
   r: MarketReserveRow,
   x: IndexedReads,
   changes: ReturnType<typeof reserveChanges> | null,
   parameters: ProductSection,
+  deficit: ProductSection | null,
 ): ProductSection[] {
   const chainId: ChainId = m.chainId;
   const { history: hr, changes: cr, holders: hd } = x.reads;
@@ -376,6 +459,7 @@ function indexedSections(
   if (unindexed(hr) && unindexed(cr) && unindexed(hd))
     return [
       parameters,
+      ...(deficit ? [deficit] : []),
       {
         scope: "reserve-indexed",
         anatomy: "M3.4 M3.6 M3.7 M3.8",
@@ -547,7 +631,7 @@ function indexedSections(
             body: missing(hd, "largest suppliers and borrowers", 240),
           },
         ];
-  return [history, parameters, changeLog, ...holders];
+  return [history, parameters, ...(deficit ? [deficit] : []), changeLog, ...holders];
 }
 
 export function AaveReservePage({ marketKey, asset }: { marketKey: AaveMarketKey; asset: string }) {
@@ -581,6 +665,7 @@ export function AaveReservePage({ marketKey, asset }: { marketKey: AaveMarketKey
     const z = reserveFigures({ r, vocab });
     const explorer = chainMeta(m.chainId).explorerName;
     const curve = curveOf(r, vocab);
+    const indexed: IndexedReads = { reads, history, range, onRange: setRange };
     const parameters: ProductSection = {
       scope: "reserve-parameters",
       anatomy: "M3.5",
@@ -628,7 +713,14 @@ export function AaveReservePage({ marketKey, asset }: { marketKey: AaveMarketKey
             },
             body: <RateCurve curve={curve} />,
           },
-          ...indexedSections(m, r, { reads, history, range, onRange: setRange }, changes, parameters),
+          ...indexedSections(
+            m,
+            r,
+            indexed,
+            changes,
+            parameters,
+            deficitSection(m, r, indexed, vocab, read.data?.blockNumber ?? null),
+          ),
         ],
       },
     };

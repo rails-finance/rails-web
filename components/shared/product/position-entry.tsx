@@ -54,7 +54,8 @@ export interface HolderRow {
   hooks?: Record<`data-${string}`, string>;
 }
 
-function Account({ wallet, href }: { wallet: string; href: string }) {
+/** A position's account cell: its facehash and ENS name or short address, the row's one link. */
+export function Account({ wallet, href }: { wallet: string; href: string }) {
   const ens = useEnsName(wallet);
   return (
     <span className="inline-flex min-w-0 items-center gap-2">
