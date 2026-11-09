@@ -224,8 +224,12 @@ export interface RateCurveModel {
   base: number;
   slope1: number;
   slope2: number;
-  /** The share of borrow interest the protocol keeps. */
+  /** The share of borrow interest the protocol keeps (Aave V4: the liquidity fee). */
   reserveFactor: number;
+  /** Interest borrowers pay above the drawn rate, as a share of it (Aave V4: the
+   *  premium owed over the drawn owed on the hub). Suppliers earn it too. 0 when
+   *  absent. */
+  premium?: number;
   /** Where the reserve sits now; utilisation null where nothing is supplied. */
   now: { utilisation: number | null; borrow: number; supply: number };
   symbol: string;

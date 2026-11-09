@@ -56,7 +56,7 @@ export function RateCurve({ curve }: { curve: RateCurveModel | Missing }) {
     );
   const c = curve;
   const rf = c.reserveFactor;
-  const supplyAt = (u: number) => borrowRateAt(u, c) * u * (1 - rf);
+  const supplyAt = (u: number) => borrowRateAt(u, c) * u * (1 + (c.premium ?? 0)) * (1 - rf);
   const u = c.now.utilisation != null ? Math.min(1, c.now.utilisation) : null;
   const top = Math.max(borrowRateAt(1, c), c.now.borrow, 0.0001);
   const ticks = rateAxis(top);
