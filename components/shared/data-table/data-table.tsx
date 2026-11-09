@@ -77,8 +77,8 @@ export const DATA_TABLE_PILL = "rounded-sm bg-background text-foreground/80 dark
 const CELL_CORNERS = "first:rounded-l-2xl last:rounded-r-2xl";
 /** The row's ground: odd rows raised, even rows sunken, read off the <tr>'s
  *  place in the body; or the stripe the row names (`DataTableRow stripe`). */
-const STRIPE_BY_PLACE = "group-odd/dt-row:bg-raised group-even/dt-row:bg-sunken";
-const STRIPE_GROUND = { raised: "bg-raised", sunken: "bg-sunken" } as const;
+const STRIPE_BY_PLACE = "group-odd/dt-row:bg-raised group-even/dt-row:bg-stripe";
+const STRIPE_GROUND = { raised: "bg-raised", sunken: "bg-stripe" } as const;
 export type DataTableStripe = keyof typeof STRIPE_GROUND;
 
 /** The row's hover border, drawn by each cell's ::after along its top and

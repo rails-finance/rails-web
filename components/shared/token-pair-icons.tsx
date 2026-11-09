@@ -14,7 +14,7 @@ export interface PairToken {
   address?: string;
 }
 
-const RING = "-ml-2 rounded-full ring-2 ring-[var(--surface-raised)] group-even/dt-row:ring-[var(--surface-sunken)]";
+const RING = "-ml-2 rounded-full ring-2 ring-[var(--surface-raised)] group-even/dt-row:ring-[var(--surface-stripe)]";
 
 export function TokenPairIcons({
   first,
