@@ -175,7 +175,7 @@ function ReserveExplainer({ r, label, vocab }: { r: MarketReserveRow; label: str
         <ExplainBullet>
           <Fig bold>{usd(avail)}</Fig> is available to withdraw or borrow now.
           {(deficitShows(r) || (borrowRoomShows(r) && c.state === "used")) && (
-            <ul className="mt-1 space-y-1" data-explain-sub="available">
+            <ul className="mt-1 space-y-1 pl-4" data-explain-sub="available">
               {deficitShows(r) && (
                 <>
                   <ExplainBullet data-explain-deficit="">
