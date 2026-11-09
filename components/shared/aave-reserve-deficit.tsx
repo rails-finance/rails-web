@@ -2,11 +2,16 @@
 
 // The reserve page's Deficit section (anatomy M3.9): on any Aave V3 reserve
 // with a write-off held. The lead says in one sentence what the outstanding
-// deficit means, with Aave's source cited; then Written off · Covered ·
+// deficit means, Aave's sources in its figure's receipt; then Written off · Covered ·
 // Outstanding, each with its receipt; then the write-offs, largest first, ten
-// shown and the rest behind one row; then a line on the cover events, which
-// Rails has not indexed. Covered is derived: written off less outstanding
-// (deficitCoveredProv states the rule and cites it).
+// shown and the rest behind one row. Where the route holds the covers
+// (Ethereum), Covered is Σ DeficitCovered, then the covers table, the
+// record's check against the Pool's getter, and the step chart
+// (aave-reserve-deficit-covers.tsx). Elsewhere Covered is derived, written off
+// less outstanding (deficitCoveredProv states the rule and cites it), and a
+// line says the cover events are not indexed. A write-off from a liquidation
+// Aave governance carried out (GOVERNANCE_LIQUIDATIONS) gets one line naming
+// the proposal, its payloads and sources in the receipt.
 
 import { useState, type ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -21,14 +26,19 @@ import {
   DataTableRow,
 } from "@/components/shared/data-table/data-table";
 import type { ReserveDeficit, WriteOff, DeficitToken } from "@/lib/api/fetch-aave-reserve-reads";
+import { CoversTable, DeficitStepChart } from "@/components/shared/aave-reserve-deficit-covers";
 import {
+  coveredSumProv,
   deficitCoveredProv,
+  deficitIdentityProv,
+  GOVERNANCE_LIQUIDATIONS,
+  governanceLiquidationProv,
   liquidationLegProv,
   writeOffProv,
   writtenOffSumProv,
   type TxExplorer,
 } from "@/lib/shared/aave-reserve-reads-provenance";
-import { DEFICIT_SOURCES, type DeficitSourceKey } from "@/lib/aave-family/deficit-sources";
+import { deficitFigureProv } from "@/lib/aave-family/deficit-sources";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { shiftDecimal } from "@/lib/utils/format";
 import { formatDate } from "@/lib/date";
@@ -36,29 +46,6 @@ import { fmtUsd } from "@/lib/aave-v4/format";
 
 const NOTE = "text-[13px] text-rb-500";
 const TOP = 10;
-
-/** Aave's sources for a sentence, as small links after it. */
-export function DeficitSources({ keys }: { keys: DeficitSourceKey[] }) {
-  return (
-    <span className="ml-1 whitespace-normal text-[11px] text-rb-500" data-deficit-sources={keys.join(" ")}>
-      (
-      {keys.map((k, i) => (
-        <span key={k}>
-          {i > 0 && ", "}
-          <a
-            href={DEFICIT_SOURCES[k].url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline dark:text-[var(--text-link)]"
-          >
-            {DEFICIT_SOURCES[k].label}
-          </a>
-        </span>
-      ))}
-      )
-    </span>
-  );
-}
 
 /** A raw amount in whole tokens. */
 const tokensOf = (raw: string, decimals: number | null): number | null =>
@@ -181,12 +168,23 @@ export function ReserveDeficitBody({
     heldFrom == null && head.outstandingRaw != null
       ? (BigInt(d.totals.writtenOff) - BigInt(head.outstandingRaw)).toString()
       : null;
-  const covered = coveredRaw != null && !coveredRaw.startsWith("-") ? tokensOf(coveredRaw, dec) : null;
+  const held = d.covers?.status === "held" ? d.covers : null;
+  const covered = held
+    ? tokensOf(held.totals.covered, dec)
+    : coveredRaw != null && !coveredRaw.startsWith("-")
+      ? tokensOf(coveredRaw, dec)
+      : null;
+  const identity = held ? (d.identity ?? null) : null;
+  const whole = identity != null && head.outstandingRaw != null && identity.outstanding === head.outstandingRaw;
   const usd = head.priceUsd != null ? fmtUsd(head.outstanding * head.priceUsd).display : null;
   const shown = open ? d.rows : d.rows.slice(0, TOP);
   const rest = d.rows.slice(TOP);
   const restRaw = rest.reduce((s, w) => s + BigInt(w.writtenOff.raw), BigInt(0)).toString();
   const restTokens = tokensOf(restRaw, dec);
+  // A write-off from a liquidation Aave governance carried out: one line naming the proposal.
+  const govTx = [...new Set(d.rows.map((w) => w.txHash.toLowerCase()))].find((h) => GOVERNANCE_LIQUIDATIONS[h]);
+  const govProv = govTx ? governanceLiquidationProv(sym, d, govTx, ex) : null;
+  const govRows = govTx ? d.rows.filter((w) => w.txHash.toLowerCase() === govTx) : [];
   const coveredProv = deficitCoveredProv(sym, d, { raw: head.outstandingRaw, block: head.block }, coveredRaw);
 
   return (
@@ -195,17 +193,17 @@ export function ReserveDeficitBody({
         {head.outstanding > 0 ? (
           <>
             Liquidations have left{" "}
-            <Prov info={head.outstandingProv}>
+            <Prov info={deficitFigureProv(head.outstandingProv)}>
               {tokenWords(head.outstanding)} {sym}
             </Prov>
             {usd && ` (${usd})`} of this reserve&apos;s loans with no borrower: suppliers are still owed it, and nobody
             owes it to the Pool.
-            <DeficitSources keys={["O2", "O3"]} />
           </>
         ) : (
           <>
-            Every write-off on this reserve has been covered.
-            <DeficitSources keys={["O5", "O6"]} />
+            <Prov info={deficitFigureProv(head.outstandingProv)}>
+              Every write-off on this reserve has been covered.
+            </Prov>
           </>
         )}
       </p>
@@ -220,7 +218,7 @@ export function ReserveDeficitBody({
         <Figure label="Covered" hook="covered">
           {covered != null ? (
             <>
-              <Prov info={coveredProv}>{tokenWords(covered)}</Prov>{" "}
+              <Prov info={held ? coveredSumProv(sym, d, held) : coveredProv}>{tokenWords(covered)}</Prov>{" "}
               <span className="text-[12px] font-normal text-rb-500">{sym}</span>
             </>
           ) : (
@@ -306,7 +304,52 @@ export function ReserveDeficitBody({
         </button>
       )}
 
-      {covered == null ? (
+      {govTx && govProv && govRows.length > 0 && (
+        <p className={`${NOTE} mt-3`} data-deficit-governance={GOVERNANCE_LIQUIDATIONS[govTx].proposal}>
+          <Prov info={govProv}>
+            {govRows.length === 1 ? "The write-off" : "The write-offs"} of{" "}
+            {formatDate(new Date(govRows[0].timestamp * 1000))}{" "}
+            {govRows.length === 1 ? "came from a liquidation" : "came from liquidations"} Aave governance carried out in
+            proposal {GOVERNANCE_LIQUIDATIONS[govTx].proposal}, against the attacker&apos;s positions after the April
+            2026 rsETH incident.
+          </Prov>
+        </p>
+      )}
+
+      {held ? (
+        <div className="mt-6" data-deficit-covers="held">
+          <h3 className="text-[14px] font-semibold text-foreground">Covered</h3>
+          {held.rows.length > 0 ? (
+            <CoversTable d={d} c={held} symbol={sym} ex={ex} />
+          ) : (
+            <p className={`${NOTE} mt-1`} data-deficit-covers-none="">
+              Nothing has been covered on this reserve.
+            </p>
+          )}
+          {identity && (
+            <p className={`${NOTE} mt-3`} data-deficit-identity={whole ? "whole" : "differs"}>
+              {whole ? (
+                <Prov info={deficitIdentityProv(sym, d, identity, { raw: head.outstandingRaw, block: head.block })}>
+                  Rails holds every write-off and cover on this reserve: written off less covered equals the Pool&apos;s
+                  deficit.
+                </Prov>
+              ) : (
+                <>
+                  Written off less covered is{" "}
+                  <Prov info={deficitIdentityProv(sym, d, identity, { raw: head.outstandingRaw, block: head.block })}>
+                    {tokenWords(tokensOf(identity.outstanding, dec) ?? 0)} {sym}
+                  </Prov>{" "}
+                  through block {identity.atBlock.toLocaleString("en-US")}; the Pool reports{" "}
+                  {tokenWords(head.outstanding)} {sym}. A write-off or cover after that block is not in this record yet.
+                </>
+              )}
+            </p>
+          )}
+          <h3 className="mt-6 text-[14px] font-semibold text-foreground">Outstanding over time</h3>
+          <p className={`${NOTE} mb-2`}>Each write-off steps it up and each cover steps it down.</p>
+          <DeficitStepChart d={d} c={held} symbol={sym} ex={ex} />
+        </div>
+      ) : covered == null ? (
         <p className={`${NOTE} mt-3`} data-deficit-covers="">
           Rails has not indexed Aave&apos;s deficit cover events yet, so who covered any of it is not listed.
         </p>
@@ -320,17 +363,19 @@ export function ReserveDeficitBody({
   );
 }
 
-/** The write-offs as CSV, raw amounts with their decimals. */
+/** The write-offs and, where held, the covers as one CSV in chain order (`kind`: write_off | cover), raw
+ *  amounts with their decimals. A cover's paid_by is the Umbrella event beside it, its payer the address whose aTokens paid it. */
 export function writeOffsCsv(d: ReserveDeficit): string {
   const head = [
+    "kind",
     "timestamp",
     "block",
     "transaction",
-    "deficit_log_index",
+    "log_index",
     "pool",
+    "amount_raw",
+    "amount_decimals",
     "user",
-    "written_off_raw",
-    "written_off_decimals",
     "collateral",
     "collateral_seized_raw",
     "collateral_decimals",
@@ -338,30 +383,76 @@ export function writeOffsCsv(d: ReserveDeficit): string {
     "debt_repaid_raw",
     "debt_repaid_decimals",
     "liquidator",
-    "tx_from",
     "liquidation_log_index",
+    "caller",
+    "paid_by",
+    "umbrella_log_index",
+    "payer",
+    "tx_from",
   ];
-  const rows = d.rows.map((w) => {
+  type Row = { block: number; order: number; cells: unknown[] };
+  const writeOffs: Row[] = d.rows.map((w) => {
     const l = w.liquidation;
-    return [
-      w.timestamp,
-      w.block,
-      w.txHash,
-      w.logIndex,
-      w.pool,
-      w.user,
-      w.writtenOff.raw,
-      w.writtenOff.decimals,
-      l?.collateral.address,
-      l?.collateralSeized,
-      l?.collateral.decimals,
-      l?.debtAsset.address,
-      l?.debtRepaid,
-      l?.debtAsset.decimals,
-      l?.liquidator,
-      l?.txFrom,
-      l?.logIndex,
-    ];
+    return {
+      block: w.block,
+      order: w.logIndex,
+      cells: [
+        "write_off",
+        w.timestamp,
+        w.block,
+        w.txHash,
+        w.logIndex,
+        w.pool,
+        w.writtenOff.raw,
+        w.writtenOff.decimals,
+        w.user,
+        l?.collateral.address,
+        l?.collateralSeized,
+        l?.collateral.decimals,
+        l?.debtAsset.address,
+        l?.debtRepaid,
+        l?.debtAsset.decimals,
+        l?.liquidator,
+        l?.logIndex,
+        null,
+        null,
+        null,
+        null,
+        l?.txFrom,
+      ],
+    };
   });
+  const covers: Row[] =
+    d.covers?.status === "held"
+      ? d.covers.rows.map((r) => ({
+          block: r.block,
+          order: 1e6 + r.logIndex,
+          cells: [
+            "cover",
+            r.timestamp,
+            r.block,
+            r.txHash,
+            r.logIndex,
+            d.pool,
+            r.amount.raw,
+            r.amount.decimals,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            r.caller,
+            r.umbrella?.event,
+            r.umbrella?.logIndex,
+            r.paidBy,
+            r.txFrom,
+          ],
+        }))
+      : [];
+  const rows = [...writeOffs, ...covers].sort((a, b) => a.block - b.block || a.order - b.order).map((r) => r.cells);
   return [head, ...rows].map((r) => r.map((v) => (v == null ? "" : String(v))).join(",")).join("\n");
 }

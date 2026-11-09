@@ -130,15 +130,15 @@ function ReserveExplainer({ f, names }: { f: V4ReserveFigures; names: V4Names })
         </ExplainBullet>
       </ExplainGroup>
       <ExplainGroup title="Rates">
-        {f.drawnApr != null && (
-          <ExplainBullet>
-            Borrowers pay the drawn rate, <Fig bold>{ratePercentText(f.drawnApr)}</Fig> a year, {PREMIUM_LINE}.
-          </ExplainBullet>
-        )}
         {f.supplyApr != null && (
           <ExplainBullet>
             Suppliers earn <Fig bold>{ratePercentText(f.supplyApr)}</Fig> a year: the drawn interest and the premium,
             less the {f.liquidityFee != null ? pctText(f.liquidityFee) : ""} liquidity fee.
+          </ExplainBullet>
+        )}
+        {f.drawnApr != null && (
+          <ExplainBullet>
+            Borrowers pay the drawn rate, <Fig bold>{ratePercentText(f.drawnApr)}</Fig> a year, {PREMIUM_LINE}.
           </ExplainBullet>
         )}
       </ExplainGroup>

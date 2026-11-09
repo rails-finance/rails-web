@@ -20,6 +20,10 @@ import { resultRows, type ResultRow } from "@/lib/start/results";
 import { readAssetDoor, ASSET_DOOR_POOL } from "@/lib/start/asset-door";
 import { AssetDoorCards } from "@/components/start/asset-door";
 import { ASSET_DOOR, HEALTH_DISCLAIMER } from "@/lib/vaults/health-words";
+import { PairDoorCards } from "@/components/start/pair-door";
+import { fetchUniswapPair } from "@/lib/api/fetch-uniswap";
+import { PAIRS, PAIR_TOKENS, pairCards, type PairKey } from "@/lib/uniswap/pairs";
+import { PAIR_DOOR } from "@/lib/uniswap/words";
 import {
   TREE,
   coinSlug,
@@ -83,6 +87,8 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 function leafHeading(leaf: Leaf): string {
   if (leaf.kind === "asset") return ASSET_DOOR.heading(leaf.symbol);
+  if (leaf.kind === "pairs") return PAIR_DOOR.listQuestion;
+  if (leaf.kind === "pair") return PAIR_DOOR.heading(PAIRS[leaf.pair].base, PAIRS[leaf.pair].quote);
   if (leaf.kind === "roster") return TREE.rosters[leaf.roster].question;
   if (leaf.kind === "coins") return TREE.groups[leaf.group].coins?.question ?? TREE.groups[leaf.group].label;
   return TREE.results[leaf.results].heading.replace("{group}", leaf.group ? groupPhrase(leaf.group) : "");
@@ -101,6 +107,8 @@ function LeafContent({ leaf, base }: { leaf: Leaf; base: string }) {
   if (leaf.kind === "coins") return <Coins group={leaf.group} base={base} />;
   if (leaf.kind === "asset")
     return <AssetStep group={leaf.group} symbol={leaf.symbol} groupBase={base.slice(0, base.lastIndexOf("/"))} />;
+  if (leaf.kind === "pairs") return <Pairs base={base} />;
+  if (leaf.kind === "pair") return <PairStep pair={leaf.pair} pairsBase={base.slice(0, base.lastIndexOf("/"))} />;
   return (
     <>
       <h2 className={QUESTION}>{TREE.rosters[leaf.roster].question}</h2>
@@ -290,6 +298,78 @@ async function AssetStep({ group, symbol, groupBase }: { group: GroupKey; symbol
         {HEALTH_DISCLAIMER}
       </p>
       <AssetDoorCards symbol={door.symbol} cards={door.cards} hiddenCount={door.hiddenCount} pool={ASSET_DOOR_POOL} />
+    </div>
+  );
+}
+
+/** The pairs (G10; ui-jobs 556, door 2), each opening its step. */
+function Pairs({ base }: { base: string }) {
+  return (
+    <div data-anatomy="G10" data-start-pairs="">
+      <h2 className={QUESTION}>{PAIR_DOOR.listQuestion}</h2>
+      <p className="mb-8 max-w-2xl text-lg text-rb-500">{PAIR_DOOR.listLine}</p>
+      <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {(Object.keys(PAIRS) as PairKey[]).map((k) => (
+          <li key={k}>
+            <Link href={`${base}/${k}`} className={PAGE_ROW} data-start-pair={k}>
+              <span className="flex -space-x-1.5" aria-hidden="true">
+                {[PAIRS[k].base, PAIRS[k].quote].map((sym) => (
+                  <span key={sym} className="rounded-full ring-2 ring-[var(--surface-raised)]">
+                    <TokenChipIcon symbol={sym} size={24} filterable={false} untitled />
+                  </span>
+                ))}
+              </span>
+              <span className="text-base font-medium text-foreground">
+                {PAIR_DOOR.chip(PAIRS[k].base, PAIRS[k].quote)}
+              </span>
+              <ArrowRight
+                className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-[var(--text-link)]"
+                aria-hidden="true"
+              />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** One pair's pools (G10.1; ui-jobs 556, door 2): the pairs as chips, the pair
+ *  chosen; the heading; then the cards (components/start/pair-door.tsx). Owns
+ *  no page beyond the step. */
+async function PairStep({ pair, pairsBase }: { pair: PairKey; pairsBase: string }) {
+  const { base, quote } = PAIRS[pair];
+  const answer = await fetchUniswapPair(PAIR_TOKENS[base].param, PAIR_TOKENS[quote].param);
+  return (
+    <div data-anatomy="G10.1" data-start-pair-step={pair}>
+      <ul className="mb-6 flex flex-wrap gap-2" aria-label={PAIR_DOOR.listQuestion}>
+        {(Object.keys(PAIRS) as PairKey[]).map((k) => {
+          const chosen = k === pair;
+          return (
+            <li key={k}>
+              <Link
+                href={`${pairsBase}/${k}`}
+                scroll={false}
+                aria-current={chosen ? "page" : undefined}
+                data-start-pair-chip={k}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 dark:focus-visible:ring-teal-400 ${
+                  chosen
+                    ? "border-teal-600 font-medium text-foreground dark:border-teal-400"
+                    : "border-rb-200 text-rb-500 hover:border-teal-600 dark:border-rb-600 dark:hover:border-teal-400"
+                }`}
+              >
+                {PAIR_DOOR.chip(PAIRS[k].base, PAIRS[k].quote)}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      <h2 className={QUESTION}>{PAIR_DOOR.heading(base, quote)}</h2>
+      {answer.kind === "ok" ? (
+        <PairDoorCards base={base} quote={quote} cards={pairCards(answer.data, pair)} />
+      ) : (
+        <p className="text-sm text-rb-500">{PAIR_DOOR.unanswered}</p>
+      )}
     </div>
   );
 }

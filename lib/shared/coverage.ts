@@ -912,6 +912,25 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
       why: "nobody in the savings module holds a loan, so there is no threshold to breach and no liquidation to trace",
     },
   }),
+  // Uniswap V3 and V4 on Ethereum (ui-jobs 556). `dashboard`: a position's
+  // page reads the pool and the position at the head and 30 days back from
+  // rails-server's at-block routes. USD is ruled out: the pool prices itself,
+  // so every figure is in its quote token. No loan, so no forensics. No pool
+  // pages yet (`views`), no timeline (`explainers`, `llm`) and no verifier.
+  "uniswap-v3": explorerDepth({
+    dashboard: true,
+    oracleUsd: { why: ORACLE_USD_REASON["uniswap-v3"] },
+    forensics: {
+      why: "a liquidity position holds no loan, so there is no threshold to breach and no liquidation to trace",
+    },
+  }),
+  "uniswap-v4": explorerDepth({
+    dashboard: true,
+    oracleUsd: { why: ORACLE_USD_REASON["uniswap-v4"] },
+    forensics: {
+      why: "a liquidity position holds no loan, so there is no threshold to breach and no liquidation to trace",
+    },
+  }),
   // Liquidation forensics (2026-07-14): same valued two-leg treatment as Aave
   // V3 (single market — SparkLend's own oracle at the event's block).
   // Protocol views (2026-07-15): /spark/markets — the single SparkLend Pool's
@@ -1425,6 +1444,11 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
  * listing of every account.
  */
 export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
+  // Uniswap V3 and V4 (2026-11-09) are position-first: a wallet field on the
+  // front door lists that wallet's positions, and no roster of every position
+  // is built.
+  "uniswap-v3",
+  "uniswap-v4",
   // The three Arbitrum explorers ship position-first (2026-10-19): a wallet
   // field on the front door, any address readable, and a listing of the
   // positions read (item 16) in place of a roster of accounts.

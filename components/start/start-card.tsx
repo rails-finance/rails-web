@@ -73,6 +73,7 @@ export function StartCard({
 
 /** The grid class for a row of `n` cards: one column on phones. */
 export function startGridCols(n: number): string {
+  if (n === 5) return "sm:grid-cols-2 lg:grid-cols-5";
   if (n >= 4) return "sm:grid-cols-2 lg:grid-cols-4";
   if (n === 2) return "sm:grid-cols-2";
   return "sm:grid-cols-3";

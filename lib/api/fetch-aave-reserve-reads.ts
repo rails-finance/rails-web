@@ -170,7 +170,58 @@ export interface ReserveDeficit {
   totals: { count: number; writtenOff: string };
   /** Largest first. */
   rows: WriteOff[];
+  /** The Pool's DeficitCovered logs for the asset (absent from an api before stage B). */
+  covers?: DeficitCovers;
+  /** Σ written off − Σ covered at the Sieve's checkpoint: getReserveDeficit when the record is whole. */
+  identity?: { writtenOff: string; covered: string; outstanding: string; atBlock: number } | null;
 }
+
+/** The Umbrella event beside a cover, which says how it was paid. */
+export type UmbrellaCoverEvent = "DeficitOffsetCovered" | "PendingDeficitCovered" | "ReserveDeficitCovered";
+
+/** One DeficitCovered. Amounts are raw. */
+export interface DeficitCover {
+  amount: { raw: string; decimals: number | null };
+  block: number;
+  /** Unix seconds. */
+  timestamp: number;
+  txHash: string;
+  txIndex: number;
+  /** The log's index within its transaction. */
+  logIndex: number;
+  /** The address that called Pool.eliminateReserveDeficit. */
+  caller: string;
+  txFrom: string;
+  umbrella: { event: UmbrellaCoverEvent; logIndex: number } | null;
+  /** The address whose aTokens went to the caller in the cover's transaction; null where none is held (absent before the api carries it). */
+  paidBy?: string | null;
+}
+
+export interface StakeSlash {
+  block: number;
+  timestamp: number;
+  txHash: string;
+  logIndex: number;
+  stakeToken: string;
+  amount: string;
+  fee: string;
+}
+
+export type DeficitCovers =
+  | {
+      status: "held";
+      source: string;
+      /** The first block the cover tables hold every log from. */
+      wholeFrom: number;
+      /** The Sieve's checkpoint. */
+      toBlock: number;
+      umbrella: string | null;
+      totals: { count: number; covered: string };
+      /** Oldest first. */
+      rows: DeficitCover[];
+      slashes: StakeSlash[];
+    }
+  | { status: "not-indexed" | "not-configured" | "read-failed"; reason: string };
 
 export type Read<T> =
   | { state: "loading" }

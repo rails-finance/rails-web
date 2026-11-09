@@ -6,10 +6,22 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
+import {
+  GlossaryLink,
+  ProtocolInfoPage,
+  type InfoReads,
+  type InfoTerm,
+  type InfoView,
+} from "@/components/shared/protocol-info-page";
 import { BaseLendingCoverageNote } from "@/components/shared/base-lending-coverage-banner";
 import { MORPHO_ARBITRUM_MARKETS } from "@/lib/morpho-arbitrum/market-catalog";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { morphoBlueContract } from "@/lib/morpho/asset-catalog";
+import { MORPHO_ADAPTIVE_CURVE_IRM } from "@/lib/morpho/adaptive-curve";
+import { MORPHO_ARBITRUM_METAMORPHO_FACTORY } from "@/lib/morpho-arbitrum/asset-catalog";
+import { MORPHO_BASE_METAMORPHO_FACTORIES } from "@/lib/morpho-base/vault-catalog";
+import { MORPHO_ETHEREUM_METAMORPHO_FACTORIES } from "@/lib/morpho-ethereum/vault-catalog";
 
 export type MorphoInfoDeployment = "ethereum" | "base" | "arbitrum";
 
@@ -114,7 +126,55 @@ function marketsView(href: string, body: ReactNode): InfoView {
 }
 
 const LOAN_TOKEN_ROWS =
-  "shows one row for each loan token, with what it is lent against and how much is lent and borrowed. Opening a row lists that token's markets.";
+  "groups every market by the token it lends, with each group's supply, borrowing and utilisation in that token. A loan token's page lists all its markets, and each market opens its own page: its rates and rate curve, its oracle's price, its terms and the vaults that supply it.";
+
+/** Slot 2a: what Rails reads from Morpho on each chain. Every address here was
+ *  checked against the chain on 9 Nov 2026 (each IRM and factory answers
+ *  MORPHO() with its chain's Morpho Blue). */
+function readsFor(deployment: MorphoInfoDeployment): InfoReads {
+  const chainId =
+    deployment === "base" ? BASE_CHAIN_ID : deployment === "arbitrum" ? ARBITRUM_CHAIN_ID : MAINNET_CHAIN_ID;
+  const blue = morphoBlueContract(chainId);
+  const factories =
+    deployment === "arbitrum"
+      ? [{ version: "v1.1", address: MORPHO_ARBITRUM_METAMORPHO_FACTORY }]
+      : deployment === "base"
+        ? MORPHO_BASE_METAMORPHO_FACTORIES
+        : MORPHO_ETHEREUM_METAMORPHO_FACTORIES;
+  return {
+    chainId,
+    contracts: [
+      {
+        name: "Morpho Blue",
+        address: blue.address,
+        reads:
+          "each market's supplied and borrowed totals, its last update and its fee, and each position's supply, borrowing and collateral. Its log of created markets is the list of every market.",
+      },
+      {
+        name: "AdaptiveCurveIRM",
+        address: MORPHO_ADAPTIVE_CURVE_IRM[chainId],
+        reads: "each market's borrow rate and its rate at target, the rate the curve sets at 90% utilisation.",
+      },
+      {
+        name: "Each market's oracle",
+        reads:
+          "the price of one unit of collateral in the loan token, and where the oracle names its price feeds, when they last published.",
+      },
+      ...factories.map((f) => ({
+        name: `MetaMorpho factory ${f.version}`,
+        address: f.address,
+        reads:
+          deployment === "arbitrum"
+            ? "its log of the vaults it created. Rails does not show Arbitrum's vaults yet."
+            : "its log of the vaults it created, which is the vault roster. Each vault is then read for its assets, its share price and the markets it lends into.",
+      })),
+    ],
+    how:
+      deployment === "arbitrum"
+        ? "The markets pages read these contracts at each page load, and a wallet's page reads its markets in one call."
+        : "The markets roster reads these contracts at most every ten minutes, its totals from Rails's server replay of Morpho Blue's logs where it has one; a market's page reads its market at each load.",
+  };
+}
 
 export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeployment }) {
   const docs = { label: "Morpho documentation", href: `${DOCS}/` };
@@ -124,6 +184,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
     return (
       <ProtocolInfoPage
         session="morpho"
+        reads={readsFor("ethereum")}
         tracks={
           <>
             The Rails Morpho Blue explorer shows every position on Ethereum, whether still open, closed or liquidated,
@@ -131,10 +192,13 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
             <Link href="/ethereum/morpho/markets" className={INLINE_LINK}>
               the markets
             </Link>
-            , with the borrowing limit that governs each.
+            , with the borrowing limit that governs each, and{" "}
+            <Link href="/ethereum/morpho/vaults" className={INLINE_LINK}>
+              the vaults
+            </Link>{" "}
+            that pool depositors&rsquo; tokens and lend them into several markets.
           </>
         }
-        notCovered="Morpho vaults, which pool depositors' tokens and lend them into several markets, aren't covered on Ethereum."
         glossary={glossary}
         howItWorks={[
           WHAT_IT_IS,
@@ -176,6 +240,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
     return (
       <ProtocolInfoPage
         session="morpho-base"
+        reads={readsFor("base")}
         tracks={
           <>
             The Rails Morpho Blue explorer shows every position on Base, a network built on Ethereum, whether still
@@ -276,6 +341,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
   return (
     <ProtocolInfoPage
       session="morpho-arbitrum"
+      reads={readsFor("arbitrum")}
       tracks={
         <>
           The Rails Morpho Blue explorer reads the positions of any wallet you enter on{" "}
@@ -319,7 +385,7 @@ export function MorphoInfoPage({ deployment }: { deployment: MorphoInfoDeploymen
         },
         marketsView(
           "/arbitrum/morpho/markets",
-          `shows the ${markets} markets Rails found from the contract's creation log, read live at one block.`,
+          `groups the ${markets} markets Rails found in the contract's creation log by the token each lends, read at the head. Each market opens its own page: its rates and rate curve, its oracle's price and its terms.`,
         ),
       ]}
       search="You can search the listing by wallet address. The Debt (USD) and Collateral (USD) filters set a range for what a position owes and holds. The Transactions filter sets a range for how many transactions the wallet has. Last activity sorts by the latest event, Last opened by when a reader last opened the wallet, and Collateral and Debt by size."

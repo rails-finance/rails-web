@@ -13,6 +13,7 @@ const CALL: Record<VaultSteward["role"], string> = {
   curator: "curator()",
   owner: "owner()",
   roleManager: "role_manager()",
+  poolDelegate: "poolDelegate() on the PoolManager",
 };
 
 const contractOf = (v: VaultSummary) => ({ name: v.name ?? v.catalogName ?? v.symbol ?? "vault", address: v.address });

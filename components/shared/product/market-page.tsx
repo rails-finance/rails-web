@@ -13,7 +13,7 @@
 // Each row is a bounds-free receipts scope inside the section's, so the
 // inspector pins a row's receipts to it and the section's ⋮ still arms them.
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
@@ -33,7 +33,14 @@ import {
   DataTableRow,
   DataTableRowLink,
 } from "@/components/shared/data-table/data-table";
-import type { Loadable, MarketModel, ReserveRowModel, ReserveTableModel, SortKey } from "@/lib/shared/product/model";
+import type {
+  Hooks,
+  Loadable,
+  MarketModel,
+  ReserveRowModel,
+  ReserveTableModel,
+  SortKey,
+} from "@/lib/shared/product/model";
 import { ProductHeadSection, ProductSectionBlock, ToolsFor } from "@/components/shared/product/product-head";
 
 /** The page header every product page draws above its head. */
@@ -302,17 +309,24 @@ export function MarketPage({
   header,
   market,
   what,
+  children,
+  hooks,
 }: {
   header: ProductPageHeader;
   market: Loadable<MarketModel>;
   what: string;
+  /** Sections the family draws after the model's, once the market has read:
+   *  "Supplied by vaults", a positions listing. Each is its own `ProvSection`. */
+  children?: ReactNode;
+  hooks?: Hooks;
 }) {
   return (
-    <div className="min-h-screen" data-anatomy="R2">
+    <div className="min-h-screen" data-anatomy="R2" {...hooks}>
       <div className="py-8">
         <SubPageHeader protocol={header.protocol} title={header.title} learnMore={header.learnMore} />
         <div data-skel-section="page-table">
           <MarketBody market={market} what={what} />
+          {market.state === "ok" && children}
         </div>
       </div>
     </div>

@@ -1350,7 +1350,9 @@ const EGRESS_IP = ${JSON.stringify(EGRESS_IP)};
 const HOLDER = "0x2222222222222222222222222222222222222222";
 const out = {};
 const { NextRequest } = await import("next/server");
-const { MORPHO_BASE_CASE_STUDY_VAULT } = await import(ROOT + "lib/morpho-base/vault-case-study.ts");
+// The Base case-study vault, Steakhouse Prime USDC (its export left the app with the
+// old Base markets page, ui-jobs 549 step 5).
+const MORPHO_BASE_CASE_STUDY_VAULT = "0xbeefe94c8ad530842bfe7d8b397938ffc1cb83b2";
 const aave = await import(ROOT + "app/api/chain/aave-vaults/vault/route.ts");
 const morpho = await import(ROOT + "app/api/chain/morpho-base/vault/route.ts");
 const tailProxy = await import(ROOT + "app/api/vaults/positions/tail/route.ts");

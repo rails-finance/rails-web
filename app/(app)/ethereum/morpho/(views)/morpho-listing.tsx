@@ -114,6 +114,8 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
     <ChainTruthListingPage<MorphoPositionSummary, MorphoListFilters, MorphoRosterState>
       title={market ? "Positions in this market" : "Morpho Blue Positions"}
       titleAs={market ? "h2" : undefined}
+      // On a market page the section heading above the listing names it.
+      titleHidden={market != null}
       // Both notes sit here rather than inside the intro disclosure, which rests
       // collapsed: a reader who cannot see what was left off has no way to tell
       // a capped answer from a complete one.

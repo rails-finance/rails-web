@@ -39,6 +39,7 @@ import { MORPHO_DEPLOYMENT, type MorphoDeployment } from "./morpho-deployments";
 import { withIndexedRoster } from "./morpho-roster";
 import { readOracle } from "./morpho-position";
 import { readOracleViaApi, readReplayedMarkets, type MarketTuple } from "./morpho-replayed-state";
+import { isAdaptiveCurveIrm } from "@/lib/morpho/adaptive-curve";
 const ZERO = BigInt(0);
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 const SECONDS_PER_YEAR = 31_536_000;
@@ -48,6 +49,7 @@ const BLUE_ABI = parseAbi([
   "function market(bytes32 id) view returns (uint128 totalSupplyAssets, uint128 totalSupplyShares, uint128 totalBorrowAssets, uint128 totalBorrowShares, uint128 lastUpdate, uint128 fee)",
 ]);
 const IRM_ABI = parseAbi([
+  "function rateAtTarget(bytes32 id) view returns (int256)",
   "function borrowRateView((address loanToken, address collateralToken, address oracle, address irm, uint256 lltv) marketParams, (uint128 totalSupplyAssets, uint128 totalSupplyShares, uint128 totalBorrowAssets, uint128 totalBorrowShares, uint128 lastUpdate, uint128 fee) market) view returns (uint256)",
 ]);
 
@@ -519,6 +521,11 @@ export interface MorphoMarketChainResponse {
   oracleFeeds: MorphoOracleFeed[] | null;
   /** The oldest feed's updatedAt; null exactly when `oracleFeeds` is. */
   oraclePublishedAt: number | null;
+  /** The AdaptiveCurveIRM's `rateAtTarget(id)` at `blockNumber`, per second in
+   *  WAD as a decimal string: the rate stored at the market's last update. Null
+   *  on a market whose IRM is not the chain's AdaptiveCurveIRM, or where the read
+   *  failed. */
+  rateAtTarget: string | null;
   chainStale: boolean;
 }
 
@@ -545,6 +552,7 @@ export async function loadMorphoMarketFromChain(
     oraclePrice: null,
     oracleFeeds: null,
     oraclePublishedAt: null,
+    rateAtTarget: null,
     chainStale: true,
   };
 
@@ -599,6 +607,20 @@ export async function loadMorphoMarketFromChain(
             .readContract({ ...rateCall(params, state as MarketTuple), blockNumber: block.number })
             .catch(() => undefined);
 
+    // The curve's one stored term, where the market runs on the chain's AdaptiveCurveIRM.
+    const rateAtTarget = isAdaptiveCurveIrm(deployment.chainId, params.irm)
+      ? await client
+          .readContract({
+            address: params.irm as `0x${string}`,
+            abi: IRM_ABI,
+            functionName: "rateAtTarget",
+            args: [params.id as `0x${string}`],
+            blockNumber: block.number,
+          })
+          .then((r) => r.toString())
+          .catch(() => null)
+      : null;
+
     const market = marketRow(params, state as MarketTuple, ratePerSec, meta, trust);
     const loanDecimals = market.loanDecimals;
     const collateralDecimals = meta.get(params.collateralToken)?.decimals ?? 18;
@@ -622,6 +644,7 @@ export async function loadMorphoMarketFromChain(
           : null,
       oracleFeeds: feeds,
       oraclePublishedAt: feeds ? Math.min(...feeds.map((f) => f.updatedAt)) : null,
+      rateAtTarget,
       chainStale: false,
     };
   } catch (error) {
