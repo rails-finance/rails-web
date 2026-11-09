@@ -352,7 +352,7 @@ function reserveRows(m: AaveMarketConfig, view: AaveMarketView, vocab: AaveMarke
         address: r.address,
         tags: <StateTags r={r} vocab={vocab} />,
         sub: (
-          <div className="flex items-center gap-1 text-[11px] text-rb-500" title={r.classLabel}>
+          <div className="flex items-center gap-1 text-[12px] text-rb-500" title={r.classLabel}>
             <ClassDot cls={r.cls} />
             <span className="truncate">{r.classLabel}</span>
           </div>

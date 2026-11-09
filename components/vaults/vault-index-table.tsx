@@ -49,6 +49,7 @@ import {
   DataTableLeadMark,
   DataTableRow,
   DataTableRowLink,
+  DataTableRowMenu,
 } from "@/components/shared/data-table/data-table";
 import {
   STANDING_WORD,
@@ -67,7 +68,7 @@ import { illiquidSentence } from "@/lib/vaults/illiquid";
 import { heldAssetsRaw, lostAssetsSentence } from "@/lib/vaults/lost-assets";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { sharePriceText } from "@/lib/shared/vault-amount-text";
-import { CompareTick } from "@/components/vaults/compare-selection";
+import { useCompareSelection } from "@/components/vaults/compare-selection";
 import { compareKey } from "@/lib/vaults/compare";
 import { COMPARE_TICK } from "@/lib/vaults/compare-words";
 
@@ -318,7 +319,7 @@ export function VaultIndexTable({
             />,
           ])}
           <DataTableHeader label="Steward" data-col-head="steward" />
-          <DataTableHeader label={COMPARE_TICK.label} data-col-head="compare" />
+          <DataTableHeader label={<span className="sr-only">Actions</span>} data-col-head="menu" />
         </DataTableHead>
         <DataTableBody>
           {sorted.map((v) => {
@@ -466,7 +467,15 @@ export function VaultIndexTable({
                   "Share price",
                   v.sharePrice && (
                     <InAsset v={v} data-cell="share-price">
-                      {sharePriceText(v.sharePrice, v.asset.decimals)}
+                      {/* Past a million, compact (its full text in the
+                          title), so one vault's figure cannot widen the column. */}
+                      {v.sharePrice.value >= 1e6 ? (
+                        <span title={sharePriceText(v.sharePrice, v.asset.decimals)}>
+                          {formatCompact(v.sharePrice.value)}
+                        </span>
+                      ) : (
+                        sharePriceText(v.sharePrice, v.asset.decimals)
+                      )}
                     </InAsset>
                   ),
                 )}
@@ -476,7 +485,12 @@ export function VaultIndexTable({
                   yf && "yearly" in yf ? (
                     <span data-cell="yield">{yieldText(yf.yearly)}</span>
                   ) : yf?.none === "too-small" ? (
-                    <span data-cell="yield" data-yield-none="too-small" title={tooSmallSentence(v)}>
+                    <span
+                      data-cell="yield"
+                      data-yield-none="too-small"
+                      title={tooSmallSentence(v)}
+                      className="inline-block w-[6.5rem] leading-tight whitespace-normal"
+                    >
                       too small to measure
                     </span>
                   ) : null,
@@ -500,10 +514,10 @@ export function VaultIndexTable({
                     </span>
                   )}
                 </DataTableCell>
-                {/* The tick stands above the row's cover (E2); below sm it
-                    names itself, so the cell carries no label. */}
-                <DataTableCell valign="middle" className="whitespace-nowrap" data-col="compare">
-                  <CompareTick vaultKey={compareKey(v.chainId, v.address)} name={name ?? v.address} />
+                {/* The row's ⋮ (D7), Compare first (E2); it stands above the
+                    row's cover, and on a card sits at its top right. */}
+                <DataTableCell valign="middle" className="dt-row-menu w-px whitespace-nowrap" data-col="menu">
+                  <VaultRowMenu vaultKey={compareKey(v.chainId, v.address)} name={name ?? v.address} />
                 </DataTableCell>
               </DataTableRow>
             );
@@ -511,5 +525,27 @@ export function VaultIndexTable({
         </DataTableBody>
       </DataTable>
     </div>
+  );
+}
+
+/** A /vaults row's ⋮ (D7): the comparison entry (E2), through the same
+ *  selection as the asset step's tick, so the bar (E3) and a refused fifth
+ *  pick behave as there. */
+function VaultRowMenu({ vaultKey, name }: { vaultKey: string; name: string }) {
+  const { keys, toggle } = useCompareSelection();
+  const on = keys.includes(vaultKey);
+  return (
+    <DataTableRowMenu
+      label={`Actions for ${name}`}
+      items={[
+        {
+          key: "compare",
+          label: on ? COMPARE_TICK.remove : COMPARE_TICK.add,
+          checked: on,
+          onSelect: () => toggle(vaultKey),
+          hooks: { "data-anatomy": "E2", "data-compare-tick": vaultKey, "data-compare-checked": on ? "" : undefined },
+        },
+      ]}
+    />
   );
 }

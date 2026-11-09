@@ -161,13 +161,15 @@
      `html.dark`. canvas = `--background`, overlay = `--surface-overlay`. */
   --surface-raised: var(--color-rb-100); /* cards, panels, inputs, active in-place control */
   --surface-sunken: var(--color-rb-200); /* segmented tracks, inset chips, recessed wells */
-  --surface-stripe: oklch(
-    0.946 calc(0.0105 * var(--paper-chroma)) var(--paper-hue)
-  ); /* the house table's even rows (D1): halfway from rb-200 to rb-100, so a bar's rb-200 track shows on it (Miles, 9 Nov) */
+  --edge-row-line: var(--color-rb-200); /* the hairline between the house table's rows (D1) */
+  --surface-row-hover: var(--color-rb-100); /* the house table's hovered row, a rounded block (D1) */
+  --surface-child-row: oklch(
+    0.985 calc(0.006 * var(--paper-chroma)) var(--paper-hue)
+  ); /* a group's rows under their parent (D8), a step off the canvas */
   --surface-marker: var(--color-rb-200); /* small inline tags: badges, count pills, token chips */
   --surface-skeleton: var(--color-rb-100); /* loading shimmer — matched to --surface-raised */
   --surface-selected: var(--color-rb-300); /* pressed/active segment in a toggle group */
-  --edge-row-hover: var(--color-rb-400); /* a hovered unlinked table row's outline (D1) */
+  --edge-row-hover: var(--color-rb-400); /* a neutral outline on a floating tip */
   --surface-field: oklch(
     0.9939 calc(0.0082 * var(--paper-chroma)) var(--paper-hue)
   ); /* prominent text inputs — near-white "type here" affordance */
@@ -438,7 +440,9 @@ html.dark {
      rendering a step darker via the override. */
   --surface-raised: rgb(20 22 30); /* = rb-800 (inlined) */
   --surface-sunken: rgb(15 16 23); /* = rb-900 (inlined) */
-  --surface-stripe: rgb(18 20 26); /* #12141A: the house table's even rows, a quieter step off raised (Miles, 9 Nov) */
+  --edge-row-line: rgb(41 46 60); /* a step lighter than the canvas */
+  --surface-row-hover: rgb(31 36 48); /* lifted off the canvas */
+  --surface-child-row: rgb(27 31 41); /* a group's rows (D8), between the canvas and the hover */
   --surface-marker: rgb(20 22 30);
   --surface-skeleton: rgb(20 22 30);
   --surface-selected: rgb(25 28 38); /* = rb-700 */
@@ -502,9 +506,6 @@ html.dark {
 }
 @utility bg-sunken {
   background-color: var(--surface-sunken);
-}
-@utility bg-stripe {
-  background-color: var(--surface-stripe);
 }
 @utility bg-marker {
   background-color: var(--surface-marker);
@@ -2384,30 +2385,94 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
   }
 }
 
-/* The house table's lead zone (D5; components/shared/data-table): its hue runs
-   on under the next cell, whose left corners round over it, so the row's body
-   reads as a panel set into the hue. Behind the cells (z-index -1, inside the
-   frame's `isolate`); the cells' own grounds cover it but at the corners. */
-[data-anatomy~="D5"]::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 100%;
-  width: 1rem;
-  z-index: -1;
-  background-color: oklch(var(--brand-zone-l) calc(var(--brand-zone-c) * var(--brand-strength, 1)) var(--brand-hue, 0));
+/* The house table's rows (D1; components/shared/data-table): a hairline
+   between rows and under the header; a hovered row lifts into a rounded block
+   inset 4px inside its row on every side, drawn by each cell's ::before (the end
+   cells rounding the outer corners), and the hairlines above and below it are
+   not drawn while it is hovered, so nothing moves. A linked row (D4) adds the
+   blue-500 border round the same block (::after), on hover and on keyboard
+   focus. A drawer row opens under the row before it, no hairline between.
+   In a layer, so a cell's own utilities win. */
+@layer components {
+  table.dt > thead > tr > th {
+    border-bottom: 1px solid var(--edge-row-line);
+  }
+  table.dt > tbody > tr > :is(td, th) {
+    border-bottom: 1px solid var(--edge-row-line);
+    transition: border-color 150ms;
+  }
+  table.dt > tbody > tr:last-child > *,
+  table.dt > tbody > tr:has(+ tr.hidden:last-child) > *,
+  table.dt > tbody > tr:has(+ tr[data-dt-drawer]:not(.hidden)) > *,
+  table.dt > tbody > tr:is(:hover, [data-anatomy~="D4"]:focus-within) > *,
+  table.dt > tbody > tr:has(+ tr:is(:hover, [data-anatomy~="D4"]:focus-within)) > *,
+  table.dt > tbody > tr:has(+ tr.hidden + tr:hover) > * {
+    border-bottom-color: transparent;
+  }
+  table.dt > thead:has(+ tbody > tr:first-child:is(:hover, [data-anatomy~="D4"]:focus-within)) th {
+    border-bottom-color: transparent;
+  }
+  table.dt > tbody > tr > *::before,
+  table.dt > tbody > tr > *::after {
+    content: "";
+    position: absolute;
+    inset: 4px 0;
+    pointer-events: none;
+  }
+  table.dt > tbody > tr > *::before {
+    z-index: -1;
+    transition: background-color 150ms;
+  }
+  table.dt > tbody > tr > *::after {
+    z-index: 20;
+    border-block: 1px solid transparent;
+    transition: border-color 150ms;
+  }
+  table.dt > tbody > tr > :first-child::before,
+  table.dt > tbody > tr > :first-child::after {
+    left: 4px;
+    border-top-left-radius: 0.75rem;
+    border-bottom-left-radius: 0.75rem;
+  }
+  table.dt > tbody > tr > :first-child::after {
+    border-left: 1px solid transparent;
+  }
+  table.dt > tbody > tr > :last-child::before,
+  table.dt > tbody > tr > :last-child::after {
+    right: 4px;
+    border-top-right-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+  }
+  table.dt > tbody > tr > :last-child::after {
+    border-right: 1px solid transparent;
+  }
+  table.dt > tbody > tr:hover > *::before,
+  table.dt > tbody > tr[data-anatomy~="D4"]:focus-within > *::before {
+    background-color: var(--surface-row-hover);
+  }
+  table.dt > tbody > tr[data-anatomy~="D4"]:is(:hover, :focus-within) > *::after {
+    border-color: var(--color-blue-500);
+  }
 }
-[data-anatomy~="D5"] + * {
-  border-top-left-radius: 1rem;
-  border-bottom-left-radius: 1rem;
+/* A group's rows (D8): under their parent row, on a lifted ground across the
+   table, the first cell indented past the parent's chevron. Each cell is its
+   own stacking context, so the hover block (z-index -1) lies over the ground
+   and under the content. Unlayered, so the indent wins over the cells'
+   padding utilities. */
+table.dt > tbody > tr[data-dt-child] > * {
+  z-index: 0;
+  background-color: var(--surface-child-row);
+}
+table.dt > tbody > tr[data-dt-child] > :first-child {
+  padding-left: 2.25rem;
 }
 
 /* The house table's stacked rows (D6; components/shared/data-table). Below sm
    (below lg with `stackBelow="lg"`, `.dt-stack-lg`; the `dt-cards` variant
    holds both) a table that opts in (`DataTable stacked`) reads each row as a card: the
-   same elements reflowed, the stripes and the linked row's border moving
-   from the cells to the row. Unlayered, so it wins over the cells' utilities. */
+   same elements reflowed, the hairline, the hover block and the linked row's
+   border moving from the cells to the row. Unlayered, so it wins over the
+   cells' utilities. */
 .dt-cell-label,
 .dt-lead-mark {
   display: none;
@@ -2433,97 +2498,116 @@ table.dt-stacked {
     & > tbody {
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
     }
     & > tbody > tr {
       display: grid;
       grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       position: relative;
-      padding-left: 6px;
-      border-radius: 1rem;
-      overflow: hidden;
+      padding: 8px 4px;
+      border-bottom: 1px solid var(--edge-row-line);
+      transition: border-color 150ms;
     }
-    /* The card's body, a panel in the stripe: right of the 6px hue edge, its
-       left corners rounded over the hue (D5's curve at this width). */
-    & > tbody > tr::before {
-      content: "";
-      position: absolute;
-      inset: 0 0 0 6px;
-      z-index: -1;
-      border-radius: 1rem;
-      background-color: var(--surface-raised);
-      transition: background-color 150ms;
+    & > tbody > tr:last-child,
+    & > tbody > tr:has(+ tr.hidden:last-child),
+    & > tbody > tr:has(+ tr[data-dt-drawer]:not(.hidden)),
+    & > tbody > tr:hover,
+    & > tbody > tr[data-anatomy~="D4"]:focus-within,
+    & > tbody > tr:has(+ tr:is(:hover, [data-anatomy~="D4"]:focus-within)),
+    & > tbody > tr:has(+ tr.hidden + tr:hover) {
+      border-bottom-color: transparent;
     }
-    & > tbody > tr:nth-child(even)::before {
-      background-color: var(--surface-stripe);
-    }
-    /* The hue behind the panel's corners: the edge's own run-on, widened to
-       the card's full height under the panel. */
-    & > tbody > tr > [data-anatomy~="D5"]::before {
-      left: 0;
-      width: 1.375rem;
-      z-index: -2;
-    }
-    & > tbody > tr > [data-anatomy~="D5"] + * {
-      border-radius: 0;
-    }
-    & > tbody > tr > * {
-      display: block;
-      position: relative;
-      background-color: transparent;
-      border-radius: 0;
-      text-align: left;
-    }
-    /* The row's hover border: one outline round the card, in place of the
-       cells'; neutral, blue on a linked row. */
-    & > tbody > tr > *::after {
-      display: none;
-    }
+    /* The hover block, inset 4px inside the card, and the linked row's border
+       round it. */
+    & > tbody > tr::before,
     & > tbody > tr::after {
       content: "";
       position: absolute;
-      inset: 0;
-      z-index: 20;
+      inset: 4px;
+      border-radius: 0.75rem;
       pointer-events: none;
+    }
+    & > tbody > tr::before {
+      z-index: -1;
+      transition: background-color 150ms;
+    }
+    & > tbody > tr::after {
+      z-index: 20;
       border: 1px solid transparent;
-      border-radius: 1rem;
       transition: border-color 150ms;
     }
-    & > tbody > tr:hover::after {
-      border-color: var(--edge-row-hover);
+    & > tbody > tr:hover::before,
+    & > tbody > tr[data-anatomy~="D4"]:focus-within::before {
+      background-color: var(--surface-row-hover);
     }
     & > tbody > tr[data-anatomy~="D4"]:hover::after,
     & > tbody > tr[data-anatomy~="D4"]:focus-within::after {
       border-color: var(--color-blue-500);
     }
+    /* A group's rows (D8): the lifted ground on the card, under its hover
+       block (the card its own stacking context), indented. */
+    & > tbody > tr[data-dt-child] {
+      z-index: 0;
+      background-color: var(--surface-child-row);
+      padding-left: 1.25rem;
+    }
+    /* A parent of one spanning cell is a line across the list; one with
+       cells (D8's \`cells\` form) is a card like any row. */
+    & > tbody > tr[data-dt-parent]:not(:has(> td)) {
+      display: block;
+    }
+    & > tbody > tr[data-dt-child] > * {
+      z-index: auto;
+      background-color: transparent;
+    }
+    & > tbody > tr[data-dt-child] > :first-child {
+      padding-left: 0.5rem;
+    }
+    & > tbody > tr > * {
+      display: block;
+      position: relative;
+      background-color: transparent;
+      border-bottom: 0;
+      text-align: left;
+    }
+    & > tbody > tr > *::before,
+    & > tbody > tr > *::after {
+      display: none;
+    }
     & > tbody > tr > [role="rowheader"],
     & > tbody > tr > .dt-cell-wide {
       grid-column: 1 / -1;
     }
+    /* A row's ⋮ (D7) at the card's top right. */
+    & > tbody > tr > .dt-row-menu {
+      position: absolute;
+      top: 10px;
+      right: 8px;
+      width: auto;
+      padding: 0;
+      z-index: 10;
+    }
     & > tbody > tr > [role="cell"]:empty {
       display: none;
     }
-    /* No lead zone, no edge: the card's body runs to its left side. */
-    & > tbody > tr:not(:has(> [data-anatomy~="D5"])) {
-      padding-left: 0;
+    /* The lead zone: a 4px bar in the protocol's hue at the card's left, its
+       glyphs moved to the card's first line (`DataTableLeadMark`); its names
+       stay for a screen reader. */
+    & > tbody > tr:has(> [data-anatomy~="D5"]) {
+      padding-left: 14px;
     }
-    & > tbody > tr:not(:has(> [data-anatomy~="D5"]))::before {
-      left: 0;
-    }
-    /* The lead zone: a 6px edge in the protocol's hue, its glyphs moved to the
-       card's first line (`DataTableLeadMark`); its names stay for a screen reader. */
     & > tbody > tr > [data-anatomy~="D5"] {
       position: absolute;
-      inset: 0 auto 0 0;
-      width: 6px;
+      inset: 14px auto 14px 6px;
+      width: 4px;
       height: auto;
       padding: 0;
     }
     & > tbody > tr > [data-anatomy~="D5"] > [data-closed-zone] {
-      width: 6px;
+      width: 4px;
       height: 100%;
       min-height: 0;
-      border-radius: 0;
+      padding: 0;
+      border-radius: 2px;
     }
     & > tbody > tr > [data-anatomy~="D5"] > [data-closed-zone] :is(svg, img) {
       display: none;
