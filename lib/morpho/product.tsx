@@ -680,7 +680,7 @@ function sectionsOf(x: Ctx): ProductSection[] {
     },
     {
       scope: "market-oracle",
-      anatomy: "",
+      anatomy: "M3.5.1",
       title: "Oracle price",
       raised: "narrow",
       tools: {

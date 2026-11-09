@@ -571,6 +571,7 @@ export function MorphoRosterPage({ data, chainId }: { data: MorphoRosterData; ch
             <ProvSection
               scope="markets-table"
               className="mb-8"
+              data-anatomy="R1.1"
               data-morpho-markets-table=""
               data-skel-section="page-table"
             >
