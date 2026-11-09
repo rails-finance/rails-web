@@ -32,7 +32,8 @@ import { RateCurve } from "@/components/shared/product/rate-curve";
 import { ReserveHistoryChart, type HistoryRange } from "@/components/shared/aave-reserve-history";
 import { ReserveChangeLog } from "@/components/shared/aave-reserve-tables";
 import { HoldersTable } from "@/components/shared/product/position-entry";
-import { DeficitSources, ReserveDeficitBody, writeOffsCsv } from "@/components/shared/aave-reserve-deficit";
+import { ReserveDeficitBody, writeOffsCsv } from "@/components/shared/aave-reserve-deficit";
+import { deficitFigureProv } from "@/lib/aave-family/deficit-sources";
 import { deficitLearnMore } from "@/lib/aave-family/deficit-learn-more";
 import { ReservePage, type ReservePageData } from "@/components/shared/product/reserve-page";
 import { SuppliedByVaults } from "@/components/shared/product/supplied-by-vaults";
@@ -150,7 +151,7 @@ function curveOf(r: MarketReserveRow, vocab: AaveMarketVocab): RateCurveModel | 
 }
 
 /** The reserve head's (i). */
-function ReserveExplainer({ r, label }: { r: MarketReserveRow; label: string }) {
+function ReserveExplainer({ r, label, vocab }: { r: MarketReserveRow; label: string; vocab: AaveMarketVocab }) {
   const usd = (tokens: number) =>
     r.priceUsd != null ? fmtUsd(tokens * r.priceUsd).display : `${formatCompact(tokens)} ${r.symbol}`;
   const avail = r.virtualBalance ?? Math.max(0, r.supplied - r.borrowed);
@@ -173,39 +174,35 @@ function ReserveExplainer({ r, label }: { r: MarketReserveRow; label: string }) 
         </ExplainBullet>
         <ExplainBullet>
           <Fig bold>{usd(avail)}</Fig> is available to withdraw or borrow now.
+          {(deficitShows(r) || (borrowRoomShows(r) && c.state === "used")) && (
+            <ul className="mt-1 space-y-1 pl-4" data-explain-sub="available">
+              {deficitShows(r) && (
+                <>
+                  <ExplainBullet data-explain-deficit="">
+                    Deficit{" "}
+                    <Prov info={deficitFigureProv(vocab.reserveDeficitProv(r.symbol, r.priceUsd != null))}>
+                      <Fig bold>{usd(r.deficit ?? 0)}</Fig>
+                    </Prov>{" "}
+                    is debt that liquidations wrote off when they left a borrower no collateral.
+                  </ExplainBullet>
+                  <ExplainBullet>
+                    The deficit earns no interest, and stays as written off until it is covered.
+                  </ExplainBullet>
+                  <ExplainBullet>Only Aave&apos;s Umbrella contract can cover the deficit.</ExplainBullet>
+                  <ExplainBullet>
+                    The DAO pays a cover up to its set offset; beyond that, Umbrella stakers are slashed.
+                  </ExplainBullet>
+                </>
+              )}
+              {borrowRoomShows(r) && c.state === "used" && (
+                <ExplainBullet>
+                  Borrow capacity <Fig bold>{usd(Math.max(0, c.cap - r.borrowed))}</Fig> is the borrow cap less what is
+                  borrowed; new supply is closed.
+                </ExplainBullet>
+              )}
+            </ul>
+          )}
         </ExplainBullet>
-        {u != null && (
-          <ExplainBullet>
-            Utilisation <Fig bold>{pct(u)}</Fig> is the share of the supply on loan.
-          </ExplainBullet>
-        )}
-        {deficitShows(r) && (
-          <>
-            <ExplainBullet>
-              Deficit <Fig bold>{usd(r.deficit ?? 0)}</Fig> is debt that liquidations wrote off when they left a
-              borrower no collateral.
-              <DeficitSources keys={["O2", "O3"]} />
-            </ExplainBullet>
-            <ExplainBullet>
-              It earns no interest, and stays as written off until it is covered.
-              <DeficitSources keys={["O7", "O3", "O5"]} />
-            </ExplainBullet>
-            <ExplainBullet>
-              Only Aave&apos;s Umbrella contract can cover it.
-              <DeficitSources keys={["O6", "D1"]} />
-            </ExplainBullet>
-            <ExplainBullet>
-              The DAO pays up to its set offset; beyond that, Umbrella stakers are slashed.
-              <DeficitSources keys={["U1", "U2", "U3", "D3"]} />
-            </ExplainBullet>
-          </>
-        )}
-        {borrowRoomShows(r) && c.state === "used" && (
-          <ExplainBullet>
-            Borrow capacity <Fig bold>{usd(Math.max(0, c.cap - r.borrowed))}</Fig> is the borrow cap less what is
-            borrowed; new supply is closed.
-          </ExplainBullet>
-        )}
       </ExplainGroup>
       <ExplainGroup title="Rates">
         {r.supplied > 0 && (
@@ -216,6 +213,11 @@ function ReserveExplainer({ r, label }: { r: MarketReserveRow; label: string }) 
         {r.borrowed > 0 && (
           <ExplainBullet>
             Borrowers pay <Fig bold>{ratePercentText(r.borrowApr)}</Fig> a year, as an APR.
+          </ExplainBullet>
+        )}
+        {u != null && (
+          <ExplainBullet>
+            Utilisation <Fig bold>{pct(u)}</Fig> is the share of the supply on loan.
           </ExplainBullet>
         )}
         <ExplainBullet>
@@ -362,7 +364,7 @@ function reserveHead(
       },
     },
     explainer: {
-      body: <ReserveExplainer r={r} label={sentenceName(m.marketLabel)} />,
+      body: <ReserveExplainer r={r} label={sentenceName(m.marketLabel)} vocab={vocab} />,
       label: "reserve explanation",
     },
     learnMore: null,

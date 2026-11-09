@@ -8,6 +8,7 @@
 //   D  aave.com/docs, read 9 Nov 2026
 
 import type { LearnMoreLink } from "@/components/shared/learn-more-modal";
+import type { Provenance } from "@/components/shared/provenance";
 
 const ORIGIN = "https://github.com/aave-dao/aave-v3-origin/blob/8305565ae342f1773c42cd2e4593f175fe5968a0/src/contracts";
 const UMBRELLA =
@@ -66,3 +67,31 @@ export type DeficitSourceKey = keyof typeof DEFICIT_SOURCES;
 /** The sources as learn-more links. */
 export const deficitLinks = (...keys: DeficitSourceKey[]): LearnMoreLink[] =>
   keys.map((k) => ({ label: DEFICIT_SOURCES[k].label, url: DEFICIT_SOURCES[k].url }));
+
+/** The pane's deficit figure: the getter's receipt, with the source behind each sub-bullet under it
+ *  (explanation-copy-charter §4: no sources on the face of a pane). */
+export function deficitFigureProv(base: Provenance): Provenance {
+  const leaf = (k: DeficitSourceKey, note: string) => ({
+    label: DEFICIT_SOURCES[k].label,
+    kind: "offchain" as const,
+    pclass: "offchain" as const,
+    note,
+    verify: { kind: "link" as const, href: DEFICIT_SOURCES[k].url, text: DEFICIT_SOURCES[k].label },
+  });
+  return {
+    ...base,
+    inputs: [
+      ...(base.inputs ?? []),
+      leaf("O2", "a liquidation that leaves no collateral burns the borrower's whole debt"),
+      leaf("O3", "the part not repaid is added to the deficit: DeficitCreated"),
+      leaf("O7", "the deficit is a count of underlying tokens: it earns no interest"),
+      leaf("O5", "a cover lowers it: DeficitCovered"),
+      leaf("O6", "only the Umbrella can cover it: eliminateReserveDeficit, onlyUmbrella"),
+      leaf("D1", "Aave's Pool docs on getReserveDeficit and eliminateReserveDeficit"),
+      leaf("U1", "Umbrella takes the funds from its caller, then calls the Pool"),
+      leaf("U2", "the DAO's deficit offset and the other covers"),
+      leaf("U3", "a slash of the reserve's stake token raises the pending deficit"),
+      leaf("D3", "Aave's Umbrella docs: the offset first, then slashing"),
+    ],
+  };
+}
