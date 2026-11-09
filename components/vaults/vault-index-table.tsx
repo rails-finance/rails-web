@@ -87,6 +87,13 @@ const COLUMNS: readonly Column[] = [
 
 const DEFAULT_SORT: SortKey = "holders";
 
+/** The steward's role, in the Steward cell's title. */
+const STEWARD_ROLE: Record<NonNullable<VaultSummary["steward"]>["role"], string> = {
+  curator: "Curator",
+  owner: "Owner",
+  roleManager: "Role manager",
+};
+
 /** How an amount in the vault's asset sorts: by token, then inside it. */
 const SORT_NOTE: Partial<Record<SortKey, string>> = {
   assets: "Sorts by token, then by what the vault holds within each token: total assets less lost assets.",
@@ -285,13 +292,14 @@ export function VaultIndexTable({
       )}
       <DataTable
         caption={`${part === "funded" ? "Vaults" : "Vaults that hold nothing"}; total assets and share price are in each vault’s asset`}
-        tableClassName="min-w-[640px] text-sm"
+        tableClassName="min-w-[860px] text-sm"
         stacked
         rowHeight="one"
       >
         <DataTableHead>
           <DataTableLeadHeader />
-          {COLUMNS.map((c) => (
+          {COLUMNS.map((c) => [
+            c.key === "assets" && <DataTableHeader key="kind" label="Kind" data-col-head="kind" />,
             <DataTableHeader
               key={c.key}
               label={c.label}
@@ -303,8 +311,9 @@ export function VaultIndexTable({
               }}
               data-sort-key={c.key}
               after={headerTip(c.key)}
-            />
-          ))}
+            />,
+          ])}
+          <DataTableHeader label="Steward" data-col-head="steward" />
         </DataTableHead>
         <DataTableBody>
           {sorted.map((v) => {
@@ -433,6 +442,11 @@ export function VaultIndexTable({
                     )}
                   </div>
                 </DataTableCell>
+                <DataTableCell label="Kind" valign="middle" className="whitespace-nowrap" data-col="kind">
+                  <span className="text-sm text-foreground" data-cell="kind">
+                    {VAULT_FAMILIES[v.family].kind}
+                  </span>
+                </DataTableCell>
                 {cell(
                   "total-assets",
                   "Total assets",
@@ -464,6 +478,23 @@ export function VaultIndexTable({
                   head("yield")?.sub,
                 )}
                 {cell("holders", "Holders", holders)}
+                <DataTableCell label="Steward" valign="middle" className="whitespace-nowrap" data-col="steward">
+                  {v.steward ? (
+                    <span
+                      className="font-mono text-[13px] text-foreground"
+                      title={`${STEWARD_ROLE[v.steward.role]} ${v.steward.address}`}
+                      data-cell="steward"
+                      data-steward-role={v.steward.role}
+                    >
+                      {shortAddress(v.steward.address)}
+                    </span>
+                  ) : (
+                    <span className="text-sm text-rb-500" data-cell="steward" data-steward-none="">
+                      <span aria-hidden>–</span>
+                      <span className="sr-only">no steward read</span>
+                    </span>
+                  )}
+                </DataTableCell>
               </DataTableRow>
             );
           })}

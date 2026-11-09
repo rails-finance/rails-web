@@ -17,8 +17,12 @@ import { shownOnArrival } from "@/lib/vaults/roster-preset";
 import type { VaultSummary } from "@/lib/vaults/summary";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { resultRows, type ResultRow } from "@/lib/start/results";
+import { readAssetDoor, ASSET_DOOR_POOL } from "@/lib/start/asset-door";
+import { AssetDoorCards } from "@/components/start/asset-door";
+import { ASSET_DOOR, HEALTH_DISCLAIMER } from "@/lib/vaults/health-words";
 import {
   TREE,
+  coinSlug,
   groupPhrase,
   leavesStart,
   resolveStartPath,
@@ -78,6 +82,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 function leafHeading(leaf: Leaf): string {
+  if (leaf.kind === "asset") return ASSET_DOOR.heading(leaf.symbol);
   if (leaf.kind === "roster") return TREE.rosters[leaf.roster].question;
   if (leaf.kind === "coins") return TREE.groups[leaf.group].coins?.question ?? TREE.groups[leaf.group].label;
   return TREE.results[leaf.results].heading.replace("{group}", leaf.group ? groupPhrase(leaf.group) : "");
@@ -88,12 +93,14 @@ export default async function StartPage({ params }: Params) {
   const r = resolveStartPath(path);
   if (!r) notFound();
   // The stack is the layout's; the page draws the leaf under it, if any.
-  return r.leaf ? <LeafContent leaf={r.leaf} /> : null;
+  return r.leaf ? <LeafContent leaf={r.leaf} base={`/start/${path.join("/")}`} /> : null;
 }
 
-function LeafContent({ leaf }: { leaf: Leaf }) {
+function LeafContent({ leaf, base }: { leaf: Leaf; base: string }) {
   if (leaf.kind === "results") return <Results results={leaf.results} group={leaf.group} />;
-  if (leaf.kind === "coins") return <Coins group={leaf.group} />;
+  if (leaf.kind === "coins") return <Coins group={leaf.group} base={base} />;
+  if (leaf.kind === "asset")
+    return <AssetStep group={leaf.group} symbol={leaf.symbol} groupBase={base.slice(0, base.lastIndexOf("/"))} />;
   return (
     <>
       <h2 className={QUESTION}>{TREE.rosters[leaf.roster].question}</h2>
@@ -177,11 +184,10 @@ function ResultLine({ row, results }: { row: ResultRow; results: ResultsKey }) {
   return text ? <span className="block text-sm text-rb-500">{text}</span> : null;
 }
 
-/** A group's coins (G8; ui-jobs 525): "All <group>" first, then a row per
- *  coin opening the vaults that hold it, most held first. The count is the
- *  rows the link opens on (shownOnArrival), so it matches the roster; a coin
- *  with none is left off. Linked in the vault's own spelling. */
-async function Coins({ group }: { group: GroupKey }) {
+/** A group's coins with the vaults that hold each, most first: the count is
+ *  the rows `/vaults?asset=` opens on (shownOnArrival), so it matches the
+ *  roster; a coin with none is left off. */
+async function coinCounts(group: GroupKey): Promise<{ label: string; symbol: string; count: number }[]> {
   const g = TREE.groups[group];
   const { vaults } = await loadVaultIndex();
   // Counted as the roster counts the rows the link opens on: funded vaults,
@@ -197,16 +203,23 @@ async function Coins({ group }: { group: GroupKey }) {
     const count = shownOnArrival(list).length;
     if (count > 0) held.set(key, { symbol: list[0].asset.symbol, count });
   }
-  const rows = (g.coins?.symbols ?? [])
+  return (g.coins?.symbols ?? [])
     .flatMap((s) => {
       const h = held.get(s.toLowerCase());
       return h ? [{ label: s, ...h }] : [];
     })
     .sort((x, y) => y.count - x.count);
+}
+
+/** A group's coins (G8; ui-jobs 525): "All <group>" first, then a row per
+ *  coin opening its asset step (G9; ui-jobs 553), most held first. */
+async function Coins({ group, base }: { group: GroupKey; base: string }) {
+  const g = TREE.groups[group];
+  const rows = await coinCounts(group);
   return (
     <div data-anatomy="G8" data-start-coins={group}>
       <h2 className={QUESTION}>{g.coins?.question ?? g.label}</h2>
-      <p className="mb-8 max-w-2xl text-lg text-rb-500">Each link opens the vaults that hold it.</p>
+      <p className="mb-8 max-w-2xl text-lg text-rb-500">Each opens the vaults that take it.</p>
       <Link href={vaultsHref(group)} className={PAGE_ROW} data-start-coin="all">
         <span className="flex -space-x-1.5" aria-hidden="true">
           {(g.icons ?? []).map((sym) => (
@@ -224,11 +237,7 @@ async function Coins({ group }: { group: GroupKey }) {
       <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {rows.map((c) => (
           <li key={c.symbol}>
-            <Link
-              href={`/vaults?asset=${encodeURIComponent(c.symbol)}`}
-              className={PAGE_ROW}
-              data-start-coin={c.symbol}
-            >
+            <Link href={`${base}/${coinSlug(c.label)}`} className={PAGE_ROW} data-start-coin={c.symbol}>
               <TokenChipIcon symbol={c.label} size={24} filterable={false} untitled />
               <span className="text-base font-medium text-foreground">{c.label}</span>
               <span className="text-sm text-rb-500">
@@ -242,6 +251,45 @@ async function Coins({ group }: { group: GroupKey }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** One coin's vaults (G9; ui-jobs 553, door 2): the group's coins as chips,
+ *  the coin chosen; the heading; the one line on what the figures are; then
+ *  the cards (components/start/asset-door.tsx). Owns no page beyond the step. */
+async function AssetStep({ group, symbol, groupBase }: { group: GroupKey; symbol: string; groupBase: string }) {
+  const [coins, door] = await Promise.all([coinCounts(group), readAssetDoor(symbol)]);
+  return (
+    <div data-anatomy="G9" data-start-asset={symbol}>
+      <ul className="mb-6 flex flex-wrap gap-2" aria-label={TREE.groups[group].coins?.question}>
+        {coins.map((c) => {
+          const chosen = c.label === symbol;
+          return (
+            <li key={c.label}>
+              <Link
+                href={`${groupBase}/${coinSlug(c.label)}`}
+                scroll={false}
+                aria-current={chosen ? "page" : undefined}
+                data-start-asset-chip={c.label}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 dark:focus-visible:ring-teal-400 ${
+                  chosen
+                    ? "border-teal-600 font-medium text-foreground dark:border-teal-400"
+                    : "border-rb-200 text-rb-500 hover:border-teal-600 dark:border-rb-600 dark:hover:border-teal-400"
+                }`}
+              >
+                <TokenChipIcon symbol={c.label} size={16} filterable={false} untitled />
+                {c.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      <h2 className={QUESTION}>{ASSET_DOOR.heading(door.symbol)}</h2>
+      <p className="mb-6 max-w-2xl text-rb-500" data-start-disclaimer="">
+        {HEALTH_DISCLAIMER}
+      </p>
+      <AssetDoorCards symbol={door.symbol} cards={door.cards} hiddenCount={door.hiddenCount} pool={ASSET_DOOR_POOL} />
     </div>
   );
 }

@@ -90,6 +90,9 @@ import { MORPHO_BASE_VAULT_TAIL_VERSION, type VaultTimelineCoords } from "@/lib/
 import type { VaultPositionRow } from "@/lib/aave-vaults/vault-position";
 import { BlockRef } from "@/components/shared/block-ref";
 import { serverReadOf } from "@/lib/shared/server-head-read";
+import { VaultHealthSection } from "@/components/vaults/vault-health-section";
+import { illiquidSentence } from "@/lib/vaults/illiquid";
+import { MORPHO_BLUE } from "@/lib/sources/chain/metamorpho-illiquid";
 
 export type MetaMorphoHolderParams = {
   params: Promise<{ vault: string; holder: string }>;
@@ -378,6 +381,72 @@ async function HoldingCardSection({ data, holder }: { data: MorphoBaseVaultRespo
   );
 }
 
+/** "How the vault is doing" (V7) from this page's read of the vault. */
+function HealthSection({ data }: { data: MorphoBaseVaultResponse }) {
+  const { vault } = data;
+  const liquidity = data.liquidity;
+  const name = vault.name || shortAddr(vault.address);
+  const zero = /^0x0{40}$/i;
+  return (
+    <VaultHealthSection
+      chainId={data.chainId}
+      family="metamorpho"
+      vault={{ address: vault.address, name, assetSymbol: vault.asset.symbol, decimals: vault.asset.decimals }}
+      totalAssetsRaw={data.totalAssets.raw}
+      block={data.blockNumber}
+      readBy={serverReadOf(data)}
+      exit={
+        liquidity
+          ? {
+              kind: "queue",
+              block: liquidity.block,
+              queueAssets: liquidity.queueAssets,
+              withdrawable: liquidity.withdrawable,
+            }
+          : null
+      }
+      caught={liquidity?.illiquid ? illiquidSentence(liquidity.illiquid) : null}
+      holder={
+        data.holder?.maxWithdraw
+          ? { block: data.blockNumber, claim: data.holder.claim.raw, maxWithdraw: data.holder.maxWithdraw.raw }
+          : null
+      }
+      // V1.0 keeps no lost-assets ledger; a V1.1 vault whose call failed is unread.
+      lostAssets={
+        data.lostAssets
+          ? { raw: data.lostAssets.raw, block: data.blockNumber }
+          : vault.factory === "v1.0"
+            ? null
+            : undefined
+      }
+      steward={
+        vault.curator
+          ? { role: "curator", address: vault.curator, block: data.blockNumber }
+          : vault.owner && !zero.test(vault.owner)
+            ? { role: "owner", address: vault.owner, block: data.blockNumber }
+            : null
+      }
+      contracts={[
+        {
+          name,
+          address: vault.address,
+          reads: "totalAssets(), lostAssets(), curator(), owner(), withdrawQueue()",
+        },
+        { name: "Morpho Blue", address: MORPHO_BLUE, reads: "market(), position()" },
+      ]}
+      links={[
+        {
+          title: "The vault's page",
+          subtitle: name,
+          href: metaMorphoVaultHref(data.chainId, vault.address),
+          item: "vault-page",
+          internal: true,
+        },
+      ]}
+    />
+  );
+}
+
 export async function metaMorphoHolderMetadata(chainId: MetaMorphoChainId, { params }: Props): Promise<Metadata> {
   const { vault, holder } = await params;
   const address = vault.toLowerCase();
@@ -575,6 +644,17 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
             }
           >
             <HoldingCardSection data={data} holder={data.holder.address} />
+          </Suspense>
+        )}
+        {!data.chainStale && !onEventPage && data.holder && (
+          <Suspense
+            fallback={
+              <div className="mb-6" data-skel-section="vault-health-pending">
+                <SkeletonBlock height={220} />
+              </div>
+            }
+          >
+            <HealthSection data={data} />
           </Suspense>
         )}
         {!data.chainStale && timelineSlot && <HoldingReceiptsScope>{timelineSlot}</HoldingReceiptsScope>}

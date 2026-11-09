@@ -123,7 +123,9 @@ export interface Level {
 export type Leaf =
   | { kind: "roster"; roster: RosterKey }
   | { kind: "results"; results: ResultsKey; group?: GroupKey }
-  | { kind: "coins"; group: GroupKey };
+  | { kind: "coins"; group: GroupKey }
+  /** One coin of a group's list: the vaults that take it (G9; ui-jobs 553). */
+  | { kind: "asset"; group: GroupKey; symbol: string };
 
 export interface Resolved {
   /** Every level from the top of the tree down; with no leaf, the last one is
@@ -139,6 +141,14 @@ export function optionIcons(option: StartOption): string[] {
   const to = option.to;
   const group = "coins" in to ? to.coins : "vaults" in to ? to.vaults : "results" in to ? to.group : undefined;
   return group ? (TREE.groups[group].icons ?? []) : [];
+}
+
+/** A coin's segment under its group's list: the symbol, lowercased. */
+export const coinSlug = (symbol: string): string => symbol.toLowerCase();
+
+/** The coin a segment names in a group's list, in the list's spelling; null for none. */
+export function coinOf(group: GroupKey, slug: string): string | null {
+  return TREE.groups[group].coins?.symbols.find((s) => coinSlug(s) === slug) ?? null;
 }
 
 /** Does pressing this option leave /start? */
@@ -171,6 +181,13 @@ export function resolveStartPath(segments: string[]): Resolved | null {
       if (!next) return null;
       levels.push({ node: next, base: href, intro: to.intro });
       continue;
+    }
+    // A group's coin list takes one more segment: the coin (G9).
+    if ("coins" in to && i === segments.length - 2) {
+      const symbol = coinOf(to.coins, segments[i + 1]);
+      if (!symbol) return null;
+      answers.push(symbol);
+      return { levels, leaf: { kind: "asset", group: to.coins, symbol }, answers };
     }
     if (!last) return null;
     if ("roster" in to) return { levels, leaf: { kind: "roster", roster: to.roster }, answers };

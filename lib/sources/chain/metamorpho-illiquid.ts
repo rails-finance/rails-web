@@ -9,12 +9,13 @@
 //   3. `market(id)` and `idToMarketParams(id)` once per distinct market;
 //   4. the IRM's `borrowRateView` on each market with interest to accrue, and
 //      the block's timestamp: the totals accrued to the block;
-//   5. for the vaults whose queue holds a market 99.9% or more borrowed on the
-//      chain's AdaptiveCurveIRM: `position(id, vault)` on every leg of that
-//      queue, and `rateAtTarget(id)` on those markets.
+//   5. `position(id, vault)` on every leg of every queue whose markets all
+//      answered, and `rateAtTarget(id)` on the markets 99.9% or more borrowed
+//      on the chain's AdaptiveCurveIRM.
 //
 // A vault whose read did not answer is left out of the map: unread, never
-// liquid. A vault read and not caught maps to null.
+// liquid. A vault read maps to its liquidity (what can leave), whose
+// `illiquid` is null where the test catches no market.
 
 import { parseAbi, type PublicClient } from "viem";
 import { resolveErc20Meta } from "./erc20-meta";
@@ -27,7 +28,7 @@ import {
   vaultIlliquid,
   type IlliquidLegInput,
   type SettledMarket,
-  type VaultIlliquid,
+  type VaultLiquidity,
 } from "@/lib/vaults/illiquid";
 
 const ZERO = BigInt(0);
@@ -197,8 +198,8 @@ export async function readMetaMorphoIlliquid(
   blockNumber: bigint,
   vaults: readonly string[],
   queuesOut?: Map<string, string[]>,
-): Promise<Map<string, VaultIlliquid | null>> {
-  const out = new Map<string, VaultIlliquid | null>();
+): Promise<Map<string, VaultLiquidity>> {
+  const out = new Map<string, VaultLiquidity>();
   if (vaults.length === 0) return out;
   const blue = MORPHO_BLUE as `0x${string}`;
 
@@ -280,18 +281,13 @@ export async function readMetaMorphoIlliquid(
     return l != null && needsRateAtTarget(chainId, l);
   };
 
-  // A vault with a market unread cannot be tested; one with no hot market is not caught.
-  const candidates: string[] = [];
-  for (const v of vaults) {
-    if (!readable.has(v)) continue;
-    const q = queues.get(v) ?? [];
-    if (q.some((id) => !markets.has(id))) continue;
-    if (q.some(hot)) candidates.push(v);
-    else out.set(v, null);
-  }
+  // A vault with a market unread cannot be tested. Every other vault's legs
+  // are read, so its withdrawable part is stated (ui-jobs 553); the hot
+  // markets' rates at target are read for the test.
+  const testable = vaults.filter((v) => readable.has(v) && (queues.get(v) ?? []).every((id) => markets.has(id)));
 
-  // 5. Positions on every leg of a candidate's queue, and the hot markets' rates.
-  const posSlots = candidates.flatMap((v) => (queues.get(v) ?? []).map((id) => ({ vault: v, id })));
+  // 5. Positions on every leg of a testable queue, and the hot markets' rates.
+  const posSlots = testable.flatMap((v) => (queues.get(v) ?? []).map((id) => ({ vault: v, id })));
   const hotIds = [...new Set(posSlots.map((s) => s.id).filter(hot))];
   const [positions, rates] = await Promise.all([
     multicall(
@@ -317,15 +313,17 @@ export async function readMetaMorphoIlliquid(
   });
 
   const caught = new Map<string, IlliquidLegInput[]>();
-  for (const v of candidates) {
-    const q = queues.get(v)!;
+  for (const v of testable) {
+    const q = queues.get(v) ?? [];
     if (q.some((id) => shares.get(`${v}:${id}`) == null)) continue;
-    const legs = q.map((id) => ({
-      ...legInput(id, markets.get(id)!, shares.get(`${v}:${id}`)!, borrowRates.get(id) ?? null, timestamp, null)!,
-      rateAtTarget: rates.get(id) ?? null,
-    }));
-    const il = vaultIlliquid(chainId, Number(blockNumber), timestamp, legs);
-    if (il == null) out.set(v, null);
+    const accrued = q.map((id) =>
+      legInput(id, markets.get(id)!, shares.get(`${v}:${id}`)!, borrowRates.get(id) ?? null, timestamp, null),
+    );
+    if (accrued.some((l) => l == null)) continue;
+    const legs = accrued.map((l) => ({ ...l!, rateAtTarget: rates.get(l!.id) ?? null }));
+    const liquidity = vaultIlliquid(chainId, Number(blockNumber), timestamp, legs);
+    if (liquidity == null) continue;
+    if (liquidity.illiquid == null) out.set(v, liquidity);
     else caught.set(v, legs);
   }
 
@@ -342,7 +340,8 @@ export async function readMetaMorphoIlliquid(
       const m = meta.get(collateral.get(l.id) ?? "");
       return { ...l, collateralSymbol: m?.named ? m.symbol : null };
     });
-    out.set(v, vaultIlliquid(chainId, Number(blockNumber), timestamp, named));
+    const liquidity = vaultIlliquid(chainId, Number(blockNumber), timestamp, named);
+    if (liquidity) out.set(v, liquidity);
   }
   return out;
 }
