@@ -24,11 +24,12 @@
 //
 // SERVER-ONLY.
 
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { VaultProtectsSection } from "@/components/vaults/vault-protects-section";
 import { MorphoBaseVaultPage as MorphoBaseVaultPageView } from "@/components/vaults/morpho-base-vault-page";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { RailHeader } from "@/components/shared/rail-header";
@@ -118,6 +119,14 @@ export async function MetaMorphoVaultRoute({
             yieldFigure={series.yieldFigure}
             strip={series.strip}
             factory={metaMorphoFactoryAddress(chainId, data.vault.factory)}
+            protects={
+              <Suspense fallback={null}>
+                <VaultProtectsSection
+                  subject={{ chainId, address, kind: "metamorpho" }}
+                  vaultName={data.vault.name || shortAddr(address)}
+                />
+              </Suspense>
+            }
           />
         )}
 

@@ -72,12 +72,15 @@ const fraction = (part: RawAmount | null, total: RawAmount | null): number | nul
     : null;
 
 export function AaveEthereumVaultPage({
+  protects,
   data,
   census,
   yieldFigure: storeYield,
   strip,
   attestation,
 }: {
+  /** "What protects it" and "The protocol underneath" (V9, V10), streamed by the route. */
+  protects?: React.ReactNode;
   data: AaveEthereumVaultResponse;
   census: VaultCensusRow | null;
   yieldFigure?: VaultYield;
@@ -747,6 +750,7 @@ export function AaveEthereumVaultPage({
           exports: vaultAssetsExports(v, { stats: exportStats, rows: exportRows }),
         }}
       />
+      {protects}
     </ProvReceiptsScope>
   );
 }
