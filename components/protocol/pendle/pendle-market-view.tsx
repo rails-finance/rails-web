@@ -21,6 +21,7 @@ import {
   maturityWords,
   rate,
   symbolOf,
+  unitRate,
 } from "@/lib/pendle/format";
 import { impliedApyProv, markProv, maturityProv, poolStateProv, tvlProv } from "@/lib/pendle/provenance";
 import type { PendleMarketPage, PendleTokenMeta } from "@/lib/pendle/types";
@@ -56,7 +57,12 @@ export function PendleMarketView({
               info={markProv(id.toUpperCase() as "PT" | "YT" | "LP", marks.source, marks.twapSeconds, m.block)}
               value={raw}
             >
-              {(rate(raw) ?? 0).toLocaleString("en-US", { maximumFractionDigits: 4 })}
+              {(unitRate(raw, id === "lp" ? t.market.decimals : t.pt.decimals, t.sy.decimals) ?? 0).toLocaleString(
+                "en-US",
+                {
+                  maximumFractionDigits: 4,
+                },
+              )}
             </Prov>
           </PanelFigure>{" "}
           SY
