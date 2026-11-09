@@ -20,7 +20,8 @@
 // markets page, f(x)'s pools roster and a pool's page, and Compound V3's
 // markets roster and a Comet's page on each chain, and Compound V2's and
 // Moonwell's markets pages with one market's page each, Maple's pools roster
-// and a pool's page, and a page per family with "Supplied by vaults" (the
+// and a pool's page, LlamaLend's markets and Fluid's vaults with one page
+// each, and a page per family with "Supplied by vaults" (the
 // Morpho market page, not yet on the shells, is held to that section alone).
 //
 // Run:  npm run verify:preflight -- --warm <the pages>
@@ -102,6 +103,13 @@ const ALL_PAGES = [
   "/ethereum/morpho/markets/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
   "/base/morpho/markets/0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
   "/arbitrum/morpho/markets/0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+  // LlamaLend's roster (R1, grouped by era) and a lend market's page (R2 with
+  // R3's sections, the semi-log rate curve): WETH / crvUSD.
+  "/ethereum/llamalend/markets",
+  "/ethereum/llamalend/markets/0x23f5a668a9590130940ef55964ead9787976f2cc",
+  // Fluid's vaults roster (R1, grouped by vault type) and a vault's page (R2).
+  "/ethereum/fluid/vaults",
+  "/ethereum/fluid/vaults/11",
 ];
 const PAGES = process.env.PAGES ? process.env.PAGES.split(",").map((p) => p.trim()) : ALL_PAGES;
 
