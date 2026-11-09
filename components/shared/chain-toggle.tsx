@@ -101,9 +101,12 @@ export function ChainToggleButtons({
   chainId,
   onChange,
   extra,
+  chains = TOGGLE_CHAINS,
 }: {
   chainId: ChainId;
   onChange: (id: ChainId) => void;
+  /** The chains offered; the launched ones unless the asset preference narrows them. */
+  chains?: ChainId[];
   /** A trailing choice outside CHAINS (the home page's "coming soon" chain).
    *  While it is active no chain segment is. */
   extra?: { label: string; active: boolean; onSelect: () => void; glyph?: ReactNode };
@@ -114,7 +117,7 @@ export function ChainToggleButtons({
       className={extra ? `${SEGMENT_SHELL} max-w-full flex-wrap justify-center` : SEGMENT_SHELL}
       {...ctrlWaking(hydrated)}
     >
-      {TOGGLE_CHAINS.map((id) => {
+      {chains.map((id) => {
         const active = chainId === id && !extra?.active;
         return (
           <button

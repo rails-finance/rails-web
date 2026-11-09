@@ -27,6 +27,7 @@ import { chainName } from "@/lib/shared/asset-roster";
 import type { ChainId } from "@/lib/shared/chains";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { assetKey } from "@/lib/shared/asset-family";
+import { useAssetScope } from "@/lib/shared/asset-scope";
 
 const CATEGORY_NOTE = "Rails’ classification of the asset";
 
@@ -34,8 +35,23 @@ export function AssetExplorer({ cards: allCards, initial }: { cards: AssetCard[]
   const [state, setState] = useState(initial);
   // The asset preference (ui-jobs 557): a card is kept when any of its chains'
   // tokens is one of the reader's.
+  // Its chain marks and chips keep only the chains where it is one of them
+  // (Miles, 9 Nov 2026: a chain shows only where the reader's assets are).
   const scoped = useScopedRows(allCards, (c) => c.chains.map((x) => assetKey(x.chain, x.token)));
-  const cards = scoped.rows;
+  const { keys } = useAssetScope();
+  const narrow = scoped.on && !scoped.peek && keys != null;
+  const cards = useMemo(
+    () =>
+      !narrow
+        ? scoped.rows
+        : scoped.rows.map((c) => {
+            const chains = c.chains.filter((x) => keys.has(assetKey(x.chain, x.token)));
+            if (chains.length === c.chains.length) return c;
+            const on = new Set(chains.map((x) => x.chain));
+            return { ...c, chains, chips: c.chips.filter((ch) => on.has(ch.chain)) };
+          }),
+    [narrow, scoped.rows, keys],
+  );
   const update = useCallback((next: Partial<ExplorerState>) => {
     setState((s) => {
       const n = { ...s, ...next };

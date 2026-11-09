@@ -9,8 +9,18 @@
 // The panel lists each chosen asset with one switch, "And what's built on it",
 // and adds assets through AssetChooser. From `?assets=` the strip says the
 // assets came with the link, and "Keep as my assets" stores them.
+//
+// On an explorer's own pages the strip carries one more line where the
+// explorer is one the preference hides (lib/shared/explorer-scope.ts): its
+// chain holds none of the reader's assets, or it lists none of them, or Rails
+// has no asset list for it. The page itself still opens whole.
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { protocolForPathname } from "@/lib/shared/protocols";
+import { CHAINS } from "@/lib/shared/chains";
+import { useExplorerScope } from "@/lib/shared/explorer-scope";
 import { createPortal } from "react-dom";
 import { Check, Link2, ListFilter, X } from "lucide-react";
 import { AssetChooser, optionKey, type AssetChooserOption } from "@/components/shared/asset-chooser";
@@ -27,7 +37,7 @@ import {
   useAssetScope,
   type AssetPick,
 } from "@/lib/shared/asset-scope";
-import { INPLACE_TEXT, OVERLAY_HEADING, RESET_LINK } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK, INPLACE_TEXT, OVERLAY_HEADING, RESET_LINK } from "@/lib/shared/ui-grammar";
 
 const chainName = (c: number) => SCOPE_CHAINS[c] ?? `chain ${c}`;
 const symbolOf = (p: Pick<AssetPick, "chain" | "token">) =>
@@ -123,10 +133,42 @@ export function AssetScopeStrip() {
               Show everything
             </button>
           </div>
+          <ExplorerScopeLine keys={scope.keys} fromLink={scope.fromLink} />
         </div>
       )}
       {open && <AssetScopePanel onClose={() => setOpen(false)} />}
     </>
+  );
+}
+
+/** Why the preference hides the explorer this page belongs to; nothing where it shows. */
+function ExplorerScopeLine({ keys, fromLink }: { keys: Set<string> | null; fromLink: boolean }) {
+  const entry = protocolForPathname(usePathname());
+  const ex = useExplorerScope();
+  if (!entry || !keys || !ex.on) return null;
+  const status = ex.statusOf(entry.id);
+  if (status === "lists") return null;
+  const chain = CHAINS[entry.chainId];
+  const onChain = [...keys].some((k) => k.startsWith(`${entry.chainId}:`));
+  const why = !onChain
+    ? `None of your assets is on ${chain.name}`
+    : status === "none"
+      ? `${entry.label} lists none of your assets`
+      : `Rails has no asset list for ${entry.label} yet`;
+  const link = fromLink ? new URLSearchParams(window.location.search).get("assets") : null;
+  return (
+    <p
+      className="mx-auto max-w-7xl px-4 pb-1.5 text-xs text-rb-500 md:px-6"
+      data-explorer-scope={!onChain ? "chain" : status}
+    >
+      {why} ·{" "}
+      <Link
+        href={`/assets${link ? `?assets=${link.replace(/ /g, "+")}` : ""}`}
+        className={`font-semibold ${INLINE_LINK}`}
+      >
+        Where your assets are listed
+      </Link>
+    </p>
   );
 }
 

@@ -14,9 +14,8 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { useHydrated } from "@/hooks/useHydrated";
-import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
-import { BASE_TOKEN_ADDRESSES } from "@/lib/shared/token-addresses.base";
-import { assetKey, familyOf, FAMILY_SYMBOLS } from "@/lib/shared/asset-family";
+import { assetKey, familyOf } from "@/lib/shared/asset-family";
+import { SCOPE_TOKENS } from "@/lib/shared/asset-scope-tokens";
 import { notifyUrlChanged } from "@/lib/shared/use-url-search-params";
 import {
   ASSET_PREFERENCE_KEY,
@@ -32,22 +31,7 @@ export type { AssetPick };
 
 export const SCOPE_CHAINS: Record<number, string> = { 1: "Ethereum", 8453: "Base" };
 
-/** Every token the chooser offers: the address tables, then the family
- *  table's own tokens (the PTs, yBOLD, the sentinels). */
-export const SCOPE_TOKENS: { chain: number; token: string; symbol: string }[] = (() => {
-  const out = new Map<string, { chain: number; token: string; symbol: string }>();
-  const put = (chain: number, token: string, symbol: string) => {
-    const key = assetKey(chain, token);
-    if (!out.has(key)) out.set(key, { chain, token: token.toLowerCase(), symbol });
-  };
-  for (const [s, a] of Object.entries(TOKEN_ADDRESSES)) put(1, a, s);
-  for (const [s, a] of Object.entries(BASE_TOKEN_ADDRESSES)) put(8453, a, s);
-  for (const [key, s] of Object.entries(FAMILY_SYMBOLS)) {
-    const [chain, token] = key.split(":");
-    put(Number(chain), token, s);
-  }
-  return [...out.values()];
-})();
+export { SCOPE_TOKENS };
 
 const BY_KEY = new Map(SCOPE_TOKENS.map((t) => [assetKey(t.chain, t.token), t.symbol]));
 export const SCOPE_SYMBOLS: SymbolIndex = (() => {
