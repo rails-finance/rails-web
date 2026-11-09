@@ -26,7 +26,7 @@
 // ANATOMY (rails-ops reference/app-anatomy.md, region D): D1 the frame and
 // its rows, D2 a sortable header, D3 the sideways scroll and pinned cells
 // (on the frame), D4 a linked row, D5 the lead cell, D6 stacked rows (on the
-// frame in D3's place).
+// frame in D3's place), D7 a row's ⋮ menu.
 //
 // STACKED ROWS (D6, opt-in: `DataTable stacked`; `stackBelow="lg"` for a
 // table too wide for a tablet). Below sm (or lg) the same <table>
@@ -44,9 +44,14 @@
 // `DataTableLeadCell`.
 
 import Link from "next/link";
+import { createPortal } from "react-dom";
+import { Check, EllipsisVertical } from "lucide-react";
 import {
   createContext,
   useContext,
+  useEffect,
+  useRef,
+  useState,
   type AnchorHTMLAttributes,
   type HTMLAttributes,
   type ReactNode,
@@ -377,7 +382,7 @@ export function DataTableLeadHeader({ sticky = "" }: { sticky?: string }) {
     <th
       scope="col"
       role={stacked ? "columnheader" : undefined}
-      className={`w-16 p-0 sm:w-[95px] ${sticky ? `${sticky} z-10 bg-background` : ""}`}
+      className={`w-[100px] p-0 ${sticky ? `${sticky} z-10 bg-background` : ""}`}
     >
       <span className="sr-only">Protocol and chain</span>
     </th>
@@ -385,8 +390,8 @@ export function DataTableLeadHeader({ sticky = "" }: { sticky?: string }) {
 }
 
 /** The lead cell: the protocol's tinted zone with its mark and the chain's
- *  glyph, a rounded tile inset in the row, with the protocol's and the
- *  chain's names for a screen reader. */
+ *  glyph, a wide rounded tile centred in the row and shorter than it, with the
+ *  protocol's and the chain's names for a screen reader. */
 export function DataTableLeadCell({
   protocol,
   protocolName,
@@ -400,11 +405,11 @@ export function DataTableLeadCell({
   sticky?: string;
 }) {
   return (
-    // h-px: a cell with a height lets its child fill the row's height.
     <DataTableCell
       pad={false}
       sticky={sticky}
-      className="relative h-px w-16 py-1.5! pl-1.5! sm:w-[95px]"
+      valign="middle"
+      className="w-[100px] py-2! pr-1! pl-3!"
       style={hueStyle(protocol)}
       title={`${protocolName} on ${chainMeta(chain).name}`}
       data-anatomy="D5"
@@ -412,7 +417,7 @@ export function DataTableLeadCell({
       data-row-zone-chain={chainMeta(chain).name}
     >
       <span className="sr-only">{protocolName} on </span>
-      <RowZone id={protocol} chain={chain} className="h-full min-h-11 w-full rounded-xl" />
+      <RowZone id={protocol} chain={chain} className="h-11 w-[84px] rounded-[14px]" />
     </DataTableCell>
   );
 }
@@ -426,5 +431,134 @@ export function DataTableLeadMark({ protocol, chain }: { protocol: string; chain
       <ProtocolIcon id={protocol} className="h-4 w-4 shrink-0 [&:is(img)]:grayscale" />
       <ChainGlyph id={chain} className="h-4 w-4 shrink-0" />
     </span>
+  );
+}
+
+/** One entry of a row's ⋮ menu (D7): a button, or a link with `href`.
+ *  `checked` marks an entry that is on (a vault in the comparison). */
+export interface DataTableRowMenuItem {
+  key: string;
+  label: ReactNode;
+  onSelect?: () => void;
+  href?: string;
+  checked?: boolean;
+  hooks?: Record<`data-${string}`, string | undefined>;
+}
+
+/** A row's ⋮ menu (D7): the actions every row carries, in the row's last
+ *  cell. Shown on the row's hover and keyboard focus, and always where the
+ *  screen has no hover (touch); open, it stays. The menu opens in a portal,
+ *  fixed under its button, since the frame's sideways scroll clips anything
+ *  inside it; it follows its button on a scroll and closes on a resize,
+ *  Escape or a press outside. */
+export function DataTableRowMenu({ label, items }: { label: string; items: DataTableRowMenuItem[] }) {
+  const [at, setAt] = useState<{ top: number; right: number } | null>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const open = at != null;
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setAt(null);
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as Node;
+      if (!menu.current?.contains(t) && !button.current?.contains(t)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      close();
+      button.current?.focus();
+    };
+    // A scroll moves the menu with its button; a button scrolled out of
+    // sight closes it.
+    const follow = () => {
+      const r = button.current?.getBoundingClientRect();
+      if (!r || r.bottom < 0 || r.top > window.innerHeight) return close();
+      setAt({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    };
+    menu.current
+      ?.querySelector<HTMLElement>("[role=menuitem], [role=menuitemcheckbox]")
+      ?.focus({ preventScroll: true });
+    window.addEventListener("pointerdown", onDown, true);
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("scroll", follow, true);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("pointerdown", onDown, true);
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("scroll", follow, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [open]);
+  const toggle = () => {
+    if (open) return setAt(null);
+    const r = button.current?.getBoundingClientRect();
+    if (r) setAt({ top: r.bottom + 4, right: window.innerWidth - r.right });
+  };
+  const ITEM =
+    "flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[13px] text-foreground outline-none hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)]";
+  return (
+    <>
+      <button
+        ref={button}
+        type="button"
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={toggle}
+        data-row-menu=""
+        className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-rb-500 transition-opacity hover:bg-[var(--surface-hover)] hover:text-foreground focus-ring group-hover/dt-row:opacity-100 group-focus-within/dt-row:opacity-100 [@media(hover:none)]:opacity-100 ${
+          open ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        <EllipsisVertical className="h-4 w-4" aria-hidden />
+      </button>
+      {open &&
+        createPortal(
+          <div
+            ref={menu}
+            role="menu"
+            aria-label={label}
+            style={{ position: "fixed", top: at.top, right: at.right }}
+            className="z-50 min-w-48 rounded-lg border border-rb-200 bg-[var(--surface-overlay)] p-1 shadow-lg dark:border-rb-700"
+            data-row-menu-list=""
+          >
+            {items.map((it) =>
+              it.href ? (
+                <Link
+                  key={it.key}
+                  href={it.href}
+                  prefetch={false}
+                  role="menuitem"
+                  className={ITEM}
+                  onClick={() => setAt(null)}
+                  {...it.hooks}
+                >
+                  {it.label}
+                </Link>
+              ) : (
+                <button
+                  key={it.key}
+                  type="button"
+                  role={it.checked == null ? "menuitem" : "menuitemcheckbox"}
+                  aria-checked={it.checked == null ? undefined : it.checked}
+                  className={ITEM}
+                  onClick={() => {
+                    it.onSelect?.();
+                    setAt(null);
+                  }}
+                  {...it.hooks}
+                >
+                  {it.checked != null && (
+                    <Check className={`h-3.5 w-3.5 shrink-0 ${it.checked ? "" : "invisible"}`} aria-hidden />
+                  )}
+                  {it.label}
+                </button>
+              ),
+            )}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }

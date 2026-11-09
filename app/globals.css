@@ -2552,6 +2552,14 @@ table.dt-stacked {
     & > tbody > tr > .dt-cell-wide {
       grid-column: 1 / -1;
     }
+    /* A row's ⋮ (D7) at the card's top right. */
+    & > tbody > tr > .dt-row-menu {
+      position: absolute;
+      top: 10px;
+      right: 8px;
+      padding: 0;
+      z-index: 10;
+    }
     & > tbody > tr > [role="cell"]:empty {
       display: none;
     }
@@ -2572,6 +2580,7 @@ table.dt-stacked {
       width: 4px;
       height: 100%;
       min-height: 0;
+      padding: 0;
       border-radius: 2px;
     }
     & > tbody > tr > [data-anatomy~="D5"] > [data-closed-zone] :is(svg, img) {
