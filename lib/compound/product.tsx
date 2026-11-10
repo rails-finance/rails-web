@@ -15,6 +15,7 @@
 // names and explorer links live in receipts and the ⋮; the contracts Rails
 // reads are on the info page ("How Rails reads it").
 
+import { rowAssetKeys } from "@/lib/shared/focus-row-keys";
 import type { ReactNode } from "react";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -880,6 +881,12 @@ export function CompoundMarketsOverview({
       header={{ protocol: protocolOf(chain), title: "Markets", learnMore: LEARN_MORE }}
       markets={cometDeploymentOf(chain).markets.map((m) => ({ key: m.key, name: m.label }))}
       useMarket={useMarket}
+      keysOf={(k) =>
+        rowAssetKeys(
+          cometDeploymentOf(chain).markets.find((m) => m.key === k),
+          protocolOf(chain).chainId,
+        )
+      }
     />
   );
 }

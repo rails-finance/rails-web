@@ -1135,6 +1135,7 @@ export function LlamalendMarketPage({ data, pair }: { data: LlamalendMarketDetai
       market={market}
       what={`the ${pair} market`}
       hooks={{ "data-llamalend-market-page": data?.market.controller }}
+      focusSource={data?.market}
     />
   );
 }

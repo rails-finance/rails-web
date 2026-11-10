@@ -6,7 +6,9 @@
  * itself, in its own source or in a module it imports (two levels down):
  *
  *   • it filters through the shared pieces: `AimGate`, `useScopedRows`,
- *     `useScopedRoster`, `InFocusSymbol`, `useAssetScope`; or
+ *     `useScopedRoster`, `InFocusSymbol`, `useAssetScope`, or the listing
+ *     shell `ChainTruthListingPage`, which keeps the rows that touch the
+ *     focus unless told `focus={false}` by a config that applies it itself; or
  *   • it says why it needs none, in a line comment `// focus: <reason>`
  *     (a page about Rails itself, a legal page, a redirect).
  *
@@ -28,7 +30,14 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LIST = path.join(ROOT, "scripts", "focus-undeclared.txt");
-const MARKERS = [/\bAimGate\b/, /\buseScopedRows\b/, /\buseScopedRoster\b/, /\bInFocusSymbol\b/, /\buseAssetScope\b/];
+const MARKERS = [
+  /\bChainTruthListingPage\b/,
+  /\bAimGate\b/,
+  /\buseScopedRows\b/,
+  /\buseScopedRoster\b/,
+  /\bInFocusSymbol\b/,
+  /\buseAssetScope\b/,
+];
 const EXEMPT = /^\s*\/\/\s*focus:\s*\S/m;
 const DEPTH = 2;
 

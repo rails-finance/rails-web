@@ -15,6 +15,7 @@
 // raw share integers and the read path live in receipts; the contracts Rails
 // reads are on the info page ("How Rails reads it").
 
+import { assetKey } from "@/lib/shared/asset-family";
 import { useEffect, useState, type ReactNode } from "react";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import { AmountText } from "@/components/shared/amount-text";
@@ -1044,6 +1045,7 @@ export function FxPoolsOverview({ data }: { data: FxSystemChainResponse }): Reac
       header={{ protocol: PROTOCOL, title: "Pools", learnMore }}
       markets={FX_POOL_KEYS.map((k) => ({ key: k, name: poolLabel(FX_POOLS[k]) }))}
       useMarket={useMarket}
+      keysOf={(k) => [assetKey(1, FX_POOLS[k].tokenAddress)]}
     />
   );
 }
@@ -1055,6 +1057,7 @@ export function FxPoolPage({ data, pool }: { data: FxSystemChainResponse; pool: 
       header={{ protocol: PROTOCOL, title: poolLabel(FX_POOLS[pool]), learnMore }}
       market={fxPoolModel(data, pool, false)}
       what={`f(x)'s ${poolLabel(FX_POOLS[pool])}`}
+      focusSource={FX_POOLS[pool]}
     />
   );
 }

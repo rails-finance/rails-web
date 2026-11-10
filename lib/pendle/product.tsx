@@ -658,6 +658,7 @@ export function PendleMarketProductPage({
       market={market}
       what={`the ${marketName(m.tokens)} market`}
       hooks={{ "data-pendle-market-page": m.tokens.market.address }}
+      focusSource={m.tokens}
     >
       <PositionReadProvider read={{ kind: "chain", block: m.block, at: m.timestamp }}>
         <PendleMarketEvents m={m} initialMeta={meta} initialSearch={initialSearch} />

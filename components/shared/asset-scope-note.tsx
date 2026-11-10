@@ -6,7 +6,8 @@
 // list until the page is left; Turn off in the profile menu ends Focus.
 
 import { useMemo, useState } from "react";
-import { useAssetScope } from "@/lib/shared/asset-scope";
+import { Lock } from "lucide-react";
+import { chainNameOf, openFocusPanel, scopeSymbolOf, useAssetScope, type AssetScope } from "@/lib/shared/asset-scope";
 import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 
 export interface ScopedRows<T> {
@@ -88,5 +89,74 @@ export function ScopeNote<T>({
         </>
       )}
     </p>
+  );
+}
+
+/** "BOLD +2", or the chains under a chain-only focus: the locked chip's words. */
+export function focusChipLabel(scope: Pick<AssetScope, "picks" | "chains">): string {
+  const names = [...new Set(scope.picks.map((p) => scopeSymbolOf(p.chain, p.token) ?? `${p.token.slice(0, 6)}…`))];
+  const list = names.length ? names : scope.chains.map(chainNameOf);
+  return list.length ? `${list[0]}${list.length > 1 ? ` +${list.length - 1}` : ""}` : "";
+}
+
+/** The locked chip a listing draws first in its chip row under Focus (N1.9):
+ *  it names the focus and opens the panel to change it. */
+export function FocusLockChip() {
+  const scope = useAssetScope();
+  const label = focusChipLabel(scope);
+  return (
+    <button
+      type="button"
+      onClick={() => openFocusPanel()}
+      className="inline-flex items-center gap-1 rounded-full bg-teal-500/15 px-2.5 py-1 text-xs text-teal-700 transition-colors hover:bg-teal-500/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 dark:text-teal-400"
+      aria-label={`Focus: ${label}. Change focus`}
+      data-aim-chip=""
+    >
+      <Lock className="size-3" aria-hidden="true" />
+      Focus: {label}
+    </button>
+  );
+}
+
+/** The count a listing shows under Focus. `page` where the list is paged on
+ *  the server and only the rows of this page could be judged. */
+export function FocusCountNote({
+  shown,
+  total,
+  noun,
+  peek,
+  setPeek,
+  page,
+}: {
+  shown: number;
+  total: number;
+  noun: [string, string];
+  peek: boolean;
+  setPeek: (v: boolean) => void;
+  page?: boolean;
+}) {
+  const word = total === 1 ? noun[0] : noun[1];
+  const press = (label: string, v: boolean) => (
+    <button type="button" onClick={() => setPeek(v)} className={`font-semibold ${INPLACE_TEXT}`} data-scope-peek={v}>
+      {label}
+    </button>
+  );
+  const of = page ? `this page's ${n(total)} ${word}` : `${n(total)} ${word}`;
+  return (
+    <span data-scope-note={page ? "page" : ""} data-shown={shown} data-total={total}>
+      {peek ? (
+        <>
+          Showing all {of} · {press("Back to your focus", false)}
+        </>
+      ) : shown === 0 ? (
+        <>
+          None of {of} is in your focus · {press("Show all", true)}
+        </>
+      ) : (
+        <>
+          Showing {n(shown)} of {of} · {press("Show all", true)}
+        </>
+      )}
+    </span>
   );
 }

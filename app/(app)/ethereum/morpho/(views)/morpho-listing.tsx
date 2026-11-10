@@ -206,6 +206,8 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
   const listing = (
     <ChainTruthListingPage<MorphoPositionSummary, MorphoListFilters, MorphoRosterState>
       key={aimView}
+      // Focus is asked of the server here (the market ids), not judged per page.
+      focus={false}
       chipsLead={aimChip}
       countNode={aimCount}
       title={market ? "Positions in this market" : "Morpho Blue Positions"}
