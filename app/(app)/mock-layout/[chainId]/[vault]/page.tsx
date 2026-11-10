@@ -1,14 +1,14 @@
 // A layout mock of one MetaMorpho vault's page (Miles, 10 Nov 2026): the live
 // page's reads (components/vaults/metamorpho-vault-route.tsx) drawn by
 // components/mock-layout/mock-vault-layout.tsx, plus
-// lib/mock-layout/vault-config-read.ts. Localhost only; not linked from the app.
+// lib/mock-layout/vault-config-read.ts and lib/mock-layout/vault-holders-read.ts. Localhost only; not linked from the app.
 
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { MockVaultLayout } from "@/components/mock-layout/mock-vault-layout";
-import { metaMorphoRosterEntry, type MetaMorphoChainId } from "@/lib/metamorpho/vault-roster";
+import { metaMorphoFactoryAddress, metaMorphoRosterEntry, type MetaMorphoChainId } from "@/lib/metamorpho/vault-roster";
 import { loadMorphoBaseVault } from "@/lib/sources/chain/morpho-base-vault";
 import { loadVaultCensusRow } from "@/lib/vaults/census-read";
 import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
@@ -17,13 +17,15 @@ import { readVaultProtects } from "@/lib/vaults/protects-read";
 import { protectsLine, underneathLine } from "@/lib/vaults/protects-words";
 import { protectsProv, underneathProv } from "@/lib/vaults/protects-provenance";
 import { readMockVaultConfig } from "@/lib/mock-layout/vault-config-read";
+import { loadMockVaultHolders } from "@/lib/mock-layout/vault-holders-read";
 import { metaMorphoVaultHref } from "@/lib/vaults/routes";
 
 export const dynamic = "force-dynamic";
 
-/** The live sections keep their receipts; the two new tables have none yet. */
+/** The live sections keep their receipts, and Who holds it carries the census's;
+ *  the configuration and addresses tile has none yet. */
 export const PROV_EXEMPT =
-  "layout mock: the new tiles (configuration, roles and addresses) state no receipts yet; the reused sections keep theirs";
+  "layout mock: the configuration and addresses tile states no receipts yet; the other tiles carry theirs";
 
 export const metadata: Metadata = {
   title: "Vault page layout mock",
@@ -52,11 +54,12 @@ export default async function MockVaultPage({
 
   // The protects read is taken here, once, rather than through
   // VaultProtectsSection: the roles tile needs its guardian.
-  const [data, census, series, r] = await Promise.all([
+  const [data, census, series, r, holders] = await Promise.all([
     loadMorphoBaseVault(address, undefined, { chainId }),
     loadVaultCensusRow(chainId, address),
     loadVaultPageSeries(chainId, address),
     readVaultProtects({ chainId, address, kind: "metamorpho" }),
+    loadMockVaultHolders(chainId, address),
   ]);
   const [assetScales, config] = await Promise.all([
     data.chainStale ? {} : loadAssetScales(chainId, [data.vault.asset.address]),
@@ -95,6 +98,8 @@ export default async function MockVaultPage({
           strip={series.strip}
           protects={protects}
           config={config}
+          holders={holders}
+          factory={metaMorphoFactoryAddress(chainId, data.vault.factory)}
         />
       )}
       <ProvInspectorLayer />

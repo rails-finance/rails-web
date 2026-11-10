@@ -1,11 +1,12 @@
 "use client";
 
 // The MetaMorpho vault page as a grid of tiles (Miles, 10 Nov 2026, round
-// three): Coinbase's asset page for the grid, Morpho's vault page for the
-// configuration and the roles. A localhost mock under /mock-layout. The hero
-// carries the live card's headlines, stats and explanation
-// (components/vaults/morpho-base-vault-page.tsx); the other reused sections
-// are the live page's too.
+// four): Coinbase's asset page for the grid, Morpho's vault page for the
+// configuration and the roles. A localhost mock under /mock-layout. The holder
+// finder, then the live vault card (V2, built with the props
+// components/vaults/morpho-base-vault-page.tsx gives it), then the grid: Who
+// holds it | Where the assets are, The last 30 days, What protects it | The
+// protocol underneath, Configuration and addresses.
 //
 // Each tile is a `Tile` holding one `ProvSection`, so its heading, read stamp,
 // "?" and ⋮ sit in its top row. The reused sections keep their headings; the
@@ -15,15 +16,13 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { serverReadOf } from "@/lib/shared/server-head-read";
-import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
+import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
-import { readStampProv, SectionReadStamp } from "@/components/shared/read-stamp";
+import { readStampProv, SectionReadStamp, useBlockTime } from "@/components/shared/read-stamp";
 import { CopyFact } from "@/components/shared/event-page-aside";
-import { PanelFigure, PositionCardPanel, type PositionPanelRow } from "@/components/shared/position-card-panel";
-import { SectionExplainer } from "@/components/shared/section-explainer";
+import { PanelFigure, type PositionPanelRow } from "@/components/shared/position-card-panel";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
-import { VaultLead, VaultPills, vaultHeads, VAULT_PILL } from "@/components/vaults/vault-heads";
-import { CreatedBullet, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
+import { CreatedBullet, VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
 import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
 import { VaultFinder } from "@/components/vaults/vault-finder";
 import { VaultStrip } from "@/components/vaults/vault-strip";
@@ -32,7 +31,7 @@ import { VaultProtects, type ProtectsSectionData } from "@/components/vaults/vau
 import { StatAmount } from "@/components/vaults/stat-amount";
 import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
-import { assetText, shortAddress, shortId } from "@/lib/shared/vault-amount-text";
+import { assetText, pctText, shareText, shortAddress, shortId } from "@/lib/shared/vault-amount-text";
 import { morphoBaseWalletHref } from "@/lib/morpho-base/routes";
 import { morphoLoanTokenHref, morphoMarketHref } from "@/lib/morpho/market-routes";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
@@ -54,27 +53,37 @@ import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { metaMorphoVaultHref, metaMorphoVaultsListingHref } from "@/lib/vaults/routes";
 import { morphoBaseVaultPageSummary, withAssetScale } from "@/lib/vaults/summary";
 import type { AssetScale } from "@/lib/vaults/asset-scale-words";
-import { vaultVenueProv } from "@/lib/vaults/card-provenance";
-import { morphoVaultAssetsContent, morphoVaultCardContent, SHARES_ISSUED_TIP } from "@/lib/vaults/card-words";
+import { vaultStewardProv, vaultVenueProv } from "@/lib/vaults/card-provenance";
+import type { VaultExportModel } from "@/lib/vaults/card-export";
+import {
+  morphoVaultAssetsContent,
+  morphoVaultCardContent,
+  SHARES_ISSUED_TIP,
+  STEWARD_TIP,
+} from "@/lib/vaults/card-words";
+import { MIN_SEGMENT_SHARE } from "@/lib/vaults/allocation-plan";
 import { measuredYield, type VaultYield } from "@/lib/vaults/yield";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
 import type { MockVaultConfig } from "@/lib/mock-layout/vault-config-read";
+import type { MockVaultHolders } from "@/lib/mock-layout/vault-holders-read";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const lltvText = (lltv: number) => `${(lltv * 100).toFixed(1)}%`;
 const ZERO = /^0x0{40}$/;
 
-/** Where the assets are draws this many markets until the reader asks for all. */
+/** Where the assets are draws this many markets, then links to every one. */
 const TOP_MARKETS = 5;
+/** Who holds it names this many holders. */
+const TOP_HOLDERS = 5;
 
 /** The grid: one column, two from lg; the 1px gaps over the frame's colour
  *  draw the shared hairlines. The scoped selectors work on the reused
  *  sections: no outer margin or ring offset, no inner frame on the protects
  *  line, and no disclaimer in its explanation. */
 const GRID = [
-  "grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-rb-200 bg-rb-200 lg:grid-cols-2",
-  "dark:border-rb-500/30 dark:bg-rb-500/30",
+  "grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-rb-200 lg:grid-cols-2",
+  "dark:bg-rb-500/30",
   "[&_section[data-prov-scope]]:m-0 [&_section[data-prov-scope]]:rounded-none [&_section[data-prov-scope]]:p-0",
   "[&_section[data-vault-protects]>.rounded-xl]:border-0 [&_section[data-vault-protects]>.rounded-xl]:px-0",
   "[&_[data-protects-disclaimer]]:hidden",
@@ -133,34 +142,6 @@ function Fact({
   );
 }
 
-/** A hero figure: dotted label, the figure large, a line under it. */
-function Big({
-  id,
-  label,
-  tip,
-  value,
-  sub,
-}: {
-  id: string;
-  label: string;
-  tip?: string;
-  value: ReactNode;
-  sub?: ReactNode;
-}) {
-  return (
-    <div className="min-w-0" data-mock-hero={id} data-card-head={id}>
-      <Term label={label} tip={tip} />
-      <div className="mt-1 flex min-w-0 text-2xl font-semibold tabular-nums text-foreground">
-        {value ?? <span className="text-[15px] font-normal text-rb-500">not read</span>}
-      </div>
-      {sub && <div className="mt-1 text-xs leading-snug text-rb-500">{sub}</div>}
-    </div>
-  );
-}
-
-const CHIP =
-  "inline-flex items-center gap-1 rounded-sm border border-rb-200 px-1.5 py-0.5 text-[11px] text-rb-500 dark:border-rb-500/30";
-
 /** One address row: what it is, its short form, copy and explorer link. */
 function AddressRow({
   id,
@@ -213,14 +194,240 @@ function wadPct(raw: string): string {
 const blueWalletHref = (chainId: 1 | 8453, vault: string) =>
   chainId === 8453 ? morphoBaseWalletHref(vault) : (listingHrefForWallet("morpho", vault) ?? "/ethereum/morpho");
 
-const ANCHORS = [
-  ["overview", "Overview"],
-  ["configuration", "Configuration"],
-  ["allocation", "Allocation"],
-  ["last-30-days", "Last 30 days"],
-  ["risk", "Risk"],
-  ["addresses", "Addresses"],
-] as const;
+/** The allocation band's ink ramp (components/shared/ratio-bar.tsx) as stroke
+ *  opacities on the foreground colour, largest first; "others" takes the
+ *  faintest step. */
+const RING_RAMP = [0.75, 0.62, 0.52, 0.44, 0.36, 0.3, 0.25, 0.2, 0.16];
+const RING_OTHERS = 0.13;
+const ringOpacity = (rank: number) => RING_RAMP[Math.min(rank, RING_RAMP.length - 1)];
+
+const ppmPct = (ppm: number) => pctText(ppm / 1_000_000);
+
+interface RingSlice {
+  key: string;
+  ppm: number;
+  opacity: number;
+  title: string;
+}
+
+/** A donut of `slices` (parts per million, summing to at most a million) with
+ *  `centre` in its hole. A 1-unit gap separates neighbours. */
+function HolderRing({ slices, centre, label }: { slices: RingSlice[]; centre: ReactNode; label: string }) {
+  const R = 60;
+  const W = 22;
+  const C = 2 * Math.PI * R;
+  const gap = slices.length > 1 ? 1.5 : 0;
+  let at = 0;
+  return (
+    <div className="relative h-40 w-40 shrink-0" data-mock-ring="">
+      <svg viewBox="0 0 160 160" className="h-full w-full -rotate-90 text-foreground" role="img" aria-label={label}>
+        <circle cx="80" cy="80" r={R} fill="none" stroke="currentColor" strokeOpacity={0.06} strokeWidth={W} />
+        {slices.map((s) => {
+          const len = (s.ppm / 1_000_000) * C;
+          const dash = Math.max(len - gap, 0.5);
+          const el = (
+            <circle
+              key={s.key}
+              cx="80"
+              cy="80"
+              r={R}
+              fill="none"
+              stroke="currentColor"
+              strokeOpacity={s.opacity}
+              strokeWidth={W}
+              strokeDasharray={`${dash} ${C - dash}`}
+              strokeDashoffset={-at}
+              data-ring-slice={s.key}
+            >
+              <title>{s.title}</title>
+            </circle>
+          );
+          at += len;
+          return el;
+        })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">{centre}</div>
+    </div>
+  );
+}
+
+/** Who holds it: the census's live holders by share of the vault's shares.
+ *  Holders of 2% or more draw their own slice (the allocation band's rule,
+ *  lib/vaults/allocation-plan.ts), everyone else one "others" slice. */
+function WhoHoldsIt({
+  chainId,
+  vault,
+  vaultName,
+  shareSymbol,
+  holders,
+}: {
+  chainId: 1 | 8453;
+  vault: string;
+  vaultName: string;
+  shareSymbol: string;
+  holders: MockVaultHolders | null;
+}) {
+  const at = useBlockTime(chainId, holders?.censusBlock ?? null);
+  const listingHref = metaMorphoVaultsListingHref(chainId, { vault });
+  const scope = "mock-holders";
+
+  let content: ReactNode;
+  if (!holders || holders.holders.length === 0) {
+    content = <p className="mt-3 text-[13px] text-rb-500">The census did not answer, so no holder is stated.</p>;
+  } else if (!holders.sumMatches) {
+    content = (
+      <p className="mt-3 text-[13px] text-rb-500">
+        The census&rsquo;s balances do not sum to the share supply at its block, so the set is not proven whole and is
+        not drawn.
+      </p>
+    );
+  } else {
+    const list = holders.holders;
+    let shown = list.filter((h) => h.ppm / 1_000_000 >= MIN_SEGMENT_SHARE);
+    if (!shown.length) shown = list.slice(0, 1);
+    // A single leftover draws alone, as on the band.
+    if (holders.liveCount - shown.length === 1 && list[shown.length]) shown = list.slice(0, shown.length + 1);
+    const shownPpm = shown.reduce((s, h) => s + h.ppm, 0);
+    const othersCount = holders.liveCount - shown.length;
+    const othersPpm = Math.max(0, 1_000_000 - shownPpm);
+    const rank = new Map(shown.map((h, i) => [h.holder, i]));
+    const slices: RingSlice[] = shown.map((h, i) => ({
+      key: h.holder,
+      ppm: h.ppm,
+      opacity: ringOpacity(i),
+      title: `${shortAddress(h.holder)} · ${ppmPct(h.ppm)}`,
+    }));
+    if (othersCount > 0)
+      slices.push({
+        key: "others",
+        ppm: othersPpm,
+        opacity: RING_OTHERS,
+        title: `${n(othersCount)} others · ${ppmPct(othersPpm)}`,
+      });
+
+    const top = list.slice(0, TOP_HOLDERS);
+    const restCount = holders.liveCount - top.length;
+    const restPpm = Math.max(0, 1_000_000 - top.reduce((s, h) => s + h.ppm, 0));
+    const shareProv = (holder: string, ppm: number): Provenance => ({
+      kind: "chain",
+      pclass: "state",
+      source: { block: holders.censusBlock },
+      summary: `Share of the vault's shares at the census — ${shortAddress(holder)} held ${ppmPct(ppm)} of ${shareSymbol}: its balanceOf() over the share token's totalSupply(), both read by the Rails census at block ${n(holders.censusBlock)} and kept.`,
+      contract: { name: vaultName, address: vault },
+      via: "Rails census · balanceOf(holder) / totalSupply() @ the census block",
+    });
+    const othersProv: Provenance = {
+      kind: "chain-derived",
+      pclass: "state",
+      source: { block: holders.censusBlock },
+      summary: `The other holders' share at the census — ${n(restCount)} addresses held ${ppmPct(restPpm)} of ${shareSymbol}: the whole supply less the ${n(top.length)} named above, from the census at block ${n(holders.censusBlock)}, where every balance summed to totalSupply().`,
+      contract: { name: vaultName, address: vault },
+      via: "Rails census · 1 − Σ balanceOf(top holders) / totalSupply() @ the census block",
+    };
+
+    const countProv: Provenance = {
+      kind: "chain-derived",
+      pclass: "state",
+      source: { block: holders.censusBlock },
+      summary: `Holders at the census — ${n(holders.liveCount)} addresses held a share of ${shareSymbol} at block ${n(holders.censusBlock)}: the Rails census swept every Transfer of the vault to that block and read balanceOf() for each address it named.`,
+      contract: { name: vaultName, address: vault },
+      via: "Rails census · eth_getLogs(Transfer) + balanceOf(holder) > 0 @ the census block",
+    };
+    const restCountProv: Provenance = {
+      ...countProv,
+      summary: `Other holders at the census — ${n(restCount)} addresses: the ${n(holders.liveCount)} holding a share of ${shareSymbol} at block ${n(holders.censusBlock)}, less the ${n(top.length)} named above.`,
+    };
+
+    content = (
+      <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row sm:items-center">
+        <HolderRing
+          slices={slices}
+          label={`${n(holders.liveCount)} holders of ${shareSymbol} by share`}
+          centre={
+            <>
+              <span className="text-xl font-semibold tabular-nums text-foreground">
+                <Prov info={countProv}>{n(holders.liveCount)}</Prov>
+              </span>
+              <span className="text-xs text-rb-500">holders</span>
+            </>
+          }
+        />
+        <div className="w-full min-w-0 flex-1">
+          <ol className="border-t border-rb-200 dark:border-rb-500/30">
+            {top.map((h) => {
+              const r = rank.get(h.holder);
+              return (
+                <li
+                  key={h.holder}
+                  className="flex items-center justify-between gap-3 border-b border-rb-200 py-2 dark:border-rb-500/30"
+                  data-mock-holder={h.holder}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      aria-hidden
+                      className="h-2.5 w-2.5 shrink-0 rounded-sm bg-foreground"
+                      style={{ opacity: r != null ? ringOpacity(r) : RING_OTHERS }}
+                    />
+                    <Link
+                      href={metaMorphoVaultHref(chainId, vault, h.holder)}
+                      prefetch={false}
+                      className={`font-mono text-[13px] ${INLINE_LINK}`}
+                      title={h.holder}
+                    >
+                      {shortAddress(h.holder)}
+                    </Link>
+                  </span>
+                  <span className="text-[13px] font-medium tabular-nums text-foreground">
+                    <Prov info={shareProv(h.holder, h.ppm)}>{ppmPct(h.ppm)}</Prov>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+          {restCount > 0 && (
+            <p className="mt-2 text-[13px] text-rb-500" data-mock-holders-rest="">
+              <Link href={listingHref} prefetch={false} className={INLINE_LINK}>
+                <Prov info={restCountProv}>{n(restCount)}</Prov> others
+              </Link>{" "}
+              hold <Prov info={othersProv}>{ppmPct(restPpm)}</Prov>
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ProvSection scope={scope} data-mock-section="holders">
+      <SectionHeading
+        title="Who holds it"
+        menu={
+          <SectionMenu
+            scope={scope}
+            title="Who holds it"
+            links={[
+              {
+                item: "holders",
+                title: "Every holder of this vault",
+                subtitle: "The positions listing, filtered to this vault",
+                href: listingHref,
+                internal: true,
+              },
+            ]}
+          />
+        }
+      >
+        {holders && (
+          <p className="mt-1 text-[13px] text-rb-500">
+            By share of {shareSymbol}, at the census of {at != null ? `${formatDate(new Date(at * 1000))}, ` : ""}block{" "}
+            {n(holders.censusBlock)}
+          </p>
+        )}
+      </SectionHeading>
+      {content}
+    </ProvSection>
+  );
+}
 
 export function MockVaultLayout({
   data,
@@ -230,6 +437,8 @@ export function MockVaultLayout({
   strip,
   protects,
   config,
+  holders,
+  factory,
 }: {
   data: MorphoBaseVaultResponse;
   census: VaultCensusRow | null;
@@ -245,6 +454,10 @@ export function MockVaultLayout({
     underneath: ProtectsSectionData;
   } | null;
   config: MockVaultConfig;
+  /** Who holds it: the census's largest holders; null where it did not answer. */
+  holders: MockVaultHolders | null;
+  /** The factory that made this vault, from the catalogue. */
+  factory: string | null;
 }) {
   const registry = useReceiptRegistry();
   const { vault, legs, chainId } = data;
@@ -282,16 +495,7 @@ export function MockVaultLayout({
         }
       : {}),
   };
-  // The live card's four headlines: Total assets · Share price · Yield · Holders.
-  const heads = vaultHeads({
-    vault: v,
-    yieldFigure: storeYield,
-    holdersHref: metaMorphoVaultsListingHref(chainId, { vault: vault.address }),
-    receipts,
-    detail: true,
-  });
-
-  // The live card's stats, less Steward (the roles tile names it).
+  // The live card's stats (components/vaults/morpho-base-vault-page.tsx).
   const stats: PositionPanelRow[] = [
     {
       id: "shares-issued",
@@ -329,6 +533,17 @@ export function MockVaultLayout({
           <Prov info={vaultGapProv(coords)}>
             <StatAmount amount={data.gap} decimals={ad} symbol={unit} />
           </Prov>
+        </span>
+      ),
+    },
+    {
+      id: "steward",
+      label: "Steward",
+      sub: steward.role === "curator" ? "curator" : "owner",
+      tip: steward.role === "curator" ? STEWARD_TIP.curator : STEWARD_TIP.owner,
+      value: (
+        <span className="font-mono text-sm" data-steward={steward.address} data-steward-role={steward.role}>
+          <Prov info={vaultStewardProv(v, steward, coords.readBy)}>{shortAddress(steward.address)}</Prov>
         </span>
       ),
     },
@@ -407,13 +622,56 @@ export function MockVaultLayout({
       subtitle: `${shortAddress(vault.address)} on ${chain.explorerName}`,
       href: addr(vault.address),
     },
+    ...(factory
+      ? [
+          {
+            item: "factory",
+            title: "Factory",
+            subtitle: `MetaMorpho ${vault.factory} · ${shortAddress(factory)}`,
+            href: addr(factory),
+          },
+        ]
+      : []),
+    {
+      item: "created",
+      title: "Created",
+      subtitle: `Block ${n(vault.createdBlock)} on ${chain.explorerName}`,
+      href: explorerUrl(chainId, "block", vault.createdBlock),
+    },
+    {
+      item: "steward",
+      title: `${steward.role === "curator" ? "Curator" : "Owner"} on ${chain.explorerName}`,
+      subtitle: shortAddress(steward.address),
+      href: addr(steward.address),
+    },
     {
       item: "venue-page",
       title: "On Morpho's app",
       subtitle: "app.morpho.org",
       href: `https://app.morpho.org/${chainId === 1 ? "ethereum" : "base"}/vault/${vault.address}`,
     },
+    {
+      item: "docs",
+      title: "Morpho's documentation",
+      subtitle: "docs.morpho.org: Vaults",
+      href: "https://docs.morpho.org/learn/concepts/vault/",
+    },
   ];
+
+  const exportModel: VaultExportModel = {
+    stats: [
+      ["Shares issued", `${shareText(data.totalSupply, vault.decimals)} ${vault.symbol}`],
+      ["Allocated in Morpho Blue", `${assetText(data.allocated, ad)} ${unit}`],
+      ["Unaccrued interest", `${assetText(data.gap, ad)} ${unit}`],
+      [`Steward (${steward.role})`, steward.address],
+      ...(lostStat ? ([["Lost assets", `${assetText(lostStat, ad)} ${unit}`]] as [string, string][]) : []),
+    ],
+    rows: legs.map((l) => [
+      `${l.isIdle ? "Idle market" : (l.collateralSymbol ?? shortId(l.id))} ${l.id}`,
+      assetText(l.assets, ad),
+      l.shareOfAllocated == null ? "" : pctText(l.shareOfAllocated),
+    ]),
+  };
 
   const rows: VaultAssetRow[] = legs.map((leg) => {
     const legCoords: MorphoVaultCoords = { ...coords, marketId: leg.id, collateralSymbol: leg.collateralSymbol };
@@ -490,9 +748,10 @@ export function MockVaultLayout({
         className="mb-4 rounded-lg border border-dashed border-rb-400 px-4 py-3 text-[13px] leading-relaxed text-rb-500 dark:border-rb-500"
         data-mock-note=""
       >
-        A mock of a new layout for this vault&rsquo;s page: Coinbase&rsquo;s grid of tiles, with the configuration and
-        roles from Morpho&rsquo;s vault page. New: the vault configuration and roles and addresses tiles; the other
-        tiles are the live page&rsquo;s sections. Receipts on the new tiles are not wired yet.{" "}
+        A mock of a new layout for this vault&rsquo;s page: the live vault card, then a grid of tiles after
+        Coinbase&rsquo;s asset pages, with the configuration and roles after Morpho&rsquo;s vault page. New: Who holds
+        it, from the census, and Configuration and addresses, which carries no receipts yet. The other tiles are the
+        live page&rsquo;s sections.{" "}
         <Link href={metaMorphoVaultHref(chainId, vault.address)} prefetch={false} className={INLINE_LINK}>
           The live page
         </Link>
@@ -500,141 +759,63 @@ export function MockVaultLayout({
 
       <VaultFinder />
 
-      <div className={GRID} data-mock-layout="">
-        {/* Hero: the live card's headlines, stats and explanation */}
-        <Tile id="overview" wide>
-          <ProvSection scope="mock-overview" data-mock-section="overview">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-3">
-                  <VaultLead vault={v} size={32} />
-                  <h1 className="min-w-0 break-words text-xl font-semibold text-foreground">{name}</h1>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                  <VaultPills vault={v} receipts={{}} />
-                  <span className={VAULT_PILL} data-pill="chain">
-                    {chain.name}
-                  </span>
-                  <span className={CHIP} data-mock-chip="asset">
-                    Asset <span className="text-foreground">{unit}</span>
-                  </span>
-                </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <SectionReadStamp
-                  chainId={chainId}
-                  block={data.blockNumber}
-                  readBy={coords.readBy}
-                  info={(at) =>
-                    readStampProv({
-                      chainId,
-                      block: data.blockNumber,
-                      at,
-                      readBy: coords.readBy,
-                      what: "Every chain figure in this section",
-                      contracts: [
-                        {
-                          name: vault.name,
-                          address: vault.address,
-                          reads: "totalAssets(), totalSupply(), convertToAssets(), curator(), owner(), lostAssets()",
-                        },
-                        {
-                          name: "Morpho Blue",
-                          address: vault.morpho,
-                          reads: "market(id), position(id, vault) for each market in the queue",
-                        },
-                      ],
-                    })
-                  }
-                />
-                <SectionMenu scope="mock-overview" title="Overview" links={links} />
-              </div>
-            </div>
-            <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
-              {heads.map((h) => (
-                <Big key={h.id} id={h.id} label={h.label} tip={h.labelTip} value={h.value} sub={h.sub} />
-              ))}
-            </div>
-            {/* A trillion-sized figure (an asset whose decimals disagree)
-                breaks across lines at phone width instead of running past
-                the tile's edge. */}
-            <div className="[&_[data-panel-figure]]:max-w-full [&_dd]:break-all">
-              <PositionCardPanel columns={[stats, []]} />
-            </div>
-            {v.illiquid && (
-              <div className="mt-4">
-                <VaultIlliquidMarkets vault={v} il={v.illiquid} />
-              </div>
-            )}
-            <SectionExplainer
-              slot={{ body: explanation }}
-              label="vault explanation"
-              learnMore={morphoVaultCardContent()}
-              anatomy={{ explanation: "C3", learnMore: "C4" }}
-              className="mt-5"
+      {/* A trillion-sized figure (an asset whose decimals disagree) breaks
+          across lines at phone width instead of running past the card's
+          edge; the live card overflows there by about 40px. */}
+      <div className="[&_[data-panel-figure]]:max-w-full [&_dd]:break-all">
+        <VaultCard
+          vault={v}
+          yieldFigure={yieldFigure}
+          holdersHref={metaMorphoVaultsListingHref(chainId, { vault: vault.address })}
+          receipts={receipts}
+          status={null}
+          stats={stats}
+          band={v.illiquid ? <VaultIlliquidMarkets vault={v} il={v.illiquid} /> : undefined}
+          links={links}
+          explanation={explanation}
+          learnMore={morphoVaultCardContent()}
+          stamp={
+            <SectionReadStamp
+              chainId={chainId}
+              block={data.blockNumber}
+              readBy={coords.readBy}
+              info={(at) =>
+                readStampProv({
+                  chainId,
+                  block: data.blockNumber,
+                  at,
+                  readBy: coords.readBy,
+                  what: "Every figure on this card and in where the assets are",
+                  contracts: [
+                    {
+                      name: vault.name,
+                      address: vault.address,
+                      reads:
+                        "totalAssets(), totalSupply(), convertToAssets(), curator(), owner(), lostAssets(), withdrawQueue()",
+                    },
+                    {
+                      name: "Morpho Blue",
+                      address: vault.morpho,
+                      reads: "market(id), position(id, vault), idToMarketParams(id) for each market in the queue",
+                    },
+                  ],
+                })
+              }
             />
-            <nav
-              aria-label="On this page"
-              className="mt-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-rb-200 pt-3 text-[13px] dark:border-rb-500/30"
-            >
-              {ANCHORS.map(([id, label]) => (
-                <a key={id} href={`#${id}`} className={INLINE_LINK}>
-                  {label}
-                </a>
-              ))}
-            </nav>
-          </ProvSection>
-        </Tile>
+          }
+          exports={exportModel}
+        />
+      </div>
 
-        <Tile id="configuration">
-          <ProvSection scope="mock-config" data-mock-section="config">
-            <SectionHeading
-              title="Vault configuration"
-              stamp={configStamp(config.block, "Fee and fee recipient", "fee(), feeRecipient()")}
-              menu={<SectionMenu scope="mock-config" title="Vault configuration" />}
-            />
-            <dl className="mt-3 border-t border-rb-200 dark:border-rb-500/30" data-prov-exempt="">
-              <Fact
-                id="version"
-                label="Version"
-                tip="The MetaMorpho factory release that deployed the vault."
-                value={v.releaseLabel}
-              />
-              <Fact
-                id="created"
-                label="Created"
-                tip="The date of the block the vault was deployed in."
-                value={config.createdAt ? formatDate(new Date(config.createdAt * 1000)) : null}
-                sub={vault.createdBlock > 0 ? `block ${n(vault.createdBlock)}` : undefined}
-              />
-              <Fact
-                id="fee"
-                label="Performance fee"
-                tip="The share of the interest the vault earns that it pays to the fee recipient, as new shares. Read from fee(), a fraction of 10^18."
-                value={config.fee != null ? wadPct(config.fee) : null}
-              />
-              <Fact
-                id="fee-recipient"
-                label="Fee recipient"
-                tip="The address the performance fee's new shares go to. Read from feeRecipient()."
-                value={
-                  feeRecipient ? (
-                    <a
-                      href={addr(feeRecipient)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`font-mono ${INLINE_LINK}`}
-                      title={feeRecipient}
-                    >
-                      {shortAddress(feeRecipient)}
-                    </a>
-                  ) : config.block != null ? (
-                    <span className="text-[13px] font-normal text-rb-500">none set</span>
-                  ) : null
-                }
-              />
-            </dl>
-          </ProvSection>
+      <div className={GRID} data-mock-layout="">
+        <Tile id="holders">
+          <WhoHoldsIt
+            chainId={chainId}
+            vault={vault.address}
+            vaultName={name}
+            shareSymbol={vault.symbol}
+            holders={holders}
+          />
         </Tile>
 
         <Tile id="allocation">
@@ -644,6 +825,7 @@ export function MockVaultLayout({
             assetAddress={vault.asset.address}
             assetDecimals={ad}
             limit={TOP_MARKETS}
+            allHref={blueWalletHref(chainId, vault.address)}
             line={
               <>
                 <PanelFigure>{n(funded.length)}</PanelFigure> of {n(legs.length)} markets in the withdraw queue hold a
@@ -654,6 +836,13 @@ export function MockVaultLayout({
             learnMore={morphoVaultAssetsContent()}
             menu={{
               links: [
+                {
+                  item: "own-positions",
+                  title: "This vault's positions on Morpho Blue",
+                  subtitle: "The vault as a Morpho Blue lender",
+                  href: blueWalletHref(chainId, vault.address),
+                  internal: true,
+                },
                 {
                   item: "loan-token-markets",
                   title: `${unit} markets on Morpho Blue`,
@@ -684,22 +873,66 @@ export function MockVaultLayout({
           </div>
         </Tile>
 
-        <Tile id="addresses" wide>
-          <ProvSection scope="mock-addresses" data-mock-section="addresses">
+        <Tile id="configuration" wide>
+          <ProvSection scope="mock-config" data-mock-section="config">
             <SectionHeading
-              title="Roles and addresses"
+              title="Configuration and addresses"
               stamp={configStamp(
-                protects?.block ?? null,
-                "The roles",
-                "owner(), curator(), guardian(), feeRecipient()",
+                config.block ?? protects?.block ?? null,
+                "The fee and the roles",
+                "fee(), feeRecipient(), owner(), curator(), guardian()",
               )}
-              menu={<SectionMenu scope="mock-addresses" title="Roles and addresses" />}
+              menu={<SectionMenu scope="mock-config" title="Configuration and addresses" />}
             >
               <p className="mt-1 text-[13px] text-rb-500">
                 {chain.name}, chain id {chainId}
               </p>
             </SectionHeading>
-            <div className="mt-3 grid grid-cols-1 gap-x-8 lg:grid-cols-2" data-prov-exempt="">
+            <div className="mt-3 grid grid-cols-1 gap-x-8 gap-y-5 lg:grid-cols-3" data-prov-exempt="">
+              <div className="min-w-0">
+                <h3 className="text-xs font-semibold text-rb-500">Configuration</h3>
+                <dl className="mt-1 border-t border-rb-200 dark:border-rb-500/30">
+                  <Fact
+                    id="version"
+                    label="Version"
+                    tip="The MetaMorpho factory release that deployed the vault."
+                    value={v.releaseLabel}
+                  />
+                  <Fact
+                    id="created"
+                    label="Created"
+                    tip="The date of the block the vault was deployed in."
+                    value={config.createdAt ? formatDate(new Date(config.createdAt * 1000)) : null}
+                    sub={vault.createdBlock > 0 ? `block ${n(vault.createdBlock)}` : undefined}
+                  />
+                  <Fact
+                    id="fee"
+                    label="Performance fee"
+                    tip="The share of the interest the vault earns that it pays to the fee recipient, as new shares. Read from fee(), a fraction of 10^18."
+                    value={config.fee != null ? wadPct(config.fee) : null}
+                  />
+                  <Fact
+                    id="fee-recipient"
+                    label="Fee recipient"
+                    tip="The address the performance fee's new shares go to. Read from feeRecipient()."
+                    value={
+                      feeRecipient ? (
+                        <a
+                          href={addr(feeRecipient)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`font-mono ${INLINE_LINK}`}
+                          title={feeRecipient}
+                        >
+                          {shortAddress(feeRecipient)}
+                        </a>
+                      ) : config.block != null ? (
+                        <span className="text-[13px] font-normal text-rb-500">none set</span>
+                      ) : null
+                    }
+                  />
+                </dl>
+              </div>
               <div className="min-w-0">
                 <h3 className="text-xs font-semibold text-rb-500">Roles</h3>
                 <ul className="mt-1 border-t border-rb-200 dark:border-rb-500/30">
@@ -727,18 +960,10 @@ export function MockVaultLayout({
                     explorer={chain.explorerName}
                     href={addr}
                   />
-                  <AddressRow
-                    id="fee-recipient"
-                    label="Fee recipient"
-                    sub="receives the performance fee"
-                    address={feeRecipient}
-                    explorer={chain.explorerName}
-                    href={addr}
-                  />
                 </ul>
                 <p className="mt-2 text-xs text-rb-500">Allocators are not listed here.</p>
               </div>
-              <div className="mt-4 min-w-0 lg:mt-0">
+              <div className="min-w-0">
                 <h3 className="text-xs font-semibold text-rb-500">Contracts</h3>
                 <ul className="mt-1 border-t border-rb-200 dark:border-rb-500/30">
                   <AddressRow

@@ -36,8 +36,8 @@ export default function MockLayoutIndex() {
     <div className="min-h-screen py-8" data-prov-exempt={PROV_EXEMPT}>
       <h1 className="text-2xl font-semibold text-foreground">Vault page layout mock</h1>
       <p className="mt-2 max-w-2xl text-rb-500">
-        MetaMorpho vault pages as a grid of tiles after Coinbase&rsquo;s asset pages, with the configuration and roles
-        after Morpho&rsquo;s vault pages.
+        MetaMorpho vault pages: the live vault card, then a grid of tiles after Coinbase&rsquo;s asset pages. Who holds
+        it draws the census&rsquo;s holders as a ring; configuration and addresses follow Morpho&rsquo;s vault pages.
       </p>
       <ul className="mt-6 space-y-3">
         {EXAMPLES.map((e) => (

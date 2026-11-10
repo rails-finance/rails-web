@@ -19,7 +19,7 @@
 // Below sm each row is a card (D6): the venue across, Amount and Share two-up
 // under their names.
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import {
   ProvSection,
@@ -107,6 +107,7 @@ export function VaultAssets({
   learnMore,
   menu,
   limit,
+  allHref,
 }: {
   rows: VaultAssetRow[];
   assetSymbol: string;
@@ -120,13 +121,13 @@ export function VaultAssets({
   learnMore: LearnMoreContent;
   /** The section ⋮'s rows above Inspect provenance. */
   menu: { links?: SectionMenuLink[]; exports?: SectionMenuExports };
-  /** Draw the first `limit` rows, with a control that shows the rest. The
-   *  band draws every row either way. */
+  /** Draw the first `limit` rows; the band draws every row either way. */
   limit?: number;
+  /** Where every row is, linked under a capped table. */
+  allHref?: string;
 }) {
-  const [all, setAll] = useState(false);
   const capped = limit != null && rows.length > limit;
-  const tableRows = capped && !all ? rows.slice(0, limit) : rows;
+  const tableRows = capped ? rows.slice(0, limit) : rows;
   const banded = rows
     .map((r, order) => ({ r, order }))
     .filter(({ r }) => !r.offBand)
@@ -270,16 +271,15 @@ export function VaultAssets({
           ))}
         </DataTableBody>
       </DataTable>
-      {capped && (
-        <button
-          type="button"
-          onClick={() => setAll((a) => !a)}
-          aria-expanded={all}
-          className={`mt-2 cursor-pointer text-[13px] ${INLINE_LINK}`}
+      {capped && allHref && (
+        <Link
+          href={allHref}
+          prefetch={false}
+          className={`mt-2 inline-block text-[13px] ${INLINE_LINK}`}
           data-assets-show-all=""
         >
-          {all ? `Show the top ${n(limit!)}` : `Show all ${n(rows.length)}`}
-        </button>
+          Show all {n(rows.length)}
+        </Link>
       )}
     </ProvSection>
   );
