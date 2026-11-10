@@ -194,7 +194,6 @@ const SPECS: ProtocolSpec[] = [
     // `<route>/<wallet>`, each opening `<route>/position/<deployment>/<id>`
     // (ids overlap across Slipstream's three position managers). Reads come
     // from rails-server's at-block routes (lib/api/fetch-aerodrome.ts).
-    // Unlaunched while Miles reads it.
     id: "aerodrome",
     session: "aerodrome",
     label: "Aerodrome",
@@ -206,7 +205,6 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Concentrated liquidity on Base, staked or not: a position's range, fees or AERO and pool over the last 30 days",
     positionListing: false,
-    unlaunched: true,
     readTier: "visit",
     subPages: [],
   },

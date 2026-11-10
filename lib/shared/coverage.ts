@@ -933,7 +933,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   }),
   // Aerodrome Slipstream on Base (ui-jobs 566), on Uniswap V3's row: the
   // position page reads the pool, the position and its gauge at the head and
-  // 30 days back. Unlaunched, so the matrix does not draw it yet.
+  // 30 days back.
   aerodrome: explorerDepth({
     dashboard: true,
     oracleUsd: { why: ORACLE_USD_REASON.aerodrome },
