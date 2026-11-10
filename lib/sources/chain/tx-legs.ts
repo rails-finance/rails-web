@@ -31,19 +31,19 @@ import { chainClient } from "./rpc";
 import { resolveErc20Meta } from "./erc20-meta";
 import { aaveOraclePricesAtBlock } from "./aave-oracle-prices";
 import { fetchStoredTxLegs } from "@/lib/sources/api/tx-legs-at-block";
-import type { ChainId } from "@/lib/shared/chains";
+import { nativeCurrency, type ChainId } from "@/lib/shared/chains";
 import { needsLegPrices, type TxLeg, type TxLegs } from "@/lib/shared/tx-legs";
 
 const TRANSFER = parseAbi(["event Transfer(address indexed from, address indexed to, uint256 value)"]);
 const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const ZERO = "0x0000000000000000000000000000000000000000";
-/** The native coin on every chain the route reads (Ethereum, Base, Arbitrum). */
-const NATIVE = { symbol: "ETH", decimals: 18 };
-/** WETH per chain: the oracle prices the native coin under it. */
+/** WETH per chain: the oracle prices the native coin under it. Arc has none:
+ *  its native coin is USDC. */
 const WRAPPED_NATIVE: Partial<Record<ChainId, string>> = {
   1: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
   8453: "0x4200000000000000000000000000000000000006",
   42161: "0x82af49447d8a07e3bd95bd0d56f35241523fbab1",
+  10: "0x4200000000000000000000000000000000000006",
 };
 
 type Answer = Omit<TxLegs, "rpcCalls" | "cached">;
@@ -178,8 +178,10 @@ async function read(chainId: ChainId, hash: string, wallet: string): Promise<{ a
     ...native.map(
       (t): TxLeg => ({
         token: null,
-        symbol: NATIVE.symbol,
-        decimals: NATIVE.decimals,
+        // The native balance's decimals: 18 on Arc too, where USDC's ERC-20
+        // interface states 6.
+        symbol: nativeCurrency(chainId).symbol,
+        decimals: nativeCurrency(chainId).decimals,
         raw: t.value.toString(),
         counterparty: t.from,
         source: nativeSource,

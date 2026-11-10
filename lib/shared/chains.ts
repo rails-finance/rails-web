@@ -13,17 +13,33 @@
 // does not pass a chain keeps rendering the exact Etherscan URL it rendered
 // before — the L1 protocol surface is untouched by the Base work.
 
-export type ChainId = 1 | 8453 | 42161 | 11155111;
+export type ChainId = 1 | 10 | 8453 | 5042 | 42161 | 11155111;
 
 export const MAINNET_CHAIN_ID = 1 satisfies ChainId;
 export const BASE_CHAIN_ID = 8453 satisfies ChainId;
 /** Arbitrum One. Its first roster entry is Aave V3 (`aave-v3-arbitrum`), which
  *  puts the chain on the nav, the sitemap and /coverage/arbitrum. */
 export const ARBITRUM_CHAIN_ID = 42161 satisfies ChainId;
+/** OP Mainnet. Registered ahead of any launched explorer on it: until one
+ *  launches, `isLaunchedChain` keeps it off every listing surface. */
+export const OPTIMISM_CHAIN_ID = 10 satisfies ChainId;
+/** Arc, Circle's chain, whose native coin is USDC. Registered ahead of any
+ *  launched explorer on it, as Optimism is. */
+export const ARC_CHAIN_ID = 5042 satisfies ChainId;
 /** Sepolia — the first testnet chain in Rails (Polaris runs there). A
  *  testnet's numbers are test numbers; `testnet: true` on its entry is what
  *  lets copy say so where it matters. */
 export const SEPOLIA_CHAIN_ID = 11155111 satisfies ChainId;
+
+export interface NativeCurrency {
+  symbol: string;
+  name: string;
+  /** The native balance's decimals (`eth_getBalance`, `msg.value`). */
+  decimals: number;
+}
+
+/** Every chain's native coin unless its entry names another. */
+const ETHER: NativeCurrency = { symbol: "ETH", name: "Ether", decimals: 18 };
 
 export interface ChainMeta {
   id: ChainId;
@@ -46,6 +62,12 @@ export interface ChainMeta {
    *  (`rails-base-backfill` for history, the site's own app for state). A chain
    *  whose one app serves both simply names the same var twice. */
   logsRpcEnv: string;
+  /** The explorer's software when it is not Etherscan-family. Blockscout takes
+   *  the same /tx, /address, /block and /token paths and shows a transaction's
+   *  logs on `?tab=logs` in place of the `#eventlog` anchor. */
+  explorerKind?: "blockscout";
+  /** The native coin when it is not 18-decimal ETH: Arc pays gas in USDC. */
+  nativeCurrency?: NativeCurrency;
   /** Optional server env var holding a second JSON-RPC URL for the state reads.
    *  When set, `chainClient` tries `rpcEnv` first and falls to this URL for a
    *  call the first one refused or did not answer. Absent on every chain but
@@ -92,6 +114,33 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
     // The Alchemy Arbitrum app; the Tenderly gateway in `rpcEnv` answers first.
     fallbackRpcEnv: "ARBITRUM_FALLBACK_RPC_URL",
   },
+  10: {
+    id: 10,
+    name: "Optimism",
+    slug: "optimism",
+    explorerName: "Optimism Etherscan",
+    // Etherscan-family, so the PATHS below and the #eventlog anchor hold.
+    explorerBase: "https://optimistic.etherscan.io",
+    // Tenderly's keyless gateway answers both the state reads and whole-life
+    // logs here, so both names are the same var.
+    rpcEnv: "OPTIMISM_RPC_URL",
+    logsRpcEnv: "OPTIMISM_RPC_URL",
+  },
+  5042: {
+    id: 5042,
+    name: "Arc",
+    slug: "arc",
+    // Named in Arc's docs (docs.arc.io, "Connect to Arc": the mainnet
+    // `blockExplorers` entry). The site runs Blockscout.
+    explorerName: "Arc Explorer",
+    explorerBase: "https://explorer.arc.io",
+    explorerKind: "blockscout",
+    rpcEnv: "ARC_RPC_URL",
+    logsRpcEnv: "ARC_RPC_URL",
+    // USDC is the native coin: 18 decimals as the native balance. Its ERC-20
+    // interface at 0x3600…0000 reports 6 (ARC_USDC_ERC20 below).
+    nativeCurrency: { symbol: "USDC", name: "USDC", decimals: 18 },
+  },
   11155111: {
     id: 11155111,
     name: "Sepolia",
@@ -107,6 +156,15 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
     testnet: true,
   },
 };
+
+/** The chain's native coin: ETH at 18 decimals unless the entry names another. */
+export function nativeCurrency(chainId: ChainId = MAINNET_CHAIN_ID): NativeCurrency {
+  return chainMeta(chainId).nativeCurrency ?? ETHER;
+}
+
+/** Arc's USDC through its ERC-20 interface: the same balance as the native
+ *  coin, stated in 6 decimals where the native balance uses 18. */
+export const ARC_USDC_ERC20 = { address: "0x3600000000000000000000000000000000000000", decimals: 6 } as const;
 
 /** Never throws on an unknown id — a bad chain must not blank a rendered page. */
 export function chainMeta(chainId: ChainId = MAINNET_CHAIN_ID): ChainMeta {
@@ -138,5 +196,7 @@ const PATHS: Record<ExplorerLinkKind, (v: string) => string> = {
  * what makes the sweep safe to land on the L1 pages.
  */
 export function explorerUrl(chainId: ChainId, kind: ExplorerLinkKind, value: string | number): string {
+  if (kind === "tx-logs" && chainMeta(chainId).explorerKind === "blockscout")
+    return `${chainMeta(chainId).explorerBase}/tx/${value}?tab=logs`;
   return `${chainMeta(chainId).explorerBase}${PATHS[kind](String(value))}`;
 }
