@@ -470,7 +470,8 @@ await phone.close();
     first.join() === [W[2], W[1], W[0]].join(),
     first.join(),
   );
-  await bp.locator("[data-bookmark-row]").first().locator('[data-bookmark-move="down"]').click();
+  await bp.locator("[data-bookmark-row]").first().locator("[data-row-menu]").click();
+  await bp.locator('[data-row-menu-list] [data-bookmark-move="down"]').click();
   await bp.reload({ waitUntil: "networkidle" });
   await bp.waitForSelector("[data-bookmark-row]");
   const moved = await order();
