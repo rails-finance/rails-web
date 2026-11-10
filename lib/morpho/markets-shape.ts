@@ -341,11 +341,44 @@ export function marketViewData(resp: MorphoMarketChainResponse): MorphoMarketVie
 
 // ── the roster table (R1) ────────────────────────────────────────────────────
 
-/** One loan token on the roster table: its summary and the markets that carry
- *  its book (the per-token page's `material`); the rest are counted, and open
- *  on the token's page. */
+/** A repeated pair's market: the feeds its oracle names, with each feed's
+ *  `description()`. `readable` is false where none of the oracle's feed
+ *  getters answered (an oracle of another shape). */
+export interface MorphoPriceSource {
+  oracle: string | null;
+  feeds: { slot: string; address: string; description: string | null }[];
+  readable: boolean;
+}
+
+/** What lib/sources/chain/morpho-roster-reads.ts adds to the rows, by
+ *  lowercased market id. */
+export interface MorphoRosterMarks {
+  /** Markets at the rate ceiling, with the stored rate at target (per second,
+   *  WAD) and the seconds it was adapted over. */
+  ceiling: Record<string, { stored: string; elapsed: number }>;
+  priceSources: Record<string, MorphoPriceSource>;
+}
+
+/** A roster row: the market, and what the roster knows beside it. */
+export interface MorphoRosterRow extends MorphoMarketRow {
+  /** A vault on Rails's roster names the market in its withdraw queue. */
+  lent?: true;
+  ceiling?: { stored: string; elapsed: number };
+  priceSource?: MorphoPriceSource;
+}
+
+/** One loan token on the roster table: its summary and its rows, the markets
+ *  that carry its book (the per-token page's `material`) and the markets that
+ *  carry the book a vault lends into (the same MATERIAL_SHARE over the funded
+ *  markets a vault lends into, families included, since a vault's choice is
+ *  not a minted repeat), each marked `lent` where a vault lends into it. The
+ *  rest are counted, and open on the token's page. */
 export interface MorphoRosterGroup extends MorphoLoanGroupSummary {
-  rows: MorphoMarketRow[];
+  rows: MorphoRosterRow[];
+  /** The funded markets outside any family: the group order's first key. */
+  own: number;
+  /** The same count over the rows a vault lends into, for the default view. */
+  lentOwn: number;
 }
 
 export type MorphoRosterData = Omit<MorphoMarketsChainResponse, "groups"> & {
@@ -353,22 +386,66 @@ export type MorphoRosterData = Omit<MorphoMarketsChainResponse, "groups"> & {
   groups: MorphoRosterGroup[];
   /** Loan tokens none of whose markets has ever held supply. */
   unfundedTokens: number;
+  /** Whether rows carry `lent`: "read" from the vault directory's queues,
+   *  "none" where Rails has no vault roster on the chain, "failed" where the
+   *  directory did not answer. Only "read" filters the default view. */
+  vaults: "read" | "none" | "failed";
 };
 
-/** The roster table's props: each funded loan token with its material markets.
- *  The never-funded and the dust stay on the server, counted. */
-export function rosterData(resp: MorphoMarketsChainResponse): MorphoRosterData {
+/** The roster table's props: each funded loan token with its material
+ *  markets, marked where a vault lends into them (`lent`, a set of lowercased
+ *  ids; null where it is not known). The never-funded and the dust stay on the
+ *  server, counted. */
+export function rosterData(
+  resp: MorphoMarketsChainResponse,
+  lent: Set<string> | null,
+  vaults: MorphoRosterData["vaults"],
+): MorphoRosterData {
   const overview = overviewData(resp);
+  const isLent = (m: MorphoMarketRow) => lent != null && m.totalSupply > 0 && lent.has(m.id.toLowerCase());
   // Ordered by the funded markets outside any family, so a token whose count
   // is one pair minted many times (Base's 720 cbBTC markets) does not lead.
   const groups = resp.groups
     .flatMap((g, i) => {
       if (g.funded === 0) return [];
       const shape = shapeLoanGroup(g);
-      const own = g.funded - shape.families.reduce((n, f) => n + f.markets.length, 0);
-      return [{ group: { ...overview.groups[i], rows: shape.material }, own }];
+      const inFamily = new Set(shape.families.flatMap((f) => f.markets.map((m) => m.id)));
+      const lentFunded = g.markets.filter(isLent);
+      const lentSupply = lentFunded.reduce((n, m) => n + m.totalSupply, 0);
+      const lentBorrow = lentFunded.reduce((n, m) => n + m.totalBorrow, 0);
+      const carries = (m: MorphoMarketRow) =>
+        lentFunded.length < TAIL_FROM ||
+        m.totalSupply >= lentSupply * MATERIAL_SHARE ||
+        (lentBorrow > 0 && m.totalBorrow >= lentBorrow * MATERIAL_SHARE);
+      const shown = new Set([...shape.material, ...lentFunded.filter(carries)].map((m) => m.id));
+      const rows: MorphoRosterRow[] = g.markets
+        .filter((m) => shown.has(m.id))
+        .map((m) => (isLent(m) ? { ...m, lent: true as const } : m));
+      const own = g.funded - inFamily.size;
+      const lentOwn = rows.filter((m) => m.lent && !inFamily.has(m.id)).length;
+      return [{ ...overview.groups[i], rows, own, lentOwn }];
     })
-    .sort((a, b) => b.own - a.own || b.group.funded - a.group.funded)
-    .map((x) => x.group);
-  return { ...resp, groups, unfundedTokens: resp.groups.length - groups.length };
+    .sort((a, b) => b.own - a.own || b.funded - a.funded);
+  return { ...resp, groups, unfundedTokens: resp.groups.length - groups.length, vaults };
+}
+
+/** Every row the roster ships, for the marks read. */
+export const rosterRows = (d: MorphoRosterData): MorphoRosterRow[] => d.groups.flatMap((g) => g.rows);
+
+/** The roster with its marks on the rows. */
+export function withRosterMarks(d: MorphoRosterData, marks: MorphoRosterMarks): MorphoRosterData {
+  return {
+    ...d,
+    groups: d.groups.map((g) => ({
+      ...g,
+      rows: g.rows.map((m) => {
+        const id = m.id.toLowerCase();
+        const ceiling = marks.ceiling[id];
+        const priceSource = marks.priceSources[id];
+        return ceiling || priceSource
+          ? { ...m, ...(ceiling ? { ceiling } : {}), ...(priceSource ? { priceSource } : {}) }
+          : m;
+      }),
+    })),
+  };
 }

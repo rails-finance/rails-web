@@ -30,16 +30,27 @@
 //      span, and its borrow rate's receipt opens. Arbitrum states it is not
 //      indexed.
 //   9. The change log (M3.6) lists the route's rows newest first (block and
-//      kind per row, the first 20), with the held line, and SparkLend's
-//      CapAutomator line on SparkLend only.
+//      kind per row, the first 20, each a timeline row on the event-card
+//      shell), with the held line, SparkLend's CapAutomator line on SparkLend
+//      only, and the newest row opens.
 //  10. The largest suppliers and borrowers (M3.7, M3.8) are the route's ten a
 //      side, wallet, amount and position link per row, a holder's receipt
 //      opens, and a press on a row's amount cell lands on its position. Base
 //      and Seamless state "Not ranked yet on Base.", Arbitrum "Not indexed yet
 //      on Arbitrum.".
+//  11. Aave V4 (lib/aave-v4/reserve.tsx): the change log (M3.6) lists
+//      GET /api/aave-v4/reserve/config-log's rows newest first, the first ten,
+//      each with words and its side (spoke or hub), the held line under it;
+//      each head states the change with its side's tag; the newest row opens
+//      to its explanation, and its Figures carry the receipt naming its event;
+//      the Parameters section's "?" (M3.5) opens the plain-words panel, the
+//      spoke's rows then the hub's; on Main USDC the 29 Oct freeze's node is a
+//      snowflake in the warning tone and the 6 Nov draw-cap raise's a gauge
+//      with the up arrow. On Base the one line.
 //
 // Run:
 //   BASE=http://localhost:3000 node scripts/verify/verify-aave-reserve-page.mjs
+//   (V4_ONLY=1 runs check 11 alone.)
 
 import { chromium } from "playwright";
 import { armScope } from "./lib/prov-inspector.mjs";
@@ -123,7 +134,7 @@ const pctOf = (t) => {
 
 const browser = await chromium.launch();
 const routes = new Map();
-for (const f of FIXTURES) {
+for (const f of process.env.V4_ONLY ? [] : FIXTURES) {
   if (!routes.has(f.api)) routes.set(f.api, await (await fetch(`${BASE}${f.api}`)).json());
   const data = routes.get(f.api);
   const r = data.reserves?.find((x) => x.symbol === f.symbol);
@@ -307,10 +318,10 @@ for (const f of FIXTURES) {
       borrow: t("[data-history-borrow]"),
       supply: t("[data-history-supply]"),
       util: t("[data-history-utilisation]"),
-      rows: [...document.querySelectorAll("tr[data-change-row]")].map((tr) => ({
+      rows: [...document.querySelectorAll("[data-change-row]")].map((tr) => ({
         block: Number(tr.getAttribute("data-change-block")),
         kind: tr.getAttribute("data-change-kind"),
-        words: tr.querySelector("[data-change-words]")?.textContent ?? "",
+        words: tr.getAttribute("data-change-words") ?? "",
       })),
       held: t("[data-change-log-held]"),
       automator: Boolean(document.querySelector("[data-change-log-automator]")),
@@ -410,6 +421,23 @@ for (const f of FIXTURES) {
       ix.automator === (API_MARKET[f.api] === "spark"),
       String(ix.automator),
     );
+    // The newest row opens: its Explanation where its kind has one, else its Figures.
+    const row = page.locator('[data-anatomy~="M3.6"] [data-change-row]').first();
+    let opened = "";
+    if (ix.rows.length) {
+      await row.locator('[data-anatomy="T1"] [aria-expanded]').first().click();
+      await row
+        .locator('[data-anatomy="T2"]')
+        .waitFor({ timeout: 10000 })
+        .catch(() => {});
+      opened = norm(
+        await row
+          .locator('[data-anatomy="T2"]')
+          .innerText()
+          .catch(() => ""),
+      );
+    }
+    check(`${tag} 9d the newest row opens`, opened.length > 10, opened.slice(0, 100));
   }
 
   if (holders.status === "not-ranked" || holders.status === "not-indexed") {
@@ -483,6 +511,169 @@ for (const f of FIXTURES) {
     await page.waitForURL(at, { timeout: 120000 }).catch(() => {});
     check(`${tag} 10d a press on a holder row lands on its position`, at(new URL(page.url())), page.url());
   }
+  await page.close();
+}
+
+// ── 11. Aave V4's change log (M3.6) ────────────────────────────────────────────
+const V4_FIXTURES = [
+  {
+    path: "/ethereum/aave-v4/markets/main/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    q: "spoke=main&asset=0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48&hub=core",
+  },
+  {
+    path: "/ethereum/aave-v4/markets/usdg-paxg/0xe343167631d89b6ffc58b88d6b7fb0228795491d",
+    q: "spoke=usdg_paxg&asset=0xe343167631d89b6ffc58b88d6b7fb0228795491d",
+  },
+  {
+    path: "/ethereum/aave-v4/markets/bluechip/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48?hub=core",
+    q: "spoke=bluechip&asset=0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48&hub=core",
+  },
+  { path: "/base/aave-v4/markets/mag7/0xb200000000000000000000c2e324d24d7eecd1fb", q: null },
+];
+const V4_SHOWN = 10;
+const V4_HUB_KINDS = new Set(["asset-config", "credit-line", "rate-curve"]);
+for (const f of V4_FIXTURES) {
+  const tag = `V4 ${f.path}`;
+  const cfg = f.q ? await (await fetch(`${BASE}/api/aave-v4/reserve/config-log?${f.q}`)).json() : null;
+  const page = await browser.newPage({ viewport: { width: 1280, height: 1000 } });
+  await page.goto(`${BASE}${f.path}`, NAV);
+  // The section draws before its read settles: wait for rows, the empty line or a stated gap.
+  await page
+    .waitForSelector(
+      '[data-anatomy~="M3.6"] :is([data-change-row], [data-change-log-empty], [data-reserve-not-indexed], [data-reserve-read-failed])',
+      { timeout: WAIT },
+    )
+    .catch(() => {});
+  const got = await page.evaluate(() => {
+    const s = document.querySelector('[data-anatomy~="M3.6"]');
+    return {
+      rows: [...(s?.querySelectorAll("[data-change-row]") ?? [])].map((tr) => ({
+        block: Number(tr.getAttribute("data-change-block")),
+        kind: tr.getAttribute("data-change-kind"),
+        side: tr.getAttribute("data-change-side"),
+        words: tr.getAttribute("data-change-words") ?? "",
+      })),
+      held: s?.querySelector("[data-change-log-held]")?.textContent ?? null,
+      empty: Boolean(s?.querySelector("[data-change-log-empty]")),
+      notIndexed: s?.querySelector("[data-reserve-not-indexed]")?.textContent ?? null,
+    };
+  });
+  if (!cfg) {
+    check(
+      `${tag} 11a Base states the one line`,
+      /not indexed Aave V4's configuration changes on Base yet/.test(got.notIndexed ?? "") && got.rows.length === 0,
+      norm(got.notIndexed),
+    );
+    await page.close();
+    continue;
+  }
+  const want = [...(cfg.logs ?? [])].reverse().slice(0, V4_SHOWN);
+  check(
+    `${tag} 11a rows match the route, newest first, each with words and its side`,
+    (cfg.logs?.length ?? 0) === 0
+      ? got.empty
+      : got.rows.length === want.length &&
+          want.every(
+            (l, i) =>
+              got.rows[i]?.block === l.block &&
+              got.rows[i]?.kind === l.kind &&
+              got.rows[i]?.side === (V4_HUB_KINDS.has(l.kind) ? "hub" : "spoke") &&
+              got.rows[i]?.words,
+          ),
+    `${got.rows.length} rows vs ${want.length}; first ${got.rows[0]?.block} ${got.rows[0]?.kind} "${got.rows[0]?.words}"`,
+  );
+  check(`${tag} 11b the held line`, /held from|not held/.test(got.held ?? ""), norm(got.held));
+  // The head (T1): plain words, and the side's tag in the time slot.
+  const heads = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-anatomy~="M3.6"] [data-change-row]')].map((r) => ({
+      side: r.getAttribute("data-change-side"),
+      words: r.querySelector('[data-anatomy="T1"]')?.textContent ?? "",
+      tag: r.querySelector("[data-head-tag]")?.getAttribute("data-head-tag") ?? null,
+    })),
+  );
+  check(
+    `${tag} 11d each row's head states the change and the side it was set on`,
+    heads.length === got.rows.length &&
+      heads.every((h) => /[A-Za-z]{4}/.test(h.words) && h.tag === h.side && /(spoke|hub)/.test(h.words)),
+    heads[0] ? `${norm(heads[0].words)} [${heads[0].tag}]` : "no rows",
+  );
+  // The node's mark (Main USDC): the 29 Oct freeze a snowflake in the warning
+  // tone, the 6 Nov draw-cap raise a gauge with the up arrow.
+  if (f.path.includes("/main/0xa0b8")) {
+    const marks = await page.evaluate(() =>
+      Object.fromEntries(
+        [...document.querySelectorAll('[data-anatomy~="M3.6"] [data-change-row]')].map((r) => [
+          `${r.getAttribute("data-change-block")}:${r.getAttribute("data-change-kind")}`,
+          [
+            r.getAttribute("data-change-glyph"),
+            r.getAttribute("data-change-direction"),
+            r.getAttribute("data-change-tone"),
+            Boolean(r.querySelector(`[data-spine-change-glyph="${r.getAttribute("data-change-glyph")}"]`)),
+          ].join("|"),
+        ]),
+      ),
+    );
+    check(
+      `${tag} 11g the freeze's node is a snowflake in the warning tone, the draw-cap raise a gauge going up`,
+      marks["26301157:reserve-config"] === "snowflake||caution|true" &&
+        marks["26355192:credit-line"] === "gauge|up||true",
+      `${marks["26301157:reserve-config"]} / ${marks["26355192:credit-line"]}`,
+    );
+  }
+  // Opened (T2, T3): the Explanation first, then the Figures with the receipt.
+  const first = page.locator('[data-anatomy~="M3.6"] [data-change-row]').first();
+  let bullets = 0;
+  let pop = "";
+  if (got.rows.length) {
+    await first.locator('[data-anatomy="T1"] [aria-expanded]').first().click();
+    await first
+      .locator("[data-change-explain] li")
+      .first()
+      .waitFor({ timeout: 10000 })
+      .catch(() => {});
+    bullets = await first.locator("[data-change-explain] li").count();
+    // The row's ⋮ "Inspect provenance" arms the card and turns to its Figures.
+    await first.locator("[data-event-head-menu] [data-event-menu] > button").click();
+    const inspect = page.locator("[data-prov-scope-toggle]:visible").first();
+    if (
+      await inspect.waitFor({ timeout: 10000 }).then(
+        () => true,
+        () => false,
+      )
+    ) {
+      await inspect.click();
+      await first.locator('[data-figure="config-change"] [data-prov-pickable]').first().click();
+      await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
+      pop = norm(
+        await page
+          .locator(".prov-inspect-pop")
+          .first()
+          .innerText()
+          .catch(() => ""),
+      );
+      await page.keyboard.press("Escape");
+    }
+  }
+  check(`${tag} 11e the newest row opens to its explanation`, bullets >= 1, `${bullets} bullets`);
+  check(`${tag} 11c a row's receipt names its event`, /event at block/.test(pop), pop.slice(0, 120));
+  // M3.5's "?": the parameters in plain words, by the side that sets them.
+  const help = page.locator('[data-anatomy~="M3.5"] button[aria-label="Parameters, learn more"]');
+  let groups = [];
+  if (await help.count()) {
+    await page.keyboard.press("Escape");
+    await help.click();
+    const dialog = page.locator('[role="dialog"][aria-label="What the parameters mean"]');
+    await dialog.waitFor({ timeout: 10000 }).catch(() => {});
+    groups = await dialog
+      .locator("[data-learn-more-group]")
+      .evaluateAll((gs) => gs.map((g) => [g.getAttribute("data-learn-more-group"), g.querySelectorAll("li").length]));
+    await page.keyboard.press("Escape");
+  }
+  check(
+    `${tag} 11f M3.5's explanation opens, a bullet a row, spoke then hub`,
+    groups.length === 2 && /spoke$/.test(groups[0][0]) && /hub$/.test(groups[1][0]) && groups.every((g) => g[1] >= 4),
+    JSON.stringify(groups),
+  );
   await page.close();
 }
 

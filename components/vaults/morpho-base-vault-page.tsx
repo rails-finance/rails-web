@@ -65,12 +65,15 @@ const blueWalletHref = (chainId: 1 | 8453, vault: string) =>
   chainId === 8453 ? morphoBaseWalletHref(vault) : (listingHrefForWallet("morpho", vault) ?? "/ethereum/morpho");
 
 export function MorphoBaseVaultPage({
+  protects,
   data,
   census,
   yieldFigure: storeYield,
   strip,
   factory,
 }: {
+  /** "What protects it" and "The protocol underneath" (V9, V10), streamed by the route. */
+  protects?: React.ReactNode;
   data: MorphoBaseVaultResponse;
   census: VaultCensusRow | null;
   yieldFigure?: VaultYield;
@@ -422,6 +425,7 @@ export function MorphoBaseVaultPage({
           exports: vaultAssetsExports(v, exportModel),
         }}
       />
+      {protects}
     </ProvReceiptsScope>
   );
 }

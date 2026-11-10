@@ -17,6 +17,14 @@ export interface LearnMoreVideo {
   description: string;
 }
 
+/** A bullet: its term in bold, then the text. `sources`: where the claim comes
+ *  from, linked inline after the text. */
+export interface LearnMoreDetail {
+  bold: string;
+  text: string;
+  sources?: LearnMoreLink[];
+}
+
 export interface LearnMoreContent {
   title: string;
   /** Introductory paragraph */
@@ -26,8 +34,10 @@ export interface LearnMoreContent {
   steps?: string[];
   /** Optional bullet-point benefits/details */
   detailsHeading?: string;
-  /** `sources`: where the claim comes from, linked inline after the text. */
-  details?: { bold: string; text: string; sources?: LearnMoreLink[] }[];
+  details?: LearnMoreDetail[];
+  /** Details in headed groups, after `details` (a reserve's parameters, by
+   *  the side that sets them). */
+  detailGroups?: { heading: string; details: LearnMoreDetail[] }[];
   /** Optional extra paragraphs (context-sensitive) */
   extraParagraphs?: string[];
   /** Optional video resource */
@@ -70,6 +80,38 @@ export function LearnMoreButton({ onClick, ariaLabel = "Learn more" }: { onClick
 }
 
 // ── Modal ────────────────────────────────────────────────────────────────────
+
+/** The bullets: the term in bold, a dash, the text and its sources. */
+function DetailList({ details }: { details: LearnMoreDetail[] }) {
+  return (
+    <ul className="space-y-1.5 list-none">
+      {details.map((d, i) => (
+        <li key={i} className="flex gap-2">
+          <span className=" shrink-0">&bull;</span>
+          <span>
+            <strong className="">{d.bold}</strong> &mdash;{" "}
+            {d.sources && d.sources.length > 0 ? (
+              <>
+                {d.text.replace(/\.$/, "")} (
+                {d.sources.map((src, j) => (
+                  <span key={j}>
+                    {j > 0 ? "; " : null}
+                    <a href={src.url} target="_blank" rel="noopener noreferrer" className="link-external underline">
+                      {src.label}
+                    </a>
+                  </span>
+                ))}
+                ).
+              </>
+            ) : (
+              d.text
+            )}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function LearnMoreModal({
   content,
@@ -170,39 +212,16 @@ export function LearnMoreModal({
             {content.detailsHeading && content.details && (
               <>
                 <p className="font-semibold  mt-4">{content.detailsHeading}</p>
-                <ul className="space-y-1.5 list-none">
-                  {content.details.map((d, i) => (
-                    <li key={i} className="flex gap-2">
-                      <span className=" shrink-0">&bull;</span>
-                      <span>
-                        <strong className="">{d.bold}</strong> &mdash;{" "}
-                        {d.sources && d.sources.length > 0 ? (
-                          <>
-                            {d.text.replace(/\.$/, "")} (
-                            {d.sources.map((src, j) => (
-                              <span key={j}>
-                                {j > 0 ? "; " : null}
-                                <a
-                                  href={src.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="link-external underline"
-                                >
-                                  {src.label}
-                                </a>
-                              </span>
-                            ))}
-                            ).
-                          </>
-                        ) : (
-                          d.text
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <DetailList details={content.details} />
               </>
             )}
+
+            {content.detailGroups?.map((g) => (
+              <div key={g.heading} data-learn-more-group={g.heading}>
+                <p className="font-semibold  mt-4">{g.heading}</p>
+                <DetailList details={g.details} />
+              </div>
+            ))}
 
             {extra && <div className="mt-4">{extra}</div>}
 

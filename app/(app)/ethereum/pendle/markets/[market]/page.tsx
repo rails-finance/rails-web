@@ -1,23 +1,28 @@
-// One Pendle market on Ethereum, /ethereum/pendle/markets/<market>: its card
-// at one block, its tokens and its latest router events. A Morpho or Aave V4
+// One Pendle market on Ethereum, /ethereum/pendle/markets/<market>, archetype
+// A2 on the shared product shell (rails-ops ui-jobs 549 step 8; decision 0059
+// point 10): the head on the vitals band, how the market is built, its pool
+// and its latest router events (lib/pendle/product.tsx). A Morpho or Aave V4
 // PT chip opens here (the asset panel's market row).
+//
+// Rendered on each request, never at build.
 
 import type { Metadata } from "next";
 import { cache } from "react";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
-import { RailHeader } from "@/components/shared/rail-header";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { SubPageHeader } from "@/components/shared/sub-page-header";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { protocolForHref } from "@/lib/shared/protocols";
 import { outsideTokenMeta, readPendleMarket } from "@/lib/sources/api/pendle";
 import { toURLSearchParams, type RawSearchParams } from "@/lib/shared/listing-ssr";
-import { PendleMarketView } from "@/components/protocol/pendle/pendle-market-view";
+import { PendleMarketProductPage } from "@/lib/pendle/product";
 import { PendleReadNotice } from "@/components/protocol/pendle/pendle-read-notice";
 import { marketName } from "@/lib/pendle/format";
 
 export const dynamic = "force-dynamic";
 
+const PROTOCOL = protocolForHref("/ethereum/pendle")!;
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
 type Params = { params: Promise<{ market: string }> };
 
@@ -49,27 +54,21 @@ export default async function PendleMarketPage({
   if (!ADDRESS.test(m)) notFound();
   const read = await load(m);
   if (!read.ok && read.code === "not_a_market") notFound();
-  const meta = read.ok ? await outsideTokenMeta(read.data) : {};
-  return (
-    <div className="min-h-screen">
-      <div className="py-8">
-        <header className="mb-5">
-          <div className="mb-2.5">
-            <RailHeader session="pendle" venue="subPage" />
-          </div>
-          <div className="mb-1 text-[11px] uppercase tracking-wider text-rb-500">Pendle market</div>
-          <h1 className="text-2xl font-semibold text-foreground">
-            {read.ok ? marketName(read.data.tokens) : `${m.slice(0, 6)}…${m.slice(-4)}`}
-          </h1>
-        </header>
-        {read.ok ? (
-          <PendleMarketView m={read.data} meta={meta} initialSearch={initialSearch} />
-        ) : (
+  if (!read.ok)
+    return (
+      <div className="min-h-screen">
+        <div className="py-8">
+          <SubPageHeader protocol={PROTOCOL} title={`${m.slice(0, 6)}…${m.slice(-4)}`} />
           <PendleReadNotice failure={read} />
-        )}
+        </div>
       </div>
-      <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+    );
+  const meta = await outsideTokenMeta(read.data);
+  return (
+    <>
+      <PendleMarketProductPage m={read.data} meta={meta} initialSearch={initialSearch} />
+      {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
       <ProvInspectorLayer />
-    </div>
+    </>
   );
 }

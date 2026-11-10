@@ -43,8 +43,21 @@ import type { ReactNode } from "react";
 
 /** The canonical slots, in the order they always render. */
 // A single reserve's page (Aave M3.2) adds what is left to draw on (`sizeFree`)
-// and the two rates (`rateIn`, `rateOut`) between the sizes and usage.
-const SLOT_ORDER = ["roster", "sizeIn", "sizeOut", "sizeFree", "rateIn", "rateOut", "usage", "population"] as const;
+// and the two rates (`rateIn`, `rateOut`) between the sizes and usage. A
+// market of a token with a price and an end (Pendle) adds the token's price
+// after the rates (`price`) and the date it ends on last (`term`).
+const SLOT_ORDER = [
+  "roster",
+  "sizeIn",
+  "sizeOut",
+  "sizeFree",
+  "rateIn",
+  "rateOut",
+  "price",
+  "usage",
+  "population",
+  "term",
+] as const;
 
 export type VitalSlot = (typeof SLOT_ORDER)[number];
 
@@ -88,13 +101,18 @@ export interface VitalsBandProps {
    *  closed to new borrowing". Kept at 11px under a rule, because they are
    *  read second and only by someone already asking. */
   notes?: ReactNode;
+  /** "row": the figures run across the band first, wrapping, and the lead and
+   *  aside sit under them side by side. The product head (R0) draws this, so a
+   *  head's figures read in one row whatever columns it has (Miles, 9 Nov 2026,
+   *  the Aave V4 hub panel). Default "columns": lead, stacked figures, aside. */
+  layout?: "columns" | "row";
   className?: string;
 }
 
 const LABEL = "text-[11px] uppercase tracking-wider text-rb-500";
 const VALUE = "tabular-nums text-base font-semibold text-foreground";
 
-export function VitalsBand({ vitals, lead, aside, notes, className }: VitalsBandProps) {
+export function VitalsBand({ vitals, lead, aside, notes, layout = "columns", className }: VitalsBandProps) {
   const present = vitals.filter((v): v is Vital => Boolean(v));
   // One figure per slot, in canonical order. A slot listed twice keeps the
   // first — the slots are the band's vocabulary, so a second figure claiming
@@ -121,7 +139,19 @@ export function VitalsBand({ vitals, lead, aside, notes, className }: VitalsBand
 
   return (
     <div className={`rounded-lg bg-raised p-5 ${className ?? ""}`}>
-      {columns ? (
+      {layout === "row" ? (
+        <>
+          <dl className="flex flex-wrap gap-x-10 gap-y-4">{figures}</dl>
+          {columns ? (
+            <div
+              className={`mt-5 grid grid-cols-1 gap-6 border-t border-foreground/5 pt-4 ${lead && aside ? "md:grid-cols-2" : ""}`}
+            >
+              {lead ? <div>{lead}</div> : null}
+              {aside ? <div className="flex flex-col">{aside}</div> : null}
+            </div>
+          ) : null}
+        </>
+      ) : columns ? (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {lead ? <div>{lead}</div> : null}
           {/* Wraps rather than sitting on a fixed column count, so a protocol

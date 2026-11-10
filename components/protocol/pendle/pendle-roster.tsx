@@ -1,7 +1,9 @@
 "use client";
 
-// The Pendle market roster on the house table (components/shared/data-table):
-// one row per market the router record names, read at one block.
+// The Pendle market roster's table section (R1.2, under the roster's R0 head,
+// lib/pendle/product.tsx): one row per market the router record names, read
+// at one block, in its own receipts scope with its ⋮ (Download CSV, Inspect
+// provenance) on the house table (components/shared/data-table).
 // ----------------------------------------------------------------------------
 // D1 one-line rows (`rowHeight="one"`); D2 sortable headers, the sort in `?sort=` and `?dir=`, each
 // written only off its default (maturity, soonest first); D3 the market pinned
@@ -33,10 +35,11 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
+import { ToolsFor } from "@/components/shared/product/product-head";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { BlockRef } from "@/components/shared/block-ref";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { lookable, useLookup } from "@/components/shared/front-door-search";
@@ -56,9 +59,7 @@ import {
 } from "@/components/shared/data-table/data-table";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
 import { formatCompact } from "@/lib/shared/format-compact";
-import { CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import {
-  PENDLE_CHAIN_ID,
   apyText,
   assetDecimals,
   assetSymbol,
@@ -70,15 +71,7 @@ import {
   shortAddress,
   units,
 } from "@/lib/pendle/format";
-import {
-  impliedApyProv,
-  markProv,
-  maturityProv,
-  readBlockProv,
-  tvlProv,
-  underlyingProv,
-  valueProv,
-} from "@/lib/pendle/provenance";
+import { impliedApyProv, markProv, maturityProv, tvlProv, underlyingProv, valueProv } from "@/lib/pendle/provenance";
 import { UNDERLYING_LABEL_TIP, underlyingProtocol } from "@/lib/pendle/underlying";
 import { pendleMarketHref, pendleWalletHref } from "@/lib/pendle/routes";
 import type { PendleRoster, PendleRosterEntry } from "@/lib/pendle/types";
@@ -244,7 +237,31 @@ const NONE = (
   </span>
 );
 
-export function PendleRosterView({
+/** Every market as CSV, whatever the filters. */
+function rosterCsv(markets: PendleRosterEntry[]): string {
+  const q = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const rows = markets.map((m) => {
+    const t = m.tokens;
+    return [
+      nameOf(m),
+      t.market.address,
+      underlyingOf(m),
+      assetOf(m),
+      m.impliedApy == null ? "" : m.impliedApy.toFixed(6),
+      exact(m.tvl?.asset, assetDecimals(t)) ?? "",
+      ptToAsset(m) == null ? "" : String(rate(ptToAsset(m))),
+      new Date(t.expiry * 1000).toISOString().slice(0, 10),
+      maturityOf(m),
+    ]
+      .map((v) => q(String(v)))
+      .join(",");
+  });
+  return ["market,address,underlying,asset,implied_apy,tvl_in_asset,pt_price_in_asset,maturity,status", ...rows].join(
+    "\n",
+  );
+}
+
+export function PendleRosterTable({
   roster,
   at,
   initialSearch,
@@ -253,7 +270,6 @@ export function PendleRosterView({
   at: number;
   initialSearch: string;
 }) {
-  const registry = useReceiptRegistry();
   const markets = roster.markets;
   const [query, setQuery] = useState("");
   const [facets, setFacets] = useState<Facets>(() => facetsFromSearch(initialSearch));
@@ -403,15 +419,37 @@ export function PendleRosterView({
   };
 
   return (
-    <ProvReceiptsScope registry={registry}>
-      <div data-pendle-roster="">
-        <p className={`mb-4 text-xs text-rb-500 ${CARD_INSET_START}`} data-pendle-asof={roster.block}>
-          Every market Pendle&rsquo;s routers have named, read at block{" "}
-          <Prov info={readBlockProv(roster.block)} value={String(roster.block)}>
-            <BlockRef block={roster.block} chainId={PENDLE_CHAIN_ID} />
-          </Prov>
-          . Underlying is a Rails label for the protocol behind each yield token.
+    <ProvSection
+      scope="markets-table"
+      className="mb-8"
+      data-anatomy="R1.2"
+      data-pendle-roster=""
+      data-pendle-asof={String(roster.block)}
+      data-skel-section="page-table"
+    >
+      <SectionHeading
+        title="Markets"
+        menu={
+          <ToolsFor
+            scope="markets-table"
+            title="Markets"
+            tools={{
+              exports: {
+                csv: {
+                  filename: "pendle-ethereum-markets.csv",
+                  build: () => rosterCsv(markets),
+                  subtitle: "Every market, whatever the filters",
+                },
+              },
+            }}
+          />
+        }
+      >
+        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
+          Each row opens its market&rsquo;s page. Underlying is a Rails label for the protocol behind each yield token.
         </p>
+      </SectionHeading>
+      <div className="mt-3">
         <ListToolbar
           dimensions={dimensions}
           filters={state}
@@ -483,7 +521,7 @@ export function PendleRosterView({
           </DataTable>
         )}
       </div>
-    </ProvReceiptsScope>
+    </ProvSection>
   );
 }
 
