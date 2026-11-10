@@ -26,7 +26,7 @@ import { VaultFinder } from "@/components/vaults/vault-finder";
 import { VaultStrip } from "@/components/vaults/vault-strip";
 import { VaultIlliquidMarkets } from "@/components/vaults/vault-illiquid";
 import { vaultHeads } from "@/components/vaults/vault-heads";
-import { ColourNote, RULE, Tile, VAULT_GRID } from "@/components/vaults/vault-tiles";
+import { ColourNote, RULE, Tile, VAULT_CARD_TILE, VAULT_GRID } from "@/components/vaults/vault-tiles";
 import { HOLDERS_SCOPE, VaultWhoHolds } from "@/components/vaults/vault-who-holds";
 import { VaultConfiguration } from "@/components/vaults/vault-config";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
@@ -574,52 +574,55 @@ export function MorphoBaseVaultPage({
 
       {/* A stat the compact form does not cover (Shares issued on an asset
           whose decimals disagree) breaks across lines at phone width instead
-          of running past the card's edge. */}
-      <div className="[&_[data-panel-figure]]:max-w-full [&_dd]:break-all">
-        <VaultCard
-          heads={heads}
-          vault={v}
-          yieldFigure={yieldFigure}
-          holdersHref={holdersHref}
-          receipts={receipts}
-          status={null}
-          stats={stats}
-          band={v.illiquid ? <VaultIlliquidMarkets vault={v} il={v.illiquid} /> : undefined}
-          links={links}
-          explanation={explanation}
-          learnMore={morphoVaultCardContent()}
-          stamp={
-            <SectionReadStamp
-              chainId={chainId}
-              block={data.blockNumber}
-              readBy={coords.readBy}
-              info={(at) =>
-                readStampProv({
-                  chainId,
-                  block: data.blockNumber,
-                  at,
-                  readBy: coords.readBy,
-                  what: "Every figure on this card and in where the assets are",
-                  contracts: [
-                    {
-                      name: vault.name,
-                      address: vault.address,
-                      reads:
-                        "totalAssets(), totalSupply(), convertToAssets(), curator(), owner(), lostAssets(), withdrawQueue()",
-                    },
-                    {
-                      name: "Morpho Blue",
-                      address: vault.morpho,
-                      reads: "market(id), position(id, vault), idToMarketParams(id) for each market in the queue",
-                    },
-                  ],
-                })
-              }
-            />
-          }
-          exports={exportModel}
-        />
-      </div>
+          of running past the card's edge. The card stands as a tile, with no
+          frame of its own. */}
+      <Tile id="summary" flush>
+        <div className={`${VAULT_CARD_TILE} [&_[data-panel-figure]]:max-w-full [&_dd]:break-all`}>
+          <VaultCard
+            heads={heads}
+            vault={v}
+            yieldFigure={yieldFigure}
+            holdersHref={holdersHref}
+            receipts={receipts}
+            status={null}
+            stats={stats}
+            band={v.illiquid ? <VaultIlliquidMarkets vault={v} il={v.illiquid} /> : undefined}
+            links={links}
+            explanation={explanation}
+            learnMore={morphoVaultCardContent()}
+            stamp={
+              <SectionReadStamp
+                chainId={chainId}
+                block={data.blockNumber}
+                readBy={coords.readBy}
+                info={(at) =>
+                  readStampProv({
+                    chainId,
+                    block: data.blockNumber,
+                    at,
+                    readBy: coords.readBy,
+                    what: "Every figure on this card and in where the assets are",
+                    contracts: [
+                      {
+                        name: vault.name,
+                        address: vault.address,
+                        reads:
+                          "totalAssets(), totalSupply(), convertToAssets(), curator(), owner(), lostAssets(), withdrawQueue()",
+                      },
+                      {
+                        name: "Morpho Blue",
+                        address: vault.morpho,
+                        reads: "market(id), position(id, vault), idToMarketParams(id) for each market in the queue",
+                      },
+                    ],
+                  })
+                }
+              />
+            }
+            exports={exportModel}
+          />
+        </div>
+      </Tile>
 
       <div className={VAULT_GRID} data-vault-grid="">
         <Tile id="last-30-days" wide>

@@ -20,6 +20,15 @@ export const VAULT_GRID = [
   "[--donut-ground:var(--background)]",
 ].join(" ");
 
+/** The vault card (V2) as the grid's first tile: no frame or ground, padded
+ *  as a tile, with a tile's hairline under it (`Tile flush`). The shell keeps
+ *  its anatomy; only its box is reset. */
+export const VAULT_CARD_TILE = [
+  "[&>section]:mb-0",
+  "[&_[data-position-card-shell]]:rounded-none [&_[data-position-card-shell]]:border-0 [&_[data-position-card-shell]]:bg-transparent",
+  "[&_[data-position-card-shell]]:px-0 [&_[data-position-card-shell]]:py-5 sm:[&_[data-position-card-shell]]:px-5",
+].join(" ");
+
 /** A hairline's colour. */
 export const RULE = "bg-rb-200 dark:bg-rb-500/30";
 
