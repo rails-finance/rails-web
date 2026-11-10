@@ -667,8 +667,8 @@ function FocusViewRow({ view, inUse, move }: { view: FocusView; inUse: boolean; 
     focusViews.rename(view.id, draftName);
     setEditing(false);
   };
-  const rowClasses =
-    "group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-colors hover:border-blue-500 hover:bg-rb-100 dark:hover:bg-rb-900";
+  // Not a link, so no hover frame (blue marks a way off the page).
+  const rowClasses = "group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5";
   const glyph = (
     <span className="flex w-8 shrink-0 items-center justify-center">
       <ViewIcons picks={view.assets} chains={view.chains} />
@@ -739,9 +739,18 @@ function FocusViewRow({ view, inUse, move }: { view: FocusView; inUse: boolean; 
         {view.name && <span className="mt-0.5 block truncate text-xs text-rb-500">{holds}</span>}
       </span>
       {inUse ? (
-        <span className="shrink-0 text-xs font-semibold text-foreground" data-focus-view-in-use="">
-          In use
-        </span>
+        <button
+          type="button"
+          onClick={() => focusViews.use(null)}
+          title="Turn Focus off"
+          className="group/use min-w-12 shrink-0 text-right text-xs font-semibold text-foreground"
+          data-focus-view-in-use=""
+        >
+          <span className="group-hover/use:hidden group-focus-visible/use:hidden">In use</span>
+          <span className={`hidden group-hover/use:inline group-focus-visible/use:inline ${INPLACE_TEXT}`}>
+            Turn off
+          </span>
+        </button>
       ) : (
         <button
           type="button"

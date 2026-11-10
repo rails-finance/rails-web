@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Bookmark, Signpost } from "lucide-react";
+import { Bookmark, Plus, Signpost } from "lucide-react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import {
   BookmarkBackup,
@@ -200,14 +200,17 @@ export function BookmarksPage() {
                   </div>
                 }
               />
-              <button
-                type="button"
-                onClick={focusViews.create}
-                className={`mt-4 text-sm font-semibold ${INPLACE_TEXT}`}
-                data-focus-view-new=""
-              >
-                New view
-              </button>
+              <div className="mt-4 flex justify-end">
+                <button
+                  type="button"
+                  onClick={focusViews.create}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-teal-600/10 px-3 py-1.5 text-sm font-semibold text-teal-700 transition-colors hover:bg-teal-600/20 dark:bg-teal-400/10 dark:text-teal-400 dark:hover:bg-teal-400/20"
+                  data-focus-view-new=""
+                >
+                  New view
+                  <Plus className="size-4" aria-hidden="true" />
+                </button>
+              </div>
             </>
           )}
           {tab === "backup" && (
