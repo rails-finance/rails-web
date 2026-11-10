@@ -55,6 +55,10 @@ export interface ChainTruthListingFilter<F extends BaseListFilters> {
   countFor?: (draft: F) => number | Promise<number>;
   /** The noun for a staged selection in that sheet. */
   nounFor?: (draft: F) => string;
+  /** A locked chip drawn first in the chip row (AIM's, ui-jobs 557). */
+  chipsLead?: ReactNode;
+  /** In place of the result count, a count line the page writes. */
+  countNode?: ReactNode;
 }
 
 /** The default failure state: a listing fetch rejected and the config
@@ -243,6 +247,8 @@ export function ChainTruthListing<T, F extends BaseListFilters = BaseListFilters
           sortOptions={filter.sortOptions}
           searchPlaceholder={filter.searchPlaceholder}
           count={count}
+          countNode={filter.countNode}
+          chipsLead={filter.chipsLead}
           viewMenu={filter.viewMenu}
           countPending={loading || refreshing}
           countFor={filter.countFor}

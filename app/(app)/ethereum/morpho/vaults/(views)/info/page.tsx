@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // How Morpho's vault layer on Ethereum is built — /ethereum/morpho/vaults/info
 // (rails-ops ui-jobs 486). The page is the shared one
 // (components/vaults/metamorpho-vaults-info.tsx).

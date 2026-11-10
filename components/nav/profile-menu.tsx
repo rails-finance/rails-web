@@ -2,8 +2,9 @@
 
 // The profile control (H20) and its menu (rails-ops ui-jobs 504): the facehash
 // with a chevron, a menu button. The menu has no heading of its own: each group
-// carries its own label (ui-jobs 524). Top down: with nothing saved, "New to
-// Rails? Start here" to /start as a blue button across the top (ui-jobs 509);
+// carries its own label (ui-jobs 524). Top down: with nothing saved, focus
+// views included, "New to Rails? Start here" to /start as a blue button across
+// the top (ui-jobs 509);
 // the filled bookmark and "Saved wallets", then the first ten in the reader's
 // order (lib/shared/sessions.ts; /bookmarks orders them) or, with none, how to
 // save one; "Saved positions" (ui-jobs 530) and "Saved views" (ui-jobs 521),
@@ -29,20 +30,26 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, ChevronDown, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
+import { Bookmark, Check, ChevronDown, ListFilter, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Facehash } from "@/components/shared/facehash";
+import { FocusAvatar } from "@/components/shared/focus-avatar";
+import { ExplorerScopeLine, FocusRows, ViewIcons, viewName } from "@/components/shared/asset-scope-strip";
 import { useBookmarks } from "@/components/shared/bookmark-list";
 import { savedName, useSavedLinks } from "@/components/shared/saved-items";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
-import { CTRL_OFF, CTRL_ON, START_CTA } from "@/lib/shared/ui-grammar";
+import { focusViews, openFocusPanel, useAssetScope } from "@/lib/shared/asset-scope";
+import { focusShort } from "@/components/shared/aim-gate";
+import { CTRL_OFF, CTRL_ON, INPLACE_TEXT, START_CTA } from "@/lib/shared/ui-grammar";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 
 const BOOKMARKS_PATH = "/bookmarks";
+/** A text press in the menu is 44px tall on a phone. */
+const MENU_TAP = "inline-flex min-h-11 items-center sm:min-h-0";
 /** The control's and the menu's accessible name: what the menu holds as a whole. */
 const MENU_NAME = "Saved and settings";
 /** A group's small label (Saved wallets, Saved positions, Saved views). */
@@ -55,6 +62,26 @@ const START_PATH = "/start";
  *  rest are on /bookmarks. */
 const MENU_ROWS = 10;
 const MENU_LINK_ROWS = 5;
+/** The menu lists this many focus views, and the view in use's first rows. */
+const MENU_FOCUS_VIEWS = 5;
+const MENU_FOCUS_ROWS = 3;
+const FOCUS_RING = "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
+
+/** A focus view's radio mark: ticked for the view in use. */
+function RadioMark({ on }: { on: boolean }) {
+  return (
+    <span
+      className={`inline-flex size-4 shrink-0 items-center justify-center rounded-full border ${
+        on
+          ? "border-teal-600 bg-teal-600 text-white dark:border-teal-500 dark:bg-teal-500"
+          : "border-rb-300 dark:border-rb-600"
+      }`}
+      aria-hidden="true"
+    >
+      {on && <Check className="size-3" strokeWidth={3} />}
+    </span>
+  );
+}
 
 const ITEM =
   "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors focus:outline-none focus-visible:bg-rb-100 hover:bg-rb-100 dark:hover:bg-rb-800 dark:focus-visible:bg-rb-800";
@@ -148,6 +175,7 @@ export function ProfileMenu() {
   const positions = useSavedLinks("position");
   const views = useSavedLinks("view");
   const pathname = usePathname();
+  const scope = useAssetScope();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [place, setPlace] = useState<{ top: number; right: number; phone: boolean } | null>(null);
@@ -166,7 +194,13 @@ export function ProfileMenu() {
     { kind: "positions", label: "Saved positions", rows: (positions ?? []).slice(0, MENU_LINK_ROWS) },
     { kind: "views", label: "Saved views", rows: (views ?? []).slice(0, MENU_LINK_ROWS) },
   ].filter((g) => g.rows.length > 0);
-  const anything = rows.length > 0 || links.length > 0;
+  const focusOn = scope.ready && scope.on;
+  /** Anything saved, focus views included, takes "Start here" out of the menu. */
+  const anything = rows.length > 0 || links.length > 0 || (scope.ready && scope.views.length > 0);
+  /** The Focus section shows with Focus on or any view saved. */
+  const focusShown = scope.ready && (scope.on || scope.views.length > 0);
+  const menuViews = scope.views.slice(0, MENU_FOCUS_VIEWS);
+  const focusLabel = scope.active?.name || focusShort(scope.picks, scope.chains);
 
   const close = useCallback((refocus = true) => {
     setOpen(false);
@@ -255,8 +289,8 @@ export function ProfileMenu() {
       <button
         ref={trigger}
         type="button"
-        aria-label={MENU_NAME}
-        title={MENU_NAME}
+        aria-label={focusOn ? `${MENU_NAME}. Focus mode: ${focusLabel}` : MENU_NAME}
+        title={focusOn ? `Focus mode: ${focusLabel}` : MENU_NAME}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -273,16 +307,13 @@ export function ProfileMenu() {
         data-anatomy="H20"
         data-profile-face={face ?? undefined}
         // Neutral, with the chrome's tile on hover and while open (ui-jobs
-        // 516): the menu opens in place.
-        className={`flex shrink-0 cursor-pointer items-center gap-0.5 rounded-lg py-[9px] pl-[9px] pr-1 text-foreground transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+        // 516): the menu opens in place. Below sm an invisible band takes the
+        // press to 44px tall without moving the header.
+        className={`relative flex shrink-0 cursor-pointer items-center gap-0.5 rounded-lg py-[9px] pl-[9px] pr-1 max-sm:before:absolute max-sm:before:-inset-y-[3px] max-sm:before:inset-x-0 max-sm:before:content-[''] text-foreground transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
           open ? CHROME_HOVER_ON : CHROME_HOVER
         }`}
       >
-        {face ? (
-          <Facehash address={face} size={20} mono />
-        ) : (
-          <span className="block size-5 rounded-[4.4px] bg-current opacity-30" aria-hidden="true" />
-        )}
+        <FocusAvatar face={face} />
         <ChevronDown className={`size-3.5 shrink-0 ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       {mounted &&
@@ -312,6 +343,104 @@ export function ProfileMenu() {
               }`}
               style={place.phone ? undefined : { top: place.top, right: place.right }}
             >
+              {/* With Focus on or a focus view saved, the menu opens with
+                  Focus (Miles, 10 Nov 2026): the saved views as a switcher
+                  with Off, what the view in use holds, and its presses. */}
+              {focusShown && (
+                <div role="group" aria-labelledby={`${menuId}-focus`} className="pb-2" data-profile-menu-focus="">
+                  <p id={`${menuId}-focus`} className={GROUP_LABEL}>
+                    <ListFilter className="size-4 shrink-0" aria-hidden="true" />
+                    Focus mode
+                  </p>
+                  <div data-profile-menu-focus-views={scope.views.length}>
+                    {menuViews.map((v) => {
+                      const on = scope.active?.id === v.id;
+                      return (
+                        <div key={v.id}>
+                          <button
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={on}
+                            onClick={() => focusViews.use(v.id)}
+                            className={ITEM}
+                            data-profile-menu-focus-view={v.id}
+                          >
+                            <RadioMark on={on} />
+                            <span className="flex min-w-0 flex-1 items-center">
+                              <ViewIcons picks={v.assets} chains={v.chains} />
+                              <span className={`truncate ${on ? "font-semibold text-foreground" : "text-foreground"}`}>
+                                {viewName(v)}
+                              </span>
+                            </span>
+                          </button>
+                          {on && (
+                            <div className="pb-1 pl-11 pr-3">
+                              <FocusRows picks={v.assets} chains={v.chains} max={MENU_FOCUS_ROWS} size={16} />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {scope.views.length > MENU_FOCUS_VIEWS && (
+                      <Link
+                        href={`${BOOKMARKS_PATH}?tab=focus`}
+                        role="menuitem"
+                        onClick={() => close(false)}
+                        className={`${ITEM} text-xs text-blue-600 dark:text-[var(--text-link)]`}
+                      >
+                        All {scope.views.length} focus views →
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={!scope.on}
+                      onClick={() => scope.clear()}
+                      className={ITEM}
+                      data-profile-menu-focus-off=""
+                    >
+                      <RadioMark on={!scope.on} />
+                      <span className="flex-1 text-foreground">Off</span>
+                    </button>
+                  </div>
+                  {/* On an explorer's page that the focus hides: why (the
+                      strip's second line, Miles 10 Nov 2026). */}
+                  <ExplorerScopeLine
+                    keys={scope.keys}
+                    className="px-3 pb-2 pt-1 text-xs leading-snug text-rb-500"
+                    onLeave={() => close(false)}
+                  />
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 pt-1 text-xs">
+                    {scope.on && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          close(false);
+                          openFocusPanel("edit");
+                        }}
+                        className={`rounded font-semibold ${FOCUS_RING} ${INPLACE_TEXT} ${MENU_TAP}`}
+                        data-profile-menu-focus-change=""
+                      >
+                        Change
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        close(false);
+                        focusViews.create();
+                      }}
+                      className={`rounded font-semibold ${FOCUS_RING} ${INPLACE_TEXT} ${MENU_TAP}`}
+                      data-profile-menu-focus-new=""
+                    >
+                      New view
+                    </button>
+                  </div>
+                  <div className="mx-1 mt-3 border-t border-rb-200 dark:border-rb-800" />
+                </div>
+              )}
               {/* With none saved, the way in fills the menu's top (Miles, 6 Nov
                   2026); with a wallet saved there is none (ui-jobs 509). */}
               {!anything && (
@@ -358,6 +487,24 @@ export function ProfileMenu() {
               ))}
               {anything && <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />}
               <div className="py-1">
+                {/* Focus mode's way in while it is off (ui-jobs 557): opens its
+                    panel (components/shared/asset-scope-strip.tsx). */}
+                {!focusShown && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      close(false);
+                      focusViews.create();
+                    }}
+                    className={ITEM}
+                    data-profile-menu-assets={scope.picks.length}
+                  >
+                    <ListFilter className="size-4 shrink-0" aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate text-foreground">Focus mode</span>
+                    <span className="shrink-0 truncate text-xs text-rb-500">Off</span>
+                  </button>
+                )}
                 <Link
                   href={BOOKMARKS_PATH}
                   role="menuitem"

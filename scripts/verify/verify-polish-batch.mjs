@@ -602,8 +602,8 @@ await phone.close();
     );
   const viewHref = await sp.locator('[data-bookmark-row="view"] a').first().getAttribute("href");
   check(
-    "SV /bookmarks tabs Wallets, Positions, Views; ?tab=views lists the view opening its URL",
-    tabs.join() === "wallets,positions,views*" && viewHref === VIEW,
+    "SV /bookmarks tabs Focus views, Listings, Wallets, Positions, Backup; the old ?tab=views opens Listings with the view opening its URL",
+    tabs.join() === "focus,listings*,wallets,positions,backup" && viewHref === VIEW,
     JSON.stringify({ tabs, viewHref }),
   );
   await ctx.close();

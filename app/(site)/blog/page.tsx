@@ -1,3 +1,4 @@
+// focus: Rails' own writing; no asset or chain to filter
 import { BlogCard } from "@/components/blog/BlogCard";
 import { articles } from "./data/articles";
 import type { Metadata } from "next";

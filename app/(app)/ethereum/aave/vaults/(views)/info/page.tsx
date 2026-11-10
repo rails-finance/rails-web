@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // How Aave's vault layer on Ethereum is built — /ethereum/aave/vaults/info.
 // ----------------------------------------------------------------------------
 // The (i) in the section rail. These paragraphs were the listing's "How this

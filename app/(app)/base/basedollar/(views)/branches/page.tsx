@@ -7,6 +7,7 @@
 // LiquityForkBranchesView holds the presentation — Asymmetry renders the same
 // component off its own roster.
 
+import { branchScopeKeys } from "@/lib/shared/asset-family";
 import {
   LiquityForkBranchesView,
   LiquityForkBranchesStamp,
@@ -14,7 +15,7 @@ import {
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
 import type { LiquityForkConfig } from "@/lib/sources/chain/liquity-fork-position";
-import { BASEDOLLAR_BRANCHES, DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
+import { BASEDOLLAR_BRANCHES, DEBT_ADDRESS, DEBT_SYMBOL } from "@/lib/basedollar/asset-catalog";
 import { BASE_CHAIN_ID } from "@/lib/shared/chains";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { unlaunchedRobotsForPath } from "@/lib/shared/page-metadata";
@@ -57,6 +58,7 @@ export default async function BasedollarBranchesPage() {
         />
 
         <LiquityForkBranchesView
+          scopeKeys={branchScopeKeys(8453, BASEDOLLAR_BRANCHES, DEBT_ADDRESS)}
           data={data}
           protocolName="Basedollar"
           basePath="/base/basedollar"

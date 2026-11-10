@@ -44,6 +44,9 @@ import { ARBITRUM_CHAIN_ID, chainMeta, type ChainId } from "@/lib/shared/chains"
 import { walletCountProv, walletTradeAtProv } from "@/lib/cow/trade";
 import type { CowWalletEntry } from "@/lib/cow/types";
 import type { WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { useAssetScope } from "@/lib/shared/asset-scope";
+import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
 
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
 const H2 = "text-sm font-semibold uppercase tracking-wide text-foreground/80";
@@ -80,7 +83,7 @@ function Tile({ label, value, sub, anatomy }: { label: string; value: string; su
   );
 }
 
-function Tiles({ open, ranked }: { open: WalletPosition[]; ranked: WalletPosition[] }) {
+function Tiles({ open, ranked, filtered }: { open: WalletPosition[]; ranked: WalletPosition[]; filtered: boolean }) {
   // Only dollars the family states at its own oracle (open point 7).
   const summed = open.filter((p) => p.usdOwnOracle && !p.notRead);
   const withColl = summed.filter((p) => p.collateralUsd != null);
@@ -137,7 +140,9 @@ function Tiles({ open, ranked }: { open: WalletPosition[]; ranked: WalletPositio
           }
         />
       </div>
-      <p className="mt-2 text-xs text-rb-500">Dollars summed at each protocol&rsquo;s oracle.</p>
+      <p className="mt-2 text-xs text-rb-500">
+        {filtered ? `Total of the ${n} shown, in dollars` : "Dollars"} summed at each protocol&rsquo;s oracle.
+      </p>
     </section>
   );
 }
@@ -359,7 +364,11 @@ export function WalletView({
   /** The explorer the reader came from, for the empty state's link back. */
   back: { href: string; name: string } | null;
 }) {
-  const all = read.positions;
+  // AIM (ui-jobs 557): the positions naming an AIM asset (lib/wallet/aim-assets.ts),
+  // the reader's own wallet included.
+  const scoped = useScopedRows(read.positions, walletPositionAssetKeys, (p) => p.chain as number);
+  const filtered = scoped.on && !scoped.peek;
+  const all = scoped.rows;
   const openAll = all.filter((p) => p.status === "open");
   // The sorted set, then the dust under the floor, then the accounts not read.
   const ranked = openAll.filter((p) => !p.notRead && !isDust(p)).sort(byRisk);
@@ -367,7 +376,9 @@ export function WalletView({
   const notRead = openAll.filter((p) => p.notRead);
   const open = [...ranked, ...dust, ...notRead];
   const closed = all.filter((p) => p.status !== "open");
-  const unread = read.families.filter((r) => r.headRead === "failed");
+  const scope = useAssetScope();
+  // Under Focus, only the families on a chain in focus.
+  const unread = read.families.filter((r) => r.headRead === "failed" && (!filtered || scope.chainOk(r.chain)));
   const stamps = open.map((p) => p.readAt).filter((t): t is number => t != null);
   const oldest = stamps.length ? Math.min(...stamps) : undefined;
   const atRiskCount = open.filter(atRisk).length;
@@ -382,6 +393,7 @@ export function WalletView({
     <ProvReceiptsScope registry={registry}>
       <div
         className="flex flex-col gap-7 py-8"
+        {...scoped.listProps}
         data-wallet-view={address}
         data-wallet-ms={read.ms}
         data-wallet-server-ms={read.serverMs}
@@ -422,11 +434,16 @@ export function WalletView({
             title={<WalletMenu wallet={address} ensName={ensName} heading view={false} />}
             lines={
               <>
-                {read.total > 0 && (
-                  <div className="text-xs text-rb-500" data-wallet-count={read.total}>
-                    {plural(read.total, "position")} · {openAll.length} open · {closed.length} closed
-                  </div>
+                {filtered ? (
+                  <ScopeNote scoped={scoped} noun={["position", "positions"]} />
+                ) : (
+                  read.total > 0 && (
+                    <div className="text-xs text-rb-500" data-wallet-count={read.total}>
+                      {plural(read.total, "position")} · {openAll.length} open · {closed.length} closed
+                    </div>
+                  )
                 )}
+                {scoped.on && scoped.peek && <ScopeNote scoped={scoped} noun={["position", "positions"]} />}
               </>
             }
             end={
@@ -446,6 +463,8 @@ export function WalletView({
             </section>
             {trades}
           </>
+        ) : filtered && all.length === 0 && read.positions.length > 0 ? (
+          <>{trades}</>
         ) : all.length === 0 ? (
           <>
             <section className="flex max-w-xl flex-col gap-3" data-wallet-empty="">
@@ -470,7 +489,7 @@ export function WalletView({
           </>
         ) : (
           <>
-            {open.length > 0 && <Tiles open={open} ranked={ranked} />}
+            {open.length > 0 && <Tiles open={open} ranked={ranked} filtered={filtered} />}
             <section aria-labelledby="wallet-open" data-wallet-open={open.length} data-anatomy="W3">
               <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
                 <h2 id="wallet-open" className={H2}>
@@ -501,7 +520,9 @@ export function WalletView({
           </>
         )}
 
-        {!read.error && <ArbitrumNote address={address} />}
+        {/* How Arbitrum positions come to show: kept under a focus that takes in
+            Arbitrum, the only guidance there is for it. */}
+        {!read.error && (!filtered || scope.chains.includes(ARBITRUM_CHAIN_ID)) && <ArbitrumNote address={address} />}
 
         {unread.length > 0 && (
           <p className="text-xs text-rb-500" data-wallet-unread={unread.map((r) => r.id).join(",")}>

@@ -16,13 +16,64 @@ import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { explorerHref } from "@/lib/shared/protocols";
 import { poolPosition } from "@/lib/uniswap/position";
 import { cardProv } from "@/lib/uniswap/provenance";
-import type { UniswapVersion } from "@/lib/uniswap/types";
+import type { Provenance } from "@/components/shared/provenance";
+import type { UniToken, UniswapVersion } from "@/lib/uniswap/types";
 import { POSITION_PAGE, num } from "@/lib/uniswap/words";
 
 /** One read per request: the metadata and the page share it. */
 export const loadUniswapPosition = cache((version: UniswapVersion, id: string) => fetchUniswapPosition(version, id));
 
 export const isPositionId = (id: string): boolean => /^\d{1,78}$/.test(id);
+
+/** The top row's price strip for a pool position: its worth first, then the pool's price, quote per
+ *  base, flipped where that reads below 0.001. Aerodrome's page draws it too. */
+export function poolAssets({
+  base,
+  quote,
+  valueNow,
+  price,
+  worthInfo,
+  priceInfo,
+}: {
+  base: UniToken;
+  quote: UniToken;
+  valueNow: number;
+  price: number;
+  worthInfo: Provenance;
+  priceInfo: Provenance;
+}) {
+  return [
+    {
+      symbol: quote.symbol,
+      address: quote.address,
+      price: valueNow,
+      unit: quote.symbol,
+      figure: `${num(valueNow)} ${quote.symbol}`,
+      triggerLabel: "Worth",
+      label: `The position's worth in ${quote.symbol}, at the pool's price`,
+      info: worthInfo,
+    },
+    price >= 0.001
+      ? {
+          symbol: base.symbol,
+          address: base.address,
+          price,
+          unit: quote.symbol,
+          figure: `${num(price)} ${quote.symbol}`,
+          label: `One ${base.symbol} in ${quote.symbol}, at the pool's price`,
+          info: priceInfo,
+        }
+      : {
+          symbol: quote.symbol,
+          address: quote.address,
+          price: 1 / price,
+          unit: base.symbol,
+          figure: `${num(1 / price)} ${base.symbol}`,
+          label: `One ${quote.symbol} in ${base.symbol}, at the pool's price`,
+          info: priceInfo,
+        },
+  ];
+}
 
 export async function UniswapPositionPage({ version, id }: { version: UniswapVersion; id: string }) {
   if (!isPositionId(id)) notFound();
@@ -50,39 +101,14 @@ export async function UniswapPositionPage({ version, id }: { version: UniswapVer
             session={session}
             fallbackHref={`${home}/${r.owner.toLowerCase()}`}
             showStamp={false}
-            assets={[
-              // The trigger leads with the position's worth; the pool's price follows in the
-              // dropdown, quote per base, flipped where that reads below 0.001.
-              {
-                symbol: p.quote.symbol,
-                address: p.quote.address,
-                price: p.valueNow,
-                unit: p.quote.symbol,
-                figure: `${num(p.valueNow)} ${p.quote.symbol}`,
-                triggerLabel: "Worth",
-                label: `The position's worth in ${p.quote.symbol}, at the pool's price`,
-                info: cardProv("worth", { p, r }),
-              },
-              p.price >= 0.001
-                ? {
-                    symbol: p.base.symbol,
-                    address: p.base.address,
-                    price: p.price,
-                    unit: p.quote.symbol,
-                    figure: `${num(p.price)} ${p.quote.symbol}`,
-                    label: `One ${p.base.symbol} in ${p.quote.symbol}, at the pool's price`,
-                    info: cardProv("price", { p, r }),
-                  }
-                : {
-                    symbol: p.quote.symbol,
-                    address: p.quote.address,
-                    price: 1 / p.price,
-                    unit: p.base.symbol,
-                    figure: `${num(1 / p.price)} ${p.base.symbol}`,
-                    label: `One ${p.quote.symbol} in ${p.base.symbol}, at the pool's price`,
-                    info: cardProv("price", { p, r }),
-                  },
-            ]}
+            assets={poolAssets({
+              base: p.base,
+              quote: p.quote,
+              valueNow: p.valueNow,
+              price: p.price,
+              worthInfo: cardProv("worth", { p, r }),
+              priceInfo: cardProv("price", { p, r }),
+            })}
             priceReason={ORACLE_USD_REASON[session]}
             owner={{ wallet: r.owner, filterProtocol: null, href: `${home}/${r.owner.toLowerCase()}` }}
             tools={false}

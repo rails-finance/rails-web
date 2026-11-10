@@ -6,6 +6,7 @@
 // real figures. The same shared LiquityForkBranchesView Ebisu renders — the
 // fork machinery is one implementation, parameterized.
 
+import { branchScopeKeys } from "@/lib/shared/asset-family";
 import {
   LiquityForkBranchesView,
   LiquityForkBranchesStamp,
@@ -13,7 +14,7 @@ import {
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
 import type { LiquityForkConfig } from "@/lib/sources/chain/liquity-fork-position";
-import { ASYMMETRY_BRANCHES, DEBT_SYMBOL } from "@/lib/asymmetry/asset-catalog";
+import { ASYMMETRY_BRANCHES, DEBT_ADDRESS, DEBT_SYMBOL } from "@/lib/asymmetry/asset-catalog";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
@@ -45,6 +46,7 @@ export default async function AsymmetryBranchesPage() {
         />
 
         <LiquityForkBranchesView
+          scopeKeys={branchScopeKeys(1, ASYMMETRY_BRANCHES, DEBT_ADDRESS)}
           data={data}
           protocolName="Asymmetry"
           basePath="/ethereum/asymmetry"

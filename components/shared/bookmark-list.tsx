@@ -9,14 +9,17 @@
 
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, GripVertical, Upload } from "lucide-react";
-import { NAV_BUTTON, POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
+import { ChevronDown, ChevronUp, GripVertical, MoreVertical, Upload } from "lucide-react";
+import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
+import { INPLACE_TEXT, NAV_BUTTON, POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
 
 import { BookmarkSummary } from "@/components/bookmarks/bookmark-summary";
 import { Facehash } from "@/components/shared/facehash";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 
 import { walletHref } from "@/components/shared/front-door-search";
+import { focusName, ViewIcons, viewName } from "@/components/shared/asset-scope-strip";
+import { focusViews, scopeLink, type FocusView } from "@/lib/shared/asset-scope";
 import {
   bookmarksBackupFilename,
   exportBookmarks,
@@ -56,7 +59,7 @@ export function useBookmarks(): WalletSession[] | null {
  *  name (B2.1). */
 /** Drag and drop within one kind's list (ui-jobs 504): the row being dragged
  *  and the index it would land at. */
-function useRowDrag(kind: SavedKind) {
+function useRowDrag(kind: SavedKind, onMove?: (id: string, to: number) => void) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<number | null>(null);
   const drag = (i: number, id: string) => ({
@@ -73,7 +76,7 @@ function useRowDrag(kind: SavedKind) {
     },
     onDrop: (e: DragEvent) => {
       e.preventDefault();
-      if (dragging) moveSaved(kind, dragging, i);
+      if (dragging) (onMove ?? ((id: string, to: number) => moveSaved(kind, id, to)))(dragging, i);
       setDragging(null);
       setOver(null);
     },
@@ -155,7 +158,8 @@ const BACKUP_BUTTON =
 
 /** Export to file and Import from file, with the line that reports what
  *  either did. The file is a JSON backup of every saved item (version 3, one
- *  list of wallets, positions and views); an import also takes a version 2
+ *  list of wallets, positions and views, and the saved Focus views beside it
+ *  in `focusViews`); an import also takes a version 2
  *  file (wallets) and a version 1 file (per-explorer lists).
  *  With nothing saved (`empty`) there is nothing to export: Import stands
  *  alone, after a line asking for the file (Miles, 6 Nov 2026). */
@@ -166,9 +170,10 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
   // The list as a JSON file the reader keeps: bookmarks live in this
   // origin's localStorage, so the file is what carries them elsewhere.
   const handleExport = () => {
-    const backup = exportBookmarks();
+    const views = focusViews.list();
+    const backup = { ...exportBookmarks(), ...(views.length ? { focusViews: views } : {}) };
     const count = backup.bookmarks.length;
-    if (count === 0) {
+    if (count + views.length === 0) {
       setNotice("No saved items to export yet.");
       return;
     }
@@ -179,13 +184,26 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
     a.download = name;
     a.click();
     URL.revokeObjectURL(url);
-    setNotice(`${plural(count, "saved item")} written to ${name}.`);
+    const what = [count ? plural(count, "saved item") : "", views.length ? plural(views.length, "focus view") : ""]
+      .filter(Boolean)
+      .join(" and ");
+    setNotice(`${what} written to ${name}.`);
   };
 
   const handleImport = async (file: File) => {
     try {
-      const result = importBookmarks(await file.text());
-      setNotice(`Read ${plural(result.read, "saved item")}, ${result.added} new.`);
+      const text = await file.text();
+      const result = importBookmarks(text);
+      let fileViews: unknown;
+      try {
+        fileViews = (JSON.parse(text) as { focusViews?: unknown }).focusViews;
+      } catch {}
+      const v = fileViews === undefined ? null : focusViews.importList(fileViews);
+      const parts = [
+        result.read ? `${plural(result.read, "saved item")}, ${result.added} new` : "",
+        v && v.read ? `${plural(v.read, "focus view")}, ${v.added} new` : "",
+      ].filter(Boolean);
+      setNotice(parts.length ? `Read ${parts.join("; ")}.` : "That backup carries nothing saved.");
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "That file couldn't be read.");
     }
@@ -434,7 +452,7 @@ function BookmarkRow({ session, summary, move }: { session: WalletSession; summa
 
   return (
     <div
-      className={`${rowClasses} ${move?.dragging ? "opacity-50" : ""} ${move?.target ? "border-t-blue-500" : ""}`}
+      className={`${rowClasses} ${move?.dragging ? "opacity-50" : ""} ${move?.target ? "border-t-teal-500" : ""}`}
       data-bookmark-row=""
       {...move?.drag}
     >
@@ -560,7 +578,7 @@ function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
   const where = [link.kind === "position" ? link.protocol?.name : null, link.chain?.name].filter(Boolean).join(" · ");
   return (
     <div
-      className={`${rowClasses} ${move.dragging ? "opacity-50" : ""} ${move.target ? "border-t-blue-500" : ""}`}
+      className={`${rowClasses} ${move.dragging ? "opacity-50" : ""} ${move.target ? "border-t-teal-500" : ""}`}
       data-bookmark-row={link.kind}
       {...move.drag}
     >
@@ -615,6 +633,292 @@ function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/** The saved Focus views (ui-jobs 557), or `empty` when there are none: rows
+ *  moved, renamed and removed as the saved links are, with the link copied
+ *  (`&view=` carrying the name) and Use putting a view in use. A removed view
+ *  can be put back for a few seconds (Undo). On a phone a row keeps its name,
+ *  Use or In use and a ⋮ that holds the rest. */
+export function FocusViewList({
+  views,
+  active,
+  empty,
+}: {
+  views: FocusView[];
+  active: string | null;
+  empty: ReactNode;
+}) {
+  const moveOf = useRowDrag("view", focusViews.move);
+  const isPhone = useMediaQuery(PHONE_QUERY);
+  const [removed, setRemoved] = useState<{ view: FocusView; index: number; wasActive: boolean } | null>(null);
+  useEffect(() => {
+    if (!removed) return;
+    const t = window.setTimeout(() => setRemoved(null), UNDO_MS);
+    return () => window.clearTimeout(t);
+  }, [removed]);
+  const remove = (id: string) => setRemoved(focusViews.remove(id));
+  const undo = removed && (
+    <p className="mb-2 flex items-center gap-2 text-sm text-rb-500" role="status" data-focus-view-removed="">
+      Removed {viewName(removed.view)}
+      {removed.wasActive ? ". Focus is off." : "."}
+      <button
+        type="button"
+        onClick={() => {
+          focusViews.restore(removed);
+          setRemoved(null);
+        }}
+        className={`font-semibold ${INPLACE_TEXT} min-h-11 sm:min-h-0`}
+        data-focus-view-undo=""
+      >
+        Undo
+      </button>
+    </p>
+  );
+  if (views.length === 0)
+    return (
+      <>
+        {undo}
+        {empty}
+      </>
+    );
+  return (
+    <>
+      {undo}
+      <div className="flex flex-col gap-1" data-bookmark-list="focus">
+        {views.map((v, i) => (
+          <FocusViewRow
+            key={v.id}
+            view={v}
+            inUse={v.id === active}
+            phone={isPhone}
+            onRemove={() => remove(v.id)}
+            move={moveOf(i, views.length, v.id)}
+          />
+        ))}
+      </div>
+    </>
+  );
+}
+
+const UNDO_MS = 8000;
+
+function FocusViewRow({
+  view,
+  inUse,
+  phone,
+  onRemove,
+  move,
+}: {
+  view: FocusView;
+  inUse: boolean;
+  phone: boolean;
+  onRemove: () => void;
+  move: RowMove;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [menu, setMenu] = useState(false);
+  const label = viewName(view);
+  const holds = focusName(view.assets, view.chains);
+  const link = () => (typeof window === "undefined" ? "" : scopeLink(view.assets, view.chains, view.name, "/"));
+  const commitEdit = () => {
+    focusViews.rename(view.id, draftName);
+    setEditing(false);
+  };
+  const startEdit = () => {
+    setDraftName(view.name ?? "");
+    setEditing(true);
+  };
+  // Not a link, so no hover frame (blue marks a way off the page).
+  const rowClasses = "group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5";
+  const glyph = (
+    <span className="flex w-8 shrink-0 items-center justify-center">
+      <ViewIcons picks={view.assets} chains={view.chains} />
+    </span>
+  );
+
+  if (editing) {
+    return (
+      <div className={rowClasses} data-bookmark-row="focus" data-anatomy="B2.2" data-editing="">
+        {glyph}
+        <input
+          autoFocus
+          aria-label="Focus view name"
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitEdit();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              setEditing(false);
+            }
+          }}
+          placeholder={holds}
+          maxLength={60}
+          className="min-w-0 flex-1 rounded border border-rb-300 bg-raised px-1.5 py-0.5 text-base font-bold outline-none sm:text-sm dark:border-rb-700"
+        />
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={commitEdit}
+            title="Save name"
+            aria-label="Save name"
+            className={`${ICON_BUTTON} hover:text-green-500`}
+          >
+            {TICK}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            title="Cancel"
+            aria-label="Cancel rename"
+            className={`${ICON_BUTTON} hover:text-foreground`}
+          >
+            {CROSS}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const use = inUse ? (
+    phone ? (
+      <span className="shrink-0 text-xs font-semibold text-foreground" data-focus-view-in-use="">
+        In use
+      </span>
+    ) : (
+      <button
+        type="button"
+        onClick={() => focusViews.use(null)}
+        aria-label={`${label} is in use. Turn off`}
+        className="group/use min-w-12 shrink-0 text-right text-xs font-semibold text-foreground"
+        data-focus-view-in-use=""
+      >
+        <span className="group-hover/use:hidden group-focus-visible/use:hidden">In use</span>
+        <span className={`hidden group-hover/use:inline group-focus-visible/use:inline ${INPLACE_TEXT}`}>Turn off</span>
+      </button>
+    )
+  ) : (
+    <button
+      type="button"
+      onClick={() => focusViews.use(view.id)}
+      aria-label={`Use ${label}`}
+      className={`shrink-0 text-xs font-semibold ${INPLACE_TEXT} min-h-11 min-w-11 sm:min-h-0 sm:min-w-0`}
+      data-focus-view-use={view.id}
+    >
+      Use
+    </button>
+  );
+
+  return (
+    <div
+      className={`${rowClasses} ${move.dragging ? "opacity-50" : ""} ${move.target ? "border-t-teal-500" : ""}`}
+      data-bookmark-row="focus"
+      data-anatomy="B2.2"
+      data-focus-view-row={view.id}
+      {...(phone ? {} : move.drag)}
+    >
+      {!phone && (
+        <GripVertical
+          className="size-4 shrink-0 cursor-grab text-rb-400 active:cursor-grabbing"
+          aria-hidden="true"
+          data-bookmark-grip=""
+        />
+      )}
+      {glyph}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold text-foreground">{label}</span>
+        {view.name && <span className="mt-0.5 block truncate text-xs text-rb-500">{holds}</span>}
+      </span>
+      {use}
+      {phone ? (
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setMenu((m) => !m)}
+            aria-label={`More for ${label}`}
+            aria-expanded={menu}
+            className="inline-flex size-11 items-center justify-center rounded-md text-rb-500 hover:text-foreground"
+            data-focus-view-more=""
+          >
+            <MoreVertical className="size-4" aria-hidden="true" />
+          </button>
+          {menu && (
+            <div
+              className="overlay-panel absolute right-0 top-full z-[var(--z-dropdown)] mt-1 flex w-48 flex-col py-1"
+              role="menu"
+              onClick={() => setMenu(false)}
+            >
+              {inUse && (
+                <RowMenuItem onClick={() => focusViews.use(null)} data="turn-off">
+                  Turn off
+                </RowMenuItem>
+              )}
+              <RowMenuItem onClick={startEdit} data="rename">
+                Rename
+              </RowMenuItem>
+              <RowMenuItem onClick={() => void navigator.clipboard?.writeText(link())} data="copy">
+                Copy link
+              </RowMenuItem>
+              {move.index > 0 && (
+                <RowMenuItem onClick={() => focusViews.move(view.id, move.index - 1)} data="up">
+                  Move up
+                </RowMenuItem>
+              )}
+              {move.index < move.count - 1 && (
+                <RowMenuItem onClick={() => focusViews.move(view.id, move.index + 1)} data="down">
+                  Move down
+                </RowMenuItem>
+              )}
+              <RowMenuItem onClick={onRemove} data="remove">
+                Remove
+              </RowMenuItem>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="flex shrink-0 items-center gap-0.5">
+          <MoveButtons label={label} move={move} onMove={(to) => focusViews.move(view.id, to)} />
+          <CopyButton text={link()} what="Copy link" />
+          <button
+            type="button"
+            onClick={startEdit}
+            title="Rename"
+            aria-label="Rename focus view"
+            className={`${ICON_BUTTON} hover:text-foreground`}
+          >
+            {PENCIL}
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            title="Remove focus view"
+            aria-label="Remove focus view"
+            className={`${ICON_BUTTON} hover:text-red-400`}
+          >
+            {BIN}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RowMenuItem({ onClick, data, children }: { onClick: () => void; data: string; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className="min-h-11 px-3 text-left text-sm text-foreground hover:bg-rb-100 dark:hover:bg-rb-800"
+      data-focus-view-menu={data}
+    >
+      {children}
+    </button>
   );
 }
 

@@ -31,6 +31,8 @@ export interface ListToolbarProps<F extends BaseListFilters> {
   /** In place of `count`, a count line the page writes (the vault roster's
    *  "N of M funded vaults", with its receipt). */
   countNode?: ReactNode;
+  /** A locked chip drawn first in the chip row (FilterChips `lead`). */
+  chipsLead?: ReactNode;
   /** The search box's skeleton anchor (`data-skel-section`); "listing-toolbar"
    *  by default. */
   skel?: string;
@@ -67,6 +69,7 @@ export function ListToolbar<F extends BaseListFilters>({
   searchPlaceholder = "Search wallet or id",
   count,
   countNode,
+  chipsLead,
   skel = "listing-toolbar",
   viewMenu = false,
   sheetCount,
@@ -142,7 +145,14 @@ export function ListToolbar<F extends BaseListFilters>({
           />
         )}
       </div>
-      <FilterChips dimensions={dimensions} filters={filters} onChange={onChange} count={count} countNode={countNode} />
+      <FilterChips
+        dimensions={dimensions}
+        filters={filters}
+        onChange={onChange}
+        count={count}
+        countNode={countNode}
+        lead={chipsLead}
+      />
     </div>
   );
 }

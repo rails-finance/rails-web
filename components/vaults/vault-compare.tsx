@@ -15,6 +15,8 @@ import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { VaultLead } from "@/components/vaults/vault-heads";
 import { HolderDonut } from "@/components/vaults/holder-donut";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { useAssetScope } from "@/lib/shared/asset-scope";
+import { assetKey } from "@/lib/shared/asset-family";
 import { VAULT_FAMILIES } from "@/lib/vaults/families";
 import { COMPARE_SORTS, mixedAssets, sortColumns, type CompareSort } from "@/lib/vaults/compare";
 import { COMPARE_PAGE, EXPOSURE_WORDS, type CompareCell } from "@/lib/vaults/compare-words";
@@ -106,6 +108,28 @@ function VaultHead({ c }: { c: CompareColumn }) {
   );
 }
 
+/** Under Focus the comparison keeps the vaults the reader chose and says how
+ *  many of them are outside the focus (ui-jobs 557). */
+function FocusCompareNote({ columns }: { columns: CompareColumn[] }) {
+  const scope = useAssetScope();
+  if (!scope.on) return null;
+  const out = columns.filter(
+    (c) =>
+      !scope.matches(
+        [assetKey(c.vault.chainId, c.vault.asset.address), assetKey(c.vault.chainId, c.vault.address)],
+        c.vault.chainId,
+      ),
+  ).length;
+  if (!out) return null;
+  return (
+    <p className={`mb-3 text-xs ${MUTED}`} data-compare-focus-out={out}>
+      {out === columns.length
+        ? "None of these vaults is in your focus. They show because you chose them."
+        : `${out} of these ${columns.length} vaults ${out === 1 ? "is" : "are"} outside your focus. They show because you chose them.`}
+    </p>
+  );
+}
+
 export function VaultCompare({ columns, initialSort }: { columns: CompareColumn[]; initialSort: CompareSort }) {
   const [sort, setSort] = useState<CompareSort>(initialSort);
   const cols = sortColumns(columns, sort);
@@ -131,6 +155,7 @@ export function VaultCompare({ columns, initialSort }: { columns: CompareColumn[
 
   return (
     <div data-compare-columns={cols.map((c) => c.key).join(",")}>
+      <FocusCompareNote columns={columns} />
       <div
         className="mb-2 flex flex-wrap items-center gap-x-1 gap-y-2 text-sm"
         role="group"

@@ -1,3 +1,4 @@
+// focus: about Rails itself; no asset or chain to filter
 import Link from "next/link";
 import type { Metadata } from "next";
 import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";

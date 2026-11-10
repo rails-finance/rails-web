@@ -6,30 +6,42 @@
 // On the shared detail card (its ⋮, read stamp and (i)); the figures are
 // plain and the chain stays in each figure's receipt (decision 0059 point 1).
 
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { Segs, UniswapReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
-import { poolPosition, type PoolPosition } from "@/lib/uniswap/position";
-import { cardProv, type UniReceiptContext } from "@/lib/uniswap/provenance";
+import { poolPosition } from "@/lib/uniswap/position";
+import { cardProv } from "@/lib/uniswap/provenance";
 import type { UniPositionRead } from "@/lib/uniswap/types";
 import { CARD_WORDS, cardExplainer, day, num, positionNumber, shown } from "@/lib/uniswap/words";
 
-/** The range against the price, on a log scale padded around both. */
-function RangeBar({ p, c }: { p: PoolPosition; c: UniReceiptContext }) {
-  if (p.range.full)
+/** The range against the price, on a log scale padded around both. Uniswap's and Aerodrome's cards
+ *  share it: `s` is the prices as shown (lib/uniswap/words.ts `shown`). */
+export function RangeBar({
+  s,
+  full,
+  inRange,
+  rangeInfo,
+  priceInfo,
+}: {
+  s: ReturnType<typeof shown>;
+  full: boolean;
+  inRange: boolean;
+  rangeInfo: Provenance;
+  priceInfo: Provenance;
+}) {
+  if (full)
     return (
       <p className="text-xs text-rb-500" data-range-bar="full">
-        <Prov info={cardProv("range", c)}>{CARD_WORDS.fullRange}</Prov>
+        <Prov info={rangeInfo}>{CARD_WORDS.fullRange}</Prov>
       </p>
     );
-  const s = shown(p);
   const lo = Math.log(Math.min(s.low, s.price));
   const hi = Math.log(Math.max(s.high, s.price));
   const pad = (hi - lo) * 0.15 || 0.1;
   const x = (v: number) => ((Math.log(v) - (lo - pad)) / (hi - lo + 2 * pad)) * 100;
   return (
-    <div data-range-bar={p.inRange ? "in" : s.side}>
+    <div data-range-bar={inRange ? "in" : s.side}>
       <div className="relative h-6" aria-hidden>
         <div className="absolute top-2.5 h-1 w-full rounded bg-rb-200 dark:bg-rb-700" />
         <div
@@ -40,10 +52,10 @@ function RangeBar({ p, c }: { p: PoolPosition; c: UniReceiptContext }) {
       </div>
       <div className="flex flex-wrap justify-between gap-x-3 text-xs tabular-nums text-rb-500">
         <span>
-          <Prov info={cardProv("range", c)}>{CARD_WORDS.rangeText(s.low, s.high)}</Prov>
+          <Prov info={rangeInfo}>{CARD_WORDS.rangeText(s.low, s.high)}</Prov>
         </span>
         <span>
-          <Prov info={cardProv("price", c)}>{CARD_WORDS.priceText(s.price, s.unit)}</Prov>
+          <Prov info={priceInfo}>{CARD_WORDS.priceText(s.price, s.unit)}</Prov>
         </span>
       </div>
     </div>
@@ -127,7 +139,13 @@ function slots(r: UniPositionRead): PositionCardSlots {
     band: (
       <div className="mt-4" data-anatomy="U1.1">
         <div className="mb-1 text-xs text-rb-500">{CARD_WORDS.rangeLabel}</div>
-        <RangeBar p={p} c={c} />
+        <RangeBar
+          s={shown(p)}
+          full={p.range.full}
+          inRange={p.inRange}
+          rangeInfo={cardProv("range", c)}
+          priceInfo={cardProv("price", c)}
+        />
       </div>
     ),
     foot: <p className="mt-3 text-xs text-rb-500">{CARD_WORDS.foot(Q)}</p>,

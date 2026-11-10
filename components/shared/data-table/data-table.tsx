@@ -475,14 +475,23 @@ export interface DataTableRowMenuItem {
   hooks?: Record<`data-${string}`, string | undefined>;
 }
 
+/** Under the button, or above it where the menu would run past the viewport's foot. */
+function placeMenu(r: DOMRect, height: number): { top?: number; bottom?: number; right: number } {
+  const right = window.innerWidth - r.right;
+  if (r.bottom + 4 + height > window.innerHeight && r.top - 4 - height > 0)
+    return { bottom: window.innerHeight - r.top + 4, right };
+  return { top: r.bottom + 4, right };
+}
+
 /** A row's ⋮ menu (D7): the actions every row carries, in the row's last
  *  cell. Shown on the row's hover and keyboard focus, and always where the
  *  screen has no hover (touch); open, it stays. The menu opens in a portal,
  *  fixed under its button, since the frame's sideways scroll clips anything
  *  inside it; it follows its button on a scroll and closes on a resize,
- *  Escape or a press outside. */
+ *  Escape or a press outside. It opens upward where there is no room below.
+ *  Where the screen has no hover its button and items are 44px tall. */
 export function DataTableRowMenu({ label, items }: { label: string; items: DataTableRowMenuItem[] }) {
-  const [at, setAt] = useState<{ top: number; right: number } | null>(null);
+  const [at, setAt] = useState<{ top?: number; bottom?: number; right: number } | null>(null);
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const open = at != null;
@@ -504,7 +513,7 @@ export function DataTableRowMenu({ label, items }: { label: string; items: DataT
     const follow = () => {
       const r = button.current?.getBoundingClientRect();
       if (!r || r.bottom < 0 || r.top > window.innerHeight) return close();
-      setAt({ top: r.bottom + 4, right: window.innerWidth - r.right });
+      setAt(placeMenu(r, menu.current?.offsetHeight ?? 0));
     };
     menu.current
       ?.querySelector<HTMLElement>("[role=menuitem], [role=menuitemcheckbox]")
@@ -523,10 +532,11 @@ export function DataTableRowMenu({ label, items }: { label: string; items: DataT
   const toggle = () => {
     if (open) return setAt(null);
     const r = button.current?.getBoundingClientRect();
-    if (r) setAt({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    // Before the menu is drawn its height is estimated from its items.
+    if (r) setAt(placeMenu(r, items.length * 44 + 8));
   };
   const ITEM =
-    "flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[13px] text-foreground outline-none hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)]";
+    "flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[13px] text-foreground outline-none hover:bg-[var(--surface-hover)] focus-visible:bg-[var(--surface-hover)] [@media(hover:none)]:min-h-11";
   return (
     <>
       <button
@@ -538,7 +548,7 @@ export function DataTableRowMenu({ label, items }: { label: string; items: DataT
         onClick={toggle}
         data-row-menu=""
         data-anatomy="D7"
-        className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-rb-500 transition-opacity hover:bg-[var(--surface-hover)] hover:text-foreground focus-ring group-hover/dt-row:opacity-100 group-focus-within/dt-row:opacity-100 [@media(hover:none)]:opacity-100 ${
+        className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-rb-500 [@media(hover:none)]:h-11 [@media(hover:none)]:w-11 transition-opacity hover:bg-[var(--surface-hover)] hover:text-foreground focus-ring group-hover/dt-row:opacity-100 group-focus-within/dt-row:opacity-100 [@media(hover:none)]:opacity-100 ${
           open ? "opacity-100" : "opacity-0"
         }`}
       >
@@ -550,7 +560,7 @@ export function DataTableRowMenu({ label, items }: { label: string; items: DataT
             ref={menu}
             role="menu"
             aria-label={label}
-            style={{ position: "fixed", top: at.top, right: at.right }}
+            style={{ position: "fixed", top: at.top, bottom: at.bottom, right: at.right }}
             className="z-50 min-w-48 rounded-lg border border-rb-200 bg-[var(--surface-overlay)] p-1 shadow-lg dark:border-rb-700"
             data-row-menu-list=""
           >

@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // How the Yearn V3 roster is built — /ethereum/yearn/vaults/info.
 // ----------------------------------------------------------------------------
 // The (i) in the rail, and what /ethereum/yearn/info sends a reader to. The

@@ -1,3 +1,4 @@
+// focus: about Rails itself; no asset or chain to filter
 import type { Metadata } from "next";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
 import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";

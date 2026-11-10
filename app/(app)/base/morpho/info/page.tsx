@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — Morpho Blue on base. The page is the shared Morpho info
 // component (components/protocol/morpho/morpho-info.tsx).
 

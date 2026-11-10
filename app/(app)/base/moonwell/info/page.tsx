@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — Moonwell on Base. The page is the shared Moonwell info
 // component (components/protocol/moonwell/moonwell-info.tsx).
 

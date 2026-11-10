@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — the intro prose on the rail's sub-nav. The anatomy
 // lives in ProtocolInfoShell; this file is the copy (Miles's text, 16 Oct 2026,
 // in the Liquity V2 page's shape). It is also where the assets are explained:

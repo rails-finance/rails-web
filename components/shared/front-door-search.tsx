@@ -40,6 +40,7 @@ import { toggleWalletPanel, useWalletPanelOpen } from "@/components/nav/wallet-p
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { loadBookmarks, SESSIONS_CHANGED_EVENT } from "@/lib/shared/sessions";
 import { Facehash } from "@/components/shared/facehash";
+import { AimChainButton, AimSearchButton, useAimSuggestScope } from "@/components/shared/aim-search-button";
 import {
   ADDRESS_RE,
   ENS_RE,
@@ -368,6 +369,36 @@ export function FrontDoorSearch({
       e.preventDefault();
       e.stopPropagation();
       s.close();
+    } else if (e.key === "Tab" && !e.shiftKey && s.expanded) {
+      // The AIM button is its own stop: the highlighted row's, else the first
+      // in the list; past it, Tab leaves the search.
+      const to = aimButton(listId, s.active) ?? aimButton(listId, null);
+      if (to) {
+        e.preventDefault();
+        to.focus();
+      } else s.close();
+    } else if (e.key === "Tab") s.close();
+    else if (e.key === "ArrowRight" && s.expanded && s.active) {
+      const input = e.currentTarget;
+      const to = aimButton(listId, s.active);
+      if (to && input.selectionStart === input.value.length && input.selectionEnd === input.value.length) {
+        e.preventDefault();
+        to.focus();
+      }
+    }
+  };
+
+  // Keys on a row's AIM button: back to the field with ←, Escape or Shift+Tab;
+  // ↑ and ↓ move the highlight from the field as they do there.
+  const onAimKeyDown = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+    const back = () => {
+      e.preventDefault();
+      inputRef.current?.focus();
+    };
+    if (e.key === "ArrowLeft" || e.key === "Escape" || (e.key === "Tab" && e.shiftKey)) back();
+    else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      back();
+      s.move(e.key === "ArrowDown" ? 1 : -1);
     } else if (e.key === "Tab") s.close();
   };
 
@@ -438,7 +469,14 @@ export function FrontDoorSearch({
         </div>
         {after}
         {suggesting && s.expanded && (
-          <SuggestionList listId={listId} rows={s.rows} active={s.active} onChoose={choose} onHover={s.hover} />
+          <SuggestionList
+            listId={listId}
+            rows={s.rows}
+            active={s.active}
+            onChoose={choose}
+            onHover={s.hover}
+            aim={{ onKeyDown: onAimKeyDown, onFocus: s.focus, onBlur: s.blur }}
+          />
         )}
       </div>
       {suggesting && resolving && !problem && (
@@ -536,9 +574,16 @@ function useSuggestions(value: string, on: boolean) {
   }, [ensName]);
 
   const ens = ensName ? (ensUnreachable.has(ensName) ? "unreachable" : ensAnswers.get(ensName)) : undefined;
-  const rows = useMemo(() => (on ? suggest(value, index, bookmarks, ens) : []), [on, value, index, bookmarks, ens]);
+  // Under AIM the rows naming an asset keep to the AIM set (ui-jobs 557).
+  const aim = useAimSuggestScope();
+  const rows = useMemo(
+    () => (on ? suggest(value, index, bookmarks, ens, aim) : []),
+    [on, value, index, bookmarks, ens, aim],
+  );
   const noMatch = rows.length === 0 && typed !== "";
-  const display: Suggestion[] = noMatch ? [{ key: "none", kind: "Wallet", name: "No match" }] : rows;
+  const display: Suggestion[] = noMatch
+    ? [{ key: "none", kind: "Wallet", name: aim ? "No match in your focus" : "No match" }]
+    : rows;
   const openable = rows.filter(isOpenable);
   const active = openable.find((r) => r.key === activeKey) ?? null;
 
@@ -584,6 +629,13 @@ function useSuggestions(value: string, on: boolean) {
 }
 
 const optionId = (listId: string, row: Suggestion) => `${listId}-${row.key.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
+const aimId = (listId: string, row: Suggestion) => `${optionId(listId, row)}-aim`;
+
+/** A row's AIM button, or with no row the list's first; null where none is drawn. */
+function aimButton(listId: string, row: Suggestion | null): HTMLButtonElement | null {
+  if (row) return document.getElementById(aimId(listId, row)) as HTMLButtonElement | null;
+  return document.getElementById(listId)?.querySelector<HTMLButtonElement>("button[data-aim-search]") ?? null;
+}
 
 /** The dropdown under the field (H15.2): one flat list, each row a name, a
  *  muted line after it, and its kind on the right. */
@@ -593,12 +645,19 @@ function SuggestionList({
   active,
   onChoose,
   onHover,
+  aim,
 }: {
   listId: string;
   rows: Suggestion[];
   active: Suggestion | null;
   onChoose: (row: Suggestion) => void;
   onHover: (key: string) => void;
+  /** A token row's AIM button (ui-jobs 557): its keys, and the list kept open while it has focus. */
+  aim: {
+    onKeyDown: (e: ReactKeyboardEvent<HTMLButtonElement>) => void;
+    onFocus: () => void;
+    onBlur: () => void;
+  };
 }) {
   return (
     <ul
@@ -654,6 +713,24 @@ function SuggestionList({
             </span>
             {openable && (
               <span className="shrink-0 text-xs text-rb-500">{row.kind === "Bookmark" ? "Saved" : row.kind}</span>
+            )}
+            {row.kind === "Chain" && row.chain && (
+              <AimChainButton
+                id={aimId(listId, row)}
+                chain={row.chain}
+                onKeyDown={aim.onKeyDown}
+                onFocus={aim.onFocus}
+                onBlur={aim.onBlur}
+              />
+            )}
+            {row.kind === "Token" && row.symbol && (
+              <AimSearchButton
+                id={aimId(listId, row)}
+                symbol={row.symbol}
+                onKeyDown={aim.onKeyDown}
+                onFocus={aim.onFocus}
+                onBlur={aim.onBlur}
+              />
             )}
           </li>
         );

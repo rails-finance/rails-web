@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — Liquity V2 on Ethereum, drawn on the typed template
 // (rails-ops standards/info-page-template.md). Every glossary source is Liquity's
 // official documentation (rails-ops reference/official-docs/liquity-v2.md).

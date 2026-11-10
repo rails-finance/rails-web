@@ -29,6 +29,9 @@ interface FilterChipsProps<F> {
   count?: { total: number; noun: string };
   /** In place of `count`: a count line the page writes, drawn in the same spot. */
   countNode?: ReactNode;
+  /** A chip the reader cannot remove here, drawn first: AIM's (ui-jobs 557),
+   *  set outside the listing and narrowed within by the chips after it. */
+  lead?: ReactNode;
 }
 
 /** A dimension's chip, in plain words ("WETH collateral"). */
@@ -59,7 +62,7 @@ export function savedViewFilterNames<F>(dimensions: FilterDimension<F>[], filter
     });
 }
 
-export function FilterChips<F>({ dimensions, filters, onChange, count, countNode }: FilterChipsProps<F>) {
+export function FilterChips<F>({ dimensions, filters, onChange, count, countNode, lead }: FilterChipsProps<F>) {
   const activeDims = dimensions.filter((d) => isDimensionActive(d, filters));
   // A dimension resting on a default that constrains the list names it in a
   // fixed chip (FilterDimension.defaultChip).
@@ -67,7 +70,7 @@ export function FilterChips<F>({ dimensions, filters, onChange, count, countNode
     .filter((d) => !isDimensionActive(d, filters))
     .map((d) => ({ id: d.id, text: d.defaultChip?.(filters) ?? null, clear: d.clearDefault }))
     .filter((c): c is { id: string; text: string; clear: ((f: F) => F) | undefined } => c.text != null);
-  if (activeDims.length === 0 && defaultChips.length === 0 && !count && countNode == null) return null;
+  if (activeDims.length === 0 && defaultChips.length === 0 && !count && countNode == null && lead == null) return null;
 
   const chipText = (dim: FilterDimension<F>) => filterChipText(dim, filters);
 
@@ -81,6 +84,7 @@ export function FilterChips<F>({ dimensions, filters, onChange, count, countNode
 
   return (
     <div className="flex flex-wrap items-center gap-2" data-anatomy="N1.4">
+      {lead}
       {defaultChips.map((c) => (
         <span
           key={c.id}

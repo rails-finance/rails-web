@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — Asymmetry on Ethereum, drawn on the typed template
 // (rails-ops standards/info-page-template.md). Every link is Asymmetry's official
 // documentation (docs.asymmetry.finance).

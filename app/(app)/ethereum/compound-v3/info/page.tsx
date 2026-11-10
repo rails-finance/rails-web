@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — Compound V3 on Ethereum. The page is the shared Compound V3 info
 // component (components/protocol/compound-v3/compound-v3-info.tsx).
 

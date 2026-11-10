@@ -22,6 +22,8 @@ import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fork-branches";
 import type { LiquityForkConfig, LiquityForkBranchConfig } from "@/lib/sources/chain/liquity-fork-position";
 import { LIQUITY_V2_BRANCHES, DEBT_SYMBOL } from "@/lib/liquity/asset-catalog";
+import { branchScopeKeys } from "@/lib/shared/asset-family";
+import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { PriceStrip } from "@/components/shared/price-strip";
@@ -63,6 +65,7 @@ export default async function LiquityV2BranchesPage() {
         <div data-skel-section="page-table">
           <ProvSource source={{ block: data.blockNumber }}>
             <LiquityForkBranchesView
+              scopeKeys={branchScopeKeys(1, LIQUITY_V2_BRANCHES, TOKEN_ADDRESSES.BOLD)}
               data={data}
               protocolName="Liquity V2"
               basePath="/ethereum/liquity-v2"

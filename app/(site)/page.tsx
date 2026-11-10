@@ -1,3 +1,5 @@
+import { HomeFocusExample, HomeFocusFiguresNote } from "@/components/home/home-focus";
+import { LIVE_EXAMPLE_COLLATERAL } from "@/lib/home/live-example";
 import type { Metadata } from "next";
 import { CoveredStats } from "@/components/home/covered-stats";
 import { HomeHero } from "@/components/home/home-hero";
@@ -79,14 +81,17 @@ export default async function Home() {
         {/* From sm the framed sample stands 128px clear of the value line and of
             the directory (Miles, 5 Nov 2026); a phone's button keeps 64px. */}
         <section className="pb-16 sm:pb-32" data-anatomy="S3">
+          <HomeFocusFiguresNote />
           <CoveredStats covered={covered} stats={stats} valueHeld={valueHeld} />
         </section>
 
         {/* Live example — a real trove in browser chrome; its hover pill
             links to the live position. */}
-        <section className="pb-16 sm:pb-32" data-anatomy="S2">
-          <LiveExampleFrame data={liveExample && packLiveExample(liveExample)} />
-        </section>
+        <HomeFocusExample symbols={[LIVE_EXAMPLE_COLLATERAL, "BOLD"]}>
+          <section className="pb-16 sm:pb-32" data-anatomy="S2">
+            <LiveExampleFrame data={liveExample && packLiveExample(liveExample)} />
+          </section>
+        </HomeFocusExample>
 
         {/* Explorer directory — one uniform row of tiles on the gradient's
             constant floor, directly above the "DeFi for everyone" band. */}

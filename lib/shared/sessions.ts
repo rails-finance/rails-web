@@ -95,7 +95,10 @@ export type SessionProtocol =
   // Uniswap V3 and V4, at `/ethereum/uniswap-v3` and `/ethereum/uniswap-v4`:
   // a position is an NFT id, read with its pool at two blocks (ui-jobs 556).
   | "uniswap-v3"
-  | "uniswap-v4";
+  | "uniswap-v4"
+  // Aerodrome Slipstream on Base, at `/base/aerodrome`: a position is an NFT
+  // id on one of three position managers, staked in its gauge or not (ui-jobs 566).
+  | "aerodrome";
 
 /** What a saved entry is: a wallet, a position page or a listing view. */
 export type SavedKind = "wallet" | "position" | "view";
@@ -521,6 +524,9 @@ export interface BookmarksBackup {
   /** ISO-8601, so the stamp reads the same in every runtime locale. */
   exportedAt: string;
   bookmarks: SavedEntry[];
+  /** Saved Focus views (lib/shared/focus-views.ts), since ui-jobs 557. An
+   *  optional field: a build without it reads the rest and skips this. */
+  focusViews?: unknown[];
 }
 
 export interface BookmarksImportResult {
@@ -568,7 +574,8 @@ export function importBookmarks(source: string): BookmarksImportResult {
   const rowsIn = lists.flatMap((rows) => (Array.isArray(rows) ? rows : []));
   const wallets = rowsIn.filter(isSessionRow);
   const links = rowsIn.filter(isLinkRow);
-  if (wallets.length + links.length === 0) throw new Error("That backup carries nothing saved.");
+  const hasViews = Array.isArray((parsed as { focusViews?: unknown }).focusViews);
+  if (wallets.length + links.length === 0 && !hasViews) throw new Error("That backup carries nothing saved.");
 
   const held = loadSessions();
   const heldWallets = held.filter(isWallet);

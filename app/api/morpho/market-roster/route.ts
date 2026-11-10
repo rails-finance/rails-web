@@ -84,6 +84,8 @@ async function buildRoster(raw: RosterRawResponse): Promise<MorphoMarketRosterRe
       label: marketLabel(loanSymbol, collateralSymbol ?? "—", p.isIdle),
       loanSymbol,
       collateralSymbol,
+      loanToken: p.loanToken.toLowerCase(),
+      collateralToken: p.isIdle ? null : p.collateralToken.toLowerCase(),
       lltvFraction: p.lltvFraction,
       positions: Number(row.positions) || 0,
       openPositions: Number(row.open_positions) || 0,
