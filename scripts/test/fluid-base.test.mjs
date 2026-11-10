@@ -2,11 +2,27 @@
 // through rails-server's /api/at-block/fluid-base/position on 10 Nov 2026,
 // rails-ops ui-jobs 574): the amounts, the ratio in the vault oracle's space,
 // 30-day interest from the exchange prices, dollars at Aave V3 Base's oracle,
-// and the two cases where no interest is stated.
+// the two cases where no interest is stated, and the dollar switch off.
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fluidBasePosition, interestWindow, rawOf, exact } from "../../lib/fluid-base/position.ts";
+import { register } from "node:module";
+
+// position.ts imports its switch by extensionless relative specifier; this resolver adds the `.ts`.
+const hooks = `
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+export async function resolve(specifier, context, next) {
+  if (specifier.startsWith(".") && !/\\.[cm]?[jt]sx?$/.test(specifier) && context.parentURL) {
+    const url = new URL(specifier + ".ts", context.parentURL).href;
+    if (existsSync(fileURLToPath(url))) return { url, shortCircuit: true };
+  }
+  return next(specifier, context);
+}`;
+register(`data:text/javascript,${encodeURIComponent(hooks)}`);
+
+const { fluidBasePosition, interestWindow, rawOf, exact } = await import("../../lib/fluid-base/position.ts");
+const { FLUID_BASE_DOLLARS } = await import("../../lib/fluid-base/dollars.ts");
 
 const READ = {
   chainId: 8453,
@@ -151,4 +167,23 @@ test("a DEX-share side has no rate and no dollar price", () => {
   assert.equal(p.colUnit, "cbBTC·GHO shares");
   assert.equal(p.supplyRate, null);
   assert.equal(p.usd.supply, null);
+});
+
+test("the dollar switch off: every dollar figure is null, the token figures unchanged", () => {
+  const on = fluidBasePosition(READ, true);
+  const off = fluidBasePosition(READ, false);
+  assert.deepEqual(off.usd, {
+    supplyPrice: null,
+    borrowPrice: null,
+    supply: null,
+    borrow: null,
+    supplyInterest: null,
+    borrowInterest: null,
+  });
+  assert.equal(off.supplyExact, on.supplyExact);
+  assert.equal(off.borrowExact, on.borrowExact);
+  assert.equal(off.ratio, on.ratio);
+  assert.deepEqual(off.interest, on.interest);
+  // The default follows the switch.
+  assert.equal(fluidBasePosition(READ).usd.supply === null, !FLUID_BASE_DOLLARS);
 });

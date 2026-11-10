@@ -13,6 +13,7 @@
 // figure is stated.
 
 import type { FluidBaseLeg, FluidBasePositionRead, FluidBaseRead } from "./types";
+import { FLUID_BASE_DOLLARS } from "./dollars";
 
 const PRECISION = BigInt(10) ** BigInt(12);
 
@@ -111,7 +112,8 @@ export interface FluidBasePosition {
   };
 }
 
-export function fluidBasePosition(r: FluidBasePositionRead): FluidBasePosition {
+/** `dollars` is FLUID_BASE_DOLLARS (lib/fluid-base/dollars.ts); off, every dollar figure is null. */
+export function fluidBasePosition(r: FluidBasePositionRead, dollars: boolean = FLUID_BASE_DOLLARS): FluidBasePosition {
   const cd = legDecimals(r.supplyLeg);
   const dd = legDecimals(r.borrowLeg);
   const n = r.now;
@@ -145,7 +147,7 @@ export function fluidBasePosition(r: FluidBasePositionRead): FluidBasePosition {
         }
       : w;
   const unit = Number(r.usd.baseUnit) || 1e8;
-  const usdPrice = (raw: string | null) => (raw == null ? null : Number(raw) / unit);
+  const usdPrice = (raw: string | null) => (!dollars || raw == null ? null : Number(raw) / unit);
   const supplyPrice = usdPrice(r.usd.supply);
   const borrowPrice = usdPrice(r.usd.borrow);
   const times = (a: number, p: number | null) => (p == null ? null : a * p);

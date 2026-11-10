@@ -4,8 +4,9 @@
 // position card. The headlines are the Ethereum card's (fluidCardSlots in
 // components/protocol/fluid/fluid-position-card.tsx): Collateral, Debt and the
 // Position ratio, with Borrow rate, Room to the borrow limit and Liquidates
-// above in the panel. New here: each side's dollar value at Aave V3 Base's
-// oracle where Aave prices it, and each side's interest over the last 30 days.
+// above in the panel. New here: each side's interest over the last 30 days,
+// and, while FLUID_BASE_DOLLARS (lib/fluid-base/dollars.ts) is on, each side's
+// dollar value at Aave V3 Base's oracle where Aave prices it.
 // Every figure is read when the page opens; the read stamp names the blocks.
 
 import { Prov } from "@/components/shared/provenance";
@@ -24,6 +25,7 @@ import { fluidBasePosition, type FluidBasePosition } from "@/lib/fluid-base/posi
 import { fluidBaseProv, readContracts, type FluidBaseReceiptContext } from "@/lib/fluid-base/provenance";
 import type { FluidBasePositionRead } from "@/lib/fluid-base/types";
 import { amount, CARD_WORDS, cardExplainer, usd } from "@/lib/fluid-base/words";
+import { FLUID_BASE_DOLLARS } from "@/lib/fluid-base/dollars";
 
 /** Every figure's read stamp on a Fluid Base page. */
 export function FluidBaseReadStamp({ c, what }: { c: FluidBaseReceiptContext; what: string }) {
@@ -91,7 +93,7 @@ function slots(r: FluidBasePositionRead): PositionCardSlots {
             <AssetAmount value={p.supply} symbol={p.colUnit} exact={p.supplyExact} />
           </Prov>
         ) : null,
-      usd: p.supply > 0 ? usdLine(c, "collateral") : undefined,
+      usd: FLUID_BASE_DOLLARS && p.supply > 0 ? usdLine(c, "collateral") : undefined,
     },
     {
       id: "debt",
@@ -101,7 +103,7 @@ function slots(r: FluidBasePositionRead): PositionCardSlots {
           <AssetAmount value={p.borrow} symbol={p.debtUnit} exact={p.borrowExact} />
         </Prov>
       ) : null,
-      usd: p.hasDebt ? usdLine(c, "debt") : undefined,
+      usd: FLUID_BASE_DOLLARS && p.hasDebt ? usdLine(c, "debt") : undefined,
     },
   ];
   if (p.ratio != null)
@@ -166,7 +168,7 @@ function slots(r: FluidBasePositionRead): PositionCardSlots {
       ),
     },
     learnMore: null,
-    foot: <p className="mt-3 text-xs text-rb-500">{CARD_WORDS.foot}</p>,
+    foot: FLUID_BASE_DOLLARS ? <p className="mt-3 text-xs text-rb-500">{CARD_WORDS.foot}</p> : undefined,
     panel: [left, right],
   };
 }

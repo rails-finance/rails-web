@@ -7,6 +7,7 @@
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { FluidBasePosition } from "@/lib/fluid-base/position";
 import { FLUID_BASE_CONTRACTS, type FluidBasePositionRead } from "@/lib/fluid-base/types";
+import { FLUID_BASE_DOLLARS } from "@/lib/fluid-base/dollars";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const date = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
@@ -35,11 +36,15 @@ export function readContracts(c: FluidBaseReceiptContext) {
       address: FLUID_BASE_CONTRACTS.vaultResolver,
       reads: `the position and its vault at both blocks (positionByNftId(${c.r.id}))`,
     },
-    {
-      name: "Aave V3 Base AaveOracle",
-      address: FLUID_BASE_CONTRACTS.aaveOracle,
-      reads: "each side's USD price at the head",
-    },
+    ...(FLUID_BASE_DOLLARS
+      ? [
+          {
+            name: "Aave V3 Base AaveOracle",
+            address: FLUID_BASE_CONTRACTS.aaveOracle,
+            reads: "each side's USD price at the head",
+          },
+        ]
+      : []),
   ];
 }
 

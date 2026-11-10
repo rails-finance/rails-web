@@ -15,6 +15,7 @@ import {
   type InfoView,
 } from "@/components/shared/protocol-info-page";
 import { FLUID_BASE_CONTRACTS } from "@/lib/fluid-base/types";
+import { FLUID_BASE_DOLLARS } from "@/lib/fluid-base/dollars";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { explorerHref } from "@/lib/shared/protocols";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -104,9 +105,12 @@ const views: readonly [InfoView, ...InfoView[]] = [
     heading: "Position page",
     body: (
       <p>
-        The position page shows the position&apos;s collateral and debt, each with its dollar value where Aave prices
-        the token, its ratio against the vault&apos;s limits, its borrow rate and the room left to borrow, and the
-        interest each side gathered over the last 30 days.
+        The position page shows the position&apos;s collateral and debt
+        {FLUID_BASE_DOLLARS
+          ? ", each with its dollar value where Aave prices the token,"
+          : " in the vault's tokens,"}{" "}
+        its ratio against the vault&apos;s limits, its borrow rate and the room left to borrow, and the interest each
+        side gathered over the last 30 days.
       </p>
     ),
   },
@@ -120,11 +124,15 @@ const reads: InfoReads = {
       reads:
         "a wallet's positions, and for one position its collateral and debt with interest and liquidations applied, and its vault's tokens, limits, oracle price, exchange prices and rates.",
     },
-    {
-      name: "Aave V3 Base AaveOracle",
-      address: FLUID_BASE_CONTRACTS.aaveOracle,
-      reads: "the dollar price of each side's token, where Aave lists it.",
-    },
+    ...(FLUID_BASE_DOLLARS
+      ? [
+          {
+            name: "Aave V3 Base AaveOracle",
+            address: FLUID_BASE_CONTRACTS.aaveOracle,
+            reads: "the dollar price of each side's token, where Aave lists it.",
+          },
+        ]
+      : []),
     { name: "Each token", reads: "its symbol and decimals, so amounts read in whole tokens." },
   ],
   how: "Rails's server reads these contracts at the block current when you open a page, and the position again at the UTC midnight 30 days back. A past block's answers are stored once that block is final, so a later visit reads only the newest block again.",
@@ -165,8 +173,10 @@ export default function InfoPage() {
         </>,
         <>
           Interest accrues through the vault&apos;s <GlossaryLink term="Exchange price">exchange prices</GlossaryLink>:
-          collateral grows at the supply rate and debt at the borrow rate. Fluid runs no dollar feed, so Rails values
-          each side at Aave V3&apos;s price on Base.
+          collateral grows at the supply rate and debt at the borrow rate.{" "}
+          {FLUID_BASE_DOLLARS
+            ? "Fluid runs no dollar feed, so Rails values each side at Aave V3's price on Base."
+            : "Fluid runs no dollar feed, so every figure is in the vault's tokens."}
         </>,
       ]}
       reads={reads}
