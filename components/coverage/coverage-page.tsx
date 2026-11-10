@@ -272,7 +272,7 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
             wherever an explorer on this chain wears the tag. ── */}
       {tiered && (
         <section className="max-w-7xl mx-auto px-4 md:px-6 pb-12" data-anatomy="H23.1" data-read-tier-legend="">
-          <div className="flex max-w-3xl flex-col items-start gap-2 rounded-xl border border-rb-200 px-4 py-3 sm:flex-row sm:items-baseline sm:gap-3 dark:border-rb-800">
+          <div className="flex max-w-3xl flex-col items-start gap-2 rounded-xl border border-rb-200 px-4 py-3 sm:flex-row sm:items-baseline sm:gap-3 dark:border-rb-700">
             <ReadTierTag tip={false} />
             <p className="text-sm text-foreground">
               {READ_TIER.line} <span className="text-rb-500">{READ_TIER.waits}</span>

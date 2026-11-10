@@ -12,7 +12,7 @@ import { READ_TIER } from "@/lib/shared/read-tier";
 export function ReadTierTag({ tip = "bubble" }: { tip?: "bubble" | "title" | false }) {
   const pill = (
     <span
-      className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-rb-300 px-1.5 py-px text-[9px] font-semibold uppercase leading-[12px] tracking-wider text-rb-500 dark:border-rb-700 dark:text-rb-400"
+      className="inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-rb-300 px-1.5 py-px text-[9px] font-semibold uppercase leading-[12px] tracking-wider text-rb-500 dark:border-rb-500 dark:text-rb-400"
       data-anatomy={tip === "bubble" ? undefined : "H23"}
       data-read-tier="visit"
       title={tip === "title" ? READ_TIER.line : undefined}
