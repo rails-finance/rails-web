@@ -1,12 +1,7 @@
 // Alchemix V3 on Ethereum — what the alUSD and alETH lines can say about their
-// own figures. Server-rendered: a read-only statement with nothing to hydrate.
+// own figures. Server-rendered; under Focus the lines in focus show (alchemix-lines-focus.tsx).
 
-import {
-  AlchemixCoverageGroup,
-  AlchemixLinesPanel,
-  AlchemixTransmuterCoveragePanel,
-  AlchemixV2CoveragePanel,
-} from "@/components/protocol/alchemix/alchemix-lines-panel";
+import { AlchemixLinesFocus } from "@/components/protocol/alchemix/alchemix-lines-focus";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { ALCHEMIX_HOW_IT_WORKS } from "@/lib/alchemix/learn-more";
 import { ALCHEMIX_ETHEREUM } from "@/lib/alchemix/lines";
@@ -41,15 +36,7 @@ export default async function AlchemixEthereumLinesPage() {
     <div className="min-h-screen">
       <div className="py-8">
         <SubPageHeader protocol={PROTOCOL} title="Lines" learnMore={ALCHEMIX_HOW_IT_WORKS} />
-        <AlchemixCoverageGroup title="Alchemist positions">
-          <AlchemixLinesPanel lines={lines} />
-        </AlchemixCoverageGroup>
-        <AlchemixCoverageGroup title="Transmuter positions">
-          <AlchemixTransmuterCoveragePanel lines={transmuter} />
-        </AlchemixCoverageGroup>
-        <AlchemixCoverageGroup title="V2 positions">
-          <AlchemixV2CoveragePanel lines={v2} />
-        </AlchemixCoverageGroup>
+        <AlchemixLinesFocus catalog={ALCHEMIX_ETHEREUM.lines} lines={lines} transmuter={transmuter} v2={v2} />
       </div>
     </div>
   );
