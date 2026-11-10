@@ -11,8 +11,9 @@
 // Each tile is a `Tile` holding one `ProvSection`, so its heading, read stamp,
 // "?" and ⋮ sit in its top row. The reused sections keep their headings; the
 // grid's scoped selectors strip their outer margins and inner frames, and hide
-// the protects section's disclaimer (the site's /terms carries it). Both
-// donuts are the asset breakdown's (C19, `ShareDonut`). The card takes the
+// the protects section's disclaimer (the site's /terms carries it). Who holds
+// it is the asset breakdown's donut (C19, `ShareDonut`); Where the assets are
+// a `SegmentBar`, each segment lit with its row. The card takes the
 // mock's headlines (`heads`) and the sidebar's protocol and chain through the
 // edge context, which the live page reads from its route.
 
@@ -66,6 +67,7 @@ import {
 } from "@/lib/vaults/card-words";
 import { MIN_SEGMENT_SHARE, planAllocation } from "@/lib/vaults/allocation-plan";
 import { ShareDonut, type DonutSlice } from "@/components/shared/asset-donut";
+import { SegmentBar, type SegmentSlice } from "@/components/shared/segment-bar";
 import { assetSliceColours, holderSliceColours } from "@/lib/shared/slice-colours";
 import { tokenColour } from "@/lib/shared/token-colours";
 import { AssetUnit } from "@/components/shared/asset-unit";
@@ -105,9 +107,27 @@ const GRID = [
 
 const TILE = "min-w-0 scroll-mt-4 bg-background p-5";
 
-function Tile({ id, wide, flush, children }: { id?: string; wide?: boolean; flush?: boolean; children: ReactNode }) {
+function Tile({
+  id,
+  wide,
+  flush,
+  segScope,
+  children,
+}: {
+  id?: string;
+  wide?: boolean;
+  flush?: boolean;
+  /** A `SegmentBar`'s scope, lighting its segments with their rows. */
+  segScope?: string;
+  children: ReactNode;
+}) {
   return (
-    <div id={id} className={`${flush ? "min-w-0 scroll-mt-4" : TILE} ${wide ? "lg:col-span-2" : ""}`} data-mock-tile="">
+    <div
+      id={id}
+      className={`${flush ? "min-w-0 scroll-mt-4" : TILE} ${wide ? "lg:col-span-2" : ""}`}
+      data-mock-tile=""
+      data-seg-scope={segScope}
+    >
       {children}
     </div>
   );
@@ -210,12 +230,17 @@ const blueWalletHref = (chainId: 1 | 8453, vault: string) =>
 
 const ppmPct = (ppm: number) => pctText(ppm / 1_000_000);
 
-/** Both donuts' size, so the two tiles of the first row pair. */
+/** Who holds it's donut. */
 const DONUT = 152;
 
-/** The line under every coloured chart. */
-function ColourNote() {
-  return <p className="mt-2 text-center text-[11px] text-rb-500">Colours tell the segments apart.</p>;
+/** The line under every coloured chart: centred under the donut, from the
+ *  left under the bar. */
+function ColourNote({ left }: { left?: boolean }) {
+  return (
+    <p className={`text-[11px] text-rb-500 ${left ? "mt-1.5" : "mt-2 text-center"}`}>
+      Colours tell the segments apart.
+    </p>
+  );
 }
 
 /** From a million, a figure reads compact. */
@@ -821,59 +846,64 @@ export function MockVaultLayout({
       }
     : null;
 
-  // Where the assets are as a donut: the band's plan (a market of 2% or more
-  // alone, the rest one slice), each row's share keyed by its slice's colour.
+  // Where the assets are as a segmented bar: the band's plan (a market of 2%
+  // or more alone, the rest one slice), each row's share keyed by its
+  // slice's colour.
   const plan = planAllocation(
     rows
       .map((r, order) => ({ r, order, key: r.key, amount: r.amount ? BigInt(r.amount.raw) : null }))
       .filter(({ r }) => !r.offBand),
   );
   const planTotal = Number(plan.total);
-  const allocSlices: DonutSlice[] = plan.shown.map((l) => ({
+  const allocParts = plan.shown.map((l) => ({
     key: l.key,
-    label: `${typeof l.r.venue === "string" ? l.r.venue : shortId(l.key)} · ${pctText(Number(l.amount ?? BigInt(0)) / planTotal)}`,
+    label: typeof l.r.venue === "string" ? l.r.venue : shortId(l.key),
     share: Number(l.amount ?? BigInt(0)) / planTotal,
+    rest: false,
   }));
-  if (plan.collected.length) {
-    const sum = plan.collected.reduce((t, l) => t + Number(l.amount ?? BigInt(0)), 0);
-    allocSlices.push({
+  if (plan.collected.length)
+    allocParts.push({
       key: "collected",
-      label: `${n(plan.collected.length)} more markets · ${pctText(sum / planTotal)}`,
-      share: sum / planTotal,
+      label: `${n(plan.collected.length)} more markets`,
+      share: plan.collected.reduce((t, l) => t + Number(l.amount ?? BigInt(0)), 0) / planTotal,
       rest: true,
     });
-  }
   // Each market in its collateral's colour, the idle market in the asset's
   // (lib/shared/slice-colours.ts): the icon's colour by symbol, then address,
   // the order the icon resolves in.
   const iconOf = new Map(rows.map((r) => [r.key, r.icon ?? asset]));
   const allocColours = assetSliceColours(
-    allocSlices.map((sl) => {
+    allocParts.map((sl) => {
       const t = iconOf.get(sl.key) ?? asset;
       return sl.rest ? { rest: true } : { token: t.address, colour: tokenColour(t.symbol) ?? tokenColour(t.address) };
     }),
   );
+  const allocSlices: SegmentSlice[] = allocParts.map(({ key, label, share }, i) => ({
+    key,
+    label,
+    share,
+    colour: allocColours[i],
+  }));
   const keyColours: Record<string, string> = {};
-  allocSlices.forEach((sl, i) => {
-    if (!sl.rest) keyColours[sl.key] = allocColours[i];
-  });
-  for (const l of plan.collected) keyColours[l.key] = allocColours[allocColours.length - 1];
-  // An amount past twenty characters (an asset whose decimals disagree)
-  // leaves the venue no room beside the donut: the donut goes above.
-  const wideAmount = rows.some((r) => r.amount != null && assetText(r.amount, ad).length > 20);
+  /** Each row's segment, for the row and its segment to light together. */
+  const segOf = new Map<string, string>();
+  for (const sl of allocSlices)
+    if (sl.key !== "collected") {
+      keyColours[sl.key] = sl.colour;
+      segOf.set(sl.key, sl.key);
+    }
+  for (const l of plan.collected) {
+    keyColours[l.key] = allocColours[allocColours.length - 1];
+    segOf.set(l.key, "collected");
+  }
+  const segRows = rows.map((r) =>
+    segOf.has(r.key) ? { ...r, hooks: { ...r.hooks, "data-seg": segOf.get(r.key)! } } : r,
+  );
   const allocChart =
-    allocSlices.length > 0 ? (
-      <div
-        className={`flex shrink-0 flex-col items-center max-sm:w-full sm:pt-3 ${wideAmount ? "w-full" : ""}`}
-        data-mock-alloc-donut=""
-      >
-        <ShareDonut
-          slices={allocSlices}
-          colours={allocColours}
-          size={DONUT}
-          label={`Where this vault's ${unit} is, by market`}
-        />
-        <ColourNote />
+    planTotal > 0 && allocSlices.length > 0 ? (
+      <div data-mock-alloc-bar="">
+        <SegmentBar slices={allocSlices} scope="allocation" label={`Where this vault's ${unit} is, by market`} />
+        <ColourNote left />
       </div>
     ) : undefined;
 
@@ -973,9 +1003,9 @@ export function MockVaultLayout({
           />
         </Tile>
 
-        <Tile id="allocation">
+        <Tile id="allocation" segScope="allocation">
           <VaultAssets
-            rows={rows}
+            rows={segRows}
             assetSymbol={unit}
             assetAddress={vault.asset.address}
             assetDecimals={ad}

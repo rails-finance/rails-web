@@ -1,5 +1,6 @@
-// The colours of a share donut's slices (the vault mock's holders and
-// markets; components/shared/asset-donut.tsx `ShareDonut` `colours`).
+// The colours of a share chart's slices (the vault mock's holders, a
+// components/shared/asset-donut.tsx `ShareDonut`, and its markets, a
+// components/shared/segment-bar.tsx `SegmentBar`).
 //
 // - Holders: the categorical palette in order, largest first.
 // - Assets: each slice its token's colour (lib/shared/token-colours.ts),
