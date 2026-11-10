@@ -36,6 +36,7 @@ const MARKERS = [
   /<PositionReadProvider\b[^>]*?\bfocus=/,
   /\bChainTruthListingPage\b/,
   /\bAimGate\b/,
+  /\bFocusSourceGate\b/,
   /\buseScopedRows\b/,
   /\buseScopedRoster\b/,
   /\bInFocusSymbol\b/,

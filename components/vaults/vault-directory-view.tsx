@@ -52,6 +52,7 @@ const FACETS: VaultRosterFacet[] = [
   },
 ];
 
+// Focus (ui-jobs 557): VaultRoster keeps the vaults in focus (useScopedRows).
 export function VaultDirectoryView({
   chainId,
   initialSearch,

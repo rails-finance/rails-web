@@ -40,6 +40,7 @@ import { loadMorphoBaseVault } from "@/lib/sources/chain/morpho-base-vault";
 import { loadVaultCensusRow } from "@/lib/vaults/census-read";
 import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
 import { loadAssetScales } from "@/lib/vaults/asset-scale";
+import { FocusSourceGate } from "@/components/shared/aim-gate";
 
 export type MetaMorphoVaultParams = {
   params: Promise<{ vault: string }>;
@@ -104,38 +105,40 @@ export async function MetaMorphoVaultRoute({
   const assetScales = data.chainStale ? {} : await loadAssetScales(chainId, [data.vault.asset.address]);
 
   return (
-    <div className="min-h-screen">
-      <div className="py-8">
-        <header className="mb-5" data-skel-section="page-header">
-          <RailHeader session={metaMorphoSession(chainId)} venue="subPage" />
-        </header>
+    <FocusSourceGate source={data.vault} chain={chainId} what="This vault">
+      <div className="min-h-screen">
+        <div className="py-8">
+          <header className="mb-5" data-skel-section="page-header">
+            <RailHeader session={metaMorphoSession(chainId)} venue="subPage" />
+          </header>
 
-        {data.chainStale ? (
-          <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
-            This vault could not be read from chain just now, so no figure is stated for it.
-          </p>
-        ) : (
-          <MorphoBaseVaultPageView
-            data={data}
-            census={census}
-            assetScales={assetScales}
-            yieldFigure={series.yieldFigure}
-            strip={series.strip}
-            factory={metaMorphoFactoryAddress(chainId, data.vault.factory)}
-            protects={
-              <Suspense fallback={null}>
-                <VaultProtectsSection
-                  subject={{ chainId, address, kind: "metamorpho" }}
-                  vaultName={data.vault.name || shortAddr(address)}
-                />
-              </Suspense>
-            }
-          />
-        )}
+          {data.chainStale ? (
+            <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
+              This vault could not be read from chain just now, so no figure is stated for it.
+            </p>
+          ) : (
+            <MorphoBaseVaultPageView
+              data={data}
+              census={census}
+              assetScales={assetScales}
+              yieldFigure={series.yieldFigure}
+              strip={series.strip}
+              factory={metaMorphoFactoryAddress(chainId, data.vault.factory)}
+              protects={
+                <Suspense fallback={null}>
+                  <VaultProtectsSection
+                    subject={{ chainId, address, kind: "metamorpho" }}
+                    vaultName={data.vault.name || shortAddr(address)}
+                  />
+                </Suspense>
+              }
+            />
+          )}
 
-        {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
-        <ProvInspectorLayer />
+          {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
+          <ProvInspectorLayer />
+        </div>
       </div>
-    </div>
+    </FocusSourceGate>
   );
 }
