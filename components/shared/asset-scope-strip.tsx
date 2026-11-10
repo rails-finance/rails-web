@@ -17,6 +17,11 @@
 // Arriving on `?assets=` / `?chains=` (with `&view=` naming it), a dialog says
 // what Focus mode is and lists what the link sets (FocusLinkIntro). Nothing
 // filters by the link until "Use this view".
+//
+// Words: "Turn off" ends Focus; "Show all" lifts it on one list or page until
+// it is left; "Off" is the menu's row. Inside a Focus section (the menu, the
+// dialog, the panel) the press is "Change"; outside one (a gate, a row's ⋮,
+// a list's chip) it is "Change focus".
 
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import Link from "next/link";

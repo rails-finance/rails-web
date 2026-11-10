@@ -13,8 +13,9 @@
 //
 // FOCUS (ui-jobs 557). /assets is where many assets join the focus: each row's
 // ⋮ (D7) holds "Add to focus" or "Remove from focus", and under "Add assets"
-// a row in focus carries an "in focus" pill after its name; with a filter on, "Focus on these N"
-// makes the shown assets the focus (50 at most). Like every page the list is
+// a row in focus carries an "In focus" pill after its name; with a filter on,
+// "Focus on these N" makes a new focus view of the shown assets, put in use
+// (50 at most; the view in use stays saved). Like every page the list is
 // held to the focus; "Add assets" (`?manage=1`, also the Focus panel's "Add
 // from all assets") shows every asset until "Done" (Miles, 10 Nov 2026).
 
@@ -387,7 +388,7 @@ export function AssetExplorer({
               <button
                 type="button"
                 onClick={() => setManage(false)}
-                className={`font-semibold ${INPLACE_TEXT}`}
+                className={`inline-flex min-h-11 items-center font-semibold sm:min-h-0 ${INPLACE_TEXT}`}
                 data-asset-manage-done=""
               >
                 Done
@@ -400,7 +401,7 @@ export function AssetExplorer({
               <button
                 type="button"
                 onClick={() => setManage(true)}
-                className={`font-semibold ${INPLACE_TEXT}`}
+                className={`inline-flex min-h-11 items-center font-semibold sm:min-h-0 ${INPLACE_TEXT}`}
                 data-asset-manage=""
               >
                 Add assets
@@ -439,7 +440,7 @@ export function AssetExplorer({
               <button
                 type="button"
                 onClick={focusOnShown}
-                className={`font-semibold ${INPLACE_TEXT}`}
+                className={`inline-flex min-h-11 items-center font-semibold sm:min-h-0 ${INPLACE_TEXT}`}
                 data-asset-focus-on-press=""
               >
                 Focus on {shown.length === 1 ? "this asset" : `these ${n(shown.length)}`}
@@ -588,10 +589,12 @@ function AssetRow({
           )}
         </span>
       </DataTableCell>
-      <DataTableCell label="Price" align="right" valign="middle" className="whitespace-nowrap tabular-nums">
+      <DataTableCell label="Price" align="right" valign="middle" className="tabular-nums sm:whitespace-nowrap">
         {row && row.price != null ? (
+          // On a phone's stacked row the flag may wrap under the price rather
+          // than run over the 30-day line beside it.
           <span
-            className="inline-flex items-center justify-end gap-1"
+            className="inline-flex flex-wrap items-center justify-end gap-1 sm:flex-nowrap"
             data-asset-price-row={`${row.chain}:${row.token}`}
             data-anatomy="A5.1"
           >
