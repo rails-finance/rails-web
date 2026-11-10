@@ -476,16 +476,18 @@ export function spokeValueProv(
   };
 }
 
-/** Available: what the spoke can still draw. */
+/** Available: what the spoke can still draw, valued at the spoke oracle's
+ *  price where it answered. */
 export function availableProv(f: V4ReserveFigures, o: { symbol: string; spoke: string; hub: string }): Provenance {
+  const priced = f.price != null;
   return {
     kind: "chain-derived",
-    pclass: "state",
+    pclass: priced ? "oracle" : "state",
     source: { block: f.block },
-    summary: `${o.symbol} available to ${o.spoke}. The hub's liquidity, capped by the draw cap less what the spoke owes${atHead(f)}.`,
+    summary: `${o.symbol} available to ${o.spoke}. The hub's liquidity, capped by the draw cap less what the spoke owes${atHead(f)}${priced ? ", valued at the spoke oracle's price at the same block" : ""}.`,
     contract: hubContract(f, o.hub),
-    via: `${HEAD} · min(hub getAssetLiquidity, getSpokeConfig.drawCap − getSpokeTotalOwed)`,
-    formula: "min(liquidity, draw cap − owed)",
+    via: `${HEAD} · min(hub getAssetLiquidity, getSpokeConfig.drawCap − getSpokeTotalOwed)${priced ? " · × oracle getReservePrice" : ""}`,
+    formula: priced ? "min(liquidity, draw cap − owed) × price" : "min(liquidity, draw cap − owed)",
     inputs: [
       {
         label: "liquidity",
@@ -508,6 +510,18 @@ export function availableProv(f: V4ReserveFigures, o: { symbol: string; spoke: s
         pclass: "state",
         note: "hub getSpokeTotalOwed",
       },
+      ...(priced
+        ? [
+            {
+              label: "price",
+              value: `$${f.price!.toLocaleString("en-US", { maximumFractionDigits: 6 })}`,
+              kind: "chain" as const,
+              pclass: "oracle" as const,
+              contract: f.oracle ? { name: `${o.spoke} oracle`, address: f.oracle } : undefined,
+              note: "the spoke oracle's getReservePrice",
+            },
+          ]
+        : []),
     ],
   };
 }
