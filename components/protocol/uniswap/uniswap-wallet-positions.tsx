@@ -20,7 +20,7 @@ import { FRONT_DOOR } from "@/lib/uniswap/words";
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 export const isWallet = (w: string): boolean => ADDRESS.test(w);
 
-const ROW =
+export const ROW =
   "flex items-center gap-3 rounded-xl border border-rb-200 bg-raised px-4 py-3 transition-colors duration-150 hover:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-rb-600";
 
 export async function UniswapWalletPositions({ version, wallet: raw }: { version: UniswapVersion; wallet: string }) {

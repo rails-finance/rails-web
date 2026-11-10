@@ -35,7 +35,19 @@ export type HookFlag = (typeof HOOK_FLAGS)[number];
 /** V4's PoolKey fee that hands the fee to the hook. */
 export const DYNAMIC_FEE = 0x800000;
 
-const STABLE = new Set(["USDC", "USDT", "DAI", "USDS", "EURC", "PYUSD", "RLUSD", "FRAX", "GHO", "USDe"]);
+/** The stablecoins a pool quotes in before ETH. */
+export const STABLE: ReadonlySet<string> = new Set([
+  "USDC",
+  "USDT",
+  "DAI",
+  "USDS",
+  "EURC",
+  "PYUSD",
+  "RLUSD",
+  "FRAX",
+  "GHO",
+  "USDe",
+]);
 const rank = (s: string) => (STABLE.has(s) ? 3 : s === "ETH" || s === "WETH" ? 2 : 1);
 
 /** Is token0 the quote? A stablecoin quotes ETH, and ETH quotes everything else. */
