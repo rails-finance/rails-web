@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 
 /** The live sections keep their receipts, and Who holds it carries the census's;
  *  the configuration and addresses tile has none yet. */
-export const PROV_EXEMPT =
+const PROV_EXEMPT =
   "layout mock: the configuration and addresses tile states no receipts yet; the other tiles carry theirs";
 
 export const metadata: Metadata = {

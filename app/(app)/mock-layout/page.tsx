@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
-export const PROV_EXEMPT = "layout mock: an index of links, no figures";
+const PROV_EXEMPT = "layout mock: an index of links, no figures";
 
 export const metadata: Metadata = {
   title: "Vault page layout mock",
