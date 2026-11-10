@@ -469,12 +469,14 @@ function PickRow({
 }) {
   const adds = useMemo(() => builtOnSymbols(pick), [pick]);
   const sym = symbolOf(pick);
+  const chainFocus = useAssetScope().chains.length > 0;
   return (
     <li className="py-2" data-asset-scope-pick={`${pick.chain}:${pick.token}`}>
       <div className="flex items-center gap-2">
         <TokenChipIcon symbol={sym} address={pick.token} size={18} filterable={false} untitled />
         <span className="text-sm font-semibold text-foreground">{sym}</span>
-        <span className="text-[11px] text-rb-500">{chainName(pick.chain)}</span>
+        {/* Under chain focus the pick stands for its symbol on the focused chains. */}
+        {!chainFocus && <span className="text-[11px] text-rb-500">{chainName(pick.chain)}</span>}
         <button
           type="button"
           onClick={onRemove}
