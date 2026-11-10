@@ -29,15 +29,11 @@ import {
   vaultDirectoryCensusProv,
   vaultDirectoryEmptyCountProv,
   vaultDirectoryGroupCountProv,
-  vaultDirectoryNameProv,
-  vaultDirectorySharePriceProv,
-  vaultHeldAssetsProv,
-  vaultLostAssetsProv,
-  vaultDirectoryTotalAssetsProv,
   type MorphoVaultCoords,
 } from "@/lib/morpho-base/vault-provenance";
 import { releaseLabel } from "@/lib/vaults/families";
-import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
+import { metaMorphoRowReceipts } from "@/lib/vaults/row-receipts";
+import type { VaultSummary } from "@/lib/vaults/summary";
 import type { VaultYield } from "@/lib/vaults/yield";
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -83,12 +79,6 @@ export function VaultDirectoryView({
 }) {
   const coords: MorphoVaultCoords = { chainId, blockNumber: blockNumber || undefined, readBy };
   const chain = chainMeta(chainId).name;
-  const rowCoords = (v: VaultSummary): MorphoVaultCoords => ({
-    ...coords,
-    vault: v.address,
-    vaultName: vaultDisplayName(v) ?? undefined,
-    assetSymbol: v.asset.symbol,
-  });
 
   const readBlock = (
     <RosterBlock
@@ -114,20 +104,7 @@ export function VaultDirectoryView({
         facets={FACETS}
         hrefOf={(v) => metaMorphoVaultHref(chainId, v.address)}
         holdersHrefOf={(v) => metaMorphoVaultsListingHref(chainId, { vault: v.address })}
-        receiptsOf={(v) => ({
-          name: vaultDirectoryNameProv(rowCoords(v)),
-          totalAssets: vaultDirectoryTotalAssetsProv(rowCoords(v)),
-          sharePrice: vaultDirectorySharePriceProv(rowCoords(v)),
-          ...(v.lostAssets && v.totalAssets
-            ? {
-                lostAssets: vaultLostAssetsProv(rowCoords(v)),
-                heldAssets: vaultHeldAssetsProv(rowCoords(v), {
-                  totalAssets: v.totalAssets.raw,
-                  lostAssets: v.lostAssets.raw,
-                }),
-              }
-            : {}),
-        })}
+        receiptsOf={(v) => metaMorphoRowReceipts({ ...coords, chainId }, v)}
         hooksOf={(v) => ({ "data-family": v.release ?? "" })}
         groupCountProv={(assetSymbol, count) => vaultDirectoryGroupCountProv({ ...coords, assetSymbol }, count)}
         emptyCountProv={(count) => vaultDirectoryEmptyCountProv(coords, count, catalogSize)}

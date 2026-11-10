@@ -57,7 +57,8 @@ import { ChainTruthTimeline } from "@/components/shared/chain-truth-timeline";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { moonwellPriceProv } from "@/lib/moonwell/position-provenance";
 import { TimelineFillWell } from "@/components/shared/timeline-fill-well";
 import { TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
@@ -441,16 +442,17 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
 
   // The top row's price dropdown: the Comptroller's own oracle price of each market the
   // account currently touches.
-  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view) return [];
     const seen = new Set<string>();
-    const out: PriceStripAsset[] = [];
+    const out: LatestPriceAsset[] = [];
     for (const r of [...view.supplies, ...view.borrows]) {
       const a = r.address.toLowerCase();
       if (seen.has(a)) continue;
       seen.add(a);
       const p = view.priceByAddress?.[a];
-      if (typeof p === "number" && p > 0) out.push({ symbol: r.symbol, address: r.address, price: p });
+      if (typeof p === "number" && p > 0)
+        out.push({ symbol: r.symbol, address: r.address, price: p, info: moonwellPriceProv(r.symbol, DEPLOYMENT) });
     }
     return out;
   }, [view]);

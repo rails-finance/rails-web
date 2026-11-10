@@ -49,6 +49,7 @@ import {
   morphoPeakBorrowedProv,
   morphoPeakOwedProv,
   morphoBorrowRateNowProv,
+  morphoYearlyCostProv,
 } from "@/lib/morpho/event-provenance";
 import { capacityProv, lltvProv, type MorphoChainCoords } from "@/lib/morpho/position-provenance";
 import { formatNumber, formatExact } from "@/lib/utils/format";
@@ -537,9 +538,9 @@ export function useMorphoCardSlots({
             id: "yearly-cost",
             label: "Costs per year",
             value: (
-              <>
+              <Prov info={morphoYearlyCostProv(v.loanSymbol, apr)}>
                 ~<AmountText value={debtNow * apr} format="compact" />
-              </>
+              </Prov>
             ),
             asset: loanAsset,
             tip: "The debt now times the borrow rate: what a year costs while the rate holds.",

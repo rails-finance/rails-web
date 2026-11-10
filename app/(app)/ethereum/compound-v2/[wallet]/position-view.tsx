@@ -72,7 +72,8 @@ import { CompoundV2FlowsNote, compoundV2FlowsContent } from "@/components/protoc
 import { useCompoundV2Flows } from "@/hooks/useCompoundV2Flows";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { compoundV2PriceProv } from "@/lib/compound-v2/event-provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { externalActor, summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { liquidationStories } from "@/lib/shared/ctoken-liquidation-story";
@@ -447,17 +448,23 @@ export default function CompoundV2PositionView({
   // The top row's price dropdown: the on-chain oracle price of each
   // market the account currently touches. Deduped by the underlying token
   // (the two WBTC markets share one asset; cETH keys on its own market).
-  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view || view.status !== "open") return [];
     const seen = new Set<string>();
-    const out: PriceStripAsset[] = [];
+    const out: LatestPriceAsset[] = [];
     for (const r of [...view.supplies, ...view.borrows]) {
       const cat = COMPOUND_V2_MARKET_BY_KEY[r.market];
       const address = (cat?.underlying ?? cat?.ctoken ?? r.market).toLowerCase();
       if (seen.has(address)) continue;
       seen.add(address);
       const p = view.priceByMarket?.[r.market];
-      if (typeof p === "number" && p > 0) out.push({ symbol: r.symbol, address, price: p });
+      if (typeof p === "number" && p > 0)
+        out.push({
+          symbol: r.symbol,
+          address,
+          price: p,
+          info: compoundV2PriceProv(r.symbol, view.priceFixedByMarket?.[r.market] === true),
+        });
     }
     return out;
   }, [view]);

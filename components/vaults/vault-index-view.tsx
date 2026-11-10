@@ -8,12 +8,13 @@
 // protocol, a Maple pool's opening Maple's pools page. Facets: Token (by
 // symbol, across chains), Network and Protocol, with the rosters' search.
 // Each roster was read at its block and the read-at line names each one.
-// No USD and no cross-asset total. The index carries no receipts and offers
-// no inspector (Miles, 8 Nov 2026): each vault's page keeps them.
+// No USD and no cross-asset total. The rows open receipts at their roster's
+// block, through each family's builders (lib/vaults/row-receipts.ts), and the
+// ⋮ arms the inspector on them (decision 0062 point 5; ui-jobs 571).
 
 import Link from "next/link";
-import { ProvUnscoped } from "@/components/shared/provenance";
-import { VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
+import { ProvSection, SectionMenu } from "@/components/shared/section-menu";
+import { ROSTER_SCOPE, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
 import { VaultIndexTable, useVaultIndexSort } from "@/components/vaults/vault-index-table";
 import { CompareBar } from "@/components/vaults/compare-selection";
 import { isoSeconds, RosterBlock, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
@@ -25,6 +26,7 @@ import type { VaultSummary } from "@/lib/vaults/summary";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { assetKey } from "@/lib/shared/asset-family";
 import type { VaultYield } from "@/lib/vaults/yield";
+import { vaultIndexRowReceipts } from "@/lib/vaults/row-receipts";
 import {
   chainName,
   VAULT_INDEX_PROTOCOL_LABEL,
@@ -76,10 +78,6 @@ const TOKEN_FACET: VaultRosterFacet = {
   valueOf: (v) => (v.asset.named ? v.asset.symbol : v.asset.address),
   labelOf: (s) => s,
 };
-
-/** The index states no receipts: its figures are plain, each vault's page
- *  carries them (check:prov reads this). */
-export const PROV_EXEMPT = "the cross-protocol index states no receipts; each vault's page carries them (ui-jobs 538)";
 
 export function VaultIndexView({
   initialSearch,
@@ -149,6 +147,12 @@ export function VaultIndexView({
     at: r.readBy?.blockTime ?? isoSeconds(r.readAt),
   });
   const counts = rosters.filter((r) => !r.chainStale);
+  // Each row's receipts name its roster's block.
+  const readByRoster = new Map(rosters.map((r) => [vaultIndexRosterKey(r), r]));
+  const receiptsOf = (v: VaultSummary) => {
+    const r = readByRoster.get(vaultIndexRosterKeyOf(v));
+    return vaultIndexRowReceipts({ blockNumber: r?.blockNumber || undefined, readBy: r?.readBy }, v);
+  };
 
   // One stamp for the oldest roster's read; the panel names each roster's block.
   const readAt = <RosterReadStamp reads={counts.map(readOf)} />;
@@ -179,11 +183,9 @@ export function VaultIndexView({
   );
 
   return (
-    // The whole index is exempt from the coverage tripwire, its reason on the
-    // element (the tripwire reads `data-prov-exempt`).
-    <div data-prov-exempt={PROV_EXEMPT}>
+    <div>
       <ScopeNote scoped={scoped} noun={["vault", "vaults"]} className="mb-2" />
-      <ProvUnscoped>
+      <ProvSection scope={ROSTER_SCOPE} as="div">
         <div {...scoped.listProps}>
           <VaultRoster
             initialSearch={initialSearch}
@@ -199,7 +201,7 @@ export function VaultIndexView({
             facetsInUrl
             hrefOf={vaultIndexHref}
             holdersHrefOf={vaultIndexHoldersHref}
-            receiptsOf={() => ({})}
+            receiptsOf={receiptsOf}
             hooksOf={hooksOf}
             mobileSort={indexSort.mobileSort}
             table={(rows, part) => (
@@ -208,6 +210,7 @@ export function VaultIndexView({
                 part={part}
                 initialSearch={initialSearch ?? ""}
                 yieldOf={(v) => yields[vaultIndexKey(v)]}
+                receiptsOf={receiptsOf}
                 leadOf={(v) => LEAD_IDS[vaultIndexRosterKeyOf(v)] ?? null}
                 hrefOf={vaultIndexHref}
                 holdersHrefOf={vaultIndexHoldersHref}
@@ -222,10 +225,11 @@ export function VaultIndexView({
               indexHref: null,
               readAt,
               drawer,
+              menu: <SectionMenu scope={ROSTER_SCOPE} title="Vaults" hint="Click a value on this table to trace it" />,
             }}
           />
         </div>
-      </ProvUnscoped>
+      </ProvSection>
       <CompareBar />
     </div>
   );

@@ -27,16 +27,12 @@ import {
   yearnEmptyCountProv,
   yearnEndorsedCountProv,
   yearnRosterCensusProv,
-  yearnVaultEndorsedProv,
-  yearnVaultNameProv,
-  yearnVaultSharePriceProv,
-  yearnVaultShutdownProv,
-  yearnVaultTotalAssetsProv,
   type YearnVaultCoords,
 } from "@/lib/yearn/vault-provenance";
 import { releaseLabel } from "@/lib/vaults/families";
-import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
+import type { VaultSummary } from "@/lib/vaults/summary";
 import type { VaultYield } from "@/lib/vaults/yield";
+import { yearnRowReceipts } from "@/lib/vaults/row-receipts";
 
 const CHAIN_ID = 1;
 const n = (v: number) => v.toLocaleString("en-US");
@@ -83,13 +79,6 @@ export function YearnVaultDirectoryView({
   endorsementUnread: readonly string[];
 }) {
   const coords: YearnVaultCoords = { blockNumber: blockNumber || undefined, readBy };
-  const rowCoords = (v: VaultSummary): YearnVaultCoords => ({
-    ...coords,
-    vault: v.address,
-    vaultName: vaultDisplayName(v) ?? undefined,
-    assetSymbol: v.asset.symbol,
-    apiVersion: v.release ?? undefined,
-  });
   const endorsed = vaults.filter((v) => v.standing.includes("endorsed")).length;
   const unread = new Set(endorsementUnread);
 
@@ -117,15 +106,7 @@ export function YearnVaultDirectoryView({
         facets={FACETS}
         hrefOf={(v) => yearnVaultHref(v.address)}
         holdersHrefOf={null}
-        receiptsOf={(v) => ({
-          name: yearnVaultNameProv(rowCoords(v)),
-          totalAssets: yearnVaultTotalAssetsProv(rowCoords(v)),
-          sharePrice: yearnVaultSharePriceProv(rowCoords(v)),
-          standing: {
-            endorsed: yearnVaultEndorsedProv(rowCoords(v), true),
-            "shut-down": yearnVaultShutdownProv(rowCoords(v)),
-          },
-        })}
+        receiptsOf={(v) => yearnRowReceipts(coords, v)}
         hooksOf={(v) => ({
           "data-release": v.release ?? "",
           "data-endorsed": unread.has(v.address) ? "unread" : String(v.standing.includes("endorsed")),

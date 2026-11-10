@@ -58,7 +58,8 @@ import { FxFlowsNote, fxFlowsContent } from "@/components/protocol/fx/fx-flows-n
 import { useFxFlows, type FxRisk } from "@/hooks/useFxFlows";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { oracleLegAtProv, snapOraclePriceProv } from "@/lib/fx/event-provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import type { PositionCardExports } from "@/components/shared/position-card";
 import { fxPositionToMarkdown } from "@/lib/fx/position-to-markdown";
@@ -395,7 +396,7 @@ export default function FxPositionView({
     view?.status === "open" ? view.settled.block : null,
     true,
   );
-  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view || view.status !== "open") return [];
     if (settledPx?.anchorPrice != null)
       return [
@@ -403,10 +404,24 @@ export default function FxPositionView({
           symbol: view.normalizedSymbol,
           price: Number(settledPx.anchorPrice) / 1e18,
           label: `${view.normalizedSymbol} · anchor price`,
+          ...(view.settled.block != null
+            ? { info: oracleLegAtProv("anchor", view.normalizedSymbol, view.settled.block) }
+            : {}),
         },
       ];
     if (view.oracle.priceUsd == null || view.oracle.priceUsd <= 0) return [];
-    return [{ symbol: view.normalizedSymbol, price: view.oracle.priceUsd }];
+    // The sweep's min-leg reading; its receipt names the settled block, so it
+    // rides only where the reading was taken there.
+    const minAtSettled = view.oracle.priceBlock != null && view.oracle.priceBlock === view.settled.block;
+    return [
+      {
+        symbol: view.normalizedSymbol,
+        price: view.oracle.priceUsd,
+        ...(minAtSettled
+          ? { info: oracleLegAtProv("min", view.normalizedSymbol, view.oracle.priceBlock as number) }
+          : {}),
+      },
+    ];
   }, [view, settledPx]);
 
   // The Lifetime flows panel replays the position's whole history
@@ -466,9 +481,21 @@ export default function FxPositionView({
     if (!view || view.status === "open") return undefined;
     return closingPricesAt(fxEvents, (row) => {
       const usd = Number(row.context.data.oraclePrice);
-      return Number.isFinite(usd) && usd > 0 ? [{ symbol: view.normalizedSymbol, price: usd }] : undefined;
+      return Number.isFinite(usd) && usd > 0
+        ? [
+            {
+              symbol: view.normalizedSymbol,
+              price: usd,
+              info: snapOraclePriceProv(view.normalizedSymbol, {
+                txHash: row.txHash,
+                blockNumber: row.blockNumber,
+                positionId: parsed?.positionId,
+              }),
+            },
+          ]
+        : undefined;
     });
-  }, [view, fxEvents]);
+  }, [view, fxEvents, parsed]);
 
   // The event route draws the sub-nav and the event's card in page mode with
   // the shared column (ui-jobs 236); the summary, flows and panels stay on the

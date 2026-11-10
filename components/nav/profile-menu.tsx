@@ -9,7 +9,8 @@
 // order (lib/shared/sessions.ts; /bookmarks orders them) or, with none, how to
 // save one; "Saved positions" (ui-jobs 530) and "Saved views" (ui-jobs 521),
 // the first five of each, drawn when there is one; "Manage saved items →" to
-// /bookmarks; the theme switch. From md a dropdown under the control, right
+// /bookmarks; the theme switch. Beside Focus, the "Provenance inspector"
+// switch (decision 0062; ui-jobs 571). From md a dropdown under the control, right
 // edges aligned; below md a sheet from the foot of the screen over a dim (ui-jobs 507), rising
 // over 220ms (globals.css `.profile-sheet`). Rows show what the
 // browser holds (name, ENS, address) and read nothing.
@@ -30,7 +31,18 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, Check, ChevronDown, ListFilter, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
+import {
+  Bookmark,
+  Check,
+  ChevronDown,
+  Crosshair,
+  ListFilter,
+  Monitor,
+  Moon,
+  Settings,
+  Signpost,
+  Sun,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Facehash } from "@/components/shared/facehash";
@@ -46,6 +58,7 @@ import { focusViews, openFocusPanel, useAssetScope } from "@/lib/shared/asset-sc
 import { focusShort } from "@/components/shared/aim-gate";
 import { CTRL_OFF, CTRL_ON, INPLACE_TEXT, START_CTA } from "@/lib/shared/ui-grammar";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
+import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
 
 const BOOKMARKS_PATH = "/bookmarks";
 /** A text press in the menu is 44px tall on a phone. */
@@ -168,7 +181,41 @@ function ThemeSwitch() {
   );
 }
 
-const ITEMS = '[role="menuitem"], [role="menuitemradio"]';
+const ITEMS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]';
+
+/** The standing provenance inspector (decision 0062; ui-jobs 571): arms the
+ *  inspector on arrival on every page that has passed the coverage gate
+ *  (lib/shared/prov-preference-routes.ts). Off by default. */
+function ProvInspectorSwitch() {
+  const on = useProvPreference();
+  return (
+    <button
+      type="button"
+      role="menuitemcheckbox"
+      aria-checked={on}
+      onClick={() => setProvPreference(!on)}
+      className={ITEM}
+      title="Arms the inspector on every page that supports it"
+      data-anatomy="H20.1"
+      data-profile-menu-prov={on ? "on" : "off"}
+    >
+      <Crosshair className="size-4 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 flex-1 truncate text-foreground">Provenance inspector</span>
+      <span
+        className={`relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors ${
+          on ? "bg-teal-500" : "bg-rb-300 dark:bg-rb-700"
+        }`}
+        aria-hidden="true"
+      >
+        <span
+          className={`absolute top-0.5 size-3 rounded-full bg-white shadow transition-transform ${
+            on ? "translate-x-3.5" : "translate-x-0.5"
+          }`}
+        />
+      </span>
+    </button>
+  );
+}
 
 export function ProfileMenu() {
   const bookmarks = useBookmarks();
@@ -505,6 +552,7 @@ export function ProfileMenu() {
                     <span className="shrink-0 truncate text-xs text-rb-500">Off</span>
                   </button>
                 )}
+                <ProvInspectorSwitch />
                 <Link
                   href={BOOKMARKS_PATH}
                   role="menuitem"

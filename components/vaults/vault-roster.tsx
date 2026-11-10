@@ -506,7 +506,9 @@ export function VaultRoster({
   const intro = (
     <section className="mb-5" data-skel-section={`${skel}-denominator`}>
       {head.readAt ? (
-        <div className="flex items-center gap-1 text-[11px] text-rb-500">
+        // The index's read line names each roster's block, the anchor its rows'
+        // receipts name.
+        <div className="flex items-center gap-1 text-[11px] text-rb-500" data-prov-exempt>
           {head.readAt}
           <InfoDisclosureTrigger
             open={introOpen}
@@ -514,6 +516,7 @@ export function VaultRoster({
             label="about these vaults"
             ariaControls="vault-roster-intro"
           />
+          {head.menu && <span className="ml-auto">{head.menu}</span>}
         </div>
       ) : (
         !chainStale && (

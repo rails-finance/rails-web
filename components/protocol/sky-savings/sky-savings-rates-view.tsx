@@ -89,6 +89,8 @@ export function SkySavingsRatesView({ rates }: { rates: SkyRates }) {
                       target="_blank"
                       rel="noopener"
                       className="link-muted"
+                      // The change's coordinate, linked to its transaction.
+                      data-prov-exempt=""
                     >
                       {r.blockNumber.toLocaleString("en-US")}
                     </a>
