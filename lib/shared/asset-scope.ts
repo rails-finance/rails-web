@@ -40,6 +40,7 @@ import {
 } from "@/lib/shared/asset-preference";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
 import {
+  mergeViews,
   activeFocus,
   activeView,
   adoptFocus,
@@ -243,6 +244,14 @@ export const focusViews = {
   create() {
     writeSaved(newView(saved(), newId(), Date.now()));
     window.dispatchEvent(new Event(OPEN_SCOPE_PANEL));
+  },
+  /** The saved views for a backup file. */
+  list: (): FocusView[] => saved().views.filter(isOn),
+  /** A backup file's views merged in; the view in use stays. */
+  importList(incoming: unknown): { read: number; added: number } {
+    const { state, read, added } = mergeViews(saved(), incoming, newId, Date.now());
+    if (read) writeSaved(state);
+    return { read, added };
   },
   /** Views emptied in the panel go as it closes. */
   prune: () => {

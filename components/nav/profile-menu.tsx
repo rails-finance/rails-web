@@ -2,8 +2,9 @@
 
 // The profile control (H20) and its menu (rails-ops ui-jobs 504): the facehash
 // with a chevron, a menu button. The menu has no heading of its own: each group
-// carries its own label (ui-jobs 524). Top down: with nothing saved, "New to
-// Rails? Start here" to /start as a blue button across the top (ui-jobs 509);
+// carries its own label (ui-jobs 524). Top down: with nothing saved, focus
+// views included, "New to Rails? Start here" to /start as a blue button across
+// the top (ui-jobs 509);
 // the filled bookmark and "Saved wallets", then the first ten in the reader's
 // order (lib/shared/sessions.ts; /bookmarks orders them) or, with none, how to
 // save one; "Saved positions" (ui-jobs 530) and "Saved views" (ui-jobs 521),
@@ -191,8 +192,9 @@ export function ProfileMenu() {
     { kind: "positions", label: "Saved positions", rows: (positions ?? []).slice(0, MENU_LINK_ROWS) },
     { kind: "views", label: "Saved views", rows: (views ?? []).slice(0, MENU_LINK_ROWS) },
   ].filter((g) => g.rows.length > 0);
-  const anything = rows.length > 0 || links.length > 0;
   const focusOn = scope.ready && scope.on;
+  /** Anything saved, focus views included, takes "Start here" out of the menu. */
+  const anything = rows.length > 0 || links.length > 0 || (scope.ready && scope.views.length > 0);
   /** The Focus section shows with Focus on or any view saved. */
   const focusShown = scope.ready && (scope.on || scope.views.length > 0);
   const menuViews = scope.views.slice(0, MENU_FOCUS_VIEWS);

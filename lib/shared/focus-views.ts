@@ -148,6 +148,44 @@ export function removeView(s: FocusViews, id: string): FocusViews {
   return { views: s.views.filter((v) => v.id !== id), active: s.active === id ? null : s.active };
 }
 
+export interface ViewsMerge {
+  state: FocusViews;
+  /** Distinct views the file carried. */
+  read: number;
+  /** Of those, the ones not already saved here. */
+  added: number;
+}
+
+/** An import: each view the file carries that no saved view holds the same
+ *  focus as goes after the reader's views, in the file's order; one already
+ *  saved gives it the file's name when it has none. The view in use stays. */
+export function mergeViews(s: FocusViews, incoming: unknown, newId: () => string, at: number): ViewsMerge {
+  const list = Array.isArray(incoming) ? incoming.filter(isView).filter(focusOn) : [];
+  let views = [...s.views];
+  const seen: FocusView[] = [];
+  let added = 0;
+  for (const v of list) {
+    if (seen.some((x) => sameFocus(x, v))) continue;
+    seen.push(v);
+    const label = v.name?.trim() || undefined;
+    const held = views.find((x) => sameFocus(x, v));
+    if (held) {
+      if (!held.name && label) views = views.map((x) => (x.id === held.id ? { ...x, name: label } : x));
+      continue;
+    }
+    const id = views.some((x) => x.id === v.id) ? newId() : v.id;
+    views.push({
+      id,
+      ...(label ? { name: label } : {}),
+      assets: v.assets,
+      chains: v.chains,
+      savedAt: typeof v.savedAt === "number" ? v.savedAt : at,
+    });
+    added++;
+  }
+  return { state: { views, active: s.active }, read: seen.length, added };
+}
+
 /** Move a view to `to` (clamped). */
 export function moveView(s: FocusViews, id: string, to: number): FocusViews {
   const from = s.views.findIndex((v) => v.id === id);

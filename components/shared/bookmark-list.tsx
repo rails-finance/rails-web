@@ -157,7 +157,8 @@ const BACKUP_BUTTON =
 
 /** Export to file and Import from file, with the line that reports what
  *  either did. The file is a JSON backup of every saved item (version 3, one
- *  list of wallets, positions and views); an import also takes a version 2
+ *  list of wallets, positions and views, and the saved Focus views beside it
+ *  in `focusViews`); an import also takes a version 2
  *  file (wallets) and a version 1 file (per-explorer lists).
  *  With nothing saved (`empty`) there is nothing to export: Import stands
  *  alone, after a line asking for the file (Miles, 6 Nov 2026). */
@@ -168,9 +169,10 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
   // The list as a JSON file the reader keeps: bookmarks live in this
   // origin's localStorage, so the file is what carries them elsewhere.
   const handleExport = () => {
-    const backup = exportBookmarks();
+    const views = focusViews.list();
+    const backup = { ...exportBookmarks(), ...(views.length ? { focusViews: views } : {}) };
     const count = backup.bookmarks.length;
-    if (count === 0) {
+    if (count + views.length === 0) {
       setNotice("No saved items to export yet.");
       return;
     }
@@ -181,13 +183,26 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
     a.download = name;
     a.click();
     URL.revokeObjectURL(url);
-    setNotice(`${plural(count, "saved item")} written to ${name}.`);
+    const what = [count ? plural(count, "saved item") : "", views.length ? plural(views.length, "focus view") : ""]
+      .filter(Boolean)
+      .join(" and ");
+    setNotice(`${what} written to ${name}.`);
   };
 
   const handleImport = async (file: File) => {
     try {
-      const result = importBookmarks(await file.text());
-      setNotice(`Read ${plural(result.read, "saved item")}, ${result.added} new.`);
+      const text = await file.text();
+      const result = importBookmarks(text);
+      let fileViews: unknown;
+      try {
+        fileViews = (JSON.parse(text) as { focusViews?: unknown }).focusViews;
+      } catch {}
+      const v = fileViews === undefined ? null : focusViews.importList(fileViews);
+      const parts = [
+        result.read ? `${plural(result.read, "saved item")}, ${result.added} new` : "",
+        v && v.read ? `${plural(v.read, "focus view")}, ${v.added} new` : "",
+      ].filter(Boolean);
+      setNotice(parts.length ? `Read ${parts.join("; ")}.` : "That backup carries nothing saved.");
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "That file couldn't be read.");
     }

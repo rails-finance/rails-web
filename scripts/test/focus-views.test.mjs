@@ -91,3 +91,43 @@ test("rename, remove, move and prune", () => {
   s = removeView(s, "a");
   assert.deepEqual(s, NO_VIEWS);
 });
+
+test("an import adds views the reader lacks, names an unnamed match, keeps the view in use", async () => {
+  const { mergeViews } = await import("../../lib/shared/focus-views.ts");
+  const USDC = { chain: 1, token: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48", builtOn: false };
+  const here = { views: [{ id: "a", assets: [BOLD], chains: [], savedAt: 1 }], active: "a" };
+  const file = [
+    { id: "a", name: "Bold things", assets: [BOLD], chains: [], savedAt: 5 },
+    { id: "a", name: "My stables", assets: [USDC], chains: [8453], savedAt: 6 },
+    { id: "z", name: "Dup", assets: [USDC], chains: [8453], savedAt: 7 },
+    { id: "e", assets: [], chains: [], savedAt: 8 },
+    { nonsense: true },
+  ];
+  let n = 0;
+  const { state, read, added } = mergeViews(here, file, () => `new${n++}`, 9);
+  assert.equal(read, 2);
+  assert.equal(added, 1);
+  assert.equal(state.active, "a");
+  assert.equal(state.views.length, 2);
+  assert.equal(state.views[0].name, "Bold things");
+  assert.equal(state.views[1].name, "My stables");
+  assert.equal(state.views[1].id, "new0");
+  assert.ok(isFocusViews(state));
+  assert.deepEqual(
+    mergeViews(here, undefined, () => "x", 1),
+    { state: here, read: 0, added: 0 },
+  );
+});
+
+test("an import never renames a view the reader named", async () => {
+  const { mergeViews } = await import("../../lib/shared/focus-views.ts");
+  const here = { views: [{ id: "a", name: "Mine", assets: [WETH], chains: [], savedAt: 1 }], active: null };
+  const { state } = mergeViews(
+    here,
+    [{ id: "b", name: "Theirs", assets: [WETH], chains: [], savedAt: 2 }],
+    () => "x",
+    3,
+  );
+  assert.equal(state.views[0].name, "Mine");
+  assert.equal(state.active, null);
+});

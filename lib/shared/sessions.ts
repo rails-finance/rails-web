@@ -521,6 +521,9 @@ export interface BookmarksBackup {
   /** ISO-8601, so the stamp reads the same in every runtime locale. */
   exportedAt: string;
   bookmarks: SavedEntry[];
+  /** Saved Focus views (lib/shared/focus-views.ts), since ui-jobs 557. An
+   *  optional field: a build without it reads the rest and skips this. */
+  focusViews?: unknown[];
 }
 
 export interface BookmarksImportResult {
@@ -568,7 +571,8 @@ export function importBookmarks(source: string): BookmarksImportResult {
   const rowsIn = lists.flatMap((rows) => (Array.isArray(rows) ? rows : []));
   const wallets = rowsIn.filter(isSessionRow);
   const links = rowsIn.filter(isLinkRow);
-  if (wallets.length + links.length === 0) throw new Error("That backup carries nothing saved.");
+  const hasViews = Array.isArray((parsed as { focusViews?: unknown }).focusViews);
+  if (wallets.length + links.length === 0 && !hasViews) throw new Error("That backup carries nothing saved.");
 
   const held = loadSessions();
   const heldWallets = held.filter(isWallet);
