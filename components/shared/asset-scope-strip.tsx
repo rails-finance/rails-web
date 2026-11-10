@@ -8,8 +8,9 @@
 // of the search's dropdown (components/shared/aim-search-button.tsx).
 //
 // The panel lists each chosen asset with one switch, "And what's built on it",
-// and adds assets through AssetChooser. From `?assets=` the strip says the
-// assets came with the link, and "Keep" stores them in this browser.
+// and adds assets through AssetChooser. Arriving on `?assets=`, a dialog says
+// what Focus mode is and what the link set it to (FocusLinkIntro), and the
+// strip's "Keep this focus" stores the link's assets in this browser.
 //
 // On an explorer's own pages the strip carries one more line where the
 // explorer is one the preference hides (lib/shared/explorer-scope.ts): its
@@ -112,9 +113,7 @@ export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" })
               className="min-w-0 text-foreground"
               title={scope.picks.map((p) => `${symbolOf(p)} on ${chainName(p.chain)}`).join(", ")}
             >
-              <span className="text-rb-600 dark:text-rb-400">
-                {scope.fromLink ? "From this link: focused on" : "Focused on"}
-              </span>{" "}
+              <span className="text-rb-600 dark:text-rb-400">Focus mode active:</span> <PickIcons picks={scope.picks} />
               <span className="font-semibold">{scopeSummary(scope.picks)}</span>
             </span>
             <span className="text-rb-500" aria-hidden="true">
@@ -159,7 +158,145 @@ export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" })
         </div>
       )}
       {open && <AssetScopePanel onClose={() => setOpen(false)} />}
+      {scope.fromLink && !open && <FocusLinkIntro onChange={() => setOpen(true)} />}
     </>
+  );
+}
+
+/** The first two picks' icons, inline before the summary. */
+function PickIcons({ picks }: { picks: AssetPick[] }) {
+  const shown = [...new Map(picks.map((p) => [symbolOf(p), p])).values()].slice(0, 2);
+  return (
+    <span className="mr-1 inline-flex -space-x-1 align-[-3px]" aria-hidden="true">
+      {shown.map((p) => (
+        <TokenChipIcon
+          key={`${p.chain}:${p.token}`}
+          symbol={symbolOf(p)}
+          address={p.token}
+          size={14}
+          filterable={false}
+          untitled
+        />
+      ))}
+    </span>
+  );
+}
+
+const EXAMPLES_SHOWN = 3;
+
+/** "sBOLD, yBOLD and ysyBOLD": a list in prose. */
+const andList = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+
+/**
+ * Arriving on a `?assets=` link: what Focus mode is and what this view is set
+ * to, once per link per tab (sessionStorage; without it, every load).
+ */
+function FocusLinkIntro({ onChange }: { onChange: () => void }) {
+  const scope = useAssetScope();
+  const linkValue =
+    typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("assets") ?? "");
+  const seenKey = `rails-focus-intro:${linkValue}`;
+  const [shown, setShown] = useState(() => {
+    try {
+      return sessionStorage.getItem(seenKey) == null;
+    } catch {
+      return true;
+    }
+  });
+  const close = () => {
+    try {
+      sessionStorage.setItem(seenKey, "1");
+    } catch {}
+    setShown(false);
+  };
+  useEffect(() => {
+    if (!shown) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented) close();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  });
+  if (!shown) return null;
+
+  const picks = [...new Map(scope.picks.map((p) => [symbolOf(p), p])).values()];
+  const examples = [...new Set(scope.picks.filter((p) => p.builtOn).flatMap((p) => builtOnSymbols(p)))].slice(
+    0,
+    EXAMPLES_SHOWN,
+  );
+  const builtOn = scope.picks.some((p) => p.builtOn);
+  const one = picks.length === 1;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[var(--z-modal)]" data-focus-intro="">
+      <div className="absolute inset-0 bg-black/30" onClick={close} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="focus-intro-title"
+        className="overlay-panel absolute left-1/2 top-24 flex w-[28rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col gap-3 p-5"
+      >
+        <div className="flex items-center gap-2">
+          <ListFilter className="size-4 text-rb-500" aria-hidden="true" />
+          <h2 id="focus-intro-title" className="text-sm font-bold text-foreground">
+            Focus mode
+          </h2>
+        </div>
+        <p className="text-sm leading-relaxed text-rb-600 dark:text-rb-300">
+          Focus mode isolates the Rails app to one or more assets. This view is set to focus on{" "}
+          {picks.map((p, i) => (
+            <span key={`${p.chain}:${p.token}`}>
+              {i > 0 && (i === picks.length - 1 ? " and " : ", ")}
+              <span className="inline-flex items-center gap-1 whitespace-nowrap font-semibold text-foreground">
+                <TokenChipIcon symbol={symbolOf(p)} address={p.token} size={16} filterable={false} untitled />
+                {symbolOf(p)}
+              </span>
+            </span>
+          ))}
+          {builtOn &&
+            (examples.length
+              ? ` and assets built on ${one ? "it" : "them"}, such as ${andList(examples)}.`
+              : ` and assets built on ${one ? "it" : "them"}.`)}
+          {!builtOn && "."}
+        </p>
+        <p className="text-xs leading-relaxed text-rb-500">
+          Lists, explorers, chains and search show only what holds, lends or is built on {one ? "it" : "them"}. The
+          strip at the top of every page changes or ends it.
+        </p>
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <button
+            type="button"
+            onClick={() => {
+              close();
+              scope.clear();
+            }}
+            className={RESET_LINK}
+            data-focus-intro-clear=""
+          >
+            Show everything
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              close();
+              onChange();
+            }}
+            className={RESET_LINK}
+          >
+            Change
+          </button>
+          <button
+            type="button"
+            onClick={close}
+            className="ml-auto rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-500"
+            data-focus-intro-continue=""
+          >
+            Continue in focus
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
