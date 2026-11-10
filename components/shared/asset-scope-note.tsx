@@ -111,6 +111,7 @@ export function FocusLockChip() {
       className="inline-flex items-center gap-1 rounded-full bg-teal-500/15 px-2.5 py-1 text-xs text-teal-700 transition-colors hover:bg-teal-500/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 dark:text-teal-400"
       aria-label={`Focus: ${label}. Change focus`}
       data-aim-chip=""
+      data-anatomy="N1.9"
     >
       <Lock className="size-3" aria-hidden="true" />
       Focus: {label}
