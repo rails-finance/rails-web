@@ -95,7 +95,10 @@ export type SessionProtocol =
   // Uniswap V3 and V4, at `/ethereum/uniswap-v3` and `/ethereum/uniswap-v4`:
   // a position is an NFT id, read with its pool at two blocks (ui-jobs 556).
   | "uniswap-v3"
-  | "uniswap-v4";
+  | "uniswap-v4"
+  // Aerodrome Slipstream on Base, at `/base/aerodrome`: a position is an NFT
+  // id on one of three position managers, staked in its gauge or not (ui-jobs 566).
+  | "aerodrome";
 
 /** What a saved entry is: a wallet, a position page or a listing view. */
 export type SavedKind = "wallet" | "position" | "view";

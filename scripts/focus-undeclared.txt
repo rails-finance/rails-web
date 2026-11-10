@@ -33,6 +33,9 @@
 /base/aave-v4/markets/[spoke]/[asset]
 /base/aave-v4/spoke/[spoke]/[wallet]
 /base/aave-v4/spoke/[spoke]/[wallet]/event/[eventId]
+/base/aerodrome
+/base/aerodrome/[wallet]
+/base/aerodrome/position/[deployment]/[id]
 /base/alchemix
 /base/alchemix/[lineKey]/[tokenId]
 /base/alchemix/[lineKey]/[tokenId]/event/[eventId]

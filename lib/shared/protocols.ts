@@ -183,6 +183,26 @@ export function explorerHref(chainId: ChainId, slug: string): string {
  *  order carries no ranking. Keep new entries in alphabetical position. */
 const SPECS: ProtocolSpec[] = [
   {
+    // Aerodrome Slipstream on Base (rails-ops ui-jobs 566), Uniswap's door 1
+    // on Base: a front door taking a wallet, its positions at
+    // `<route>/<wallet>`, each opening `<route>/position/<deployment>/<id>`
+    // (ids overlap across Slipstream's three position managers). Reads come
+    // from rails-server's at-block routes (lib/api/fetch-aerodrome.ts).
+    // Unlaunched while Miles reads it.
+    id: "aerodrome",
+    session: "aerodrome",
+    label: "Aerodrome",
+    chainId: 8453,
+    slug: "aerodrome",
+    // DRAFT: hue 262, read off Aerodrome's blue.
+    brand: 262,
+    tags: ["Liquidity"],
+    desc: "Concentrated liquidity on Base, staked or not: a position's range, fees or AERO and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    subPages: [],
+  },
+  {
     id: "aave-v3",
     session: "aave-v3",
     label: "Aave V3",
@@ -911,6 +931,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   pendle: "Position",
   "uniswap-v3": "Position",
   "uniswap-v4": "Position",
+  aerodrome: "Position",
 };
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",
