@@ -32,6 +32,7 @@ import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { releaseLabel, type VaultFamily } from "@/lib/vaults/families";
 import type { VaultIlliquid, VaultLiquidity } from "@/lib/vaults/illiquid";
 import { hasLostAssets } from "@/lib/vaults/lost-assets";
+import type { AssetScale } from "@/lib/vaults/asset-scale-words";
 import { tooSmallToMeasure } from "@/lib/vaults/yield";
 
 /** What the chain or the venue states about a vault's standing, as a pill
@@ -41,8 +42,16 @@ import { tooSmallToMeasure } from "@/lib/vaults/yield";
  *  `illiquid`: Rails's test over the chain's reads of a MetaMorpho vault's
  *  markets (lib/vaults/illiquid.ts, ui-jobs 540). `lost-assets`: a MetaMorpho
  *  V1.1 vault's `lostAssets()` is 1% or more of its total (lib/vaults/lost-assets.ts,
- *  ui-jobs 543). */
-export type VaultStanding = "endorsed" | "shut-down" | "paused" | "address-book" | "illiquid" | "lost-assets";
+ *  ui-jobs 543). `decimals-disagree`: the asset's stated decimals disagree with
+ *  the scale its conversion works at (lib/vaults/asset-scale.ts). */
+export type VaultStanding =
+  | "endorsed"
+  | "shut-down"
+  | "paused"
+  | "address-book"
+  | "illiquid"
+  | "lost-assets"
+  | "decimals-disagree";
 
 /** Who runs the vault, by the role the contract names: a MetaMorpho
  *  `curator()` (or its `owner()` where no curator is named), an Umbrella
@@ -97,6 +106,9 @@ export interface VaultSummary {
    *  queue's sum and the part of it its markets hold free (ui-jobs 553);
    *  absent where it was not read. */
   withdrawable?: Pick<VaultLiquidity, "block" | "queueAssets" | "withdrawable">;
+  /** Where the asset's decimals disagree with its conversion: the standing
+   *  `decimals-disagree` and its reading. */
+  assetScale?: AssetScale;
   /** The block the vault was created in, where the catalogue holds it. */
   createdBlock: number | null;
   /** The position census for this vault: every address it counted, live and
@@ -386,4 +398,10 @@ export function yearnVaultPageSummary(d: YearnVaultResponse): VaultSummary {
     census: null,
     readAt: { block: d.blockNumber, timestamp: "" },
   };
+}
+
+/** The summary with the asset's scale reading applied, where it disagrees. */
+export function withAssetScale(v: VaultSummary, scales: Record<string, AssetScale>): VaultSummary {
+  const scale = scales[v.asset.address.toLowerCase()];
+  return scale ? { ...v, assetScale: scale, standing: [...v.standing, "decimals-disagree"] } : v;
 }

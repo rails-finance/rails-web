@@ -44,8 +44,10 @@ import {
   maplePoolSummary,
   morphoBaseVaultSummaries,
   yearnVaultSummaries,
+  withAssetScale,
   type VaultSummary,
 } from "@/lib/vaults/summary";
+import { loadAssetScales } from "@/lib/vaults/asset-scale";
 import { loadVaultYields } from "@/lib/vaults/yield-read";
 import type { VaultYield } from "@/lib/vaults/yield";
 import { vaultIndexKey, type VaultIndexRoster } from "@/lib/vaults/index-rosters";
@@ -181,6 +183,19 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
         ),
       );
 
+  // The "decimals disagree" standing: one read per chain over the assets.
+  const [baseScales, ethScales] = await Promise.all([
+    loadAssetScales(
+      BASE_CHAIN_ID,
+      morphoVaults.map((v) => v.asset.address),
+    ),
+    loadAssetScales(
+      MAINNET_CHAIN_ID,
+      [...morphoEthVaults, ...aaveVaults, ...yearnVaults, ...mapleVaults].map((v) => v.asset.address),
+    ),
+  ]);
+  const scaled = (vs: VaultSummary[], scales: typeof baseScales) => vs.map((v) => withAssetScale(v, scales));
+
   const [baseYieldsRead, ethYieldsRead] = await Promise.all([
     loadVaultYields(
       BASE_CHAIN_ID,
@@ -203,7 +218,10 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
 
   const ethCensusBlock = ethCensus.length > 0 ? Math.max(...ethCensus.map((c) => c.censusBlock)) : null;
   return {
-    vaults: [...morphoVaults, ...morphoEthVaults, ...aaveVaults, ...yearnVaults, ...mapleVaults],
+    vaults: [
+      ...scaled(morphoVaults, baseScales),
+      ...scaled([...morphoEthVaults, ...aaveVaults, ...yearnVaults, ...mapleVaults], ethScales),
+    ],
     yields,
     indexDown: [
       morphoRead,

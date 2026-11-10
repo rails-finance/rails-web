@@ -39,6 +39,7 @@ import { metaMorphoVaultHref } from "@/lib/vaults/routes";
 import { loadMorphoBaseVault } from "@/lib/sources/chain/morpho-base-vault";
 import { loadVaultCensusRow } from "@/lib/vaults/census-read";
 import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
+import { loadAssetScales } from "@/lib/vaults/asset-scale";
 
 export type MetaMorphoVaultParams = {
   params: Promise<{ vault: string }>;
@@ -100,6 +101,7 @@ export async function MetaMorphoVaultRoute({
     loadVaultCensusRow(chainId, address),
     loadVaultPageSeries(chainId, address),
   ]);
+  const assetScales = data.chainStale ? {} : await loadAssetScales(chainId, [data.vault.asset.address]);
 
   return (
     <div className="min-h-screen">
@@ -116,6 +118,7 @@ export async function MetaMorphoVaultRoute({
           <MorphoBaseVaultPageView
             data={data}
             census={census}
+            assetScales={assetScales}
             yieldFigure={series.yieldFigure}
             strip={series.strip}
             factory={metaMorphoFactoryAddress(chainId, data.vault.factory)}
