@@ -62,7 +62,11 @@ export default async function CompoundPositionPage({ params, searchParams }: Pro
   ]);
 
   return (
-    <PositionReadProvider key={`${market}:${wallet}:${grouped ? "rows" : "events"}`} read={tail.position ? read : null}>
+    <PositionReadProvider
+      focus={{ source: tail.position }}
+      key={`${market}:${wallet}:${grouped ? "rows" : "events"}`}
+      read={tail.position ? read : null}
+    >
       <CompoundPositionView
         // Keyed on the pair so a client-side navigation to another Comet account
         // remounts with that account's server tail as its initial state.

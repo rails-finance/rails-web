@@ -54,7 +54,7 @@ export default async function AaveV3BasePositionPage({ params, searchParams }: P
   const read = await timedRead(readOfHeadAnswer(tail.position), BASE_CHAIN_ID);
 
   return (
-    <PositionReadProvider key={wallet} read={tail.position ? read : null}>
+    <PositionReadProvider focus={{ source: tail.position }} key={wallet} read={tail.position ? read : null}>
       <AaveV3BasePositionView
         // Keyed on the wallet so a client-side navigation to another account
         // remounts with that account's server read as its initial state, rather

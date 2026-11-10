@@ -43,7 +43,7 @@ export default async function FluidPositionPage({ params }: Props) {
   const [tail, read] = await Promise.all([loadFluidPositionTail(nft), indexReadAt(MAINNET_CHAIN_ID)]);
 
   return (
-    <PositionReadProvider key={nft} read={tail.position ? read : null}>
+    <PositionReadProvider focus={{ source: tail.position }} key={nft} read={tail.position ? read : null}>
       <FluidPositionView
         // Keyed on the id so a client-side navigation to another position
         // remounts with that position's server tail as its initial state.

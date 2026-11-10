@@ -51,7 +51,7 @@ export default async function LiquityV1TrovePage({ params, searchParams }: Props
   const [tail, read] = await Promise.all([loadLiquityV1PositionTail(wallet), indexReadAt(MAINNET_CHAIN_ID)]);
 
   return (
-    <PositionReadProvider key={wallet} read={tail.summaries ? read : null}>
+    <PositionReadProvider focus={{ source: tail.summaries }} key={wallet} read={tail.summaries ? read : null}>
       <LiquityV1TroveView
         // Keyed on the wallet so a client-side navigation to another borrower
         // remounts with that wallet's server tail as its initial state.

@@ -52,7 +52,7 @@ export default async function MorphoArbitrumPositionPage({ params }: Props) {
   }
 
   return (
-    <PositionReadProvider key={`${wallet}:${market}`} read={tail.head ? read : null}>
+    <PositionReadProvider focus={{ source: tail.head }} key={`${wallet}:${market}`} read={tail.head ? read : null}>
       <MorphoArbitrumPositionView
         key={`${wallet}:${market}`}
         wallet={wallet}

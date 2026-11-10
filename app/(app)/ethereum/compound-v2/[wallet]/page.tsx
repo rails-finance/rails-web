@@ -48,7 +48,11 @@ export default async function CompoundV2PositionPage({ params, searchParams }: P
   const [tail, read] = await Promise.all([loadCompoundV2PositionTail(wallet, grouped), indexReadAt(MAINNET_CHAIN_ID)]);
 
   return (
-    <PositionReadProvider key={`${wallet}:${grouped ? "rows" : "events"}`} read={tail.position ? read : null}>
+    <PositionReadProvider
+      focus={{ source: tail.position }}
+      key={`${wallet}:${grouped ? "rows" : "events"}`}
+      read={tail.position ? read : null}
+    >
       <CompoundV2PositionView
         // Keyed on the wallet so a client-side navigation to another account
         // remounts with that account's server tail as its initial state.

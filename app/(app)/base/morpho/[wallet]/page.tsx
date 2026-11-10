@@ -61,7 +61,7 @@ export default async function MorphoBaseWalletPage({ params }: Props) {
   const vaultNote = morphoBaseVaultOwnerNote(wallet);
 
   return (
-    <PositionReadProvider key={wallet} read={tail.head ? read : null}>
+    <PositionReadProvider focus={{ source: tail.head }} key={wallet} read={tail.head ? read : null}>
       <MorphoBaseWalletView
         // Keyed on the wallet so a client-side navigation to another account
         // remounts with that account's server read as its initial state.

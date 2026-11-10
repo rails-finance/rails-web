@@ -45,7 +45,7 @@ export default async function FrankencoinPositionPage({ params }: Props) {
   const [tail, read] = await Promise.all([loadFrankencoinPositionTail(position), indexReadAt(MAINNET_CHAIN_ID)]);
 
   return (
-    <PositionReadProvider key={position} read={tail.position ? read : null}>
+    <PositionReadProvider focus={{ source: tail.position }} key={position} read={tail.position ? read : null}>
       <FrankencoinPositionView
         // Keyed on the contract so a client-side navigation to another position
         // remounts with that position's server tail as its initial state.

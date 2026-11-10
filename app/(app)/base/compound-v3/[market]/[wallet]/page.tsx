@@ -61,7 +61,7 @@ export default async function CompoundBaseMarketPage({ params, searchParams }: P
   const read = await timedRead(readOfHeadAnswer(tail.head), BASE_CHAIN_ID);
 
   return (
-    <PositionReadProvider key={`${market.key}:${wallet}`} read={tail.head ? read : null}>
+    <PositionReadProvider focus={{ source: tail.head }} key={`${market.key}:${wallet}`} read={tail.head ? read : null}>
       <CompoundBaseMarketView
         // Keyed on the pair so a client-side navigation to another position
         // remounts with that position's server read as its initial state.

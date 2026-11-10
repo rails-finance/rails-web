@@ -61,7 +61,7 @@ export default async function CompoundArbitrumMarketPage({ params }: Props) {
   }
 
   return (
-    <PositionReadProvider key={`${market.key}:${wallet}`} read={tail.head ? read : null}>
+    <PositionReadProvider focus={{ source: tail.head }} key={`${market.key}:${wallet}`} read={tail.head ? read : null}>
       <CompoundArbitrumMarketView
         key={`${market.key}:${wallet}`}
         wallet={wallet}
