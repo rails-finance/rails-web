@@ -49,10 +49,17 @@ export interface UniLogAmount {
   amount1: string;
 }
 
-/** The chains the at-block routes answer for, and each one's blocks a day: the grid every past
- *  read stands on (Ethereum's 12-second slots, Base's 2-second blocks). */
+/** The chains the at-block routes answer for, and the grid every past read stands on: a fixed
+ *  count of blocks a day on Ethereum (12-second slots). Base has none: two-second blocks until
+ *  Denim (block 53,556,127, 5 Nov 2026), five a second since, so its reads stand on UTC midnights. */
 export type UniChainId = 1 | 8453;
-export const DAY_BLOCKS_BY_CHAIN: Readonly<Record<UniChainId, number>> = { 1: 7_200, 8453: 43_200 };
+export const DAY_BLOCKS_BY_CHAIN: Readonly<Partial<Record<UniChainId, number>>> = { 1: 7_200 };
+
+/** How a receipt names the daily grid: "one each 7,200 blocks", or "one at each UTC midnight". */
+export function dayGridPhrase(chainId: UniChainId): string {
+  const n = DAY_BLOCKS_BY_CHAIN[chainId];
+  return n ? `one each ${n.toLocaleString("en-US")} blocks` : "one at each UTC midnight";
+}
 
 /** GET /api/at-block/uniswap/position?version=&id= */
 export interface UniPositionRead {
