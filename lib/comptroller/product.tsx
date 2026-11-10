@@ -20,9 +20,10 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ExplainBullet, ExplainGroup, ExplainSub, Fig } from "@/components/shared/explain-groups";
 import { readStampProv } from "@/components/shared/read-stamp";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { AssetUnit } from "@/components/shared/asset-unit";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
-import { DATA_TABLE_PILL } from "@/components/shared/data-table/data-table";
+import { DATA_TABLE_PILL, DataTableAmount } from "@/components/shared/data-table/data-table";
 import { MarketPage } from "@/components/shared/product/market-page";
 import { ReservePage } from "@/components/shared/product/reserve-page";
 import { RateCurve } from "@/components/shared/product/rate-curve";
@@ -288,7 +289,41 @@ function figuresOf(x: Ctx, m: ComptrollerMarket) {
     ) : (
       DASH
     );
-  return { supplied, borrowed, available, supplyRate, borrowRate, utilisation, price, u };
+  // The table's amount cells (D1, decision 0047): the token amount over its
+  // oracle dollars, the amount an echo of the dollar figure's receipt and the
+  // carrier of the side's link. Null where the cell keeps one line: no oracle
+  // price (tokens only) or a side at zero.
+  const amountOf = (n: number, info: Provenance, side: "supply" | "borrow" | null) => {
+    const figure = (
+      <Prov info={info} echo>
+        <span className="inline-flex items-center gap-1.5">
+          {formatCompact(n)}
+          <AssetUnit symbol={m.symbol} address={m.underlying ?? m.market} />
+        </span>
+      </Prov>
+    );
+    const href = side ? listingHref(x, m, side) : null;
+    return href ? (
+      <Link
+        href={href}
+        className={INLINE_LINK}
+        title={`Positions ${side === "supply" ? "supplying" : "borrowing"} ${m.symbol}`}
+      >
+        {figure}
+      </Link>
+    ) : (
+      figure
+    );
+  };
+  const p = m.priceUsd;
+  const pair = (n: number, info: Provenance, side: "supply" | "borrow" | null) =>
+    p != null && n > 0 ? { amount: amountOf(n, info, side), value: <Prov info={info}>{usdText(n * p)}</Prov> } : null;
+  const amounts = {
+    supplied: pair(m.supplied, cmValueProv(x.v, c, "supplied"), "supply"),
+    borrowed: pair(m.borrowed, cmValueProv(x.v, c, "borrowed"), "borrow"),
+    available: pair(m.cash, cmAvailableProv(x.v, c, true), null),
+  };
+  return { supplied, borrowed, available, amounts, supplyRate, borrowRate, utilisation, price, u };
 }
 
 /** The Collateral cell: the collateral factor, or "Not collateral" at zero. */
@@ -306,7 +341,7 @@ function Collateral({ x, m }: { x: Ctx; m: ComptrollerMarket }) {
   return <Prov info={info}>{pct(m.collateralFactor)}</Prov>;
 }
 
-/** A side's cap under its size, near binding or closed. */
+/** A side's cap beside its dollar value (under its size when unpriced), near binding or closed. */
 function CapPill({ x, m, side }: { x: Ctx; m: ComptrollerMarket; side: "supply" | "borrow" }) {
   const c = capOf(x, m, side);
   if (side === "borrow" && (x.shared.borrowClosed || x.shared.borrowPaused)) return null;
@@ -842,7 +877,9 @@ function marketRow(x: Ctx, m: ComptrollerMarket): ReserveRowModel {
       supplied: {
         sort: [m.priceUsd != null ? m.supplied * m.priceUsd : 0, m.supplied],
         title: `${tokens(m.supplied, m.symbol)} supplied`,
-        node: (
+        node: z.amounts.supplied ? (
+          <DataTableAmount {...z.amounts.supplied} tag={<CapPill x={x} m={m} side="supply" />} />
+        ) : (
           <>
             <div>{z.supplied}</div>
             <CapPill x={x} m={m} side="supply" />
@@ -852,14 +889,20 @@ function marketRow(x: Ctx, m: ComptrollerMarket): ReserveRowModel {
       borrowed: {
         sort: [m.priceUsd != null ? m.borrowed * m.priceUsd : 0, m.borrowed],
         title: `${tokens(m.borrowed, m.symbol)} borrowed`,
-        node: (
+        node: z.amounts.borrowed ? (
+          <DataTableAmount {...z.amounts.borrowed} tag={<CapPill x={x} m={m} side="borrow" />} />
+        ) : (
           <>
             <div>{z.borrowed ?? <span className="text-rb-500">no borrows</span>}</div>
             <CapPill x={x} m={m} side="borrow" />
           </>
         ),
       },
-      available: { sort: avail, title: `${tokens(m.cash, m.symbol)} the market holds`, node: z.available },
+      available: {
+        sort: avail,
+        title: `${tokens(m.cash, m.symbol)} the market holds`,
+        node: z.amounts.available ? <DataTableAmount {...z.amounts.available} /> : z.available,
+      },
       supplyRate: {
         sort: m.supplyApr ?? -1,
         title: `Supply rate: ${RATE_TIP.supply.toLowerCase()}`,
@@ -884,9 +927,9 @@ function marketsTable(x: Ctx): ReserveTableModel {
     title: "All markets",
     line: (
       <>
-        Every market the Comptroller lists; sort any column. USD is the oracle&rsquo;s price. A cap shows under its size
-        once 90% of it is in use. The bar is utilisation, and its tick is the rate model&rsquo;s kink. A row opens its
-        market&rsquo;s page.
+        Every market the Comptroller lists; sort any column. USD is the oracle&rsquo;s price. A cap shows beside its
+        dollar value once 90% of it is in use. The bar is utilisation, and its tick is the rate model&rsquo;s kink. A
+        row opens its market&rsquo;s page.
       </>
     ),
     label: `${f.name} markets`,
