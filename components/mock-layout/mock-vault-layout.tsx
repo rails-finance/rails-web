@@ -1,15 +1,16 @@
 "use client";
 
 // The MetaMorpho vault page as a grid of tiles (Miles, 10 Nov 2026, round
-// two): Coinbase's asset page for the grid, Morpho's vault page for the hero,
-// the configuration, the returns and the roles. A localhost mock under
-// /mock-layout. The reads are the live page's
-// (components/vaults/morpho-base-vault-page.tsx) plus the page's own.
+// three): Coinbase's asset page for the grid, Morpho's vault page for the
+// configuration and the roles. A localhost mock under /mock-layout. The hero
+// carries the live card's headlines, stats and explanation
+// (components/vaults/morpho-base-vault-page.tsx); the other reused sections
+// are the live page's too.
 //
 // Each tile is a `Tile` holding one `ProvSection`, so its heading, read stamp,
-// "?" and ⋮ sit in its top row. The reused sections keep their own headings;
-// the grid's scoped selectors strip their outer margins and inner frames, and
-// hide the protects section's disclaimer (the page states it once, in a row).
+// "?" and ⋮ sit in its top row. The reused sections keep their headings; the
+// grid's scoped selectors strip their outer margins and inner frames, and hide
+// the protects section's disclaimer (the site's /terms carries it).
 
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -18,20 +19,26 @@ import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { readStampProv, SectionReadStamp } from "@/components/shared/read-stamp";
 import { CopyFact } from "@/components/shared/event-page-aside";
-import { PanelFigure } from "@/components/shared/position-card-panel";
-import { VaultLead, VaultPills, vaultHeads, VAULT_HEAD_TIPS, VAULT_PILL } from "@/components/vaults/vault-heads";
-import type { VaultMenuLink } from "@/components/vaults/vault-card";
+import { PanelFigure, PositionCardPanel, type PositionPanelRow } from "@/components/shared/position-card-panel";
+import { SectionExplainer } from "@/components/shared/section-explainer";
+import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
+import { VaultLead, VaultPills, vaultHeads, VAULT_PILL } from "@/components/vaults/vault-heads";
+import { CreatedBullet, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
 import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
+import { VaultFinder } from "@/components/vaults/vault-finder";
 import { VaultStrip } from "@/components/vaults/vault-strip";
 import { VaultIlliquidMarkets } from "@/components/vaults/vault-illiquid";
 import { VaultProtects, type ProtectsSectionData } from "@/components/vaults/vault-protects";
+import { StatAmount } from "@/components/vaults/stat-amount";
 import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
-import { assetText, sharePriceText, shortAddress, shortId } from "@/lib/shared/vault-amount-text";
+import { assetText, shortAddress, shortId } from "@/lib/shared/vault-amount-text";
 import { morphoBaseWalletHref } from "@/lib/morpho-base/routes";
 import { morphoLoanTokenHref, morphoMarketHref } from "@/lib/morpho/market-routes";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
 import {
+  vaultAllocatedProv,
+  vaultGapProv,
   vaultLegAssetsProv,
   vaultLegLltvProv,
   vaultLegShareProv,
@@ -39,6 +46,7 @@ import {
   vaultLostAssetsProv,
   vaultSharePriceProv,
   vaultTotalAssetsProv,
+  vaultTotalSupplyProv,
   type MorphoVaultCoords,
 } from "@/lib/morpho-base/vault-provenance";
 import type { MorphoBaseVaultResponse } from "@/lib/sources/chain/morpho-base-vault";
@@ -46,26 +54,24 @@ import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { metaMorphoVaultHref, metaMorphoVaultsListingHref } from "@/lib/vaults/routes";
 import { morphoBaseVaultPageSummary, withAssetScale } from "@/lib/vaults/summary";
 import type { AssetScale } from "@/lib/vaults/asset-scale-words";
-import { vaultStewardProv, vaultVenueProv } from "@/lib/vaults/card-provenance";
-import { vaultWithdrawableProv } from "@/lib/vaults/row-provenance";
-import { morphoVaultAssetsContent, STEWARD_TIP } from "@/lib/vaults/card-words";
-import { HEALTH_DISCLAIMER } from "@/lib/vaults/health-words";
-import { spanOf, yearlyOf } from "@/lib/vaults/health";
-import { changeText, measuredYield, yieldText, type VaultYield, type VaultYieldRead } from "@/lib/vaults/yield";
+import { vaultVenueProv } from "@/lib/vaults/card-provenance";
+import { morphoVaultAssetsContent, morphoVaultCardContent, SHARES_ISSUED_TIP } from "@/lib/vaults/card-words";
+import { measuredYield, type VaultYield } from "@/lib/vaults/yield";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
-import { priceHistoryRows } from "@/lib/mock-layout/price-history";
 import type { MockVaultConfig } from "@/lib/mock-layout/vault-config-read";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const lltvText = (lltv: number) => `${(lltv * 100).toFixed(1)}%`;
-const dayText = (day: number) => formatDate(new Date(day * 86_400_000));
 const ZERO = /^0x0{40}$/;
+
+/** Where the assets are draws this many markets until the reader asks for all. */
+const TOP_MARKETS = 5;
 
 /** The grid: one column, two from lg; the 1px gaps over the frame's colour
  *  draw the shared hairlines. The scoped selectors work on the reused
  *  sections: no outer margin or ring offset, no inner frame on the protects
- *  line, and no disclaimer in its explanation (the page's one copy is a row). */
+ *  line, and no disclaimer in its explanation. */
 const GRID = [
   "grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-rb-200 bg-rb-200 lg:grid-cols-2",
   "dark:border-rb-500/30 dark:bg-rb-500/30",
@@ -97,12 +103,7 @@ function Term({ label, tip }: { label: string; tip?: string }) {
   );
 }
 
-const WITHDRAWABLE_TIP =
-  "What the vault could take out of its markets at the read block: in each market of the withdraw queue, the lesser of the vault's assets there and the market's supply less its borrow.";
-const RETURNS_TIP =
-  "Rails's interpretation of two reads of the share price from the daily store: the growth between them as a yearly rate, (p1 / p0 − 1) × 365 / days. Net of the fees the vault takes inside the share. No forecast.";
-
-/** One label/value pair in a tile's two-column grid. */
+/** One label/value pair in a tile's list. */
 function Fact({
   id,
   label,
@@ -132,8 +133,6 @@ function Fact({
   );
 }
 
-const FACTS = "mt-3 grid grid-cols-1 gap-x-8 border-t border-rb-200 sm:grid-cols-2 dark:border-rb-500/30";
-
 /** A hero figure: dotted label, the figure large, a line under it. */
 function Big({
   id,
@@ -149,7 +148,7 @@ function Big({
   sub?: ReactNode;
 }) {
   return (
-    <div className="min-w-0" data-mock-hero={id}>
+    <div className="min-w-0" data-mock-hero={id} data-card-head={id}>
       <Term label={label} tip={tip} />
       <div className="mt-1 flex min-w-0 text-2xl font-semibold tabular-nums text-foreground">
         {value ?? <span className="text-[15px] font-normal text-rb-500">not read</span>}
@@ -204,14 +203,6 @@ function AddressRow({
   );
 }
 
-/** "7 days", "1 day", "36 hours", "none". */
-function waitText(seconds: number): string {
-  if (seconds === 0) return "none";
-  if (seconds % 86_400 === 0) return `${n(seconds / 86_400)} ${seconds === 86_400 ? "day" : "days"}`;
-  if (seconds % 3_600 === 0) return `${n(seconds / 3_600)} ${seconds === 3_600 ? "hour" : "hours"}`;
-  return `${n(seconds)} seconds`;
-}
-
 /** A WAD fraction as a percentage, to two places. */
 function wadPct(raw: string): string {
   const bp = Number((BigInt(raw) * BigInt(1_000_000)) / BigInt(10) ** BigInt(18)) / 10_000;
@@ -224,8 +215,9 @@ const blueWalletHref = (chainId: 1 | 8453, vault: string) =>
 
 const ANCHORS = [
   ["overview", "Overview"],
+  ["configuration", "Configuration"],
   ["allocation", "Allocation"],
-  ["history", "History"],
+  ["last-30-days", "Last 30 days"],
   ["risk", "Risk"],
   ["addresses", "Addresses"],
 ] as const;
@@ -236,7 +228,6 @@ export function MockVaultLayout({
   assetScales,
   yieldFigure: storeYield,
   strip,
-  priceReads,
   protects,
   config,
 }: {
@@ -245,13 +236,10 @@ export function MockVaultLayout({
   assetScales: Record<string, AssetScale>;
   yieldFigure?: VaultYield;
   strip: VaultStripSeries | null;
-  /** The share price's stored reads, oldest first; null where the store did not answer. */
-  priceReads: VaultYieldRead[] | null;
-  /** "What protects it" and "The protocol underneath", and the guardian and
-   *  timelock behind them; null where the read failed. */
+  /** "What protects it" and "The protocol underneath", and the guardian
+   *  behind them; null where the read failed. */
   protects: {
     block: number;
-    timelock: number;
     guardian: string | null;
     protects: ProtectsSectionData;
     underneath: ProtectsSectionData;
@@ -274,10 +262,12 @@ export function MockVaultLayout({
   };
   const unit = vault.asset.symbol;
   const ad = vault.asset.decimals;
+  const asset = { symbol: unit, address: vault.asset.address };
   const steward = v.steward!;
   const funded = legs.filter((l) => BigInt(l.assets.raw) > BigInt(0));
   const addr = (a: string) => explorerUrl(chainId, "address", a);
   const name = vault.name || shortAddress(vault.address);
+  const feeRecipient = config.feeRecipient && !ZERO.test(config.feeRecipient) ? config.feeRecipient : null;
 
   const receipts = {
     totalAssets: vaultTotalAssetsProv(coords),
@@ -292,6 +282,7 @@ export function MockVaultLayout({
         }
       : {}),
   };
+  // The live card's four headlines: Total assets · Share price · Yield · Holders.
   const heads = vaultHeads({
     vault: v,
     yieldFigure: storeYield,
@@ -299,14 +290,108 @@ export function MockVaultLayout({
     receipts,
     detail: true,
   });
-  const head = (id: string) => heads.find((h) => h.id === id);
-  const total = head("total-assets");
-  const yld = head("yield");
-  const holders = head("holders");
 
-  const w = v.withdrawable;
-  const withdrawable = w ? { raw: w.withdrawable, value: Number(w.withdrawable) / 10 ** ad } : null;
-  const queue = w ? { raw: w.queueAssets, value: Number(w.queueAssets) / 10 ** ad } : null;
+  // The live card's stats, less Steward (the roles tile names it).
+  const stats: PositionPanelRow[] = [
+    {
+      id: "shares-issued",
+      label: "Shares issued",
+      tip: SHARES_ISSUED_TIP,
+      sub: vault.symbol,
+      value: (
+        <span data-figure="total-shares">
+          <Prov info={vaultTotalSupplyProv(coords)}>
+            <StatAmount amount={data.totalSupply} decimals={vault.decimals} symbol={vault.symbol} shares />
+          </Prov>
+        </span>
+      ),
+    },
+    {
+      id: "allocated",
+      label: "Allocated in Morpho Blue",
+      tip: "The vault's supply in each Morpho Blue market, summed as Morpho Blue last settled them. Total assets adds the interest since, so either figure can be the larger.",
+      asset,
+      value: (
+        <span data-figure="allocated">
+          <Prov info={vaultAllocatedProv(coords)}>
+            <StatAmount amount={data.allocated} decimals={ad} symbol={unit} />
+          </Prov>
+        </span>
+      ),
+    },
+    {
+      id: "unaccrued",
+      label: "Unaccrued interest",
+      tip: "Total assets minus the allocated sum: interest the vault counts that the markets have not settled yet.",
+      asset,
+      value: (
+        <span data-figure="gap">
+          <Prov info={vaultGapProv(coords)}>
+            <StatAmount amount={data.gap} decimals={ad} symbol={unit} />
+          </Prov>
+        </span>
+      ),
+    },
+  ];
+  const lostStat = data.lostAssets && BigInt(data.lostAssets.raw) > BigInt(0) ? data.lostAssets : null;
+  if (lostStat)
+    stats.push({
+      id: "lost-assets",
+      label: "Lost assets",
+      tip: "On a MetaMorpho V1.1 vault, the part of total assets that no market holds. The share price has not been lowered for it.",
+      asset,
+      value: (
+        <span data-figure="lost-assets">
+          <Prov info={vaultLostAssetsProv(coords)}>
+            <StatAmount amount={lostStat} decimals={ad} symbol={unit} />
+          </Prov>
+        </span>
+      ),
+    });
+
+  // The live card's (i) pane.
+  const explanation = (
+    <div data-vault-explanation="">
+      <ExplainGroup title="Holdings">
+        <ExplainBullet>
+          This vault lends{" "}
+          <Fig>
+            {assetText(data.totalAssets, ad)} {unit}
+          </Fig>{" "}
+          across <Fig>{n(funded.length)}</Fig> Morpho Blue markets for the holders of its shares.
+        </ExplainBullet>
+        <ExplainBullet>
+          Morpho Blue last settled{" "}
+          <Fig>
+            {assetText(data.allocated, ad)} {unit}
+          </Fig>{" "}
+          of it; the rest is interest it has not booked yet.
+        </ExplainBullet>
+      </ExplainGroup>
+      <ExplainGroup title="Risk">
+        <ExplainBullet>
+          The {steward.role} <Fig>{shortAddress(steward.address)}</Fig> chooses the markets and each one&rsquo;s cap.
+        </ExplainBullet>
+        <ExplainBullet>A loss in any of these markets lowers the share price for every holder.</ExplainBullet>
+      </ExplainGroup>
+      <ExplainGroup title="Rate">
+        <YieldBullets yieldFigure={yieldFigure} rewards="rewards paid outside the share, such as MORPHO," />
+      </ExplainGroup>
+      <ExplainGroup title="History">
+        <CreatedBullet
+          chainId={chainId}
+          block={vault.createdBlock > 0 ? vault.createdBlock : null}
+          by={`the MetaMorpho ${vault.factory} factory`}
+        />
+        {v.census && (
+          <ExplainBullet>
+            <Fig>{n(v.census.holders)}</Fig> addresses have held a share; <Fig>{n(v.census.live)}</Fig> hold one at the
+            last census.
+          </ExplainBullet>
+        )}
+      </ExplainGroup>
+    </div>
+  );
 
   const links: VaultMenuLink[] = [
     {
@@ -368,6 +453,9 @@ export function MockVaultLayout({
       hooks: { "data-leg": leg.id },
     };
   });
+  // Largest first, so the first rows are the top markets by amount.
+  const amountOf = (r: VaultAssetRow) => (r.amount ? BigInt(r.amount.raw) : BigInt(-1));
+  rows.sort((a, b) => (amountOf(b) > amountOf(a) ? 1 : amountOf(b) < amountOf(a) ? -1 : 0));
   if (!legs.some((l) => l.isIdle))
     rows.push({
       key: "idle",
@@ -378,15 +466,6 @@ export function MockVaultLayout({
       offBand: true,
       hooks: { "data-idle": "none" },
     });
-
-  const history = priceReads ? priceHistoryRows(priceReads) : null;
-  const priceOf = (r: VaultYieldRead) => sharePriceText({ raw: r.raw, value: Number(r.raw) / 10 ** ad }, ad);
-  // Decision 0047's figure over each window, through lib/vaults/health.ts:
-  // spanOf picks the reads, yearlyOf is (p1 / p0 − 1) × 365 / d.
-  const returns = ([7, 30, 90] as const).map((days) => {
-    const span = priceReads ? spanOf(priceReads, days) : null;
-    return { days, span, yearly: span && BigInt(span.from.raw) > BigInt(0) ? yearlyOf(span) : null };
-  });
 
   const configStamp = (block: number | null, what: string, reads: string) =>
     block ? (
@@ -411,16 +490,18 @@ export function MockVaultLayout({
         className="mb-4 rounded-lg border border-dashed border-rb-400 px-4 py-3 text-[13px] leading-relaxed text-rb-500 dark:border-rb-500"
         data-mock-note=""
       >
-        A mock of a new layout for this vault&rsquo;s page: Coinbase&rsquo;s grid of tiles, with the hero,
-        configuration, returns and roles from Morpho&rsquo;s vault page. New: the hero figures, vault configuration,
-        returns, share price history and roles and addresses tiles. Receipts on the new tiles are not wired yet.{" "}
+        A mock of a new layout for this vault&rsquo;s page: Coinbase&rsquo;s grid of tiles, with the configuration and
+        roles from Morpho&rsquo;s vault page. New: the vault configuration and roles and addresses tiles; the other
+        tiles are the live page&rsquo;s sections. Receipts on the new tiles are not wired yet.{" "}
         <Link href={metaMorphoVaultHref(chainId, vault.address)} prefetch={false} className={INLINE_LINK}>
           The live page
         </Link>
       </div>
 
+      <VaultFinder />
+
       <div className={GRID} data-mock-layout="">
-        {/* Hero */}
+        {/* Hero: the live card's headlines, stats and explanation */}
         <Tile id="overview" wide>
           <ProvSection scope="mock-overview" data-mock-section="overview">
             <div className="flex items-start justify-between gap-3">
@@ -433,14 +514,6 @@ export function MockVaultLayout({
                   <VaultPills vault={v} receipts={{}} />
                   <span className={VAULT_PILL} data-pill="chain">
                     {chain.name}
-                  </span>
-                  <span className={CHIP} data-mock-chip="steward">
-                    <abbr title={steward.role === "curator" ? STEWARD_TIP.curator : STEWARD_TIP.owner}>
-                      {steward.role === "curator" ? "Curator" : "Owner"}
-                    </abbr>
-                    <span className="font-mono text-foreground">
-                      <Prov info={vaultStewardProv(v, steward, coords.readBy)}>{shortAddress(steward.address)}</Prov>
-                    </span>
                   </span>
                   <span className={CHIP} data-mock-chip="asset">
                     Asset <span className="text-foreground">{unit}</span>
@@ -465,6 +538,11 @@ export function MockVaultLayout({
                           address: vault.address,
                           reads: "totalAssets(), totalSupply(), convertToAssets(), curator(), owner(), lostAssets()",
                         },
+                        {
+                          name: "Morpho Blue",
+                          address: vault.morpho,
+                          reads: "market(id), position(id, vault) for each market in the queue",
+                        },
                       ],
                     })
                   }
@@ -473,55 +551,31 @@ export function MockVaultLayout({
               </div>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5 lg:grid-cols-4">
-              <Big
-                id="total-assets"
-                label="Total assets"
-                tip={VAULT_HEAD_TIPS.totalAssets}
-                value={total?.value}
-                sub={total?.sub}
-              />
-              <Big
-                id="withdrawable"
-                label="Withdrawable"
-                tip={WITHDRAWABLE_TIP}
-                value={
-                  withdrawable ? (
-                    <span
-                      className="flex min-w-0 flex-wrap items-baseline gap-x-1.5"
-                      data-mock-withdrawable={withdrawable.raw}
-                    >
-                      <span className="break-all">
-                        {v.illiquid ? (
-                          <Prov info={vaultWithdrawableProv(v, v.illiquid)}>{assetText(withdrawable, ad)}</Prov>
-                        ) : (
-                          <span data-prov-exempt="">{assetText(withdrawable, ad)}</span>
-                        )}
-                      </span>
-                      <span className="text-[0.5em] font-medium text-rb-500">{unit}</span>
-                    </span>
-                  ) : null
-                }
-                sub={
-                  queue ? <span data-prov-exempt="">of {assetText(queue, ad)} in the withdraw queue</span> : undefined
-                }
-              />
-              <Big id="yield" label="Yield 30 days" tip={VAULT_HEAD_TIPS.yield} value={yld?.value} sub={yld?.sub} />
-              <Big
-                id="holders"
-                label="Holders"
-                tip={VAULT_HEAD_TIPS.holders}
-                value={holders?.value}
-                sub={holders?.sub}
-              />
+              {heads.map((h) => (
+                <Big key={h.id} id={h.id} label={h.label} tip={h.labelTip} value={h.value} sub={h.sub} />
+              ))}
+            </div>
+            {/* A trillion-sized figure (an asset whose decimals disagree)
+                breaks across lines at phone width instead of running past
+                the tile's edge. */}
+            <div className="[&_[data-panel-figure]]:max-w-full [&_dd]:break-all">
+              <PositionCardPanel columns={[stats, []]} />
             </div>
             {v.illiquid && (
               <div className="mt-4">
                 <VaultIlliquidMarkets vault={v} il={v.illiquid} />
               </div>
             )}
+            <SectionExplainer
+              slot={{ body: explanation }}
+              label="vault explanation"
+              learnMore={morphoVaultCardContent()}
+              anatomy={{ explanation: "C3", learnMore: "C4" }}
+              className="mt-5"
+            />
             <nav
               aria-label="On this page"
-              className="mt-5 flex flex-wrap gap-x-5 gap-y-1 border-t border-rb-200 pt-3 text-[13px] dark:border-rb-500/30"
+              className="mt-4 flex flex-wrap gap-x-5 gap-y-1 border-t border-rb-200 pt-3 text-[13px] dark:border-rb-500/30"
             >
               {ANCHORS.map(([id, label]) => (
                 <a key={id} href={`#${id}`} className={INLINE_LINK}>
@@ -532,21 +586,14 @@ export function MockVaultLayout({
           </ProvSection>
         </Tile>
 
-        {/* The page's one disclaimer */}
-        <Tile wide>
-          <p className="text-[13px] leading-relaxed text-rb-500" data-mock-disclaimer="">
-            {HEALTH_DISCLAIMER}
-          </p>
-        </Tile>
-
-        <Tile>
+        <Tile id="configuration">
           <ProvSection scope="mock-config" data-mock-section="config">
             <SectionHeading
               title="Vault configuration"
               stamp={configStamp(config.block, "Fee and fee recipient", "fee(), feeRecipient()")}
               menu={<SectionMenu scope="mock-config" title="Vault configuration" />}
             />
-            <dl className={FACTS} data-prov-exempt="">
+            <dl className="mt-3 border-t border-rb-200 dark:border-rb-500/30" data-prov-exempt="">
               <Fact
                 id="version"
                 label="Version"
@@ -561,142 +608,46 @@ export function MockVaultLayout({
                 sub={vault.createdBlock > 0 ? `block ${n(vault.createdBlock)}` : undefined}
               />
               <Fact
-                id="timelock"
-                label="Timelock"
-                tip="How long new markets, higher caps, removals and a shorter timelock wait before they take effect."
-                value={protects ? waitText(protects.timelock) : null}
-              />
-              <Fact
                 id="fee"
                 label="Performance fee"
                 tip="The share of the interest the vault earns that it pays to the fee recipient, as new shares. Read from fee(), a fraction of 10^18."
                 value={config.fee != null ? wadPct(config.fee) : null}
-                sub={
-                  config.feeRecipient && !ZERO.test(config.feeRecipient)
-                    ? `to ${shortAddress(config.feeRecipient)}`
-                    : config.fee != null
-                      ? "no fee recipient set"
-                      : undefined
+              />
+              <Fact
+                id="fee-recipient"
+                label="Fee recipient"
+                tip="The address the performance fee's new shares go to. Read from feeRecipient()."
+                value={
+                  feeRecipient ? (
+                    <a
+                      href={addr(feeRecipient)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`font-mono ${INLINE_LINK}`}
+                      title={feeRecipient}
+                    >
+                      {shortAddress(feeRecipient)}
+                    </a>
+                  ) : config.block != null ? (
+                    <span className="text-[13px] font-normal text-rb-500">none set</span>
+                  ) : null
                 }
               />
             </dl>
           </ProvSection>
         </Tile>
 
-        <Tile>
-          <ProvSection scope="mock-returns" data-mock-section="returns">
-            <SectionHeading title="Returns" menu={<SectionMenu scope="mock-returns" title="Returns" />}>
-              <p className="mt-1 text-[13px] text-rb-500">
-                The share price&rsquo;s growth over each window, as a yearly rate.
-              </p>
-            </SectionHeading>
-            <dl className={FACTS} data-prov-exempt="">
-              {returns.map((r) => (
-                <Fact
-                  key={r.days}
-                  id={`returns-${r.days}`}
-                  label={`${r.days} days`}
-                  tip={RETURNS_TIP}
-                  value={
-                    r.yearly != null ? (
-                      yieldText(r.yearly)
-                    ) : (
-                      <span className="text-[13px] font-normal text-rb-500">
-                        {priceReads == null ? "store did not answer" : "Not in the daily store"}
-                      </span>
-                    )
-                  }
-                  sub={r.span ? `${dayText(r.span.from.day)} to ${dayText(r.span.to.day)}` : undefined}
-                />
-              ))}
-            </dl>
-          </ProvSection>
-        </Tile>
-
-        <Tile id="history">
-          <ProvSection scope="mock-price-history" data-mock-section="price-history">
-            <SectionHeading
-              title="Share price history"
-              menu={<SectionMenu scope="mock-price-history" title="Share price history" />}
-            >
-              <p className="mt-1 text-[13px] text-rb-500">One read a day from Rails&rsquo;s daily store.</p>
-            </SectionHeading>
-            <div className="mt-2 min-w-0" data-prov-exempt="">
-              {history == null ? (
-                <p className="text-[13px] text-rb-500">The daily store did not answer.</p>
-              ) : history.length === 0 ? (
-                <p className="text-[13px] text-rb-500">No daily series yet.</p>
-              ) : (
-                <table className="w-full text-[13px] tabular-nums" data-mock-price-history="">
-                  <thead>
-                    <tr className="border-b border-rb-200 text-left text-xs text-rb-500 dark:border-rb-500/30">
-                      <th className="py-2 pr-3 font-normal">
-                        <span className="sr-only">Window</span>
-                      </th>
-                      <th className="py-2 pr-3 font-normal">Date</th>
-                      <th className="py-2 pr-3 text-right font-normal">
-                        <abbr title={VAULT_HEAD_TIPS.sharePrice} className={`${LABEL} text-xs`}>
-                          Share price
-                        </abbr>
-                      </th>
-                      <th className="py-2 text-right font-normal">
-                        <abbr title="The latest share price over this row's, less one." className={`${LABEL} text-xs`}>
-                          Change to latest
-                        </abbr>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {history.map((r) => (
-                      <tr
-                        key={r.id}
-                        className="border-b border-rb-200 dark:border-rb-500/30"
-                        data-mock-history-row={r.id}
-                      >
-                        <th scope="row" className="py-2 pr-3 text-left font-medium text-foreground">
-                          {r.label}
-                        </th>
-                        {r.read ? (
-                          <>
-                            <td className="py-2 pr-3 text-rb-500" title={`Block ${n(r.read.block)}`}>
-                              {dayText(r.read.day)}
-                            </td>
-                            <td className="break-all py-2 pr-3 text-right text-foreground">
-                              {priceOf(r.read)}{" "}
-                              <span className="whitespace-nowrap break-normal text-xs text-rb-500">{unit}</span>
-                            </td>
-                            <td className="py-2 text-right text-foreground">
-                              {r.change == null ? "" : changeText(r.change)}
-                            </td>
-                          </>
-                        ) : (
-                          <td colSpan={3} className="py-2 text-rb-500">
-                            Not in the daily store
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </ProvSection>
-        </Tile>
-
-        <Tile>
-          <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
-        </Tile>
-
-        <Tile id="allocation" wide>
+        <Tile id="allocation">
           <VaultAssets
             rows={rows}
             assetSymbol={unit}
             assetAddress={vault.asset.address}
             assetDecimals={ad}
+            limit={TOP_MARKETS}
             line={
               <>
                 <PanelFigure>{n(funded.length)}</PanelFigure> of {n(legs.length)} markets in the withdraw queue hold a
-                balance.
+                balance, largest first.
               </>
             }
             shareTip="Each market's amount over the sum across the withdraw queue."
@@ -713,6 +664,10 @@ export function MockVaultLayout({
               ],
             }}
           />
+        </Tile>
+
+        <Tile id="last-30-days" wide>
+          <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
         </Tile>
 
         {/* The two protects sections render as one fragment: one wide tile,
@@ -776,7 +731,7 @@ export function MockVaultLayout({
                     id="fee-recipient"
                     label="Fee recipient"
                     sub="receives the performance fee"
-                    address={config.feeRecipient && !ZERO.test(config.feeRecipient) ? config.feeRecipient : null}
+                    address={feeRecipient}
                     explorer={chain.explorerName}
                     href={addr}
                   />

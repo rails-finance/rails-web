@@ -19,7 +19,7 @@
 // Below sm each row is a card (D6): the venue across, Amount and Share two-up
 // under their names.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   ProvSection,
@@ -47,6 +47,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { assetText, pctText } from "@/lib/shared/vault-amount-text";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import { planAllocation } from "@/lib/vaults/allocation-plan";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -105,6 +106,7 @@ export function VaultAssets({
   shareTip,
   learnMore,
   menu,
+  limit,
 }: {
   rows: VaultAssetRow[];
   assetSymbol: string;
@@ -118,7 +120,13 @@ export function VaultAssets({
   learnMore: LearnMoreContent;
   /** The section ⋮'s rows above Inspect provenance. */
   menu: { links?: SectionMenuLink[]; exports?: SectionMenuExports };
+  /** Draw the first `limit` rows, with a control that shows the rest. The
+   *  band draws every row either way. */
+  limit?: number;
 }) {
+  const [all, setAll] = useState(false);
+  const capped = limit != null && rows.length > limit;
+  const tableRows = capped && !all ? rows.slice(0, limit) : rows;
   const banded = rows
     .map((r, order) => ({ r, order }))
     .filter(({ r }) => !r.offBand)
@@ -197,7 +205,7 @@ export function VaultAssets({
           <DataTableHeader align="right">{shareHead}</DataTableHeader>
         </DataTableHead>
         <DataTableBody>
-          {rows.map((r) => (
+          {tableRows.map((r) => (
             <DataTableRow key={r.key} href={r.href} {...r.hooks}>
               <DataTableCell rowHeader className="sm:w-full sm:max-w-0">
                 <div className="flex items-center gap-2">
@@ -262,6 +270,17 @@ export function VaultAssets({
           ))}
         </DataTableBody>
       </DataTable>
+      {capped && (
+        <button
+          type="button"
+          onClick={() => setAll((a) => !a)}
+          aria-expanded={all}
+          className={`mt-2 cursor-pointer text-[13px] ${INLINE_LINK}`}
+          data-assets-show-all=""
+        >
+          {all ? `Show the top ${n(limit!)}` : `Show all ${n(rows.length)}`}
+        </button>
+      )}
     </ProvSection>
   );
 }
