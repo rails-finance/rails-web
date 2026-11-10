@@ -268,7 +268,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
           all seven sit at the same height and stay aligned along the row. */}
       <DataTable label="Explorer capability matrix" tableClassName="table-fixed">
         <DataTableHead>
-          <DataTableLeadHeader />
+          <DataTableLeadHeader plain />
           <DataTableHeader label={<span className="sr-only">Explorer</span>} className="w-[18%] xl:w-[26%]" />
           {CAPABILITIES.map((cap, capIndex) => {
             // Same last-two-columns clamp as the cell popovers: Liquidation
@@ -333,7 +333,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
               const soon = row.entry;
               return (
                 <DataTableRow key={soon.id} href={soon.href}>
-                  <DataTableLeadCell protocol={soon.iconId} protocolName={soon.label} chain={chainId} />
+                  <DataTableLeadCell plain protocol={soon.iconId} protocolName={soon.label} chain={chainId} />
                   <DataTableCell rowHeader>
                     <div className="flex items-center gap-2 flex-wrap">
                       <DataTableRowLink href={soon.href} className="text-sm font-semibold">
@@ -367,7 +367,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
               // parser, which hydrates as a mismatch.
               <Fragment key={p.id}>
                 <DataTableRow href={p.href}>
-                  <DataTableLeadCell protocol={p.id} protocolName={p.label} chain={chainId} />
+                  <DataTableLeadCell plain protocol={p.id} protocolName={p.label} chain={chainId} />
                   <DataTableCell rowHeader>
                     {/* The name is the row's one link (D4); the desc and the
                         essay trigger sit under it, outside the link text. */}

@@ -2575,8 +2575,13 @@ table.dt-stacked {
     /* The lead zone: a 4px bar in the protocol's hue at the card's left, its
        glyphs moved to the card's first line (`DataTableLeadMark`); its names
        stay for a screen reader. */
-    & > tbody > tr:has(> [data-anatomy~="D5"]) {
+    & > tbody > tr:has(> [data-anatomy~="D5"]:not([data-lead-plain])) {
       padding-left: 14px;
+    }
+    /* A plain lead (not a position) has no edge: its glyphs are on the card's
+       first line. */
+    & > tbody > tr > [data-lead-plain] {
+      display: none;
     }
     & > tbody > tr > [data-anatomy~="D5"] {
       position: absolute;

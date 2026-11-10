@@ -304,7 +304,7 @@ export function VaultIndexTable({
         rowHeight="one"
       >
         <DataTableHead>
-          <DataTableLeadHeader />
+          <DataTableLeadHeader plain />
           {COLUMNS.map((c) => [
             c.key === "assets" && <DataTableHeader key="kind" label="Kind" data-col-head="kind" />,
             <DataTableHeader
@@ -393,6 +393,7 @@ export function VaultIndexTable({
                 {...hooksOf(v)}
               >
                 <DataTableLeadCell
+                  plain
                   protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
                   protocolName={VAULT_INDEX_PROTOCOL_LABEL[vaultIndexProtocol(v)]}
                   chain={v.chainId as ChainId}
