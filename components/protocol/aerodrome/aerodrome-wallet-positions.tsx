@@ -7,12 +7,12 @@
 //
 // SERVER-ONLY: the read uses the bearer token.
 
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight } from "lucide-react";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
-import { ROW, isWallet } from "@/components/protocol/uniswap/uniswap-wallet-positions";
+import { isWallet } from "@/components/protocol/uniswap/uniswap-wallet-positions";
+import { poolTokenKeys } from "@/components/protocol/uniswap/pool-focus-keys";
+import { PoolWalletList } from "@/components/protocol/uniswap/pool-wallet-list";
 import { fetchAerodromePositions } from "@/lib/api/fetch-aerodrome";
 import { FRONT_DOOR } from "@/lib/aerodrome/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
@@ -47,29 +47,21 @@ export async function AerodromeWalletPositions({ wallet: raw }: { wallet: string
           {FRONT_DOOR.none}
         </p>
       ) : (
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {all.map((p) => (
-            <li key={`${p.deployment}:${p.id}`}>
-              <Link
-                href={`${home}/position/${p.deployment}/${p.id}`}
-                className={ROW}
-                data-aerodrome-position-row={`${p.deployment}:${p.id}`}
-                data-staked={p.staked ? "true" : "false"}
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium text-foreground">{FRONT_DOOR.row(p)}</span>
-                  <span className="block text-xs text-rb-500">
-                    {p.staked ? FRONT_DOOR.staked : FRONT_DOOR.unstaked}
-                  </span>
-                </span>
-                <ArrowRight
-                  className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-[var(--text-link)]"
-                  aria-hidden="true"
-                />
-              </Link>
-            </li>
-          ))}
-        </ul>
+        // Focus (ui-jobs 557): a position is kept when either side of its pair is in focus.
+        <PoolWalletList
+          rows={all.map((p) => ({
+            key: `${p.deployment}:${p.id}`,
+            href: `${home}/position/${p.deployment}/${p.id}`,
+            label: FRONT_DOOR.row(p),
+            sub: p.staked ? FRONT_DOOR.staked : FRONT_DOOR.unstaked,
+            keys: poolTokenKeys(8453, [p.token0, p.token1]),
+            chain: 8453,
+            attrs: {
+              "data-aerodrome-position-row": `${p.deployment}:${p.id}`,
+              "data-staked": p.staked ? "true" : "false",
+            },
+          }))}
+        />
       )}
       {answer.kind === "ok" && answer.data.truncated && (
         <p className="mt-3 text-sm text-rb-500">{FRONT_DOOR.truncated}</p>

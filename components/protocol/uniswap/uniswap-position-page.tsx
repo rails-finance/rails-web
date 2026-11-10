@@ -10,6 +10,8 @@ import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { AimGate } from "@/components/shared/aim-gate";
+import { poolTokenKeys } from "@/components/protocol/uniswap/pool-focus-keys";
 import { UniswapPositionCard } from "@/components/protocol/uniswap/uniswap-position-card";
 import { UniswapReadout } from "@/components/protocol/uniswap/uniswap-readout";
 import { fetchUniswapPosition } from "@/lib/api/fetch-uniswap";
@@ -94,39 +96,42 @@ export async function UniswapPositionPage({ version, id }: { version: UniswapVer
   const r = answer.data;
   const p = poolPosition(r);
   const title = POSITION_PAGE.title(p);
+  // Focus (ui-jobs 557): the position is in focus when either side of its pair is.
   return (
-    <div className="min-h-screen">
-      <div className="py-8">
-        <header className="mb-5" data-skel-section="page-header">
-          <DetailTopRow
-            session={session}
-            fallbackHref={`${home}/${r.owner.toLowerCase()}`}
-            showStamp={false}
-            assets={poolAssets({
-              base: p.base,
-              quote: p.quote,
-              valueNow: p.valueNow,
-              price: p.price,
-              worthInfo: cardProv("worth", { p, r }),
-              priceInfo: cardProv("price", { p, r }),
-            })}
-            priceReason={ORACLE_USD_REASON[session]}
-            owner={{ wallet: r.owner, filterProtocol: null, href: `${home}/${r.owner.toLowerCase()}` }}
-            tools={false}
-          />
-          <ReadTierTitleRow id={session}>
-            <h2 className="text-lg font-semibold text-foreground" data-uniswap-position={`${version}:${id}`}>
-              {title}
-            </h2>
-          </ReadTierTitleRow>
-          <p className="text-xs text-rb-500">{POSITION_PAGE.sub(p)}</p>
-        </header>
-        <div className="flex flex-col gap-6">
-          <UniswapPositionCard r={r} />
-          <UniswapReadout r={r} title={title} />
+    <AimGate keys={poolTokenKeys(1, [r.token0, r.token1])} chain={1} what="This position">
+      <div className="min-h-screen">
+        <div className="py-8">
+          <header className="mb-5" data-skel-section="page-header">
+            <DetailTopRow
+              session={session}
+              fallbackHref={`${home}/${r.owner.toLowerCase()}`}
+              showStamp={false}
+              assets={poolAssets({
+                base: p.base,
+                quote: p.quote,
+                valueNow: p.valueNow,
+                price: p.price,
+                worthInfo: cardProv("worth", { p, r }),
+                priceInfo: cardProv("price", { p, r }),
+              })}
+              priceReason={ORACLE_USD_REASON[session]}
+              owner={{ wallet: r.owner, filterProtocol: null, href: `${home}/${r.owner.toLowerCase()}` }}
+              tools={false}
+            />
+            <ReadTierTitleRow id={session}>
+              <h2 className="text-lg font-semibold text-foreground" data-uniswap-position={`${version}:${id}`}>
+                {title}
+              </h2>
+            </ReadTierTitleRow>
+            <p className="text-xs text-rb-500">{POSITION_PAGE.sub(p)}</p>
+          </header>
+          <div className="flex flex-col gap-6">
+            <UniswapPositionCard r={r} />
+            <UniswapReadout r={r} title={title} />
+          </div>
         </div>
+        <ProvInspectorLayer />
       </div>
-      <ProvInspectorLayer />
-    </div>
+    </AimGate>
   );
 }
