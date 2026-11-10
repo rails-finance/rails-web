@@ -467,7 +467,7 @@ function FocusLinkIntro({
 
   if (isPhone)
     return (
-      <div data-focus-intro="">
+      <div data-focus-intro="" data-anatomy="H22">
         <MobileSheet label="Focus mode" onClose={notNow} header={<MobileSheetFilterHeader label="Focus mode" />}>
           {body}
         </MobileSheet>
@@ -475,7 +475,7 @@ function FocusLinkIntro({
     );
 
   return createPortal(
-    <div className="fixed inset-0 z-[var(--z-modal)]" data-focus-intro="">
+    <div className="fixed inset-0 z-[var(--z-modal)]" data-focus-intro="" data-anatomy="H22">
       <div className={`absolute inset-0 ${PAGE_SCRIM}`} onClick={notNow} aria-hidden="true" />
       <ModalFrame labelledBy="focus-intro-title" className="top-24 w-[28rem] gap-3 p-5">
         <div className="flex items-center gap-2">

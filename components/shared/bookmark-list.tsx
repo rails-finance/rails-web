@@ -741,7 +741,7 @@ function FocusViewRow({
 
   if (editing) {
     return (
-      <div className={rowClasses} data-bookmark-row="focus" data-editing="">
+      <div className={rowClasses} data-bookmark-row="focus" data-anatomy="B2.2" data-editing="">
         {glyph}
         <input
           autoFocus
@@ -818,6 +818,7 @@ function FocusViewRow({
     <div
       className={`${rowClasses} ${move.dragging ? "opacity-50" : ""} ${move.target ? "border-t-teal-500" : ""}`}
       data-bookmark-row="focus"
+      data-anatomy="B2.2"
       data-focus-view-row={view.id}
       {...(phone ? {} : move.drag)}
     >

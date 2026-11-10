@@ -54,7 +54,7 @@ export function focusShort(picks: AssetPick[], chains: number[]): string {
 function OutOfFocus({ what, why, onPeek }: { what: string; why?: string; onPeek: () => void }) {
   const scope = useAssetScope();
   return (
-    <div className="flex flex-col items-center gap-2 py-24 text-center" data-aim-gate="out">
+    <div className="flex flex-col items-center gap-2 py-24 text-center" data-aim-gate="out" data-anatomy="H21">
       <p className="text-sm text-foreground">
         {what} is outside your focus ({focusShort(scope.picks, scope.chains)})
       </p>
