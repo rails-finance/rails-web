@@ -845,7 +845,7 @@ function FocusViewRow({
       data-editing={editing ? "" : undefined}
       {...d.props}
     >
-      <DataTableCell rowHeader valign="middle" className={NAME_CELL}>
+      <DataTableCell rowHeader valign="middle" className="sm:w-[34%] sm:max-w-0 sm:min-w-[200px]">
         <span className="flex min-w-0 items-center gap-2">
           <Grip />
           {editing ? (
@@ -865,7 +865,7 @@ function FocusViewRow({
           )}
         </span>
       </DataTableCell>
-      <DataTableCell label="Assets" valign="middle" className="sm:max-w-64">
+      <DataTableCell label="Assets" valign="middle" className="sm:w-[40%] sm:max-w-0">
         {view.assets.length ? (
           <span className="flex min-w-0 items-center gap-1 text-foreground/80">
             <ViewIcons picks={view.assets} chains={[]} />

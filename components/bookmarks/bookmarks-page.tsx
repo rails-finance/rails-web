@@ -141,7 +141,7 @@ export function BookmarksPage() {
     // In the app shell (ui-jobs 480): the column's left edge and the app
     // pages' py-8, so Back's line centres on the profile control (H20) at the
     // top right from md.
-    <div className="max-w-3xl py-8">
+    <div className="py-8">
       {/* Back's row, as a detail page draws it (H7): the column's first line,
           level with the profile control (H20) the app layout draws at the top
           right from md. With no history Back opens the home page. */}
@@ -197,7 +197,7 @@ export function BookmarksPage() {
                   </Link>
                 </div>
               )}
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {kindCard(
                   "focus",
                   <Focus className="size-4" aria-hidden="true" />,
