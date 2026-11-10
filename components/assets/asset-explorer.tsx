@@ -434,7 +434,7 @@ function AssetRow({
   onRemove: () => void;
 }) {
   const href = c.row?.href ?? c.chains.find((x) => x.href)?.href ?? null;
-  const row = c.row && !c.row.rowless ? c.row : null;
+  const row = c.row;
   const flag = row?.flag ? flagWords(row.flag) : null;
   const token = c.chains[0]?.token ?? "";
   const name = (
