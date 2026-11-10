@@ -1,6 +1,6 @@
 "use client";
 
-// "How the share and its pool are doing" (U5·balancer; rails-ops ui-jobs 569):
+// "How the share and its pool are doing" (U5; rails-ops ui-jobs 569):
 // one line per measure over the last 30 days, the wallet's figure first, then
 // the pool's, each part traced to its reads (lib/balancer/provenance.ts). The
 // section is one receipts scope its ⋮ arms (decision 0059). The layout is
@@ -40,7 +40,7 @@ export function BalancerReadout({ r, title }: { r: BalPositionRead; title: strin
   const c = { p, r };
   const lines = readoutLines(p);
   return (
-    <ProvSection scope={SCOPE} data-anatomy="U5·balancer" data-pool-readout={`${r.pool}:${r.wallet}`}>
+    <ProvSection scope={SCOPE} data-anatomy="U5" data-pool-readout={`${r.pool}:${r.wallet}`}>
       <SectionHeading
         title={READOUT.title}
         stamp={<BalancerReadStamp c={c} what="Every figure in this section" />}
@@ -60,7 +60,7 @@ export function BalancerReadout({ r, title }: { r: BalPositionRead; title: strin
             <li
               key={l.key}
               className="grid gap-x-4 gap-y-0.5 py-2.5 first:pt-0 last:pb-0 sm:grid-cols-[7rem_minmax(0,1fr)]"
-              data-anatomy="U5.1·balancer"
+              data-anatomy="U5.1"
               data-pool-line={l.key}
             >
               <span className="text-xs font-semibold text-rb-500 sm:pt-0.5">{l.label}</span>

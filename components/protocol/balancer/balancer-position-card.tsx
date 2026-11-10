@@ -1,6 +1,6 @@
 "use client";
 
-// A wallet's share of a Balancer V3 pool (U4·balancer; rails-ops ui-jobs 569),
+// A wallet's share of a Balancer V3 pool (U4; rails-ops ui-jobs 569),
 // on the shared position card: the wallet's share of the pool, its part of each
 // token, the pool's value per share over 30 days, and when it first added. Every
 // figure in the pool's tokens, each with its receipt.
@@ -98,7 +98,7 @@ function slots(r: BalPositionRead): PositionCardSlots {
 export function BalancerPositionCard({ r }: { r: BalPositionRead }) {
   return (
     <div
-      data-anatomy="U4·balancer"
+      data-anatomy="U4"
       data-position-card={`${r.pool}:${r.wallet}`}
       data-pool={r.pool}
       data-balance-raw={r.balance}

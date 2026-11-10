@@ -1,6 +1,6 @@
 "use client";
 
-// A wallet's Balancer V3 pools (U6·balancer; rails-ops ui-jobs 569): one row per
+// A wallet's Balancer V3 pools (U6; rails-ops ui-jobs 569): one row per
 // pool the wallet holds a share of, its share with its receipt, each opening the
 // pool-share page. One receipts scope its ⋮ arms; the read stamp's receipt names
 // the search that found the pools. Under Focus (ui-jobs 557) a row stays when one
@@ -32,7 +32,7 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
   );
   const title = "Pools with a share";
   return (
-    <ProvSection scope={SCOPE} data-anatomy="U6·balancer" data-balancer-wallet={r.wallet.toLowerCase()}>
+    <ProvSection scope={SCOPE} data-anatomy="U6" data-balancer-wallet={r.wallet.toLowerCase()}>
       <SectionHeading
         title={title}
         stamp={
@@ -64,7 +64,7 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
         }
         menu={<SectionMenu scope={SCOPE} title={title} />}
       >
-        <p className="text-xs text-rb-500" data-anatomy="U6.1·balancer" data-balancer-not-found="">
+        <p className="text-xs text-rb-500" data-anatomy="U6.1" data-balancer-not-found="">
           {FRONT_DOOR.notFound}
         </p>
       </SectionHeading>
