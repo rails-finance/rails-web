@@ -27,7 +27,6 @@ import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { readStampProv, SectionReadStamp, useBlockTime } from "@/components/shared/read-stamp";
 import { CopyFact } from "@/components/shared/event-page-aside";
-import { Icon } from "@/components/icons/icon";
 import { PanelFigure, type PositionPanelRow } from "@/components/shared/position-card-panel";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
 import { CreatedBullet, VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
@@ -266,7 +265,21 @@ function AddressValue({
         title={view}
         className="shrink-0 text-rb-500 hover:text-foreground"
       >
-        <Icon name="external-link" size={12} />
+        <svg
+          width={12}
+          height={12}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M14 4h6v6" />
+          <path d="M20 4l-9 9" />
+          <path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+        </svg>
       </a>
     </span>
   );
