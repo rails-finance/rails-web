@@ -115,6 +115,7 @@ const GRID = [
   "[&_section[data-prov-scope]]:m-0 [&_section[data-prov-scope]]:rounded-none [&_section[data-prov-scope]]:p-0",
   "[&_section[data-vault-protects]>.rounded-xl]:border-0 [&_section[data-vault-protects]>.rounded-xl]:px-0",
   "[&_[data-protects-disclaimer]]:hidden",
+  "[&_table.dt>thead>tr>th]:border-b-transparent",
 ].join(" ");
 
 const TILE = "min-w-0 scroll-mt-4 bg-background p-5";
@@ -962,7 +963,7 @@ export function MockVaultLayout({
   );
   const allocChart =
     planTotal > 0 && allocSlices.length > 0 ? (
-      <div data-mock-alloc-bar="">
+      <div className="pt-4 pb-4" data-mock-alloc-bar="">
         <SegmentBar slices={allocSlices} scope="allocation" label={`Where this vault's ${unit} is, by market`} />
       </div>
     ) : undefined;
