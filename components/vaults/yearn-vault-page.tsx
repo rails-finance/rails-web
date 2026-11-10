@@ -73,11 +73,14 @@ const fraction = (part: RawAmount | null, total: RawAmount | null): number | nul
     : null;
 
 export function YearnVaultPage({
+  protects,
   data,
   yieldFigure: storeYield,
   strip,
   strategyPages = {},
 }: {
+  /** "What protects it" and "The protocol underneath" (V9, V10), streamed by the route. */
+  protects?: React.ReactNode;
   data: YearnVaultResponse;
   /** Rails's page for each strategy that is a roster vault (a Yearn V3 vault,
    *  a MetaMorpho vault on Ethereum), by lowercased address. */
@@ -463,6 +466,7 @@ export function YearnVaultPage({
         learnMore={yearnVaultAssetsContent()}
         menu={{ exports: vaultAssetsExports(v, exportModel) }}
       />
+      {protects}
     </ProvReceiptsScope>
   );
 }

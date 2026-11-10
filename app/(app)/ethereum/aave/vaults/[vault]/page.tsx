@@ -28,11 +28,12 @@
 // gives: chain 1 is the render layer's default, so every explorer link under
 // /ethereum/… resolves to Etherscan with no extra wiring.
 
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { VaultProtectsSection } from "@/components/vaults/vault-protects-section";
 import { AaveEthereumVaultPage } from "@/components/vaults/aave-ethereum-vault-page";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
@@ -118,6 +119,14 @@ export default async function AaveEthereumVaultRoute({ params, searchParams }: P
             yieldFigure={series.yieldFigure}
             strip={series.strip}
             attestation={attestation}
+            protects={
+              <Suspense fallback={null}>
+                <VaultProtectsSection
+                  subject={{ chainId: MAINNET_CHAIN_ID, address, kind: data.vault.family }}
+                  vaultName={data.vault.name || shortAddr(address)}
+                />
+              </Suspense>
+            }
           />
         )}
 

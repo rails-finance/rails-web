@@ -15,19 +15,20 @@
 // the rail above the H1 says so. The line under the H1 names the release and the
 // asset, and carries no link to the protocol.
 
-import { cache } from "react";
+import { cache, Suspense } from "react";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { RailHeader } from "@/components/shared/rail-header";
 import { YearnVaultPage } from "@/components/vaults/yearn-vault-page";
+import { VaultProtectsSection } from "@/components/vaults/vault-protects-section";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { metaMorphoVaultHref, yearnVaultHref } from "@/lib/vaults/routes";
 import { metaMorphoRosterEntry } from "@/lib/metamorpho/vault-roster";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { loadYearnEthereumVault } from "@/lib/sources/chain/yearn-ethereum-vault";
-import { isYearnRosterVault } from "@/lib/yearn/vault-roster";
+import { isYearnRosterVault, yearnRosterEntry } from "@/lib/yearn/vault-roster";
 import { YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
 
@@ -63,7 +64,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function YearnVaultRoute({ params, searchParams }: Props) {
   const { vault } = await params;
   const address = vault.toLowerCase();
-  if (!(await isYearnRosterVault(address))) notFound();
+  const entry = await yearnRosterEntry(address);
+  if (!entry) notFound();
 
   // The finder's submit (V4), sent on to the holder's own path as typed; the
   // holder route resolves a name and states every outcome. `redirect()`
@@ -101,6 +103,14 @@ export default async function YearnVaultRoute({ params, searchParams }: Props) {
             yieldFigure={series.yieldFigure}
             strip={series.strip}
             strategyPages={strategyPages}
+            protects={
+              <Suspense fallback={null}>
+                <VaultProtectsSection
+                  subject={{ chainId: YEARN_CHAIN_ID, address, kind: "yearn-v3", createdBlock: entry.createdBlock }}
+                  vaultName={entry.name}
+                />
+              </Suspense>
+            }
           />
         )}
 
