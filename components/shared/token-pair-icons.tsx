@@ -1,6 +1,6 @@
 // A market's or vault's two tokens as one mark on a house-table row (rails-ops
-// ui-jobs 539): the first token's mark at V6's 28px, the second's overlapping
-// it, ringed in the row's stripe. The second can instead be the protocol the
+// ui-jobs 539): two marks at 36px, the first overlapping the second and ringed
+// in the row's ground (the page's, or the hover block's). The second can instead be the protocol the
 // row wraps (a MakerDAO ilk's Spark or Uniswap), drawn as its mark on D1's
 // pill ground. Silent: the row names both in words.
 
@@ -14,7 +14,9 @@ export interface PairToken {
   address?: string;
 }
 
-const RING = "-ml-2 rounded-full ring-2 ring-[var(--surface-raised)] group-even/dt-row:ring-[var(--surface-stripe)]";
+const RING =
+  "relative z-[1] rounded-full ring-2 ring-background transition-[box-shadow] group-hover/dt-row:ring-[var(--surface-row-hover)]";
+const UNDER = "-ml-2.5";
 
 export function TokenPairIcons({
   first,
@@ -30,15 +32,17 @@ export function TokenPairIcons({
   fixed?: boolean;
 }) {
   return (
-    <span className={`flex shrink-0 items-center ${fixed ? "w-12" : ""}`} aria-hidden data-prov-exempt="">
-      <TokenChipIcon symbol={first.symbol} address={first.address} size={28} filterable={false} untitled />
+    <span className={`flex shrink-0 items-center ${fixed ? "w-[62px]" : ""}`} aria-hidden data-prov-exempt="">
+      <span className={second || protocol ? RING : "rounded-full"}>
+        <TokenChipIcon symbol={first.symbol} address={first.address} size={36} filterable={false} untitled />
+      </span>
       {second ? (
-        <span className={RING}>
-          <TokenChipIcon symbol={second.symbol} address={second.address} size={28} filterable={false} untitled />
+        <span className={UNDER}>
+          <TokenChipIcon symbol={second.symbol} address={second.address} size={36} filterable={false} untitled />
         </span>
       ) : protocol ? (
-        <span className={`${RING} flex h-7 w-7 items-center justify-center ${DATA_TABLE_PILL} rounded-full!`}>
-          <ProtocolIcon id={protocol} className="h-4 w-4 shrink-0" />
+        <span className={`${UNDER} flex h-9 w-9 items-center justify-center ${DATA_TABLE_PILL} rounded-full!`}>
+          <ProtocolIcon id={protocol} className="h-5 w-5 shrink-0" />
         </span>
       ) : null}
     </span>

@@ -43,7 +43,16 @@ export function ReadStamp({ readAt }: { readAt: ReadAt | null }) {
 
 /** A section's ⋮ from its tools. */
 export function ToolsFor({ scope, title, tools }: { scope: string; title: string; tools: SectionTools }) {
-  return <SectionMenu scope={scope} title={title} hint={tools.hint} links={tools.links} exports={tools.exports} />;
+  return (
+    <SectionMenu
+      scope={scope}
+      title={title}
+      hint={tools.hint}
+      links={tools.links}
+      exports={tools.exports}
+      views={tools.views}
+    />
+  );
 }
 
 /** The links at the foot of a head, "View … →". */
@@ -96,6 +105,14 @@ function StructureTerms({ s }: { s: MarketStructure }) {
       );
     case "eras":
       return <Term f={s.era} />;
+    case "tokens":
+      return (
+        <>
+          <Term f={s.yt} />
+          <Term f={s.lp} />
+          <Term f={s.sy} />
+        </>
+      );
     case "ladder":
       return (
         <>
@@ -210,9 +227,8 @@ export function ProductHeadSection({
       )}
       <div className="mt-3" {...head.bandHooks}>
         <VitalsBand
-          // A head with no purpose keeps the lead column, so stacked heads on a
-          // roster align their figures and links.
-          lead={lead ?? (aside ? <span aria-hidden /> : null)}
+          layout="row"
+          lead={lead}
           aside={aside}
           notes={
             head.structure || head.collateral || head.notes ? (

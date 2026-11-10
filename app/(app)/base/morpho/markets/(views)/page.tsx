@@ -5,8 +5,7 @@
 // head's ⋮ links. Server-rendered from the singleton at one block.
 
 import { MorphoRosterPage } from "@/lib/morpho/roster";
-import { loadMorphoMarketsFromChain } from "@/lib/sources/chain/morpho-markets";
-import { rosterData } from "@/lib/morpho/markets-shape";
+import { loadMorphoRoster } from "@/lib/sources/chain/morpho-roster-reads";
 import { MORPHO_BASE_DEPLOYMENT } from "@/lib/sources/chain/morpho-deployments";
 import { MORPHO_BASE_CHAIN_ID } from "@/lib/morpho-base/asset-catalog";
 import { unlaunchedRobotsForPath } from "@/lib/shared/page-metadata";
@@ -23,6 +22,6 @@ export const metadata = {
 };
 
 export default async function MorphoBaseMarketsPage() {
-  const data = await loadMorphoMarketsFromChain(MORPHO_BASE_DEPLOYMENT);
-  return <MorphoRosterPage data={rosterData(data)} chainId={MORPHO_BASE_CHAIN_ID} />;
+  const data = await loadMorphoRoster(MORPHO_BASE_DEPLOYMENT, MORPHO_BASE_CHAIN_ID);
+  return <MorphoRosterPage data={data} chainId={MORPHO_BASE_CHAIN_ID} />;
 }

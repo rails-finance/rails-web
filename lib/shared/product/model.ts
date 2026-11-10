@@ -18,7 +18,7 @@
 import type { ReactNode } from "react";
 import type { Provenance } from "@/components/shared/provenance";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import type { SectionMenuExports, SectionMenuLink } from "@/components/shared/section-menu";
+import type { SectionMenuExports, SectionMenuLink, SectionMenuView } from "@/components/shared/section-menu";
 import type { VitalSlot } from "@/components/shared/vitals-band";
 import type { ChainId } from "@/lib/shared/chains";
 import type { ServerRead } from "@/lib/shared/server-head-read";
@@ -66,6 +66,8 @@ export interface ReadAt {
 export interface SectionTools {
   links?: SectionMenuLink[];
   exports?: SectionMenuExports;
+  /** Switch rows that change what the section shows, first in the ⋮. */
+  views?: SectionMenuView[];
   /** The armed hint: "Click a value in this section to trace it". */
   hint?: string;
 }
@@ -105,7 +107,16 @@ export interface StructureFigure {
 /** The slot where a protocol adds what is its own (survey §3.2's
  *  `MarketStructure`): one variant per structure, named for what it is. The
  *  head draws its terms under the band; a page section can draw the rest. */
-export type MarketStructure = TicksStructure | CometStructure | EraStructure | LadderStructure;
+export type MarketStructure = TicksStructure | CometStructure | EraStructure | LadderStructure | TokensStructure;
+
+/** Pendle: the market's other tokens beside the PT the band prices, each in
+ *  the market's asset: YT, LP and SY (survey §3.2's `tokens`). */
+export interface TokensStructure {
+  kind: "tokens";
+  yt: StructureFigure;
+  lp: StructureFigure;
+  sy: StructureFigure;
+}
 
 /** LlamaLend: the factory lineage a market was created by ("V1 lend market",
  *  "V1 mint market", "V2 market"), the roster's group level. */

@@ -320,12 +320,6 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
         </DataTableHead>
         <DataTableBody>
           {rows.map((row, i) => {
-            // Stripe by MERGED-row index parity, never the primitive's
-            // place-in-the-body count: the always-mounted (and often hidden)
-            // drawer rows break DOM parity, and the coming-soon row takes the
-            // same parity as any other row. Each row names its stripe, and
-            // its drawer repeats it.
-            const stripe = i % 2 === 0 ? "raised" : "sunken";
             const up = i >= rows.length - 2;
 
             // A coming-soon row makes NO capability claims: unlike every
@@ -338,7 +332,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
             if (row.kind === "soon") {
               const soon = row.entry;
               return (
-                <DataTableRow key={soon.id} href={soon.href} stripe={stripe}>
+                <DataTableRow key={soon.id} href={soon.href}>
                   <DataTableLeadCell protocol={soon.iconId} protocolName={soon.label} chain={chainId} />
                   <DataTableCell rowHeader>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -372,7 +366,7 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
               // <tbody> and <tr> is silently reparented by the HTML table
               // parser, which hydrates as a mismatch.
               <Fragment key={p.id}>
-                <DataTableRow href={p.href} stripe={stripe}>
+                <DataTableRow href={p.href}>
                   <DataTableLeadCell protocol={p.id} protocolName={p.label} chain={chainId} />
                   <DataTableCell rowHeader>
                     {/* The name is the row's one link (D4); the desc and the
@@ -487,9 +481,9 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
                   })}
                 </DataTableRow>
                 {hasEssay && (
-                  // An unlinked row in its explorer row's stripe, one cell
+                  // An unlinked drawer row under its explorer row, one cell
                   // across every column, the lead column's included.
-                  <DataTableRow stripe={stripe} className={rowEssayOpen ? "" : "hidden"}>
+                  <DataTableRow drawer className={rowEssayOpen ? "" : "hidden"}>
                     {/* Derived, never the literal column count: the lead, the
                         name and each capability. */}
                     <DataTableCell colSpan={CAPABILITIES.length + 2} className="pb-5 pr-6">

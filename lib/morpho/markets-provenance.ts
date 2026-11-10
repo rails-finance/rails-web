@@ -157,13 +157,18 @@ export const morphoLoanTokenSupplyProv = (coords: MorphoMarketCoords): Provenanc
 /** A loan-token group's total supplied/borrowed — Σ over that token's markets of
  *  each market's stored size. Legitimate only within one token (same unit); groups
  *  are never summed across each other. */
-export const morphoGroupTotalProv = (side: "supplied" | "borrowed", coords: MorphoMarketCoords): Provenance => {
+export const morphoGroupTotalProv = (
+  side: "supplied" | "borrowed",
+  coords: MorphoMarketCoords,
+  /** The roster's default view: the count of markets a vault lends into, which the total is over. */
+  lentOnly?: number,
+): Provenance => {
   const field = side === "supplied" ? "totalSupplyAssets" : "totalBorrowAssets";
   return {
     kind: "chain-derived",
     pclass: "state",
     source: { block: coords.blockNumber },
-    summary: `${coords.loanSymbol ?? "Loan-token"} ${side}, group total — Σ over this loan token's markets of each market's stored \`${field}\`${atBlock(coords)}. A sum is legitimate ONLY inside one token: every market here measures in ${coords.loanSymbol ?? "the same loan token"}, so the total is a real quantity — groups are never summed across each other, whose units don't compare.`,
+    summary: `${coords.loanSymbol ?? "Loan-token"} ${side}, group total — Σ over ${lentOnly != null ? `the ${lentOnly} ${coords.loanSymbol ?? "loan-token"} markets a vault on Rails's roster lends into (a market in the vault's withdraw queue, read from the vault)` : "this loan token's markets"} of each market's stored \`${field}\`${atBlock(coords)}. A sum is legitimate ONLY inside one token: every market here measures in ${coords.loanSymbol ?? "the same loan token"}, so the total is a real quantity — groups are never summed across each other, whose units don't compare.`,
     contract: blueContract(coords),
     via: `${LANE} · Σ Morpho.market(id).${field} over the ${coords.loanSymbol ?? "loan-token"} markets ${stateAt(coords)}`,
     formula: `Σ ${field}`,
@@ -304,11 +309,11 @@ export const morphoFeeProv = (coords: MorphoMarketCoords): Provenance => ({
 /** A loan-token group's utilisation — Σ borrowed ÷ Σ supplied over that token's
  *  markets, raw amounts so decimals cancel. The per-market ratio, taken over
  *  the whole group; still no oracle, still not a loan-to-value. */
-export const morphoGroupUtilizationProv = (coords: MorphoMarketCoords): Provenance => ({
+export const morphoGroupUtilizationProv = (coords: MorphoMarketCoords, lentOnly?: number): Provenance => ({
   kind: "chain-derived",
   pclass: "state",
   source: { block: coords.blockNumber },
-  summary: `${coords.loanSymbol ?? "Loan-token"} utilisation, group — Σ \`totalBorrowAssets\` ÷ Σ \`totalSupplyAssets\` over this loan token's markets${atBlock(coords)}, raw amounts in one token so their decimals cancel. The same ratio each market states, taken over the whole group; it needs no oracle and is NOT a loan-to-value, because Blue never totals collateral.`,
+  summary: `${coords.loanSymbol ?? "Loan-token"} utilisation, group — Σ \`totalBorrowAssets\` ÷ Σ \`totalSupplyAssets\` over ${lentOnly != null ? `the ${lentOnly} markets a vault on Rails's roster lends into` : "this loan token's markets"}${atBlock(coords)}, raw amounts in one token so their decimals cancel. The same ratio each market states, taken over the whole group; it needs no oracle and is NOT a loan-to-value, because Blue never totals collateral.`,
   contract: blueContract(coords),
   via: `${LANE} · Σ Morpho.market(id).totalBorrowAssets ÷ Σ totalSupplyAssets over the ${coords.loanSymbol ?? "loan-token"} markets ${stateAt(coords)}`,
   formula: "Σ totalBorrowAssets ÷ Σ totalSupplyAssets",
@@ -355,6 +360,92 @@ export const morphoFamilyTotalProv = (
     ],
   };
 };
+
+/** A repeated pair's stored book on the roster (R1.1.1) — Σ over the N
+ *  markets in one loan token with one collateral and one LLTV, which differ
+ *  only in their oracle or rate model. */
+export const morphoPairTotalProv = (
+  side: "supplied" | "borrowed",
+  coords: MorphoMarketCoords,
+  count: number,
+): Provenance => {
+  const field = side === "supplied" ? "totalSupplyAssets" : "totalBorrowAssets";
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    source: { block: coords.blockNumber },
+    summary: `${coords.loanSymbol ?? "Loan-token"} ${side}, over the ${count} ${coords.collateralSymbol ?? ""} / ${coords.loanSymbol ?? ""} markets at one LLTV — Σ of each market's stored \`${field}\`${atBlock(coords)}. They differ only in their oracle or rate model, and all measure in ${coords.loanSymbol ?? "one loan token"}. The rates and utilisation on this row are the largest market's.`,
+    contract: blueContract(coords),
+    via: `${LANE} · Σ Morpho.market(id).${field} over the ${count} markets ${stateAt(coords)}`,
+    formula: `Σ ${field}`,
+    inputs: [
+      {
+        label: field,
+        kind: "chain",
+        pclass: "state",
+        note: `Morpho.market(id).${field} per market ${stateAt(coords)}`,
+      },
+    ],
+  };
+};
+
+/** What sets one market of a repeated pair apart (R1.1.1): its oracle's feeds,
+ *  each named by its `description()`. */
+export const morphoPriceSourceProv = (
+  coords: MorphoMarketCoords,
+  p: {
+    oracle: string | null;
+    irm: string | null;
+    feeds: { slot: string; address: string; description: string | null }[];
+  },
+): Provenance => ({
+  kind: "chain",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  verify: recompute("BASE_FEED_1() … QUOTE_FEED_2() on the oracle, then description() on each feed", coords),
+  summary:
+    p.feeds.length > 0
+      ? `Price source — the feeds this market's oracle names, each by its own \`description()\`${atBlock(coords)}. The market shares its loan token, collateral and LLTV with the others in its row; its oracle is its own. Where two markets' feeds read alike, the page numbers them by size.`
+      : `Price source — this market's oracle names no feed Rails can read${atBlock(coords)}, so the page calls it a separate price source, numbered by size where the pair has several. Its oracle is its own.`,
+  contract: { name: "Market oracle", address: p.oracle ?? undefined },
+  via: `${LANE} · oracle.BASE_FEED_1/2(), QUOTE_FEED_1/2() · feed.description() ${readAt(coords)}`,
+  inputs: [
+    { label: "market id", value: coords.marketId ?? "", kind: "chain" },
+    { label: "oracle", value: p.oracle ?? "none", kind: "chain" },
+    { label: "rate model", value: p.irm ?? "none", kind: "chain" },
+    ...p.feeds.map((f) => ({
+      label: f.slot,
+      value: f.description ? `${f.description} (${f.address})` : f.address,
+      kind: "chain" as const,
+    })),
+  ],
+});
+
+/** The "rate ceiling" tag (R1.1.2): the vault pages' illiquid test on the
+ *  market alone (lib/vaults/illiquid.ts `atRateCeiling`). */
+export const morphoRateCeilingProv = (
+  coords: MorphoMarketCoords,
+  t: { stored: string; elapsed: number; utilisation: number },
+): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: coords.blockNumber },
+  verify: recompute("AdaptiveCurveIrm.rateAtTarget(id)", coords),
+  summary: `Rate ceiling — the market is ${(t.utilisation * 100).toFixed(2)}% borrowed on the AdaptiveCurveIRM, and its rate at target, the stored \`rateAtTarget(id)\` moved over the ${t.elapsed.toLocaleString("en-US")} seconds since the market last settled, is at the IRM's maximum of 200% a year${atBlock(coords)}. At full utilisation the borrow rate is then four times that, 800% a year. The vault pages' "Markets at the rate ceiling" uses the same test.`,
+  contract: irmContract(coords),
+  via: `${LANE} · AdaptiveCurveIrm.rateAtTarget(id) ${readAt(coords)} · adapted to the block`,
+  formula: "utilisation ≥ 99.9% and rateAtTarget × e^(speed × err × elapsed) ≥ 200% a year",
+  inputs: [
+    { label: "rateAtTarget", kind: "chain", pclass: "state", value: t.stored, note: "per second, WAD, as stored" },
+    {
+      label: "elapsed",
+      kind: "chain-derived",
+      pclass: "state",
+      value: `${t.elapsed.toLocaleString("en-US")} s`,
+      note: "block time − market(id).lastUpdate",
+    },
+  ],
+});
 
 // ── the AdaptiveCurveIRM's curve (one market's page) ─────────────────────────
 

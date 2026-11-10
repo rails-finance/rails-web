@@ -205,6 +205,18 @@ export function adaptedRateAtTarget(rateAtTarget: bigint, utilisation: number, e
   return BigInt(Math.floor(adapted));
 }
 
+/** The market half of the test: a market at the rate ceiling is 99.9% or more
+ *  borrowed on its chain's AdaptiveCurveIRM, and its rate at target, adapted
+ *  `elapsed` seconds from the stored one at the settled utilisation, is at the
+ *  IRM's maximum. The vault test adds the 10% share; the markets roster tags
+ *  the market alone (ui-jobs 549). The caller checks the IRM and the
+ *  utilisation (`needsRateAtTarget`, `fullyBorrowedShare`). */
+export const atRateCeiling = (rateAtTarget: bigint, settledUtilisation: number, elapsed: number): boolean =>
+  adaptedRateAtTarget(rateAtTarget, settledUtilisation, elapsed) >= MAX_RATE_AT_TARGET;
+
+/** `fullyBorrowed` over a ratio already taken: borrow over supply, 0..1. */
+export const fullyBorrowedShare = (utilisation: number): boolean => utilisation * Number(UTIL_DEN) >= Number(UTIL_NUM);
+
 /** The AdaptiveCurveIRM's borrow rate at a utilisation, a year, simple. */
 export function borrowRateYearly(rateAtTarget: bigint, utilisation: number): number {
   const err = errAt(utilisation);
@@ -233,8 +245,8 @@ export function vaultIlliquid(
     const share = Number((l.vaultAssets * BigInt(1_000_000)) / sum) / 1_000_000;
     if (share < ILLIQUID_MIN_SHARE || !needsRateAtTarget(chainId, l) || l.rateAtTarget == null) continue;
     const utilisation = Number((l.borrowAssets * BigInt(1_000_000)) / l.supplyAssets) / 1_000_000;
-    const rateAtTarget = adaptedRateAtTarget(l.rateAtTarget, l.settledUtilisation, timestamp - l.lastUpdate);
-    if (rateAtTarget >= MAX_RATE_AT_TARGET) {
+    if (atRateCeiling(l.rateAtTarget, l.settledUtilisation, timestamp - l.lastUpdate)) {
+      const rateAtTarget = adaptedRateAtTarget(l.rateAtTarget, l.settledUtilisation, timestamp - l.lastUpdate);
       caught += l.vaultAssets;
       markets.push({
         id: l.id,

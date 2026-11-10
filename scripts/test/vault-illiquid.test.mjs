@@ -11,6 +11,8 @@ import {
   RATE_CEILING_YEARLY,
   ADAPTIVE_CURVE_IRM,
   adaptedRateAtTarget,
+  atRateCeiling,
+  fullyBorrowedShare,
   expectedMarket,
   toAssetsDown,
 } from "../../lib/vaults/illiquid.ts";
@@ -114,6 +116,15 @@ test("a full market's stored minimum adapts to the maximum in about 55 days", ()
   assert.ok(il);
   assert.equal(Math.round(il.markets[0].borrowRateYearly * 100), 800);
   assert.equal(adaptedRateAtTarget(MAX_RATE_AT_TARGET, 0.5, 365 * 86_400), MIN);
+});
+
+test("the market half alone: the roster's rate ceiling tag", () => {
+  const MIN = 1_000_000_000_000_000_000n / 1000n / 31_536_000n;
+  assert.equal(atRateCeiling(MAX_RATE_AT_TARGET, 1, 0), true);
+  assert.equal(atRateCeiling(MIN, 1, 50 * 86_400), false);
+  assert.equal(atRateCeiling(MIN, 1, 60 * 86_400), true);
+  assert.equal(fullyBorrowedShare(0.999), true);
+  assert.equal(fullyBorrowedShare(0.998), false);
 });
 
 test("a market unsettled for months is weighed on its accrued totals (spDAI's shape)", () => {

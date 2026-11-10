@@ -2,15 +2,15 @@
 
 // A roster's markets as one house table grouped by an axis the protocol
 // measures in (anatomy R1.1, rails-ops ui-jobs 549): one `ProvSection` with its
-// heading, line and ⋮, then each group a disclosure headed by its name and the
-// group's own figures, the first group open on arrival. Each group is one D1
-// table (D4 linked rows, D6 cards below lg) sharing one sort. A row's first
-// cell holds the pair's marks, its name (the row's one link, carrying its
-// receipt) and a line under it. Each row is a bounds-free receipts scope inside
+// heading, line and ⋮, then one D1 table (D4 linked rows, D6 cards below lg)
+// under one header and one sort, each group a parent row (D8) with its name
+// and figures that opens into its markets as indented child rows, the first
+// group open on arrival. A row's first cell holds the pair's marks, its name
+// (the row's one link, carrying its receipt) and a muted line under it. Each row is a bounds-free receipts scope inside
 // the section's, so the section's ⋮ arms every value in it.
 
-import { useMemo, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, ChevronRight } from "lucide-react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading } from "@/components/shared/section-menu";
 import { TokenPairIcons, type PairToken } from "@/components/shared/token-pair-icons";
@@ -18,6 +18,7 @@ import {
   DataTable,
   DataTableBody,
   DataTableCell,
+  DataTableGroupRow,
   DataTableHead,
   DataTableHeader,
   DataTableRow,
@@ -83,15 +84,15 @@ function Row({ r, columns }: { r: GroupedRow; columns: ReserveColumn[] }) {
   const registry = useReceiptRegistry();
   return (
     <ProvReceiptsScope registry={registry} bounds={false}>
-      <DataTableRow href={r.href} {...r.hooks}>
+      <DataTableRow href={r.href} child {...r.hooks}>
         <DataTableCell rowHeader className="whitespace-nowrap">
-          <span className="flex items-center gap-2.5">
+          <span className="flex items-center gap-3">
             <TokenPairIcons first={r.icons.first} second={r.icons.second} fixed />
-            <span className="min-w-0 leading-tight">
-              <span className="block text-[13px] font-medium text-foreground">
+            <span className="min-w-0 leading-snug">
+              <span className="block text-[14px] font-medium text-foreground">
                 {r.href ? <DataTableRowLink href={r.href}>{r.name}</DataTableRowLink> : r.name}
               </span>
-              {r.sub && <span className="block text-[11px] text-rb-500">{r.sub}</span>}
+              {r.sub && <span className="block text-[12px] text-rb-500">{r.sub}</span>}
             </span>
           </span>
         </DataTableCell>
@@ -183,57 +184,38 @@ export function GroupedMarketsTable({ t }: { t: GroupedTableModel }) {
         </button>
       </div>
       <div className="mt-3">
-        {t.groups.map((g) => {
-          const id = `${t.scope}-group-${g.key}`;
-          const isOpen = open.has(g.key);
-          return (
-            <div
-              key={g.key}
-              className="border-t border-rb-200 py-2 first:border-t-0 dark:border-rb-800"
-              data-row-group={g.key}
-              {...g.hooks}
-            >
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <button
-                  type="button"
-                  aria-expanded={isOpen}
-                  aria-controls={id}
-                  onClick={() => toggle(g.key)}
-                  className="inline-flex items-center gap-1.5 text-left text-[14px] font-semibold text-foreground"
-                  data-row-group-toggle={g.key}
-                >
-                  <ChevronRight
-                    className={`h-4 w-4 shrink-0 text-rb-500 transition-transform ${isOpen ? "rotate-90" : ""}`}
-                    aria-hidden
+        <DataTable
+          label={t.title}
+          stacked
+          stackBelow="lg"
+          rowHeight="two"
+          tableClassName={t.tableClassName ?? "text-[13px] lg:min-w-[56rem]"}
+        >
+          <DataTableHead>
+            {th("name", t.nameLabel)}
+            {t.columns.map((c) => th(c.key, c.label, c.align, c.tip))}
+          </DataTableHead>
+          <DataTableBody>
+            {t.groups.map((g) => {
+              const isOpen = open.has(g.key);
+              return (
+                <Fragment key={g.key}>
+                  <DataTableGroupRow
+                    open={isOpen}
+                    onToggle={() => toggle(g.key)}
+                    colSpan={t.columns.length + 1}
+                    label={g.label}
+                    summary={g.summary}
+                    data-row-group={g.key}
+                    toggleHooks={{ "data-row-group-toggle": g.key }}
+                    {...g.hooks}
                   />
-                  {g.label}
-                </button>
-                {g.summary && <span className="text-[12px] tabular-nums text-rb-500">{g.summary}</span>}
-              </div>
-              {isOpen && (
-                <div id={id} className="mt-2">
-                  <DataTable
-                    label={typeof g.label === "string" ? g.label : `${t.title}: ${g.key}`}
-                    stacked
-                    stackBelow="lg"
-                    rowHeight="two"
-                    tableClassName={t.tableClassName ?? "text-[13px] lg:min-w-[56rem]"}
-                  >
-                    <DataTableHead>
-                      {th("name", t.nameLabel)}
-                      {t.columns.map((c) => th(c.key, c.label, c.align, c.tip))}
-                    </DataTableHead>
-                    <DataTableBody>
-                      {(sorted.get(g.key) ?? []).map((r) => (
-                        <Row key={r.key} r={r} columns={t.columns} />
-                      ))}
-                    </DataTableBody>
-                  </DataTable>
-                </div>
-              )}
-            </div>
-          );
-        })}
+                  {isOpen && (sorted.get(g.key) ?? []).map((r) => <Row key={r.key} r={r} columns={t.columns} />)}
+                </Fragment>
+              );
+            })}
+          </DataTableBody>
+        </DataTable>
       </div>
       {t.foot}
     </ProvSection>
