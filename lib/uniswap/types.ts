@@ -49,13 +49,18 @@ export interface UniLogAmount {
   amount1: string;
 }
 
+/** The chains the at-block routes answer for, and each one's blocks a day: the grid every past
+ *  read stands on (Ethereum's 12-second slots, Base's 2-second blocks). */
+export type UniChainId = 1 | 8453;
+export const DAY_BLOCKS_BY_CHAIN: Readonly<Record<UniChainId, number>> = { 1: 7_200, 8453: 43_200 };
+
 /** GET /api/at-block/uniswap/position?version=&id= */
 export interface UniPositionRead {
-  chainId: 1;
+  chainId: UniChainId;
   version: UniswapVersion;
   id: string;
   head: BlockRef;
-  /** About 30 days back (216,000 blocks), on the 7,200-block grid the store keeps. */
+  /** About 30 days back, on the chain's day grid the store keeps (216,000 blocks on Ethereum). */
   then: BlockRef;
   provider: string;
   owner: string;
@@ -75,7 +80,7 @@ export interface UniPositionRead {
    *  `positionLiquidity` is null. */
   past: (UniPoolRead & { positionLiquidity: string | null }) | null;
   opened: BlockRef | null;
-  /** Up to 30 reads from `opened` on: the head first, then the multiples of 7,200 below it. */
+  /** Up to 30 reads from `opened` on: the head first, then the multiples of the chain's blocks a day below it. */
   daily: { block: number; time: number; tick: number }[];
   /** V3 only: the position manager's logs for this token id. */
   history: null | {
@@ -99,7 +104,7 @@ export interface UniPairPoolAt {
 
 /** GET /api/at-block/uniswap/pair?a=&b= */
 export interface UniPairRead {
-  chainId: 1;
+  chainId: UniChainId;
   /** Head, then about 30, 60 and 90 days back. */
   reads: BlockRef[];
   /** The tokens named; WETH appended where ETH is named. */
@@ -118,7 +123,7 @@ export interface UniPairRead {
 
 /** GET /api/at-block/uniswap/positions?owner= */
 export interface UniPositionsRead {
-  chainId: 1;
+  chainId: UniChainId;
   head: BlockRef;
   positions: {
     version: UniswapVersion;
