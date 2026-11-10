@@ -31,7 +31,10 @@ import {
 
 import { walletHref } from "@/components/shared/front-door-search";
 import { focusName, ViewIcons, viewName } from "@/components/shared/asset-scope-strip";
-import { focusViews, openFocusPanel, scopeLink, type FocusView } from "@/lib/shared/asset-scope";
+import { ChainGlyph } from "@/components/icons/chain-glyphs";
+import { launchedChains } from "@/lib/shared/protocols";
+import type { ChainId } from "@/lib/shared/chains";
+import { chainNameOf, focusViews, openFocusPanel, scopeLink, type FocusView } from "@/lib/shared/asset-scope";
 import {
   bookmarksBackupFilename,
   exportBookmarks,
@@ -800,16 +803,12 @@ function FocusViewRow({
   );
 
   const items: DataTableRowMenuItem[] = [
-    ...(inUse
-      ? [
-          {
-            key: "edit",
-            label: "Edit",
-            onSelect: () => openFocusPanel("edit"),
-            hooks: { "data-focus-view-menu": "edit" },
-          },
-        ]
-      : []),
+    {
+      key: "edit",
+      label: "Edit",
+      onSelect: () => openFocusPanel("edit", view.id),
+      hooks: { "data-focus-view-menu": "edit" },
+    },
     ...(inUse && phone
       ? [
           {
@@ -876,14 +875,7 @@ function FocusViewRow({
         )}
       </DataTableCell>
       <DataTableCell label="Chains" valign="middle" className="whitespace-nowrap">
-        {view.chains.length ? (
-          <span className="flex items-center gap-1 text-foreground/80">
-            <ViewIcons picks={[]} chains={view.chains} />
-            {focusName([], view.chains)}
-          </span>
-        ) : (
-          <span className="text-rb-500">All chains</span>
-        )}
+        <ViewChainToggles view={view} />
       </DataTableCell>
       <DataTableCell valign="middle" className="whitespace-nowrap">
         {use}
@@ -893,6 +885,48 @@ function FocusViewRow({
         <DataTableRowMenu label={`Actions for ${label}`} items={items} />
       </DataTableCell>
     </DataTableRow>
+  );
+}
+
+/** A view's chains as one toggle per launched chain (Miles, 10 Nov 2026):
+ *  in focus in text ink, the rest dimmed; a press adds or drops the chain, as
+ *  the panel's Chains part does. None pressed is every chain. A view of
+ *  chains alone keeps its last chain, since an emptied view is removed. */
+function ViewChainToggles({ view }: { view: FocusView }) {
+  const all = launchedChains().map((c) => c.id);
+  const toggle = (id: number) =>
+    focusViews.edit(view.id, {
+      assets: view.assets,
+      chains: view.chains.includes(id)
+        ? view.chains.filter((c) => c !== id)
+        : all.filter((c) => c === id || view.chains.includes(c)),
+    });
+  return (
+    <span className="relative z-[2] flex items-center gap-0.5" role="group" aria-label={`Chains in ${viewName(view)}`}>
+      {all.map((id) => {
+        const on = view.chains.includes(id);
+        const last = on && view.chains.length === 1 && view.assets.length === 0;
+        const name = chainNameOf(id);
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={on}
+            disabled={last}
+            onClick={() => toggle(id)}
+            title={last ? `${name} is this view's only part` : on ? `Drop ${name}` : `Add ${name}`}
+            className={`inline-flex size-11 items-center justify-center rounded-md transition-colors sm:size-7 ${
+              on ? "text-foreground" : "text-rb-400/80 hover:text-rb-500 dark:text-rb-600 dark:hover:text-rb-400"
+            } ${last ? "cursor-default" : "cursor-pointer hover:bg-rb-200/60 dark:hover:bg-rb-800"}`}
+            data-focus-view-chain={id}
+          >
+            <ChainGlyph id={id as ChainId} className="h-3.5 w-3.5" />
+            <span className="sr-only">{name}</span>
+          </button>
+        );
+      })}
+      {view.chains.length === 0 && <span className="ml-1.5 text-xs text-rb-500">All</span>}
+    </span>
   );
 }
 

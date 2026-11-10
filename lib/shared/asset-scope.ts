@@ -124,11 +124,12 @@ export function withRecord(p: AssetPick): AssetPick {
 // ── The store ───────────────────────────────────────────────────────────────
 
 const CHANGE = "rails:asset-scope";
-/** Opens the panel from anywhere: on the view in use, or (detail "new") on a
- *  new view that becomes one once it holds something. */
+/** Opens the panel from anywhere: on a saved view (`view`, else the view in
+ *  use), or (mode "new") on a new view that becomes one once it holds
+ *  something. */
 export const OPEN_SCOPE_PANEL = "rails:asset-scope-open";
-export const openFocusPanel = (mode: "edit" | "new" = "edit") =>
-  window.dispatchEvent(new CustomEvent(OPEN_SCOPE_PANEL, { detail: mode }));
+export const openFocusPanel = (mode: "edit" | "new" = "edit", view?: string) =>
+  window.dispatchEvent(new CustomEvent(OPEN_SCOPE_PANEL, { detail: { mode, view } }));
 
 /** A focus link's proposal: what it sets and its name. */
 export interface FocusProposal {
@@ -281,6 +282,13 @@ export const focusViews = {
   edit: (id: string, f: Focus) => writeSaved(editView(saved(), id, f)),
   /** The saved views for a backup file. */
   list: (): FocusView[] => saved().views,
+  /** A saved view by id, or the view in use; read from the store, so it is
+   *  right on a component's first render. */
+  find(id?: string | null): FocusView | null {
+    const s = saved();
+    const want = id ?? s.active;
+    return s.views.find((v) => v.id === want) ?? null;
+  },
   /** A backup file's views merged in; the view in use stays. */
   importList(incoming: unknown): { read: number; added: number } {
     const { state, read, added } = mergeViews(saved(), incoming, newId, Date.now(), knownChain);
