@@ -11,6 +11,9 @@ import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { effectivePicks, scopeSymbolOf, useAssetScope, type AssetPick } from "@/lib/shared/asset-scope";
 import type { ChainId } from "@/lib/shared/chains";
 
+/** A chain's mark in its own colour, so Base's square reads as Base. */
+const CHAIN_TINT: Record<number, string> = { 8453: "#0052FF" };
+
 const symbolOf = (p: AssetPick) => scopeSymbolOf(p.chain, p.token) ?? p.token;
 
 /** The facehash (or its placeholder) with Focus's ring and badge. */
@@ -23,7 +26,7 @@ export function FocusAvatar({ face, size = 20 }: { face: string | null; size?: n
   const badge = Math.round(size * 0.6);
   return (
     <span
-      className="relative inline-flex shrink-0"
+      className={`relative inline-flex shrink-0 ${on ? "mr-1" : ""}`}
       style={on ? { borderRadius: 5, boxShadow: "0 0 0 2px var(--color-teal-500)" } : undefined}
       data-focus-avatar={on ? (picks.length ? "assets" : "chains") : undefined}
     >
@@ -48,7 +51,12 @@ export function FocusAvatar({ face, size = 20 }: { face: string | null; size?: n
               untitled
             />
           ) : picks.length === 0 && chains.length === 1 ? (
-            <ChainGlyph chainId={chains[0] as ChainId} className="size-full text-foreground" />
+            <span
+              className="inline-flex size-full items-center justify-center rounded-full"
+              style={{ color: CHAIN_TINT[chains[0]] ?? "var(--foreground)" }}
+            >
+              <ChainGlyph chainId={chains[0] as ChainId} className="size-[80%]" />
+            </span>
           ) : (
             <span
               className="inline-flex size-full items-center justify-center rounded-full bg-teal-600 px-0.5 text-[8px] font-bold leading-none text-white"
