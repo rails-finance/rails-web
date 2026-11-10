@@ -105,29 +105,41 @@ const TOP_MARKETS = 5;
 /** Who holds it names this many holders, largest first. */
 const TOP_HOLDERS = 10;
 
-/** The grid: one column, two from lg; the 1px gaps over the frame's colour
- *  draw the shared hairlines. The scoped selectors work on the reused
+/** The grid: one column, two from lg. Each tile draws its own hairlines,
+ *  inset 20px from its ends, so no two lines meet (Tile, RULE). The scoped selectors work on the reused
  *  sections: no outer margin or ring offset, and no disclaimer in the protects
  *  section's explanation. */
 const GRID = [
-  "grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-rb-200 lg:grid-cols-2",
-  "dark:bg-rb-500/30",
+  "grid grid-cols-1 lg:grid-cols-2",
+  // The last 30 days: no frame round each chart; a hairline between them from sm.
+  "[&_[data-strip-tile]]:rounded-none [&_[data-strip-tile]]:border-0 [&_[data-strip-tile]]:px-0",
+  "sm:[&_[data-strip-tile]+[data-strip-tile]]:border-l sm:[&_[data-strip-tile]+[data-strip-tile]]:pl-5",
+  "[&_[data-strip-tile]+[data-strip-tile]]:border-rb-200 dark:[&_[data-strip-tile]+[data-strip-tile]]:border-rb-500/30",
   "[&_section[data-prov-scope]]:m-0 [&_section[data-prov-scope]]:rounded-none [&_section[data-prov-scope]]:p-0",
   "[&_[data-protects-disclaimer]]:hidden",
 ].join(" ");
 
-const TILE = "min-w-0 scroll-mt-4 bg-background p-5";
+const TILE = "min-w-0 scroll-mt-4 p-5";
+
+/** A hairline's colour. */
+const RULE = "bg-rb-200 dark:bg-rb-500/30";
 
 function Tile({
   id,
   wide,
   flush,
+  left,
+  last,
   segScope,
   children,
 }: {
   id?: string;
   wide?: boolean;
   flush?: boolean;
+  /** The left tile of a pair: a vertical hairline at its right edge from lg. */
+  left?: boolean;
+  /** The last tile: no hairline under it. */
+  last?: boolean;
   /** A `SegmentBar`'s scope, lighting its segments with their rows. */
   segScope?: string;
   children: ReactNode;
@@ -135,11 +147,15 @@ function Tile({
   return (
     <div
       id={id}
-      className={`${flush ? "min-w-0 scroll-mt-4" : TILE} ${wide ? "lg:col-span-2" : ""}`}
+      className={`relative ${flush ? "min-w-0 scroll-mt-4" : TILE} ${wide ? "lg:col-span-2" : ""}`}
       data-mock-tile=""
       data-seg-scope={segScope}
     >
       {children}
+      {!last && <i aria-hidden className={`pointer-events-none absolute inset-x-5 bottom-0 h-px ${RULE}`} />}
+      {left && (
+        <i aria-hidden className={`pointer-events-none absolute inset-y-5 right-0 hidden w-px lg:block ${RULE}`} />
+      )}
     </div>
   );
 }
@@ -1056,7 +1072,7 @@ export function MockVaultLayout({
           <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
         </Tile>
 
-        <Tile id="allocation" segScope="allocation">
+        <Tile id="allocation" segScope="allocation" left>
           <VaultAssets
             rows={segRows}
             assetSymbol={unit}
@@ -1110,7 +1126,8 @@ export function MockVaultLayout({
         {/* The two protects sections render as one fragment: one wide tile,
             split in two from lg by the same 1px-gap hairline. */}
         <Tile id="risk" wide flush>
-          <div className="grid grid-cols-1 gap-px lg:grid-cols-2 [&>section]:bg-background [&>section]:!p-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 [&>section]:!p-5">
+            <i aria-hidden className={`pointer-events-none absolute inset-y-5 left-1/2 hidden w-px lg:block ${RULE}`} />
             <VaultProtects
               chainId={chainId}
               block={protects?.block ?? 0}
@@ -1122,7 +1139,7 @@ export function MockVaultLayout({
           </div>
         </Tile>
 
-        <Tile id="configuration" wide>
+        <Tile id="configuration" wide last>
           <ProvSection scope="mock-config" data-mock-section="config">
             <SectionHeading
               title="Configuration and addresses"
