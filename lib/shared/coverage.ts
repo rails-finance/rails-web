@@ -20,6 +20,7 @@
  * explorer gains a capability, flip its cell in the same change (CLAUDE.md).
  */
 
+import { EULER_DOLLARS } from "@/lib/euler/types";
 import { LAUNCHED_PROTOCOLS, PROTOCOLS, isLaunchedChain, type ProtocolEntry } from "@/lib/shared/protocols";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 // The `oracleUsd: { why }` text below is shared with the position views' price
@@ -120,6 +121,11 @@ function explorerDepth(cells: Partial<Record<DepthKey, DepthCell>>): Record<Dept
 }
 
 /** Where each explorer currently stands, keyed by `ProtocolEntry.id`. */
+/** Euler V2's USD cell, following EULER_DOLLARS (lib/euler/types.ts). */
+const EULER_USD_CELL: DepthCell = EULER_DOLLARS
+  ? { except: "a vault whose unit of account is not USD: its figures stay in that unit" }
+  : false;
+
 export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // Market notes (2026-09-04): a trove's timeline now states the stretches
   // between two of its own events where the branch's oracle price moved far
@@ -941,6 +947,19 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
       why: "a liquidity position holds no loan, so there is no threshold to breach and no liquidation to trace",
     },
   }),
+  // Euler V2 on Base and Arbitrum (read-on-visit-candidates-572.md, row 10).
+  // `dashboard`: a holding's page reads the account and the vault at the head
+  // and 30 days back from rails-server's at-block routes. Dollars come from
+  // each vault's oracle router where its unit of account is USD. No timeline,
+  // no market pages and no verifier yet.
+  "euler-v2-base": explorerDepth({
+    dashboard: true,
+    oracleUsd: EULER_USD_CELL,
+  }),
+  "euler-v2-arbitrum": explorerDepth({
+    dashboard: true,
+    oracleUsd: EULER_USD_CELL,
+  }),
   // Liquidation forensics (2026-07-14): same valued two-leg treatment as Aave
   // V3 (single market — SparkLend's own oracle at the event's block).
   // Protocol views (2026-07-15): /spark/markets — the single SparkLend Pool's
@@ -1461,6 +1480,10 @@ export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
   "uniswap-v4",
   // Aerodrome Slipstream (ui-jobs 566), position-first as Uniswap is.
   "aerodrome",
+  // Euler V2 on Base and Arbitrum, position-first as Uniswap is: a wallet's
+  // accounts are read when it is visited.
+  "euler-v2-base",
+  "euler-v2-arbitrum",
   // The three Arbitrum explorers ship position-first (2026-10-19): a wallet
   // field on the front door, any address readable, and a listing of the
   // positions read (item 16) in place of a roster of accounts.
@@ -1634,6 +1657,15 @@ export const VIEW_NOTES: Record<string, string> = {
  * Rendered on /coverage; each explorer's /info page carries the
  * reader-facing consequence in plain words instead.
  */
+/** Euler V2's coverage note; its dollar sentence follows EULER_DOLLARS (lib/euler/types.ts). */
+const EULER_NOTE = [
+  "Each wallet has 256 Euler accounts. Rails finds every account that borrows or has a deposit enabled as collateral, from the connector's lists for all 256. A deposit not used as collateral is read on the wallet's first account only, across every vault on the chain; on the other 255 it is not found.",
+  EULER_DOLLARS
+    ? "Each vault prices in its own unit of account through its oracle: dollars where that unit is USD, and the unit's token otherwise."
+    : "Figures are in each asset, and in the unit's token where a vault's unit of account is a token.",
+  "The 30-day figures come from the vault's share price and interest index at a block 30 days back, applied to what the account holds now.",
+].join(" ");
+
 export const COVERAGE_NOTES: Record<string, string> = {
   "aave-vaults":
     "Each vault position's timeline replays that wallet's whole share-transfer history live from the vault's logs on every request, and checks it wei-exact against the vault's balance before drawing anything: a mismatch means no rows. The roster of holders comes from a daily sweep of every vault's whole history (Aave's enumerators for its vaults, the two MetaMorpho factories for those), proven complete against each vault's total supply; a sweep that can't prove complete isn't published. The page shows the flows and share prices as they happened, with no USD, APY or yield figure.",
@@ -1679,6 +1711,8 @@ export const COVERAGE_NOTES: Record<string, string> = {
     "A Uniswap V4 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
   aerodrome:
     "An Aerodrome Slipstream pool prices its two tokens against each other and Aerodrome runs no USD feed, so every figure is in the pool's quote token at the pool's price, and AERO is priced through Aerodrome's own AERO pools; a liquidity position holds no loan, so there is no liquidation to trace.",
+  "euler-v2-base": EULER_NOTE,
+  "euler-v2-arbitrum": EULER_NOTE,
   alchemix:
     "Alchemix states no dollar figure for a position because the protocol has none. The Alchemist values collateral as vault shares at the vault's share price, in the asset underneath, and counts each synthetic as one unit of that asset. It runs no USD feed, so a position's debt, collateral and collateralisation are stated in that asset, and the dollar figure beside the collateral is a market price the page labels as one. Debt is a read rather than a replay. A redemption emits one number with no account attached and applies a single survival ratio to every open position at once, and the weights behind it have no public getter, so the explorer reads each V3 position's debt and collateral from getCDP at the block a figure names, at every block where one can step, and checks its event replay against that read to the wei. Each line's replay stays the served figure only until that line's first redemption. The amount set aside for repayment accrues every block, so it is stated at the block it was read and never carried forward or added to a debt taken at another block. Share prices are stored with the Alchemist readings only, so Transmuter positions and V2 accounts state amounts in the synthetic or in vault shares with no price read at the block. V2 closed on 2 April 2026 and is served as a record frozen at block 24,794,239: every account re-read at head returned the same bytes. A V2 debt is signed, a negative one is a credit, and the swept collateral appears in no position's figure. A V2 figure is never added to its V3 successor's, because the V3 position is what the V2 one became. No position has been liquidated on any line yet, so the liquidation card is built and has nothing to show.",
 };

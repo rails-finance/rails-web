@@ -431,6 +431,43 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "branches", label: "Branches", tab: "Branches" }],
   },
   {
+    // Euler V2 on Base and Arbitrum (rails-ops reference/read-on-visit-candidates-572.md,
+    // row 10): a vault kit under one connector, the same code on both chains and
+    // separate vaults, so two entries. The route is a front door taking a
+    // wallet; its accounts are at `<route>/<wallet>`, each holding opening
+    // `<route>/position/<account>/<vault>`. Reads come from rails-server's
+    // at-block routes (lib/api/fetch-euler.ts). No Ethereum entry: its 902
+    // vaults put a wallet's read over the tier's budget.
+    id: "euler-v2-base",
+    session: "euler-v2-base",
+    label: "Euler V2",
+    chainId: 8453,
+    slug: "euler-v2",
+    protocolKey: "euler-v2",
+    // DRAFT: hue 160, read off the green of Euler's app; Miles to confirm.
+    brand: 160,
+    tags: ["Lend", "Borrow"],
+    desc: "Euler's vaults on Base: a wallet's 256 accounts, each loan with its collateral and health, and each deposit over the last 30 days",
+    positionListing: false,
+    readTier: "visit",
+    unlaunched: true,
+    subPages: [],
+  },
+  {
+    id: "euler-v2-arbitrum",
+    session: "euler-v2-arbitrum",
+    label: "Euler V2",
+    chainId: 42161,
+    slug: "euler-v2",
+    protocolKey: "euler-v2",
+    tags: ["Lend", "Borrow"],
+    desc: "Euler's vaults on Arbitrum: a wallet's 256 accounts, each loan with its collateral and health, and each deposit over the last 30 days",
+    positionListing: false,
+    readTier: "visit",
+    unlaunched: true,
+    subPages: [],
+  },
+  {
     id: "fluid",
     session: "fluid",
     label: "Fluid",
@@ -940,6 +977,9 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "uniswap-v3": "Position",
   "uniswap-v4": "Position",
   aerodrome: "Position",
+  // One account's holding in one vault.
+  "euler-v2-base": "Position",
+  "euler-v2-arbitrum": "Position",
 };
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",

@@ -98,7 +98,11 @@ export type SessionProtocol =
   | "uniswap-v4"
   // Aerodrome Slipstream on Base, at `/base/aerodrome`: a position is an NFT
   // id on one of three position managers, staked in its gauge or not (ui-jobs 566).
-  | "aerodrome";
+  | "aerodrome"
+  // Euler V2 on Base and Arbitrum, at `/base/euler-v2` and `/arbitrum/euler-v2`:
+  // a position is one account's holding in one vault, read at two blocks.
+  | "euler-v2-base"
+  | "euler-v2-arbitrum";
 
 /** What a saved entry is: a wallet, a position page or a listing view. */
 export type SavedKind = "wallet" | "position" | "view";
