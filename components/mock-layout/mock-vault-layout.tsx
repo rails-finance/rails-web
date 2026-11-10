@@ -4,13 +4,13 @@
 // five): Coinbase's asset page for the grid, Morpho's vault page for the
 // configuration and the roles. A localhost mock under /mock-layout. The holder
 // finder, then the live vault card (V2, built with the props
-// components/vaults/morpho-base-vault-page.tsx gives it), then the grid: Who
-// holds it | Where the assets are, The last 30 days, What protects it | The
-// protocol underneath, Configuration and addresses.
+// components/vaults/morpho-base-vault-page.tsx gives it), then the grid: The
+// last 30 days, Where the assets are | Who holds it, What protects it | The
+// protocol underneath (each line one paragraph), Configuration and addresses.
 //
 // Each tile is a `Tile` holding one `ProvSection`, so its heading, read stamp,
 // "?" and ⋮ sit in its top row. The reused sections keep their headings; the
-// grid's scoped selectors strip their outer margins and inner frames, and hide
+// grid's scoped selectors strip their outer margins, and hide
 // the protects section's disclaimer (the site's /terms carries it). Who holds
 // it is the asset breakdown's donut (C19, `ShareDonut`) beside the ten largest
 // holders; Where the assets are a `SegmentBar` over the markets. Both lists are
@@ -107,15 +107,13 @@ const TOP_HOLDERS = 10;
 
 /** The grid: one column, two from lg; the 1px gaps over the frame's colour
  *  draw the shared hairlines. The scoped selectors work on the reused
- *  sections: no outer margin or ring offset, no inner frame on the protects
- *  line, and no disclaimer in its explanation. */
+ *  sections: no outer margin or ring offset, and no disclaimer in the protects
+ *  section's explanation. */
 const GRID = [
   "grid grid-cols-1 gap-px overflow-hidden rounded-xl bg-rb-200 lg:grid-cols-2",
   "dark:bg-rb-500/30",
   "[&_section[data-prov-scope]]:m-0 [&_section[data-prov-scope]]:rounded-none [&_section[data-prov-scope]]:p-0",
-  "[&_section[data-vault-protects]>.rounded-xl]:border-0 [&_section[data-vault-protects]>.rounded-xl]:px-0",
   "[&_[data-protects-disclaimer]]:hidden",
-  "[&_table.dt>thead>tr>th]:border-b-transparent",
 ].join(" ");
 
 const TILE = "min-w-0 scroll-mt-4 bg-background p-5";
@@ -463,7 +461,7 @@ function WhoHoldsIt({
                       align="right"
                       className="whitespace-nowrap font-semibold tabular-nums text-foreground"
                     >
-                      <span className="inline-flex items-center gap-1.5">
+                      <span className="flex items-center justify-end gap-1.5">
                         <span title={`${sh.exact} ${shareSymbol}`} data-cell="holder-shares" data-raw={h.balance}>
                           <Prov info={balanceProv(h.holder, sh.exact)}>{sh.text}</Prov>
                         </span>
@@ -475,14 +473,14 @@ function WhoHoldsIt({
                       align="right"
                       className="whitespace-nowrap font-semibold tabular-nums text-foreground"
                     >
-                      {/* The key, beside the share it stands for (C19's legend). */}
+                      <Prov info={shareProv(h.holder, h.ppm)}>{ppmPct(h.ppm)}</Prov>
+                      {/* The key, after the share it stands for (C19's legend). */}
                       <i
                         aria-hidden
-                        className="mr-1.5 inline-block size-2.5 rounded-[2px] align-[-1px]"
+                        className="ml-1.5 inline-block size-2.5 rounded-[2px] align-[-1px]"
                         style={{ background: colourOf.get(h.holder) ?? othersColour }}
                         data-key-colour=""
                       />
-                      <Prov info={shareProv(h.holder, h.ppm)}>{ppmPct(h.ppm)}</Prov>
                     </DataTableCell>
                   </DataTableRow>
                 );
@@ -1054,6 +1052,10 @@ export function MockVaultLayout({
       </PositionCardEdgeContext.Provider>
 
       <div className={`${GRID} [--donut-ground:var(--background)]`} data-mock-layout="">
+        <Tile id="last-30-days" wide>
+          <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
+        </Tile>
+
         <Tile id="allocation" segScope="allocation">
           <VaultAssets
             rows={segRows}
@@ -1105,10 +1107,6 @@ export function MockVaultLayout({
           />
         </Tile>
 
-        <Tile id="last-30-days" wide>
-          <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
-        </Tile>
-
         {/* The two protects sections render as one fragment: one wide tile,
             split in two from lg by the same 1px-gap hairline. */}
         <Tile id="risk" wide flush>
@@ -1119,6 +1117,7 @@ export function MockVaultLayout({
               vaultName={name}
               protects={protects?.protects ?? null}
               underneath={protects?.underneath ?? null}
+              look="paragraph"
             />
           </div>
         </Tile>

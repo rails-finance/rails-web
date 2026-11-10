@@ -41,18 +41,29 @@ const SECTIONS = {
   },
 } as const;
 
+/** How a line reads: "framed", the label column beside the headline over its
+ *  sentence in a framed box (the live page); "paragraph", one unframed
+ *  paragraph, the headline in semibold leading the muted sentence and gap,
+ *  no label (the /mock-layout grid). */
+export type ProtectsLook = "framed" | "paragraph";
+
+/** The full stop a headline lacks, if it lacks one. */
+const stopFor = (t: string) => (/[.!?]$/.test(t) ? "" : ".");
+
 function OneSection({
   which,
   data,
   chainId,
   block,
   vaultName,
+  look,
 }: {
   which: keyof typeof SECTIONS;
   data: ProtectsSectionData | null;
   chainId: ChainId;
   block: number;
   vaultName: string;
+  look: ProtectsLook;
 }) {
   const s = SECTIONS[which];
   const line = data?.line;
@@ -85,8 +96,31 @@ function OneSection({
           />
         }
       />
-      <div className="mt-2 rounded-xl border border-rb-200 px-4 py-3 dark:border-rb-500/30">
-        {line && data ? (
+      <div
+        className={
+          look === "paragraph" ? "mt-2" : "mt-2 rounded-xl border border-rb-200 px-4 py-3 dark:border-rb-500/30"
+        }
+      >
+        {line && data && look === "paragraph" ? (
+          <p className="text-[13px] leading-snug text-rb-500" data-protects-line="">
+            <span className="font-semibold text-foreground" data-protects-headline="">
+              <Prov info={data.info}>{line.headline}</Prov>
+              {stopFor(line.headline)}
+            </span>
+            {line.sentence && (
+              <>
+                {" "}
+                <span data-protects-sentence="">{line.sentence}</span>
+              </>
+            )}
+            {line.gap && (
+              <>
+                {" "}
+                <span data-protects-gap="">{line.gap}</span>
+              </>
+            )}
+          </p>
+        ) : line && data ? (
           <div className="grid gap-x-4 gap-y-0.5 sm:grid-cols-[7rem_minmax(0,1fr)]" data-protects-line="">
             <span className="text-xs font-semibold text-rb-500 sm:pt-0.5">{line.label}</span>
             <div className="min-w-0">
@@ -141,6 +175,7 @@ export function VaultProtects({
   vaultName,
   protects,
   underneath,
+  look = "framed",
 }: {
   chainId: ChainId;
   /** The block both sections were read at; 0 where the read failed. */
@@ -148,11 +183,19 @@ export function VaultProtects({
   vaultName: string;
   protects: ProtectsSectionData | null;
   underneath: ProtectsSectionData | null;
+  look?: ProtectsLook;
 }) {
   return (
     <>
-      <OneSection which="protects" data={protects} chainId={chainId} block={block} vaultName={vaultName} />
-      <OneSection which="underneath" data={underneath} chainId={chainId} block={block} vaultName={vaultName} />
+      <OneSection which="protects" data={protects} chainId={chainId} block={block} vaultName={vaultName} look={look} />
+      <OneSection
+        which="underneath"
+        data={underneath}
+        chainId={chainId}
+        block={block}
+        vaultName={vaultName}
+        look={look}
+      />
     </>
   );
 }

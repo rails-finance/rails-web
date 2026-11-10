@@ -291,14 +291,6 @@ export function VaultAssets({
                 align="right"
                 className={`whitespace-nowrap tabular-nums ${ix ? "font-semibold text-foreground" : "text-rb-500"}`}
               >
-                {keyColours?.[r.key] && (
-                  <i
-                    aria-hidden
-                    className="mr-1.5 inline-block size-2.5 rounded-[2px] align-[-1px]"
-                    style={{ background: keyColours[r.key] }}
-                    data-key-colour=""
-                  />
-                )}
                 <span data-cell="leg-share">
                   {r.share == null ? (
                     "—"
@@ -308,6 +300,14 @@ export function VaultAssets({
                     pctText(r.share)
                   )}
                 </span>
+                {keyColours?.[r.key] && (
+                  <i
+                    aria-hidden
+                    className="ml-1.5 inline-block size-2.5 rounded-[2px] align-[-1px]"
+                    style={{ background: keyColours[r.key] }}
+                    data-key-colour=""
+                  />
+                )}
               </DataTableCell>
             </DataTableRow>
           ))}
