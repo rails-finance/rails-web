@@ -4,7 +4,9 @@
 // every vault page, drawn as the shared card's detail surface (decision 0043:
 // the family supplies figures and words, never which parts exist).
 // ----------------------------------------------------------------------------
-// Heading "Vault summary", the status tag where the contract says the vault is
+// No sidebar (C20): that marks a position. The protocol's mark and name lead
+// the heading row and the chain's glyph ends it (C20.1, C20.2). Heading
+// "Vault summary", the status tag where the contract says the vault is
 // shut down or paused, the identity (the asset's icon with the venue mark, the
 // name, the short address with copy, the neutral pills) and the ⋮. Headlines
 // Total assets · Share price · Yield · Holders (decision 0047 point 5), each
@@ -155,6 +157,7 @@ export function VaultCard({
       <PositionCard
         slots={{
           surface: "detail",
+          sidebar: false,
           heading: "Vault summary",
           status,
           identity,
