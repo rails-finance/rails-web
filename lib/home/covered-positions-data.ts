@@ -297,6 +297,8 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   // is visited; no census of holders is built, and nothing in a pool is a loan.
   "uniswap-v3",
   "uniswap-v4",
+  // Aerodrome Slipstream, for the Uniswap reason (ui-jobs 566).
+  "aerodrome",
   // Sky Savings, for the same reason: an sUSDS balance carries no debt and no
   // threshold (Miles, 2026-09-29, rails-ops TO-DO-sky-savings-scoping §6.1).
   // It has a listing all the same; this set keeps it out of the count.
