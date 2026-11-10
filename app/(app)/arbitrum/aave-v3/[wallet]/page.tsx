@@ -50,7 +50,7 @@ export default async function AaveV3ArbitrumPositionPage({ params }: Props) {
   }
 
   return (
-    <PositionReadProvider key={wallet} read={tail.position ? read : null}>
+    <PositionReadProvider focus={{ source: tail.position }} key={wallet} read={tail.position ? read : null}>
       <AaveV3ArbitrumPositionView
         key={wallet}
         wallet={wallet}

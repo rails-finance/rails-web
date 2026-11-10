@@ -48,7 +48,7 @@ export default async function FxPositionPage({ params }: Props) {
   ]);
 
   return (
-    <PositionReadProvider key={slug} read={tail.position ? read : null}>
+    <PositionReadProvider focus={{ source: tail.position }} key={slug} read={tail.position ? read : null}>
       <FxPositionView
         // Keyed on the slug so a client-side navigation to another position
         // remounts with that position's server tail as its initial state.

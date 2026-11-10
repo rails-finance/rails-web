@@ -43,6 +43,7 @@ import { loadAaveEthereumVault } from "@/lib/sources/chain/aave-ethereum-vault";
 import { RailHeader } from "@/components/shared/rail-header";
 import { loadVaultCensusRow } from "@/lib/vaults/census-read";
 import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
+import { FocusSourceGate } from "@/components/shared/aim-gate";
 
 // Every figure is a call at the head — nothing about this is cacheable across
 // requests.
@@ -102,37 +103,39 @@ export default async function AaveEthereumVaultRoute({ params, searchParams }: P
   ]);
 
   return (
-    <div className="min-h-screen">
-      <div className="py-8">
-        <header className="mb-5" data-skel-section="page-header">
-          <RailHeader session="aave-vaults" venue="subPage" />
-        </header>
+    <FocusSourceGate source={data.vault} chain={1} what="This vault">
+      <div className="min-h-screen">
+        <div className="py-8">
+          <header className="mb-5" data-skel-section="page-header">
+            <RailHeader session="aave-vaults" venue="subPage" />
+          </header>
 
-        {data.chainStale ? (
-          <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
-            This vault could not be read from chain just now, so no figure is stated for it.
-          </p>
-        ) : (
-          <AaveEthereumVaultPage
-            data={data}
-            census={census}
-            yieldFigure={series.yieldFigure}
-            strip={series.strip}
-            attestation={attestation}
-            protects={
-              <Suspense fallback={null}>
-                <VaultProtectsSection
-                  subject={{ chainId: MAINNET_CHAIN_ID, address, kind: data.vault.family }}
-                  vaultName={data.vault.name || shortAddr(address)}
-                />
-              </Suspense>
-            }
-          />
-        )}
+          {data.chainStale ? (
+            <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
+              This vault could not be read from chain just now, so no figure is stated for it.
+            </p>
+          ) : (
+            <AaveEthereumVaultPage
+              data={data}
+              census={census}
+              yieldFigure={series.yieldFigure}
+              strip={series.strip}
+              attestation={attestation}
+              protects={
+                <Suspense fallback={null}>
+                  <VaultProtectsSection
+                    subject={{ chainId: MAINNET_CHAIN_ID, address, kind: data.vault.family }}
+                    vaultName={data.vault.name || shortAddr(address)}
+                  />
+                </Suspense>
+              }
+            />
+          )}
 
-        {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
-        <ProvInspectorLayer />
+          {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
+          <ProvInspectorLayer />
+        </div>
       </div>
-    </div>
+    </FocusSourceGate>
   );
 }

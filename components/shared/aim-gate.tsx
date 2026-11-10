@@ -18,6 +18,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import { rowAssetKeys } from "@/lib/shared/focus-row-keys";
 import { useExplorerScope } from "@/lib/shared/explorer-scope";
 import { explorerWhy } from "@/components/shared/asset-scope-strip";
 import {
@@ -112,6 +113,29 @@ export function AimGate({
       </div>
     );
   return <OutOfFocus what={what} onPeek={setPeek} />;
+}
+
+/** A page about one object, gated by the tokens the object names (read by
+ *  lib/shared/focus-row-keys.ts): a vault, a holding, a pool. An object with
+ *  no token Rails can read is not gated. */
+export function FocusSourceGate({
+  source,
+  chain,
+  what,
+  children,
+}: {
+  source: unknown;
+  chain: number;
+  what: string;
+  children: ReactNode;
+}) {
+  const keys = rowAssetKeys(source, chain);
+  if (keys.length === 0) return <>{children}</>;
+  return (
+    <AimGate keys={keys} chain={chain} what={what}>
+      {children}
+    </AimGate>
+  );
 }
 
 const BY_SLUG = new Map(Object.values(CHAINS).map((c) => [c.slug, c.id as number]));

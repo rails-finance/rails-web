@@ -6,7 +6,11 @@
  * itself, in its own source or in a module it imports (two levels down):
  *
  *   • it filters through the shared pieces: `AimGate`, `useScopedRows`,
- *     `useScopedRoster`, `InFocusSymbol`, `useAssetScope`; or
+ *     `useScopedRoster`, `InFocusSymbol`, `useAssetScope`, or the listing
+ *     shell `ChainTruthListingPage`, which keeps the rows that touch the
+ *     focus unless told `focus={false}` by a config that applies it itself,
+ *     or a position page's `<PositionReadProvider focus={…}>`, which gates
+ *     the position by the tokens it names; or
  *   • it says why it needs none, in a line comment `// focus: <reason>`
  *     (a page about Rails itself, a legal page, a redirect).
  *
@@ -28,7 +32,16 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const LIST = path.join(ROOT, "scripts", "focus-undeclared.txt");
-const MARKERS = [/\bAimGate\b/, /\buseScopedRows\b/, /\buseScopedRoster\b/, /\bInFocusSymbol\b/, /\buseAssetScope\b/];
+const MARKERS = [
+  /<PositionReadProvider\b[^>]*?\bfocus=/,
+  /\bChainTruthListingPage\b/,
+  /\bAimGate\b/,
+  /\bFocusSourceGate\b/,
+  /\buseScopedRows\b/,
+  /\buseScopedRoster\b/,
+  /\bInFocusSymbol\b/,
+  /\buseAssetScope\b/,
+];
 const EXEMPT = /^\s*\/\/\s*focus:\s*\S/m;
 const DEPTH = 2;
 
@@ -88,8 +101,10 @@ function declared(file) {
       for (const m of s.matchAll(/from\s+"([^"]+)"/g)) {
         const r = resolve(f, m[1]);
         // The shell and the shared Focus modules mention the markers; a page
-        // importing them for something else is not declared by that.
-        if (!r || seen.has(r) || /components\/(nav|shared\/(asset-scope|aim-|in-focus|focus-))/.test(r)) continue;
+        // importing them for something else is not declared by that (a page
+        // using PositionReadProvider declares only with its `focus=`).
+        if (!r || seen.has(r) || /components\/(nav|shared\/(asset-scope|aim-|in-focus|focus-|position-read))/.test(r))
+          continue;
         seen.add(r);
         next.push(r);
       }

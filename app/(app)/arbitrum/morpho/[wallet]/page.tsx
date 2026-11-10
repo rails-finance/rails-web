@@ -50,7 +50,11 @@ export default async function MorphoArbitrumWalletPage({ params }: Props) {
 
   // The chain read the figures stand on, as the cards state it (ui-jobs 512).
   return (
-    <PositionReadProvider key={wallet} read={await timedRead(readOfHeadAnswer(tail.head), ARBITRUM_CHAIN_ID)}>
+    <PositionReadProvider
+      focus={{ source: tail.head }}
+      key={wallet}
+      read={await timedRead(readOfHeadAnswer(tail.head), ARBITRUM_CHAIN_ID)}
+    >
       <MorphoArbitrumWalletView key={wallet} wallet={wallet} initialSlots={tail.head} initialTimeline={tail.timeline} />
     </PositionReadProvider>
   );

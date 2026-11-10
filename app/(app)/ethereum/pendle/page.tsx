@@ -6,6 +6,8 @@
 import { redirect } from "next/navigation";
 import { protocolForHref } from "@/lib/shared/protocols";
 
+// focus: a redirect to the explorer's first sub-page, which declares itself.
+
 export default function PendleExplorerRoot() {
   redirect(protocolForHref("/ethereum/pendle")!.subPages[0]!.href);
 }

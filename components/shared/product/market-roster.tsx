@@ -10,6 +10,7 @@
 import { MarketBody, type ProductPageHeader } from "@/components/shared/product/market-page";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import type { Loadable, MarketModel } from "@/lib/shared/product/model";
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 
 /** One market's panel. `useMarket` is the family's read, called once per panel. */
 function Panel<K extends string>({
@@ -34,19 +35,30 @@ export function MarketRoster<K extends string>({
   markets,
   useMarket,
   anatomy = "M4",
+  keysOf,
 }: {
   header: ProductPageHeader;
   /** Each market's key and name, in the roster's order. */
   markets: readonly { key: K; name: string }[];
   useMarket: (k: K) => Loadable<MarketModel>;
   anatomy?: string;
+  /** Focus (ui-jobs 557): a market's `chain:address` keys, where the family
+   *  names them; the roster then keeps the markets in focus. */
+  keysOf?: (k: K) => string[];
 }) {
+  const scoped = useScopedRows(
+    [...markets],
+    (m) => keysOf?.(m.key) ?? [],
+    () => header.protocol.chainId,
+  );
+  const shown = keysOf ? scoped.rows : markets;
   return (
     <div className="min-h-screen" data-anatomy={`${anatomy} R1`}>
       <div className="py-8">
         <SubPageHeader protocol={header.protocol} title={header.title} learnMore={header.learnMore} />
-        <div className="space-y-2">
-          {markets.map((m) => (
+        {keysOf && <ScopeNote scoped={scoped} noun={["market", "markets"]} className="mb-3" />}
+        <div className="space-y-2" {...scoped.listProps}>
+          {shown.map((m) => (
             <Panel key={m.key} k={m.key} name={m.name} useMarket={useMarket} />
           ))}
         </div>

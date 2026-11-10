@@ -57,7 +57,11 @@ export default async function DolomitePositionPage({ params }: Props) {
   ]);
 
   return (
-    <PositionReadProvider key={`${owner}:${accountNumber}`} read={tail.position ? read : null}>
+    <PositionReadProvider
+      focus={{ source: tail.position }}
+      key={`${owner}:${accountNumber}`}
+      read={tail.position ? read : null}
+    >
       <DolomitePositionView
         // Keyed on the pair so a client-side navigation to another account
         // remounts with that account's server tail as its initial state.

@@ -46,7 +46,7 @@ export default async function MoonwellBasePositionPage({ params }: Props) {
   const read = await timedRead(readOfHeadAnswer(position), BASE_CHAIN_ID);
 
   return (
-    <PositionReadProvider key={wallet} read={position ? read : null}>
+    <PositionReadProvider focus={{ source: position }} key={wallet} read={position ? read : null}>
       <MoonwellBaseView
         // Keyed on the wallet so a client-side navigation to another account
         // remounts with that account's server read as its initial state.

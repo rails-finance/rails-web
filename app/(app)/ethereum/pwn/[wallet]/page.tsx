@@ -52,7 +52,7 @@ export default async function PwnLoanPage({ params, searchParams }: Props) {
   const [tail, read] = await Promise.all([loadPwnPositionTail(wallet), indexReadAt(MAINNET_CHAIN_ID)]);
 
   return (
-    <PositionReadProvider key={wallet} read={tail.summaries ? read : null}>
+    <PositionReadProvider focus={{ source: tail.summaries }} key={wallet} read={tail.summaries ? read : null}>
       <PwnLoanView
         // Keyed on the wallet so a client-side navigation to another party
         // remounts with that wallet's server tail as its initial state.

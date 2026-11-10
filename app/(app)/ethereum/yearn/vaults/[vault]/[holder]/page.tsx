@@ -67,6 +67,7 @@ import type { VaultTimelineCoords } from "@/lib/shared/vault-holder-timeline";
 import { BlockRef } from "@/components/shared/block-ref";
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { VaultHealthSection } from "@/components/vaults/vault-health-section";
+import { FocusSourceGate } from "@/components/shared/aim-gate";
 
 // Every figure is a call at the head with the holder in the path — nothing
 // about this is cacheable across requests.
@@ -376,109 +377,111 @@ export default async function YearnVaultHoldingPage({ params }: Props) {
   ];
 
   return (
-    <div className="min-h-screen">
-      <div className="py-8">
-        <header className="mb-5" data-skel-section="page-header">
-          {/* Smart-back returns the reader wherever they came from; a fresh tab
+    <FocusSourceGate source={data.vault} chain={1} what="This vault">
+      <div className="min-h-screen">
+        <div className="py-8">
+          <header className="mb-5" data-skel-section="page-header">
+            {/* Smart-back returns the reader wherever they came from; a fresh tab
               lands on the vault section's listing. The price and recency strip
               sits in the holder's address row, Back stands alone, and Tools
               closes the row. The share is quoted in the vault's asset. */}
-          <DetailTopRow
-            session="yearn"
-            fallbackHref={yearnVaultHref(address)}
-            assets={shareAssets}
-            priceReason={ORACLE_USD_REASON["yearn"]}
-            owner={{ wallet: lookup.address, filterProtocol: null, bookmark: false }}
-            // The card's ⋮ carries the menu; an event page draws no Tools.
-            tools={false}
-          />
-          {!onEventPage && (
-            <>
-              <h2 className="text-2xl font-semibold text-foreground" data-vault-page={address}>
-                {/* The wallet heading above names a resolved holder. */}
-                {!lookup.address && <span className="font-mono">{subject}</span>}
-                <span className={`${lookup.address ? "" : "ml-2 "}text-base font-normal text-rb-500`}>
-                  in {vaultName}
-                </span>
-              </h2>
-              {/* How the subject was REACHED — a fact about the page rather than
+            <DetailTopRow
+              session="yearn"
+              fallbackHref={yearnVaultHref(address)}
+              assets={shareAssets}
+              priceReason={ORACLE_USD_REASON["yearn"]}
+              owner={{ wallet: lookup.address, filterProtocol: null, bookmark: false }}
+              // The card's ⋮ carries the menu; an event page draws no Tools.
+              tools={false}
+            />
+            {!onEventPage && (
+              <>
+                <h2 className="text-2xl font-semibold text-foreground" data-vault-page={address}>
+                  {/* The wallet heading above names a resolved holder. */}
+                  {!lookup.address && <span className="font-mono">{subject}</span>}
+                  <span className={`${lookup.address ? "" : "ml-2 "}text-base font-normal text-rb-500`}>
+                    in {vaultName}
+                  </span>
+                </h2>
+                {/* How the subject was REACHED — a fact about the page rather than
               about the address, and stated here because the header is always
               drawn. */}
-              {lookup.kind === "ens" && lookup.address && (
-                <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>
-                  {lookup.typed} · resolved through mainnet ENS
-                </p>
-              )}
-            </>
-          )}
-          {data.chainStale ? (
-            <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-              This vault could not be read from chain just now, so no figure is stated for this address in it.
-            </p>
-          ) : onEventPage ? null : (
-            <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-rb-500">
-              {/* The release; the card names the block. */}
-              <span data-vault-block={data.blockNumber}>Yearn V3 {data.vault.apiVersion}</span>
-              <Link href={yearnVaultHref(address)} className={PAGE_LINK} prefetch={false} data-link="vault-market">
-                {vaultName} <span aria-hidden>→</span>
-              </Link>
-            </p>
-          )}
-        </header>
+                {lookup.kind === "ens" && lookup.address && (
+                  <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>
+                    {lookup.typed} · resolved through mainnet ENS
+                  </p>
+                )}
+              </>
+            )}
+            {data.chainStale ? (
+              <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
+                This vault could not be read from chain just now, so no figure is stated for this address in it.
+              </p>
+            ) : onEventPage ? null : (
+              <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-rb-500">
+                {/* The release; the card names the block. */}
+                <span data-vault-block={data.blockNumber}>Yearn V3 {data.vault.apiVersion}</span>
+                <Link href={yearnVaultHref(address)} className={PAGE_LINK} prefetch={false} data-link="vault-market">
+                  {vaultName} <span aria-hidden>→</span>
+                </Link>
+              </p>
+            )}
+          </header>
 
-        {/* An input that named no address is a stated reading, not a 404: the
+          {/* An input that named no address is a stated reading, not a 404: the
             vault is real, the question was asked, and this is the answer to
             what was typed. */}
-        {lookup.error === "invalid" && (
-          <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="invalid">
-            That is neither of the two accepted forms. A holding is opened with a 20-byte address starting{" "}
-            <code>0x</code>, or an ENS name ending <code>.eth</code>.
-          </p>
-        )}
-        {lookup.error === "unresolved" && (
-          <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="unresolved">
-            No address is recorded for {lookup.typed} on Ethereum mainnet at the time of this read.
-          </p>
-        )}
+          {lookup.error === "invalid" && (
+            <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="invalid">
+              That is neither of the two accepted forms. A holding is opened with a 20-byte address starting{" "}
+              <code>0x</code>, or an ENS name ending <code>.eth</code>.
+            </p>
+          )}
+          {lookup.error === "unresolved" && (
+            <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="unresolved">
+              No address is recorded for {lookup.typed} on Ethereum mainnet at the time of this read.
+            </p>
+          )}
 
-        {!data.chainStale && !onEventPage && data.holder && (
-          <Suspense
-            fallback={
-              <div className="mb-6" data-skel-section="vault-position-card-pending">
-                <SkeletonBlock height={120} />
-              </div>
-            }
-          >
-            <HoldingCard data={data} holder={data.holder} />
-          </Suspense>
-        )}
-        {!data.chainStale && !onEventPage && data.holder && (
-          <Suspense
-            fallback={
-              <div className="mb-6" data-skel-section="vault-health-pending">
-                <SkeletonBlock height={220} />
-              </div>
-            }
-          >
-            <HealthSection data={data} />
-          </Suspense>
-        )}
-        {!data.chainStale && data.holder && (
-          <HoldingReceiptsScope>
+          {!data.chainStale && !onEventPage && data.holder && (
             <Suspense
               fallback={
-                <div className="mb-6" data-skel-section="vault-timeline-pending">
-                  <SkeletonBlock height={180} />
+                <div className="mb-6" data-skel-section="vault-position-card-pending">
+                  <SkeletonBlock height={120} />
                 </div>
               }
             >
-              <YearnTimelineSection data={data} holder={data.holder.address} onEventPage={onEventPage} />
+              <HoldingCard data={data} holder={data.holder} />
             </Suspense>
-          </HoldingReceiptsScope>
-        )}
+          )}
+          {!data.chainStale && !onEventPage && data.holder && (
+            <Suspense
+              fallback={
+                <div className="mb-6" data-skel-section="vault-health-pending">
+                  <SkeletonBlock height={220} />
+                </div>
+              }
+            >
+              <HealthSection data={data} />
+            </Suspense>
+          )}
+          {!data.chainStale && data.holder && (
+            <HoldingReceiptsScope>
+              <Suspense
+                fallback={
+                  <div className="mb-6" data-skel-section="vault-timeline-pending">
+                    <SkeletonBlock height={180} />
+                  </div>
+                }
+              >
+                <YearnTimelineSection data={data} holder={data.holder.address} onEventPage={onEventPage} />
+              </Suspense>
+            </HoldingReceiptsScope>
+          )}
 
-        <ProvInspectorLayer />
+          <ProvInspectorLayer />
+        </div>
       </div>
-    </div>
+    </FocusSourceGate>
   );
 }

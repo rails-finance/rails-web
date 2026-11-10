@@ -22,6 +22,8 @@ import type { ProtocolEntry } from "@/lib/shared/protocols";
 import type { Hooks, Loadable, ProductHead, ProductSection, ReserveIdentity } from "@/lib/shared/product/model";
 import { ProductHeadSection, ProductSectionBlock } from "@/components/shared/product/product-head";
 import { ProductFailed, ProductLoading } from "@/components/shared/product/market-page";
+import { AimGate } from "@/components/shared/aim-gate";
+import { assetKey } from "@/lib/shared/asset-family";
 
 /** What the page has once the head read answers. */
 export interface ReservePageData {
@@ -83,13 +85,14 @@ export function ReservePage({
       </div>
     );
   else
+    // Focus (ui-jobs 557): a reserve outside it is gated whole.
     body = (
-      <>
+      <AimGate keys={[assetKey(protocol.chainId, data.identity.address)]} chain={protocol.chainId} what="This reserve">
         {data.sections.map((s) => (
           <ProductSectionBlock key={s.scope} s={s} />
         ))}
         {suppliedBy}
-      </>
+      </AimGate>
     );
 
   return (

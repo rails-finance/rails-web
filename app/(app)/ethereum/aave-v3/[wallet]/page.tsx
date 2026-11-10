@@ -71,7 +71,11 @@ export default async function AaveV3PositionPage({ params, searchParams }: Props
   ]);
 
   return (
-    <PositionReadProvider key={`${wallet}:${market}:${grouped ? "rows" : "events"}`} read={tail.position ? read : null}>
+    <PositionReadProvider
+      focus={{ source: tail.position }}
+      key={`${wallet}:${market}:${grouped ? "rows" : "events"}`}
+      read={tail.position ? read : null}
+    >
       <AaveV3PositionDetail
         // Keyed on the account, its market AND the shape of its history: all
         // three change what this page is about, so a client-side navigation to

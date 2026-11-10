@@ -31,6 +31,7 @@ import { loadYearnEthereumVault } from "@/lib/sources/chain/yearn-ethereum-vault
 import { isYearnRosterVault, yearnRosterEntry } from "@/lib/yearn/vault-roster";
 import { YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
+import { FocusSourceGate } from "@/components/shared/aim-gate";
 
 // Every figure is a slot read at the head — nothing about this is cacheable
 // across requests.
@@ -87,36 +88,38 @@ export default async function YearnVaultRoute({ params, searchParams }: Props) {
   );
 
   return (
-    <div className="min-h-screen">
-      <div className="py-8">
-        <header className="mb-5" data-skel-section="page-header">
-          <RailHeader session="yearn" venue="subPage" />
-        </header>
+    <FocusSourceGate source={data.vault} chain={1} what="This vault">
+      <div className="min-h-screen">
+        <div className="py-8">
+          <header className="mb-5" data-skel-section="page-header">
+            <RailHeader session="yearn" venue="subPage" />
+          </header>
 
-        {data.chainStale ? (
-          <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
-            This vault could not be read from chain just now, so no figure is stated for it.
-          </p>
-        ) : (
-          <YearnVaultPage
-            data={data}
-            yieldFigure={series.yieldFigure}
-            strip={series.strip}
-            strategyPages={strategyPages}
-            protects={
-              <Suspense fallback={null}>
-                <VaultProtectsSection
-                  subject={{ chainId: YEARN_CHAIN_ID, address, kind: "yearn-v3", createdBlock: entry.createdBlock }}
-                  vaultName={entry.name}
-                />
-              </Suspense>
-            }
-          />
-        )}
+          {data.chainStale ? (
+            <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
+              This vault could not be read from chain just now, so no figure is stated for it.
+            </p>
+          ) : (
+            <YearnVaultPage
+              data={data}
+              yieldFigure={series.yieldFigure}
+              strip={series.strip}
+              strategyPages={strategyPages}
+              protects={
+                <Suspense fallback={null}>
+                  <VaultProtectsSection
+                    subject={{ chainId: YEARN_CHAIN_ID, address, kind: "yearn-v3", createdBlock: entry.createdBlock }}
+                    vaultName={entry.name}
+                  />
+                </Suspense>
+              }
+            />
+          )}
 
-        {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
-        <ProvInspectorLayer />
+          {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
+          <ProvInspectorLayer />
+        </div>
       </div>
-    </div>
+    </FocusSourceGate>
   );
 }

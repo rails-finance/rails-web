@@ -147,6 +147,7 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
       title={aim ? `Loan or collateral in your focus: ${aim.symbols.join(", ") || "none"}` : undefined}
       aria-label={`Focus: ${aim?.symbols.join(", ") || "assets"}. Change focus`}
       data-aim-chip={aim?.symbols.length ?? ""}
+      data-anatomy="N1.9"
     >
       <Lock className="size-3" aria-hidden="true" />
       {aim != null && aim.symbols.length === 0
@@ -206,6 +207,8 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
   const listing = (
     <ChainTruthListingPage<MorphoPositionSummary, MorphoListFilters, MorphoRosterState>
       key={aimView}
+      // Focus is asked of the server here (the market ids), not judged per page.
+      focus={false}
       chipsLead={aimChip}
       countNode={aimCount}
       title={market ? "Positions in this market" : "Morpho Blue Positions"}

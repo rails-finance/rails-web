@@ -58,7 +58,11 @@ export default async function MaplePositionPage({ params, searchParams }: Props)
   const read = tail?.position ? (poolRead ?? indexRead) : null;
 
   return (
-    <PositionReadProvider key={`${wallet}:${grouped ? "rows" : "events"}`} read={read}>
+    <PositionReadProvider
+      focus={{ source: tail?.position }}
+      key={`${wallet}:${grouped ? "rows" : "events"}`}
+      read={read}
+    >
       <MaplePositionView
         // Keyed on the wallet so a client-side navigation to another lender
         // remounts with that lender's server tail as its initial state.

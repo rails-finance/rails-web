@@ -50,7 +50,7 @@ export default async function MakerVaultPage({ params, searchParams }: Props) {
   const read = await timedRead(tail.summary ? (readOfHeadAnswer(tail.chain) ?? indexRead) : null, MAINNET_CHAIN_ID);
 
   return (
-    <PositionReadProvider key={`${vault}:${grouped ? "rows" : "events"}`} read={read}>
+    <PositionReadProvider focus={{ source: tail.summary }} key={`${vault}:${grouped ? "rows" : "events"}`} read={read}>
       <MakerVaultDetailView
         // Keyed on the vault so a client-side navigation to another one remounts
         // with that vault's server tail as its initial state.

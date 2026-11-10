@@ -82,6 +82,7 @@ import { serverReadOf } from "@/lib/shared/server-head-read";
 import { VaultHealthSection } from "@/components/vaults/vault-health-section";
 import { illiquidSentence } from "@/lib/vaults/illiquid";
 import { MORPHO_BLUE } from "@/lib/sources/chain/metamorpho-illiquid";
+import { FocusSourceGate } from "@/components/shared/aim-gate";
 
 export type MetaMorphoHolderParams = {
   params: Promise<{ vault: string; holder: string }>;
@@ -464,144 +465,149 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
   ) : null;
 
   return (
-    <div className="min-h-screen">
-      <div className="py-8">
-        <header className="mb-5" data-skel-section="page-header">
-          {/* Smart-back returns the reader wherever they came from; a fresh tab
+    <FocusSourceGate source={data.vault} chain={chainId} what="This vault">
+      <div className="min-h-screen">
+        <div className="py-8">
+          <header className="mb-5" data-skel-section="page-header">
+            {/* Smart-back returns the reader wherever they came from; a fresh tab
               lands on the vault section's listing. The price and recency strip
               sits in the holder's address row, Back stands alone, and Tools
               closes the row. The share is quoted in the vault's asset. */}
-          <DetailTopRow
-            session={session}
-            fallbackHref={metaMorphoVaultsListingHref(chainId)}
-            assets={shareAssets}
-            priceReason={ORACLE_USD_REASON[session]}
-            owner={{
-              wallet: lookup.address,
-              ensName: lookup.ensName,
-              filterProtocol: null,
-              // The bookmark the card's wallet pill carried: the position page's
-              // card leaves the wallet to this row.
-            }}
-            // The card's ⋮ carries the menu; an event page draws no Tools.
-            tools={false}
-          />
-          {!onEventPage && (
-            <>
-              <h2 className="text-2xl font-semibold text-foreground" data-vault-page={address}>
-                {/* The wallet heading above names a resolved holder. */}
-                {!lookup.address && <span className="font-mono">{subject}</span>}
-                <span className={`${lookup.address ? "" : "ml-2 "}text-base font-normal text-rb-500`}>
-                  in {vaultName}
-                </span>
-              </h2>
-              {/* How the subject was REACHED — a fact about the page rather than
+            <DetailTopRow
+              session={session}
+              fallbackHref={metaMorphoVaultsListingHref(chainId)}
+              assets={shareAssets}
+              priceReason={ORACLE_USD_REASON[session]}
+              owner={{
+                wallet: lookup.address,
+                ensName: lookup.ensName,
+                filterProtocol: null,
+                // The bookmark the card's wallet pill carried: the position page's
+                // card leaves the wallet to this row.
+              }}
+              // The card's ⋮ carries the menu; an event page draws no Tools.
+              tools={false}
+            />
+            {!onEventPage && (
+              <>
+                <h2 className="text-2xl font-semibold text-foreground" data-vault-page={address}>
+                  {/* The wallet heading above names a resolved holder. */}
+                  {!lookup.address && <span className="font-mono">{subject}</span>}
+                  <span className={`${lookup.address ? "" : "ml-2 "}text-base font-normal text-rb-500`}>
+                    in {vaultName}
+                  </span>
+                </h2>
+                {/* How the subject was REACHED — a fact about the page rather than
               about the address, and stated here because the header is always
               drawn. The card below carries the identity itself; the census has
               no row for an address it has never seen, so a card is not
               somewhere this note could always live. */}
-              {lookup.lane === "ens" && lookup.address && (
-                <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>
-                  {lookup.typed} · resolved through mainnet ENS
-                </p>
-              )}
-              {lookup.lane === "basename" && lookup.address && (
-                <p className="mt-1 text-[11px] text-rb-500" data-holder-basename={lookup.typed}>
-                  {lookup.typed} · resolved through Basenames on Base
-                </p>
-              )}
-            </>
-          )}
-          {data.chainStale ? (
-            <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
-              This vault could not be read from chain just now, so no figure is stated for this address in it.
-            </p>
-          ) : onEventPage ? null : (
-            <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-rb-500">
-              {/* The family and the factory; the card names the block. */}
-              <span data-vault-block={data.blockNumber}>
-                MetaMorpho {data.vault.factory}
-                {factory && (
-                  <>
-                    {" · "}
-                    <a
-                      href={explorerUrl(chainId, "address", factory)}
-                      target="_blank"
-                      rel="noopener"
-                      className="link-external"
-                    >
-                      factory
-                    </a>
-                  </>
+                {lookup.lane === "ens" && lookup.address && (
+                  <p className="mt-1 text-[11px] text-rb-500" data-holder-ens={lookup.typed}>
+                    {lookup.typed} · resolved through mainnet ENS
+                  </p>
                 )}
-              </span>
-              <Link
-                href={metaMorphoVaultHref(chainId, address)}
-                className={PAGE_LINK}
-                prefetch={false}
-                data-link="vault-market"
-              >
-                {vaultName} <span aria-hidden>→</span>
-              </Link>
-              <Link
-                href={metaMorphoVaultsListingHref(chainId, { vault: address })}
-                className={PAGE_LINK}
-                prefetch={false}
-                data-link="vault-positions"
-                data-positions-vault={address}
-              >
-                Every holder <span aria-hidden>→</span>
-              </Link>
-            </p>
-          )}
-        </header>
+                {lookup.lane === "basename" && lookup.address && (
+                  <p className="mt-1 text-[11px] text-rb-500" data-holder-basename={lookup.typed}>
+                    {lookup.typed} · resolved through Basenames on Base
+                  </p>
+                )}
+              </>
+            )}
+            {data.chainStale ? (
+              <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-rb-500">
+                This vault could not be read from chain just now, so no figure is stated for this address in it.
+              </p>
+            ) : onEventPage ? null : (
+              <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-rb-500">
+                {/* The family and the factory; the card names the block. */}
+                <span data-vault-block={data.blockNumber}>
+                  MetaMorpho {data.vault.factory}
+                  {factory && (
+                    <>
+                      {" · "}
+                      <a
+                        href={explorerUrl(chainId, "address", factory)}
+                        target="_blank"
+                        rel="noopener"
+                        className="link-external"
+                      >
+                        factory
+                      </a>
+                    </>
+                  )}
+                </span>
+                <Link
+                  href={metaMorphoVaultHref(chainId, address)}
+                  className={PAGE_LINK}
+                  prefetch={false}
+                  data-link="vault-market"
+                >
+                  {vaultName} <span aria-hidden>→</span>
+                </Link>
+                <Link
+                  href={metaMorphoVaultsListingHref(chainId, { vault: address })}
+                  className={PAGE_LINK}
+                  prefetch={false}
+                  data-link="vault-positions"
+                  data-positions-vault={address}
+                >
+                  Every holder <span aria-hidden>→</span>
+                </Link>
+              </p>
+            )}
+          </header>
 
-        {/* An input that named no address is a stated reading, not a 404: the
+          {/* An input that named no address is a stated reading, not a 404: the
             vault is real, the question was asked, and this is the answer to
             what was typed. */}
-        {lookup.error === "invalid" && (
-          <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="invalid">
-            That is none of the accepted forms. A holding is opened with a 20-byte address starting <code>0x</code>, an
-            ENS name ending <code>.eth</code>, or a Basename ending <code>.base.eth</code>.
-          </p>
-        )}
-        {lookup.error === "unresolved" && (
-          <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="unresolved">
-            No address is recorded for {lookup.typed} on Ethereum mainnet at the time of this read.
-          </p>
-        )}
-        {lookup.error === "unresolved-basename" && (
-          <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="unresolved-basename">
-            No address is recorded for {lookup.typed} on Basenames on Base at the time of this read.
-          </p>
-        )}
+          {lookup.error === "invalid" && (
+            <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="invalid">
+              That is none of the accepted forms. A holding is opened with a 20-byte address starting <code>0x</code>,
+              an ENS name ending <code>.eth</code>, or a Basename ending <code>.base.eth</code>.
+            </p>
+          )}
+          {lookup.error === "unresolved" && (
+            <p className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500" data-lookup-error="unresolved">
+              No address is recorded for {lookup.typed} on Ethereum mainnet at the time of this read.
+            </p>
+          )}
+          {lookup.error === "unresolved-basename" && (
+            <p
+              className="mb-6 max-w-3xl text-[13px] leading-relaxed text-rb-500"
+              data-lookup-error="unresolved-basename"
+            >
+              No address is recorded for {lookup.typed} on Basenames on Base at the time of this read.
+            </p>
+          )}
 
-        {!data.chainStale && !onEventPage && data.holder && (
-          <Suspense
-            fallback={
-              <div className="mb-6" data-skel-section="vault-position-card-pending">
-                <SkeletonBlock height={120} />
-              </div>
-            }
-          >
-            <HoldingCardSection data={data} holder={data.holder.address} />
-          </Suspense>
-        )}
-        {!data.chainStale && !onEventPage && data.holder && (
-          <Suspense
-            fallback={
-              <div className="mb-6" data-skel-section="vault-health-pending">
-                <SkeletonBlock height={220} />
-              </div>
-            }
-          >
-            <HealthSection data={data} />
-          </Suspense>
-        )}
-        {!data.chainStale && timelineSlot && <HoldingReceiptsScope>{timelineSlot}</HoldingReceiptsScope>}
+          {!data.chainStale && !onEventPage && data.holder && (
+            <Suspense
+              fallback={
+                <div className="mb-6" data-skel-section="vault-position-card-pending">
+                  <SkeletonBlock height={120} />
+                </div>
+              }
+            >
+              <HoldingCardSection data={data} holder={data.holder.address} />
+            </Suspense>
+          )}
+          {!data.chainStale && !onEventPage && data.holder && (
+            <Suspense
+              fallback={
+                <div className="mb-6" data-skel-section="vault-health-pending">
+                  <SkeletonBlock height={220} />
+                </div>
+              }
+            >
+              <HealthSection data={data} />
+            </Suspense>
+          )}
+          {!data.chainStale && timelineSlot && <HoldingReceiptsScope>{timelineSlot}</HoldingReceiptsScope>}
 
-        <ProvInspectorLayer />
+          <ProvInspectorLayer />
+        </div>
       </div>
-    </div>
+    </FocusSourceGate>
   );
 }

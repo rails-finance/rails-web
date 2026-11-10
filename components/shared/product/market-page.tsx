@@ -14,6 +14,12 @@
 // inspector pins a row's receipts to it and the section's ⋮ still arms them.
 
 import { useMemo, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { assetKey } from "@/lib/shared/asset-family";
+import { protocolForPathname } from "@/lib/shared/protocols";
+import { AimGate } from "@/components/shared/aim-gate";
+import { rowAssetKeys } from "@/lib/shared/focus-row-keys";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
@@ -137,6 +143,15 @@ function Row({ r, t }: { r: ReserveRowModel; t: ReserveTableModel }) {
 
 /** The reserves section: heading and ⋮, line, chips, table. */
 export function ReserveTableSection({ t }: { t: ReserveTableModel }) {
+  // Focus (ui-jobs 557): the reserves whose asset is in focus, on the
+  // explorer's chain; the note says what it hid.
+  const chain = protocolForPathname(usePathname())?.chainId ?? 1;
+  const scoped = useScopedRows(
+    t.rows,
+    (r) => [assetKey(chain, r.asset.address)],
+    () => chain,
+  );
+  const rows = scoped.rows;
   const [groups, setGroups] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState(t.defaultSort.key);
   const [sortDir, setSortDir] = useState<"asc" | "desc">(t.defaultSort.dir);
@@ -158,12 +173,12 @@ export function ReserveTableSection({ t }: { t: ReserveTableModel }) {
       return n;
     });
   const present = useMemo(() => {
-    const s = new Set(t.rows.map((r) => r.group));
+    const s = new Set(rows.map((r) => r.group));
     return (t.groups ?? []).filter((g) => s.has(g.key));
-  }, [t.rows, t.groups]);
+  }, [rows, t.groups]);
   const filtered = useMemo(
-    () => t.rows.filter((r) => groups.size === 0 || (r.group != null && groups.has(r.group))),
-    [t.rows, groups],
+    () => rows.filter((r) => groups.size === 0 || (r.group != null && groups.has(r.group))),
+    [rows, groups],
   );
   const sorted = useMemo(() => {
     const sign = sortDir === "asc" ? 1 : -1;
@@ -185,6 +200,12 @@ export function ReserveTableSection({ t }: { t: ReserveTableModel }) {
         {t.line && <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">{t.line}</p>}
       </SectionHeading>
 
+      <ScopeNote
+        scoped={scoped}
+        noun={[t.assetLabel.toLowerCase(), `${t.assetLabel.toLowerCase()}s`]}
+        className="mt-2"
+      />
+
       {present.length > 0 && (
         <div className="mb-4 mt-3 flex flex-wrap items-center gap-1.5">
           {t.groupLabel && (
@@ -202,7 +223,7 @@ export function ReserveTableSection({ t }: { t: ReserveTableModel }) {
         </div>
       )}
 
-      {filtered.length === 0 ? (
+      {filtered.length === 0 && rows.length === 0 && scoped.on ? null : filtered.length === 0 ? (
         <div className="rounded-lg border border-rb-200 py-12 text-center text-rb-500 dark:border-rb-800">
           <p className="mb-1">{t.emptyFiltered}</p>
           <button type="button" onClick={() => setGroups(new Set())} className={`text-[13px] ${INLINE_LINK}`}>
@@ -305,16 +326,29 @@ export function MarketBody({
   );
 }
 
+/** The keys a market page is judged by under Focus: the family's own object
+ *  (its tokens, read by lib/shared/focus-row-keys.ts), else its reserves. */
+function marketFocusKeys(chain: number, market: Loadable<MarketModel>, focusSource: unknown): string[] {
+  if (focusSource != null) return rowAssetKeys(focusSource, chain);
+  if (market.state !== "ok" || !market.data.reserves) return [];
+  return market.data.reserves.rows.map((r) => assetKey(chain, r.asset.address));
+}
+
 export function MarketPage({
   header,
   market,
   what,
   children,
   hooks,
+  focusSource,
 }: {
   header: ProductPageHeader;
   market: Loadable<MarketModel>;
   what: string;
+  /** Focus (ui-jobs 557): the object whose tokens name this market (a Pendle
+   *  market's tokens, a vault's pair), where it has no reserves table. A
+   *  market none of whose tokens is in focus is gated whole. */
+  focusSource?: unknown;
   /** Sections the family draws after the model's, once the market has read:
    *  "Supplied by vaults", a positions listing. Each is its own `ProvSection`. */
   children?: ReactNode;
@@ -325,10 +359,24 @@ export function MarketPage({
       <div className="py-8">
         <SubPageHeader protocol={header.protocol} title={header.title} learnMore={header.learnMore} />
         <div data-skel-section="page-table">
-          <MarketBody market={market} what={what} />
-          {market.state === "ok" && children}
+          <FocusMarketGate keys={marketFocusKeys(header.protocol.chainId, market, focusSource)} what={what}>
+            <MarketBody market={market} what={what} />
+            {market.state === "ok" && children}
+          </FocusMarketGate>
         </div>
       </div>
     </div>
+  );
+}
+
+/** A market page with tokens to judge is gated by them; one with none yet
+ *  (loading, or a family that names none) draws whole. */
+function FocusMarketGate({ keys, what, children }: { keys: string[]; what: string; children: ReactNode }) {
+  if (keys.length === 0) return <>{children}</>;
+  const name = what.replace(/^the /, "");
+  return (
+    <AimGate keys={keys} what={`${name.charAt(0).toUpperCase()}${name.slice(1)}`}>
+      {children}
+    </AimGate>
   );
 }

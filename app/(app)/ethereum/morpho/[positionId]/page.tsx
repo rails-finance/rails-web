@@ -57,7 +57,11 @@ export default async function MorphoPositionPage({ params, searchParams }: Props
   const [tail, read] = await Promise.all([loadMorphoPositionTail(positionId, grouped), indexReadAt(MAINNET_CHAIN_ID)]);
 
   return (
-    <PositionReadProvider key={`${positionId}:${grouped ? "rows" : "events"}`} read={tail.position ? read : null}>
+    <PositionReadProvider
+      focus={{ source: tail.position }}
+      key={`${positionId}:${grouped ? "rows" : "events"}`}
+      read={tail.position ? read : null}
+    >
       <MorphoPositionView
         // Keyed on the pair so a client-side navigation to another position
         // remounts with that position's server tail as its initial state.

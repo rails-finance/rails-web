@@ -939,6 +939,7 @@ export function FluidVaultPage({ data, vaultId }: { data: FluidVaultDetail | nul
       market={market}
       what={`vault ${vaultId}`}
       hooks={{ "data-fluid-vault-page": String(vaultId) }}
+      focusSource={data}
     />
   );
 }

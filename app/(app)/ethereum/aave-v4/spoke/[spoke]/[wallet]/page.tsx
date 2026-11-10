@@ -80,7 +80,7 @@ export default async function AaveV4SpokePage({ params }: Props) {
   );
 
   return (
-    <PositionReadProvider key={`${spokeSlug}:${wallet}`} read={read}>
+    <PositionReadProvider focus={{ source: tail.spokePositions }} key={`${spokeSlug}:${wallet}`} read={read}>
       <AaveV4SpokeView
         // Keyed on the pair so a client-side navigation to another spoke or
         // account remounts with that position's server tail as its initial state.

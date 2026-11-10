@@ -33,6 +33,8 @@
 //     which rows are shown; a group says "shown" while they do, and the counts
 //     line says how many of the funded vaults are shown.
 
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { assetKey } from "@/lib/shared/asset-family";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { isoSeconds, RosterReadStamp } from "@/components/vaults/roster-read-stamp";
@@ -216,7 +218,7 @@ interface RosterFilters extends BaseListFilters {
 }
 
 export function VaultRoster({
-  vaults,
+  vaults: allVaults,
   yields,
   chainId,
   blockNumber,
@@ -282,6 +284,13 @@ export function VaultRoster({
   const [emptyOpen, setEmptyOpen] = useState(false);
   const [query, setQuery] = useState("");
 
+  // Focus (ui-jobs 557): the vaults whose share token or asset is in focus.
+  const scoped = useScopedRows(
+    allVaults as VaultSummary[],
+    (v) => [assetKey(chainId, v.address), assetKey(chainId, v.asset.address)],
+    () => chainId,
+  );
+  const vaults = scoped.rows;
   const funded = useMemo(() => vaults.filter((v) => v.totalAssets != null && rawOf(v) > ZERO), [vaults]);
   const emptyRows = useMemo(() => vaults.filter((v) => v.totalAssets != null && rawOf(v) === ZERO), [vaults]);
   const unread = useMemo(() => vaults.filter((v) => v.totalAssets == null), [vaults]);
@@ -589,6 +598,7 @@ export function VaultRoster({
   return (
     <>
       {intro}
+      <ScopeNote scoped={scoped} noun={["vault", "vaults"]} className="mb-2" />
       {/* ── the listings' toolbar: search, facets and preset, sort ──────── */}
       <ListToolbar
         dimensions={dimensions}

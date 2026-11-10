@@ -17,6 +17,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { useChainId } from "@/lib/shared/chain-context";
 import { explorerUrl } from "@/lib/shared/chains";
 import { positionReadWords, sameRead, type PositionRead } from "@/lib/shared/position-read";
+import { AimGate } from "@/components/shared/aim-gate";
+import { rowAssetKeys } from "@/lib/shared/focus-row-keys";
 
 interface ReadStore {
   read: PositionRead | null;
@@ -26,7 +28,19 @@ interface ReadStore {
 const PositionReadContext = createContext<ReadStore | null>(null);
 
 /** The page's read. Key it with the view, so a navigation to another position starts from that page's read. */
-export function PositionReadProvider({ read, children }: { read: PositionRead | null; children: ReactNode }) {
+export function PositionReadProvider({
+  read,
+  children,
+  focus,
+}: {
+  read: PositionRead | null;
+  children: ReactNode;
+  /** Focus (ui-jobs 557): the position the page loaded, whose token addresses
+   *  (lib/shared/focus-row-keys.ts) decide whether it is in focus. A position
+   *  outside the focus is gated whole; one inside shows whole, its events
+   *  included. A position with no token Rails can read is not gated. */
+  focus?: { source: unknown; what?: string };
+}) {
   const chainId = useChainId();
   const [live, setLive] = useState<PositionRead | null>(null);
   const [times, setTimes] = useState<ReadonlyMap<number, number>>(() => new Map());
@@ -47,7 +61,18 @@ export function PositionReadProvider({ read, children }: { read: PositionRead | 
   }, [chainId, untimed, times]);
   const timed =
     shown && shown.at == null && shown.block != null ? { ...shown, at: times.get(shown.block) ?? null } : shown;
-  return <PositionReadContext.Provider value={{ read: timed, report }}>{children}</PositionReadContext.Provider>;
+  const keys = focus ? rowAssetKeys(focus.source, chainId) : [];
+  return (
+    <PositionReadContext.Provider value={{ read: timed, report }}>
+      {keys.length > 0 ? (
+        <AimGate keys={keys} chain={chainId} what={focus?.what ?? "This position"}>
+          {children}
+        </AimGate>
+      ) : (
+        children
+      )}
+    </PositionReadContext.Provider>
+  );
 }
 
 /** A family's live read, once its figures stand on it; null or undefined leaves the stamp as it is. */

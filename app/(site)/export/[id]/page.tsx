@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { ExportReceiptView } from "./receipt-view";
 
+// focus: an export the reader made, shown as it was exported.
+
 // The link a queued CSV export hands the reader (rails-ops decision 0029). It
 // shows the job while the file is prepared and the download once it is ready,
 // for 24 hours, whether or not the page that requested it is still open.

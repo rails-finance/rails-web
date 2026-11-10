@@ -45,7 +45,11 @@ export default async function LlamalendPositionPage({ params }: Props) {
   const [tail, read] = await Promise.all([loadLlamalendPositionTail(controller, user), indexReadAt(MAINNET_CHAIN_ID)]);
 
   return (
-    <PositionReadProvider key={`${controller}:${user}`} read={tail.position ? read : null}>
+    <PositionReadProvider
+      focus={{ source: tail.position }}
+      key={`${controller}:${user}`}
+      read={tail.position ? read : null}
+    >
       <LlamalendPositionView
         // Keyed on the pair so a client-side navigation to another position
         // remounts with that position's server tail as its initial state.

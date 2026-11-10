@@ -5,6 +5,8 @@
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { ProtocolFrontDoor } from "@/components/shared/protocol-front-door";
 
+// focus: the explorer's front door, a wallet look-up with no list; FocusChainGate gates the explorer when the focus hides it.
+
 export const metadata = listingMetadata({
   title: "Compound V3 on Arbitrum",
   canonicalPath: "/arbitrum/compound-v3",
