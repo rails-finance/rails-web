@@ -162,7 +162,7 @@ function Tile({
 }
 
 const LABEL =
-  "cursor-help text-[13px] text-rb-500 underline decoration-rb-400 decoration-dotted underline-offset-4 dark:decoration-rb-500";
+  "cursor-help text-[14px] font-semibold text-rb-500 underline decoration-rb-400 decoration-dotted underline-offset-4 dark:decoration-rb-500";
 
 function Term({ label, tip }: { label: string; tip?: string }) {
   return tip ? (
@@ -170,15 +170,17 @@ function Term({ label, tip }: { label: string; tip?: string }) {
       {label}
     </abbr>
   ) : (
-    <span className="text-[13px] text-rb-500">{label}</span>
+    <span className="text-[14px] font-semibold text-rb-500">{label}</span>
   );
 }
 
 // Configuration and addresses: one rule for all three columns.
-// - Column heading: 12px semibold muted, no rule under it.
+// - Column heading: the section heading's style (14px semibold foreground),
+//   no rule under it; the tile has no heading of its own.
 // - Row: label left, value right-aligned to the column's edge, on one
 //   baseline; a hairline between rows, none under a column's last row.
-// - Label: 13px regular muted; dotted underline only when it has a tip.
+// - Label: 14px semibold muted, the value's size; dotted underline only
+//   when it has a tip.
 // - Value: 14px medium foreground. An address: short form in mono, copy
 //   button, explorer icon button ("View on Etherscan" / "View on Basescan").
 // - Sub-text: 12px muted, its own line under the label.
@@ -199,7 +201,7 @@ function Row({
 }) {
   return (
     <div
-      className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 border-b border-rb-200 py-2.5 last:border-b-0 dark:border-rb-500/30"
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 border-b border-rb-200 py-2.5 last-of-type:border-b-0 dark:border-rb-500/30"
       {...hook}
     >
       <dt className="min-w-0">
@@ -1216,18 +1218,17 @@ export function MockVaultLayout({
 
         <Tile id="configuration" wide last>
           <ProvSection scope="mock-config" data-mock-section="config">
-            <SectionHeading
-              title="Configuration and addresses"
-              stamp={configStamp(
+            <div className="absolute right-5 top-5 flex items-center gap-2">
+              {configStamp(
                 config.block ?? protects?.block ?? null,
                 "The fee and the roles",
                 "fee(), feeRecipient(), owner(), curator(), guardian()",
               )}
-              menu={<SectionMenu scope="mock-config" title="Configuration and addresses" />}
-            ></SectionHeading>
-            <div className="mt-3 grid grid-cols-1 gap-x-8 gap-y-5 lg:grid-cols-3" data-prov-exempt="">
+              <SectionMenu scope="mock-config" title="Configuration and addresses" />
+            </div>
+            <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-3" data-prov-exempt="">
               <div className="min-w-0">
-                <h3 className="text-xs font-semibold text-rb-500">Configuration</h3>
+                <h2 className="text-sm font-semibold text-foreground">Configuration</h2>
                 <dl className="mt-1">
                   <Fact
                     id="network"
@@ -1281,7 +1282,7 @@ export function MockVaultLayout({
                 </dl>
               </div>
               <div className="min-w-0">
-                <h3 className="text-xs font-semibold text-rb-500">Roles</h3>
+                <h2 className="text-sm font-semibold text-foreground">Roles</h2>
                 <dl className="mt-1">
                   <AddressRow
                     id="owner"
@@ -1311,7 +1312,7 @@ export function MockVaultLayout({
                 <p className="mt-2 text-xs text-rb-500">Allocators are not listed here.</p>
               </div>
               <div className="min-w-0">
-                <h3 className="text-xs font-semibold text-rb-500">Contracts</h3>
+                <h2 className="text-sm font-semibold text-foreground">Contracts</h2>
                 <dl className="mt-1">
                   <AddressRow
                     id="vault"
