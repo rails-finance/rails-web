@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — the page on the rail's sub-nav, drawn on the typed
 // template (rails-ops standards/info-page-template.md). f(x) keeps no
 // event-prose yaml, so the glossary sits here. Every link is a page of

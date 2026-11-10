@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — Seamless on Base, drawn on the typed template
 // (rails-ops standards/info-page-template.md). Seamless's own documentation site is offline
 // (reference/official-docs/seamless.md), so the glossary links the Aave V3 documentation, the

@@ -1,3 +1,4 @@
+// focus: Rails' own writing; no asset or chain to filter
 import { notFound } from "next/navigation";
 import { ArticleLayout } from "@/components/blog/ArticleLayout";
 import { articles } from "../data/articles";

@@ -1,3 +1,4 @@
+// focus: a legal page; no asset or chain to filter
 import type { Metadata } from "next";
 import { HOME_SHARE_IMAGE, SITE_URL, twitterCard } from "@/lib/shared/page-metadata";
 import { LEGAL_LAST_UPDATED } from "@/lib/shared/site-dates";

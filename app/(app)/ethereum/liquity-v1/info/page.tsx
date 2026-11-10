@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — the page on the rail's sub-nav, drawn on the typed
 // template (rails-ops standards/info-page-template.md). The glossary text lives in
 // content/liquity-v1/event-prose.yaml.

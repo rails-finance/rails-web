@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer: the page on the rail's (i), drawn on the typed template
 // (rails-ops standards/info-page-template.md). Every link is a page of
 // docs.pendle.finance, the host content/official-docs.json lists for pendle.

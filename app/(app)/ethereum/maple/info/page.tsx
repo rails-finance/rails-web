@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — Maple on Ethereum, drawn on the typed template
 // (rails-ops standards/info-page-template.md). Every link is Maple's official
 // documentation (docs.maple.finance).

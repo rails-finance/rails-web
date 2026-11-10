@@ -1,3 +1,4 @@
+// focus: the explorer's explainer; the shell's gate stands over the explorer
 // About this explorer — a page of its own on the rail's sub-nav, drawn on
 // ProtocolInfoPage (rails-ops standards/info-page-template.md). Basedollar has no
 // reachable documentation site (docs.basedollar.money does not answer), so the glossary
