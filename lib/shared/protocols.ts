@@ -194,8 +194,9 @@ const SPECS: ProtocolSpec[] = [
     label: "Aerodrome",
     chainId: 8453,
     slug: "aerodrome",
-    // DRAFT: hue 262, read off Aerodrome's blue.
-    brand: 262,
+    // Hue 264, Aerodrome's blue #0433FF in oklch (the mark's second stripe, from
+    // the favicon in aerodrome-finance/agents on GitHub).
+    brand: 264,
     tags: ["Liquidity"],
     desc: "Concentrated liquidity on Base, staked or not: a position's range, fees or AERO and pool over the last 30 days",
     positionListing: false,
