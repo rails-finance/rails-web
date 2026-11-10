@@ -38,6 +38,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { useAssetScope } from "@/lib/shared/asset-scope";
 import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 import { ProvenanceInfoTabs } from "@/components/shared/provenance-info-tabs";
 import { RatioBar, type RatioBarTick } from "@/components/shared/ratio-bar";
@@ -416,7 +417,11 @@ export function LiquityForkBranchesView({
             ))}
           </div>
         ) : (
-          <p className="mt-3 text-[13px] text-rb-500">No branch currently holds a trove to redeem against.</p>
+          <p className="mt-3 text-[13px] text-rb-500">
+            {scoped.on && !scoped.peek && scoped.rows.length < scoped.total
+              ? "No branch in your focus holds a trove to redeem against."
+              : "No branch currently holds a trove to redeem against."}
+          </p>
         )}
       </section>
 
@@ -428,6 +433,8 @@ export function LiquityForkBranchesView({
 /** The page header's live-read stamp — the block every figure was read at. */
 export function LiquityForkBranchesStamp({ data }: { data: LiquityForkBranchesResponse }) {
   const chainId = useChainId();
+  // Under Focus the totals still cover every branch, and say so.
+  const focused = useAssetScope().on;
   if (data.chainStale || data.blockNumber === 0) return null;
   return (
     <p className="mt-2 text-[11px] text-rb-500">
@@ -435,6 +442,7 @@ export function LiquityForkBranchesStamp({ data }: { data: LiquityForkBranchesRe
       {" · "}
       <AmountText value={data.totalDebt} format="compact" /> {data.debtSymbol} outstanding
       {data.totalCollUsd != null && ` against ${formatUsdValue(data.totalCollUsd)} of collateral`}
+      {focused && ` across all ${data.branches.length} branches`}
       {!data.totalCollUsdComplete && data.branches.some((b) => !b.stale) && (
         <span className="text-rb-400"> · a collateral total is withheld: not every branch priced on this read</span>
       )}

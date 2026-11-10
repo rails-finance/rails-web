@@ -45,6 +45,7 @@ import { walletCountProv, walletTradeAtProv } from "@/lib/cow/trade";
 import type { CowWalletEntry } from "@/lib/cow/types";
 import type { WalletFamilyRead, WalletPosition, WalletRead } from "@/lib/wallet/types";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { useAssetScope } from "@/lib/shared/asset-scope";
 import { walletPositionAssetKeys } from "@/lib/wallet/aim-assets";
 
 const TILE = "rounded-2xl border border-rb-300/40 bg-raised px-5 py-4 dark:border-rb-700/40";
@@ -375,7 +376,9 @@ export function WalletView({
   const notRead = openAll.filter((p) => p.notRead);
   const open = [...ranked, ...dust, ...notRead];
   const closed = all.filter((p) => p.status !== "open");
-  const unread = read.families.filter((r) => r.headRead === "failed");
+  const scope = useAssetScope();
+  // Under Focus, only the families on a chain in focus.
+  const unread = read.families.filter((r) => r.headRead === "failed" && (!filtered || scope.chainOk(r.chain)));
   const stamps = open.map((p) => p.readAt).filter((t): t is number => t != null);
   const oldest = stamps.length ? Math.min(...stamps) : undefined;
   const atRiskCount = open.filter(atRisk).length;
@@ -517,8 +520,9 @@ export function WalletView({
           </>
         )}
 
-        {/* AIM's universe has no Arbitrum token, so under AIM the note has nothing to offer. */}
-        {!read.error && !filtered && <ArbitrumNote address={address} />}
+        {/* How Arbitrum positions come to show: kept under a focus that takes in
+            Arbitrum, the only guidance there is for it. */}
+        {!read.error && (!filtered || scope.chains.includes(ARBITRUM_CHAIN_ID)) && <ArbitrumNote address={address} />}
 
         {unread.length > 0 && (
           <p className="text-xs text-rb-500" data-wallet-unread={unread.map((r) => r.id).join(",")}>

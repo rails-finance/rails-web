@@ -511,27 +511,22 @@ export function morphoMarketFetchParams(
 // no facet behind. A server `assets` param (approved, not built) would take
 // the AIM set whole and lift the cap.
 
-/** The markets AIM reaches on this listing, by population, and the symbols
- *  that put them there. A side counts where any roster address under its
- *  symbol has its `1:address` in the set. */
+/** The markets Focus reaches on this listing, by population, and the symbols
+ *  that put them there. A side counts where its token's address, `1:address`,
+ *  is in the set: by address, so one of three USDC contracts in focus does not
+ *  bring in the markets of the other two. */
 export function morphoAimMarkets(
   roster: MorphoMarketRosterResponse,
   keys: ReadonlySet<string>,
 ): { ids: string[]; symbols: string[] } {
-  const inSet = new Map<string, boolean>();
-  const symbolIn = (symbol: string | null) => {
-    if (!symbol) return false;
-    let v = inSet.get(symbol);
-    if (v == null) {
-      v = (roster.tokens[symbol] ?? []).some((a) => keys.has(`1:${a.toLowerCase()}`));
-      inSet.set(symbol, v);
-    }
-    return v;
-  };
+  const inSet = (addr: string | null | undefined) => !!addr && keys.has(`1:${addr.toLowerCase()}`);
   const weight = new Map<string, number>();
   const hit: MorphoMarketRosterEntry[] = [];
   for (const m of roster.markets) {
-    const sides = [m.loanSymbol, m.collateralSymbol].filter((s): s is string => symbolIn(s));
+    const sides = [
+      inSet(m.loanToken) ? m.loanSymbol : null,
+      inSet(m.collateralToken) ? m.collateralSymbol : null,
+    ].filter((s): s is string => s != null);
     if (sides.length === 0) continue;
     hit.push(m);
     for (const s of sides) weight.set(s, (weight.get(s) ?? 0) + m.positions);

@@ -5,24 +5,25 @@
 // While Focus is on the dropdown is restricted too (Miles, 9 Nov 2026): a
 // chain, token, vault or explorer row shows only where it is in focus
 // (useAimSuggestScope); wallets and bookmarks stay. Assets and chains are
-// added in the Focus panel, opened from the strip, which is also the way out.
+// added in the Focus panel, opened from the profile menu, which is also the
+// way out. Under asset focus a chain row shows only where one of its
+// explorers lists an asset in focus; under chain focus a token row shows only
+// where the symbol has a token on a focused chain.
 //
 // A chain row carries the same button (AimChainButton): "Focus" focuses Rails
 // on that chain (with assets picked, narrows them to it); "In focus" takes it
 // out.
 //
-// The button on a token row: "AIM" while AIM is off turns it on with that
-// token; "In AIM" while it is on takes it out.
+// The button on a token row: "Focus" adds the token; "In focus" takes it out.
 // The index carries a token as its symbol alone. The symbol maps to every
-// token the AIM chooser offers under it, case aside, on every chain
+// token the chooser offers under it, case aside, on every chain
 // (SCOPE_SYMBOLS, the same reading as a bare `?assets=bold`): "USDC" adds
-// USDC on Ethereum and on Base, and a symbol two contracts share on one chain
-// adds both. A symbol the chooser does not offer draws no button.
+// USDC on Ethereum and on Base. A symbol the chooser does not offer draws no
+// button.
 //
-//   off               "AIM"         turns AIM on with the symbol's tokens, built-on on
-//   on, picked        "In AIM"      takes them out (the last one out turns AIM off)
-//   on, reached       "In AIM"      a label, no press: another pick's built-on reaches it
-// An out-of-set token row is not drawn under AIM; were one passed, it draws nothing.
+//   no asset picked   "Focus"       adds the symbol's tokens, built-on on
+//   picked            "In focus"    takes them out (the last one out turns Focus off)
+//   reached           "In focus"    a grey label, no press: another pick's built-on reaches it
 
 import { forwardRef, useMemo, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Check } from "lucide-react";
@@ -30,7 +31,7 @@ import { assetKey } from "@/lib/shared/asset-family";
 import { SCOPE_SYMBOLS, useAssetScope } from "@/lib/shared/asset-scope";
 import { CHAINS } from "@/lib/shared/chains";
 import { useExplorerScope } from "@/lib/shared/explorer-scope";
-import { protocolForHref } from "@/lib/shared/protocols";
+import { LAUNCHED_PROTOCOLS, protocolForHref } from "@/lib/shared/protocols";
 import type { SuggestScope } from "@/lib/search/suggest";
 
 export type AimButtonState = "off" | "in" | "reached" | "out";
@@ -52,13 +53,24 @@ export function useAimSuggestScope(): SuggestScope | null {
       const id = CHAIN_IDS[name];
       return id == null ? scope.chains.length === 0 : scope.chainOk(id);
     };
+    /** A chain row: focused, and with assets picked, one of its explorers lists one. */
+    const chainRow = (name: string) => {
+      if (!chainOk(name)) return false;
+      if (!keys) return true;
+      const id = CHAIN_IDS[name];
+      return ex.on && LAUNCHED_PROTOCOLS.some((p) => p.chainId === id && ex.statusOf(p.id) === "lists");
+    };
     const symbolIn = (symbol: string, chain?: number) =>
       aimTokensFor(symbol).some(
         (t) => (chain == null || t.chain === chain) && keys != null && keys.has(assetKey(t.chain, t.token)),
       );
     return {
-      chain: chainOk,
-      token: (symbol) => !keys || symbolIn(symbol),
+      chain: chainRow,
+      token: (symbol) => {
+        if (keys) return symbolIn(symbol);
+        const known = aimTokensFor(symbol);
+        return known.length === 0 || known.some((t) => scope.chainOk(t.chain));
+      },
       vault: (v) => {
         const chain = CHAIN_IDS[v[4]];
         if (!chainOk(v[4])) return false;
@@ -111,7 +123,7 @@ export const AimSearchButton = forwardRef<
   if (state === "reached")
     return (
       <span
-        className="inline-flex shrink-0 items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-teal-700 dark:text-teal-400"
+        className="inline-flex shrink-0 items-center gap-1 px-2 py-0.5 text-[11px] font-semibold text-rb-500"
         title="Built on another asset in your focus"
         data-aim-search="reached"
       >
@@ -128,7 +140,8 @@ export const AimSearchButton = forwardRef<
     scope.setPicks(tokens.map((t) => ({ ...t, builtOn: true })));
   };
 
-  const label = state === "off" ? `Focus Rails on ${symbol}` : `Remove ${symbol} from your focus`;
+  const label =
+    state === "in" ? `Remove ${symbol} from focus` : scope.on ? `Add ${symbol} to focus` : `Focus on ${symbol}`;
 
   return (
     <button
@@ -169,7 +182,7 @@ export const AimChainButton = forwardRef<
   const chainId = CHAIN_IDS[chain];
   if (!scope.ready || chainId == null) return null;
   const inFocus = scope.chains.includes(chainId);
-  const label = inFocus ? `Remove ${chain} from your focus` : `Focus Rails on ${chain}`;
+  const label = inFocus ? `Remove ${chain} from focus` : scope.on ? `Add ${chain} to focus` : `Focus on ${chain}`;
   return (
     <button
       ref={ref}

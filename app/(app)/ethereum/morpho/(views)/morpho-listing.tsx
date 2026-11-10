@@ -143,7 +143,7 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
     <button
       type="button"
       onClick={() => window.dispatchEvent(new Event(OPEN_SCOPE_PANEL))}
-      className="inline-flex items-center gap-1 rounded-full bg-teal-500/15 px-2.5 py-1 text-xs text-teal-800 transition-colors hover:bg-teal-500/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 dark:text-teal-200"
+      className="inline-flex items-center gap-1 rounded-full bg-teal-500/15 px-2.5 py-1 text-xs text-teal-700 transition-colors hover:bg-teal-500/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 dark:text-teal-400"
       title={aim ? `Loan or collateral in your focus: ${aim.symbols.join(", ") || "none"}` : undefined}
       aria-label={`Focus: ${aim?.symbols.join(", ") || "assets"}. Change focus`}
       data-aim-chip={aim?.symbols.length ?? ""}
@@ -171,19 +171,22 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
               {label}
             </button>
           );
+          const word = (v: number) => (v === 1 ? "position" : "positions");
           if (peek)
             return (
               <span data-scope-note="" data-total={total}>
-                Showing all {n(total)} positions · {press("Back to your focus", false)}
+                Showing all {n(total)} {word(total)} · {press("Back to your focus", false)}
               </span>
             );
           return (
             <span data-scope-note="" data-shown={total} data-total={unscoped ?? ""}>
               {unscoped == null
-                ? `${n(total)} positions in your focus`
+                ? total === 0
+                  ? "No position in your focus matches"
+                  : `${n(total)} ${word(total)} in your focus`
                 : total === 0
-                  ? `None of the ${n(unscoped)} positions holds an asset in your focus`
-                  : `Showing ${n(total)} of ${n(unscoped)} positions`}{" "}
+                  ? `None of the ${n(unscoped)} ${word(unscoped)} is in your focus`
+                  : `Showing ${n(total)} of ${n(unscoped)} ${word(unscoped)}`}{" "}
               · {press("Show all", true)}
             </span>
           );
@@ -268,7 +271,9 @@ export function MorphoListing({ initialItems, initialTotal, initialKey, initialS
             params ? fetchMorphoPositions(params) : null,
             aimRef.current && all ? fetchMorphoPositions({ ...all, limit: 1, offset: 0 }) : null,
           ]);
-          if (aimRef.current) setUnscoped(whole ? whole.pagination.total : 0);
+          // Nothing to ask without Focus (the roster unread, or a selection that
+          // matches nothing): no figure to set the shown count against.
+          if (aimRef.current) setUnscoped(whole ? whole.pagination.total : null);
           return r ? { data: r.data, total: r.pagination.total } : { data: [], total: 0 };
         },
         fetchCount: market

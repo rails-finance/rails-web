@@ -21,6 +21,7 @@ import { readAssetDoor, ASSET_DOOR_POOL } from "@/lib/start/asset-door";
 import { AssetDoorCards } from "@/components/start/asset-door";
 import { ASSET_DOOR, HEALTH_DISCLAIMER } from "@/lib/vaults/health-words";
 import { PairDoorCards } from "@/components/start/pair-door";
+import { InFocusSymbol, StartOutOfFocus } from "@/components/start/start-focus";
 import { fetchUniswapPair } from "@/lib/api/fetch-uniswap";
 import { PAIRS, PAIR_TOKENS, pairCards, type PairKey } from "@/lib/uniswap/pairs";
 import { PAIR_DOOR } from "@/lib/uniswap/words";
@@ -274,22 +275,24 @@ async function AssetStep({ group, symbol, groupBase }: { group: GroupKey; symbol
         {coins.map((c) => {
           const chosen = c.label === symbol;
           return (
-            <li key={c.label}>
-              <Link
-                href={`${groupBase}/${coinSlug(c.label)}`}
-                scroll={false}
-                aria-current={chosen ? "page" : undefined}
-                data-start-asset-chip={c.label}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 dark:focus-visible:ring-teal-400 ${
-                  chosen
-                    ? "border-teal-600 font-medium text-foreground dark:border-teal-400"
-                    : "border-rb-200 text-rb-500 hover:border-teal-600 dark:border-rb-600 dark:hover:border-teal-400"
-                }`}
-              >
-                <TokenChipIcon symbol={c.label} size={16} filterable={false} untitled />
-                {c.label}
-              </Link>
-            </li>
+            <InFocusSymbol key={c.label} symbols={[c.label]}>
+              <li>
+                <Link
+                  href={`${groupBase}/${coinSlug(c.label)}`}
+                  scroll={false}
+                  aria-current={chosen ? "page" : undefined}
+                  data-start-asset-chip={c.label}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 dark:focus-visible:ring-teal-400 ${
+                    chosen
+                      ? "border-teal-600 font-medium text-foreground dark:border-teal-400"
+                      : "border-rb-200 text-rb-500 hover:border-teal-600 dark:border-rb-600 dark:hover:border-teal-400"
+                  }`}
+                >
+                  <TokenChipIcon symbol={c.label} size={16} filterable={false} untitled />
+                  {c.label}
+                </Link>
+              </li>
+            </InFocusSymbol>
           );
         })}
       </ul>
@@ -297,7 +300,9 @@ async function AssetStep({ group, symbol, groupBase }: { group: GroupKey; symbol
       <p className="mb-6 max-w-2xl text-rb-500" data-start-disclaimer="">
         {HEALTH_DISCLAIMER}
       </p>
-      <AssetDoorCards symbol={door.symbol} cards={door.cards} hiddenCount={door.hiddenCount} pool={ASSET_DOOR_POOL} />
+      <InFocusSymbol symbols={[door.symbol]} fallback={<StartOutOfFocus what={door.symbol} />}>
+        <AssetDoorCards symbol={door.symbol} cards={door.cards} hiddenCount={door.hiddenCount} pool={ASSET_DOOR_POOL} />
+      </InFocusSymbol>
     </div>
   );
 }
@@ -310,24 +315,26 @@ function Pairs({ base }: { base: string }) {
       <p className="mb-8 max-w-2xl text-lg text-rb-500">{PAIR_DOOR.listLine}</p>
       <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {(Object.keys(PAIRS) as PairKey[]).map((k) => (
-          <li key={k}>
-            <Link href={`${base}/${k}`} className={PAGE_ROW} data-start-pair={k}>
-              <span className="flex -space-x-1.5" aria-hidden="true">
-                {[PAIRS[k].base, PAIRS[k].quote].map((sym) => (
-                  <span key={sym} className="rounded-full ring-2 ring-[var(--surface-raised)]">
-                    <TokenChipIcon symbol={sym} size={24} filterable={false} untitled />
-                  </span>
-                ))}
-              </span>
-              <span className="text-base font-medium text-foreground">
-                {PAIR_DOOR.chip(PAIRS[k].base, PAIRS[k].quote)}
-              </span>
-              <ArrowRight
-                className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-[var(--text-link)]"
-                aria-hidden="true"
-              />
-            </Link>
-          </li>
+          <InFocusSymbol key={k} symbols={[PAIRS[k].base, PAIRS[k].quote]}>
+            <li>
+              <Link href={`${base}/${k}`} className={PAGE_ROW} data-start-pair={k}>
+                <span className="flex -space-x-1.5" aria-hidden="true">
+                  {[PAIRS[k].base, PAIRS[k].quote].map((sym) => (
+                    <span key={sym} className="rounded-full ring-2 ring-[var(--surface-raised)]">
+                      <TokenChipIcon symbol={sym} size={24} filterable={false} untitled />
+                    </span>
+                  ))}
+                </span>
+                <span className="text-base font-medium text-foreground">
+                  {PAIR_DOOR.chip(PAIRS[k].base, PAIRS[k].quote)}
+                </span>
+                <ArrowRight
+                  className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-[var(--text-link)]"
+                  aria-hidden="true"
+                />
+              </Link>
+            </li>
+          </InFocusSymbol>
         ))}
       </ul>
     </div>
@@ -346,27 +353,31 @@ async function PairStep({ pair, pairsBase }: { pair: PairKey; pairsBase: string 
         {(Object.keys(PAIRS) as PairKey[]).map((k) => {
           const chosen = k === pair;
           return (
-            <li key={k}>
-              <Link
-                href={`${pairsBase}/${k}`}
-                scroll={false}
-                aria-current={chosen ? "page" : undefined}
-                data-start-pair-chip={k}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 dark:focus-visible:ring-teal-400 ${
-                  chosen
-                    ? "border-teal-600 font-medium text-foreground dark:border-teal-400"
-                    : "border-rb-200 text-rb-500 hover:border-teal-600 dark:border-rb-600 dark:hover:border-teal-400"
-                }`}
-              >
-                {PAIR_DOOR.chip(PAIRS[k].base, PAIRS[k].quote)}
-              </Link>
-            </li>
+            <InFocusSymbol key={k} symbols={[PAIRS[k].base, PAIRS[k].quote]}>
+              <li>
+                <Link
+                  href={`${pairsBase}/${k}`}
+                  scroll={false}
+                  aria-current={chosen ? "page" : undefined}
+                  data-start-pair-chip={k}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 dark:focus-visible:ring-teal-400 ${
+                    chosen
+                      ? "border-teal-600 font-medium text-foreground dark:border-teal-400"
+                      : "border-rb-200 text-rb-500 hover:border-teal-600 dark:border-rb-600 dark:hover:border-teal-400"
+                  }`}
+                >
+                  {PAIR_DOOR.chip(PAIRS[k].base, PAIRS[k].quote)}
+                </Link>
+              </li>
+            </InFocusSymbol>
           );
         })}
       </ul>
       <h2 className={QUESTION}>{PAIR_DOOR.heading(base, quote)}</h2>
       {answer.kind === "ok" ? (
-        <PairDoorCards base={base} quote={quote} cards={pairCards(answer.data, pair)} />
+        <InFocusSymbol symbols={[base, quote]} fallback={<StartOutOfFocus what={PAIR_DOOR.chip(base, quote)} />}>
+          <PairDoorCards base={base} quote={quote} cards={pairCards(answer.data, pair)} />
+        </InFocusSymbol>
       ) : (
         <p className="text-sm text-rb-500">{PAIR_DOOR.unanswered}</p>
       )}
