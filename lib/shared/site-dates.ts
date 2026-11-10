@@ -11,4 +11,4 @@ export const DEPLOYED_AT = new Date(process.env.RAILS_DEPLOYED_AT ?? "2026-10-30
 /** The day the Privacy Policy and Terms of Service wording last changed. Both
  *  pages print it and the sitemap names it; bump it by hand whenever either
  *  text is revised. */
-export const LEGAL_LAST_UPDATED = { iso: "2026-09-28", label: "September 28, 2026" } as const;
+export const LEGAL_LAST_UPDATED = { iso: "2026-11-10", label: "November 10, 2026" } as const;
