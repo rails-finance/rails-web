@@ -19,6 +19,7 @@
 // mock's headlines (`heads`) and the sidebar's protocol and chain through the
 // edge context, which the live page reads from its route.
 
+import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { serverReadOf } from "@/lib/shared/server-head-read";
@@ -1149,15 +1150,23 @@ export function MockVaultLayout({
                 "fee(), feeRecipient(), owner(), curator(), guardian()",
               )}
               menu={<SectionMenu scope="mock-config" title="Configuration and addresses" />}
-            >
-              <p className="mt-1 text-[13px] text-rb-500">
-                {chain.name}, chain id {chainId}
-              </p>
-            </SectionHeading>
+            ></SectionHeading>
             <div className="mt-3 grid grid-cols-1 gap-x-8 gap-y-5 lg:grid-cols-3" data-prov-exempt="">
               <div className="min-w-0">
                 <h3 className="text-xs font-semibold text-rb-500">Configuration</h3>
                 <dl className="mt-1">
+                  <Fact
+                    id="network"
+                    label="Network"
+                    tip="The chain the vault and every address on this page live on."
+                    value={
+                      <span className="inline-flex items-center gap-1.5">
+                        <ChainGlyph id={chainId} className="h-4 w-4 shrink-0" />
+                        {chain.name}
+                      </span>
+                    }
+                    sub={`chain id ${chainId}`}
+                  />
                   <Fact
                     id="version"
                     label="Version"
