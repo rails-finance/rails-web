@@ -414,12 +414,12 @@ export function reserveFigures({ r, vocab, assetHref }: RowProps) {
     available:
       priced && availTokens > 0
         ? {
-            amount: <span data-available-basis={basis}>{tokenAmount(availTokens, availableInfo, null)}</span>,
+            amount: tokenAmount(availTokens, availableInfo, null),
             value: <Prov info={availableInfo}>{fmtUsd(availUsd).display}</Prov>,
           }
         : null,
   };
-  return { supplied, borrowed, available, amounts, supplyRate, borrowRate, price };
+  return { supplied, borrowed, available, amounts, availableBasis: basis, supplyRate, borrowRate, price };
 }
 
 /** One line of the details panel. */

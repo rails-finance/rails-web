@@ -408,7 +408,13 @@ function reserveRows(m: AaveMarketConfig, view: AaveMarketView, vocab: AaveMarke
         available: {
           sort: [availTokens * (r.priceUsd ?? 0), availTokens],
           title: r.virtualBalance != null ? "The Pool's balance of this reserve" : "Supplied less borrowed",
-          node: z.amounts.available ? <DataTableAmount {...z.amounts.available} /> : z.available,
+          node: z.amounts.available ? (
+            <span data-available-basis={z.availableBasis}>
+              <DataTableAmount {...z.amounts.available} />
+            </span>
+          ) : (
+            z.available
+          ),
         },
         supplyRate: { sort: r.supplyApr, title: `Supply rate: ${RATE_TIP.supply.toLowerCase()}`, node: z.supplyRate },
         borrowRate: { sort: r.borrowApr, title: `Borrow rate: ${RATE_TIP.borrow.toLowerCase()}`, node: z.borrowRate },
