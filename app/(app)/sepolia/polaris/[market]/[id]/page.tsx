@@ -5,6 +5,9 @@ import { normalizeCdpId, normalizeMarket, POLARIS_MARKET_CONFIG } from "@/lib/po
 import { loadPolarisPositionTail } from "@/lib/polaris/position-page-data";
 import { polarisPositionHref, POLARIS_BASE_PATH } from "@/lib/polaris/routes";
 import PolarisPositionView from "./position-view";
+import { AimGate } from "@/components/shared/aim-gate";
+import { polarisMarketKeys } from "@/lib/polaris/focus-keys";
+import { POLARIS_CHAIN_ID } from "@/lib/polaris/asset-catalog";
 
 interface Props {
   params: Promise<{ market: string; id: string }>;
@@ -69,13 +72,17 @@ export default async function PolarisPositionPage({ params }: Props) {
   // body comes from `not-found.tsx` alongside this file.
   if (tail.missing) notFound();
 
+  // Focus (ui-jobs 557): the position is held behind the gate when neither its
+  // market's stablecoin nor pETH is in focus; its event pages render this page.
   return (
-    <PolarisPositionView
-      key={`${market}:${id}`}
-      market={market}
-      cdpId={id}
-      initialSummary={tail.position}
-      initialEvents={tail.events}
-    />
+    <AimGate keys={polarisMarketKeys(market)} chain={POLARIS_CHAIN_ID} what="This Polaris position">
+      <PolarisPositionView
+        key={`${market}:${id}`}
+        market={market}
+        cdpId={id}
+        initialSummary={tail.position}
+        initialEvents={tail.events}
+      />
+    </AimGate>
   );
 }

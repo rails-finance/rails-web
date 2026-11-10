@@ -13,6 +13,9 @@ import { COMPOUND_BASE_CHAIN_ID } from "@/lib/compound-base/asset-catalog";
 import { COMPOUND_BASE_PAGE } from "@/lib/compound-base/page-deployment";
 import type { CaptureSource } from "@/lib/shared/capture-source";
 import { markNavStart } from "@/lib/perf/settle-marks";
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { rowAssetKeys } from "@/lib/shared/focus-row-keys";
+import { overviewCardFocusSource } from "@/lib/compound/overview-focus";
 
 export interface OverviewCard {
   key: string;
@@ -34,9 +37,25 @@ export function CompoundBaseOverviewCards({
   cards: OverviewCard[];
   captureSource: CaptureSource;
 }) {
+  // Focus (ui-jobs 557): the Comets whose base token or held collateral is in
+  // focus.
+  const chain = D.deployment.chainId;
+  const scoped = useScopedRows(
+    cards,
+    (c) =>
+      rowAssetKeys(
+        overviewCardFocusSource(
+          D.deployment.markets.find((m) => m.key === c.key),
+          c.live,
+        ),
+        chain,
+      ),
+    () => chain,
+  );
   return (
-    <div className="flex flex-col gap-3" data-compound-base-overview={cards.length}>
-      {cards.map(({ key, href, view, live, baseAtChain }) => (
+    <div className="flex flex-col gap-3" data-compound-base-overview={cards.length} {...scoped.listProps}>
+      <ScopeNote scoped={scoped} noun={["market", "markets"]} />
+      {scoped.rows.map(({ key, href, view, live, baseAtChain }) => (
         <div key={key} data-overview-market={key}>
           <Link
             href={href}

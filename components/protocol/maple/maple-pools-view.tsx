@@ -38,6 +38,8 @@ import { ProvSection, SectionMenu } from "@/components/shared/section-menu";
 import { readStampProv, SectionReadStamp, type ReadContract } from "@/components/shared/read-stamp";
 import { maplePoolHref, maplePoolPositionsHref } from "@/lib/vaults/routes";
 import { mapleExitAssets } from "@/lib/maple/exit-value";
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { assetKey } from "@/lib/shared/asset-family";
 import {
   poolTotalAssetsProv,
   poolTotalSupplyProv,
@@ -309,15 +311,23 @@ function poolReadContracts(cat: MaplePool): ReadContract[] {
   ];
 }
 
+/** A pool's keys under Focus (ui-jobs 557): its share token and its funds asset. */
+const poolKeys = (s: MaplePoolState): string[] => {
+  const cat = MAPLE_POOL_BY_KEY[s.pool];
+  return cat ? [assetKey(1, cat.pool), assetKey(1, cat.asset)] : [];
+};
+
 export function MaplePoolsView({ pools }: { pools: MaplePoolState[] }) {
   const registry = useReceiptRegistry();
+  const scoped = useScopedRows(pools, poolKeys, () => 1);
   if (pools.length === 0) {
     return <p className="text-sm text-rb-500">The pools could not be read from chain at this block.</p>;
   }
   return (
     <ProvReceiptsScope registry={registry}>
-      <div className="grid gap-2.5 lg:grid-cols-2">
-        {pools.map((s) => {
+      <ScopeNote scoped={scoped} noun={["pool", "pools"]} className="mb-3" />
+      <div className="grid gap-2.5 lg:grid-cols-2" {...scoped.listProps}>
+        {scoped.rows.map((s) => {
           const cat = MAPLE_POOL_BY_KEY[s.pool];
           if (!cat) return null;
           return <PoolCard key={s.pool} s={s} cat={cat} />;
