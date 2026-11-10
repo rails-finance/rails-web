@@ -52,8 +52,9 @@ import {
   scopeSymbolOf,
   useAssetScope,
   type AssetPick,
+  manageHref,
 } from "@/lib/shared/asset-scope";
-import { INLINE_LINK, INPLACE_TEXT, OVERLAY_HEADING, PAGE_SCRIM, RESET_LINK } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK, INPLACE_TEXT, OVERLAY_HEADING, PAGE_LINK, PAGE_SCRIM, RESET_LINK } from "@/lib/shared/ui-grammar";
 
 /** The strip across the top of every page, replaced by the profile control's
  *  ring and badge (Miles, 10 Nov 2026); kept for a side-by-side. */
@@ -70,7 +71,7 @@ export function scopeSummary(picks: AssetPick[]): string {
   const more = names.length > 2 ? ` +${names.length - 2}` : "";
   const built = picks.filter((p) => p.builtOn).length;
   const tail =
-    built === 0
+    built === 0 || names.length > 2
       ? ""
       : built === picks.length
         ? names.length === 1
@@ -166,7 +167,7 @@ export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" })
               Show everything
             </button>
           </div>
-          <ExplorerScopeLine keys={scope.keys} fromLink={scope.fromLink} />
+          <ExplorerScopeLine keys={scope.keys} />
         </div>
       )}
       {open && <AssetScopePanel onClose={() => setOpen(false)} />}
@@ -327,15 +328,16 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
         </div>
         <p className="text-sm leading-relaxed text-rb-600 dark:text-rb-300">
           Focus mode isolates the Rails app to the assets and chains you choose. This view is set to focus on{" "}
-          {picks.map((p, i) => (
+          {picks.slice(0, NAMED_SHOWN).map((p, i, shown) => (
             <span key={`${p.chain}:${p.token}`}>
-              {i > 0 && (i === picks.length - 1 ? " and " : ", ")}
+              {i > 0 && (i === shown.length - 1 && picks.length <= NAMED_SHOWN ? " and " : ", ")}
               <span className="inline-flex items-center gap-1 whitespace-nowrap font-semibold text-foreground">
                 <TokenChipIcon symbol={symbolOf(p)} address={p.token} size={16} filterable={false} untitled />
                 {symbolOf(p)}
               </span>
             </span>
           ))}
+          {picks.length > NAMED_SHOWN && ` and ${picks.length - NAMED_SHOWN} more`}
           {onChains}
           {builtOn &&
             (examples.length
@@ -419,7 +421,16 @@ function FocusTip() {
 }
 
 /** Why the preference hides the explorer this page belongs to; nothing where it shows. */
-function ExplorerScopeLine({ keys, fromLink }: { keys: Set<string> | null; fromLink: boolean }) {
+export function ExplorerScopeLine({
+  keys,
+  className = "mx-auto max-w-7xl px-4 pb-1.5 text-xs text-rb-500 md:px-6",
+  onLeave,
+}: {
+  keys: Set<string> | null;
+  className?: string;
+  /** Called as the link is followed (the menu closes). */
+  onLeave?: () => void;
+}) {
   const entry = protocolForPathname(usePathname());
   const ex = useExplorerScope();
   if (!entry || !keys || !ex.on) return null;
@@ -432,17 +443,10 @@ function ExplorerScopeLine({ keys, fromLink }: { keys: Set<string> | null; fromL
     : status === "none"
       ? `${entry.label} lists none of your assets`
       : `Rails has no asset list for ${entry.label} yet`;
-  const link = fromLink ? new URLSearchParams(window.location.search).get("assets") : null;
   return (
-    <p
-      className="mx-auto max-w-7xl px-4 pb-1.5 text-xs text-rb-500 md:px-6"
-      data-explorer-scope={!onChain ? "chain" : status}
-    >
+    <p className={className} data-explorer-scope={!onChain ? "chain" : status}>
       {why} ·{" "}
-      <Link
-        href={`/assets${link ? `?assets=${link.replace(/ /g, "+")}` : ""}`}
-        className={`font-semibold ${INLINE_LINK}`}
-      >
+      <Link href={manageHref(false)} onClick={onLeave} className={`font-semibold ${INLINE_LINK}`}>
         Where your assets are listed
       </Link>
     </p>
@@ -477,6 +481,10 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
 }
 
 const ADDS_SHOWN = 5;
+/** The pick list scrolls past this many. */
+const PICKS_BEFORE_SCROLL = 6;
+/** The dialog names this many picks, then "and N more". */
+const NAMED_SHOWN = 3;
 
 /** The one place the name is spelled out. */
 const PANEL_TITLE = "Focus";
@@ -494,37 +502,32 @@ function PickRow({
   const sym = symbolOf(pick);
   const chainFocus = useAssetScope().chains.length > 0;
   return (
-    <li className="py-2" data-asset-scope-pick={`${pick.chain}:${pick.token}`}>
-      <div className="flex items-center gap-2">
-        <TokenChipIcon symbol={sym} address={pick.token} size={18} filterable={false} untitled />
-        <span className="text-sm font-semibold text-foreground">{sym}</span>
-        {/* Under chain focus the pick stands for its symbol on the focused chains. */}
-        {!chainFocus && <span className="text-[11px] text-rb-500">{chainName(pick.chain)}</span>}
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label={`Remove ${sym} on ${chainName(pick.chain)}`}
-          className="ml-auto inline-flex size-6 items-center justify-center rounded-full text-rb-500 transition-colors hover:bg-teal-500/15 hover:text-teal-600 dark:hover:text-teal-400"
-        >
-          <X className="size-3.5" strokeWidth={2.5} />
-        </button>
-      </div>
-      <div className="mt-1 pl-[26px]">
-        <Switch
-          on={pick.builtOn}
-          onChange={(builtOn) => onChange({ ...pick, builtOn })}
-          label="And what's built on it"
-        />
-        {pick.builtOn && adds.length > 0 && (
-          <p className="mt-1 text-[11px] leading-snug text-rb-500" data-asset-scope-adds={adds.length}>
-            Adds {adds.slice(0, ADDS_SHOWN).join(", ")}
-            {adds.length > ADDS_SHOWN && ` and ${adds.length - ADDS_SHOWN} more`}
-          </p>
-        )}
-        {pick.builtOn && adds.length === 0 && (
-          <p className="mt-1 text-[11px] text-rb-500">Nothing in the family map is built on it yet.</p>
-        )}
-      </div>
+    <li className="flex items-center gap-2 py-1.5" data-asset-scope-pick={`${pick.chain}:${pick.token}`}>
+      <TokenChipIcon symbol={sym} address={pick.token} size={18} filterable={false} untitled />
+      <span className="min-w-0 truncate text-sm font-semibold text-foreground">{sym}</span>
+      {/* Under chain focus the pick stands for its symbol on the focused chains. */}
+      {!chainFocus && <span className="shrink-0 text-[11px] text-rb-500">{chainName(pick.chain)}</span>}
+      <span
+        className="ml-auto shrink-0"
+        title={
+          pick.builtOn
+            ? adds.length
+              ? `Adds ${adds.slice(0, ADDS_SHOWN).join(", ")}${adds.length > ADDS_SHOWN ? ` and ${adds.length - ADDS_SHOWN} more` : ""}`
+              : "Nothing in the family map is built on it yet."
+            : undefined
+        }
+        data-asset-scope-adds={pick.builtOn ? adds.length : undefined}
+      >
+        <Switch on={pick.builtOn} onChange={(builtOn) => onChange({ ...pick, builtOn })} label="Built on it" />
+      </span>
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={`Remove ${sym} on ${chainName(pick.chain)}`}
+        className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-rb-500 transition-colors hover:bg-teal-500/15 hover:text-teal-600 dark:hover:text-teal-400"
+      >
+        <X className="size-3.5" strokeWidth={2.5} />
+      </button>
     </li>
   );
 }
@@ -632,7 +635,10 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
       </p>
       <h3 className={OVERLAY_HEADING}>Assets</h3>
       {picks.length > 0 && (
-        <ul className="divide-y divide-rb-200 dark:divide-rb-800" data-asset-scope-picks={picks.length}>
+        <ul
+          className={`divide-y divide-rb-200 dark:divide-rb-800 ${picks.length > PICKS_BEFORE_SCROLL ? "max-h-[15.5rem] overflow-y-auto pr-1" : ""}`}
+          data-asset-scope-picks={picks.length}
+        >
           {picks.map((p) => (
             <PickRow
               key={keyOf(p)}
@@ -655,6 +661,14 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
         chainName={chainName}
         anatomy={undefined}
       />
+      <Link
+        href={manageHref()}
+        onClick={onClose}
+        className={`self-start text-xs ${PAGE_LINK}`}
+        data-asset-scope-manage=""
+      >
+        Add from all assets <span aria-hidden>→</span>
+      </Link>
       <FocusChains />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rb-200 pt-3 dark:border-rb-800">
         {scope.on && (

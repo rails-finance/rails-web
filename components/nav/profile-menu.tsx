@@ -34,7 +34,7 @@ import { useTheme } from "next-themes";
 
 import { Facehash } from "@/components/shared/facehash";
 import { FocusAvatar } from "@/components/shared/focus-avatar";
-import { FocusWords } from "@/components/shared/asset-scope-strip";
+import { ExplorerScopeLine, FocusWords } from "@/components/shared/asset-scope-strip";
 import { useBookmarks } from "@/components/shared/bookmark-list";
 import { savedName, useSavedLinks } from "@/components/shared/saved-items";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
@@ -325,6 +325,13 @@ export function ProfileMenu() {
                   <p className="px-3 pb-2 text-sm leading-snug text-foreground">
                     <FocusWords picks={scope.picks} chains={scope.chains} />
                   </p>
+                  {/* On an explorer's page that the focus hides: why (the
+                      strip's second line, Miles 10 Nov 2026). */}
+                  <ExplorerScopeLine
+                    keys={scope.keys}
+                    className="px-3 pb-2 text-xs leading-snug text-rb-500"
+                    onLeave={() => close(false)}
+                  />
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 text-xs">
                     <button
                       type="button"

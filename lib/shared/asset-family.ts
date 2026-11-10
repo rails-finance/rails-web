@@ -34,6 +34,8 @@ export interface FamilyPick {
   token: string;
   /** "And what's built on it": walk down the family from this asset. */
   builtOn: boolean;
+  /** The symbol, for a token outside the chooser's tables (one added from /assets). */
+  symbol?: string;
 }
 
 export const NATIVE = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";

@@ -61,8 +61,18 @@ export const SCOPE_SYMBOLS: SymbolIndex = (() => {
   return m;
 })();
 
+/** Symbols for tokens outside the chooser's tables: the /assets rows, and
+ *  any pick that carries its own (`AssetPick.symbol`). */
+const NAMED = new Map<string, string>();
+export function registerSymbols(entries: Iterable<{ chain: number; token: string; symbol: string }>) {
+  for (const e of entries) {
+    const k = assetKey(e.chain, e.token);
+    if (!BY_KEY.has(k)) NAMED.set(k, e.symbol);
+  }
+}
+
 export const scopeSymbolOf = (chain: number, token: string): string | null =>
-  BY_KEY.get(assetKey(chain, token)) ?? null;
+  BY_KEY.get(assetKey(chain, token)) ?? NAMED.get(assetKey(chain, token)) ?? null;
 
 // ── The store ───────────────────────────────────────────────────────────────
 
@@ -112,6 +122,9 @@ function snapshot(): Snapshot {
     const v = s ? JSON.parse(s) : null;
     if (isFocus(v)) stored = v;
   } catch {}
+  registerSymbols(
+    stored.assets.flatMap((p) => (p.symbol ? [{ chain: p.chain, token: p.token, symbol: p.symbol }] : [])),
+  );
   const assets = a === "\u0001" ? null : parseAssetsParam(a, SCOPE_SYMBOLS);
   const chains = c === "\u0001" ? null : parseChainsParam(c, CHAIN_SLUGS);
   const link = assets == null && chains == null ? null : { assets: assets ?? [], chains: chains ?? [] };
@@ -277,4 +290,21 @@ export function useAssetScope(): AssetScope {
     keepLink,
     clear,
   };
+}
+
+/** `/assets` in its manage state (`?manage=1`): every asset shown, to add to
+ *  the focus. A focus that came with a link travels with it. */
+export const MANAGE_PARAM = "manage";
+export function manageHref(manage = true): string {
+  const p = new URLSearchParams();
+  if (typeof window !== "undefined") {
+    const sp = new URLSearchParams(window.location.search);
+    for (const k of [ASSETS_PARAM, CHAINS_PARAM]) {
+      const v = sp.get(k);
+      if (v != null) p.set(k, v);
+    }
+  }
+  if (manage) p.set(MANAGE_PARAM, "1");
+  if (![...p.keys()].length) return "/assets";
+  return `/assets?${p.toString().replace(/%2B/g, "+").replace(/%2C/gi, ",").replace(/%3A/gi, ":")}`;
 }
