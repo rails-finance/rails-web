@@ -77,7 +77,7 @@ function FiguresTable({
         <col />
       </colgroup>
       <DataTableHead>
-        <DataTableLeadHeader />
+        <DataTableLeadHeader plain />
         <DataTableHeader label="Explorer" />
         <DataTableHeader label={heads[0]} align="right" />
         <DataTableHeader label={heads[1]} />
@@ -93,7 +93,7 @@ function FiguresTable({
 function PlaceCells({ place, label, tier }: { place: ValueHeldPlace; label: string; tier?: boolean }) {
   return (
     <>
-      <DataTableLeadCell protocol={place.protocol} protocolName={label} chain={place.chainId as ChainId} />
+      <DataTableLeadCell plain protocol={place.protocol} protocolName={label} chain={place.chainId as ChainId} />
       <DataTableCell rowHeader>
         <span className="flex items-center gap-2">
           <DataTableLeadMark protocol={place.protocol} chain={place.chainId as ChainId} />

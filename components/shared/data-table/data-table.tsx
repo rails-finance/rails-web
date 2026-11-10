@@ -406,13 +406,13 @@ export function DataTableCell({
 }
 
 /** The lead column's header: no visible label, its name for a screen reader. */
-export function DataTableLeadHeader({ sticky = "" }: { sticky?: string }) {
+export function DataTableLeadHeader({ sticky = "", plain }: { sticky?: string; plain?: boolean }) {
   const stacked = useContext(Stacked);
   return (
     <th
       scope="col"
       role={stacked ? "columnheader" : undefined}
-      className={`w-[124px] p-0 ${sticky ? `${sticky} z-10 bg-background` : ""}`}
+      className={`${plain ? "w-[76px]" : "w-[124px]"} p-0 ${sticky ? `${sticky} z-10 bg-background` : ""}`}
     >
       <span className="sr-only">Protocol and chain</span>
     </th>
@@ -421,19 +421,46 @@ export function DataTableLeadHeader({ sticky = "" }: { sticky?: string }) {
 
 /** The lead cell: the protocol's tinted zone with its mark and the chain's
  *  glyph, a wide rounded tile centred in the row and shorter than it, with the
- *  protocol's and the chain's names for a screen reader. */
+ *  protocol's and the chain's names for a screen reader. `plain` on a row that
+ *  is not a position (the vault index, /about/figures, /coverage): the mark and
+ *  the glyph in grey, no tint, which marks a position (C20); below the stacking
+ *  width the cell is not drawn and `DataTableLeadMark` carries both. */
 export function DataTableLeadCell({
   protocol,
   protocolName,
   chain,
   sticky = "",
+  plain,
 }: {
   /** The `protocols.ts` id: the tint and the mark. */
   protocol: string;
   protocolName: string;
   chain: ChainId;
   sticky?: string;
+  plain?: boolean;
 }) {
+  if (plain)
+    return (
+      <DataTableCell
+        pad={false}
+        sticky={sticky}
+        valign="middle"
+        className="w-[76px] py-5! pl-5! pr-0!"
+        title={`${protocolName} on ${chainMeta(chain).name}`}
+        data-anatomy="D5"
+        data-lead-plain=""
+        data-row-zone={protocol}
+        data-row-zone-chain={chainMeta(chain).name}
+      >
+        <span className="sr-only">
+          {protocolName} on {chainMeta(chain).name}
+        </span>
+        <span className="flex items-center gap-2.5 text-rb-500" aria-hidden>
+          <ProtocolIcon id={protocol} className="h-[18px] w-[18px] shrink-0 [&:is(img)]:grayscale" />
+          <ChainGlyph id={chain} className="h-[18px] w-[18px] shrink-0" />
+        </span>
+      </DataTableCell>
+    );
   return (
     <DataTableCell
       pad={false}
