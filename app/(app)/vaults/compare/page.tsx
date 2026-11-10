@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 
 /** The comparison states no receipts: its figures are plain, each vault's
  *  page carries them (check:prov reads this). */
-export const PROV_EXEMPT = "the vault comparison states no receipts; each vault's page carries them (ui-jobs 553)";
+const PROV_EXEMPT = "the vault comparison states no receipts; each vault's page carries them (ui-jobs 553)";
 
 export const metadata = {
   title: COMPARE_TITLE,
