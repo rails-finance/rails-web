@@ -98,7 +98,7 @@ function slicesOf(sorted: BreakdownAsset[], total: number, side: BreakdownSide):
 }
 
 /** Arc angles, each at least MIN_ARC, the rest scaled to fill the circle. */
-function anglesOf(slices: Slice[]): [number, number][] {
+function anglesOf(slices: { share: number }[]): [number, number][] {
   const full = 2 * Math.PI;
   const raw = slices.map((s) => s.share * full);
   const small = raw.filter((a) => a < MIN_ARC).length;
@@ -437,6 +437,88 @@ export function AssetBreakdownPanel({
           <RowHelp tip={DUST_TIP} name="Dust" />
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** One slice of `ShareDonut`: a part of a whole, largest first. */
+export interface DonutSlice {
+  key: string;
+  /** The slice's name in its tooltip and label ("0x1234…abcd · 12.3%"). */
+  label: string;
+  /** Of the whole, 0 to 1. */
+  share: number;
+  /** The trailing merged slice, in the breakdown's "Other" grey. */
+  rest?: boolean;
+}
+
+/** Each slice's colour, by the breakdown's rule: the side's tone graded by
+ *  size rank toward `--donut-ground`, the merged slice in "Other" grey. A key
+ *  square beside a row takes its slice's colour from here. */
+export function donutColours(slices: DonutSlice[], side: BreakdownSide = "collateral"): string[] {
+  const steps = STEPS(side, slices.filter((s) => !s.rest).length);
+  let i = 0;
+  return slices.map((s) => (s.rest ? OTHER : steps[i++]));
+}
+
+/** A path's coordinates to three places: the server and the browser can
+ *  disagree in a trigonometric result's last digits, and this donut renders
+ *  on both. The arc flags are integers and stay as they are. */
+const fixed = (d: string) =>
+  d.replace(/-?\d*\.\d+(?:e[-+]?\d+)?|-?\d+e[-+]?\d+/g, (m) => String(+Number(m).toFixed(3)));
+
+/** The breakdown's donut on its own, for a share of a whole that is not a
+ *  side's assets (the vault mock's holders and markets): the same corners,
+ *  pad and colours, at `size`, with `centre` in its hole. The slices are
+ *  drawn as given; each carries its label as a tooltip. */
+export function ShareDonut({
+  slices,
+  label,
+  size = SIZE,
+  side = "collateral",
+  centre,
+}: {
+  slices: DonutSlice[];
+  /** The donut's accessible name. */
+  label: string;
+  size?: number;
+  side?: BreakdownSide;
+  /** Drawn in the hole, centred: a count and its noun. */
+  centre?: ReactNode;
+}) {
+  if (slices.length === 0) return null;
+  const angles = anglesOf(slices);
+  const colours = donutColours(slices, side);
+  const k = size / 120;
+  const C = size / 2;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }} data-share-donut="">
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        role="img"
+        aria-label={label}
+        className="overflow-visible"
+        data-breakdown-donut={size}
+      >
+        {slices.map((s, i) => (
+          <path
+            key={s.key}
+            d={fixed(arcPath(29 * k, 58 * k, angles[i][0], angles[i][1], PAD, 3 * k))}
+            transform={`translate(${C},${C})`}
+            fill={colours[i]}
+            data-breakdown-slice={s.key}
+          >
+            <title>{s.label}</title>
+          </path>
+        ))}
+      </svg>
+      {centre != null && (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center [&>*]:pointer-events-auto">
+          {centre}
+        </div>
+      )}
     </div>
   );
 }

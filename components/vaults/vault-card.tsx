@@ -17,7 +17,12 @@
 // provenance" (components/shared/section-menu.tsx).
 
 import { useState, type ReactNode } from "react";
-import { PositionCard, type PositionCardStatus, type PositionPanelRow } from "@/components/shared/position-card";
+import {
+  PositionCard,
+  type PositionCardHead,
+  type PositionCardStatus,
+  type PositionPanelRow,
+} from "@/components/shared/position-card";
 import { POSITION_CARD_MAX_STATS } from "@/components/shared/position-card-panel";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { Prov } from "@/components/shared/provenance";
@@ -66,6 +71,9 @@ export interface VaultCardProps {
   band?: ReactNode;
   /** The family's identity hooks: on the standing pills. */
   pillHooks?: Parameters<typeof VaultPills>[0]["hooks"];
+  /** The headlines in place of `vaultHeads`'s (the layout mock's); absent on
+   *  every live page. */
+  heads?: PositionCardHead[];
 }
 
 function CopyAddress({ address }: { address: string }) {
@@ -105,6 +113,7 @@ export function VaultCard({
   hooks,
   pillHooks,
   band,
+  heads,
 }: VaultCardProps) {
   const markdown = () => vaultCardMarkdown(v, yieldFigure, exports);
   const csv = {
@@ -149,7 +158,7 @@ export function VaultCard({
           heading: "Vault summary",
           status,
           identity,
-          heads: vaultHeads({ vault: v, yieldFigure, holdersHref, receipts, detail: true }),
+          heads: heads ?? vaultHeads({ vault: v, yieldFigure, holdersHref, receipts, detail: true }),
           panel: [stats, []],
           band,
           counters: null,

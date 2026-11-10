@@ -108,6 +108,8 @@ export function VaultAssets({
   menu,
   limit,
   allHref,
+  chart,
+  keyColours,
 }: {
   rows: VaultAssetRow[];
   assetSymbol: string;
@@ -125,6 +127,12 @@ export function VaultAssets({
   limit?: number;
   /** Where every row is, linked under a capped table. */
   allHref?: string;
+  /** A chart before the table, in place of the band: beside it where the
+   *  row holds both (the table at 20rem or more), else above it. The chart is
+   *  the row's first flex item and sizes itself. */
+  chart?: ReactNode;
+  /** The chart's key: a colour square before each row's share, by row key. */
+  keyColours?: Record<string, string>;
 }) {
   const capped = limit != null && rows.length > limit;
   const tableRows = capped ? rows.slice(0, limit) : rows;
@@ -186,101 +194,120 @@ export function VaultAssets({
           {line}
         </p>
       </SectionHeading>
-      <div className="mt-3 [&>div]:px-0">
-        <AllocationBar
-          segments={segments}
-          ariaLabel={`Where this vault's ${assetSymbol} is`}
-          emptyLabel={total === BigInt(0) ? "Nothing to divide at this block." : undefined}
-        />
-      </div>
-      <DataTable
-        className="mt-2"
-        tableClassName="text-[12px]"
-        label={`Where this vault's ${assetSymbol} is, by venue`}
-        stacked
-        rowHeight="two"
-      >
-        <DataTableHead>
-          <DataTableHeader label="Venue" />
-          <DataTableHeader label="Amount" align="right" />
-          <DataTableHeader align="right">{shareHead}</DataTableHeader>
-        </DataTableHead>
-        <DataTableBody>
-          {tableRows.map((r) => (
-            <DataTableRow key={r.key} href={r.href} {...r.hooks}>
-              <DataTableCell rowHeader className="sm:w-full sm:max-w-0">
-                <div className="flex items-center gap-2">
-                  <TokenChipIcon
-                    symbol={r.icon?.symbol ?? assetSymbol}
-                    address={r.icon?.address ?? assetAddress}
-                    size={20}
-                    filterable={false}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <span
-                      className="block text-foreground sm:truncate"
-                      title={typeof r.venue === "string" ? r.venue : undefined}
-                      data-cell="venue"
-                      {...r.venueHooks}
-                    >
-                      {venueOf(r)}
-                    </span>
-                    {r.sub != null && (
-                      <span
-                        className="block text-[11px] [overflow-wrap:anywhere] text-rb-500 sm:truncate"
-                        title={typeof r.sub === "string" ? r.sub : undefined}
-                      >
-                        {r.sub}
+      {!chart && (
+        <div className="mt-3 [&>div]:px-0">
+          <AllocationBar
+            segments={segments}
+            ariaLabel={`Where this vault's ${assetSymbol} is`}
+            emptyLabel={total === BigInt(0) ? "Nothing to divide at this block." : undefined}
+          />
+        </div>
+      )}
+      <div className={chart ? "mt-3 flex flex-wrap items-start gap-x-6 gap-y-4" : undefined}>
+        {chart}
+        <div className={chart ? "min-w-0 flex-1 basis-80" : undefined}>
+          <DataTable
+            className="mt-2"
+            tableClassName="text-[12px]"
+            label={`Where this vault's ${assetSymbol} is, by venue`}
+            stacked
+            rowHeight="two"
+          >
+            <DataTableHead>
+              <DataTableHeader label="Venue" />
+              <DataTableHeader label="Amount" align="right" />
+              <DataTableHeader align="right">{shareHead}</DataTableHeader>
+            </DataTableHead>
+            <DataTableBody>
+              {tableRows.map((r) => (
+                <DataTableRow key={r.key} href={r.href} {...r.hooks}>
+                  <DataTableCell rowHeader className="sm:w-full sm:max-w-0">
+                    <div className="flex items-center gap-2">
+                      <TokenChipIcon
+                        symbol={r.icon?.symbol ?? assetSymbol}
+                        address={r.icon?.address ?? assetAddress}
+                        size={20}
+                        filterable={false}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <span
+                          className="block text-foreground sm:truncate"
+                          title={typeof r.venue === "string" ? r.venue : undefined}
+                          data-cell="venue"
+                          {...r.venueHooks}
+                        >
+                          {venueOf(r)}
+                        </span>
+                        {r.sub != null && (
+                          <span
+                            className="block text-[11px] [overflow-wrap:anywhere] text-rb-500 sm:truncate"
+                            title={typeof r.sub === "string" ? r.sub : undefined}
+                          >
+                            {r.sub}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </DataTableCell>
+                  <DataTableCell
+                    label="Amount"
+                    align="right"
+                    className="whitespace-nowrap tabular-nums text-foreground"
+                  >
+                    {r.offBand ? (
+                      <span className="text-rb-500" data-cell="leg-assets">
+                        —
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5">
+                        <span data-cell="leg-assets" {...(r.amountFigure ? { "data-figure": r.amountFigure } : {})}>
+                          {r.amount == null ? (
+                            <NotLoaded />
+                          ) : r.amountProv ? (
+                            <Prov info={r.amountProv}>{assetText(r.amount, assetDecimals)}</Prov>
+                          ) : (
+                            assetText(r.amount, assetDecimals)
+                          )}
+                        </span>
+                        {r.amount != null && <AssetUnit symbol={assetSymbol} address={assetAddress} />}
                       </span>
                     )}
-                  </div>
-                </div>
-              </DataTableCell>
-              <DataTableCell label="Amount" align="right" className="whitespace-nowrap tabular-nums text-foreground">
-                {r.offBand ? (
-                  <span className="text-rb-500" data-cell="leg-assets">
-                    —
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5">
-                    <span data-cell="leg-assets" {...(r.amountFigure ? { "data-figure": r.amountFigure } : {})}>
-                      {r.amount == null ? (
-                        <NotLoaded />
-                      ) : r.amountProv ? (
-                        <Prov info={r.amountProv}>{assetText(r.amount, assetDecimals)}</Prov>
+                  </DataTableCell>
+                  <DataTableCell label={shareHead} align="right" className="whitespace-nowrap tabular-nums text-rb-500">
+                    {keyColours?.[r.key] && (
+                      <i
+                        aria-hidden
+                        className="mr-1.5 inline-block size-2.5 rounded-[2px] align-[-1px]"
+                        style={{ background: keyColours[r.key] }}
+                        data-key-colour=""
+                      />
+                    )}
+                    <span data-cell="leg-share">
+                      {r.share == null ? (
+                        "—"
+                      ) : r.shareProv ? (
+                        <Prov info={r.shareProv}>{pctText(r.share)}</Prov>
                       ) : (
-                        assetText(r.amount, assetDecimals)
+                        pctText(r.share)
                       )}
                     </span>
-                    {r.amount != null && <AssetUnit symbol={assetSymbol} address={assetAddress} />}
-                  </span>
-                )}
-              </DataTableCell>
-              <DataTableCell label={shareHead} align="right" className="whitespace-nowrap tabular-nums text-rb-500">
-                <span data-cell="leg-share">
-                  {r.share == null ? (
-                    "—"
-                  ) : r.shareProv ? (
-                    <Prov info={r.shareProv}>{pctText(r.share)}</Prov>
-                  ) : (
-                    pctText(r.share)
-                  )}
-                </span>
-              </DataTableCell>
-            </DataTableRow>
-          ))}
-        </DataTableBody>
-      </DataTable>
-      {capped && allHref && (
-        <Link
-          href={allHref}
-          prefetch={false}
-          className={`mt-2 inline-block text-[13px] ${INLINE_LINK}`}
-          data-assets-show-all=""
-        >
-          Show all {n(rows.length)}
-        </Link>
-      )}
+                  </DataTableCell>
+                </DataTableRow>
+              ))}
+            </DataTableBody>
+          </DataTable>
+          {capped && allHref && (
+            <Link
+              href={allHref}
+              prefetch={false}
+              className={`mt-2 inline-block text-[13px] ${INLINE_LINK}`}
+              data-assets-show-all=""
+            >
+              Show all {n(rows.length)}
+            </Link>
+          )}
+        </div>
+      </div>
     </ProvSection>
   );
 }

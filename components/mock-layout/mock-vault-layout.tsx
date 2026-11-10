@@ -1,7 +1,7 @@
 "use client";
 
 // The MetaMorpho vault page as a grid of tiles (Miles, 10 Nov 2026, round
-// four): Coinbase's asset page for the grid, Morpho's vault page for the
+// five): Coinbase's asset page for the grid, Morpho's vault page for the
 // configuration and the roles. A localhost mock under /mock-layout. The holder
 // finder, then the live vault card (V2, built with the props
 // components/vaults/morpho-base-vault-page.tsx gives it), then the grid: Who
@@ -11,7 +11,10 @@
 // Each tile is a `Tile` holding one `ProvSection`, so its heading, read stamp,
 // "?" and ⋮ sit in its top row. The reused sections keep their headings; the
 // grid's scoped selectors strip their outer margins and inner frames, and hide
-// the protects section's disclaimer (the site's /terms carries it).
+// the protects section's disclaimer (the site's /terms carries it). Both
+// donuts are the asset breakdown's (C19, `ShareDonut`). The card takes the
+// mock's headlines (`heads`) and the sidebar's protocol and chain through the
+// edge context, which the live page reads from its route.
 
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -31,7 +34,7 @@ import { VaultProtects, type ProtectsSectionData } from "@/components/vaults/vau
 import { StatAmount } from "@/components/vaults/stat-amount";
 import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
-import { assetText, pctText, shareText, shortAddress, shortId } from "@/lib/shared/vault-amount-text";
+import { assetText, pctText, sharePriceText, shareText, shortAddress, shortId } from "@/lib/shared/vault-amount-text";
 import { morphoBaseWalletHref } from "@/lib/morpho-base/routes";
 import { morphoLoanTokenHref, morphoMarketHref } from "@/lib/morpho/market-routes";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
@@ -61,7 +64,16 @@ import {
   SHARES_ISSUED_TIP,
   STEWARD_TIP,
 } from "@/lib/vaults/card-words";
-import { MIN_SEGMENT_SHARE } from "@/lib/vaults/allocation-plan";
+import { MIN_SEGMENT_SHARE, planAllocation } from "@/lib/vaults/allocation-plan";
+import { donutColours, ShareDonut, type DonutSlice } from "@/components/shared/asset-donut";
+import { AssetUnit } from "@/components/shared/asset-unit";
+import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
+import type { PositionCardHead } from "@/components/shared/position-card";
+import { vaultHeads } from "@/components/vaults/vault-heads";
+import { formatCompact } from "@/lib/shared/format-compact";
+import { formatUnitsExact } from "@/lib/utils/format";
+import { protocolForPathname } from "@/lib/shared/protocols";
+import { vaultHoldersProv } from "@/lib/vaults/row-provenance";
 import { measuredYield, type VaultYield } from "@/lib/vaults/yield";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
 import type { MockVaultConfig } from "@/lib/mock-layout/vault-config-read";
@@ -194,60 +206,58 @@ function wadPct(raw: string): string {
 const blueWalletHref = (chainId: 1 | 8453, vault: string) =>
   chainId === 8453 ? morphoBaseWalletHref(vault) : (listingHrefForWallet("morpho", vault) ?? "/ethereum/morpho");
 
-/** The allocation band's ink ramp (components/shared/ratio-bar.tsx) as stroke
- *  opacities on the foreground colour, largest first; "others" takes the
- *  faintest step. */
-const RING_RAMP = [0.75, 0.62, 0.52, 0.44, 0.36, 0.3, 0.25, 0.2, 0.16];
-const RING_OTHERS = 0.13;
-const ringOpacity = (rank: number) => RING_RAMP[Math.min(rank, RING_RAMP.length - 1)];
-
 const ppmPct = (ppm: number) => pctText(ppm / 1_000_000);
 
-interface RingSlice {
-  key: string;
-  ppm: number;
-  opacity: number;
-  title: string;
+/** Both donuts' size, so the two tiles of the first row pair. */
+const DONUT = 152;
+
+/** The line under every coloured chart. */
+function ColourNote() {
+  return <p className="mt-2 text-center text-[11px] text-rb-500">Colours tell the segments apart.</p>;
 }
 
-/** A donut of `slices` (parts per million, summing to at most a million) with
- *  `centre` in its hole. A 1-unit gap separates neighbours. */
-function HolderRing({ slices, centre, label }: { slices: RingSlice[]; centre: ReactNode; label: string }) {
-  const R = 60;
-  const W = 22;
-  const C = 2 * Math.PI * R;
-  const gap = slices.length > 1 ? 1.5 : 0;
-  let at = 0;
+/** From a million, a figure reads compact. */
+const MILLION = 1_000_000;
+
+/** A headline's or a stat's figure in the vault's asset: compact from a
+ *  million (formatCompact, the V6 index's form), the full figure in its
+ *  title; then the asset's mark, or its symbol in words where it has none. */
+function InAssetFigure({
+  value,
+  full,
+  exact,
+  asset,
+  prov,
+  head = false,
+}: {
+  value: number;
+  full: ReactNode;
+  /** The full figure as text, for the title. */
+  exact: string;
+  asset: { symbol: string; address: string; named: boolean };
+  prov?: Provenance;
+  /** At headline size. */
+  head?: boolean;
+}) {
+  const big = Math.abs(value) >= MILLION;
+  const text = big ? formatCompact(value) : full;
   return (
-    <div className="relative h-40 w-40 shrink-0" data-mock-ring="">
-      <svg viewBox="0 0 160 160" className="h-full w-full -rotate-90 text-foreground" role="img" aria-label={label}>
-        <circle cx="80" cy="80" r={R} fill="none" stroke="currentColor" strokeOpacity={0.06} strokeWidth={W} />
-        {slices.map((s) => {
-          const len = (s.ppm / 1_000_000) * C;
-          const dash = Math.max(len - gap, 0.5);
-          const el = (
-            <circle
-              key={s.key}
-              cx="80"
-              cy="80"
-              r={R}
-              fill="none"
-              stroke="currentColor"
-              strokeOpacity={s.opacity}
-              strokeWidth={W}
-              strokeDasharray={`${dash} ${C - dash}`}
-              strokeDashoffset={-at}
-              data-ring-slice={s.key}
-            >
-              <title>{s.title}</title>
-            </circle>
-          );
-          at += len;
-          return el;
-        })}
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">{centre}</div>
-    </div>
+    // A phone's half-width headline column holds about eight characters at
+    // headline size; a longer figure steps down there rather than wrap.
+    <span
+      className={`inline-flex max-w-full items-center gap-1.5 whitespace-nowrap ${head && typeof text === "string" && text.length > 8 ? "max-sm:text-[0.6em]" : ""}`}
+      data-mock-figure=""
+    >
+      <span
+        data-figure-value=""
+        data-prov-exact={exact}
+        data-prov-symbol={asset.symbol}
+        title={big ? `${exact} ${asset.symbol}` : undefined}
+      >
+        {prov ? <Prov info={prov}>{text}</Prov> : text}
+      </span>
+      <AssetUnit symbol={asset.symbol} address={asset.address} named={asset.named} />
+    </span>
   );
 }
 
@@ -290,20 +300,21 @@ function WhoHoldsIt({
     const shownPpm = shown.reduce((s, h) => s + h.ppm, 0);
     const othersCount = holders.liveCount - shown.length;
     const othersPpm = Math.max(0, 1_000_000 - shownPpm);
-    const rank = new Map(shown.map((h, i) => [h.holder, i]));
-    const slices: RingSlice[] = shown.map((h, i) => ({
+    const slices: DonutSlice[] = shown.map((h) => ({
       key: h.holder,
-      ppm: h.ppm,
-      opacity: ringOpacity(i),
-      title: `${shortAddress(h.holder)} · ${ppmPct(h.ppm)}`,
+      label: `${shortAddress(h.holder)} · ${ppmPct(h.ppm)}`,
+      share: h.ppm / 1_000_000,
     }));
     if (othersCount > 0)
       slices.push({
         key: "others",
-        ppm: othersPpm,
-        opacity: RING_OTHERS,
-        title: `${n(othersCount)} others · ${ppmPct(othersPpm)}`,
+        label: `${n(othersCount)} others · ${ppmPct(othersPpm)}`,
+        share: othersPpm / 1_000_000,
+        rest: true,
       });
+    const colours = donutColours(slices);
+    const colourOf = new Map(slices.map((sl, i) => [sl.key, colours[i]]));
+    const othersColour = colours[colours.length - 1];
 
     const top = list.slice(0, TOP_HOLDERS);
     const restCount = holders.liveCount - top.length;
@@ -339,23 +350,26 @@ function WhoHoldsIt({
     };
 
     content = (
-      <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row sm:items-center">
-        <HolderRing
-          slices={slices}
-          label={`${n(holders.liveCount)} holders of ${shareSymbol} by share`}
-          centre={
-            <>
-              <span className="text-xl font-semibold tabular-nums text-foreground">
-                <Prov info={countProv}>{n(holders.liveCount)}</Prov>
-              </span>
-              <span className="text-xs text-rb-500">holders</span>
-            </>
-          }
-        />
+      <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row sm:items-start">
+        <div className="shrink-0 sm:pt-1">
+          <ShareDonut
+            slices={slices}
+            size={DONUT}
+            label={`${n(holders.liveCount)} holders of ${shareSymbol} by share`}
+            centre={
+              <>
+                <span className="text-lg font-semibold tabular-nums text-foreground" data-mock-holders-count="">
+                  <Prov info={countProv}>{n(holders.liveCount)}</Prov>
+                </span>
+                <span className="text-xs text-rb-500">holders</span>
+              </>
+            }
+          />
+          <ColourNote />
+        </div>
         <div className="w-full min-w-0 flex-1">
           <ol className="border-t border-rb-200 dark:border-rb-500/30">
             {top.map((h) => {
-              const r = rank.get(h.holder);
               return (
                 <li
                   key={h.holder}
@@ -363,11 +377,6 @@ function WhoHoldsIt({
                   data-mock-holder={h.holder}
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <span
-                      aria-hidden
-                      className="h-2.5 w-2.5 shrink-0 rounded-sm bg-foreground"
-                      style={{ opacity: r != null ? ringOpacity(r) : RING_OTHERS }}
-                    />
                     <Link
                       href={metaMorphoVaultHref(chainId, vault, h.holder)}
                       prefetch={false}
@@ -377,7 +386,13 @@ function WhoHoldsIt({
                       {shortAddress(h.holder)}
                     </Link>
                   </span>
-                  <span className="text-[13px] font-medium tabular-nums text-foreground">
+                  <span className="flex items-center gap-2 text-[13px] font-medium tabular-nums text-foreground">
+                    {/* The key, beside the share it stands for (C19's legend). */}
+                    <i
+                      aria-hidden
+                      className="block size-2.5 rounded-[2px]"
+                      style={{ background: colourOf.get(h.holder) ?? othersColour }}
+                    />
                     <Prov info={shareProv(h.holder, h.ppm)}>{ppmPct(h.ppm)}</Prov>
                   </span>
                 </li>
@@ -476,6 +491,7 @@ export function MockVaultLayout({
   const unit = vault.asset.symbol;
   const ad = vault.asset.decimals;
   const asset = { symbol: unit, address: vault.asset.address };
+  const assetMark = { ...asset, named: v.asset.named };
   const steward = v.steward!;
   const funded = legs.filter((l) => BigInt(l.assets.raw) > BigInt(0));
   const addr = (a: string) => explorerUrl(chainId, "address", a);
@@ -514,12 +530,15 @@ export function MockVaultLayout({
       id: "allocated",
       label: "Allocated in Morpho Blue",
       tip: "The vault's supply in each Morpho Blue market, summed as Morpho Blue last settled them. Total assets adds the interest since, so either figure can be the larger.",
-      asset,
       value: (
         <span data-figure="allocated">
-          <Prov info={vaultAllocatedProv(coords)}>
-            <StatAmount amount={data.allocated} decimals={ad} symbol={unit} />
-          </Prov>
+          <InAssetFigure
+            value={data.allocated.value}
+            full={<StatAmount amount={data.allocated} decimals={ad} symbol={unit} />}
+            exact={assetText(data.allocated, ad)}
+            asset={assetMark}
+            prov={vaultAllocatedProv(coords)}
+          />
         </span>
       ),
     },
@@ -527,12 +546,15 @@ export function MockVaultLayout({
       id: "unaccrued",
       label: "Unaccrued interest",
       tip: "Total assets minus the allocated sum: interest the vault counts that the markets have not settled yet.",
-      asset,
       value: (
         <span data-figure="gap">
-          <Prov info={vaultGapProv(coords)}>
-            <StatAmount amount={data.gap} decimals={ad} symbol={unit} />
-          </Prov>
+          <InAssetFigure
+            value={data.gap.value}
+            full={<StatAmount amount={data.gap} decimals={ad} symbol={unit} />}
+            exact={assetText(data.gap, ad)}
+            asset={assetMark}
+            prov={vaultGapProv(coords)}
+          />
         </span>
       ),
     },
@@ -725,6 +747,119 @@ export function MockVaultLayout({
       hooks: { "data-idle": "none" },
     });
 
+  // The card's headlines: vaultHeads's, with Total assets and Share price
+  // compact from a million and the asset's mark after them, and Holders
+  // leading with the addresses holding a share now.
+  const holdersHref = metaMorphoVaultsListingHref(chainId, { vault: vault.address });
+  const c = v.census;
+  const heads: PositionCardHead[] = vaultHeads({ vault: v, yieldFigure, holdersHref, receipts, detail: true }).map(
+    (h) => {
+      if (h.id === "total-assets" && v.totalAssets)
+        return {
+          ...h,
+          value: (
+            <span data-cell="total-assets" data-figure="total-assets" data-raw={v.totalAssets.raw}>
+              <InAssetFigure
+                value={v.totalAssets.value}
+                full={assetText(v.totalAssets, ad)}
+                exact={assetText(v.totalAssets, ad)}
+                asset={assetMark}
+                prov={receipts.totalAssets}
+                head
+              />
+            </span>
+          ),
+        };
+      if (h.id === "share-price" && v.sharePrice)
+        return {
+          ...h,
+          value: (
+            <span data-cell="share-price" data-figure="share-price" data-raw={v.sharePrice.raw}>
+              <InAssetFigure
+                value={v.sharePrice.value}
+                full={sharePriceText(v.sharePrice, ad)}
+                exact={sharePriceText(v.sharePrice, ad)}
+                asset={assetMark}
+                prov={receipts.sharePrice}
+                head
+              />
+            </span>
+          ),
+        };
+      if (h.id === "holders" && c && c.holders > 0)
+        return {
+          ...h,
+          labelTip:
+            "The addresses holding a share of this vault at the census block. A floor: an address is often a wrapper or a contract holding for others.",
+          value: (
+            <Link
+              href={holdersHref}
+              prefetch={false}
+              className="pointer-events-auto hover:text-blue-600 dark:hover:text-[var(--text-link)]"
+              data-cell="holders"
+              data-positions-link={v.address}
+            >
+              <Prov info={vaultHoldersProv(v, c)}>{n(c.live)}</Prov>
+            </Link>
+          ),
+          sub: <Prov info={vaultHoldersProv(v, c)}>{`${n(c.holders)} have held it`}</Prov>,
+        };
+      return h;
+    },
+  );
+
+  // The card's sidebar names the explorer the live page sits under; the
+  // mock's route is on no roster entry, so it is named here.
+  const entry = protocolForPathname(metaMorphoVaultHref(chainId, vault.address));
+  const edge: PositionCardEdge | null = entry
+    ? {
+        protocol: { id: entry.id, name: entry.label, href: entry.href },
+        chain: { id: entry.chainId, name: chainMeta(entry.chainId).name },
+      }
+    : null;
+
+  // Where the assets are as a donut: the band's plan (a market of 2% or more
+  // alone, the rest one slice), each row's share keyed by its slice's colour.
+  const plan = planAllocation(
+    rows
+      .map((r, order) => ({ r, order, key: r.key, amount: r.amount ? BigInt(r.amount.raw) : null }))
+      .filter(({ r }) => !r.offBand),
+  );
+  const planTotal = Number(plan.total);
+  const allocSlices: DonutSlice[] = plan.shown.map((l) => ({
+    key: l.key,
+    label: `${typeof l.r.venue === "string" ? l.r.venue : shortId(l.key)} · ${pctText(Number(l.amount ?? BigInt(0)) / planTotal)}`,
+    share: Number(l.amount ?? BigInt(0)) / planTotal,
+  }));
+  if (plan.collected.length) {
+    const sum = plan.collected.reduce((t, l) => t + Number(l.amount ?? BigInt(0)), 0);
+    allocSlices.push({
+      key: "collected",
+      label: `${n(plan.collected.length)} more markets · ${pctText(sum / planTotal)}`,
+      share: sum / planTotal,
+      rest: true,
+    });
+  }
+  const allocColours = donutColours(allocSlices);
+  const keyColours: Record<string, string> = {};
+  allocSlices.forEach((sl, i) => {
+    if (!sl.rest) keyColours[sl.key] = allocColours[i];
+  });
+  for (const l of plan.collected) keyColours[l.key] = allocColours[allocColours.length - 1];
+  // An amount past twenty characters (an asset whose decimals disagree)
+  // leaves the venue no room beside the donut: the donut goes above.
+  const wideAmount = rows.some((r) => r.amount != null && assetText(r.amount, ad).length > 20);
+  const allocChart =
+    allocSlices.length > 0 ? (
+      <div
+        className={`flex shrink-0 flex-col items-center max-sm:w-full sm:pt-3 ${wideAmount ? "w-full" : ""}`}
+        data-mock-alloc-donut=""
+      >
+        <ShareDonut slices={allocSlices} size={DONUT} label={`Where this vault's ${unit} is, by market`} />
+        <ColourNote />
+      </div>
+    ) : undefined;
+
   const configStamp = (block: number | null, what: string, reads: string) =>
     block ? (
       <SectionReadStamp
@@ -759,55 +894,58 @@ export function MockVaultLayout({
 
       <VaultFinder />
 
-      {/* A trillion-sized figure (an asset whose decimals disagree) breaks
-          across lines at phone width instead of running past the card's
-          edge; the live card overflows there by about 40px. */}
-      <div className="[&_[data-panel-figure]]:max-w-full [&_dd]:break-all">
-        <VaultCard
-          vault={v}
-          yieldFigure={yieldFigure}
-          holdersHref={metaMorphoVaultsListingHref(chainId, { vault: vault.address })}
-          receipts={receipts}
-          status={null}
-          stats={stats}
-          band={v.illiquid ? <VaultIlliquidMarkets vault={v} il={v.illiquid} /> : undefined}
-          links={links}
-          explanation={explanation}
-          learnMore={morphoVaultCardContent()}
-          stamp={
-            <SectionReadStamp
-              chainId={chainId}
-              block={data.blockNumber}
-              readBy={coords.readBy}
-              info={(at) =>
-                readStampProv({
-                  chainId,
-                  block: data.blockNumber,
-                  at,
-                  readBy: coords.readBy,
-                  what: "Every figure on this card and in where the assets are",
-                  contracts: [
-                    {
-                      name: vault.name,
-                      address: vault.address,
-                      reads:
-                        "totalAssets(), totalSupply(), convertToAssets(), curator(), owner(), lostAssets(), withdrawQueue()",
-                    },
-                    {
-                      name: "Morpho Blue",
-                      address: vault.morpho,
-                      reads: "market(id), position(id, vault), idToMarketParams(id) for each market in the queue",
-                    },
-                  ],
-                })
-              }
-            />
-          }
-          exports={exportModel}
-        />
-      </div>
+      {/* A stat the compact form does not cover (Shares issued on an asset
+          whose decimals disagree) breaks across lines at phone width instead
+          of running past the card's edge. */}
+      <PositionCardEdgeContext.Provider value={edge}>
+        <div className="[&_[data-panel-figure]]:max-w-full [&_dd]:break-all">
+          <VaultCard
+            heads={heads}
+            vault={v}
+            yieldFigure={yieldFigure}
+            holdersHref={holdersHref}
+            receipts={receipts}
+            status={null}
+            stats={stats}
+            band={v.illiquid ? <VaultIlliquidMarkets vault={v} il={v.illiquid} /> : undefined}
+            links={links}
+            explanation={explanation}
+            learnMore={morphoVaultCardContent()}
+            stamp={
+              <SectionReadStamp
+                chainId={chainId}
+                block={data.blockNumber}
+                readBy={coords.readBy}
+                info={(at) =>
+                  readStampProv({
+                    chainId,
+                    block: data.blockNumber,
+                    at,
+                    readBy: coords.readBy,
+                    what: "Every figure on this card and in where the assets are",
+                    contracts: [
+                      {
+                        name: vault.name,
+                        address: vault.address,
+                        reads:
+                          "totalAssets(), totalSupply(), convertToAssets(), curator(), owner(), lostAssets(), withdrawQueue()",
+                      },
+                      {
+                        name: "Morpho Blue",
+                        address: vault.morpho,
+                        reads: "market(id), position(id, vault), idToMarketParams(id) for each market in the queue",
+                      },
+                    ],
+                  })
+                }
+              />
+            }
+            exports={exportModel}
+          />
+        </div>
+      </PositionCardEdgeContext.Provider>
 
-      <div className={GRID} data-mock-layout="">
+      <div className={`${GRID} [--donut-ground:var(--background)]`} data-mock-layout="">
         <Tile id="holders">
           <WhoHoldsIt
             chainId={chainId}
@@ -826,6 +964,8 @@ export function MockVaultLayout({
             assetDecimals={ad}
             limit={TOP_MARKETS}
             allHref={blueWalletHref(chainId, vault.address)}
+            chart={allocChart}
+            keyColours={keyColours}
             line={
               <>
                 <PanelFigure>{n(funded.length)}</PanelFigure> of {n(legs.length)} markets in the withdraw queue hold a

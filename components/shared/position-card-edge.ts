@@ -16,8 +16,10 @@ import { protocolBrand, protocolForPathname } from "@/lib/shared/protocols";
  *  family sets stay. The protocol and chain name the card's sidebar (C20). */
 export interface PositionCardEdge {
   surface?: "wallet";
-  /** The roster id (the glyph key) and display name of the card's protocol. */
-  protocol?: { id: string; name: string };
+  /** The roster id (the glyph key) and display name of the card's protocol;
+   *  `href`, where set, the explorer route the detail card's sidebar name
+   *  links to. */
+  protocol?: { id: string; name: string; href?: string };
   chain?: { id: ChainId; name: string };
   atRisk?: boolean;
   /** The read's recency (H6), at the top right of the card's heading row. */
