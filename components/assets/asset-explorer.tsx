@@ -7,16 +7,19 @@
 // The selection lives in the URL (`?cat=`, `?chain=`, `?explorer=`,
 // `?focus=`, `?sort=`, `?dir=`), written in place without a reload.
 //
-// FOCUS (ui-jobs 557). /assets is where many assets join the focus: each row
-// ends in "Add to focus" (on hover from sm, always below it), a row in focus
-// shows a check and "Remove from focus"; with a filter on, "Focus on these N"
+// SORT. From sm the headers sort (D2): Asset by symbol, Price by how many
+// series read it (the default), Change and Listed by; below sm the rows stack
+// (D6) and the toolbar's sort offers every order, Flagged first included.
+//
+// FOCUS (ui-jobs 557). /assets is where many assets join the focus: each row's
+// ⋮ (D7) holds "Add to focus" or "Remove from focus", and a row in focus
+// carries an "in focus" pill after its name; with a filter on, "Focus on these N"
 // makes the shown assets the focus (50 at most). Like every page the list is
 // held to the focus; "Add assets" (`?manage=1`, also the Focus panel's "Add
 // from all assets") shows every asset until "Done" (Miles, 10 Nov 2026).
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { Check, Plus } from "lucide-react";
 import { asOfMark, asOfWords, flagWords, fmtRowPrice } from "@/components/assets/asset-price-row";
 import { PriceUnitMark } from "@/components/assets/price-unit-mark";
 import { fmtChange, PriceSparkline } from "@/components/assets/price-sparkline";
@@ -35,6 +38,9 @@ import {
   DataTableHeader,
   DataTableRow,
   DataTableRowLink,
+  DataTableRowMenu,
+  DATA_TABLE_PILL,
+  type DataTableDir,
 } from "@/components/shared/data-table/data-table";
 import { ASSET_CATEGORY_LABELS, ASSET_CATEGORY_ORDER, type AssetCategory } from "@/lib/shared/asset-categories";
 import {
@@ -52,7 +58,13 @@ import type { ChainId } from "@/lib/shared/chains";
 import type { BaseListFilters } from "@/lib/shared/list-filter";
 import { useScopedRows } from "@/components/shared/asset-scope-note";
 import { assetKey } from "@/lib/shared/asset-family";
-import { MANAGE_PARAM, registerSymbols, useAssetScope, type AssetPick } from "@/lib/shared/asset-scope";
+import {
+  MANAGE_PARAM,
+  OPEN_SCOPE_PANEL,
+  registerSymbols,
+  useAssetScope,
+  type AssetPick,
+} from "@/lib/shared/asset-scope";
 import { notifyUrlChanged, useUrlSearchParams } from "@/lib/shared/use-url-search-params";
 import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 
@@ -63,6 +75,16 @@ const n = (v: number) => v.toLocaleString("en-US");
 const FOCUS_ON_MAX = 50;
 /** The Explorers cell draws this many marks, then "+N". */
 const MARKS_SHOWN = 4;
+
+/** The sortable headers: the sort each presses and the direction a first
+ *  press takes (sortCards reads Symbol A to Z on "asc", the rest most first
+ *  on "desc"). */
+const HEAD_SORT: Partial<Record<string, { sort: CardSort; first: DataTableDir }>> = {
+  Asset: { sort: "symbol", first: "asc" },
+  Price: { sort: "read", first: "desc" },
+  Change: { sort: "change", first: "desc" },
+  "Listed by": { sort: "explorers", first: "desc" },
+};
 
 interface Filters extends BaseListFilters {
   cats: string[];
@@ -179,6 +201,31 @@ export function AssetExplorer({
     const { q: _q, ...rest } = next; // eslint-disable-line @typescript-eslint/no-unused-vars
     setFiltersState(rest);
     writeUrl(rest);
+  };
+
+  const setSort = (sortBy: CardSort, sortOrder: DataTableDir) => {
+    const next = { ...filters, sortBy, sortOrder };
+    setFiltersState(next);
+    writeUrl(next);
+  };
+  /** A header's press: the same key flips, another takes its first direction. */
+  const pressHead = (label: string) => {
+    const h = HEAD_SORT[label]!;
+    setSort(h.sort, filters.sortBy === h.sort ? (filters.sortOrder === "asc" ? "desc" : "asc") : h.first);
+  };
+  const headerFor = (label: string, align: "left" | "right" = "left") => {
+    const h = HEAD_SORT[label];
+    return (
+      <DataTableHeader
+        key={label}
+        label={label}
+        align={align}
+        sort={
+          h ? { dir: filters.sortBy === h.sort ? filters.sortOrder : null, onSort: () => pressHead(label) } : undefined
+        }
+        data-sort-key={h?.sort}
+      />
+    );
   };
 
   // ── the facets, their options from the rows the focus leaves ─────────────
@@ -352,7 +399,17 @@ export function AssetExplorer({
           dimensions={dimensions}
           filters={state}
           onChange={onToolbar}
-          sortOptions={[...CARD_SORTS]}
+          sortOptions={[]}
+          mobileSort={{
+            options: [...CARD_SORTS],
+            sortBy: filters.sortBy,
+            sortOrder: filters.sortOrder,
+            onChange: (key, order) => {
+              const k = key as CardSort;
+              const first = Object.values(HEAD_SORT).find((h) => h?.sort === k)?.first ?? "desc";
+              setSort(k, k === filters.sortBy ? order : first);
+            },
+          }}
           searchPlaceholder="Symbol, address or category"
           countNode={countNode}
           sheetCount={{ total: shown.length, noun: "assets" }}
@@ -388,14 +445,14 @@ export function AssetExplorer({
             data-asset-table=""
           >
             <DataTableHead>
-              <DataTableHeader label="Asset" />
-              <DataTableHeader label="Category" />
-              <DataTableHeader label="Chains" />
-              <DataTableHeader label="Price" align="right" />
-              <DataTableHeader label="30 days" align="right" />
-              <DataTableHeader label="Change" align="right" />
-              <DataTableHeader label="Listed by" />
-              <DataTableHeader label="Focus" className="w-px" />
+              {headerFor("Asset")}
+              {headerFor("Category")}
+              {headerFor("Chains")}
+              {headerFor("Price", "right")}
+              {headerFor("30 days", "right")}
+              {headerFor("Change", "right")}
+              {headerFor("Listed by")}
+              <DataTableHeader label={<span className="sr-only">Actions</span>} data-col-head="menu" />
             </DataTableHead>
             <DataTableBody>
               {shown.map((c) => (
@@ -463,10 +520,27 @@ function AssetRow({
             name
           )}
           {c.short && <span className="shrink-0 font-mono text-[11px] text-rb-500">{c.short}</span>}
+          {inFocus && (
+            <span
+              className={`${DATA_TABLE_PILL} shrink-0 px-1.5 py-0.5 text-[11px]`}
+              title={picked ? "In your focus" : "In your focus through what it is built on"}
+              data-pill="in-focus"
+              data-asset-focus-pill={picked ? "picked" : "built-on"}
+            >
+              in focus
+            </span>
+          )}
         </div>
       </DataTableCell>
       <DataTableCell label="Category" valign="middle" className="whitespace-nowrap">
-        <CategoryBadge category={c.category} />
+        <span
+          className="text-sm text-foreground"
+          title={CATEGORY_NOTE}
+          data-asset-category-badge={c.category}
+          data-anatomy="A5.8"
+        >
+          {ASSET_CATEGORY_LABELS[c.category]}
+        </span>
       </DataTableCell>
       <DataTableCell label="Chains" valign="middle" className="whitespace-nowrap">
         <span className="flex items-center gap-1.5" data-asset-card-chains="">
@@ -553,8 +627,9 @@ function AssetRow({
       <DataTableCell label="Listed by" valign="middle" className="whitespace-nowrap">
         <ExplorerMarks card={c} />
       </DataTableCell>
-      <DataTableCell valign="middle" className="whitespace-nowrap" data-col="focus">
-        <FocusPress inFocus={inFocus} picked={picked} symbol={c.symbol} onAdd={onAdd} onRemove={onRemove} />
+      {/* The row's ⋮ (D7): the Focus entry; on a card it sits at the top right. */}
+      <DataTableCell valign="middle" className="dt-row-menu w-px whitespace-nowrap" data-col="menu">
+        <AssetRowMenu inFocus={inFocus} picked={picked} symbol={c.symbol} onAdd={onAdd} onRemove={onRemove} />
       </DataTableCell>
     </DataTableRow>
   );
@@ -604,10 +679,10 @@ function ExplorerMarks({ card: c }: { card: AssetCard }) {
   );
 }
 
-/** The row's Focus press: "Add to focus" (from sm on hover or keyboard focus,
- *  below sm always); a picked row's check, "Remove from focus" on hover; a
- *  row in focus through what it is built on, a check alone. */
-function FocusPress({
+/** A row's ⋮ (D7): "Add to focus"; on a picked row, "Remove from focus"
+ *  (checked); on a row in focus through what it is built on, "Change focus",
+ *  which opens the Focus panel. */
+function AssetRowMenu({
   inFocus,
   picked,
   symbol,
@@ -620,40 +695,29 @@ function FocusPress({
   onAdd: () => void;
   onRemove: () => void;
 }) {
-  const press = `inline-flex items-center gap-1 rounded text-xs font-semibold ${INPLACE_TEXT}`;
-  if (picked)
-    return (
-      <button
-        type="button"
-        onClick={onRemove}
-        className={`${press} group/focus`}
-        aria-label={`Remove ${symbol} from focus`}
-        data-asset-focus-press="remove"
-      >
-        <Check className="size-3.5" aria-hidden="true" />
-        <span className="group-hover/focus:hidden group-focus-visible/focus:hidden">In focus</span>
-        <span className="hidden group-hover/focus:inline group-focus-visible/focus:inline">Remove from focus</span>
-      </button>
-    );
-  if (inFocus)
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-rb-500" title="In focus through what it is built on">
-        <Check className="size-3.5" aria-hidden="true" />
-        In focus
-      </span>
-    );
-  return (
-    <button
-      type="button"
-      onClick={onAdd}
-      className={`${press} sm:opacity-0 sm:group-hover/dt-row:opacity-100 sm:focus-visible:opacity-100`}
-      aria-label={`Add ${symbol} to focus`}
-      data-asset-focus-press="add"
-    >
-      <Plus className="size-3.5" aria-hidden="true" />
-      Add to focus
-    </button>
-  );
+  const item = picked
+    ? {
+        key: "focus",
+        label: "Remove from focus",
+        checked: true,
+        onSelect: onRemove,
+        hooks: { "data-asset-focus-press": "remove" },
+      }
+    : inFocus
+      ? {
+          key: "focus",
+          label: "Change focus",
+          onSelect: () => window.dispatchEvent(new Event(OPEN_SCOPE_PANEL)),
+          hooks: { "data-asset-focus-press": "change" },
+        }
+      : {
+          key: "focus",
+          label: "Add to focus",
+          checked: false,
+          onSelect: onAdd,
+          hooks: { "data-asset-focus-press": "add" },
+        };
+  return <DataTableRowMenu label={`Actions for ${symbol}`} items={[item]} />;
 }
 
 /** A card without a price's figure (A5.11); the asset page (A1.3) draws it too. */

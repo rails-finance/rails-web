@@ -21,7 +21,7 @@
 // chain holds none of the reader's assets, or it lists none of them, or Rails
 // has no asset list for it. The page itself still opens whole.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { protocolForPathname } from "@/lib/shared/protocols";
@@ -590,6 +590,32 @@ function FocusChains() {
   );
 }
 
+/** The panel's picks: past PICKS_BEFORE_SCROLL they scroll, and the list's
+ *  bottom edge fades while more is below (a mask, so it reads on any ground). */
+function PicksList({ count, children }: { count: number; children: ReactNode }) {
+  const ref = useRef<HTMLUListElement>(null);
+  const [more, setMore] = useState(false);
+  const scrolls = count > PICKS_BEFORE_SCROLL;
+  const measure = () => {
+    const el = ref.current;
+    setMore(!!el && el.scrollTop + el.clientHeight < el.scrollHeight - 2);
+  };
+  useEffect(measure, [count]);
+  return (
+    <ul
+      ref={ref}
+      onScroll={scrolls ? measure : undefined}
+      className={`divide-y divide-rb-200 dark:divide-rb-800 ${scrolls ? "max-h-[15.5rem] overflow-y-auto pr-1" : ""} ${
+        scrolls && more ? "[mask-image:linear-gradient(to_bottom,black_calc(100%-2rem),transparent)]" : ""
+      }`}
+      data-asset-scope-picks={count}
+      data-asset-scope-picks-more={scrolls && more ? "" : undefined}
+    >
+      {children}
+    </ul>
+  );
+}
+
 function AssetScopePanel({ onClose }: { onClose: () => void }) {
   const scope = useAssetScope();
   const isPhone = useMediaQuery(PHONE_QUERY);
@@ -635,10 +661,7 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
       </p>
       <h3 className={OVERLAY_HEADING}>Assets</h3>
       {picks.length > 0 && (
-        <ul
-          className={`divide-y divide-rb-200 dark:divide-rb-800 ${picks.length > PICKS_BEFORE_SCROLL ? "max-h-[15.5rem] overflow-y-auto pr-1" : ""}`}
-          data-asset-scope-picks={picks.length}
-        >
+        <PicksList count={picks.length}>
           {picks.map((p) => (
             <PickRow
               key={keyOf(p)}
@@ -647,7 +670,7 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
               onRemove={() => scope.setPicks(picks.filter((q) => keyOf(q) !== keyOf(p)))}
             />
           ))}
-        </ul>
+        </PicksList>
       )}
       <AssetChooser
         options={OPTIONS}
