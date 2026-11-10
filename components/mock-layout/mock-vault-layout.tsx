@@ -1157,7 +1157,7 @@ export function MockVaultLayout({
             <div className="mt-3 grid grid-cols-1 gap-x-8 gap-y-5 lg:grid-cols-3" data-prov-exempt="">
               <div className="min-w-0">
                 <h3 className="text-xs font-semibold text-rb-500">Configuration</h3>
-                <dl className="mt-1 border-t border-rb-200 dark:border-rb-500/30">
+                <dl className="mt-1">
                   <Fact
                     id="version"
                     label="Version"
@@ -1201,7 +1201,7 @@ export function MockVaultLayout({
               </div>
               <div className="min-w-0">
                 <h3 className="text-xs font-semibold text-rb-500">Roles</h3>
-                <ul className="mt-1 border-t border-rb-200 dark:border-rb-500/30">
+                <ul className="mt-1">
                   <AddressRow
                     id="owner"
                     label="Owner"
@@ -1231,7 +1231,7 @@ export function MockVaultLayout({
               </div>
               <div className="min-w-0">
                 <h3 className="text-xs font-semibold text-rb-500">Contracts</h3>
-                <ul className="mt-1 border-t border-rb-200 dark:border-rb-500/30">
+                <ul className="mt-1">
                   <AddressRow
                     id="vault"
                     label="Vault"
