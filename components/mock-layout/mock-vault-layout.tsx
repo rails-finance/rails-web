@@ -130,6 +130,7 @@ function Tile({
   wide,
   flush,
   left,
+  right,
   last,
   segScope,
   children,
@@ -139,6 +140,8 @@ function Tile({
   flush?: boolean;
   /** The left tile of a pair: a vertical hairline at its right edge from lg. */
   left?: boolean;
+  /** The right tile of a pair: its bottom hairline meets the left tile's from lg. */
+  right?: boolean;
   /** The last tile: no hairline under it. */
   last?: boolean;
   /** A `SegmentBar`'s scope, lighting its segments with their rows. */
@@ -153,7 +156,12 @@ function Tile({
       data-seg-scope={segScope}
     >
       {children}
-      {!last && <i aria-hidden className={`pointer-events-none absolute inset-x-5 bottom-0 h-px ${RULE}`} />}
+      {!last && (
+        <i
+          aria-hidden
+          className={`pointer-events-none absolute bottom-0 h-px ${left ? "left-5 right-5 lg:right-0" : right ? "left-5 right-5 lg:left-0" : "inset-x-5"} ${RULE}`}
+        />
+      )}
       {left && (
         <i aria-hidden className={`pointer-events-none absolute inset-y-5 right-0 hidden w-px lg:block ${RULE}`} />
       )}
@@ -1200,7 +1208,7 @@ export function MockVaultLayout({
           />
         </Tile>
 
-        <Tile id="holders" segScope="mock-holders">
+        <Tile id="holders" segScope="mock-holders" right>
           <WhoHoldsIt
             chainId={chainId}
             vault={vault.address}
@@ -1237,7 +1245,10 @@ export function MockVaultLayout({
               )}
               <SectionMenu scope="mock-config" title="Configuration and addresses" />
             </div>
-            <div className="grid grid-cols-1 gap-x-8 gap-y-6 lg:grid-cols-3" data-prov-exempt="">
+            <div
+              className="grid grid-cols-1 gap-y-6 lg:grid-cols-3 lg:[&>div+div]:border-l lg:[&>div+div]:border-rb-200 lg:[&>div+div]:pl-8 lg:[&>div:not(:last-child)]:pr-8 dark:lg:[&>div+div]:border-rb-500/30"
+              data-prov-exempt=""
+            >
               <div className="min-w-0">
                 <h2 className="text-sm font-semibold text-foreground">Configuration</h2>
                 <dl className="mt-1">
