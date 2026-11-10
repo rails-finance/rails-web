@@ -36,6 +36,24 @@ const pct = (x: number) =>
 /** A key as a CSS string's content. */
 const cssString = (s: string) => s.replace(/["\\]/g, "\\$&");
 
+/** The rules that light a chart's slice and its rows together under
+ *  `[data-seg-scope="<scope>"]`: hovering or focusing anything carrying
+ *  `data-seg="<key>"` dims every other `data-seg`; hovering a `data-seg-row`
+ *  dims the other rows (rows sharing one slice). Used by `SegmentBar` and
+ *  `ShareDonut`. */
+export function segmentLinkCss(scope: string, keys: readonly string[]): string {
+  const sc = `[data-seg-scope="${cssString(scope)}"]`;
+  const lit = ":is(:hover,:focus-within)";
+  return [
+    `${sc} tr[data-seg]{transition:opacity 200ms}`,
+    ...keys.map((key) => {
+      const k = cssString(key);
+      return `${sc}:has([data-seg="${k}"]${lit}) [data-seg]:not([data-seg="${k}"]){opacity:.35}`;
+    }),
+    `${sc}:has([data-seg-row]${lit}) [data-seg-row]:not(${lit}){opacity:.35}`,
+  ].join("");
+}
+
 export function SegmentBar({
   slices,
   label,
@@ -55,14 +73,11 @@ export function SegmentBar({
   const largest = drawn.reduce((b, s, i) => (s.share > drawn[b].share ? i : b), 0);
   const gaps = GAP * (drawn.length - 1);
   const named = drawn.map((s) => `${s.label} ${pct(s.share / total)}`);
-  const sc = scope ? cssString(scope) : null;
-  const css = sc
-    ? drawn
-        .map((s) => {
-          const k = cssString(s.key);
-          return `[data-seg-scope="${sc}"]:has([data-seg="${k}"]:is(:hover,:focus-within)) [data-seg]:not([data-seg="${k}"]){opacity:.35}`;
-        })
-        .join("")
+  const css = scope
+    ? segmentLinkCss(
+        scope,
+        drawn.map((s) => s.key),
+      )
     : "";
   return (
     <>

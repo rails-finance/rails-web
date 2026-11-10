@@ -12,8 +12,10 @@
 // "?" and ⋮ sit in its top row. The reused sections keep their headings; the
 // grid's scoped selectors strip their outer margins and inner frames, and hide
 // the protects section's disclaimer (the site's /terms carries it). Who holds
-// it is the asset breakdown's donut (C19, `ShareDonut`); Where the assets are
-// a `SegmentBar`, each segment lit with its row. The card takes the
+// it is the asset breakdown's donut (C19, `ShareDonut`) beside the ten largest
+// holders; Where the assets are a `SegmentBar` over the markets. Both lists are
+// house tables in the /vaults index's rows (V6), each row lit with its slice or
+// segment and the reverse (`data-seg-scope`, CSS `:has()`). The card takes the
 // mock's headlines (`heads`) and the sidebar's protocol and chain through the
 // edge context, which the live page reads from its route.
 
@@ -36,6 +38,16 @@ import { StatAmount } from "@/components/vaults/stat-amount";
 import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
 import { assetText, pctText, sharePriceText, shareText, shortAddress, shortId } from "@/lib/shared/vault-amount-text";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+  DataTableRowLink,
+} from "@/components/shared/data-table/data-table";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { morphoBaseWalletHref } from "@/lib/morpho-base/routes";
 import { morphoLoanTokenHref, morphoMarketHref } from "@/lib/morpho/market-routes";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
@@ -90,8 +102,8 @@ const ZERO = /^0x0{40}$/;
 
 /** Where the assets are draws this many markets, then links to every one. */
 const TOP_MARKETS = 5;
-/** Who holds it names this many holders. */
-const TOP_HOLDERS = 5;
+/** Who holds it names this many holders, largest first. */
+const TOP_HOLDERS = 10;
 
 /** The grid: one column, two from lg; the 1px gaps over the frame's colour
  *  draw the shared hairlines. The scoped selectors work on the reused
@@ -296,12 +308,14 @@ function WhoHoldsIt({
   vault,
   vaultName,
   shareSymbol,
+  shareDecimals,
   holders,
 }: {
   chainId: 1 | 8453;
   vault: string;
   vaultName: string;
   shareSymbol: string;
+  shareDecimals: number;
   holders: MockVaultHolders | null;
 }) {
   const at = useBlockTime(chainId, holders?.censusBlock ?? null);
@@ -354,6 +368,14 @@ function WhoHoldsIt({
       contract: { name: vaultName, address: vault },
       via: "Rails census · balanceOf(holder) / totalSupply() @ the census block",
     });
+    const balanceProv = (holder: string, exact: string): Provenance => ({
+      kind: "chain",
+      pclass: "state",
+      source: { block: holders.censusBlock },
+      summary: `Shares held at the census — ${shortAddress(holder)} held ${exact} ${shareSymbol}: its balanceOf() on the share token, read by the Rails census at block ${n(holders.censusBlock)} and kept.`,
+      contract: { name: vaultName, address: vault },
+      via: "Rails census · balanceOf(holder) @ the census block",
+    });
     const othersProv: Provenance = {
       kind: "chain-derived",
       pclass: "state",
@@ -376,13 +398,25 @@ function WhoHoldsIt({
       summary: `Other holders at the census — ${n(restCount)} addresses: the ${n(holders.liveCount)} holding a share of ${shareSymbol} at block ${n(holders.censusBlock)}, less the ${n(top.length)} named above.`,
     };
 
+    const sharesOf = (balance: string) => {
+      const a = { raw: balance, value: Number(formatUnitsExact(balance, shareDecimals).replace(/,/g, "")) };
+      return { text: formatCompact(a.value), exact: shareText(a, shareDecimals) };
+    };
+    const shareHead = (
+      <HeadingTip
+        text="Share of the vault"
+        tip={`Each holder's ${shareSymbol} over the share token's totalSupply() at the census block.`}
+      />
+    );
+
     content = (
-      <div className="mt-4 flex flex-col items-center gap-6 sm:flex-row sm:items-start">
-        <div className="shrink-0 sm:pt-1">
+      <div className="mt-4 flex flex-col items-center gap-6 xl:flex-row xl:items-start">
+        <div className="shrink-0 xl:pt-3">
           <ShareDonut
             slices={slices}
             colours={colours}
             size={DONUT}
+            scope={scope}
             label={`${n(holders.liveCount)} holders of ${shareSymbol} by share`}
             centre={
               <>
@@ -396,37 +430,61 @@ function WhoHoldsIt({
           <ColourNote />
         </div>
         <div className="w-full min-w-0 flex-1">
-          <ol className="border-t border-rb-200 dark:border-rb-500/30">
-            {top.map((h) => {
-              return (
-                <li
-                  key={h.holder}
-                  className="flex items-center justify-between gap-3 border-b border-rb-200 py-2 dark:border-rb-500/30"
-                  data-mock-holder={h.holder}
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <Link
-                      href={metaMorphoVaultHref(chainId, vault, h.holder)}
-                      prefetch={false}
-                      className={`font-mono text-[13px] ${INLINE_LINK}`}
-                      title={h.holder}
+          {/* The /vaults index's rows (V6): the house table, one line a row. */}
+          <DataTable tableClassName="text-sm" label={`The largest holders of ${shareSymbol}`} stacked rowHeight="one">
+            <DataTableHead>
+              <DataTableHeader label="Holder" />
+              <DataTableHeader label="Shares" align="right" />
+              <DataTableHeader align="right">{shareHead}</DataTableHeader>
+            </DataTableHead>
+            <DataTableBody>
+              {top.map((h) => {
+                const href = metaMorphoVaultHref(chainId, vault, h.holder);
+                const sh = sharesOf(h.balance);
+                return (
+                  <DataTableRow
+                    key={h.holder}
+                    href={href}
+                    data-mock-holder={h.holder}
+                    data-seg={colourOf.has(h.holder) ? h.holder : "others"}
+                    data-seg-row={h.holder}
+                  >
+                    <DataTableCell rowHeader className="sm:w-full sm:max-w-0">
+                      <DataTableRowLink href={href} className="font-mono text-[13px] font-semibold" title={h.holder}>
+                        {shortAddress(h.holder)}
+                      </DataTableRowLink>
+                    </DataTableCell>
+                    <DataTableCell
+                      label="Shares"
+                      align="right"
+                      className="whitespace-nowrap font-semibold tabular-nums text-foreground"
                     >
-                      {shortAddress(h.holder)}
-                    </Link>
-                  </span>
-                  <span className="flex items-center gap-2 text-[13px] font-medium tabular-nums text-foreground">
-                    {/* The key, beside the share it stands for (C19's legend). */}
-                    <i
-                      aria-hidden
-                      className="block size-2.5 rounded-[2px]"
-                      style={{ background: colourOf.get(h.holder) ?? othersColour }}
-                    />
-                    <Prov info={shareProv(h.holder, h.ppm)}>{ppmPct(h.ppm)}</Prov>
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span title={`${sh.exact} ${shareSymbol}`} data-cell="holder-shares" data-raw={h.balance}>
+                          <Prov info={balanceProv(h.holder, sh.exact)}>{sh.text}</Prov>
+                        </span>
+                        <AssetUnit symbol={shareSymbol} address={vault} />
+                      </span>
+                    </DataTableCell>
+                    <DataTableCell
+                      label={shareHead}
+                      align="right"
+                      className="whitespace-nowrap font-semibold tabular-nums text-foreground"
+                    >
+                      {/* The key, beside the share it stands for (C19's legend). */}
+                      <i
+                        aria-hidden
+                        className="mr-1.5 inline-block size-2.5 rounded-[2px] align-[-1px]"
+                        style={{ background: colourOf.get(h.holder) ?? othersColour }}
+                        data-key-colour=""
+                      />
+                      <Prov info={shareProv(h.holder, h.ppm)}>{ppmPct(h.ppm)}</Prov>
+                    </DataTableCell>
+                  </DataTableRow>
+                );
+              })}
+            </DataTableBody>
+          </DataTable>
           {restCount > 0 && (
             <p className="mt-2 text-[13px] text-rb-500" data-mock-holders-rest="">
               <Link href={listingHref} prefetch={false} className={INLINE_LINK}>
@@ -993,12 +1051,13 @@ export function MockVaultLayout({
       </PositionCardEdgeContext.Provider>
 
       <div className={`${GRID} [--donut-ground:var(--background)]`} data-mock-layout="">
-        <Tile id="holders">
+        <Tile id="holders" segScope="mock-holders">
           <WhoHoldsIt
             chainId={chainId}
             vault={vault.address}
             vaultName={name}
             shareSymbol={vault.symbol}
+            shareDecimals={vault.decimals}
             holders={holders}
           />
         </Tile>
@@ -1013,6 +1072,7 @@ export function MockVaultLayout({
             allHref={blueWalletHref(chainId, vault.address)}
             chart={allocChart}
             keyColours={keyColours}
+            look="index"
             line={
               <>
                 <PanelFigure>{n(funded.length)}</PanelFigure> of {n(legs.length)} markets in the withdraw queue hold a

@@ -2,7 +2,9 @@
 // benchmark). One definition for every position card, and for every other
 // surface that states a figure compact:
 //
-//   from 1,000   one decimal with K, M or B: "277.8K", "2.1M", "905.0K", "1.3B"
+//   from 1,000   one decimal with K, M, B, T or Q: "277.8K", "2.1M", "905.0K",
+//                "1.3B", "4.2T", "34.5Q" (Q a quadrillion, 1e15; past that the
+//                figure stays in Q: "1,200.0Q")
 //   below 1,000  two decimals: "932.59", "3.00", "0.40"
 //   under 0.01   three significant digits, "<0.000001" below that ("0.00512"),
 //                so a non-zero balance never reads as "0.00"
@@ -13,6 +15,8 @@
 import { formatTinyNonZero, isHighValueUnit } from "@/lib/utils/format";
 
 const UNITS: readonly (readonly [number, string])[] = [
+  [1e15, "Q"],
+  [1e12, "T"],
   [1e9, "B"],
   [1e6, "M"],
   [1e3, "K"],
