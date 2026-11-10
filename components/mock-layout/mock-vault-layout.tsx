@@ -245,11 +245,11 @@ const ppmPct = (ppm: number) => pctText(ppm / 1_000_000);
 /** Who holds it's donut. */
 const DONUT = 152;
 
-/** The line under every coloured chart: centred under the donut, from the
- *  left under the bar. */
-function ColourNote({ left }: { left?: boolean }) {
+/** The page's one note on the charts' colours, at its foot (Miles, round
+ *  nine: a tooltip later). */
+function ColourNote() {
   return (
-    <p className={`text-[11px] text-rb-500 ${left ? "mt-1.5" : "mt-2 text-center"}`}>
+    <p className="mt-4 text-[11px] text-rb-500" data-mock-colour-note="">
       Colours tell the segments apart.
     </p>
   );
@@ -427,7 +427,6 @@ function WhoHoldsIt({
               </>
             }
           />
-          <ColourNote />
         </div>
         <div className="w-full min-w-0 flex-1">
           {/* The /vaults index's rows (V6): the house table, one line a row. */}
@@ -961,7 +960,6 @@ export function MockVaultLayout({
     planTotal > 0 && allocSlices.length > 0 ? (
       <div data-mock-alloc-bar="">
         <SegmentBar slices={allocSlices} scope="allocation" label={`Where this vault's ${unit} is, by market`} />
-        <ColourNote left />
       </div>
     ) : undefined;
 
@@ -1253,6 +1251,7 @@ export function MockVaultLayout({
           </ProvSection>
         </Tile>
       </div>
+      <ColourNote />
     </ProvReceiptsScope>
   );
 }
