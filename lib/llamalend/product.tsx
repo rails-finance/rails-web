@@ -22,6 +22,7 @@ import type { ReactNode } from "react";
 import { ExplainBullet, ExplainGroup, ExplainSub, Fig } from "@/components/shared/explain-groups";
 import { readStampProv, type ReadContract } from "@/components/shared/read-stamp";
 import { Prov } from "@/components/shared/provenance";
+import { AssetUnit } from "@/components/shared/asset-unit";
 import { MarketPage } from "@/components/shared/product/market-page";
 import { ProductHeadSection } from "@/components/shared/product/product-head";
 import { GroupedMarketsTable, type GroupedRow, type RowGroup } from "@/components/shared/product/grouped-table";
@@ -288,8 +289,13 @@ function rosterRow(m: LlamalendMarketRow, block: number, readBy?: ServerRead): G
     cells: {
       borrowed: {
         node: (
+          // The amount with its token's mark (D1's amount cell, one line: no
+          // oracle dollars, decision 0047).
           <Prov info={llamaDebtProv(c)}>
-            {amount(m.totalDebt)} {m.borrowedSymbol}
+            <span className="inline-flex items-center gap-1.5 text-foreground/80">
+              {amount(m.totalDebt)}
+              <AssetUnit symbol={m.borrowedSymbol} address={m.borrowedToken} />
+            </span>
           </Prov>
         ),
         sort: m.totalDebt,
