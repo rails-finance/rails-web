@@ -97,7 +97,17 @@ export function compoundV2LineRows(chain: CompoundV2ChainResponse | null): {
             {
               id: "liquidation-drop",
               label: "Liquidates on a drop of",
-              value: `${dropPct}%`,
+              value: (
+                <Prov
+                  info={compoundV2CapacityProv(
+                    "Drop to liquidation",
+                    "1 − debt value ÷ CF-weighted capacity (replica)",
+                    serverReadOf(chain),
+                  )}
+                >
+                  {dropPct}%
+                </Prov>
+              ),
               tip: "How far the collateral can fall in value, with the debt held, before the account reaches the liquidation line. Client arithmetic over the Comptroller's reads (a replica of its walk).",
             },
           ]

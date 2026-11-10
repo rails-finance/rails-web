@@ -647,6 +647,21 @@ export const fixedPriceLineProv = (sym: string): Provenance => ({
   via: "oracle getConfig · fixedPrice (priceFeed == 0)",
 });
 
+/** One market's price on the position page's price list: the Comptroller
+ *  oracle's getUnderlyingPrice, the price its liquidity math reads. A no-feed
+ *  market's is the stored constant (`fixedPriceLineProv`). */
+export const compoundV2PriceProv = (sym: string, fixed: boolean): Provenance =>
+  fixed
+    ? fixedPriceLineProv(sym)
+    : {
+        kind: "chain",
+        pclass: "oracle",
+        verify: { kind: "recompute", text: "Re-run the oracle's getUnderlyingPrice eth_call for this market" },
+        summary: `${sym} price in USD — the Comptroller oracle's getUnderlyingPrice for the ${sym} market, the price the Comptroller's liquidity math reads.`,
+        contract: { name: "Compound Open Price Feed (Comptroller oracle)", address: "" },
+        via: "oracle getUnderlyingPrice(cToken), scaled by 10^(36 − underlying decimals)",
+      };
+
 /** The live per-block borrow rate on one market, annualized on ITS model's
  *  own blocksPerYear (not one constant across the roster). */
 export const borrowRateProv = (sym?: string): Provenance => ({

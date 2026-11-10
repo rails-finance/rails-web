@@ -355,6 +355,17 @@ export const cometPriceAtBlockProv = (sym: string, coords: CompoundCoords): Prov
   inputs: eventInputs(coords),
 });
 
+/** An asset's price on the position page's price list: the Comet's own
+ *  `getPrice` on the asset's configured feed, the price its liquidation engine
+ *  reads, as the page's read returned it. */
+export const cometPriceProv = (sym: string, coords?: CompoundCoords): Provenance => ({
+  kind: "chain",
+  pclass: "oracle",
+  summary: `${sym} price in USD — the Comet's \`getPrice\` on the asset's configured price feed, the price its liquidation engine uses. An ETH-quoted market's figure is multiplied by Comet's WETH/USD.`,
+  contract: cometContract(coords),
+  via: "Comet · getAssetInfoByAddress(asset).priceFeed → getPrice",
+});
+
 /** A side's figure at an event from the position's replay: an asset this
  *  event left alone, or the side's dollars where it holds several. */
 export const replayHeldProv = (

@@ -67,6 +67,7 @@ import { computeFluidEconomics, fluidLifetimeWithOpening } from "@/lib/fluid/eco
 import { fluidEconomicsExplanation, fluidEconomicsContent } from "@/lib/fluid/economics-explanation";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { atBlockOraclePriceProv } from "@/lib/fluid/event-provenance";
 import type { Provenance } from "@/components/shared/provenance";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -439,10 +440,29 @@ export default function FluidPositionView({
     return closingPricesAt(
       fluidEvents,
       (row) => {
-        const debtPerCol = row.context.data.oraclePriceAtBlock?.debtPerCol;
-        if (debtPerCol == null || !(debtPerCol > 0)) return undefined;
+        const at = row.context.data.oraclePriceAtBlock;
+        const debtPerCol = at?.debtPerCol;
+        if (!at || debtPerCol == null || !(debtPerCol > 0)) return undefined;
         return [
-          { symbol: supply, price: debtPerCol, unit: borrow, label: `${supply} in ${borrow} (the vault's oracle)` },
+          {
+            symbol: supply,
+            price: debtPerCol,
+            unit: borrow,
+            label: `${supply} in ${borrow} (the vault's oracle)`,
+            info: atBlockOraclePriceProv(
+              supply,
+              borrow,
+              {
+                txHash: row.txHash,
+                blockNumber: row.blockNumber,
+                vault: row.context.data.vault,
+                nftId: String(view.nftId),
+              },
+              debtPerCol,
+              at.oracle,
+              at.source,
+            ),
+          },
           { symbol: borrow, label: `${borrow}, the vault's debt token` },
         ];
       },

@@ -50,6 +50,8 @@ import { interleaveRowPlan, servedFoldersEnabled } from "@/lib/shared/timeline-f
 import { withFolderActors } from "@/lib/shared/timeline-folder-reductions";
 import { closingPricesAt, DetailTopRow } from "@/components/shared/detail-back-row";
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { oraclePriceProv } from "@/lib/morpho/position-provenance";
+import { atBlockOraclePriceProv } from "@/lib/morpho/event-provenance";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { MorphoEventCard } from "@/components/protocol/morpho/morpho-event-card";
 import {
@@ -418,11 +420,24 @@ export default function MorphoPositionView({
         price: oracle,
         unit: oracle ? v.loanSymbol : undefined,
         label: `${v.collateralSymbol} in ${v.loanSymbol} (the market's oracle)`,
+        info:
+          oracle && chain
+            ? oraclePriceProv(
+                {
+                  collSym: v.collateralSymbol,
+                  loanSym: v.loanSymbol,
+                  oracle: chain.oracle,
+                  block: chain.blockNumber,
+                  lane: "GET /api/chain/morpho/position",
+                },
+                { marketId: splitMorphoPositionId(positionId).market },
+              )
+            : undefined,
       });
     }
     out.push({ symbol: v.loanSymbol, address: v.loanToken, label: `${v.loanSymbol}, the market's loan token` });
     return out;
-  }, [liveView, chain]);
+  }, [liveView, chain, positionId]);
 
   // A closed position's prices: the market oracle at the closing block, which
   // the index carries on liquidation rows only. A position its owner closed
@@ -441,11 +456,17 @@ export default function MorphoPositionView({
           price,
           unit: v.loanSymbol,
           label: `${collateralSymbol} in ${v.loanSymbol} (the market's oracle)`,
+          info: atBlockOraclePriceProv(
+            collateralSymbol,
+            v.loanSymbol,
+            { txHash: row.txHash, blockNumber: row.blockNumber, marketId: splitMorphoPositionId(positionId).market },
+            price,
+          ),
         },
         { symbol: v.loanSymbol, address: v.loanToken, label: `${v.loanSymbol}, the market's loan token` },
       ];
     });
-  }, [liveView, morphoEvents]);
+  }, [liveView, morphoEvents, positionId]);
 
   // The card ⋮'s export shapes (ui-jobs 308 point 2).
   const exports = liveView

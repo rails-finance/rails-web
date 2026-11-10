@@ -126,13 +126,22 @@ export function FilterChips<F>({ dimensions, filters, onChange, count, countNode
           Reset
         </button>
       )}
+      {/* The result count is the list's chrome: how many rows the filter
+          returns, the same total the pagination states. The tripwire skips it
+          (data-prov-exempt); a protocol's own count carries its receipt where
+          the page states it as a figure. */}
       {countNode != null && (
-        <span className="ml-auto text-xs text-rb-500 tabular-nums" data-anatomy="N1.6">
+        <span className="ml-auto text-xs text-rb-500 tabular-nums" data-anatomy="N1.6" data-prov-exempt="">
           {countNode}
         </span>
       )}
       {countNode == null && count && (
-        <span className="ml-auto text-xs text-rb-500 tabular-nums" data-anatomy="N1.6" data-result-count={count.total}>
+        <span
+          className="ml-auto text-xs text-rb-500 tabular-nums"
+          data-anatomy="N1.6"
+          data-result-count={count.total}
+          data-prov-exempt=""
+        >
           {count.total.toLocaleString("en-US")} {count.total === 1 ? count.noun.replace(/s$/, "") : count.noun}
         </span>
       )}

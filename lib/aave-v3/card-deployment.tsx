@@ -53,6 +53,8 @@ export interface AaveV3CardDeployment {
   /** `market`: the row's market, whose oracle prices it. */
   usd: (what: string, market?: string) => Provenance;
   liqPrice: (symbol: string, market?: string) => Provenance;
+  /** "Liquidates on a drop of": 1 − 1 ÷ the health factor the Pool reports. */
+  liqDrop: (market?: string) => Provenance;
   /** A closed account's "highest recorded" figures — where the maximum came
    *  from on this lane (the index's replay on Ethereum; the live sweep's
    *  principal replay on a Base lender). */
@@ -75,6 +77,8 @@ export const ETHEREUM_CARD_DEPLOYMENT: AaveV3CardDeployment = {
     accountDataProv("Health factor", "healthFactor", POOL_BY_MARKET[market] ?? AAVE_V3_POOL, readBy),
   usd: aaveV3UsdProvOnchain,
   liqPrice: aaveV3LiqPriceProv,
+  liqDrop: (market) =>
+    liqDropProv({ name: "Aave V3 Pool", address: (market && POOL_BY_MARKET[market]) || AAVE_V3_POOL }),
   peakSupply: aaveV3PeakSupplyProv,
   peakDebt: aaveV3PeakBorrowProv,
   interestCaption: aaveV3InterestCaptionProv,
@@ -97,6 +101,19 @@ export function useAaveV3CardDeployment(): AaveV3CardDeployment {
 }
 
 const at = (block?: number): string => (block != null ? ` at block ${block.toLocaleString("en-US")}` : "");
+/** The drop the whole collateral can take before liquidation: a function of
+ *  the Pool's health factor alone, so its one input is that read. */
+const liqDropProv = (pool: { name: string; address: string }): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary:
+    "Drop to liquidation — how far the dollar value of all the collateral can fall, the debt standing still, before the health factor reaches 1 and the account can be liquidated.",
+  contract: pool,
+  via: "1 − 1 ÷ Pool getUserAccountData health factor",
+  formula: "1 − 1 ÷ health factor",
+  inputs: [{ label: "health factor", kind: "chain", pclass: "state", note: "Pool getUserAccountData" }],
+});
+
 const RECOMPUTE = { kind: "recompute" as const, text: "To check: make the same call to the contract on any node." };
 
 /** A Base lender's LISTING card receipts: every current figure is a read of
@@ -154,6 +171,7 @@ export function makeSweptCardDeployment(id: {
         { label: "oracle price", kind: "chain", note: "IAaveOracle getAssetPrice" },
       ],
     }),
+    liqDrop: () => liqDropProv(pool),
     liqPrice: (symbol) => ({
       kind: "chain-derived",
       pclass: "state",
@@ -278,6 +296,7 @@ export function makeLivePoolCardDeployment(id: {
         { label: "oracle price", kind: "chain", note: "IAaveOracle getAssetPrice" },
       ],
     }),
+    liqDrop: () => liqDropProv(pool),
     liqPrice: (symbol) => ({
       kind: "chain-derived",
       pclass: "state",

@@ -64,7 +64,8 @@ import { MoonwellFlowsNote, moonwellFlowsContent } from "@/components/protocol/m
 import { useMoonwellFlows } from "@/hooks/useMoonwellFlows";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { moonwellPriceProv } from "@/lib/moonwell/position-provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { externalActor, summariseExternalActors, withOpeningActors } from "@/lib/shared/external-actor";
 import { liquidationStories } from "@/lib/shared/ctoken-liquidation-story";
@@ -356,16 +357,17 @@ export default function MoonwellPositionView({
 
   // The top row's price dropdown: the on-chain oracle price of each
   // market the account currently touches.
-  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     if (!view || view.status !== "open") return [];
     const seen = new Set<string>();
-    const out: PriceStripAsset[] = [];
+    const out: LatestPriceAsset[] = [];
     for (const r of [...view.supplies, ...view.borrows]) {
       const a = r.address.toLowerCase();
       if (seen.has(a)) continue;
       seen.add(a);
       const p = view.priceByAddress?.[a];
-      if (typeof p === "number" && p > 0) out.push({ symbol: r.symbol, address: r.address, price: p });
+      if (typeof p === "number" && p > 0)
+        out.push({ symbol: r.symbol, address: r.address, price: p, info: moonwellPriceProv(r.symbol) });
     }
     return out;
   }, [view]);

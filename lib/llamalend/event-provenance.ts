@@ -221,6 +221,17 @@ export const positionIndexProv = (sym: string, which: "collateral" | "debt", con
   via: `${LLAMALEND_VIA} · latest UserState after-image at this position grain`,
 });
 
+/** A closed or liquidated position's collateral where the last UserState
+ *  stated none (the Controller's 2^256−1 sentinel): zero by the Controller's
+ *  rule, since a loan ends only with its collateral returned. */
+export const positionClosedCollateralProv = (sym: string, controller?: string): Provenance => ({
+  kind: "derived",
+  pclass: "state",
+  summary: `${sym} collateral at the loan's end — the last UserState log carried the Controller's sentinel in place of a figure, and an ended loan holds none: the Controller returns the collateral when the debt reaches 0, and a liquidation removes the loan with its collateral.`,
+  contract: { name: "LlamaLend Controller", address: controller ?? "" },
+  via: `${LLAMALEND_VIA} · latest UserState after-image (collateral unstated) · loan ended`,
+});
+
 /** USD figure on a crvUSD-borrowed market — the AMM's own oracle (~$1 unit). */
 export const llamalendUsdProv = (what: string, borrowedSymbol: string, amm?: string): Provenance => ({
   kind: "chain-derived",
