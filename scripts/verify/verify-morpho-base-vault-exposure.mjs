@@ -568,7 +568,12 @@ const href = (holder) => `${BASE}/base/morpho/vaults/${VAULT}${holder ? `?holder
 // is the `[data-figure]` span itself (ui-jobs 407, V2).
 const figure = async (name) => {
   const value = page.locator(`[data-figure="${name}"] [data-figure-value]`);
-  if ((await value.count()) > 0) return (await value.first().textContent())?.trim();
+  if ((await value.count()) > 0) {
+    // A figure drawn compact (the vault page's card from a million) states its
+    // full print-rule text in `data-figure-full`.
+    const full = await value.first().getAttribute("data-figure-full");
+    return full ?? (await value.first().textContent())?.trim();
+  }
   return (await page.locator(`[data-figure="${name}"]`).first().textContent())?.trim();
 };
 
@@ -646,18 +651,39 @@ check(
 // The queue is however long this vault's queue is — one leg, six, twenty, none.
 // A page that drew a different number of rows would still sum correctly if the
 // missing leg were empty, so the count is its own check.
+// The vault page's table draws the largest legs first and stops at its cap;
+// its "Show all N" link names every row's key (`data-assets-keys`: the market
+// ids, and "idle" where the queue has no idle market). The holder page draws
+// every row.
 const legRows = await page.locator("[data-leg]").count();
+const showAll = page.locator("[data-assets-show-all]");
+const named = (await showAll.count())
+  ? ((await showAll.first().getAttribute("data-assets-keys")) ?? "").split(" ").filter((k) => k && k !== "idle")
+  : null;
+const queueIds = own.legs.map((l) => l.id.toLowerCase());
 check(
-  "3a the allocation table draws one row per withdraw-queue entry",
-  legRows === own.legs.length,
-  `${legRows} rows vs ${own.legs.length} entries in withdrawQueue`,
+  "3a the allocation table draws one row per withdraw-queue entry, or its first rows and a link naming all of them",
+  named
+    ? named.length === queueIds.length &&
+        named.every((k) => queueIds.includes(k.toLowerCase())) &&
+        legRows < queueIds.length
+    : legRows === queueIds.length,
+  `${legRows} rows drawn${named ? `, ${named.length} named by the link` : ""}, vs ${queueIds.length} entries in withdrawQueue`,
 );
 // Per leg too, so a compensating pair of errors cannot sum to the right total.
 // Count-guarded: a row this script's own read expects and the page never drew is
-// a red check, not a locator timeout that ends the run early.
+// a red check, not a locator timeout that ends the run early. A leg past the
+// table's cap is held to its segment in the bar instead, by the Σ in 3.
+const drawn = new Set(
+  await page.locator("[data-leg]").evaluateAll((els) => els.map((e) => e.getAttribute("data-leg"))),
+);
+const capped = legRows < own.legs.length;
 for (const leg of own.legs) {
+  if (capped && !drawn.has(leg.id)) continue;
   const cellLoc = page.locator(`[data-leg="${leg.id}"] [data-cell="leg-assets"]`);
-  const cell = (await cellLoc.count()) ? ((await cellLoc.textContent()) ?? "").trim() : "(no row for this leg)";
+  const cell = (await cellLoc.count())
+    ? ((await cellLoc.getAttribute("data-figure-full")) ?? ((await cellLoc.textContent()) ?? "").trim())
+    : "(no row for this leg)";
   check(
     `3-${leg.id.slice(0, 8)} the leg's supplied figure equals this script's own read`,
     cell === assetText(leg.assets, own.assetDecimals),

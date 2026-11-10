@@ -19,6 +19,7 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { RowHelp } from "@/components/shared/row-help";
 import { QuietTipsContext, RevealTip } from "@/components/shared/reveal-tip";
 import { ProvDetached } from "@/components/shared/provenance";
+import { segmentLinkCss } from "@/components/shared/segment-bar";
 
 /** One asset of a side. */
 export interface BreakdownAsset {
@@ -98,7 +99,7 @@ function slicesOf(sorted: BreakdownAsset[], total: number, side: BreakdownSide):
 }
 
 /** Arc angles, each at least MIN_ARC, the rest scaled to fill the circle. */
-function anglesOf(slices: Slice[]): [number, number][] {
+function anglesOf(slices: { share: number }[]): [number, number][] {
   const full = 2 * Math.PI;
   const raw = slices.map((s) => s.share * full);
   const small = raw.filter((a) => a < MIN_ARC).length;
@@ -437,6 +438,111 @@ export function AssetBreakdownPanel({
           <RowHelp tip={DUST_TIP} name="Dust" />
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** One slice of `ShareDonut`: a part of a whole, largest first. */
+export interface DonutSlice {
+  key: string;
+  /** The slice's name in its tooltip and label ("0x1234…abcd · 12.3%"). */
+  label: string;
+  /** Of the whole, 0 to 1. */
+  share: number;
+  /** The trailing merged slice, in the breakdown's "Other" grey. */
+  rest?: boolean;
+}
+
+/** Each slice's colour, by the breakdown's rule: the side's tone graded by
+ *  size rank toward `--donut-ground`, the merged slice in "Other" grey. */
+function donutColours(slices: DonutSlice[], side: BreakdownSide = "collateral"): string[] {
+  const steps = STEPS(side, slices.filter((s) => !s.rest).length);
+  let i = 0;
+  return slices.map((s) => (s.rest ? OTHER : steps[i++]));
+}
+
+/** A path's coordinates to three places: the server and the browser can
+ *  disagree in a trigonometric result's last digits, and this donut renders
+ *  on both. The arc flags are integers and stay as they are. */
+const fixed = (d: string) =>
+  d.replace(/-?\d*\.\d+(?:e[-+]?\d+)?|-?\d+e[-+]?\d+/g, (m) => String(+Number(m).toFixed(3)));
+
+/** The breakdown's donut on its own, for a share of a whole that is not a
+ *  side's assets (a MetaMorpho vault page's holders): the same corners,
+ *  pad and colours, at `size`, with `centre` in its hole. The slices are
+ *  drawn as given; each carries its label as a tooltip. `colours`, one CSS
+ *  colour per slice (lib/shared/slice-colours.ts), replaces the side's
+ *  graded tone.
+ *
+ *  Linking, as `SegmentBar` (components/shared/segment-bar.tsx): give the
+ *  donut a `scope` and set `data-seg-scope` to it on an ancestor holding the
+ *  donut and its rows. A row carrying `data-seg="<slice key>"` lights with its
+ *  slice on hover or focus, every other slice and row dimming (CSS `:has()`,
+ *  no state). Several rows can share a slice (the merged one): each also
+ *  carries `data-seg-row`, and a hovered row dims the others in its slice. */
+export function ShareDonut({
+  slices,
+  label,
+  size = SIZE,
+  side = "collateral",
+  centre,
+  colours: given,
+  scope,
+}: {
+  slices: DonutSlice[];
+  /** The donut's accessible name. */
+  label: string;
+  size?: number;
+  side?: BreakdownSide;
+  /** Drawn in the hole, centred: a count and its noun. */
+  centre?: ReactNode;
+  /** One CSS colour per slice, in place of the side's graded tone. */
+  colours?: string[];
+  /** The `data-seg-scope` its rows sit under, to light a slice and its rows together. */
+  scope?: string;
+}) {
+  if (slices.length === 0) return null;
+  const css = scope
+    ? segmentLinkCss(
+        scope,
+        slices.map((s) => s.key),
+      )
+    : "";
+  const angles = anglesOf(slices);
+  const colours = given ?? donutColours(slices, side);
+  const k = size / 120;
+  const C = size / 2;
+  return (
+    <div className="relative shrink-0" style={{ width: size, height: size }} data-share-donut="">
+      {css && <style>{css}</style>}
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        role="img"
+        aria-label={label}
+        className="overflow-visible"
+        data-breakdown-donut={size}
+      >
+        {slices.map((s, i) => (
+          <path
+            key={s.key}
+            d={fixed(arcPath(29 * k, 58 * k, angles[i][0], angles[i][1], PAD, 3 * k))}
+            transform={`translate(${C},${C})`}
+            style={{ fill: colours[i] }}
+            className={scope ? "transition-opacity duration-200" : undefined}
+            data-breakdown-slice={s.key}
+            data-seg={scope ? s.key : undefined}
+          >
+            <title>{s.label}</title>
+          </path>
+        ))}
+      </svg>
+      {centre != null && (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center [&>*]:pointer-events-auto">
+          {centre}
+        </div>
+      )}
     </div>
   );
 }

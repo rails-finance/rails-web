@@ -23,10 +23,10 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
 /** An element is "a value" when its whole collapsed text is one stat-shaped
- *  token: optional approx/sign prefix, a formatted number, optional %/K/M/B,
+ *  token: optional approx/sign prefix, a formatted number, optional %/K/M/B/T/Q,
  *  optional trailing ticker word. Anything longer reads as prose and is the
  *  surrounding component's business. */
-const STAT_RE = /^[~≈<>±+\-−]?\$?\d[\d,]*(?:\.\d+)?\s?[KMB%]?(?:\s[A-Za-z$][\w.$/-]{0,11})?$/;
+const STAT_RE = /^[~≈<>±+\-−]?\$?\d[\d,]*(?:\.\d+)?\s?[KMBTQ%]?(?:\s[A-Za-z$][\w.$/-]{0,11})?$/;
 
 /** Subtrees the sweep never enters: a <Prov>-covered value, receipts-pane
  *  chrome, an explicit exemption, capture decoration, charts (axis ticks are
