@@ -274,11 +274,12 @@ interface FocusMiss {
 }
 
 /**
- * Where a focus holds nothing, chain by chain: "BOLD isn't listed on
- * Arbitrum" only where Rails can say so; "Rails has no asset list for
- * Arbitrum yet" where it cannot. `empty`: every focused chain lists none of
- * the assets, so the focus would show nothing. Null until the explorer index
- * has arrived.
+ * Where a focus holds nothing, chain by chain: "BOLD isn't listed on Base"
+ * only where every explorer there has an asset list and none holds it; "Rails
+ * knows no BOLD on Base" where the address tables hold no BOLD there; "Rails
+ * has no asset list for Arbitrum yet" where it cannot say. `empty`: on every
+ * focused chain no asset is reached, so the focus would show nothing as
+ * Rails stands. Null until the explorer index has arrived.
  */
 export function useFocusMisses(focus: Focus): { misses: FocusMiss[]; empty: boolean } | null {
   const listing = useChainListing();
@@ -293,7 +294,15 @@ export function useFocusMisses(focus: Focus): { misses: FocusMiss[]; empty: bool
       let none = 0;
       for (const [sym, picks] of bySymbol) {
         const keys = focusKeys({ assets: picks, chains: [c] }) ?? new Set<string>();
-        const status: ExplorerStatus = keys.size ? listing(keys, c) : "none";
+        if (!keys.size) {
+          // No address for it on this chain: where Rails keeps no token table
+          // for the chain it cannot say; where it does, it knows none.
+          none++;
+          if (SCOPE_CHAINS[c] == null) unknown = true;
+          else misses.push({ text: `Rails knows no ${sym} on ${chainNameOf(c)}`, kind: "none", chain: c });
+          continue;
+        }
+        const status: ExplorerStatus = listing(keys, c);
         if (status === "none") {
           none++;
           misses.push({ text: `${sym} isn't listed on ${chainNameOf(c)}`, kind: "none", chain: c });
