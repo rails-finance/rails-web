@@ -33,6 +33,8 @@ import { Bookmark, ChevronDown, ListFilter, Monitor, Moon, Settings, Signpost, S
 import { useTheme } from "next-themes";
 
 import { Facehash } from "@/components/shared/facehash";
+import { FocusAvatar } from "@/components/shared/focus-avatar";
+import { FocusWords } from "@/components/shared/asset-scope-strip";
 import { useBookmarks } from "@/components/shared/bookmark-list";
 import { savedName, useSavedLinks } from "@/components/shared/saved-items";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
@@ -41,7 +43,7 @@ import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
 import { OPEN_SCOPE_PANEL, useAssetScope } from "@/lib/shared/asset-scope";
 import { focusShort } from "@/components/shared/aim-gate";
-import { CTRL_OFF, CTRL_ON, START_CTA } from "@/lib/shared/ui-grammar";
+import { CTRL_OFF, CTRL_ON, INPLACE_TEXT, START_CTA } from "@/lib/shared/ui-grammar";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 
 const BOOKMARKS_PATH = "/bookmarks";
@@ -170,6 +172,7 @@ export function ProfileMenu() {
     { kind: "views", label: "Saved views", rows: (views ?? []).slice(0, MENU_LINK_ROWS) },
   ].filter((g) => g.rows.length > 0);
   const anything = rows.length > 0 || links.length > 0;
+  const focusOn = scope.ready && scope.on;
 
   const close = useCallback((refocus = true) => {
     setOpen(false);
@@ -258,8 +261,8 @@ export function ProfileMenu() {
       <button
         ref={trigger}
         type="button"
-        aria-label={MENU_NAME}
-        title={MENU_NAME}
+        aria-label={focusOn ? `${MENU_NAME}. Focus mode: ${focusShort(scope.picks, scope.chains)}` : MENU_NAME}
+        title={focusOn ? `Focus mode: ${focusShort(scope.picks, scope.chains)}` : MENU_NAME}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -281,11 +284,7 @@ export function ProfileMenu() {
           open ? CHROME_HOVER_ON : CHROME_HOVER
         }`}
       >
-        {face ? (
-          <Facehash address={face} size={20} mono />
-        ) : (
-          <span className="block size-5 rounded-[4.4px] bg-current opacity-30" aria-hidden="true" />
-        )}
+        <FocusAvatar face={face} />
         <ChevronDown className={`size-3.5 shrink-0 ${open ? "rotate-180" : ""}`} aria-hidden="true" />
       </button>
       {mounted &&
@@ -315,6 +314,57 @@ export function ProfileMenu() {
               }`}
               style={place.phone ? undefined : { top: place.top, right: place.right }}
             >
+              {/* With Focus on, the menu opens with it (Miles, 10 Nov 2026):
+                  what is in focus, and its presses. */}
+              {focusOn && (
+                <div role="group" aria-labelledby={`${menuId}-focus`} className="pb-2" data-profile-menu-focus="">
+                  <p id={`${menuId}-focus`} className={GROUP_LABEL}>
+                    <ListFilter className="size-4 shrink-0" aria-hidden="true" />
+                    Focus mode
+                  </p>
+                  <p className="px-3 pb-2 text-sm leading-snug text-foreground">
+                    <FocusWords picks={scope.picks} chains={scope.chains} />
+                  </p>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 text-xs">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        close(false);
+                        window.dispatchEvent(new Event(OPEN_SCOPE_PANEL));
+                      }}
+                      className={`rounded font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${INPLACE_TEXT}`}
+                      data-profile-menu-focus-change=""
+                    >
+                      Change
+                    </button>
+                    {scope.fromLink && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={scope.keepLink}
+                        className={`rounded font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${INPLACE_TEXT}`}
+                        data-profile-menu-focus-keep=""
+                      >
+                        Keep this focus
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        scope.clear();
+                        close(false);
+                      }}
+                      className={`rounded font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${INPLACE_TEXT}`}
+                      data-profile-menu-focus-clear=""
+                    >
+                      Show everything
+                    </button>
+                  </div>
+                  <div className="mx-1 mt-3 border-t border-rb-200 dark:border-rb-800" />
+                </div>
+              )}
               {/* With none saved, the way in fills the menu's top (Miles, 6 Nov
                   2026); with a wallet saved there is none (ui-jobs 509). */}
               {!anything && (
@@ -361,24 +411,24 @@ export function ProfileMenu() {
               ))}
               {anything && <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />}
               <div className="py-1">
-                {/* The asset preference's way in (ui-jobs 557): opens its panel
-                    (components/shared/asset-scope-strip.tsx). */}
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    close(false);
-                    window.dispatchEvent(new Event(OPEN_SCOPE_PANEL));
-                  }}
-                  className={ITEM}
-                  data-profile-menu-assets={scope.picks.length}
-                >
-                  <ListFilter className="size-4 shrink-0" aria-hidden="true" />
-                  <span className="min-w-0 flex-1 truncate text-foreground">Focus</span>
-                  <span className="shrink-0 truncate text-xs text-rb-500">
-                    {scope.on ? focusShort(scope.picks, scope.chains) : "Off"}
-                  </span>
-                </button>
+                {/* Focus mode's way in while it is off (ui-jobs 557): opens its
+                    panel (components/shared/asset-scope-strip.tsx). */}
+                {!focusOn && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      close(false);
+                      window.dispatchEvent(new Event(OPEN_SCOPE_PANEL));
+                    }}
+                    className={ITEM}
+                    data-profile-menu-assets={scope.picks.length}
+                  >
+                    <ListFilter className="size-4 shrink-0" aria-hidden="true" />
+                    <span className="min-w-0 flex-1 truncate text-foreground">Focus</span>
+                    <span className="shrink-0 truncate text-xs text-rb-500">Off</span>
+                  </button>
+                )}
                 <Link
                   href={BOOKMARKS_PATH}
                   role="menuitem"

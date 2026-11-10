@@ -180,6 +180,10 @@ export const INLINE_LINK = "text-blue-600 dark:text-[var(--text-link)] hover:und
  * `overlay-item` rows. See components/shared/filter-dropdown.tsx for the
  * reference panel.
  */
+/** The page behind an overlay lightened (light) or darkened (dark): the wallet
+ *  panel's scrim (H16.1), shared by the Focus dialog and panel. */
+export const PAGE_SCRIM = "bg-white/60 dark:bg-rb-950/70";
+
 export const OVERLAY_HEADING = "text-xs uppercase tracking-wider font-bold";
 
 /** A position page's section heading in sentence case: "Lifetime flows". */

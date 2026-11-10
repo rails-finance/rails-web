@@ -1,10 +1,10 @@
 "use client";
 
-// Focus mode (ui-jobs 557): its strip and panel. With Focus on, a strip
-// across the top of the app column on every page, at every width: "Focus mode
-// active: BOLD and what's built on it, on Ethereum · Change · Show
-// everything" ("Focus: BOLD on Ethereum" on a phone). Off, nothing: the ways
-// in are "Focus" in the profile menu (H20), which opens the same panel
+// Focus mode (ui-jobs 557): its panel and its arrival dialog. Focus shows on
+// the profile control (components/shared/focus-avatar.tsx), and its menu opens
+// with a Focus section (Miles, 10 Nov 2026). The strip that ran across the top
+// of every page is kept here unshown (SHOW_STRIP) for comparison. The ways in
+// are "Focus" in the profile menu (H20), which opens the panel
 // (OPEN_SCOPE_PANEL), and the Focus button on a token or chain row of the
 // search's dropdown (components/shared/aim-search-button.tsx).
 //
@@ -13,21 +13,25 @@
 // chain; none pressed is every chain, and a focused chain where an asset is
 // not listed says so. Arriving on `?assets=` / `?chains=`, a dialog says what
 // Focus mode is and what the link set it to (FocusLinkIntro), and the strip's
-// "Keep this focus" stores the link's focus in this browser.
+// "Keep this focus" (in the dialog and the profile menu) stores the link's
+// focus in this browser.
 //
 // On an explorer's own pages the strip carries one more line where the
 // explorer is one the preference hides (lib/shared/explorer-scope.ts): its
 // chain holds none of the reader's assets, or it lists none of them, or Rails
 // has no asset list for it. The page itself still opens whole.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { protocolForPathname } from "@/lib/shared/protocols";
 import { CHAINS } from "@/lib/shared/chains";
 import { useExplorerScope } from "@/lib/shared/explorer-scope";
 import { createPortal } from "react-dom";
-import { Check, Link2, ListFilter, X } from "lucide-react";
+import { Check, Lightbulb, Link2, ListFilter, X } from "lucide-react";
+import { FocusAvatar } from "@/components/shared/focus-avatar";
+import { useBookmarks } from "@/components/shared/bookmark-list";
+import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
 import { AssetChooser, optionKey, type AssetChooserOption } from "@/components/shared/asset-chooser";
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -49,7 +53,11 @@ import {
   useAssetScope,
   type AssetPick,
 } from "@/lib/shared/asset-scope";
-import { INLINE_LINK, INPLACE_TEXT, OVERLAY_HEADING, RESET_LINK } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK, INPLACE_TEXT, OVERLAY_HEADING, PAGE_SCRIM, RESET_LINK } from "@/lib/shared/ui-grammar";
+
+/** The strip across the top of every page, replaced by the profile control's
+ *  ring and badge (Miles, 10 Nov 2026); kept for a side-by-side. */
+const SHOW_STRIP = false as boolean;
 
 const chainName = (c: number) => SCOPE_CHAINS[c] ?? `chain ${c}`;
 const symbolOf = (p: Pick<AssetPick, "chain" | "token">) =>
@@ -90,30 +98,12 @@ export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" })
     window.addEventListener(OPEN_SCOPE_PANEL, show);
     return () => window.removeEventListener(OPEN_SCOPE_PANEL, show);
   }, []);
-  const on = scope.on;
-
-  // Home's header bar floats over the hero (components/nav/header-bar.tsx);
-  // the strip's height moves it down (globals.css, --aim-strip-h).
-  const stripRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const el = stripRef.current;
-    const root = document.documentElement;
-    if (!el) return;
-    const set = () => root.style.setProperty("--aim-strip-h", `${el.offsetHeight}px`);
-    set();
-    const ro = new ResizeObserver(set);
-    ro.observe(el);
-    return () => {
-      ro.disconnect();
-      root.style.removeProperty("--aim-strip-h");
-    };
-  }, [on]);
+  const on = scope.on && SHOW_STRIP;
 
   return (
     <>
       {on && (
         <div
-          ref={stripRef}
           // The app column's main pulls up 17px from md; the margin gives it back.
           className={`border-b border-rb-200 bg-rb-100/60 dark:border-rb-800 dark:bg-rb-900/60 ${column === "app" ? "md:mb-[17px]" : ""}`}
           data-asset-scope-strip={scope.fromLink ? "link" : "stored"}
@@ -210,7 +200,7 @@ function ChainWords({ chains, size = "size-3" }: { chains: number[]; size?: stri
 }
 
 /** The strip's words: "[icons] BOLD and what's built on it, on [mark] Ethereum"; "[mark] Base". */
-function FocusWords({ picks, chains }: { picks: AssetPick[]; chains: number[] }) {
+export function FocusWords({ picks, chains }: { picks: AssetPick[]; chains: number[] }) {
   if (!picks.length) return <ChainWords chains={chains} />;
   return (
     <>
@@ -314,7 +304,7 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
   const chains = scope.chains;
   const onChains = chains.length > 0 && (
     <>
-      {picks.length ? ", on " : ""}
+      {picks.length ? " on " : ""}
       <ChainWords chains={chains} size="size-3.5" />
     </>
   );
@@ -322,7 +312,7 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
 
   return createPortal(
     <div className="fixed inset-0 z-[var(--z-modal)]" data-focus-intro="">
-      <div className="absolute inset-0 bg-black/30" onClick={close} aria-hidden="true" />
+      <div className={`absolute inset-0 ${PAGE_SCRIM}`} onClick={close} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
@@ -346,19 +336,20 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
               </span>
             </span>
           ))}
+          {onChains}
           {builtOn &&
             (examples.length
-              ? ` and assets built on ${one ? "it" : "them"}, such as ${andList(examples)}`
-              : ` and assets built on ${one ? "it" : "them"}`)}
-          {onChains}.
+              ? `, with assets built on ${one ? "it" : "them"} such as ${andList(examples)}`
+              : `, with assets built on ${one ? "it" : "them"}`)}
+          .
         </p>
         <p className="text-xs leading-relaxed text-rb-500">
           {picks.length
             ? `Lists, explorers, chains and search show only what holds, lends or is built on ${one ? "it" : "them"}${chainsTail}.`
-            : `Lists, explorers and search show only what is on ${chains.map(chainNameOf).join(" and ")}.`}{" "}
-          The strip at the top of every page changes or ends it.
+            : `Lists, explorers and search show only what is on ${chains.map(chainNameOf).join(" and ")}.`}
         </p>
-        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <FocusTip />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <button
             type="button"
             onClick={() => {
@@ -382,6 +373,17 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
           </button>
           <button
             type="button"
+            onClick={() => {
+              close();
+              scope.keepLink();
+            }}
+            className={RESET_LINK}
+            data-focus-intro-keep=""
+          >
+            Keep this focus
+          </button>
+          <button
+            type="button"
             onClick={close}
             className="ml-auto rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-500"
             data-focus-intro-continue=""
@@ -392,6 +394,27 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
       </div>
     </div>,
     document.body,
+  );
+}
+
+/** Where Focus lives once the dialog closes: the profile control, drawn small. */
+function FocusTip() {
+  const bookmarks = useBookmarks();
+  const face = bookmarks == null ? null : (bookmarks[0]?.addresses[0] ?? SAMPLE_WALLET);
+  return (
+    <div
+      className="flex items-center gap-3 rounded-lg border border-teal-600/30 px-3 py-2.5 text-xs text-rb-500"
+      data-focus-intro-tip=""
+    >
+      <Lightbulb className="size-4 shrink-0 text-foreground" aria-hidden="true" />
+      <p className="min-w-0 flex-1 leading-snug">
+        <span className="font-semibold text-foreground">Tip</span> Change or end{" "}
+        <span className="font-semibold text-foreground">Focus mode</span> from the menu at the top right
+      </p>
+      <span className="shrink-0 rounded-md bg-rb-100 p-1.5 dark:bg-rb-800" aria-hidden="true">
+        <FocusAvatar face={face} size={18} />
+      </span>
+    </div>
   );
 }
 
@@ -687,7 +710,7 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
 
   return createPortal(
     <div className="fixed inset-0 z-[var(--z-modal)]" data-asset-scope-dialog="">
-      <div className="absolute inset-0 bg-black/20" onClick={onClose} aria-hidden="true" />
+      <div className={`absolute inset-0 ${PAGE_SCRIM}`} onClick={onClose} aria-hidden="true" />
       <div
         role="dialog"
         aria-label={PANEL_TITLE}

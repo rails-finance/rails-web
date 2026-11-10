@@ -2557,7 +2557,3 @@ html[data-asset-scope] [data-scope-list]:not([data-scope-ready]),
 html[data-chain-focus] [data-chain-gate]:not([data-scope-ready]) {
   visibility: hidden;
 }
-/* AIM's strip is the first line of the page; home's floating header bar sits under it. */
-html[data-asset-scope] header[data-anatomy="H2"].absolute {
-  top: var(--aim-strip-h, 0px);
-}

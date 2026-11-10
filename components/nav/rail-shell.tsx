@@ -44,9 +44,8 @@ export function RailShell({
     <>
       <BrandRail />
       <div className="flex flex-1 flex-col md:pl-14">
-        {/* AIM's strip (ui-jobs 557): over either column while AIM is on,
-            nothing while it is off. The site column has it too: AIM can be
-            turned on from the home page's search. */}
+        {/* Focus mode's panel and arrival dialog (ui-jobs 557), in either
+            column: Focus can be turned on from the home page's search. */}
         <AssetScopeStrip column={column} />
         {column === "app" ? (
           <main className="relative mx-auto w-full max-w-7xl flex-1 px-4 md:-mt-[17px] md:px-6">
