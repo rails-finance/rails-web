@@ -87,7 +87,7 @@ export function SkySavingsRatesView({ rates }: { rates: SkyRates }) {
                     <a
                       href={explorerUrl(SKY_CHAIN_ID, "tx", r.txHash)}
                       target="_blank"
-                      rel="noopener noreferrer"
+                      rel="noopener"
                       className="link-muted"
                     >
                       {r.blockNumber.toLocaleString("en-US")}

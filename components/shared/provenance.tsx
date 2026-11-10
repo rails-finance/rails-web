@@ -546,7 +546,7 @@ export function classifyValue(info: Provenance): { vcls: ProvClass; isComputed: 
 function VerifyRow({ v }: { v: ProvVerify }) {
   if ((v.kind === "etherscan" || v.kind === "link") && v.href)
     return (
-      <a className="prov-verify prov-verify-link" href={v.href} target="_blank" rel="noopener noreferrer">
+      <a className="prov-verify prov-verify-link" href={v.href} target="_blank" rel="noopener">
         <ExternalLink aria-hidden />
         <span>{v.text}</span>
       </a>
@@ -558,7 +558,7 @@ function ContractLink({ c }: { c: { name: string; address?: string } }) {
   const chainId = useChainId();
   if (!c.address) return <span>{c.name}</span>;
   return (
-    <a href={explorerUrl(chainId, "address", c.address)} target="_blank" rel="noopener noreferrer">
+    <a href={explorerUrl(chainId, "address", c.address)} target="_blank" rel="noopener">
       {c.name} {shortHex(c.address)}
     </a>
   );
@@ -851,13 +851,7 @@ export function ProvReceipt({
       if (/\blogs?\b/i.test(s)) linkIdx = i;
     });
     const link = (text: string) => (
-      <a
-        className="prov-via-verify"
-        href={viaVerify.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={viaVerify.text}
-      >
+      <a className="prov-via-verify" href={viaVerify.href} target="_blank" rel="noopener" title={viaVerify.text}>
         {text}
         <ExternalLink aria-hidden />
       </a>
@@ -993,7 +987,7 @@ export function ProvReceipt({
                       {inp.value && <span className="prov-row-value">{inp.value}</span>}
                       {inp.contract && <ContractLink c={inp.contract} />}
                       {(inp.verify?.kind === "etherscan" || inp.verify?.kind === "link") && inp.verify.href && (
-                        <a href={inp.verify.href} target="_blank" rel="noopener noreferrer">
+                        <a href={inp.verify.href} target="_blank" rel="noopener">
                           {inp.verify.text}
                         </a>
                       )}
@@ -1021,7 +1015,7 @@ export function ProvReceipt({
               )}
               {txHash && (
                 <span className="prov-src-item">
-                  <a href={explorerUrl(chainId, "tx-logs", txHash)} target="_blank" rel="noopener noreferrer">
+                  <a href={explorerUrl(chainId, "tx-logs", txHash)} target="_blank" rel="noopener">
                     tx {shortHex(txHash)}
                   </a>
                   <CopyBtn text={txHash} title="Copy tx hash" />

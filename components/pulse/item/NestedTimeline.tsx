@@ -72,7 +72,7 @@ export function NestedTimeline({
                   <a
                     href={entry.link}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener"
                     className="group/nested block relative pl-4 py-2 space-y-2 dark:border-rb-800 rounded-md hover:bg-white dark:hover:bg-rb-800/50 transition-all duration-200 ease-out cursor-pointer -ml-2 px-2"
                   >
                     {/* Row 1: Content + Metrics */}
@@ -142,7 +142,7 @@ export function NestedTimeline({
                                 key={actor.handle}
                                 href={actor.link}
                                 target="_blank"
-                                rel="noreferrer"
+                                rel="noopener"
                                 title={actor.handle}
                                 className="hover:opacity-80 transition-opacity relative hover:z-10"
                               >

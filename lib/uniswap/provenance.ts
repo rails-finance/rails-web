@@ -6,7 +6,7 @@
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { PoolPosition } from "@/lib/uniswap/position";
-import type { UniPositionRead } from "@/lib/uniswap/types";
+import { DAY_BLOCKS_BY_CHAIN, type UniPositionRead } from "@/lib/uniswap/types";
 import type { LineKey } from "@/lib/uniswap/words";
 
 export const UNISWAP_CONTRACTS = {
@@ -165,7 +165,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: UniReceiptCont
       const d = p.daysInRange;
       return {
         ...cardProv("range", c),
-        summary: `Range — the position's ticks ${r.tickLower} to ${r.tickUpper} against the pool's tick ${r.now.tick} at ${at(r.head)}${d ? `; the pool's tick was inside the range at ${d.inRange} of ${d.read} daily reads from block ${n(d.from)} to block ${n(d.to)}, one each 7,200 blocks, kept in rails-server's at-block store` : ""}.`,
+        summary: `Range — the position's ticks ${r.tickLower} to ${r.tickUpper} against the pool's tick ${r.now.tick} at ${at(r.head)}${d ? `; the pool's tick was inside the range at ${d.inRange} of ${d.read} daily reads from block ${n(d.from)} to block ${n(d.to)}, one each ${n(DAY_BLOCKS_BY_CHAIN[r.chainId])} blocks, kept in rails-server's at-block store` : ""}.`,
         inputs: [
           ...(cardProv("range", c).inputs ?? []),
           ...(d ? [derived("daily reads in range", `${d.inRange} of ${d.read}`)] : []),

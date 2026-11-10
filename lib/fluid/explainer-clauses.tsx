@@ -794,7 +794,7 @@ function liquidationSlots(
           <a
             href={explorerUrl(MAINNET_CHAIN_ID, "address", ctx.liquidator)}
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener"
             className={INLINE_LINK}
             onClick={(e) => e.stopPropagation()}
           >

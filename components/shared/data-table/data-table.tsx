@@ -130,10 +130,13 @@ export function DataTable({
   return (
     // `relative`: a visually hidden span inside a cell is placed against the
     // frame, so it never widens the page.
+    // `py-px`: the hover block's border reaches 1px past a row's top and
+    // bottom, and the scroll frame clips what overflows it, so the first and
+    // last rows' borders need the pixel inside the frame.
     <Stacked.Provider value={stacked}>
       <RowHeight.Provider value={rowHeight ? ROW_HEIGHT[stacked ? stackBelow : "sm"][rowHeight] : ""}>
         <div
-          className={`relative isolate -mx-2 max-w-[calc(100%+1rem)] overflow-x-auto px-2 ${className}`}
+          className={`relative isolate -mx-2 max-w-[calc(100%+1rem)] overflow-x-auto px-2 py-px ${className}`}
           data-anatomy={[anatomy, "D1", stacked ? "D6" : "D3"].filter(Boolean).join(" ")}
           {...frame}
         >

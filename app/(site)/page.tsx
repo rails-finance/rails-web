@@ -178,7 +178,7 @@ export default async function Home() {
                     <a
                       href="https://t.me/railsfinance"
                       target="_blank"
-                      rel="noopener noreferrer"
+                      rel="noopener"
                       aria-label="railsfinance on Telegram"
                       className="text-pink-500 hover:underline underline-offset-2"
                     >

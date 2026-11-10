@@ -7,7 +7,9 @@
  *
  * This is a pure source-tree read: no RPC, no dev server. A file passes if
  * it contains a `<ProvReceiptsScope` or `<ProvSection` usage (a section ⋮'s
- * scope, components/shared/section-menu.tsx), exports `PROV_EXEMPT = "<reason>"`,
+ * scope, components/shared/section-menu.tsx), declares `const PROV_EXEMPT = "<reason>"`
+ * (exported from a component; a page file keeps it unexported, since Next's
+ * generated page types allow only Next's own exports from a page),
  * or is named on the ALLOWLIST below with a reason comment. Anything else is
  * a silent gap the tripwire cannot see, and fails the gate.
  *
@@ -64,14 +66,14 @@ for (const file of files) {
   const source = fs.readFileSync(file, "utf8");
 
   const hasScope = /<(?:ProvReceiptsScope|ProvSection)[\s>]/.test(source);
-  const hasExempt = /export\s+const\s+PROV_EXEMPT\s*=\s*["'`]/.test(source);
+  const hasExempt = /(?:export\s+)?const\s+PROV_EXEMPT\s*=\s*["'`]/.test(source);
   const allowlisted = Object.prototype.hasOwnProperty.call(ALLOWLIST, name);
 
   const cond = hasScope || hasExempt || allowlisted;
   const detail = hasScope
     ? "has <ProvReceiptsScope> or <ProvSection>"
     : hasExempt
-      ? "exports PROV_EXEMPT"
+      ? "declares PROV_EXEMPT"
       : allowlisted
         ? `allowlisted — ${ALLOWLIST[name]}`
         : "no scope, no PROV_EXEMPT, not on the allowlist";

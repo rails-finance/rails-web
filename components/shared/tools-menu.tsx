@@ -93,15 +93,7 @@ export function ToolsMenuItem({
   };
   if (href) {
     return external ? (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        role="menuitem"
-        className={className}
-        onClick={onClick}
-        {...data}
-      >
+      <a href={href} target="_blank" rel="noopener" role="menuitem" className={className} onClick={onClick} {...data}>
         {body}
       </a>
     ) : (

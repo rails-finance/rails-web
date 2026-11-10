@@ -138,7 +138,7 @@ import { formatCompact } from "@/lib/shared/format-compact";
 function AnnouncementLink({ url }: { url: string }) {
   const open = () => {
     if (typeof window !== "undefined") {
-      window.open(url, "_blank", "noopener,noreferrer");
+      window.open(url, "_blank", "noopener");
     }
   };
   return (

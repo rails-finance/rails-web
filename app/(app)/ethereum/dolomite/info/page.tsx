@@ -138,7 +138,7 @@ const reads: InfoReads = {
       <a
         href={explorerUrl(MAINNET_CHAIN_ID, "address", DOLOMITE_ADDRESSES.DEFAULT_RISK_OVERRIDE_SETTER)}
         target="_blank"
-        rel="noopener noreferrer"
+        rel="noopener"
         className="link-external"
       >
         DefaultAccountRiskOverrideSetter

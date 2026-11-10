@@ -123,7 +123,7 @@ export function LlamalendPositionExplanation({
             <>
               {" "}
               Curve&rsquo;s docs call a shortfall like this{" "}
-              <a href={BAD_DEBT_DOC_URL} target="_blank" rel="noopener noreferrer" className={INLINE_LINK}>
+              <a href={BAD_DEBT_DOC_URL} target="_blank" rel="noopener" className={INLINE_LINK}>
                 bad debt
               </a>
               : the lenders in this market are exposed to it.

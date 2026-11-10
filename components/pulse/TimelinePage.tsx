@@ -244,7 +244,7 @@ export function TimelinePage({ title, description, dataSources = DEFAULT_DATA_SO
                           <a
                             href="https://etherscan.io/name-lookup-search?id=donate.rails.eth"
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener"
                             className="link-external"
                           >
                             donate.rails.eth
@@ -253,7 +253,7 @@ export function TimelinePage({ title, description, dataSources = DEFAULT_DATA_SO
                           <a
                             href="https://x.com/rails_finance"
                             target="_blank"
-                            rel="noreferrer"
+                            rel="noopener"
                             className="link-external"
                           >
                             @rails_finance

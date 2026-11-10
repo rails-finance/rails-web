@@ -260,7 +260,7 @@ export function pwnEventSlots(
                   <a
                     href={explorerUrl(MAINNET_CHAIN_ID, "tx", back.txHash)}
                     target="_blank"
-                    rel="noopener noreferrer"
+                    rel="noopener"
                     className="link-external font-mono"
                     onClick={(e) => e.stopPropagation()}
                   >

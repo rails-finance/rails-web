@@ -2382,7 +2382,7 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
 }
 
 /* The house table's rows (D1; components/shared/data-table): a hairline
-   between rows and under the header; a hovered row lifts into a rounded block
+   between rows only; a hovered row lifts into a rounded block
    whose top and bottom lie on the hairlines above and below it and whose ends
    reach 8px past them, the corner radius, so a hairline stops where the
    corner's curve begins (the frame's padding, -mx-2 px-2, makes the room); drawn by each cell's
@@ -2392,9 +2392,6 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
    focus. A drawer row opens under the row before it, no hairline between.
    In a layer, so a cell's own utilities win. */
 @layer components {
-  table.dt > thead > tr > th {
-    border-bottom: 1px solid var(--edge-row-line);
-  }
   table.dt > tbody > tr > :is(td, th) {
     border-bottom: 1px solid var(--edge-row-line);
     transition: border-color 150ms;
@@ -2405,11 +2402,6 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
   table.dt > tbody > tr:is(:not([data-dt-parent]):hover, [data-anatomy~="D4"]:focus-within) > *,
   table.dt > tbody > tr:has(+ tr:is(:not([data-dt-parent]):hover, [data-anatomy~="D4"]:focus-within)) > *,
   table.dt > tbody > tr:has(+ tr.hidden + tr:not([data-dt-parent]):hover) > * {
-    border-bottom-color: transparent;
-  }
-  table.dt
-    > thead:has(+ tbody > tr:first-child:is(:not([data-dt-parent]):hover, [data-anatomy~="D4"]:focus-within))
-    th {
     border-bottom-color: transparent;
   }
   table.dt > tbody > tr > *::before,

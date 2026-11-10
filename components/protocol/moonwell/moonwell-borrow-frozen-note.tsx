@@ -13,7 +13,7 @@ export function MoonwellBorrowFrozenNote({ className = "mb-3" }: { className?: s
       <Link
         href={explorerUrl(BASE_CHAIN_ID, "block", MOONWELL_BASE_BORROW_FREEZE_BLOCK)}
         target="_blank"
-        rel="noopener noreferrer"
+        rel="noopener"
         className={INLINE_LINK}
       >
         {MOONWELL_BASE_BORROW_FREEZE_BLOCK.toLocaleString("en-US")}

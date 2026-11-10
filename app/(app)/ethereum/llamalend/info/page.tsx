@@ -136,12 +136,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
 ];
 
 const ext = (address: string, label: string) => (
-  <a
-    href={explorerUrl(MAINNET_CHAIN_ID, "address", address)}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="link-external"
-  >
+  <a href={explorerUrl(MAINNET_CHAIN_ID, "address", address)} target="_blank" rel="noopener" className="link-external">
     {label}
   </a>
 );

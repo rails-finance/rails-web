@@ -340,7 +340,7 @@ function CdpMenuRows({ v }: { v: PolarisPositionView }) {
         icon={<ImageIcon size={16} />}
         title="Position NFT"
         subtitle="Open it on Etherscan"
-        onClick={() => window.open(polarisCdpNftUrl(v.market, v.cdpId), "_blank", "noopener,noreferrer")}
+        onClick={() => window.open(polarisCdpNftUrl(v.market, v.cdpId), "_blank", "noopener")}
       />
       <ToolsMenuItem
         icon={copied === "link" ? <Check size={16} /> : <Link2 size={16} className="-rotate-45" />}
