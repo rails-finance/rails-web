@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { ReadTierTag, isReadOnVisit } from "@/components/shared/read-tier-tag";
 import { formatFlowUsd } from "@/lib/shared/flows-timeline";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { formatValueHeld, spokenValueHeld, type ValueHeld, type ValueHeldPlace } from "@/lib/home/value-held";
@@ -89,7 +90,7 @@ function FiguresTable({
 
 /** The explorer's lead zone, then its name (a link to its listing, "vaults"
  *  after it for a vault surface), with the zone's marks on a card's first line. */
-function PlaceCells({ place, label }: { place: ValueHeldPlace; label: string }) {
+function PlaceCells({ place, label, tier }: { place: ValueHeldPlace; label: string; tier?: boolean }) {
   return (
     <>
       <DataTableLeadCell protocol={place.protocol} protocolName={label} chain={place.chainId as ChainId} />
@@ -106,6 +107,7 @@ function PlaceCells({ place, label }: { place: ValueHeldPlace; label: string }) 
             )}
             {place.surface && <span className="text-rb-500"> {place.surface}</span>}
           </span>
+          {tier && <ReadTierTag />}
         </span>
       </DataTableCell>
     </>
@@ -158,7 +160,7 @@ export function FiguresBody({ value, caption }: { value: ValueHeld | null; capti
               <FiguresTable heads={["", "", "Reason"]} label="Not counted">
                 {value.notCounted.map((n) => (
                   <DataTableRow key={`${n.label}:${n.chainId}:${n.surface}:${n.reason}`}>
-                    <PlaceCells place={n} label={n.label} />
+                    <PlaceCells place={n} label={n.label} tier={isReadOnVisit(n.protocol)} />
                     <DataTableCell />
                     <DataTableCell />
                     <DataTableCell label="Reason" wide className={TEXT}>

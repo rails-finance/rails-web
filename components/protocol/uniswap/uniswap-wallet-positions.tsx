@@ -10,6 +10,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
+import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
 import { fetchUniswapPositions } from "@/lib/api/fetch-uniswap";
 import { explorerHref } from "@/lib/shared/protocols";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
@@ -44,7 +45,9 @@ export async function UniswapWalletPositions({ version, wallet: raw }: { version
           owner={{ wallet, filterProtocol: null }}
           tools={false}
         />
-        <h2 className="text-lg font-semibold text-foreground">{FRONT_DOOR.heading(version)}</h2>
+        <ReadTierTitleRow id={session}>
+          <h2 className="text-lg font-semibold text-foreground">{FRONT_DOOR.heading(version)}</h2>
+        </ReadTierTitleRow>
       </header>
       {answer.kind !== "ok" ? (
         <p className="text-sm text-rb-500">{FRONT_DOOR.unanswered}</p>

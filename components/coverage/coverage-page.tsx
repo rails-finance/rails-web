@@ -17,6 +17,8 @@ import { CHAINS, type ChainId } from "@/lib/shared/chains";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainToggleLinks } from "@/components/shared/chain-toggle";
 import { InfoDisclosure } from "@/components/shared/info-disclosure";
+import { ReadTierTag } from "@/components/shared/read-tier-tag";
+import { READ_TIER } from "@/lib/shared/read-tier";
 import { DepthMatrix } from "@/components/coverage/depth-matrix";
 import { CapabilityPill } from "@/components/coverage/capability-sheet";
 import { CoverageDrawerBody } from "@/components/coverage/drawer-body";
@@ -121,11 +123,29 @@ const countWord = (n: number): string => COUNT_WORDS[n] ?? String(n);
 const joinFamilies = (families: readonly string[]): string =>
   families.length <= 2 ? families.join(" and ") : `${families.slice(0, -1).join(", ")}, and ${families.at(-1)}`;
 
+/** Explorer names for the caveat, each linked to its listing; the last joined
+ *  by a conjunction, since a comma-only join reads as an unfinished list. */
+function ExplorerNames({ explorers }: { explorers: ReturnType<typeof coverageExplorers> }) {
+  return explorers.map((p, i) => (
+    <span key={p.id}>
+      {i > 0 && (i === explorers.length - 1 ? (explorers.length > 2 ? ", and " : " and ") : ", ")}
+      <Link href={p.listingHref} className={INLINE_LINK}>
+        {explorerName(p)}
+      </Link>
+    </span>
+  ));
+}
+
 export function CoveragePage({ chainId }: { chainId: ChainId }) {
   // Explorers ON THIS PAGE'S CHAIN that cannot browse every open position —
   // the caveat under the foundation names them, so it must not name an
   // explorer the matrix above doesn't show.
   const listingExceptions = coverageExplorers(chainId).filter((p) => EXPLORERS_WITHOUT_LISTING.has(p.id));
+  // Decision 0061: a "Read on visit" explorer keeps no list at all, so the
+  // caveat gives it a sentence of its own, and the legend shows under the matrix.
+  const listedExceptions = listingExceptions.filter((p) => !p.readTier);
+  const tieredExceptions = listingExceptions.filter((p) => p.readTier);
+  const tiered = coverageExplorers(chainId).some((p) => p.readTier);
   // A vault is still never a row in the matrix — but the PROTOCOL whose factory
   // deployed it is, and that is where the vaults live now (rails-ops decision
   // 0028). So this page has no Vaults section beneath the matrix: Morpho Blue
@@ -197,10 +217,13 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
             });
             return (
               <div key={p.id} className="rounded-2xl bg-raised p-4">
-                <Link href={p.href} className="flex items-center gap-2.5">
-                  <ProtocolIcon id={p.id} className="h-7 w-7 shrink-0" />
-                  <span className="font-semibold text-foreground">{p.label}</span>
-                </Link>
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <Link href={p.href} className="flex items-center gap-2.5">
+                    <ProtocolIcon id={p.id} className="h-7 w-7 shrink-0" />
+                    <span className="font-semibold text-foreground">{p.label}</span>
+                  </Link>
+                  {p.readTier && <ReadTierTag />}
+                </div>
                 <p className="text-xs text-rb-500 mt-1">{p.desc}</p>
                 {included.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5 mt-3">
@@ -245,6 +268,19 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
         </div>
       </section>
 
+      {/* ── The "Read on visit" legend (decision 0061), under the matrix
+            wherever an explorer on this chain wears the tag. ── */}
+      {tiered && (
+        <section className="max-w-7xl mx-auto px-4 md:px-6 pb-12" data-anatomy="H23.1" data-read-tier-legend="">
+          <div className="flex max-w-3xl flex-col items-start gap-2 rounded-xl border border-rb-200 px-4 py-3 sm:flex-row sm:items-baseline sm:gap-3 dark:border-rb-800">
+            <ReadTierTag tip={false} />
+            <p className="text-sm text-foreground">
+              {READ_TIER.line} <span className="text-rb-500">{READ_TIER.waits}</span>
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* ── The shared foundation — the page-closing band. Every explorer has
             all of it, so it renders as a checklist, not a comparison; it inherits
             the bg-raised band that closed the page before. ── */}
@@ -255,21 +291,25 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
               promise is named rather than letting the claim stand for all. */}
           {listingExceptions.length > 0 && (
             <p className="text-sm text-rb-500 mb-5 max-w-3xl">
-              {listingExceptions.length === 1 ? "With one exception:" : `With ${countWord(listingExceptions.length)} exceptions:`}{" "}
-              {listingExceptions.map((p, i) => (
-                <span key={p.id}>
-                  {/* A comma-only join reads as an unfinished list once there
-                      are more than two, so the last item takes a conjunction. */}
-                  {i > 0 && (i === listingExceptions.length - 1 ? (listingExceptions.length > 2 ? ", and " : " and ") : ", ")}
-                  <Link href={p.listingHref} className={INLINE_LINK}>
-                    {explorerName(p)}
-                  </Link>
-                </span>
-              ))}{" "}
-              {listingExceptions.length === 1 ? "lists" : "list"} the positions Rails has read, from each day&rsquo;s
-              most active wallets and any wallet a reader opened: there is no roster of{" "}
-              {listingExceptions.length === 1 ? "its" : "their"} accounts yet. Everything a single wallet holds is
-              unaffected.
+              {listingExceptions.length === 1 ? "With one exception:" : `With ${countWord(listingExceptions.length)} exceptions:`}
+              {listedExceptions.length > 0 && (
+                <>
+                  {" "}
+                  <ExplorerNames explorers={listedExceptions} />{" "}
+                  {listedExceptions.length === 1 ? "lists" : "list"} the positions Rails has read, from each day&rsquo;s
+                  most active wallets and any wallet a reader opened: there is no roster of{" "}
+                  {listedExceptions.length === 1 ? "its" : "their"} accounts yet. Everything a single wallet holds is
+                  unaffected.
+                </>
+              )}
+              {tieredExceptions.length > 0 && (
+                <>
+                  {" "}
+                  <ExplorerNames explorers={tieredExceptions} />{" "}
+                  {tieredExceptions.length === 1 ? "answers" : "answer"} one wallet or one position at a time and{" "}
+                  {tieredExceptions.length === 1 ? "keeps" : "keep"} no list of positions.
+                </>
+              )}
             </p>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-4">
