@@ -4,6 +4,8 @@
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { CowFrontDoor } from "@/components/protocol/cow/cow-front-door";
 
+// focus: the explorer's front door, a wallet look-up with no list; FocusChainGate gates the explorer when the focus hides it.
+
 export const metadata = listingMetadata({
   title: "CoW on Ethereum",
   canonicalPath: "/ethereum/cow",

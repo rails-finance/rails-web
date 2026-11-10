@@ -1,14 +1,11 @@
 # Pages not yet declared under Focus mode (scripts/check-focus.mjs). This list only shrinks.
-/arbitrum/aave-v3
 /arbitrum/aave-v3/[wallet]
 /arbitrum/aave-v3/[wallet]/event/[eventId]
 /arbitrum/aave-v3/markets
-/arbitrum/compound-v3
 /arbitrum/compound-v3/[market]
 /arbitrum/compound-v3/[market]/[wallet]
 /arbitrum/compound-v3/[market]/[wallet]/event/[eventId]
 /arbitrum/compound-v3/[market]/event/[eventId]
-/arbitrum/morpho
 /arbitrum/morpho/[wallet]
 /arbitrum/morpho/[wallet]/[market]
 /arbitrum/morpho/[wallet]/[market]/event/[eventId]
@@ -43,11 +40,6 @@
 /base/morpho/vaults/[vault]/[holder]/event/[eventId]
 /base/seamless/[wallet]
 /base/seamless/[wallet]/event/[eventId]
-/coverage/arbitrum
-/coverage/base
-/coverage/ethereum
-/coverage/sepolia
-/ethereum/aave
 /ethereum/aave-v3/[wallet]
 /ethereum/aave-v3/[wallet]/event/[eventId]
 /ethereum/aave-v3/markets
@@ -71,7 +63,6 @@
 /ethereum/compound-v2/[wallet]/event/[eventId]
 /ethereum/compound-v3/[market]/[wallet]
 /ethereum/compound-v3/[market]/[wallet]/event/[eventId]
-/ethereum/cow
 /ethereum/cow/[wallet]
 /ethereum/dolomite/[owner]/[accountNumber]
 /ethereum/dolomite/[owner]/[accountNumber]/event/[eventId]
@@ -108,7 +99,6 @@
 /ethereum/morpho/vaults/[vault]
 /ethereum/morpho/vaults/[vault]/[holder]
 /ethereum/morpho/vaults/[vault]/[holder]/event/[eventId]
-/ethereum/pendle
 /ethereum/pendle/[wallet]
 /ethereum/pendle/[wallet]/[market]
 /ethereum/pwn/[wallet]
@@ -119,18 +109,14 @@
 /ethereum/sky-savings/rates
 /ethereum/spark/[wallet]
 /ethereum/spark/[wallet]/event/[eventId]
-/ethereum/uniswap-v3
 /ethereum/uniswap-v3/[wallet]
 /ethereum/uniswap-v3/position/[id]
-/ethereum/uniswap-v4
 /ethereum/uniswap-v4/[wallet]
 /ethereum/uniswap-v4/position/[id]
-/ethereum/yearn
 /ethereum/yearn/vaults
 /ethereum/yearn/vaults/[vault]
 /ethereum/yearn/vaults/[vault]/[holder]
 /ethereum/yearn/vaults/[vault]/[holder]/event/[eventId]
-/export/[id]
 /pulse
 /sepolia/polaris/[market]/[id]
 /sepolia/polaris/[market]/[id]/event/[eventId]
