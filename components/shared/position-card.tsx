@@ -206,6 +206,11 @@ interface PositionCardSlotsCommon {
    *  Detail draws them at the right of the (i) row, listing at the right of
    *  the heading row. `null` where a card has none. */
   counters: PositionCardCounters | null;
+  /** `false` on a card that is not a position (the vault card V2, the vault
+   *  row V1), on a page that names its protocol and chain: no sidebar (C20),
+   *  which marks a position, and no C20.1. A detail card keeps the chain's
+   *  glyph at the heading row's right end at every width (C20.2). */
+  sidebar?: false;
 }
 
 interface PositionCardDetailCommon extends PositionCardSlotsCommon {
@@ -807,48 +812,53 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const edge = useContext(PositionCardEdgeContext);
   const wallet = !detail && edge?.surface === "wallet";
   const identity = usePositionCardIdentity();
-  // Below md the sidebar's protocol and chain stand in the heading row (C20.1,
-  // C20.2); from md the panel carries them.
-  const chainPill = identity ? (
-    <span className="flex items-center md:hidden">
-      {/* Outside the row's quiet tips: the glyph's tip names the chain. */}
-      <QuietTipsContext.Provider value={false}>
-        <RevealTip tip={identity.chain.name} focusable align="end" className="rounded-sm focus-ring">
-          <span
-            role="img"
-            aria-label={identity.chain.name}
-            className="flex h-4 items-center text-brand-zone"
-            data-pill="chain"
-            data-anatomy="C20.2"
-          >
-            <ChainGlyph id={identity.chain.id} className="h-4 w-4" />
-          </span>
-        </RevealTip>
-      </QuietTipsContext.Provider>
-    </span>
-  ) : null;
+  // A card with a sidebar: below md its protocol and chain stand in the
+  // heading row (C20.1, C20.2), from md the panel carries them. A card with
+  // none (`sidebar: false`): a detail card's chain glyph at every width.
+  const barred = identity != null && slots.sidebar !== false;
+  const narrowOnly = barred ? "md:hidden" : "";
+  const chainPill =
+    identity && (barred || detail) ? (
+      <span className={`flex items-center ${narrowOnly}`}>
+        {/* Outside the row's quiet tips: the glyph's tip names the chain. */}
+        <QuietTipsContext.Provider value={false}>
+          <RevealTip tip={identity.chain.name} focusable align="end" className="rounded-sm focus-ring">
+            <span
+              role="img"
+              aria-label={identity.chain.name}
+              className="flex h-4 items-center text-brand-zone"
+              data-pill="chain"
+              data-anatomy="C20.2"
+            >
+              <ChainGlyph id={identity.chain.id} className="h-4 w-4" />
+            </span>
+          </RevealTip>
+        </QuietTipsContext.Provider>
+      </span>
+    ) : null;
   // On a detail card the name is the link to the explorer (C20.1).
   const markHref = detail ? identity?.protocol.href : undefined;
-  const protocolMark = identity ? (
-    <span
-      className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-zone md:hidden"
-      data-card-protocol={identity.protocol.id}
-      data-anatomy="C20.1"
-    >
-      <ProtocolIcon id={identity.protocol.id} className="h-4 w-4 shrink-0 text-rb-500" />
-      {markHref ? (
-        <Link
-          href={markHref}
-          aria-label={`${identity.protocol.name} explorer`}
-          className="whitespace-nowrap rounded-sm transition-colors hover:text-foreground focus-visible:text-foreground focus-ring"
-        >
-          {identity.protocol.name}
-        </Link>
-      ) : (
-        identity.protocol.name
-      )}
-    </span>
-  ) : null;
+  const protocolMark =
+    barred && identity ? (
+      <span
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-zone md:hidden"
+        data-card-protocol={identity.protocol.id}
+        data-anatomy="C20.1"
+      >
+        <ProtocolIcon id={identity.protocol.id} className="h-4 w-4 shrink-0 text-rb-500" />
+        {markHref ? (
+          <Link
+            href={markHref}
+            aria-label={`${identity.protocol.name} explorer`}
+            className="whitespace-nowrap rounded-sm transition-colors hover:text-foreground focus-visible:text-foreground focus-ring"
+          >
+            {identity.protocol.name}
+          </Link>
+        ) : (
+          identity.protocol.name
+        )}
+      </span>
+    ) : null;
   const panel = detail ? slots.panel : undefined;
   const over = overCap(slots);
 
@@ -912,7 +922,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
                 </span>
               )}
             </PositionCardStripSlot>
-            {chainPill && <span className={`${slots.stamp ? "" : "max-md:ml-auto "}md:hidden`}>{chainPill}</span>}
+            {chainPill && <span className={`${slots.stamp ? "" : "max-md:ml-auto "}${narrowOnly}`}>{chainPill}</span>}
           </span>
         ) : (
           ((!wallet && slots.tag) || (wallet && edge?.stamp) || chainPill) && (
@@ -979,9 +989,9 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       data-prov-scope={detail ? POSITION_CARD_SCOPE : undefined}
       data-prov-lit={lit ? "" : undefined}
       data-card-over-cap={over ?? undefined}
-      className={identity ? `${POSITION_CARD_FRAME_BOX} relative flex` : POSITION_CARD_FRAME}
+      className={barred ? `${POSITION_CARD_FRAME_BOX} relative flex` : POSITION_CARD_FRAME}
       style={
-        identity
+        barred
           ? ({
               "--brand-hue": identity.hue ?? 0,
               ...(identity.hue == null ? { "--brand-strength": 0 } : {}),
@@ -989,7 +999,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
           : undefined
       }
     >
-      {identity && (
+      {barred && (
         <>
           {/* The zone's tint: the card's shape clipped to its left edge, a
               border below md and the panel (with the body's rounded corners
@@ -1000,7 +1010,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       )}
       <div
         className={
-          identity
+          barred
             ? `relative min-w-0 flex-1 md:rounded-[15px] md:bg-raised ${POSITION_CARD_PAD} max-md:pl-[26px]`
             : "contents"
         }

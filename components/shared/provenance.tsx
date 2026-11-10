@@ -644,13 +644,13 @@ function isFigure(value: string): boolean {
  *  direction and size of the rounding — not just the general rule. */
 function NotationModal({ display, exact, onClose }: { display: string; exact: string; onClose: () => void }) {
   // Recover both figures. `exact` is a grouped decimal ("43,041.84"); `display`
-  // is the compact form ("43K"), expanded via its K/M/B multiplier.
+  // is the compact form ("43K"), expanded via its K/M/B/T/Q multiplier.
   const exactN = parseFloat(exact.replace(/−/g, "-").replace(/,/g, ""));
   const m = display
     .replace(/−/g, "-")
     .replace(/,/g, "")
-    .match(/^([+-]?[0-9]*\.?[0-9]+)\s*([KMB])?$/i);
-  const mult = m?.[2] ? ({ K: 1e3, M: 1e6, B: 1e9 }[m[2].toUpperCase()] ?? 1) : 1;
+    .match(/^([+-]?[0-9]*\.?[0-9]+)\s*([KMBTQ])?$/i);
+  const mult = m?.[2] ? ({ K: 1e3, M: 1e6, B: 1e9, T: 1e12, Q: 1e15 }[m[2].toUpperCase()] ?? 1) : 1;
   const displayN = m ? parseFloat(m[1]) * mult : null;
 
   let adjustment: ReactNode = null;

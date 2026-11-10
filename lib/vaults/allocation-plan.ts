@@ -8,7 +8,7 @@
 /** The smallest share of the band a leg may hold and still draw on its own. A
  *  width rule: at a panel of about 640px it is 13px, the narrowest thing an eye
  *  separates from its neighbour. */
-const MIN_SEGMENT_SHARE = 0.02;
+export const MIN_SEGMENT_SHARE = 0.02;
 
 export interface AllocationLeg {
   key: string;

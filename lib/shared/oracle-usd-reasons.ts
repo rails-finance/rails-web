@@ -42,4 +42,6 @@ export const ORACLE_USD_REASON: Record<string, string> = {
     "a pool prices itself: every figure is in the pool's quote token at the pool's price, and Uniswap runs no USD feed",
   "uniswap-v4":
     "a pool prices itself: every figure is in the pool's quote token at the pool's price, and Uniswap runs no USD feed",
+  aerodrome:
+    "a pool prices itself: every figure is in the pool's quote token at the pool's price, AERO through Aerodrome's own AERO pools, and Aerodrome runs no USD feed",
 };

@@ -47,6 +47,8 @@ import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { assetText, pctText } from "@/lib/shared/vault-amount-text";
 import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import { planAllocation } from "@/lib/vaults/allocation-plan";
+import { formatCompact } from "@/lib/shared/format-compact";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -105,6 +107,11 @@ export function VaultAssets({
   shareTip,
   learnMore,
   menu,
+  limit,
+  allHref,
+  chart,
+  keyColours,
+  look,
 }: {
   rows: VaultAssetRow[];
   assetSymbol: string;
@@ -118,7 +125,24 @@ export function VaultAssets({
   learnMore: LearnMoreContent;
   /** The section ⋮'s rows above Inspect provenance. */
   menu: { links?: SectionMenuLink[]; exports?: SectionMenuExports };
+  /** Draw the first `limit` rows; the band draws every row either way. */
+  limit?: number;
+  /** Where every row is, linked under a capped table. */
+  allHref?: string;
+  /** A chart above the table, in place of the band, at the section's width. */
+  chart?: ReactNode;
+  /** The chart's key: a colour square before each row's share, by row key. */
+  keyColours?: Record<string, string>;
+  /** `index`: the /vaults index's rows (V6): 14px type, the venue's mark at
+   *  28px and its name semibold, the figures semibold in the foreground, an
+   *  amount compact (`formatCompact`, as V6's Total assets) with its full text
+   *  in a title and `data-figure-full`. The MetaMorpho page passes it. */
+  look?: "index";
 }) {
+  const ix = look === "index";
+  const amountText = (a: RawAmount) => (ix ? formatCompact(a.value) : assetText(a, assetDecimals));
+  const capped = limit != null && rows.length > limit;
+  const tableRows = capped ? rows.slice(0, limit) : rows;
   const banded = rows
     .map((r, order) => ({ r, order }))
     .filter(({ r }) => !r.offBand)
@@ -177,16 +201,19 @@ export function VaultAssets({
           {line}
         </p>
       </SectionHeading>
-      <div className="mt-3 [&>div]:px-0">
-        <AllocationBar
-          segments={segments}
-          ariaLabel={`Where this vault's ${assetSymbol} is`}
-          emptyLabel={total === BigInt(0) ? "Nothing to divide at this block." : undefined}
-        />
-      </div>
+      {!chart && (
+        <div className="mt-3 [&>div]:px-0">
+          <AllocationBar
+            segments={segments}
+            ariaLabel={`Where this vault's ${assetSymbol} is`}
+            emptyLabel={total === BigInt(0) ? "Nothing to divide at this block." : undefined}
+          />
+        </div>
+      )}
+      {chart && <div className="mt-3">{chart}</div>}
       <DataTable
         className="mt-2"
-        tableClassName="text-[12px]"
+        tableClassName={ix ? "text-sm" : "text-[12px]"}
         label={`Where this vault's ${assetSymbol} is, by venue`}
         stacked
         rowHeight="two"
@@ -197,19 +224,19 @@ export function VaultAssets({
           <DataTableHeader align="right">{shareHead}</DataTableHeader>
         </DataTableHead>
         <DataTableBody>
-          {rows.map((r) => (
+          {tableRows.map((r) => (
             <DataTableRow key={r.key} href={r.href} {...r.hooks}>
               <DataTableCell rowHeader className="sm:w-full sm:max-w-0">
                 <div className="flex items-center gap-2">
                   <TokenChipIcon
                     symbol={r.icon?.symbol ?? assetSymbol}
                     address={r.icon?.address ?? assetAddress}
-                    size={20}
+                    size={ix ? 28 : 20}
                     filterable={false}
                   />
                   <div className="min-w-0 flex-1">
                     <span
-                      className="block text-foreground sm:truncate"
+                      className={`block text-foreground sm:truncate ${ix ? "font-semibold" : ""}`}
                       title={typeof r.venue === "string" ? r.venue : undefined}
                       data-cell="venue"
                       {...r.venueHooks}
@@ -218,7 +245,7 @@ export function VaultAssets({
                     </span>
                     {r.sub != null && (
                       <span
-                        className="block text-[11px] [overflow-wrap:anywhere] text-rb-500 sm:truncate"
+                        className={`block ${ix ? "text-[12px]" : "text-[11px]"} [overflow-wrap:anywhere] text-rb-500 sm:truncate`}
                         title={typeof r.sub === "string" ? r.sub : undefined}
                       >
                         {r.sub}
@@ -227,27 +254,44 @@ export function VaultAssets({
                   </div>
                 </div>
               </DataTableCell>
-              <DataTableCell label="Amount" align="right" className="whitespace-nowrap tabular-nums text-foreground">
+              <DataTableCell
+                label="Amount"
+                align="right"
+                className={`whitespace-nowrap tabular-nums text-foreground ${ix ? "font-semibold" : ""}`}
+              >
                 {r.offBand ? (
                   <span className="text-rb-500" data-cell="leg-assets">
                     —
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1.5">
-                    <span data-cell="leg-assets" {...(r.amountFigure ? { "data-figure": r.amountFigure } : {})}>
+                    <span
+                      data-cell="leg-assets"
+                      title={
+                        r.amount && amountText(r.amount) !== assetText(r.amount, assetDecimals)
+                          ? `${assetText(r.amount, assetDecimals)} ${assetSymbol}`
+                          : undefined
+                      }
+                      {...(r.amountFigure ? { "data-figure": r.amountFigure } : {})}
+                      {...(ix && r.amount ? { "data-figure-full": assetText(r.amount, assetDecimals) } : {})}
+                    >
                       {r.amount == null ? (
                         <NotLoaded />
                       ) : r.amountProv ? (
-                        <Prov info={r.amountProv}>{assetText(r.amount, assetDecimals)}</Prov>
+                        <Prov info={r.amountProv}>{amountText(r.amount)}</Prov>
                       ) : (
-                        assetText(r.amount, assetDecimals)
+                        amountText(r.amount)
                       )}
                     </span>
                     {r.amount != null && <AssetUnit symbol={assetSymbol} address={assetAddress} />}
                   </span>
                 )}
               </DataTableCell>
-              <DataTableCell label={shareHead} align="right" className="whitespace-nowrap tabular-nums text-rb-500">
+              <DataTableCell
+                label={shareHead}
+                align="right"
+                className={`whitespace-nowrap tabular-nums ${ix ? "font-semibold text-foreground" : "text-rb-500"}`}
+              >
                 <span data-cell="leg-share">
                   {r.share == null ? (
                     "—"
@@ -257,11 +301,30 @@ export function VaultAssets({
                     pctText(r.share)
                   )}
                 </span>
+                {keyColours?.[r.key] && (
+                  <i
+                    aria-hidden
+                    className="ml-1.5 inline-block size-2.5 rounded-[2px] align-[-1px]"
+                    style={{ background: keyColours[r.key] }}
+                    data-key-colour=""
+                  />
+                )}
               </DataTableCell>
             </DataTableRow>
           ))}
         </DataTableBody>
       </DataTable>
+      {capped && allHref && (
+        <Link
+          href={allHref}
+          prefetch={false}
+          className={`mt-2 inline-block text-[13px] ${INLINE_LINK}`}
+          data-assets-show-all=""
+          data-assets-keys={rows.map((r) => r.key).join(" ")}
+        >
+          Show all {n(rows.length)}
+        </Link>
+      )}
     </ProvSection>
   );
 }

@@ -2,9 +2,12 @@
 // Ethereum (rails-ops ui-jobs 407, 486). Each chain's page.tsx is these two
 // exports with its chain fixed.
 // ----------------------------------------------------------------------------
-// The vault card (V2), where the assets are (V3) and the holder finder (V4),
-// drawn by components/vaults/morpho-base-vault-page.tsx from one pinned read of
-// the vault and of Blue; Holders is the census's, Yield the daily store's.
+// The holder finder (V4), the vault card (V2) and the grid of tiles, drawn by
+// components/vaults/morpho-base-vault-page.tsx from one pinned read of the
+// vault and of Blue, the fee and the guardian at the same block
+// (lib/vaults/config-read.ts); Holders and Who holds it are the census's
+// (lib/vaults/holders-read.ts), Yield the daily store's. What protects it and
+// The protocol underneath stream behind their own Suspense.
 //
 // THE PAGE LINKS TO THE FILTERED LISTING, IT DOES NOT LIST. The Holders
 // headline links to the position listing filtered to this address. What ONE
@@ -41,6 +44,8 @@ import { loadVaultCensusRow } from "@/lib/vaults/census-read";
 import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
 import { loadAssetScales } from "@/lib/vaults/asset-scale";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
+import { readVaultConfig } from "@/lib/vaults/config-read";
+import { loadVaultHolders } from "@/lib/vaults/holders-read";
 
 export type MetaMorphoVaultParams = {
   params: Promise<{ vault: string }>;
@@ -97,12 +102,18 @@ export async function MetaMorphoVaultRoute({
   const holderParam = firstParam((await searchParams).holder);
   if (holderParam && holderParam.trim()) redirect(metaMorphoVaultHref(chainId, address, holderParam.trim()));
 
-  const [data, census, series] = await Promise.all([
+  const [data, census, series, holders] = await Promise.all([
     load(chainId, address, undefined),
     loadVaultCensusRow(chainId, address),
     loadVaultPageSeries(chainId, address),
+    loadVaultHolders(chainId, address),
   ]);
-  const assetScales = data.chainStale ? {} : await loadAssetScales(chainId, [data.vault.asset.address]);
+  const [assetScales, config] = data.chainStale
+    ? [{}, null]
+    : await Promise.all([
+        loadAssetScales(chainId, [data.vault.asset.address]),
+        readVaultConfig(chainId, address, data.blockNumber, data.vault.createdBlock),
+      ]);
 
   return (
     <FocusSourceGate source={data.vault} chain={chainId} what="This vault">
@@ -112,7 +123,7 @@ export async function MetaMorphoVaultRoute({
             <RailHeader session={metaMorphoSession(chainId)} venue="subPage" />
           </header>
 
-          {data.chainStale ? (
+          {data.chainStale || !config ? (
             <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500">
               This vault could not be read from chain just now, so no figure is stated for it.
             </p>
@@ -124,11 +135,14 @@ export async function MetaMorphoVaultRoute({
               yieldFigure={series.yieldFigure}
               strip={series.strip}
               factory={metaMorphoFactoryAddress(chainId, data.vault.factory)}
+              config={config}
+              holders={holders}
               protects={
                 <Suspense fallback={null}>
                   <VaultProtectsSection
                     subject={{ chainId, address, kind: "metamorpho" }}
                     vaultName={data.vault.name || shortAddr(address)}
+                    look="paragraph"
                   />
                 </Suspense>
               }

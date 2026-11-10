@@ -4,7 +4,9 @@
 // every vault page, drawn as the shared card's detail surface (decision 0043:
 // the family supplies figures and words, never which parts exist).
 // ----------------------------------------------------------------------------
-// Heading "Vault summary", the status tag where the contract says the vault is
+// No sidebar (C20): that marks a position. The protocol's mark and name lead
+// the heading row and the chain's glyph ends it (C20.1, C20.2). Heading
+// "Vault summary", the status tag where the contract says the vault is
 // shut down or paused, the identity (the asset's icon with the venue mark, the
 // name, the short address with copy, the neutral pills) and the ⋮. Headlines
 // Total assets · Share price · Yield · Holders (decision 0047 point 5), each
@@ -17,7 +19,12 @@
 // provenance" (components/shared/section-menu.tsx).
 
 import { useState, type ReactNode } from "react";
-import { PositionCard, type PositionCardStatus, type PositionPanelRow } from "@/components/shared/position-card";
+import {
+  PositionCard,
+  type PositionCardHead,
+  type PositionCardStatus,
+  type PositionPanelRow,
+} from "@/components/shared/position-card";
 import { POSITION_CARD_MAX_STATS } from "@/components/shared/position-card-panel";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { Prov } from "@/components/shared/provenance";
@@ -66,6 +73,9 @@ export interface VaultCardProps {
   band?: ReactNode;
   /** The family's identity hooks: on the standing pills. */
   pillHooks?: Parameters<typeof VaultPills>[0]["hooks"];
+  /** The headlines in place of `vaultHeads`'s (the MetaMorpho page's);
+   *  absent on the other families' pages. */
+  heads?: PositionCardHead[];
 }
 
 function CopyAddress({ address }: { address: string }) {
@@ -105,6 +115,7 @@ export function VaultCard({
   hooks,
   pillHooks,
   band,
+  heads,
 }: VaultCardProps) {
   const markdown = () => vaultCardMarkdown(v, yieldFigure, exports);
   const csv = {
@@ -146,10 +157,11 @@ export function VaultCard({
       <PositionCard
         slots={{
           surface: "detail",
+          sidebar: false,
           heading: "Vault summary",
           status,
           identity,
-          heads: vaultHeads({ vault: v, yieldFigure, holdersHref, receipts, detail: true }),
+          heads: heads ?? vaultHeads({ vault: v, yieldFigure, holdersHref, receipts, detail: true }),
           panel: [stats, []],
           band,
           counters: null,

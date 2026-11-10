@@ -5,6 +5,9 @@
 /arbitrum/morpho/markets
 /arbitrum/morpho/markets/[loanToken]
 /base/aave-v4/markets/[spoke]
+/base/aerodrome
+/base/aerodrome/[wallet]
+/base/aerodrome/position/[deployment]/[id]
 /base/alchemix/[lineKey]/[tokenId]
 /base/alchemix/[lineKey]/[tokenId]/event/[eventId]
 /base/alchemix/lines

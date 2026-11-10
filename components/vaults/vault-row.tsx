@@ -6,9 +6,10 @@
 // ----------------------------------------------------------------------------
 // Identity: the asset's icon with the venue mark, the vault's name, its short
 // address, and pills for family and release and for what the chain or the
-// venue states about its standing. On the index the sidebar (C20) names
-// each row's protocol and chain. Pills are
-// neutral (standards/color-grammar.md).
+// venue states about its standing. A vault is not a position, so the row has
+// no sidebar (C20): the protocol's mark and name lead its heading row and the
+// chain's glyph ends it (C20.1, C20.2) at every width. Pills are neutral
+// (standards/color-grammar.md).
 //
 // Headlines, in this order: Total assets · Share price · Yield · Holders. The
 // first two are in the vault's asset. Yield is decision 0047's figure where the
@@ -104,6 +105,7 @@ export function VaultRow({
         <PositionCard
           slots={{
             surface: "listing",
+            sidebar: false,
             anatomy: "V1",
             status: null,
             lead: <VaultLead vault={v} />,

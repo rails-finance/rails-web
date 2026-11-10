@@ -65,7 +65,7 @@ export function feeLabel(p: Pick<PoolPosition, "fee" | "dynamicFee" | "lpFeePct"
 const list = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
 
 /** Prices as shown: quote per base, flipped to base per quote when that would read below 0.001. */
-export function shown(p: PoolPosition) {
+export function shown(p: Pick<PoolPosition, "price" | "priceThen" | "range" | "base" | "quote" | "side">) {
   if (p.price >= 0.001)
     return {
       price: p.price,

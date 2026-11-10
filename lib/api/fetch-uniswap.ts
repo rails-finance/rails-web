@@ -14,19 +14,20 @@ import type { UniPairRead, UniPositionRead, UniPositionsRead, UniswapVersion } f
 /** An answer, a 404 from the route, or no answer. */
 export type UniAnswer<T> = { kind: "ok"; data: T } | { kind: "not-found" } | { kind: "error" };
 
-async function read<T>(path: string, revalidate: number): Promise<UniAnswer<T>> {
+/** One at-block route's answer; `who` names the protocol in the log. Aerodrome's client reads through it. */
+export async function readAtBlock<T>(path: string, revalidate: number, who = "uniswap"): Promise<UniAnswer<T>> {
   const base = process.env.RAILS_API_URL;
   if (!base) return { kind: "error" };
   try {
     const res = await fetch(`${base}${path}`, createAuthFetchOptions({ next: { revalidate } }));
     if (res.status === 404) return { kind: "not-found" };
     if (!res.ok) {
-      console.error(`uniswap: ${path} answered ${res.status}`);
+      console.error(`${who}: ${path} answered ${res.status}`);
       return { kind: "error" };
     }
     return { kind: "ok", data: (await res.json()) as T };
   } catch (error) {
-    console.error(`uniswap: ${path} did not answer`, error);
+    console.error(`${who}: ${path} did not answer`, error);
     return { kind: "error" };
   }
 }
@@ -34,17 +35,17 @@ async function read<T>(path: string, revalidate: number): Promise<UniAnswer<T>> 
 /** GET /api/at-block/uniswap/position */
 export function fetchUniswapPosition(version: UniswapVersion, id: string): Promise<UniAnswer<UniPositionRead>> {
   const qs = new URLSearchParams({ version, id });
-  return read(`/api/at-block/uniswap/position?${qs}`, 60);
+  return readAtBlock(`/api/at-block/uniswap/position?${qs}`, 60);
 }
 
 /** GET /api/at-block/uniswap/pair; `a` and `b` are addresses, or "eth" for native ETH. */
 export function fetchUniswapPair(a: string, b: string): Promise<UniAnswer<UniPairRead>> {
   const qs = new URLSearchParams({ a, b });
-  return read(`/api/at-block/uniswap/pair?${qs}`, 300);
+  return readAtBlock(`/api/at-block/uniswap/pair?${qs}`, 300);
 }
 
 /** GET /api/at-block/uniswap/positions */
 export function fetchUniswapPositions(owner: string): Promise<UniAnswer<UniPositionsRead>> {
   const qs = new URLSearchParams({ owner: owner.toLowerCase() });
-  return read(`/api/at-block/uniswap/positions?${qs}`, 60);
+  return readAtBlock(`/api/at-block/uniswap/positions?${qs}`, 60);
 }
