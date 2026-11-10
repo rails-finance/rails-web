@@ -27,6 +27,7 @@ import { Prov, ProvReceiptsScope, useReceiptRegistry, type Provenance } from "@/
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { readStampProv, SectionReadStamp, useBlockTime } from "@/components/shared/read-stamp";
 import { CopyFact } from "@/components/shared/event-page-aside";
+import { Icon } from "@/components/icons/icon";
 import { PanelFigure, type PositionPanelRow } from "@/components/shared/position-card-panel";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
 import { CreatedBullet, VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
@@ -174,7 +175,44 @@ function Term({ label, tip }: { label: string; tip?: string }) {
   );
 }
 
-/** One label/value pair in a tile's list. */
+// Configuration and addresses: one rule for all three columns.
+// - Column heading: 12px semibold muted, no rule under it.
+// - Row: label left, value right-aligned to the column's edge, on one
+//   baseline; a hairline between rows, none under a column's last row.
+// - Label: 13px regular muted; dotted underline only when it has a tip.
+// - Value: 14px medium foreground. An address: short form in mono, copy
+//   button, explorer icon button ("View on Etherscan" / "View on Basescan").
+// - Sub-text: 12px muted, its own line under the label.
+
+/** One row of a column: label (and sub-text) left, value right. */
+function Row({
+  hook,
+  label,
+  tip,
+  value,
+  sub,
+}: {
+  hook: Record<string, string>;
+  label: string;
+  tip?: string;
+  value: ReactNode;
+  sub?: ReactNode;
+}) {
+  return (
+    <div
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 border-b border-rb-200 py-2.5 last:border-b-0 dark:border-rb-500/30"
+      {...hook}
+    >
+      <dt className="min-w-0">
+        <Term label={label} tip={tip} />
+      </dt>
+      <dd className="flex justify-end text-right text-[14px] font-medium tabular-nums text-foreground">{value}</dd>
+      {sub && <dd className="col-start-1 mt-0.5 text-xs leading-snug text-rb-500">{sub}</dd>}
+    </div>
+  );
+}
+
+/** One label/value pair in the Configuration column. */
 function Fact({
   id,
   label,
@@ -189,18 +227,48 @@ function Fact({
   sub?: ReactNode;
 }) {
   return (
-    <div
-      className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 border-b border-rb-200 py-2.5 dark:border-rb-500/30"
-      data-mock-fact={id}
-    >
-      <dt>
-        <Term label={label} tip={tip} />
-      </dt>
-      <dd className="flex min-w-0 justify-end text-right text-[14px] font-medium tabular-nums text-foreground">
-        {value ?? <span className="text-[13px] font-normal text-rb-500">not read</span>}
-      </dd>
-      {sub && <dd className="col-span-2 mt-0.5 text-xs leading-snug text-rb-500">{sub}</dd>}
-    </div>
+    <Row
+      hook={{ "data-mock-fact": id }}
+      label={label}
+      tip={tip}
+      sub={sub}
+      value={value ?? <span className="text-[13px] font-normal text-rb-500">not read</span>}
+    />
+  );
+}
+
+/** An address value: its short form, copy, and an explorer icon link. */
+function AddressValue({
+  id,
+  label,
+  address,
+  explorer,
+  href,
+}: {
+  id: string;
+  label: string;
+  address: string;
+  explorer: string;
+  href: string;
+}) {
+  const view = `View on ${explorer}`;
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className="font-mono text-foreground" title={address}>
+        {shortAddress(address)}
+      </span>
+      <CopyFact value={address} label={`Copy the ${label.toLowerCase()} address`} name={id} />
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={view}
+        title={view}
+        className="shrink-0 text-rb-500 hover:text-foreground"
+      >
+        <Icon name="external-link" size={12} />
+      </a>
+    </span>
   );
 }
 
@@ -208,6 +276,7 @@ function Fact({
 function AddressRow({
   id,
   label,
+  tip,
   sub,
   address,
   explorer,
@@ -215,34 +284,26 @@ function AddressRow({
 }: {
   id: string;
   label: string;
+  tip?: string;
   sub?: string;
   address: string | null;
   explorer: string;
   href: (a: string) => string;
 }) {
   return (
-    <li
-      className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-rb-200 py-2.5 dark:border-rb-500/30"
-      data-mock-address={id}
-    >
-      <div className="min-w-0">
-        <div className="text-[13px] font-medium text-foreground">{label}</div>
-        {sub && <div className="text-xs text-rb-500">{sub}</div>}
-      </div>
-      {address ? (
-        <div className="flex items-center gap-2.5">
-          <span className="font-mono text-[13px] text-foreground" title={address}>
-            {shortAddress(address)}
-          </span>
-          <CopyFact value={address} label={`Copy the ${label.toLowerCase()} address`} name={id} />
-          <a href={href(address)} target="_blank" rel="noopener noreferrer" className={`text-[13px] ${INLINE_LINK}`}>
-            {explorer}
-          </a>
-        </div>
-      ) : (
-        <span className="text-[13px] text-rb-500">none set</span>
-      )}
-    </li>
+    <Row
+      hook={{ "data-mock-address": id }}
+      label={label}
+      tip={tip}
+      sub={sub}
+      value={
+        address ? (
+          <AddressValue id={id} label={label} address={address} explorer={explorer} href={href(address)} />
+        ) : (
+          <span className="text-[13px] font-normal text-rb-500">none set</span>
+        )
+      }
+    />
   );
 }
 
@@ -1192,15 +1253,13 @@ export function MockVaultLayout({
                     tip="The address the performance fee's new shares go to. Read from feeRecipient()."
                     value={
                       feeRecipient ? (
-                        <a
+                        <AddressValue
+                          id="fee-recipient"
+                          label="Fee recipient"
+                          address={feeRecipient}
+                          explorer={chain.explorerName}
                           href={addr(feeRecipient)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`font-mono ${INLINE_LINK}`}
-                          title={feeRecipient}
-                        >
-                          {shortAddress(feeRecipient)}
-                        </a>
+                        />
                       ) : config.block != null ? (
                         <span className="text-[13px] font-normal text-rb-500">none set</span>
                       ) : null
@@ -1210,7 +1269,7 @@ export function MockVaultLayout({
               </div>
               <div className="min-w-0">
                 <h3 className="text-xs font-semibold text-rb-500">Roles</h3>
-                <ul className="mt-1">
+                <dl className="mt-1">
                   <AddressRow
                     id="owner"
                     label="Owner"
@@ -1235,15 +1294,16 @@ export function MockVaultLayout({
                     explorer={chain.explorerName}
                     href={addr}
                   />
-                </ul>
+                </dl>
                 <p className="mt-2 text-xs text-rb-500">Allocators are not listed here.</p>
               </div>
               <div className="min-w-0">
                 <h3 className="text-xs font-semibold text-rb-500">Contracts</h3>
-                <ul className="mt-1">
+                <dl className="mt-1">
                   <AddressRow
                     id="vault"
                     label="Vault"
+                    tip="The MetaMorpho contract that holds the deposits and issues the shares."
                     sub={name}
                     address={vault.address}
                     explorer={chain.explorerName}
@@ -1252,6 +1312,7 @@ export function MockVaultLayout({
                   <AddressRow
                     id="asset"
                     label="Asset"
+                    tip="The token the vault takes in deposits and lends out."
                     sub={unit}
                     address={vault.asset.address}
                     explorer={chain.explorerName}
@@ -1261,6 +1322,7 @@ export function MockVaultLayout({
                     <AddressRow
                       id="wraps"
                       label="What the asset wraps"
+                      tip="The token the asset holds underneath."
                       sub={`${v.assetScale.wraps.symbol}, ${unit}'s asset(), ${v.assetScale.wraps.decimals} decimals`}
                       address={v.assetScale.wraps.address}
                       explorer={chain.explorerName}
@@ -1270,12 +1332,13 @@ export function MockVaultLayout({
                   <AddressRow
                     id="morpho-blue"
                     label="Morpho Blue"
+                    tip="The Morpho Blue contract the vault supplies to; every market it lends in lives there."
                     sub="the lending protocol"
                     address={vault.morpho}
                     explorer={chain.explorerName}
                     href={addr}
                   />
-                </ul>
+                </dl>
               </div>
             </div>
           </ProvSection>
