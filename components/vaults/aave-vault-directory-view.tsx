@@ -24,19 +24,16 @@ import { AaveFirstPartySources } from "@/components/vaults/aave-first-party-sour
 import { AAVE_FAMILY_LABEL } from "@/components/vaults/aave-vault-format";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { ethereumVaultHref, ethereumVaultRosterHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
-import { AAVE_VAULT_FAMILY_ORDER, aaveVaultAttestation, type AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
+import { AAVE_VAULT_FAMILY_ORDER, type AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
 import {
   aaveVaultAssetGroupCountProv,
-  aaveVaultBookProv,
   aaveVaultCatalogueProv,
   aaveVaultEmptyCountProv,
-  aaveVaultNameProv,
-  aaveVaultSharePriceProv,
-  aaveVaultTotalAssetsProv,
   type AaveVaultCoords,
 } from "@/lib/aave-vaults/vault-provenance";
-import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
+import type { VaultSummary } from "@/lib/vaults/summary";
 import type { VaultYield } from "@/lib/vaults/yield";
+import { aaveRowReceipts } from "@/lib/vaults/row-receipts";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -74,14 +71,6 @@ export function AaveVaultDirectoryView({
   censusBlock: number | null;
 }) {
   const coords: AaveVaultCoords = { blockNumber: blockNumber || undefined, readBy };
-  const rowCoords = (v: VaultSummary): AaveVaultCoords => ({
-    ...coords,
-    vault: v.address,
-    vaultName: vaultDisplayName(v) ?? undefined,
-    assetSymbol: v.asset.symbol,
-    shareSymbol: v.symbol ?? undefined,
-  });
-  const family = (v: VaultSummary) => v.family as AaveVaultFamily;
 
   const readBlock = (
     <RosterBlock
@@ -107,12 +96,7 @@ export function AaveVaultDirectoryView({
         facets={FACETS}
         hrefOf={(v) => ethereumVaultHref(v.address)}
         holdersHrefOf={(v) => ethereumVaultsListingHref({ vault: v.address })}
-        receiptsOf={(v) => ({
-          name: aaveVaultNameProv(rowCoords(v), aaveVaultAttestation(v.address, family(v))),
-          totalAssets: aaveVaultTotalAssetsProv(rowCoords(v), family(v)),
-          sharePrice: v.shareDecimals != null ? aaveVaultSharePriceProv(rowCoords(v), v.shareDecimals) : undefined,
-          standing: { "address-book": aaveVaultBookProv(rowCoords(v), aaveVaultAttestation(v.address, family(v))) },
-        })}
+        receiptsOf={(v) => aaveRowReceipts(coords, v)}
         hooksOf={(v) => ({ "data-family": v.family })}
         groupCountProv={(assetSymbol, count) => aaveVaultAssetGroupCountProv({ ...coords, assetSymbol }, count)}
         emptyCountProv={(count) => aaveVaultEmptyCountProv(coords, count, counts.catalogSize)}

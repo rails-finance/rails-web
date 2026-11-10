@@ -1947,6 +1947,14 @@ label[for] {
 .dark [data-prov-inspect] {
   text-decoration-color: rgb(45 212 191 / 0.5); /* teal-400 */
 }
+/* armed by the standing preference (decision 0062 point 2): a lighter
+   underline, and no halo (prov-inspector.tsx) */
+:root[data-prov-quiet] [data-prov-inspect] {
+  text-decoration-color: rgb(13 148 136 / 0.3);
+}
+:root[data-prov-quiet].dark [data-prov-inspect] {
+  text-decoration-color: rgb(45 212 191 / 0.28);
+}
 /* the dock toggle — the picktoggle's grammar sized for the floating strip; the
    scoped row of a ⋮ menu (ui-jobs 284) wears the same */
 .prov-inspect-toggle,
@@ -2022,11 +2030,16 @@ label[for] {
    the LEFT end of the bottom edge: the right end is where the dock sits on the
    pages that still have one, and where a card's end flank lands — a pick that
    hit this chip instead would put the tool down rather than trace a value. */
-.prov-inspect-exit {
+.prov-inspect-chips {
   position: fixed;
   z-index: var(--z-inspect-exit);
   left: 12px;
   bottom: max(12px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.prov-inspect-exit {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -2055,6 +2068,24 @@ label[for] {
 }
 .dark .prov-inspect-exit:hover {
   background: rgb(45 212 191 / 0.16);
+}
+/* "Keep this on" (decision 0062 point 7): a quiet text press beside the exit */
+.prov-inspect-keep {
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 4px;
+  color: var(--color-rb-500);
+  background: transparent;
+  border: 0;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.prov-inspect-keep:hover {
+  color: rgb(13 148 136); /* teal-600 */
+}
+.dark .prov-inspect-keep:hover {
+  color: rgb(45 212 191); /* teal-400 */
 }
 /* the armed halo — a fixed inset ring + inward glow on the whole viewport
    while the tool is on (the browser-extension "operating" treatment), so the

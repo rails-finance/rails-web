@@ -318,21 +318,35 @@ export interface ProvInspectorPin {
 export class ProvInspectorStore {
   private armed = false;
   private scope: string | null = null;
+  /** Armed on arrival by the standing preference (decision 0062): the quieter
+   *  look, no halo. Arming by hand clears it. */
+  private quiet = false;
   private opener: HTMLElement | null = null;
   private pinned: ProvInspectorPin | null = null;
   private tick = 0;
   private listeners = new Set<() => void>();
-  /** Arm or disarm. `scope` names the one section to arm (null: the whole
-   *  page); `opener` is the control that armed it, which takes focus back when
-   *  the mode is put down (`restoreFocus`). Switching scope while armed
-   *  unpins. */
+  /** Arm or disarm by hand. `scope` names the one section to arm (null: the
+   *  whole page); `opener` is the control that armed it, which takes focus
+   *  back when the mode is put down (`restoreFocus`). Switching scope while
+   *  armed unpins. */
   setArmed = (on: boolean, scope: string | null = null, opener: HTMLElement | null = null) => {
     const nextScope = on ? scope : null;
-    if (this.armed === on && this.scope === nextScope) return;
+    if (this.armed === on && this.scope === nextScope && !this.quiet) return;
     this.armed = on;
     this.scope = nextScope;
+    this.quiet = false;
     this.pinned = null;
     if (on) this.opener = opener;
+    this.emit();
+  };
+  /** Arm page-wide on arrival for the standing preference (decision 0062). */
+  armByPreference = () => {
+    if (this.armed) return;
+    this.armed = true;
+    this.scope = null;
+    this.quiet = true;
+    this.pinned = null;
+    this.opener = null;
     this.emit();
   };
   /** Hand focus back to the control that armed the mode, where it is still on
@@ -359,6 +373,7 @@ export class ProvInspectorStore {
   };
   getArmed = () => this.armed;
   getScope = () => this.scope;
+  getQuiet = () => this.quiet;
   /** Armed for the section `scopeId`: armed page-wide, or armed on it. */
   armedFor = (scopeId: string | null | undefined) =>
     this.armed && (this.scope == null || (scopeId != null && this.scope === scopeId));
@@ -1236,8 +1251,10 @@ export function Prov({
   // pulse's target — data-prov-active lands here while its receipt is pinned).
   // The dev-only coverage stamp tells the tripwire this value is traced.
   const handlePick = (e: SyntheticEvent) => {
-    // Header values sit inside the card's clickable detail-toggle div — a
-    // pick must pin the receipt, never collapse the card.
+    // The click rule (decision 0062 point 4): a pick pins the receipt and
+    // nothing else. Header values sit inside the card's clickable
+    // detail-toggle div, and a listing's figures inside the row's link: the
+    // pick must not collapse the card or follow the link.
     e.stopPropagation();
     e.preventDefault();
     if (!registry) return;

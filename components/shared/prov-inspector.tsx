@@ -41,6 +41,9 @@ import {
   type ProvInspectorPin,
 } from "./provenance";
 import { usePriceStripActive } from "@/components/shared/price-strip";
+import { useParams, usePathname } from "next/navigation";
+import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
+import { provPreferenceAllows } from "@/lib/shared/prov-preference-routes";
 
 export function ProvInspectorToggle({
   variant = "dock",
@@ -188,6 +191,13 @@ export function ProvInspectorLayer() {
     () => false,
   );
   const pin = useSyncExternalStore(provInspector.subscribe, provInspector.getPin, () => null);
+  // Armed by the standing preference (decision 0062): no halo, the lighter
+  // underline (`:root[data-prov-quiet]`, globals.css).
+  const quiet = useSyncExternalStore(provInspector.subscribe, provInspector.getQuiet, () => false);
+  const preference = useProvPreference();
+  const pathname = usePathname();
+  const params = useParams();
+  const allowed = provPreferenceAllows(pathname, params);
   // Where the way out lives. A page with the dock still has the toggle in
   // sight, so the halo adds nothing; a page whose toggle is a row of a menu
   // that has since closed has no visible control at all, so the halo carries
@@ -209,6 +219,19 @@ export function ProvInspectorLayer() {
   }, [armed]);
   // Leaving the page puts the tool down.
   useEffect(() => () => provInspector.setArmed(false), []);
+  // The standing preference arms each page view on arrival, on the routes
+  // that pass the coverage gate. A disarm holds until the next page; turning
+  // the switch off puts a preference arming down.
+  useEffect(() => {
+    if (preference && allowed) provInspector.armByPreference();
+    else if (provInspector.getQuiet()) provInspector.setArmed(false);
+  }, [preference, allowed, pathname]);
+  useEffect(() => {
+    const root = document.documentElement;
+    if (armed && quiet) root.setAttribute("data-prov-quiet", "");
+    else root.removeAttribute("data-prov-quiet");
+    return () => root.removeAttribute("data-prov-quiet");
+  }, [armed, quiet]);
   if (typeof document === "undefined" || !armed) return null;
   return (
     <>
@@ -216,22 +239,42 @@ export function ProvInspectorLayer() {
           teal (the browser-extension "operating" treatment). Armed on one
           section, that section wears the ring instead (`useProvScopeLit`).
           Pointer-transparent chrome; sits under the popover. */}
-      {!scoped && createPortal(<div className="prov-inspect-halo" aria-hidden data-prov-chrome="" />, document.body)}
-      {/* The halo's own way out, where nothing else on the page offers one. */}
-      {!dock &&
+      {!scoped &&
+        !quiet &&
+        createPortal(<div className="prov-inspect-halo" aria-hidden data-prov-chrome="" />, document.body)}
+      {/* The halo's own way out, where nothing else on the page offers one;
+          armed by hand with the preference off, "Keep this on" beside it
+          (decision 0062 point 7). */}
+      {(!dock || (!quiet && !preference)) &&
         createPortal(
-          <button
-            type="button"
-            className="prov-inspect-exit"
-            data-prov-chrome=""
-            onClick={() => {
-              provInspector.setArmed(false);
-              provInspector.restoreFocus();
-            }}
-          >
-            <X aria-hidden />
-            <span>Exit inspector</span>
-          </button>,
+          <div className="prov-inspect-chips" data-prov-chrome="">
+            {!dock && (
+              <button
+                type="button"
+                className="prov-inspect-exit"
+                data-anatomy="H7.4"
+                onClick={() => {
+                  provInspector.setArmed(false);
+                  provInspector.restoreFocus();
+                }}
+              >
+                <X aria-hidden />
+                <span>Exit inspector</span>
+              </button>
+            )}
+            {!quiet && !preference && (
+              <button
+                type="button"
+                className="prov-inspect-keep"
+                data-anatomy="H7.5"
+                data-prov-keep-on=""
+                title={KEEP_ON_TITLE}
+                onClick={() => setProvPreference(true)}
+              >
+                {KEEP_ON_LABEL}
+              </button>
+            )}
+          </div>,
           document.body,
         )}
       {/* Keyed per pick: a fresh mount per figure resets expansion + position. */}
@@ -239,6 +282,10 @@ export function ProvInspectorLayer() {
     </>
   );
 }
+
+/** The armed state's offer to keep the inspector on (decision 0062 point 7). */
+const KEEP_ON_LABEL = "Keep this on";
+const KEEP_ON_TITLE = "Arm the inspector on every page that supports it. The profile menu turns it off.";
 
 const POP_WIDTH = 400;
 
