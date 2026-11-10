@@ -41,6 +41,7 @@ import {
   type SymbolIndex,
 } from "@/lib/shared/asset-preference";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
+import { isLaunchedChain, launchedChains } from "@/lib/shared/protocols";
 import {
   mergeViews,
   activeFocus,
@@ -68,7 +69,9 @@ export type { AssetPick, FocusView };
 /** The chains the asset chooser's tokens are on. */
 export const SCOPE_CHAINS: Record<number, string> = { 1: "Ethereum", 8453: "Base" };
 
-const CHAIN_SLUGS: Record<string, number> = Object.fromEntries(Object.values(CHAINS).map((c) => [c.slug, c.id]));
+/** The slugs a focus link may name: launched chains only, so a link cannot put
+ *  an unlaunched chain into the Focus panel. */
+const CHAIN_SLUGS: Record<string, number> = Object.fromEntries(launchedChains().map((c) => [c.slug, c.id]));
 export const chainNameOf = (id: number): string => CHAINS[id as ChainId]?.name ?? `chain ${id}`;
 const chainOfKey = (k: string) => Number(k.slice(0, k.indexOf(":")));
 
@@ -147,7 +150,7 @@ const EMPTY: Snapshot = { saved: NO_VIEWS, stored: NO_FOCUS, link: null };
 let cache: { raw: string; snap: Snapshot } = { raw: "", snap: EMPTY };
 
 const newId = () => `v${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
-const knownChain = (id: number) => CHAINS[id as ChainId] != null;
+const knownChain = (id: number) => CHAINS[id as ChainId] != null && isLaunchedChain(id as ChainId);
 
 /** The stores before saved views held only on localhost while Focus was a
  *  mock; they are dropped, not carried forward. */

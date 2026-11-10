@@ -848,7 +848,7 @@ export function isUnlaunchedPath(pathname: string | null): boolean {
  *  step. Today all three chains are offered. The order is `CHAINS`', which is
  *  the display order the toggle wants (Ethereum, Base, Sepolia). */
 export function launchedChains(): ChainMeta[] {
-  return (Object.values(CHAINS) as ChainMeta[]).filter((c) => LAUNCHED_PROTOCOLS.some((p) => p.chainId === c.id));
+  return (Object.values(CHAINS) as ChainMeta[]).filter((c) => isLaunchedChain(c.id));
 }
 
 /** The PRODUCTION chains Rails offers — the launched chains minus the
@@ -872,11 +872,24 @@ export function launchedProductionChainNames(): string {
   return names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
 }
 
-/** Is this chain's own front door (`/coverage/<slug>`) offered? False while
- *  every explorer on the chain is unlaunched — the coverage page would be a
- *  directory of pages nothing else links. */
+/** THE CHAIN LAUNCH FLAG: a chain is launched when it has at least one launched
+ *  explorer. False for a chain with no explorers at all (Optimism and Arc while
+ *  their first explorers are built) and for one whose every explorer is
+ *  unlaunched. Every surface a reader finds a chain on asks this, directly or
+ *  through `launchedChains()`: the home chain tabs, the nav, the chain toggle,
+ *  Focus's chain picks, /coverage's chain list, the sitemap, /about, llms.txt
+ *  and StructuredData. An unlaunched chain's /coverage/<slug> still serves,
+ *  with the work-in-progress strip and `index: false`. Tested in
+ *  scripts/test/chain-launch.test.mjs. */
 export function isLaunchedChain(chainId: ChainId): boolean {
-  return LAUNCHED_PROTOCOLS.some((p) => p.chainId === chainId);
+  return chainLaunchedIn(PROTOCOLS, chainId);
+}
+
+/** The rule over any roster: some entry on the chain is not flagged
+ *  `unlaunched`. `some` over no entries is false, so a chain with none is
+ *  unlaunched. */
+export function chainLaunchedIn(roster: readonly Pick<ProtocolEntry, "chainId" | "unlaunched">[], chainId: ChainId) {
+  return roster.some((p) => p.chainId === chainId && !p.unlaunched);
 }
 
 /** The singular noun each protocol's positions go by, for per-position page
