@@ -186,17 +186,23 @@ const EXAMPLES_SHOWN = 3;
 
 /**
  * A few of what the picks add, taken in turn from each pick, each pick's
- * ordered by how much is built on it in turn (sBOLD and yBOLD before a
- * one-off vault).
+ * ordered by how much is built on it in turn, then rate tokens before vaults
+ * (sBOLD and yBOLD before a one-off vault, wstETH before a WETH vault).
  */
 function examplesOf(picks: AssetPick[]): string[] {
-  const reach = (sym: string) => {
+  const KIND_RANK = ["rate", "wraps", "vault", "pt", "yt", "lp", "debt"];
+  const rank = (sym: string) => {
     const row = FAMILY_ROWS.find((r) => r.symbol === sym);
-    if (!row) return 0;
+    if (!row) return [0, KIND_RANK.length];
     const [chain, token] = row.token.split(":");
-    return familyOf([{ chain: Number(chain), token, builtOn: true }]).size;
+    return [familyOf([{ chain: Number(chain), token, builtOn: true }]).size, KIND_RANK.indexOf(row.kind)];
   };
-  const lists = picks.filter((p) => p.builtOn).map((p) => builtOnSymbols(p).sort((a, b) => reach(b) - reach(a)));
+  const order = (a: string, b: string) => {
+    const [ra, ka] = rank(a);
+    const [rb, kb] = rank(b);
+    return rb - ra || ka - kb;
+  };
+  const lists = picks.filter((p) => p.builtOn).map((p) => builtOnSymbols(p).sort(order));
   const out = new Set<string>();
   for (let i = 0; out.size < EXAMPLES_SHOWN && lists.some((l) => i < l.length); i++)
     for (const l of lists) if (i < l.length && out.size < EXAMPLES_SHOWN) out.add(l[i]);
