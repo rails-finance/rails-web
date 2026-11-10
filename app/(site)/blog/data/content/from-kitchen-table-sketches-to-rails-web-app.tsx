@@ -19,7 +19,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       <h2 id="the-kitchen-table-blueprint-2021">The kitchen table blueprint (2021)</h2>
       <p>
         By mid-2021, curiosity won out. I opened a position on{" "}
-        <a href="https://liquity.org" target="_blank" rel="noopener noreferrer">
+        <a href="https://liquity.org" target="_blank" rel="noopener">
           Liquity
         </a>{" "}
         — a DeFi lending protocol that issues a stablecoin (LUSD) as a debt asset and relies on sophisticated on-chain
@@ -66,33 +66,33 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       </p>
       <p>
         I applied to attend the{" "}
-        <a href="https://ethglobal.com" target="_blank" rel="noopener noreferrer">
+        <a href="https://ethglobal.com" target="_blank" rel="noopener">
           ETHGlobal
         </a>{" "}
         hackathon, ETHAmsterdam 2022 — that weekend strengthened my belief that I was on to something. I joined a team
         designing a cutting-edge{" "}
-        <a href="https://ethglobal.com/showcase/soul-protocol-69p0s" target="_blank" rel="noopener noreferrer">
+        <a href="https://ethglobal.com/showcase/soul-protocol-69p0s" target="_blank" rel="noopener">
           soulbound NFT
         </a>{" "}
         project. I met Liquity’s inventor, shared my work with others (including{" "}
-        <a href="https://x.com/JustinCBram" target="_blank" rel="noopener noreferrer">
+        <a href="https://x.com/JustinCBram" target="_blank" rel="noopener">
           Justin Bram
         </a>
         , the YouTube educator whose{" "}
-        <a href="https://www.youtube.com/watch?v=1z9dxvkqF7E" target="_blank" rel="noopener noreferrer">
+        <a href="https://www.youtube.com/watch?v=1z9dxvkqF7E" target="_blank" rel="noopener">
           video had first taught me how to use Liquity
         </a>
         ), and received genuine enthusiasm for what I was building. I was excited for what could come next.
       </p>
       <p>
         Fired up by that energy, I headed to{" "}
-        <a href="https://ethglobal.com/showcase/rails-s6n2z" target="_blank" rel="noopener noreferrer">
+        <a href="https://ethglobal.com/showcase/rails-s6n2z" target="_blank" rel="noopener">
           ETHNewYork 2022
         </a>
         . I set out to find a developer to team up with. My hack was a visualiser for a Superfluid app, set on a
         Rails-like platform; it wasn't the grand project idea but opened my mind to a more niche approach and won me a
         pool prize — I also landed some design work on a Superfluid project visualising{" "}
-        <a href="https://geoweb.land/governance" target="_blank" rel="noopener noreferrer">
+        <a href="https://geoweb.land/governance" target="_blank" rel="noopener">
           streaming quadratic funding
         </a>
         , gaining valuable experience and connections but falling short of finding a collaborator.
@@ -119,11 +119,11 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       </p>
       <p>
         For Rails to become a true visual language, it had to adapt beyond Liquity. I took this streamlined approach to{" "}
-        <a href="https://ethglobal.com/showcase/rails-20fvz" target="_blank" rel="noopener noreferrer">
+        <a href="https://ethglobal.com/showcase/rails-20fvz" target="_blank" rel="noopener">
           ETHIstanbul 2023
         </a>{" "}
         (for CowSwap) and later to{" "}
-        <a href="https://ethglobal.com/showcase/rails-vbqxy" target="_blank" rel="noopener noreferrer">
+        <a href="https://ethglobal.com/showcase/rails-vbqxy" target="_blank" rel="noopener">
           ETHLondon 2024
         </a>{" "}
         (for Morpho), applying a protocol-first Rails design language.
@@ -180,12 +180,7 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
       <p>
         Together, we’ve built a base that truly lives up to the original vision: a platform ready to grow with DeFi —
         and let's be{" "}
-        <a
-          href="http://github.com/liquity/bold"
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Liquity V2 BOLD Github Repo"
-        >
+        <a href="http://github.com/liquity/bold" target="_blank" rel="noopener" title="Liquity V2 BOLD Github Repo">
           BOLD
         </a>
         , to help <em>grow</em> DeFi itself.
@@ -216,18 +211,18 @@ export default function FromKitchenTableSketchesToRailsWebApp() {
         <strong>Try Rails:</strong> <a href="/">rails.finance</a>
         <br />
         <strong>Follow:</strong>{" "}
-        <a href="https://twitter.com/rails_finance" target="_blank" rel="noopener noreferrer">
+        <a href="https://twitter.com/rails_finance" target="_blank" rel="noopener">
           @rails_finance
         </a>
         <br />
         <strong>Collaborate:</strong> If you’re a protocol team or grant provider, we’d love to{" "}
-        <a href="https://twitter.com/rails_finance" target="_blank" rel="noopener noreferrer">
+        <a href="https://twitter.com/rails_finance" target="_blank" rel="noopener">
           connect
         </a>
         .
         <br />
         If you’d like to follow our journey or explore integrations,{" "}
-        <a href="https://twitter.com/rails_finance" target="_blank" rel="noopener noreferrer">
+        <a href="https://twitter.com/rails_finance" target="_blank" rel="noopener">
           reach out
         </a>
         .

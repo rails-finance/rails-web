@@ -133,7 +133,7 @@ export default function ArchitecturePage() {
         <a
           href="https://github.com/rails-finance/rails-web"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
           className="underline hover:text-pink-500 transition-colors"
         >
           View on GitHub →

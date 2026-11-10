@@ -88,7 +88,7 @@ export function TimelineCoverageFooter({ coverage, sourceLabel }: TimelineCovera
   const undated = coverage.undated ?? 0;
 
   const blockLink = (b: number) => (
-    <a href={explorerUrl(chainId, "block", b)} target="_blank" rel="noopener noreferrer" className="link-external">
+    <a href={explorerUrl(chainId, "block", b)} target="_blank" rel="noopener" className="link-external">
       {b.toLocaleString("en-US")}
     </a>
   );
@@ -171,7 +171,7 @@ export function TimelineConfirmationFooter({ coverage }: { coverage: ChainTimeli
   const chainId = useChainId();
   if (!coverage.confirmation && coverage.throughBlock == null) return null;
   const blockLink = (b: number) => (
-    <a href={explorerUrl(chainId, "block", b)} target="_blank" rel="noopener noreferrer" className="link-external">
+    <a href={explorerUrl(chainId, "block", b)} target="_blank" rel="noopener" className="link-external">
       {b.toLocaleString("en-US")}
     </a>
   );
@@ -239,7 +239,7 @@ function ConfirmationLine({
             {confirmation.dropped.map((d, i) => (
               <span key={`${d.txHash}-${d.logIndex}`}>
                 {i > 0 && ", "}
-                <a href={txLink(d.txHash)} target="_blank" rel="noopener noreferrer" className="link-external">
+                <a href={txLink(d.txHash)} target="_blank" rel="noopener" className="link-external">
                   {d.txHash.slice(0, 10)}…
                 </a>{" "}
                 log {d.logIndex} at block {d.blockNumber.toLocaleString("en-US")}

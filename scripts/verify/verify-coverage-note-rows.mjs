@@ -17,8 +17,8 @@
  * included-capability pill on a mobile card is its own trigger, opening a
  * bottom sheet with that capability's `detail` (capability-sheet.tsx) — see
  * mobile()'s own assertions. Single-open accordion across all THREE header/
- * cell/essay grammars; zebra-by-data-index (on the cells' grounds), full-bleed
- * colSpan and the house table's row gap all still hold. The mobile card stack's own disclosure (protocol view
+ * cell/essay grammars; one ground for every row (no stripes), full-bleed
+ * colSpan and the house table's hairlines all still hold. The mobile card stack's own disclosure (protocol view
  * + structural note, unrelated to the capability sheet) is unchanged.
  *
  * Visibility is asserted with innerText / bounding boxes, never textContent —
@@ -42,8 +42,8 @@
  * That row makes NO capability claims: an icon, a linked name, a neutral
  * "Coming soon" pill, and one muted note spanned across every capability
  * column, never a mark or a disclosure trigger of its own. Row order, pill
- * neutrality, the spanned colSpan, the absent marks/triggers, and zebra
- * parity through that row are all asserted below, with the row count and its
+ * neutrality, the spanned colSpan and the absent marks/triggers are all
+ * asserted below, with the row count and its
  * expected neighbours derived from the page's own `COMING_SOON` array (never
  * hardcoded to "LlamaLend V2" specifically).
  */
@@ -444,47 +444,29 @@ async function desktop(theme) {
     `every essay row spans ${CAP_COUNT + 2} columns`,
   );
 
-  // Rows part on the house table's 4px row gap (D1), never a border: a seam
-  // drawn on the row would fall between a row and its own drawer.
+  // Rows part on a hairline (D1): the cells' bottom border, no gap and no
+  // border on the row, on the page's ground (no stripes). A seam on the row
+  // would fall between a row and its own drawer.
   const spacing = await table.evaluate((t) => getComputedStyle(t).borderSpacing);
-  assert(/^0px 4px$/.test(spacing), `rows part on a 4px gap (border-spacing ${spacing})`);
+  assert(/^0px( 0px)?$/.test(spacing), `rows sit flush, parted by a hairline (border-spacing ${spacing})`);
   const borders = await markRows.evaluateAll((trs) =>
     trs.map((tr) => getComputedStyle(tr).borderTopWidth !== "0px" || getComputedStyle(tr).borderBottomWidth !== "0px"),
   );
   assert(!borders.some(Boolean), "no row carries a top or bottom border");
-
-  /* Zebra striping — asserted in BOTH themes (this fn runs for each). The
-     ground lies on the cells (D1), so read the row header's. Parity is by
-     data index, not nth-child, so the always-mounted essay rows can't shift
-     the pattern. */
-  const groundOf = (tr) => getComputedStyle(tr.querySelector("th[scope=row]")).backgroundColor;
-  const bg1 = await markRows.nth(0).evaluate(groundOf);
-  const bg2 = await markRows.nth(1).evaluate(groundOf);
-  assert(bg1 !== bg2, `zebra: data row 2 background differs from row 1 (${bg1} vs ${bg2})`);
-
-  // The coming-soon row participates in the SAME merged-index parity as any
-  // other row — no reset, no row of its own outside the pattern. Read every
-  // markRow's background + text once, locate the soon row by its label, and
-  // check it differs from its immediate neighbours (alternation holds right
-  // across it, not just at rows 1/2 above).
-  const zebraRows = await markRows.evaluateAll((trs) =>
-    trs.map((tr) => ({ bg: getComputedStyle(tr.querySelector("th[scope=row]")).backgroundColor, text: tr.innerText })),
+  const hairline = await markRows
+    .nth(0)
+    .evaluate((tr) => getComputedStyle(tr.querySelector("th[scope=row]")).borderBottomWidth);
+  assert(hairline === "1px", `a data row's cells draw a 1px hairline under it (${hairline})`);
+  const grounds = await markRows.evaluateAll((trs) =>
+    trs.map((tr) => getComputedStyle(tr.querySelector("th[scope=row]")).backgroundColor),
+  );
+  assert(
+    new Set(grounds).size === 1,
+    `every data row lies on one ground, no stripes (${[...new Set(grounds)].join(", ")})`,
   );
   if (HAS_SOON) {
-    const soonZebraIdx = zebraRows.findIndex((r) => r.text.includes(EXPECTED_ROWS[SOON_IDX].label));
-    assert(soonZebraIdx !== -1, "the coming-soon row is found among the striped rows");
-    if (soonZebraIdx > 0) {
-      assert(
-        zebraRows[soonZebraIdx].bg !== zebraRows[soonZebraIdx - 1].bg,
-        "the coming-soon row's stripe differs from the row above it",
-      );
-    }
-    if (soonZebraIdx < zebraRows.length - 1) {
-      assert(
-        zebraRows[soonZebraIdx].bg !== zebraRows[soonZebraIdx + 1].bg,
-        "the coming-soon row's stripe differs from the row below it",
-      );
-    }
+    const soonIdx = (await markRows.allInnerTexts()).findIndex((t) => t.includes(EXPECTED_ROWS[SOON_IDX].label));
+    assert(soonIdx !== -1, "the coming-soon row is found among the data rows");
   }
 
   /* Collapsed state — visibility asserted two independent ways, once for each
@@ -698,19 +680,24 @@ async function desktop(theme) {
   const tableBox = await table.boundingBox();
   const mapleCellBox = await mapleEssay.locator("xpath=ancestor::td[1]").boundingBox();
   assert(Math.abs(mapleCellBox.width - tableBox.width) < 4, "essay panel cell spans the full table width");
-  // The open essay row takes its parent data row's stripe (the cells' ground),
-  // so it reads as that row's block rather than the next stripe.
+  // The open essay row reads as its data row's block: the same ground, and
+  // no hairline between them.
   const rowBgs = await mapleEssay.evaluate((el) => {
     const noteCell = el.closest("td");
-    const dataRow = noteCell.closest("tr").previousElementSibling;
+    const dataCell = noteCell.closest("tr").previousElementSibling.querySelector("th[scope=row]");
     return {
       note: getComputedStyle(noteCell).backgroundColor,
-      data: getComputedStyle(dataRow.querySelector("th[scope=row]")).backgroundColor,
+      data: getComputedStyle(dataCell).backgroundColor,
+      line: getComputedStyle(dataCell).borderBottomColor,
     };
   });
   assert(
     rowBgs.note === rowBgs.data,
     `open essay row shares its parent's background (${rowBgs.note} === ${rowBgs.data})`,
+  );
+  assert(
+    /rgba\(0, 0, 0, 0\)|transparent/.test(rowBgs.line),
+    `no hairline between a data row and its open essay (${rowBgs.line})`,
   );
 
   /* Single-open ACROSS ROWS, and across kinds: opening morpho's views popover
@@ -937,11 +924,11 @@ async function desktop(theme) {
     .evaluateAll((els) => els.map((e) => e.id));
   assert(new Set(panelIds).size === panelIds.length, "every popover/essay/header panel id is unique across the table");
 
-  /* Theme sanity with a panel open: the stripe follows the theme. */
+  /* Theme sanity with a panel open: the hairline follows the theme. */
   const seam = await markRows
     .nth(3)
-    .evaluate((tr) => getComputedStyle(tr.querySelector("th[scope=row]")).backgroundColor);
-  console.log(`  (${theme} stripe ground: ${seam})`);
+    .evaluate((tr) => getComputedStyle(tr.querySelector("th[scope=row]")).borderBottomColor);
+  console.log(`  (${theme} hairline: ${seam})`);
 
   await page.close();
   return { seam, width: sectionBox.width };
@@ -1219,7 +1206,7 @@ async function base() {
 
 const light = await desktop("light");
 const dark = await desktop("dark");
-assert(light.seam !== dark.seam, `light and dark stripe grounds differ (${light.seam} vs ${dark.seam})`);
+assert(light.seam !== dark.seam, `light and dark hairlines differ (${light.seam} vs ${dark.seam})`);
 await mobile("light");
 await comingSoon();
 await base();

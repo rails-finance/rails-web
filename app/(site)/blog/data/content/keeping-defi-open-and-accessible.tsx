@@ -25,7 +25,7 @@ export default function KeepingDefiOpenResponseDefi101() {
         <a
           href="https://trustlessness.eth.limo/general/2025/11/11/the-trustless-manifesto.html"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
         >
           Trustless Manifesto
         </a>

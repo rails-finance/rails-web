@@ -188,7 +188,7 @@ function explanationParts({
     ) : null;
 
   const vault = vaultHref ? (
-    <a href={vaultHref} target="_blank" rel="noopener noreferrer" className="link">
+    <a href={vaultHref} target="_blank" rel="noopener" className="link">
       the {mytSymbol} vault
     </a>
   ) : (

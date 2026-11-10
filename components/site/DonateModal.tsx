@@ -94,7 +94,7 @@ function DonateModalInner({ onClose }: { onClose: () => void }) {
               <a
                 href={ETHERSCAN_URL}
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="noopener"
                 className="shrink-0 link-external"
                 aria-label="View on Etherscan"
               >

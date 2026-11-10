@@ -386,7 +386,7 @@ function RowNotes({
           <a
             href={explorerUrl(chainId, "address", event.counterparty)}
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener"
             className="link-muted font-mono"
           >
             {shortAddress(event.counterparty)}

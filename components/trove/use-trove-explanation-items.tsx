@@ -528,7 +528,7 @@ function buildOpenItems({
             <a
               href={batchManagerInfo.website}
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               title={troveWords("delegate_visit", { name: batchManagerInfo.name })}
               className="inline-flex items-center gap-0.5 hover:text-pink-500 transition-colors"
             >
@@ -644,7 +644,7 @@ function buildOpenItems({
             <a
               href={nftUrl}
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               title={troveWords("nft_open_title")}
               className="inline-flex items-center gap-0.5 hover:text-pink-500 transition-colors"
             >

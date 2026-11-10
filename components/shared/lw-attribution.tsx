@@ -14,7 +14,7 @@ export function LwNotice({ className }: { className?: string }) {
   return (
     <span className={className} data-lw-notice="">
       {LW_NOTICE}{" "}
-      <a href={LW_NOTICE_URL} target="_blank" rel="noreferrer" className="hover:underline">
+      <a href={LW_NOTICE_URL} target="_blank" rel="noopener" className="hover:underline">
         {LW_NOTICE_URL}
       </a>
     </span>

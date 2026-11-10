@@ -527,7 +527,7 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
                     <a
                       href={explorerUrl(chainId, "address", factory)}
                       target="_blank"
-                      rel="noopener noreferrer"
+                      rel="noopener"
                       className="link-external"
                     >
                       factory

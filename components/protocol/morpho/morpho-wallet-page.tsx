@@ -375,7 +375,7 @@ function LiveMarketRows({
         <a
           href={explorerUrl(d.chainId, "block", data.blockNumber)}
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
           className="link-external"
         >
           {data.blockNumber.toLocaleString("en-US")}

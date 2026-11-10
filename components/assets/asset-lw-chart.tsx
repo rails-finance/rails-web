@@ -733,7 +733,7 @@ export function AssetLwChart({
                     : "round"}
               {mainRounds && mainRounds.legs.length > 1 && leg?.kind === "feed" ? ` of ${legName(leg.name)}` : ""},
               block {round[4].toLocaleString("en-US")},{" "}
-              <a href={tx(round[5])} target="_blank" rel="noreferrer" className="font-mono hover:underline">
+              <a href={tx(round[5])} target="_blank" rel="noopener" className="font-mono hover:underline">
                 {round[5].slice(0, 10)}…
               </a>
             </span>

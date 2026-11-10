@@ -81,7 +81,7 @@ function InfoReadsSection({ reads, chainId }: { reads: InfoReads; chainId: Chain
                 <a
                   href={explorerUrl(chain, "address", c.address)}
                   target="_blank"
-                  rel="noopener noreferrer"
+                  rel="noopener"
                   className="link-external font-mono text-[12px]"
                   title={`${c.address} on ${CHAINS[chain].explorerName}`}
                 >
@@ -222,7 +222,7 @@ export function ProtocolInfoPage({
                 {t.sources.map((l, i) => (
                   <span key={l.href}>
                     {i > 0 && ", "}
-                    <a href={l.href} className={INLINE_LINK} target="_blank" rel="noopener noreferrer">
+                    <a href={l.href} className={INLINE_LINK} target="_blank" rel="noopener">
                       {l.label}
                     </a>
                   </span>
@@ -258,7 +258,7 @@ export function ProtocolInfoPage({
       </p>
       <p className="mt-2 text-sm text-rb-500" data-anatomy="I7">
         Official documentation:{" "}
-        <a href={docs.href} className={INLINE_LINK} target="_blank" rel="noopener noreferrer">
+        <a href={docs.href} className={INLINE_LINK} target="_blank" rel="noopener">
           {docs.label}
         </a>
       </p>

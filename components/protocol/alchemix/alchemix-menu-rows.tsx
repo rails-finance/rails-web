@@ -49,7 +49,7 @@ export function AlchemixMenuRows({
           icon={<ExternalLink size={16} />}
           title={outside.title}
           subtitle={outside.subtitle}
-          onClick={() => window.open(outside.url, "_blank", "noopener,noreferrer")}
+          onClick={() => window.open(outside.url, "_blank", "noopener")}
         />
       ) : null}
       <ToolsMenuItem

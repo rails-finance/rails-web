@@ -154,7 +154,7 @@ export default function InfoPage() {
           <a
             href={explorerUrl(BASE_CHAIN_ID, "tx-logs", SEAMLESS_FREEZE_TX)}
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener"
             className="link-external"
           >
             one transaction

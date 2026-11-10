@@ -62,11 +62,7 @@ export default function RailsSolutionDefiTrustProblem() {
 
       <p>
         <strong>Trust defaults to the wrong signals.</strong> Without understanding, users rely on social proof.{" "}
-        <a
-          href="https://link.springer.com/article/10.1007/s11142-024-09838-4"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a href="https://link.springer.com/article/10.1007/s11142-024-09838-4" target="_blank" rel="noopener">
           Research
         </a>{" "}
         from Indiana University's Kelley School analyzing 36,000 tweets from 180 top crypto influencers found that
@@ -128,7 +124,7 @@ export default function RailsSolutionDefiTrustProblem() {
 
       <p>
         Currently in beta, <a href="/">Rails</a> is focused solely on providing deep analytics for the{" "}
-        <a href="http://liquity.org/" target="_blank" rel="noopener noreferrer">
+        <a href="http://liquity.org/" target="_blank" rel="noopener">
           Liquity V2 protocol
         </a>{" "}
         on Ethereum mainnet, with plans to expand to its ecosystem of "friendly forks" and other protocols. Rails is

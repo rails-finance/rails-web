@@ -138,13 +138,13 @@ export function TroveIdentityRow({
         // <button> instead of <a> because this row renders inside cards that
         // are wrapped in a Next <Link> on the listing pages — nested anchors
         // are invalid HTML and trigger a hydration warning. window.open with
-        // noopener,noreferrer matches what target="_blank" + rel did.
+        // noopener matches what target="_blank" + rel did.
         <button
           type="button"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            window.open(nftUrl, "_blank", "noopener,noreferrer");
+            window.open(nftUrl, "_blank", "noopener");
           }}
           aria-label="View NFT on OpenSea"
           title="View NFT on OpenSea"

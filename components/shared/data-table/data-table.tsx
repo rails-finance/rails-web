@@ -8,10 +8,11 @@
 // A real <table>: a caption or label, `<th scope="col">` headers, an optional
 // `<th scope="row">` cell. Rows sit on the page's ground, a hairline between
 // them (`--edge-row-line`). A hovered row lifts into a rounded block
-// (`--surface-row-hover`) inset evenly inside its row, and the hairlines above
-// and below it are not drawn while it is hovered, so nothing moves. The row
-// visuals live in `table.dt` (app/globals.css). The frame scrolls sideways
-// inside itself, never the page; a pinned cell carries the page's ground.
+// (`--surface-row-hover`) whose top and bottom lie on the hairlines above and
+// below it (which it replaces while hovered, so nothing moves) and whose ends
+// reach past them by the 8px corner radius, into the frame's padding. The row visuals live in
+// `table.dt` (app/globals.css). The frame scrolls sideways inside itself, never
+// the page; a pinned cell carries the page's ground.
 //
 // A LINKED ROW. `DataTableRow href` with one `DataTableRowLink` in a cell
 // (the row's name, the one link a keyboard reaches). Every cell lays a hidden
@@ -132,7 +133,7 @@ export function DataTable({
     <Stacked.Provider value={stacked}>
       <RowHeight.Provider value={rowHeight ? ROW_HEIGHT[stacked ? stackBelow : "sm"][rowHeight] : ""}>
         <div
-          className={`relative isolate max-w-full overflow-x-auto ${className}`}
+          className={`relative isolate -mx-2 max-w-[calc(100%+1rem)] overflow-x-auto px-2 ${className}`}
           data-anatomy={[anatomy, "D1", stacked ? "D6" : "D3"].filter(Boolean).join(" ")}
           {...frame}
         >
@@ -315,6 +316,27 @@ export function DataTableRowLink({
     >
       {children}
     </Link>
+  );
+}
+
+/** An amount cell (D1): the token amount over its dollar value in muted 12px,
+ *  the dollar value only where Rails reads an oracle at a named block
+ *  (rails-ops decision 0047). `tag` (a cap pill) sits beside the dollars, so
+ *  the cell keeps two lines; with no `value` it sits under the amount. Both
+ *  lines follow the cell's alignment. */
+export function DataTableAmount({ amount, value, tag }: { amount: ReactNode; value?: ReactNode; tag?: ReactNode }) {
+  return (
+    <span className="inline-flex flex-col leading-snug align-middle" data-dt-amount="">
+      <span className="block text-foreground/80">{amount}</span>
+      {(value != null || tag) && (
+        <span className="block text-[12px] text-rb-500">
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            {value}
+            {tag}
+          </span>
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -512,6 +534,7 @@ export function DataTableRowMenu({ label, items }: { label: string; items: DataT
         aria-expanded={open}
         onClick={toggle}
         data-row-menu=""
+        data-anatomy="D7"
         className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-rb-500 transition-opacity hover:bg-[var(--surface-hover)] hover:text-foreground focus-ring group-hover/dt-row:opacity-100 group-focus-within/dt-row:opacity-100 [@media(hover:none)]:opacity-100 ${
           open ? "opacity-100" : "opacity-0"
         }`}
@@ -620,6 +643,7 @@ export function DataTableGroupRow({
       role={stacked ? "row" : undefined}
       className="group/dt-row cursor-pointer"
       data-dt-parent=""
+      data-anatomy="D8"
       data-open={open ? "" : undefined}
       onClick={(e) => {
         // A control in the row (the toggle, a receipt, a link) keeps its press.

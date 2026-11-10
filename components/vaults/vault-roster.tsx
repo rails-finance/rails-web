@@ -626,7 +626,7 @@ export function VaultRoster({
                 <a
                   href={explorerUrl(g.chainId as ChainId, "address", g.asset.address)}
                   target="_blank"
-                  rel="noopener noreferrer"
+                  rel="noopener"
                   className={g.asset.named ? "" : "font-mono"}
                 >
                   {g.asset.symbol}

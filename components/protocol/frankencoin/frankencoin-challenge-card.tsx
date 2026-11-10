@@ -180,7 +180,7 @@ function SaleLine({ e, symbol }: { e: FrankEvent; symbol: string }) {
       <a
         href={explorerUrl(MAINNET_CHAIN_ID, "tx-logs", e.txHash)}
         target="_blank"
-        rel="noopener noreferrer"
+        rel="noopener"
         className={INLINE_LINK}
         onClick={(ev) => ev.stopPropagation()}
       >
@@ -195,7 +195,7 @@ function AddrLink({ address }: { address: string }) {
     <a
       href={explorerUrl(MAINNET_CHAIN_ID, "address", address)}
       target="_blank"
-      rel="noopener noreferrer"
+      rel="noopener"
       className="text-blue-600 dark:text-[var(--text-link)] hover:underline tabular-nums"
       onClick={(e) => e.stopPropagation()}
     >

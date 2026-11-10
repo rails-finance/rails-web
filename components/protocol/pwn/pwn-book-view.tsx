@@ -160,7 +160,7 @@ function CollateralSection({ book }: { book: PwnLoanBook }) {
                 <a
                   href={explorerUrl(MAINNET_CHAIN_ID, "address", c.address)}
                   target="_blank"
-                  rel="noopener noreferrer"
+                  rel="noopener"
                   className="link-external text-foreground"
                   title={c.address}
                 >
@@ -227,7 +227,7 @@ function CreditSection({ book }: { book: PwnLoanBook }) {
                   <a
                     href={explorerUrl(MAINNET_CHAIN_ID, "address", t.address)}
                     target="_blank"
-                    rel="noopener noreferrer"
+                    rel="noopener"
                     className="link-external text-foreground"
                     title={t.address}
                   >

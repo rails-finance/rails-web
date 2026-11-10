@@ -85,7 +85,7 @@ export function PositionReadStamp() {
           <a
             href={explorerUrl(chainId, "block", read.block)}
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener"
             className="rounded-sm hover:text-foreground focus-ring"
           >
             {read.block.toLocaleString("en-US")}

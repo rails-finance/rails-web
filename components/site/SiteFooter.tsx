@@ -55,7 +55,7 @@ export function SiteFooter() {
               <a
                 href="https://x.com/rails_finance"
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="noopener"
                 className="text-rb-500 hover:text-pink-500 dark:hover:text-pink-400 transition-colors duration-150"
                 title="Follow Rails on X"
               >
@@ -66,7 +66,7 @@ export function SiteFooter() {
               <a
                 href="https://www.youtube.com/@rails_finance"
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="noopener"
                 className="text-rb-500 hover:text-pink-500 dark:hover:text-pink-400 transition-colors duration-150"
                 title="Rails Finance on YouTube"
               >
@@ -77,7 +77,7 @@ export function SiteFooter() {
               <a
                 href="https://github.com/rails-finance/rails-web"
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="noopener"
                 className="text-rb-500 hover:text-pink-500 dark:hover:text-pink-400 transition-colors duration-150"
                 title="Rails on GitHub"
               >
@@ -88,7 +88,7 @@ export function SiteFooter() {
               <a
                 href="https://t.me/railsfinance"
                 target="_blank"
-                rel="noopener noreferrer"
+                rel="noopener"
                 className="text-rb-500 hover:text-pink-500 dark:hover:text-pink-400 transition-colors duration-150"
                 title="Rails Finance on Telegram"
               >

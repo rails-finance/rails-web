@@ -351,7 +351,7 @@ function ContractLine({ chain, contract }: { chain: ChainId; contract: string })
         <a
           href={explorerUrl(chain, "token", contract)}
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
           className="link-external font-mono"
           aria-label={`${WORDS.contract} ${contract}`}
         >
