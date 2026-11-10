@@ -89,8 +89,9 @@ export function useAimSuggestScope(): SuggestScope | null {
 /** The chooser's tokens under a search symbol; [] where it offers none. */
 export const aimTokensFor = (symbol: string) => SCOPE_SYMBOLS.get(symbol.toLowerCase()) ?? [];
 
+// Below sm an invisible band around the pill takes the press to 44px tall.
 const PILL =
-  "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500";
+  "relative inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 max-sm:after:absolute max-sm:after:-inset-x-1 max-sm:after:-inset-y-3 max-sm:after:content-['']";
 const OUTLINE = `${PILL} border border-teal-500/60 text-teal-700 hover:bg-teal-500/10 dark:text-teal-400`;
 const FILLED = `${PILL} border border-transparent bg-teal-500/15 text-teal-700 hover:bg-teal-500/25 dark:text-teal-300`;
 

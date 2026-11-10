@@ -307,8 +307,9 @@ export function ProfileMenu() {
         data-anatomy="H20"
         data-profile-face={face ?? undefined}
         // Neutral, with the chrome's tile on hover and while open (ui-jobs
-        // 516): the menu opens in place.
-        className={`flex shrink-0 cursor-pointer items-center gap-0.5 rounded-lg py-[9px] pl-[9px] pr-1 text-foreground transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+        // 516): the menu opens in place. Below sm an invisible band takes the
+        // press to 44px tall without moving the header.
+        className={`relative flex shrink-0 cursor-pointer items-center gap-0.5 rounded-lg py-[9px] pl-[9px] pr-1 max-sm:before:absolute max-sm:before:-inset-y-[3px] max-sm:before:inset-x-0 max-sm:before:content-[''] text-foreground transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
           open ? CHROME_HOVER_ON : CHROME_HOVER
         }`}
       >
