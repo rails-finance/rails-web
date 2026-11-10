@@ -430,7 +430,11 @@ function WhoHoldsIt({
         </div>
         <div className="w-full min-w-0 flex-1">
           {/* The /vaults index's rows (V6): the house table, one line a row. */}
-          <DataTable tableClassName="text-sm" label={`The largest holders of ${shareSymbol}`} stacked rowHeight="one">
+          <DataTable
+            tableClassName="text-sm sm:[&_tbody_tr]:h-12 sm:[&_tbody_tr]:py-0"
+            label={`The largest holders of ${shareSymbol}`}
+            stacked
+          >
             <DataTableHead>
               <DataTableHeader label="Holder" />
               <DataTableHeader label="Shares" align="right" />
@@ -1049,17 +1053,6 @@ export function MockVaultLayout({
       </PositionCardEdgeContext.Provider>
 
       <div className={`${GRID} [--donut-ground:var(--background)]`} data-mock-layout="">
-        <Tile id="holders" segScope="mock-holders">
-          <WhoHoldsIt
-            chainId={chainId}
-            vault={vault.address}
-            vaultName={name}
-            shareSymbol={vault.symbol}
-            shareDecimals={vault.decimals}
-            holders={holders}
-          />
-        </Tile>
-
         <Tile id="allocation" segScope="allocation">
           <VaultAssets
             rows={segRows}
@@ -1097,6 +1090,17 @@ export function MockVaultLayout({
                 },
               ],
             }}
+          />
+        </Tile>
+
+        <Tile id="holders" segScope="mock-holders">
+          <WhoHoldsIt
+            chainId={chainId}
+            vault={vault.address}
+            vaultName={name}
+            shareSymbol={vault.symbol}
+            shareDecimals={vault.decimals}
+            holders={holders}
           />
         </Tile>
 
