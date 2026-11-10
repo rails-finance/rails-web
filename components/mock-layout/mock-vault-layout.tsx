@@ -183,7 +183,10 @@ function Term({ label, tip }: { label: string; tip?: string }) {
 //   when it has a tip.
 // - Value: 14px medium foreground. An address: short form in mono, copy
 //   button, explorer icon button ("View on Etherscan" / "View on Basescan").
-// - Sub-text: 12px muted, its own line under the label.
+// - Detail of the value (chain id, block, a contract's name): 12px muted,
+//   under the value, right-aligned.
+// - Note about the entry (what a role can do): 12px muted, its own line
+//   across the row's full width, left-aligned.
 
 /** One row of a column: label (and sub-text) left, value right. */
 function Row({
@@ -192,12 +195,16 @@ function Row({
   tip,
   value,
   sub,
+  note,
 }: {
   hook: Record<string, string>;
   label: string;
   tip?: string;
   value: ReactNode;
+  /** Detail of the value, under it. */
   sub?: ReactNode;
+  /** A note about the entry, across the row. */
+  note?: ReactNode;
 }) {
   return (
     <div
@@ -208,7 +215,8 @@ function Row({
         <Term label={label} tip={tip} />
       </dt>
       <dd className="flex justify-end text-right text-[14px] font-medium tabular-nums text-foreground">{value}</dd>
-      {sub && <dd className="col-start-1 mt-0.5 text-xs leading-snug text-rb-500">{sub}</dd>}
+      {sub && <dd className="col-start-2 mt-0.5 text-right text-xs leading-snug text-rb-500">{sub}</dd>}
+      {note && <dd className="col-span-2 mt-0.5 text-xs leading-snug text-rb-500">{note}</dd>}
     </div>
   );
 }
@@ -293,6 +301,7 @@ function AddressRow({
   label,
   tip,
   sub,
+  note,
   address,
   explorer,
   href,
@@ -301,6 +310,7 @@ function AddressRow({
   label: string;
   tip?: string;
   sub?: string;
+  note?: string;
   address: string | null;
   explorer: string;
   href: (a: string) => string;
@@ -310,6 +320,7 @@ function AddressRow({
       hook={{ "data-mock-address": id }}
       label={label}
       tip={tip}
+      note={note}
       sub={sub}
       value={
         address ? (
@@ -1287,7 +1298,7 @@ export function MockVaultLayout({
                   <AddressRow
                     id="owner"
                     label="Owner"
-                    sub="sets the curator, the guardian and the fee"
+                    note="sets the curator, the guardian and the fee"
                     address={vault.owner}
                     explorer={chain.explorerName}
                     href={addr}
@@ -1295,7 +1306,7 @@ export function MockVaultLayout({
                   <AddressRow
                     id="curator"
                     label="Curator"
-                    sub="chooses the markets and their caps"
+                    note="chooses the markets and their caps"
                     address={vault.curator}
                     explorer={chain.explorerName}
                     href={addr}
@@ -1303,7 +1314,7 @@ export function MockVaultLayout({
                   <AddressRow
                     id="guardian"
                     label="Guardian"
-                    sub="can cancel a change while it waits"
+                    note="can cancel a change while it waits"
                     address={protects ? protects.guardian : null}
                     explorer={chain.explorerName}
                     href={addr}
@@ -1347,7 +1358,7 @@ export function MockVaultLayout({
                     id="morpho-blue"
                     label="Morpho Blue"
                     tip="The Morpho Blue contract the vault supplies to; every market it lends in lives there."
-                    sub="the lending protocol"
+                    note="the lending protocol"
                     address={vault.morpho}
                     explorer={chain.explorerName}
                     href={addr}
