@@ -24,6 +24,11 @@ export function FocusAvatar({ face, size = 20 }: { face: string | null; size?: n
   const picks = on ? [...new Map((shown.length ? shown : scope.picks).map((p) => [symbolOf(p), p])).values()] : [];
   const chains = on ? scope.chains : [];
   const badge = Math.round(size * 0.6);
+  const count = picks.length || chains.length;
+  // A fixed box for every badge: a percentage-sized glyph inside an
+  // auto-width box takes the SVG's own size and stretches the cut-out.
+  // Only a two-digit count widens it.
+  const wide = count > 9 && !(picks.length === 1 || (picks.length === 0 && chains.length === 1));
   return (
     <span
       className={`relative inline-flex shrink-0 ${on ? "mr-1" : ""}`}
@@ -38,7 +43,7 @@ export function FocusAvatar({ face, size = 20 }: { face: string | null; size?: n
       {on && (
         <span
           className="absolute -bottom-1.5 -right-1.5 inline-flex items-center justify-center rounded-full bg-background ring-2 ring-background"
-          style={{ minWidth: badge, height: badge }}
+          style={{ width: wide ? undefined : badge, minWidth: badge, height: badge }}
           aria-hidden="true"
           data-focus-badge=""
         >
@@ -52,17 +57,19 @@ export function FocusAvatar({ face, size = 20 }: { face: string | null; size?: n
             />
           ) : picks.length === 0 && chains.length === 1 ? (
             <span
-              className="inline-flex size-full items-center justify-center rounded-full"
+              className="inline-flex size-full items-center justify-center rounded-full bg-rb-100 dark:bg-rb-800"
               style={{ color: CHAIN_TINT[chains[0]] ?? "var(--foreground)" }}
             >
-              <ChainGlyph chainId={chains[0] as ChainId} className="size-[80%]" />
+              <span className="inline-flex" style={{ height: Math.round(badge * 0.66) }}>
+                <ChainGlyph chainId={chains[0] as ChainId} className="h-full w-auto" />
+              </span>
             </span>
           ) : (
             <span
               className="inline-flex size-full items-center justify-center rounded-full bg-teal-600 px-0.5 text-[8px] font-bold leading-none text-white"
               style={{ fontSize: Math.max(7, Math.round(badge * 0.62)) }}
             >
-              {picks.length || chains.length}
+              {count}
             </span>
           )}
         </span>
