@@ -67,7 +67,7 @@ export function expandIndex(w: SearchIndexWire): SearchIndex {
   };
 }
 
-export type SuggestionKind = "Wallet" | "Bookmark" | "Explorer" | "Vault" | "Token";
+export type SuggestionKind = "Wallet" | "Bookmark" | "Chain" | "Explorer" | "Vault" | "Token";
 
 export interface Suggestion {
   /** Stable within one list: the row's DOM id is formed from it. */
@@ -84,6 +84,8 @@ export interface Suggestion {
   /** A token row's symbol, as the index carries it (the AIM button maps it to
    *  the chooser's tokens, components/shared/aim-search-button.tsx). */
   symbol?: string;
+  /** A chain row's chain name, as the index carries it (the Focus button maps it to the chain). */
+  chain?: string;
 }
 
 /** A bookmark as the matcher needs it. */
@@ -95,10 +97,12 @@ export interface SuggestBookmark {
   names?: readonly string[];
 }
 
-/** What AIM (asset isolation mode, ui-jobs 557) lets through, while it is on:
- *  the rows that name an asset show only where it touches the AIM set.
- *  Wallets and bookmarks are not assets and stay. */
+/** What Focus mode (ui-jobs 557) lets through, while it is on: the rows that
+ *  name a chain or an asset show only where they are in focus. Wallets and
+ *  bookmarks stay. */
 export interface SuggestScope {
+  /** A chain, by the index's name for it. */
+  chain: (name: string) => boolean;
   token: (symbol: string) => boolean;
   vault: (v: SearchVault) => boolean;
   explorer: (href: string) => boolean;
@@ -221,6 +225,27 @@ export function suggest(
   //    a vault the census shows empty follows every funded match.
   if (index && q.length >= 2) {
     const named: { row: Suggestion; tier: number; kind: number; order: number; empty?: boolean }[] = [];
+    // A chain, from the explorers' chains: its row goes to its coverage page
+    // and carries the Focus button (components/shared/aim-search-button.tsx).
+    const chainCount = new Map<string, number>();
+    for (const [, chain] of index.explorers) chainCount.set(chain, (chainCount.get(chain) ?? 0) + 1);
+    [...chainCount].forEach(([chain, count], i) => {
+      const tier = matchTier(chain, q);
+      if (tier >= 3 && (!scope || scope.chain(chain)))
+        named.push({
+          row: {
+            key: `c:${chain}`,
+            kind: "Chain",
+            name: chain,
+            detail: `${count} explorer${count === 1 ? "" : "s"}`,
+            chain,
+            href: `/coverage/${chain.toLowerCase()}`,
+          },
+          tier,
+          kind: -1,
+          order: i,
+        });
+    });
     index.explorers.forEach(([name, chain, href], i) => {
       const tier = Math.max(matchTier(name, q), matchTier(`${name} ${chain}`, q));
       if (tier > 0 && (!scope || scope.explorer(href)))

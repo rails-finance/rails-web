@@ -365,7 +365,7 @@ export function WalletView({
 }) {
   // AIM (ui-jobs 557): the positions naming an AIM asset (lib/wallet/aim-assets.ts),
   // the reader's own wallet included.
-  const scoped = useScopedRows(read.positions, walletPositionAssetKeys);
+  const scoped = useScopedRows(read.positions, walletPositionAssetKeys, (p) => p.chain as number);
   const filtered = scoped.on && !scoped.peek;
   const all = scoped.rows;
   const openAll = all.filter((p) => p.status === "open");

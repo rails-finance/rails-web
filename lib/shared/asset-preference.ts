@@ -1,7 +1,10 @@
-// The asset preference (ui-jobs 557): the assets a reader limits Rails to,
-// kept in this browser, and `?assets=` that overrides it for one view.
+// Focus mode (ui-jobs 557): the assets and the chains a reader limits Rails
+// to, kept in this browser, and `?assets=` / `?chains=` that override it for
+// one view (a link carrying either replaces the whole stored focus).
 //
-// Stored under its own key, `rails-assets-v1`, as `[{ chain, token, builtOn }]`.
+// Stored under its own key, `rails-focus-v2`, as `{ assets: [{ chain, token,
+// builtOn }], chains: [chainId] }`. `rails-assets-v1` (the assets alone) is
+// read once into it.
 // Its own key, rather than a field of `defi-explorer-preferences`
 // (preferences.ts), so the script in app/layout.tsx can read it before first
 // paint without parsing the whole preference object, and so a reset of the
@@ -18,10 +21,48 @@
 
 import type { FamilyPick } from "@/lib/shared/asset-family";
 
+export const FOCUS_KEY = "rails-focus-v2";
+/** The assets-only store before chain focus; migrated into FOCUS_KEY. */
 export const ASSET_PREFERENCE_KEY = "rails-assets-v1";
 export const ASSETS_PARAM = "assets";
+export const CHAINS_PARAM = "chains";
 
 export type AssetPick = FamilyPick;
+
+export interface Focus {
+  assets: AssetPick[];
+  /** Chain ids; [] is every chain. */
+  chains: number[];
+}
+
+export const NO_FOCUS: Focus = { assets: [], chains: [] };
+
+export function isFocus(v: unknown): v is Focus {
+  return (
+    !!v &&
+    typeof v === "object" &&
+    isPickList((v as Focus).assets) &&
+    Array.isArray((v as Focus).chains) &&
+    (v as Focus).chains.every((c) => typeof c === "number")
+  );
+}
+
+/** Reads `?chains=`: chain slugs (`ethereum,base`) or ids; null when absent. */
+export function parseChainsParam(raw: string | null, slugs: Record<string, number>): number[] | null {
+  if (raw == null) return null;
+  const ids = new Set(Object.values(slugs));
+  const out: number[] = [];
+  for (const part of raw.split(",")) {
+    const v = part.trim().toLowerCase();
+    const id = /^\d+$/.test(v) ? Number(v) : slugs[v];
+    if (id != null && ids.has(id) && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+export function formatChainsParam(chains: readonly number[], slugOf: (id: number) => string | undefined): string {
+  return chains.map((c) => slugOf(c) ?? String(c)).join(",");
+}
 
 /** symbol (lowercased) → the tokens of that symbol, per chain. */
 export type SymbolIndex = Map<string, { chain: number; token: string }[]>;
@@ -99,5 +140,7 @@ export function formatAssetsParam(
   return parts.join(",");
 }
 
-/** The script app/layout.tsx runs before first paint. */
-export const ASSET_SCOPE_SCRIPT = `(function(){try{var s=localStorage.getItem('${ASSET_PREFERENCE_KEY}');if((s&&s!=='[]')||/[?&]${ASSETS_PARAM}=[^&]/.test(location.search))document.documentElement.dataset.assetScope='1'}catch(e){}})()`;
+/** The script app/layout.tsx runs before first paint: marks the page when a
+ *  focus is stored or linked (`data-asset-scope`), and when it holds chains
+ *  (`data-chain-focus`, which holds a chain's pages until the gate has run). */
+export const ASSET_SCOPE_SCRIPT = `(function(){try{var d=document.documentElement.dataset,q=location.search,f=localStorage.getItem('${FOCUS_KEY}'),s=localStorage.getItem('${ASSET_PREFERENCE_KEY}'),on=false,ch=false;if(f){f=JSON.parse(f);ch=!!(f&&f.chains&&f.chains.length);on=ch||!!(f&&f.assets&&f.assets.length)}else on=!!(s&&s!=='[]');var la=/[?&]${ASSETS_PARAM}=[^&]/.test(q),lc=/[?&]${CHAINS_PARAM}=[^&]/.test(q);if(la||lc)ch=lc;if(on||la||lc)d.assetScope='1';if(ch)d.chainFocus='1'}catch(e){}})()`;

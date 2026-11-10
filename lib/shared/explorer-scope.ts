@@ -96,29 +96,63 @@ export interface ScopedRoster extends ScopedRows<ProtocolEntry> {
   unknown: ProtocolEntry[];
 }
 
-/** The explorer roster under the preference (Miles, 9 Nov 2026: strict). An
- *  explorer shows only where it lists a key the preference reaches; a chain
- *  only where one of its explorers does, so a chain with none of the
- *  reader's assets, or with no explorer Rails can judge, is hidden. `rows`
- *  and `total` count explorers across every chain, for ScopeNote. */
+/** The explorer roster under Focus (Miles, 9 Nov 2026: strict). An explorer
+ *  shows only on a focused chain (every chain when none is focused) and, with
+ *  assets picked, only where it lists a key the focus reaches; a chain only
+ *  where one of its explorers shows. Chain focus alone needs no asset list, so
+ *  the explorers Rails has none for show on their chain. `rows` and `total`
+ *  count explorers across every chain, for ScopeNote. */
 export function useScopedRoster(): ScopedRoster {
+  const scope = useAssetScope();
   const ex = useExplorerScope();
   const [peek, setPeek] = useState(false);
-  const filtering = ex.on && !peek;
+  const assets = scope.keys != null;
+  // Judged: chains alone are known at once; assets wait for the index.
+  const judged = scope.on && (!assets || ex.on);
+  const filtering = judged && !peek;
   return useMemo(() => {
-    const listing = new Set(LAUNCHED_PROTOCOLS.filter((p) => ex.statusOf(p.id) === "lists").map((p) => p.id));
+    const listing = new Set(
+      LAUNCHED_PROTOCOLS.filter((p) => scope.chainOk(p.chainId) && (!assets || ex.statusOf(p.id) === "lists")).map(
+        (p) => p.id,
+      ),
+    );
     const chains = new Set(LAUNCHED_PROTOCOLS.filter((p) => listing.has(p.id)).map((p) => p.chainId));
     return {
       filtering,
       shows: (id) => !filtering || listing.has(id),
       chainShows: (c) => !filtering || chains.has(c),
-      unknown: ex.on ? LAUNCHED_PROTOCOLS.filter((p) => ex.statusOf(p.id) === "unknown") : [],
+      unknown:
+        assets && ex.on
+          ? LAUNCHED_PROTOCOLS.filter((p) => scope.chainOk(p.chainId) && ex.statusOf(p.id) === "unknown")
+          : [],
       rows: filtering ? LAUNCHED_PROTOCOLS.filter((p) => listing.has(p.id)) : LAUNCHED_PROTOCOLS,
       total: LAUNCHED_PROTOCOLS.length,
-      on: ex.on,
+      on: judged,
       peek,
       setPeek,
       listProps: { "data-scope-list": "", ...(ex.ready ? { "data-scope-ready": "" as const } : {}) },
     };
-  }, [ex, filtering, peek]);
+  }, [ex, scope, assets, judged, filtering, peek]);
+}
+
+/** Whether any explorer on `chain` lists one of `keys`; null until the index has arrived. */
+export function useListedOn(): ((keys: Set<string>, chain: number) => boolean) | null {
+  const [index, setIndex] = useState<Index | null | undefined>(loaded);
+  useEffect(() => {
+    if (index !== undefined) return;
+    let live = true;
+    load().then((i) => live && setIndex(i));
+    return () => {
+      live = false;
+    };
+  }, [index]);
+  return useMemo(() => {
+    if (!index) return null;
+    return (keys, chain) =>
+      LAUNCHED_PROTOCOLS.some((p) => {
+        if (p.chainId !== chain) return false;
+        const list = index.lists.get(p.id);
+        return !!list && [...keys].some((k) => list.has(k));
+      });
+  }, [index]);
 }

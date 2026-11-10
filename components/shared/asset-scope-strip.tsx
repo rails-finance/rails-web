@@ -1,16 +1,19 @@
 "use client";
 
-// AIM, asset isolation mode (ui-jobs 557): the asset preference's strip and
-// panel. With AIM on, a strip across the top of the app column on every page,
-// at every width: "AIM · WETH, BOLD and what's built on them · Change · Turn
-// off". Off, nothing: the ways in are "AIM" in the profile menu (H20), which
-// opens the same panel (OPEN_SCOPE_PANEL), and the AIM button on a token row
-// of the search's dropdown (components/shared/aim-search-button.tsx).
+// Focus mode (ui-jobs 557): its strip and panel. With Focus on, a strip
+// across the top of the app column on every page, at every width: "Focus mode
+// active: BOLD and what's built on it, on Ethereum · Change · Show
+// everything" ("Focus: BOLD on Ethereum" on a phone). Off, nothing: the ways
+// in are "Focus" in the profile menu (H20), which opens the same panel
+// (OPEN_SCOPE_PANEL), and the Focus button on a token or chain row of the
+// search's dropdown (components/shared/aim-search-button.tsx).
 //
-// The panel lists each chosen asset with one switch, "And what's built on it",
-// and adds assets through AssetChooser. Arriving on `?assets=`, a dialog says
-// what Focus mode is and what the link set it to (FocusLinkIntro), and the
-// strip's "Keep this focus" stores the link's assets in this browser.
+// The panel has two parts. Assets: each chosen asset with one switch, "And
+// what's built on it", added through AssetChooser. Chains: one press per
+// chain; none pressed is every chain, and a focused chain where an asset is
+// not listed says so. Arriving on `?assets=` / `?chains=`, a dialog says what
+// Focus mode is and what the link set it to (FocusLinkIntro), and the strip's
+// "Keep this focus" stores the link's focus in this browser.
 //
 // On an explorer's own pages the strip carries one more line where the
 // explorer is one the preference hides (lib/shared/explorer-scope.ts): its
@@ -29,8 +32,15 @@ import { AssetChooser, optionKey, type AssetChooserOption } from "@/components/s
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
+import { ChainGlyph, segmentClass } from "@/components/shared/chain-toggle";
+import { focusShort } from "@/components/shared/aim-gate";
+import { useListedOn } from "@/lib/shared/explorer-scope";
+import { launchedChains } from "@/lib/shared/protocols";
+import type { ChainId } from "@/lib/shared/chains";
 import { builtOnSymbols, FAMILY_ROWS, familyOf } from "@/lib/shared/asset-family";
 import {
+  chainNameOf,
+  effectivePicks,
   OPEN_SCOPE_PANEL,
   SCOPE_CHAINS,
   SCOPE_TOKENS,
@@ -73,13 +83,14 @@ const OPTIONS: AssetChooserOption[] = SCOPE_TOKENS.map((t) => ({
 
 export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" }) {
   const scope = useAssetScope();
+  const isPhone = useMediaQuery(PHONE_QUERY);
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const show = () => setOpen(true);
     window.addEventListener(OPEN_SCOPE_PANEL, show);
     return () => window.removeEventListener(OPEN_SCOPE_PANEL, show);
   }, []);
-  const on = scope.picks.length > 0;
+  const on = scope.on;
 
   // Home's header bar floats over the hero (components/nav/header-bar.tsx);
   // the strip's height moves it down (globals.css, --aim-strip-h).
@@ -108,17 +119,28 @@ export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" })
           data-asset-scope-strip={scope.fromLink ? "link" : "stored"}
         >
           <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-2 gap-y-1 px-4 py-1.5 text-xs md:px-6">
-            <span
-              className="min-w-0 text-foreground"
-              title={scope.picks.map((p) => `${symbolOf(p)} on ${chainName(p.chain)}`).join(", ")}
-            >
+            <span className="min-w-0 text-foreground" title={focusTitle(scope.picks, scope.chains)} data-focus-label="">
               <ListFilter className="mr-1.5 inline size-3.5 align-[-2px] text-rb-500" aria-hidden="true" />
-              <span className="text-rb-600 dark:text-rb-400">Focus mode active:</span> <PickIcons picks={scope.picks} />
-              <span className="font-semibold">{scopeSummary(scope.picks)}</span>
+              {isPhone ? (
+                <>
+                  <span className="text-rb-600 dark:text-rb-400">Focus:</span>{" "}
+                  <span className="font-semibold">{focusShort(scope.picks, scope.chains)}</span>
+                </>
+              ) : (
+                <>
+                  <span className="text-rb-600 dark:text-rb-400">Focus mode active:</span>{" "}
+                  <FocusWords picks={scope.picks} chains={scope.chains} />
+                </>
+              )}
             </span>
-            <span className="text-rb-500" aria-hidden="true">
-              ·
-            </span>
+            {/* On a phone the presses take their own line, with no dot leading it. */}
+            {isPhone ? (
+              <span className="basis-full" aria-hidden="true" />
+            ) : (
+              <span className="text-rb-500" aria-hidden="true">
+                ·
+              </span>
+            )}
             <button
               type="button"
               onClick={() => setOpen(true)}
@@ -159,6 +181,47 @@ export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" })
       )}
       {open && <AssetScopePanel onClose={() => setOpen(false)} />}
       {scope.fromLink && !open && <FocusLinkIntro onChange={() => setOpen(true)} />}
+    </>
+  );
+}
+
+/** "BOLD on Ethereum; Base": every pick and chain, for the strip's title. */
+function focusTitle(picks: AssetPick[], chains: number[]): string {
+  const a = picks.map((p) => `${symbolOf(p)} on ${chainName(p.chain)}`).join(", ");
+  const c = chains.map(chainNameOf).join(", ");
+  return [a, c && `chains: ${c}`].filter(Boolean).join("; ");
+}
+
+/** The chains in prose, each with its mark: "Ethereum and Base". */
+function ChainWords({ chains, size = "size-3" }: { chains: number[]; size?: string }) {
+  return (
+    <>
+      {chains.map((c, i) => (
+        <span key={c}>
+          {i > 0 && (i === chains.length - 1 ? " and " : ", ")}
+          <span className="inline-flex items-center gap-1 whitespace-nowrap font-semibold text-foreground">
+            <ChainGlyph chainId={c as ChainId} className={size} />
+            {chainNameOf(c)}
+          </span>
+        </span>
+      ))}
+    </>
+  );
+}
+
+/** The strip's words: "[icons] BOLD and what's built on it, on [mark] Ethereum"; "[mark] Base". */
+function FocusWords({ picks, chains }: { picks: AssetPick[]; chains: number[] }) {
+  if (!picks.length) return <ChainWords chains={chains} />;
+  return (
+    <>
+      <PickIcons picks={picks} />
+      <span className="font-semibold">{scopeSummary(picks)}</span>
+      {chains.length > 0 && (
+        <>
+          {", on "}
+          <ChainWords chains={chains} />
+        </>
+      )}
     </>
   );
 }
@@ -218,8 +281,8 @@ const andList = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0
  */
 function FocusLinkIntro({ onChange }: { onChange: () => void }) {
   const scope = useAssetScope();
-  const linkValue =
-    typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("assets") ?? "");
+  const sp = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
+  const linkValue = `${sp?.get("assets") ?? ""}|${sp?.get("chains") ?? ""}`;
   const seenKey = `rails-focus-intro:${linkValue}`;
   const [shown, setShown] = useState(() => {
     try {
@@ -248,6 +311,14 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
   const examples = examplesOf(scope.picks);
   const builtOn = scope.picks.some((p) => p.builtOn);
   const one = picks.length === 1;
+  const chains = scope.chains;
+  const onChains = chains.length > 0 && (
+    <>
+      {picks.length ? ", on " : ""}
+      <ChainWords chains={chains} size="size-3.5" />
+    </>
+  );
+  const chainsTail = chains.length ? `, on ${chains.map(chainNameOf).join(" and ")}` : "";
 
   return createPortal(
     <div className="fixed inset-0 z-[var(--z-modal)]" data-focus-intro="">
@@ -265,7 +336,7 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
           </h2>
         </div>
         <p className="text-sm leading-relaxed text-rb-600 dark:text-rb-300">
-          Focus mode isolates the Rails app to one or more assets. This view is set to focus on{" "}
+          Focus mode isolates the Rails app to the assets and chains you choose. This view is set to focus on{" "}
           {picks.map((p, i) => (
             <span key={`${p.chain}:${p.token}`}>
               {i > 0 && (i === picks.length - 1 ? " and " : ", ")}
@@ -277,13 +348,15 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
           ))}
           {builtOn &&
             (examples.length
-              ? ` and assets built on ${one ? "it" : "them"}, such as ${andList(examples)}.`
-              : ` and assets built on ${one ? "it" : "them"}.`)}
-          {!builtOn && "."}
+              ? ` and assets built on ${one ? "it" : "them"}, such as ${andList(examples)}`
+              : ` and assets built on ${one ? "it" : "them"}`)}
+          {onChains}.
         </p>
         <p className="text-xs leading-relaxed text-rb-500">
-          Lists, explorers, chains and search show only what holds, lends or is built on {one ? "it" : "them"}. The
-          strip at the top of every page changes or ends it.
+          {picks.length
+            ? `Lists, explorers, chains and search show only what holds, lends or is built on ${one ? "it" : "them"}${chainsTail}.`
+            : `Lists, explorers and search show only what is on ${chains.map(chainNameOf).join(" and ")}.`}{" "}
+          The strip at the top of every page changes or ends it.
         </p>
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2">
           <button
@@ -431,6 +504,64 @@ function PickRow({
   );
 }
 
+/** The panel's Chains part: one press per launched chain, pressed is in
+ *  focus, none pressed is every chain. Under it, each focused chain where a
+ *  picked asset is not listed ("BOLD isn't listed on Arbitrum"), judged by the
+ *  explorer index (lib/shared/explorer-scope.ts). */
+function FocusChains() {
+  const scope = useAssetScope();
+  const listedOn = useListedOn();
+  const chains = launchedChains().map((c) => c.id);
+  const toggle = (id: number) =>
+    scope.setChains(
+      scope.chains.includes(id)
+        ? scope.chains.filter((c) => c !== id)
+        : chains.filter((c) => c === id || scope.chains.includes(c)),
+    );
+  const misses: string[] = [];
+  if (listedOn)
+    for (const p of [...new Map(scope.picks.map((q) => [symbolOf(q), q])).values()])
+      for (const c of scope.chains) {
+        const sameSymbol = scope.picks.filter((q) => symbolOf(q) === symbolOf(p));
+        const keys = familyOf(effectivePicks(sameSymbol, [c]));
+        const onChain = new Set([...keys].filter((k) => k.startsWith(`${c}:`)));
+        if (!listedOn(onChain, c)) misses.push(`${symbolOf(p)} isn't listed on ${chainNameOf(c)}`);
+      }
+  return (
+    <div className="flex flex-col gap-2 border-t border-rb-200 pt-3 dark:border-rb-800" data-focus-chains="">
+      <h3 className={OVERLAY_HEADING}>Chains</h3>
+      <div className="-ml-2 flex flex-wrap items-center gap-1" role="group" aria-label="Chains in focus">
+        {chains.map((id) => {
+          const on = scope.chains.includes(id);
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => toggle(id)}
+              className={segmentClass(on)}
+              data-focus-chain={id}
+            >
+              <ChainGlyph chainId={id} className="h-3.5 w-3.5" />
+              {chainNameOf(id)}
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-[11px] text-rb-500">
+        {scope.chains.length ? "Only the chosen chains show." : "Every chain shows while none is chosen."}
+      </p>
+      {misses.length > 0 && (
+        <ul className="text-[11px] leading-snug text-foreground" data-focus-chain-miss={misses.length}>
+          {misses.map((m) => (
+            <li key={m}>{m}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function AssetScopePanel({ onClose }: { onClose: () => void }) {
   const scope = useAssetScope();
   const isPhone = useMediaQuery(PHONE_QUERY);
@@ -461,7 +592,7 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(scopeLink(picks));
+      await navigator.clipboard.writeText(scopeLink(picks, scope.chains));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {}
@@ -471,9 +602,10 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
     <div className="flex flex-col gap-3 px-4 pb-4" data-asset-scope-panel="">
       <p className="text-xs leading-relaxed text-rb-500">
         {scope.fromLink
-          ? "These came with the link and apply to this view. Keep them to see every page this way."
-          : "Lists show only what holds, lends or is built on these assets. Kept in this browser."}
+          ? "This focus came with the link and applies to this view. Keep it to see every page this way."
+          : "Rails shows only what holds, lends or is built on these assets, on these chains. Kept in this browser."}
       </p>
+      <h3 className={OVERLAY_HEADING}>Assets</h3>
       {picks.length > 0 && (
         <ul className="divide-y divide-rb-200 dark:divide-rb-800" data-asset-scope-picks={picks.length}>
           {picks.map((p) => (
@@ -498,8 +630,9 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
         chainName={chainName}
         anatomy={undefined}
       />
+      <FocusChains />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rb-200 pt-3 dark:border-rb-800">
-        {picks.length > 0 && (
+        {scope.on && (
           <>
             <button
               type="button"

@@ -38,19 +38,19 @@ export function AssetExplorer({ cards: allCards, initial }: { cards: AssetCard[]
   // Its chain marks and chips keep only the chains where it is one of them
   // (Miles, 9 Nov 2026: a chain shows only where the reader's assets are).
   const scoped = useScopedRows(allCards, (c) => c.chains.map((x) => assetKey(x.chain, x.token)));
-  const { keys } = useAssetScope();
-  const narrow = scoped.on && !scoped.peek && keys != null;
+  const { matches } = useAssetScope();
+  const narrow = scoped.on && !scoped.peek;
   const cards = useMemo(
     () =>
       !narrow
         ? scoped.rows
         : scoped.rows.map((c) => {
-            const chains = c.chains.filter((x) => keys.has(assetKey(x.chain, x.token)));
+            const chains = c.chains.filter((x) => matches([assetKey(x.chain, x.token)], x.chain));
             if (chains.length === c.chains.length) return c;
             const on = new Set(chains.map((x) => x.chain));
             return { ...c, chains, chips: c.chips.filter((ch) => on.has(ch.chain)) };
           }),
-    [narrow, scoped.rows, keys],
+    [narrow, scoped.rows, matches],
   );
   const update = useCallback((next: Partial<ExplorerState>) => {
     setState((s) => {

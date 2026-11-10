@@ -29,6 +29,7 @@ import type { ReactNode } from "react";
 import { ProfileMenu } from "@/components/nav/profile-menu";
 import { BrandRail } from "@/components/nav/brand-rail";
 import { AssetScopeStrip } from "@/components/shared/asset-scope-strip";
+import { FocusChainGate } from "@/components/shared/aim-gate";
 
 export function RailShell({
   column,
@@ -52,7 +53,7 @@ export function RailShell({
             <div className="absolute right-3.5 top-8 z-10 hidden md:block" data-profile-corner="">
               <ProfileMenu />
             </div>
-            {children}
+            <FocusChainGate>{children}</FocusChainGate>
           </main>
         ) : (
           <main className="relative flex-1">
@@ -66,7 +67,7 @@ export function RailShell({
                 </div>
               </div>
             </div>
-            {children}
+            <FocusChainGate>{children}</FocusChainGate>
           </main>
         )}
         {footer}

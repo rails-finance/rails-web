@@ -4,7 +4,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { assetKey, builtOnSymbols, familyOf, NATIVE } from "../../lib/shared/asset-family.ts";
-import { formatAssetsParam, parseAssetsParam } from "../../lib/shared/asset-preference.ts";
+import {
+  formatAssetsParam,
+  formatChainsParam,
+  parseAssetsParam,
+  parseChainsParam,
+} from "../../lib/shared/asset-preference.ts";
 
 const WETH = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
 const WETH_BASE = "0x4200000000000000000000000000000000000006";
@@ -83,4 +88,14 @@ test("?assets= writes the shortest form and reads back", () => {
   assert.equal(v, `weth+,1:bold+,1:${SBOLD}`);
   assert.deepEqual(parseAssetsParam(v, symbols), picks);
   assert.equal(formatAssetsParam([{ chain: 1, token: WETH, builtOn: false }], symbolOf, symbols), "1:weth");
+});
+
+test("?chains= reads slugs and ids, and writes slugs", () => {
+  const slugs = { ethereum: 1, base: 8453, arbitrum: 42161 };
+  assert.deepEqual(parseChainsParam("base,ethereum", slugs), [8453, 1]);
+  assert.deepEqual(parseChainsParam("42161, base ,base", slugs), [42161, 8453]);
+  assert.deepEqual(parseChainsParam("nope,10", slugs), []);
+  assert.equal(parseChainsParam(null, slugs), null);
+  const slugOf = (id) => Object.entries(slugs).find(([, v]) => v === id)?.[0];
+  assert.equal(formatChainsParam([1, 8453], slugOf), "ethereum,base");
 });

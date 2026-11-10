@@ -40,7 +40,7 @@ import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
 import { OPEN_SCOPE_PANEL, useAssetScope } from "@/lib/shared/asset-scope";
-import { scopeSummary } from "@/components/shared/asset-scope-strip";
+import { focusShort } from "@/components/shared/aim-gate";
 import { CTRL_OFF, CTRL_ON, START_CTA } from "@/lib/shared/ui-grammar";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 
@@ -376,9 +376,7 @@ export function ProfileMenu() {
                   <ListFilter className="size-4 shrink-0" aria-hidden="true" />
                   <span className="min-w-0 flex-1 truncate text-foreground">Focus</span>
                   <span className="shrink-0 truncate text-xs text-rb-500">
-                    {scope.picks.length
-                      ? scopeSummary(scope.picks).replace(/ and what's built on (it|them)$/, "")
-                      : "Off"}
+                    {scope.on ? focusShort(scope.picks, scope.chains) : "Off"}
                   </span>
                 </button>
                 <Link

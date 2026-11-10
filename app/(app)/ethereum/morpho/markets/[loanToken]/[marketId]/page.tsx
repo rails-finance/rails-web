@@ -94,7 +94,7 @@ export default async function MorphoMarketPage({ params, searchParams }: Params)
     .map((a) => `${MAINNET_CHAIN_ID}:${a}`);
 
   return (
-    <AimGate keys={aimKeys} what="This Morpho market">
+    <AimGate keys={aimKeys} chain={MAINNET_CHAIN_ID} what="This Morpho market">
       <MorphoMarketShell
         data={view}
         chainId={MAINNET_CHAIN_ID}

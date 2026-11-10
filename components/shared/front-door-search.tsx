@@ -40,7 +40,7 @@ import { toggleWalletPanel, useWalletPanelOpen } from "@/components/nav/wallet-p
 import { startNavigationProgress } from "@/components/nav/navigation-progress";
 import { loadBookmarks, SESSIONS_CHANGED_EVENT } from "@/lib/shared/sessions";
 import { Facehash } from "@/components/shared/facehash";
-import { AimSearchButton, useAimSuggestScope } from "@/components/shared/aim-search-button";
+import { AimChainButton, AimSearchButton, useAimSuggestScope } from "@/components/shared/aim-search-button";
 import {
   ADDRESS_RE,
   ENS_RE,
@@ -713,6 +713,15 @@ function SuggestionList({
             </span>
             {openable && (
               <span className="shrink-0 text-xs text-rb-500">{row.kind === "Bookmark" ? "Saved" : row.kind}</span>
+            )}
+            {row.kind === "Chain" && row.chain && (
+              <AimChainButton
+                id={aimId(listId, row)}
+                chain={row.chain}
+                onKeyDown={aim.onKeyDown}
+                onFocus={aim.onFocus}
+                onBlur={aim.onBlur}
+              />
             )}
             {row.kind === "Token" && row.symbol && (
               <AimSearchButton

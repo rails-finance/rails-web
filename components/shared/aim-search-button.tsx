@@ -1,11 +1,15 @@
 "use client";
 
-// AIM (asset isolation mode, ui-jobs 557) in the search's dropdown (H15.2).
+// Focus mode (ui-jobs 557) in the search's dropdown (H15.2).
 //
-// While AIM is on the dropdown is restricted too (Miles, 9 Nov 2026): a token,
-// vault or explorer row shows only where it touches the AIM set
-// (useAimSuggestScope); wallets and bookmarks stay. Assets are added in the
-// AIM panel, opened from the strip, which is also the way out.
+// While Focus is on the dropdown is restricted too (Miles, 9 Nov 2026): a
+// chain, token, vault or explorer row shows only where it is in focus
+// (useAimSuggestScope); wallets and bookmarks stay. Assets and chains are
+// added in the Focus panel, opened from the strip, which is also the way out.
+//
+// A chain row carries the same button (AimChainButton): "Focus" focuses Rails
+// on that chain (with assets picked, narrows them to it); "In focus" takes it
+// out.
 //
 // The button on a token row: "AIM" while AIM is off turns it on with that
 // token; "In AIM" while it is on takes it out.
@@ -24,14 +28,15 @@ import { forwardRef, useMemo, type KeyboardEvent as ReactKeyboardEvent } from "r
 import { Check } from "lucide-react";
 import { assetKey } from "@/lib/shared/asset-family";
 import { SCOPE_SYMBOLS, useAssetScope } from "@/lib/shared/asset-scope";
+import { CHAINS } from "@/lib/shared/chains";
 import { useExplorerScope } from "@/lib/shared/explorer-scope";
 import { protocolForHref } from "@/lib/shared/protocols";
 import type { SuggestScope } from "@/lib/search/suggest";
 
 export type AimButtonState = "off" | "in" | "reached" | "out";
 
-/** The index's chain names; a chain AIM does not cover keeps nothing. */
-const CHAIN_IDS: Record<string, number> = { Ethereum: 1, Base: 8453 };
+/** The index's chain names → chain ids. */
+const CHAIN_IDS: Record<string, number> = Object.fromEntries(Object.values(CHAINS).map((c) => [c.name, c.id]));
 
 /** What the dropdown keeps while AIM is on; null while it is off. A vault
  *  shows where its asset or its share token is in the set (as /vaults does),
@@ -41,22 +46,32 @@ export function useAimSuggestScope(): SuggestScope | null {
   const scope = useAssetScope();
   const ex = useExplorerScope();
   return useMemo(() => {
+    if (!scope.on) return null;
     const keys = scope.keys;
-    if (!keys) return null;
+    const chainOk = (name: string) => {
+      const id = CHAIN_IDS[name];
+      return id == null ? scope.chains.length === 0 : scope.chainOk(id);
+    };
     const symbolIn = (symbol: string, chain?: number) =>
-      aimTokensFor(symbol).some((t) => (chain == null || t.chain === chain) && keys.has(assetKey(t.chain, t.token)));
+      aimTokensFor(symbol).some(
+        (t) => (chain == null || t.chain === chain) && keys != null && keys.has(assetKey(t.chain, t.token)),
+      );
     return {
-      token: (symbol) => symbolIn(symbol),
+      chain: chainOk,
+      token: (symbol) => !keys || symbolIn(symbol),
       vault: (v) => {
         const chain = CHAIN_IDS[v[4]];
+        if (!chainOk(v[4])) return false;
+        if (!keys) return true;
         return chain != null && (keys.has(assetKey(chain, v[5])) || symbolIn(v[2], chain));
       },
       explorer: (href) => {
         const entry = protocolForHref(href);
-        return entry != null && ex.on && ex.statusOf(entry.id) === "lists";
+        if (!entry || !scope.chainOk(entry.chainId)) return false;
+        return !keys || (ex.on && ex.statusOf(entry.id) === "lists");
       },
     };
-  }, [scope.keys, ex]);
+  }, [scope, ex]);
 }
 
 /** The chooser's tokens under a search symbol; [] where it offers none. */
@@ -135,6 +150,46 @@ export const AimSearchButton = forwardRef<
     >
       {state === "in" && <Check className="size-3" aria-hidden="true" />}
       {state === "off" ? "Focus" : "In focus"}
+    </button>
+  );
+});
+
+/** The Focus button on a chain row. */
+export const AimChainButton = forwardRef<
+  HTMLButtonElement,
+  {
+    chain: string;
+    id?: string;
+    onKeyDown?: (e: ReactKeyboardEvent<HTMLButtonElement>) => void;
+    onFocus?: () => void;
+    onBlur?: () => void;
+  }
+>(function AimChainButton({ chain, id, onKeyDown, onFocus, onBlur }, ref) {
+  const scope = useAssetScope();
+  const chainId = CHAIN_IDS[chain];
+  if (!scope.ready || chainId == null) return null;
+  const inFocus = scope.chains.includes(chainId);
+  const label = inFocus ? `Remove ${chain} from your focus` : `Focus Rails on ${chain}`;
+  return (
+    <button
+      ref={ref}
+      id={id}
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={(e) => {
+        e.stopPropagation();
+        scope.setChains(inFocus ? scope.chains.filter((c) => c !== chainId) : [...scope.chains, chainId]);
+      }}
+      onKeyDown={onKeyDown}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      className={inFocus ? FILLED : OUTLINE}
+      data-aim-search={inFocus ? "in" : "off"}
+      data-aim-chain={chainId}
+    >
+      {inFocus && <Check className="size-3" aria-hidden="true" />}
+      {inFocus ? "In focus" : "Focus"}
     </button>
   );
 });

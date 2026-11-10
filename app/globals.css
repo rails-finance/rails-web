@@ -2553,7 +2553,8 @@ table.dt-stacked {
 /* The asset preference (ui-jobs 557): with a preference or `?assets=` present
    (html[data-asset-scope], set before first paint in app/layout.tsx), a
    filtered list waits for its filter instead of drawing whole first. */
-html[data-asset-scope] [data-scope-list]:not([data-scope-ready]) {
+html[data-asset-scope] [data-scope-list]:not([data-scope-ready]),
+html[data-chain-focus] [data-chain-gate]:not([data-scope-ready]) {
   visibility: hidden;
 }
 /* AIM's strip is the first line of the page; home's floating header bar sits under it. */

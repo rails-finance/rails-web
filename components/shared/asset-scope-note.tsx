@@ -20,16 +20,19 @@ export interface ScopedRows<T> {
   listProps: { "data-scope-list": ""; "data-scope-ready"?: "" };
 }
 
-/** Keeps the rows any of whose keys (`chain:address`) the preference reaches. */
-export function useScopedRows<T>(all: T[], keysOf: (row: T) => string[]): ScopedRows<T> {
+/** Keeps the rows that pass the focus (AssetScope.matches): one of their keys
+ *  (`chain:address`) is in focus, and their chain is focused. `chainOf` names
+ *  a row's chain where its keys may not (a wallet card with no asset Rails
+ *  knows still passes chain focus on its chain). */
+export function useScopedRows<T>(all: T[], keysOf: (row: T) => string[], chainOf?: (row: T) => number): ScopedRows<T> {
   const scope = useAssetScope();
   const [peek, setPeek] = useState(false);
-  const on = scope.keys != null;
+  const on = scope.on;
   const rows = useMemo(
-    () => (!scope.keys || peek ? all : all.filter((r) => keysOf(r).some((k) => scope.keys!.has(k)))),
-    // keysOf is a pure accessor; the caller's rows and the keys decide the result.
+    () => (!on || peek ? all : all.filter((r) => scope.matches(keysOf(r), chainOf?.(r)))),
+    // keysOf and chainOf are pure accessors; the caller's rows and the focus decide the result.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [all, scope.keys, peek],
+    [all, on, scope.matches, peek],
   );
   return {
     rows,
@@ -69,7 +72,7 @@ export function ScopeNote<T>({
         </>
       ) : rows.length === 0 ? (
         <>
-          None of the {n(total)} {word} holds an asset in your focus · {press("Show all", true)}
+          None of the {n(total)} {word} is in your focus · {press("Show all", true)}
         </>
       ) : (
         <>
