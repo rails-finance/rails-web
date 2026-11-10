@@ -56,6 +56,9 @@ export interface AaveMarketVocab {
   reserveCountProv: () => Provenance;
   /** One reserve's supplied / borrowed value in USD. */
   reserveValueProv: (side: "supplied" | "borrowed", symbol: string) => Provenance;
+  /** One reserve's supplied total in tokens, where the row states no dollars
+   *  (a reserve with no market price). */
+  reserveTokensProv: (symbol: string) => Provenance;
   /** One reserve's available underlying: the Pool's virtual balance where it
    *  has one (v3.3+), else supplied less borrowed. */
   reserveAvailableProv: (
@@ -223,6 +226,15 @@ function makeVocab(cfg: AaveMarketConfig): (coords: AaveMarketCoords) => AaveMar
           note: "IAaveOracle.getAssetPrice @ head",
         },
       ],
+    }),
+    reserveTokensProv: (symbol) => ({
+      kind: "chain",
+      pclass: "state",
+      source: { block: coords.blockNumber },
+      verify: recompute("aToken.totalSupply", coords),
+      summary: `${symbol} supplied. The reserve's aToken totalSupply${atBlock(coords)}, in tokens: the reserve has no market price, so the row states its size in ${symbol}.`,
+      contract: poolContract(coords),
+      via: `${cfg.lane} · aToken totalSupply @ head`,
     }),
     reserveAvailableProv: (symbol, { priced, basis, deficit }) => {
       const oracleLeg = {

@@ -284,7 +284,7 @@ export function reserveFigures({ r, vocab, assetHref }: RowProps) {
   );
   const supplied =
     fixed && r.supplied > 0 ? (
-      inTokens(r.supplied)
+      <Prov info={vocab.reserveTokensProv(r.symbol)}>{inTokens(r.supplied)}</Prov>
     ) : supplyLink ? (
       <Link href={supplyLink} className={INLINE_LINK}>
         <Prov info={vocab.reserveValueProv("supplied", r.symbol)}>{sUsd.display}</Prov>
