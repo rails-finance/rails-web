@@ -60,10 +60,14 @@ export const CARD_WORDS = {
   supplied: "Supplied",
   suppliedTip: "The asset this account's vault shares redeem for now.",
   earned: "Earned in 30 days",
-  earnedTip: "What the vault's share price added over the last 30 days to the shares this account holds now.",
+  earnedTip:
+    "What the deposit gained over the last 30 days: what its shares redeem for now less what they redeemed for then.",
   earnedYear: (x: number) => `${rate(x)} a year`,
-  earnedChanged: "on the shares held now",
-  noWindow: "The vault is younger than 30 days.",
+  earnedOpened: "Opened inside the 30 days, so Rails does not state its earnings yet.",
+  earnedChanged: "Its shares changed inside the 30 days, so Rails does not state its earnings yet.",
+  /** The card cell where no 30-day figure is stated; the (i) says why. */
+  windowOpenedShort: "Opened inside the 30 days",
+  windowChangedShort: "Changed inside the 30 days",
   collateralFor: "Collateral",
   collateralForTip: "Whether a loan on this account counts this deposit as collateral.",
   backs: (list: { vaultSymbol: string }[]) => `For ${list.map((c) => c.vaultSymbol).join(", ")}`,
@@ -78,9 +82,10 @@ export const CARD_WORDS = {
     "The collateral's value at each vault's liquidation LTV, over the debt's value. Below 1.00 the loan can be liquidated.",
   healthSub: "liquidation below 1.00",
   interest: "Interest in 30 days",
-  interestTip: "What the vault's interest index added over the last 30 days to the debt this account owes now.",
+  interestTip: "What the debt grew by over the last 30 days: the debt now less the debt then.",
   interestYear: (x: number) => `${rate(x)} a year`,
-  interestChanged: "on the debt owed now",
+  interestOpened: "Opened inside the 30 days, so Rails does not state its interest yet.",
+  interestChanged: "Its debt changed inside the 30 days, so Rails does not state its interest yet.",
   unpriced: "no price",
   band: "Collateral on this account",
   bandAmount: "Amount",
@@ -101,6 +106,25 @@ export type Seg = string | { fig: string };
 export interface ExplainGroupWords {
   title: string;
   bullets: Seg[][];
+}
+
+/** The 30 days' first bullet: the stated figure, or why none is stated. */
+function windowBullet(p: EulerPosition): Seg[] {
+  const loan = p.kind === "loan";
+  if (p.windowState === "opened") return [loan ? CARD_WORDS.interestOpened : CARD_WORDS.earnedOpened];
+  if (p.windowState === "changed") return [loan ? CARD_WORDS.interestChanged : CARD_WORDS.earnedChanged];
+  const x = loan ? p.interest : p.earned;
+  return loan
+    ? [
+        "Over the last 30 days the debt grew by ",
+        { fig: `${num(x ?? 0)} ${p.asset.symbol}` },
+        ", the debt now less the debt then.",
+      ]
+    : [
+        "Over the last 30 days the deposit earned ",
+        { fig: `${num(x ?? 0)} ${p.asset.symbol}` },
+        ", what its shares redeem for now less what they redeemed for then.",
+      ];
 }
 
 export function cardExplainer(p: EulerPosition): ExplainGroupWords[] {
@@ -145,13 +169,11 @@ export function cardExplainer(p: EulerPosition): ExplainGroupWords[] {
   groups.push({
     title: "The 30 days",
     bullets: [
-      p.kind === "loan"
-        ? ["Interest is the vault's interest index growth over the window, applied to the debt owed now."]
-        : ["Earnings are the vault's share price growth over the window, applied to the shares held now."],
+      windowBullet(p),
       [
         "Rails reads two blocks ",
         { fig: `${p.window.days.toFixed(1)} days` },
-        " apart, and the yearly rate is that growth times 365 over those days.",
+        " apart. The yearly rate is the vault's growth between them times 365 over those days.",
       ],
     ],
   });

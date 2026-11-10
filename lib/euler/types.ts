@@ -113,6 +113,8 @@ export interface EulerPositionRead {
     interestAccumulator: string | null;
     shares: string | null;
     debt: string | null;
+    /** convertToAssets of the shares held now, at the window's block. */
+    assets: string | null;
   } | null;
   controllers: string[];
   collaterals: string[];

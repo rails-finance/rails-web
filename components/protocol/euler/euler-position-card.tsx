@@ -76,6 +76,43 @@ function CollateralBand({ c }: { c: EulerReceiptContext }) {
   );
 }
 
+/** Earned in 30 days or Interest in 30 days: the figure where the holding matched at both reads,
+ *  its value and the vault's yearly rate under it; otherwise "Opened" or "Changed inside the 30
+ *  days", and the (i) says why (Fluid's treatment). */
+function windowHead(c: EulerReceiptContext, id: "earned" | "interest"): PositionCardHead {
+  const { p } = c;
+  const loan = id === "interest";
+  const x = loan ? p.interest : p.earned;
+  const head = {
+    id,
+    label: loan ? CARD_WORDS.interest : CARD_WORDS.earned,
+    labelTip: loan ? CARD_WORDS.interestTip : CARD_WORDS.earnedTip,
+  };
+  if (p.windowState !== "ok" || x === null)
+    return {
+      ...head,
+      value: (
+        <span className="text-xs text-rb-500" data-window-withheld={p.windowState}>
+          {p.windowState === "opened" ? CARD_WORDS.windowOpenedShort : CARD_WORDS.windowChangedShort}
+        </span>
+      ),
+    };
+  const year = loan ? p.window.borrowRateYear : p.window.supplyRateYear;
+  return {
+    ...head,
+    value: (
+      <Prov info={cardProv(id, c)}>
+        {num(x)} {p.asset.symbol}
+      </Prov>
+    ),
+    usd: valueLine(inUnit(p.windowValue, p.unit), cardProv(id, c)),
+    sub:
+      year === null ? undefined : (
+        <span data-figure={`${id}-rate`}>{(loan ? CARD_WORDS.interestYear : CARD_WORDS.earnedYear)(year)}</span>
+      ),
+  };
+}
+
 function slots(r: EulerPositionRead): PositionCardSlots {
   const p = eulerPosition(r);
   const c = { p, r };
@@ -93,26 +130,7 @@ function slots(r: EulerPositionRead): PositionCardSlots {
       ),
       usd: valueLine(inUnit(p.suppliedValue, p.unit), cardProv("supplied", c)),
     });
-    heads.push({
-      id: "earned",
-      label: CARD_WORDS.earned,
-      labelTip: CARD_WORDS.earnedTip,
-      value:
-        p.earned === null ? null : (
-          <Prov info={cardProv("earned", c)}>
-            {num(p.earned)} {A}
-          </Prov>
-        ),
-      sub:
-        p.earned === null ? (
-          CARD_WORDS.noWindow
-        ) : (
-          <span data-figure="earned-rate">
-            {CARD_WORDS.earnedYear(p.window.supplyRateYear ?? 0)}
-            {p.sameShares === false ? `, ${CARD_WORDS.earnedChanged}` : ""}
-          </span>
-        ),
-    });
+    heads.push(windowHead(c, "earned"));
     heads.push({
       id: "collateral",
       label: CARD_WORDS.collateralFor,
@@ -156,26 +174,7 @@ function slots(r: EulerPositionRead): PositionCardSlots {
       value: p.health === null ? null : <Prov info={cardProv("health", c)}>{p.health.toFixed(2)}</Prov>,
       sub: CARD_WORDS.healthSub,
     });
-    heads.push({
-      id: "interest",
-      label: CARD_WORDS.interest,
-      labelTip: CARD_WORDS.interestTip,
-      value:
-        p.interest === null ? null : (
-          <Prov info={cardProv("interest", c)}>
-            {num(p.interest)} {A}
-          </Prov>
-        ),
-      sub:
-        p.interest === null ? (
-          CARD_WORDS.noWindow
-        ) : (
-          <span data-figure="interest-rate">
-            {CARD_WORDS.interestYear(p.window.borrowRateYear ?? 0)}
-            {p.sameShares === false ? `, ${CARD_WORDS.interestChanged}` : ""}
-          </span>
-        ),
-    });
+    heads.push(windowHead(c, "interest"));
   }
   const words = cardExplainer(p);
   return {

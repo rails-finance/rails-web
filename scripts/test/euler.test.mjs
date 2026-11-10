@@ -60,7 +60,13 @@ const loan = {
   owner: "0x96C16626Fd02Bf43c3b0d4d2aE2B31CB900d07ac",
   index: 2,
   vault: vault(),
-  past: { sharePrice: "1015828", interestAccumulator: "1022156470651751066595445631", shares: "0", debt: "0" },
+  past: {
+    sharePrice: "1015828",
+    interestAccumulator: "1022156470651751066595445631",
+    shares: "0",
+    debt: "0",
+    assets: "0",
+  },
   controllers: ["0xEef57677c2FC1a930eed234E3545e750C88f6743"],
   collaterals: ["0x3895eD2c5fA7F469365db24187064A614f2e07E6"],
   borrow: {
@@ -122,9 +128,10 @@ test("a loan: debt, its value, collateral, health and the window's interest", ()
   const g = 1030853138883472077081401640 / 1022156470651751066595445631 - 1;
   close(p.window.indexGrowth, g, 1e-9);
   close(p.window.borrowRateYear, (g * 365) / days, 1e-9);
-  close(p.interest, 1681.877428 * (1 - 1 / (1 + g)), 1e-6);
-  // The debt was opened inside the window: none at the past block.
-  assert.equal(p.sameShares, false);
+  // Opened: no debt at the past block, so no 30-day figure.
+  assert.equal(p.windowState, "opened");
+  assert.equal(p.interest, null);
+  assert.equal(p.windowValue, null);
   // interestRate is per second, scaled by 10^27.
   close(p.borrowRateNow, (11512255653400157300 * 31_536_000) / 1e27, 1e-6);
   close(p.utilisation, 77561607179 / 78963887439, 1e-9);
@@ -135,16 +142,23 @@ test("a deposit: what the shares redeem for, and the share price's change on the
     ...loan,
     borrow: null,
     vault: vault({ shares: "1979102", assets: "2023315", debt: "0" }),
-    past: { sharePrice: "1015828", interestAccumulator: "1022156470651751066595445631", shares: "1979102", debt: "0" },
+    past: {
+      sharePrice: "1015828",
+      interestAccumulator: "1022156470651751066595445631",
+      shares: "1979102",
+      debt: "0",
+      assets: "2010408",
+    },
     collateralFor: [{ vault: "0xB8B29614fc7C93a75798453EE838CA3e20B60c6F", vaultSymbol: "eAERO-6" }],
   };
   const p = eulerPosition(r);
   assert.equal(p.kind, "deposit");
   assert.equal(p.supplied, 2.023315);
   close(p.suppliedValue, 2.023315 * 0.99974633);
-  // 1,979,102 shares × (1,022,350 − 1,015,828) ÷ 10^6 = 12,907 raw units, 0.012907 USDC.
+  // Matched: the same shares at both reads; earned is what they redeem for now less then.
+  assert.equal(p.windowState, "ok");
   assert.equal(p.earned, 0.012907);
-  assert.equal(p.sameShares, true);
+  close(p.windowValue, 0.012907 * 0.99974633);
   const g = 1022350 / 1015828 - 1;
   close(p.window.shareGrowth, g);
   close(p.window.supplyRateYear, (g * 365) / p.window.days);
@@ -157,8 +171,33 @@ test("a vault younger than the window: no earned or interest figure", () => {
   assert.equal(p.interest, null);
   assert.equal(p.earned, null);
   assert.equal(p.window.borrowRateYear, null);
-  assert.equal(p.sameShares, null);
+  assert.equal(p.windowState, "opened");
   assert.equal(eulerWindow({ ...loan, past: null }).supplyRateYear, null);
+});
+
+test("a loan matched at both reads: the debt now less the debt then", () => {
+  const a0 = BigInt("1022156470651751066595445631");
+  const a1 = BigInt("1030853138883472077081401640");
+  const then = (BigInt(1681877428) * a0) / a1;
+  const p = eulerPosition({ ...loan, past: { ...loan.past, debt: then.toString() } });
+  assert.equal(p.windowState, "ok");
+  assert.equal(p.interest, scaled(BigInt(1681877428) - then, 6));
+  close(p.windowValue, p.interest * 0.99974633);
+});
+
+test("changed inside the window: a loan borrowed more, a deposit's shares moved; no figure", () => {
+  const borrowedMore = eulerPosition({ ...loan, past: { ...loan.past, debt: "1000000000" } });
+  assert.equal(borrowedMore.windowState, "changed");
+  assert.equal(borrowedMore.interest, null);
+  const moved = eulerPosition({
+    ...loan,
+    borrow: null,
+    vault: vault({ shares: "1979102", assets: "2023315", debt: "0" }),
+    past: { ...loan.past, shares: "1000000", assets: "1015828" },
+  });
+  assert.equal(moved.windowState, "changed");
+  assert.equal(moved.earned, null);
+  assert.equal(moved.windowValue, null);
 });
 
 test("a vault whose oracle gave no price: no value, figures in the asset", () => {

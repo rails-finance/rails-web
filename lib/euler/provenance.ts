@@ -86,18 +86,17 @@ export function cardProv(key: CardKey, c: EulerReceiptContext): Provenance {
         source: head,
         summary:
           p.earned === null
-            ? `Earned in 30 days — the vault had no share price at ${at(r.then)}, so no figure is stated.`
-            : `Earned in 30 days — the shares held now times the share price's change from ${at(r.then)} to ${at(r.head)}: ${fig(p.earned)} ${A}, ${fig((p.window.supplyRateYear ?? 0) * 100)}% a year over ${p.window.days.toFixed(2)} days.`,
+            ? `Earned in 30 days — the shares differ between ${at(r.then)} and ${at(r.head)}, so no figure is stated.`
+            : `Earned in 30 days — the same ${v.shares} shares at ${at(r.then)} and ${at(r.head)}, and what they redeem for at each: ${fig(p.earned)} ${A}${p.windowValue !== null ? `, worth ${fig(p.windowValue)} in ${unitName(c)} at the head's price` : ""}.`,
         contract: vaultC(c),
         via: bothVia(r),
-        formula:
-          "shares × (sharePrice_now − sharePrice_then) ÷ 10^decimals; yearly: (sharePrice_now ÷ sharePrice_then − 1) × 365 ÷ days",
+        formula: "convertToAssets(shares) now − convertToAssets(shares) then, where balanceOf matches at both blocks",
         inputs: [
           chain(`balanceOf(${r.account}) @ ${n(r.head.block)}`, v.shares),
           chain(`balanceOf(${r.account}) @ ${n(r.then.block)}`, r.past?.shares ?? "–"),
-          chain(`convertToAssets(10^${v.decimals}) @ ${n(r.head.block)}`, v.sharePrice),
-          chain(`convertToAssets(10^${v.decimals}) @ ${n(r.then.block)}`, r.past?.sharePrice ?? "–"),
-          derived("days between the blocks", p.window.days.toFixed(4)),
+          chain(`convertToAssets(shares) @ ${n(r.head.block)}`, v.assets),
+          chain(`convertToAssets(shares) @ ${n(r.then.block)}`, r.past?.assets ?? "–"),
+          ...(p.windowValue !== null ? priceInputs(c) : []),
         ],
       };
     case "collateralFor":
@@ -164,16 +163,17 @@ export function cardProv(key: CardKey, c: EulerReceiptContext): Provenance {
         source: head,
         summary:
           p.interest === null
-            ? `Interest in 30 days — the vault had no interest index at ${at(r.then)}, so no figure is stated.`
-            : `Interest in 30 days — the debt owed now less that debt deflated by the interest index's growth from ${at(r.then)} to ${at(r.head)}: ${fig(p.interest)} ${A}, ${fig((p.window.borrowRateYear ?? 0) * 100)}% a year over ${p.window.days.toFixed(2)} days.`,
+            ? `Interest in 30 days — the debt was borrowed or repaid between ${at(r.then)} and ${at(r.head)}, so no figure is stated.`
+            : `Interest in 30 days — the debt at ${at(r.head)} less the debt at ${at(r.then)}, with nothing borrowed or repaid between them (the debt then grown by the vault's interest index matches the debt now): ${fig(p.interest)} ${A}${p.windowValue !== null ? `, worth ${fig(p.windowValue)} in ${unitName(c)} at the head's price` : ""}.`,
         contract: vaultC(c),
         via: bothVia(r),
-        formula: "debt × (1 − index_then ÷ index_now); yearly: (index_now ÷ index_then − 1) × 365 ÷ days",
+        formula: "debtOf now − debtOf then, where debtOf then × index_now ÷ index_then = debtOf now to a millionth",
         inputs: [
           chain(`debtOf(${r.account}) @ ${n(r.head.block)}`, v.debt),
           chain(`debtOf(${r.account}) @ ${n(r.then.block)}`, r.past?.debt ?? "–"),
           chain(`interestAccumulator() @ ${n(r.head.block)}`, v.interestAccumulator),
           chain(`interestAccumulator() @ ${n(r.then.block)}`, r.past?.interestAccumulator ?? "–"),
+          ...(p.windowValue !== null ? priceInputs(c) : []),
         ],
       };
     case "price":

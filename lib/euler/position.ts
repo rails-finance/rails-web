@@ -5,9 +5,17 @@
 //
 // Dollars only from the vault's oracle at the head, and only where the vault's
 // unit of account is USD (rails-ops decision 0047 point 7); otherwise in the
-// unit's token, or none where the unit is not a token. The 30-day figures
-// apply the change in the vault's share price, or its interest index, to what
-// the account holds now, annualised simply over the days between the reads.
+// unit's token, or none where the unit is not a token.
+//
+// The 30-day figures state what Rails read (Fluid's rule): only where the
+// account's holding in the vault matches at both reads. A deposit matches when
+// its vault shares are the same; its earnings are what those shares redeem for
+// now less what they redeemed for then. A loan matches when its debt now is its
+// debt then grown by the vault's interest index alone, so nothing was borrowed
+// or repaid; its interest is the debt now less the debt then. A holding that
+// was zero at the past block was opened inside the window, and any other
+// difference changed it: neither states a figure. The yearly rates are the
+// vault's, annualised simply over the days between the reads.
 //
 // Pure: imports nothing through `@/`, so scripts/test can load it.
 
@@ -70,12 +78,14 @@ export interface EulerPosition {
   suppliedValue: number | null;
   borrowedValue: number | null;
   window: EulerWindow;
-  /** The asset the deposit's shares gained over the window, on the shares held now. */
+  /** Whether the holding matched at both reads ("ok"), was zero at the past one ("opened"), or differed ("changed"). */
+  windowState: WindowState;
+  /** A matched deposit's earnings over the window, in the asset; null otherwise. */
   earned: number | null;
-  /** The interest the debt held now gathered over the window. */
+  /** A matched loan's interest over the window, in the asset; null otherwise. */
   interest: number | null;
-  /** The account held the same shares, and the same debt, at the window's past block. */
-  sameShares: boolean | null;
+  /** That figure in the unit of account at the head's price; null where unpriced or not stated. */
+  windowValue: number | null;
   borrowRateNow: number;
   utilisation: number | null;
   totalSupplied: number;
@@ -108,6 +118,20 @@ function sameDebt(past: string | null, now: string, a0: bigint | null, a1: bigin
   return d * BigInt(1_000_000) <= BigInt(now) + BigInt(1_000_000);
 }
 
+export type WindowState = "ok" | "opened" | "changed";
+
+/** The holding at the window's past block against now: matched, opened inside the window, or changed. */
+export function holdingState(r: EulerPositionRead, kind: "loan" | "deposit"): WindowState {
+  const past = r.past;
+  if (kind === "loan") {
+    if (!past || past.debt === null || BigInt(past.debt) === BigInt(0)) return "opened";
+    const a0 = past.interestAccumulator ? BigInt(past.interestAccumulator) : null;
+    return sameDebt(past.debt, r.vault.debt, a0, BigInt(r.vault.interestAccumulator)) ? "ok" : "changed";
+  }
+  if (!past || past.shares === null || BigInt(past.shares) === BigInt(0)) return "opened";
+  return past.shares === r.vault.shares ? "ok" : "changed";
+}
+
 export function eulerWindow(r: EulerPositionRead): EulerWindow {
   const days = (r.head.time - r.then.time) / DAY;
   const p1 = BigInt(r.vault.sharePrice);
@@ -135,16 +159,12 @@ export function eulerPosition(r: EulerPositionRead): EulerPosition {
   const priced = unit.kind === "usd" || unit.kind === "token";
   const price = v.assetPrice === null || !priced ? null : scaled(v.assetPrice, v.unit.decimals);
   const w = eulerWindow(r);
-  const p0 = r.past?.sharePrice ? BigInt(r.past.sharePrice) : null;
+  const windowState = holdingState(r, kind);
+  const ok = windowState === "ok" && r.past !== null;
   const earned =
-    p0 === null
-      ? null
-      : scaled((BigInt(v.shares) * (BigInt(v.sharePrice) - p0)) / BigInt(10) ** BigInt(v.decimals), dec);
-  const a0 = r.past?.interestAccumulator ? BigInt(r.past.interestAccumulator) : null;
-  const a1 = BigInt(v.interestAccumulator);
-  const interest = a0 === null || a1 === BigInt(0) ? null : scaled(BigInt(v.debt) - (BigInt(v.debt) * a0) / a1, dec);
-  const sameShares =
-    r.past === null ? null : kind === "loan" ? sameDebt(r.past.debt, v.debt, a0, a1) : r.past.shares === v.shares;
+    ok && kind === "deposit" && r.past!.assets != null ? scaled(BigInt(v.assets) - BigInt(r.past!.assets), dec) : null;
+  const interest = ok && kind === "loan" ? scaled(BigInt(v.debt) - BigInt(r.past!.debt!), dec) : null;
+  const windowFig = kind === "loan" ? interest : earned;
   const totalAssets = BigInt(v.totalAssets);
   const collaterals = (r.borrow?.collaterals ?? []).map((c) => ({
     vault: c.vault,
@@ -177,9 +197,10 @@ export function eulerPosition(r: EulerPositionRead): EulerPosition {
     suppliedValue: price === null ? null : supplied * price,
     borrowedValue: price === null ? null : borrowed * price,
     window: w,
+    windowState,
     earned,
     interest,
-    sameShares,
+    windowValue: windowFig === null || price === null ? null : windowFig * price,
     borrowRateNow: scaled((BigInt(v.interestRate) * BigInt(YEAR_SECONDS) * BigInt(10) ** BigInt(9)) / RAY, 9),
     utilisation:
       totalAssets > BigInt(0) ? Number((BigInt(v.totalBorrows) * BigInt(10) ** BigInt(9)) / totalAssets) / 1e9 : null,
