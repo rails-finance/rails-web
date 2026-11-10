@@ -36,6 +36,7 @@ export function MarketRoster<K extends string>({
   useMarket,
   anatomy = "M4",
   keysOf,
+  keysPending = false,
 }: {
   header: ProductPageHeader;
   /** Each market's key and name, in the roster's order. */
@@ -45,6 +46,9 @@ export function MarketRoster<K extends string>({
   /** Focus (ui-jobs 557): a market's `chain:address` keys, where the family
    *  names them; the roster then keeps the markets in focus. */
   keysOf?: (k: K) => string[];
+  /** The keys are still being read: the roster stays held and says nothing
+   *  until they are in. */
+  keysPending?: boolean;
 }) {
   const scoped = useScopedRows(
     [...markets],
@@ -56,8 +60,8 @@ export function MarketRoster<K extends string>({
     <div className="min-h-screen" data-anatomy={`${anatomy} R1`}>
       <div className="py-8">
         <SubPageHeader protocol={header.protocol} title={header.title} learnMore={header.learnMore} />
-        {keysOf && <ScopeNote scoped={scoped} noun={["market", "markets"]} className="mb-3" />}
-        <div className="space-y-2" {...scoped.listProps}>
+        {keysOf && !keysPending && <ScopeNote scoped={scoped} noun={["market", "markets"]} className="mb-3" />}
+        <div className="space-y-2" {...(keysPending && scoped.on ? { "data-scope-list": "" } : scoped.listProps)}>
           {shown.map((m) => (
             <Panel key={m.key} k={m.key} name={m.name} useMarket={useMarket} />
           ))}
