@@ -333,17 +333,6 @@ export function poolStateProv(
   };
 }
 
-/** The block a roster is read at. */
-export function readBlockProv(block: number): Provenance {
-  return {
-    kind: "chain",
-    pclass: "state",
-    summary: `Read block. Every figure on this page is read at block ${n(block)}: the market's state, its marks and the SY's exchange rate.`,
-    source: { block },
-    verify: { kind: "rollup", text: "Each figure's receipt names this block." },
-  };
-}
-
 /** A market token: which contract read names it. */
 export function marketTokenProv(
   role: "Wrapped token" | "SY" | "PT" | "YT" | "LP" | "Reward",
@@ -369,5 +358,89 @@ export function marketTokenProv(
       href: explorerUrl(PENDLE_CHAIN_ID, "address", tok.address),
       text: "The contract on Etherscan",
     },
+  };
+}
+
+/** A count over the roster: every market the router record names, or those
+ *  before or past their maturity at the block. */
+export function rosterCountProv(which: "all" | "active" | "matured", count: number, block: number): Provenance {
+  const what =
+    which === "all"
+      ? `Markets. The ${n(count)} markets Pendle's routers have named through block ${n(block)}, from the router logs Rails holds.`
+      : which === "active"
+        ? `Active markets. The ${n(count)} markets whose isExpired() read false at block ${n(block)}.`
+        : `Matured markets. The ${n(count)} markets whose isExpired() read true at block ${n(block)}, or did not answer.`;
+  return {
+    kind: "derived",
+    pclass: which === "all" ? "indexed" : "state",
+    summary: what,
+    source: { block },
+    verify: { kind: "rollup", text: "The rows of the table, with the Maturity filter set to every market." },
+  };
+}
+
+/** A token's price in the asset: its mark in SY times the SY's exchange rate. */
+export function priceProv(
+  leg: "PT" | "YT" | "LP",
+  source: PendleMarkSource | null,
+  twapSeconds: number,
+  block: number,
+  asset: string,
+  expired: boolean,
+): Provenance {
+  if (expired && leg !== "LP")
+    return {
+      kind: "derived",
+      pclass: "state",
+      summary:
+        leg === "PT"
+          ? `PT price. The market has matured, so each PT redeems for one ${asset}.`
+          : "YT price. The market has matured, so YT is worth nothing.",
+      formula: leg === "PT" ? "1" : "0",
+      source: { block },
+      verify: callCheck("market.isExpired()", block),
+    };
+  const mark = markProv(leg, source, twapSeconds, block);
+  return {
+    kind: "derived",
+    pclass: source === "oracle-twap" ? "oracle" : "state",
+    summary: `${leg} price. What one ${leg} is worth in ${asset}: its mark in SY ${source === "oracle-twap" ? `(Pendle's oracle, a ${twapSeconds / 60}-minute average)` : "(RouterStatic's spot rate)"}, times the SY's exchange rate, at block ${n(block)}.`,
+    formula: `${leg.toLowerCase()}ToSy × SY.exchangeRate() ÷ 10¹⁸`,
+    inputs: [
+      {
+        label: `${leg} mark`,
+        kind: "chain",
+        pclass: mark.pclass,
+        contract: mark.contract,
+        note: mark.via,
+      },
+      { label: "SY.exchangeRate()", kind: "chain", pclass: "state" },
+    ],
+    contract: mark.contract,
+    source: { block },
+    verify: callCheck(`${mark.contract?.name ?? "the oracle"} ${mark.via} and the SY's exchangeRate()`, block),
+  };
+}
+
+/** The SY's exchange rate: what one SY is worth in the asset. */
+export function syRateProv(sy: PendleToken, block: number, asset: string): Provenance {
+  return {
+    kind: "chain",
+    pclass: "state",
+    summary: `SY price. What one ${symbolOf(sy)} is worth in ${asset}: the SY's exchangeRate() at block ${n(block)}.`,
+    contract: { name: symbolOf(sy), address: sy.address },
+    via: "exchangeRate()",
+    source: { block },
+    verify: callCheck(`${symbolOf(sy)} exchangeRate()`, block),
+  };
+}
+
+/** The count of a market's router events. */
+export function marketEventsProv(events: number): Provenance {
+  return {
+    kind: "derived",
+    pclass: "indexed",
+    summary: `Router events. The ${n(events)} ${events === 1 ? "event" : "events"} Pendle's routers have logged on this market, from the router logs Rails holds.`,
+    verify: { kind: "rollup", text: "The rows below, read 50 at a time." },
   };
 }

@@ -39,7 +39,8 @@ import {
 import type { MorphoBaseVaultResponse } from "@/lib/sources/chain/morpho-base-vault";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { metaMorphoVaultsListingHref } from "@/lib/vaults/routes";
-import { morphoBaseVaultPageSummary } from "@/lib/vaults/summary";
+import { morphoBaseVaultPageSummary, withAssetScale } from "@/lib/vaults/summary";
+import type { AssetScale } from "@/lib/vaults/asset-scale-words";
 import { vaultStewardProv, vaultVenueProv } from "@/lib/vaults/card-provenance";
 import { vaultAssetsExports, type VaultExportModel } from "@/lib/vaults/card-export";
 import {
@@ -65,12 +66,18 @@ const blueWalletHref = (chainId: 1 | 8453, vault: string) =>
   chainId === 8453 ? morphoBaseWalletHref(vault) : (listingHrefForWallet("morpho", vault) ?? "/ethereum/morpho");
 
 export function MorphoBaseVaultPage({
+  protects,
+  assetScales,
   data,
   census,
   yieldFigure: storeYield,
   strip,
   factory,
 }: {
+  /** "What protects it" and "The protocol underneath" (V9, V10), streamed by the route. */
+  protects?: React.ReactNode;
+  /** The "decimals disagree" reading for the vault's asset, where it disagrees. */
+  assetScales?: Record<string, AssetScale>;
   data: MorphoBaseVaultResponse;
   census: VaultCensusRow | null;
   yieldFigure?: VaultYield;
@@ -83,7 +90,7 @@ export function MorphoBaseVaultPage({
   const { vault, legs, chainId } = data;
   const words = CHAIN_WORDS[chainId];
   const base = (kind: "address" | "block", v: string | number) => explorerUrl(chainId, kind, v);
-  const v = morphoBaseVaultPageSummary(data, census);
+  const v = withAssetScale(morphoBaseVaultPageSummary(data, census), assetScales ?? {});
   // A figure on total assets under the dust floor is too small to measure (ui-jobs 542).
   const yieldFigure = measuredYield(storeYield, v.totalAssets?.raw);
   const coords: MorphoVaultCoords = {
@@ -422,6 +429,7 @@ export function MorphoBaseVaultPage({
           exports: vaultAssetsExports(v, exportModel),
         }}
       />
+      {protects}
     </ProvReceiptsScope>
   );
 }

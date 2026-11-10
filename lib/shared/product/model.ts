@@ -18,7 +18,7 @@
 import type { ReactNode } from "react";
 import type { Provenance } from "@/components/shared/provenance";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
-import type { SectionMenuExports, SectionMenuLink } from "@/components/shared/section-menu";
+import type { SectionMenuExports, SectionMenuLink, SectionMenuView } from "@/components/shared/section-menu";
 import type { VitalSlot } from "@/components/shared/vitals-band";
 import type { ChainId } from "@/lib/shared/chains";
 import type { ServerRead } from "@/lib/shared/server-head-read";
@@ -66,6 +66,8 @@ export interface ReadAt {
 export interface SectionTools {
   links?: SectionMenuLink[];
   exports?: SectionMenuExports;
+  /** Switch rows that change what the section shows, first in the ⋮. */
+  views?: SectionMenuView[];
   /** The armed hint: "Click a value in this section to trace it". */
   hint?: string;
 }
@@ -105,7 +107,48 @@ export interface StructureFigure {
 /** The slot where a protocol adds what is its own (survey §3.2's
  *  `MarketStructure`): one variant per structure, named for what it is. The
  *  head draws its terms under the band; a page section can draw the rest. */
-export type MarketStructure = TicksStructure | CometStructure;
+export type MarketStructure = TicksStructure | CometStructure | EraStructure | LadderStructure | TokensStructure;
+
+/** Pendle: the market's other tokens beside the PT the band prices, each in
+ *  the market's asset: YT, LP and SY (survey §3.2's `tokens`). */
+export interface TokensStructure {
+  kind: "tokens";
+  yt: StructureFigure;
+  lp: StructureFigure;
+  sy: StructureFigure;
+}
+
+/** LlamaLend: the factory lineage a market was created by ("V1 lend market",
+ *  "V1 mint market", "V2 market"), the roster's group level. */
+export interface EraStructure {
+  kind: "eras";
+  era: StructureFigure;
+}
+
+/** Fluid: the vault's type (T1 to T4, which legs are smart) and its ladder,
+ *  the three rungs on one axis of debt over collateral value: borrowing stops
+ *  at the first, liquidation starts at the second, past the third the vault
+ *  absorbs the position. */
+export interface LadderStructure {
+  kind: "ladder";
+  vaultType: StructureFigure;
+  borrowTo: StructureFigure;
+  liquidateFrom: StructureFigure;
+  absorbFrom: StructureFigure;
+}
+
+/** A pair market's collateral terms in the protocol's words (survey §3.2's
+ *  `CollateralTerms`), drawn in the head's foot after its structure. */
+export type CollateralTerms = BandsTerms;
+
+/** LlamaLend: the band width A and the two discounts that size a loan and set
+ *  when its health reaches 0. */
+export interface BandsTerms {
+  kind: "bands";
+  a: StructureFigure;
+  loanDiscount: StructureFigure;
+  liquidationDiscount: StructureFigure;
+}
 
 /** Compound V3: the base asset's terms beside its rates, in Compound's
  *  words: the kink, the reserves against their target, the minimum borrow. */
@@ -164,6 +207,8 @@ export interface ProductHead {
   entries?: EntryLink[];
   /** The protocol's structure: its terms drawn under the band. */
   structure?: MarketStructure;
+  /** A pair market's collateral terms, drawn after the structure. */
+  collateral?: CollateralTerms;
   /** Lines under a figure that qualify it are part of the figure's value;
    *  qualifications of the whole band go here. */
   notes?: ReactNode;
@@ -278,6 +323,10 @@ export interface RateCurveModel {
   slope2: number;
   /** The share of borrow interest the protocol keeps (Aave V4: the liquidity fee). */
   reserveFactor: number;
+  /** A model whose borrow rate climbs exponentially from `min` at 0% utilisation
+   *  to `max` at 100% (LlamaLend's lend markets: min × (max ÷ min)^U), fractions
+   *  a year. Where set, it replaces the two slopes, and the curve draws no kink. */
+  semilog?: { min: number; max: number };
   /** Interest borrowers pay above the drawn rate, as a share of it (Aave V4: the
    *  premium owed over the drawn owed on the hub). Suppliers earn it too. 0 when
    *  absent. */

@@ -6,7 +6,9 @@
 // the hub chip, the state tags, a spoke reserve's parameters (the spoke's and the
 // hub's, each labelled) and the Details panel that opens them in a row.
 
-import { useId, useRef, useState, type ReactNode } from "react";
+import { createContext, useContext, useId, useRef, useState, type ReactNode } from "react";
+import { HeadingTip } from "@/components/shared/tip-label";
+import { v4ParameterTips } from "@/lib/aave-v4/learn-more-parameters";
 import { ChevronDown } from "lucide-react";
 import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { Prov } from "@/components/shared/provenance";
@@ -100,11 +102,16 @@ export function V4StateTags({ f, line, names }: { f: V4ReserveFigures | null; li
   );
 }
 
+/** The terms' sentences (`v4ParameterTips`), set by V4Parameters. */
+const TipsContext = createContext<Record<string, string>>({});
+
+/** One parameter row; its label explains itself on a press (C10's HeadingTip). */
 function Line({ term, title, children }: { term: string; title?: string; children: ReactNode }) {
+  const tip = useContext(TipsContext)[term] ?? title;
   return (
     <div className="contents">
-      <dt className="text-rb-500" title={title}>
-        {term}
+      <dt className="text-rb-500" data-parameter-term={term}>
+        <HeadingTip text={term} tip={tip} />
       </dt>
       <dd className="text-right tabular-nums text-foreground">{children}</dd>
     </div>
@@ -274,16 +281,18 @@ export function V4Parameters({ f, line, names }: { f: V4ReserveFigures; line: V4
   const head = "mb-1.5 text-[11px] uppercase tracking-wider text-rb-500";
   const list = "grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]";
   return (
-    <div data-reserve-parameters="">
-      <p className={head}>This spoke</p>
-      <dl className={list} data-parameters-side="spoke">
-        <SpokeTerms f={f} line={line} names={names} />
-      </dl>
-      <p className={`${head} mt-3`}>Hub: {names.hub}</p>
-      <dl className={list} data-parameters-side="hub">
-        <HubTerms f={f} names={names} />
-      </dl>
-    </div>
+    <TipsContext.Provider value={v4ParameterTips(names)}>
+      <div data-reserve-parameters="">
+        <p className={head}>This spoke</p>
+        <dl className={list} data-parameters-side="spoke">
+          <SpokeTerms f={f} line={line} names={names} />
+        </dl>
+        <p className={`${head} mt-3`}>Hub: {names.hub}</p>
+        <dl className={list} data-parameters-side="hub">
+          <HubTerms f={f} names={names} />
+        </dl>
+      </div>
+    </TipsContext.Provider>
   );
 }
 

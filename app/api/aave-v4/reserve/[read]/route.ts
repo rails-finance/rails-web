@@ -8,6 +8,7 @@ import { publicErrorMessage } from "@/lib/api/public-error";
 //   head    → /api/at-block/aave-v4/reserve?spoke=&asset=[&hub=]
 //   holders → /api/aave-v4/reserve-holders?spoke=&asset=[&hub=]
 //   history → /api/aave-v4/hub-asset-history?hub=&asset=[&from=]
+//   config-log → /api/aave-v4/reserve-config-log?spoke=&asset=[&hub=]
 // The upstream validates the parameters; this route passes them on, and the
 // answer, its status (400 `hub_required` names the hubs) and its
 // Cache-Control back unchanged. The client is lib/api/fetch-aave-v4-reserve.ts.
@@ -20,6 +21,7 @@ const UPSTREAM: Record<string, string> = {
   head: "/api/at-block/aave-v4/reserve",
   holders: "/api/aave-v4/reserve-holders",
   history: "/api/aave-v4/hub-asset-history",
+  "config-log": "/api/aave-v4/reserve-config-log",
 };
 const PARAMS = ["spoke", "asset", "hub", "from"] as const;
 /** The longest the box gets before this route answers 504. */

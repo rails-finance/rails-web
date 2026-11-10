@@ -47,6 +47,9 @@ export const COMPARE_TICK = {
   label: "Compare",
   /** For a screen reader, with the vault's name. */
   aria: (name: string) => `Compare ${name}`,
+  /** The /vaults row ⋮ entry (D7). */
+  add: "Add to compare",
+  remove: "Remove from compare",
 };
 
 export const COMPARE_BAR = {

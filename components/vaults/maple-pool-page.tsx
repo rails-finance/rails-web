@@ -52,10 +52,13 @@ const ZERO = BigInt(0);
 const eth = (kind: "address" | "block", v: string | number) => explorerUrl(MAINNET_CHAIN_ID, kind, v);
 
 export function MaplePoolPage({
+  protects,
   pool: p,
   state: s,
   readAt,
 }: {
+  /** "What protects it" and "The protocol underneath" (V9, V10), streamed by the route. */
+  protects?: React.ReactNode;
   pool: MaplePool;
   state: MaplePoolState;
   readAt: string;
@@ -469,6 +472,7 @@ export function MaplePoolPage({
           exports: vaultAssetsExports(v, exportModel),
         }}
       />
+      {protects}
     </ProvReceiptsScope>
   );
 }

@@ -670,7 +670,12 @@ async function pageText(browser, url) {
       historyText: document.querySelector("[data-history-source]")?.innerText ?? "",
       pageBlock: Number(q("[data-vault-block]", "data-vault-block")),
       cardId: q("[data-position-card]", "data-position-card"),
-      cardReceipts: !!document.querySelector("[data-position-card]")?.closest("[data-skel-section='detail-card']"),
+      // The plain card (V8, ui-jobs 553) carries `data-position-card` on a wrapper
+      // around the shared PositionCard, so the detail shell sits inside it.
+      cardReceipts: !!(
+        document.querySelector("[data-position-card]")?.closest("[data-skel-section='detail-card']") ??
+        document.querySelector("[data-position-card] [data-skel-section='detail-card']")
+      ),
       cardExplanation: [...document.querySelectorAll("[data-skel-section='detail-card'] button")]
         .map((b) => `${b.innerText.trim()} ${b.getAttribute("aria-label") ?? ""}`.trim())
         .join(" | "),

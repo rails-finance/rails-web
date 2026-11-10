@@ -82,7 +82,9 @@ import {
 } from "@/components/protocol/aave-v4/aave-v4-market-parts";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { ratePercentText } from "@/lib/shared/rate-percent";
-import { formatCompactTitled } from "@/lib/shared/format-compact";
+import { formatCompact, formatCompactTitled } from "@/lib/shared/format-compact";
+import { DataTableAmount } from "@/components/shared/data-table/data-table";
+import { AssetUnit } from "@/components/shared/asset-unit";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import type {
   EntryLink,
@@ -498,6 +500,37 @@ function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): Reserve
     </span>
   );
   const avail = f ? amountText(f.available, usd, l.symbol) : null;
+  // The table's amount cells (D1, decision 0047): the token amount over its
+  // oracle dollar value, the amount an echo of the dollar figure's receipt.
+  // Null where the cell keeps one line: no head read (stored tokens), a price
+  // from the off-chain market feed, or a side at zero.
+  const oracle = f != null && x.price?.via === "oracle" && usd != null;
+  const pair = (n: number, info: Provenance) => {
+    if (!oracle || n <= 0) return null;
+    const a = amountText(n, usd, l.symbol);
+    return {
+      amount: (
+        <Prov info={info} echo>
+          <span className="inline-flex items-center gap-1.5">
+            {formatCompact(n)}
+            <AssetUnit symbol={l.symbol} address={l.underlying} />
+          </span>
+        </Prov>
+      ),
+      value: (
+        <Prov info={info}>
+          <span title={a.title}>{a.display}</span>
+        </Prov>
+      ),
+    };
+  };
+  const amounts = f
+    ? {
+        supplied: pair(f.spokeSupplied, valued(headValueProv(f, "spoke", "supplied", names))),
+        borrowed: pair(f.spokeBorrowed, valued(headValueProv(f, "spoke", "borrowed", names))),
+        available: borrowable !== false ? pair(f.available, valued(availableProv(f, names))) : null,
+      }
+    : { supplied: null, borrowed: null, available: null };
   const cf = f?.collateralFactor ?? l.collateralFactor;
   return {
     key,
@@ -509,7 +542,7 @@ function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): Reserve
       tags: <V4StateTags f={f} line={l} names={names} />,
       chips: <HubChip label={names.hub} />,
       sub: (
-        <div className="flex items-center gap-1 text-[11px] text-rb-500" title={ASSET_CLASS_TITLE[l.cls]}>
+        <div className="flex items-center gap-1 text-[12px] text-rb-500" title={ASSET_CLASS_TITLE[l.cls]}>
           <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: ASSET_CLASS_COLOR[l.cls] }} />
           <span className="truncate">{ASSET_CLASS_TITLE[l.cls]}</span>
         </div>
@@ -519,19 +552,26 @@ function rowOf(d: V4Deployment, sp: V4Spoke, x: V4Row, c: StoredCoords): Reserve
     },
     hooks: { "data-reserve-hub": l.hub },
     cells: {
-      supplied: { sort: rowTokens(x, "supplied") * (usd ?? 0), node: supplied },
-      borrowed: { sort: rowTokens(x, "borrowed") * (usd ?? 0), node: borrowed },
+      supplied: {
+        sort: rowTokens(x, "supplied") * (usd ?? 0),
+        node: amounts.supplied ? <DataTableAmount {...amounts.supplied} /> : supplied,
+      },
+      borrowed: {
+        sort: rowTokens(x, "borrowed") * (usd ?? 0),
+        node: amounts.borrowed ? <DataTableAmount {...amounts.borrowed} /> : borrowed,
+      },
       available: {
         sort: f ? f.available * (usd ?? 0) : -1,
         title: "The hub's liquidity, capped by what the draw cap leaves this spoke",
-        node:
-          f && avail && borrowable !== false ? (
-            <Prov info={valued(availableProv(f, names))}>
-              <span title={avail.title}>{avail.display}</span>
-            </Prov>
-          ) : (
-            dash
-          ),
+        node: amounts.available ? (
+          <DataTableAmount {...amounts.available} />
+        ) : f && avail && borrowable !== false ? (
+          <Prov info={valued(availableProv(f, names))}>
+            <span title={avail.title}>{avail.display}</span>
+          </Prov>
+        ) : (
+          dash
+        ),
       },
       supplyRate: {
         sort: f?.supplyApr ?? -1,

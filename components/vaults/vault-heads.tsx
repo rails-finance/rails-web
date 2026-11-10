@@ -23,6 +23,7 @@ import { changeText, jumpTail, measuredYield, yieldText, type VaultYield } from 
 import { vaultHoldersProv, vaultWithdrawableProv, vaultYieldProv } from "@/lib/vaults/row-provenance";
 import { illiquidSentence, type VaultIlliquid } from "@/lib/vaults/illiquid";
 import { heldAssetsRaw } from "@/lib/vaults/lost-assets";
+import { assetScaleSentence } from "@/lib/vaults/asset-scale-words";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -45,6 +46,7 @@ export const STANDING_WORD: Record<VaultStanding, string> = {
   "address-book": "in Aave’s address book",
   illiquid: "illiquid",
   "lost-assets": "lost assets",
+  "decimals-disagree": "decimals disagree",
 };
 
 const VENUE: Record<VaultFamily, VaultVenue> = {
@@ -112,6 +114,9 @@ export function VaultPills({
           key={s}
           className={VAULT_PILL}
           data-pill={s}
+          title={
+            s === "decimals-disagree" && v.assetScale ? assetScaleSentence(v.asset.symbol, v.assetScale) : undefined
+          }
           {...(s === "endorsed"
             ? { "data-endorsed-badge": "" }
             : s === "shut-down"
@@ -257,7 +262,15 @@ export function vaultHeads({
       ) : null,
       ...(v.standing.includes("lost-assets")
         ? { sub: <LostAssetsCaution vault={v} receipts={receipts} detail={detail} /> }
-        : {}),
+        : v.assetScale
+          ? {
+              sub: (
+                <span className="text-xs text-rb-500" data-asset-scale={v.assetScale.implied}>
+                  {assetScaleSentence(v.asset.symbol, v.assetScale)}
+                </span>
+              ),
+            }
+          : {}),
     },
     {
       id: "share-price",

@@ -34,6 +34,7 @@ import {
 } from "@/components/shared/aave-reserve-parts";
 import { marketModal, useAaveMarket, type AaveMarketRead } from "@/components/shared/aave-market-page";
 import { MarketPage } from "@/components/shared/product/market-page";
+import { DataTableAmount } from "@/components/shared/data-table/data-table";
 import { MarketRoster } from "@/components/shared/product/market-roster";
 import { positionEntry } from "@/components/shared/product/position-entry";
 import { fmtUsd } from "@/lib/aave-v4/format";
@@ -352,7 +353,7 @@ function reserveRows(m: AaveMarketConfig, view: AaveMarketView, vocab: AaveMarke
         address: r.address,
         tags: <StateTags r={r} vocab={vocab} />,
         sub: (
-          <div className="flex items-center gap-1 text-[11px] text-rb-500" title={r.classLabel}>
+          <div className="flex items-center gap-1 text-[12px] text-rb-500" title={r.classLabel}>
             <ClassDot cls={r.cls} />
             <span className="truncate">{r.classLabel}</span>
           </div>
@@ -362,7 +363,12 @@ function reserveRows(m: AaveMarketConfig, view: AaveMarketView, vocab: AaveMarke
       cells: {
         supplied: {
           sort: [r.suppliedUsd, r.supplied],
-          node: (
+          node: z.amounts.supplied ? (
+            <DataTableAmount
+              {...z.amounts.supplied}
+              tag={<CapPill side="supply" c={r.supplyCapState} r={r} vocab={vocab} />}
+            />
+          ) : (
             <>
               <div>{z.supplied}</div>
               <CapPill side="supply" c={r.supplyCapState} r={r} vocab={vocab} />
@@ -371,7 +377,12 @@ function reserveRows(m: AaveMarketConfig, view: AaveMarketView, vocab: AaveMarke
         },
         borrowed: {
           sort: [r.borrowedUsd, r.borrowed],
-          node: (
+          node: z.amounts.borrowed ? (
+            <DataTableAmount
+              {...z.amounts.borrowed}
+              tag={<CapPill side="borrow" c={r.borrowCapState} r={r} vocab={vocab} />}
+            />
+          ) : (
             <>
               <div>
                 {z.borrowed ??
@@ -397,7 +408,13 @@ function reserveRows(m: AaveMarketConfig, view: AaveMarketView, vocab: AaveMarke
         available: {
           sort: [availTokens * (r.priceUsd ?? 0), availTokens],
           title: r.virtualBalance != null ? "The Pool's balance of this reserve" : "Supplied less borrowed",
-          node: z.available,
+          node: z.amounts.available ? (
+            <span data-available-basis={z.availableBasis}>
+              <DataTableAmount {...z.amounts.available} />
+            </span>
+          ) : (
+            z.available
+          ),
         },
         supplyRate: { sort: r.supplyApr, title: `Supply rate: ${RATE_TIP.supply.toLowerCase()}`, node: z.supplyRate },
         borrowRate: { sort: r.borrowApr, title: `Borrow rate: ${RATE_TIP.borrow.toLowerCase()}`, node: z.borrowRate },
@@ -417,9 +434,9 @@ function reservesTable(m: AaveMarketConfig, read: AaveMarketRead, view: AaveMark
     line: (
       <>
         Every reserve on the Pool, filter by class, sort any column. Rates, caps and risk parameters are the
-        configuration the Pool enforces; USD is the market&apos;s oracle price. A cap shows under its size once 90% of
-        it is in use. The bar is utilisation, and its tick is the rate model&apos;s kink. A row opens its reserve&apos;s
-        page; Details opens its parameters in place.
+        configuration the Pool enforces; USD is the market&apos;s oracle price. A cap shows beside its dollar value once
+        90% of it is in use. The bar is utilisation, and its tick is the rate model&apos;s kink. A row opens its
+        reserve&apos;s page; Details opens its parameters in place.
       </>
     ),
     label: `${view.label} reserves`,

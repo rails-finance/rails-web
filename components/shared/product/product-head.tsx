@@ -17,6 +17,7 @@ import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/se
 import { SectionExplainer } from "@/components/shared/section-explainer";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import type {
+  CollateralTerms,
   EntryLink,
   MarketStructure,
   ProductHead,
@@ -42,7 +43,16 @@ export function ReadStamp({ readAt }: { readAt: ReadAt | null }) {
 
 /** A section's ⋮ from its tools. */
 export function ToolsFor({ scope, title, tools }: { scope: string; title: string; tools: SectionTools }) {
-  return <SectionMenu scope={scope} title={title} hint={tools.hint} links={tools.links} exports={tools.exports} />;
+  return (
+    <SectionMenu
+      scope={scope}
+      title={title}
+      hint={tools.hint}
+      links={tools.links}
+      exports={tools.exports}
+      views={tools.views}
+    />
+  );
 }
 
 /** The links at the foot of a head, "View … →". */
@@ -76,19 +86,52 @@ function Term({ f }: { f: StructureFigure }) {
 
 /** A head's structure terms, in the band's foot before its notes. */
 function StructureTerms({ s }: { s: MarketStructure }) {
-  if (s.kind === "comet")
-    return (
-      <>
-        <Term f={s.kink} />
-        <Term f={s.reserves} />
-        <Term f={s.minBorrow} />
-      </>
-    );
+  switch (s.kind) {
+    case "comet":
+      return (
+        <>
+          <Term f={s.kink} />
+          <Term f={s.reserves} />
+          <Term f={s.minBorrow} />
+        </>
+      );
+    case "ticks":
+      return (
+        <>
+          <Term f={s.ticks} />
+          <Term f={s.rebalance} />
+          <Term f={s.liquidation} />
+        </>
+      );
+    case "eras":
+      return <Term f={s.era} />;
+    case "tokens":
+      return (
+        <>
+          <Term f={s.yt} />
+          <Term f={s.lp} />
+          <Term f={s.sy} />
+        </>
+      );
+    case "ladder":
+      return (
+        <>
+          <Term f={s.vaultType} />
+          <Term f={s.borrowTo} />
+          <Term f={s.liquidateFrom} />
+          <Term f={s.absorbFrom} />
+        </>
+      );
+  }
+}
+
+/** A pair market's collateral terms, after its structure. */
+function CollateralTermsRow({ c }: { c: CollateralTerms }) {
   return (
     <>
-      <Term f={s.ticks} />
-      <Term f={s.rebalance} />
-      <Term f={s.liquidation} />
+      <Term f={c.a} />
+      <Term f={c.loanDiscount} />
+      <Term f={c.liquidationDiscount} />
     </>
   );
 }
@@ -184,14 +227,14 @@ export function ProductHeadSection({
       )}
       <div className="mt-3" {...head.bandHooks}>
         <VitalsBand
-          // A head with no purpose keeps the lead column, so stacked heads on a
-          // roster align their figures and links.
-          lead={lead ?? (aside ? <span aria-hidden /> : null)}
+          layout="row"
+          lead={lead}
           aside={aside}
           notes={
-            head.structure || head.notes ? (
+            head.structure || head.collateral || head.notes ? (
               <>
                 {head.structure && <StructureTerms s={head.structure} />}
+                {head.collateral && <CollateralTermsRow c={head.collateral} />}
                 {head.notes}
               </>
             ) : undefined

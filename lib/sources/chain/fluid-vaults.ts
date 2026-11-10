@@ -158,6 +158,13 @@ export interface FluidVaultRow {
    *  price relates shares to shares, so the quotient is not a borrowed share of
    *  anything nameable), and null without collateral or a speaking oracle. */
   aggregateRatio: number | null;
+
+  /** Open positions in the vault, its own count (vaultState.totalPositions). */
+  totalPositions: number;
+  /** What borrowers can take now, in the debt token, before the vault's borrow
+   *  limit at the Liquidity layer (limitsAndAvailability.borrowable). Null on
+   *  a smart-debt leg, where it counts shares. */
+  borrowable: number | null;
 }
 
 export interface FluidSkippedVault {
@@ -203,6 +210,8 @@ type VaultData = ReadContractReturnType<typeof FLUID_VAULT_RESOLVER_ABI, "getVau
 
 const isZeroAddr = (a: string | undefined) => !a || BigInt(a) === ZERO;
 
+type Client = ReturnType<typeof headReadsClient>;
+
 export async function loadFluidVaultsFromChain(): Promise<FluidVaultsChainResponse> {
   try {
     const client = headReadsClient();
@@ -220,230 +229,7 @@ export async function loadFluidVaultsFromChain(): Promise<FluidVaultsChainRespon
       functionName: "getAllVaultsAddresses",
       blockNumber: at,
     });
-    const reads = await client.multicall({
-      contracts: addresses.map((vault) => ({
-        address: resolver,
-        abi: FLUID_VAULT_RESOLVER_ROSTER_ABI,
-        functionName: "getVaultEntireData" as const,
-        args: [vault] as const,
-      })),
-      allowFailure: true,
-      blockNumber: at,
-    });
-    const all: VaultData[] = [];
-    const skipped: FluidSkippedVault[] = [];
-    reads.forEach((r, i) => {
-      if (r.status === "success") all.push(r.result as unknown as VaultData);
-      else skipped.push({ vault: addresses[i].toLowerCase(), rosterIndex: i });
-    });
-
-    // Name every token leg in one cached multicall — skip smart legs (DEX
-    // shares, not a token: null symbol by convention) and skip native ETH,
-    // whose sentinel implements no symbol() and would otherwise leave the most
-    // common collateral on the protocol rendering as a truncated address.
-    const wanted: string[] = [];
-    for (const vd of all) {
-      const kind = vaultKindOf(Number(vd.constantVariables.vaultType));
-      const smartCol = vd.isSmartCol || kind === "smart-col" || kind === "smart";
-      const smartDebt = vd.isSmartDebt || kind === "smart-debt" || kind === "smart";
-      const sup = vd.constantVariables.supplyToken;
-      const bor = vd.constantVariables.borrowToken;
-      // Token legs: name token0. Smart legs: name BOTH sides of the pool, so
-      // the row can say which pair's shares it holds.
-      for (const [leg, smart] of [
-        [sup, smartCol],
-        [bor, smartDebt],
-      ] as const) {
-        const addrs = smart ? [leg.token0, leg.token1] : [leg.token0];
-        for (const a of addrs) if (a && !isFluidEthSentinel(a) && BigInt(a) !== ZERO) wanted.push(a);
-      }
-    }
-    const meta = await resolveErc20Meta(wanted);
-    // Every leg's figures scale by these decimals: without them the read fails
-    // whole rather than state amounts scaled by a stand-in.
-    assertDecimalsRead(meta, wanted);
-
-    // Resolve every smart leg's shares into the tokens they are a slice OF.
-    // The vaults name their own pools (constantVariables.supply/borrow points at
-    // the DEX rather than the Liquidity layer), so we ask the DexResolver for
-    // exactly those and never enumerate: getAllDexEntireDatas() is a floor — it
-    // misses pools that answer perfectly well when asked for by address.
-    const pools = [
-      ...new Set(
-        all
-          .flatMap((vd) => [vd.constantVariables.supply, vd.constantVariables.borrow])
-          .filter((a) => a.toLowerCase() !== FLUID_ADDRESSES.LIQUIDITY.toLowerCase()),
-      ),
-    ];
-    const dex = new Map<string, DexPool>();
-    if (pools.length > 0) {
-      try {
-        // Cast the decode: the fragment's struct is deep enough that viem's
-        // inference gives up (it lands on `never`), and only these five fields
-        // are read. The shape is pinned by the verified ABI, not by this type.
-        const datas = (await client.readContract({
-          address: FLUID_DEX_RESOLVER_ADDRESS as `0x${string}`,
-          abi: FLUID_DEX_RESOLVER_ABI,
-          functionName: "getDexEntireDatas",
-          args: [pools],
-        })) as unknown as {
-          dex: string;
-          constantViews: { token0: string; token1: string };
-          dexState: {
-            token0PerSupplyShare: bigint;
-            token1PerSupplyShare: bigint;
-            token0PerBorrowShare: bigint;
-            token1PerBorrowShare: bigint;
-          };
-        }[];
-        for (const d of datas) {
-          dex.set(d.dex.toLowerCase(), {
-            token0: d.constantViews.token0,
-            token1: d.constantViews.token1,
-            perSupplyShare: [d.dexState.token0PerSupplyShare, d.dexState.token1PerSupplyShare],
-            perBorrowShare: [d.dexState.token0PerBorrowShare, d.dexState.token1PerBorrowShare],
-          });
-        }
-      } catch (e) {
-        // The conversion is an enrichment, not the roster: a DexResolver failure
-        // must leave every vault rendering its shares, not blank the page.
-        console.error("Fluid DexResolver read failed — smart legs stay as shares:", e);
-      }
-    }
-
-    /** One token's display name: the ETH sentinel is named "ETH", everything
-     *  else comes from the multicall (null when symbol() didn't answer). */
-    const nameOf = (token: string): string | null => {
-      if (isFluidEthSentinel(token)) return "ETH";
-      const m = meta.get(token.toLowerCase());
-      return m?.named ? m.symbol : null;
-    };
-
-    /** A smart leg's shares, resolved into the tokens they are made of, using the
-     *  pool's OWN per-share figures (1e18-scaled) rather than a pro-rata we
-     *  recompute from reserves ÷ totalShares. Same principle as Maple's rate:
-     *  render the protocol's own answer, don't re-derive one that has to agree.
-     *
-     *  A supply leg and a debt leg are different instruments backed by different
-     *  reserves, so each reads the pair it holds — using the collateral figures for a
-     *  smart-DEBT leg silently resolves nothing on debt-only pools.
-     *
-     *  Null when the pool states 0 for both: 6 of the 40 pools hold nothing, and
-     *  "0 of each" would imply a position that isn't there — the share count is
-     *  the honest statement. Kept in BigInt to the final scale so a 1e25-share
-     *  numerator can't lose precision through a float.
-     *
-     *  This is composition, NOT price: pro-rata is the protocol's own redemption
-     *  mechanic (withdrawPerfect), and no USD is implied anywhere. */
-    const legTokens = (poolAddr: string, sharesRaw: bigint, leg: "supply" | "borrow"): LegToken[] | null => {
-      const p = dex.get(poolAddr.toLowerCase());
-      if (!p) return null;
-      const per = leg === "supply" ? p.perSupplyShare : p.perBorrowShare;
-      if (per[0] === ZERO && per[1] === ZERO) return null;
-      const E18 = BigInt("1000000000000000000");
-      return ([p.token0, p.token1] as const).map((tok, i) => {
-        const m = meta.get(tok.toLowerCase());
-        const decimals = isFluidEthSentinel(tok) ? 18 : (m?.decimals ?? 18);
-        return {
-          symbol: isFluidEthSentinel(tok) ? "ETH" : m?.named ? m.symbol : null,
-          amount: scaleRaw((sharesRaw * per[i]) / E18, decimals),
-        };
-      });
-    };
-
-    /** Leg identity: DEX shares → null symbol at 18dp (plus the pool's pair, so
-     *  the row can name what the shares are OF), native ETH → the sentinel's own
-     *  answer, everything else → the multicall's. */
-    const legMeta = (
-      leg: { token0: string; token1: string },
-      smart: boolean,
-    ): { symbol: string | null; decimals: number; pool: [string, string] | null } => {
-      if (smart) {
-        const a = nameOf(leg.token0);
-        const b = nameOf(leg.token1);
-        return { symbol: null, decimals: SHARES_DECIMALS, pool: a && b ? [a, b] : null };
-      }
-      if (isFluidEthSentinel(leg.token0)) return { symbol: "ETH", decimals: 18, pool: null };
-      const m = meta.get(leg.token0.toLowerCase());
-      return { symbol: m?.named ? m.symbol : null, decimals: m?.decimals ?? SHARES_DECIMALS, pool: null };
-    };
-
-    const vaults: FluidVaultRow[] = all.map((vd) => {
-      const vaultType = Number(vd.constantVariables.vaultType);
-      const kind = vaultKindOf(vaultType);
-      const smartCol = vd.isSmartCol || kind === "smart-col" || kind === "smart";
-      const smartDebt = vd.isSmartDebt || kind === "smart-debt" || kind === "smart";
-
-      const supplyMeta = legMeta(vd.constantVariables.supplyToken, smartCol);
-      const borrowMeta = legMeta(vd.constantVariables.borrowToken, smartDebt);
-      const supplyDecimals = supplyMeta.decimals;
-      const borrowDecimals = borrowMeta.decimals;
-
-      const c = vd.configs;
-      // A vault with no collateralFactor has never been configured: the factory
-      // minted it and governance never set a ladder or an oracle on it.
-      const configured = c.collateralFactor > 0;
-
-      const priceScale = fluidOraclePriceScale(supplyDecimals, borrowDecimals);
-      const priceOperate = c.oraclePriceOperate > ZERO ? Number(c.oraclePriceOperate) / priceScale : null;
-      const priceLiquidate = c.oraclePriceLiquidate > ZERO ? Number(c.oraclePriceLiquidate) / priceScale : null;
-
-      const r = vd.exchangePricesAndRates;
-
-      const totalSupply = scaleRaw(vd.totalSupplyAndBorrow.totalSupplyVault, supplyDecimals);
-      const totalBorrow = scaleRaw(vd.totalSupplyAndBorrow.totalBorrowVault, borrowDecimals);
-      // Only where every term is a token quantity the price relates:
-      // a smart vault's legs are DEX shares, so the quotient would be a number
-      // without a referent.
-      const smartEither = smartCol || smartDebt;
-      const colValue = priceLiquidate != null && totalSupply > 0 ? totalSupply * priceLiquidate : null;
-      const aggregateRatio = !smartEither && colValue != null && colValue > 0 ? totalBorrow / colValue : null;
-
-      return {
-        vault: getAddress(vd.vault).toLowerCase(),
-        vaultId: Number(vd.constantVariables.vaultId),
-        vaultType,
-        kind,
-        isSmartCol: smartCol,
-        isSmartDebt: smartDebt,
-        supplySymbol: supplyMeta.symbol,
-        borrowSymbol: borrowMeta.symbol,
-        supplyDecimals,
-        borrowDecimals,
-        supplyPool: supplyMeta.pool,
-        borrowPool: borrowMeta.pool,
-        supplyLegTokens: smartCol
-          ? legTokens(vd.constantVariables.supply, vd.totalSupplyAndBorrow.totalSupplyVault, "supply")
-          : null,
-        borrowLegTokens: smartDebt
-          ? legTokens(vd.constantVariables.borrow, vd.totalSupplyAndBorrow.totalBorrowVault, "borrow")
-          : null,
-
-        configured,
-        collateralFactor: configured ? Number(c.collateralFactor) / 1e4 : null,
-        liquidationThreshold: configured ? Number(c.liquidationThreshold) / 1e4 : null,
-        liquidationMaxLimit: configured ? Number(c.liquidationMaxLimit) / 1e4 : null,
-        liquidationPenalty: configured ? Number(c.liquidationPenalty) / 1e4 : null,
-        withdrawalGap: configured ? Number(c.withdrawalGap) / 1e4 : null,
-
-        oracle: isZeroAddr(c.oracle) ? null : getAddress(c.oracle).toLowerCase(),
-        oraclePriceOperate: priceOperate,
-        oraclePriceLiquidate: priceLiquidate,
-
-        totalSupply,
-        totalBorrow,
-
-        supplyRatePct: smartCol ? null : Number(r.supplyRateVault) / 100,
-        borrowRatePct: smartDebt ? null : Number(r.borrowRateVault) / 100,
-
-        aggregateRatio,
-      };
-    });
-
-    // Roster order: the factory's own minting order. vaultId IS the sequence, so
-    // it needs no sort key of ours — but the resolver's array order is its own
-    // business, so pin it explicitly rather than inherit it.
-    vaults.sort((a, b) => a.vaultId - b.vaultId);
+    const { vaults, skipped } = await vaultRowsAt(client, at, addresses);
 
     return {
       blockNumber,
@@ -465,4 +251,289 @@ export async function loadFluidVaultsFromChain(): Promise<FluidVaultsChainRespon
     console.error("Fluid vaults chain read failed:", error);
     return empty();
   }
+}
+
+const FACTORY_ABI = [
+  {
+    inputs: [{ internalType: "uint256", name: "vaultId_", type: "uint256" }],
+    name: "getVaultAddress",
+    outputs: [{ internalType: "address", name: "vault_", type: "address" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "totalVaults",
+    outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
+export interface FluidVaultDetail {
+  blockNumber: number;
+  head?: PositionHeadStamp;
+  vault: FluidVaultRow;
+}
+
+/** One vault by its id (a vault's page): the VaultFactory names its address,
+ *  then the roster's per-vault read for that vault alone. Null where the
+ *  factory has minted no such vault; throws where the read fails. */
+export async function loadFluidVaultFromChain(vaultId: number): Promise<FluidVaultDetail | null> {
+  const client = headReadsClient();
+  const blockNumber = Number(await client.getBlockNumber());
+  const at = BigInt(blockNumber);
+  const factory = FLUID_ADDRESSES.VAULT_FACTORY as `0x${string}`;
+  const total = Number(
+    await client.readContract({ address: factory, abi: FACTORY_ABI, functionName: "totalVaults", blockNumber: at }),
+  );
+  if (!Number.isInteger(vaultId) || vaultId < 1 || vaultId > total) return null;
+  const address = await client.readContract({
+    address: factory,
+    abi: FACTORY_ABI,
+    functionName: "getVaultAddress",
+    args: [BigInt(vaultId)],
+    blockNumber: at,
+  });
+  const { vaults } = await vaultRowsAt(client, at, [address]);
+  if (!vaults[0]) throw new Error(`Fluid vault ${vaultId}: the resolver's read of it reverts at block ${blockNumber}`);
+  return { blockNumber, head: serverHeadStampAt(MAINNET_CHAIN_ID, blockNumber), vault: vaults[0] };
+}
+
+/** Each vault's getVaultEntireData at one block, named and shaped into rows. */
+async function vaultRowsAt(
+  client: Client,
+  at: bigint,
+  addresses: readonly `0x${string}`[],
+): Promise<{ vaults: FluidVaultRow[]; skipped: FluidSkippedVault[] }> {
+  const resolver = FLUID_ADDRESSES.VAULT_RESOLVER as `0x${string}`;
+  const reads = await client.multicall({
+    contracts: addresses.map((vault) => ({
+      address: resolver,
+      abi: FLUID_VAULT_RESOLVER_ROSTER_ABI,
+      functionName: "getVaultEntireData" as const,
+      args: [vault] as const,
+    })),
+    allowFailure: true,
+    blockNumber: at,
+  });
+  const all: VaultData[] = [];
+  const skipped: FluidSkippedVault[] = [];
+  reads.forEach((r, i) => {
+    if (r.status === "success") all.push(r.result as unknown as VaultData);
+    else skipped.push({ vault: addresses[i].toLowerCase(), rosterIndex: i });
+  });
+
+  // Name every token leg in one cached multicall — skip smart legs (DEX
+  // shares, not a token: null symbol by convention) and skip native ETH,
+  // whose sentinel implements no symbol() and would otherwise leave the most
+  // common collateral on the protocol rendering as a truncated address.
+  const wanted: string[] = [];
+  for (const vd of all) {
+    const kind = vaultKindOf(Number(vd.constantVariables.vaultType));
+    const smartCol = vd.isSmartCol || kind === "smart-col" || kind === "smart";
+    const smartDebt = vd.isSmartDebt || kind === "smart-debt" || kind === "smart";
+    const sup = vd.constantVariables.supplyToken;
+    const bor = vd.constantVariables.borrowToken;
+    // Token legs: name token0. Smart legs: name BOTH sides of the pool, so
+    // the row can say which pair's shares it holds.
+    for (const [leg, smart] of [
+      [sup, smartCol],
+      [bor, smartDebt],
+    ] as const) {
+      const addrs = smart ? [leg.token0, leg.token1] : [leg.token0];
+      for (const a of addrs) if (a && !isFluidEthSentinel(a) && BigInt(a) !== ZERO) wanted.push(a);
+    }
+  }
+  const meta = await resolveErc20Meta(wanted);
+  // Every leg's figures scale by these decimals: without them the read fails
+  // whole rather than state amounts scaled by a stand-in.
+  assertDecimalsRead(meta, wanted);
+
+  // Resolve every smart leg's shares into the tokens they are a slice OF.
+  // The vaults name their own pools (constantVariables.supply/borrow points at
+  // the DEX rather than the Liquidity layer), so we ask the DexResolver for
+  // exactly those and never enumerate: getAllDexEntireDatas() is a floor — it
+  // misses pools that answer perfectly well when asked for by address.
+  const pools = [
+    ...new Set(
+      all
+        .flatMap((vd) => [vd.constantVariables.supply, vd.constantVariables.borrow])
+        .filter((a) => a.toLowerCase() !== FLUID_ADDRESSES.LIQUIDITY.toLowerCase()),
+    ),
+  ];
+  const dex = new Map<string, DexPool>();
+  if (pools.length > 0) {
+    try {
+      // Cast the decode: the fragment's struct is deep enough that viem's
+      // inference gives up (it lands on `never`), and only these five fields
+      // are read. The shape is pinned by the verified ABI, not by this type.
+      const datas = (await client.readContract({
+        address: FLUID_DEX_RESOLVER_ADDRESS as `0x${string}`,
+        abi: FLUID_DEX_RESOLVER_ABI,
+        functionName: "getDexEntireDatas",
+        args: [pools],
+      })) as unknown as {
+        dex: string;
+        constantViews: { token0: string; token1: string };
+        dexState: {
+          token0PerSupplyShare: bigint;
+          token1PerSupplyShare: bigint;
+          token0PerBorrowShare: bigint;
+          token1PerBorrowShare: bigint;
+        };
+      }[];
+      for (const d of datas) {
+        dex.set(d.dex.toLowerCase(), {
+          token0: d.constantViews.token0,
+          token1: d.constantViews.token1,
+          perSupplyShare: [d.dexState.token0PerSupplyShare, d.dexState.token1PerSupplyShare],
+          perBorrowShare: [d.dexState.token0PerBorrowShare, d.dexState.token1PerBorrowShare],
+        });
+      }
+    } catch (e) {
+      // The conversion is an enrichment, not the roster: a DexResolver failure
+      // must leave every vault rendering its shares, not blank the page.
+      console.error("Fluid DexResolver read failed — smart legs stay as shares:", e);
+    }
+  }
+
+  /** One token's display name: the ETH sentinel is named "ETH", everything
+   *  else comes from the multicall (null when symbol() didn't answer). */
+  const nameOf = (token: string): string | null => {
+    if (isFluidEthSentinel(token)) return "ETH";
+    const m = meta.get(token.toLowerCase());
+    return m?.named ? m.symbol : null;
+  };
+
+  /** A smart leg's shares, resolved into the tokens they are made of, using the
+   *  pool's OWN per-share figures (1e18-scaled) rather than a pro-rata we
+   *  recompute from reserves ÷ totalShares. Same principle as Maple's rate:
+   *  render the protocol's own answer, don't re-derive one that has to agree.
+   *
+   *  A supply leg and a debt leg are different instruments backed by different
+   *  reserves, so each reads the pair it holds — using the collateral figures for a
+   *  smart-DEBT leg silently resolves nothing on debt-only pools.
+   *
+   *  Null when the pool states 0 for both: 6 of the 40 pools hold nothing, and
+   *  "0 of each" would imply a position that isn't there — the share count is
+   *  the honest statement. Kept in BigInt to the final scale so a 1e25-share
+   *  numerator can't lose precision through a float.
+   *
+   *  This is composition, NOT price: pro-rata is the protocol's own redemption
+   *  mechanic (withdrawPerfect), and no USD is implied anywhere. */
+  const legTokens = (poolAddr: string, sharesRaw: bigint, leg: "supply" | "borrow"): LegToken[] | null => {
+    const p = dex.get(poolAddr.toLowerCase());
+    if (!p) return null;
+    const per = leg === "supply" ? p.perSupplyShare : p.perBorrowShare;
+    if (per[0] === ZERO && per[1] === ZERO) return null;
+    const E18 = BigInt("1000000000000000000");
+    return ([p.token0, p.token1] as const).map((tok, i) => {
+      const m = meta.get(tok.toLowerCase());
+      const decimals = isFluidEthSentinel(tok) ? 18 : (m?.decimals ?? 18);
+      return {
+        symbol: isFluidEthSentinel(tok) ? "ETH" : m?.named ? m.symbol : null,
+        amount: scaleRaw((sharesRaw * per[i]) / E18, decimals),
+      };
+    });
+  };
+
+  /** Leg identity: DEX shares → null symbol at 18dp (plus the pool's pair, so
+   *  the row can name what the shares are OF), native ETH → the sentinel's own
+   *  answer, everything else → the multicall's. */
+  const legMeta = (
+    leg: { token0: string; token1: string },
+    smart: boolean,
+  ): { symbol: string | null; decimals: number; pool: [string, string] | null } => {
+    if (smart) {
+      const a = nameOf(leg.token0);
+      const b = nameOf(leg.token1);
+      return { symbol: null, decimals: SHARES_DECIMALS, pool: a && b ? [a, b] : null };
+    }
+    if (isFluidEthSentinel(leg.token0)) return { symbol: "ETH", decimals: 18, pool: null };
+    const m = meta.get(leg.token0.toLowerCase());
+    return { symbol: m?.named ? m.symbol : null, decimals: m?.decimals ?? SHARES_DECIMALS, pool: null };
+  };
+
+  const vaults: FluidVaultRow[] = all.map((vd) => {
+    const vaultType = Number(vd.constantVariables.vaultType);
+    const kind = vaultKindOf(vaultType);
+    const smartCol = vd.isSmartCol || kind === "smart-col" || kind === "smart";
+    const smartDebt = vd.isSmartDebt || kind === "smart-debt" || kind === "smart";
+
+    const supplyMeta = legMeta(vd.constantVariables.supplyToken, smartCol);
+    const borrowMeta = legMeta(vd.constantVariables.borrowToken, smartDebt);
+    const supplyDecimals = supplyMeta.decimals;
+    const borrowDecimals = borrowMeta.decimals;
+
+    const c = vd.configs;
+    // A vault with no collateralFactor has never been configured: the factory
+    // minted it and governance never set a ladder or an oracle on it.
+    const configured = c.collateralFactor > 0;
+
+    const priceScale = fluidOraclePriceScale(supplyDecimals, borrowDecimals);
+    const priceOperate = c.oraclePriceOperate > ZERO ? Number(c.oraclePriceOperate) / priceScale : null;
+    const priceLiquidate = c.oraclePriceLiquidate > ZERO ? Number(c.oraclePriceLiquidate) / priceScale : null;
+
+    const r = vd.exchangePricesAndRates;
+
+    const totalSupply = scaleRaw(vd.totalSupplyAndBorrow.totalSupplyVault, supplyDecimals);
+    const totalBorrow = scaleRaw(vd.totalSupplyAndBorrow.totalBorrowVault, borrowDecimals);
+    // Only where every term is a token quantity the price relates:
+    // a smart vault's legs are DEX shares, so the quotient would be a number
+    // without a referent.
+    const smartEither = smartCol || smartDebt;
+    const colValue = priceLiquidate != null && totalSupply > 0 ? totalSupply * priceLiquidate : null;
+    const aggregateRatio = !smartEither && colValue != null && colValue > 0 ? totalBorrow / colValue : null;
+
+    return {
+      vault: getAddress(vd.vault).toLowerCase(),
+      vaultId: Number(vd.constantVariables.vaultId),
+      vaultType,
+      kind,
+      isSmartCol: smartCol,
+      isSmartDebt: smartDebt,
+      supplySymbol: supplyMeta.symbol,
+      borrowSymbol: borrowMeta.symbol,
+      supplyDecimals,
+      borrowDecimals,
+      supplyPool: supplyMeta.pool,
+      borrowPool: borrowMeta.pool,
+      supplyLegTokens: smartCol
+        ? legTokens(vd.constantVariables.supply, vd.totalSupplyAndBorrow.totalSupplyVault, "supply")
+        : null,
+      borrowLegTokens: smartDebt
+        ? legTokens(vd.constantVariables.borrow, vd.totalSupplyAndBorrow.totalBorrowVault, "borrow")
+        : null,
+
+      configured,
+      collateralFactor: configured ? Number(c.collateralFactor) / 1e4 : null,
+      liquidationThreshold: configured ? Number(c.liquidationThreshold) / 1e4 : null,
+      liquidationMaxLimit: configured ? Number(c.liquidationMaxLimit) / 1e4 : null,
+      liquidationPenalty: configured ? Number(c.liquidationPenalty) / 1e4 : null,
+      withdrawalGap: configured ? Number(c.withdrawalGap) / 1e4 : null,
+
+      oracle: isZeroAddr(c.oracle) ? null : getAddress(c.oracle).toLowerCase(),
+      oraclePriceOperate: priceOperate,
+      oraclePriceLiquidate: priceLiquidate,
+
+      totalSupply,
+      totalBorrow,
+
+      supplyRatePct: smartCol ? null : Number(r.supplyRateVault) / 100,
+      borrowRatePct: smartDebt ? null : Number(r.borrowRateVault) / 100,
+
+      aggregateRatio,
+
+      totalPositions: Number(vd.vaultState.totalPositions),
+      borrowable: smartDebt ? null : scaleRaw(vd.limitsAndAvailability.borrowable, borrowDecimals),
+    };
+  });
+
+  // Roster order: the factory's own minting order. vaultId IS the sequence, so
+  // it needs no sort key of ours — but the resolver's array order is its own
+  // business, so pin it explicitly rather than inherit it.
+  vaults.sort((a, b) => a.vaultId - b.vaultId);
+
+  return { vaults, skipped };
 }

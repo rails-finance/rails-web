@@ -12,6 +12,8 @@ import { notFound, redirect } from "next/navigation";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { RailHeader } from "@/components/shared/rail-header";
 import { MaplePoolPage } from "@/components/vaults/maple-pool-page";
+import { Suspense } from "react";
+import { VaultProtectsSection } from "@/components/vaults/vault-protects-section";
 import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { resolveMaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { maplePoolHref } from "@/lib/vaults/routes";
@@ -73,7 +75,19 @@ export default async function MaplePoolRoute({ params, searchParams }: Props) {
         )}
 
         {s ? (
-          <MaplePoolPage pool={p} state={s} readAt={new Date().toISOString()} />
+          <MaplePoolPage
+            pool={p}
+            state={s}
+            readAt={new Date().toISOString()}
+            protects={
+              <Suspense fallback={null}>
+                <VaultProtectsSection
+                  subject={{ chainId: 1, address: p.pool, kind: "maple-pool" }}
+                  vaultName={p.symbol}
+                />
+              </Suspense>
+            }
+          />
         ) : (
           <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500" data-maple-pool-unread="">
             This pool could not be read from chain just now, so no figure is stated for it.

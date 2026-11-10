@@ -95,10 +95,10 @@ function Row({ r, t }: { r: ReserveRowModel; t: ReserveTableModel }) {
     <ProvReceiptsScope registry={registry} bounds={false}>
       <DataTableRow data-reserve-row={r.key} href={r.href} {...r.hooks}>
         <DataTableCell rowHeader>
-          <div className="flex items-center gap-2">
-            <TokenChipIcon symbol={r.asset.symbol} address={r.asset.address} size={20} filterable={false} />
-            <div className="min-w-0 flex-1 leading-tight">
-              <div className="flex flex-wrap items-center gap-x-1.5 text-[13px] font-medium text-foreground">
+          <div className="flex items-center gap-3">
+            <TokenChipIcon symbol={r.asset.symbol} address={r.asset.address} size={36} filterable={false} />
+            <div className="min-w-0 flex-1 leading-snug">
+              <div className="flex flex-wrap items-center gap-x-1.5 text-[14px] font-medium text-foreground">
                 {r.href ? (
                   <DataTableRowLink href={r.href} data-reserve-link={r.key}>
                     {symbol}
@@ -109,7 +109,7 @@ function Row({ r, t }: { r: ReserveRowModel; t: ReserveTableModel }) {
                 {r.asset.tags}
                 {r.asset.chips}
               </div>
-              {r.asset.sub}
+              {r.asset.sub && <div className="text-[12px] text-rb-500">{r.asset.sub}</div>}
             </div>
             {r.asset.details}
           </div>

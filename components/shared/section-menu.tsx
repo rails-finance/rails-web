@@ -20,7 +20,7 @@
 // `data-prov-lit` (the ring, app/globals.css).
 
 import { useState, type ReactNode } from "react";
-import { Copy, Download, ExternalLink, FileText, ArrowRight } from "lucide-react";
+import { Copy, Download, ExternalLink, FileText, ArrowRight, ToggleLeft, ToggleRight } from "lucide-react";
 import { Icon } from "@/components/icons/icon";
 import { ToolsMenu, ToolsMenuItem } from "@/components/shared/tools-menu";
 import { ProvReceiptsScope, useProvScopeLit, useReceiptRegistry } from "@/components/shared/provenance";
@@ -43,6 +43,16 @@ export interface SectionMenuExports {
   markdown?: { build: () => string; copySubtitle?: string };
   /** The section's table as CSV. */
   csv?: { filename: string; build: () => string; subtitle?: string };
+}
+
+/** A switch row that changes what the section shows (the Morpho roster's
+ *  "Show all markets"), drawn first. */
+export interface SectionMenuView {
+  item: string;
+  title: string;
+  subtitle: string;
+  on: boolean;
+  toggle: () => void;
 }
 
 const DIVIDER = <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-700" />;
@@ -68,10 +78,12 @@ export function SectionMenuRows({
   close,
   links = [],
   exports,
+  views = [],
 }: {
   close: () => void;
   links?: SectionMenuLink[];
   exports?: SectionMenuExports;
+  views?: SectionMenuView[];
 }) {
   const [copied, setCopied] = useState(false);
   const rails = links.filter((l) => l.internal);
@@ -79,6 +91,23 @@ export function SectionMenuRows({
   const md = exports?.markdown;
   const csv = exports?.csv;
   const groups: ReactNode[] = [];
+  if (views.length)
+    groups.push(
+      views.map((v) => (
+        <ToolsMenuItem
+          key={v.item}
+          icon={v.on ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+          title={v.title}
+          subtitle={v.subtitle}
+          item={v.item}
+          checked={v.on}
+          onClick={() => {
+            v.toggle();
+            close();
+          }}
+        />
+      )),
+    );
   if (rails.length)
     groups.push(
       rails.map((l) => (
@@ -173,6 +202,7 @@ export function SectionMenu({
   hint = "Click a value in this section to trace it",
   links,
   exports,
+  views,
 }: {
   /** The `scopeId` of the `ProvSection` this ⋮ arms. */
   scope: string;
@@ -181,12 +211,14 @@ export function SectionMenu({
   hint?: string;
   links?: SectionMenuLink[];
   exports?: SectionMenuExports;
+  views?: SectionMenuView[];
 }) {
-  const rows = (links?.length ?? 0) > 0 || exports?.markdown != null || exports?.csv != null;
+  const rows =
+    (links?.length ?? 0) > 0 || (views?.length ?? 0) > 0 || exports?.markdown != null || exports?.csv != null;
   return (
     <div className="-my-1 -mr-1 flex shrink-0" data-anatomy="K1" data-section-menu={scope}>
       <ToolsMenu variant="panel" label={`${title} menu`} heading={title} provScope={{ id: scope, hint }}>
-        {rows ? (close) => <SectionMenuRows close={close} links={links} exports={exports} /> : undefined}
+        {rows ? (close) => <SectionMenuRows close={close} links={links} exports={exports} views={views} /> : undefined}
       </ToolsMenu>
     </div>
   );

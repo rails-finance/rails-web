@@ -16,12 +16,15 @@
 import type { ReactNode } from "react";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
 import { readStampProv } from "@/components/shared/read-stamp";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+import { AssetUnit } from "@/components/shared/asset-unit";
 import { MarketPage } from "@/components/shared/product/market-page";
-import { DATA_TABLE_PILL } from "@/components/shared/data-table/data-table";
+import { DATA_TABLE_PILL, DataTableAmount } from "@/components/shared/data-table/data-table";
 import { positionEntry } from "@/components/shared/product/position-entry";
 import type { SectionMenuLink } from "@/components/shared/section-menu";
 import { formatTinyNonZero } from "@/lib/utils/format";
+import { formatCompact } from "@/lib/shared/format-compact";
+import { fmtUsd } from "@/lib/aave-v4/format";
 import { DOLOMITE_ADDRESSES, formatDolomitePrice } from "@/lib/dolomite/asset-catalog";
 import {
   type DolomiteMarketCoords,
@@ -165,6 +168,34 @@ function Tags({ m }: { m: DolomiteMarketRow }) {
 
 function marketRow(m: DolomiteMarketRow, axisMax: number, block: number, readBy: ServerRead | undefined) {
   const coords: DolomiteMarketCoords = { blockNumber: block, marketId: m.marketId, symbol: m.symbol, readBy };
+  // The table's amount cells (D1, decision 0047): the token amount over its
+  // oracle dollars (getMarketPrice at the read's block), the amount an echo of
+  // the dollar figure's receipt. Null where the cell keeps one line: no price
+  // (dollars unknown) or a side at zero.
+  const pair = (n: number, v: number | null, info: Provenance) =>
+    v != null && n > 0
+      ? {
+          amount: (
+            <Prov info={info} echo>
+              <span className="inline-flex items-center gap-1.5">
+                {formatCompact(n)}
+                <AssetUnit symbol={m.symbol} address={m.token} />
+              </span>
+            </Prov>
+          ),
+          value: (
+            <Prov info={info}>
+              <span title={usd(v)}>{fmtUsd(v).display}</span>
+            </Prov>
+          ),
+        }
+      : null;
+  const suppliedInfo = dolMarketValueProv("supplied", coords);
+  const borrowedInfo = dolMarketValueProv("borrowed", coords);
+  const amounts = {
+    supplied: pair(m.totalSupplyUnderlying, m.totalSupplyUsd, suppliedInfo),
+    borrowed: pair(m.totalBorrowUnderlying, m.totalBorrowUsd, borrowedInfo),
+  };
   const row: ReserveRowModel = {
     key: String(m.marketId),
     asset: {
@@ -206,12 +237,20 @@ function marketRow(m: DolomiteMarketRow, axisMax: number, block: number, readBy:
       supplied: {
         sort: m.totalSupplyUsd ?? -1,
         title: `${tokenAmount(m.totalSupplyUnderlying, m.symbol)} supplied`,
-        node: <Prov info={dolMarketValueProv("supplied", coords)}>{usd(m.totalSupplyUsd)}</Prov>,
+        node: amounts.supplied ? (
+          <DataTableAmount {...amounts.supplied} />
+        ) : (
+          <Prov info={suppliedInfo}>{usd(m.totalSupplyUsd)}</Prov>
+        ),
       },
       borrowed: {
         sort: m.totalBorrowUsd ?? -1,
         title: `${tokenAmount(m.totalBorrowUnderlying, m.symbol)} borrowed`,
-        node: <Prov info={dolMarketValueProv("borrowed", coords)}>{usd(m.totalBorrowUsd)}</Prov>,
+        node: amounts.borrowed ? (
+          <DataTableAmount {...amounts.borrowed} />
+        ) : (
+          <Prov info={borrowedInfo}>{usd(m.totalBorrowUsd)}</Prov>
+        ),
       },
       borrowRate: {
         sort: m.borrowAprPct ?? -1,

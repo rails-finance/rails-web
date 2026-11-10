@@ -398,6 +398,13 @@ export interface LlamalendMarketRow extends LlamalendMarketIdentity {
   utilisationBasis: "lender deposits" | "crvUSD debt ceiling" | null;
   /** Total debt in USD — ONLY when the borrowed token is crvUSD (~$1). */
   totalDebtUsd: number | null;
+  /** The borrowed token on the Controller, free to borrow now: lenders'
+   *  deposits not lent on a lend market, the minted room under the ceiling on a
+   *  mint market. Null when the read failed. */
+  available: number | null;
+  /** A mint market's crvUSD debt ceiling (the factory's debt_ceiling); null on
+   *  a lend market. */
+  debtCeiling: number | null;
 }
 
 export interface LlamalendMarketsResponse {
@@ -524,8 +531,8 @@ export async function loadLlamalendMarkets(): Promise<LlamalendMarketsResponse> 
 
       let utilisation: number | null = null;
       let utilisationBasis: LlamalendMarketRow["utilisationBasis"] = null;
+      const ceiling = m.factory === "crvusd" ? ok<bigint>(second[i * PER2 + 2]) : null;
       if (m.factory === "crvusd") {
-        const ceiling = ok<bigint>(second[i * PER2 + 2]);
         if (ceiling != null && ceiling > ZERO) {
           utilisation = scaleRaw(totalDebtRaw, m.borrowedDecimals) / scaleRaw(ceiling, m.borrowedDecimals);
           utilisationBasis = "crvUSD debt ceiling";
@@ -556,6 +563,8 @@ export async function loadLlamalendMarkets(): Promise<LlamalendMarketsResponse> 
         utilisation,
         utilisationBasis,
         totalDebtUsd: m.borrowedIsCrvusd ? totalDebt : null,
+        available: controllerBalance != null ? scaleRaw(controllerBalance, m.borrowedDecimals) : null,
+        debtCeiling: ceiling != null ? scaleRaw(ceiling, m.borrowedDecimals) : null,
       };
     });
 
@@ -589,6 +598,73 @@ export async function loadLlamalendMarkets(): Promise<LlamalendMarketsResponse> 
     console.error("LlamaLend markets chain read failed:", error);
     return empty();
   }
+}
+
+// ── One market (its page) ─────────────────────────────────────────────────────
+// The roster's read, then three more reads of the one market at the same
+// block: its vault (a lend market's), what the vault pays lenders now
+// (`lend_apr()`), and the rate the AMM charges borrowers now (`rate()`), which
+// the monetary policy's rate replaces at the next loan action.
+
+const VAULT_ABI = parseAbi([
+  "function vaults(uint256) view returns (address)",
+  "function vault() view returns (address)",
+  "function lend_apr() view returns (uint256)",
+]);
+const AMM_RATE_ABI = parseAbi(["function rate() view returns (uint256)"]);
+
+export interface LlamalendMarketDetail {
+  blockNumber: number;
+  head?: PositionHeadStamp;
+  market: LlamalendMarketRow;
+  /** The lend market's ERC-4626 vault, lenders' deposits; null on a mint market. */
+  vault: string | null;
+  /** What lenders earn a year now, the vault's lend_apr (%); null on a mint market or a failed read. */
+  lendAprPct: number | null;
+  /** The rate borrowers are charged now, the AMM's rate() a year (%). */
+  chargedAprPct: number | null;
+  /** Markets on the roster wired to the same monetary policy, this one included. */
+  policySharers: number;
+}
+
+export async function loadLlamalendMarket(controller: string): Promise<LlamalendMarketDetail | null> {
+  const all = await loadLlamalendMarkets();
+  if (all.chainStale) throw new Error("LlamaLend markets read failed");
+  const market = all.markets.find((m) => m.controller === controller.toLowerCase());
+  if (!market) return null;
+  const client = headReadsClient();
+  const at = BigInt(all.blockNumber);
+  const lend = market.factory !== "crvusd";
+  let vault: string | null = null;
+  if (lend) {
+    const v = await client
+      .readContract(
+        market.factory === "oneway"
+          ? { address: ONEWAY, abi: VAULT_ABI, functionName: "vaults", args: [BigInt(market.index)], blockNumber: at }
+          : { address: market.controller as `0x${string}`, abi: VAULT_ABI, functionName: "vault", blockNumber: at },
+      )
+      .catch(() => null);
+    vault = v ? getAddress(v).toLowerCase() : null;
+  }
+  const [lendRead, rateRead] = (await client.multicall({
+    allowFailure: true,
+    blockNumber: at,
+    contracts: [
+      { address: (vault ?? market.controller) as `0x${string}`, abi: VAULT_ABI, functionName: "lend_apr" },
+      { address: market.amm as `0x${string}`, abi: AMM_RATE_ABI, functionName: "rate" },
+    ] as const,
+  })) as Res[];
+  const lendApr = vault ? ok<bigint>(lendRead) : null;
+  const rate = ok<bigint>(rateRead);
+  return {
+    blockNumber: all.blockNumber,
+    head: all.head,
+    market,
+    vault,
+    lendAprPct: lendApr != null ? scale1e18(lendApr) * 100 : null,
+    chargedAprPct: rate != null ? scale1e18(rate) * SECONDS_PER_YEAR * 100 : null,
+    policySharers: all.markets.filter((m) => m.monetaryPolicy === market.monetaryPolicy).length,
+  };
 }
 
 // ── Market-state map for the position surfaces ────────────────────────────────

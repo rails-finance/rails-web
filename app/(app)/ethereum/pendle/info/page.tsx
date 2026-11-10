@@ -2,8 +2,15 @@
 // (rails-ops standards/info-page-template.md). Every link is a page of
 // docs.pendle.finance, the host content/official-docs.json lists for pendle.
 
-import { ProtocolInfoPage, type InfoTerm } from "@/components/shared/protocol-info-page";
+import { ProtocolInfoPage, type InfoReads, type InfoTerm } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
+import {
+  PENDLE_LIMIT_ROUTER,
+  PENDLE_ORACLE,
+  PENDLE_ROUTER_STATIC,
+  PENDLE_ROUTER_V3,
+  PENDLE_ROUTER_V4,
+} from "@/lib/pendle/format";
 
 export const metadata = infoMetadata("pendle");
 
@@ -48,6 +55,43 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   },
 ];
 
+// Slot 2a. Each address checked against the chain on 9 Nov 2026: each holds
+// code, RouterStatic and the oracle answer getPtToSyRate for a live market,
+// and rails-server reads these same addresses (services/pendle-positions.ts,
+// services/pendle-router-flows.ts).
+const reads: InfoReads = {
+  contracts: [
+    {
+      name: "Each market",
+      reads:
+        "its tokens, its maturity and whether it has passed, the PT and SY its pool holds, its implied rate, its LP supply and its reward tokens.",
+    },
+    { name: "Each SY", reads: "the token it wraps, and its exchange rate, what one SY is worth in the asset." },
+    {
+      name: "PendlePYLpOracle",
+      address: PENDLE_ORACLE,
+      reads: "the PT, YT and LP prices in SY as a 15-minute average, where the market's oracle is ready.",
+    },
+    {
+      name: "RouterStatic",
+      address: PENDLE_ROUTER_STATIC,
+      reads:
+        "the same prices at the spot rate where the oracle is not ready, and a wallet's balances and unclaimed interest and rewards.",
+    },
+    {
+      name: "PendleRouterV4",
+      address: PENDLE_ROUTER_V4,
+      reads: "its event logs: every trade, mint, redeem and liquidity move through it.",
+    },
+    { name: "PendleRouterV3", address: PENDLE_ROUTER_V3, reads: "its event logs, as for V4." },
+    { name: "Limit router", address: PENDLE_LIMIT_ROUTER, reads: "its event logs: each limit order fill." },
+  ],
+  how: "Rails's server reads each market at the chain's finalized block. The markets page serves the last roster at once and reads it again once it is ten minutes old; a market's page and a wallet's page read at each load. The list of markets and every router event come from Rails's server store of the routers' logs.",
+  notes: [
+    "A market enters the roster once a router event names it, so a market no one has traded through the routers is not listed.",
+  ],
+};
+
 export default function PendleInfoPage() {
   return (
     <ProtocolInfoPage
@@ -60,6 +104,7 @@ export default function PendleInfoPage() {
         </>
       }
       glossary={GLOSSARY}
+      reads={reads}
       howItWorks={[
         "A Pendle market splits a yield-bearing token into PT, which redeems for one unit of the asset at maturity, and YT, which collects the yield until then.",
         "Each market's pool trades PT against SY, and the price of PT gives the market's implied APY.",
@@ -69,7 +114,7 @@ export default function PendleInfoPage() {
       views={[
         {
           heading: "Markets",
-          body: "Every market the routers have named, grouped by the protocol behind its yield token, live markets first. A market's page shows its implied APY, pool, marks and latest router events.",
+          body: "Every market the routers have named, with how many are active and how many have matured, the active markets first. A market's page shows its TVL, implied APY, PT price and maturity, the YT, LP and SY prices, how the market is built, its pool and its latest router events.",
         },
         {
           heading: "Wallet and position pages",
