@@ -8,13 +8,13 @@
 // (OPEN_SCOPE_PANEL), and the Focus button on a token or chain row of the
 // search's dropdown (components/shared/aim-search-button.tsx).
 //
-// The panel has two parts. Assets: each chosen asset with one switch, "And
-// what's built on it", added through AssetChooser. Chains: one press per
-// chain; none pressed is every chain, and a focused chain where an asset is
-// not listed says so. Arriving on `?assets=` / `?chains=`, a dialog says what
-// Focus mode is and what the link set it to (FocusLinkIntro), and the strip's
-// "Keep this focus" (in the dialog and the profile menu) stores the link's
-// focus in this browser.
+// The panel edits the focus view in use (lib/shared/focus-views.ts): its name,
+// then two parts. Assets: each chosen asset with one switch, "Built on it",
+// added through AssetChooser. Chains: one press per chain; none pressed is
+// every chain, and a focused chain where an asset is not listed says so.
+// Arriving on `?assets=` / `?chains=` (with `&view=` naming it), a dialog says
+// what Focus mode is and lists what the link sets (FocusLinkIntro), with "Use
+// this view", which saves it and keeps it as the reader moves around Rails.
 //
 // On an explorer's own pages the strip carries one more line where the
 // explorer is one the preference hides (lib/shared/explorer-scope.ts): its
@@ -45,6 +45,8 @@ import { builtOnSymbols, FAMILY_ROWS, familyOf } from "@/lib/shared/asset-family
 import {
   chainNameOf,
   effectivePicks,
+  focusViews,
+  type FocusView,
   OPEN_SCOPE_PANEL,
   SCOPE_CHAINS,
   SCOPE_TOKENS,
@@ -147,11 +149,11 @@ export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" })
                 </span>
                 <button
                   type="button"
-                  onClick={scope.keepLink}
+                  onClick={scope.adoptLink}
                   className={`font-semibold ${INPLACE_TEXT}`}
                   data-asset-scope-keep=""
                 >
-                  Keep this focus
+                  Use this view
                 </button>
               </>
             )}
@@ -170,7 +172,14 @@ export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" })
           <ExplorerScopeLine keys={scope.keys} />
         </div>
       )}
-      {open && <AssetScopePanel onClose={() => setOpen(false)} />}
+      {open && (
+        <AssetScopePanel
+          onClose={() => {
+            setOpen(false);
+            focusViews.prune();
+          }}
+        />
+      )}
       {scope.fromLink && !open && <FocusLinkIntro onChange={() => setOpen(true)} />}
     </>
   );
@@ -236,6 +245,98 @@ function PickIcons({ picks }: { picks: AssetPick[] }) {
   );
 }
 
+/** What a focus holds, as a view's name until it has one of its own: "WETH
+ *  and BOLD", "WETH, BOLD, USDC +2 on Ethereum", "Base". */
+export function focusName(picks: AssetPick[], chains: number[]): string {
+  const names = [...new Set(picks.map(symbolOf))];
+  const a = names.length > 3 ? `${names.slice(0, 3).join(", ")} +${names.length - 3}` : andList(names);
+  const c = andList(chains.map(chainNameOf));
+  return a && c ? `${a} on ${c}` : a || c || "Empty view";
+}
+
+/** A saved view's name: its own, else what it holds. */
+export const viewName = (v: Pick<FocusView, "name" | "assets" | "chains">) => v.name || focusName(v.assets, v.chains);
+
+/** A view's first marks: its assets', else its chains'. */
+export function ViewIcons({ picks, chains }: { picks: AssetPick[]; chains: number[] }) {
+  if (picks.length) return <PickIcons picks={picks} />;
+  return (
+    <span className="mr-1 inline-flex -space-x-1 align-[-3px]" aria-hidden="true">
+      {chains.slice(0, 2).map((c) => (
+        <ChainGlyph key={c} chainId={c as ChainId} className="size-3.5" />
+      ))}
+    </span>
+  );
+}
+
+/** "with sBOLD, yBOLD and 3 more": what one pick adds, short. */
+function addsLine(p: AssetPick): string | null {
+  if (!p.builtOn) return null;
+  const adds = examplesOf([p], 99);
+  if (!adds.length) return null;
+  return adds.length > 2 ? `with ${adds.slice(0, 2).join(", ")} and ${adds.length - 2} more` : `with ${andList(adds)}`;
+}
+
+/**
+ * A focus as rows: one per asset (its mark, symbol and chain, and under it
+ * what it adds when built-on is on), then one per chain. `max` rows, then "and
+ * N more"; or every row, scrolling past `scrollAfter` with the bottom fade.
+ */
+export function FocusRows({
+  picks,
+  chains,
+  max,
+  scrollAfter,
+  size = 18,
+}: {
+  picks: AssetPick[];
+  chains: number[];
+  max?: number;
+  scrollAfter?: number;
+  size?: number;
+}) {
+  const unique = [...new Map(picks.map((p) => [`${p.chain}:${p.token}`, p])).values()];
+  const chainFocus = chains.length > 0;
+  const rows: ReactNode[] = [
+    ...unique.map((p) => {
+      const sub = addsLine(p);
+      return (
+        <li key={`${p.chain}:${p.token}`} className="flex items-start gap-2 py-1.5" data-focus-row="asset">
+          <span className="mt-px shrink-0">
+            <TokenChipIcon symbol={symbolOf(p)} address={p.token} size={size} filterable={false} untitled />
+          </span>
+          <span className="min-w-0">
+            <span className="flex items-baseline gap-1.5">
+              <span className="truncate text-sm font-semibold text-foreground">{symbolOf(p)}</span>
+              {!chainFocus && <span className="shrink-0 text-[11px] text-rb-500">{chainNameOf(p.chain)}</span>}
+            </span>
+            {sub && <span className="block text-[11px] leading-snug text-rb-500">{sub}</span>}
+          </span>
+        </li>
+      );
+    }),
+    ...chains.map((c) => (
+      <li key={`chain-${c}`} className="flex items-center gap-2 py-1.5" data-focus-row="chain">
+        <span className="inline-flex shrink-0 items-center justify-center" style={{ width: size, height: size }}>
+          <ChainGlyph chainId={c as ChainId} className="size-4" />
+        </span>
+        <span className="text-sm font-semibold text-foreground">{chainNameOf(c)}</span>
+        <span className="text-[11px] text-rb-500">{unique.length ? "only this chain" : "chain"}</span>
+      </li>
+    )),
+  ];
+  const shown = max != null ? rows.slice(0, max) : rows;
+  const more = rows.length - shown.length;
+  return (
+    <>
+      <FadeList count={rows.length} scrollAfter={scrollAfter} data-focus-rows={rows.length}>
+        {shown}
+      </FadeList>
+      {more > 0 && <p className="pt-0.5 text-[11px] text-rb-500">and {more} more</p>}
+    </>
+  );
+}
+
 const EXAMPLES_SHOWN = 3;
 
 /**
@@ -243,7 +344,7 @@ const EXAMPLES_SHOWN = 3;
  * ordered by how much is built on it in turn, then rate tokens before vaults
  * (sBOLD and yBOLD before a one-off vault, wstETH before a WETH vault).
  */
-function examplesOf(picks: AssetPick[]): string[] {
+function examplesOf(picks: AssetPick[], limit = EXAMPLES_SHOWN): string[] {
   const KIND_RANK = ["rate", "wraps", "vault", "pt", "yt", "lp", "debt"];
   const rank = (sym: string) => {
     const row = FAMILY_ROWS.find((r) => r.symbol === sym);
@@ -258,22 +359,28 @@ function examplesOf(picks: AssetPick[]): string[] {
   };
   const lists = picks.filter((p) => p.builtOn).map((p) => builtOnSymbols(p).sort(order));
   const out = new Set<string>();
-  for (let i = 0; out.size < EXAMPLES_SHOWN && lists.some((l) => i < l.length); i++)
-    for (const l of lists) if (i < l.length && out.size < EXAMPLES_SHOWN) out.add(l[i]);
+  for (let i = 0; out.size < limit && lists.some((l) => i < l.length); i++)
+    for (const l of lists) if (i < l.length && out.size < limit) out.add(l[i]);
   return [...out];
 }
 
 /** "sBOLD, yBOLD and ysyBOLD": a list in prose. */
 const andList = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
 
+/** The dialog's rows scroll past this many. */
+const INTRO_ROWS = 5;
+
 /**
- * Arriving on a `?assets=` link: what Focus mode is and what this view is set
- * to, once per link per tab (sessionStorage; without it, every load).
+ * Arriving on a focus link: what Focus mode is and what the link sets, with
+ * "Use this view" (saved as a view and put in use), Change (the panel, on the
+ * link's focus) and "Not now" (the link's focus dropped; the reader's own view
+ * resumes). Once per link per tab (sessionStorage); Escape and the scrim are
+ * "Not now".
  */
 function FocusLinkIntro({ onChange }: { onChange: () => void }) {
   const scope = useAssetScope();
   const sp = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
-  const linkValue = `${sp?.get("assets") ?? ""}|${sp?.get("chains") ?? ""}`;
+  const linkValue = `${sp?.get("assets") ?? ""}|${sp?.get("chains") ?? ""}|${sp?.get("view") ?? ""}`;
   const seenKey = `rails-focus-intro:${linkValue}`;
   const [shown, setShown] = useState(() => {
     try {
@@ -288,37 +395,28 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
     } catch {}
     setShown(false);
   };
+  const notNow = () => {
+    close();
+    scope.dismissLink();
+  };
   useEffect(() => {
     if (!shown) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !e.defaultPrevented) close();
+      if (e.key === "Escape" && !e.defaultPrevented) notNow();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   });
   if (!shown) return null;
 
-  const picks = [...new Map(scope.picks.map((p) => [symbolOf(p), p])).values()];
-  const examples = examplesOf(scope.picks);
-  const builtOn = scope.picks.some((p) => p.builtOn);
-  const one = picks.length === 1;
-  const chains = scope.chains;
-  const onChains = chains.length > 0 && (
-    <>
-      {picks.length ? " on " : ""}
-      <ChainWords chains={chains} size="size-3.5" />
-    </>
-  );
-  const chainsTail = chains.length ? `, on ${chains.map(chainNameOf).join(" and ")}` : "";
-
   return createPortal(
     <div className="fixed inset-0 z-[var(--z-modal)]" data-focus-intro="">
-      <div className={`absolute inset-0 ${PAGE_SCRIM}`} onClick={close} aria-hidden="true" />
+      <div className={`absolute inset-0 ${PAGE_SCRIM}`} onClick={notNow} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="focus-intro-title"
-        className="overlay-panel absolute left-1/2 top-24 flex w-[28rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col gap-3 p-5"
+        className="overlay-panel absolute left-1/2 top-24 flex max-h-[calc(100dvh-7rem)] w-[28rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col gap-3 overflow-y-auto p-5"
       >
         <div className="flex items-center gap-2">
           <ListFilter className="size-4 text-rb-500" aria-hidden="true" />
@@ -327,41 +425,20 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
           </h2>
         </div>
         <p className="text-sm leading-relaxed text-rb-600 dark:text-rb-300">
-          Focus mode isolates the Rails app to the assets and chains you choose. This view is set to focus on{" "}
-          {picks.slice(0, NAMED_SHOWN).map((p, i, shown) => (
-            <span key={`${p.chain}:${p.token}`}>
-              {i > 0 && (i === shown.length - 1 && picks.length <= NAMED_SHOWN ? " and " : ", ")}
-              <span className="inline-flex items-center gap-1 whitespace-nowrap font-semibold text-foreground">
-                <TokenChipIcon symbol={symbolOf(p)} address={p.token} size={16} filterable={false} untitled />
-                {symbolOf(p)}
-              </span>
-            </span>
-          ))}
-          {picks.length > NAMED_SHOWN && ` and ${picks.length - NAMED_SHOWN} more`}
-          {onChains}
-          {builtOn &&
-            (examples.length
-              ? `, with assets built on ${one ? "it" : "them"} such as ${andList(examples)}`
-              : `, with assets built on ${one ? "it" : "them"}`)}
-          .
+          Focus mode isolates the Rails app to the assets and chains you choose. This link sets:
         </p>
-        <p className="text-xs leading-relaxed text-rb-500">
-          {picks.length
-            ? `Lists, explorers, chains and search show only what holds, lends or is built on ${one ? "it" : "them"}${chainsTail}.`
-            : `Lists, explorers and search show only what is on ${chains.map(chainNameOf).join(" and ")}.`}
-        </p>
+        <div className="rounded-lg border border-rb-200 px-3 py-2 dark:border-rb-800" data-focus-intro-view="">
+          {scope.linkName && (
+            <p className="pb-1 text-sm font-bold text-foreground" data-focus-intro-name="">
+              {scope.linkName}
+            </p>
+          )}
+          <FocusRows picks={scope.picks} chains={scope.chains} scrollAfter={INTRO_ROWS} />
+        </div>
         <FocusTip />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button
-            type="button"
-            onClick={() => {
-              close();
-              scope.clear();
-            }}
-            className={RESET_LINK}
-            data-focus-intro-clear=""
-          >
-            Show everything
+          <button type="button" onClick={notNow} className={RESET_LINK} data-focus-intro-not-now="">
+            Not now
           </button>
           <button
             type="button"
@@ -370,6 +447,7 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
               onChange();
             }}
             className={RESET_LINK}
+            data-focus-intro-change=""
           >
             Change
           </button>
@@ -377,20 +455,12 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
             type="button"
             onClick={() => {
               close();
-              scope.keepLink();
+              scope.adoptLink();
             }}
-            className={RESET_LINK}
-            data-focus-intro-keep=""
-          >
-            Keep this focus
-          </button>
-          <button
-            type="button"
-            onClick={close}
             className="ml-auto rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-500"
-            data-focus-intro-continue=""
+            data-focus-intro-use=""
           >
-            Continue in focus
+            Use this view
           </button>
         </div>
       </div>
@@ -483,8 +553,6 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
 const ADDS_SHOWN = 5;
 /** The pick list scrolls past this many. */
 const PICKS_BEFORE_SCROLL = 6;
-/** The dialog names this many picks, then "and N more". */
-const NAMED_SHOWN = 3;
 
 /** The one place the name is spelled out. */
 const PANEL_TITLE = "Focus";
@@ -590,12 +658,22 @@ function FocusChains() {
   );
 }
 
-/** The panel's picks: past PICKS_BEFORE_SCROLL they scroll, and the list's
- *  bottom edge fades while more is below (a mask, so it reads on any ground). */
-function PicksList({ count, children }: { count: number; children: ReactNode }) {
+/** A list that scrolls past `scrollAfter` rows, its bottom edge fading while
+ *  more is below (a mask, so it reads on any ground). */
+function FadeList({
+  count,
+  scrollAfter,
+  children,
+  ...data
+}: {
+  count: number;
+  scrollAfter?: number;
+  children: ReactNode;
+  [data: `data-${string}`]: unknown;
+}) {
   const ref = useRef<HTMLUListElement>(null);
   const [more, setMore] = useState(false);
-  const scrolls = count > PICKS_BEFORE_SCROLL;
+  const scrolls = scrollAfter != null && count > scrollAfter;
   const measure = () => {
     const el = ref.current;
     setMore(!!el && el.scrollTop + el.clientHeight < el.scrollHeight - 2);
@@ -605,14 +683,54 @@ function PicksList({ count, children }: { count: number; children: ReactNode }) 
     <ul
       ref={ref}
       onScroll={scrolls ? measure : undefined}
-      className={`divide-y divide-rb-200 dark:divide-rb-800 ${scrolls ? "max-h-[15.5rem] overflow-y-auto pr-1" : ""} ${
+      className={`divide-y divide-rb-200 dark:divide-rb-800 ${scrolls ? "overflow-y-auto pr-1" : ""} ${
         scrolls && more ? "[mask-image:linear-gradient(to_bottom,black_calc(100%-2rem),transparent)]" : ""
       }`}
-      data-asset-scope-picks={count}
-      data-asset-scope-picks-more={scrolls && more ? "" : undefined}
+      style={scrolls ? { maxHeight: `${scrollAfter * 2.6}rem` } : undefined}
+      data-fade-more={scrolls && more ? "" : undefined}
+      {...data}
     >
       {children}
     </ul>
+  );
+}
+
+/** The panel's picks: past PICKS_BEFORE_SCROLL they scroll and fade. */
+function PicksList({ count, children }: { count: number; children: ReactNode }) {
+  return (
+    <FadeList count={count} scrollAfter={PICKS_BEFORE_SCROLL} data-asset-scope-picks={count}>
+      {children}
+    </FadeList>
+  );
+}
+
+/** The panel's first line: the view's name, edited in place; empty, it is
+ *  called by what it holds. */
+function ViewNameField({ view }: { view: FocusView }) {
+  const [draft, setDraft] = useState(view.name ?? "");
+  useEffect(() => setDraft(view.name ?? ""), [view.id, view.name]);
+  const commit = () => {
+    if ((view.name ?? "") !== draft.trim()) focusViews.rename(view.id, draft);
+  };
+  return (
+    <label className="flex flex-col gap-1" data-focus-view-name="">
+      <span className={OVERLAY_HEADING}>Name</span>
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            commit();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        placeholder={focusName(view.assets, view.chains)}
+        maxLength={60}
+        className="rounded-md border border-rb-300 bg-raised px-2 py-1 text-base font-semibold text-foreground outline-none placeholder:font-normal placeholder:text-rb-500 focus:border-teal-500 sm:text-sm dark:border-rb-700"
+      />
+    </label>
   );
 }
 
@@ -644,9 +762,10 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
     );
   };
 
+  const name = scope.fromLink ? scope.linkName : (scope.active?.name ?? null);
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(scopeLink(picks, scope.chains));
+      await navigator.clipboard.writeText(scopeLink(picks, scope.chains, name ?? undefined));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {}
@@ -654,10 +773,11 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
 
   const body = (
     <div className="flex flex-col gap-3 px-4 pb-4" data-asset-scope-panel="">
+      {scope.active && !scope.fromLink && <ViewNameField view={scope.active} />}
       <p className="text-xs leading-relaxed text-rb-500">
         {scope.fromLink
-          ? "This focus came with the link and applies to this view. Keep it to see every page this way."
-          : "Rails shows only what holds, lends or is built on these assets, on these chains. Kept in this browser."}
+          ? "This focus came with a link. Use this view to save it and keep it as you move around Rails."
+          : "Rails shows only what holds, lends or is built on these assets, on these chains. Saved in this browser as a focus view."}
       </p>
       <h3 className={OVERLAY_HEADING}>Assets</h3>
       {picks.length > 0 && (
@@ -718,13 +838,13 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
               ) : (
                 <Link2 className="size-3.5" aria-hidden="true" />
               )}
-              {copied ? "Copied" : "Copy a link to this view"}
+              {copied ? "Copied" : "Copy link"}
             </button>
           </>
         )}
         {scope.fromLink && (
-          <button type="button" onClick={scope.keepLink} className={RESET_LINK}>
-            Keep in this browser
+          <button type="button" onClick={scope.adoptLink} className={RESET_LINK} data-asset-scope-use="">
+            Use this view
           </button>
         )}
         <button

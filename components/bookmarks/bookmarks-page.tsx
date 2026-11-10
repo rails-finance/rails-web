@@ -1,10 +1,10 @@
 "use client";
 
 // The bookmarks page's body (rails-ops ui-jobs 480), drawn in the app shell: Back's row (H7), the heading (B1), then
-// the tabs Wallets, Positions and Views (B4, ui-jobs 521 and 530, in the profile
-// menu's order) over the chosen kind's list and the backup controls (B2), the
+// the tabs Wallets, Positions, Views and Focus views (B4, ui-jobs 521, 530 and
+// 557) over the chosen kind's list and the backup controls (B2), the
 // same components the wallet panel draws (components/shared/bookmark-list.tsx).
-// The tab rides in the URL (`?tab=positions`, `?tab=views`). With no saved
+// The tab rides in the URL (`?tab=positions`, `?tab=views`, `?tab=focus`). With no saved
 // wallets, the wallets tab's empty state (B3) says how to make one, offers
 // Start here and the sample wallet (lib/shared/sample-wallet.ts), and asks for
 // a backup file to import (Miles, 6 Nov 2026: no search here, no word about
@@ -14,29 +14,38 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Bookmark, Signpost } from "lucide-react";
 import { DetailBackButton } from "@/components/shared/detail-back-row";
-import { BookmarkBackup, BookmarkList, SavedLinkList, useBookmarks } from "@/components/shared/bookmark-list";
+import {
+  BookmarkBackup,
+  BookmarkList,
+  FocusViewList,
+  SavedLinkList,
+  useBookmarks,
+} from "@/components/shared/bookmark-list";
+import { focusViews, useAssetScope } from "@/lib/shared/asset-scope";
 import { useSavedLinks } from "@/components/shared/saved-items";
 import { SAVED_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
-import { PROFILE_CLEARANCE, START_CTA } from "@/lib/shared/ui-grammar";
+import { INPLACE_TEXT, PROFILE_CLEARANCE, START_CTA } from "@/lib/shared/ui-grammar";
 
-type Tab = "wallets" | "positions" | "views";
+type Tab = "wallets" | "positions" | "views" | "focus";
 const TABS: { id: Tab; label: string; noun: string; menu: string }[] = [
   { id: "wallets", label: "Wallets", noun: "wallet", menu: "ten" },
   { id: "positions", label: "Positions", noun: "position", menu: "five" },
   { id: "views", label: "Views", noun: "view", menu: "five" },
+  { id: "focus", label: "Focus views", noun: "focus view", menu: "five" },
 ];
 
 const tabFromUrl = (): Tab => {
   const t = new URLSearchParams(window.location.search).get("tab");
-  return t === "positions" || t === "views" ? t : "wallets";
+  return t === "positions" || t === "views" || t === "focus" ? t : "wallets";
 };
 
 export function BookmarksPage() {
   const bookmarks = useBookmarks();
   const positions = useSavedLinks("position");
   const views = useSavedLinks("view");
+  const scope = useAssetScope();
   const [tab, setTab] = useState<Tab>("wallets");
   useEffect(() => setTab(tabFromUrl()), []);
   const choose = (t: Tab) => {
@@ -47,14 +56,15 @@ export function BookmarksPage() {
     window.history.replaceState(window.history.state, "", url);
   };
 
-  const ready = bookmarks && positions && views;
+  const ready = bookmarks && positions && views && scope.ready;
   const counts: Record<Tab, number> = {
     wallets: bookmarks?.length ?? 0,
     positions: positions?.length ?? 0,
     views: views?.length ?? 0,
+    focus: scope.views.length,
   };
   const current = TABS.find((t) => t.id === tab)!;
-  const nothing = counts.wallets + counts.positions + counts.views === 0;
+  const nothing = counts.wallets + counts.positions + counts.views + counts.focus === 0;
 
   return (
     // In the app shell (ui-jobs 480): the column's left edge and the app
@@ -167,6 +177,31 @@ export function BookmarksPage() {
                 </div>
               }
             />
+          )}
+          {tab === "focus" && (
+            <>
+              <FocusViewList
+                views={scope.views}
+                active={scope.fromLink ? null : (scope.active?.id ?? null)}
+                empty={
+                  <div data-anatomy="B3">
+                    <p className="font-semibold text-foreground">No focus views yet.</p>
+                    <p className="mt-1 text-sm text-rb-500">
+                      A focus view limits Rails to the assets and chains you choose. Make one here, or press Use this
+                      view on a focus link.
+                    </p>
+                  </div>
+                }
+              />
+              <button
+                type="button"
+                onClick={focusViews.create}
+                className={`mt-4 text-sm font-semibold ${INPLACE_TEXT}`}
+                data-focus-view-new=""
+              >
+                New view
+              </button>
+            </>
           )}
           {/* One instance through the switch from empty to a list, so an
               import's report stays on the page. */}

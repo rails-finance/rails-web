@@ -10,13 +10,15 @@
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, GripVertical, Upload } from "lucide-react";
-import { NAV_BUTTON, POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
+import { INPLACE_TEXT, NAV_BUTTON, POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
 
 import { BookmarkSummary } from "@/components/bookmarks/bookmark-summary";
 import { Facehash } from "@/components/shared/facehash";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 
 import { walletHref } from "@/components/shared/front-door-search";
+import { focusName, ViewIcons, viewName } from "@/components/shared/asset-scope-strip";
+import { focusViews, scopeLink, type FocusView } from "@/lib/shared/asset-scope";
 import {
   bookmarksBackupFilename,
   exportBookmarks,
@@ -56,7 +58,7 @@ export function useBookmarks(): WalletSession[] | null {
  *  name (B2.1). */
 /** Drag and drop within one kind's list (ui-jobs 504): the row being dragged
  *  and the index it would land at. */
-function useRowDrag(kind: SavedKind) {
+function useRowDrag(kind: SavedKind, onMove?: (id: string, to: number) => void) {
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<number | null>(null);
   const drag = (i: number, id: string) => ({
@@ -73,7 +75,7 @@ function useRowDrag(kind: SavedKind) {
     },
     onDrop: (e: DragEvent) => {
       e.preventDefault();
-      if (dragging) moveSaved(kind, dragging, i);
+      if (dragging) (onMove ?? ((id: string, to: number) => moveSaved(kind, id, to)))(dragging, i);
       setDragging(null);
       setOver(null);
     },
@@ -609,6 +611,155 @@ function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
           onClick={() => removeSaved(link.kind, link.key)}
           title={`Remove from saved ${noun}s`}
           aria-label={`Remove from saved ${noun}s`}
+          className={`${ICON_BUTTON} hover:text-red-400`}
+        >
+          {BIN}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The saved Focus views (ui-jobs 557), or `empty` when there are none: rows
+ *  moved, renamed and removed as the saved links are, with the link copied
+ *  (`&view=` carrying the name) and Use putting a view in use. */
+export function FocusViewList({
+  views,
+  active,
+  empty,
+}: {
+  views: FocusView[];
+  active: string | null;
+  empty: ReactNode;
+}) {
+  const moveOf = useRowDrag("view", focusViews.move);
+  if (views.length === 0) return <>{empty}</>;
+  return (
+    <div className="flex flex-col gap-1" data-bookmark-list="focus">
+      {views.map((v, i) => (
+        <FocusViewRow key={v.id} view={v} inUse={v.id === active} move={moveOf(i, views.length, v.id)} />
+      ))}
+    </div>
+  );
+}
+
+function FocusViewRow({ view, inUse, move }: { view: FocusView; inUse: boolean; move: RowMove }) {
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const label = viewName(view);
+  const holds = focusName(view.assets, view.chains);
+  const commitEdit = () => {
+    focusViews.rename(view.id, draftName);
+    setEditing(false);
+  };
+  const rowClasses =
+    "group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-colors hover:border-blue-500 hover:bg-rb-100 dark:hover:bg-rb-900";
+  const glyph = (
+    <span className="flex w-8 shrink-0 items-center justify-center">
+      <ViewIcons picks={view.assets} chains={view.chains} />
+    </span>
+  );
+
+  if (editing) {
+    return (
+      <div className={rowClasses} data-bookmark-row="focus" data-editing="">
+        {glyph}
+        <input
+          autoFocus
+          aria-label="Focus view name"
+          value={draftName}
+          onChange={(e) => setDraftName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              commitEdit();
+            } else if (e.key === "Escape") {
+              e.preventDefault();
+              setEditing(false);
+            }
+          }}
+          placeholder={holds}
+          maxLength={60}
+          className="min-w-0 flex-1 rounded border border-rb-300 bg-raised px-1.5 py-0.5 text-base font-bold outline-none sm:text-sm dark:border-rb-700"
+        />
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={commitEdit}
+            title="Save name"
+            aria-label="Save name"
+            className={`${ICON_BUTTON} hover:text-green-500`}
+          >
+            {TICK}
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditing(false)}
+            title="Cancel"
+            aria-label="Cancel rename"
+            className={`${ICON_BUTTON} hover:text-foreground`}
+          >
+            {CROSS}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`${rowClasses} ${move.dragging ? "opacity-50" : ""} ${move.target ? "border-t-blue-500" : ""}`}
+      data-bookmark-row="focus"
+      data-focus-view-row={view.id}
+      {...move.drag}
+    >
+      <GripVertical
+        className="size-4 shrink-0 cursor-grab text-rb-400 active:cursor-grabbing"
+        aria-hidden="true"
+        data-bookmark-grip=""
+      />
+      {glyph}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-bold text-foreground">{label}</span>
+        {view.name && <span className="mt-0.5 block truncate text-xs text-rb-500">{holds}</span>}
+      </span>
+      {inUse ? (
+        <span className="shrink-0 text-xs font-semibold text-foreground" data-focus-view-in-use="">
+          In use
+        </span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => focusViews.use(view.id)}
+          className={`shrink-0 text-xs font-semibold ${INPLACE_TEXT}`}
+          data-focus-view-use={view.id}
+        >
+          Use
+        </button>
+      )}
+      <div className="flex shrink-0 items-center gap-0.5">
+        <MoveButtons label={label} move={move} onMove={(to) => focusViews.move(view.id, to)} />
+        <CopyButton
+          text={typeof window === "undefined" ? "" : scopeLink(view.assets, view.chains, view.name, "/")}
+          what="Copy link"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            setDraftName(view.name ?? "");
+            setEditing(true);
+          }}
+          title="Rename"
+          aria-label="Rename focus view"
+          className={`${ICON_BUTTON} hover:text-foreground`}
+        >
+          {PENCIL}
+        </button>
+        <button
+          type="button"
+          onClick={() => focusViews.remove(view.id)}
+          title="Remove focus view"
+          aria-label="Remove focus view"
           className={`${ICON_BUTTON} hover:text-red-400`}
         >
           {BIN}

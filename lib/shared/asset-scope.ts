@@ -1,8 +1,8 @@
 "use client";
 
-// Focus mode in the browser (ui-jobs 557): the reader's stored focus
-// (lib/shared/asset-preference.ts, `rails-focus-v2`: assets and chains),
-// `?assets=` / `?chains=` over it for one view, and the tests every filtered
+// Focus mode in the browser (ui-jobs 557): the reader's saved focus views and
+// the one in use (lib/shared/focus-views.ts), `?assets=` / `?chains=` /
+// `&view=` over it for one view until "Use this view" saves it, and the tests every filtered
 // list runs: the asset keys the focus reaches (lib/shared/asset-family.ts
 // `familyOf`) and the chains it keeps. A row shows when it passes both.
 //
@@ -39,8 +39,27 @@ import {
   type SymbolIndex,
 } from "@/lib/shared/asset-preference";
 import { CHAINS, type ChainId } from "@/lib/shared/chains";
+import {
+  activeFocus,
+  activeView,
+  adoptFocus,
+  editActive,
+  FOCUS_VIEWS_KEY,
+  isFocusViews,
+  migrateFocus,
+  moveView,
+  newView,
+  NO_VIEWS,
+  pruneEmpty,
+  removeView,
+  renameView,
+  setActive,
+  VIEW_PARAM,
+  type FocusView,
+  type FocusViews,
+} from "@/lib/shared/focus-views";
 
-export type { AssetPick };
+export type { AssetPick, FocusView };
 
 /** The chains the asset chooser's tokens are on. */
 export const SCOPE_CHAINS: Record<number, string> = { 1: "Ethereum", 8453: "Base" };
@@ -81,27 +100,45 @@ const CHANGE = "rails:asset-scope";
 export const OPEN_SCOPE_PANEL = "rails:asset-scope-open";
 
 interface Snapshot {
+  /** The saved views and the one in use (lib/shared/focus-views.ts). */
+  saved: FocusViews;
   stored: Focus;
   /** The focus a link sets on this view; null when the URL carries neither param. */
   link: Focus | null;
+  /** The link's `&view=` name. */
+  linkName: string | null;
 }
-const EMPTY: Snapshot = { stored: NO_FOCUS, link: null };
+const EMPTY: Snapshot = { saved: NO_VIEWS, stored: NO_FOCUS, link: null, linkName: null };
 let cache: { raw: string; snap: Snapshot } = { raw: "", snap: EMPTY };
 
-function readStored(): string {
+const newId = () => `v${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+/** The older single focus (`rails-focus-v2`, or `rails-assets-v1` before it). */
+function readOldFocus(): Focus | null {
   try {
     const v2 = localStorage.getItem(FOCUS_KEY);
-    if (v2 != null) return v2;
+    if (v2 != null) {
+      const f = JSON.parse(v2);
+      return isFocus(f) ? f : null;
+    }
     const v1 = localStorage.getItem(ASSET_PREFERENCE_KEY);
     if (v1) {
       const assets = JSON.parse(v1);
-      if (isPickList(assets)) {
-        const v = JSON.stringify({ assets, chains: [] });
-        localStorage.setItem(FOCUS_KEY, v);
-        localStorage.removeItem(ASSET_PREFERENCE_KEY);
-        return v;
-      }
+      if (isPickList(assets)) return { assets, chains: [] };
     }
+  } catch {}
+  return null;
+}
+
+/** The saved views, made from the older single focus on the first read. */
+function readSaved(): string {
+  try {
+    const held = localStorage.getItem(FOCUS_VIEWS_KEY);
+    if (held != null) return held;
+    const v = JSON.stringify(migrateFocus(readOldFocus(), newId(), Date.now()));
+    localStorage.setItem(FOCUS_VIEWS_KEY, v);
+    localStorage.removeItem(ASSET_PREFERENCE_KEY);
+    return v;
   } catch {}
   return "";
 }
@@ -110,25 +147,28 @@ function readRaw(): string {
   const sp = new URLSearchParams(window.location.search);
   const a = sp.get(ASSETS_PARAM);
   const c = sp.get(CHAINS_PARAM);
-  return [readStored(), a ?? "\u0001", c ?? "\u0001"].join("\u0000");
+  const n = sp.get(VIEW_PARAM);
+  return [readSaved(), a ?? "\u0001", c ?? "\u0001", n ?? ""].join("\u0000");
 }
 
 function snapshot(): Snapshot {
   const raw = readRaw();
   if (raw === cache.raw) return cache.snap;
-  const [s, a, c] = raw.split("\u0000");
-  let stored: Focus = NO_FOCUS;
+  const [s, a, c, n] = raw.split("\u0000");
+  let saved: FocusViews = NO_VIEWS;
   try {
     const v = s ? JSON.parse(s) : null;
-    if (isFocus(v)) stored = v;
+    if (isFocusViews(v)) saved = v;
   } catch {}
   registerSymbols(
-    stored.assets.flatMap((p) => (p.symbol ? [{ chain: p.chain, token: p.token, symbol: p.symbol }] : [])),
+    saved.views.flatMap((v) =>
+      v.assets.flatMap((p) => (p.symbol ? [{ chain: p.chain, token: p.token, symbol: p.symbol }] : [])),
+    ),
   );
   const assets = a === "\u0001" ? null : parseAssetsParam(a, SCOPE_SYMBOLS);
   const chains = c === "\u0001" ? null : parseChainsParam(c, CHAIN_SLUGS);
   const link = assets == null && chains == null ? null : { assets: assets ?? [], chains: chains ?? [] };
-  cache = { raw, snap: { stored, link } };
+  cache = { raw, snap: { saved, stored: activeFocus(saved), link, linkName: link && n.trim() ? n.trim() : null } };
   return cache.snap;
 }
 
@@ -155,34 +195,67 @@ function markHtml(on: boolean) {
 const slugOf = (id: number) => CHAINS[id as ChainId]?.slug;
 
 /** The query string for this view under a focus link, or with none. */
-function focusQuery(f: Focus | null): string {
-  const sp = new URLSearchParams(window.location.search);
+function focusQuery(f: Focus | null, name?: string | null, base: string = window.location.search): string {
+  const sp = new URLSearchParams(base);
   sp.delete(ASSETS_PARAM);
   sp.delete(CHAINS_PARAM);
+  sp.delete(VIEW_PARAM);
   const parts = sp.toString() ? [sp.toString()] : [];
   if (f && f.assets.length) parts.push(`${ASSETS_PARAM}=${formatAssetsParam(f.assets, scopeSymbolOf, SCOPE_SYMBOLS)}`);
   if (f && f.chains.length) parts.push(`${CHAINS_PARAM}=${formatChainsParam(f.chains, slugOf)}`);
+  if (f && name) parts.push(`${VIEW_PARAM}=${encodeURIComponent(name).replace(/%20/g, "+")}`);
   return parts.join("&");
 }
 
 function writeLink(f: Focus | null) {
-  const qs = focusQuery(f && isOn(f) ? f : null);
+  const qs = focusQuery(f && isOn(f) ? f : null, f ? snapshot().linkName : null);
   window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
   notifyUrlChanged();
 }
 
-function writeStored(f: Focus) {
+/** Write the saved views, and the focus in use to `rails-focus-v2` for the
+ *  script that marks the page before first paint. */
+function writeSaved(next: FocusViews) {
   try {
-    if (isOn(f)) localStorage.setItem(FOCUS_KEY, JSON.stringify(f));
-    else localStorage.setItem(FOCUS_KEY, JSON.stringify(NO_FOCUS));
+    localStorage.setItem(FOCUS_VIEWS_KEY, JSON.stringify(next));
+    localStorage.setItem(FOCUS_KEY, JSON.stringify(activeFocus(next)));
   } catch {}
   window.dispatchEvent(new Event(CHANGE));
 }
 
-/** A link to this view under this focus. */
-export function scopeLink(picks: AssetPick[], chains: number[] = []): string {
-  const qs = focusQuery({ assets: picks, chains });
-  return `${window.location.origin}${window.location.pathname}${qs ? `?${qs}` : ""}`;
+const saved = () => snapshot().saved;
+
+/** The saved views' edits, for the profile menu and /bookmarks. */
+export const focusViews = {
+  use(id: string | null) {
+    const next = setActive(saved(), id);
+    writeSaved(next);
+    markHtml(isOn(activeFocus(next)));
+  },
+  rename: (id: string, name: string) => writeSaved(renameView(saved(), id, name)),
+  remove(id: string) {
+    const next = removeView(saved(), id);
+    writeSaved(next);
+    markHtml(isOn(activeFocus(next)));
+  },
+  move: (id: string, to: number) => writeSaved(moveView(saved(), id, to)),
+  /** An empty view put in use, and the panel opened on it. */
+  create() {
+    writeSaved(newView(saved(), newId(), Date.now()));
+    window.dispatchEvent(new Event(OPEN_SCOPE_PANEL));
+  },
+  /** Views emptied in the panel go as it closes. */
+  prune: () => {
+    const now = saved();
+    const next = pruneEmpty(now);
+    if (next.views.length !== now.views.length) writeSaved(next);
+  },
+};
+
+/** A link to a focus: this page, or `path`, with `&view=` when it has a name. */
+export function scopeLink(picks: AssetPick[], chains: number[] = [], name?: string, path?: string): string {
+  const qs = focusQuery({ assets: picks, chains }, name, path ? "" : window.location.search);
+  return `${window.location.origin}${path ?? window.location.pathname}${qs ? `?${qs}` : ""}`;
 }
 
 /** The picks as they apply under chain focus: each pick's symbol on every
@@ -204,12 +277,17 @@ export interface AssetScope {
   ready: boolean;
   /** Either part of the focus is set. */
   on: boolean;
-  /** The asset picks in force: the link's when it carries a focus, else the stored. */
+  /** The asset picks in force: the link's when it carries a focus, else the view in use. */
   picks: AssetPick[];
   /** The focused chains; [] is every chain. */
   chains: number[];
   /** The focus came from `?assets=` / `?chains=`. */
   fromLink: boolean;
+  /** The link's `&view=` name. */
+  linkName: string | null;
+  /** The saved views, in the reader's order, and the one in use. */
+  views: FocusView[];
+  active: FocusView | null;
   /** The asset keys the picks reach on the focused chains; null when no asset is picked. */
   keys: Set<string> | null;
   /** A chain passes chain focus. */
@@ -222,9 +300,12 @@ export interface AssetScope {
   setPicks: (next: AssetPick[]) => void;
   /** Replaces the focused chains in force. */
   setChains: (next: number[]) => void;
-  /** Keeps the link's focus as the stored one and drops the params. */
-  keepLink: () => void;
-  /** Show everything: clears the stored focus and the link's. */
+  /** "Use this view": saves the link's focus as a view (or switches to the
+   *  saved one holding it), puts it in use and drops the params. */
+  adoptLink: () => void;
+  /** "Not now": drops the link's params; the view in use, if any, resumes. */
+  dismissLink: () => void;
+  /** Off: no view in use, and the link's params dropped. The views stay saved. */
   clear: () => void;
 }
 
@@ -255,7 +336,7 @@ export function useAssetScope(): AssetScope {
 
   const write = useCallback((next: Focus) => {
     if (snapshot().link != null) writeLink(next);
-    else writeStored(next);
+    else writeSaved(editActive(saved(), next, newId(), Date.now()));
     markHtml(isOn(next));
   }, []);
   const current = () => {
@@ -264,17 +345,25 @@ export function useAssetScope(): AssetScope {
   };
   const setPicks = useCallback((next: AssetPick[]) => write({ ...current(), assets: next }), [write]);
   const setChains = useCallback((next: number[]) => write({ ...current(), chains: next }), [write]);
-  const keepLink = useCallback(() => {
-    const link = snapshot().link;
+  const adoptLink = useCallback(() => {
+    const { link, linkName } = snapshot();
     if (!link) return;
-    writeStored(link);
+    writeSaved(adoptFocus(saved(), link, linkName ?? undefined, newId(), Date.now()));
     writeLink(null);
+    markHtml(isOn(link));
+  }, []);
+  const dismissLink = useCallback(() => {
+    writeLink(null);
+    markHtml(isOn(snapshot().stored));
   }, []);
   const clear = useCallback(() => {
-    writeStored(NO_FOCUS);
+    writeSaved(setActive(saved(), null));
     if (snapshot().link != null) writeLink(null);
     markHtml(false);
   }, []);
+
+  const views = ready ? snap.saved.views : NO_VIEWS.views;
+  const active = ready ? activeView(snap.saved) : null;
 
   return {
     ready,
@@ -282,12 +371,16 @@ export function useAssetScope(): AssetScope {
     picks,
     chains,
     fromLink,
+    linkName: fromLink ? snap.linkName : null,
+    views,
+    active,
     keys,
     chainOk,
     matches,
     setPicks,
     setChains,
-    keepLink,
+    adoptLink,
+    dismissLink,
     clear,
   };
 }
@@ -299,7 +392,7 @@ export function manageHref(manage = true): string {
   const p = new URLSearchParams();
   if (typeof window !== "undefined") {
     const sp = new URLSearchParams(window.location.search);
-    for (const k of [ASSETS_PARAM, CHAINS_PARAM]) {
+    for (const k of [ASSETS_PARAM, CHAINS_PARAM, VIEW_PARAM]) {
       const v = sp.get(k);
       if (v != null) p.set(k, v);
     }
