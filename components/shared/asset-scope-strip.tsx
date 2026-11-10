@@ -29,7 +29,7 @@ import { AssetChooser, optionKey, type AssetChooserOption } from "@/components/s
 import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile-sheet";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
-import { builtOnSymbols, familyOf } from "@/lib/shared/asset-family";
+import { builtOnSymbols, FAMILY_ROWS, familyOf } from "@/lib/shared/asset-family";
 import {
   OPEN_SCOPE_PANEL,
   SCOPE_CHAINS,
@@ -108,11 +108,11 @@ export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" })
           data-asset-scope-strip={scope.fromLink ? "link" : "stored"}
         >
           <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-2 gap-y-1 px-4 py-1.5 text-xs md:px-6">
-            <ListFilter className="size-3.5 shrink-0 text-rb-500" aria-hidden="true" />
             <span
               className="min-w-0 text-foreground"
               title={scope.picks.map((p) => `${symbolOf(p)} on ${chainName(p.chain)}`).join(", ")}
             >
+              <ListFilter className="mr-1.5 inline size-3.5 align-[-2px] text-rb-500" aria-hidden="true" />
               <span className="text-rb-600 dark:text-rb-400">Focus mode active:</span> <PickIcons picks={scope.picks} />
               <span className="font-semibold">{scopeSummary(scope.picks)}</span>
             </span>
@@ -184,6 +184,25 @@ function PickIcons({ picks }: { picks: AssetPick[] }) {
 
 const EXAMPLES_SHOWN = 3;
 
+/**
+ * A few of what the picks add, taken in turn from each pick, each pick's
+ * ordered by how much is built on it in turn (sBOLD and yBOLD before a
+ * one-off vault).
+ */
+function examplesOf(picks: AssetPick[]): string[] {
+  const reach = (sym: string) => {
+    const row = FAMILY_ROWS.find((r) => r.symbol === sym);
+    if (!row) return 0;
+    const [chain, token] = row.token.split(":");
+    return familyOf([{ chain: Number(chain), token, builtOn: true }]).size;
+  };
+  const lists = picks.filter((p) => p.builtOn).map((p) => builtOnSymbols(p).sort((a, b) => reach(b) - reach(a)));
+  const out = new Set<string>();
+  for (let i = 0; out.size < EXAMPLES_SHOWN && lists.some((l) => i < l.length); i++)
+    for (const l of lists) if (i < l.length && out.size < EXAMPLES_SHOWN) out.add(l[i]);
+  return [...out];
+}
+
 /** "sBOLD, yBOLD and ysyBOLD": a list in prose. */
 const andList = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
 
@@ -220,10 +239,7 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
   if (!shown) return null;
 
   const picks = [...new Map(scope.picks.map((p) => [symbolOf(p), p])).values()];
-  const examples = [...new Set(scope.picks.filter((p) => p.builtOn).flatMap((p) => builtOnSymbols(p)))].slice(
-    0,
-    EXAMPLES_SHOWN,
-  );
+  const examples = examplesOf(scope.picks);
   const builtOn = scope.picks.some((p) => p.builtOn);
   const one = picks.length === 1;
 
