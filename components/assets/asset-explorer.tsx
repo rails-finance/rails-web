@@ -12,8 +12,8 @@
 // (D6) and the toolbar's sort offers every order, Flagged first included.
 //
 // FOCUS (ui-jobs 557). /assets is where many assets join the focus: each row's
-// ⋮ (D7) holds "Add to focus" or "Remove from focus", and a row in focus
-// carries an "in focus" pill after its name; with a filter on, "Focus on these N"
+// ⋮ (D7) holds "Add to focus" or "Remove from focus", and under "Add assets"
+// a row in focus carries an "in focus" pill after its name; with a filter on, "Focus on these N"
 // makes the shown assets the focus (50 at most). Like every page the list is
 // held to the focus; "Add assets" (`?manage=1`, also the Focus panel's "Add
 // from all assets") shows every asset until "Done" (Miles, 10 Nov 2026).
@@ -460,6 +460,7 @@ export function AssetExplorer({
                   key={c.id}
                   card={c}
                   focusOn={scope.on}
+                  marked={manage}
                   inFocus={inFocus(c)}
                   picked={picked(c).length > 0}
                   onAdd={() => add(c)}
@@ -478,6 +479,7 @@ export function AssetExplorer({
 function AssetRow({
   card: c,
   focusOn,
+  marked,
   inFocus,
   picked,
   onAdd,
@@ -485,6 +487,9 @@ function AssetRow({
 }: {
   card: AssetCard;
   focusOn: boolean;
+  /** "Add assets" shows every row, so the ones in focus carry the pill;
+   *  held to the focus, every row is in it and none does. */
+  marked: boolean;
   inFocus: boolean;
   picked: boolean;
   onAdd: () => void;
@@ -520,7 +525,7 @@ function AssetRow({
             name
           )}
           {c.short && <span className="shrink-0 font-mono text-[11px] text-rb-500">{c.short}</span>}
-          {inFocus && (
+          {marked && inFocus && (
             <span
               className={`${DATA_TABLE_PILL} shrink-0 px-1.5 py-0.5 text-[11px]`}
               title={picked ? "In your focus" : "In your focus through what it is built on"}
