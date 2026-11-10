@@ -453,9 +453,8 @@ export interface DonutSlice {
 }
 
 /** Each slice's colour, by the breakdown's rule: the side's tone graded by
- *  size rank toward `--donut-ground`, the merged slice in "Other" grey. A key
- *  square beside a row takes its slice's colour from here. */
-export function donutColours(slices: DonutSlice[], side: BreakdownSide = "collateral"): string[] {
+ *  size rank toward `--donut-ground`, the merged slice in "Other" grey. */
+function donutColours(slices: DonutSlice[], side: BreakdownSide = "collateral"): string[] {
   const steps = STEPS(side, slices.filter((s) => !s.rest).length);
   let i = 0;
   return slices.map((s) => (s.rest ? OTHER : steps[i++]));
@@ -470,13 +469,16 @@ const fixed = (d: string) =>
 /** The breakdown's donut on its own, for a share of a whole that is not a
  *  side's assets (the vault mock's holders and markets): the same corners,
  *  pad and colours, at `size`, with `centre` in its hole. The slices are
- *  drawn as given; each carries its label as a tooltip. */
+ *  drawn as given; each carries its label as a tooltip. `colours`, one CSS
+ *  colour per slice (lib/shared/slice-colours.ts), replaces the side's
+ *  graded tone. */
 export function ShareDonut({
   slices,
   label,
   size = SIZE,
   side = "collateral",
   centre,
+  colours: given,
 }: {
   slices: DonutSlice[];
   /** The donut's accessible name. */
@@ -485,10 +487,12 @@ export function ShareDonut({
   side?: BreakdownSide;
   /** Drawn in the hole, centred: a count and its noun. */
   centre?: ReactNode;
+  /** One CSS colour per slice, in place of the side's graded tone. */
+  colours?: string[];
 }) {
   if (slices.length === 0) return null;
   const angles = anglesOf(slices);
-  const colours = donutColours(slices, side);
+  const colours = given ?? donutColours(slices, side);
   const k = size / 120;
   const C = size / 2;
   return (
@@ -507,7 +511,7 @@ export function ShareDonut({
             key={s.key}
             d={fixed(arcPath(29 * k, 58 * k, angles[i][0], angles[i][1], PAD, 3 * k))}
             transform={`translate(${C},${C})`}
-            fill={colours[i]}
+            style={{ fill: colours[i] }}
             data-breakdown-slice={s.key}
           >
             <title>{s.label}</title>

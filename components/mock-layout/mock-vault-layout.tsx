@@ -65,7 +65,9 @@ import {
   STEWARD_TIP,
 } from "@/lib/vaults/card-words";
 import { MIN_SEGMENT_SHARE, planAllocation } from "@/lib/vaults/allocation-plan";
-import { donutColours, ShareDonut, type DonutSlice } from "@/components/shared/asset-donut";
+import { ShareDonut, type DonutSlice } from "@/components/shared/asset-donut";
+import { assetSliceColours, holderSliceColours } from "@/lib/shared/slice-colours";
+import { tokenColour } from "@/lib/shared/token-colours";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import { PositionCardEdgeContext, type PositionCardEdge } from "@/components/shared/position-card-edge";
 import type { PositionCardHead } from "@/components/shared/position-card";
@@ -312,7 +314,7 @@ function WhoHoldsIt({
         share: othersPpm / 1_000_000,
         rest: true,
       });
-    const colours = donutColours(slices);
+    const colours = holderSliceColours(slices);
     const colourOf = new Map(slices.map((sl, i) => [sl.key, colours[i]]));
     const othersColour = colours[colours.length - 1];
 
@@ -354,6 +356,7 @@ function WhoHoldsIt({
         <div className="shrink-0 sm:pt-1">
           <ShareDonut
             slices={slices}
+            colours={colours}
             size={DONUT}
             label={`${n(holders.liveCount)} holders of ${shareSymbol} by share`}
             centre={
@@ -840,7 +843,16 @@ export function MockVaultLayout({
       rest: true,
     });
   }
-  const allocColours = donutColours(allocSlices);
+  // Each market in its collateral's colour, the idle market in the asset's
+  // (lib/shared/slice-colours.ts): the icon's colour by symbol, then address,
+  // the order the icon resolves in.
+  const iconOf = new Map(rows.map((r) => [r.key, r.icon ?? asset]));
+  const allocColours = assetSliceColours(
+    allocSlices.map((sl) => {
+      const t = iconOf.get(sl.key) ?? asset;
+      return sl.rest ? { rest: true } : { token: t.address, colour: tokenColour(t.symbol) ?? tokenColour(t.address) };
+    }),
+  );
   const keyColours: Record<string, string> = {};
   allocSlices.forEach((sl, i) => {
     if (!sl.rest) keyColours[sl.key] = allocColours[i];
@@ -855,7 +867,12 @@ export function MockVaultLayout({
         className={`flex shrink-0 flex-col items-center max-sm:w-full sm:pt-3 ${wideAmount ? "w-full" : ""}`}
         data-mock-alloc-donut=""
       >
-        <ShareDonut slices={allocSlices} size={DONUT} label={`Where this vault's ${unit} is, by market`} />
+        <ShareDonut
+          slices={allocSlices}
+          colours={allocColours}
+          size={DONUT}
+          label={`Where this vault's ${unit} is, by market`}
+        />
         <ColourNote />
       </div>
     ) : undefined;
