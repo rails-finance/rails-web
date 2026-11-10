@@ -127,7 +127,7 @@ export function VaultWhoHolds({
 
     content = (
       <div className="mt-4 flex flex-col items-center gap-6 xl:flex-row xl:items-start">
-        <div className="shrink-0 xl:pt-3">
+        <div className="shrink-0 xl:pt-3" data-anatomy="V11.1">
           <ShareDonut
             slices={slices}
             colours={colours}
@@ -220,7 +220,7 @@ export function VaultWhoHolds({
   }
 
   return (
-    <ProvSection scope={HOLDERS_SCOPE} data-vault-holders={vault}>
+    <ProvSection scope={HOLDERS_SCOPE} data-vault-holders={vault} data-anatomy="V11">
       <SectionHeading
         title="Who holds it"
         menu={

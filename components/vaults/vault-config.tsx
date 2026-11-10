@@ -84,6 +84,7 @@ function Row({
   return (
     <div
       className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 border-b border-rb-200 py-2.5 last-of-type:border-b-0 dark:border-rb-500/30"
+      data-anatomy="V12.1"
       {...hook}
     >
       <dt className="min-w-0">
@@ -279,7 +280,7 @@ export function VaultConfiguration({
     configCallProv(c, { label, call, answer: a, what });
 
   return (
-    <ProvSection scope={SCOPE} data-vault-config={vault}>
+    <ProvSection scope={SCOPE} data-vault-config={vault} data-anatomy="V12">
       <div className="absolute right-0 top-5 flex items-center gap-2 sm:right-5">
         <SectionReadStamp
           chainId={chainId}
