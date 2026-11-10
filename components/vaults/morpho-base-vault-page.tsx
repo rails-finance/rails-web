@@ -563,7 +563,7 @@ export function MorphoBaseVaultPage({
   );
   const allocChart =
     planTotal > 0 && allocSlices.length > 0 ? (
-      <div className="pt-4 pb-4" data-alloc-bar="">
+      <div className="pt-4 pb-4" data-assets-bar="">
         <SegmentBar slices={allocSlices} scope="allocation" label={`Where this vault's ${unit} is, by market`} />
       </div>
     ) : undefined;
