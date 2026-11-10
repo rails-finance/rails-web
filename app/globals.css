@@ -2383,9 +2383,11 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
 
 /* The house table's rows (D1; components/shared/data-table): a hairline
    between rows and under the header; a hovered row lifts into a rounded block
-   inset 4px inside its row on every side, drawn by each cell's ::before (the end
-   cells rounding the outer corners), and the hairlines above and below it are
-   not drawn while it is hovered, so nothing moves. A linked row (D4) adds the
+   whose top and bottom lie on the hairlines above and below it and whose ends
+   reach 8px past them, the corner radius, so a hairline stops where the
+   corner's curve begins (the frame's padding, -mx-2 px-2, makes the room); drawn by each cell's
+   ::before (the end cells rounding the outer corners); the hairlines it covers
+   are not drawn while it is hovered, so nothing moves. A linked row (D4) adds the
    blue-500 border round the same block (::after), on hover and on keyboard
    focus. A drawer row opens under the row before it, no hairline between.
    In a layer, so a cell's own utilities win. */
@@ -2414,7 +2416,7 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
   table.dt > tbody > tr > *::after {
     content: "";
     position: absolute;
-    inset: 4px 0;
+    inset: -1px 0;
     pointer-events: none;
   }
   table.dt > tbody > tr > *::before {
@@ -2428,18 +2430,18 @@ html[data-wallet-panel-open] body > :not([data-wallet-panel-root]) *::after {
   }
   table.dt > tbody > tr > :first-child::before,
   table.dt > tbody > tr > :first-child::after {
-    left: 4px;
-    border-top-left-radius: 0.75rem;
-    border-bottom-left-radius: 0.75rem;
+    left: -8px;
+    border-top-left-radius: 0.5rem;
+    border-bottom-left-radius: 0.5rem;
   }
   table.dt > tbody > tr > :first-child::after {
     border-left: 1px solid transparent;
   }
   table.dt > tbody > tr > :last-child::before,
   table.dt > tbody > tr > :last-child::after {
-    right: 4px;
-    border-top-right-radius: 0.75rem;
-    border-bottom-right-radius: 0.75rem;
+    right: -8px;
+    border-top-right-radius: 0.5rem;
+    border-bottom-right-radius: 0.5rem;
   }
   table.dt > tbody > tr > :last-child::after {
     border-right: 1px solid transparent;
@@ -2512,14 +2514,14 @@ table.dt-stacked {
     & > tbody > tr:has(+ tr.hidden + tr:not([data-dt-parent]):hover) {
       border-bottom-color: transparent;
     }
-    /* The hover block, inset 4px inside the card, and the linked row's border
-       round it. */
+    /* The hover block and the linked row's border: top and bottom on the
+       hairlines, 8px (the corner radius) past their ends. */
     & > tbody > tr::before,
     & > tbody > tr::after {
       content: "";
       position: absolute;
-      inset: 4px;
-      border-radius: 0.75rem;
+      inset: -1px -8px;
+      border-radius: 0.5rem;
       pointer-events: none;
     }
     & > tbody > tr::before {

@@ -8,10 +8,11 @@
 // A real <table>: a caption or label, `<th scope="col">` headers, an optional
 // `<th scope="row">` cell. Rows sit on the page's ground, a hairline between
 // them (`--edge-row-line`). A hovered row lifts into a rounded block
-// (`--surface-row-hover`) inset evenly inside its row, and the hairlines above
-// and below it are not drawn while it is hovered, so nothing moves. The row
-// visuals live in `table.dt` (app/globals.css). The frame scrolls sideways
-// inside itself, never the page; a pinned cell carries the page's ground.
+// (`--surface-row-hover`) whose top and bottom lie on the hairlines above and
+// below it (which it replaces while hovered, so nothing moves) and whose ends
+// reach past them by the 8px corner radius, into the frame's padding. The row visuals live in
+// `table.dt` (app/globals.css). The frame scrolls sideways inside itself, never
+// the page; a pinned cell carries the page's ground.
 //
 // A LINKED ROW. `DataTableRow href` with one `DataTableRowLink` in a cell
 // (the row's name, the one link a keyboard reaches). Every cell lays a hidden
@@ -132,7 +133,7 @@ export function DataTable({
     <Stacked.Provider value={stacked}>
       <RowHeight.Provider value={rowHeight ? ROW_HEIGHT[stacked ? stackBelow : "sm"][rowHeight] : ""}>
         <div
-          className={`relative isolate max-w-full overflow-x-auto ${className}`}
+          className={`relative isolate -mx-2 max-w-[calc(100%+1rem)] overflow-x-auto px-2 ${className}`}
           data-anatomy={[anatomy, "D1", stacked ? "D6" : "D3"].filter(Boolean).join(" ")}
           {...frame}
         >
