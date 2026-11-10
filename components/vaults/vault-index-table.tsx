@@ -66,6 +66,7 @@ import { vaultDisplayName, type VaultStanding, type VaultSummary } from "@/lib/v
 import { measuredYield, yieldText, type VaultYield } from "@/lib/vaults/yield";
 import { illiquidSentence } from "@/lib/vaults/illiquid";
 import { heldAssetsRaw, lostAssetsSentence } from "@/lib/vaults/lost-assets";
+import { assetScaleSentence } from "@/lib/vaults/asset-scale-words";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { sharePriceText } from "@/lib/shared/vault-amount-text";
 import { useCompareSelection } from "@/components/vaults/compare-selection";
@@ -125,6 +126,7 @@ function pillTitle(st: VaultStanding, v: VaultSummary): string {
       held: formatCompact(heldOf(v, v.totalAssets.raw)),
       symbol: v.asset.symbol,
     });
+  if (st === "decimals-disagree" && v.assetScale) return assetScaleSentence(v.asset.symbol, v.assetScale);
   return STANDING_WORD[st];
 }
 
