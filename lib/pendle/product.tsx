@@ -17,6 +17,8 @@
 // Every read is rails-server's at the chain's finalized block; the addresses
 // sit in receipts and the ⋮s.
 
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { rowAssetKeys } from "@/lib/shared/focus-row-keys";
 import type { ReactNode } from "react";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
 import { readStampProv, type ReadContract } from "@/components/shared/read-stamp";
@@ -150,6 +152,13 @@ export function PendleRosterPage({
   at: number;
   initialSearch: string;
 }) {
+  // Focus (ui-jobs 557): the markets whose tokens (PT, YT, SY, the yield
+  // token, the LP) are in focus; the head still counts the whole roster.
+  const scoped = useScopedRows(
+    roster.markets,
+    (m) => rowAssetKeys(m.tokens, PENDLE_CHAIN_ID),
+    () => PENDLE_CHAIN_ID,
+  );
   const block = roster.block;
   const total = roster.markets.length;
   const active = roster.markets.filter((m) => m.expired === false).length;
@@ -212,7 +221,10 @@ export function PendleRosterPage({
       <div className="py-8">
         <SubPageHeader protocol={protocolForHref(ROOT)!} title="Markets" />
         <ProductHeadSection head={head} titled={false} />
-        <PendleRosterTable roster={roster} at={at} initialSearch={initialSearch} />
+        <ScopeNote scoped={scoped} noun={["market", "markets"]} className="mb-2" />
+        <div {...scoped.listProps}>
+          <PendleRosterTable roster={{ ...roster, markets: scoped.rows }} at={at} initialSearch={initialSearch} />
+        </div>
       </div>
     </div>
   );
