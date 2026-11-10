@@ -941,6 +941,16 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
       why: "a liquidity position holds no loan, so there is no threshold to breach and no liquidation to trace",
     },
   }),
+  // Fluid's vaults on Base (ui-jobs 574), read on visit: the position page
+  // reads the position and its vault at the head and 30 days back.
+  // Unlaunched, so the matrix does not draw it yet.
+  "fluid-base": explorerDepth({
+    dashboard: true,
+    oracleUsd: { why: ORACLE_USD_REASON["fluid-base"] },
+    forensics: {
+      why: "a liquidation names no position in its event, and history waits until Rails indexes Fluid on Base",
+    },
+  }),
   // Liquidation forensics (2026-07-14): same valued two-leg treatment as Aave
   // V3 (single market — SparkLend's own oracle at the event's block).
   // Protocol views (2026-07-15): /spark/markets — the single SparkLend Pool's
@@ -1461,6 +1471,8 @@ export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
   "uniswap-v4",
   // Aerodrome Slipstream (ui-jobs 566), position-first as Uniswap is.
   "aerodrome",
+  // Fluid on Base (ui-jobs 574), read on visit: a wallet's positions on the front door.
+  "fluid-base",
   // The three Arbitrum explorers ship position-first (2026-10-19): a wallet
   // field on the front door, any address readable, and a listing of the
   // positions read (item 16) in place of a roster of accounts.
@@ -1679,6 +1691,8 @@ export const COVERAGE_NOTES: Record<string, string> = {
     "A Uniswap V4 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
   aerodrome:
     "An Aerodrome Slipstream pool prices its two tokens against each other and Aerodrome runs no USD feed, so every figure is in the pool's quote token at the pool's price, and AERO is priced through Aerodrome's own AERO pools; a liquidity position holds no loan, so there is no liquidation to trace.",
+  "fluid-base":
+    "Fluid on Base is the same protocol as on Ethereum, read a different way. Each page reads the position and its vault from Fluid's VaultResolver when it opens, and again at the UTC midnight 30 days before, so the interest over those 30 days comes from the vault's exchange prices at the two blocks. Collateral and debt are stated in the vault's tokens, and the ratio in the vault oracle's debt-per-collateral price, the figure the liquidation engine judges. Fluid runs no USD feed, so a side's dollar value comes from the Aave V3 Base oracle at the same block, and a side Aave does not list, or a side held as DEX pool shares, stays in its own unit. There is no listing, history or liquidation record until Rails indexes Fluid on Base.",
   alchemix:
     "Alchemix states no dollar figure for a position because the protocol has none. The Alchemist values collateral as vault shares at the vault's share price, in the asset underneath, and counts each synthetic as one unit of that asset. It runs no USD feed, so a position's debt, collateral and collateralisation are stated in that asset, and the dollar figure beside the collateral is a market price the page labels as one. Debt is a read rather than a replay. A redemption emits one number with no account attached and applies a single survival ratio to every open position at once, and the weights behind it have no public getter, so the explorer reads each V3 position's debt and collateral from getCDP at the block a figure names, at every block where one can step, and checks its event replay against that read to the wei. Each line's replay stays the served figure only until that line's first redemption. The amount set aside for repayment accrues every block, so it is stated at the block it was read and never carried forward or added to a debt taken at another block. Share prices are stored with the Alchemist readings only, so Transmuter positions and V2 accounts state amounts in the synthetic or in vault shares with no price read at the block. V2 closed on 2 April 2026 and is served as a record frozen at block 24,794,239: every account re-read at head returned the same bytes. A V2 debt is signed, a negative one is a credit, and the swept collateral appears in no position's figure. A V2 figure is never added to its V3 successor's, because the V3 position is what the V2 one became. No position has been liquidated on any line yet, so the liquidation card is built and has nothing to show.",
 };

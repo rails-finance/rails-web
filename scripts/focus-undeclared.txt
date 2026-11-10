@@ -8,6 +8,9 @@
 /base/aerodrome
 /base/aerodrome/[wallet]
 /base/aerodrome/position/[deployment]/[id]
+/base/fluid
+/base/fluid/[wallet]
+/base/fluid/position/[id]
 /base/alchemix/[lineKey]/[tokenId]
 /base/alchemix/[lineKey]/[tokenId]/event/[eventId]
 /base/alchemix/lines

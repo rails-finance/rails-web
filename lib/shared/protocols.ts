@@ -442,6 +442,25 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "vaults", label: "Vaults overview", tab: "Vaults" }],
   },
   {
+    // Fluid's vaults on Base (rails-ops ui-jobs 574), read on visit: a front
+    // door taking a wallet, its positions at `<route>/<wallet>`, each opening
+    // `<route>/position/<id>`. A separate entry from Ethereum's indexed
+    // explorer. Reads come from rails-server's at-block routes
+    // (lib/api/fetch-fluid-base.ts). Unlaunched while Miles reads it.
+    id: "fluid-base",
+    session: "fluid-base",
+    label: "Fluid",
+    chainId: 8453,
+    slug: "fluid",
+    protocolKey: "fluid",
+    tags: ["Borrow", "CDP"],
+    desc: "Fluid vault positions on Base: a position's collateral, debt, ratio to its limits and interest over the last 30 days",
+    positionListing: false,
+    readTier: "visit",
+    unlaunched: true,
+    subPages: [],
+  },
+  {
     id: "frankencoin",
     session: "frankencoin",
     label: "Frankencoin",
@@ -940,6 +959,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "uniswap-v3": "Position",
   "uniswap-v4": "Position",
   aerodrome: "Position",
+  "fluid-base": "Position",
 };
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",
