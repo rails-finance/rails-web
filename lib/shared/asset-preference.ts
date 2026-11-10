@@ -52,20 +52,6 @@ const isAddress = (s: string) => /^0x[0-9a-f]{40}$/.test(s);
 /** A symbol a link can carry as written: anything else goes as its address. */
 const PLAIN = /^[a-z0-9][a-z0-9.\-]*$/i;
 
-export function isPickList(v: unknown): v is AssetPick[] {
-  return (
-    Array.isArray(v) &&
-    v.every(
-      (p) =>
-        p &&
-        typeof p === "object" &&
-        typeof p.chain === "number" &&
-        typeof p.token === "string" &&
-        typeof p.builtOn === "boolean",
-    )
-  );
-}
-
 /** Reads `?assets=`; null when absent, [] when present but naming nothing known. */
 export function parseAssetsParam(raw: string | null, symbols: SymbolIndex): AssetPick[] | null {
   if (raw == null) return null;

@@ -65,23 +65,6 @@ const chainName = (c: number) => SCOPE_CHAINS[c] ?? chainNameOf(c);
 const symbolOf = (p: Pick<AssetPick, "chain" | "token">) =>
   scopeSymbolOf(p.chain, p.token) ?? `${p.token.slice(0, 6)}…${p.token.slice(-4)}`;
 
-/** "WETH, BOLD +2 and what's built on them": the chosen symbols, each once. */
-export function scopeSummary(picks: AssetPick[]): string {
-  const names = [...new Set(picks.map(symbolOf))];
-  const named = names.slice(0, 2).join(", ");
-  const more = names.length > 2 ? ` +${names.length - 2}` : "";
-  const built = picks.filter((p) => p.builtOn).length;
-  const tail =
-    built === 0 || names.length > 2
-      ? ""
-      : built === picks.length
-        ? names.length === 1
-          ? " and what's built on it"
-          : " and what's built on them"
-        : "";
-  return `${named}${more}${tail}`;
-}
-
 // Ordered by how much is built on each (BOLD, ETH and BTC first), the
 // count not drawn.
 const OPTIONS: AssetChooserOption[] = SCOPE_TOKENS.map((t) => ({
