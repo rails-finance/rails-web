@@ -5,10 +5,12 @@
 // the pages read. The layout is CoW's (components/protocol/cow/cow-front-door.tsx).
 // Aerodrome's door (ui-jobs 566) is the same, through `PoolFrontDoor`.
 
+import Link from "next/link";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
 import { ReadTierTag, isReadOnVisit } from "@/components/shared/read-tier-tag";
 import { READ_TIER } from "@/lib/shared/read-tier";
+import { NAV_PILL } from "@/lib/shared/ui-grammar";
 import type { UniswapVersion } from "@/lib/uniswap/types";
 import { FRONT_DOOR, versionLabel } from "@/lib/uniswap/words";
 
@@ -42,6 +44,12 @@ export function PoolFrontDoor({ id, label, line, route }: { id: string; label: s
         <FrontDoorSearch href={(wallet) => `${route}/${wallet}`} />
       </div>
       <p className="mt-6 max-w-xl text-center text-sm text-rb-500">{line}</p>
+      {/* The info page's door, as the shared front door draws it. */}
+      <nav aria-label="Explorer sections" className="mt-6 flex justify-center">
+        <Link href={`${route}/info`} className={NAV_PILL}>
+          About {label} on Rails
+        </Link>
+      </nav>
     </div>
   );
 }
