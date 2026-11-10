@@ -9,15 +9,26 @@ import {
   CircleEqual,
   Clock,
   Hourglass,
+  Gauge,
   KeyRound,
   Layers,
+  ListPlus,
   LogOut,
+  Pause,
+  Play,
+  Plug,
+  RadioTower,
   ScrollText,
   Settings2,
+  Shield,
+  ShieldAlert,
   SlidersHorizontal,
+  Snowflake,
   Timer,
+  Unplug,
   UserMinus,
   UserPlus,
+  type LucideIcon,
 } from "lucide-react";
 
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -31,6 +42,7 @@ import { spokenAmount, useSpineRow } from "@/components/shared/mobile-spine";
 import { WARNING_TRIANGLE_PATH } from "@/lib/shared/warning-triangle";
 import { fmtHeaderMagnitude } from "@/lib/shared/spine-format";
 import type { Tone } from "@/lib/shared/tone";
+import type { ChangeGlyph } from "@/lib/shared/change-mark";
 
 // ── Icon overrides ──────────────────────────────────────────────────────────
 
@@ -51,7 +63,7 @@ export type SpineIcon =
   | "custody" // Position moved between accounts (a receipt-token transfer run, or a position NFT's transfer: a Liquity V2 Trove, a Polaris position) — the paper plane in a neutral disc, the same custody mark a single row wears as `badge: "send"`
   | "swap" // A position swap: one asset became another under an order the owner signed, both legs staying in the position (rails-ops TO-DO-ui-jobs §15, §19) — a bare arrow-down-up at 45° in its axis hues, the legs stacked on the right flank (`swapLegs`)
   | "market" // A market note — a receipted fact about the MARKET between two of the account's events (components/shared/market-note-row.tsx): the glyph `noteGlyph` names (a rate's `chart-line`, a vault's terms `scroll-text`, a PSM share `chart-pie`), thin neutral ink, never a party colour
-  | "protocol-change" // A protocol change in the event history (components/shared/protocol-change-row.tsx, ui-jobs 448): a setting the protocol moved for every position, the pink diamond of the Lifetime flows events row. Lucide `sliders-horizontal` in neutral ink, the governance badge in its corner
+  | "protocol-change" // A protocol change in the event history (components/shared/protocol-change-row.tsx, ui-jobs 448): a setting the protocol moved for every position, the pink diamond of the Lifetime flows events row. Lucide `sliders-horizontal` in neutral ink, the governance badge in its corner. A reserve's change log (components/shared/config-change-timeline.tsx, M3.6) names the setting's family with `changeGlyph`: caps `gauge`, rates and fees the rate-change % mark, collateral terms `shield`, liquidation settings `shield-alert`, a freeze `snowflake`, a pause `pause` (`play` on unpause), a switch `plug` / `unplug`, the price source `radio-tower`, a listing `list-plus`, eMode membership `layers`; the default `sliders-horizontal` for anything else. Caps, rates and fees, and collateral terms moved one way take `iconDirection`'s arrow on the right; a freeze, a pause, a line off or halted and borrowing off draw the glyph in `changeTone`, the node alone
   | "live-window" // The live window between ONE position's last touch and now, pinned in the timeline's head slot (components/protocol/polaris/polaris-since-last-touch.tsx). Its own class, not a market note: lucide `timer` (the time since the last touch) in the notes' thin neutral ink — the holder did nothing inside the window, which is what lets its causes be stated as facts
   | "none" // No node of its own: a group whose members moved no asset (a run of rate changes), or the boundary, draws no node
   | "moment" // The state card (components/shared/flow-moment-card.tsx) — the position at a moment between its events, where "Sync to chart" cut the timeline: lucide `clock`, neutral ink, not an event
@@ -70,6 +82,23 @@ export const SPINE_COLORS: Record<SpineInk, string> = {
   party: "var(--color-pink-500)",
   caution: "var(--tone-caution)",
   critical: "var(--tone-critical)",
+};
+
+/** The protocol-change node's glyph per family; `rate` draws the rate-change % mark. */
+const CHANGE_GLYPHS: Record<ChangeGlyph, LucideIcon | null> = {
+  sliders: SlidersHorizontal,
+  gauge: Gauge,
+  rate: null,
+  shield: Shield,
+  "shield-alert": ShieldAlert,
+  snowflake: Snowflake,
+  pause: Pause,
+  play: Play,
+  plug: Plug,
+  unplug: Unplug,
+  "radio-tower": RadioTower,
+  "list-plus": ListPlus,
+  layers: Layers,
 };
 
 /** Pulsing dot color matching the node's tone */
@@ -205,6 +234,12 @@ export interface SpineColumnProps {
   icon?: SpineIcon;
   /** icon="market" only: what the note's node names. Default "rate". */
   noteGlyph?: SpineNoteGlyph;
+  /** icon="protocol-change" only: the changed setting's family (see SpineIcon).
+   *  Default "sliders". */
+  changeGlyph?: ChangeGlyph;
+  /** icon="protocol-change" only: the glyph in the warning tone, the line
+   *  unchanged. */
+  changeTone?: Tone;
   /** The event was executed by a third party (someone other than the position
    *  owner): the node takes the third party's badge (`actor`) on the token
    *  icons rather than replacing them. When there are no token rows to draw,
@@ -877,6 +912,8 @@ export function SpineColumn({
   swapAxis,
   icon,
   noteGlyph = "rate",
+  changeGlyph = "sliders",
+  changeTone,
   externalParty,
   warningTone = "caution",
   warningTip,
@@ -1139,18 +1176,34 @@ export function SpineColumn({
           rateSpan ? rateFlank(rateSpan) : undefined,
         );
       }
-      case "protocol-change":
+      case "protocol-change": {
         // A protocol change's node: a setting moved, in the spine's neutral
-        // ink. Nothing happened to the account here either.
-        return nodeRow(
-          <SlidersHorizontal
+        // ink, or the warning tone where the change stopped something.
+        // Nothing happened to the account here either.
+        const ink = changeTone ? SPINE_COLORS[changeTone] : "var(--color-rb-500)";
+        const Glyph = CHANGE_GLYPHS[changeGlyph];
+        const glyph = Glyph ? (
+          <Glyph
             size={T}
             strokeWidth={1.25}
             absoluteStrokeWidth
-            color="var(--color-rb-500)"
+            color={ink}
             aria-hidden="true"
-          />,
+            data-spine-change-glyph={changeGlyph}
+          />
+        ) : (
+          <RateIcon size={T} color={ink} />
         );
+        return nodeRow(
+          glyph,
+          iconDirection ? (
+            <>
+              <DirectionArrow direction={iconDirection} size={Math.round(scale.arrowSize * 0.7)} />
+              <span />
+            </>
+          ) : undefined,
+        );
+      }
       case "live-window":
         // The live window's node: the notes' register (the account did
         // nothing here), its own glyph.

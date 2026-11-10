@@ -283,19 +283,128 @@ const atHead = (f: V4ReserveFigures) => ` at block ${n(f.block)}`;
 const hubContract = (f: V4ReserveFigures, hub: string) => ({ name: `${hub} hub`, address: f.hubAddress });
 const spokeContract = (f: V4ReserveFigures, spoke: string) => ({ name: `${spoke} spoke`, address: f.spokeAddress });
 
-/** Where this reserve's configuration changes live: on-chain, in the spoke's
- *  and the hub's logs, which Rails has not indexed yet. */
-export function configChangesProv(f: V4ReserveFigures, o: { symbol: string; spoke: string; hub: string }): Provenance {
+const CONFIG_LOG = "GET /api/aave-v4/reserve-config-log";
+/** Aave's V4 source at the commit read for the change log's words. */
+const V4_SRC = "https://github.com/aave/aave-v4/blob/a3ef63ea6415d25237a9775bf66e76e9993561c2/src";
+const sourceLine = (label: string, path: string, note: string) => ({
+  label,
+  kind: "offchain" as const,
+  pclass: "offchain" as const,
+  note,
+  verify: { kind: "link" as const, href: `${V4_SRC}/${path}`, text: label },
+});
+/** The source lines a kind's words rest on. */
+const KIND_SOURCES: Record<string, ProvInput[]> = {
+  "dynamic-added": [
+    sourceLine(
+      "Spoke.sol: a position's terms follow its key",
+      "spoke/Spoke.sol#L728-L733",
+      "a position's collateral factor is read under the key it last took; the key moves to the reserve's latest only when the spoke refreshes it",
+    ),
+    sourceLine(
+      "Spoke.sol: what refreshes the key",
+      "spoke/Spoke.sol#L244-L300",
+      "borrow, and withdraw while the asset is collateral, refresh every collateral's key; setUsingAsCollateral (L391-L413) refreshes it on switching collateral on or off; updateUserDynamicConfig (L424) refreshes on request",
+    ),
+  ],
+  "dynamic-updated": [
+    sourceLine(
+      "Spoke.sol: an update rewrites a key in place",
+      "spoke/Spoke.sol#L206-L215",
+      "every position on that key reads the new terms at once",
+    ),
+  ],
+  "reserve-config": [
+    sourceLine(
+      "ISpoke.sol: receiveSharesEnabled",
+      "spoke/interfaces/ISpoke.sol#L60",
+      "true if the liquidator can receive collateral shares during liquidation",
+    ),
+    sourceLine(
+      "LiquidationLogic.sol: taking shares",
+      "spoke/libraries/LiquidationLogic.sol#L552-L557",
+      "a liquidator asking for shares needs the collateral reserve unfrozen and receiveSharesEnabled",
+    ),
+  ],
+};
+
+/** The contract by role, as a receipt names it. */
+export const v4ContractName = (role: "spoke" | "hub" | "strategy", o: { spoke: string; hub: string }) =>
+  role === "spoke" ? `${o.spoke} spoke` : role === "hub" ? `${o.hub} hub` : `${o.hub} hub's rate strategy`;
+
+/** One configuration change: the event, the contract that emitted it, and
+ *  its block, transaction and log, each linked to the explorer. */
+export function v4ConfigChangeProv(
+  c: {
+    row: { kind: string; block: number; txHash: string; logIndex: number; [k: string]: unknown };
+    words: string;
+    contract: { role: "spoke" | "hub" | "strategy"; address: string };
+    event: string;
+  },
+  o: { spoke: string; hub: string },
+  explorer: { block: string; tx: string; name: string },
+): Provenance {
+  const r = c.row;
+  const name = v4ContractName(c.contract.role, o);
+  const scope =
+    r.kind === "liquidation-config"
+      ? " It holds for every reserve on the spoke."
+      : r.kind === "credit-line"
+        ? ` It is the ${o.spoke} spoke's line on the hub for this asset.`
+        : r.kind === "price-source"
+          ? ` The new source is ${String(r.source)}.`
+          : r.kind === "dynamic-added" || r.kind === "dynamic-updated"
+            ? ` Collateral terms key ${String(r.key)}.`
+            : "";
   return {
     kind: "chain",
-    summary: `Every change to ${o.symbol}'s settings on ${o.spoke} is an event on-chain. The ${o.spoke} spoke logs its reserve, dynamic and liquidation settings; the ${o.hub} hub logs the asset's settings and this spoke's credit line. Rails has not indexed these events yet.`,
+    pclass: "emitted",
+    source: { block: r.block, txHash: r.txHash },
+    summary: `${c.words}. The ${name}'s ${c.event} event at block ${n(r.block)}, log ${r.logIndex} of transaction ${r.txHash}.${scope}`,
+    contract: { name, address: c.contract.address },
+    via: `${CONFIG_LOG} · ${c.event}`,
+    verify: { kind: "etherscan", href: explorer.tx, text: `The transaction on ${explorer.name}` },
+    inputs: [
+      // Labelled apart from the spine's "block" chip, which draws unlinked.
+      {
+        label: "in block",
+        value: n(r.block),
+        kind: "chain",
+        pclass: "emitted",
+        verify: { kind: "etherscan", href: explorer.block, text: `Block ${n(r.block)} on ${explorer.name}` },
+      },
+      {
+        label: "log",
+        value: `${r.logIndex}`,
+        kind: "chain",
+        pclass: "emitted",
+        note: `${c.event}, log ${r.logIndex} of the transaction`,
+        verify: {
+          kind: "etherscan",
+          href: `${explorer.tx}#eventlog`,
+          text: `The transaction's logs on ${explorer.name}`,
+        },
+      },
+      ...(KIND_SOURCES[r.kind] ?? []),
+    ],
+  };
+}
+
+/** Base: the change log's tables are Ethereum's only. */
+export function configChangesBaseProv(
+  f: V4ReserveFigures,
+  o: { symbol: string; spoke: string; hub: string },
+): Provenance {
+  return {
+    kind: "chain",
+    summary: `Every change to ${o.symbol}'s settings on ${o.spoke} is an event on-chain. The ${o.spoke} spoke logs its reserve, collateral and liquidation settings, the ${o.hub} hub the asset's settings and this spoke's credit line. ${CONFIG_LOG} reads them from Ethereum's tables; Base has none yet.`,
     contract: spokeContract(f, o.spoke),
     inputs: [
       {
         label: `${o.spoke} spoke`,
         value: f.spokeAddress,
         kind: "chain",
-        note: "reserve, dynamic and liquidation settings",
+        note: "reserve, collateral and liquidation settings",
       },
       { label: `${o.hub} hub`, value: f.hubAddress, kind: "chain", note: "asset settings and the spoke's credit line" },
     ],
