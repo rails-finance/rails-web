@@ -318,6 +318,27 @@ export function DataTableRowLink({
   );
 }
 
+/** An amount cell (D1): the token amount over its dollar value in muted 12px,
+ *  the dollar value only where Rails reads an oracle at a named block
+ *  (rails-ops decision 0047). `tag` (a cap pill) sits beside the dollars, so
+ *  the cell keeps two lines; with no `value` it sits under the amount. Both
+ *  lines follow the cell's alignment. */
+export function DataTableAmount({ amount, value, tag }: { amount: ReactNode; value?: ReactNode; tag?: ReactNode }) {
+  return (
+    <span className="inline-flex flex-col leading-snug align-middle" data-dt-amount="">
+      <span className="block text-foreground/80">{amount}</span>
+      {(value != null || tag) && (
+        <span className="block text-[12px] text-rb-500">
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            {value}
+            {tag}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}
+
 /** A cell's cover: the row's link again, hidden from the keyboard and from a
  *  screen reader, under the cell's content. */
 function RowCover({ href }: { href: string }) {
@@ -512,6 +533,7 @@ export function DataTableRowMenu({ label, items }: { label: string; items: DataT
         aria-expanded={open}
         onClick={toggle}
         data-row-menu=""
+        data-anatomy="D7"
         className={`inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-md text-rb-500 transition-opacity hover:bg-[var(--surface-hover)] hover:text-foreground focus-ring group-hover/dt-row:opacity-100 group-focus-within/dt-row:opacity-100 [@media(hover:none)]:opacity-100 ${
           open ? "opacity-100" : "opacity-0"
         }`}
@@ -620,6 +642,7 @@ export function DataTableGroupRow({
       role={stacked ? "row" : undefined}
       className="group/dt-row cursor-pointer"
       data-dt-parent=""
+      data-anatomy="D8"
       data-open={open ? "" : undefined}
       onClick={(e) => {
         // A control in the row (the toggle, a receipt, a link) keeps its press.

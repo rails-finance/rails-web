@@ -30,7 +30,7 @@ import { AnchoredPanel } from "@/components/shared/asset-popover";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { type AssetClass, ASSET_CLASS_COLOR } from "@/lib/aave-v4/asset-class";
 import { capShows, type AaveMarketView, type CapState, type MarketReserveRow } from "@/lib/shared/aave-market-view";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import type { AaveMarketVocab } from "@/lib/shared/aave-market-provenance";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { ratePercentText } from "@/lib/shared/rate-percent";
@@ -369,7 +369,56 @@ export function reserveFigures({ r, vocab, assetHref }: RowProps) {
     ) : (
       <span className="text-rb-500">—</span>
     );
-  return { supplied, borrowed, available, supplyRate, borrowRate, price };
+  // The table's amount cells (D1, decision 0047): the token amount over its
+  // oracle dollar value. The amount echoes the dollar figure's receipt, which
+  // names the token total and the price it is valued at; the amount carries
+  // the row's side link. Null where the cell keeps one line: a fixed-price
+  // reserve (tokens only) or a side at zero.
+  const tokenAmount = (n: number, info: Provenance, href: string | null) => {
+    const figure = (
+      <Prov info={info} echo>
+        <span className="inline-flex items-center gap-1.5">
+          {formatCompact(n)}
+          <AssetUnit symbol={r.symbol} address={r.address} />
+        </span>
+      </Prov>
+    );
+    return href ? (
+      <Link href={href} className={INLINE_LINK}>
+        {figure}
+      </Link>
+    ) : (
+      figure
+    );
+  };
+  const suppliedInfo = vocab.reserveValueProv("supplied", r.symbol);
+  const borrowedInfo = vocab.reserveValueProv("borrowed", r.symbol);
+  const availableInfo = vocab.reserveAvailableProv(r.symbol, { priced: true, basis, deficit: r.deficit });
+  const priced = !fixed && r.priceUsd != null;
+  const amounts = {
+    supplied:
+      priced && r.supplied > 0
+        ? {
+            amount: tokenAmount(r.supplied, suppliedInfo, supplyLink),
+            value: <Prov info={suppliedInfo}>{sUsd.display}</Prov>,
+          }
+        : null,
+    borrowed:
+      priced && r.borrowed > 0
+        ? {
+            amount: tokenAmount(r.borrowed, borrowedInfo, borrowLink),
+            value: <Prov info={borrowedInfo}>{bUsd.display}</Prov>,
+          }
+        : null,
+    available:
+      priced && availTokens > 0
+        ? {
+            amount: <span data-available-basis={basis}>{tokenAmount(availTokens, availableInfo, null)}</span>,
+            value: <Prov info={availableInfo}>{fmtUsd(availUsd).display}</Prov>,
+          }
+        : null,
+  };
+  return { supplied, borrowed, available, amounts, supplyRate, borrowRate, price };
 }
 
 /** One line of the details panel. */
