@@ -46,7 +46,12 @@ import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { Prov } from "@/components/shared/provenance";
 import { serverReadOf, type ServerRead } from "@/lib/shared/server-head-read";
-import { positionStateProv, positionIndexProv, llamalendUsdProv } from "@/lib/llamalend/event-provenance";
+import {
+  positionStateProv,
+  positionIndexProv,
+  positionClosedCollateralProv,
+  llamalendUsdProv,
+} from "@/lib/llamalend/event-provenance";
 import { llamalendPositionContent } from "@/lib/llamalend/position-content";
 import { type LlamalendFactoryKind, type LlamalendVersion } from "@/lib/llamalend/asset-catalog";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
@@ -269,23 +274,34 @@ export function useLlamalendCardSlots({
       {
         id: "final-collateral",
         label: CARD_VOCAB.finalCollateral,
-        value: (
-          <AssetAmount
-            value={v.collateral ?? 0}
-            symbol={v.collateralSymbol}
-            exact={v.collateralRaw != null ? formatUnitsExact(v.collateralRaw, v.collateralDecimals) : "0"}
-          />
-        ),
+        // An unstated collateral (the sentinel) shows 0 by the rule above,
+        // and its receipt says so.
+        value:
+          v.collateral != null ? (
+            <Prov info={stateProv(v, v.collateralSymbol, "collateral")}>
+              <AssetAmount
+                value={v.collateral}
+                symbol={v.collateralSymbol}
+                exact={v.collateralRaw != null ? formatUnitsExact(v.collateralRaw, v.collateralDecimals) : undefined}
+              />
+            </Prov>
+          ) : (
+            <Prov info={positionClosedCollateralProv(v.collateralSymbol, v.controller)}>
+              <AssetAmount value={0} symbol={v.collateralSymbol} exact="0" />
+            </Prov>
+          ),
       },
       {
         id: "final-debt",
         label: CARD_VOCAB.finalDebt,
         value: (
-          <AssetAmount
-            value={v.debt}
-            symbol={v.borrowedSymbol}
-            exact={formatUnitsExact(v.debtRaw, v.borrowedDecimals)}
-          />
+          <Prov info={stateProv(v, v.borrowedSymbol, "debt")}>
+            <AssetAmount
+              value={v.debt}
+              symbol={v.borrowedSymbol}
+              exact={formatUnitsExact(v.debtRaw, v.borrowedDecimals)}
+            />
+          </Prov>
         ),
       },
     ];

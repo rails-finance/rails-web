@@ -40,6 +40,23 @@ function HealthValue({ hf, chain }: { hf: number; chain: MoonwellChainResponse }
   );
 }
 
+/** 1 − 1 ÷ HF is 1 − debt ÷ capacity: the same two reads as the share. */
+function DropValue({ hf, chain }: { hf: number; chain: MoonwellChainResponse }) {
+  const lane = useLane();
+  return (
+    <Prov
+      info={moonwellCapacityProv(
+        "Drop to liquidation",
+        "1 − debt value ÷ CF-weighted capacity",
+        lane,
+        serverReadOf(chain),
+      )}
+    >
+      {Math.round((1 - 1 / hf) * 100)}%
+    </Prov>
+  );
+}
+
 function ShareValue({ chain }: { chain: MoonwellChainResponse }) {
   const lane = useLane();
   const share = capacityShare(chain.debtValueUsd, chain.collateralCapacityUsd);
@@ -106,7 +123,7 @@ export function moonwellRiskRows(chain: MoonwellChainResponse | null): PositionP
       id: "liquidation-drop",
       label: "Liquidates on a drop of",
       tip: "How far the value of the collateral basket can fall, all together, before the account reaches the liquidation line: 1 − 1 ÷ the health factor.",
-      value: `${Math.round((1 - 1 / hf) * 100)}%`,
+      value: <DropValue hf={hf} chain={chain} />,
     });
   }
   rows.push(liquidationLineRow(chain));

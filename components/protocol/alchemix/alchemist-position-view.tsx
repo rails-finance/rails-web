@@ -122,6 +122,7 @@ import { ALCHEMIX_LIFETIME_FLOWS, alchemixPositionContent } from "@/lib/alchemix
 import type { LatestPriceAsset } from "@/components/shared/latest-prices";
 import {
   clearedRunProv,
+  redemptionCountProv,
   collateralisationProv,
   eventsAloneDebtProv,
   lineLiquidationsProv,
@@ -690,7 +691,10 @@ export function AlchemistPositionView({
                       >
                         <PanelFigure>{formatCompactTitled(redemptionTotals.cleared).display}</PanelFigure>
                       </Prov>{" "}
-                      {sym} by <PanelFigure>{redemptionTotals.count}</PanelFigure>{" "}
+                      {sym} by{" "}
+                      <Prov info={redemptionCountProv(redemptionTotals.count, coords)}>
+                        <PanelFigure>{redemptionTotals.count}</PanelFigure>
+                      </Prov>{" "}
                       {redemptionTotals.count === 1 ? "redemption" : "redemptions"}
                     </span>
                   ),

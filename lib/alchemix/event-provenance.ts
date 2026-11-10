@@ -222,6 +222,19 @@ export function clearedRunProv(
   };
 }
 
+/** How many redemptions the cleared total runs over: a count of the
+ *  Alchemist's line-wide `Redemption` logs on this position's timeline. */
+export function redemptionCountProv(count: number, coords: AlchemixCoords): Provenance {
+  return {
+    kind: "chain",
+    pclass: "indexed",
+    summary: "Redemptions on this timeline — the number of the line's Redemption logs this position's timeline lists",
+    contract: alchemistContract(coords),
+    via: "count of Redemption logs on this position's timeline",
+    inputs: coordInputs(coords, [{ label: "Redemption logs", value: String(count), kind: "chain", pclass: "indexed" }]),
+  };
+}
+
 /** The collateral one redemption took from this position, from the same two
  *  readings the cleared debt is taken from. Only built where the reading before
  *  it is the one `debtClearedFromReadings` names, so the two figures always

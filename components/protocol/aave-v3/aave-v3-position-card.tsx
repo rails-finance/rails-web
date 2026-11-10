@@ -782,7 +782,7 @@ export function useAaveV3CardSlots({
               id: "liquidation-drop",
               label: "Liquidates on a drop of",
               tip: "How far the dollar value of all the collateral can fall, the debt standing still, before the health factor reaches 1 and the account can be liquidated: 1 − 1 ÷ health factor.",
-              value: `${liq.dropPct.toFixed(0)}%`,
+              value: <Prov info={dep.liqDrop(v.market)}>{liq.dropPct.toFixed(0)}%</Prov>,
             }
           : null;
 

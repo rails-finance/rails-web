@@ -93,6 +93,19 @@ export function comptrollerVerdictProv(what: string, lane?: MoonwellLane, readBy
   );
 }
 
+/** One market's price on the position page's price list: the Comptroller
+ *  oracle's getUnderlyingPrice, the price its liquidity math reads. */
+export function moonwellPriceProv(sym: string, lane?: MoonwellLane): Provenance {
+  return {
+    kind: "chain",
+    pclass: "oracle",
+    verify: recompute("Comptroller oracle", "getUnderlyingPrice"),
+    summary: `${sym} price in USD — the Comptroller oracle's getUnderlyingPrice for the ${sym} market, the price the Comptroller's liquidity and liquidation math reads.`,
+    contract: comptrollerOf(lane),
+    via: "Comptroller.oracle() · getUnderlyingPrice(mToken), scaled by 10^(36 − underlying decimals)",
+  };
+}
+
 /** One entered market's collateral factor — Comptroller.markets at head: the
  *  share of the supply's oracle value the account may borrow against. */
 export function moonwellCollateralFactorProv(sym: string, lane?: MoonwellLane, readBy?: ServerRead | null): Provenance {

@@ -649,3 +649,24 @@ export const morphoBorrowRateNowProv = (apr: number): Provenance => ({
   formula: "rate per second × seconds per year",
   inputs: [{ label: "APR", value: `${(apr * 100).toFixed(2)}%`, kind: "chain", note: "live read" }],
 });
+
+/** Costs per year — the debt the card states now times the borrow rate beside
+ *  it. A projection: it holds only while the rate does. */
+export const morphoYearlyCostProv = (sym: string, apr: number): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `Costs per year (${sym}) — the debt now times the market's borrow rate now: what a year of interest comes to while the rate holds.`,
+  contract: MORPHO,
+  via: "debt now × market IRM borrowRateView at head × 31,536,000",
+  formula: "debt now × APR",
+  inputs: [
+    { label: "debt now", kind: "chain", pclass: "state", note: "the debt figure on this card" },
+    {
+      label: "APR",
+      value: `${(apr * 100).toFixed(2)}%`,
+      kind: "chain",
+      pclass: "state",
+      note: "borrowRateView at head",
+    },
+  ],
+});

@@ -71,7 +71,8 @@ import { scaleCompoundChainBalance } from "@/lib/api/fetch-compound-position";
 import { DetailBodySkeleton } from "@/components/shared/detail-body-skeleton";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import type { PriceStripAsset } from "@/components/shared/price-strip";
+import type { LatestPriceAsset } from "@/components/shared/latest-prices";
+import { cometPriceProv } from "@/lib/compound/event-provenance";
 import { TimelineConfirmationFooter, TimelineCoverageFooter } from "@/components/shared/timeline-coverage-footer";
 import { boundaryFromChainCoverage } from "@/lib/shared/timeline-boundary";
 import { TimelineActivityHeader } from "@/components/shared/timeline-toolbar";
@@ -865,9 +866,9 @@ export function CompoundWalletView({
 
   // Ambient oracle-price pill: every priced token the wallet holds, in its
   // market's own unit converted to dollars by the protocol's own feeds.
-  const stripAssets = useMemo<PriceStripAsset[]>(() => {
+  const stripAssets = useMemo<LatestPriceAsset[]>(() => {
     const seen = new Set<string>();
-    const out: PriceStripAsset[] = [];
+    const out: LatestPriceAsset[] = [];
     for (const v of views) {
       if (v.status !== "open") continue;
       const assets = [
@@ -880,7 +881,12 @@ export function CompoundWalletView({
         const p = v.priceByAddress?.[addr];
         if (typeof p === "number" && p > 0) {
           seen.add(addr);
-          out.push({ symbol: a.symbol, address: a.address, price: p });
+          out.push({
+            symbol: a.symbol,
+            address: a.address,
+            price: p,
+            info: cometPriceProv(a.symbol, { comet: v.comet, marketLabel: v.marketLabel }),
+          });
         }
       }
     }

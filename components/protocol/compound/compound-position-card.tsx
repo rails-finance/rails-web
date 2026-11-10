@@ -618,7 +618,9 @@ export function useCompoundCardSlots({
         id: "read-at-block",
         label: "Read at block",
         tip: "The block the Comet's balance was read at. Interest accrues every block, so the balance moves between loads.",
-        value: v.current.block.toLocaleString("en-US"),
+        // The read's coordinate, the block every figure above was read at:
+        // exempt like the strip's block chip (receipts grammar, tripwire).
+        value: <span data-prov-exempt="">{v.current.block.toLocaleString("en-US")}</span>,
       });
     if (!oneLine && lines.length > 1) heads[0] = { ...heads[0], breakdown: supplyBreakdown };
     panel = [[], right];
