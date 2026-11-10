@@ -110,7 +110,7 @@ export function ProseSentenceText({ s, ctx, coords }: { s: ProseSentence; ctx: L
               key={i}
               href={explorerUrl(MAINNET_CHAIN_ID, "address", seg.address)}
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               onClick={(e) => e.stopPropagation()}
               className="text-pink-500 hover:text-pink-600 transition-colors"
             >

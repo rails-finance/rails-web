@@ -88,7 +88,7 @@ export default function WhenFrontendsFailWhatHappensInACrisis() {
       <p style={{ marginTop: "2rem" }}>
         Rails already provides read-only dashboards for{" "}
         <strong>
-          <a href="https://docs.liquity.org/v2-faq" target="_blank" rel="noopener noreferrer">
+          <a href="https://docs.liquity.org/v2-faq" target="_blank" rel="noopener">
             Liquity V2
           </a>
         </strong>
@@ -100,7 +100,7 @@ export default function WhenFrontendsFailWhatHappensInACrisis() {
 
       <p>
         For a first-class protocol explorer that will support <em>your</em> users, contact{" "}
-        <a href="http://x.com/rails_finance" target="_blank" rel="noopener noreferrer">
+        <a href="http://x.com/rails_finance" target="_blank" rel="noopener">
           @rails_finance
         </a>
         .

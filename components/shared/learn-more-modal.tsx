@@ -96,7 +96,7 @@ function DetailList({ details }: { details: LearnMoreDetail[] }) {
                 {d.sources.map((src, j) => (
                   <span key={j}>
                     {j > 0 ? "; " : null}
-                    <a href={src.url} target="_blank" rel="noopener noreferrer" className="link-external underline">
+                    <a href={src.url} target="_blank" rel="noopener" className="link-external underline">
                       {src.label}
                     </a>
                   </span>
@@ -236,12 +236,7 @@ export function LearnMoreModal({
                   </div>
                   <div className="text-xs ">
                     {content.video.description}{" "}
-                    <a
-                      href={content.video.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="link-external underline"
-                    >
+                    <a href={content.video.url} target="_blank" rel="noopener" className="link-external underline">
                       {content.video.label} ↗
                     </a>
                   </div>
@@ -265,7 +260,7 @@ export function LearnMoreModal({
                         key={i}
                         href={link.url}
                         target="_blank"
-                        rel="noopener noreferrer"
+                        rel="noopener"
                         className="block text-xs link-external hover:underline"
                       >
                         ↗ {link.label}

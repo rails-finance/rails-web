@@ -68,13 +68,7 @@ function LiquityModalInner({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* Logo — links out to liquity.org for anyone who wants to leave */}
-          <a
-            href="https://liquity.org"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Liquity"
-            className="inline-block"
-          >
+          <a href="https://liquity.org" target="_blank" rel="noopener" aria-label="Liquity" className="inline-block">
             <LiquityLogo className="h-9 w-auto" />
           </a>
 

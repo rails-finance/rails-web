@@ -48,7 +48,7 @@ export function BlockRef({
       <a
         href={explorerUrl(chainId, "block", String(block).replace(/,/g, ""))}
         target="_blank"
-        rel="noopener noreferrer"
+        rel="noopener"
         className={`${linkClassName} ${shell}`}
         title={name}
         aria-label={name}

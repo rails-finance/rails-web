@@ -59,7 +59,7 @@ const DIVIDER = <div className="mx-3 my-1 border-t border-rb-300 dark:border-rb-
 
 function openText(text: string, type: string) {
   const url = URL.createObjectURL(new Blob([text], { type }));
-  window.open(url, "_blank", "noopener,noreferrer");
+  window.open(url, "_blank", "noopener");
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 

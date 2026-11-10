@@ -64,7 +64,7 @@ export function TeamSection({ aside }: { aside?: ReactNode }) {
             <div className="min-w-0">
               <p className={TEAM_LINE}>
                 <span className={TEAM_NAME}>{m.name}</span>{" "}
-                <a href={m.url} target="_blank" rel="noopener noreferrer" className={LINK}>
+                <a href={m.url} target="_blank" rel="noopener" className={LINK}>
                   {m.handle}
                 </a>
               </p>

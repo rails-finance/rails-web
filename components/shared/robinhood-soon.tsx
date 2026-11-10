@@ -12,11 +12,11 @@ export function RobinhoodSoon() {
   return (
     <span>
       Coming soon,{" "}
-      <a href={RAILS_X_URL} target="_blank" rel="noopener noreferrer" className={LINK}>
+      <a href={RAILS_X_URL} target="_blank" rel="noopener" className={LINK}>
         follow us on X
       </a>{" "}
       for announcements and Telegram{" "}
-      <a href={RAILS_TELEGRAM_URL} target="_blank" rel="noopener noreferrer" className={LINK}>
+      <a href={RAILS_TELEGRAM_URL} target="_blank" rel="noopener" className={LINK}>
         @railsfinance
       </a>{" "}
       for details.

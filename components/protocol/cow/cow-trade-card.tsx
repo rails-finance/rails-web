@@ -161,7 +161,7 @@ export function CowTradeCard({
             key="tx"
             href={explorerUrl(COW_CHAIN_ID, "tx", trade.txHash)}
             target="_blank"
-            rel="noopener noreferrer"
+            rel="noopener"
             className="link-muted font-mono text-xs"
           >
             {shortAddress(trade.txHash)} ↗

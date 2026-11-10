@@ -228,7 +228,7 @@ function LineRow({
           <a
             href={href(line.oracle.address)}
             target="_blank"
-            rel="noreferrer"
+            rel="noopener"
             className="font-mono text-xs font-normal text-rb-500 hover:underline"
           >
             {shortAddress(line.oracle.address)}

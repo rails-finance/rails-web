@@ -62,7 +62,7 @@ export function ArticleLayout({ article, nextArticle, prevArticle, children }: A
             <a
               href={article.mediumUrl}
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium bg-rb-100 dark:bg-rb-800 text-rb-500 hover:bg-rb-200 dark:hover:bg-rb-700 rounded-md transition-colors"
             >
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">

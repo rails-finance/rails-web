@@ -221,6 +221,16 @@ const nextConfig: NextConfig = {
       fallback: [],
     };
   },
+  // rails-ops decision 0060: another site learns the origin, never the path
+  // (Rails URLs carry wallet addresses).
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [{ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" }],
+      },
+    ];
+  },
   async redirects() {
     return [
       // Legacy explorer paths — collapsed to a single hop to the new canonical

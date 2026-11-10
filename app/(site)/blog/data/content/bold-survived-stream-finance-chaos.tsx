@@ -6,7 +6,7 @@ export default function BoldSurvivedStreamFinanceChaos() {
         <a
           href="https://www.coindesk.com/markets/2025/11/03/balancer-hit-by-apparent-exploit-as-usd70m-in-crypto-moves-to-new-wallets"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
         >
           Balancer lost $128 million to an exploit
         </a>
@@ -14,7 +14,7 @@ export default function BoldSurvivedStreamFinanceChaos() {
         <a
           href="https://99bitcoins.com/news/altcoins/balancer-hack-uncovers-hidden-defi-frauds-as-xusd-depeg-threatens-morpho-and-euler/"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
         >
           Stream Finance's xUSD stablecoin depegged
         </a>
@@ -22,12 +22,12 @@ export default function BoldSurvivedStreamFinanceChaos() {
         <a
           href="https://www.theblock.co/post/377491/analysts-map-285m-in-potential-exposure-across-defi-after-stream-finances-93m-loss"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
         >
           $285 million in bad debt across DeFi
         </a>{" "}
         as a wave of panic withdrawals ensued. Yet{" "}
-        <a href="https://coinmarketcap.com/currencies/liquity-v2/" target="_blank" rel="noopener noreferrer">
+        <a href="https://coinmarketcap.com/currencies/liquity-v2/" target="_blank" rel="noopener">
           Liquity V2's BOLD stablecoin remained completely unscathed
         </a>
         .
@@ -43,14 +43,14 @@ export default function BoldSurvivedStreamFinanceChaos() {
 
       <p>
         Stream Finance{" "}
-        <a href="https://streamprotocol.money/" target="_blank" rel="noopener noreferrer">
+        <a href="https://streamprotocol.money/" target="_blank" rel="noopener">
           promised simplicity — deposit USDC, receive xUSD, earn 12–18% APY
         </a>
         . Behind this lurked{" "}
         <a
           href="https://bitcoinethereumnews.com/tech/stream-finance-stablecoin-plunges-77-after-protocols-fund-manager-loses-93-million/"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
         >
           recursive looping that created 4x leverage
         </a>
@@ -59,7 +59,7 @@ export default function BoldSurvivedStreamFinanceChaos() {
         <a
           href="https://coinmarketcap.com/academy/article/stream-finance-stablecoin-xusd-crashes-77percent-after-dollar93m-loss"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
         >
           $170 million backed $530 million positions
         </a>
@@ -71,7 +71,7 @@ export default function BoldSurvivedStreamFinanceChaos() {
         <a
           href="https://www.ccn.com/news/crypto/defi-stream-finance-xusd-depeg-stablecoin/"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
         >
           depended on five external protocols
         </a>
@@ -79,7 +79,7 @@ export default function BoldSurvivedStreamFinanceChaos() {
         <a
           href="https://protos.com/stream-finance-halts-withdrawals-after-93m-loss-xusd-depegs-by-75/"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
         >
           interest costs hit $500,000 daily
         </a>
@@ -87,7 +87,7 @@ export default function BoldSurvivedStreamFinanceChaos() {
         <a
           href="https://bitcoinethereumnews.com/tech/stream-finance-freezes-withdrawals-after-93m-loss-amid-fraud-concerns/"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
         >
           an off-chain fund manager lost $93 million through undisclosed mechanisms
         </a>{" "}
@@ -99,7 +99,7 @@ export default function BoldSurvivedStreamFinanceChaos() {
         <a
           href="https://www.coinspeaker.com/stream-finance-suspends-withdrawals-93m-loss-defi-contagion/"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
         >
           rates spiked to 75–90%
         </a>
@@ -111,7 +111,7 @@ export default function BoldSurvivedStreamFinanceChaos() {
       <p>
         Liquity V2's BOLD takes the opposite approach. No recursive leverage, no external fund managers, no off-chain
         dependencies. Just{" "}
-        <a href="https://docs.liquity.org/v2-faq/bold-and-earn" target="_blank" rel="noopener noreferrer">
+        <a href="https://docs.liquity.org/v2-faq/bold-and-earn" target="_blank" rel="noopener">
           overcollateralized loans with three battle-tested collateral types — ETH, wstETH, and rETH
         </a>
         .
@@ -121,7 +121,7 @@ export default function BoldSurvivedStreamFinanceChaos() {
         <a
           href="https://mixbytes.io/blog/modern-stablecoins-how-they-re-made-liquity-v2"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
         >
           Each collateral operates in isolated branches
         </a>{" "}
@@ -131,7 +131,7 @@ export default function BoldSurvivedStreamFinanceChaos() {
 
       <p>
         Stability relies on{" "}
-        <a href="https://docs.liquity.org/v2-faq/bold-and-earn" target="_blank" rel="noopener noreferrer">
+        <a href="https://docs.liquity.org/v2-faq/bold-and-earn" target="_blank" rel="noopener">
           redemption-based arbitrage
         </a>
         . Any BOLD holder can redeem 1 BOLD for $1 worth of collateral anytime, creating a hard price floor through
@@ -143,14 +143,14 @@ export default function BoldSurvivedStreamFinanceChaos() {
         <a
           href="https://mixbytes.io/blog/modern-stablecoins-how-they-re-made-liquity-v2"
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
         >
           User-set interest rates
         </a>{" "}
         create self-stabilizing dynamics. Borrowers choose rates knowing redemptions target lowest-rate positions first.
         When BOLD dips below $1, redemption pressure pushes borrowers to raise rates. Higher rates make BOLD holding
         attractive —{" "}
-        <a href="https://docs.liquity.org/v2-faq/bold-and-earn" target="_blank" rel="noopener noreferrer">
+        <a href="https://docs.liquity.org/v2-faq/bold-and-earn" target="_blank" rel="noopener">
           Stability Pool depositors receive 75% of borrower interest
         </a>{" "}
         — pushing price upward. Sustainable real yield from internal mechanics, no leverage required.
@@ -162,11 +162,11 @@ export default function BoldSurvivedStreamFinanceChaos() {
       </p>
 
       <p>
-        <a href="https://docs.liquity.org/v2-faq/bold-and-earn" target="_blank" rel="noopener noreferrer">
+        <a href="https://docs.liquity.org/v2-faq/bold-and-earn" target="_blank" rel="noopener">
           Core contracts are immutable
         </a>{" "}
         — no parameter tweaks, no governance changes possible.{" "}
-        <a href="https://docs.liquity.org/v2-faq/bold-and-earn" target="_blank" rel="noopener noreferrer">
+        <a href="https://docs.liquity.org/v2-faq/bold-and-earn" target="_blank" rel="noopener">
           100% on-chain operations
         </a>
         , no external fund managers to lose assets.

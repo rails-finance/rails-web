@@ -241,7 +241,7 @@ export function EventNotFoundNotice({ id, chainId }: { id: string; chainId: Chai
             <a
               href={explorerUrl(chainId, "tx-logs", hashMatch[0])}
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               className="link-external"
             >
               View the transaction on the chain&rsquo;s explorer

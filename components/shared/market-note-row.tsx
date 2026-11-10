@@ -745,7 +745,7 @@ function observationLinks(p: MarketNotePoint, links: NoteLinks) {
           {", "}
         </>
       )}
-      <a href={links.explorer(p)} target="_blank" rel="noopener noreferrer" className="link-external">
+      <a href={links.explorer(p)} target="_blank" rel="noopener" className="link-external">
         log {p.logIndex} on the chain&rsquo;s explorer
       </a>
       {")"}
@@ -806,7 +806,7 @@ function vaultTermsBody(note: VaultTermsNote, links: NoteLinks): NoteBody {
       <>
         {note.statement}, read from the vault&rsquo;s own <code>{note.termsKind}</code> configuration log at block{" "}
         {note.to.block.toLocaleString("en-US")} (
-        <a href={links.explorer(note.to)} target="_blank" rel="noopener noreferrer" className="link-external">
+        <a href={links.explorer(note.to)} target="_blank" rel="noopener" className="link-external">
           on the chain&rsquo;s explorer
         </a>
         ). It is not this address&rsquo;s event: it moved every holder&rsquo;s terms at once, which is why it sits among

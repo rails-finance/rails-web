@@ -727,7 +727,7 @@ function ContractIdentityCard({
         <a
           href={explorerUrl(MAINNET_CHAIN_ID, "address", wallet)}
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
           className="font-mono text-[13px] text-foreground underline decoration-line underline-offset-2 hover:decoration-foreground"
         >
           {wallet}

@@ -25,7 +25,7 @@ export function LinkedAddress({ address, label, className = "", chainId }: Linke
     <a
       href={explorerUrl(chainId ?? ctxChain, "address", address)}
       target="_blank"
-      rel="noopener noreferrer"
+      rel="noopener"
       onClick={(e) => e.stopPropagation()}
       className={`text-blue-600 dark:text-[var(--text-link)] hover:underline font-mono text-xs ${className}`}
     >

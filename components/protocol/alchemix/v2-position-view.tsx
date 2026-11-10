@@ -157,7 +157,7 @@ export function AlchemixV2PositionView({
         <a
           href={explorerUrl(chainId, "address", p.closure.sweptTo)}
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
           className="link-muted"
         >
           Alchemix DAO Safe
@@ -169,7 +169,7 @@ export function AlchemixV2PositionView({
             <a
               href={explorerUrl(chainId, "tx", p.closure.sweepTxHash)}
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               className="link-muted"
             >
               one transaction

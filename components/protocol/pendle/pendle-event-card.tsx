@@ -168,7 +168,7 @@ export function PendleEventCard({
           key="r"
           href={explorerUrl(PENDLE_CHAIN_ID, "address", router.address)}
           target="_blank"
-          rel="noopener noreferrer"
+          rel="noopener"
           className="link-muted text-xs"
         >
           {router.name} ↗

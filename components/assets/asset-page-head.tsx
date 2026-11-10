@@ -110,7 +110,7 @@ function ContractLine({ chain, token }: { chain: number; token: string }) {
       <a
         href={explorerUrl(chain as ChainId, "token", address)}
         target="_blank"
-        rel="noopener noreferrer"
+        rel="noopener"
         className="font-mono text-xs text-blue-600 hover:underline dark:text-[var(--text-link)]"
         title={address}
       >

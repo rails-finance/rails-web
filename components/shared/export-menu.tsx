@@ -113,7 +113,7 @@ export function ExportMenu({
   const viewMarkdown = (close: () => void) => {
     const blob = new Blob([buildMarkdown()], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
-    window.open(url, "_blank", "noopener,noreferrer");
+    window.open(url, "_blank", "noopener");
     // Revoke once the new tab has had time to load the blob.
     setTimeout(() => URL.revokeObjectURL(url), 10000);
     close();
