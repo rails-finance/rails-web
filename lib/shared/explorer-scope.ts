@@ -53,6 +53,8 @@ export interface ExplorerScope {
   on: boolean;
   /** Settled: off, or judged, or the index failed (everything shows). */
   ready: boolean;
+  /** The index could not be read: nothing is judged, and every explorer shows. */
+  failed: boolean;
   statusOf: (id: string) => ExplorerStatus;
 }
 
@@ -81,7 +83,12 @@ export function useExplorerScope(): ExplorerScope {
       for (const k of keys) if (list.has(k)) return "lists";
       return outside ? "unknown" : "none";
     };
-    return { on, ready: scope.ready && (keys == null || index !== undefined), statusOf };
+    return {
+      on,
+      ready: scope.ready && (keys == null || index !== undefined),
+      failed: keys != null && index === null,
+      statusOf,
+    };
   }, [scope.keys, scope.ready, index]);
 }
 
@@ -127,7 +134,8 @@ export function useScopedRoster(): ScopedRoster {
           : [],
       rows: filtering ? LAUNCHED_PROTOCOLS.filter((p) => listing.has(p.id)) : LAUNCHED_PROTOCOLS,
       total: LAUNCHED_PROTOCOLS.length,
-      on: judged,
+      on: judged || (assets && ex.failed),
+      failed: assets && ex.failed,
       peek,
       setPeek,
       listProps: { "data-scope-list": "", ...(ex.ready ? { "data-scope-ready": "" as const } : {}) },
@@ -135,8 +143,11 @@ export function useScopedRoster(): ScopedRoster {
   }, [ex, scope, assets, judged, filtering, peek]);
 }
 
-/** Whether any explorer on `chain` lists one of `keys`; null until the index has arrived. */
-export function useListedOn(): ((keys: Set<string>, chain: number) => boolean) | null {
+/** How a chain's explorers stand to `keys`: "lists" where one lists a key,
+ *  "unknown" where none does but one has no asset list (or a key is outside
+ *  the index), "none" where every explorer on it has a list and none holds
+ *  a key; null until the index has arrived. */
+export function useChainListing(): ((keys: Set<string>, chain: number) => ExplorerStatus) | null {
   const [index, setIndex] = useState<Index | null | undefined>(loaded);
   useEffect(() => {
     if (index !== undefined) return;
@@ -148,11 +159,18 @@ export function useListedOn(): ((keys: Set<string>, chain: number) => boolean) |
   }, [index]);
   return useMemo(() => {
     if (!index) return null;
-    return (keys, chain) =>
-      LAUNCHED_PROTOCOLS.some((p) => {
-        if (p.chainId !== chain) return false;
+    return (keys, chain) => {
+      const here = LAUNCHED_PROTOCOLS.filter((p) => p.chainId === chain);
+      let unknown = here.length === 0 || [...keys].some((k) => !SCOPE_KEYS.has(k));
+      for (const p of here) {
         const list = index.lists.get(p.id);
-        return !!list && [...keys].some((k) => list.has(k));
-      });
+        if (!list || index.unknown.has(p.id)) {
+          unknown = true;
+          continue;
+        }
+        if ([...keys].some((k) => list.has(k))) return "lists";
+      }
+      return unknown ? "unknown" : "none";
+    };
   }, [index]);
 }

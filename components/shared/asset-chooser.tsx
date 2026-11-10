@@ -59,7 +59,8 @@ export interface AssetChooserProps {
   label?: string;
   /** What a count counts, for its tip ("trades"); null draws no counts. */
   countNoun?: string | null;
-  /** Draws the chosen tokens as pills; false where the caller lists them. */
+  /** Draws the chosen tokens as pills; false where the caller lists them
+   *  (and removes them: Backspace and Reset then leave the picks alone). */
   pills?: boolean;
   /** The heading over the most counted options. */
   topLabel?: string;
@@ -216,7 +217,7 @@ export function AssetChooser({
     } else if (e.key === "Escape") {
       e.preventDefault();
       close();
-    } else if (e.key === "Backspace" && query === "" && selected.length) {
+    } else if (e.key === "Backspace" && pills && query === "" && selected.length) {
       onChange(selected.slice(0, -1));
     }
   }
@@ -290,7 +291,7 @@ export function AssetChooser({
               <MobileSheetFilterHeader
                 label={label}
                 status={sheetStatus}
-                onReset={selected.length ? () => onChange([]) : undefined}
+                onReset={selected.length && pills ? () => onChange([]) : undefined}
               />
             }
           >
@@ -300,7 +301,7 @@ export function AssetChooser({
           <div className="overlay-panel absolute left-0 top-full z-[var(--z-dropdown)] mt-1 flex max-h-[440px] w-[22rem] max-w-[calc(100vw-2rem)] flex-col">
             <div className="flex items-center justify-between px-4 py-3">
               <span className={OVERLAY_HEADING}>{label}</span>
-              {selected.length > 0 && (
+              {selected.length > 0 && pills && (
                 <button type="button" onClick={() => onChange([])} className={RESET_LINK}>
                   Reset
                 </button>

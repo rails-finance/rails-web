@@ -59,6 +59,7 @@ import type { BaseListFilters } from "@/lib/shared/list-filter";
 import { useScopedRows } from "@/components/shared/asset-scope-note";
 import { assetKey } from "@/lib/shared/asset-family";
 import {
+  focusViews,
   MANAGE_PARAM,
   OPEN_SCOPE_PANEL,
   registerSymbols,
@@ -167,8 +168,16 @@ export function AssetExplorer({
     },
     [scope.picks],
   );
+  /** A row's picks: one per chain, each carrying the row's other chains as
+   *  its asset record, so chain focus finds it by address on any of them. */
   const picksOf = (c: AssetCard): AssetPick[] =>
-    c.chains.map((x) => ({ chain: x.chain, token: x.token.toLowerCase(), builtOn: true, symbol: c.symbol }));
+    c.chains.map((x) => ({
+      chain: x.chain,
+      token: x.token.toLowerCase(),
+      builtOn: true,
+      symbol: c.symbol,
+      also: c.chains.filter((y) => y !== x).map((y) => ({ chain: y.chain, token: y.token.toLowerCase() })),
+    }));
   const add = (c: AssetCard) => {
     // The first add keeps the whole list in view, to go on adding.
     if (!scope.on) setManage(true);
@@ -189,7 +198,9 @@ export function AssetExplorer({
     put("focus", next.focus.join(","));
     put("sort", next.sortBy, "read");
     put("dir", next.sortOrder, "desc");
-    for (const k of ["view"]) p.delete(k);
+    // A saved listing's `view` goes with a filter change; a focus link's
+    // `&view=` name (with `?assets=` or `?chains=`) stays for its dialog.
+    if (!p.has("assets") && !p.has("chains")) p.delete("view");
     const qs = p.toString().replace(/%2C/gi, ",").replace(/%2B/g, "+").replace(/%3A/gi, ":");
     window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
     notifyUrlChanged();
@@ -328,17 +339,21 @@ export function AssetExplorer({
     query.trim() !== "" ||
     filters.cats.length + filters.chains.length + filters.explorers.length + (scope.on ? filters.focus.length : 0) > 0;
 
-  // "Focus on these N": the shown assets become the focus (chains kept).
+  // "Focus on these N" (Miles, 10 Nov 2026): a new view holding the shown
+  // assets (on the chains in focus), put in use; the view in use is kept.
   const focusOnShown = () =>
-    scope.setPicks(
-      shown
+    focusViews.add({
+      assets: shown
         .flatMap(picksOf)
         .filter((p, i, all) => all.findIndex((q) => q.chain === p.chain && q.token === p.token) === i),
-    );
+      chains: scope.chains,
+    });
 
   const countNode = (
     <span className="text-xs text-rb-500 tabular-nums" data-asset-count={shown.length}>
-      {filtering ? `${n(shown.length)} of ${n(cards.length)} assets` : `${n(cards.length)} assets`}
+      {filtering
+        ? `${n(shown.length)} of ${n(cards.length)} ${cards.length === 1 ? "asset" : "assets"}`
+        : `${n(cards.length)} ${cards.length === 1 ? "asset" : "assets"}`}
     </span>
   );
 
@@ -380,7 +395,8 @@ export function AssetExplorer({
             </>
           ) : (
             <>
-              Showing {n(scoped.rows.length)} of {n(allCards.length)} assets in your focus ·{" "}
+              Showing {n(scoped.rows.length)} of {n(allCards.length)} {allCards.length === 1 ? "asset" : "assets"} in
+              your focus ·{" "}
               <button
                 type="button"
                 onClick={() => setManage(true)}
@@ -532,7 +548,7 @@ function AssetRow({
               data-pill="in-focus"
               data-asset-focus-pill={picked ? "picked" : "built-on"}
             >
-              in focus
+              In focus
             </span>
           )}
         </div>

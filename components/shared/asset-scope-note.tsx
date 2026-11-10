@@ -3,7 +3,7 @@
 // A list under the asset preference (ui-jobs 557): `useScopedRows` keeps the
 // rows that touch the reader's assets, and `ScopeNote` says what it hid,
 // "Showing 14 of 312 vaults · Show all". Show all lifts the filter on this
-// list until the page is left; the strip's "Turn off" ends AIM (components/shared/asset-scope-strip.tsx).
+// list until the page is left; Turn off in the profile menu ends Focus.
 
 import { useMemo, useState } from "react";
 import { useAssetScope } from "@/lib/shared/asset-scope";
@@ -18,6 +18,8 @@ export interface ScopedRows<T> {
   setPeek: (v: boolean) => void;
   /** Spread on the list's wrapper: held hidden until the filter has run. */
   listProps: { "data-scope-list": ""; "data-scope-ready"?: "" };
+  /** What the list is filtered by could not be read, so every row shows. */
+  failed?: boolean;
 }
 
 /** Keeps the rows that pass the focus (AssetScope.matches): one of their keys
@@ -59,6 +61,12 @@ export function ScopeNote<T>({
   if (!scoped.on) return null;
   const { rows, total, peek, setPeek } = scoped;
   const word = total === 1 ? noun[0] : noun[1];
+  if (scoped.failed)
+    return (
+      <p className={`text-xs text-rb-500 ${className}`} data-scope-note="failed">
+        Rails could not read which {noun[1]} list your assets, so all {n(total)} show.
+      </p>
+    );
   const press = (label: string, v: boolean) => (
     <button type="button" onClick={() => setPeek(v)} className={`font-semibold ${INPLACE_TEXT}`} data-scope-peek={v}>
       {label}

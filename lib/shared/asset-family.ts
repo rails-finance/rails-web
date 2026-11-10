@@ -12,8 +12,9 @@
 //
 // `familyOf` is the downward closure: from each chosen asset, every token built
 // on it, through every kind but `debt` (BOLD is minted against WETH, which does
-// not make BOLD a form of WETH). `wraps` is also walked upward, so ETH and WETH
-// are one node whichever is chosen.
+// not make BOLD a form of WETH). A native coin and its canonical wrapper are
+// one node whichever is chosen (ETH and WETH); every other `wraps` edge is
+// walked down only.
 //
 // Pure: no `@/` imports (scripts/test/asset-family.test.mjs runs it directly).
 
@@ -36,6 +37,9 @@ export interface FamilyPick {
   builtOn: boolean;
   /** The symbol, for a token outside the chooser's tables (one added from /assets). */
   symbol?: string;
+  /** The same asset's address on other chains (one asset record, from the
+   *  roster), which chain focus picks from. Matching is by address alone. */
+  also?: { chain: number; token: string }[];
 }
 
 export const NATIVE = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
@@ -169,20 +173,21 @@ for (const r of FAMILY_ROWS) {
   UP.set(r.token, [...(UP.get(r.token) ?? []), r]);
 }
 
-/** One wraps-node: the asset and every token it wraps or is wrapped as, both
- *  ways (WETH ↔ ETH, cbBTC ↔ BTC ↔ WBTC). */
+/** Wrapped one for one by a native coin's canonical wrapper: one asset either
+ *  way (Miles, 10 Nov 2026). Every other `wraps` edge is walked down only, so
+ *  cbBTC reaches what is built on cbBTC, not WBTC or tBTC, and USDbC does not
+ *  reach USDC. */
+const CANONICAL: ReadonlySet<string> = new Set([k1(WETH), kb(WETH_BASE)]);
+const NATIVES: ReadonlySet<string> = new Set([k1(NATIVE), kb(NATIVE)]);
+
+/** One wraps-node: the asset, and for a native coin or its canonical wrapper
+ *  the other of the pair (ETH ↔ WETH). */
 function wrapsNode(key: string): string[] {
-  const seen = new Set([key]);
-  const todo = [key];
-  while (todo.length) {
-    const at = todo.pop()!;
-    const next = [
-      ...(UP.get(at) ?? []).filter((r) => r.kind === "wraps").map((r) => r.underlying),
-      ...(DOWN.get(at) ?? []).filter((r) => r.kind === "wraps").map((r) => r.token),
-    ];
-    for (const n of next) if (!seen.has(n)) (seen.add(n), todo.push(n));
-  }
-  return [...seen];
+  const out = [key];
+  if (CANONICAL.has(key)) for (const r of UP.get(key) ?? []) if (r.kind === "wraps") out.push(r.underlying);
+  if (NATIVES.has(key))
+    for (const r of DOWN.get(key) ?? []) if (r.kind === "wraps" && CANONICAL.has(r.token)) out.push(r.token);
+  return out;
 }
 
 /** The keys a selection reaches: each chosen asset's wraps-node, and with

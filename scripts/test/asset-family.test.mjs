@@ -31,6 +31,19 @@ test("ETH chosen reaches WETH through wraps", () => {
   assert.ok(familyOf([{ chain: 1, token: NATIVE, builtOn: false }]).has(k(WETH)));
 });
 
+test("other wrappers are walked down only: cbBTC is not WBTC, USDbC is not USDC", () => {
+  const CBBTC = "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf";
+  const WBTC = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599";
+  const cb = familyOf([{ chain: 1, token: CBBTC, builtOn: true }]);
+  assert.ok(!cb.has(k(WBTC)));
+  assert.ok(!cb.has(k("0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")));
+  const USDBC = "0xd9aaec86b65d86f6a7b5b1b0c42ffa531710b6ca";
+  const USDC_BASE = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+  assert.ok(!familyOf([{ chain: 8453, token: USDBC, builtOn: true }]).has(k(USDC_BASE, 8453)));
+  assert.ok(familyOf([{ chain: 8453, token: USDC_BASE, builtOn: true }]).has(k(USDBC, 8453)));
+  assert.ok(!familyOf([{ chain: 8453, token: USDC_BASE, builtOn: false }]).has(k(USDBC, 8453)));
+});
+
 test("WETH built on adds the rate tokens, on its own chain only", () => {
   const s = familyOf([{ chain: 1, token: WETH, builtOn: true }]);
   assert.ok(s.has(k(WSTETH)));
@@ -74,6 +87,7 @@ test("?assets= reads symbols, chain:symbol, addresses and + (or the space a quer
   ]);
   assert.deepEqual(parseAssetsParam(`1:${SBOLD} `, symbols), [{ chain: 1, token: SBOLD, builtOn: true }]);
   assert.deepEqual(parseAssetsParam("nope", symbols), []);
+  assert.deepEqual(parseAssetsParam("", symbols), []);
   assert.equal(parseAssetsParam(null, symbols), null);
 });
 
@@ -88,6 +102,16 @@ test("?assets= writes the shortest form and reads back", () => {
   assert.equal(v, `weth+,1:bold+,1:${SBOLD}`);
   assert.deepEqual(parseAssetsParam(v, symbols), picks);
   assert.equal(formatAssetsParam([{ chain: 1, token: WETH, builtOn: false }], symbolOf, symbols), "1:weth");
+});
+
+test("?assets= carries a symbol that would not read back as its address", () => {
+  const WUSD = "0x1111111111111111111111111111111111111111";
+  const odd = new Map([["wusd+", [{ chain: 8453, token: WUSD }]]]);
+  const v = formatAssetsParam([{ chain: 8453, token: WUSD, builtOn: true }], () => "wUSD+", odd);
+  assert.equal(v, `8453:${WUSD}+`);
+  assert.deepEqual(parseAssetsParam(v, odd), [{ chain: 8453, token: WUSD, builtOn: true }]);
+  const spaced = formatAssetsParam([{ chain: 1, token: WUSD, builtOn: false }], () => "RST0001 BY DANUBE", odd);
+  assert.equal(spaced, `1:${WUSD}`);
 });
 
 test("?chains= reads slugs and ids, and writes slugs", () => {

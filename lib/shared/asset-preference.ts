@@ -1,29 +1,20 @@
-// Focus mode (ui-jobs 557): the assets and the chains a reader limits Rails
-// to, kept in this browser, and `?assets=` / `?chains=` that override it for
-// one view (a link carrying either replaces the whole stored focus).
+// Focus mode (ui-jobs 557): the shapes, the `?assets=` / `?chains=` formats
+// a focus link carries, and the script that marks the page before first paint.
+// The saved views live under FOCUS_VIEWS_KEY (lib/shared/focus-views.ts).
 //
-// Stored under its own key, `rails-focus-v2`, as `{ assets: [{ chain, token,
-// builtOn }], chains: [chainId] }`. `rails-assets-v1` (the assets alone) is
-// read once into it.
-// Its own key, rather than a field of `defi-explorer-preferences`
-// (preferences.ts), so the script in app/layout.tsx can read it before first
-// paint without parsing the whole preference object, and so a reset of the
-// display preferences leaves the reader's assets alone.
-//
-// `?assets=` is a comma list. An entry is `chain:symbol` (`1:weth`) where the
-// symbol names one token on that chain, else `chain:address`; a bare symbol
-// (`bold`) stands for that symbol on every chain the address tables know. A
-// trailing `+` is "and what's built on it". A query string reads `+` as a
-// space, so a trailing space counts as `+` too.
+// `?assets=` is a comma list. An entry is `chain:address`; where a symbol is
+// plain (letters, digits, dots, dashes) and names one token on its chain,
+// `chain:symbol` (`1:weth`); a bare symbol (`bold`) stands for that symbol on
+// every chain the address tables know. A trailing `+` is "and what's built on
+// it". A query string reads `+` as a space, so a trailing space counts as `+` too.
 //
 // Pure: type imports only (scripts/test/asset-family.test.mjs runs it
 // directly); the symbol tables arrive as arguments.
 
 import type { FamilyPick } from "@/lib/shared/asset-family";
 
-export const FOCUS_KEY = "rails-focus-v2";
-/** The assets-only store before chain focus; migrated into FOCUS_KEY. */
-export const ASSET_PREFERENCE_KEY = "rails-assets-v1";
+/** The saved focus views and the one in use (lib/shared/focus-views.ts). */
+export const FOCUS_VIEWS_KEY = "rails-focus-views";
 export const ASSETS_PARAM = "assets";
 export const CHAINS_PARAM = "chains";
 
@@ -36,16 +27,6 @@ export interface Focus {
 }
 
 export const NO_FOCUS: Focus = { assets: [], chains: [] };
-
-export function isFocus(v: unknown): v is Focus {
-  return (
-    !!v &&
-    typeof v === "object" &&
-    isPickList((v as Focus).assets) &&
-    Array.isArray((v as Focus).chains) &&
-    (v as Focus).chains.every((c) => typeof c === "number")
-  );
-}
 
 /** Reads `?chains=`: chain slugs (`ethereum,base`) or ids; null when absent. */
 export function parseChainsParam(raw: string | null, slugs: Record<string, number>): number[] | null {
@@ -68,6 +49,8 @@ export function formatChainsParam(chains: readonly number[], slugOf: (id: number
 export type SymbolIndex = Map<string, { chain: number; token: string }[]>;
 
 const isAddress = (s: string) => /^0x[0-9a-f]{40}$/.test(s);
+/** A symbol a link can carry as written: anything else goes as its address. */
+const PLAIN = /^[a-z0-9][a-z0-9.\-]*$/i;
 
 export function isPickList(v: unknown): v is AssetPick[] {
   return (
@@ -128,19 +111,20 @@ export function formatAssetsParam(
     const covers =
       all.length > 1 &&
       all.every((t) => picks.some((q) => q.chain === t.chain && q.token === t.token && q.builtOn === p.builtOn));
-    if (sym && covers) {
+    if (sym && covers && PLAIN.test(sym)) {
       for (const t of all) done.add(`${t.chain}:${t.token}`);
       parts.push(`${sym.toLowerCase()}${plus}`);
       continue;
     }
     done.add(key);
     const unique = all.filter((t) => t.chain === p.chain).length === 1;
-    parts.push(`${p.chain}:${sym && unique ? sym.toLowerCase() : p.token}${plus}`);
+    parts.push(`${p.chain}:${sym && unique && PLAIN.test(sym) ? sym.toLowerCase() : p.token}${plus}`);
   }
   return parts.join(",");
 }
 
 /** The script app/layout.tsx runs before first paint: marks the page when a
- *  focus is stored or linked (`data-asset-scope`), and when it holds chains
- *  (`data-chain-focus`, which holds a chain's pages until the gate has run). */
-export const ASSET_SCOPE_SCRIPT = `(function(){try{var d=document.documentElement.dataset,q=location.search,f=localStorage.getItem('${FOCUS_KEY}'),s=localStorage.getItem('${ASSET_PREFERENCE_KEY}'),on=false,ch=false;if(f){f=JSON.parse(f);ch=!!(f&&f.chains&&f.chains.length);on=ch||!!(f&&f.assets&&f.assets.length)}else on=!!(s&&s!=='[]');var la=/[?&]${ASSETS_PARAM}=[^&]/.test(q),lc=/[?&]${CHAINS_PARAM}=[^&]/.test(q);if(la||lc)ch=lc;if(on||la||lc)d.assetScope='1';if(ch)d.chainFocus='1'}catch(e){}})()`;
+ *  saved view is in use (`data-asset-scope`), and when it holds chains
+ *  (`data-chain-focus`, which holds a chain's pages until the gate has run).
+ *  A link's focus is only proposed, so the URL plays no part. */
+export const ASSET_SCOPE_SCRIPT = `(function(){try{var d=document.documentElement.dataset,s=JSON.parse(localStorage.getItem('${FOCUS_VIEWS_KEY}')||'null'),v=null,i;if(s&&s.views&&s.active)for(i=0;i<s.views.length;i++)if(s.views[i]&&s.views[i].id===s.active)v=s.views[i];if(!v)return;var c=v.chains&&v.chains.length,a=v.assets&&v.assets.length;if(a||c)d.assetScope='1';if(c)d.chainFocus='1'}catch(e){}})()`;

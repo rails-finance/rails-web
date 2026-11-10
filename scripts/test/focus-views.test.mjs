@@ -1,34 +1,32 @@
-// Saved Focus views (lib/shared/focus-views.ts): the first read from the older
-// single focus, "Use this view" saving a link or switching to the view that
-// holds it, and the edits; ui-jobs 557.
+// Saved Focus views (lib/shared/focus-views.ts): one state (a view in use or
+// none, no empty view), "Use this view" saving a link or switching to the
+// view that holds it, the edits, the tolerant read and the import's checks;
+// ui-jobs 557.
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  addView,
   adoptFocus,
   activeFocus,
   editActive,
+  editView,
   isFocusViews,
-  migrateFocus,
   moveView,
   NO_VIEWS,
-  pruneEmpty,
+  readViews,
   removeView,
   renameView,
+  restoreView,
   sameFocus,
 } from "../../lib/shared/focus-views.ts";
 
 const BOLD = { chain: 1, token: "0x6440f144b7e50d6a8439336510312d2f54beb01d", builtOn: true };
 const WETH = { chain: 1, token: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", builtOn: true };
 
-test("an older focus that is on becomes one view in use; off, none", () => {
-  const s = migrateFocus({ assets: [WETH, BOLD], chains: [] }, "a", 1);
-  assert.equal(s.views.length, 1);
-  assert.equal(s.active, "a");
-  assert.equal(s.views[0].name, undefined);
-  assert.ok(isFocusViews(s));
-  assert.deepEqual(migrateFocus({ assets: [], chains: [] }, "a", 1), NO_VIEWS);
-  assert.deepEqual(migrateFocus(null, "a", 1), NO_VIEWS);
+test("a link naming nothing makes no view, and an empty focus is no view", () => {
+  assert.deepEqual(adoptFocus(NO_VIEWS, { assets: [], chains: [] }, "x", "a", 1), NO_VIEWS);
+  assert.deepEqual(addView(NO_VIEWS, { assets: [], chains: [] }, "x", "a", 1), NO_VIEWS);
 });
 
 test("same focus ignores order, not the built-on switch or chains", () => {
@@ -38,7 +36,7 @@ test("same focus ignores order, not the built-on switch or chains", () => {
 });
 
 test("using a link saves it first and in use, the earlier view kept", () => {
-  const before = migrateFocus({ assets: [WETH], chains: [] }, "a", 1);
+  const before = addView(NO_VIEWS, { assets: [WETH], chains: [] }, undefined, "a", 1);
   const s = adoptFocus(before, { assets: [BOLD], chains: [1] }, " My stables ", "b", 2);
   assert.deepEqual(
     s.views.map((v) => v.id),
@@ -69,7 +67,7 @@ test("an edit goes into the view in use, or makes one when none is", () => {
   assert.deepEqual(activeFocus(s).assets, [BOLD, WETH]);
 });
 
-test("rename, remove, move and prune", () => {
+test("rename, remove, move, and an edit that empties a view removes it", () => {
   let s = adoptFocus(NO_VIEWS, { assets: [WETH], chains: [] }, undefined, "a", 1);
   s = adoptFocus(s, { assets: [BOLD], chains: [] }, "B", "b", 2);
   s = renameView(s, "a", "  Wrapped ");
@@ -81,15 +79,56 @@ test("rename, remove, move and prune", () => {
     s.views.map((v) => v.id),
     ["a", "b"],
   );
+  assert.equal(s.active, "b");
   s = editActive(s, { assets: [], chains: [] }, "x", 3);
-  s = pruneEmpty(s);
   assert.deepEqual(
     s.views.map((v) => v.id),
     ["a"],
   );
-  assert.equal(s.active, null);
-  s = removeView(s, "a");
+  assert.equal(s.active, null, "emptying the view in use turns Focus off");
+  s = editView(s, "a", { assets: [], chains: [] });
   assert.deepEqual(s, NO_VIEWS);
+});
+
+test("a removed view comes back where it was, in use if it was", () => {
+  let s = addView(NO_VIEWS, { assets: [WETH], chains: [] }, "W", "a", 1);
+  s = addView(s, { assets: [BOLD], chains: [] }, "B", "b", 2, 1);
+  assert.deepEqual(
+    s.views.map((v) => v.id),
+    ["a", "b"],
+  );
+  const gone = removeView(s, "b");
+  assert.equal(gone.active, null);
+  const back = restoreView(gone, s.views[1], 1, true);
+  assert.deepEqual(back, s);
+});
+
+test("the store is read view by view: a malformed or empty view goes, the rest stay", () => {
+  const raw = {
+    views: [
+      { id: "a", assets: [BOLD], chains: [], savedAt: 1 },
+      { id: "b", assets: [{ chain: 1, token: "nope", builtOn: true }], chains: [], savedAt: 2 },
+      { id: "c", assets: [], chains: [], savedAt: 3 },
+      { id: "d", assets: [WETH], chains: [999], savedAt: 4 },
+    ],
+    active: "c",
+  };
+  const s = readViews(raw, (c) => c === 1 || c === 8453);
+  assert.deepEqual(
+    s.views.map((v) => v.id),
+    ["a", "d"],
+  );
+  assert.deepEqual(s.views[1].chains, [], "an unknown chain is dropped");
+  assert.equal(s.active, null);
+  assert.deepEqual(readViews("junk"), NO_VIEWS);
+});
+
+test("one asset on two chains is one focus under a chain focus", () => {
+  const BOLD_BASE = { chain: 8453, token: "0x03569cc076654f82679c4ba2124d64774781b01d", builtOn: true };
+  const a = { ...BOLD, also: [{ chain: 8453, token: BOLD_BASE.token }] };
+  const b = { ...BOLD_BASE, also: [{ chain: 1, token: BOLD.token }] };
+  assert.ok(sameFocus({ assets: [a], chains: [1] }, { assets: [b], chains: [1] }));
+  assert.ok(!sameFocus({ assets: [a], chains: [] }, { assets: [b], chains: [] }));
 });
 
 test("an import adds views the reader lacks, names an unnamed match, keeps the view in use", async () => {
@@ -102,9 +141,16 @@ test("an import adds views the reader lacks, names an unnamed match, keeps the v
     { id: "z", name: "Dup", assets: [USDC], chains: [8453], savedAt: 7 },
     { id: "e", assets: [], chains: [], savedAt: 8 },
     { nonsense: true },
+    { id: "f", name: "Nowhere", assets: [], chains: [999], savedAt: 9 },
   ];
   let n = 0;
-  const { state, read, added } = mergeViews(here, file, () => `new${n++}`, 9);
+  const { state, read, added } = mergeViews(
+    here,
+    file,
+    () => `new${n++}`,
+    9,
+    (c) => c === 1 || c === 8453,
+  );
   assert.equal(read, 2);
   assert.equal(added, 1);
   assert.equal(state.active, "a");

@@ -2,31 +2,28 @@
 
 // Focus mode (ui-jobs 557): its panel and its arrival dialog. Focus shows on
 // the profile control (components/shared/focus-avatar.tsx), and its menu opens
-// with a Focus section (Miles, 10 Nov 2026). The strip that ran across the top
-// of every page is kept here unshown (SHOW_STRIP) for comparison. The ways in
-// are "Focus" in the profile menu (H20), which opens the panel
-// (OPEN_SCOPE_PANEL), and the Focus button on a token or chain row of the
-// search's dropdown (components/shared/aim-search-button.tsx).
+// with a Focus section (Miles, 10 Nov 2026). The ways in are the profile
+// menu, which opens the panel (OPEN_SCOPE_PANEL), and the Focus button on a
+// token or chain row of the search's dropdown
+// (components/shared/aim-search-button.tsx).
 //
-// The panel edits the focus view in use (lib/shared/focus-views.ts): its name,
-// then two parts. Assets: each chosen asset with one switch, "Built on it",
-// added through AssetChooser. Chains: one press per chain; none pressed is
-// every chain, and a focused chain where an asset is not listed says so.
+// The panel edits one view on a draft: its name, then two parts. Assets: each
+// chosen asset with one switch, "Built on it", added through AssetChooser.
+// Chains: one press per chain; none pressed is every chain. A draft becomes a
+// view, put in use, once it holds something; a view emptied in the panel is
+// removed, and Focus is off. Opened from a link's dialog, the draft is the
+// link's proposal and nothing is saved until "Use this view".
+//
 // Arriving on `?assets=` / `?chains=` (with `&view=` naming it), a dialog says
-// what Focus mode is and lists what the link sets (FocusLinkIntro), with "Use
-// this view", which saves it and keeps it as the reader moves around Rails.
-//
-// On an explorer's own pages the strip carries one more line where the
-// explorer is one the preference hides (lib/shared/explorer-scope.ts): its
-// chain holds none of the reader's assets, or it lists none of them, or Rails
-// has no asset list for it. The page itself still opens whole.
+// what Focus mode is and lists what the link sets (FocusLinkIntro). Nothing
+// filters by the link until "Use this view".
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { protocolForPathname } from "@/lib/shared/protocols";
 import { CHAINS } from "@/lib/shared/chains";
-import { useExplorerScope } from "@/lib/shared/explorer-scope";
+import { useChainListing, useExplorerScope, type ExplorerStatus } from "@/lib/shared/explorer-scope";
 import { createPortal } from "react-dom";
 import { Check, Lightbulb, Link2, ListFilter, X } from "lucide-react";
 import { FocusAvatar } from "@/components/shared/focus-avatar";
@@ -37,15 +34,15 @@ import { MobileSheet, MobileSheetFilterHeader } from "@/components/shared/mobile
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { ChainGlyph, segmentClass } from "@/components/shared/chain-toggle";
-import { focusShort } from "@/components/shared/aim-gate";
-import { useListedOn } from "@/lib/shared/explorer-scope";
 import { launchedChains } from "@/lib/shared/protocols";
 import type { ChainId } from "@/lib/shared/chains";
 import { builtOnSymbols, FAMILY_ROWS, familyOf } from "@/lib/shared/asset-family";
+import type { Focus } from "@/lib/shared/asset-preference";
 import {
   chainNameOf,
-  effectivePicks,
+  focusKeys,
   focusViews,
+  type FocusProposal,
   type FocusView,
   OPEN_SCOPE_PANEL,
   SCOPE_CHAINS,
@@ -53,16 +50,13 @@ import {
   scopeLink,
   scopeSymbolOf,
   useAssetScope,
+  withRecord,
   type AssetPick,
   manageHref,
 } from "@/lib/shared/asset-scope";
-import { INLINE_LINK, INPLACE_TEXT, OVERLAY_HEADING, PAGE_LINK, PAGE_SCRIM, RESET_LINK } from "@/lib/shared/ui-grammar";
+import { INLINE_LINK, OVERLAY_HEADING, PAGE_LINK, PAGE_SCRIM, RESET_LINK } from "@/lib/shared/ui-grammar";
 
-/** The strip across the top of every page, replaced by the profile control's
- *  ring and badge (Miles, 10 Nov 2026); kept for a side-by-side. */
-const SHOW_STRIP = false as boolean;
-
-const chainName = (c: number) => SCOPE_CHAINS[c] ?? `chain ${c}`;
+const chainName = (c: number) => SCOPE_CHAINS[c] ?? chainNameOf(c);
 const symbolOf = (p: Pick<AssetPick, "chain" | "token">) =>
   scopeSymbolOf(p.chain, p.token) ?? `${p.token.slice(0, 6)}…${p.token.slice(-4)}`;
 
@@ -92,145 +86,53 @@ const OPTIONS: AssetChooserOption[] = SCOPE_TOKENS.map((t) => ({
   count: familyOf([{ chain: t.chain, token: t.token, builtOn: true }]).size,
 }));
 
-export function AssetScopeStrip({ column = "app" }: { column?: "app" | "site" }) {
+/** The panel's target: the view in use, a new view, or a link's proposal. */
+type PanelMode = "edit" | "new" | "link";
+
+/** Focus's overlays, mounted once in the shell: the panel (opened by
+ *  OPEN_SCOPE_PANEL) and the arrival dialog. */
+export function AssetScopeStrip() {
   const scope = useAssetScope();
-  const isPhone = useMediaQuery(PHONE_QUERY);
-  const [open, setOpen] = useState(false);
+  const [panel, setPanel] = useState<{ mode: PanelMode; draft?: FocusProposal } | null>(null);
   useEffect(() => {
-    const show = () => setOpen(true);
+    const show = (e: Event) => {
+      const mode = (e as CustomEvent<PanelMode | undefined>).detail === "new" ? "new" : "edit";
+      setPanel({ mode });
+    };
     window.addEventListener(OPEN_SCOPE_PANEL, show);
     return () => window.removeEventListener(OPEN_SCOPE_PANEL, show);
   }, []);
-  const on = scope.on && SHOW_STRIP;
+  const link = scope.link;
+  const linkValue = useLinkValue();
 
   return (
     <>
-      {on && (
-        <div
-          // The app column's main pulls up 17px from md; the margin gives it back.
-          className={`border-b border-rb-200 bg-rb-100/60 dark:border-rb-800 dark:bg-rb-900/60 ${column === "app" ? "md:mb-[17px]" : ""}`}
-          data-asset-scope-strip={scope.fromLink ? "link" : "stored"}
-        >
-          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-2 gap-y-1 px-4 py-1.5 text-xs md:px-6">
-            <span className="min-w-0 text-foreground" title={focusTitle(scope.picks, scope.chains)} data-focus-label="">
-              <ListFilter className="mr-1.5 inline size-3.5 align-[-2px] text-rb-500" aria-hidden="true" />
-              {isPhone ? (
-                <>
-                  <span className="text-rb-600 dark:text-rb-400">Focus:</span>{" "}
-                  <span className="font-semibold">{focusShort(scope.picks, scope.chains)}</span>
-                </>
-              ) : (
-                <>
-                  <span className="text-rb-600 dark:text-rb-400">Focus mode active:</span>{" "}
-                  <FocusWords picks={scope.picks} chains={scope.chains} />
-                </>
-              )}
-            </span>
-            {/* On a phone the presses take their own line, with no dot leading it. */}
-            {isPhone ? (
-              <span className="basis-full" aria-hidden="true" />
-            ) : (
-              <span className="text-rb-500" aria-hidden="true">
-                ·
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              className={`font-semibold ${INPLACE_TEXT}`}
-              data-asset-scope-change=""
-            >
-              Change
-            </button>
-            {scope.fromLink && (
-              <>
-                <span className="text-rb-500" aria-hidden="true">
-                  ·
-                </span>
-                <button
-                  type="button"
-                  onClick={scope.adoptLink}
-                  className={`font-semibold ${INPLACE_TEXT}`}
-                  data-asset-scope-keep=""
-                >
-                  Use this view
-                </button>
-              </>
-            )}
-            <span className="text-rb-500" aria-hidden="true">
-              ·
-            </span>
-            <button
-              type="button"
-              onClick={scope.clear}
-              className={`font-semibold ${INPLACE_TEXT}`}
-              data-asset-scope-clear=""
-            >
-              Show everything
-            </button>
-          </div>
-          <ExplorerScopeLine keys={scope.keys} />
-        </div>
-      )}
-      {open && (
-        <AssetScopePanel
-          onClose={() => {
-            setOpen(false);
-            focusViews.prune();
-          }}
+      {panel && <AssetScopePanel mode={panel.mode} proposal={panel.draft} onClose={() => setPanel(null)} />}
+      {link && !panel && (
+        <FocusLinkIntro
+          key={linkValue}
+          seenKey={`rails-focus-intro:${linkValue}`}
+          proposal={link}
+          onChange={() => setPanel({ mode: "link", draft: link })}
         />
       )}
-      {scope.fromLink && !open && <FocusLinkIntro onChange={() => setOpen(true)} />}
     </>
   );
 }
 
-/** "BOLD on Ethereum; Base": every pick and chain, for the strip's title. */
-function focusTitle(picks: AssetPick[], chains: number[]): string {
-  const a = picks.map((p) => `${symbolOf(p)} on ${chainName(p.chain)}`).join(", ");
-  const c = chains.map(chainNameOf).join(", ");
-  return [a, c && `chains: ${c}`].filter(Boolean).join("; ");
-}
-
-/** The chains in prose, each with its mark: "Ethereum and Base". */
-function ChainWords({ chains, size = "size-3" }: { chains: number[]; size?: string }) {
-  return (
-    <>
-      {chains.map((c, i) => (
-        <span key={c}>
-          {i > 0 && (i === chains.length - 1 ? " and " : ", ")}
-          <span className="inline-flex items-center gap-1 whitespace-nowrap font-semibold text-foreground">
-            <ChainGlyph chainId={c as ChainId} className={size} />
-            {chainNameOf(c)}
-          </span>
-        </span>
-      ))}
-    </>
-  );
-}
-
-/** The strip's words: "[icons] BOLD and what's built on it, on [mark] Ethereum"; "[mark] Base". */
-export function FocusWords({ picks, chains }: { picks: AssetPick[]; chains: number[] }) {
-  if (!picks.length) return <ChainWords chains={chains} />;
-  return (
-    <>
-      <PickIcons picks={picks} />
-      <span className="font-semibold">{scopeSummary(picks)}</span>
-      {chains.length > 0 && (
-        <>
-          {", on "}
-          <ChainWords chains={chains} />
-        </>
-      )}
-    </>
-  );
+/** The link's params as one string: a new link is a new dialog. */
+function useLinkValue(): string {
+  usePathname();
+  if (typeof window === "undefined") return "";
+  const sp = new URLSearchParams(window.location.search);
+  return `${sp.get("assets") ?? ""}|${sp.get("chains") ?? ""}|${sp.get("view") ?? ""}`;
 }
 
 /** The first two picks' icons, inline before the summary. */
 function PickIcons({ picks }: { picks: AssetPick[] }) {
   const shown = [...new Map(picks.map((p) => [symbolOf(p), p])).values()].slice(0, 2);
   return (
-    <span className="mr-1 inline-flex -space-x-1 align-[-3px]" aria-hidden="true">
+    <span className="mr-1 inline-flex shrink-0 -space-x-1 align-[-3px]" aria-hidden="true">
       {shown.map((p) => (
         <TokenChipIcon
           key={`${p.chain}:${p.token}`}
@@ -251,7 +153,7 @@ export function focusName(picks: AssetPick[], chains: number[]): string {
   const names = [...new Set(picks.map(symbolOf))];
   const a = names.length > 3 ? `${names.slice(0, 3).join(", ")} +${names.length - 3}` : andList(names);
   const c = andList(chains.map(chainNameOf));
-  return a && c ? `${a} on ${c}` : a || c || "Empty view";
+  return a && c ? `${a} on ${c}` : a || c || "New view";
 }
 
 /** A saved view's name: its own, else what it holds. */
@@ -261,7 +163,7 @@ export const viewName = (v: Pick<FocusView, "name" | "assets" | "chains">) => v.
 export function ViewIcons({ picks, chains }: { picks: AssetPick[]; chains: number[] }) {
   if (picks.length) return <PickIcons picks={picks} />;
   return (
-    <span className="mr-1 inline-flex -space-x-1 align-[-3px]" aria-hidden="true">
+    <span className="mr-1 inline-flex shrink-0 -space-x-1 align-[-3px]" aria-hidden="true">
       {chains.slice(0, 2).map((c) => (
         <ChainGlyph key={c} chainId={c as ChainId} className="size-3.5" />
       ))}
@@ -375,21 +277,107 @@ function examplesOf(picks: AssetPick[], limit = EXAMPLES_SHOWN): string[] {
 /** "sBOLD, yBOLD and ysyBOLD": a list in prose. */
 const andList = (xs: string[]) => (xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
 
-/** The dialog's rows scroll past this many. */
+interface FocusMiss {
+  text: string;
+  /** "none": every explorer on the chain has a list and none holds it;
+   *  "unknown": Rails cannot say (an explorer there has no asset list). */
+  kind: "none" | "unknown";
+  chain: number;
+}
+
+/**
+ * Where a focus holds nothing, chain by chain: "BOLD isn't listed on
+ * Arbitrum" only where Rails can say so; "Rails has no asset list for
+ * Arbitrum yet" where it cannot. `empty`: every focused chain lists none of
+ * the assets, so the focus would show nothing. Null until the explorer index
+ * has arrived.
+ */
+export function useFocusMisses(focus: Focus): { misses: FocusMiss[]; empty: boolean } | null {
+  const listing = useChainListing();
+  return useMemo(() => {
+    if (!listing) return null;
+    const misses: FocusMiss[] = [];
+    const bySymbol = new Map<string, AssetPick[]>();
+    for (const p of focus.assets) bySymbol.set(symbolOf(p), [...(bySymbol.get(symbolOf(p)) ?? []), p]);
+    let emptyChains = 0;
+    for (const c of focus.chains) {
+      let unknown = false;
+      let none = 0;
+      for (const [sym, picks] of bySymbol) {
+        const keys = focusKeys({ assets: picks, chains: [c] }) ?? new Set<string>();
+        const status: ExplorerStatus = keys.size ? listing(keys, c) : "none";
+        if (status === "none") {
+          none++;
+          misses.push({ text: `${sym} isn't listed on ${chainNameOf(c)}`, kind: "none", chain: c });
+        } else if (status === "unknown") unknown = true;
+      }
+      if (unknown)
+        misses.push({ text: `Rails has no asset list for ${chainNameOf(c)} yet`, kind: "unknown", chain: c });
+      if (bySymbol.size > 0 && none === bySymbol.size) emptyChains++;
+    }
+    return { misses, empty: focus.chains.length > 0 && emptyChains === focus.chains.length };
+  }, [listing, focus]);
+}
+
+/** The dialog's rows scroll past this many (fewer on a phone). */
 const INTRO_ROWS = 5;
+const INTRO_ROWS_PHONE = 3;
+
+/** On a phone, a press is at least 44px tall. */
+const TAP = "min-h-11 sm:min-h-0";
+
+/** Focus moves into a dialog as it opens, Tab stays inside it, and the page
+ *  behind does not scroll. */
+function useModalFocus(ref: RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const before = document.activeElement as HTMLElement | null;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    (el.querySelector<HTMLElement>("[data-autofocus]:not([disabled])") ?? el).focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const all = [...el.querySelectorAll<HTMLElement>("button:not([disabled]),a[href],input,[tabindex='0']")];
+      if (!all.length) return;
+      const a = all[0];
+      const z = all[all.length - 1];
+      if (e.shiftKey && document.activeElement === a) {
+        e.preventDefault();
+        z.focus();
+      } else if (!e.shiftKey && document.activeElement === z) {
+        e.preventDefault();
+        a.focus();
+      }
+    };
+    el.addEventListener("keydown", onKey);
+    return () => {
+      el.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+      before?.focus?.();
+    };
+  }, [ref]);
+}
 
 /**
  * Arriving on a focus link: what Focus mode is and what the link sets, with
  * "Use this view" (saved as a view and put in use), Change (the panel, on the
- * link's focus) and "Not now" (the link's focus dropped; the reader's own view
- * resumes). Once per link per tab (sessionStorage); Escape and the scrim are
- * "Not now".
+ * link's proposal) and "Not now" (the link's params dropped). Once per link
+ * per tab (sessionStorage); Escape and the scrim are "Not now". Where the
+ * focus would show nothing, the dialog says so and "Use this view" waits for
+ * a change.
  */
-function FocusLinkIntro({ onChange }: { onChange: () => void }) {
+function FocusLinkIntro({
+  seenKey,
+  proposal,
+  onChange,
+}: {
+  seenKey: string;
+  proposal: FocusProposal;
+  onChange: () => void;
+}) {
   const scope = useAssetScope();
-  const sp = typeof window === "undefined" ? null : new URLSearchParams(window.location.search);
-  const linkValue = `${sp?.get("assets") ?? ""}|${sp?.get("chains") ?? ""}|${sp?.get("view") ?? ""}`;
-  const seenKey = `rails-focus-intro:${linkValue}`;
+  const isPhone = useMediaQuery(PHONE_QUERY);
   const [shown, setShown] = useState(() => {
     try {
       return sessionStorage.getItem(seenKey) == null;
@@ -397,6 +385,8 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
       return true;
     }
   });
+  const judged = useFocusMisses(proposal.focus);
+  const empty = !!judged?.empty;
   const close = () => {
     try {
       sessionStorage.setItem(seenKey, "1");
@@ -408,7 +398,7 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
     scope.dismissLink();
   };
   useEffect(() => {
-    if (!shown) return;
+    if (!shown || isPhone) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !e.defaultPrevented) notNow();
     };
@@ -417,63 +407,119 @@ function FocusLinkIntro({ onChange }: { onChange: () => void }) {
   });
   if (!shown) return null;
 
+  const { focus, name } = proposal;
+  const body = (
+    <div className="flex flex-col gap-3" data-focus-intro-body="">
+      <p className="text-sm leading-relaxed text-rb-600 dark:text-rb-300">
+        Focus mode limits Rails to the assets and chains you choose. This link sets:
+      </p>
+      <div className="rounded-lg border border-rb-200 px-3 py-2 dark:border-rb-800" data-focus-intro-view="">
+        {name && (
+          <p className="pb-1 text-sm font-bold text-foreground [overflow-wrap:anywhere]" data-focus-intro-name="">
+            {name}
+          </p>
+        )}
+        <FocusRows picks={focus.assets} chains={focus.chains} scrollAfter={isPhone ? INTRO_ROWS_PHONE : INTRO_ROWS} />
+      </div>
+      {judged && judged.misses.length > 0 && (
+        <ul className="text-xs leading-snug text-foreground" data-focus-intro-miss={judged.misses.length}>
+          {judged.misses.map((m) => (
+            <li key={m.text} data-miss-kind={m.kind}>
+              {m.text}
+            </li>
+          ))}
+          {empty && (
+            <li className="text-rb-500" data-focus-intro-empty="">
+              It would show nothing as it stands. Press Change to fix it first.
+            </li>
+          )}
+        </ul>
+      )}
+      {!isPhone && <FocusTip />}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <button type="button" onClick={notNow} className={`${RESET_LINK} ${TAP}`} data-focus-intro-not-now="">
+          Not now
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            close();
+            onChange();
+          }}
+          className={`${RESET_LINK} ${TAP}`}
+          data-focus-intro-change=""
+        >
+          Change
+        </button>
+        <button
+          type="button"
+          disabled={empty}
+          data-autofocus=""
+          onClick={() => {
+            close();
+            scope.adoptLink(proposal);
+          }}
+          className={`ml-auto rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-500 disabled:cursor-not-allowed disabled:bg-rb-300 disabled:text-rb-600 dark:disabled:bg-rb-700 dark:disabled:text-rb-400 ${TAP}`}
+          data-focus-intro-use=""
+        >
+          Use this view
+        </button>
+      </div>
+    </div>
+  );
+
+  if (isPhone)
+    return (
+      <div data-focus-intro="">
+        <MobileSheet label="Focus mode" onClose={notNow} header={<MobileSheetFilterHeader label="Focus mode" />}>
+          {body}
+        </MobileSheet>
+      </div>
+    );
+
   return createPortal(
     <div className="fixed inset-0 z-[var(--z-modal)]" data-focus-intro="">
       <div className={`absolute inset-0 ${PAGE_SCRIM}`} onClick={notNow} aria-hidden="true" />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="focus-intro-title"
-        className="overlay-panel absolute left-1/2 top-24 flex max-h-[calc(100dvh-7rem)] w-[28rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col gap-3 overflow-y-auto p-5"
-      >
+      <ModalFrame labelledBy="focus-intro-title" className="top-24 w-[28rem] gap-3 p-5">
         <div className="flex items-center gap-2">
           <ListFilter className="size-4 text-rb-500" aria-hidden="true" />
           <h2 id="focus-intro-title" className="text-sm font-bold text-foreground">
             Focus mode
           </h2>
         </div>
-        <p className="text-sm leading-relaxed text-rb-600 dark:text-rb-300">
-          Focus mode isolates the Rails app to the assets and chains you choose. This link sets:
-        </p>
-        <div className="rounded-lg border border-rb-200 px-3 py-2 dark:border-rb-800" data-focus-intro-view="">
-          {scope.linkName && (
-            <p className="pb-1 text-sm font-bold text-foreground" data-focus-intro-name="">
-              {scope.linkName}
-            </p>
-          )}
-          <FocusRows picks={scope.picks} chains={scope.chains} scrollAfter={INTRO_ROWS} />
-        </div>
-        <FocusTip />
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button type="button" onClick={notNow} className={RESET_LINK} data-focus-intro-not-now="">
-            Not now
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              close();
-              onChange();
-            }}
-            className={RESET_LINK}
-            data-focus-intro-change=""
-          >
-            Change
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              close();
-              scope.adoptLink();
-            }}
-            className="ml-auto rounded-md bg-teal-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-teal-500"
-            data-focus-intro-use=""
-          >
-            Use this view
-          </button>
-        </div>
-      </div>
+        {body}
+      </ModalFrame>
     </div>,
     document.body,
+  );
+}
+
+/** A centred modal panel that takes focus, keeps Tab inside and locks the page's scroll. */
+function ModalFrame({
+  labelledBy,
+  label,
+  className,
+  children,
+}: {
+  labelledBy?: string;
+  label?: string;
+  className: string;
+  children: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useModalFocus(ref);
+  return (
+    <div
+      ref={ref}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={labelledBy}
+      aria-label={label}
+      tabIndex={-1}
+      className={`overlay-panel absolute left-1/2 flex max-h-[calc(100dvh-7rem)] max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col overflow-y-auto focus:outline-none ${className}`}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -483,13 +529,13 @@ function FocusTip() {
   const face = bookmarks == null ? null : (bookmarks[0]?.addresses[0] ?? SAMPLE_WALLET);
   return (
     <div
-      className="flex items-center gap-3 rounded-lg border border-teal-600/30 px-3 py-2.5 text-xs text-rb-500"
+      className="flex items-center gap-3 rounded-lg border border-rb-200 px-3 py-2.5 text-xs text-rb-500 dark:border-rb-800"
       data-focus-intro-tip=""
     >
       <Lightbulb className="size-4 shrink-0 text-foreground" aria-hidden="true" />
       <p className="min-w-0 flex-1 leading-snug">
-        <span className="font-semibold text-foreground">Tip</span> Change or end{" "}
-        <span className="font-semibold text-foreground">Focus mode</span> from the menu at the top right
+        <span className="font-semibold text-foreground">Tip</span> Change or turn off Focus from the menu at the top
+        right
       </p>
       <span className="shrink-0 rounded-md bg-rb-100 p-1.5 dark:bg-rb-800" aria-hidden="true">
         <FocusAvatar face={face} size={18} />
@@ -498,7 +544,22 @@ function FocusTip() {
   );
 }
 
-/** Why the preference hides the explorer this page belongs to; nothing where it shows. */
+/** Why Focus hides an explorer; null where it shows. */
+export function explorerWhy(
+  entry: { label: string; chainId: number },
+  status: ExplorerStatus,
+  keys: Set<string>,
+): { why: string; kind: "chain" | "none" | "unknown" } | null {
+  if (status === "lists") return null;
+  const chain = CHAINS[entry.chainId as ChainId];
+  const onChain = [...keys].some((k) => k.startsWith(`${entry.chainId}:`));
+  if (!onChain) return { why: `None of your assets is on ${chain.name}`, kind: "chain" };
+  return status === "none"
+    ? { why: `${entry.label} lists none of your assets`, kind: "none" }
+    : { why: `Rails has no asset list for ${entry.label} yet`, kind: "unknown" };
+}
+
+/** Why Focus hides the explorer this page belongs to; nothing where it shows. */
 export function ExplorerScopeLine({
   keys,
   className = "mx-auto max-w-7xl px-4 pb-1.5 text-xs text-rb-500 md:px-6",
@@ -512,18 +573,11 @@ export function ExplorerScopeLine({
   const entry = protocolForPathname(usePathname());
   const ex = useExplorerScope();
   if (!entry || !keys || !ex.on) return null;
-  const status = ex.statusOf(entry.id);
-  if (status === "lists") return null;
-  const chain = CHAINS[entry.chainId];
-  const onChain = [...keys].some((k) => k.startsWith(`${entry.chainId}:`));
-  const why = !onChain
-    ? `None of your assets is on ${chain.name}`
-    : status === "none"
-      ? `${entry.label} lists none of your assets`
-      : `Rails has no asset list for ${entry.label} yet`;
+  const w = explorerWhy(entry, ex.statusOf(entry.id), keys);
+  if (!w) return null;
   return (
-    <p className={className} data-explorer-scope={!onChain ? "chain" : status}>
-      {why} ·{" "}
+    <p className={className} data-explorer-scope={w.kind}>
+      {w.why} ·{" "}
       <Link href={manageHref(false)} onClick={onLeave} className={`font-semibold ${INLINE_LINK}`}>
         Where your assets are listed
       </Link>
@@ -538,7 +592,7 @@ function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) =
       role="switch"
       aria-checked={on}
       onClick={() => onChange(!on)}
-      className="inline-flex shrink-0 items-center gap-2 text-xs text-rb-500 hover:text-foreground"
+      className={`inline-flex shrink-0 items-center gap-2 text-xs text-rb-500 hover:text-foreground ${TAP}`}
       data-asset-scope-built-on={on}
     >
       <span
@@ -567,21 +621,22 @@ const PANEL_TITLE = "Focus";
 
 function PickRow({
   pick,
+  chainFocus,
   onChange,
   onRemove,
 }: {
   pick: AssetPick;
+  chainFocus: boolean;
   onChange: (p: AssetPick) => void;
   onRemove: () => void;
 }) {
   const adds = useMemo(() => builtOnSymbols(pick), [pick]);
   const sym = symbolOf(pick);
-  const chainFocus = useAssetScope().chains.length > 0;
   return (
     <li className="flex items-center gap-2 py-1.5" data-asset-scope-pick={`${pick.chain}:${pick.token}`}>
       <TokenChipIcon symbol={sym} address={pick.token} size={18} filterable={false} untitled />
       <span className="min-w-0 truncate text-sm font-semibold text-foreground">{sym}</span>
-      {/* Under chain focus the pick stands for its symbol on the focused chains. */}
+      {/* Under chain focus the pick stands for its asset on the focused chains. */}
       {!chainFocus && <span className="shrink-0 text-[11px] text-rb-500">{chainName(pick.chain)}</span>}
       <span
         className="ml-auto shrink-0"
@@ -600,7 +655,7 @@ function PickRow({
         type="button"
         onClick={onRemove}
         aria-label={`Remove ${sym} on ${chainName(pick.chain)}`}
-        className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-rb-500 transition-colors hover:bg-teal-500/15 hover:text-teal-600 dark:hover:text-teal-400"
+        className="inline-flex size-11 shrink-0 items-center justify-center rounded-full text-rb-500 transition-colors hover:bg-rb-100 hover:text-foreground sm:size-6 dark:hover:bg-rb-800"
       >
         <X className="size-3.5" strokeWidth={2.5} />
       </button>
@@ -609,41 +664,30 @@ function PickRow({
 }
 
 /** The panel's Chains part: one press per launched chain, pressed is in
- *  focus, none pressed is every chain. Under it, each focused chain where a
- *  picked asset is not listed ("BOLD isn't listed on Arbitrum"), judged by the
- *  explorer index (lib/shared/explorer-scope.ts). */
-function FocusChains() {
-  const scope = useAssetScope();
-  const listedOn = useListedOn();
+ *  focus, none pressed is every chain. Under it, where the focus holds
+ *  nothing on a chain, and where Rails cannot say. */
+function FocusChains({ draft, setChains }: { draft: Focus; setChains: (next: number[]) => void }) {
+  const judged = useFocusMisses(draft);
   const chains = launchedChains().map((c) => c.id);
   const toggle = (id: number) =>
-    scope.setChains(
-      scope.chains.includes(id)
-        ? scope.chains.filter((c) => c !== id)
-        : chains.filter((c) => c === id || scope.chains.includes(c)),
+    setChains(
+      draft.chains.includes(id)
+        ? draft.chains.filter((c) => c !== id)
+        : chains.filter((c) => c === id || draft.chains.includes(c)),
     );
-  const misses: string[] = [];
-  if (listedOn)
-    for (const p of [...new Map(scope.picks.map((q) => [symbolOf(q), q])).values()])
-      for (const c of scope.chains) {
-        const sameSymbol = scope.picks.filter((q) => symbolOf(q) === symbolOf(p));
-        const keys = familyOf(effectivePicks(sameSymbol, [c]));
-        const onChain = new Set([...keys].filter((k) => k.startsWith(`${c}:`)));
-        if (!listedOn(onChain, c)) misses.push(`${symbolOf(p)} isn't listed on ${chainNameOf(c)}`);
-      }
   return (
     <div className="flex flex-col gap-2 border-t border-rb-200 pt-3 dark:border-rb-800" data-focus-chains="">
       <h3 className={OVERLAY_HEADING}>Chains</h3>
       <div className="-ml-2 flex flex-wrap items-center gap-1" role="group" aria-label="Chains in focus">
         {chains.map((id) => {
-          const on = scope.chains.includes(id);
+          const on = draft.chains.includes(id);
           return (
             <button
               key={id}
               type="button"
               aria-pressed={on}
               onClick={() => toggle(id)}
-              className={segmentClass(on)}
+              className={`${segmentClass(on)} ${TAP}`}
               data-focus-chain={id}
             >
               <ChainGlyph chainId={id} className="h-3.5 w-3.5" />
@@ -652,13 +696,13 @@ function FocusChains() {
           );
         })}
       </div>
-      <p className="text-[11px] text-rb-500">
-        {scope.chains.length ? "Only the chosen chains show." : "Every chain shows while none is chosen."}
-      </p>
-      {misses.length > 0 && (
-        <ul className="text-[11px] leading-snug text-foreground" data-focus-chain-miss={misses.length}>
-          {misses.map((m) => (
-            <li key={m}>{m}</li>
+      {!draft.chains.length && <p className="text-[11px] text-rb-500">None chosen is every chain.</p>}
+      {judged && judged.misses.length > 0 && (
+        <ul className="text-[11px] leading-snug text-foreground" data-focus-chain-miss={judged.misses.length}>
+          {judged.misses.map((m) => (
+            <li key={m.text} data-miss-kind={m.kind}>
+              {m.text}
+            </li>
           ))}
         </ul>
       )}
@@ -703,64 +747,78 @@ function FadeList({
   );
 }
 
-/** The panel's picks: past PICKS_BEFORE_SCROLL they scroll and fade. */
-function PicksList({ count, children }: { count: number; children: ReactNode }) {
-  return (
-    <FadeList count={count} scrollAfter={PICKS_BEFORE_SCROLL} data-asset-scope-picks={count}>
-      {children}
-    </FadeList>
-  );
-}
+const keyOf = (p: Pick<AssetPick, "chain" | "token">) => optionKey({ chain: p.chain, address: p.token });
 
-/** The panel's first line: the view's name, edited in place; empty, it is
- *  called by what it holds. */
-function ViewNameField({ view }: { view: FocusView }) {
-  const [draft, setDraft] = useState(view.name ?? "");
-  useEffect(() => setDraft(view.name ?? ""), [view.id, view.name]);
-  const commit = () => {
-    if ((view.name ?? "") !== draft.trim()) focusViews.rename(view.id, draft);
-  };
-  return (
-    <label className="flex flex-col gap-1" data-focus-view-name="">
-      <span className={OVERLAY_HEADING}>Name</span>
-      <input
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            commit();
-            (e.target as HTMLInputElement).blur();
-          }
-        }}
-        placeholder={focusName(view.assets, view.chains)}
-        maxLength={60}
-        className="rounded-md border border-rb-300 bg-raised px-2 py-1 text-base font-semibold text-foreground outline-none placeholder:font-normal placeholder:text-rb-500 focus:border-teal-500 sm:text-sm dark:border-rb-700"
-      />
-    </label>
-  );
-}
-
-function AssetScopePanel({ onClose }: { onClose: () => void }) {
+/**
+ * The panel. It edits a draft: in "edit" mode the view in use, written
+ * through as the draft changes (emptied, the view is removed and Focus is
+ * off; the draft and its name stay, and the next pick saves a view again);
+ * in "new" mode nothing is saved until the draft holds something, and then it
+ * is a new view, put in use; in "link" mode a link's proposal, saved only by
+ * "Use this view".
+ */
+function AssetScopePanel({
+  mode: initial,
+  proposal,
+  onClose,
+}: {
+  mode: PanelMode;
+  proposal?: FocusProposal;
+  onClose: () => void;
+}) {
   const scope = useAssetScope();
   const isPhone = useMediaQuery(PHONE_QUERY);
   const [copied, setCopied] = useState(false);
-  const picks = scope.picks;
-  const keyOf = (p: Pick<AssetPick, "chain" | "token">) => optionKey({ chain: p.chain, address: p.token });
+  const [mode] = useState<PanelMode>(initial === "edit" && !scope.active ? "new" : initial);
+  const [viewId, setViewId] = useState<string | null>(mode === "edit" ? (scope.active?.id ?? null) : null);
+  const [draft, setDraft] = useState<Focus>(() =>
+    mode === "link" && proposal
+      ? proposal.focus
+      : mode === "edit" && scope.active
+        ? { assets: scope.active.assets, chains: scope.active.chains }
+        : { assets: [], chains: [] },
+  );
+  const [name, setName] = useState<string>(
+    (mode === "link" ? proposal?.name : mode === "edit" ? scope.active?.name : null) ?? "",
+  );
+  const linkMode = mode === "link";
+
+  // A link's proposal closed without a choice is "Not now".
+  const close = linkMode
+    ? () => {
+        scope.dismissLink();
+        onClose();
+      }
+    : onClose;
 
   useEffect(() => {
     if (isPhone) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !e.defaultPrevented) onClose();
+      if (e.key === "Escape" && !e.defaultPrevented) close();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [isPhone, onClose]);
+  });
+
+  const commit = (next: Focus) => {
+    const f = { assets: next.assets.map(withRecord), chains: next.chains };
+    setDraft(f);
+    if (linkMode) return;
+    const holds = f.assets.length > 0 || f.chains.length > 0;
+    if (viewId && scope.views.some((v) => v.id === viewId)) {
+      focusViews.edit(viewId, f);
+      if (!holds) setViewId(null);
+    } else if (holds) setViewId(focusViews.add(f, name));
+  };
+  const setPicks = (assets: AssetPick[]) => commit({ ...draft, assets });
+  const setChains = (chains: number[]) => commit({ ...draft, chains });
+  const rename = (v: string) => {
+    if (!linkMode && viewId) focusViews.rename(viewId, v);
+  };
 
   const choose = (keys: string[]) => {
-    const now = new Map(picks.map((p) => [keyOf(p), p]));
-    scope.setPicks(
+    const now = new Map(draft.assets.map((p) => [keyOf(p), p]));
+    setPicks(
       keys.map((k) => {
         const had = now.get(k);
         if (had) return had;
@@ -770,39 +828,63 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
     );
   };
 
-  const name = scope.fromLink ? scope.linkName : (scope.active?.name ?? null);
+  const holds = draft.assets.length > 0 || draft.chains.length > 0;
+  const judged = useFocusMisses(draft);
+  const empty = !!judged?.empty;
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(scopeLink(picks, scope.chains, name ?? undefined));
+      await navigator.clipboard.writeText(scopeLink(draft.assets, draft.chains, name.trim() || undefined));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {}
   };
 
   const body = (
-    <div className="flex flex-col gap-3 px-4 pb-4" data-asset-scope-panel="">
-      {scope.active && !scope.fromLink && <ViewNameField view={scope.active} />}
+    <div className="flex flex-col gap-3 px-4 pb-4" data-asset-scope-panel={mode}>
+      <label className="flex flex-col gap-1" data-focus-view-name="">
+        <span className={OVERLAY_HEADING}>Name</span>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => rename(name)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              rename(name);
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+          placeholder={focusName(draft.assets, draft.chains)}
+          maxLength={60}
+          className="rounded-md border border-rb-300 bg-raised px-2 py-1 text-base font-semibold text-foreground outline-none placeholder:font-normal placeholder:text-rb-500 focus:border-teal-500 sm:text-sm dark:border-rb-700"
+        />
+      </label>
       <p className="text-xs leading-relaxed text-rb-500">
-        {scope.fromLink
-          ? "This focus came with a link. Use this view to save it and keep it as you move around Rails."
-          : "Rails shows only what holds, lends or is built on these assets, on these chains. Saved in this browser as a focus view."}
+        {linkMode
+          ? "This focus came with a link. Nothing is saved until you use it."
+          : "Rails shows only what holds, lends or is built on these assets, on these chains."}
       </p>
       <h3 className={OVERLAY_HEADING}>Assets</h3>
-      {picks.length > 0 && (
-        <PicksList count={picks.length}>
-          {picks.map((p) => (
+      {draft.assets.length > 0 && (
+        <FadeList
+          count={draft.assets.length}
+          scrollAfter={PICKS_BEFORE_SCROLL}
+          data-asset-scope-picks={draft.assets.length}
+        >
+          {draft.assets.map((p) => (
             <PickRow
               key={keyOf(p)}
               pick={p}
-              onChange={(next) => scope.setPicks(picks.map((q) => (keyOf(q) === keyOf(p) ? next : q)))}
-              onRemove={() => scope.setPicks(picks.filter((q) => keyOf(q) !== keyOf(p)))}
+              chainFocus={draft.chains.length > 0}
+              onChange={(next) => setPicks(draft.assets.map((q) => (keyOf(q) === keyOf(p) ? next : q)))}
+              onRemove={() => setPicks(draft.assets.filter((q) => keyOf(q) !== keyOf(p)))}
             />
           ))}
-        </PicksList>
+        </FadeList>
       )}
       <AssetChooser
         options={OPTIONS}
-        selected={picks.map(keyOf)}
+        selected={draft.assets.map(keyOf)}
         onChange={choose}
         label="Add an asset"
         addLabel="Add an asset"
@@ -812,80 +894,100 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
         chainName={chainName}
         anatomy={undefined}
       />
-      <Link
-        href={manageHref()}
-        onClick={onClose}
-        className={`self-start text-xs ${PAGE_LINK}`}
-        data-asset-scope-manage=""
-      >
-        Add from all assets <span aria-hidden>→</span>
-      </Link>
-      <FocusChains />
+      {!linkMode && (
+        <Link
+          href={manageHref()}
+          onClick={onClose}
+          className={`self-start text-xs ${PAGE_LINK}`}
+          data-asset-scope-manage=""
+        >
+          Add from all assets <span aria-hidden>→</span>
+        </Link>
+      )}
+      <FocusChains draft={draft} setChains={setChains} />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-rb-200 pt-3 dark:border-rb-800">
-        {scope.on && (
+        {!linkMode && viewId && holds && scope.active?.id === viewId && (
+          <button
+            type="button"
+            onClick={() => {
+              scope.clear();
+              onClose();
+            }}
+            className={`${RESET_LINK} ${TAP}`}
+            data-asset-scope-panel-clear=""
+          >
+            Turn off
+          </button>
+        )}
+        {holds && (
+          <button
+            type="button"
+            onClick={copy}
+            className={`inline-flex items-center gap-1 text-xs font-semibold text-rb-500 hover:text-foreground ${TAP}`}
+            data-asset-scope-copy=""
+          >
+            {copied ? (
+              <Check className="size-3.5" aria-hidden="true" />
+            ) : (
+              <Link2 className="size-3.5" aria-hidden="true" />
+            )}
+            {copied ? "Copied" : "Copy link"}
+          </button>
+        )}
+        {linkMode ? (
           <>
             <button
               type="button"
-              onClick={() => {
-                scope.clear();
-                onClose();
-              }}
-              className={RESET_LINK}
-              data-asset-scope-panel-clear=""
+              onClick={close}
+              className={`ml-auto ${RESET_LINK} ${TAP}`}
+              data-asset-scope-not-now=""
             >
-              Show everything
+              Not now
             </button>
             <button
               type="button"
-              onClick={copy}
-              className="inline-flex items-center gap-1 text-xs font-semibold text-rb-500 hover:text-foreground"
-              data-asset-scope-copy=""
+              disabled={!holds || empty}
+              onClick={() => {
+                scope.adoptLink({ focus: draft, name: name.trim() || null });
+                onClose();
+              }}
+              className={`rounded-md bg-teal-600 px-3 py-1 text-xs font-semibold text-white hover:bg-teal-500 disabled:cursor-not-allowed disabled:bg-rb-300 disabled:text-rb-600 dark:disabled:bg-rb-700 dark:disabled:text-rb-400 ${TAP}`}
+              data-asset-scope-use=""
             >
-              {copied ? (
-                <Check className="size-3.5" aria-hidden="true" />
-              ) : (
-                <Link2 className="size-3.5" aria-hidden="true" />
-              )}
-              {copied ? "Copied" : "Copy link"}
+              Use this view
             </button>
           </>
-        )}
-        {scope.fromLink && (
-          <button type="button" onClick={scope.adoptLink} className={RESET_LINK} data-asset-scope-use="">
-            Use this view
+        ) : (
+          <button
+            type="button"
+            onClick={onClose}
+            className={`ml-auto rounded-md bg-rb-100 px-3 py-1 text-xs font-semibold text-foreground hover:bg-rb-200 dark:bg-rb-800 dark:hover:bg-rb-700 ${TAP}`}
+          >
+            Done
           </button>
         )}
-        <button
-          type="button"
-          onClick={onClose}
-          className="ml-auto rounded-md bg-rb-100 px-3 py-1 text-xs font-semibold text-foreground hover:bg-rb-200 dark:bg-rb-800 dark:hover:bg-rb-700"
-        >
-          Done
-        </button>
       </div>
     </div>
   );
 
+  const title = linkMode ? "Focus from a link" : !viewId ? "New focus view" : PANEL_TITLE;
+
   if (isPhone)
     return (
-      <MobileSheet label={PANEL_TITLE} onClose={onClose} header={<MobileSheetFilterHeader label={PANEL_TITLE} />}>
+      <MobileSheet label={title} onClose={close} header={<MobileSheetFilterHeader label={title} />}>
         {body}
       </MobileSheet>
     );
 
   return createPortal(
     <div className="fixed inset-0 z-[var(--z-modal)]" data-asset-scope-dialog="">
-      <div className={`absolute inset-0 ${PAGE_SCRIM}`} onClick={onClose} aria-hidden="true" />
-      <div
-        role="dialog"
-        aria-label={PANEL_TITLE}
-        className="overlay-panel absolute left-1/2 top-20 flex w-[26rem] max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col"
-      >
+      <div className={`absolute inset-0 ${PAGE_SCRIM}`} onClick={close} aria-hidden="true" />
+      <ModalFrame label={title} className="top-20 w-[26rem]">
         <div className="flex items-center justify-between px-4 py-3">
-          <span className={OVERLAY_HEADING}>{PANEL_TITLE}</span>
+          <span className={OVERLAY_HEADING}>{title}</span>
           <button
             type="button"
-            onClick={onClose}
+            onClick={close}
             aria-label="Close"
             className="inline-flex size-6 items-center justify-center rounded-full text-rb-500 hover:bg-rb-100 hover:text-foreground dark:hover:bg-rb-800"
           >
@@ -893,7 +995,7 @@ function AssetScopePanel({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         {body}
-      </div>
+      </ModalFrame>
     </div>,
     document.body,
   );

@@ -42,12 +42,14 @@ import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
-import { focusViews, OPEN_SCOPE_PANEL, useAssetScope } from "@/lib/shared/asset-scope";
+import { focusViews, openFocusPanel, useAssetScope } from "@/lib/shared/asset-scope";
 import { focusShort } from "@/components/shared/aim-gate";
 import { CTRL_OFF, CTRL_ON, INPLACE_TEXT, START_CTA } from "@/lib/shared/ui-grammar";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 
 const BOOKMARKS_PATH = "/bookmarks";
+/** A text press in the menu is 44px tall on a phone. */
+const MENU_TAP = "inline-flex min-h-11 items-center sm:min-h-0";
 /** The control's and the menu's accessible name: what the menu holds as a whole. */
 const MENU_NAME = "Saved and settings";
 /** A group's small label (Saved wallets, Saved positions, Saved views). */
@@ -198,7 +200,7 @@ export function ProfileMenu() {
   /** The Focus section shows with Focus on or any view saved. */
   const focusShown = scope.ready && (scope.on || scope.views.length > 0);
   const menuViews = scope.views.slice(0, MENU_FOCUS_VIEWS);
-  const focusLabel = (!scope.fromLink && scope.active?.name) || focusShort(scope.picks, scope.chains);
+  const focusLabel = scope.active?.name || focusShort(scope.picks, scope.chains);
 
   const close = useCallback((refocus = true) => {
     setOpen(false);
@@ -341,64 +343,24 @@ export function ProfileMenu() {
               style={place.phone ? undefined : { top: place.top, right: place.right }}
             >
               {/* With Focus on or a focus view saved, the menu opens with
-                  Focus (Miles, 10 Nov 2026): a link's focus waiting to be
-                  used, the saved views as a switcher with Off, what the view
-                  in use holds, and its presses. */}
+                  Focus (Miles, 10 Nov 2026): the saved views as a switcher
+                  with Off, what the view in use holds, and its presses. */}
               {focusShown && (
                 <div role="group" aria-labelledby={`${menuId}-focus`} className="pb-2" data-profile-menu-focus="">
                   <p id={`${menuId}-focus`} className={GROUP_LABEL}>
                     <ListFilter className="size-4 shrink-0" aria-hidden="true" />
                     Focus mode
                   </p>
-                  {scope.fromLink && (
-                    <div
-                      className="mx-1 mb-2 rounded-lg border border-rb-200 px-2 py-1.5 dark:border-rb-800"
-                      data-profile-menu-focus-link=""
-                    >
-                      <p className="px-1 text-xs text-rb-500">
-                        From a link{scope.linkName ? `: ${scope.linkName}` : ""}
-                      </p>
-                      <div className="px-1">
-                        <FocusRows picks={scope.picks} chains={scope.chains} max={MENU_FOCUS_ROWS} size={16} />
-                      </div>
-                      <div className="flex items-center gap-3 px-1 pt-1 text-xs">
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={() => {
-                            scope.adoptLink();
-                            close(false);
-                          }}
-                          className={`rounded font-semibold ${FOCUS_RING} ${INPLACE_TEXT}`}
-                          data-profile-menu-focus-use=""
-                        >
-                          Use this view
-                        </button>
-                        <button
-                          type="button"
-                          role="menuitem"
-                          onClick={scope.dismissLink}
-                          className={`rounded font-semibold ${FOCUS_RING} ${INPLACE_TEXT}`}
-                          data-profile-menu-focus-not-now=""
-                        >
-                          Not now
-                        </button>
-                      </div>
-                    </div>
-                  )}
                   <div data-profile-menu-focus-views={scope.views.length}>
                     {menuViews.map((v) => {
-                      const on = !scope.fromLink && scope.active?.id === v.id;
+                      const on = scope.active?.id === v.id;
                       return (
                         <div key={v.id}>
                           <button
                             type="button"
                             role="menuitemradio"
                             aria-checked={on}
-                            onClick={() => {
-                              if (scope.fromLink) scope.dismissLink();
-                              focusViews.use(v.id);
-                            }}
+                            onClick={() => focusViews.use(v.id)}
                             className={ITEM}
                             data-profile-menu-focus-view={v.id}
                           >
@@ -438,7 +400,6 @@ export function ProfileMenu() {
                     >
                       <RadioMark on={!scope.on} />
                       <span className="flex-1 text-foreground">Off</span>
-                      <span className="text-xs text-rb-500">Show everything</span>
                     </button>
                   </div>
                   {/* On an explorer's page that the focus hides: why (the
@@ -455,9 +416,9 @@ export function ProfileMenu() {
                         role="menuitem"
                         onClick={() => {
                           close(false);
-                          window.dispatchEvent(new Event(OPEN_SCOPE_PANEL));
+                          openFocusPanel("edit");
                         }}
-                        className={`rounded font-semibold ${FOCUS_RING} ${INPLACE_TEXT}`}
+                        className={`rounded font-semibold ${FOCUS_RING} ${INPLACE_TEXT} ${MENU_TAP}`}
                         data-profile-menu-focus-change=""
                       >
                         Change
@@ -468,10 +429,9 @@ export function ProfileMenu() {
                       role="menuitem"
                       onClick={() => {
                         close(false);
-                        if (scope.fromLink) scope.dismissLink();
                         focusViews.create();
                       }}
-                      className={`rounded font-semibold ${FOCUS_RING} ${INPLACE_TEXT}`}
+                      className={`rounded font-semibold ${FOCUS_RING} ${INPLACE_TEXT} ${MENU_TAP}`}
                       data-profile-menu-focus-new=""
                     >
                       New view
@@ -534,13 +494,13 @@ export function ProfileMenu() {
                     role="menuitem"
                     onClick={() => {
                       close(false);
-                      window.dispatchEvent(new Event(OPEN_SCOPE_PANEL));
+                      focusViews.create();
                     }}
                     className={ITEM}
                     data-profile-menu-assets={scope.picks.length}
                   >
                     <ListFilter className="size-4 shrink-0" aria-hidden="true" />
-                    <span className="min-w-0 flex-1 truncate text-foreground">Focus</span>
+                    <span className="min-w-0 flex-1 truncate text-foreground">Focus mode</span>
                     <span className="shrink-0 truncate text-xs text-rb-500">Off</span>
                   </button>
                 )}

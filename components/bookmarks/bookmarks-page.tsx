@@ -92,15 +92,20 @@ export function BookmarksPage() {
       <div className={`flex min-h-[38px] items-center ${PROFILE_CLEARANCE}`} data-anatomy="H7" data-back-row="">
         <DetailBackButton fallbackHref="/" />
       </div>
-      {/* One header row: the heading (B1) and the tabs (B4), which wrap under
-          it on a phone. */}
-      <div className="mb-6 mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+      {/* One header row: the heading (B1) and the tabs (B4); on a phone the
+          tabs are one row under it that scrolls sideways (Miles, 10 Nov 2026). */}
+      <div className="mb-6 mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
         <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight text-foreground" data-anatomy="B1">
           {/* The saved-state glyph the wallet menu draws (ui-jobs 493, 494). */}
           <Bookmark className="size-6 shrink-0" fill="currentColor" aria-hidden="true" />
           {SAVED_NAME}
         </h1>
-        <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Saved items" data-anatomy="B4">
+        <div
+          className="-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
+          role="tablist"
+          aria-label="Saved items"
+          data-anatomy="B4"
+        >
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -110,7 +115,7 @@ export function BookmarksPage() {
               aria-selected={tab === t.id}
               aria-controls="saved-panel"
               onClick={() => choose(t.id)}
-              className={`${tab === t.id ? "pill-active" : "pill-idle"} cursor-pointer`}
+              className={`${tab === t.id ? "pill-active" : "pill-idle"} min-h-11 shrink-0 cursor-pointer whitespace-nowrap sm:min-h-0`}
               data-saved-tab={t.id}
             >
               {t.label}
@@ -189,13 +194,13 @@ export function BookmarksPage() {
             <>
               <FocusViewList
                 views={scope.views}
-                active={scope.fromLink ? null : (scope.active?.id ?? null)}
+                active={scope.active?.id ?? null}
                 empty={
                   <div data-anatomy="B3">
                     <p className="font-semibold text-foreground">No focus views yet.</p>
                     <p className="mt-1 text-sm text-rb-500">
-                      A focus view limits Rails to the assets and chains you choose. Make one here, or press Use this
-                      view on a focus link.
+                      A focus view limits Rails to the assets and chains you choose. Make one here, or press{" "}
+                      <span className="font-semibold text-foreground">Use this view</span> on a focus link.
                     </p>
                   </div>
                 }
@@ -215,7 +220,7 @@ export function BookmarksPage() {
           )}
           {tab === "backup" && (
             <div data-saved-backup="">
-              <p className="font-semibold text-foreground">Saved in this browser only.</p>
+              <p className="font-semibold text-foreground">Saved in this browser.</p>
               <p className="mt-1 text-sm text-rb-500">
                 {nothing
                   ? "Nothing is saved here yet."
