@@ -300,6 +300,24 @@ const SPECS: ProtocolSpec[] = [
     subPages: [],
   },
   {
+    // Balancer V3 on Ethereum (rails-ops ui-jobs 569), Uniswap's door 1: a
+    // front door taking a wallet, the pools it holds a share of at
+    // `<route>/<wallet>`, each opening `<route>/position/<pool>/<wallet>` (a
+    // pool share is a Vault balance, so the pool and the wallet name it). Reads
+    // come from rails-server's at-block routes (lib/api/fetch-balancer.ts).
+    id: "balancer-v3",
+    session: "balancer-v3",
+    label: "Balancer V3",
+    chainId: 1,
+    slug: "balancer-v3",
+    tags: ["Liquidity"],
+    desc: "Pool shares on Ethereum: a wallet's part of each pool's tokens and the pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    readTier: "visit",
+    subPages: [],
+  },
+  {
     // Alchemix V3's ETHEREUM lines — alUSD and alETH. Two entries rather than a
     // chain switch, for the reason aave-v3 / aave-v3-base are two: a position's
     // identity is the (chain, line) pair, and a token id on one chain says
@@ -940,6 +958,8 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "uniswap-v3": "Position",
   "uniswap-v4": "Position",
   aerodrome: "Position",
+  // A Vault balance of a pool's shares; the page names it a pool share.
+  "balancer-v3": "Position",
 };
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",
@@ -989,6 +1009,8 @@ export function protocolIconSrc(id: string): string {
   // its mark is Compound's, as Base's (`compound-base`) is.
   // Uniswap V4 takes Uniswap's mark; the repo holds no V4 image of its own.
   if (brand === "uniswap-v4") return "/icons/protocols/uniswap.png";
+  // Balancer V3 takes Balancer's mark.
+  if (brand === "balancer-v3") return "/icons/protocols/balancer.png";
   return `/icons/protocols/${brand === "compound-v3" ? "compound" : brand}.png`;
 }
 

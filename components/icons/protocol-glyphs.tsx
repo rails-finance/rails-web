@@ -822,6 +822,16 @@ const GLYPHS: Record<string, Glyph> = {
       },
     ],
   },
+  // Balancer: the three stacked stones of public/icons/protocols/balancer.png, each
+  // ellipse measured off that image (ui-jobs 569).
+  "balancer-v3": {
+    viewBox: "24 23 208 208",
+    paths: [
+      { d: "M75 65.5a52 17.5 0 1 0 104 0a52 17.5 0 1 0 -104 0Z" },
+      { d: "M57 109a70 22.5 0 1 0 140 0a70 22.5 0 1 0 -140 0Z" },
+      { d: "M40 162.5a87.5 28 0 1 0 175 0a87.5 28 0 1 0 -175 0Z" },
+    ],
+  },
   uniswap: {
     viewBox: "0 0 20 22",
     inset: 0.18,
