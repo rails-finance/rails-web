@@ -1,4 +1,4 @@
-// The colours of a share chart's slices (the vault mock's holders, a
+// The colours of a share chart's slices (a MetaMorpho vault page's holders, a
 // components/shared/asset-donut.tsx `ShareDonut`, and its markets, a
 // components/shared/segment-bar.tsx `SegmentBar`).
 //

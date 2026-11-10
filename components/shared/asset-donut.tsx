@@ -468,7 +468,7 @@ const fixed = (d: string) =>
   d.replace(/-?\d*\.\d+(?:e[-+]?\d+)?|-?\d+e[-+]?\d+/g, (m) => String(+Number(m).toFixed(3)));
 
 /** The breakdown's donut on its own, for a share of a whole that is not a
- *  side's assets (the vault mock's holders and markets): the same corners,
+ *  side's assets (a MetaMorpho vault page's holders): the same corners,
  *  pad and colours, at `size`, with `centre` in its hole. The slices are
  *  drawn as given; each carries its label as a tooltip. `colours`, one CSS
  *  colour per slice (lib/shared/slice-colours.ts), replaces the side's

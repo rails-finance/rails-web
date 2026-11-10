@@ -28,9 +28,18 @@ export async function readVaultStrip(page) {
       days: t.querySelector("[data-strip-line]")?.getAttribute("data-strip-days") ?? null,
       sentence: (t.querySelector("[data-strip-sentence]")?.textContent ?? "").replace(/\s+/g, " ").trim(),
     }));
+    // In document order, the section-level V codes either side of the strip:
+    // siblings on most vault pages, tiles of the grid on MetaMorpho's.
+    const sections = [...document.querySelectorAll("[data-anatomy]")].filter(
+      (e) =>
+        /(?:^|\s)V\d+(?:\s|$)/.test(e.getAttribute("data-anatomy") ?? "") && !strip.contains(e) && !e.contains(strip),
+    );
+    const before = sections.filter((e) => e.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const after = sections.filter((e) => e.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_PRECEDING);
+    const code = (e) => (e?.getAttribute("data-anatomy") ?? "").split(/\s+/).find((c) => /^V\d+$/.test(c));
     return {
-      afterCard: strip.previousElementSibling?.getAttribute("data-anatomy") === "V2",
-      beforeAssets: strip.nextElementSibling?.getAttribute("data-anatomy") === "V3",
+      afterCard: code(before[before.length - 1]) === "V2",
+      beforeAssets: code(after[0]) === "V3",
       tiles,
     };
   });

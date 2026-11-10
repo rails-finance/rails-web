@@ -136,7 +136,7 @@ export function VaultAssets({
   /** `index`: the /vaults index's rows (V6): 14px type, the venue's mark at
    *  28px and its name semibold, the figures semibold in the foreground, an
    *  amount compact (`formatCompact`, as V6's Total assets) with its full text
-   *  in a title. The live page passes none. */
+   *  in a title and `data-figure-full`. The MetaMorpho page passes it. */
   look?: "index";
 }) {
   const ix = look === "index";
@@ -273,6 +273,7 @@ export function VaultAssets({
                           : undefined
                       }
                       {...(r.amountFigure ? { "data-figure": r.amountFigure } : {})}
+                      {...(ix && r.amount ? { "data-figure-full": assetText(r.amount, assetDecimals) } : {})}
                     >
                       {r.amount == null ? (
                         <NotLoaded />
@@ -319,6 +320,7 @@ export function VaultAssets({
           prefetch={false}
           className={`mt-2 inline-block text-[13px] ${INLINE_LINK}`}
           data-assets-show-all=""
+          data-assets-keys={rows.map((r) => r.key).join(" ")}
         >
           Show all {n(rows.length)}
         </Link>

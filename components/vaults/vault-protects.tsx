@@ -44,7 +44,7 @@ const SECTIONS = {
 /** How a line reads: "framed", the label column beside the headline over its
  *  sentence in a framed box (the live page); "paragraph", one unframed
  *  paragraph, the headline in semibold leading the muted sentence and gap,
- *  no label (the /mock-layout grid). */
+ *  no label (the MetaMorpho page's grid). */
 export type ProtectsLook = "framed" | "paragraph";
 
 /** The full stop a headline lacks, if it lacks one. */

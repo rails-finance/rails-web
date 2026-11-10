@@ -71,8 +71,8 @@ export interface VaultCardProps {
   band?: ReactNode;
   /** The family's identity hooks: on the standing pills. */
   pillHooks?: Parameters<typeof VaultPills>[0]["hooks"];
-  /** The headlines in place of `vaultHeads`'s (the layout mock's); absent on
-   *  every live page. */
+  /** The headlines in place of `vaultHeads`'s (the MetaMorpho page's);
+   *  absent on the other families' pages. */
   heads?: PositionCardHead[];
 }
 
