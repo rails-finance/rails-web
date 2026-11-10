@@ -110,6 +110,12 @@ type ProtocolSpec = {
    *  is the one that puts it back in the nav, the sitemap and the matrix.
    *  Omitted means launched; `true` is the only other value. */
   unlaunched?: true;
+  /** "visit": the explorer reads its figures from the chain when a page opens
+   *  and has no history, listing or holder count until Rails indexes it
+   *  (rails-ops decision 0061). Every surface that shows the roster draws
+   *  `ReadTierTag` for it; the field goes in the commit that indexes the
+   *  explorer. Omitted means indexed. */
+  readTier?: "visit";
   /** This explorer's protocol-level sub-pages, in tab order. The first is the
    *  overview beside the position listing — the branch roster, market roster,
    *  system state, hub comparison or loan book — and every explorer carries
@@ -201,6 +207,7 @@ const SPECS: ProtocolSpec[] = [
     desc: "Concentrated liquidity on Base, staked or not: a position's range, fees or AERO and pool over the last 30 days",
     positionListing: false,
     unlaunched: true,
+    readTier: "visit",
     subPages: [],
   },
   {
@@ -713,6 +720,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Concentrated liquidity on Ethereum: a position's range, fees and pool over the last 30 days, read from the pool at two blocks",
     positionListing: false,
+    readTier: "visit",
     subPages: [],
   },
   {
@@ -725,6 +733,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Uniswap's singleton pools on Ethereum, hooks included: a position's range, fees and pool over the last 30 days",
     positionListing: false,
+    readTier: "visit",
     subPages: [],
   },
   {
