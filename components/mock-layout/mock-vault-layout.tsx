@@ -120,7 +120,7 @@ const GRID = [
   "[&_[data-protects-disclaimer]]:hidden",
 ].join(" ");
 
-const TILE = "min-w-0 scroll-mt-4 p-5";
+const TILE = "min-w-0 scroll-mt-4 py-5 sm:px-5";
 
 /** A hairline's colour. */
 const RULE = "bg-rb-200 dark:bg-rb-500/30";
@@ -159,7 +159,7 @@ function Tile({
       {!last && (
         <i
           aria-hidden
-          className={`pointer-events-none absolute bottom-0 h-px ${left ? "left-5 right-5 lg:right-0" : right ? "left-5 right-5 lg:left-0" : "inset-x-5"} ${RULE}`}
+          className={`pointer-events-none absolute bottom-0 h-px ${left ? "inset-x-0 sm:inset-x-5 lg:right-0" : right ? "inset-x-0 sm:inset-x-5 lg:left-0" : "inset-x-0 sm:inset-x-5"} ${RULE}`}
         />
       )}
       {left && (
@@ -573,7 +573,7 @@ function WhoHoldsIt({
                       align="right"
                       className="whitespace-nowrap font-semibold tabular-nums text-foreground"
                     >
-                      <span className="flex items-center justify-end gap-1.5">
+                      <span className="flex items-center gap-1.5 sm:justify-end">
                         <span title={`${sh.exact} ${shareSymbol}`} data-cell="holder-shares" data-raw={h.balance}>
                           <Prov info={balanceProv(h.holder, sh.exact)}>{sh.text}</Prov>
                         </span>
@@ -1222,7 +1222,7 @@ export function MockVaultLayout({
         {/* The two protects sections render as one fragment: one wide tile,
             split in two from lg by the same 1px-gap hairline. */}
         <Tile id="risk" wide flush>
-          <div className="grid grid-cols-1 lg:grid-cols-2 [&>section]:!p-5">
+          <div className="grid grid-cols-1 lg:grid-cols-2 [&>section]:!px-0 [&>section]:!py-5 sm:[&>section]:!p-5">
             <i aria-hidden className={`pointer-events-none absolute inset-y-5 left-1/2 hidden w-px lg:block ${RULE}`} />
             <VaultProtects
               chainId={chainId}
