@@ -295,10 +295,18 @@ export function FocusRows({
   scrollAfter?: number;
   size?: number;
 }) {
-  const unique = [...new Map(picks.map((p) => [`${p.chain}:${p.token}`, p])).values()];
+  // One row per symbol and switch: WETH on Ethereum and on Base is one row.
+  const groups = new Map<string, { pick: AssetPick; chains: number[] }>();
+  for (const p of picks) {
+    const k = `${symbolOf(p)}:${p.builtOn ? 1 : 0}`;
+    const g = groups.get(k);
+    if (!g) groups.set(k, { pick: p, chains: [p.chain] });
+    else if (!g.chains.includes(p.chain)) g.chains.push(p.chain);
+  }
+  const unique = [...groups.values()];
   const chainFocus = chains.length > 0;
   const rows: ReactNode[] = [
-    ...unique.map((p) => {
+    ...unique.map(({ pick: p, chains: on }) => {
       const sub = addsLine(p);
       return (
         <li key={`${p.chain}:${p.token}`} className="flex items-start gap-2 py-1.5" data-focus-row="asset">
@@ -308,7 +316,7 @@ export function FocusRows({
           <span className="min-w-0">
             <span className="flex items-baseline gap-1.5">
               <span className="truncate text-sm font-semibold text-foreground">{symbolOf(p)}</span>
-              {!chainFocus && <span className="shrink-0 text-[11px] text-rb-500">{chainNameOf(p.chain)}</span>}
+              {!chainFocus && <span className="shrink-0 text-[11px] text-rb-500">{andList(on.map(chainNameOf))}</span>}
             </span>
             {sub && <span className="block text-[11px] leading-snug text-rb-500">{sub}</span>}
           </span>
