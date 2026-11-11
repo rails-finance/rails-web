@@ -93,7 +93,9 @@ export const ASSETS_SCOPE = "vault-assets";
  *  in its mark's colour (a market's collateral, else the asset's;
  *  lib/shared/slice-colours.ts), each row's share keyed by its slice's
  *  colour, and each row lit with its slice (`data-seg`). Returns the rows with
- *  their hooks, the chart, and the key; no chart where nothing answered. */
+ *  their hooks, the chart, and the key. With fewer than two segments there is
+ *  nothing to tell apart: no bar, no key (`chart: null`). Where nothing
+ *  answered, no chart, and the section states the empty band. */
 export function allocationBar(
   rows: VaultAssetRow[],
   {
@@ -105,7 +107,7 @@ export function allocationBar(
     /** What a row is, one and many: the bar's label and the collected slice's. */
     venue: { one: string; many: string };
   },
-): { rows: VaultAssetRow[]; chart: ReactNode | undefined; keyColours: Record<string, string> } {
+): { rows: VaultAssetRow[]; chart: ReactNode | null | undefined; keyColours: Record<string, string> } {
   const plan = planAllocation(
     rows
       .map((r, order) => ({ r, order, key: r.key, amount: r.amount ? BigInt(r.amount.raw) : null }))
@@ -134,6 +136,7 @@ export function allocationBar(
     }),
   );
   const slices: SegmentSlice[] = parts.map(({ key, label, share }, i) => ({ key, label, share, colour: colours[i] }));
+  if (planTotal > 0 && slices.length < 2) return { rows, chart: null, keyColours: {} };
   const keyColours: Record<string, string> = {};
   /** Each row's segment, for the row and its segment to light together. */
   const segOf = new Map<string, string>();
@@ -210,8 +213,9 @@ export function VaultAssets({
   limit?: number;
   /** Where every row is, linked under a capped table. */
   allHref?: string;
-  /** A chart above the table, in place of the band, at the section's width. */
-  chart?: ReactNode;
+  /** A chart above the table, in place of the band, at the section's width;
+   *  null: neither chart nor band. */
+  chart?: ReactNode | null;
   /** The chart's key: a colour square before each row's share, by row key. */
   keyColours?: Record<string, string>;
   /** `index`: the /vaults index's rows (V6): 14px type, the venue's mark at
@@ -282,7 +286,7 @@ export function VaultAssets({
           {line}
         </p>
       </SectionHeading>
-      {!chart && (
+      {chart === undefined && (
         <div className="mt-3 [&>div]:px-0">
           <AllocationBar
             segments={segments}
@@ -291,7 +295,7 @@ export function VaultAssets({
           />
         </div>
       )}
-      {chart && <div className="mt-3">{chart}</div>}
+      {chart != null && <div className="mt-3">{chart}</div>}
       <DataTable
         className="mt-2"
         tableClassName={ix ? "text-sm" : "text-[12px]"}
