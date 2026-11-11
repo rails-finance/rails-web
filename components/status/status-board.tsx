@@ -518,6 +518,10 @@ function chainsOf(cells: StatusCell[], next: NextItem[]): ChainId[] {
   return present.sort((x, y) => rank(x) - rank(y));
 }
 
+/** The first two columns' widths, shared by the status table and the
+ *  coming-soon table so their columns line up. */
+const COL = { protocol: "sm:w-[28%]", second: "sm:w-[18%]" };
+
 type SortKey = "name" | "status" | "index" | "last";
 const STATUS_RANK: Record<Heartbeat, number> = { stalled: 0, late: 1, none: 2, fresh: 3 };
 
@@ -587,11 +591,17 @@ function NextTable({ chain, items }: { chain: number; items: NextItem[] }) {
   return (
     <section className="mt-14">
       <h2 className="text-xl font-semibold tracking-tight text-foreground">Coming soon to Rails</h2>
-      <DataTable label={`Coming soon to Rails on ${chainName(chain)}`} anatomy="Y3" stacked className="mt-4">
+      <DataTable
+        label={`Coming soon to Rails on ${chainName(chain)}`}
+        anatomy="Y3"
+        stacked
+        className="mt-4"
+        tableClassName="sm:table-fixed"
+      >
         <DataTableHead>
-          <DataTableHeader label="Protocol" />
-          <DataTableHeader label="Stage" />
-          <DataTableHeader label="Why" />
+          <DataTableHeader label="Protocol" className={COL.protocol} />
+          <DataTableHeader label="Stage" className={COL.second} />
+          <DataTableHeader label="Why" className="sm:w-[34%]" />
           <DataTableHeader label="Source" />
         </DataTableHead>
         <DataTableBody>
@@ -710,12 +720,17 @@ export function StatusBoard({ source }: { source: StatusSource }) {
               </span>
             ))}
           </div>
-          <DataTable label={`Indexing status on ${chainName(chain)}`} anatomy="Y1" stacked>
+          <DataTable
+            label={`Indexing status on ${chainName(chain)}`}
+            anatomy="Y1"
+            stacked
+            tableClassName="sm:table-fixed"
+          >
             <DataTableHead>
-              <DataTableHeader label="Protocol" sort={sortBy("name")} />
-              <DataTableHeader label="Status" sort={sortBy("status")} />
-              <DataTableHeader label="Index" sort={sortBy("index")} />
-              <DataTableHeader label="Last write" sort={sortBy("last")} />
+              <DataTableHeader label="Protocol" sort={sortBy("name")} className={COL.protocol} />
+              <DataTableHeader label="Status" sort={sortBy("status")} className={COL.second} />
+              <DataTableHeader label="Index" sort={sortBy("index")} className="sm:w-[12%]" />
+              <DataTableHeader label="Last write" sort={sortBy("last")} className="sm:w-[16%]" />
               <DataTableHeader label="Kept current by" />
             </DataTableHead>
             <DataTableBody>
