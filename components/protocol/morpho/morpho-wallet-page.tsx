@@ -164,7 +164,7 @@ export function MorphoWalletView({
         <DetailTopRow
           session={d.session}
           wallet={wallet}
-          owner={{ wallet, vault: vaultNote }}
+          owner={{ wallet, chain: d.chainId, vault: vaultNote }}
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON[d.session]}
         />

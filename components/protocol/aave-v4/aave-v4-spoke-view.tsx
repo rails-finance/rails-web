@@ -778,7 +778,7 @@ function AaveV4SpokePageInner({
         <DetailTopRow
           session={session}
           wallet={wallet}
-          owner={{ wallet }}
+          owner={{ wallet, chain: deployment.chainId }}
           assets={stripAssets}
           closed={positionClosed}
           // The card's ⋮ carries the menu; an event page draws no Tools.

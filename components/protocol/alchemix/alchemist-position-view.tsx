@@ -939,6 +939,7 @@ export function AlchemistPositionView({
             // what that is), on the wallet row above the card (ui-jobs 228).
             owner={{
               wallet: position.owner,
+              chain: chainId,
               extra:
                 v2History && v2History.links.length > 0
                   ? v2History.links.map((l) => (
