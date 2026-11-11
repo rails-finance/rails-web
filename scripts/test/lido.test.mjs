@@ -22,10 +22,11 @@ export async function resolve(specifier, context, next) {
 }`;
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
-const { gainOn, growth, lidoStake, lidoTotals, requestRow, units } = await import("../../lib/lido/stake.ts");
-const { readoutExplainer, readoutLines, REQUESTS, rateText, signed, WINDOW_WORDS } = await import(
-  "../../lib/lido/words.ts"
+const { gainOn, growth, lidoStake, lidoTotals, requestRow, shareCause, units } = await import(
+  "../../lib/lido/stake.ts"
 );
+const { cardExplainer, readoutExplainer, readoutLines, requestsExplainer, REQUESTS, rateText, signed, WINDOW_WORDS } =
+  await import("../../lib/lido/words.ts");
 
 const RATE_NOW = "1248899063481582992";
 const RATE_THEN = "1246088839423097632";
@@ -128,22 +129,19 @@ test("a request's state: waiting, ready to claim, claimed", () => {
 
 const SAME = { past: { stethShares: `80${E}`, wstethBalance: `20${E}`, rate: RATE_THEN } };
 
-test("the window's three states: Earned where the shares match, Opened or Changed inside the 30 days otherwise", () => {
+test("the window's three states: Earned where the shares match, the reason on the line otherwise", () => {
   const ok = lidoStake(read(SAME));
   assert.ok(Math.abs(ok.earned - 100 * (1.248899063481582992 - 1.246088839423097632)) < 1e-9);
   const okLine = readoutLines(ok, read().then.time)[2];
   assert.match(okLine.text, /^0\.281 ETH: the 100 shares held on/);
   assert.equal(okLine.withheld, undefined);
-  for (const [state, short, long] of [
-    ["opened", WINDOW_WORDS.openedShort, WINDOW_WORDS.opened],
-    ["changed", WINDOW_WORDS.changedShort, WINDOW_WORDS.changed],
-  ]) {
+  for (const state of ["opened", "changed"]) {
     const s = lidoStake(read({ windowState: state }));
     assert.equal(s.earned, null);
     const line = readoutLines(s, read().then.time)[2];
-    assert.equal(line.text, short);
+    assert.equal(line.text, WINDOW_WORDS[state]);
+    assert.match(line.text, /^Not stated: /);
     assert.equal(line.withheld, state);
-    assert.ok(readoutExplainer(s)[0].bullets.includes(long));
   }
   assert.equal(readoutExplainer(ok)[0].bullets.length, 2);
 });
@@ -155,7 +153,11 @@ test("the readout: shares, rate, earned; no shares then says so", () => {
     ["shares", "rate", "earned"],
   );
   assert.match(lines[0].text, /the same as on/);
-  assert.match(readoutLines(lidoStake(read({ windowState: "changed" })), 0)[0].text, /a change of \+10 shares/);
+  // From 90 to 100 shares with 800.7 + 1.6 shares requested after the past read (#141000 is older): part.
+  assert.match(
+    readoutLines(lidoStake(read({ windowState: "changed" })), 0)[0].text,
+    /: 802\.3 shares went into withdrawal requests #141290 and #141346; the other 812\.3 shares moved into the wallet \(staked, received or bought\)\.$/,
+  );
   assert.match(lines[1].text, /^1\.248899 ETH per share now/);
   assert.match(lines[2].text, /shares held on .*, valued at today's rate less that day's/);
   const none = { stethShares: "0", wstethBalance: "0" };
@@ -184,4 +186,56 @@ test("the protocol's totals", () => {
   assert.ok(Math.abs(t.pooledEth - 9_714_004.69) < 0.01);
   assert.equal(rateText(t.rate), "1.248899 ETH");
   assert.equal(signed(-0.25), "−0.25");
+});
+
+// Wallet 0xbada…5afe on 11 Nov 2026 (rails-server's read): 405.2 wstETH then, 401.2 now, and request #141400 for
+// 4.0033 shares (a wei short of the drop) made after the past read.
+const BADA = {
+  then: "405248965424130034079",
+  now: "401245665424130034079",
+  thenTime: 1_791_755_291,
+  request: {
+    id: "141400",
+    amountOfStETH: "5000036936041275227",
+    amountOfShares: "4003299999999999999",
+    timestamp: 1_794_408_179,
+    isFinalized: false,
+    isClaimed: false,
+    claimableEth: null,
+    hint: null,
+  },
+};
+
+test("the shares' change named from the requests made since the past read", () => {
+  const all = shareCause(BigInt(BADA.then), BigInt(BADA.now), BADA.thenTime, [BADA.request]);
+  assert.equal(all.fit, "all");
+  assert.equal(all.rest, 0);
+  const s = lidoStake(
+    read({
+      windowState: "changed",
+      now: { ...read().now, stethShares: "0", wstethBalance: BADA.now },
+      past: { stethShares: "0", wstethBalance: BADA.then, rate: RATE_THEN },
+      requests: { ...read().requests, count: 1, rows: [BADA.request] },
+    }),
+  );
+  assert.equal(
+    readoutLines(s, BADA.thenTime)[0].text,
+    "401.2 now, against 405.2 on 11 Oct 2026: 4.003 shares went into withdrawal request #141400 on 11 Nov.",
+  );
+  // No request after the past read: the shares moved in or out, and the (i) notes wrapping once.
+  const out = shareCause(BigInt(BADA.then), BigInt(BADA.now), BADA.thenTime, [{ ...BADA.request, timestamp: 1 }]);
+  assert.equal(out.fit, "none");
+  assert.ok(Math.abs(out.rest + 4.0033) < 1e-9);
+  // A request for one share against a drop of 4.0033: part, and the rest moved out.
+  const part = shareCause(BigInt(BADA.then), BigInt(BADA.now), BADA.thenTime, [
+    { ...BADA.request, amountOfShares: `1${E}` },
+  ]);
+  assert.equal(part.fit, "part");
+  assert.ok(Math.abs(part.rest + 3.0033) < 1e-9);
+  assert.equal(shareCause(5n, 5n, 0, [BADA.request]), null);
+  assert.match(
+    cardExplainer(s)[0].bullets[0],
+    /^This wallet holds 401\.2 shares, all as wstETH; at 1\.248899 ETH a share/,
+  );
+  assert.match(requestsExplainer(s)[0].bullets[0], /^The 5 stETH in the waiting request left this wallet's shares/);
 });

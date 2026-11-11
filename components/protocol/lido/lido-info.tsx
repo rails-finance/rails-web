@@ -25,7 +25,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "stETH",
     definition:
-      "stETH is Lido's staked ether token. Its balance is shown in ETH and grows at each oracle report, while the holder's shares stay the same.",
+      "stETH is Lido's staked ether token. Its balance is shown in ETH and moves at each oracle report, while the holder's shares stay the same.",
     sources: [STETH_DOCS],
   },
   {
@@ -37,19 +37,19 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Share rate",
     definition:
-      "The share rate is the ETH one share is worth: all the ether Lido accounts for over all shares. Lido's oracle moves it when it reports the validators' balances, about once a day.",
+      "The share rate is the ETH one share is worth: all the ether Lido accounts for over all shares. Lido's oracle moves it when it reports the validators' balances, about once a day. It normally rises; slashing or penalties can lower it.",
     sources: [DOCS],
   },
   {
     term: "wstETH",
     definition:
-      "wstETH is stETH wrapped into a token that counts shares: one wstETH is one share, so its count stays the same while its worth in ETH grows.",
+      "wstETH is stETH wrapped into a token that counts shares: one wstETH is one share, so its count stays the same while its worth in ETH moves.",
     sources: [STETH_DOCS],
   },
   {
     term: "Withdrawal request",
     definition:
-      "A withdrawal request locks stETH in Lido's withdrawal queue, as an NFT owned by the wallet that made it. Once the queue finalizes it, the owner claims its ETH.",
+      "A withdrawal request locks stETH in Lido's withdrawal queue, as an NFT owned by the wallet that made it. An oracle report finalizes it once there is ether to pay it; then the owner claims the ETH with a transaction, at most the stETH locked when the request was made.",
     sources: [QUEUE_DOCS],
   },
 ];
@@ -61,12 +61,12 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
   </>,
   <>
     About once a day Lido&apos;s oracle reports the validators&apos; balances, and the{" "}
-    <GlossaryLink term="Share rate">share rate</GlossaryLink> moves with the rewards. Every holder&apos;s stETH grows at
-    that rate.
+    <GlossaryLink term="Share rate">share rate</GlossaryLink> moves with the rewards. Every holder&apos;s stETH moves
+    with it.
   </>,
   <>
     <GlossaryLink term="wstETH">wstETH</GlossaryLink> holds the same shares under a balance that does not change, so its
-    worth in ETH grows instead.
+    worth in ETH moves instead.
   </>,
   <>
     To leave, a holder makes a <GlossaryLink term="Withdrawal request">withdrawal request</GlossaryLink>; once it is
@@ -90,12 +90,12 @@ const views: readonly [InfoView, ...InfoView[]] = [
         <ul className={`${UL} mt-2`}>
           <li>The card states the stake in ETH, its stETH and wstETH apart, and the share rate.</li>
           <li>
-            Under it, the stake 30 days back: the shares then and now, the share rate then and now, and what the shares
-            earned at the rate&apos;s rise.
+            Under it, the stake 30 days back: the shares then and now, with the withdrawal requests that account for a
+            change, the share rate then and now, and what the shares earned at the rate&apos;s change.
           </li>
           <li>
-            Then the wallet&apos;s withdrawal requests: each one&apos;s stETH, when it was made, and whether it waits,
-            is ready to claim or was claimed.
+            Then the wallet&apos;s withdrawal requests: each one&apos;s stETH, when it was made, and whether it waits or
+            is ready to claim.
           </li>
         </ul>
       </>
@@ -145,6 +145,13 @@ export function LidoInfo() {
         <>
           The Rails Lido explorer shows a wallet&apos;s Lido stake on Ethereum: its stETH and wstETH in ETH, how the
           stake changed over the last 30 days, and its withdrawal requests.
+        </>
+      }
+      guide={
+        <>
+          Press a figure&apos;s label to read what it means. The (i) under a section says what its figures mean for the
+          wallet, and the ? on the stake card explains how Lido staking works. A section&apos;s ⋮ traces its figures to
+          the chain.
         </>
       }
       notCovered="stVaults, Lido on other chains, node operators and the LDO token aren't covered here."
