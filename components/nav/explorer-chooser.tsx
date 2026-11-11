@@ -21,8 +21,8 @@ import { CHROME_HOVER } from "@/components/nav/chrome-hover";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CHAINS, MAINNET_CHAIN_ID, type ChainId, type ChainMeta } from "@/lib/shared/chains";
-import { protocolsForChain, protocolForPathname, type ProtocolEntry } from "@/lib/shared/protocols";
+import { CHAINS, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { launchedChains, protocolForPathname, protocolsForChain, type ProtocolEntry } from "@/lib/shared/protocols";
 import { chainExplorers } from "@/lib/shared/explorer-rank";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
@@ -75,9 +75,7 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
   const activeEntry = protocolForPathname(pathname);
   const roster = useScopedRoster();
   const { filtering } = roster;
-  const chains = (Object.values(CHAINS) as ChainMeta[]).filter(
-    (c) => protocolsForChain(c.id).length > 0 && roster.chainShows(c.id),
-  );
+  const chains = launchedChains().filter((c) => roster.chainShows(c.id));
 
   const [selectedId, setSelectedId] = useState<ChainId>(MAINNET_CHAIN_ID);
   // Robinhood: a chain with no explorers yet; selecting it shows the

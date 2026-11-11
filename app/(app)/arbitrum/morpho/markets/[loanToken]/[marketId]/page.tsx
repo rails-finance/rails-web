@@ -31,7 +31,11 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const id = marketId.toLowerCase();
   if (!ADDRESS.test(token) || !MARKET_ID.test(id)) return { title: "Morpho Blue market on Arbitrum" };
   const m = (await load(id))?.market;
-  const pair = m ? `${m.collateralSymbol ?? "no collateral"} / ${m.loanSymbol}` : "Morpho Blue market";
+  const pair = !m
+    ? "Morpho Blue market"
+    : m.isIdle
+      ? `${m.loanSymbol} idle market`
+      : `${m.collateralSymbol ?? "no collateral"} / ${m.loanSymbol}`;
   return {
     title: `${pair} · Morpho Blue on Arbitrum`,
     description: `One Morpho Blue market on Arbitrum, ${pair}: what it holds, what it pays and charges, its rate curve, its oracle price and its terms.`,

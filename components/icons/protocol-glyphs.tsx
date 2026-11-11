@@ -174,6 +174,22 @@ const ALCHEMIX_MARK: Glyph = {
   ],
 };
 
+const EULER_MARK: Glyph = {
+  viewBox: "0 0 462 460",
+  inset: 0.16,
+  paths: [
+    {
+      d: "M403.944 241.649L149.691 388.442C132.132 398.579 126.113 421.026 136.248 438.579C146.381 456.132 168.831 462.142 186.389 452.005L440.642 305.212C458.2 295.075 464.22 272.628 454.085 255.075C443.952 237.523 421.502 231.512 403.944 241.649Z",
+    },
+    {
+      d: "M228.091 194.721L37.402 304.815C19.8435 314.952 13.8244 337.399 23.9583 354.952C34.0923 372.505 56.5418 378.516 74.1004 368.378L264.79 258.283C282.348 248.146 288.367 225.699 278.233 208.146C268.099 190.594 245.65 184.583 228.091 194.721Z",
+    },
+    {
+      d: "M275.25 18.7317L20.9976 165.525C3.43901 175.662 -2.57981 198.109 7.55407 215.662C17.688 233.214 40.1372 239.225 57.6959 229.088L311.949 82.2946C329.507 72.1575 335.526 49.7101 325.392 32.1578C315.258 14.6053 292.809 8.59428 275.25 18.7317Z",
+    },
+  ],
+};
+
 const GLYPHS: Record<string, Glyph> = {
   // viewBox inferred from path extents — source was pasted without the <svg>
   // wrapper. Compound is a centred mark, so a tight bounding box frames it well.
@@ -186,6 +202,8 @@ const GLYPHS: Record<string, Glyph> = {
   // And Base's Comets are the same protocol again, on another chain.
   "compound-base": COMPOUND_MARK,
   "compound-v3-arbitrum": COMPOUND_MARK,
+  // Compound V3 on Optimism: the same mark, its own deployment.
+  "compound-v3-optimism": COMPOUND_MARK,
   // Paths are authored in a ~0–160 space; the two source group transforms
   // (outer scale+translate, inner translate) map them into the 50×50 viewBox.
   asymmetry: {
@@ -220,11 +238,15 @@ const GLYPHS: Record<string, Glyph> = {
   "aave-v3-base": AAVE_V3_MARK,
   // Aave V3 on Arbitrum — the same mark, its own deployment.
   "aave-v3-arbitrum": AAVE_V3_MARK,
+  // Aave V3 on Optimism: the Ethereum mark, its own deployment.
+  "aave-v3-optimism": AAVE_V3_MARK,
   // Aave's vault layer — same protocol, same mark, its own roster subject.
   "aave-vaults": AAVE_V3_MARK,
   "aave-v4": AAVE_V4_MARK,
   // Aave V4 on Base: the Ethereum mark, its own deployment.
   "aave-v4-base": AAVE_V4_MARK,
+  // Aave V4 on Arc: the Ethereum mark, its own deployment.
+  "aave-v4-arc": AAVE_V4_MARK,
   alchemix: ALCHEMIX_MARK,
   // Alchemix on Base: the Ethereum mark, its own deployment.
   "alchemix-base": ALCHEMIX_MARK,
@@ -345,6 +367,8 @@ const GLYPHS: Record<string, Glyph> = {
   // Morpho Blue on Base — same singleton, same mark, its own roster.
   "morpho-base": MORPHO_MARK,
   "morpho-arbitrum": MORPHO_MARK,
+  // Morpho Blue on Arc: the Ethereum mark, its own deployment.
+  "morpho-arc": MORPHO_MARK,
   "sky-savings": {
     viewBox: "0 0 512 512",
     paths: [
@@ -422,6 +446,14 @@ const GLYPHS: Record<string, Glyph> = {
         d: "M4.40005 0.866667C3.86672 0.155556 2.80005 0.155556 2.26672 0.866667C2.09362 1.09746 2.00005 1.37817 2.00005 1.66667V3.07323C2.00005 3.28133 2.0336 3.48807 2.09941 3.6855L2.22347 4.05769C2.37365 4.50822 2.70192 4.84264 3.09978 5.01598C2.67973 5.47451 2.41649 6.06963 2.37353 6.71399L1.99087 12.4538C1.86774 14.3008 3.3327 15.8667 5.18379 15.8667H10.8164C12.6675 15.8667 14.1324 14.3008 14.0093 12.4538L13.6267 6.71399C13.5837 6.06962 13.3204 5.47449 12.9004 5.01595C13.2982 4.8426 13.6265 4.5082 13.7766 4.05769L13.9007 3.6855C13.9665 3.48807 14 3.28133 14 3.07323V1.66667C14 1.37817 13.9065 1.09746 13.7334 0.866667C13.2 0.155556 12.1334 0.155556 11.6 0.866667L11.4634 1.04888C11.4093 1.12106 11.3617 1.19798 11.3214 1.27869L10.9079 2.10557C10.7493 2.42282 10.6667 2.77263 10.6667 3.12732V3.55302C10.6667 3.66145 10.6777 3.76821 10.6989 3.87197C9.82581 3.60369 8.91625 3.46667 8.00009 3.46667C7.0839 3.46667 6.17431 3.6037 5.30123 3.872C5.32239 3.76823 5.33338 3.66146 5.33338 3.55302V3.12732C5.33338 2.77263 5.2508 2.42282 5.09218 2.10557L4.67874 1.27869C4.63838 1.19798 4.59085 1.12106 4.53671 1.04888L4.40005 0.866667ZM12.2263 4.47783C12.116 4.41491 12.0005 4.35908 11.8804 4.31104L11.5911 4.1953C11.4284 4.02518 11.3334 3.79632 11.3334 3.55302V3.12732C11.3334 2.87613 11.3919 2.62839 11.5042 2.40372L11.9176 1.57683C11.9401 1.53189 11.9666 1.48907 11.9967 1.44888L12.1334 1.26667C12.4 0.911111 12.9334 0.911111 13.2 1.26667C13.2866 1.38206 13.3334 1.52242 13.3334 1.66667V3.07323C13.3334 3.20968 13.3114 3.34523 13.2682 3.47468L13.1442 3.84687C13.0841 4.0271 12.9751 4.17541 12.8376 4.28332C12.9012 4.01278 12.9334 3.73546 12.9334 3.45682V3.41202C12.9334 2.88045 12.8096 2.35618 12.5719 1.88074C12.506 1.74901 12.3459 1.69562 12.2141 1.76148C12.0824 1.82734 12.029 1.98752 12.0949 2.11925C12.2956 2.52064 12.4 2.96325 12.4 3.41202V3.45682C12.4 3.78792 12.3467 4.11686 12.242 4.43096L12.2263 4.47783ZM4.11978 4.31104L4.40899 4.19536C4.57168 4.02523 4.66672 3.79634 4.66672 3.55302V3.12732C4.66672 2.87613 4.60823 2.62839 4.4959 2.40372L4.08245 1.57683C4.05998 1.53189 4.03352 1.48907 4.00337 1.44888L3.86672 1.26667C3.60005 0.911111 3.06672 0.911111 2.80005 1.26667C2.7135 1.38206 2.66672 1.52242 2.66672 1.66667V3.07323C2.66672 3.20968 2.68871 3.34523 2.73186 3.47468L2.85593 3.84687C2.916 4.0271 3.02502 4.17541 3.1625 4.28332C3.09894 4.01278 3.06672 3.73546 3.06672 3.45682V3.41202C3.06672 2.88045 3.19048 2.35618 3.4282 1.88074C3.49407 1.74901 3.65424 1.69562 3.78597 1.76148C3.9177 1.82734 3.97109 1.98752 3.90523 2.11925C3.70453 2.52064 3.60005 2.96325 3.60005 3.41202V3.45682C3.60005 3.78792 3.65343 4.11686 3.75813 4.43096L3.77377 4.47787C3.88415 4.41493 3.99966 4.35909 4.11978 4.31104ZM8.00009 4.53333C6.96695 4.53333 5.94329 4.73047 4.98404 5.11417L4.51593 5.30142C3.90109 5.54735 3.48188 6.12421 3.43783 6.78494L3.05518 12.5248C2.97309 13.7561 3.94973 14.8 5.18379 14.8H10.8164C12.0505 14.8 13.0271 13.7561 12.945 12.5248L12.5623 6.78494C12.5183 6.12421 12.0991 5.54735 11.4843 5.30142L11.0161 5.11417C10.0569 4.73047 9.03324 4.53333 8.00009 4.53333Z",
       },
     ],
+  },
+  // Lido: the two pieces of public/icons/protocols/lido.png, the upper
+  // diamond and the drop below its notch, each measured off that image
+  // (ui-jobs 570).
+  lido: {
+    viewBox: "0 0 256 256",
+    inset: 0.06,
+    paths: [{ d: "M128 2L192 100L128 130L64 100Z" }, { d: "M54 116L128 152L202 116A88 88 0 1 1 54 116Z" }],
   },
   // Basedollar's mark is two-tone (yellow disc, brown detail); the glyph keeps
   // only the detail — ring, rays, arch and base bars — so it reads as a
@@ -786,6 +818,9 @@ const GLYPHS: Record<string, Glyph> = {
     ],
   },
   // Uniswap: nine paths, the last two evenodd; fills stripped. Ink spans 0.956 of the 22-unit height (the binding axis), so inset 0.18 brings it to ~0.78.
+  // Euler: the mark from euler-xyz/euler-lite (public/logo.svg on GitHub), three bars drawn in currentColor there.
+  "euler-v2-base": EULER_MARK,
+  "euler-v2-arbitrum": EULER_MARK,
   // Aerodrome: the mark from aerodrome.finance (supplied by Miles, 10 Nov 2026). The source drew five overlapping
   // bands with a white stroke to part them; these outlines are traced from that render, so the gaps are geometry and
   // the mark reads on any background.
@@ -819,6 +854,22 @@ const GLYPHS: Record<string, Glyph> = {
       },
       {
         d: "M3.398 21.663L3.65 21.86L3.8 21.99L3.863 22.02L3.975 22.104L4.413 22.39L4.888 22.677L5.638 23.086L5.675 23.117L5.75 23.144L6.013 23.279L6.425 23.467L7.338 23.831L8.175 24.141L9.075 24.455L9.863 24.716L10.863 24.99L12.088 25.304L13.688 25.692L14.763 25.905L16.025 26.141L17.063 26.329L17.575 26.413L17.525 26.419L17.438 26.408L16.2 26.278L13.588 25.893L12.475 25.717L11.25 25.468L10.075 25.216L8.713 24.904L7.988 24.701L7.138 24.444L5.813 24.015L5.288 23.83L5.013 23.718L4.425 23.455L3.875 23.194L3.788 23.143L3.754 23.113L3.644 23L3.433 22.738L3.312 22.538L3.257 22.388L3.262 22.025L3.294 21.875Z",
+      },
+    ],
+  },
+  // Balancer: Balancer's official mark, three stacked stones, on its own
+  // 512 canvas (ui-jobs 569).
+  "balancer-v3": {
+    viewBox: "0 0 512 512",
+    paths: [
+      {
+        d: "M375.644 126.065C375.644 148.144 322.077 166.043 255.999 166.043C189.921 166.043 136.355 148.144 136.355 126.065C136.355 103.985 189.921 86.0862 255.999 86.0862C322.077 86.0862 375.644 103.985 375.644 126.065Z",
+      },
+      {
+        d: "M455.407 343.283C455.407 316.07 406.59 292.669 336.623 282.322L334.811 282.69C311.212 287.346 284.413 289.978 256 289.978C226.856 289.978 199.409 287.208 175.376 282.322C105.409 292.669 56.5918 316.07 56.5918 343.283C56.5918 380.082 145.869 409.914 256 409.914C366.13 409.914 455.407 380.082 455.407 343.283Z",
+      },
+      {
+        d: "M415.526 223.347C415.526 199.799 369.838 179.82 306.468 172.762L304.833 173.026C289.752 175.398 273.267 176.704 256 176.704C238.105 176.704 221.053 175.302 205.531 172.764C142.161 179.819 96.4734 199.801 96.4734 223.347C96.4734 252.786 167.895 276.652 256 276.652C344.104 276.652 415.526 252.786 415.526 223.347Z",
       },
     ],
   },
@@ -951,9 +1002,11 @@ const GLYPHS: Record<string, Glyph> = {
   },
 };
 
-// Uniswap's two explorers draw Uniswap's mark.
-GLYPHS["uniswap-v3"] = GLYPHS.uniswap;
-GLYPHS["uniswap-v4"] = GLYPHS.uniswap;
+// Uniswap's explorers, on every chain, draw Uniswap's mark.
+for (const id of ["uniswap-v3", "uniswap-v4", "uniswap-v3-base", "uniswap-v3-arbitrum", "uniswap-v4-arbitrum"])
+  GLYPHS[id] = GLYPHS.uniswap;
+// Balancer V3's other chains draw its mark.
+GLYPHS["balancer-v3-arbitrum"] = GLYPHS["balancer-v3"];
 
 export function hasProtocolGlyph(id: string): boolean {
   return id in GLYPHS;

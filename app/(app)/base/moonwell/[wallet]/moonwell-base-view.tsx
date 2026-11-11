@@ -482,7 +482,7 @@ export default function MoonwellBaseView({ wallet, initialPosition, initialCover
               <DetailTopRow
                 session="moonwell-base"
                 wallet={wallet}
-                owner={{ wallet }}
+                owner={{ wallet, chain: 8453 }}
                 assets={stripAssets}
                 closed={view != null && view.status !== "open"}
                 // The card's ⋮ carries the menu; an event page draws no Tools.

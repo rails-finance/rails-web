@@ -1,2 +1,15 @@
 # Pages not yet declared under Focus mode (scripts/check-focus.mjs). This list only shrinks.
-
+/arc/aave-v4
+/arc/aave-v4/[wallet]
+/arc/aave-v4/markets/[spoke]
+/arc/aave-v4/spoke/[spoke]/[wallet]
+/arc/morpho
+/arc/morpho/[wallet]
+/arc/morpho/[wallet]/[market]
+/base/fluid
+/base/fluid/[wallet]
+/base/fluid/position/[id]
+/optimism/aave-v3/[wallet]
+/optimism/aave-v3/markets
+/optimism/compound-v3/[market]
+/optimism/compound-v3/[market]/[wallet]

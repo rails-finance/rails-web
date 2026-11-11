@@ -108,6 +108,11 @@ interface Ctx {
 
 const shortAddr = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
+const ZERO_LOAN_TOKEN = "0x0000000000000000000000000000000000000000";
+/** An idle market that names no loan token (Arc's first market, ui-jobs 577): it is called the
+ *  idle market, never by a token. */
+const namesNoToken = (m: { isIdle: boolean; loanToken: string }) => m.isIdle && m.loanToken === ZERO_LOAN_TOKEN;
+
 function ctxOf(d: MorphoMarketViewData, chainId: ChainId): Ctx {
   const m = d.market;
   const coll = m.isIdle ? "no collateral" : (m.collateralSymbol ?? shortAddr(m.collateralToken));
@@ -125,7 +130,7 @@ function ctxOf(d: MorphoMarketViewData, chainId: ChainId): Ctx {
       loanToken: m.loanToken,
     },
     coll,
-    pair: m.isIdle ? `${m.loanSymbol} idle market` : `${coll} / ${m.loanSymbol}`,
+    pair: namesNoToken(m) ? "Idle market" : m.isIdle ? `${m.loanSymbol} idle market` : `${coll} / ${m.loanSymbol}`,
     explorer: chainMeta(chainId).explorerName,
     chainName: chainMeta(chainId).name,
   };
@@ -156,6 +161,13 @@ function curveRead(x: Ctx): { rat: number; u: number; elapsed: number } | null {
 
 function Size({ x, side }: { x: Ctx; side: "supplied" | "borrowed" | "available" }) {
   const m = x.d.market;
+  // An idle market that names no loan token (Arc's first market) holds nothing to size.
+  if (namesNoToken(m))
+    return (
+      <span className="text-rb-500" title="This market names no loan token, collateral, oracle or rate model.">
+        no loan token
+      </span>
+    );
   if (!m.amountsTrusted)
     return (
       <span
@@ -192,6 +204,15 @@ const noRate = (m: MorphoMarketViewData["market"]) => (
 function MarketExplainer({ x }: { x: Ctx }) {
   const m = x.d.market;
   const size = (n: number) => `${amount(n)} ${m.loanSymbol}`;
+  if (namesNoToken(m))
+    return (
+      <ExplainGroup title="This market">
+        <ExplainBullet>
+          This idle market names no loan token, collateral, oracle or rate model, so nothing can be supplied to it or
+          borrowed from it.
+        </ExplainBullet>
+      </ExplainGroup>
+    );
   if (m.isIdle)
     return (
       <ExplainGroup title="This market">
@@ -287,7 +308,8 @@ function MarketExplainer({ x }: { x: Ctx }) {
 
 function marketMarkdown(x: Ctx): string {
   const m = x.d.market;
-  const sz = (n: number) => (m.amountsTrusted ? `${amount(n)} ${m.loanSymbol}` : "not stated");
+  const sz = (n: number) =>
+    namesNoToken(m) ? "no loan token" : m.amountsTrusted ? `${amount(n)} ${m.loanSymbol}` : "not stated";
   return [
     `# ${x.pair}, a Morpho Blue market on ${x.chainName}`,
     "",
@@ -310,13 +332,17 @@ function headOf(x: Ctx, positions: { href: string; label: string } | null): Mark
   const blue = morphoBlueContract(x.chainId);
   const loanHref = morphoLoanTokenHref(x.chainId, m.loanToken);
   const links: SectionMenuLink[] = [
-    {
-      item: "loan-token",
-      title: `All ${m.loanSymbol} markets`,
-      subtitle: `Every Morpho Blue market that lends ${m.loanSymbol}`,
-      href: loanHref,
-      internal: true,
-    },
+    ...(namesNoToken(m)
+      ? []
+      : [
+          {
+            item: "loan-token",
+            title: `All ${m.loanSymbol} markets`,
+            subtitle: `Every Morpho Blue market that lends ${m.loanSymbol}`,
+            href: loanHref,
+            internal: true,
+          },
+        ]),
     ...(positions
       ? [
           {
@@ -360,17 +386,28 @@ function headOf(x: Ctx, positions: { href: string; label: string } | null): Mark
     title: x.pair,
     subtitle: (
       <p className="mt-1 text-[13px] text-rb-500" data-morpho-market-line="">
-        {m.isIdle ? (
+        {namesNoToken(m) ? (
+          <>No loan token, collateral, oracle or rate model</>
+        ) : m.isIdle ? (
           <>An idle {m.loanSymbol} market</>
         ) : (
           <>
             Lends {m.loanSymbol} against {x.coll} · LLTV <Prov info={lltvProv(x)}>{pctText(m.lltv)}</Prov>
           </>
-        )}{" "}
-        ·{" "}
-        <Link href={loanHref} prefetch={false} className="text-blue-600 hover:underline dark:text-[var(--text-link)]">
-          All {m.loanSymbol} markets
-        </Link>
+        )}
+        {!namesNoToken(m) && (
+          <>
+            {" "}
+            ·{" "}
+            <Link
+              href={loanHref}
+              prefetch={false}
+              className="text-blue-600 hover:underline dark:text-[var(--text-link)]"
+            >
+              All {m.loanSymbol} markets
+            </Link>
+          </>
+        )}
       </p>
     ),
     figures: [
@@ -622,7 +659,7 @@ function Parameters({ x }: { x: Ctx }) {
   const m = x.d.market;
   return (
     <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-[13px]" data-reserve-parameters="">
-      <Term term="Loan token">{m.loanSymbol}</Term>
+      <Term term="Loan token">{namesNoToken(m) ? "none" : m.loanSymbol}</Term>
       <Term term="Collateral">{m.isIdle ? "none" : x.coll}</Term>
       <Term term="LLTV" title="The most a borrower may owe against the collateral's value, and the liquidation line">
         {m.isIdle ? "none" : <Prov info={lltvProv(x)}>{pctText(m.lltv)}</Prov>}
@@ -695,7 +732,9 @@ function sectionsOf(x: Ctx): ProductSection[] {
       raised: "narrow",
       tools: {
         links: [
-          link("loan-token", `${m.loanSymbol} on ${x.explorer}`, "The loan token", m.loanToken),
+          ...(namesNoToken(m)
+            ? []
+            : [link("loan-token", `${m.loanSymbol} on ${x.explorer}`, "The loan token", m.loanToken)]),
           ...(m.isIdle
             ? []
             : [link("collateral", `${x.coll} on ${x.explorer}`, "The collateral token", m.collateralToken)]),
@@ -731,7 +770,9 @@ function PositionsSection({ x, all, children }: { x: Ctx; all: { href: string; l
           />
         }
       >
-        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">Every borrower in the {x.pair} market.</p>
+        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
+          Every borrower in the {x.pair.endsWith("market") ? x.pair : `${x.pair} market`}.
+        </p>
       </SectionHeading>
       <div className="-mt-6">{children}</div>
     </ProvSection>
@@ -747,6 +788,7 @@ export function MorphoMarketPage({
   chainId,
   pair,
   vaults,
+  note,
   listing,
   positions,
 }: {
@@ -757,6 +799,9 @@ export function MorphoMarketPage({
   pair: string;
   /** "Supplied by vaults", where the chain has a vault roster. */
   vaults?: ReactNode;
+  /** A line under the head about this market's place on the explorer (Arc's unlisted and idle
+   *  markets, ui-jobs 577). */
+  note?: ReactNode;
   /** The positions listing fixed to this market, where the explorer has one. */
   listing?: ReactNode;
   /** Every position on the explorer: the ⋮'s link, and the head's entry where there is no listing. */
@@ -806,6 +851,7 @@ export function MorphoMarketPage({
       what={`the ${pair} market`}
       hooks={{ "data-morpho-market-page": data?.market.id }}
     >
+      {note}
       {vaults}
       {holders && <ProductSectionBlock s={holders} />}
       {x && listing && (

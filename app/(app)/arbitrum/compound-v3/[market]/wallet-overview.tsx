@@ -102,7 +102,7 @@ export function CompoundArbitrumWalletOverview({
         <DetailTopRow
           session="compound-v3-arbitrum"
           wallet={wallet}
-          owner={{ wallet }}
+          owner={{ wallet, chain: 42161 }}
           assets={stripAssets(head)}
           closed={markets.length > 0 && markets.every((m) => m.chain == null)}
           tools={false}

@@ -62,7 +62,7 @@ import {
 } from "@/components/shared/data-table/data-table";
 import { ratePercentText } from "@/lib/shared/rate-percent";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
-import { chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
+import { ARC_CHAIN_ID, chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { morphoBlueContract } from "@/lib/morpho/asset-catalog";
 import { morphoLoanTokenHref, morphoMarketHref } from "@/lib/morpho/market-routes";
@@ -848,7 +848,15 @@ function RosterExplainer({ d }: { d: MorphoRosterData }) {
   );
 }
 
-type RosterProps = { data: MorphoRosterData; chainId: ChainId };
+type RosterProps = {
+  data: MorphoRosterData;
+  chainId: ChainId;
+  /** A line under the head (Arc's unlisted markets and its idle market, ui-jobs 577). */
+  note?: ReactNode;
+  /** The head's word for the markets holding no supply; "never funded" where absent. Arc's list
+   *  leaves out the never-supplied markets, so its zero-supply ones are "empty now" (ui-jobs 577). */
+  unfundedLabel?: string;
+};
 
 /** The roster reads `?all=1` from the URL; the static render, before the
  *  params are known, draws the default view. */
@@ -865,7 +873,7 @@ function RosterWithParams(props: RosterProps) {
   return <RosterView {...props} all={all} />;
 }
 
-function RosterView({ data, chainId, all }: RosterProps & { all: boolean }) {
+function RosterView({ data, chainId, all, note, unfundedLabel = "never funded" }: RosterProps & { all: boolean }) {
   const root = `/${chainMeta(chainId).slug}/morpho`;
   const pathname = usePathname();
   const r: Read = { chainId, block: data.blockNumber, fromLogs: data.totalsSource === "sieve" };
@@ -911,14 +919,22 @@ function RosterView({ data, chainId, all }: RosterProps & { all: boolean }) {
   const explorer = chainMeta(chainId).explorerName;
   const s = data.summary;
   const links: SectionMenuLink[] = [
-    {
-      item: "positions",
-      title: "All Morpho Blue positions",
-      subtitle: "Every position Rails holds",
-      href: chainId === 42161 ? `${root}/positions` : root,
-      internal: true,
-    },
-    ...(chainId !== 42161
+    chainId === ARC_CHAIN_ID
+      ? {
+          item: "positions",
+          title: "A wallet's Morpho Blue positions",
+          subtitle: "Read from the chain for the wallet you enter",
+          href: root,
+          internal: true,
+        }
+      : {
+          item: "positions",
+          title: "All Morpho Blue positions",
+          subtitle: "Every position Rails holds",
+          href: chainId === 42161 ? `${root}/positions` : root,
+          internal: true,
+        },
+    ...(chainId !== 42161 && chainId !== ARC_CHAIN_ID
       ? [
           {
             item: "vaults",
@@ -962,7 +978,7 @@ function RosterView({ data, chainId, all }: RosterProps & { all: boolean }) {
     ],
     notes: (
       <span data-prov-exempt="">
-        {s.borrowed.toLocaleString("en-US")} have borrowing · {s.neverFunded.toLocaleString("en-US")} never funded
+        {s.borrowed.toLocaleString("en-US")} have borrowing · {s.neverFunded.toLocaleString("en-US")} {unfundedLabel}
         {s.idleMarkets > 0 && ` · ${s.idleMarkets} idle`}
       </span>
     ),
@@ -982,6 +998,7 @@ function RosterView({ data, chainId, all }: RosterProps & { all: boolean }) {
         ) : (
           <>
             <ProductHeadSection head={head} titled={false} />
+            {note}
             <ProvSection
               scope="markets-table"
               className="mb-8"

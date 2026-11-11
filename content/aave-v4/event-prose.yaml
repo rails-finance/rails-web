@@ -1602,6 +1602,45 @@ L5:
           Caps per hub and spoke
         doc: HUB_SPOKE_CONFIGS
 
+  # The Arc pages' "?" (Markets, a spoke, a reserve, Hubs).
+  arc_hub:
+    title: |-
+      How the hub and its spokes work
+    intro: |-
+      Aave V4 on Arc has one hub, Core, and three spokes that draw from it: Main, Forex and USDC Maple.
+    detailsHeading: |-
+      Key concepts:
+    details:
+      - bold: |-
+          Liquidity hub
+        text: |-
+          the pool that holds supplied assets, backs borrowing and sets each asset's drawn rate.
+      - bold: |-
+          Spoke
+        text: |-
+          a market drawing from the hub, with its own collateral factors, liquidation settings and oracle.
+      - bold: |-
+          Credit line and utilisation
+        text: |-
+          the cap the hub grants a spoke to draw an asset; utilisation is how much of the hub's asset is drawn.
+      - bold: |-
+          Collateral factor
+        text: |-
+          the share of an asset's value that counts toward a borrow on a spoke; below a health factor of 1 a position can be liquidated.
+    links:
+      - label: |-
+          Liquidity model
+        doc: LIQUIDITY_MODEL
+      - label: |-
+          Liquidity hubs
+        doc: HUBS
+      - label: |-
+          Spokes
+        doc: SPOKES
+      - label: |-
+          Caps per hub and spoke
+        doc: HUB_SPOKE_CONFIGS
+
   # The Base hub page's "?".
   base_hub:
     title: |-

@@ -1,15 +1,24 @@
 import "server-only";
 
-// Clients for rails-server's Uniswap routes on Ethereum (rails-ops ui-jobs
-// 556): one position at the head and 30 days back, a pair's hookless pools at
-// four reads, and a wallet's positions. Raw values; lib/uniswap/position.ts
-// and pairs.ts do the math. Cached as the routes cache: a minute for a
-// position or a wallet, five for a pair.
+// Clients for rails-server's Uniswap and PancakeSwap routes (rails-ops ui-jobs
+// 556, 568, 573, 575): one position at the head and 30 days back, a pair's
+// hookless pools at four reads, and a wallet's positions. Raw values;
+// lib/uniswap/position.ts and pairs.ts do the math. Cached as the routes
+// cache: a minute for a position or a wallet, five for a pair. Ethereum's
+// Uniswap is asked without `chain`, as before; every other deployment names
+// its chain.
 //
 // SERVER-ONLY: reads RAILS_API_URL and the bearer token.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import type { UniChainId, UniProtocol } from "@/lib/uniswap/deployments";
 import type { UniPairRead, UniPositionRead, UniPositionsRead, UniswapVersion } from "@/lib/uniswap/types";
+
+/** The route's path and its `chain` parameter, which Ethereum's Uniswap leaves out. */
+const route = (protocol: UniProtocol, chainId: UniChainId, page: string, qs: Record<string, string>) => {
+  const q = new URLSearchParams(protocol === "uniswap" && chainId === 1 ? qs : { chain: String(chainId), ...qs });
+  return `/api/at-block/${protocol}/${page}?${q}`;
+};
 
 /** An answer, a 404 from the route, or no answer. */
 export type UniAnswer<T> = { kind: "ok"; data: T } | { kind: "not-found" } | { kind: "error" };
@@ -33,19 +42,31 @@ export async function readAtBlock<T>(path: string, revalidate: number, who = "un
 }
 
 /** GET /api/at-block/uniswap/position */
-export function fetchUniswapPosition(version: UniswapVersion, id: string): Promise<UniAnswer<UniPositionRead>> {
-  const qs = new URLSearchParams({ version, id });
-  return readAtBlock(`/api/at-block/uniswap/position?${qs}`, 60);
+export function fetchUniswapPosition(
+  version: UniswapVersion,
+  id: string,
+  protocol: UniProtocol = "uniswap",
+  chainId: UniChainId = 1,
+): Promise<UniAnswer<UniPositionRead>> {
+  return readAtBlock(route(protocol, chainId, "position", { version, id }), 60, protocol);
 }
 
-/** GET /api/at-block/uniswap/pair; `a` and `b` are addresses, or "eth" for native ETH. */
-export function fetchUniswapPair(a: string, b: string): Promise<UniAnswer<UniPairRead>> {
-  const qs = new URLSearchParams({ a, b });
-  return readAtBlock(`/api/at-block/uniswap/pair?${qs}`, 300);
+/** GET /api/at-block/<protocol>/pair; `a` and `b` are addresses, "native" for the chain's gas coin,
+ *  or "eth" on Ethereum. */
+export function fetchUniswapPair(
+  a: string,
+  b: string,
+  protocol: UniProtocol = "uniswap",
+  chainId: UniChainId = 1,
+): Promise<UniAnswer<UniPairRead>> {
+  return readAtBlock(route(protocol, chainId, "pair", { a, b }), 300, protocol);
 }
 
-/** GET /api/at-block/uniswap/positions */
-export function fetchUniswapPositions(owner: string): Promise<UniAnswer<UniPositionsRead>> {
-  const qs = new URLSearchParams({ owner: owner.toLowerCase() });
-  return readAtBlock(`/api/at-block/uniswap/positions?${qs}`, 60);
+/** GET /api/at-block/<protocol>/positions */
+export function fetchUniswapPositions(
+  owner: string,
+  protocol: UniProtocol = "uniswap",
+  chainId: UniChainId = 1,
+): Promise<UniAnswer<UniPositionsRead>> {
+  return readAtBlock(route(protocol, chainId, "positions", { owner: owner.toLowerCase() }), 60, protocol);
 }

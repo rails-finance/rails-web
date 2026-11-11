@@ -17,8 +17,8 @@ import { CHAINS, type ChainId } from "@/lib/shared/chains";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainToggleLinks } from "@/components/shared/chain-toggle";
 import { InfoDisclosure } from "@/components/shared/info-disclosure";
-import { ReadTierTag } from "@/components/shared/read-tier-tag";
-import { READ_TIER } from "@/lib/shared/read-tier";
+import { HistoryTag, HistoryLegendTag } from "@/components/shared/history-tag";
+import { HISTORY_FROM_DATE, HISTORY_NONE } from "@/lib/shared/history-tier";
 import { DepthMatrix } from "@/components/coverage/depth-matrix";
 import { CapabilityPill } from "@/components/coverage/capability-sheet";
 import { CoverageDrawerBody } from "@/components/coverage/drawer-body";
@@ -141,11 +141,15 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
   // the caveat under the foundation names them, so it must not name an
   // explorer the matrix above doesn't show.
   const listingExceptions = coverageExplorers(chainId).filter((p) => EXPLORERS_WITHOUT_LISTING.has(p.id));
-  // Decision 0061: a "Read on visit" explorer keeps no list at all, so the
-  // caveat gives it a sentence of its own, and the legend shows under the matrix.
-  const listedExceptions = listingExceptions.filter((p) => !p.readTier);
-  const tieredExceptions = listingExceptions.filter((p) => p.readTier);
-  const tiered = coverageExplorers(chainId).some((p) => p.readTier);
+  // Three kinds of exception, each with its own sentence: a listing of the
+  // positions read (the Arbitrum three), an explorer not yet indexed (decision
+  // 0061), and one indexed with no listing page yet (`listing: false`). The
+  // history legend (decisions 0061 and 0063) shows under the matrix, one line
+  // per kind of tag on this chain.
+  const tieredExceptions = listingExceptions.filter((p) => p.history === "none");
+  const unlistedExceptions = listingExceptions.filter((p) => p.history !== "none" && p.listing === false);
+  const listedExceptions = listingExceptions.filter((p) => p.history !== "none" && p.listing !== false);
+  const kinds = new Set(coverageExplorers(chainId).map((p) => p.history));
   // A vault is still never a row in the matrix — but the PROTOCOL whose factory
   // deployed it is, and that is where the vaults live now (rails-ops decision
   // 0028). So this page has no Vaults section beneath the matrix: Morpho Blue
@@ -222,7 +226,7 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
                     <ProtocolIcon id={p.id} className="h-7 w-7 shrink-0" />
                     <span className="font-semibold text-foreground">{p.label}</span>
                   </Link>
-                  {p.readTier && <ReadTierTag />}
+                  {p.history && <HistoryTag id={p.id} />}
                 </div>
                 <p className="text-xs text-rb-500 mt-1">{p.desc}</p>
                 {included.length > 0 ? (
@@ -268,15 +272,25 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
         </div>
       </section>
 
-      {/* ── The "Read on visit" legend (decision 0061), under the matrix
-            wherever an explorer on this chain wears the tag. ── */}
-      {tiered && (
-        <section className="max-w-7xl mx-auto px-4 md:px-6 pb-12" data-anatomy="H23.1" data-read-tier-legend="">
-          <div className="flex max-w-3xl flex-col items-start gap-2 rounded-xl border border-rb-200 px-4 py-3 sm:flex-row sm:items-baseline sm:gap-3 dark:border-rb-700">
-            <ReadTierTag tip={false} />
-            <p className="text-sm text-foreground">
-              {READ_TIER.line} <span className="text-rb-500">{READ_TIER.waits}</span>
-            </p>
+      {/* ── The history legend (decisions 0061 and 0063), under the matrix
+            wherever an explorer on this chain wears a tag: one line per kind. ── */}
+      {(kinds.has("none") || kinds.has("from-date")) && (
+        <section className="max-w-7xl mx-auto px-4 md:px-6 pb-12" data-anatomy="H23.1" data-history-legend="">
+          <div className="flex max-w-3xl flex-col gap-3 rounded-xl border border-rb-200 px-4 py-3 dark:border-rb-700">
+            {kinds.has("none") && (
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-baseline sm:gap-3" data-history-legend-kind="none">
+                <HistoryLegendTag kind="none" />
+                <p className="text-sm text-foreground">
+                  {HISTORY_NONE.line} <span className="text-rb-500">{HISTORY_NONE.waits}</span>
+                </p>
+              </div>
+            )}
+            {kinds.has("from-date") && (
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-baseline sm:gap-3" data-history-legend-kind="from-date">
+                <HistoryLegendTag kind="from-date" />
+                <p className="text-sm text-foreground">{HISTORY_FROM_DATE.legend}</p>
+              </div>
+            )}
           </div>
         </section>
       )}
@@ -310,6 +324,13 @@ export function CoveragePage({ chainId }: { chainId: ChainId }) {
                   {tieredExceptions.length === 1 ? "keeps" : "keep"} no list of positions.
                 </>
               )}
+              {unlistedExceptions.map((p) => (
+                <span key={p.id} data-coverage-unlisted={p.id}>
+                  {" "}
+                  <ExplorerNames explorers={[p]} /> answers one wallet or one position at a time, and no listing page
+                  draws its index yet.
+                </span>
+              ))}
             </p>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-4">

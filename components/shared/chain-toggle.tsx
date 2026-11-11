@@ -9,7 +9,15 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ARBITRUM_CHAIN_ID, CHAINS, SEPOLIA_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import {
+  ARBITRUM_CHAIN_ID,
+  ARC_CHAIN_ID,
+  CHAINS,
+  OPTIMISM_CHAIN_ID,
+  SEPOLIA_CHAIN_ID,
+  type ChainId,
+} from "@/lib/shared/chains";
+import { ChainGlyph as ChainMarkGlyph } from "@/components/icons/chain-glyphs";
 import { ARBITRUM_MARK_PATH } from "@/components/shared/explorer-mark";
 import { launchedChains } from "@/lib/shared/protocols";
 import { CTRL_GHOST, ctrlWaking } from "@/lib/shared/ui-grammar";
@@ -53,6 +61,11 @@ export function ChainGlyph({ chainId, className = "" }: { chainId: ChainId; clas
         <path d={ARBITRUM_MARK_PATH} />
       </svg>
     );
+  }
+  if (chainId === OPTIMISM_CHAIN_ID || chainId === ARC_CHAIN_ID) {
+    // The marks in components/icons/chain-glyphs.tsx, so a chain without a case
+    // here draws its own mark rather than the Ethereum diamond below.
+    return <ChainMarkGlyph id={chainId} className={`shrink-0 ${className}`} />;
   }
   if (chainId === SEPOLIA_CHAIN_ID) {
     // Sepolia is an Ethereum testnet, so it wears the Ethereum diamond as an

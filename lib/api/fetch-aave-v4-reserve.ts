@@ -14,7 +14,7 @@ export type { V4ConfigLog } from "@/lib/aave-v4/config-words";
 
 /** The head read of one spoke reserve: decimal strings at one block. */
 export interface V4ReserveHead {
-  chainId: 1 | 8453;
+  chainId: 1 | 8453 | 5042;
   blockNumber: number;
   blockTime: number;
   readAt: string;
@@ -115,7 +115,8 @@ export type V4Read<T> =
 
 const READ_MS = 35_000;
 
-type V4ReadName = "head" | "holders" | "history" | "config-log";
+/** `arc-head` is Aave V4 on Arc's head read (rails-server /api/at-block/aave-v4-arc/reserve). */
+type V4ReadName = "head" | "arc-head" | "holders" | "history" | "config-log";
 
 /** One read of the four, settled into a `V4Read`. */
 export async function getV4Read<T>(
@@ -157,7 +158,10 @@ export function useV4Read<T>(read: V4ReadName, q: Record<string, string> | null)
 }
 
 /** Many head reads at once (a spoke page's reserves), each settled on its own. */
-export function useV4Heads(qs: Record<string, string>[] | null): (V4Read<V4ReserveHead> & { key: string })[] | null {
+export function useV4Heads(
+  qs: Record<string, string>[] | null,
+  read: "head" | "arc-head" = "head",
+): (V4Read<V4ReserveHead> & { key: string })[] | null {
   const [out, setOut] = useState<(V4Read<V4ReserveHead> & { key: string })[] | null>(null);
   const key = qs ? qs.map((q) => new URLSearchParams(q).toString()).join("|") : "";
   useEffect(() => {
@@ -166,13 +170,13 @@ export function useV4Heads(qs: Record<string, string>[] | null): (V4Read<V4Reser
     setOut(null);
     Promise.all(
       qs.map(async (q) => ({
-        ...(await getV4Read<V4ReserveHead>("head", q, ac.signal)),
+        ...(await getV4Read<V4ReserveHead>(read, q, ac.signal)),
         key: new URLSearchParams(q).toString(),
       })),
     ).then((rs) => !ac.signal.aborted && setOut(rs));
     return () => ac.abort();
     // `key` is the question.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, read]);
   return out;
 }

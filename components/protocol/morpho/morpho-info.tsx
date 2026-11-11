@@ -107,6 +107,14 @@ const LIQUIDATION_ITEM = (
   </>
 );
 
+/** The glossary and the "How it works" items another chain's info page shares (Arc's, ui-jobs 577). */
+export const MORPHO_INFO_SHARED = {
+  glossary: () => glossaryFor("arbitrum"),
+  whatItIs: WHAT_IT_IS,
+  isolatedMarkets: ISOLATED_MARKETS,
+  liquidation: LIQUIDATION_ITEM,
+};
+
 const FIGURES_IN_LOAN_TOKEN =
   "Every figure is in the market's loan token, because Morpho Blue never states a dollar value, so a debt reads like 1,200 USDC.";
 

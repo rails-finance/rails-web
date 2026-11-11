@@ -299,6 +299,34 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   "uniswap-v4",
   // Aerodrome Slipstream, for the Uniswap reason (ui-jobs 566).
   "aerodrome",
+  // Uniswap on Base and Arbitrum and PancakeSwap V3, for the same reason
+  // (ui-jobs 568, 573, 575).
+  "uniswap-v3-base",
+  "uniswap-v3-arbitrum",
+  "uniswap-v4-arbitrum",
+  "pancakeswap-v3-base",
+  "pancakeswap-v3-arbitrum",
+  // Compound V3 on Optimism: no census of accounts (ui-jobs 578).
+  "compound-v3-optimism",
+  // Lido (ui-jobs 570): a stake carries no debt and no threshold.
+  "lido",
+  // Fluid on Base, read on visit: no census of positions (ui-jobs 574).
+  "fluid-base",
+  // Morpho Blue on Arc: no census of positions (ui-jobs 577).
+  "morpho-arc",
+  // Aave V4 on Arc: no census of accounts (ui-jobs 577).
+  "aave-v4-arc",
+  // Aave V3 on Optimism: no census of accounts (ui-jobs 578).
+  "aave-v3-optimism",
+  // Euler V2 on Base and Arbitrum: a wallet's accounts are read when it is
+  // visited, and no census of holders is built.
+  "euler-v2-base",
+  "euler-v2-arbitrum",
+  // Balancer V3 (ui-jobs 569): its index counts the pool shares held now
+  // (lib/api/fetch-index.ts, on the front door), and the headline counts every
+  // position ever held, so it stays out until the index states that figure.
+  "balancer-v3",
+  "balancer-v3-arbitrum",
   // Sky Savings, for the same reason: an sUSDS balance carries no debt and no
   // threshold (Miles, 2026-09-29, rails-ops TO-DO-sky-savings-scoping §6.1).
   // It has a listing all the same; this set keeps it out of the count.

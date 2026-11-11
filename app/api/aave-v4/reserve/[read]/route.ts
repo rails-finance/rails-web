@@ -6,6 +6,7 @@ import { publicErrorMessage } from "@/lib/api/public-error";
 
 // GET pass-through to rails-server's Aave V4 reserve-page reads (ui-jobs 548):
 //   head    → /api/at-block/aave-v4/reserve?spoke=&asset=[&hub=]
+//   arc-head → /api/at-block/aave-v4-arc/reserve?spoke=&asset=[&hub=] (Aave V4 on Arc)
 //   holders → /api/aave-v4/reserve-holders?spoke=&asset=[&hub=]
 //   history → /api/aave-v4/hub-asset-history?hub=&asset=[&from=]
 //   config-log → /api/aave-v4/reserve-config-log?spoke=&asset=[&hub=]
@@ -19,6 +20,7 @@ export const dynamic = "force-dynamic";
 const RAILS_API_URL = process.env.RAILS_API_URL;
 const UPSTREAM: Record<string, string> = {
   head: "/api/at-block/aave-v4/reserve",
+  "arc-head": "/api/at-block/aave-v4-arc/reserve",
   holders: "/api/aave-v4/reserve-holders",
   history: "/api/aave-v4/hub-asset-history",
   "config-log": "/api/aave-v4/reserve-config-log",

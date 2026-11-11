@@ -9,7 +9,7 @@
 
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { isWallet } from "@/components/protocol/uniswap/uniswap-wallet-positions";
 import { poolTokenKeys } from "@/components/protocol/uniswap/pool-focus-keys";
 import { PoolWalletList } from "@/components/protocol/uniswap/pool-wallet-list";
@@ -33,12 +33,12 @@ export async function AerodromeWalletPositions({ wallet: raw }: { wallet: string
           fallbackHref={home}
           showStamp={false}
           priceReason={ORACLE_USD_REASON[session]}
-          owner={{ wallet, filterProtocol: null }}
+          owner={{ wallet, chain: 8453, filterProtocol: null }}
           tools={false}
         />
-        <ReadTierTitleRow id={session}>
+        <HistoryTitleRow id={session}>
           <h2 className="text-lg font-semibold text-foreground">{FRONT_DOOR.heading}</h2>
-        </ReadTierTitleRow>
+        </HistoryTitleRow>
       </header>
       {answer.kind !== "ok" ? (
         <p className="text-sm text-rb-500">{FRONT_DOOR.unanswered}</p>

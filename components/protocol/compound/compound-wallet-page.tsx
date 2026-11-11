@@ -901,7 +901,7 @@ export function CompoundWalletView({
             <DetailTopRow
               session={d.session}
               wallet={wallet}
-              owner={{ wallet }}
+              owner={{ wallet, chain: d.deployment.chainId }}
               assets={stripAssets}
               closed={views.length > 0 && views.every((v) => v.status !== "open")}
               // Each market's card carries its exports on its ⋮; the event

@@ -334,7 +334,8 @@ export function readoutLines(p: AeroPosition): ReadoutLine[] {
 
 /** The readout's (i): one group per line, in the lines' order. Each bullet stands alone. */
 export function readoutExplainer(p: AeroPosition, order: readonly LineKey[]): ExplainGroupWords[] {
-  const groups: Record<LineKey, ExplainGroupWords> = {
+  // Aerodrome draws no CAKE line (PancakeSwap's, lib/uniswap/words.ts).
+  const groups: Record<Exclude<LineKey, "cake">, ExplainGroupWords> = {
     range: {
       title: "Range",
       bullets: [
@@ -380,7 +381,7 @@ export function readoutExplainer(p: AeroPosition, order: readonly LineKey[]): Ex
       bullets: [["Aerodrome's fee modules can set a pool's fee from swap to swap."]],
     },
   };
-  return order.map((k) => groups[k]);
+  return order.flatMap((k) => (k === "cake" ? [] : [groups[k]]));
 }
 
 // ── The front door and a wallet's positions ────────────────────────────────

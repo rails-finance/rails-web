@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readTxLegs } from "@/lib/sources/chain/tx-legs";
 import { saleVenue } from "@/lib/shared/sale-venue";
-import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import {
+  ARBITRUM_CHAIN_ID,
+  ARC_CHAIN_ID,
+  BASE_CHAIN_ID,
+  MAINNET_CHAIN_ID,
+  OPTIMISM_CHAIN_ID,
+  type ChainId,
+} from "@/lib/shared/chains";
 
 // What a transaction moved to and from a wallet, read from its receipt
 // (lib/sources/chain/tx-legs.ts: rails-server's at-block store first on
@@ -10,7 +17,7 @@ import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from
 // TO-DO-ui-jobs 438). A receipt rendered as primary truth: decision 0006's
 // carve-out.
 //
-// `?chain=1|8453|42161&hash=<tx>&wallet=<address>&via=<counterparty>` answers
+// `?chain=1|10|5042|8453|42161&hash=<tx>&wallet=<address>&via=<counterparty>` answers
 // TxLegs. `via` must be a router or settlement in the registry, which keeps
 // the read to the rows that qualify. `rpcCalls` (and the `x-rails-rpc-calls`
 // header) counts the upstream chain calls this process spent for the request (the
@@ -21,7 +28,7 @@ export const dynamic = "force-dynamic";
 
 const HASH = /^0x[0-9a-f]{64}$/;
 const ADDRESS = /^0x[0-9a-f]{40}$/;
-const CHAINS: ChainId[] = [MAINNET_CHAIN_ID, BASE_CHAIN_ID, ARBITRUM_CHAIN_ID];
+const CHAINS: ChainId[] = [MAINNET_CHAIN_ID, BASE_CHAIN_ID, ARBITRUM_CHAIN_ID, OPTIMISM_CHAIN_ID, ARC_CHAIN_ID];
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
@@ -30,7 +37,10 @@ export async function GET(request: NextRequest) {
   const wallet = (q.get("wallet") ?? "").toLowerCase();
   const via = (q.get("via") ?? "").toLowerCase();
   if (!CHAINS.includes(chain) || !HASH.test(hash) || !ADDRESS.test(wallet) || !ADDRESS.test(via))
-    return NextResponse.json({ error: "chain (1, 8453 or 42161), hash, wallet and via are required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "chain (1, 10, 5042, 8453 or 42161), hash, wallet and via are required" },
+      { status: 400 },
+    );
   if (!saleVenue(via, chain))
     return NextResponse.json({ error: "via is not a router or settlement contract in the registry" }, { status: 400 });
   try {

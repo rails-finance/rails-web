@@ -11,8 +11,9 @@
 //
 // Pure and client-safe.
 
-import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
+import { ARBITRUM_CHAIN_ID, ARC_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { MORPHO_ARBITRUM_IRM } from "@/lib/morpho-arbitrum/asset-catalog";
+import { MORPHO_ARC_CONTRACTS } from "@/lib/morpho-arc/types";
 
 /** The AdaptiveCurveIRM on each chain, lowercased. Each answers `MORPHO()`
  *  with its chain's Morpho Blue (read 9 Nov 2026). */
@@ -20,6 +21,8 @@ export const MORPHO_ADAPTIVE_CURVE_IRM: Readonly<Record<number, string>> = {
   [MAINNET_CHAIN_ID]: "0x870ac11d48b15db9a138cf899d20f13f79ba00bc",
   [BASE_CHAIN_ID]: "0x46415998764c29ab2a25cbea6254146d50d22687",
   [ARBITRUM_CHAIN_ID]: MORPHO_ARBITRUM_IRM,
+  // Arc: Morpho's addresses page, checked on chain 11 Nov 2026.
+  [ARC_CHAIN_ID]: MORPHO_ARC_CONTRACTS.adaptiveCurveIrm,
 };
 
 export const isAdaptiveCurveIrm = (chainId: number, irm: string | null | undefined): boolean =>

@@ -11,6 +11,7 @@ import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { FRONT_DOOR } from "@/lib/uniswap/words";
 import type { UniswapVersion } from "@/lib/uniswap/types";
+import type { UniProtocol } from "@/lib/uniswap/deployments";
 
 export const ROW =
   "flex items-center gap-3 rounded-xl border border-rb-200 bg-raised px-4 py-3 transition-colors duration-150 hover:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-rb-600";
@@ -63,22 +64,26 @@ export function PoolWalletList({ rows }: { rows: PoolWalletRow[] }) {
 export function UniswapOtherCount({
   others,
   version,
+  chain,
+  protocol,
   href,
 }: {
   others: string[][];
   version: UniswapVersion;
+  chain: number;
+  protocol: UniProtocol;
   href: string;
 }) {
   const scoped = useScopedRows(
     others,
     (k) => k,
-    () => 1,
+    () => chain,
   );
   if (scoped.rows.length === 0) return null;
   return (
     <p className="mt-4 text-sm" {...scoped.listProps}>
       <Link href={href} className={INLINE_LINK}>
-        {FRONT_DOOR.other(version, scoped.rows.length)}
+        {FRONT_DOOR.other(version, scoped.rows.length, protocol)}
       </Link>
     </p>
   );

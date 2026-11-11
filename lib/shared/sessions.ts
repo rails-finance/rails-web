@@ -59,12 +59,18 @@ export type SessionProtocol =
   // Morpho Blue on Arbitrum, at `/arbitrum/morpho`: its own singleton and
   // markets, so its own scope.
   | "morpho-arbitrum"
+  // Morpho Blue on Arc, at `/arc/morpho`: a position is a wallet's place in
+  // one market, read from the chain when a page opens (ui-jobs 577).
+  | "morpho-arc"
   | "spark"
   | "compound"
   | "compound-base"
   // Compound V3 on Arbitrum, at `/arbitrum/compound-v3`: its own four Comets,
   // so its own scope.
   | "compound-v3-arbitrum"
+  // Compound V3 on Optimism, at `/optimism/compound-v3`: a position is a wallet's
+  // account in one Comet, read from the chain when a page opens (ui-jobs 578).
+  | "compound-v3-optimism"
   | "compound-v2"
   | "dolomite"
   | "pwn"
@@ -98,7 +104,34 @@ export type SessionProtocol =
   | "uniswap-v4"
   // Aerodrome Slipstream on Base, at `/base/aerodrome`: a position is an NFT
   // id on one of three position managers, staked in its gauge or not (ui-jobs 566).
-  | "aerodrome";
+  | "aerodrome"
+  // Uniswap V3 on Base and V3 and V4 on Arbitrum, and PancakeSwap V3 on Base
+  // and Arbitrum, on Uniswap's pages with a chain (ui-jobs 568, 573, 575).
+  | "uniswap-v3-base"
+  | "uniswap-v3-arbitrum"
+  | "uniswap-v4-arbitrum"
+  | "pancakeswap-v3-base"
+  | "pancakeswap-v3-arbitrum"
+  // Lido on Ethereum, at `/ethereum/lido`: a wallet's stake is its stETH
+  // shares and wstETH, with its withdrawal requests (ui-jobs 570).
+  | "lido"
+  // Fluid's vaults on Base, at `/base/fluid`: a position is a VaultFactory NFT,
+  // read from the chain when a page opens (ui-jobs 574).
+  | "fluid-base"
+  // Aave V4 on Arc, at `/arc/aave-v4`: a position is a wallet's account on one
+  // spoke, read from the chain when a page opens (ui-jobs 577).
+  | "aave-v4-arc"
+  // Aave V3 on Optimism, at `/optimism/aave-v3`: a position is a wallet's
+  // account on the Pool, read from the chain when a page opens (ui-jobs 578).
+  | "aave-v3-optimism"
+  // Euler V2 on Base and Arbitrum, at `/base/euler-v2` and `/arbitrum/euler-v2`:
+  // a position is one account's holding in one vault, read at two blocks.
+  | "euler-v2-base"
+  | "euler-v2-arbitrum"
+  // Balancer V3 on Ethereum, at `/ethereum/balancer-v3`: a pool share is the
+  // wallet's balance of the pool's shares in the Vault (ui-jobs 569).
+  | "balancer-v3"
+  | "balancer-v3-arbitrum";
 
 /** What a saved entry is: a wallet, a position page or a listing view. */
 export type SavedKind = "wallet" | "position" | "view";

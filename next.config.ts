@@ -125,6 +125,8 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/morpho-arbitrum", "/arbitrum/morpho"],
   // Compound V3 on Arbitrum never had a pre-0016 path; the row is for check:routes.
   ["/compound-v3-arbitrum", "/arbitrum/compound-v3"],
+  // Compound V3 on Optimism never had a pre-0016 path; the row is for check:routes.
+  ["/compound-v3-optimism", "/optimism/compound-v3"],
   // CoW never had a pre-0016 path; the row is for check:routes.
   ["/cow", "/ethereum/cow"],
   // Pendle never had a pre-0016 path; the row is for check:routes.
@@ -134,6 +136,29 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/uniswap-v4", "/ethereum/uniswap-v4"],
   // Aerodrome never had a pre-0016 path; the row is for check:routes.
   ["/aerodrome", "/base/aerodrome"],
+  // Uniswap on Base and Arbitrum and PancakeSwap V3 never had pre-0016 paths;
+  // the rows, keyed by roster id, are for check:routes.
+  ["/uniswap-v3-base", "/base/uniswap-v3"],
+  ["/uniswap-v3-arbitrum", "/arbitrum/uniswap-v3"],
+  ["/uniswap-v4-arbitrum", "/arbitrum/uniswap-v4"],
+  ["/pancakeswap-v3-base", "/base/pancakeswap-v3"],
+  ["/pancakeswap-v3-arbitrum", "/arbitrum/pancakeswap-v3"],
+  // Lido never had a pre-0016 path; the row is for check:routes.
+  ["/lido", "/ethereum/lido"],
+  // Fluid on Base never had a pre-0016 path; the row is for check:routes.
+  ["/fluid-base", "/base/fluid"],
+  // Morpho Blue on Arc never had a pre-0016 path; the row is for check:routes.
+  ["/morpho-arc", "/arc/morpho"],
+  // Aave V4 on Arc never had a pre-0016 path; the row is for check:routes.
+  ["/aave-v4-arc", "/arc/aave-v4"],
+  // Aave V3 on Optimism never had a pre-0016 path; the row is for check:routes.
+  ["/aave-v3-optimism", "/optimism/aave-v3"],
+  // Euler V2 never had a pre-0016 path; the rows are for check:routes.
+  ["/euler-v2-base", "/base/euler-v2"],
+  ["/euler-v2-arbitrum", "/arbitrum/euler-v2"],
+  // Balancer V3 never had a pre-0016 path; the row is for check:routes.
+  ["/balancer-v3", "/ethereum/balancer-v3"],
+  ["/balancer-v3-arbitrum", "/arbitrum/balancer-v3"],
   // Polaris never had a pre-0016 path; the row exists because check:routes
   // wants every explorer forwarded from its bare slug, and a bare /polaris is
   // the address anyone will guess.

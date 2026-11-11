@@ -626,7 +626,7 @@ export default function SeamlessPositionView({ wallet, initialPosition, initialT
             <DetailTopRow
               session="seamless"
               wallet={wallet}
-              owner={{ wallet }}
+              owner={{ wallet, chain: BASE_CHAIN_ID }}
               assets={stripAssets}
               closed={view != null && view.status !== "open"}
               // The card's ⋮ carries the menu; an event page draws no Tools.

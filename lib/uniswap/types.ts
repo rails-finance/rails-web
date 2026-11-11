@@ -3,12 +3,14 @@
 // named blocks. Raw chain values; bigints as decimal strings. The web does the
 // math (lib/uniswap/position.ts, lib/uniswap/pairs.ts).
 //
-// Pure, with no imports: the unit tests read the modules that use it.
+// Pure, with type imports only: the unit tests read the modules that use it.
+
+import type { UniChainId } from "./deployments";
 
 export type UniswapVersion = "v3" | "v4";
 
 export interface UniToken {
-  /** Checksummed; the zero address for native ETH. */
+  /** Checksummed; the zero address for the chain's native coin. */
   address: string;
   symbol: string;
   decimals: number;
@@ -49,19 +51,23 @@ export interface UniLogAmount {
   amount1: string;
 }
 
-/** The chains the at-block routes answer for, and the grid every past read stands on: a fixed
- *  count of blocks a day on Ethereum (12-second slots). Base has none: two-second blocks until
- *  Denim (block 53,556,127, 5 Nov 2026), five a second since, so its reads stand on UTC midnights. */
-export type UniChainId = 1 | 8453;
+/** The grid every past read stands on: a fixed count of blocks a day on Ethereum (12-second
+ *  slots). Base has none: two-second blocks until Denim (block 53,556,127, 5 Nov 2026), five a
+ *  second since, so its reads stand on UTC midnights. Arbitrum's blocks have no fixed time, so its
+ *  reads stand on the first multiple of 1,000 blocks at or after each UTC midnight. */
+export type { UniChainId } from "./deployments";
 export const DAY_BLOCKS_BY_CHAIN: Readonly<Partial<Record<UniChainId, number>>> = { 1: 7_200 };
 
 /** How a receipt names the daily grid: "one each 7,200 blocks", or "one at each UTC midnight". */
 export function dayGridPhrase(chainId: UniChainId): string {
   const n = DAY_BLOCKS_BY_CHAIN[chainId];
-  return n ? `one each ${n.toLocaleString("en-US")} blocks` : "one at each UTC midnight";
+  if (n) return `one each ${n.toLocaleString("en-US")} blocks`;
+  return chainId === 42161
+    ? "one at the first multiple of 1,000 blocks at or after each UTC midnight"
+    : "one at each UTC midnight";
 }
 
-/** GET /api/at-block/uniswap/position?version=&id= */
+/** GET /api/at-block/<uniswap|pancakeswap>/position?chain=&version=&id= */
 export interface UniPositionRead {
   chainId: UniChainId;
   version: UniswapVersion;
@@ -89,12 +95,25 @@ export interface UniPositionRead {
   opened: BlockRef | null;
   /** Up to 30 reads from `opened` on: the head first, then the multiples of the chain's blocks a day below it. */
   daily: { block: number; time: number; tick: number }[];
-  /** V3 only: the position manager's logs for this token id. */
+  /** V3 only: the position manager's logs for this token id; null where the chain serves no
+   *  whole-life logs (Base). */
   history: null | {
     increase: (UniLogAmount & { liquidity: string })[];
     decrease: (UniLogAmount & { liquidity: string })[];
     collect: UniLogAmount[];
   };
+  /** PancakeSwap only: the stake where MasterChefV3 holds the NFT, else null. */
+  staked?: UniStake | null;
+}
+
+/** A PancakeSwap position staked in MasterChefV3. `owner` is then the farm; `user` is the staker. */
+export interface UniStake {
+  masterChef: string;
+  user: string;
+  pid: string;
+  /** CAKE not yet harvested, raw. */
+  pendingCake: string;
+  cake: UniToken;
 }
 
 /** One pool of a pair at one read block. */
@@ -109,12 +128,12 @@ export interface UniPairPoolAt {
   protocolFee: number;
 }
 
-/** GET /api/at-block/uniswap/pair?a=&b= */
+/** GET /api/at-block/<uniswap|pancakeswap>/pair?chain=&a=&b= */
 export interface UniPairRead {
   chainId: UniChainId;
   /** Head, then about 30, 60 and 90 days back. */
   reads: BlockRef[];
-  /** The tokens named; WETH appended where ETH is named. */
+  /** The tokens named; the wrapped token appended where the native coin is named. */
   tokens: UniToken[];
   pools: {
     version: UniswapVersion;
@@ -128,7 +147,7 @@ export interface UniPairRead {
   }[];
 }
 
-/** GET /api/at-block/uniswap/positions?owner= */
+/** GET /api/at-block/<uniswap|pancakeswap>/positions?chain=&owner= */
 export interface UniPositionsRead {
   chainId: UniChainId;
   head: BlockRef;
@@ -139,6 +158,8 @@ export interface UniPositionsRead {
     token1: UniToken;
     fee: number;
     liquidity: string;
+    /** PancakeSwap only: held by MasterChefV3 for this owner. */
+    staked?: boolean;
   }[];
   /** More than 200 ids in a version; V4 newest first, then V3. */
   truncated: boolean;

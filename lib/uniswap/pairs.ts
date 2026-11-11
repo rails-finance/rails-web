@@ -6,21 +6,46 @@
 // at any read (under 50,000 of a stable quote or 20 ETH), under that in size,
 // or a 30-day fee figure above 10%.
 //
-// Pure, with type imports only: scripts/test/uniswap.test.mjs reads it.
+// The tables are per chain (ui-jobs 568, 573, 575): each chain names its own
+// tokens and pairs, its native coin and its wrapped token from
+// lib/uniswap/deployments.ts. "ETH" in a pair names the native coin or its
+// wrapped token, where that coin is ETH.
+//
+// Pure: scripts/test/uniswap.test.mjs reads it.
 
+import { uniDeployment, type UniChainId, type UniDeployment } from "./deployments";
 import type { UniPairRead, UniToken, UniswapVersion } from "./types";
 
 const U256 = BigInt(2) ** BigInt(256);
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
-const WETH = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 
 const sub = (a: bigint, b: bigint) => (((a - b) % U256) + U256) % U256;
 const sqrtFromX96 = (x: string) => Number(BigInt(x)) / 2 ** 96;
 
-/** The tokens the pairs name, as the route is asked for them ("eth" for native ETH). */
-export const PAIR_TOKENS: Record<string, UniToken & { param: string }> = {
-  ETH: { symbol: "ETH", address: ZERO_ADDRESS, decimals: 18, param: "eth" },
-  WETH: { symbol: "WETH", address: WETH, decimals: 18, param: WETH },
+type PairToken = UniToken & { param: string };
+const tok = (symbol: string, address: string, decimals: number): PairToken => ({
+  symbol,
+  address,
+  decimals,
+  param: address,
+});
+/** A chain's native coin and its wrapped token, as the route is asked for them ("native"; "eth" on
+ *  Ethereum, as before). */
+function nativeTokens(d: UniDeployment): Record<string, PairToken> {
+  return {
+    [d.native.symbol]: {
+      symbol: d.native.symbol,
+      address: ZERO_ADDRESS,
+      decimals: d.native.decimals,
+      param: d.chainId === 1 ? "eth" : "native",
+    },
+    [d.wrapped.symbol]: tok(d.wrapped.symbol, d.wrapped.address, d.wrapped.decimals),
+  };
+}
+
+/** Ethereum's tokens the pairs name, as the route is asked for them ("eth" for native ETH). */
+export const PAIR_TOKENS: Record<string, PairToken> = {
+  ...nativeTokens(uniDeployment("uniswap", 1)),
   USDC: {
     symbol: "USDC",
     address: "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
@@ -59,6 +84,48 @@ export type PairKey = keyof typeof PAIRS;
 
 export const isPairKey = (k: string): k is PairKey => k in PAIRS;
 
+type PairSpec = { base: string; quote: string };
+
+/** Each chain's tokens and pairs. Base's tokens from Circle (USDC), Coinbase (cbBTC) and Lido
+ *  (wstETH); Arbitrum's from Circle (USDC), the WBTC and Lido deployments; each symbol and decimals
+ *  checked against the chain through the pair route on 11 Nov 2026. */
+export const CHAIN_PAIRS: Record<UniChainId, { tokens: Record<string, PairToken>; pairs: Record<string, PairSpec> }> = {
+  1: { tokens: PAIR_TOKENS, pairs: PAIRS },
+  8453: {
+    tokens: {
+      ...nativeTokens(uniDeployment("uniswap", 8453)),
+      USDC: tok("USDC", "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", 6),
+      cbBTC: tok("cbBTC", "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", 8),
+      wstETH: tok("wstETH", "0xc1CBa3fCea344f92D9239c08C0568f6F2F0ee452", 18),
+    },
+    pairs: {
+      "eth-usdc": { base: "ETH", quote: "USDC" },
+      "cbbtc-eth": { base: "cbBTC", quote: "ETH" },
+      "cbbtc-usdc": { base: "cbBTC", quote: "USDC" },
+      "wsteth-eth": { base: "wstETH", quote: "ETH" },
+    },
+  },
+  42161: {
+    tokens: {
+      ...nativeTokens(uniDeployment("uniswap", 42161)),
+      USDC: tok("USDC", "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", 6),
+      WBTC: tok("WBTC", "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f", 8),
+      wstETH: tok("wstETH", "0x5979D7b546E38E414F7E9822514be443A4800529", 18),
+    },
+    pairs: {
+      "eth-usdc": { base: "ETH", quote: "USDC" },
+      "wbtc-eth": { base: "WBTC", quote: "ETH" },
+      "wbtc-usdc": { base: "WBTC", quote: "USDC" },
+      "wsteth-eth": { base: "wstETH", quote: "ETH" },
+    },
+  },
+};
+
+/** A chain's pair by its key, or null. */
+export function chainPair(chainId: UniChainId, key: string): PairSpec | null {
+  return Object.hasOwn(CHAIN_PAIRS[chainId].pairs, key) ? CHAIN_PAIRS[chainId].pairs[key] : null;
+}
+
 /** Why a pool is set aside. */
 export type AsideReason =
   | { kind: "empty" }
@@ -72,8 +139,12 @@ export interface PoolCard {
   key: string;
   version: UniswapVersion;
   fee: number;
-  /** V4 with WETH where the pair names ETH: the card says so. */
+  /** V4 with the wrapped token where the pair names the native coin: the card says so. */
   weth: boolean;
+  /** The wrapped token's symbol, for that note. */
+  wrappedSymbol: string;
+  protocol: UniDeployment["protocol"];
+  chainId: UniChainId;
   /** V3 only: the two balances, valued in the quote token. */
   size: number | null;
   sizeThen: number | null;
@@ -87,27 +158,38 @@ export interface PoolCard {
   reads: number[];
 }
 
-/** The liquidity floor: 20 ETH where ETH is the quote, else 50,000 of the stablecoin. */
+/** The liquidity floor: 20 ETH where ETH is the quote, else 50,000 of the stablecoin. Aerodrome's
+ *  pools are on Base, whose native coin is ETH. */
 export const floorFor = (quote: string): number => (quote === "ETH" ? 20 : 50_000);
 
 /** Highest 30-day fee figure a card keeps without being set aside. */
 export const SPIKE = 0.1;
 
-/** Every pool of the read as a card. */
-export function pairCards(read: UniPairRead, key: PairKey): PoolCard[] {
-  const { quote } = PAIRS[key];
+/** Every pool of the read as a card. `key` is one of the chain's pairs (Ethereum's by default). */
+export function pairCards(read: UniPairRead, key: string, protocol: UniDeployment["protocol"] = "uniswap"): PoolCard[] {
+  const d = uniDeployment(protocol, read.chainId);
+  const table = CHAIN_PAIRS[d.chainId];
+  const spec = chainPair(d.chainId, key);
+  if (!spec) return [];
+  const { quote } = spec;
   const meta = (address: string): UniToken => {
     const a = address.toLowerCase();
     return (
       read.tokens.find((t) => t.address.toLowerCase() === a) ??
-      Object.values(PAIR_TOKENS).find((t) => t.address.toLowerCase() === a) ?? {
+      Object.values(table.tokens).find((t) => t.address.toLowerCase() === a) ?? {
         address,
         symbol: "?",
         decimals: 18,
       }
     );
   };
-  const isQuote = (t: UniToken) => t.symbol === quote || (quote === "ETH" && t.symbol === "WETH");
+  // The quote by address: the named token, or either side of the native coin.
+  const quoteAddresses = new Set(
+    (quote === d.native.symbol ? [ZERO_ADDRESS, d.wrapped.address] : [table.tokens[quote]?.address ?? ""]).map((a) =>
+      a.toLowerCase(),
+    ),
+  );
+  const isQuote = (t: UniToken) => quoteAddresses.has(t.address.toLowerCase());
   const floor = floorFor(quote);
 
   return read.pools.flatMap((pool): PoolCard[] => {
@@ -158,7 +240,11 @@ export function pairCards(read: UniPairRead, key: PairKey): PoolCard[] {
         key: pool.key,
         version: pool.version,
         fee: pool.fee,
-        weth: pool.version === "v4" && [t0, t1].some((t) => t.symbol === "WETH"),
+        weth:
+          pool.version === "v4" && [t0, t1].some((t) => t.address.toLowerCase() === d.wrapped.address.toLowerCase()),
+        wrappedSymbol: d.wrapped.symbol,
+        protocol,
+        chainId: d.chainId,
         size,
         sizeThen: past ? valueQuote(past) : null,
         windows,
