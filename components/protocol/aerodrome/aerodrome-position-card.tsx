@@ -14,12 +14,14 @@ import { PoolReadStamp, Segs } from "@/components/protocol/uniswap/uniswap-reado
 import { aeroPosition } from "@/lib/aerodrome/position";
 import { cardProv, readContracts, type AeroReceiptContext } from "@/lib/aerodrome/provenance";
 import type { AeroPositionRead } from "@/lib/aerodrome/types";
-import { CARD_WORDS, cardExplainer } from "@/lib/aerodrome/words";
+import { cardExplainer, cardWords } from "@/lib/aerodrome/words";
 import { num, positionNumber, short, shown } from "@/lib/uniswap/words";
 
 /** Every figure's read stamp on an Aerodrome page. */
 export function AerodromeReadStamp({ c, what }: { c: AeroReceiptContext; what: string }) {
-  return <PoolReadStamp chainId={8453} head={c.r.head} then={c.r.then} contracts={readContracts(c)} what={what} />;
+  return (
+    <PoolReadStamp chainId={c.r.chainId} head={c.r.head} then={c.r.then} contracts={readContracts(c)} what={what} />
+  );
 }
 
 function slots(r: AeroPositionRead): PositionCardSlots {
@@ -27,6 +29,8 @@ function slots(r: AeroPositionRead): PositionCardSlots {
   const c = { p, r };
   const B = p.base.symbol;
   const Q = p.quote.symbol;
+  const R = p.site.reward.symbol;
+  const CARD_WORDS = cardWords(p.site);
   const words = cardExplainer(p);
   const heads: PositionCardHead[] = [
     {
@@ -61,7 +65,11 @@ function slots(r: AeroPositionRead): PositionCardSlots {
       label: CARD_WORDS.claimable,
       labelTip: CARD_WORDS.claimableTip,
       value:
-        p.aero.claimable === null ? null : <Prov info={cardProv("claimable", c)}>{num(p.aero.claimable)} AERO</Prov>,
+        p.aero.claimable === null ? null : (
+          <Prov info={cardProv("claimable", c)}>
+            {num(p.aero.claimable)} {R}
+          </Prov>
+        ),
       sub:
         p.aero.claimableValue !== null ? (
           <span data-figure="claimable-quote">

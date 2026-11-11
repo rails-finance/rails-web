@@ -129,6 +129,9 @@ export type SessionProtocol =
   // Aave V3 on Optimism, at `/optimism/aave-v3`: a position is a wallet's
   // account on the Pool, read from the chain when a page opens (ui-jobs 578).
   | "aave-v3-optimism"
+  // Velodrome Slipstream on Optimism, at `/optimism/velodrome`: Aerodrome's
+  // pages on Optimism's two position managers (ui-jobs 578).
+  | "velodrome"
   // Euler V2 on Base and Arbitrum, at `/base/euler-v2` and `/arbitrum/euler-v2`:
   // a position is one account's holding in one vault, read at two blocks.
   | "euler-v2-base"

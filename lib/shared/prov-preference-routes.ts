@@ -133,6 +133,7 @@ export const PROV_PREFERENCE_ROUTES: readonly string[] = [
   "/ethereum/yearn/vaults/[vault]/[holder]",
   "/optimism/uniswap-v3/position/[id]",
   "/optimism/uniswap-v4/position/[id]",
+  "/optimism/velodrome/position/[deployment]/[id]",
   "/sepolia/polaris/[market]/[id]",
   "/sepolia/polaris/markets",
 ];

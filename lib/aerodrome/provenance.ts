@@ -7,7 +7,8 @@
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { AeroPosition, AeroPriceRoute } from "@/lib/aerodrome/position";
-import { AERO_CONTRACTS, type AeroPositionRead } from "@/lib/aerodrome/types";
+import { AERODROME, type SlipstreamSite } from "@/lib/aerodrome/sites";
+import type { AeroPositionRead } from "@/lib/aerodrome/types";
 import type { LineKey } from "@/lib/uniswap/words";
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -39,32 +40,38 @@ const REWARD_INSIDE =
 const chain = (label: string, value: string): ProvInput => ({ label, value, kind: "chain", pclass: "state" });
 const derived = (label: string, value: string): ProvInput => ({ label, value, kind: "derived" });
 
-/** How AERO was priced, for a receipt. */
-export function routeText(route: AeroPriceRoute, q: string, base: string): string {
+/** How AERO (VELO on Optimism) was priced, for a receipt. */
+export function routeText(route: AeroPriceRoute, q: string, base: string, site: SlipstreamSite = AERODROME): string {
+  const R = site.reward.symbol;
+  const P = site.label;
   switch (route.via) {
     case "usdc-leg":
-      return `AERO is priced in USDC through Aerodrome's AERO/USDC volatile pool ${route.leg.pool}, its reserves at the head.`;
+      return `${R} is priced in USDC through ${P}'s ${R}/USDC volatile pool ${route.leg.pool}, its reserves at the head.`;
     case "weth-leg":
-      return `AERO is priced in WETH through Aerodrome's AERO/WETH volatile pool ${route.leg.pool}, its reserves at the head.`;
+      return `${R} is priced in WETH through ${P}'s ${R}/WETH volatile pool ${route.leg.pool}, its reserves at the head.`;
     case "is-quote":
-      return "AERO is this pool's quote token.";
+      return `${R} is this pool's quote token.`;
     case "pool":
-      return `AERO is this pool's base token, priced in ${q} by the pool.`;
+      return `${R} is this pool's base token, priced in ${q} by the pool.`;
     case "weth-then-pool":
-      return `AERO is priced in WETH through Aerodrome's AERO/WETH volatile pool ${route.leg.pool}, then in ${q} at this pool's price for ${base}.`;
+      return `${R} is priced in WETH through ${P}'s ${R}/WETH volatile pool ${route.leg.pool}, then in ${q} at this pool's price for ${base}.`;
     case "usdc-then-pool":
-      return `AERO is priced in USDC through Aerodrome's AERO/USDC volatile pool ${route.leg.pool}, then in ${q} at this pool's price for ${base}.`;
+      return `${R} is priced in USDC through ${P}'s ${R}/USDC volatile pool ${route.leg.pool}, then in ${q} at this pool's price for ${base}.`;
     case "none":
-      return `Neither AERO pool reaches ${q}, so AERO has no price here.`;
+      return `Neither ${R} pool reaches ${q}, so ${R} has no price here.`;
   }
 }
+
+/** The price route's sentence on this page's site. */
+const routeOf = (c: AeroReceiptContext) => routeText(c.p.aeroPrice.route, c.p.quote.symbol, c.p.base.symbol, c.p.site);
 
 function routeInputs(c: AeroReceiptContext): ProvInput[] {
   const route = c.p.aeroPrice.route;
   const out: ProvInput[] = [];
   if ("leg" in route)
     out.push(chain(`getReserves() · ${route.leg.pool}`, `${route.leg.now.reserve0}, ${route.leg.now.reserve1}`));
-  if (c.p.aeroPrice.price !== null) out.push(derived(`AERO in ${c.p.quote.symbol}`, fig(c.p.aeroPrice.price)));
+  if (c.p.aeroPrice.price !== null)
+    out.push(derived(`${c.p.site.reward.symbol} in ${c.p.quote.symbol}`, fig(c.p.aeroPrice.price)));
   return out;
 }
 
@@ -143,15 +150,16 @@ export function cardProv(
     case "claimable": {
       const s = r.staked;
       const a = p.aero;
+      const R = p.site.reward.symbol;
       return {
         kind: a?.claimableFrom === "earned" ? "chain" : "derived",
         pclass: "state",
         source: head,
-        summary: `AERO to claim — ${
+        summary: `${R} to claim — ${
           a?.claimableFrom === "earned"
-            ? `the gauge's earned(depositor, ${p.id}) at ${at(r.head)}: the rewards settled at its last update, plus the liquidity times the reward growth inside the range since, less any early-unstake penalty. The same arithmetic from the reads gives ${fig(a.claimableArithmetic)} AERO.`
-            : `no depositor was found, so the gauge's earned() cannot be asked; this is its arithmetic at ${at(r.head)}: the rewards settled at the last update, plus the liquidity times the reward growth inside the range since, less any early-unstake penalty.`
-        } ${routeText(p.aeroPrice.route, Q, p.base.symbol)}`,
+            ? `the gauge's earned(depositor, ${p.id}) at ${at(r.head)}: the rewards settled at its last update, plus the liquidity times the reward growth inside the range since, less any early-unstake penalty. The same arithmetic from the reads gives ${fig(a.claimableArithmetic)} ${R}.`
+            : `${p.site.namesDepositor ? "no depositor was found" : `on ${p.site.chainName} Rails does not yet look up the wallet that staked a position`}, so the gauge's earned() cannot be asked; this is its arithmetic at ${at(r.head)}: the rewards settled at the last update, plus the liquidity times the reward growth inside the range since, less any early-unstake penalty.`
+        } ${routeOf(c)}`,
         contract: gaugeC(c),
         via: headVia(c),
         formula: "rewards + L × (rewardGrowthInside now − rewardGrowthInside at last update) ÷ 2^128, less penalty",
@@ -164,7 +172,7 @@ export function cardProv(
             ? [chain("penaltyRate(), minStakeTimes(pool)", `${s.penaltyBps} bps, ${s.minStakeSeconds ?? "–"} s`)]
             : []),
           ...(s?.depositTimestamp != null ? [chain("depositTimestamp(id)", String(s.depositTimestamp))] : []),
-          derived("AERO", fig(a?.claimable ?? 0)),
+          derived(R, fig(a?.claimable ?? 0)),
           ...routeInputs(c),
         ],
       };
@@ -177,7 +185,9 @@ export function cardProv(
         source: head,
         summary: s?.depositor
           ? `Staked by — ownerOf(${p.id}) at ${at(r.head)} is the pool's gauge ${s.gauge}. The gauge keeps no list from position to wallet, so the wallet is found from the gauge's Deposit and ClaimRewards logs and the position manager's Transfer logs at the block of ${s.depositTimestamp !== null ? "its depositTimestamp" : "its last update"}, and confirmed by the gauge's stakedContains(wallet, ${p.id}) at the head.`
-          : `Staked in the gauge — ownerOf(${p.id}) at ${at(r.head)} is the pool's gauge ${r.owner}. No wallet in the gauge's logs at the deposit's block passed stakedContains at the head.`,
+          : p.site.namesDepositor
+            ? `Staked in the gauge — ownerOf(${p.id}) at ${at(r.head)} is the pool's gauge ${r.owner}. No wallet in the gauge's logs at the deposit's block passed stakedContains at the head.`
+            : `Staked in the gauge — ownerOf(${p.id}) at ${at(r.head)} is the pool's gauge ${r.owner}. The gauge keeps no list from position to wallet, and on ${p.site.chainName} Rails does not yet read the deposit's logs to name the wallet.`,
         contract: gaugeC(c),
         via: headVia(c),
         inputs: [
@@ -239,20 +249,21 @@ function earnedProv(c: AeroReceiptContext): Provenance | null {
   }
   if (p.aero) {
     const a = p.aero;
+    const R = p.site.reward.symbol;
     return {
       kind: "derived",
       pclass: "state",
       source: head,
-      summary: `AERO, 30 days — the position's liquidity ${r.liquidity}, the same at both blocks and staked at both, times the growth of AERO per unit of staked liquidity inside its range between ${both(c)}. ${routeText(p.aeroPrice.route, Q, p.base.symbol)}`,
+      summary: `${R}, 30 days — the position's liquidity ${r.liquidity}, the same at both blocks and staked at both, times the growth of ${R} per unit of staked liquidity inside its range between ${both(c)}. ${routeOf(c)}`,
       contract: poolC(c),
       via: bothVia(c),
       formula: "L × (rewardGrowthInside now − rewardGrowthInside then) ÷ 2^128 ÷ 10^18",
       inputs: [
         chain(`rewardGrowthInside · ${at(r.head)}`, r.now.rewardGrowthInsideX128),
         chain(`rewardGrowthInside · ${at(r.then)}`, past.rewardGrowthInsideX128),
-        derived("AERO", fig(a.earned30d ?? 0)),
+        derived(R, fig(a.earned30d ?? 0)),
         ...routeInputs(c),
-        ...(a.earned30dValue !== null ? [derived(`AERO, ${Q}`, fig(a.earned30dValue))] : []),
+        ...(a.earned30dValue !== null ? [derived(`${R}, ${Q}`, fig(a.earned30dValue))] : []),
       ],
     };
   }
@@ -287,7 +298,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: AeroReceiptCon
       const d = p.daysInRange;
       return {
         ...cardProv("range", c),
-        summary: `Range — the position's ticks ${r.tickLower} to ${r.tickUpper} against the pool's tick ${r.now.tick} at ${at(r.head)}${d ? `; the pool's tick was inside the range at ${d.inRange} of ${d.read} daily reads from block ${n(d.from)} to block ${n(d.to)}, one at each UTC midnight (Base has no fixed count of blocks a day), each a day the position existed, kept in rails-server's at-block store` : ""}.`,
+        summary: `Range — the position's ticks ${r.tickLower} to ${r.tickUpper} against the pool's tick ${r.now.tick} at ${at(r.head)}${d ? `; the pool's tick was inside the range at ${d.inRange} of ${d.read} daily reads from block ${n(d.from)} to block ${n(d.to)}, one at each UTC midnight${p.site.gridNote ? ` (${p.site.gridNote})` : ""}, each a day the position existed, kept in rails-server's at-block store` : ""}.`,
         inputs: [
           ...(cardProv("range", c).inputs ?? []),
           ...(d ? [derived("daily reads in range", `${d.inRange} of ${d.read}`)] : []),
@@ -314,15 +325,15 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: AeroReceiptCon
     case "fees:pool": {
       if (!past) return null;
       const pool = p.pool30d;
+      const R = p.site.reward.symbol;
       return {
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Full-range fees and AERO — the growth of the pool's fee counters between ${both(c)}, which grow per unit of unstaked liquidity (in range, less the staked part), as a share of a full-range position's value at the price now; and the growth of its reward counter, which grows by the gauge's rewardRate per unit of staked liquidity, valued the same way. ${routeText(p.aeroPrice.route, Q, p.base.symbol)} A figure is set aside when its liquidity in range was under ${pool.floor === null ? "no floor (this quote token has none)" : `${n(pool.floor)} ${Q}`} at either read, when the pool is younger than 30 days, or when it is above 10%.`,
+        summary: `Full-range fees and ${R} — the growth of the pool's fee counters between ${both(c)}, which grow per unit of unstaked liquidity (in range, less the staked part), as a share of a full-range position's value at the price now; and the growth of its reward counter, which grows by the gauge's rewardRate per unit of staked liquidity, valued the same way. ${routeOf(c)} A figure is set aside when its liquidity in range was under ${pool.floor === null ? "no floor (this quote token has none)" : `${n(pool.floor)} ${Q}`} at either read, when the pool is younger than 30 days, or when it is above 10%.`,
         contract: poolC(c),
         via: bothVia(c),
-        formula:
-          "fees: (Δg0 × P + Δg1) ÷ (2 × √P), g in units of 2^128; AERO: Δg ÷ 2^128 ÷ 10^18 × AERO price ÷ (2 × √P valued in the quote)",
+        formula: `fees: (Δg0 × P + Δg1) ÷ (2 × √P), g in units of 2^128; ${R}: Δg ÷ 2^128 ÷ 10^18 × ${R} price ÷ (2 × √P valued in the quote)`,
         inputs: [
           chain(
             `feeGrowthGlobal0/1X128 · ${at(r.head)}`,
@@ -337,14 +348,14 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: AeroReceiptCon
             "unstaked liquidity now, then",
             `${L(pool.unstakedLiquidity.now)}, ${L(pool.unstakedLiquidity.then)}`,
           ),
-          chain("rewardRate() now, AERO wei a second", r.now.rewardRate),
-          derived("AERO a day to staked liquidity now", fig(pool.aeroPerDay)),
+          chain(`rewardRate() now, ${R} wei a second`, r.now.rewardRate),
+          derived(`${R} a day to staked liquidity now`, fig(pool.aeroPerDay)),
           ...routeInputs(c),
           ...(pool.fullRangeFees !== null
             ? [derived("fees, share of value", `${(pool.fullRangeFees * 100).toFixed(4)}%`)]
             : []),
           ...(pool.fullRangeAero !== null
-            ? [derived("AERO, share of value", `${(pool.fullRangeAero * 100).toFixed(4)}%`)]
+            ? [derived(`${R}, share of value`, `${(pool.fullRangeAero * 100).toFixed(4)}%`)]
             : []),
         ],
       };
@@ -355,7 +366,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: AeroReceiptCon
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Against holding — the tokens the same liquidity held at ${at(r.then)}, valued at the pool's price at ${at(r.head)}, against the position's worth now, without and with its 30-day ${p.staked ? "AERO, valued now" : "fees"}.`,
+        summary: `Against holding — the tokens the same liquidity held at ${at(r.then)}, valued at the pool's price at ${at(r.head)}, against the position's worth now, without and with its 30-day ${p.staked ? `${p.site.reward.symbol}, valued now` : "fees"}.`,
         contract: poolC(c),
         via: bothVia(c),
         formula: "worth now ÷ held then valued now − 1; with earnings, (worth now + earnings) ÷ the same − 1",
@@ -364,7 +375,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: AeroReceiptCon
           derived(`held then, valued now, ${Q}`, fig(p.holdThen)),
           derived(`worth now, ${Q}`, fig(p.valueNow)),
           derived(
-            `${p.staked ? "AERO" : "fees"}, 30 days, ${Q}`,
+            `${p.staked ? p.site.reward.symbol : "fees"}, 30 days, ${Q}`,
             fig((p.staked ? p.aero?.earned30dValue : p.fees30d) ?? 0),
           ),
         ],
@@ -407,7 +418,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: AeroReceiptCon
         pclass: "state",
         source: head,
         summary: s
-          ? `Unstaking — the gauge's withdraw(${p.id}) takes no permission beyond the depositor's and pays out the AERO to claim; ${p.aero?.penalty ? `penaltyRate() is ${s.penaltyBps} bps and minStakeTimes(pool) ${s.minStakeSeconds} s, so before depositTimestamp + ${s.minStakeSeconds} s that share of the AERO goes to the minter` : s.penaltyBps != null ? `penaltyRate() is ${s.penaltyBps} bps, which applies only within minStakeTimes(pool), ${s.minStakeSeconds} s, of the deposit, now past` : "this gauge has no early-unstake penalty"}. The Slipstream pool's burn and collect take no permission.`
+          ? `Unstaking — the gauge's withdraw(${p.id}) takes no permission beyond the depositor's and pays out the ${p.site.reward.symbol} to claim; ${p.aero?.penalty ? `penaltyRate() is ${s.penaltyBps} bps and minStakeTimes(pool) ${s.minStakeSeconds} s, so before depositTimestamp + ${s.minStakeSeconds} s that share of the ${p.site.reward.symbol} goes to the minter` : s.penaltyBps != null ? `penaltyRate() is ${s.penaltyBps} bps, which applies only within minStakeTimes(pool), ${s.minStakeSeconds} s, of the deposit, now past` : "this gauge has no early-unstake penalty"}. The Slipstream pool's burn and collect take no permission.`
           : "No gate — a Slipstream pool has no pause and no hook; its burn and collect take no permission.",
         contract: s ? gaugeC(c) : poolC(c),
         via: headVia(c),
@@ -426,7 +437,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: AeroReceiptCon
         kind: "chain",
         pclass: "state",
         source: head,
-        summary: `Fees and who sets them — pool.fee() and pool.unstakedFee() at ${at(r.head)}${past ? ` and ${at(r.then)}` : ""}, in millionths. The pool asks its factory ${AERO_CONTRACTS.factory[p.deployment]}, whose swap fee module and unstaked fee module return each pool's fee; the factory's fee managers can replace either module.`,
+        summary: `Fees and who sets them — pool.fee() and pool.unstakedFee() at ${at(r.head)}${past ? ` and ${at(r.then)}` : ""}, in millionths. The pool asks its factory ${p.site.factory[p.deployment]}, whose swap fee module and unstaked fee module return each pool's fee; the factory's fee managers can replace either module.`,
         contract: poolC(c),
         via: past ? bothVia(c) : headVia(c),
         inputs: [
@@ -465,7 +476,10 @@ export function readContracts(c: AeroReceiptContext) {
           },
         ]
       : []),
-    { name: "Aerodrome AERO/USDC pool", address: r.aero.usdc.pool, reads: "getReserves()" },
-    { name: "Aerodrome AERO/WETH pool", address: r.aero.weth.pool, reads: "getReserves()" },
+    ...(["usdc", "weth"] as const).map((k) => ({
+      name: `${p.site.label} ${p.site.reward.symbol}/${k.toUpperCase()} pool`,
+      address: r.aero[k].pool,
+      reads: "getReserves()",
+    })),
   ];
 }

@@ -22,15 +22,15 @@ import {
   type Amounts,
 } from "../uniswap/position";
 import type { BlockRef, UniToken } from "../uniswap/types";
-import { AERO_CONTRACTS, type AeroDeployment, type AeroPositionRead, type AeroPriceLeg } from "./types";
+import { AERO_CONTRACTS, type AeroPositionRead, type AeroPriceLeg, type SlipstreamDeployment } from "./types";
+import { AERODROME, siteOf, type SlipstreamSite } from "./sites";
 
 const Q128 = BigInt(2) ** BigInt(128);
 const ZERO = BigInt(0);
 const MAX_BPS = BigInt(10_000);
-const BASE_WETH = "0x4200000000000000000000000000000000000006";
-const BASE_USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
-const isAero = (t: Pick<UniToken, "address">) => same(t.address, AERO_CONTRACTS.aero);
+/** The site's reward token: AERO on Base, VELO on Optimism. */
+const isReward = (t: Pick<UniToken, "address">, reward: string) => same(t.address, reward);
 
 /** AERO a liquidity earned between two reward-growth readings, in wei. */
 export const aeroBetween = (L: bigint, now: bigint, then: bigint): bigint => (L * sub256(now, then)) / Q128;
@@ -59,11 +59,16 @@ export function claimableWei(
   return penaltyBps ? gross - (gross * BigInt(penaltyBps)) / MAX_BPS : gross;
 }
 
-/** AERO's price from a v2 volatile pool's reserves: units of the other token per AERO (human). */
-export function legPrice(leg: AeroPriceLeg, otherDecimals: number, at: "now" | "then" = "now"): number | null {
+/** The reward's price from a v2 volatile pool's reserves: units of the other token per AERO (or VELO), human. */
+export function legPrice(
+  leg: AeroPriceLeg,
+  otherDecimals: number,
+  at: "now" | "then" = "now",
+  reward: string = AERO_CONTRACTS.aero,
+): number | null {
   const r = leg[at];
   if (!r) return null;
-  const aeroIs0 = same(leg.token0, AERO_CONTRACTS.aero);
+  const aeroIs0 = same(leg.token0, reward);
   const aero = Number(aeroIs0 ? r.reserve0 : r.reserve1) / 1e18;
   const other = Number(aeroIs0 ? r.reserve1 : r.reserve0) / 10 ** otherDecimals;
   return aero > 0 ? other / aero : null;
@@ -79,33 +84,36 @@ export type AeroPriceRoute =
   | { via: "usdc-then-pool"; leg: AeroPriceLeg }
   | { via: "none" };
 
-/** AERO in the quote token at the head: through the AERO/USDC or AERO/WETH leg that matches the quote;
- *  else the position's own pool where one of its tokens is AERO; else through WETH, then USDC, where the
- *  pool's base is one of them, and the pool's price from there; else no price. */
+/** AERO (VELO on Optimism) in the quote token at the head: through the reward/USDC or reward/WETH leg
+ *  that matches the quote; else the position's own pool where one of its tokens is the reward; else
+ *  through WETH, then USDC, where the pool's base is one of them, and the pool's price from there; else
+ *  no price. The legs are the site's (rails-server answers them under `aero` on every site). */
 export function aeroInQuote(
   r: Pick<AeroPositionRead, "aero">,
   base: UniToken,
   quote: UniToken,
   price: number,
+  site: SlipstreamSite = AERODROME,
 ): { price: number | null; route: AeroPriceRoute } {
-  if (same(quote.address, BASE_USDC)) {
+  const reward = site.reward.address;
+  if (same(quote.address, site.usdc)) {
     const leg = r.aero.usdc;
-    return { price: legPrice(leg, 6), route: { via: "usdc-leg", leg } };
+    return { price: legPrice(leg, 6, "now", reward), route: { via: "usdc-leg", leg } };
   }
-  if (same(quote.address, BASE_WETH)) {
+  if (same(quote.address, site.weth)) {
     const leg = r.aero.weth;
-    return { price: legPrice(leg, 18), route: { via: "weth-leg", leg } };
+    return { price: legPrice(leg, 18, "now", reward), route: { via: "weth-leg", leg } };
   }
-  if (isAero(quote)) return { price: 1, route: { via: "is-quote" } };
-  if (isAero(base)) return { price, route: { via: "pool" } };
-  if (same(base.address, BASE_WETH)) {
+  if (isReward(quote, reward)) return { price: 1, route: { via: "is-quote" } };
+  if (isReward(base, reward)) return { price, route: { via: "pool" } };
+  if (same(base.address, site.weth)) {
     const leg = r.aero.weth;
-    const w = legPrice(leg, 18);
+    const w = legPrice(leg, 18, "now", reward);
     return { price: w === null ? null : w * price, route: { via: "weth-then-pool", leg } };
   }
-  if (same(base.address, BASE_USDC)) {
+  if (same(base.address, site.usdc)) {
     const leg = r.aero.usdc;
-    const u = legPrice(leg, 6);
+    const u = legPrice(leg, 6, "now", reward);
     return { price: u === null ? null : u * price, route: { via: "usdc-then-pool", leg } };
   }
   return { price: null, route: { via: "none" } };
@@ -161,7 +169,9 @@ export type AeroWindow =
   | { kind: "no-pool" };
 
 export interface AeroPosition {
-  deployment: AeroDeployment;
+  /** Aerodrome on Base or Velodrome on Optimism, by the read's chain. */
+  site: SlipstreamSite;
+  deployment: SlipstreamDeployment;
   id: string;
   /** The wallet: the depositor while staked (null when none is found), else the NFT's owner. */
   holder: string | null;
@@ -249,7 +259,8 @@ export function aeroPosition(r: AeroPositionRead): AeroPosition {
   const [a0, a1] = amountsFor(L, px.sqrt, tl, tu);
   const valueNow = px.value(a0, a1);
   const price = px.priceAt(null, px.sqrt);
-  const aeroPrice = aeroInQuote(r, base, quote, price);
+  const site = siteOf(r.chainId);
+  const aeroPrice = aeroInQuote(r, base, quote, price, site);
 
   // Which part of the window can be measured.
   const window: AeroWindow = !past
@@ -400,6 +411,7 @@ export function aeroPosition(r: AeroPositionRead): AeroPosition {
   const inRange = now.tick >= tl && now.tick < tu;
   const paying = staked ? stakedL : unstakedL;
   return {
+    site,
     deployment: r.deployment,
     id: r.id,
     holder: r.staked ? r.staked.depositor : r.owner,
