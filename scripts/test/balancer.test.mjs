@@ -139,7 +139,34 @@ test("a wallet row and the words that say what the search misses", () => {
   });
   assert.equal(w.symbol, "waEthWETH-rETH");
   assert.equal(FRONT_DOOR.rowShare(w.share), "0.907% of the pool");
-  assert.match(FRONT_DOOR.notFound, /received by transfer, or staked in a gauge/);
+  assert.equal(w.staked, null);
+  assert.equal(
+    FRONT_DOOR.found("Ethereum"),
+    "Pools are found from every transfer of pool shares to or from this wallet since Balancer V3 launched on Ethereum.",
+  );
+});
+
+test("shares staked in a gauge sum into a part of the pool", () => {
+  const row = {
+    pool: read().pool,
+    name: null,
+    symbol: "rETH-waEthWETH",
+    balance: "0",
+    totalSupply: "1000000000000000000000",
+    tokens: read().tokens,
+    balancesRaw: read().now.balancesRaw,
+    staked: [
+      { gauge: "0x62A66eB9aBf7a788F48D0ce7C0C065df9e09dA19", balance: "8000000000000000000" },
+      { gauge: "0x0000000000000000000000000000000000000001", balance: "2000000000000000000" },
+    ],
+  };
+  const w = walletRow(row);
+  assert.equal(w.share, 0);
+  assert.equal(w.staked.shares, 10);
+  assert.equal(w.staked.share, 0.01);
+  assert.equal(w.staked.gauges.length, 2);
+  assert.equal(FRONT_DOOR.rowStaked(w.staked.share), "Staked in a gauge: 1.000% of the pool");
+  assert.equal(walletRow({ ...row, staked: [] }).staked, null);
 });
 
 test("each chain names itself on the front door and in a receipt's grid", async () => {

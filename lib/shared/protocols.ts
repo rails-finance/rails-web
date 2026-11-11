@@ -339,7 +339,9 @@ const SPECS: ProtocolSpec[] = [
     // front door taking a wallet, the pools it holds a share of at
     // `<route>/<wallet>`, each opening `<route>/position/<pool>/<wallet>` (a
     // pool share is a Vault balance, so the pool and the wallet name it). Reads
-    // come from rails-server's at-block routes (lib/api/fetch-balancer.ts).
+    // come from rails-server's at-block routes (lib/api/fetch-balancer.ts); a
+    // wallet's pools are found in Rails's index of the Vault's transfers since
+    // deployment, so it carries no `history`.
     id: "balancer-v3",
     session: "balancer-v3",
     label: "Balancer V3",
@@ -348,8 +350,6 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Pool shares on Ethereum: a wallet's part of each pool's tokens and the pool over the last 30 days",
     positionListing: false,
-    unlaunched: true,
-    history: "none",
     listing: false,
     subPages: [],
   },
@@ -365,8 +365,6 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Pool shares on Arbitrum: a wallet's part of each pool's tokens and the pool over the last 30 days",
     positionListing: false,
-    unlaunched: true,
-    history: "none",
     listing: false,
     subPages: [],
   },

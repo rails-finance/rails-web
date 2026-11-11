@@ -19,7 +19,7 @@ import { BalancerReadout } from "@/components/protocol/balancer/balancer-readout
 import { fetchBalancerPosition } from "@/lib/api/fetch-balancer";
 import { balPosition } from "@/lib/balancer/position";
 import { BAL_CHAINS, type BalChainId } from "@/lib/balancer/chains";
-import { POSITION_PAGE } from "@/lib/balancer/words";
+import { POSITION_PAGE, REFUSED } from "@/lib/balancer/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { explorerHref } from "@/lib/shared/protocols";
 
@@ -44,12 +44,12 @@ export async function BalancerPositionPage({
   const chain = BAL_CHAINS[chainId];
   const session = chain.session;
   const home = explorerHref(chainId, session);
-  if (answer.kind === "error")
+  if (answer.kind === "error" || answer.kind === "refused")
     return (
       <div className="py-8">
         <DetailTopRow session={session} fallbackHref={`${home}/${wallet}`} showStamp={false} />
-        <p className="mt-6 text-sm text-rb-500" data-position-unanswered="">
-          {POSITION_PAGE.unanswered}
+        <p className="mt-6 text-sm text-rb-500" data-position-unanswered={answer.kind === "refused" ? answer.code : ""}>
+          {answer.kind === "refused" ? REFUSED[answer.code] : POSITION_PAGE.unanswered}
         </p>
       </div>
     );

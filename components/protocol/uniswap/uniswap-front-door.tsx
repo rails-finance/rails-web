@@ -5,6 +5,7 @@
 // the pages read. The layout is CoW's (components/protocol/cow/cow-front-door.tsx).
 // Aerodrome's door (ui-jobs 566) is the same, through `PoolFrontDoor`.
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
@@ -24,6 +25,7 @@ export function PoolFrontDoor({
   route,
   extra,
   links,
+  below,
 }: {
   id: string;
   label: string;
@@ -33,6 +35,8 @@ export function PoolFrontDoor({
   extra?: string;
   /** The explorer's protocol pages, before the info page's door (Aave V4 on Arc's Markets and Hubs). */
   links?: { href: string; label: string }[];
+  /** A section under the lines, before the links (Balancer V3's count). */
+  below?: ReactNode;
 }) {
   const tagged = historyOf(id) != null;
   return (
@@ -56,6 +60,7 @@ export function PoolFrontDoor({
       </div>
       <p className="mt-6 max-w-xl text-center text-sm text-rb-500">{line}</p>
       {extra && <p className="mt-2 max-w-xl text-center text-sm text-rb-500">{extra}</p>}
+      {below}
       {/* The info page's door, as the shared front door draws it. */}
       <nav aria-label="Explorer sections" className="mt-6 flex flex-wrap justify-center gap-2">
         {links?.map((l) => (

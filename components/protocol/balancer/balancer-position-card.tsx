@@ -2,19 +2,21 @@
 
 // A wallet's share of a Balancer V3 pool (U4; rails-ops ui-jobs 569),
 // on the shared position card: the wallet's share of the pool, its part of each
-// token, the pool's value per share over 30 days, and when it first added. Every
+// token, the pool's value per share over 30 days, any shares staked in the
+// pool's gauge, and when it first added. Every
 // figure in the pool's tokens, each with its receipt.
 
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { PoolReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
-import { balPosition } from "@/lib/balancer/position";
-import { cardProv, readContracts, type BalReceiptContext } from "@/lib/balancer/provenance";
+import { balPosition, stakedOf } from "@/lib/balancer/position";
+import { cardProv, readContracts, stakedProv, type BalReceiptContext } from "@/lib/balancer/provenance";
 import type { BalPositionRead } from "@/lib/balancer/types";
-import type { ChainId } from "@/lib/shared/chains";
+import { chainMeta, type ChainId } from "@/lib/shared/chains";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { CARD_WORDS, cardExplainer, rateText } from "@/lib/balancer/words";
-import { day, num, share } from "@/lib/uniswap/words";
+import { day, num, share, short } from "@/lib/uniswap/words";
 
 /** Every figure's read stamp on a Balancer page. */
 export function BalancerReadStamp({ c, what }: { c: BalReceiptContext; what: string }) {
@@ -33,6 +35,8 @@ function slots(r: BalPositionRead): PositionCardSlots {
   const p = balPosition(r);
   const c = { p, r };
   const [first, ...rest] = p.tokens.map((t, i) => `${num(p.now.holds[i])} ${t.symbol}`);
+  const staked = stakedOf(r.staked, r.now.totalSupply);
+  const stakedReceipt = staked ? stakedProv({ ...r, totalSupply: r.now.totalSupply, staked: r.staked ?? [] }) : null;
   const heads: PositionCardHead[] = [
     {
       id: "share",
@@ -62,6 +66,34 @@ function slots(r: BalPositionRead): PositionCardSlots {
       labelTip: CARD_WORDS.rateTip,
       value: <Prov info={cardProv("rate", c)}>{rateText(p)}</Prov>,
     },
+    ...(staked && stakedReceipt
+      ? [
+          {
+            id: "staked",
+            label: CARD_WORDS.staked,
+            labelTip: CARD_WORDS.stakedTip,
+            value: <Prov info={stakedReceipt}>{share(staked.share)}</Prov>,
+            sub: (
+              <span data-figure="staked">
+                <Prov info={stakedReceipt}>{num(staked.shares)} pool shares</Prov>
+                {staked.gauges.map((g) => (
+                  <span key={g}>
+                    {" in "}
+                    <a
+                      href={`${chainMeta(r.chainId as ChainId).explorerBase}/address/${g}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`${INLINE_LINK} font-mono`}
+                    >
+                      {short(g)}
+                    </a>
+                  </span>
+                ))}
+              </span>
+            ),
+          },
+        ]
+      : []),
     {
       id: "added",
       label: CARD_WORDS.added,
@@ -79,7 +111,7 @@ function slots(r: BalPositionRead): PositionCardSlots {
   return {
     surface: "detail",
     heading: CARD_WORDS.heading,
-    status: p.now.shares === 0 ? { word: "No shares now", tone: "muted", tip: CARD_WORDS.none } : null,
+    status: p.now.shares === 0 && !staked ? { word: "No shares now", tone: "muted", tip: CARD_WORDS.none } : null,
     identity: <span className="text-xs text-rb-500">{p.tokens.map((t) => t.symbol).join(" · ")}</span>,
     heads,
     counters: null,

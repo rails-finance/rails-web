@@ -2,8 +2,9 @@
 
 // A wallet's Balancer V3 pools (U6; rails-ops ui-jobs 569): one row per
 // pool the wallet holds a share of, its share with its receipt, each opening the
-// pool-share page. One receipts scope its ⋮ arms; the read stamp's receipt names
-// the search that found the pools. Under Focus (ui-jobs 557) a row stays when one
+// pool-share page, and under it any shares staked in the pool's gauge. One
+// receipts scope its ⋮ arms; the read stamp's receipt names the search that
+// found the pools: Rails's index of the Vault's transfers, then the chain's logs. Under Focus (ui-jobs 557) a row stays when one
 // of its pool's tokens is in focus.
 
 import Link from "next/link";
@@ -14,10 +15,13 @@ import { SectionReadStamp, readStampProv } from "@/components/shared/read-stamp"
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
 import { assetKey } from "@/lib/shared/asset-family";
 import { walletRow } from "@/lib/balancer/position";
-import { finderProv, walletShareProv } from "@/lib/balancer/provenance";
+import { finderProv, gaugeContracts, stakedProv, walletShareProv } from "@/lib/balancer/provenance";
 import type { BalPositionsRead } from "@/lib/balancer/types";
-import type { ChainId } from "@/lib/shared/chains";
+import { chainMeta, type ChainId } from "@/lib/shared/chains";
+import { balChain } from "@/lib/balancer/chains";
 import { FRONT_DOOR } from "@/lib/balancer/words";
+import { short } from "@/lib/uniswap/words";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const SCOPE = "balancer-wallet";
 /** Uniswap's wallet row (components/protocol/uniswap/uniswap-wallet-positions.tsx, a server module). */
@@ -51,8 +55,10 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
                   {
                     name: "Balancer V3 Vault",
                     address: r.vault,
-                    reads: "LiquidityAdded logs, balanceOf(pool, wallet), getPoolTokenInfo(pool), totalSupply(pool)",
+                    reads:
+                      "Transfer events from Rails's index and the chain's logs above it, balanceOf(pool, wallet), getPoolTokenInfo(pool), totalSupply(pool)",
                   },
+                  ...gaugeContracts(r.positions.flatMap((p) => p.staked ?? [])),
                 ],
               });
               return {
@@ -65,8 +71,8 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
         }
         menu={<SectionMenu scope={SCOPE} title={title} />}
       >
-        <p className="text-xs text-rb-500" data-anatomy="U6.1" data-balancer-not-found="">
-          {FRONT_DOOR.notFound}
+        <p className="text-xs text-rb-500" data-anatomy="U6.1" data-balancer-found="">
+          {FRONT_DOOR.found(balChain(r.chainId).name)}
         </p>
       </SectionHeading>
       {r.positions.length === 0 ? (
@@ -80,7 +86,7 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
             {scoped.rows.map((row) => {
               const w = walletRow(row);
               return (
-                <li key={row.pool}>
+                <li key={row.pool} className="flex flex-col gap-1">
                   <Link
                     href={`${home}/position/${row.pool.toLowerCase()}/${r.wallet.toLowerCase()}`}
                     className={ROW}
@@ -89,7 +95,11 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-foreground">{w.symbol}</span>
                       <span className="block text-xs text-rb-500">
-                        <Prov info={walletShareProv(r, row)}>{FRONT_DOOR.rowShare(w.share)}</Prov>
+                        {BigInt(row.balance) > BigInt(0) || !w.staked ? (
+                          <Prov info={walletShareProv(r, row)}>{FRONT_DOOR.rowShare(w.share)}</Prov>
+                        ) : (
+                          FRONT_DOOR.rowAllStaked
+                        )}
                         {" · "}
                         {w.tokens.map((t) => t.symbol).join(", ")}
                       </span>
@@ -99,6 +109,42 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
                       aria-hidden="true"
                     />
                   </Link>
+                  {w.staked && (
+                    <p
+                      className="px-4 text-xs text-rb-500"
+                      data-anatomy="U6.2"
+                      data-balancer-staked={row.pool.toLowerCase()}
+                    >
+                      <span title={FRONT_DOOR.stakedTip}>
+                        <Prov
+                          info={stakedProv({
+                            chainId: r.chainId,
+                            vault: r.vault,
+                            pool: row.pool,
+                            wallet: r.wallet,
+                            head: r.head,
+                            totalSupply: row.totalSupply,
+                            staked: row.staked ?? [],
+                          })}
+                        >
+                          {FRONT_DOOR.rowStaked(w.staked.share)}
+                        </Prov>
+                      </span>
+                      {w.staked.gauges.map((g) => (
+                        <span key={g}>
+                          {" · "}
+                          <a
+                            href={`${chainMeta(r.chainId as ChainId).explorerBase}/address/${g}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`${INLINE_LINK} font-mono`}
+                          >
+                            {short(g)}
+                          </a>
+                        </span>
+                      ))}
+                    </p>
+                  )}
                 </li>
               );
             })}

@@ -8,7 +8,7 @@
 //
 // Pure: scripts/test/balancer.test.mjs reads it.
 
-import type { BalPoolAt, BalPositionRead, BalPositionsRead, BalToken, BlockRef } from "./types";
+import type { BalPoolAt, BalPositionRead, BalPositionsRead, BalStaked, BalToken, BlockRef } from "./types";
 
 const ZERO = BigInt(0);
 const SCALE = BigInt(10) ** BigInt(18);
@@ -110,6 +110,19 @@ export function balPosition(r: BalPositionRead): BalPosition {
   };
 }
 
+/** The wallet's shares staked in the pool's gauges, summed, and as a part of
+ *  all the pool's shares; null where none are staked or none were read. */
+export function stakedOf(staked: readonly BalStaked[] | undefined, supply: string) {
+  if (!staked?.length) return null;
+  const raw = staked.reduce((n, s) => n + BigInt(s.balance), ZERO);
+  return {
+    raw: raw.toString(),
+    shares: units(raw, 18),
+    share: fraction(raw, supply),
+    gauges: staked.map((s) => s.gauge),
+  };
+}
+
 /** A wallet page's row: the pool, the wallet's fraction of it and its part of each token. */
 export function walletRow(p: BalPositionsRead["positions"][number]) {
   return {
@@ -118,5 +131,6 @@ export function walletRow(p: BalPositionsRead["positions"][number]) {
     share: fraction(p.balance, p.totalSupply),
     holds: sharesOf(p.tokens, p.balancesRaw, p.balance, p.totalSupply),
     tokens: p.tokens,
+    staked: stakedOf(p.staked, p.totalSupply),
   };
 }

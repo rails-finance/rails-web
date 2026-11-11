@@ -7,6 +7,7 @@
 // Pure, with type imports only: scripts/test/balancer.test.mjs reads it.
 
 import type { BalPosition } from "./position";
+import type { BalIndexRefusal } from "./types";
 import { day, num, pct, share } from "../uniswap/words";
 
 export const LABEL = "Balancer V3";
@@ -16,13 +17,38 @@ export const FRONT_DOOR = {
     `A wallet's Balancer V3 pool shares on ${chain}, each with its part of the pool's tokens and the pool over the last 30 days.`,
   heading: "Balancer V3 pool shares",
   none: "Rails found no Balancer V3 pool this wallet holds a share of.",
-  /** What the search does not reach, said on every wallet page. */
-  notFound:
-    "Pools are found from the liquidity this wallet added. Pool shares it received by transfer, or staked in a gauge, are not found from its address.",
+  /** How the pools were found, said on every wallet page. */
+  found: (chain: string) =>
+    `Pools are found from every transfer of pool shares to or from this wallet since Balancer V3 launched on ${chain}.`,
   truncated: (checked: number, held: number) =>
-    `This wallet added liquidity to more pools than Rails reads at once: Rails checked the ${checked} it touched most recently and shows at most ${held}.`,
+    `This wallet has held shares of more pools than Rails reads at once: Rails checked the ${checked} it touched most recently and shows at most ${held}.`,
   unanswered: "The read of this wallet's pools did not answer. Try again in a minute.",
   rowShare: (s: number) => `${share(s)} of the pool`,
+  /** A row's gauge stake: the gauge holds these shares for the wallet. */
+  rowStaked: (s: number) => `Staked in a gauge: ${share(s)} of the pool`,
+  /** A row whose shares are all in a gauge, in place of its share of the pool. */
+  rowAllStaked: "All staked in a gauge",
+  stakedTip: "Pool shares this wallet staked in the pool's gauge. The gauge holds them and pays rewards on them.",
+};
+
+/** The index's count on the front door (rails-ops decision 0063). */
+export const COUNT_WORDS = {
+  title: "Recorded by Rails",
+  positions: "Pool-share holdings",
+  positionsTip:
+    "Each holding is one address's shares in one pool. The address is a wallet or a contract, such as a gauge or a router that holds pool shares.",
+  holders: "Holders",
+  holdersTip: "The addresses that hold shares of at least one pool, wallets and contracts both.",
+  line: (chain: string) => `Every pool share held on ${chain} now, from Rails's record of the Vault since it launched.`,
+  unanswered: "Rails's count of pool shares did not answer. Try again in a minute.",
+};
+
+/** A page's words when the index cannot serve its read. */
+export const REFUSED: Record<BalIndexRefusal, string> = {
+  index_unavailable:
+    "Rails's record of Balancer V3 on this chain is not available right now, so this page cannot be read. Try again later.",
+  index_behind:
+    "Rails's record of Balancer V3 on this chain is catching up with the chain. Try again in a few minutes.",
 };
 
 export const POSITION_PAGE = {
@@ -44,6 +70,9 @@ export const CARD_WORDS = {
   rate: "Value per share, 30 days",
   rateTip:
     "How much the pool's value per share changed over the last 30 days. It grows with the swap fees the pool keeps and its tokens' own yield.",
+  staked: "Staked in a gauge",
+  stakedTip:
+    "The wallet's pool shares staked in the pool's gauge, as a part of all the pool's shares. The gauge holds them and pays rewards on them.",
   added: "First added",
   addedTip: "When this wallet first added liquidity to this pool.",
   none: "This wallet holds no shares of this pool now.",
