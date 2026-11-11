@@ -7,6 +7,7 @@
 // why in its own words.
 
 import { RevealTip } from "@/components/shared/reveal-tip";
+import type { AssetMark } from "@/lib/shared/asset-mark";
 
 /** A figure the chain did not answer for. `title` is the hover line; the
  *  default fits any figure, and a caller names the figure where it can.
@@ -50,8 +51,9 @@ export function TokenAmountNotLoaded({ address, label }: { address?: string; lab
   );
 }
 
-/** Symbols for an icon cluster, leaving out tokens whose metadata did not load:
- *  their placeholder symbol is an address, which has no icon. */
-export function loadedSymbols(tokens: { symbol: string; decimalsUnread?: true }[]): string[] {
-  return tokens.filter((t) => !t.decimalsUnread).map((t) => t.symbol);
+/** The assets for an icon cluster, each with its address (AssetMark),
+ *  leaving out tokens whose metadata did not load: their placeholder symbol is
+ *  an address, which has no icon. */
+export function loadedMarks(tokens: { symbol: string; address: string | null; decimalsUnread?: true }[]): AssetMark[] {
+  return tokens.filter((t) => !t.decimalsUnread).map((t) => ({ symbol: t.symbol, address: t.address }));
 }

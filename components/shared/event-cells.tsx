@@ -24,6 +24,7 @@ import { ClosedTokens, LedgerCell, T2Skeleton, type ClosedUsdFigures } from "@/c
 import { EventLedgerContext, ledgerFigure } from "@/components/shared/event-ledger-context";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import { useFlowMark } from "@/components/shared/flow-focus-context";
 import type { FlowSide } from "@/lib/shared/flows-timeline";
 
 /** A figure in a cell: as the family formats it, with its receipt. */
@@ -153,6 +154,7 @@ function Figure({ f, icon, children }: { f: EventFigure; icon?: ReactNode; child
 function CellValue({ cell }: { cell: EventCellSpec }) {
   const { value: v, changed } = cell;
   const src = useContext(EventLedgerContext);
+  const markOf = useFlowMark();
   const side = cell.kind === "ledger" ? cell.side : undefined;
   const dec = side ? (src?.decimals?.(side) ?? null) : null;
   const shown = (f: EventFigure): ReactNode => {
@@ -169,13 +171,17 @@ function CellValue({ cell }: { cell: EventCellSpec }) {
     );
   };
   const before = v.before;
-  const icon = v.icon ? <TokenChipIcon symbol={v.icon} address={v.iconAddress} size={16} /> : undefined;
+  // A family that names no address leaves it to the page's flow model's book.
+  const addressOf = (symbol: string, own?: string) => own ?? markOf(symbol).address ?? undefined;
+  const icon = v.icon ? (
+    <TokenChipIcon symbol={v.icon} address={addressOf(v.icon, v.iconAddress)} size={16} />
+  ) : undefined;
   const icons = v.icons?.length ? (
     <span className="ml-1 inline-flex items-center gap-1" data-closed-assets="">
       {v.icons.map((a) => {
         const mark = (
           <RevealTip tip={a.title} label={a.title}>
-            <TokenChipIcon symbol={a.symbol} address={a.address} size={16} filterable={false} />
+            <TokenChipIcon symbol={a.symbol} address={addressOf(a.symbol, a.address)} size={16} filterable={false} />
           </RevealTip>
         );
         return a.info ? (
@@ -198,7 +204,7 @@ function CellValue({ cell }: { cell: EventCellSpec }) {
     );
   return (
     <>
-      {v.cluster && v.cluster.length > 0 && <InlineAssetCluster symbols={v.cluster} size={18} overlap={5} />}
+      {v.cluster && v.cluster.length > 0 && <InlineAssetCluster assets={v.cluster.map(markOf)} size={18} overlap={5} />}
       {v.lead != null ? (
         <span className="inline-flex items-center gap-1" data-cell-lead="">
           <span className="text-sm font-semibold text-foreground tabular-nums">{v.lead}</span>

@@ -32,6 +32,7 @@ import {
   type CTokenLiveMarket,
 } from "@/lib/shared/ctoken-flows";
 import { moonwellFlowRows, moonwellSeriesKey } from "@/lib/moonwell/flows";
+import { MOONWELL_MARKET_BY_KEY } from "@/lib/moonwell/asset-catalog";
 import { ctokenCardLines, ctokenHealthReader, ctokenHealthSource, ctokenTodayRead } from "@/lib/shared/ctoken-health";
 import { useCTokenFactorChanges } from "@/hooks/useFactorChanges";
 import { factorChangePicks } from "@/lib/shared/collateral-factor-changes";
@@ -110,8 +111,20 @@ export function useMoonwellFlows(p: MoonwellFlowsInput): {
   }, [needRead, fetchAll]);
 
   const source = p.pending ? null : (p.wholeEvents ?? fetched.events);
-  const { mtokenOf } = p;
-  const rows = useMemo(() => (source ? moonwellFlowRows(source, mtokenOf) : null), [source, mtokenOf]);
+  const { mtokenOf, chainId } = p;
+  // Each market's underlying, for the icons: the live read's, else Ethereum's
+  // catalog (Base resolves its roster at read time, so a market the read does
+  // not list keeps its symbol alone).
+  const chainMarkets = p.chain?.markets;
+  const underlyingOf = useMemo(() => {
+    const read = new Map((chainMarkets ?? []).map((m) => [m.market, m.underlying]));
+    return (market: string): string | null =>
+      read.get(market) ?? (chainId === 1 ? (MOONWELL_MARKET_BY_KEY[market]?.underlying ?? null) : null);
+  }, [chainMarkets, chainId]);
+  const rows = useMemo(
+    () => (source ? moonwellFlowRows(source, mtokenOf, underlyingOf) : null),
+    [source, mtokenOf, underlyingOf],
+  );
 
   // The daily store, one read per page: each market's series from its first
   // row's day. A failed or empty read carries the last event's price.
@@ -121,7 +134,6 @@ export function useMoonwellFlows(p: MoonwellFlowsInput): {
     return { markets, from: Math.floor(rows[0].ts / DAY_S), key: markets.join(",") };
   }, [rows]);
   const [daily, setDaily] = useState<{ key: string; prices: Record<string, [number, number][]> | null } | null>(null);
-  const { chainId } = p;
   useEffect(() => {
     if (!want) return;
     const ac = new AbortController();
