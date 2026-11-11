@@ -6,6 +6,7 @@ import {
   BASE_CHAIN_ID,
   MAINNET_CHAIN_ID,
   OPTIMISM_CHAIN_ID,
+  ROBINHOOD_CHAIN_ID,
   type ChainId,
 } from "@/lib/shared/chains";
 
@@ -17,7 +18,14 @@ import {
 export const runtime = "nodejs";
 
 const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
-const CHAINS: ChainId[] = [MAINNET_CHAIN_ID, BASE_CHAIN_ID, ARBITRUM_CHAIN_ID, OPTIMISM_CHAIN_ID, ARC_CHAIN_ID];
+const CHAINS: ChainId[] = [
+  MAINNET_CHAIN_ID,
+  BASE_CHAIN_ID,
+  ARBITRUM_CHAIN_ID,
+  OPTIMISM_CHAIN_ID,
+  ARC_CHAIN_ID,
+  ROBINHOOD_CHAIN_ID,
+];
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams;
@@ -25,7 +33,7 @@ export async function GET(request: NextRequest) {
   const chain = Number(q.get("chain") ?? MAINNET_CHAIN_ID) as ChainId;
   if (!ADDRESS.test(address) || !CHAINS.includes(chain))
     return NextResponse.json(
-      { error: "address and a chain of 1, 10, 5042, 8453 or 42161 are required" },
+      { error: "address and a chain of 1, 10, 4663, 5042, 8453 or 42161 are required" },
       { status: 400 },
     );
   const kind = await readAddressKind(address, chain);

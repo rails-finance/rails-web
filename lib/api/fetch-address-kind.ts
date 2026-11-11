@@ -62,7 +62,7 @@ const cache = new Map<string, Promise<AddressKind | null>>();
 
 export function fetchAddressKind(address: string, chainId: ChainId): Promise<AddressKind | null> {
   // The route reads the production chains; a testnet address states nothing.
-  if (![1, 10, 5042, 8453, 42161].includes(chainId)) return Promise.resolve(null);
+  if (![1, 10, 4663, 5042, 8453, 42161].includes(chainId)) return Promise.resolve(null);
   const key = `${chainId}:${address.toLowerCase()}`;
   let p = cache.get(key);
   if (!p) {

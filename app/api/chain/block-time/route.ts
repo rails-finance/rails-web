@@ -6,6 +6,7 @@ import {
   BASE_CHAIN_ID,
   MAINNET_CHAIN_ID,
   OPTIMISM_CHAIN_ID,
+  ROBINHOOD_CHAIN_ID,
   SEPOLIA_CHAIN_ID,
   type ChainId,
 } from "@/lib/shared/chains";
@@ -22,6 +23,7 @@ const CHAINS: ChainId[] = [
   ARBITRUM_CHAIN_ID,
   OPTIMISM_CHAIN_ID,
   ARC_CHAIN_ID,
+  ROBINHOOD_CHAIN_ID,
   SEPOLIA_CHAIN_ID,
 ];
 
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
   const block = Number(q.get("block"));
   if (!CHAINS.includes(chain) || !Number.isSafeInteger(block) || block <= 0)
     return NextResponse.json(
-      { error: "a chain of 1, 10, 5042, 8453, 42161 or 11155111 and a block are required" },
+      { error: "a chain of 1, 10, 4663, 5042, 8453, 42161 or 11155111 and a block are required" },
       { status: 400 },
     );
   const at = (await blockTimestamps(chain, [block])).get(block);

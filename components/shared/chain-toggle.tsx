@@ -14,6 +14,7 @@ import {
   ARC_CHAIN_ID,
   CHAINS,
   OPTIMISM_CHAIN_ID,
+  ROBINHOOD_CHAIN_ID,
   SEPOLIA_CHAIN_ID,
   type ChainId,
 } from "@/lib/shared/chains";
@@ -62,7 +63,7 @@ export function ChainGlyph({ chainId, className = "" }: { chainId: ChainId; clas
       </svg>
     );
   }
-  if (chainId === OPTIMISM_CHAIN_ID || chainId === ARC_CHAIN_ID) {
+  if (chainId === OPTIMISM_CHAIN_ID || chainId === ARC_CHAIN_ID || chainId === ROBINHOOD_CHAIN_ID) {
     // The marks in components/icons/chain-glyphs.tsx, so a chain without a case
     // here draws its own mark rather than the Ethereum diamond below.
     return <ChainMarkGlyph id={chainId} className={`shrink-0 ${className}`} />;

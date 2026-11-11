@@ -31,6 +31,7 @@ import {
   CHAINS,
   MAINNET_CHAIN_ID,
   OPTIMISM_CHAIN_ID,
+  ROBINHOOD_CHAIN_ID,
   SEPOLIA_CHAIN_ID,
   type ChainId,
 } from "@/lib/shared/chains";
@@ -64,6 +65,9 @@ const TTL_MS: Record<ChainId, number> = {
   [OPTIMISM_CHAIN_ID]: 2_000,
   // Arc: about half a second (1,000 blocks in 507 s, 10 Nov 2026).
   [ARC_CHAIN_ID]: 500,
+  // Robinhood Chain runs Arbitrum Nitro: Arbitrum's quarter-second rate until
+  // its own is measured.
+  [ROBINHOOD_CHAIN_ID]: 250,
   // Sepolia keeps Ethereum's 12-second slot.
   [SEPOLIA_CHAIN_ID]: 12_000,
 };

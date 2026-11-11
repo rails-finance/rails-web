@@ -126,7 +126,7 @@ export const TOKEN_ADDRESSES: Record<string, string> = {
 };
 
 /** One table per chain, keyed by `ChainId` so a new chain cannot compile
- *  without saying which table it reads. Arbitrum and Optimism have none yet: an empty table
+ *  without saying which table it reads. Arbitrum, Optimism and Robinhood Chain have none yet: an empty table
  *  answers null, where reading Ethereum's would name the wrong contract. */
 const TABLES: Record<ChainId, Record<string, string>> = {
   1: TOKEN_ADDRESSES,
@@ -135,6 +135,7 @@ const TABLES: Record<ChainId, Record<string, string>> = {
   10: {},
   // Arc's USDC through its ERC-20 interface (the native coin, 6 decimals there).
   5042: { USDC: "0x3600000000000000000000000000000000000000" },
+  4663: {},
   11155111: SEPOLIA_TOKEN_ADDRESSES,
 };
 
