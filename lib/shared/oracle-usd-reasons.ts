@@ -63,6 +63,8 @@ export const ORACLE_USD_REASON: Record<string, string> = {
     "a pool share is a claim on the pool's tokens, and Balancer runs no USD feed, so every figure is in the pool's own tokens",
   aerodrome:
     "a pool prices itself: every figure is in the pool's quote token at the pool's price, AERO through Aerodrome's own AERO pools, and Aerodrome runs no USD feed",
+  "aave-v3-optimism":
+    "the Pool's oracle prices every reserve in USD, so a balance's dollar value is its amount at that oracle's price at the block the page reads",
   "aave-v4-arc":
     "each spoke's oracle prices every reserve in USD, so a balance's dollar value is its amount at that oracle's price at the block the page reads",
   "fluid-base": FLUID_BASE_DOLLARS

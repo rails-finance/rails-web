@@ -20,6 +20,8 @@
 /arc/morpho/[wallet]/[market]
 /arc/morpho/markets
 /arc/morpho/markets/[loanToken]
+/optimism/aave-v3/[wallet]
+/optimism/aave-v3/markets
 /base/alchemix/[lineKey]/[tokenId]
 /base/alchemix/[lineKey]/[tokenId]/event/[eventId]
 /base/alchemix/lines

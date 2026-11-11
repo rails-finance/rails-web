@@ -28,7 +28,11 @@ const API_MARKET: Record<AaveMarketKey, string> = {
   "aave-v3-base": "base",
   seamless: "seamless",
   "aave-v3-arbitrum": "arbitrum",
+  "aave-v3-optimism": "optimism",
 };
+
+/** The markets Rails has not indexed (read on visit): their reads answer "not indexed" and ask nothing. */
+const NOT_INDEXED: ReadonlySet<AaveMarketKey> = new Set(["aave-v3-optimism"]);
 
 /** The markets whose Pool has no deficit getter (SparkLend's reverts; Seamless runs V3.0). */
 const NO_DEFICIT: ReadonlySet<AaveMarketKey> = new Set(["spark", "seamless"]);
@@ -253,11 +257,13 @@ function settle<T>(body: T & Partial<NotHeld>): Read<T> {
 
 /** One read, started on mount and again when its question changes. `path`
  *  under /api/; a null question reads nothing and stays loading. */
-function useRead<T>(path: string, q: Record<string, string> | null): Read<T> {
-  const [out, setOut] = useState<Read<T>>({ state: "loading" });
+function useRead<T>(path: string, q: Record<string, string> | null, notIndexed = false): Read<T> {
+  const [out, setOut] = useState<Read<T>>(
+    notIndexed ? { state: "not-held", status: "not-indexed" } : { state: "loading" },
+  );
   const key = q ? new URLSearchParams(q).toString() : "";
   useEffect(() => {
-    if (!q) return;
+    if (!q || notIndexed) return;
     const ac = new AbortController();
     setOut({ state: "loading" });
     getRead<T>(path, q, ac.signal)
@@ -266,7 +272,7 @@ function useRead<T>(path: string, q: Record<string, string> | null): Read<T> {
     return () => ac.abort();
     // `key` is the question.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, key]);
+  }, [path, key, notIndexed]);
   return out;
 }
 
@@ -282,13 +288,15 @@ export function historyFrom(all: boolean): string | null {
  *  day (YYYY-MM-DD), or null for the reserve's whole history. */
 export function useReserveReads(key: AaveMarketKey, reserve: string, from: string | null) {
   const base = { market: API_MARKET[key], reserve: reserve.toLowerCase() };
+  const off = NOT_INDEXED.has(key);
   return {
-    history: useRead<ReserveHistory>("aave-family/reserve-history", from ? { ...base, from } : base),
-    changes: useRead<ReserveConfigLog>("aave-family/reserve-config-log", base),
-    holders: useRead<ReserveHolders>("aave-family/reserve-holders", base),
+    history: useRead<ReserveHistory>("aave-family/reserve-history", from ? { ...base, from } : base, off),
+    changes: useRead<ReserveConfigLog>("aave-family/reserve-config-log", base, off),
+    holders: useRead<ReserveHolders>("aave-family/reserve-holders", base, off),
     deficit: useRead<ReserveDeficit>(
       "aave/reserve-deficit",
       NO_DEFICIT.has(key) ? null : { market: base.market, asset: base.reserve },
+      off,
     ),
     hasDeficit: !NO_DEFICIT.has(key),
   };
