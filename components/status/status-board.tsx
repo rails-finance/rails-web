@@ -24,6 +24,8 @@ import {
   type DataTableDir,
 } from "@/components/shared/data-table/data-table";
 import { ChainToggleButtons } from "@/components/shared/chain-toggle";
+import { DOT, STATUS_WORDS } from "@/components/status/status-grammar";
+import { PricesView } from "@/components/status/prices-view";
 import { NEXT_STAGE_WORDS, nextItems, type NextItem } from "@/lib/status/next";
 import { CHAINS, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
@@ -78,14 +80,6 @@ function Mark({ id, name }: { id: string; name: string }) {
     </span>
   );
 }
-
-const DOT: Record<Heartbeat, string> = {
-  fresh: "bg-green-500",
-  late: "bg-amber-500",
-  stalled: "bg-red-500",
-  paused: "bg-blue-400",
-  none: "bg-rb-300 dark:bg-rb-600",
-};
 
 const HEARTBEAT_WORDS: Record<Heartbeat, string> = {
   fresh: "Reporting",
@@ -185,14 +179,6 @@ interface CellView {
   lane: string;
   title: string;
 }
-
-const STATUS_WORDS: Record<Heartbeat, string> = {
-  fresh: "Arriving",
-  late: "Late",
-  stalled: "Stalled",
-  paused: "Paused",
-  none: "Not measured",
-};
 
 function cellView(c: StatusCell, now: number, allowance: Allowance | null): CellView {
   const live = c.entry?.live;
@@ -708,6 +694,8 @@ export function StatusBoard({ source }: { source: StatusSource }) {
   const next = nextItems(atHead);
   const chains = chainsOf(cells, next);
   const allowance = source.route === "status" ? (source.data.allowance ?? null) : null;
+  const prices = source.route === "status" ? (source.data.prices ?? null) : null;
+  const [pricesOpen, setPricesOpen] = useState(false);
   const [chain, setChain] = useState<ChainId>(chains[0] ?? 1);
   const [sort, setSort] = useState<{ key: SortKey; dir: DataTableDir }>({ key: "status", dir: "asc" });
 
@@ -736,9 +724,19 @@ export function StatusBoard({ source }: { source: StatusSource }) {
   return (
     <div className="mt-10">
       <div className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0" data-anatomy="Y4">
-        <ChainToggleButtons chainId={chain} onChange={setChain} chains={chains} />
+        <ChainToggleButtons
+          chainId={chain}
+          onChange={(c) => {
+            setChain(c);
+            setPricesOpen(false);
+          }}
+          chains={chains}
+          extra={prices ? { label: "Prices", active: pricesOpen, onSelect: () => setPricesOpen(true) } : undefined}
+        />
       </div>
-      {lines.length > 0 ? (
+      {pricesOpen && prices ? (
+        <PricesView prices={prices} now={now} />
+      ) : lines.length > 0 ? (
         <>
           {/* Below sm the table stacks into cards with no header row; the sort is a select. */}
           <label className="mb-3 flex items-center gap-2 text-xs text-rb-500 sm:hidden" data-anatomy="Y1.4">
@@ -807,7 +805,7 @@ export function StatusBoard({ source }: { source: StatusSource }) {
       ) : (
         <p className="text-sm text-rb-500">No Rails explorer on {chainName(chain)} yet.</p>
       )}
-      <NextTable chain={chain} items={next} />
+      {!pricesOpen && <NextTable chain={chain} items={next} />}
     </div>
   );
 }

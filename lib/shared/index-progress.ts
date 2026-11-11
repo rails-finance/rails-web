@@ -210,6 +210,77 @@ export interface IndexStatus {
   lanes?: { lane: string; chain: number; checkpoint: StatusLive["checkpoint"]; unreachable?: { error: string } }[];
   gateways?: unknown[];
   allowance?: Allowance | null;
+  prices?: PricesSection;
+}
+
+// ── Prices: the oracle lane's feeds and rates, and the price fillers ───────
+
+export interface PriceFeed {
+  feed: string;
+  pair: string;
+  proxy: string;
+  decimals: number;
+  /** Chainlink's heartbeat: the longest the feed goes without a round. */
+  heartbeatSec: number | null;
+  deviationPct: number | null;
+  source: string | null;
+  lastRound: { block: number; time: Secs | null; answer: string } | null;
+}
+
+export interface RateUpdate {
+  name: string;
+  label: string;
+  contract: string;
+  expectEverySec: number | null;
+  source: string | null;
+  lastEvent: { block: number; time: Secs | null } | null;
+}
+
+export interface PriceFiller {
+  lane: string;
+  mode: string | null;
+  lastOkAt: string | null;
+  staleAfterMinutes: number | null;
+  watermarkLagBlocks: number | null;
+  unpricedLiq: number | null;
+  retryDepth: number | null;
+  lastError: string | null;
+}
+
+export interface PricesSection {
+  lane: {
+    checkpoint: { block: number; time: Secs | null; updatedAt?: string | null } | null;
+    unreachable?: { error: string };
+  };
+  feeds: PriceFeed[];
+  rates: RateUpdate[];
+  fillers: PriceFiller[];
+  alarms: string[];
+}
+
+/** A feed or rate against its interval: late past 1.5 times, stalled past 3
+ *  times (the rule the stored Liquity V2 oracle uses to refuse a round). */
+export function intervalState(t: Secs | null | undefined, every: number | null, now: Secs): Heartbeat {
+  if (t == null || !every) return "none";
+  const age = now - t;
+  return age > 3 * every ? "stalled" : age > 1.5 * every ? "late" : "fresh";
+}
+
+/** A filler against its stale mark: late past it, stalled past twice it. */
+export function fillerState(f: PriceFiller, now: Secs): Heartbeat {
+  const t = isoSecs(f.lastOkAt);
+  if (t == null || !f.staleAfterMinutes) return "none";
+  const mins = (now - t) / 60;
+  return mins > 2 * f.staleAfterMinutes ? "stalled" : mins > f.staleAfterMinutes ? "late" : "fresh";
+}
+
+/** A filler's error as a kind of failure. The raw text can carry hosts and
+ *  addresses, so a public page shows the kind only. */
+export function errorKind(e: string | null): string | null {
+  if (!e) return null;
+  if (/whitelist|allowlist|forbidden|unauthori[sz]ed|\b40[13]\b|refus/i.test(e)) return "Upstream refused";
+  if (/time(d)? ?out/i.test(e)) return "Timeout";
+  return "Error";
 }
 
 /** One cell of the status table, from either route. */
