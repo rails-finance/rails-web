@@ -484,3 +484,39 @@ test("an Arbitrum pair names the native coin by address and its wrapped token", 
   );
   assert.deepEqual(pairCards(read, "no-such-pair"), []);
 });
+
+test("Optimism: its pairs name Optimism's tokens, and a card names the chain", async () => {
+  const { CHAIN_PAIRS } = await import("../../lib/uniswap/pairs.ts");
+  const { dayGridPhrase } = await import("../../lib/uniswap/types.ts");
+  const t = CHAIN_PAIRS[10].tokens;
+  assert.deepEqual(
+    [t.ETH.param, t.WETH.address, t.USDC.address, t.OP.address],
+    [
+      "native",
+      "0x4200000000000000000000000000000000000006",
+      "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+      "0x4200000000000000000000000000000000000042",
+    ],
+  );
+  assert.equal(dayGridPhrase(10), "one at the first block at or after each UTC midnight");
+  const O_WETH = { address: t.WETH.address, symbol: "WETH", decimals: 18 };
+  const O_USDC = { address: t.USDC.address, symbol: "USDC", decimals: 6 };
+  const read = {
+    chainId: 10,
+    reads: READS,
+    tokens: [{ address: "0x0000000000000000000000000000000000000000", symbol: "ETH", decimals: 18 }, O_USDC, O_WETH],
+    pools: [
+      {
+        version: "v3",
+        fee: 3000,
+        tickSpacing: 60,
+        key: "0xc1738D90E2E26C35784A0d3E3d8A9f795074bcA4",
+        token0: O_USDC.address,
+        token1: O_WETH.address,
+        at: [0, 1, 2, 3].map((k) => stableAt(k, 0.0006)),
+      },
+    ],
+  };
+  const [c] = pairCards(read, "eth-usdc");
+  assert.equal(PAIR_DOOR.card.sub(c), "Uniswap V3 · 0.3% · Optimism · no hook");
+});
