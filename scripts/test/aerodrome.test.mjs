@@ -202,7 +202,7 @@ test("a staked position: AERO over the window, priced through the leg matching t
     fees.yours,
     /Earned 3 AERO in the last 30 days, worth 1\.5 USDC now\. To claim now: 1 AERO, worth 0\.5 USDC\./,
   );
-  assert.doesNotMatch(fees.yours, /Unstaking before/);
+  assert.doesNotMatch(fees.yours, /Claiming or unstaking before/);
   // The unstaked fee is not the staked holder's.
   assert.doesNotMatch(readoutLines(p).find((l) => l.key === "steward").pool, /unstaked/);
 });
@@ -256,16 +256,16 @@ test("the early-unstake penalty applies only inside the minimum stake, and is sh
   close(inside.aero.claimable, 0); // all of the 1 AERO is forfeit
   assert.match(
     readoutLines(inside).find((l) => l.key === "fees").yours,
-    /Unstaking before .* gives up all of the AERO to claim\./,
+    /Claiming or unstaking before .* gives up all of the AERO to claim\./,
   );
-  assert.match(readoutLines(inside).find((l) => l.key === "withdrawals").yours, /Unstaking before/);
+  assert.match(readoutLines(inside).find((l) => l.key === "withdrawals").yours, /Claiming or unstaking before/);
   const past = aeroPosition(staked({}, { ...s, depositTimestamp: HEAD.time - 3600 }));
   assert.equal(past.aero.penalty, null);
   assert.doesNotMatch(
     readoutLines(past)
       .map((l) => `${l.yours} ${l.pool}`)
       .join(" "),
-    /Unstaking before/,
+    /Claiming or unstaking before/,
   );
 });
 
