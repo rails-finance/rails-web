@@ -134,6 +134,13 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/uniswap-v4", "/ethereum/uniswap-v4"],
   // Aerodrome never had a pre-0016 path; the row is for check:routes.
   ["/aerodrome", "/base/aerodrome"],
+  // Uniswap on Base and Arbitrum and PancakeSwap V3 never had pre-0016 paths;
+  // the rows, keyed by roster id, are for check:routes.
+  ["/uniswap-v3-base", "/base/uniswap-v3"],
+  ["/uniswap-v3-arbitrum", "/arbitrum/uniswap-v3"],
+  ["/uniswap-v4-arbitrum", "/arbitrum/uniswap-v4"],
+  ["/pancakeswap-v3-base", "/base/pancakeswap-v3"],
+  ["/pancakeswap-v3-arbitrum", "/arbitrum/pancakeswap-v3"],
   // Polaris never had a pre-0016 path; the row exists because check:routes
   // wants every explorer forwarded from its bare slug, and a bare /polaris is
   // the address anyone will guess.

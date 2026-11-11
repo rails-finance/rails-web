@@ -98,7 +98,14 @@ export type SessionProtocol =
   | "uniswap-v4"
   // Aerodrome Slipstream on Base, at `/base/aerodrome`: a position is an NFT
   // id on one of three position managers, staked in its gauge or not (ui-jobs 566).
-  | "aerodrome";
+  | "aerodrome"
+  // Uniswap V3 on Base and V3 and V4 on Arbitrum, and PancakeSwap V3 on Base
+  // and Arbitrum, on Uniswap's pages with a chain (ui-jobs 568, 573, 575).
+  | "uniswap-v3-base"
+  | "uniswap-v3-arbitrum"
+  | "uniswap-v4-arbitrum"
+  | "pancakeswap-v3-base"
+  | "pancakeswap-v3-arbitrum";
 
 /** What a saved entry is: a wallet, a position page or a listing view. */
 export type SavedKind = "wallet" | "position" | "view";

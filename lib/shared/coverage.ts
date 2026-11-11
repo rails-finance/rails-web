@@ -120,6 +120,16 @@ function explorerDepth(cells: Partial<Record<DepthKey, DepthCell>>): Record<Dept
 }
 
 /** Where each explorer currently stands, keyed by `ProtocolEntry.id`. */
+/** A Uniswap-family explorer's row (Uniswap's and PancakeSwap's pages, ui-jobs 556, 568, 573, 575). */
+const UNISWAP_FAMILY_DEPTH = (id: string) =>
+  explorerDepth({
+    dashboard: true,
+    oracleUsd: { why: ORACLE_USD_REASON[id] },
+    forensics: {
+      why: "a liquidity position holds no loan, so there is no threshold to breach and no liquidation to trace",
+    },
+  });
+
 export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   // Market notes (2026-09-04): a trove's timeline now states the stretches
   // between two of its own events where the branch's oracle price moved far
@@ -931,6 +941,15 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
       why: "a liquidity position holds no loan, so there is no threshold to breach and no liquidation to trace",
     },
   }),
+  // Uniswap V3 on Base, V3 and V4 on Arbitrum (ui-jobs 568, 573) and
+  // PancakeSwap V3 on Base and Arbitrum (575), on Ethereum's Uniswap rows: the
+  // position page reads the pool and the position at the head and 30 days
+  // back. Unlaunched, so the matrix does not draw them yet.
+  "uniswap-v3-base": UNISWAP_FAMILY_DEPTH("uniswap-v3-base"),
+  "uniswap-v3-arbitrum": UNISWAP_FAMILY_DEPTH("uniswap-v3-arbitrum"),
+  "uniswap-v4-arbitrum": UNISWAP_FAMILY_DEPTH("uniswap-v4-arbitrum"),
+  "pancakeswap-v3-base": UNISWAP_FAMILY_DEPTH("pancakeswap-v3-base"),
+  "pancakeswap-v3-arbitrum": UNISWAP_FAMILY_DEPTH("pancakeswap-v3-arbitrum"),
   // Aerodrome Slipstream on Base (ui-jobs 566), on Uniswap V3's row: the
   // position page reads the pool, the position and its gauge at the head and
   // 30 days back.
@@ -1461,6 +1480,13 @@ export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
   "uniswap-v4",
   // Aerodrome Slipstream (ui-jobs 566), position-first as Uniswap is.
   "aerodrome",
+  // Uniswap on Base and Arbitrum and PancakeSwap V3 (ui-jobs 568, 573, 575),
+  // position-first as Uniswap is on Ethereum.
+  "uniswap-v3-base",
+  "uniswap-v3-arbitrum",
+  "uniswap-v4-arbitrum",
+  "pancakeswap-v3-base",
+  "pancakeswap-v3-arbitrum",
   // The three Arbitrum explorers ship position-first (2026-10-19): a wallet
   // field on the front door, any address readable, and a listing of the
   // positions read (item 16) in place of a roster of accounts.
@@ -1677,6 +1703,16 @@ export const COVERAGE_NOTES: Record<string, string> = {
     "A Uniswap V3 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
   "uniswap-v4":
     "A Uniswap V4 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
+  "uniswap-v3-base":
+    "A Uniswap V3 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace. On Base, Rails reads no position's events, so a position shows no opening day and no figure since its first deposit.",
+  "uniswap-v3-arbitrum":
+    "A Uniswap V3 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
+  "uniswap-v4-arbitrum":
+    "A Uniswap V4 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
+  "pancakeswap-v3-base":
+    "A PancakeSwap V3 pool prices its two tokens against each other and PancakeSwap runs no USD feed, so every figure is in the pool's quote token at the pool's price, and CAKE in CAKE; a liquidity position holds no loan, so there is no liquidation to trace. On Base, Rails reads no position's events, so a position shows no opening day and no figure since its first deposit.",
+  "pancakeswap-v3-arbitrum":
+    "A PancakeSwap V3 pool prices its two tokens against each other and PancakeSwap runs no USD feed, so every figure is in the pool's quote token at the pool's price, and CAKE in CAKE; a liquidity position holds no loan, so there is no liquidation to trace.",
   aerodrome:
     "An Aerodrome Slipstream pool prices its two tokens against each other and Aerodrome runs no USD feed, so every figure is in the pool's quote token at the pool's price, and AERO is priced through Aerodrome's own AERO pools; a liquidity position holds no loan, so there is no liquidation to trace.",
   alchemix:

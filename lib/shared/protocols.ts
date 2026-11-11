@@ -601,6 +601,41 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
+    // PancakeSwap V3 on Base and Arbitrum (rails-ops ui-jobs 575), a Uniswap
+    // V3 fork read by Uniswap's pages (components/protocol/uniswap, with
+    // `protocol: "pancakeswap"`): a front door taking a wallet, its positions
+    // at `<route>/<wallet>` (staked in the farm or not), each opening
+    // `<route>/position/<id>`. Unlaunched until decision 0061's launch list
+    // holds.
+    id: "pancakeswap-v3-base",
+    session: "pancakeswap-v3-base",
+    label: "PancakeSwap V3",
+    chainId: 8453,
+    slug: "pancakeswap-v3",
+    // Hue 57, the bunny's #D1884F in oklch (pancakeswap/pancake-developer, docs/public/logo.svg).
+    brand: 57,
+    tags: ["Liquidity"],
+    desc: "PancakeSwap V3 on Base, staked in its farm or not: a position's range, fees, CAKE and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    readTier: "visit",
+    subPages: [],
+  },
+  {
+    id: "pancakeswap-v3-arbitrum",
+    session: "pancakeswap-v3-arbitrum",
+    label: "PancakeSwap V3",
+    chainId: 42161,
+    slug: "pancakeswap-v3",
+    protocolKey: "pancakeswap-v3-base",
+    tags: ["Liquidity"],
+    desc: "PancakeSwap V3 on Arbitrum, staked in its farm or not: a position's range, fees, CAKE and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    readTier: "visit",
+    subPages: [],
+  },
+  {
     // Pendle on Ethereum, phase 1: a wallet's PT, YT and LP per market at a
     // pinned block, from the routers' events and chain reads. A Pendle market
     // is not a share vault and holds no loan, so there is no position listing
@@ -731,6 +766,52 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Uniswap's singleton pools on Ethereum, hooks included: a position's range, fees and pool over the last 30 days",
     positionListing: false,
+    readTier: "visit",
+    subPages: [],
+  },
+  {
+    // Uniswap V3 on Base (rails-ops ui-jobs 568) and V3 and V4 on Arbitrum
+    // (573), each its own entry on the Ethereum explorers' pages
+    // (components/protocol/uniswap, with a chain): Base reads no position's
+    // history. Unlaunched until decision 0061's launch list holds.
+    id: "uniswap-v3-base",
+    session: "uniswap-v3-base",
+    label: "Uniswap V3",
+    chainId: 8453,
+    slug: "uniswap-v3",
+    protocolKey: "uniswap-v3",
+    tags: ["Liquidity"],
+    desc: "Uniswap V3 on Base: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    readTier: "visit",
+    subPages: [],
+  },
+  {
+    id: "uniswap-v3-arbitrum",
+    session: "uniswap-v3-arbitrum",
+    label: "Uniswap V3",
+    chainId: 42161,
+    slug: "uniswap-v3",
+    protocolKey: "uniswap-v3",
+    tags: ["Liquidity"],
+    desc: "Uniswap V3 on Arbitrum: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    readTier: "visit",
+    subPages: [],
+  },
+  {
+    id: "uniswap-v4-arbitrum",
+    session: "uniswap-v4-arbitrum",
+    label: "Uniswap V4",
+    chainId: 42161,
+    slug: "uniswap-v4",
+    protocolKey: "uniswap-v4",
+    tags: ["Liquidity"],
+    desc: "Uniswap's singleton pools on Arbitrum, hooks included: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
     readTier: "visit",
     subPages: [],
   },
@@ -940,6 +1021,11 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "uniswap-v3": "Position",
   "uniswap-v4": "Position",
   aerodrome: "Position",
+  "uniswap-v3-base": "Position",
+  "uniswap-v3-arbitrum": "Position",
+  "uniswap-v4-arbitrum": "Position",
+  "pancakeswap-v3-base": "Position",
+  "pancakeswap-v3-arbitrum": "Position",
 };
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",

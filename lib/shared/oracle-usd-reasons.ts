@@ -18,6 +18,11 @@
 
 /** Keyed by `ProtocolEntry.id`; absent means the explorer prices in USD or has
  *  not been ruled out. */
+const UNISWAP_REASON =
+  "a pool prices itself: every figure is in the pool's quote token at the pool's price, and Uniswap runs no USD feed";
+const PANCAKESWAP_REASON =
+  "a pool prices itself: every figure is in the pool's quote token at the pool's price, CAKE is stated in CAKE, and PancakeSwap runs no USD feed";
+
 export const ORACLE_USD_REASON: Record<string, string> = {
   fluid:
     "debt-token units by design: each vault's oracle prices the collateral in the vault's debt token (the space its liquidation engine judges in); Fluid runs no USD feed",
@@ -42,6 +47,11 @@ export const ORACLE_USD_REASON: Record<string, string> = {
     "a pool prices itself: every figure is in the pool's quote token at the pool's price, and Uniswap runs no USD feed",
   "uniswap-v4":
     "a pool prices itself: every figure is in the pool's quote token at the pool's price, and Uniswap runs no USD feed",
+  "uniswap-v3-base": UNISWAP_REASON,
+  "uniswap-v3-arbitrum": UNISWAP_REASON,
+  "uniswap-v4-arbitrum": UNISWAP_REASON,
+  "pancakeswap-v3-base": PANCAKESWAP_REASON,
+  "pancakeswap-v3-arbitrum": PANCAKESWAP_REASON,
   aerodrome:
     "a pool prices itself: every figure is in the pool's quote token at the pool's price, AERO through Aerodrome's own AERO pools, and Aerodrome runs no USD feed",
 };
