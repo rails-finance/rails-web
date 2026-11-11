@@ -28,7 +28,7 @@ export default async function StatusPage() {
         ? { route: "progress", data: progress.data }
         : null;
   return (
-    <div className="container mx-auto md:px-6 px-4 pt-32 pb-16 max-w-4xl">
+    <div className="mx-auto max-w-7xl px-4 pb-16 pt-32 md:px-6">
       <h1 className="font-sans font-semibold tracking-tight text-foreground text-[clamp(28px,4vw,40px)]">Status</h1>
       <p className="mt-3 max-w-2xl text-base leading-relaxed text-rb-500">
         Rails reads every protocol&apos;s history from its deployment block. This page shows how far each index has
