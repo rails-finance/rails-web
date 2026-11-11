@@ -5,10 +5,16 @@ import Link from "next/link";
 
 import { protocolIconSrc } from "@/lib/shared/protocols";
 import { chainExplorers } from "@/lib/shared/explorer-rank";
-import { CHAINS, MAINNET_CHAIN_ID, BASE_CHAIN_ID, SEPOLIA_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import {
+  CHAINS,
+  MAINNET_CHAIN_ID,
+  BASE_CHAIN_ID,
+  ROBINHOOD_CHAIN_ID,
+  SEPOLIA_CHAIN_ID,
+  type ChainId,
+} from "@/lib/shared/chains";
 import { ProtocolGlyph, hasProtocolGlyph } from "@/components/icons/protocol-glyphs";
-import { ChainToggleButtons } from "@/components/shared/chain-toggle";
-import { HomeOnlyChainGlyph } from "@/components/icons/chain-glyphs";
+import { ChainGlyph, ChainToggleButtons } from "@/components/shared/chain-toggle";
 import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-soon";
 import { ScopeNote } from "@/components/shared/asset-scope-note";
 import { launchedChains } from "@/lib/shared/protocols";
@@ -32,8 +38,10 @@ const HOME_FEATURED = 12;
 
 const STORAGE_KEY = "home-chain-toggle";
 
-/** Stored value for the home-only Robinhood choice. It has no ChainId and
- *  no explorers; selecting it swaps the tiles for a coming-soon message. */
+/** Stored value for the Robinhood choice. Robinhood Chain is registered
+ *  (ROBINHOOD_CHAIN_ID) but has no explorers, so `launchedChains()` leaves it
+ *  out of the toggle's chains and this choice is added by hand; selecting it
+ *  swaps the tiles for a coming-soon message. */
 const ROBINHOOD_STORED = "robinhood";
 
 // Ethereum is the default — both the server render and the client's first
@@ -137,7 +145,7 @@ export function ProtocolRow() {
                     label: ROBINHOOD_LABEL,
                     active: robinhood,
                     onSelect: handleRobinhood,
-                    glyph: <HomeOnlyChainGlyph id="robinhood" className="h-3.5 w-3.5 shrink-0 max-[380px]:hidden" />,
+                    glyph: <ChainGlyph chainId={ROBINHOOD_CHAIN_ID} className="h-3.5 w-3.5 max-[380px]:hidden" />,
                   }
             }
           />

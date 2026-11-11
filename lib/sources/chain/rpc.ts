@@ -33,6 +33,7 @@ import {
   CHAINS,
   MAINNET_CHAIN_ID,
   OPTIMISM_CHAIN_ID,
+  ROBINHOOD_CHAIN_ID,
   SEPOLIA_CHAIN_ID,
   chainMeta,
   type ChainId,
@@ -50,6 +51,20 @@ const arc = defineChain({
   contracts: { multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11" } },
 });
 
+/** Robinhood Chain, which viem does not define: the values from Robinhood's
+ *  docs (docs.robinhood.com/chain). The public RPC below is not an archive
+ *  node (no state at a past block) and caps `eth_getLogs` at 10,000,000 blocks
+ *  per call. No Multicall3 is declared: none has been checked there yet. */
+const robinhood = defineChain({
+  id: ROBINHOOD_CHAIN_ID,
+  name: CHAINS[ROBINHOOD_CHAIN_ID].name,
+  nativeCurrency: { symbol: "ETH", name: "Ether", decimals: 18 },
+  rpcUrls: { default: { http: ["https://rpc.mainnet.chain.robinhood.com"] } },
+  blockExplorers: {
+    default: { name: CHAINS[ROBINHOOD_CHAIN_ID].explorerName, url: CHAINS[ROBINHOOD_CHAIN_ID].explorerBase },
+  },
+});
+
 const VIEM_CHAINS: Record<ChainId, Chain> = {
   [MAINNET_CHAIN_ID]: mainnet,
   [BASE_CHAIN_ID]: base,
@@ -59,6 +74,7 @@ const VIEM_CHAINS: Record<ChainId, Chain> = {
   // viem's OP Mainnet carries Multicall3 at the canonical address.
   [OPTIMISM_CHAIN_ID]: optimism,
   [ARC_CHAIN_ID]: arc,
+  [ROBINHOOD_CHAIN_ID]: robinhood,
   // viem's definition carries Multicall3 at the canonical address, so
   // `multicall()` works on Sepolia without a contracts override.
   [SEPOLIA_CHAIN_ID]: sepolia,

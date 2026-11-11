@@ -32,6 +32,7 @@ import {
   BASE_CHAIN_ID,
   MAINNET_CHAIN_ID,
   OPTIMISM_CHAIN_ID,
+  ROBINHOOD_CHAIN_ID,
 } from "@/lib/shared/chains";
 import { getLocalTokenIcon } from "@/lib/shared/local-token-icons";
 import { PT_UNDERLYING_BASE, PT_UNDERLYING_MAINNET } from "@/lib/shared/pt-underlying";
@@ -166,12 +167,15 @@ export function TokenChipIcon({
   //
   // A PT the generated map has not seen — a market listed since the last run —
   // keeps the letter, and still gets the badge.
-  // Arbitrum, Optimism and Arc have no generated map yet; Ethereum's would key
-  // the wrong contracts.
+  // Arbitrum, Optimism, Arc and Robinhood Chain have no generated map yet;
+  // Ethereum's would key the wrong contracts.
   const ptTable =
     chainId === BASE_CHAIN_ID
       ? PT_UNDERLYING_BASE
-      : chainId === ARBITRUM_CHAIN_ID || chainId === OPTIMISM_CHAIN_ID || chainId === ARC_CHAIN_ID
+      : chainId === ARBITRUM_CHAIN_ID ||
+          chainId === OPTIMISM_CHAIN_ID ||
+          chainId === ARC_CHAIN_ID ||
+          chainId === ROBINHOOD_CHAIN_ID
         ? {}
         : PT_UNDERLYING_MAINNET;
   const ptUnderlying = address ? ptTable[address.toLowerCase()] : undefined;

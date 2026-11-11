@@ -21,12 +21,11 @@ import { CHROME_HOVER } from "@/components/nav/chrome-hover";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CHAINS, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import { CHAINS, MAINNET_CHAIN_ID, ROBINHOOD_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { launchedChains, protocolForPathname, protocolsForChain, type ProtocolEntry } from "@/lib/shared/protocols";
 import { chainExplorers } from "@/lib/shared/explorer-rank";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { ChainGlyph } from "@/components/shared/chain-toggle";
-import { HomeOnlyChainGlyph } from "@/components/icons/chain-glyphs";
 import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-soon";
 import { ScopeNote } from "@/components/shared/asset-scope-note";
 import { useScopedRoster } from "@/lib/shared/explorer-scope";
@@ -136,7 +135,7 @@ export function ExplorerChooser({ onNavigate }: { onNavigate: () => void }) {
               data-switcher-robinhood=""
               className={`${TAB} ${robinhood ? TAB_ON : TAB_OFF}`}
             >
-              <HomeOnlyChainGlyph id="robinhood" className="h-5 w-5" />
+              <ChainGlyph chainId={ROBINHOOD_CHAIN_ID} className="h-5 w-5" />
             </button>
           )}
         </div>

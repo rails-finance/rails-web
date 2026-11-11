@@ -13,7 +13,7 @@
 // does not pass a chain keeps rendering the exact Etherscan URL it rendered
 // before — the L1 protocol surface is untouched by the Base work.
 
-export type ChainId = 1 | 10 | 8453 | 5042 | 42161 | 11155111;
+export type ChainId = 1 | 10 | 8453 | 4663 | 5042 | 42161 | 11155111;
 
 export const MAINNET_CHAIN_ID = 1 satisfies ChainId;
 export const BASE_CHAIN_ID = 8453 satisfies ChainId;
@@ -26,6 +26,9 @@ export const OPTIMISM_CHAIN_ID = 10 satisfies ChainId;
 /** Arc, Circle's chain, whose native coin is USDC. Registered ahead of any
  *  launched explorer on it, as Optimism is. */
 export const ARC_CHAIN_ID = 5042 satisfies ChainId;
+/** Robinhood Chain, an Arbitrum chain running Arbitrum Nitro. Registered ahead
+ *  of any launched explorer on it, as Optimism is. */
+export const ROBINHOOD_CHAIN_ID = 4663 satisfies ChainId;
 /** Sepolia — the first testnet chain in Rails (Polaris runs there). A
  *  testnet's numbers are test numbers; `testnet: true` on its entry is what
  *  lets copy say so where it matters. */
@@ -140,6 +143,22 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
     // USDC is the native coin: 18 decimals as the native balance. Its ERC-20
     // interface at 0x3600…0000 reports 6 (ARC_USDC_ERC20 below).
     nativeCurrency: { symbol: "USDC", name: "USDC", decimals: 18 },
+  },
+  4663: {
+    id: 4663,
+    name: "Robinhood Chain",
+    slug: "robinhood",
+    // The explorer Robinhood's docs link (docs.robinhood.com/chain, the network
+    // table). The site runs Blockscout.
+    explorerName: "Blockscout",
+    explorerBase: "https://robinhoodchain.blockscout.com",
+    explorerKind: "blockscout",
+    // The public RPC (rpc.mainnet.chain.robinhood.com) serves both names. It is
+    // not an archive node: state at a past block is unavailable, so a read at a
+    // past block fails there. `eth_getLogs` takes at most 10,000,000 blocks per
+    // call.
+    rpcEnv: "ROBINHOOD_RPC_URL",
+    logsRpcEnv: "ROBINHOOD_RPC_URL",
   },
   11155111: {
     id: 11155111,

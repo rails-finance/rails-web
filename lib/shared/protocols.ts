@@ -1261,8 +1261,8 @@ export function launchedProductionChainNames(): string {
 }
 
 /** THE CHAIN LAUNCH FLAG: a chain is launched when it has at least one launched
- *  explorer. False for a chain with no explorers at all (Optimism and Arc while
- *  their first explorers are built) and for one whose every explorer is
+ *  explorer. False for a chain with no explorers at all (Robinhood Chain while
+ *  its first explorers are built) and for one whose every explorer is
  *  unlaunched. Every surface a reader finds a chain on asks this, directly or
  *  through `launchedChains()`: the home chain tabs, the nav, the chain toggle,
  *  Focus's chain picks, /coverage's chain list, the sitemap, /about, llms.txt

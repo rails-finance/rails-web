@@ -19,6 +19,8 @@ import type { Glyph } from "@/components/icons/protocol-glyphs";
  *     public/logos/logo-docs-light.svg), the red dropped.
  *   Arc: the arch from the logo on Arc's docs (docs.arc.io, ARC_Doc_WHT.svg),
  *     the gradient dropped.
+ *   Robinhood Chain: Robinhood's feather, from the SVG Miles supplied on
+ *     2 Nov 2026, its baked-in white fill dropped.
  *
  * Sepolia, Ethereum's testnet, takes the Ethereum mark.
  */
@@ -66,43 +68,6 @@ const ARC_MARK: Glyph = {
   ],
 };
 
-const GLYPHS: Partial<Record<ChainId, Glyph>> = {
-  1: ETHEREUM_MARK,
-  8453: BASE_MARK,
-  42161: ARBITRUM_MARK,
-  10: OPTIMISM_MARK,
-  5042: ARC_MARK,
-  11155111: ETHEREUM_MARK,
-};
-
-export function ChainGlyph({ id, className = "" }: { id: ChainId; className?: string }): ReactNode {
-  const glyph = GLYPHS[id];
-  if (!glyph) return null;
-  return (
-    <svg
-      viewBox={glyph.viewBox}
-      className={className}
-      fill="currentColor"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      {glyph.paths?.map((p, i) => (
-        <path key={i} d={p.d} fillRule={p.fillRule} />
-      ))}
-    </svg>
-  );
-}
-
-/**
- * Home-page-only chain entries: choices on the home explorer toggle that have
- * no ChainId, no explorers and no place in CHAINS. Drop a mark in by replacing
- * `null` with a `Glyph` (monochrome paths, no baked-in colour), the same shape
- * as the marks above. A key with `null` renders no glyph.
- */
-export type HomeOnlyChainKey = "robinhood";
-
-// Robinhood's feather, from the SVG Miles supplied on 2 Nov 2026 (its baked-in
-// white fill dropped for currentColor).
 const ROBINHOOD_MARK: Glyph = {
   viewBox: "0 0 149.53 149.53",
   paths: [
@@ -118,12 +83,18 @@ const ROBINHOOD_MARK: Glyph = {
   ],
 };
 
-const HOME_ONLY_GLYPHS: Record<HomeOnlyChainKey, Glyph | null> = {
-  robinhood: ROBINHOOD_MARK,
+const GLYPHS: Partial<Record<ChainId, Glyph>> = {
+  1: ETHEREUM_MARK,
+  8453: BASE_MARK,
+  42161: ARBITRUM_MARK,
+  10: OPTIMISM_MARK,
+  5042: ARC_MARK,
+  4663: ROBINHOOD_MARK,
+  11155111: ETHEREUM_MARK,
 };
 
-export function HomeOnlyChainGlyph({ id, className = "" }: { id: HomeOnlyChainKey; className?: string }): ReactNode {
-  const glyph = HOME_ONLY_GLYPHS[id];
+export function ChainGlyph({ id, className = "" }: { id: ChainId; className?: string }): ReactNode {
+  const glyph = GLYPHS[id];
   if (!glyph) return null;
   return (
     <svg
