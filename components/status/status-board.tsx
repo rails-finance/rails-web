@@ -106,6 +106,12 @@ function heartbeatLine(e: IndexProgressEntry, now: number): string {
     : `${words}: last planned against the finalized block of ${utcTime(t)}, ${ageWords(now - t)} ago.`;
 }
 
+const CAUSE_WORDS: Record<string, string> = {
+  gateway: "gateway error",
+  overBudget: "over the daily ceiling",
+  timeout: "timeout",
+};
+
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 function visitLine(v: VisitReads | null | undefined): string {
@@ -470,7 +476,8 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
                     {" "}
                     Failed:{" "}
                     {Object.entries(live.visitReads.byCause)
-                      .map(([k, v]) => `${k.replace(/[-_]/g, " ")} ${n(v)}`)
+                      .filter(([, v]) => v > 0)
+                      .map(([k, v]) => `${CAUSE_WORDS[k] ?? k} ${n(v)}`)
                       .join(", ")}
                     .
                   </span>
@@ -492,9 +499,10 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
                   className={`ml-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle ${DOT[writerState(w, now)]}`}
                 />
                 <span className="text-rb-500"> · {WRITER_KIND[w.kind] ?? w.kind}</span>
-                {w.expectEverySec ? (
-                  <span className="text-rb-500"> · runs every {ageWords(w.expectEverySec)}</span>
-                ) : null}
+                <span className="text-rb-500">
+                  {" "}
+                  · {w.expectEverySec ? `runs every ${ageWords(w.expectEverySec)}` : "runs on events"}
+                </span>
                 <div className="mt-0.5 text-rb-500">
                   {w.lastWriteAt ? `Last write ${utcTime(Date.parse(w.lastWriteAt) / 1000)}` : "No write time stored"}
                   {w.newest && ` · newest row at block ${n(w.newest.block)}`}

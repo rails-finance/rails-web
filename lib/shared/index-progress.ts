@@ -225,24 +225,30 @@ export function visitState(v: VisitReads | null | undefined): Heartbeat {
 }
 
 /** A writer's state against its schedule: late past 1.5 times its cadence,
- *  stalled past 3 times; the fixed hour and three hours where no cadence is
- *  stored. */
+ *  stalled past 3 times. */
 export function writerState(w: StatusWriter, now: Secs): Heartbeat {
   const t = isoSecs(w.lastWriteAt);
-  if (t == null) return "none";
   const every = w.expectEverySec;
-  if (!every) return heartbeatAge(t, now);
+  // An event-driven writer has no schedule to be late against.
+  if (t == null || !every) return "none";
   const age = now - t;
   return age > 3 * every ? "stalled" : age > 1.5 * every ? "late" : "fresh";
 }
 
 const RANK: Record<Heartbeat, number> = { none: 0, fresh: 1, late: 2, stalled: 3 };
 
-/** A pipeline's state: the worst of its writers that stamp a write time, else
- *  the backfill's heartbeat by the fixed ages. */
+/** A pipeline's state: the worst of its scheduled writers. A writer that
+ *  runs on events (no `expectEverySec`) only shows how long the protocol has
+ *  been quiet, so with none scheduled the lane's checkpoint decides (Sieve
+ *  moving means data is arriving), else the backfill's heartbeat. */
 export function pipelineState(e: StatusEntry, now: Secs): Heartbeat {
-  const states = (e.live?.writers ?? []).map((w) => writerState(w, now)).filter((h) => h !== "none");
+  const states = (e.live?.writers ?? [])
+    .filter((w) => w.expectEverySec)
+    .map((w) => writerState(w, now))
+    .filter((h) => h !== "none");
   if (states.length) return states.reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
+  const moved = isoSecs(e.live?.checkpoint?.updatedAt);
+  if (moved != null) return heartbeatAge(moved, now);
   return heartbeatAge(isoSecs(e.backfill?.heartbeatAt), now);
 }
 
