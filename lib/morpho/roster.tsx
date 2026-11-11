@@ -54,7 +54,7 @@ import {
 } from "@/components/shared/data-table/data-table";
 import { ratePercentText } from "@/lib/shared/rate-percent";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
-import { chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
+import { ARC_CHAIN_ID, chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { morphoBlueContract } from "@/lib/morpho/asset-catalog";
 import { morphoLoanTokenHref, morphoMarketHref } from "@/lib/morpho/market-routes";
@@ -861,14 +861,22 @@ function RosterView({ data, chainId, all }: RosterProps & { all: boolean }) {
   const explorer = chainMeta(chainId).explorerName;
   const s = data.summary;
   const links: SectionMenuLink[] = [
-    {
-      item: "positions",
-      title: "All Morpho Blue positions",
-      subtitle: "Every position Rails holds",
-      href: chainId === 42161 ? `${root}/positions` : root,
-      internal: true,
-    },
-    ...(chainId !== 42161
+    chainId === ARC_CHAIN_ID
+      ? {
+          item: "positions",
+          title: "A wallet's Morpho Blue positions",
+          subtitle: "Read from the chain for the wallet you enter",
+          href: root,
+          internal: true,
+        }
+      : {
+          item: "positions",
+          title: "All Morpho Blue positions",
+          subtitle: "Every position Rails holds",
+          href: chainId === 42161 ? `${root}/positions` : root,
+          internal: true,
+        },
+    ...(chainId !== 42161 && chainId !== ARC_CHAIN_ID
       ? [
           {
             item: "vaults",

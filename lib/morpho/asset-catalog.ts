@@ -15,6 +15,7 @@
 // resolved separately via the ERC20 multicall).
 
 import { MORPHO_ARBITRUM_BLUE } from "@/lib/morpho-arbitrum/asset-catalog";
+import { MORPHO_ARC_CONTRACTS } from "@/lib/morpho-arc/types";
 
 /** Morpho Blue singleton (mainnet, lowercase). The one contract every market,
  *  position, and event belongs to — the provenance dock names it. */
@@ -26,6 +27,7 @@ export const MORPHO_ADDRESSES = {
  *  vanity address above; Arbitrum's is its own (lib/morpho-arbitrum/asset-catalog.ts). */
 export function morphoBlueContract(chainId?: number): { name: string; address: string } {
   if (chainId === 42161) return { name: "Morpho Blue (Arbitrum)", address: MORPHO_ARBITRUM_BLUE };
+  if (chainId === 5042) return { name: "Morpho Blue (Arc)", address: MORPHO_ARC_CONTRACTS.morpho };
   return { name: chainId === 8453 ? "Morpho Blue (Base)" : "Morpho Blue", address: MORPHO_ADDRESSES.MORPHO_BLUE };
 }
 

@@ -985,6 +985,17 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
       why: "a liquidation names no position in its event, and history waits until Rails indexes Fluid on Base",
     },
   }),
+  // Morpho Blue on Arc (ui-jobs 577): the position page reads the position and
+  // its market at the head and 30 days back; the markets pages read every
+  // market at the head. Unlaunched, so the matrix does not draw it yet.
+  "morpho-arc": explorerDepth({
+    dashboard: true,
+    oracleUsd: { why: ORACLE_USD_REASON["morpho-arc"] },
+    views: true,
+    forensics: {
+      why: "liquidations are events, and history waits until Rails indexes Morpho Blue on Arc",
+    },
+  }),
   // Euler V2 on Base and Arbitrum (read-on-visit-candidates-572.md, row 10).
   // `dashboard`: a holding's page reads the account and the vault at the head
   // and 30 days back from rails-server's at-block routes. Dollars come from
@@ -1545,6 +1556,8 @@ export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
   "lido",
   // Fluid on Base (ui-jobs 574), read on visit: a wallet's positions on the front door.
   "fluid-base",
+  // Morpho Blue on Arc (ui-jobs 577): a wallet's positions on the front door.
+  "morpho-arc",
   // Euler V2 on Base and Arbitrum, position-first as Uniswap is: a wallet's
   // accounts are read when it is visited.
   "euler-v2-base",
@@ -1669,6 +1682,8 @@ export const VIEW_NOTES: Record<string, string> = {
     "The full reserve roster of a market that is closing: eighteen reserves, every one carrying the frozen bit, with the sizes, rates and risk parameters the Pool still enforces on what is left.",
   "aave-v3-base":
     "The Base Pool's full reserve roster (sizes, rates, risk configuration and oracle prices), with every risk parameter decoded from the reserve's configuration.",
+  "morpho-arc":
+    "Every market Morpho Blue has created on Arc, from its CreateMarket log, read at the block the page opens: grouped by the token each lends, with sizes, rates and utilisation.",
   "morpho-arbitrum":
     "The census's 258 markets, read at one block: the funded ones in dollar stables or WETH ranked by supply in dollars, the rest listed in their loan tokens.",
   "aave-v3-arbitrum":
@@ -1790,6 +1805,8 @@ export const COVERAGE_NOTES: Record<string, string> = {
   aerodrome:
     "An Aerodrome Slipstream pool prices its two tokens against each other and Aerodrome runs no USD feed, so every figure is in the pool's quote token at the pool's price, and AERO is priced through Aerodrome's own AERO pools; a liquidity position holds no loan, so there is no liquidation to trace.",
   lido: "Lido accounts each holder's stake in stETH shares, and one wstETH is one share, so a stake is valued in ETH at Lido's share rate, which moves at each oracle report; Lido runs no USD feed. A wallet's withdrawal requests are listed by the withdrawal queue for their owner. A stake holds no loan, so there is no liquidation to trace.",
+  "morpho-arc":
+    "Morpho Blue on Arc is the same contract as on Ethereum, Base and Arbitrum, read a different way. Rails lists the markets from Morpho's CreateMarket log, and each page reads the markets and the wallet's position in each when it opens. A position page reads the position and its market again at the UTC midnight 30 days before, so the interest over those 30 days is stated where the shares are the same at both. Each market's oracle prices the collateral in its loan token; a dollar figure takes the loan token at its Chainlink feed on Arc, and a market whose loan token has none there stays in that token. There is no listing, history or liquidation record until Rails indexes Morpho Blue on Arc.",
   "fluid-base": `Fluid on Base is the same protocol as on Ethereum, read a different way. Each page reads the position and its vault from Fluid's VaultResolver when it opens, and again at the UTC midnight 30 days before, so the interest over those 30 days comes from the vault's exchange prices at the two blocks. Collateral and debt are stated in the vault's tokens, and the ratio in the vault oracle's debt-per-collateral price, the figure the liquidation engine judges. ${FLUID_BASE_DOLLARS ? "Fluid runs no USD feed, so a side's dollar value comes from the Aave V3 Base oracle at the same block, and a side Aave does not list, or a side held as DEX pool shares, stays in its own unit." : "Fluid runs no USD feed, so no figure is in dollars."} There is no listing, history or liquidation record until Rails indexes Fluid on Base.`,
   "euler-v2-base": EULER_NOTE,
   "euler-v2-arbitrum": EULER_NOTE,

@@ -227,6 +227,25 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
+    // Morpho Blue on Arc (rails-ops ui-jobs 577), read from the chain when a
+    // page opens: a front door taking a wallet, its positions at
+    // `<route>/<wallet>`, each opening `<route>/<wallet>/<market id>`; the
+    // Markets pages are the shared Morpho pages, fed by rails-server's
+    // /api/at-block/morpho-arc routes. Unlaunched while Miles reads it.
+    id: "morpho-arc",
+    session: "morpho-arc",
+    label: "Morpho Blue",
+    chainId: 5042,
+    slug: "morpho",
+    protocolKey: "morpho",
+    tags: ["Lend", "Borrow"],
+    desc: "Morpho Blue on Arc: a wallet's positions across every market, each with its collateral, debt and LTV against the market's line, and 30 days of interest",
+    positionListing: false,
+    readTier: "visit",
+    unlaunched: true,
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+  },
+  {
     id: "aave-v4",
     session: "aave-v4",
     label: "Aave V4",
@@ -1118,6 +1137,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   morpho: "Position",
   "morpho-base": "Position",
   "morpho-arbitrum": "Position",
+  "morpho-arc": "Position",
   spark: "Position",
   compound: "Position",
   "compound-base": "Position",

@@ -59,6 +59,9 @@ export type SessionProtocol =
   // Morpho Blue on Arbitrum, at `/arbitrum/morpho`: its own singleton and
   // markets, so its own scope.
   | "morpho-arbitrum"
+  // Morpho Blue on Arc, at `/arc/morpho`: a position is a wallet's place in
+  // one market, read from the chain when a page opens (ui-jobs 577).
+  | "morpho-arc"
   | "spark"
   | "compound"
   | "compound-base"
