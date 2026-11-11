@@ -1,7 +1,9 @@
-// One Uniswap position on Ethereum (rails-ops ui-jobs 556, door 1), at
-// `/ethereum/uniswap-v3/position/<id>` and `/ethereum/uniswap-v4/position/<id>`:
-// the position card, then the six-line readout under it. One read of
-// rails-server's at-block route (lib/api/fetch-uniswap.ts) serves both.
+// One Uniswap-family position (rails-ops ui-jobs 556, door 1; 568, 573, 575),
+// at `<route>/position/<id>` under each explorer (`/ethereum/uniswap-v3`,
+// `/base/uniswap-v3`, `/arbitrum/pancakeswap-v3`…): the position card, then
+// the readout under it. One read of rails-server's at-block route
+// (lib/api/fetch-uniswap.ts) serves both. A staked PancakeSwap position
+// belongs to its staker, whose wallet the head links.
 //
 // SERVER-ONLY: the read uses the bearer token.
 
@@ -14,7 +16,8 @@ import { UniswapPositionCard } from "@/components/protocol/uniswap/uniswap-posit
 import { UniswapReadout } from "@/components/protocol/uniswap/uniswap-readout";
 import { fetchUniswapPosition } from "@/lib/api/fetch-uniswap";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
-import { explorerHref } from "@/lib/shared/protocols";
+import type { SessionProtocol } from "@/lib/shared/sessions";
+import { uniExplorer, type UniChainId, type UniProtocol } from "@/lib/uniswap/deployments";
 import { poolPosition } from "@/lib/uniswap/position";
 import { cardProv } from "@/lib/uniswap/provenance";
 import type { Provenance } from "@/components/shared/provenance";
@@ -22,7 +25,10 @@ import type { UniToken, UniswapVersion } from "@/lib/uniswap/types";
 import { POSITION_PAGE, num } from "@/lib/uniswap/words";
 
 /** One read per request: the metadata and the page share it. */
-export const loadUniswapPosition = cache((version: UniswapVersion, id: string) => fetchUniswapPosition(version, id));
+export const loadUniswapPosition = cache(
+  (version: UniswapVersion, id: string, protocol: UniProtocol = "uniswap", chainId: UniChainId = 1) =>
+    fetchUniswapPosition(version, id, protocol, chainId),
+);
 
 export const isPositionId = (id: string): boolean => /^\d{1,78}$/.test(id);
 
@@ -76,12 +82,23 @@ export function poolAssets({
   ];
 }
 
-export async function UniswapPositionPage({ version, id }: { version: UniswapVersion; id: string }) {
+export async function UniswapPositionPage({
+  version,
+  id,
+  protocol = "uniswap",
+  chainId = 1,
+}: {
+  version: UniswapVersion;
+  id: string;
+  protocol?: UniProtocol;
+  chainId?: UniChainId;
+}) {
   if (!isPositionId(id)) notFound();
-  const answer = await loadUniswapPosition(version, id);
+  const answer = await loadUniswapPosition(version, id, protocol, chainId);
   if (answer.kind === "not-found") notFound();
-  const session = version === "v3" ? "uniswap-v3" : "uniswap-v4";
-  const home = explorerHref(1, session);
+  const x = uniExplorer(protocol, chainId, version);
+  const session = x.id as SessionProtocol;
+  const home = x.route;
   if (answer.kind === "error")
     return (
       <div className="py-8">
@@ -92,15 +109,16 @@ export async function UniswapPositionPage({ version, id }: { version: UniswapVer
       </div>
     );
   const r = answer.data;
-  const p = poolPosition(r);
+  const p = poolPosition(r, protocol);
   const title = POSITION_PAGE.title(p);
+  const holderHref = `${home}/${p.holder.toLowerCase()}`;
   return (
     <div className="min-h-screen">
       <div className="py-8">
         <header className="mb-5" data-skel-section="page-header">
           <DetailTopRow
             session={session}
-            fallbackHref={`${home}/${r.owner.toLowerCase()}`}
+            fallbackHref={holderHref}
             showStamp={false}
             assets={poolAssets({
               base: p.base,
@@ -111,7 +129,12 @@ export async function UniswapPositionPage({ version, id }: { version: UniswapVer
               priceInfo: cardProv("price", { p, r }),
             })}
             priceReason={ORACLE_USD_REASON[session]}
-            owner={{ wallet: r.owner, filterProtocol: null, href: `${home}/${r.owner.toLowerCase()}` }}
+            owner={{
+              wallet: p.holder,
+              filterProtocol: null,
+              href: holderHref,
+              ...(chainId === 1 ? {} : { chain: chainId }),
+            }}
             tools={false}
           />
           <ReadTierTitleRow id={session}>
@@ -122,8 +145,8 @@ export async function UniswapPositionPage({ version, id }: { version: UniswapVer
           <p className="text-xs text-rb-500">{POSITION_PAGE.sub(p)}</p>
         </header>
         <div className="flex flex-col gap-6">
-          <UniswapPositionCard r={r} />
-          <UniswapReadout r={r} title={title} />
+          <UniswapPositionCard r={r} protocol={protocol} />
+          <UniswapReadout r={r} title={title} protocol={protocol} />
         </div>
       </div>
       <ProvInspectorLayer />

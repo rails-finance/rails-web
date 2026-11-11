@@ -299,6 +299,13 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   "uniswap-v4",
   // Aerodrome Slipstream, for the Uniswap reason (ui-jobs 566).
   "aerodrome",
+  // Uniswap on Base and Arbitrum and PancakeSwap V3, for the same reason
+  // (ui-jobs 568, 573, 575).
+  "uniswap-v3-base",
+  "uniswap-v3-arbitrum",
+  "uniswap-v4-arbitrum",
+  "pancakeswap-v3-base",
+  "pancakeswap-v3-arbitrum",
   // Sky Savings, for the same reason: an sUSDS balance carries no debt and no
   // threshold (Miles, 2026-09-29, rails-ops TO-DO-sky-savings-scoping §6.1).
   // It has a listing all the same; this set keeps it out of the count.

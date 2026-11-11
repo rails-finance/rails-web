@@ -15,6 +15,7 @@ import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-gr
 import type { ChainId } from "@/lib/shared/chains";
 import { poolPosition } from "@/lib/uniswap/position";
 import { lineProv, readContracts, type UniReceiptContext } from "@/lib/uniswap/provenance";
+import type { UniProtocol } from "@/lib/uniswap/deployments";
 import type { BlockRef, UniPositionRead } from "@/lib/uniswap/types";
 import {
   READOUT,
@@ -61,7 +62,9 @@ export function PoolReadStamp({
 
 /** The section's read stamp. */
 export function UniswapReadStamp({ c, what }: { c: UniReceiptContext; what: string }) {
-  return <PoolReadStamp chainId={1} head={c.r.head} then={c.r.then} contracts={readContracts(c)} what={what} />;
+  return (
+    <PoolReadStamp chainId={c.r.chainId} head={c.r.head} then={c.r.then} contracts={readContracts(c)} what={what} />
+  );
 }
 
 /** A bullet's parts, the card's figures bold. */
@@ -183,8 +186,16 @@ export function PoolReadout({
   );
 }
 
-export function UniswapReadout({ r, title }: { r: UniPositionRead; title: string }) {
-  const p = poolPosition(r);
+export function UniswapReadout({
+  r,
+  title,
+  protocol = "uniswap",
+}: {
+  r: UniPositionRead;
+  title: string;
+  protocol?: UniProtocol;
+}) {
+  const p = poolPosition(r, protocol);
   const c = { p, r };
   const lines = readoutLines(p);
   return (

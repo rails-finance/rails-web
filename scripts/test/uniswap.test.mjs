@@ -1,11 +1,29 @@
 // lib/uniswap/position.ts, pairs.ts and words.ts against hand-made reads in
 // the shape of rails-server's at-block routes (rails-ops ui-jobs 556).
 // Run: npm test
+//
+// The modules import each other by extensionless relative specifier, so this
+// file registers the resolver aerodrome.test.mjs uses before loading them.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { poolPosition, hookPermissions, protocolCut, amountsFor } from "../../lib/uniswap/position.ts";
-import { pairCards, orderCards } from "../../lib/uniswap/pairs.ts";
-import { readoutLines, readoutExplainer, cutSentence, cutShort, num, pct, PAIR_DOOR } from "../../lib/uniswap/words.ts";
+import { register } from "node:module";
+
+const hooks = `
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+export async function resolve(specifier, context, next) {
+  if (specifier.startsWith(".") && !/\\.[cm]?[jt]sx?$/.test(specifier) && context.parentURL) {
+    const url = new URL(specifier + ".ts", context.parentURL).href;
+    if (existsSync(fileURLToPath(url))) return { url, shortCircuit: true };
+  }
+  return next(specifier, context);
+}`;
+register(`data:text/javascript,${encodeURIComponent(hooks)}`);
+
+const { poolPosition, hookPermissions, protocolCut, amountsFor } = await import("../../lib/uniswap/position.ts");
+const { pairCards, orderCards } = await import("../../lib/uniswap/pairs.ts");
+const { readoutLines, readoutExplainer, cardExplainer, cutSentence, cutShort, num, pct, PAIR_DOOR, POSITION_PAGE } =
+  await import("../../lib/uniswap/words.ts");
 
 const Q128 = BigInt(2) ** BigInt(128);
 const sqrtX96 = (tick) => BigInt(Math.round(Math.sqrt(Math.pow(1.0001, tick)) * 2 ** 96)).toString();
@@ -363,4 +381,106 @@ test("a pair naming ETH: V4 pools with WETH say so", () => {
   const [c] = pairCards(read, "eth-usdc");
   assert.equal(c.weth, true);
   assert.equal(PAIR_DOOR.card.sub(c), "Uniswap V4 · 0.05% (WETH) · Ethereum · no hook");
+});
+
+// ── Base, Arbitrum and PancakeSwap (ui-jobs 568, 573, 575) ─────────────────
+
+test("PancakeSwap's feeProtocol: two 16-bit shares in ten-thousandths of the swap fee", () => {
+  // 3200:3200, the pool's default (pancake-v3-contracts, PancakeV3Pool.sol).
+  const cut = protocolCut("v3", 209718400, "pancakeswap");
+  assert.deepEqual(cut, { version: "pancake-v3", s0: 3200, s1: 3200 });
+  assert.equal(cutSentence(cut), "PancakeSwap takes 32% of the swap fees, out of what liquidity providers earn.");
+  assert.equal(cutShort(cut), "32% of swap fees");
+  assert.equal(
+    cutSentence(protocolCut("v3", 3300 + 3400 * 65536, "pancakeswap")),
+    "PancakeSwap takes 33% of fees paid in one token and 34% in the other, out of what liquidity providers earn.",
+  );
+  assert.equal(cutShort(protocolCut("v3", 0, "pancakeswap")), "none");
+});
+
+const CAKE = { address: "0x3055913c90Fcc1A6CE9a358911721eEb942013A1", symbol: "Cake", decimals: 18 };
+const STAKER = "0x346CB3db2200453DB3C5600375Bc93330AB08912";
+
+test("a staked PancakeSwap position belongs to its staker and states its CAKE", () => {
+  const r = {
+    ...v3OutOfRange(),
+    chainId: 8453,
+    owner: "0xC6A2Db661D5a5690172d8eB0a7DEA2d3008665A3",
+    opened: null,
+    history: null,
+    now: poolRead(-192000, { protocolFee: 209718400 }),
+    staked: {
+      masterChef: "0xC6A2Db661D5a5690172d8eB0a7DEA2d3008665A3",
+      user: STAKER,
+      pid: "286",
+      pendingCake: "112817202380908321",
+      cake: CAKE,
+    },
+  };
+  const p = poolPosition(r, "pancakeswap");
+  assert.equal(p.holder, STAKER);
+  assert.ok(Math.abs(p.staked.pendingCake - 0.112817202380908321) < 1e-12);
+  assert.equal(POSITION_PAGE.title(p).includes("PancakeSwap V3"), true);
+  assert.match(POSITION_PAGE.sub(p), /· Base · staked in PancakeSwap's farm$/);
+  const by = Object.fromEntries(readoutLines(p).map((l) => [l.key, l]));
+  assert.equal(by.cake.yours, "Staked in PancakeSwap's farm: 0.1128 Cake not yet harvested.");
+  assert.equal(
+    by.cake.pool,
+    "A staked position keeps earning the pool's swap fees, and earns CAKE while it is in range.",
+  );
+  assert.match(by.withdrawals.yours, /^Can be withdrawn at any block by the staker/);
+  assert.match(by.steward.pool, /PancakeSwap takes 32% of the swap fees/);
+  // Base reads no history: the against line says so.
+  assert.equal(by.against.pool, "Since its first deposit: Rails does not read a position's deposits on Base yet.");
+  assert.ok(cardExplainer(p)[0].bullets.some((b) => b.some((s) => typeof s === "string" && s.includes("farm"))));
+});
+
+test("an unstaked PancakeSwap position earns no CAKE; a Uniswap one draws no CAKE line", () => {
+  const r = { ...v3OutOfRange(), chainId: 42161, staked: null };
+  const cake = readoutLines(poolPosition(r, "pancakeswap")).find((l) => l.key === "cake");
+  assert.equal(cake.yours, "Not staked in PancakeSwap's farm, so it earns no CAKE.");
+  assert.equal(cake.pool, null);
+  const uni = readoutLines(poolPosition({ ...v3OutOfRange(), chainId: 42161 }));
+  assert.equal(
+    uni.some((l) => l.key === "cake"),
+    false,
+  );
+});
+
+test("a Base position younger than the window, with no opening day, says so", () => {
+  const r = { ...v3OutOfRange(), chainId: 8453, opened: null, history: null };
+  r.past = { ...r.past, positionLiquidity: null };
+  const by = Object.fromEntries(readoutLines(poolPosition(r)).map((l) => [l.key, l]));
+  assert.match(by.fees.yours, /^It did not exist 30 days ago, so Rails states no 30-day fees yet\./);
+  assert.equal(by.against.yours, "It did not exist 30 days ago.");
+  assert.equal(by.range.yours.includes("daily"), false);
+});
+
+test("an Arbitrum pair names the native coin by address and its wrapped token", () => {
+  const A_WETH = { address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", symbol: "WETH", decimals: 18 };
+  const A_USDC = { address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", symbol: "USDC", decimals: 6 };
+  const read = {
+    chainId: 42161,
+    reads: READS,
+    tokens: [{ address: "0x0000000000000000000000000000000000000000", symbol: "ETH", decimals: 18 }, A_USDC, A_WETH],
+    pools: [
+      {
+        version: "v4",
+        fee: 500,
+        tickSpacing: 10,
+        key: "0xarb-weth",
+        token0: A_WETH.address,
+        token1: A_USDC.address,
+        at: [0, 1, 2, 3].map((k) => stableAt(k, 0.0006, { balance0: null, balance1: null })),
+      },
+    ],
+  };
+  const [c] = pairCards(read, "eth-usdc");
+  assert.equal(c.weth, true);
+  assert.equal(PAIR_DOOR.card.sub(c), "Uniswap V4 · 0.05% (WETH) · Arbitrum · no hook");
+  assert.equal(
+    PAIR_DOOR.none("ETH", "USDC", "pancakeswap"),
+    "No PancakeSwap pool without a hook takes ETH and USDC at the last read.",
+  );
+  assert.deepEqual(pairCards(read, "no-such-pair"), []);
 });

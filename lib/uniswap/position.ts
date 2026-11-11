@@ -7,6 +7,7 @@
 //
 // Pure, with type imports only: scripts/test/uniswap.test.mjs reads it.
 
+import { nativeSymbols, uniDeployment, type UniChainId, type UniProtocol } from "./deployments";
 import type { BlockRef, UniPositionRead, UniToken, UniswapVersion } from "./types";
 
 const Q128 = BigInt(2) ** BigInt(128);
@@ -47,11 +48,16 @@ export const STABLE: ReadonlySet<string> = new Set([
   "FRAX",
   "GHO",
   "USDe",
+  "USD₮0",
+  "USDbC",
 ]);
-const rank = (s: string) => (STABLE.has(s) ? 3 : s === "ETH" || s === "WETH" ? 2 : 1);
+const ETH_SYMBOLS: readonly string[] = ["ETH", "WETH"];
+const rank = (s: string, natives: readonly string[]) => (STABLE.has(s) ? 3 : natives.includes(s) ? 2 : 1);
 
-/** Is token0 the quote? A stablecoin quotes ETH, and ETH quotes everything else. */
-export const quoteIsToken0 = (t0: UniToken, t1: UniToken): boolean => rank(t0.symbol) > rank(t1.symbol);
+/** Is token0 the quote? A stablecoin quotes the chain's native coin (ETH and WETH unless named), and
+ *  that coin quotes everything else. */
+export const quoteIsToken0 = (t0: UniToken, t1: UniToken, natives: readonly string[] = ETH_SYMBOLS): boolean =>
+  rank(t0.symbol, natives) > rank(t1.symbol, natives);
 
 /** a − b in uint256, wrapping as the pools' fee growth does. */
 export const sub256 = (a: bigint, b: bigint): bigint => (((a - b) % U256) + U256) % U256;
@@ -131,18 +137,52 @@ export function fullRangeShare(g0Now: string, g1Now: string, g0Then: string, g1T
 /** The protocol's cut, read from the pool. */
 export type ProtocolCut =
   | { version: "v3"; /** 1/n of the LPs' fee in token0 and token1; 0 is none. */ d0: number; d1: number }
-  | { version: "v4"; /** Pips (millionths) added to each swap, by direction. */ p0: number; p1: number };
+  | { version: "v4"; /** Pips (millionths) added to each swap, by direction. */ p0: number; p1: number }
+  | {
+      version: "pancake-v3";
+      /** Ten-thousandths of the swap fee taken, for swaps paying token0 and token1; 0 is none. */
+      s0: number;
+      s1: number;
+    };
 
-export function protocolCut(version: UniswapVersion, protocolFee: number): ProtocolCut {
+/** Uniswap V3's feeProtocol is a uint8, two 4-bit denominators; V4's protocolFee two 12-bit pips.
+ *  PancakeSwap V3's feeProtocol is a uint32, two 16-bit shares in ten-thousandths of the fee
+ *  (pancake-v3-contracts, v3-core PancakeV3Pool.sol: `feeProtocol % 65536` and `feeProtocol >> 16`,
+ *  over PROTOCOL_FEE_DENOMINATOR 10,000). */
+export function protocolCut(
+  version: UniswapVersion,
+  protocolFee: number,
+  protocol: UniProtocol = "uniswap",
+): ProtocolCut {
+  if (protocol === "pancakeswap")
+    return { version: "pancake-v3", s0: protocolFee % 65536, s1: Math.floor(protocolFee / 65536) };
   return version === "v3"
     ? { version, d0: protocolFee & 15, d1: protocolFee >> 4 }
     : { version, p0: protocolFee & 0xfff, p1: protocolFee >> 12 };
 }
 
+/** A PancakeSwap position staked in the farm: CAKE not yet harvested, in CAKE. */
+export interface PoolStake {
+  masterChef: string;
+  user: string;
+  pid: string;
+  pendingCake: number;
+  cake: UniToken;
+}
+
 export interface PoolPosition {
+  protocol: UniProtocol;
+  chainId: UniChainId;
   version: UniswapVersion;
   id: string;
+  /** The NFT's holder on record: the farm where the position is staked. */
   owner: string;
+  /** Whose position it is: the staker where it is staked, else the owner. */
+  holder: string;
+  /** PancakeSwap: the stake, or null where it is not staked; undefined elsewhere. */
+  staked?: PoolStake | null;
+  /** Whether the chain's reads include the position's history (its deposits and the day it opened). */
+  historyRead: boolean;
   /** The pool's contract (V3) or its id in the PoolManager (V4). */
   pool: string;
   base: UniToken;
@@ -206,8 +246,9 @@ const sumLogs = (xs: { amount0: string; amount1: string }[]): [number, number] =
 ];
 
 /** The position as the page draws it. */
-export function poolPosition(r: UniPositionRead): PoolPosition {
-  const quoteIs0 = quoteIsToken0(r.token0, r.token1);
+export function poolPosition(r: UniPositionRead, protocol: UniProtocol = "uniswap"): PoolPosition {
+  const d = uniDeployment(protocol, r.chainId);
+  const quoteIs0 = quoteIsToken0(r.token0, r.token1, nativeSymbols(d));
   const now = r.now;
   const px = new Pricer(sqrtFromX96(now.sqrtPriceX96), r.token0.decimals, r.token1.decimals, quoteIs0);
   const L = BigInt(r.liquidity);
@@ -295,10 +336,28 @@ export function poolPosition(r: UniPositionRead): PoolPosition {
   const dynamicFee = r.version === "v4" && r.fee === DYNAMIC_FEE;
   const hooks = r.hooks && BigInt(r.hooks) !== ZERO ? r.hooks : null;
   const activeL = BigInt(now.activeLiquidity);
+  const st = r.staked;
   return {
+    protocol,
+    chainId: r.chainId,
     version: r.version,
     id: r.id,
     owner: r.owner,
+    holder: st ? st.user : r.owner,
+    ...(r.staked === undefined
+      ? {}
+      : {
+          staked: st
+            ? {
+                masterChef: st.masterChef,
+                user: st.user,
+                pid: st.pid,
+                pendingCake: Number(st.pendingCake) / 10 ** st.cake.decimals,
+                cake: st.cake,
+              }
+            : null,
+        }),
+    historyRead: d.history,
     pool: r.pool,
     base: quoteIs0 ? r.token1 : r.token0,
     quote: quoteIs0 ? r.token0 : r.token1,
@@ -345,6 +404,6 @@ export function poolPosition(r: UniPositionRead): PoolPosition {
           ? px.amounts(Number(past.balance0), Number(past.balance1))
           : null,
     },
-    protocolCut: protocolCut(r.version, now.protocolFee),
+    protocolCut: protocolCut(r.version, now.protocolFee, protocol),
   };
 }

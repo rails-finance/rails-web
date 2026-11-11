@@ -951,9 +951,9 @@ const GLYPHS: Record<string, Glyph> = {
   },
 };
 
-// Uniswap's two explorers draw Uniswap's mark.
-GLYPHS["uniswap-v3"] = GLYPHS.uniswap;
-GLYPHS["uniswap-v4"] = GLYPHS.uniswap;
+// Uniswap's explorers, on every chain, draw Uniswap's mark.
+for (const id of ["uniswap-v3", "uniswap-v4", "uniswap-v3-base", "uniswap-v3-arbitrum", "uniswap-v4-arbitrum"])
+  GLYPHS[id] = GLYPHS.uniswap;
 
 export function hasProtocolGlyph(id: string): boolean {
   return id in GLYPHS;

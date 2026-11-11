@@ -12,6 +12,7 @@ import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups"
 import { Segs, UniswapReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
 import { poolPosition } from "@/lib/uniswap/position";
 import { cardProv } from "@/lib/uniswap/provenance";
+import type { UniProtocol } from "@/lib/uniswap/deployments";
 import type { UniPositionRead } from "@/lib/uniswap/types";
 import { CARD_WORDS, cardExplainer, day, num, positionNumber, shown } from "@/lib/uniswap/words";
 
@@ -62,8 +63,8 @@ export function RangeBar({
   );
 }
 
-function slots(r: UniPositionRead): PositionCardSlots {
-  const p = poolPosition(r);
+function slots(r: UniPositionRead, protocol: UniProtocol): PositionCardSlots {
+  const p = poolPosition(r, protocol);
   const c = { p, r };
   const B = p.base.symbol;
   const Q = p.quote.symbol;
@@ -97,19 +98,39 @@ function slots(r: UniPositionRead): PositionCardSlots {
     {
       id: "uncollected",
       label: CARD_WORDS.uncollected,
-      labelTip: CARD_WORDS.uncollectedTip,
+      labelTip: p.staked ? CARD_WORDS.uncollectedTipStaked(p.staked.user) : CARD_WORDS.uncollectedTip,
       value: (
         <Prov info={cardProv("uncollected", c)}>
           {num(p.uncollected)} {Q}
         </Prov>
       ),
     },
-    {
-      id: "opened",
-      label: CARD_WORDS.opened,
-      labelTip: CARD_WORDS.openedTip,
-      value: p.opened ? <Prov info={cardProv("opened", c)}>{day(p.opened.time)}</Prov> : null,
-    },
+    // PancakeSwap: CAKE not yet harvested, where the position is staked in the farm.
+    ...(p.staked
+      ? [
+          {
+            id: "cake",
+            label: CARD_WORDS.cake,
+            labelTip: CARD_WORDS.cakeTip,
+            value: (
+              <Prov info={cardProv("cake", c)}>
+                {num(p.staked.pendingCake)} {p.staked.cake.symbol}
+              </Prov>
+            ),
+          },
+        ]
+      : []),
+    // Opened: where the chain's reads include the position's history (none on Base).
+    ...(p.historyRead
+      ? [
+          {
+            id: "opened",
+            label: CARD_WORDS.opened,
+            labelTip: CARD_WORDS.openedTip,
+            value: p.opened ? <Prov info={cardProv("opened", c)}>{day(p.opened.time)}</Prov> : null,
+          },
+        ]
+      : []),
   ];
   return {
     surface: "detail",
@@ -153,7 +174,7 @@ function slots(r: UniPositionRead): PositionCardSlots {
   };
 }
 
-export function UniswapPositionCard({ r }: { r: UniPositionRead }) {
+export function UniswapPositionCard({ r, protocol = "uniswap" }: { r: UniPositionRead; protocol?: UniProtocol }) {
   return (
     <div
       data-anatomy="U1"
@@ -162,7 +183,7 @@ export function UniswapPositionCard({ r }: { r: UniPositionRead }) {
       data-liquidity-raw={r.liquidity}
       data-live-block={r.head.block}
     >
-      <PositionCard slots={slots(r)} />
+      <PositionCard slots={slots(r, protocol)} />
     </div>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
-// The /start pair step's cards (G10; rails-ops ui-jobs 556, door 2): every
-// hookless Uniswap pool for the pair in the order the reader picks, the
+// The /start pair step's cards (G10; rails-ops ui-jobs 556, door 2), and an
+// explorer's pair page's (ui-jobs 568, 573, 575): every
+// hookless Uniswap or PancakeSwap pool for the pair in the order the reader picks, the
 // set-aside line with its toggle. The order and the toggle change this page
 // only (teal, color-grammar.md §4c). A card opens nothing: a pool has no page
 // yet. Figures are plain, as on the asset step (G9). Every word is
@@ -10,6 +11,7 @@
 import { useState } from "react";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { orderCards, type PairOrder, type PoolCard } from "@/lib/uniswap/pairs";
+import { uniExplorerId, type UniProtocol } from "@/lib/uniswap/deployments";
 import { protocolCut } from "@/lib/uniswap/position";
 import { PAIR_DOOR, cutShort, num, pct, share } from "@/lib/uniswap/words";
 
@@ -36,7 +38,10 @@ function Card({ c, base, quote }: { c: PoolCard; base: string; quote: string }) 
   return (
     <div className={CARD} data-pool-card={c.key} data-pool-card-aside={c.aside?.kind}>
       <div className="mb-3 flex items-center gap-2.5">
-        <ProtocolIcon id={`uniswap-${c.version}`} className="h-7 w-7 shrink-0 text-foreground" />
+        <ProtocolIcon
+          id={uniExplorerId(c.protocol, c.chainId, c.version)}
+          className="h-7 w-7 shrink-0 text-foreground"
+        />
         <div className="min-w-0">
           <div className="truncate font-medium text-foreground">{w.title(base, quote)}</div>
           <div className={`truncate text-xs ${MUTED}`}>{w.sub(c)}</div>
@@ -54,14 +59,27 @@ function Card({ c, base, quote }: { c: PoolCard; base: string; quote: string }) 
           sub={c.size === null ? w.sizeNotRead : c.sizeThen ? w.sizeChange(c.size / c.sizeThen - 1) : w.noChange}
         />
         <Figure label={w.price} value={c.priceMove !== null ? pct(c.priceMove, 1) : null} />
-        <Figure label={w.protocolFee} value={cutShort(protocolCut(c.version, c.protocolFee))} />
+        <Figure label={w.protocolFee} value={cutShort(protocolCut(c.version, c.protocolFee, c.protocol))} />
       </dl>
       {c.aside && <p className={`mt-2 text-xs ${MUTED}`}>{w.aside(c.aside, quote)}</p>}
     </div>
   );
 }
 
-export function PairDoorCards({ base, quote, cards }: { base: string; quote: string; cards: PoolCard[] }) {
+export function PairDoorCards({
+  base,
+  quote,
+  cards,
+  protocol = "uniswap",
+  v4 = true,
+}: {
+  base: string;
+  quote: string;
+  cards: PoolCard[];
+  protocol?: UniProtocol;
+  /** Whether V4 pools can be among the cards. */
+  v4?: boolean;
+}) {
   const [o, setO] = useState<PairOrder>("size");
   const [all, setAll] = useState(false);
   const aside = cards.filter((c) => c.aside).length;
@@ -90,10 +108,10 @@ export function PairDoorCards({ base, quote, cards }: { base: string; quote: str
         ))}
       </div>
       <p className={`mb-4 max-w-3xl text-sm ${MUTED}`} data-pair-intro="">
-        {PAIR_DOOR.intro(o)}
+        {PAIR_DOOR.intro(o, v4)}
       </p>
       {drawn.length === 0 ? (
-        <p className={`text-sm ${MUTED}`}>{PAIR_DOOR.none(base, quote)}</p>
+        <p className={`text-sm ${MUTED}`}>{PAIR_DOOR.none(base, quote, protocol)}</p>
       ) : (
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {drawn.map((c) => (
