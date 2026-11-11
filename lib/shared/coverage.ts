@@ -956,6 +956,9 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   "uniswap-v4-arbitrum": UNISWAP_FAMILY_DEPTH("uniswap-v4-arbitrum"),
   "pancakeswap-v3-base": UNISWAP_FAMILY_DEPTH("pancakeswap-v3-base"),
   "pancakeswap-v3-arbitrum": UNISWAP_FAMILY_DEPTH("pancakeswap-v3-arbitrum"),
+  // Uniswap V3 and V4 on Arc (ui-jobs 577), the same rows.
+  "uniswap-v3-arc": UNISWAP_FAMILY_DEPTH("uniswap-v3-arc"),
+  "uniswap-v4-arc": UNISWAP_FAMILY_DEPTH("uniswap-v4-arc"),
   // Aerodrome Slipstream on Base (ui-jobs 566), on Uniswap V3's row: the
   // position page reads the pool, the position and its gauge at the head and
   // 30 days back.
@@ -1588,6 +1591,8 @@ export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
   "uniswap-v4-arbitrum",
   "pancakeswap-v3-base",
   "pancakeswap-v3-arbitrum",
+  "uniswap-v3-arc",
+  "uniswap-v4-arc",
   // Lido (ui-jobs 570), wallet-first as Uniswap is.
   "lido",
   // Fluid on Base (ui-jobs 574), read on visit: a wallet's positions on the front door.
@@ -1853,6 +1858,10 @@ export const COVERAGE_NOTES: Record<string, string> = {
     "A PancakeSwap V3 pool prices its two tokens against each other and PancakeSwap runs no USD feed, so every figure is in the pool's quote token at the pool's price, and CAKE in CAKE; a liquidity position holds no loan, so there is no liquidation to trace. On Base, Rails reads no position's events, so a position shows no opening day and no figure since its first deposit.",
   "pancakeswap-v3-arbitrum":
     "A PancakeSwap V3 pool prices its two tokens against each other and PancakeSwap runs no USD feed, so every figure is in the pool's quote token at the pool's price, and CAKE in CAKE; a liquidity position holds no loan, so there is no liquidation to trace.",
+  "uniswap-v3-arc":
+    "A Uniswap V3 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
+  "uniswap-v4-arc":
+    "A Uniswap V4 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
   aerodrome:
     "An Aerodrome Slipstream pool prices its two tokens against each other and Aerodrome runs no USD feed, so every figure is in the pool's quote token at the pool's price, and AERO is priced through Aerodrome's own AERO pools; a liquidity position holds no loan, so there is no liquidation to trace.",
   lido: "Lido accounts each holder's stake in stETH shares, and one wstETH is one share, so a stake is valued in ETH at Lido's share rate, which moves at each oracle report; Lido runs no USD feed. A wallet's withdrawal requests are listed by the withdrawal queue for their owner. A stake holds no loan, so there is no liquidation to trace.",

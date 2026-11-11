@@ -253,6 +253,18 @@ function reads(version: UniswapVersion, d: UniDeployment): InfoReads {
       { name: "Each token", reads: "its symbol and decimals." },
     ],
     how,
+    // Arc (ui-jobs 577): a V4 pool's address(0) side is the chain's gas coin, USDC there.
+    ...(d.native.symbol !== "ETH"
+      ? {
+          notes: [
+            <>
+              On {d.chainName}, {d.native.symbol} is the gas coin. A V4 pool can hold it as the chain&apos;s native
+              coin, counted in {d.native.decimals} decimals, or through its ERC-20 at {d.wrapped.address}, counted in{" "}
+              {d.wrapped.decimals}. The two are one balance, and Rails names both {d.native.symbol}.
+            </>,
+          ] as const,
+        }
+      : {}),
   };
 }
 

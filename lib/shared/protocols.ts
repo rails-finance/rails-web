@@ -837,6 +837,37 @@ const SPECS: ProtocolSpec[] = [
     subPages: [],
   },
   {
+    // Uniswap V3 and V4 on Arc (rails-ops ui-jobs 577), on the same pages as
+    // Arbitrum's, read from the chain when a page opens. Unlaunched while
+    // Miles reads it.
+    id: "uniswap-v3-arc",
+    session: "uniswap-v3-arc",
+    label: "Uniswap V3",
+    chainId: 5042,
+    slug: "uniswap-v3",
+    protocolKey: "uniswap-v3",
+    tags: ["Liquidity"],
+    desc: "Uniswap V3 on Arc: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
+    id: "uniswap-v4-arc",
+    session: "uniswap-v4-arc",
+    label: "Uniswap V4",
+    chainId: 5042,
+    slug: "uniswap-v4",
+    protocolKey: "uniswap-v4",
+    tags: ["Liquidity"],
+    desc: "Uniswap's singleton pools on Arc, hooks included: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
     // Pendle on Ethereum, phase 1: a wallet's PT, YT and LP per market at a
     // pinned block, from the routers' events and chain reads. A Pendle market
     // is not a share vault and holds no loan, so there is no position listing
@@ -1247,6 +1278,8 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "uniswap-v4-arbitrum": "Position",
   "pancakeswap-v3-base": "Position",
   "pancakeswap-v3-arbitrum": "Position",
+  "uniswap-v3-arc": "Position",
+  "uniswap-v4-arc": "Position",
   // A wallet's stETH and wstETH; the page names it a stake.
   lido: "Stake",
   "fluid-base": "Position",

@@ -306,6 +306,8 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   "uniswap-v4-arbitrum",
   "pancakeswap-v3-base",
   "pancakeswap-v3-arbitrum",
+  "uniswap-v3-arc",
+  "uniswap-v4-arc",
   // Compound V3 on Optimism: no census of accounts (ui-jobs 578).
   "compound-v3-optimism",
   // Lido (ui-jobs 570): a stake carries no debt and no threshold.

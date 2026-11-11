@@ -62,6 +62,7 @@ export const DAY_BLOCKS_BY_CHAIN: Readonly<Partial<Record<UniChainId, number>>> 
 export function dayGridPhrase(chainId: UniChainId): string {
   const n = DAY_BLOCKS_BY_CHAIN[chainId];
   if (n) return `one each ${n.toLocaleString("en-US")} blocks`;
+  if (chainId === 5042) return "one at the first multiple of 1,000 blocks at or after each UTC midnight";
   return chainId === 42161
     ? "one at the first multiple of 1,000 blocks at or after each UTC midnight"
     : "one at each UTC midnight";
