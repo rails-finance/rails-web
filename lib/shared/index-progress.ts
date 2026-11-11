@@ -51,6 +51,25 @@ export interface IndexProgressEntry {
   sieve?: { tables: { table: string; fromBlock: number }[]; checkpoint: number };
   /** Wall time (ISO) of the fill's last hourly sample for this index. */
   heartbeatAt?: string | null;
+  /** Why the fill is holding this index, where it is. */
+  held?: FillHold | null;
+}
+
+/** A fill's hold on an index: the free gateway's allowance under the floor
+ *  kept in reserve, or one of the fill's other holds. */
+export type FillHold =
+  | { reason: "egress-floor"; floorBytes: number; remainingBytes: number; resetsAt: string }
+  | { reason: "paused" | "fill-error" | "check-running" | "job-failed"; detail: string | null; since: string | null };
+
+/** The free gateway's daily allowance: one counter for every network. */
+export interface Allowance {
+  host: string;
+  allowanceToday: number | null;
+  usedToday: number | null;
+  remaining: number | null;
+  floorBytes: number | null;
+  resetsAt: string | null;
+  seenAt: string | null;
 }
 
 export interface IndexProgress {
@@ -64,7 +83,7 @@ export interface IndexProgress {
 export const HEARTBEAT_LATE = 60 * 60;
 export const HEARTBEAT_STALLED = 3 * 60 * 60;
 
-export type Heartbeat = "fresh" | "late" | "stalled" | "none";
+export type Heartbeat = "fresh" | "late" | "stalled" | "paused" | "none";
 
 const isoSecs = (iso: string | null | undefined): Secs | null => {
   if (!iso) return null;
@@ -103,6 +122,11 @@ export function fillStall(e: IndexProgressEntry): "not-gaining" | "behind" | nul
 /** A fill's state: its heartbeat's age, and never better than late while it
  *  is not moving. */
 export function fillState(e: IndexProgressEntry, now: Secs): Heartbeat {
+  // Held on purpose: the allowance, or the fill's switch. A check runs in
+  // seconds and reads as the heartbeat; an error or a failed job is late.
+  const r = e.held?.reason;
+  if (r === "egress-floor" || r === "paused") return "paused";
+  if (r === "fill-error" || r === "job-failed") return "late";
   const hb = heartbeatState(e, now);
   return fillStall(e) && (hb === "fresh" || hb === "none") ? "late" : hb;
 }
@@ -185,6 +209,7 @@ export interface IndexStatus {
   entries: StatusEntry[];
   lanes?: { lane: string; chain: number; checkpoint: StatusLive["checkpoint"]; unreachable?: { error: string } }[];
   gateways?: unknown[];
+  allowance?: Allowance | null;
 }
 
 /** One cell of the status table, from either route. */
@@ -254,7 +279,7 @@ export function writerState(w: StatusWriter, now: Secs): Heartbeat {
   return age > 3 * every ? "stalled" : age > 1.5 * every ? "late" : "fresh";
 }
 
-const RANK: Record<Heartbeat, number> = { none: 0, fresh: 1, late: 2, stalled: 3 };
+const RANK: Record<Heartbeat, number> = { none: 0, fresh: 1, paused: 2, late: 3, stalled: 4 };
 
 /** A pipeline's state: the worst of its scheduled writers. A writer that
  *  runs on events (no `expectEverySec`) only shows how long the protocol has

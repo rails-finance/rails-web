@@ -50,6 +50,8 @@ import {
   type IndexProgress,
   type IndexProgressEntry,
   type IndexStatus,
+  type Allowance,
+  type FillHold,
   type StatusCell,
   type StatusEntry,
 } from "@/lib/shared/index-progress";
@@ -81,6 +83,7 @@ const DOT: Record<Heartbeat, string> = {
   fresh: "bg-green-500",
   late: "bg-amber-500",
   stalled: "bg-red-500",
+  paused: "bg-blue-400",
   none: "bg-rb-300 dark:bg-rb-600",
 };
 
@@ -88,6 +91,7 @@ const HEARTBEAT_WORDS: Record<Heartbeat, string> = {
   fresh: "Reporting",
   late: "Late",
   stalled: "Stalled",
+  paused: "Paused",
   none: "No heartbeat yet",
 };
 
@@ -103,13 +107,42 @@ const STALL_WORDS = {
   behind: "Read to the head, then fell behind it; the fill still reports.",
 } as const;
 
-function heartbeatLine(e: IndexProgressEntry, now: number): string {
+const mb = (b: number) => `${n(Math.round(b / 1e6))} MB`;
+const hhmm = (iso: string) => {
+  const d = new Date(iso);
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")} UTC`;
+};
+
+/** Why a fill holds an index, in a sentence; null when it does not. */
+function heldLine(h: FillHold | null | undefined, allowance: Allowance | null): string | null {
+  if (!h) return null;
+  if (h.reason === "egress-floor") {
+    const of = allowance?.allowanceToday ? ` of today's ${mb(allowance.allowanceToday)}` : "";
+    return `Paused until ${hhmm(h.resetsAt)}: the free gateway has ${mb(h.remainingBytes)}${of} left, under the ${mb(h.floorBytes)} kept in reserve.`;
+  }
+  const since = h.since ? ` since ${hhmm(h.since)}` : "";
+  const detail = h.detail ? `: ${h.detail}` : "";
+  switch (h.reason) {
+    case "paused":
+      return `Paused${since}: the fill is switched off${detail}.`;
+    case "fill-error":
+      return `The fill hit an error${since} and retries in 5 min${detail}.`;
+    case "check-running":
+      return `A conservation check is running${detail}.`;
+    case "job-failed":
+      return `A filter job failed${since} and waits for the next plan${detail}.`;
+  }
+}
+
+function heartbeatLine(e: IndexProgressEntry, now: number, allowance: Allowance | null = null): string {
+  const held = heldLine(e.held, allowance);
   const t = heartbeatTime(e);
   if (t == null) return "The fill has not reported this index yet.";
   const words = HEARTBEAT_WORDS[fillState(e, now)];
   const line = heartbeatIsWallTime(e)
     ? `${words}: the fill last wrote at ${utcTime(t)}, ${ageWords(now - t)} ago.`
     : `${words}: last planned against the finalized block of ${utcTime(t)}, ${ageWords(now - t)} ago.`;
+  if (held && fillState(e, now) !== "fresh") return `${held} ${line}`;
   const stall = fillStall(e);
   return stall ? `${line} ${STALL_WORDS[stall]}` : line;
 }
@@ -157,10 +190,11 @@ const STATUS_WORDS: Record<Heartbeat, string> = {
   fresh: "Arriving",
   late: "Late",
   stalled: "Stalled",
+  paused: "Paused",
   none: "Not measured",
 };
 
-function cellView(c: StatusCell, now: number): CellView {
+function cellView(c: StatusCell, now: number, allowance: Allowance | null): CellView {
   const live = c.entry?.live;
   const lane = live ? laneWords(live.lane) : c.fill ? "The full-history fill" : "–";
   if (c.fill) {
@@ -168,12 +202,12 @@ function cellView(c: StatusCell, now: number): CellView {
     const stall = fillStall(c.fill);
     return {
       hb,
-      status: stall && hb === "late" ? "Not gaining" : STATUS_WORDS[hb],
+      status: stall && hb === "late" && !c.fill.held ? "Not gaining" : STATUS_WORDS[hb],
       index: percentWords(c.fill),
       indexRank: c.fill.atHead ? 100 : (c.fill.percent ?? 0),
       last: heartbeatTime(c.fill),
       lane,
-      title: heartbeatLine(c.fill, now),
+      title: heartbeatLine(c.fill, now, allowance),
     };
   }
   if (c.kind === "pipeline" && c.entry) {
@@ -265,10 +299,10 @@ function Contracts({ chain, contracts }: { chain: number; contracts: string[] })
   );
 }
 
-function ChainDetail({ e, now }: { e: IndexProgressEntry; now: number }) {
+function ChainDetail({ e, now, allowance }: { e: IndexProgressEntry; now: number; allowance: Allowance | null }) {
   return (
     <section>
-      <p className="text-xs text-rb-500">{heartbeatLine(e, now)}</p>
+      <p className="text-xs text-rb-500">{heartbeatLine(e, now, allowance)}</p>
 
       <dl className="mt-3 flex flex-col gap-y-1.5 text-sm">
         <Figure
@@ -539,7 +573,7 @@ function chainsOf(cells: StatusCell[], next: NextItem[]): ChainId[] {
 const COL = { protocol: "sm:w-[28%]", second: "sm:w-[18%]" };
 
 type SortKey = "name" | "status" | "index" | "last";
-const STATUS_RANK: Record<Heartbeat, number> = { stalled: 0, late: 1, none: 2, fresh: 3 };
+const STATUS_RANK: Record<Heartbeat, number> = { stalled: 0, late: 1, paused: 2, none: 3, fresh: 4 };
 
 interface Line {
   cell: StatusCell;
@@ -548,7 +582,7 @@ interface Line {
   view: CellView;
 }
 
-function Row({ line, now }: { line: Line; now: number }) {
+function Row({ line, now, allowance }: { line: Line; now: number; allowance: Allowance | null }) {
   const [open, setOpen] = useState(false);
   const { cell: c, view: v } = line;
   return (
@@ -588,7 +622,7 @@ function Row({ line, now }: { line: Line; now: number }) {
           <DataTableCell colSpan={5} wide className="pb-6">
             <div className="sm:pl-[2.25rem]" data-anatomy="Y1.2">
               {c.fill ? (
-                <ChainDetail e={c.fill} now={now} />
+                <ChainDetail e={c.fill} now={now} allowance={allowance} />
               ) : c.entry ? (
                 <PipelineDetail e={c.entry} now={now} />
               ) : null}
@@ -673,6 +707,7 @@ export function StatusBoard({ source }: { source: StatusSource }) {
     cells.some((c) => c.protocol === protocol && c.chain === ch && c.fill?.atHead === true);
   const next = nextItems(atHead);
   const chains = chainsOf(cells, next);
+  const allowance = source.route === "status" ? (source.data.allowance ?? null) : null;
   const [chain, setChain] = useState<ChainId>(chains[0] ?? 1);
   const [sort, setSort] = useState<{ key: SortKey; dir: DataTableDir }>({ key: "status", dir: "asc" });
 
@@ -681,7 +716,7 @@ export function StatusBoard({ source }: { source: StatusSource }) {
     .map((c) => {
       const entry = rosterFor(c.key, c.chain);
       const name = entry?.label ?? (c.fill ? c.fill.label.split(" · ")[0] : c.key);
-      return { cell: c, name, markId: entry?.id ?? c.key, view: cellView(c, now) };
+      return { cell: c, name, markId: entry?.id ?? c.key, view: cellView(c, now, allowance) };
     });
   const byName = (a: Line, b: Line) => a.name.localeCompare(b.name, "en-US");
   const cmp: Record<SortKey, (a: Line, b: Line) => number> = {
@@ -723,7 +758,7 @@ export function StatusBoard({ source }: { source: StatusSource }) {
             </select>
           </label>
           <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-rb-500" data-anatomy="Y2">
-            {(["fresh", "late", "stalled", "none"] as const).map((h) => (
+            {(["fresh", "late", "stalled", "paused", "none"] as const).map((h) => (
               <span key={h} className="inline-flex items-center gap-1.5">
                 <span className={`h-1.5 w-1.5 rounded-full ${DOT[h]}`} />
                 {h === "fresh"
@@ -732,10 +767,19 @@ export function StatusBoard({ source }: { source: StatusSource }) {
                     ? `Late: past 1.5 times its schedule, or ${pct(VISIT_FAIL_LATE)} of visit reads failing`
                     : h === "stalled"
                       ? `Stalled: past 3 times its schedule, or ${pct(VISIT_FAIL_STALLED)} failing`
-                      : "Not measured: no write time or visit"}
+                      : h === "paused"
+                        ? "Paused: held for the daily allowance"
+                        : "Not measured: no write time or visit"}
               </span>
             ))}
           </div>
+          {allowance?.remaining != null && allowance.allowanceToday != null && (
+            <p className="mb-3 text-xs text-rb-500" data-anatomy="Y2.1">
+              The free gateway&apos;s daily allowance: {mb(allowance.remaining)} of {mb(allowance.allowanceToday)} left
+              {allowance.floorBytes != null && `, ${mb(allowance.floorBytes)} kept in reserve`}
+              {allowance.resetsAt && `, resets at ${hhmm(allowance.resetsAt)}`}. One allowance serves every network.
+            </p>
+          )}
           <DataTable
             label={`Indexing status on ${chainName(chain)}`}
             anatomy="Y1"
@@ -751,7 +795,7 @@ export function StatusBoard({ source }: { source: StatusSource }) {
             </DataTableHead>
             <DataTableBody>
               {lines.map((l) => (
-                <Row key={`${l.cell.key}-${l.cell.chain}`} line={l} now={now} />
+                <Row key={`${l.cell.key}-${l.cell.chain}`} line={l} now={now} allowance={allowance} />
               ))}
             </DataTableBody>
           </DataTable>
