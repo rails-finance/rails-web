@@ -1,19 +1,29 @@
 "use client";
 
-// One Yearn V3 vault's page on Ethereum (rails-ops ui-jobs 407): the vault card
-// (V2), the last 30 days (V5), where the assets are (V3) and the holder finder (V4). One block's read
-// of the vault and of the Yearn V3 Registry (lib/sources/chain/
-// yearn-ethereum-vault.ts); Yield is the daily store's. There is no census, so
-// Holders is empty.
+// One Yearn V3 vault's page on Ethereum (rails-ops ui-jobs 407; the grid of
+// tiles, ui-jobs 584): the holder finder (V4), the vault card (V2), then the
+// grid (components/vaults/vault-tiles.tsx): the last 30 days (V5); where the
+// assets are (V3) | who holds it (V11); what protects it (V9) | the protocol
+// underneath (V10), streamed by the route; configuration and addresses (V12);
+// the colour note at the foot. One block's read of the vault and of the Yearn
+// V3 Registry (lib/sources/chain/yearn-ethereum-vault.ts); Holders and Who
+// holds it are the census's, Yield the daily store's.
 
 import { serverReadOf } from "@/lib/shared/server-head-read";
 import { ProvReceiptsScope, Prov, useReceiptRegistry } from "@/components/shared/provenance";
-import { readStampProv, SectionReadStamp } from "@/components/shared/read-stamp";
+import { readStampProv, SectionReadStamp, useBlockTime } from "@/components/shared/read-stamp";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
 import type { PositionPanelRow } from "@/components/shared/position-card-panel";
 import { NotLoaded } from "@/components/shared/not-loaded";
 import { CreatedBullet, VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
-import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
+import { ALLOCATION_SCOPE, allocationBar, VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
+import { ColourNote, RULE, Tile, VAULT_CARD_TILE, VAULT_GRID } from "@/components/vaults/vault-tiles";
+import { HOLDERS_SCOPE, VaultWhoHolds } from "@/components/vaults/vault-who-holds";
+import { VaultConfiguration } from "@/components/vaults/vault-config";
+import { yearnConfigTile } from "@/components/vaults/vault-config-columns";
+import { yearnVaultHref } from "@/lib/vaults/routes";
+import type { VaultHolders } from "@/lib/vaults/holders-read";
+import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 import { VaultFinder } from "@/components/vaults/vault-finder";
 import { VaultStrip } from "@/components/vaults/vault-strip";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
@@ -78,6 +88,8 @@ export function YearnVaultPage({
   yieldFigure: storeYield,
   strip,
   strategyPages = {},
+  census,
+  holders,
 }: {
   /** "What protects it" and "The protocol underneath" (V9, V10), streamed by the route. */
   protects?: React.ReactNode;
@@ -88,10 +100,15 @@ export function YearnVaultPage({
   yieldFigure?: VaultYield;
   /** The store's three daily series for the strip (V5); null where it did not answer. */
   strip: VaultStripSeries | null;
+  /** The census's row for the vault: the Holders headline; null where it did not answer. */
+  census: VaultCensusRow | null;
+  /** Who holds it: the census's largest holders; null where it did not answer. */
+  holders: VaultHolders | null;
 }) {
   const registry = useReceiptRegistry();
   const y = data.vault;
-  const v = yearnVaultPageSummary(data);
+  const createdAt = useBlockTime(CHAIN_ID, y.createdBlock > 0 ? y.createdBlock : null);
+  const v = yearnVaultPageSummary(data, census);
   // A figure on total assets under the dust floor is too small to measure (ui-jobs 542).
   const yieldFigure = measuredYield(storeYield, v.totalAssets?.raw);
   const unit = y.asset.symbol;
@@ -402,71 +419,123 @@ export function YearnVaultPage({
     ],
   };
 
+  const alloc = allocationBar(rows, { asset, venue: { one: "strategy", many: "strategies" } });
+  const vaultName = y.name ?? y.censusName;
+  const config = yearnConfigTile({ data, coords, release: v.releaseLabel, createdAt });
+
   return (
     <ProvReceiptsScope registry={registry}>
       <VaultFinder />
-      <VaultCard
-        vault={v}
-        yieldFigure={yieldFigure}
-        holdersHref={null}
-        receipts={{
-          name: yearnVaultNameProv(coords),
-          totalAssets: yearnVaultTotalAssetsProv(coords),
-          sharePrice: yearnVaultSharePriceProv(coords),
-          standing: { endorsed: yearnVaultEndorsedProv(coords, true), "shut-down": yearnVaultShutdownProv(coords) },
-        }}
-        status={status}
-        stats={stats}
-        links={links}
-        explanation={explanation}
-        learnMore={yearnVaultCardContent()}
-        stamp={
-          <SectionReadStamp
+      <Tile id="summary" flush>
+        <div className={VAULT_CARD_TILE}>
+          <VaultCard
+            vault={v}
+            yieldFigure={yieldFigure}
+            holdersHref={null}
+            receipts={{
+              name: yearnVaultNameProv(coords),
+              totalAssets: yearnVaultTotalAssetsProv(coords),
+              sharePrice: yearnVaultSharePriceProv(coords),
+              standing: { endorsed: yearnVaultEndorsedProv(coords, true), "shut-down": yearnVaultShutdownProv(coords) },
+            }}
+            status={status}
+            stats={stats}
+            links={links}
+            explanation={explanation}
+            learnMore={yearnVaultCardContent()}
+            stamp={
+              <SectionReadStamp
+                chainId={CHAIN_ID}
+                block={data.blockNumber}
+                readBy={coords.readBy}
+                info={(at) =>
+                  readStampProv({
+                    chainId: CHAIN_ID,
+                    block: data.blockNumber,
+                    at,
+                    readBy: coords.readBy,
+                    what: "Every figure on this card and in where the assets are",
+                    contracts: [
+                      {
+                        name: vaultName,
+                        address: y.address,
+                        reads:
+                          "totalAssets(), totalSupply(), convertToAssets(), totalIdle(), totalDebt(), profitMaxUnlockTime(), role_manager(), accountant(), isShutdown(), get_default_queue(), strategies(strategy)",
+                      },
+                      { name: "Yearn V3 Registry", address: YEARN_REGISTRY, reads: "isEndorsed(vault)" },
+                    ],
+                  })
+                }
+              />
+            }
+            exports={exportModel}
+          />
+        </div>
+      </Tile>
+
+      <div className={VAULT_GRID} data-vault-grid="" data-anatomy="V13">
+        <Tile id="last-30-days" wide>
+          <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
+        </Tile>
+
+        <Tile id="allocation" segScope={ALLOCATION_SCOPE} left>
+          <VaultAssets
+            rows={alloc.rows}
+            assetSymbol={unit}
+            assetAddress={asset.address}
+            assetDecimals={ad}
+            chart={alloc.chart}
+            keyColours={alloc.keyColours}
+            look="index"
+            line={
+              <>
+                The idle balance and the{" "}
+                <Prov info={yearnVaultQueueProv(coords, data.strategies.length)}>
+                  {n(data.strategies.length)} {data.strategies.length === 1 ? "strategy" : "strategies"}
+                </Prov>{" "}
+                of the default queue, in its order.
+              </>
+            }
+            shareTip="The row's amount over the vault's total assets."
+            learnMore={yearnVaultAssetsContent()}
+            menu={{ exports: vaultAssetsExports(v, exportModel) }}
+          />
+        </Tile>
+
+        <Tile id="holders" segScope={HOLDERS_SCOPE} right>
+          <VaultWhoHolds
             chainId={CHAIN_ID}
+            vault={y.address}
+            vaultName={vaultName}
+            shareSymbol={y.symbol ?? vaultName}
+            shareDecimals={y.shareDecimals ?? null}
+            holders={holders}
+            holderHref={(h) => yearnVaultHref(y.address, h)}
+            listingHref={null}
+          />
+        </Tile>
+
+        {/* What protects it and The protocol underneath stream in as two
+            sections: one wide tile, split in two from lg by a hairline. */}
+        <Tile id="risk" wide flush>
+          <div className="grid grid-cols-1 lg:grid-cols-2 [&>section]:!px-0 [&>section]:!py-5 sm:[&>section]:!p-5">
+            <i aria-hidden className={`pointer-events-none absolute inset-y-5 left-1/2 hidden w-px lg:block ${RULE}`} />
+            {protects}
+          </div>
+        </Tile>
+
+        <Tile id="configuration" wide last>
+          <VaultConfiguration
+            chainId={CHAIN_ID}
+            vault={y.address}
+            vaultName={vaultName}
             block={data.blockNumber}
             readBy={coords.readBy}
-            info={(at) =>
-              readStampProv({
-                chainId: CHAIN_ID,
-                block: data.blockNumber,
-                at,
-                readBy: coords.readBy,
-                what: "Every figure on this card and in where the assets are",
-                contracts: [
-                  {
-                    name: y.name ?? y.censusName,
-                    address: y.address,
-                    reads:
-                      "totalAssets(), totalSupply(), convertToAssets(), totalIdle(), totalDebt(), profitMaxUnlockTime(), role_manager(), accountant(), isShutdown(), get_default_queue(), strategies(strategy)",
-                  },
-                  { name: "Yearn V3 Registry", address: YEARN_REGISTRY, reads: "isEndorsed(vault)" },
-                ],
-              })
-            }
+            {...config}
           />
-        }
-        exports={exportModel}
-      />
-      <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
-      <VaultAssets
-        rows={rows}
-        assetSymbol={unit}
-        assetAddress={asset.address}
-        assetDecimals={ad}
-        line={
-          <>
-            The idle balance and the{" "}
-            <Prov info={yearnVaultQueueProv(coords, data.strategies.length)}>
-              {n(data.strategies.length)} {data.strategies.length === 1 ? "strategy" : "strategies"}
-            </Prov>{" "}
-            of the default queue, in its order.
-          </>
-        }
-        shareTip="The row's amount over the vault's total assets."
-        learnMore={yearnVaultAssetsContent()}
-        menu={{ exports: vaultAssetsExports(v, exportModel) }}
-      />
-      {protects}
+        </Tile>
+      </div>
+      <ColourNote />
     </ProvReceiptsScope>
   );
 }

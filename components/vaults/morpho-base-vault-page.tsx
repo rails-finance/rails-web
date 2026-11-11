@@ -19,9 +19,8 @@ import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-gr
 import { PanelFigure, type PositionPanelRow } from "@/components/shared/position-card-panel";
 import type { PositionCardHead } from "@/components/shared/position-card";
 import { AssetUnit } from "@/components/shared/asset-unit";
-import { SegmentBar, type SegmentSlice } from "@/components/shared/segment-bar";
 import { CreatedBullet, VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
-import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
+import { ALLOCATION_SCOPE, allocationBar, VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
 import { VaultFinder } from "@/components/vaults/vault-finder";
 import { VaultStrip } from "@/components/vaults/vault-strip";
 import { VaultIlliquidMarkets } from "@/components/vaults/vault-illiquid";
@@ -29,6 +28,7 @@ import { vaultHeads } from "@/components/vaults/vault-heads";
 import { ColourNote, RULE, Tile, VAULT_CARD_TILE, VAULT_GRID } from "@/components/vaults/vault-tiles";
 import { HOLDERS_SCOPE, VaultWhoHolds } from "@/components/vaults/vault-who-holds";
 import { VaultConfiguration } from "@/components/vaults/vault-config";
+import { metaMorphoConfigTile } from "@/components/vaults/vault-config-columns";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
 import { explorerUrl } from "@/lib/shared/chains";
 import {
@@ -42,8 +42,6 @@ import {
 } from "@/lib/shared/vault-amount-text";
 import { StatAmount } from "@/components/vaults/stat-amount";
 import { formatCompact } from "@/lib/shared/format-compact";
-import { assetSliceColours } from "@/lib/shared/slice-colours";
-import { tokenColour } from "@/lib/shared/token-colours";
 import { morphoBaseWalletHref } from "@/lib/morpho-base/routes";
 import { morphoLoanTokenHref, morphoMarketHref } from "@/lib/morpho/market-routes";
 import { listingHrefForWallet } from "@/lib/shared/protocols";
@@ -62,7 +60,7 @@ import {
 } from "@/lib/morpho-base/vault-provenance";
 import type { MorphoBaseVaultResponse } from "@/lib/sources/chain/morpho-base-vault";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
-import { metaMorphoVaultsListingHref } from "@/lib/vaults/routes";
+import { metaMorphoVaultHref, metaMorphoVaultsListingHref } from "@/lib/vaults/routes";
 import { morphoBaseVaultPageSummary, withAssetScale } from "@/lib/vaults/summary";
 import type { AssetScale } from "@/lib/vaults/asset-scale-words";
 import { vaultStewardProv, vaultVenueProv } from "@/lib/vaults/card-provenance";
@@ -73,7 +71,6 @@ import {
   SHARES_ISSUED_TIP,
   STEWARD_TIP,
 } from "@/lib/vaults/card-words";
-import { planAllocation } from "@/lib/vaults/allocation-plan";
 import { vaultHoldersProv } from "@/lib/vaults/row-provenance";
 import { measuredYield, type VaultYield } from "@/lib/vaults/yield";
 import type { VaultConfig } from "@/lib/vaults/config-read";
@@ -508,65 +505,8 @@ export function MorphoBaseVaultPage({
     },
   );
 
-  // Where the assets are as a segmented bar: the band's plan (a market of 2%
-  // or more alone, the rest one slice), each row's share keyed by its
-  // slice's colour.
-  const plan = planAllocation(
-    rows
-      .map((r, order) => ({ r, order, key: r.key, amount: r.amount ? BigInt(r.amount.raw) : null }))
-      .filter(({ r }) => !r.offBand),
-  );
-  const planTotal = Number(plan.total);
-  const allocParts = plan.shown.map((l) => ({
-    key: l.key,
-    label: typeof l.r.venue === "string" ? l.r.venue : shortId(l.key),
-    share: Number(l.amount ?? BigInt(0)) / planTotal,
-    rest: false,
-  }));
-  if (plan.collected.length)
-    allocParts.push({
-      key: "collected",
-      label: `${n(plan.collected.length)} more markets`,
-      share: plan.collected.reduce((t, l) => t + Number(l.amount ?? BigInt(0)), 0) / planTotal,
-      rest: true,
-    });
-  // Each market in its collateral's colour, the idle market in the asset's
-  // (lib/shared/slice-colours.ts): the icon's colour by symbol, then address,
-  // the order the icon resolves in.
-  const iconOf = new Map(rows.map((r) => [r.key, r.icon ?? asset]));
-  const allocColours = assetSliceColours(
-    allocParts.map((sl) => {
-      const t = iconOf.get(sl.key) ?? asset;
-      return sl.rest ? { rest: true } : { token: t.address, colour: tokenColour(t.symbol) ?? tokenColour(t.address) };
-    }),
-  );
-  const allocSlices: SegmentSlice[] = allocParts.map(({ key, label, share }, i) => ({
-    key,
-    label,
-    share,
-    colour: allocColours[i],
-  }));
-  const keyColours: Record<string, string> = {};
-  /** Each row's segment, for the row and its segment to light together. */
-  const segOf = new Map<string, string>();
-  for (const sl of allocSlices)
-    if (sl.key !== "collected") {
-      keyColours[sl.key] = sl.colour;
-      segOf.set(sl.key, sl.key);
-    }
-  for (const l of plan.collected) {
-    keyColours[l.key] = allocColours[allocColours.length - 1];
-    segOf.set(l.key, "collected");
-  }
-  const segRows = rows.map((r) =>
-    segOf.has(r.key) ? { ...r, hooks: { ...r.hooks, "data-seg": segOf.get(r.key)! } } : r,
-  );
-  const allocChart =
-    planTotal > 0 && allocSlices.length > 0 ? (
-      <div className="pt-4 pb-4" data-assets-bar="" data-anatomy="V3.1">
-        <SegmentBar slices={allocSlices} scope="allocation" label={`Where this vault's ${unit} is, by market`} />
-      </div>
-    ) : undefined;
+  // Where the assets are as a segmented bar, each row keyed by its slice.
+  const alloc = allocationBar(rows, { asset, venue: { one: "market", many: "markets" } });
 
   return (
     <ProvReceiptsScope registry={registry}>
@@ -629,16 +569,16 @@ export function MorphoBaseVaultPage({
           <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
         </Tile>
 
-        <Tile id="allocation" segScope="allocation" left>
+        <Tile id="allocation" segScope={ALLOCATION_SCOPE} left>
           <VaultAssets
-            rows={segRows}
+            rows={alloc.rows}
             assetSymbol={unit}
             assetAddress={asset.address}
             assetDecimals={ad}
             limit={TOP_MARKETS}
             allHref={blueWalletHref(chainId, vault.address)}
-            chart={allocChart}
-            keyColours={keyColours}
+            chart={alloc.chart}
+            keyColours={alloc.keyColours}
             look="index"
             line={
               <>
@@ -678,6 +618,8 @@ export function MorphoBaseVaultPage({
             shareSymbol={vault.symbol}
             shareDecimals={vault.decimals}
             holders={holders}
+            holderHref={(h) => metaMorphoVaultHref(chainId, vault.address, h)}
+            listingHref={holdersHref}
           />
         </Tile>
 
@@ -695,17 +637,24 @@ export function MorphoBaseVaultPage({
             chainId={chainId}
             vault={vault.address}
             vaultName={name}
-            release={v.releaseLabel}
-            factory={factory}
-            createdBlock={vault.createdBlock}
-            asset={asset}
-            assetScale={v.assetScale}
-            morpho={vault.morpho}
-            owner={vault.owner}
-            curator={vault.curator}
             block={data.blockNumber}
             readBy={coords.readBy}
-            config={config}
+            {...metaMorphoConfigTile({
+              chainId,
+              vault: vault.address,
+              vaultName: name,
+              release: v.releaseLabel,
+              factory,
+              createdBlock: vault.createdBlock,
+              asset,
+              assetScale: v.assetScale,
+              morpho: vault.morpho,
+              owner: vault.owner,
+              curator: vault.curator,
+              block: data.blockNumber,
+              readBy: coords.readBy,
+              config,
+            })}
           />
         </Tile>
       </div>

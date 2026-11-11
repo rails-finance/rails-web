@@ -1,9 +1,9 @@
 // One Aave vault's page — /ethereum/aave/vaults/<vault>.
 // ----------------------------------------------------------------------------
-// The vault card (V2), where the assets are (V3) and the holder finder (V4),
-// rails-ops ui-jobs 407, drawn by components/vaults/aave-ethereum-vault-page.tsx
-// from one pinned read of the vault and of the contracts it hops to; Holders
-// is the census's, Yield the daily store's. The Holders headline links to the
+// The vault card (V2) and the grid of tiles under it (V13; rails-ops ui-jobs
+// 407, 584), drawn by components/vaults/aave-ethereum-vault-page.tsx from one
+// pinned read of the vault and of the contracts it hops to; Holders and Who
+// holds it are the census's, Yield the daily store's. The Holders headline links to the
 // section's listing filtered to this vault.
 //
 // `?holder=` IS NOT A READING HERE. It is what the native GET form emits, and
@@ -43,6 +43,7 @@ import { loadAaveEthereumVault } from "@/lib/sources/chain/aave-ethereum-vault";
 import { RailHeader } from "@/components/shared/rail-header";
 import { loadVaultCensusRow } from "@/lib/vaults/census-read";
 import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
+import { loadVaultHolders } from "@/lib/vaults/holders-read";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 
 // Every figure is a call at the head — nothing about this is cacheable across
@@ -97,9 +98,10 @@ export default async function AaveEthereumVaultRoute({ params, searchParams }: P
   if (!data.served) notFound();
 
   const attestation = aaveVaultAttestation(address, data.vault.family);
-  const [census, series] = await Promise.all([
+  const [census, series, holders] = await Promise.all([
     loadVaultCensusRow(MAINNET_CHAIN_ID, address),
     loadVaultPageSeries(MAINNET_CHAIN_ID, address),
+    loadVaultHolders(MAINNET_CHAIN_ID, address, data.vault.family),
   ]);
 
   return (
@@ -121,11 +123,13 @@ export default async function AaveEthereumVaultRoute({ params, searchParams }: P
               yieldFigure={series.yieldFigure}
               strip={series.strip}
               attestation={attestation}
+              holders={holders}
               protects={
                 <Suspense fallback={null}>
                   <VaultProtectsSection
                     subject={{ chainId: MAINNET_CHAIN_ID, address, kind: data.vault.family }}
                     vaultName={data.vault.name || shortAddr(address)}
+                    look="paragraph"
                   />
                 </Suspense>
               }

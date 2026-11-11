@@ -1,6 +1,7 @@
 "use client";
 
-// Who holds it, on a MetaMorpho vault page (Miles, 10 Nov 2026): the census's
+// Who holds it, on a vault page (Miles, 10 Nov 2026; MetaMorpho, Aave and
+// Yearn V3 since ui-jobs 584): the census's
 // live holders by share of the vault's shares, as a donut (`ShareDonut`, the
 // live holder count in its hole) beside the ten largest holders. Holders of
 // 2% or more draw their own slice (the allocation band's rule,
@@ -42,7 +43,7 @@ import {
   otherHoldersShareProv,
   type HoldersCoords,
 } from "@/lib/vaults/holders-provenance";
-import { metaMorphoVaultHref, metaMorphoVaultsListingHref } from "@/lib/vaults/routes";
+import type { ChainId } from "@/lib/shared/chains";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const ppmPct = (ppm: number) => pctText(ppm / 1_000_000);
@@ -60,22 +61,29 @@ export function VaultWhoHolds({
   vault,
   vaultName,
   shareSymbol,
-  shareDecimals,
+  shareDecimals: readDecimals,
   holders,
+  holderHref,
+  listingHref,
 }: {
-  chainId: 1 | 8453;
+  chainId: ChainId;
   vault: string;
   vaultName: string;
   shareSymbol: string;
-  shareDecimals: number;
+  /** The share token's decimals as the page read them; the census's where the page has none. */
+  shareDecimals: number | null;
   /** The census's largest holders; null where it did not answer. */
   holders: VaultHolders | null;
+  /** A holder's position page. */
+  holderHref: (holder: string) => string;
+  /** The positions listing filtered to the vault; null where the family has none. */
+  listingHref: string | null;
 }) {
   const at = useBlockTime(chainId, holders?.censusBlock ?? null);
-  const listingHref = metaMorphoVaultsListingHref(chainId, { vault });
+  const shareDecimals = readDecimals ?? holders?.shareDecimals ?? null;
 
   let content: ReactNode;
-  if (!holders || holders.holders.length === 0) {
+  if (!holders || holders.holders.length === 0 || shareDecimals == null) {
     content = <p className="mt-3 text-[13px] text-rb-500">The census did not answer, so no holder is stated.</p>;
   } else if (!holders.sumMatches) {
     content = (
@@ -114,6 +122,11 @@ export function VaultWhoHolds({
     const restCount = holders.liveCount - top.length;
     const restPpm = Math.max(0, 1_000_000 - top.reduce((s, h) => s + h.ppm, 0));
 
+    const others = (
+      <>
+        <Prov info={otherHoldersCountProv(c, holders.liveCount, restCount, top.length)}>{n(restCount)}</Prov> others
+      </>
+    );
     const sharesOf = (balance: string) => {
       const a = { raw: balance, value: Number(formatUnitsExact(balance, shareDecimals).replace(/,/g, "")) };
       return { text: formatCompact(a.value), exact: shareText(a, shareDecimals) };
@@ -157,7 +170,7 @@ export function VaultWhoHolds({
             </DataTableHead>
             <DataTableBody>
               {top.map((h) => {
-                const href = metaMorphoVaultHref(chainId, vault, h.holder);
+                const href = holderHref(h.holder);
                 const sh = sharesOf(h.balance);
                 return (
                   <DataTableRow
@@ -207,10 +220,13 @@ export function VaultWhoHolds({
           </DataTable>
           {restCount > 0 && (
             <p className="mt-2 text-[13px] text-rb-500" data-holders-rest="">
-              <Link href={listingHref} prefetch={false} className={INLINE_LINK}>
-                <Prov info={otherHoldersCountProv(c, holders.liveCount, restCount, top.length)}>{n(restCount)}</Prov>{" "}
+              {listingHref ? (
+                <Link href={listingHref} prefetch={false} className={INLINE_LINK}>
+                  {others}
+                </Link>
+              ) : (
                 others
-              </Link>{" "}
+              )}{" "}
               hold <Prov info={otherHoldersShareProv(c, restCount, restPpm, top.length)}>{ppmPct(restPpm)}</Prov>
             </p>
           )}
@@ -227,15 +243,19 @@ export function VaultWhoHolds({
           <SectionMenu
             scope={HOLDERS_SCOPE}
             title="Who holds it"
-            links={[
-              {
-                item: "holders",
-                title: "Every holder of this vault",
-                subtitle: "The positions listing, filtered to this vault",
-                href: listingHref,
-                internal: true,
-              },
-            ]}
+            links={
+              listingHref
+                ? [
+                    {
+                      item: "holders",
+                      title: "Every holder of this vault",
+                      subtitle: "The positions listing, filtered to this vault",
+                      href: listingHref,
+                      internal: true,
+                    },
+                  ]
+                : undefined
+            }
           />
         }
       >

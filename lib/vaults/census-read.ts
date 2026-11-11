@@ -9,10 +9,16 @@ import { fetchVaultPositions } from "@/lib/api/fetch-vault-positions";
 import { ssrHop } from "@/lib/shared/listing-ssr";
 import type { VaultCensusRow } from "@/lib/aave-vaults/vault-position";
 
-export async function loadVaultCensusRow(chainId: number, vault: string): Promise<VaultCensusRow | null> {
+/** `families`: the census's word where the read must name it (Yearn's
+ *  "yearn-v3"); a chain-1 read without it answers Aave's three and MetaMorpho. */
+export async function loadVaultCensusRow(
+  chainId: number,
+  vault: string,
+  families?: string,
+): Promise<VaultCensusRow | null> {
   try {
     const hop = await ssrHop();
-    const r = await fetchVaultPositions({ chainId, vault, overlay: false, limit: 1, ...hop });
+    const r = await fetchVaultPositions({ chainId, vault, families, overlay: false, limit: 1, ...hop });
     return r.census.find((c) => c.vault.toLowerCase() === vault.toLowerCase()) ?? null;
   } catch (error) {
     console.error(`The vault census did not answer for ${vault}:`, error);

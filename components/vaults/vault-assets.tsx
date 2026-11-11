@@ -49,6 +49,9 @@ import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
 import { planAllocation } from "@/lib/vaults/allocation-plan";
 import { formatCompact } from "@/lib/shared/format-compact";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { SegmentBar, type SegmentSlice } from "@/components/shared/segment-bar";
+import { assetSliceColours } from "@/lib/shared/slice-colours";
+import { tokenColour } from "@/lib/shared/token-colours";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
@@ -84,6 +87,84 @@ export interface VaultAssetRow {
 
 /** The section's scope: its ⋮ arms the inspector on it alone. */
 export const ASSETS_SCOPE = "vault-assets";
+
+/** Where the assets are as a segment bar (V3.1), on the vault-page grid: the
+ *  band's plan (a venue of 2% or more alone, the rest one slice), each venue
+ *  in its mark's colour (a market's collateral, else the asset's;
+ *  lib/shared/slice-colours.ts), each row's share keyed by its slice's
+ *  colour, and each row lit with its slice (`data-seg`). Returns the rows with
+ *  their hooks, the chart, and the key; no chart where nothing answered. */
+export function allocationBar(
+  rows: VaultAssetRow[],
+  {
+    asset,
+    venue,
+  }: {
+    /** The vault's asset: the mark of a row with none of its own. */
+    asset: { symbol: string; address: string };
+    /** What a row is, one and many: the bar's label and the collected slice's. */
+    venue: { one: string; many: string };
+  },
+): { rows: VaultAssetRow[]; chart: ReactNode | undefined; keyColours: Record<string, string> } {
+  const plan = planAllocation(
+    rows
+      .map((r, order) => ({ r, order, key: r.key, amount: r.amount ? BigInt(r.amount.raw) : null }))
+      .filter(({ r }) => !r.offBand),
+  );
+  const planTotal = Number(plan.total);
+  const parts = plan.shown.map((l) => ({
+    key: l.key,
+    label: typeof l.r.venue === "string" ? l.r.venue : l.key,
+    share: Number(l.amount ?? BigInt(0)) / planTotal,
+    rest: false,
+  }));
+  if (plan.collected.length)
+    parts.push({
+      key: "collected",
+      label: `${n(plan.collected.length)} more ${venue.many}`,
+      share: plan.collected.reduce((t, l) => t + Number(l.amount ?? BigInt(0)), 0) / planTotal,
+      rest: true,
+    });
+  // The icon's colour by symbol, then address, the order the icon resolves in.
+  const iconOf = new Map(rows.map((r) => [r.key, r.icon ?? asset]));
+  const colours = assetSliceColours(
+    parts.map((sl) => {
+      const t = iconOf.get(sl.key) ?? asset;
+      return sl.rest ? { rest: true } : { token: t.address, colour: tokenColour(t.symbol) ?? tokenColour(t.address) };
+    }),
+  );
+  const slices: SegmentSlice[] = parts.map(({ key, label, share }, i) => ({ key, label, share, colour: colours[i] }));
+  const keyColours: Record<string, string> = {};
+  /** Each row's segment, for the row and its segment to light together. */
+  const segOf = new Map<string, string>();
+  for (const sl of slices)
+    if (sl.key !== "collected") {
+      keyColours[sl.key] = sl.colour;
+      segOf.set(sl.key, sl.key);
+    }
+  for (const l of plan.collected) {
+    keyColours[l.key] = colours[colours.length - 1];
+    segOf.set(l.key, "collected");
+  }
+  const chart =
+    planTotal > 0 && slices.length > 0 ? (
+      <div className="pt-4 pb-4" data-assets-bar="" data-anatomy="V3.1">
+        <SegmentBar
+          slices={slices}
+          scope={ALLOCATION_SCOPE}
+          label={`Where this vault's ${asset.symbol} is, by ${venue.one}`}
+        />
+      </div>
+    ) : undefined;
+  return {
+    rows: rows.map((r) => (segOf.has(r.key) ? { ...r, hooks: { ...r.hooks, "data-seg": segOf.get(r.key)! } } : r)),
+    chart,
+    keyColours,
+  };
+}
+
+/** The bar's and its rows' linking scope (the tile's `segScope`). */
+export const ALLOCATION_SCOPE = "allocation";
 
 /** The venue: its receipt around the name. A row with a page opens it from
  *  anywhere on the row (D4); the name is the one keyboard stop. */

@@ -112,8 +112,9 @@ export interface VaultSummary {
   /** The block the vault was created in, where the catalogue holds it. */
   createdBlock: number | null;
   /** The position census for this vault: every address it counted, live and
-   *  closed (a floor), and how many held shares at its block. Null where there
-   *  is no census (Yearn) or the census did not answer. */
+   *  closed (a floor), and how many held shares at its block. Null where the
+   *  read names no census (Maple; Yearn on the rosters and the index) or the
+   *  census did not answer. */
   census: { holders: number; live: number; sumMatches: boolean; atBlock: number } | null;
   /** The block every figure above was read at, and when that read was taken. */
   readAt: { block: number; timestamp: string };
@@ -371,8 +372,8 @@ export function aaveEthereumVaultPageSummary(
   };
 }
 
-/** A Yearn V3 vault's page read. There is no census. */
-export function yearnVaultPageSummary(d: YearnVaultResponse): VaultSummary {
+/** A Yearn V3 vault's page read, with its census row where the census answered. */
+export function yearnVaultPageSummary(d: YearnVaultResponse, census: VaultCensusRow | null = null): VaultSummary {
   const v = d.vault;
   const standing: VaultStanding[] = [];
   if (v.endorsed === true) standing.push("endorsed");
@@ -395,7 +396,7 @@ export function yearnVaultPageSummary(d: YearnVaultResponse): VaultSummary {
     steward: v.roleManager ? { role: "roleManager", address: v.roleManager } : null,
     standing,
     createdBlock: v.createdBlock,
-    census: null,
+    census: censusOf(census ?? undefined),
     readAt: { block: d.blockNumber, timestamp: "" },
   };
 }

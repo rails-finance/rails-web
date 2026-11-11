@@ -106,7 +106,7 @@ export async function MetaMorphoVaultRoute({
     load(chainId, address, undefined),
     loadVaultCensusRow(chainId, address),
     loadVaultPageSeries(chainId, address),
-    loadVaultHolders(chainId, address),
+    loadVaultHolders(chainId, address, "morpho"),
   ]);
   const [assetScales, config] = data.chainStale
     ? [{}, null]

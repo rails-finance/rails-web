@@ -1,11 +1,15 @@
 "use client";
 
-// One Aave vault's page on Ethereum (rails-ops ui-jobs 407): the vault card
-// (V2), the last 30 days (V5), where the assets are (V3) and the holder finder (V4), for savings GHO,
-// a static aToken or an Umbrella stake token. One block's read of the vault
-// and of the contracts it hops to (lib/sources/chain/aave-ethereum-vault.ts);
-// Holders is the census's, Yield the daily store's. No USD: every figure is a
-// quantity of one named token.
+// One Aave vault's page on Ethereum (rails-ops ui-jobs 407; the grid of tiles,
+// ui-jobs 584), for savings GHO, a static aToken or an Umbrella stake token:
+// the holder finder (V4), the vault card (V2), then the grid
+// (components/vaults/vault-tiles.tsx): the last 30 days (V5); where the
+// assets are (V3) | who holds it (V11); what protects it (V9) | the protocol
+// underneath (V10), streamed by the route; configuration and addresses (V12);
+// the colour note at the foot. One block's read of the vault and of the
+// contracts it hops to (lib/sources/chain/aave-ethereum-vault.ts); Holders and
+// Who holds it are the census's, Yield the daily store's. No USD: every figure
+// is a quantity of one named token.
 
 import Link from "next/link";
 import { ProvReceiptsScope, Prov, useReceiptRegistry } from "@/components/shared/provenance";
@@ -14,7 +18,12 @@ import type { SectionMenuLink } from "@/components/shared/section-menu";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
 import { PanelFigure, type PositionPanelRow } from "@/components/shared/position-card-panel";
 import { VaultCard, YieldBullets, type VaultMenuLink } from "@/components/vaults/vault-card";
-import { VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
+import { ALLOCATION_SCOPE, allocationBar, VaultAssets, type VaultAssetRow } from "@/components/vaults/vault-assets";
+import { ColourNote, RULE, Tile, VAULT_CARD_TILE, VAULT_GRID } from "@/components/vaults/vault-tiles";
+import { HOLDERS_SCOPE, VaultWhoHolds } from "@/components/vaults/vault-who-holds";
+import { VaultConfiguration } from "@/components/vaults/vault-config";
+import { aaveConfigTile } from "@/components/vaults/vault-config-columns";
+import type { VaultHolders } from "@/lib/vaults/holders-read";
 import { VaultFinder } from "@/components/vaults/vault-finder";
 import { VaultStrip } from "@/components/vaults/vault-strip";
 import type { VaultStripSeries } from "@/lib/vaults/yield-read";
@@ -78,6 +87,7 @@ export function AaveEthereumVaultPage({
   yieldFigure: storeYield,
   strip,
   attestation,
+  holders,
 }: {
   /** "What protects it" and "The protocol underneath" (V9, V10), streamed by the route. */
   protects?: React.ReactNode;
@@ -87,6 +97,8 @@ export function AaveEthereumVaultPage({
   /** The store's three daily series for the strip (V5); null where it did not answer. */
   strip: VaultStripSeries | null;
   attestation: AaveVaultAttestation;
+  /** Who holds it: the census's largest holders; null where it did not answer. */
+  holders: VaultHolders | null;
 }) {
   const registry = useReceiptRegistry();
   const { vault } = data;
@@ -676,81 +688,133 @@ export function AaveEthereumVaultPage({
       }
     : null;
 
+  const holdersHref = ethereumVaultsListingHref({ vault: vault.address });
+  const alloc = allocationBar(rows, { asset, venue: { one: "venue", many: "venues" } });
+  const config = aaveConfigTile({ data, coords, kind: v.releaseLabel });
+
   return (
     <ProvReceiptsScope registry={registry}>
       <VaultFinder />
-      <VaultCard
-        vault={v}
-        yieldFigure={yieldFigure}
-        holdersHref={ethereumVaultsListingHref({ vault: vault.address })}
-        receipts={{
-          name: aaveVaultNameProv(coords, attestation),
-          totalAssets: aaveVaultTotalAssetsProv(coords, family),
-          sharePrice: sd != null ? aaveVaultSharePriceProv(coords, sd) : undefined,
-          standing: { "address-book": aaveVaultBookProv(coords, attestation) },
-        }}
-        pillHooks={{ "address-book": { "data-vault-attestation": attestation.kind } }}
-        hooks={{ "data-mechanic": family, "data-vault-attestation-kind": attestation.kind }}
-        status={status}
-        stats={stats}
-        links={links}
-        explanation={explanation}
-        learnMore={aaveVaultCardContent(family)}
-        stamp={
-          <SectionReadStamp
-            chainId={MAINNET_CHAIN_ID}
-            block={data.blockNumber}
-            blockTime={data.blockTimestamp || null}
-            readBy={coords.readBy}
-            info={(at) =>
-              readStampProv({
-                chainId: MAINNET_CHAIN_ID,
-                block: data.blockNumber,
-                at,
-                readBy: coords.readBy,
-                what: "Every figure on this card and in where the assets are",
-                contracts: readContracts,
-              })
+      <Tile id="summary" flush>
+        <div className={VAULT_CARD_TILE}>
+          <VaultCard
+            vault={v}
+            yieldFigure={yieldFigure}
+            holdersHref={holdersHref}
+            receipts={{
+              name: aaveVaultNameProv(coords, attestation),
+              totalAssets: aaveVaultTotalAssetsProv(coords, family),
+              sharePrice: sd != null ? aaveVaultSharePriceProv(coords, sd) : undefined,
+              standing: { "address-book": aaveVaultBookProv(coords, attestation) },
+            }}
+            pillHooks={{ "address-book": { "data-vault-attestation": attestation.kind } }}
+            hooks={{ "data-mechanic": family, "data-vault-attestation-kind": attestation.kind }}
+            status={status}
+            stats={stats}
+            links={links}
+            explanation={explanation}
+            learnMore={aaveVaultCardContent(family)}
+            stamp={
+              <SectionReadStamp
+                chainId={MAINNET_CHAIN_ID}
+                block={data.blockNumber}
+                blockTime={data.blockTimestamp || null}
+                readBy={coords.readBy}
+                info={(at) =>
+                  readStampProv({
+                    chainId: MAINNET_CHAIN_ID,
+                    block: data.blockNumber,
+                    at,
+                    readBy: coords.readBy,
+                    what: "Every figure on this card and in where the assets are",
+                    contracts: readContracts,
+                  })
+                }
+              />
             }
+            exports={{ stats: exportStats, rows: exportRows }}
           />
-        }
-        exports={{ stats: exportStats, rows: exportRows }}
-      />
-      <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
-      <VaultAssets
-        rows={rows}
-        assetSymbol={unit}
-        assetAddress={asset.address}
-        assetDecimals={ad}
-        line={
-          family === "sgho" ? (
-            <>The GHO the contract holds, beside its total assets.</>
-          ) : family === "stata" ? (
-            <>One supply position in the Aave V3 Core market.</>
-          ) : (
-            <>
-              The stake, and the hop to the <PanelFigure>{data.umbrella?.reserve?.symbol ?? "reserve"}</PanelFigure> it
-              covers.
-            </>
-          )
-        }
-        shareTip="The row's amount over the vault's total assets."
-        learnMore={aaveVaultAssetsContent(family)}
-        menu={{
-          links: [
-            ...assetLinks,
-            {
-              item: "holders",
-              title: "This vault's holders",
-              subtitle: "Every address that holds a share",
-              href: ethereumVaultsListingHref({ vault: vault.address }),
-              internal: true,
-            },
-          ],
-          exports: vaultAssetsExports(v, { stats: exportStats, rows: exportRows }),
-        }}
-      />
-      {protects}
+        </div>
+      </Tile>
+
+      <div className={VAULT_GRID} data-vault-grid="" data-anatomy="V13">
+        <Tile id="last-30-days" wide>
+          <VaultStrip vault={v} strip={strip} yieldFigure={yieldFigure} />
+        </Tile>
+
+        <Tile id="allocation" segScope={ALLOCATION_SCOPE} left>
+          <VaultAssets
+            rows={alloc.rows}
+            assetSymbol={unit}
+            assetAddress={asset.address}
+            assetDecimals={ad}
+            chart={alloc.chart}
+            keyColours={alloc.keyColours}
+            look="index"
+            line={
+              family === "sgho" ? (
+                <>The GHO the contract holds, beside its total assets.</>
+              ) : family === "stata" ? (
+                <>One supply position in the Aave V3 Core market.</>
+              ) : (
+                <>
+                  The stake, and the hop to the <PanelFigure>{data.umbrella?.reserve?.symbol ?? "reserve"}</PanelFigure>{" "}
+                  it covers.
+                </>
+              )
+            }
+            shareTip="The row's amount over the vault's total assets."
+            learnMore={aaveVaultAssetsContent(family)}
+            menu={{
+              links: [
+                ...assetLinks,
+                {
+                  item: "holders",
+                  title: "This vault's holders",
+                  subtitle: "Every address that holds a share",
+                  href: holdersHref,
+                  internal: true,
+                },
+              ],
+              exports: vaultAssetsExports(v, { stats: exportStats, rows: exportRows }),
+            }}
+          />
+        </Tile>
+
+        <Tile id="holders" segScope={HOLDERS_SCOPE} right>
+          <VaultWhoHolds
+            chainId={MAINNET_CHAIN_ID}
+            vault={vault.address}
+            vaultName={vaultName}
+            shareSymbol={vault.symbol ?? vaultName}
+            shareDecimals={sd}
+            holders={holders}
+            holderHref={(h) => ethereumVaultHref(vault.address, h)}
+            listingHref={holdersHref}
+          />
+        </Tile>
+
+        {/* What protects it and The protocol underneath stream in as two
+            sections: one wide tile, split in two from lg by a hairline. */}
+        <Tile id="risk" wide flush>
+          <div className="grid grid-cols-1 lg:grid-cols-2 [&>section]:!px-0 [&>section]:!py-5 sm:[&>section]:!p-5">
+            <i aria-hidden className={`pointer-events-none absolute inset-y-5 left-1/2 hidden w-px lg:block ${RULE}`} />
+            {protects}
+          </div>
+        </Tile>
+
+        <Tile id="configuration" wide last>
+          <VaultConfiguration
+            chainId={MAINNET_CHAIN_ID}
+            vault={vault.address}
+            vaultName={vaultName}
+            block={data.blockNumber}
+            readBy={coords.readBy}
+            {...config}
+          />
+        </Tile>
+      </div>
+      <ColourNote />
     </ProvReceiptsScope>
   );
 }

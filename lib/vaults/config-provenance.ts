@@ -1,8 +1,10 @@
-// The receipts of a MetaMorpho vault page's Configuration and addresses: each
-// role and contract the vault names (`owner()`, `curator()`, `guardian()`,
-// `feeRecipient()`, `asset()`, `MORPHO()`) and `fee()` at the card's pinned
-// block; the release and the creation block from the factory's
-// `CreateMetaMorpho` log; what the asset wraps from its `asset()`.
+// The receipts of a vault page's Configuration and addresses: each role and
+// contract the vault names (on MetaMorpho `owner()`, `curator()`,
+// `guardian()`, `feeRecipient()`, `asset()`, `MORPHO()`; on Aave and Yearn
+// the calls their pages read) and `fee()` at the card's pinned block; the
+// release and the creation block from the factory's creation log
+// (`CreateMetaMorpho`, Yearn's `NewVault`); what the asset wraps from its
+// `asset()`.
 
 import { powerOfTen, type Provenance } from "@/components/shared/provenance";
 import { formatDate } from "@/lib/date";
@@ -75,11 +77,13 @@ export interface VaultCreation {
   chainId: ChainId;
   vault: string;
   vaultName: string;
-  /** "MetaMorpho V1.1". */
+  /** "MetaMorpho V1.1", "Yearn V3 3.0.4". */
   release: string;
+  /** The factory's creation log: "CreateMetaMorpho", "NewVault". */
+  log: string;
   /** The factory's address, from the catalogue; null where it holds none. */
   factory: string | null;
-  /** The block of the `CreateMetaMorpho` log. */
+  /** The block of the creation log. */
   block: number;
   /** That block's time, seconds; null where it was not read. */
   at: number | null;
@@ -99,9 +103,9 @@ export function configReleaseProv(k: VaultCreation): Provenance {
       href: explorerUrl(k.chainId, "block", k.block),
       text: `Block ${n(k.block)} on ${chainMeta(k.chainId).explorerName}`,
     },
-    summary: `Version — ${k.release}: the ${k.release} factory${k.factory ? ` ${k.factory}` : ""} emitted the \`CreateMetaMorpho\` log naming ${k.vault} at block ${n(k.block)}, as Rails's roster of each factory's creation logs records it.`,
+    summary: `Version — ${k.release}: the ${k.release} factory${k.factory ? ` ${k.factory}` : ""} emitted the \`${k.log}\` log naming ${k.vault} at block ${n(k.block)}, as Rails's roster of each factory's creation logs records it.`,
     contract: factoryContract(k),
-    via: "CreateMetaMorpho(metaMorpho, …) log on the factory · the Rails roster",
+    via: `${k.log} log on the factory · the Rails roster`,
   };
 }
 
@@ -116,9 +120,9 @@ export function configCreatedProv(k: VaultCreation): Provenance {
       href: explorerUrl(k.chainId, "block", k.block),
       text: `Block ${n(k.block)} on ${chainMeta(k.chainId).explorerName}`,
     },
-    summary: `Created — block ${n(k.block)}${k.at != null ? `, ${formatDate(new Date(k.at * 1000))}` : ""}: the block of the factory's \`CreateMetaMorpho\` log naming the vault${k.at != null ? "; the date is that block's timestamp" : ""}.`,
+    summary: `Created — block ${n(k.block)}${k.at != null ? `, ${formatDate(new Date(k.at * 1000))}` : ""}: the block of the factory's \`${k.log}\` log naming the vault${k.at != null ? "; the date is that block's timestamp" : ""}.`,
     contract: factoryContract(k),
-    via: "CreateMetaMorpho log · eth_getBlockByNumber(creation block).timestamp",
+    via: `${k.log} log · eth_getBlockByNumber(creation block).timestamp`,
     inputs: [
       { label: "creation block", value: n(k.block), kind: "chain", pclass: "emitted" },
       ...(k.at != null
@@ -139,9 +143,9 @@ export function configVaultProv(k: VaultCreation): Provenance {
       href: explorerUrl(k.chainId, "address", k.vault),
       text: `The vault on ${chainMeta(k.chainId).explorerName}`,
     },
-    summary: `Vault — ${k.vault}, ${k.vaultName}: the contract the ${k.release} factory's \`CreateMetaMorpho\` log names at block ${n(k.block)}, and the address every figure on this page is read from.`,
+    summary: `Vault — ${k.vault}, ${k.vaultName}: the contract the ${k.release} factory's \`${k.log}\` log names at block ${n(k.block)}, and the address every figure on this page is read from.`,
     contract: factoryContract(k),
-    via: "CreateMetaMorpho(metaMorpho, …) log on the factory · the Rails roster",
+    via: `${k.log} log on the factory · the Rails roster`,
   };
 }
 

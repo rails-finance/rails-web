@@ -1,8 +1,8 @@
 // ONE YEARN V3 VAULT'S PAGE — /ethereum/yearn/vaults/<vault>.
 // ----------------------------------------------------------------------------
-// The vault card (V2), where the assets are (V3) and the holder finder (V4),
-// rails-ops ui-jobs 407, drawn by components/vaults/yearn-vault-page.tsx from
-// one block's read of the vault. A fund factsheet (decision 0017, which 0028
+// The vault card (V2) and the grid of tiles under it (V13; rails-ops ui-jobs
+// 407, 584), drawn by components/vaults/yearn-vault-page.tsx from one block's
+// read of the vault; Holders and Who holds it are the census's. A fund factsheet (decision 0017, which 0028
 // left standing). `?holder=` is the finder's submit and is sent on to the
 // holder's own page one segment down.
 //
@@ -31,6 +31,8 @@ import { loadYearnEthereumVault } from "@/lib/sources/chain/yearn-ethereum-vault
 import { isYearnRosterVault, yearnRosterEntry } from "@/lib/yearn/vault-roster";
 import { YEARN_CHAIN_ID } from "@/lib/sources/chain/yearn-ethereum-vault-directory";
 import { loadVaultPageSeries } from "@/lib/vaults/yield-read";
+import { loadVaultHolders } from "@/lib/vaults/holders-read";
+import { loadVaultCensusRow } from "@/lib/vaults/census-read";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 
 // Every figure is a slot read at the head — nothing about this is cacheable
@@ -74,7 +76,12 @@ export default async function YearnVaultRoute({ params, searchParams }: Props) {
   const typed = firstParam((await searchParams).holder)?.trim();
   if (typed) redirect(yearnVaultHref(address, typed));
 
-  const [data, series] = await Promise.all([load(address), loadVaultPageSeries(YEARN_CHAIN_ID, address)]);
+  const [data, series, census, holders] = await Promise.all([
+    load(address),
+    loadVaultPageSeries(YEARN_CHAIN_ID, address),
+    loadVaultCensusRow(YEARN_CHAIN_ID, address, "yearn-v3"),
+    loadVaultHolders(YEARN_CHAIN_ID, address, "yearn-v3"),
+  ]);
   // The strategies that are roster vaults with a page here (a Yearn V3 vault,
   // a MetaMorpho vault on Ethereum): "Where the assets are" opens them.
   const strategyPages: Record<string, string> = {};
@@ -105,11 +112,14 @@ export default async function YearnVaultRoute({ params, searchParams }: Props) {
               yieldFigure={series.yieldFigure}
               strip={series.strip}
               strategyPages={strategyPages}
+              census={census}
+              holders={holders}
               protects={
                 <Suspense fallback={null}>
                   <VaultProtectsSection
                     subject={{ chainId: YEARN_CHAIN_ID, address, kind: "yearn-v3", createdBlock: entry.createdBlock }}
                     vaultName={entry.name}
+                    look="paragraph"
                   />
                 </Suspense>
               }

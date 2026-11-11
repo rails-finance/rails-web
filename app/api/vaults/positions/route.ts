@@ -78,11 +78,11 @@ const CENSUS_CHAINS: readonly ChainId[] = [MAINNET_CHAIN_ID, BASE_CHAIN_ID];
 
 /** The families each chain's census writes. Base has exactly one — every
  *  catalogued vault there is MetaMorpho — so it is a value the route accepts
- *  and never a menu the listing offers. Chain 1 holds Aave's three and
- *  MetaMorpho's (ui-jobs 486); rails-server scopes a chain-1 read to Aave's
- *  three unless `families` names others. */
+ *  and never a menu the listing offers. Chain 1 holds Aave's three,
+ *  MetaMorpho's (ui-jobs 486) and Yearn V3's (ui-jobs 584); rails-server
+ *  scopes a chain-1 read to Aave's three unless `families` names others. */
 const FAMILIES_BY_CHAIN: Record<number, readonly string[]> = {
-  [MAINNET_CHAIN_ID]: [...AAVE_VAULT_FAMILY_ORDER, "morpho"],
+  [MAINNET_CHAIN_ID]: [...AAVE_VAULT_FAMILY_ORDER, "morpho", "yearn-v3"],
   [BASE_CHAIN_ID]: ["morpho"],
 };
 
