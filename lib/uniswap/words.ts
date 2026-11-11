@@ -7,6 +7,7 @@
 //
 // Pure, with type imports only: scripts/test/uniswap.test.mjs reads it.
 
+import { protocolName, uniDeployment, type UniProtocol } from "./deployments";
 import type { HookFlag, PoolPosition, ProtocolCut } from "./position";
 import type { AsideReason, PairOrder, PoolCard } from "./pairs";
 import type { UniswapVersion } from "./types";
@@ -50,8 +51,12 @@ export const short = (a: string): string => `${a.slice(0, 6)}…${a.slice(-4)}`;
 /** "#1,083,471". */
 export const positionNumber = (id: string): string => `#${Number(id).toLocaleString("en-US")}`;
 
-/** "Uniswap V3". */
-export const versionLabel = (v: UniswapVersion): string => `Uniswap ${v.toUpperCase()}`;
+/** "Uniswap V3", "PancakeSwap V3". */
+export const versionLabel = (v: UniswapVersion, protocol: UniProtocol = "uniswap"): string =>
+  `${protocolName(protocol)} ${v.toUpperCase()}`;
+
+/** The chain a position's or a card's pool is on: "Ethereum", "Base". */
+const chainName = (p: { protocol: UniProtocol; chainId: number }) => uniDeployment(p.protocol, p.chainId).chainName;
 
 const feeText = (fee: number) => `${(fee / 1e4).toLocaleString("en-US", { maximumFractionDigits: 4 })}%`;
 
@@ -89,8 +94,16 @@ export function shown(p: Pick<PoolPosition, "price" | "priceThen" | "range" | "b
 
 const pips = (x: number) => `${(x / 1e4).toLocaleString("en-US", { maximumFractionDigits: 4 })}%`;
 
-/** The Steward line's sentence on Uniswap's cut. */
+const bps = (x: number) => `${(x / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
+
+/** The Steward line's sentence on the protocol's cut. */
 export function cutSentence(c: ProtocolCut): string {
+  if (c.version === "pancake-v3") {
+    const { s0: a, s1: b } = c;
+    if (!a && !b) return "PancakeSwap takes none of this pool's fees.";
+    if (a === b) return `PancakeSwap takes ${bps(a)} of the swap fees, out of what liquidity providers earn.`;
+    return `PancakeSwap takes ${bps(a)} of fees paid in one token and ${bps(b)} in the other, out of what liquidity providers earn.`;
+  }
   if (c.version === "v3") {
     const { d0: a, d1: b } = c;
     if (!a && !b) return "Uniswap takes none of this pool's fees.";
@@ -106,6 +119,7 @@ export function cutSentence(c: ProtocolCut): string {
 
 /** A pair card's protocol fee: "1/4 of LP fees", "0.05% added to swaps", "none". */
 export function cutShort(c: ProtocolCut): string {
+  if (c.version === "pancake-v3") return c.s0 ? `${bps(c.s0)} of swap fees` : "none";
   if (c.version === "v3") return c.d0 ? `1/${c.d0} of LP fees` : "none";
   return c.p0 ? `${pips(c.p0)} added to swaps` : "none";
 }
@@ -138,9 +152,11 @@ const REMOVE = new Set<HookFlag>(["beforeRemoveLiquidity", "afterRemoveLiquidity
 
 export const POSITION_PAGE = {
   title: (p: PoolPosition) =>
-    `${p.base.symbol}/${p.quote.symbol} · ${versionLabel(p.version)} · position ${positionNumber(p.id)}`,
-  sub: (p: PoolPosition) => `Fee ${feeLabel(p)} · Ethereum${p.hooks ? ` · hook ${short(p.hooks)}` : ""}`,
-  notFound: (v: UniswapVersion, id: string) => `${versionLabel(v)} has no position ${positionNumber(id)}.`,
+    `${p.base.symbol}/${p.quote.symbol} · ${versionLabel(p.version, p.protocol)} · position ${positionNumber(p.id)}`,
+  sub: (p: PoolPosition) =>
+    `Fee ${feeLabel(p)} · ${chainName(p)}${p.hooks ? ` · hook ${short(p.hooks)}` : ""}${p.staked ? " · staked in PancakeSwap's farm" : ""}`,
+  notFound: (v: UniswapVersion, id: string, protocol: UniProtocol = "uniswap") =>
+    `${versionLabel(v, protocol)} has no position ${positionNumber(id)}.`,
   unanswered: "The read of this position did not answer. Try again in a minute.",
 };
 
@@ -154,6 +170,8 @@ export const CARD_WORDS = {
   worthTip: (q: string) => `Both tokens valued in ${q} at the pool's price now.`,
   uncollectedTip: "Fees the position has earned and the owner has not collected yet.",
   openedTip: "The day the position took its first deposit.",
+  cake: "CAKE not yet harvested",
+  cakeTip: "CAKE PancakeSwap's farm has paid this staked position that the staker has not harvested yet.",
   foot: (q: string) => `In ${q}, at the pool's own price. Rails prices nothing in dollars here.`,
   rangeLabel: "The range against the price",
   fullRange: "Full range: the position is in range at every price.",
@@ -184,6 +202,12 @@ export function cardExplainer(p: PoolPosition): ExplainGroupWords[] {
     ],
     ["Fees not yet collected come to ", { fig: `${num(p.uncollected)} ${Q}` }, "."],
   ];
+  if (p.staked)
+    position.push([
+      "The position is staked in PancakeSwap's farm, with ",
+      { fig: `${num(p.staked.pendingCake)} ${p.staked.cake.symbol}` },
+      " not yet harvested.",
+    ]);
   if (p.opened) position.push(["The position opened on ", { fig: day(p.opened.time) }, "."]);
   position.push(
     p.range.full
@@ -212,7 +236,7 @@ export function cardExplainer(p: PoolPosition): ExplainGroupWords[] {
 
 // ── Door 1: the readout ────────────────────────────────────────────────────
 
-export type LineKey = "range" | "fees" | "against" | "size" | "withdrawals" | "steward";
+export type LineKey = "range" | "fees" | "cake" | "against" | "size" | "withdrawals" | "steward";
 
 export interface ReadoutLine {
   key: LineKey;
@@ -243,9 +267,12 @@ export function readoutLines(p: PoolPosition): ReadoutLine[] {
     : p.inRange
       ? `In range: the price, ${num(s.price)} ${s.unit}, sits inside ${num(s.low)} to ${num(s.high)}.`
       : `Out of range, ${s.side} it: the price is ${num(s.price)} ${s.unit}, the range ${num(s.low)} to ${num(s.high)}. It holds only ${onlyHolds ?? "one token"} and earns no fees while the price is outside.`;
+  // Without the chain's history (Base) a position opened inside the window has no opening day, and
+  // the daily reads before it opened are not its own.
+  const newInWindow = !opened && p.openedInWindow;
   const dir = p.daysInRange;
   const days =
-    dir && dir.read > 0
+    dir && dir.read > 0 && !newInWindow
       ? opened
         ? `In range on ${dir.inRange} of ${dir.read} daily reads since it opened on ${day(opened)}.`
         : `In range on ${dir.inRange} of the last ${dir.read} days, read once a day.`
@@ -263,11 +290,13 @@ export function readoutLines(p: PoolPosition): ReadoutLine[] {
   // Fees
   const feesYours = opened
     ? `Opened on ${day(opened)}, inside the window: its first 30-day figure is on ${day(opened + 30 * 86400)}.`
-    : p.liquidityChanged
-      ? "Its liquidity changed inside the window, so Rails does not state its 30-day fees yet."
-      : p.fees30d !== null
-        ? `Earned ${num(p.fees30d)} ${Q} in fees in the last 30 days.`
-        : null;
+    : newInWindow
+      ? "It did not exist 30 days ago, so Rails states no 30-day fees yet."
+      : p.liquidityChanged
+        ? "Its liquidity changed inside the window, so Rails does not state its 30-day fees yet."
+        : p.fees30d !== null
+          ? `Earned ${num(p.fees30d)} ${Q} in fees in the last 30 days.`
+          : null;
   const uncollected = p.uncollected > 0 ? `Not yet collected: ${num(p.uncollected)} ${Q}.` : null;
   const fees: ReadoutLine = {
     key: "fees",
@@ -282,11 +311,13 @@ export function readoutLines(p: PoolPosition): ReadoutLine[] {
   // Against holding
   const ahYours = opened
     ? "Opened inside the window."
-    : p.liquidityChanged
-      ? "Its liquidity changed inside the window, so Rails does not state this yet."
-      : p.againstHolding !== null && p.againstHoldingWithFees !== null
-        ? `${pct(p.againstHolding)} against holding the tokens it held on ${day(p.then.time)}, both valued at today's price; ${pct(p.againstHoldingWithFees)} with the fees it earned.`
-        : null;
+    : newInWindow
+      ? "It did not exist 30 days ago."
+      : p.liquidityChanged
+        ? "Its liquidity changed inside the window, so Rails does not state this yet."
+        : p.againstHolding !== null && p.againstHoldingWithFees !== null
+          ? `${pct(p.againstHolding)} against holding the tokens it held on ${day(p.then.time)}, both valued at today's price; ${pct(p.againstHoldingWithFees)} with the fees it earned.`
+          : null;
   const sd = p.sinceDeposit;
   const against: ReadoutLine = {
     key: "against",
@@ -296,7 +327,9 @@ export function readoutLines(p: PoolPosition): ReadoutLine[] {
       ? `Since its first deposit on ${p.opened ? day(p.opened.time) : "–"}: ${num(sd.deposited.base)} ${B} and ${num(sd.deposited.quote)} ${Q} put in, ${num(sd.holdValue)} ${Q} if held. The position, its unpaid fees and all it has paid out come to ${num(sd.nowWithEverything)} ${Q}: ${pct(sd.nowWithEverything / sd.holdValue - 1)}.`
       : p.version === "v4"
         ? "Since its first deposit: Rails does not read a V4 position's own deposits yet."
-        : null,
+        : !p.historyRead
+          ? `Since its first deposit: Rails does not read a position's deposits on ${chainName(p)} yet.`
+          : null,
   };
 
   // Size
@@ -318,11 +351,13 @@ export function readoutLines(p: PoolPosition): ReadoutLine[] {
   const withdrawals: ReadoutLine = {
     key: "withdrawals",
     label: "Withdrawals",
-    yours: !p.hooks
-      ? "Can be withdrawn at any block. The pool has no pause and no hook."
-      : removes
-        ? `The pool's hook ${short(p.hooks)} runs on every withdrawal and can block it or take from it.`
-        : `Can be withdrawn at any block. The pool's hook ${short(p.hooks)} runs on ${list(hookActions(p.hookPermissions))}, and has no permission on withdrawals.`,
+    yours: p.staked
+      ? "Can be withdrawn at any block by the staker, through PancakeSwap's farm, which holds the position. The pool has no pause and no hook."
+      : !p.hooks
+        ? "Can be withdrawn at any block. The pool has no pause and no hook."
+        : removes
+          ? `The pool's hook ${short(p.hooks)} runs on every withdrawal and can block it or take from it.`
+          : `Can be withdrawn at any block. The pool's hook ${short(p.hooks)} runs on ${list(hookActions(p.hookPermissions))}, and has no permission on withdrawals.`,
     pool: p.hasSubscriber ? "A subscriber contract is notified of the position's changes." : null,
   };
 
@@ -338,9 +373,26 @@ export function readoutLines(p: PoolPosition): ReadoutLine[] {
     } ${cutSentence(p.protocolCut)}`,
   };
 
+  // CAKE: PancakeSwap's farm, staked or not.
+  const cakeLine: ReadoutLine[] =
+    p.staked === undefined
+      ? []
+      : [
+          {
+            key: "cake",
+            label: "CAKE",
+            yours: p.staked
+              ? `Staked in PancakeSwap's farm: ${num(p.staked.pendingCake)} ${p.staked.cake.symbol} not yet harvested.`
+              : "Not staked in PancakeSwap's farm, so it earns no CAKE.",
+            pool: p.staked
+              ? "A staked position keeps earning the pool's swap fees, and earns CAKE while it is in range."
+              : null,
+          },
+        ];
+
   return p.inRange || p.range.full
-    ? [size, fees, range, withdrawals, against, steward]
-    : [range, size, fees, withdrawals, against, steward];
+    ? [size, fees, ...cakeLine, range, withdrawals, against, steward]
+    : [range, size, fees, ...cakeLine, withdrawals, against, steward];
 }
 
 /** The readout's (i): one group per line, in the lines' order (charter §4, "Product panes follow
@@ -357,6 +409,14 @@ export function readoutExplainer(p: PoolPosition, order: readonly LineKey[]): Ex
       bullets: [
         ["Each swap pays the pool's fee to the liquidity in range at that moment."],
         ["A donation to the pool counts as a fee in the pool's figure."],
+      ],
+    },
+    cake: {
+      title: "CAKE",
+      bullets: [
+        [
+          "A position staked in PancakeSwap's farm earns CAKE on top of its swap fees; the staker harvests the CAKE and collects the fees through the farm.",
+        ],
       ],
     },
     against: {
@@ -376,7 +436,11 @@ export function readoutExplainer(p: PoolPosition, order: readonly LineKey[]): Ex
     steward: {
       title: "Steward",
       bullets: [
-        ["Uniswap's governance sets the protocol fee."],
+        [
+          p.protocol === "pancakeswap"
+            ? "The owner of PancakeSwap's factory sets the protocol fee."
+            : "Uniswap's governance sets the protocol fee.",
+        ],
         ...(p.dynamicFee ? [["A dynamic fee is set by the pool's hook and can change at any swap."]] : []),
       ],
     },
@@ -387,16 +451,20 @@ export function readoutExplainer(p: PoolPosition, order: readonly LineKey[]): Ex
 // ── Door 1: the front door and a wallet's positions ────────────────────────
 
 export const FRONT_DOOR = {
-  line: (v: UniswapVersion) =>
-    `A wallet's ${versionLabel(v)} positions on Ethereum, each with its range, fees and pool over the last 30 days.`,
-  heading: (v: UniswapVersion) => `${versionLabel(v)} positions`,
-  none: (v: UniswapVersion) => `This address holds no ${versionLabel(v)} position with liquidity in it.`,
-  other: (v: UniswapVersion, n: number) =>
-    `It also holds ${n.toLocaleString("en-US")} ${versionLabel(v)} ${n === 1 ? "position" : "positions"}.`,
+  line: (v: UniswapVersion, protocol: UniProtocol = "uniswap", chainId = 1) =>
+    `A wallet's ${versionLabel(v, protocol)} positions on ${uniDeployment(protocol, chainId).chainName}, each with its range, fees and pool over the last 30 days.`,
+  /** PancakeSwap's door adds its farm. */
+  stakedLine: "Positions staked in PancakeSwap's farm are listed under the wallet that staked them.",
+  heading: (v: UniswapVersion, protocol: UniProtocol = "uniswap") => `${versionLabel(v, protocol)} positions`,
+  none: (v: UniswapVersion, protocol: UniProtocol = "uniswap") =>
+    `This address holds no ${versionLabel(v, protocol)} position with liquidity in it.`,
+  other: (v: UniswapVersion, n: number, protocol: UniProtocol = "uniswap") =>
+    `It also holds ${n.toLocaleString("en-US")} ${versionLabel(v, protocol)} ${n === 1 ? "position" : "positions"}.`,
   truncated: "The newest 200 are listed.",
   unanswered: "The read of this wallet's positions did not answer. Try again in a minute.",
   row: (p: { id: string; token0: { symbol: string }; token1: { symbol: string }; fee: number }, v: UniswapVersion) =>
     `${positionNumber(p.id)} · ${p.token0.symbol}/${p.token1.symbol} ${v === "v4" && p.fee === 0x800000 ? "dynamic fee" : feeText(p.fee)}`,
+  staked: "staked",
 };
 
 // ── Door 2: the /start pair step ───────────────────────────────────────────
@@ -432,10 +500,13 @@ export const PAIR_DOOR = {
     fees: "Highest 30-day fees",
     range: "Narrowest 90-day fee range",
   } as Record<PairOrder, string>,
-  intro: (o: PairOrder): string =>
+  /** `v4`: whether V4 pools can be among the cards (the order's note on them). */
+  intro: (o: PairOrder, v4 = true): string =>
     `${
       o === "size"
-        ? "Largest first, by the two balances valued at the pool's price; V4 pools after, since Rails does not read their size yet."
+        ? v4
+          ? "Largest first, by the two balances valued at the pool's price; V4 pools after, since Rails does not read their size yet."
+          : "Largest first, by the two balances valued at the pool's price."
         : o === "fees"
           ? "By what a full-range position earned in fees over the last 30 days, as a share of its value."
           : "By the spread of full-range fees across the three 30-day windows of the last 90 days."
@@ -444,12 +515,13 @@ export const PAIR_DOOR = {
     `${all ? "Showing" : "Setting aside"} ${n.toLocaleString("en-US")} ${n === 1 ? "pool" : "pools"} that are empty or thin in range, younger than 30 days, or show a 30-day fee figure above 10%; each card says which.`,
   show: "Show them",
   hide: "Hide them",
-  none: (base: string, quote: string) => `No Uniswap pool without a hook takes ${base} and ${quote} at the last read.`,
+  none: (base: string, quote: string, protocol: UniProtocol = "uniswap") =>
+    `No ${protocolName(protocol)} pool without a hook takes ${base} and ${quote} at the last read.`,
   unanswered: "The read of these pools did not answer. Try again in a minute.",
   card: {
     title: (base: string, quote: string) => `${base}/${quote}`,
-    sub: (c: Pick<PoolCard, "version" | "fee" | "weth">) =>
-      `${versionLabel(c.version)} · ${feeText(c.fee)}${c.weth ? " (WETH)" : ""} · Ethereum · no hook`,
+    sub: (c: Pick<PoolCard, "version" | "fee" | "weth" | "wrappedSymbol" | "protocol" | "chainId">) =>
+      `${versionLabel(c.version, c.protocol)} · ${feeText(c.fee)}${c.weth ? ` (${c.wrappedSymbol})` : ""} · ${chainName(c)} · no hook`,
     fees: "Full-range fees, 30 days",
     feesRange: (low: number, high: number) => `${share(low)} to ${share(high)} in each 30 days of 90`,
     noRange: "No 90-day range",

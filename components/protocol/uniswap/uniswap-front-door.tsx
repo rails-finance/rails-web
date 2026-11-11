@@ -11,12 +11,26 @@ import { FrontDoorSearch } from "@/components/shared/front-door-search";
 import { ReadTierTag, isReadOnVisit } from "@/components/shared/read-tier-tag";
 import { READ_TIER } from "@/lib/shared/read-tier";
 import { NAV_PILL } from "@/lib/shared/ui-grammar";
+import { uniExplorer, type UniChainId, type UniProtocol } from "@/lib/uniswap/deployments";
 import type { UniswapVersion } from "@/lib/uniswap/types";
 import { FRONT_DOOR, versionLabel } from "@/lib/uniswap/words";
 
 /** A pool explorer's front door: `id` is the roster id (the mark and `data-front-door`), `route` the
  *  explorer's route, under which a wallet's positions live. */
-export function PoolFrontDoor({ id, label, line, route }: { id: string; label: string; line: string; route: string }) {
+export function PoolFrontDoor({
+  id,
+  label,
+  line,
+  route,
+  extra,
+}: {
+  id: string;
+  label: string;
+  line: string;
+  route: string;
+  /** A second line under `line`. */
+  extra?: string;
+}) {
   const tiered = isReadOnVisit(id);
   return (
     <div
@@ -44,6 +58,7 @@ export function PoolFrontDoor({ id, label, line, route }: { id: string; label: s
         <FrontDoorSearch href={(wallet) => `${route}/${wallet}`} />
       </div>
       <p className="mt-6 max-w-xl text-center text-sm text-rb-500">{line}</p>
+      {extra && <p className="mt-2 max-w-xl text-center text-sm text-rb-500">{extra}</p>}
       {/* The info page's door, as the shared front door draws it. */}
       <nav aria-label="Explorer sections" className="mt-6 flex justify-center">
         <Link href={`${route}/info`} className={NAV_PILL}>
@@ -54,9 +69,24 @@ export function PoolFrontDoor({ id, label, line, route }: { id: string; label: s
   );
 }
 
-export function UniswapFrontDoor({ version }: { version: UniswapVersion }) {
-  const id = `uniswap-${version}`;
+/** A Uniswap-family explorer's door: Uniswap V3 and V4 on each chain, and PancakeSwap V3. */
+export function UniswapFrontDoor({
+  version,
+  protocol = "uniswap",
+  chainId = 1,
+}: {
+  version: UniswapVersion;
+  protocol?: UniProtocol;
+  chainId?: UniChainId;
+}) {
+  const x = uniExplorer(protocol, chainId, version);
   return (
-    <PoolFrontDoor id={id} label={versionLabel(version)} line={FRONT_DOOR.line(version)} route={`/ethereum/${id}`} />
+    <PoolFrontDoor
+      id={x.id}
+      label={versionLabel(version, protocol)}
+      line={FRONT_DOOR.line(version, protocol, chainId)}
+      extra={x.deployment.masterChef ? FRONT_DOOR.stakedLine : undefined}
+      route={x.route}
+    />
   );
 }

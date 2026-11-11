@@ -5,15 +5,15 @@
 // (decision 0059 point 1); this module is where they live.
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
+import { uniDeployment, type UniDeployment } from "@/lib/uniswap/deployments";
 import type { PoolPosition } from "@/lib/uniswap/position";
 import { dayGridPhrase, type UniPositionRead } from "@/lib/uniswap/types";
 import type { LineKey } from "@/lib/uniswap/words";
 
-export const UNISWAP_CONTRACTS = {
-  v3Npm: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
-  v4PositionManager: "0xbD216513d74C8cf14cf4747E6AaA6420FF64ee9e",
-  v4StateView: "0x7fFE42C4a5DEeA5b0feC41C94C136Cf115597227",
-} as const;
+/** The contracts a deployment's receipts name (lib/uniswap/deployments.ts). */
+function uniContracts(d: UniDeployment) {
+  return { v3Npm: d.v3Npm, v4PositionManager: d.v4PositionManager ?? "", v4StateView: d.v4StateView ?? "" };
+}
 
 const n = (v: number) => v.toLocaleString("en-US");
 const date = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
@@ -26,15 +26,21 @@ export interface UniReceiptContext {
   r: UniPositionRead;
 }
 
+const dep = (c: UniReceiptContext) => uniDeployment(c.p.protocol, c.p.chainId);
+const contracts = (c: UniReceiptContext) => uniContracts(dep(c));
+
 function positionContract(c: UniReceiptContext) {
   return c.p.version === "v3"
-    ? { name: "NonfungiblePositionManager", address: UNISWAP_CONTRACTS.v3Npm }
-    : { name: "PositionManager", address: UNISWAP_CONTRACTS.v4PositionManager };
+    ? { name: "NonfungiblePositionManager", address: contracts(c).v3Npm }
+    : { name: "PositionManager", address: contracts(c).v4PositionManager };
 }
 function poolContract(c: UniReceiptContext) {
   return c.p.version === "v3"
-    ? { name: `Uniswap V3 pool ${c.p.base.symbol}/${c.p.quote.symbol}`, address: c.p.pool }
-    : { name: "StateView", address: UNISWAP_CONTRACTS.v4StateView };
+    ? { name: `${dep(c).protocolName} V3 pool ${c.p.base.symbol}/${c.p.quote.symbol}`, address: c.p.pool }
+    : { name: "StateView", address: contracts(c).v4StateView };
+}
+function farmContract(c: UniReceiptContext) {
+  return { name: "MasterChefV3", address: dep(c).masterChef ?? "" };
 }
 const positionCall = (c: UniReceiptContext) =>
   c.p.version === "v3" ? `positions(${c.p.id})` : `getPoolAndPositionInfo(${c.p.id})`;
@@ -51,7 +57,7 @@ const derived = (label: string, value: string): ProvInput => ({ label, value, ki
 
 /** The card's figures. */
 export function cardProv(
-  key: "price" | "holds" | "worth" | "uncollected" | "opened" | "range",
+  key: "price" | "holds" | "worth" | "uncollected" | "opened" | "range" | "cake",
   c: UniReceiptContext,
 ): Provenance {
   const { p, r } = c;
@@ -136,6 +142,26 @@ export function cardProv(
         contract: positionContract(c),
         via: "rails-server · getLogs by token id",
       };
+    case "cake": {
+      const st = p.staked;
+      return {
+        kind: "chain",
+        pclass: "state",
+        source: head,
+        summary: st
+          ? `CAKE not yet harvested — MasterChefV3's pendingCake(${p.id}) at ${at(r.head)}, ${r.staked?.pendingCake ?? "0"} in CAKE's ${st.cake.decimals} decimals: ${fig(st.pendingCake)} ${st.cake.symbol}. The farm holds the position for its staker ${st.user}.`
+          : `Not staked — ownerOf(${p.id}) on the NonfungiblePositionManager at ${at(r.head)} is ${r.owner}, not MasterChefV3, so the farm pays it no CAKE.`,
+        contract: st ? farmContract(c) : positionContract(c),
+        via: via(c, `block ${n(r.head.block)}`),
+        inputs: st
+          ? [
+              chain(`pendingCake(${p.id})`, r.staked?.pendingCake ?? "0"),
+              chain(`userPositionInfos(${p.id}) · user`, st.user),
+              chain(`ownerOf(${p.id})`, r.owner),
+            ]
+          : [chain(`ownerOf(${p.id})`, r.owner), chain("MasterChefV3", farmContract(c).address)],
+      };
+    }
     case "range":
       return {
         kind: "derived",
@@ -162,7 +188,8 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: UniReceiptCont
   const past = r.past;
   switch (`${key}:${part}`) {
     case "range:yours": {
-      const d = p.daysInRange;
+      // As the line: no daily count for a position younger than the window with no opening day.
+      const d = p.openedInWindow && !p.opened ? null : p.daysInRange;
       return {
         ...cardProv("range", c),
         summary: `Range — the position's ticks ${r.tickLower} to ${r.tickUpper} against the pool's tick ${r.now.tick} at ${at(r.head)}${d ? `; the pool's tick was inside the range at ${d.inRange} of ${d.read} daily reads from block ${n(d.from)} to block ${n(d.to)}, ${dayGridPhrase(r.chainId)}, kept in rails-server's at-block store` : ""}.`,
@@ -245,6 +272,19 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: UniReceiptCont
           derived(`fees, 30 days, ${Q}`, fig(p.fees30d ?? 0)),
         ],
       };
+    case "cake:yours":
+      return cardProv("cake", c);
+    case "cake:pool":
+      if (!p.staked) return null;
+      return {
+        kind: "derived",
+        pclass: "state",
+        source: head,
+        summary: `A staked position — ownerOf(${p.id}) at ${at(r.head)} is MasterChefV3, which records the staker in userPositionInfos. The farm keeps the position in the pool, so its fee growth runs as before, and pays CAKE by the reward growth inside the range of the pool's farm.`,
+        contract: farmContract(c),
+        via: via(c, `block ${n(r.head.block)}`),
+        inputs: [chain(`ownerOf(${p.id})`, r.owner), chain(`userPositionInfos(${p.id}) · pid`, p.staked.pid)],
+      };
     case "against:pool": {
       const sd = p.sinceDeposit;
       if (!sd) return null;
@@ -303,7 +343,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: UniReceiptCont
         summary: p.hooks
           ? `Hook permissions — the pool's hook ${p.hooks}, from the PoolKey, carries its permissions in the low 14 bits of its address (v4-core Hooks.sol): ${p.hookPermissions.join(", ") || "none"}.`
           : p.version === "v3"
-            ? "No hook — a Uniswap V3 pool has no hook and no pause; its burn and collect take no permission."
+            ? `No hook — a ${dep(c).protocolName} V3 pool has no hook and no pause; its burn and collect take no permission.${p.staked ? ` ownerOf(${p.id}) is MasterChefV3, whose decreaseLiquidity, collect and withdraw answer only the staker it records, ${p.staked.user}.` : ""}`
             : "No hook — the pool's PoolKey.hooks is the zero address, so nothing runs on a withdrawal.",
         contract: positionContract(c),
         via: via(c, `block ${n(r.head.block)}`),
@@ -325,9 +365,11 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: UniReceiptCont
         pclass: "state",
         source: head,
         summary:
-          p.version === "v3"
-            ? `Fee and protocol cut — the pool's fee tier is fixed at creation; slot0().feeProtocol at ${at(r.head)} is ${r.now.protocolFee}, a denominator per token in its two 4-bit halves.`
-            : `Fee and protocol fee — getSlot0 at ${at(r.head)} gives lpFee ${r.now.lpFee} and protocolFee ${r.now.protocolFee}, two 12-bit amounts in millionths, one per direction; the PoolKey fee is ${r.fee}${p.dynamicFee ? ", the flag that hands the fee to the hook" : ""}.`,
+          p.protocolCut.version === "pancake-v3"
+            ? `Fee and protocol cut — the pool's fee tier is fixed at creation; slot0().feeProtocol at ${at(r.head)} is ${r.now.protocolFee}, two 16-bit shares of the swap fee in ten-thousandths, ${p.protocolCut.s0} for token0 and ${p.protocolCut.s1} for token1 (PancakeV3Pool: feeProtocol % 65536 and feeProtocol >> 16).`
+            : p.version === "v3"
+              ? `Fee and protocol cut — the pool's fee tier is fixed at creation; slot0().feeProtocol at ${at(r.head)} is ${r.now.protocolFee}, a denominator per token in its two 4-bit halves.`
+              : `Fee and protocol fee — getSlot0 at ${at(r.head)} gives lpFee ${r.now.lpFee} and protocolFee ${r.now.protocolFee}, two 12-bit amounts in millionths, one per direction; the PoolKey fee is ${r.fee}${p.dynamicFee ? ", the flag that hands the fee to the hook" : ""}.`,
         contract: poolContract(c),
         via: via(c, `block ${n(r.head.block)}`),
         inputs: [
@@ -342,24 +384,34 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: UniReceiptCont
 
 /** What the section's read stamp lists as read. */
 export function readContracts(c: UniReceiptContext) {
+  const k = contracts(c);
   return c.p.version === "v3"
     ? [
-        { name: "NonfungiblePositionManager", address: UNISWAP_CONTRACTS.v3Npm, reads: "positions(id), ownerOf(id)" },
+        { name: "NonfungiblePositionManager", address: k.v3Npm, reads: "positions(id), ownerOf(id)" },
         {
-          name: `Uniswap V3 pool ${c.p.base.symbol}/${c.p.quote.symbol}`,
+          name: `${dep(c).protocolName} V3 pool ${c.p.base.symbol}/${c.p.quote.symbol}`,
           address: c.p.pool,
           reads: "slot0(), liquidity(), feeGrowthGlobal0/1X128(), ticks(lower), ticks(upper)",
         },
+        ...(c.p.staked !== undefined
+          ? [
+              {
+                name: "MasterChefV3",
+                address: farmContract(c).address,
+                reads: "userPositionInfos(id), pendingCake(id)",
+              },
+            ]
+          : []),
       ]
     : [
         {
           name: "PositionManager",
-          address: UNISWAP_CONTRACTS.v4PositionManager,
+          address: k.v4PositionManager,
           reads: "getPoolAndPositionInfo(id), getPositionLiquidity(id), ownerOf(id)",
         },
         {
           name: "StateView",
-          address: UNISWAP_CONTRACTS.v4StateView,
+          address: k.v4StateView,
           reads: "getSlot0, getLiquidity, getFeeGrowthGlobals, getFeeGrowthInside, getPositionInfo",
         },
       ];
