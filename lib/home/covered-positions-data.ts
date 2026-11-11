@@ -322,7 +322,9 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   // visited, and no census of holders is built.
   "euler-v2-base",
   "euler-v2-arbitrum",
-  // Balancer V3, for the Uniswap reason (ui-jobs 569).
+  // Balancer V3 (ui-jobs 569): its index counts the pool shares held now
+  // (lib/api/fetch-index.ts, on the front door), and the headline counts every
+  // position ever held, so it stays out until the index states that figure.
   "balancer-v3",
   "balancer-v3-arbitrum",
   // Sky Savings, for the same reason: an sUSDS balance carries no debt and no

@@ -8,7 +8,7 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { FluidBasePositionCard } from "@/components/protocol/fluid-base/fluid-base-position-card";
 import { fetchFluidBasePosition } from "@/lib/api/fetch-fluid-base";
@@ -52,11 +52,11 @@ export async function FluidBasePositionPage({ id }: { id: string }) {
             owner={{ wallet, filterProtocol: null, href: `${home}/${wallet}` }}
             tools={false}
           />
-          <ReadTierTitleRow id={session}>
+          <HistoryTitleRow id={session}>
             <h2 className="text-lg font-semibold text-foreground" data-fluid-base-position={id}>
               {title}
             </h2>
-          </ReadTierTitleRow>
+          </HistoryTitleRow>
           <p className="text-xs text-rb-500">{POSITION_PAGE.sub(p, r.vaultId)}</p>
         </header>
         <FluidBasePositionCard r={r} />

@@ -2,14 +2,23 @@
 // ui-jobs 569; the figures are lib/balancer/position.ts, the words
 // lib/balancer/words.ts): each figure traces to the Vault reads behind it,
 // with the blocks they were read at. The past read stands on Ethereum's grid,
-// the multiple of 7,200 blocks 30 days below the head. The surface names no
-// function or block (decision 0059 point 1); this module is where they live.
+// the multiple of 7,200 blocks 30 days below the head. A wallet's pools and a
+// pool share's adds and removes come from Rails's position index of the Vault's
+// events (rails-ops decision 0063), then the chain's logs above it to the head.
+// The surface names no function or block (decision 0059 point 1); this module
+// is where they live.
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { BalPosition } from "@/lib/balancer/position";
-import { walletRow } from "@/lib/balancer/position";
+import { stakedOf, walletRow } from "@/lib/balancer/position";
 import { balChain } from "@/lib/balancer/chains";
-import type { BalPositionRead, BalPositionsRead, BlockRef } from "@/lib/balancer/types";
+import {
+  BALANCER_VAULT,
+  type BalPositionRead,
+  type BalPositionsRead,
+  type BalStaked,
+  type BlockRef,
+} from "@/lib/balancer/types";
 import type { BalLineKey } from "@/lib/balancer/words";
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -31,6 +40,15 @@ const chain = (label: string, value: string): ProvInput => ({ label, value, kind
 const derived = (label: string, value: string): ProvInput => ({ label, value, kind: "derived" });
 const thenLine = (c: BalReceiptContext) => (c.r.past ? `, and at ${at(c.r.then)}, ${balChain(c.r.chainId).grid}` : "");
 
+/** A stake's reads beside the Vault balance: each gauge's balanceOf(wallet). */
+const stakeInputs = (staked: readonly BalStaked[] | undefined, wallet: string): ProvInput[] =>
+  (staked ?? []).map((g) => chain(`${g.gauge}.balanceOf(${wallet})`, g.balance));
+/** The wallet's shares: its Vault balance, plus its gauge stakes where it has any. */
+const sharesTerm = (staked: readonly BalStaked[] | undefined) =>
+  staked?.length ? "(balanceOf(pool, wallet) + Σ gauge.balanceOf(wallet))" : "balanceOf(pool, wallet)";
+const sharesWords = (staked: readonly BalStaked[] | undefined) =>
+  staked?.length ? "the wallet's pool shares, in the wallet and staked in its gauges," : "the wallet's pool shares";
+
 /** The card's figures. */
 export function cardProv(key: "share" | "holds" | "rate" | "added", c: BalReceiptContext): Provenance {
   const { p, r } = c;
@@ -41,12 +59,13 @@ export function cardProv(key: "share" | "holds" | "rate" | "added", c: BalReceip
         kind: "derived",
         pclass: "state",
         source,
-        summary: `Share of pool — the wallet's pool shares over all the pool's shares at ${at(r.head)}: ${fig(p.now.share * 100)}%.`,
+        summary: `Share of pool — ${sharesWords(r.staked)} over all the pool's shares at ${at(r.head)}: ${fig(p.now.share * 100)}%.`,
         contract: vaultC(r),
         via: headVia(c),
-        formula: "balanceOf(pool, wallet) ÷ totalSupply(pool)",
+        formula: `${sharesTerm(r.staked)} ÷ totalSupply(pool)`,
         inputs: [
           chain(`balanceOf(${r.pool}, ${r.wallet})`, r.balance),
+          ...stakeInputs(r.staked, r.wallet),
           chain(`totalSupply(${r.pool})`, r.now.totalSupply),
         ],
       };
@@ -55,13 +74,14 @@ export function cardProv(key: "share" | "holds" | "rate" | "added", c: BalReceip
         kind: "derived",
         pclass: "state",
         source,
-        summary: `Holds now — the wallet's part of each token at ${at(r.head)}: the Vault's balance of the token in the pool times the wallet's shares over all shares.`,
+        summary: `Holds now — the wallet's part of each token at ${at(r.head)}: the Vault's balance of the token in the pool times ${sharesWords(r.staked)} over all shares.`,
         contract: vaultC(r),
         via: headVia(c),
-        formula: "balancesRaw[i] × balanceOf(pool, wallet) ÷ totalSupply(pool) ÷ 10^decimals[i]",
+        formula: `balancesRaw[i] × ${sharesTerm(r.staked)} ÷ totalSupply(pool) ÷ 10^decimals[i]`,
         inputs: [
           chain(`getPoolTokenInfo(${r.pool}) · balancesRaw`, r.now.balancesRaw.join(", ")),
           chain("balanceOf(pool, wallet)", r.balance),
+          ...stakeInputs(r.staked, r.wallet),
           chain("totalSupply(pool)", r.now.totalSupply),
           ...p.tokens.map((t, i) => derived(t.symbol, fig(p.now.holds[i]))),
         ],
@@ -87,9 +107,9 @@ export function cardProv(key: "share" | "holds" | "rate" | "added", c: BalReceip
         kind: "chain",
         pclass: "emitted",
         source: first ? { block: first.block, txHash: first.txHash } : source,
-        summary: `First added — the earliest LiquidityAdded the Vault emitted for this pool with this wallet as provider, read from block ${n(balChain(r.chainId).firstBlock)} to ${n(r.head.block)}: ${r.flows.length} adds and removes in all.`,
+        summary: `First added — the earliest LiquidityAdded the Vault emitted for this pool with this wallet as provider, from Rails's index of the Vault's events from block ${n(balChain(r.chainId).firstBlock)}${r.indexThrough ? ` through block ${n(r.indexThrough)}` : ""}, then the Vault's logs above it to block ${n(r.head.block)}: ${r.flows.length} adds and removes in all.`,
         contract: vaultC(r),
-        via: `rails-server · eth_getLogs ${n(balChain(r.chainId).firstBlock)}–${n(r.head.block)}`,
+        via: `rails-server · position index${r.indexThrough ? ` through block ${n(r.indexThrough)}` : ""}, then eth_getLogs to ${n(r.head.block)}`,
         inputs: first
           ? [chain("block", n(first.block)), chain("transaction", first.txHash)]
           : [chain("logs found", "0")],
@@ -107,8 +127,12 @@ export function lineProv(key: BalLineKey, part: "yours" | "pool", c: BalReceiptC
     return part === "yours"
       ? {
           ...base,
-          summary: `Pool shares — the wallet's shares at ${at(r.head)}${thenLine(c)}.`,
-          inputs: [chain("balanceOf · head", r.balance), chain("balanceOf · then", r.past?.balance ?? "no answer")],
+          summary: p.windowWithheld
+            ? `Pool shares — ${sharesWords(r.staked)} at ${at(r.head)}. The gauges are read at the head only, so no 30-day change is stated.`
+            : `Pool shares — the wallet's shares at ${at(r.head)}${thenLine(c)}.`,
+          inputs: p.windowWithheld
+            ? [chain("balanceOf · head", r.balance), ...stakeInputs(r.staked, r.wallet)]
+            : [chain("balanceOf · head", r.balance), chain("balanceOf · then", r.past?.balance ?? "no answer")],
         }
       : {
           ...base,
@@ -121,11 +145,11 @@ export function lineProv(key: BalLineKey, part: "yours" | "pool", c: BalReceiptC
   if (key === "share")
     return {
       ...base,
-      summary: `Share of pool — the wallet's shares over all shares at ${at(r.head)}${thenLine(c)}.`,
-      formula: "balanceOf(pool, wallet) ÷ totalSupply(pool)",
+      summary: `Share of pool — ${sharesWords(r.staked)} over all shares at ${at(r.head)}${p.windowWithheld ? "" : thenLine(c)}.`,
+      formula: `${sharesTerm(r.staked)} ÷ totalSupply(pool)`,
       inputs: [
         derived("head", `${fig(p.now.share * 100)}%`),
-        ...(p.then ? [derived("then", `${fig(p.then.share * 100)}%`)] : []),
+        ...(p.then && !p.windowWithheld ? [derived("then", `${fig(p.then.share * 100)}%`)] : []),
       ],
     };
   if (key.startsWith("token:")) {
@@ -134,9 +158,12 @@ export function lineProv(key: BalLineKey, part: "yours" | "pool", c: BalReceiptC
     return part === "yours"
       ? {
           ...base,
-          summary: `Your ${t.symbol} — the pool's ${t.symbol} times the wallet's share of the pool at ${at(r.head)}${thenLine(c)}.`,
-          formula: "balancesRaw[i] × balanceOf(pool, wallet) ÷ totalSupply(pool)",
-          inputs: [derived("head", fig(p.now.holds[i])), ...(p.then ? [derived("then", fig(p.then.holds[i]))] : [])],
+          summary: `Your ${t.symbol} — the pool's ${t.symbol} times the wallet's share of the pool at ${at(r.head)}${p.windowWithheld ? "" : thenLine(c)}.`,
+          formula: `balancesRaw[i] × ${sharesTerm(r.staked)} ÷ totalSupply(pool)`,
+          inputs: [
+            derived("head", fig(p.now.holds[i])),
+            ...(p.then && !p.windowWithheld ? [derived("then", fig(p.then.holds[i]))] : []),
+          ],
         }
       : {
           ...base,
@@ -172,10 +199,41 @@ export function readContracts(c: BalReceiptContext) {
       name: "Balancer V3 Vault",
       address: c.r.vault,
       reads:
-        "balanceOf(pool, wallet), totalSupply(pool), getPoolTokenInfo(pool), getCurrentLiveBalances(pool), getBptRate(pool), isPoolPaused, isPoolInRecoveryMode, getStaticSwapFeePercentage; LiquidityAdded and LiquidityRemoved logs",
+        "balanceOf(pool, wallet), totalSupply(pool), getPoolTokenInfo(pool), getCurrentLiveBalances(pool), getBptRate(pool), isPoolPaused, isPoolInRecoveryMode, getStaticSwapFeePercentage; LiquidityAdded and LiquidityRemoved events from Rails's index and the chain's logs above it",
     },
     { name: `Pool ${c.p.symbol}`, address: c.r.pool, reads: "name(), symbol()" },
+    ...gaugeContracts(c.r.staked),
   ];
+}
+
+/** The gauges a wallet's staked shares sit in, for a read stamp. */
+export const gaugeContracts = (staked: readonly BalStaked[] | undefined) =>
+  (staked ?? []).map((s) => ({ name: "Gauge", address: s.gauge, reads: "lp_token(), balanceOf(wallet)" }));
+
+/** Shares staked in a pool's gauges: each gauge's balance for the wallet, at the head. */
+export function stakedProv(a: {
+  chainId: number;
+  vault: string;
+  pool: string;
+  wallet: string;
+  head: BlockRef;
+  totalSupply: string;
+  staked: readonly BalStaked[];
+}): Provenance {
+  const s = stakedOf(a.staked, a.totalSupply);
+  return {
+    kind: "derived",
+    pclass: "state",
+    source: { block: a.head.block },
+    summary: `Staked in a gauge — the wallet's balance in each gauge whose lp_token is this pool at ${at(a.head)}, over all the pool's shares: ${fig((s?.share ?? 0) * 100)}%.`,
+    contract: { name: "Gauge", address: a.staked[0]?.gauge ?? a.vault },
+    via: `rails-server · eth_call @ block ${n(a.head.block)}`,
+    formula: "Σ gauge.balanceOf(wallet) ÷ totalSupply(pool)",
+    inputs: [
+      ...a.staked.map((g) => chain(`${g.gauge}.balanceOf(${a.wallet})`, g.balance)),
+      chain(`totalSupply(${a.pool})`, a.totalSupply),
+    ],
+  };
 }
 
 /** A wallet page row's share. */
@@ -185,30 +243,63 @@ export function walletShareProv(r: BalPositionsRead, row: BalPositionsRead["posi
     kind: "derived",
     pclass: "state",
     source: { block: r.head.block },
-    summary: `Share of pool — the wallet's shares over all the pool's shares at ${at(r.head)}: ${fig(w.share * 100)}%.`,
+    summary: `Share of pool — ${sharesWords(row.staked)} over all the pool's shares at ${at(r.head)}: ${fig(w.share * 100)}%.`,
     contract: vaultC(r),
     via: `rails-server · eth_call @ block ${n(r.head.block)}`,
-    formula: "balanceOf(pool, wallet) ÷ totalSupply(pool)",
+    formula: `${sharesTerm(row.staked)} ÷ totalSupply(pool)`,
     inputs: [
       chain(`balanceOf(${row.pool}, ${r.wallet})`, row.balance),
+      ...stakeInputs(row.staked, r.wallet),
       chain(`totalSupply(${row.pool})`, row.totalSupply),
     ],
   };
 }
 
-/** The wallet page's search: what was read to find the pools. */
+/** The front door's count: Rails's index of the Vault's pool-share transfers. */
+export function countProv(
+  key: "positions" | "holders",
+  c: { chainId: number; through: number; positions: number; holders: number },
+): Provenance {
+  const what =
+    key === "positions"
+      ? `Pool-share holdings — the (pool, holder) pairs with a balance above zero: ${n(c.positions)}`
+      : `Holders — the addresses holding shares of at least one pool, wallets and contracts both: ${n(c.holders)}`;
+  return {
+    kind: "derived",
+    pclass: "emitted",
+    source: { block: c.through },
+    summary: `${what}, from Rails's index of the Vault's pool-share Transfer events from block ${n(balChain(c.chainId).firstBlock)} through block ${n(c.through)}.`,
+    contract: { name: "Balancer V3 Vault", address: BALANCER_VAULT },
+    via: `rails-server · position index through block ${n(c.through)}`,
+    inputs: [chain("indexed through", n(c.through)), derived(key, n(key === "positions" ? c.positions : c.holders))],
+  };
+}
+
+/** The wallet page's search: what was read to find the pools. The index's
+ *  rows run from the Vault's first block to the index's reach; the tail's
+ *  Transfer logs from the block after it to the head. */
 export function finderProv(r: BalPositionsRead): Provenance {
-  const s = r.sources[0];
+  const idx = r.sources.find((s) => s.source === "index");
+  const tail = r.sources.find((s) => s.source === "tail");
+  const through = idx?.to ?? r.head.block;
+  const parts = [
+    idx &&
+      `Rails's index of the Vault's pool-share Transfer events naming this wallet, blocks ${n(idx.from)} to ${n(idx.to)}: ${n(idx.logs)} transfers across ${n(idx.pools)} pools`,
+    tail &&
+      `the Vault's Transfer logs to this wallet, blocks ${n(tail.from)} to ${n(tail.to)}: ${n(tail.logs)} across ${n(tail.pools)} pools`,
+  ].filter(Boolean);
   return {
     kind: "chain",
     pclass: "emitted",
     source: { block: r.head.block },
-    summary: `Pools found — the Vault's LiquidityAdded logs with this wallet as provider, blocks ${n(s?.from ?? balChain(r.chainId).firstBlock)} to ${n(s?.to ?? r.head.block)}: ${n(s?.logs ?? 0)} adds across ${n(s?.pools ?? 0)} pools, ${n(r.checked)} checked with balanceOf at ${at(r.head)}.`,
+    summary: `Pools found — ${parts.join("; then ")}; ${n(r.checked)} pools checked with balanceOf at ${at(r.head)}.`,
     contract: vaultC(r),
-    via: `rails-server · eth_getLogs, then eth_call @ block ${n(r.head.block)}`,
+    via: `rails-server · position index through block ${n(through)}, eth_getLogs to ${n(r.head.block)}, then eth_call @ block ${n(r.head.block)}`,
     inputs: [
-      chain("adds found", n(s?.logs ?? 0)),
-      chain("pools named", n(s?.pools ?? 0)),
+      chain("index transfers", n(idx?.logs ?? 0)),
+      chain("index pools", n(idx?.pools ?? 0)),
+      chain("tail logs", n(tail?.logs ?? 0)),
+      chain("tail pools", n(tail?.pools ?? 0)),
       chain("pools checked", n(r.checked)),
     ],
   };

@@ -8,7 +8,7 @@
 //
 // Pure: scripts/test/balancer.test.mjs reads it.
 
-import type { BalPoolAt, BalPositionRead, BalPositionsRead, BalToken, BlockRef } from "./types";
+import type { BalPoolAt, BalPositionRead, BalPositionsRead, BalStaked, BalToken, BlockRef } from "./types";
 
 const ZERO = BigInt(0);
 const SCALE = BigInt(10) ** BigInt(18);
@@ -69,6 +69,12 @@ export interface BalPosition {
   feePct: number | null;
   paused: boolean;
   recoveryMode: boolean;
+  /** The shares in the wallet and in gauges, where any are staked; `now`
+   *  counts both. */
+  split: { held: number; staked: NonNullable<ReturnType<typeof stakedOf>> } | null;
+  /** Staked shares are read at the head only, so the wallet's 30-day change
+   *  is withheld where any are staked (`then` still carries the pool's side). */
+  windowWithheld: boolean;
   /** The wallet's first add to this pool, or null where none was found. */
   firstAdd: BlockRef | null;
   adds: number;
@@ -88,7 +94,9 @@ function side(tokens: readonly BalToken[], at: BlockRef, p: BalPoolAt, shares: s
 }
 
 export function balPosition(r: BalPositionRead): BalPosition {
-  const now = side(r.tokens, r.head, r.now, r.balance);
+  const staked = stakedOf(r.staked, r.now.totalSupply);
+  const total = staked ? (BigInt(r.balance) + BigInt(staked.raw)).toString() : r.balance;
+  const now = side(r.tokens, r.head, r.now, total);
   const then = r.past ? side(r.tokens, r.then, r.past, r.past.balance) : null;
   const first = r.flows.find((f) => f.kind === "add");
   return {
@@ -104,19 +112,38 @@ export function balPosition(r: BalPositionRead): BalPosition {
     feePct: r.swapFee == null ? null : units(r.swapFee, 16),
     paused: r.paused === true,
     recoveryMode: r.recoveryMode === true,
+    split: staked ? { held: units(r.balance, 18), staked } : null,
+    windowWithheld: staked != null,
     firstAdd: first ? { block: first.block, time: first.time } : null,
     adds: r.flows.filter((f) => f.kind === "add").length,
     removes: r.flows.filter((f) => f.kind === "remove").length,
   };
 }
 
-/** A wallet page's row: the pool, the wallet's fraction of it and its part of each token. */
+/** The wallet's shares staked in the pool's gauges, summed, and as a part of
+ *  all the pool's shares; null where none are staked or none were read. */
+export function stakedOf(staked: readonly BalStaked[] | undefined, supply: string) {
+  if (!staked?.length) return null;
+  const raw = staked.reduce((n, s) => n + BigInt(s.balance), ZERO);
+  return {
+    raw: raw.toString(),
+    shares: units(raw, 18),
+    share: fraction(raw, supply),
+    gauges: staked.map((s) => s.gauge),
+  };
+}
+
+/** A wallet page's row: the pool, the wallet's fraction of it (its shares
+ *  in the wallet and staked in gauges together) and its part of each token. */
 export function walletRow(p: BalPositionsRead["positions"][number]) {
+  const staked = stakedOf(p.staked, p.totalSupply);
+  const total = staked ? (BigInt(p.balance) + BigInt(staked.raw)).toString() : p.balance;
   return {
     pool: p.pool,
     symbol: p.symbol ?? p.tokens.map((t) => t.symbol).join("-"),
-    share: fraction(p.balance, p.totalSupply),
-    holds: sharesOf(p.tokens, p.balancesRaw, p.balance, p.totalSupply),
+    share: fraction(total, p.totalSupply),
+    holds: sharesOf(p.tokens, p.balancesRaw, total, p.totalSupply),
     tokens: p.tokens,
+    staked,
   };
 }

@@ -13,7 +13,7 @@ import { ROBINHOOD_LABEL, RobinhoodSoon } from "@/components/shared/robinhood-so
 import { ScopeNote } from "@/components/shared/asset-scope-note";
 import { launchedChains } from "@/lib/shared/protocols";
 import { useScopedRoster } from "@/lib/shared/explorer-scope";
-import { ReadTierTag } from "@/components/shared/read-tier-tag";
+import { HistoryTag } from "@/components/shared/history-tag";
 
 /** Tile width classes chosen per list size so every breakpoint fills its
  *  rows evenly: a chain's eight most used divide by 2/4/8, a list of 6 by 2/3/6. A new
@@ -176,12 +176,12 @@ export function ProtocolRow() {
                     style={{ borderRadius: "20%" }}
                   />
                 )}
-                {p.readTier ? (
-                  // Decision 0061: the tag under the name, both inside the
+                {p.history ? (
+                  // Decisions 0061 and 0063: the tag under the name, both inside the
                   // mark's 2rem, so a tagged tile keeps the row height.
                   <span className="flex min-w-0 flex-col items-start">
                     <span className="text-sm font-semibold leading-4 whitespace-nowrap">{p.label}</span>
-                    <ReadTierTag tip="title" />
+                    <HistoryTag id={p.id} tip="title" />
                   </span>
                 ) : (
                   <span className="text-sm font-semibold whitespace-nowrap">{p.label}</span>

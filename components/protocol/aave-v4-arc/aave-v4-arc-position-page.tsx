@@ -8,7 +8,7 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AaveV4ArcPositionCard } from "@/components/protocol/aave-v4-arc/aave-v4-arc-position-card";
 import { fetchAaveV4ArcPosition } from "@/lib/api/fetch-aave-v4-arc";
@@ -53,11 +53,11 @@ export async function AaveV4ArcPositionPage({ spoke: slug, wallet: raw }: { spok
       <div className="py-8">
         <header className="mb-5" data-skel-section="page-header">
           {head}
-          <ReadTierTitleRow id={session}>
+          <HistoryTitleRow id={session}>
             <h2 className="text-lg font-semibold text-foreground" data-aave-v4-arc-position={`${spoke.key}:${wallet}`}>
               {POSITION_PAGE.title(spoke.name)}
             </h2>
-          </ReadTierTitleRow>
+          </HistoryTitleRow>
           <p className="text-xs text-rb-500">{POSITION_PAGE.sub}</p>
         </header>
         {r.reserves.length === 0 ? (

@@ -30,7 +30,7 @@ const markdown = (title: string, lines: BalLine[]) =>
   [
     `## ${READOUT.title}: ${title}`,
     "",
-    ...lines.map((l) => `- **${l.label}**: ${[l.yours, l.pool].filter(Boolean).join(" ")}`),
+    ...lines.map((l) => `- **${l.label}**: ${[l.yours, l.withheld, l.pool].filter(Boolean).join(" ")}`),
     "",
     READOUT.sub,
   ].join("\n");
@@ -66,6 +66,11 @@ export function BalancerReadout({ r, title }: { r: BalPositionRead; title: strin
               <span className="text-xs font-semibold text-rb-500 sm:pt-0.5">{l.label}</span>
               <div className="min-w-0 space-y-0.5">
                 {l.yours && <Part text={l.yours} info={lineProv(l.key, "yours", c)} muted={false} />}
+                {l.withheld && (
+                  <p className="text-[13px] leading-snug text-rb-500" data-window-withheld="staked">
+                    {l.withheld}
+                  </p>
+                )}
                 {l.pool && <Part text={l.pool} info={lineProv(l.key, "pool", c)} muted={l.yours !== null} />}
               </div>
             </li>
