@@ -515,6 +515,7 @@ function StarToggle({
             : "cursor-pointer text-rb-400 hover:text-amber-500 dark:text-rb-600 dark:hover:text-amber-400"
       }`}
       data-bookmark-star={on ? "on" : off ? "full" : "off"}
+      data-anatomy="B2.3"
     >
       <Star className="size-4" fill={on ? "currentColor" : "none"} aria-hidden="true" />
     </button>
