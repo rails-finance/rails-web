@@ -34,7 +34,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
     ? "Morpho Blue market"
     : m.isIdle && m.loanToken === ZERO_ADDRESS
       ? "Idle market"
-      : `${m.collateralSymbol ?? "no collateral"} / ${m.loanSymbol}`;
+      : m.isIdle
+        ? `${m.loanSymbol} idle market`
+        : `${m.collateralSymbol ?? "no collateral"} / ${m.loanSymbol}`;
   return {
     title: `${pair} · Morpho Blue on Arc`,
     description: `One Morpho Blue market on Arc, ${pair}: what it holds, what it pays and charges, its rate curve, its oracle price and its terms.`,
