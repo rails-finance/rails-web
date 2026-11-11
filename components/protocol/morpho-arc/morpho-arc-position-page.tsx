@@ -9,7 +9,7 @@ import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { MorphoArcPositionCard } from "@/components/protocol/morpho-arc/morpho-arc-position-card";
 import { fetchMorphoArcPosition } from "@/lib/api/fetch-morpho-arc";
@@ -59,11 +59,11 @@ export async function MorphoArcPositionPage({ market: rawId, wallet: raw }: { ma
       <div className="py-8">
         <header className="mb-5" data-skel-section="page-header">
           {head}
-          <ReadTierTitleRow id={session}>
+          <HistoryTitleRow id={session}>
             <h2 className="text-lg font-semibold text-foreground" data-morpho-arc-position={`${id}:${wallet}`}>
               {POSITION_PAGE.title(f)}
             </h2>
-          </ReadTierTitleRow>
+          </HistoryTitleRow>
           <p className="text-xs text-rb-500">
             {POSITION_PAGE.sub(f)} ·{" "}
             <Link href={morphoMarketHref(ARC_CHAIN_ID, r.market.loanToken, id)} className={INLINE_LINK}>

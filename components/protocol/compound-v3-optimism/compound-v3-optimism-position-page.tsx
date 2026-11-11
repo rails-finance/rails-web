@@ -10,7 +10,7 @@ import Link from "next/link";
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { CompoundV3OptimismPositionCard } from "@/components/protocol/compound-v3-optimism/compound-v3-optimism-position-card";
 import { fetchCompoundV3OptimismPosition } from "@/lib/api/fetch-compound-v3-optimism";
@@ -59,14 +59,14 @@ export async function CompoundV3OptimismPositionPage({ market, wallet: raw }: { 
       <div className="py-8">
         <header className="mb-5" data-skel-section="page-header">
           {head}
-          <ReadTierTitleRow id={session}>
+          <HistoryTitleRow id={session}>
             <h2
               className="text-lg font-semibold text-foreground"
               data-compound-v3-optimism-position={`${m.key}:${wallet}`}
             >
               {POSITION_PAGE.title(m.label)}
             </h2>
-          </ReadTierTitleRow>
+          </HistoryTitleRow>
           <p className="text-xs text-rb-500">
             {POSITION_PAGE.sub} ·{" "}
             <Link href={opcWalletHref(wallet)} className={INLINE_LINK}>

@@ -10,7 +10,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { Prov } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { CompoundV3OptimismReceipts } from "@/components/protocol/compound-v3-optimism/compound-v3-optimism-receipts";
@@ -44,9 +44,9 @@ export async function CompoundV3OptimismWallet({ wallet: raw }: { wallet: string
           owner={{ wallet, filterProtocol: null }}
           tools={false}
         />
-        <ReadTierTitleRow id={session}>
+        <HistoryTitleRow id={session}>
           <h2 className="text-lg font-semibold text-foreground">{WALLET_PAGE.title}</h2>
-        </ReadTierTitleRow>
+        </HistoryTitleRow>
         <p className="text-xs text-rb-500">{WALLET_PAGE.sub}</p>
       </header>
       {answer.kind !== "ok" ? (
