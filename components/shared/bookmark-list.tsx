@@ -10,7 +10,7 @@
 // row's ⋮ (D7).
 
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
-import { GripVertical, Upload } from "lucide-react";
+import { GripVertical, Star, Upload } from "lucide-react";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { INPLACE_TEXT, NAV_BUTTON, POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
 
@@ -40,12 +40,14 @@ import {
   exportBookmarks,
   importBookmarks,
   loadBookmarks,
+  MENU_STARS,
   moveSaved,
   removeBookmark,
   removeSaved,
   renameSaved,
   renameSession,
   SESSIONS_CHANGED_EVENT,
+  toggleStar,
   type SavedKind,
   type SavedLink,
   type WalletSession,
@@ -127,6 +129,7 @@ export function BookmarkList({
 }) {
   const moveOf = useRowDrag("wallet");
   if (bookmarks.length === 0) return <>{empty}</>;
+  const full = bookmarks.filter((b) => b.starred).length >= MENU_STARS;
   return (
     <DataTable caption="Saved wallets" stacked rowHeight="one" tableClassName="text-sm" data-bookmark-list="">
       <DataTableHead>
@@ -141,6 +144,7 @@ export function BookmarkList({
             key={s.key}
             session={s}
             summary={summary}
+            full={full}
             move={reorder ? moveOf(i, bookmarks.length, s.addresses[0]) : undefined}
           />
         ))}
@@ -163,6 +167,7 @@ export function SavedLinkList({
 }) {
   const moveOf = useRowDrag(kind);
   if (links.length === 0) return <>{empty}</>;
+  const full = links.filter((l) => l.starred).length >= MENU_STARS;
   return (
     <DataTable
       caption={kind === "position" ? "Saved positions" : "Saved listings"}
@@ -180,7 +185,7 @@ export function SavedLinkList({
       </DataTableHead>
       <DataTableBody>
         {links.map((l, i) => (
-          <SavedLinkRow key={l.key} link={l} move={moveOf(i, links.length, l.key)} />
+          <SavedLinkRow key={l.key} link={l} full={full} move={moveOf(i, links.length, l.key)} />
         ))}
       </DataTableBody>
     </DataTable>
@@ -466,6 +471,55 @@ function RenameField({
 
 const NAME_CELL = "sm:w-full sm:max-w-0 sm:min-w-[200px]";
 const MENU_CELL = "dt-row-menu w-px whitespace-nowrap";
+
+/** A saved entry's star (ui-jobs 586): starred entries are the ones the
+ *  profile menu shows, up to `MENU_STARS` of a kind; with that many starred,
+ *  the other rows' stars are off. */
+function StarToggle({
+  kind,
+  id,
+  on,
+  full,
+  label,
+}: {
+  kind: SavedKind;
+  id: string;
+  on: boolean;
+  full: boolean;
+  label: string;
+}) {
+  const off = full && !on;
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      disabled={off}
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleStar(kind, id);
+      }}
+      aria-label={on ? `Unstar ${label}` : `Star ${label}`}
+      title={
+        off
+          ? "Five starred. Unstar one to star this."
+          : on
+            ? "Starred: shown in the profile menu"
+            : "Star to show in the profile menu"
+      }
+      className={`-my-2 inline-flex size-11 shrink-0 items-center justify-center rounded-md transition-colors sm:size-7 ${
+        on
+          ? "text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300"
+          : off
+            ? "cursor-not-allowed text-rb-300 dark:text-rb-600"
+            : "cursor-pointer text-rb-400 hover:text-amber-500 dark:text-rb-600 dark:hover:text-amber-400"
+      }`}
+      data-bookmark-star={on ? "on" : off ? "full" : "off"}
+    >
+      <Star className="size-4" fill={on ? "currentColor" : "none"} aria-hidden="true" />
+    </button>
+  );
+}
 const ACTIONS_HEADER = <DataTableHeader label={<span className="sr-only">Actions</span>} />;
 
 function shortAddress(a: string): string {
@@ -474,7 +528,17 @@ function shortAddress(a: string): string {
 
 /** A saved wallet (D4): the facehash and name open its page; its positions,
  *  its address and the ⋮ follow. */
-function BookmarkRow({ session, summary, move }: { session: WalletSession; summary?: boolean; move?: RowMove }) {
+function BookmarkRow({
+  session,
+  summary,
+  full,
+  move,
+}: {
+  session: WalletSession;
+  summary?: boolean;
+  full: boolean;
+  move?: RowMove;
+}) {
   const [editing, setEditing] = useState(false);
   const [copied, copy] = useCopy();
 
@@ -502,6 +566,7 @@ function BookmarkRow({ session, summary, move }: { session: WalletSession; summa
       <DataTableCell rowHeader valign="middle" className="sm:w-[38%] sm:max-w-0 sm:min-w-[200px]">
         <span className="flex min-w-0 items-center gap-2">
           {move && <Grip />}
+          <StarToggle kind="wallet" id={primary} on={!!session.starred} full={full} label={label} />
           {editing ? (
             <span className="flex min-w-0 flex-1 items-center gap-3">
               {avatar}
@@ -578,7 +643,7 @@ const KIND_NOUN = { position: "position", view: "listing" } as const;
 
 /** A saved position or listing (D4): the explorer's mark and the name open
  *  the page; its explorer, chain, a closed position's tag and the ⋮ follow. */
-function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
+function SavedLinkRow({ link, full, move }: { link: SavedLink; full: boolean; move: RowMove }) {
   const [editing, setEditing] = useState(false);
   const [copied, copy] = useCopy();
   const label = link.customName || link.name;
@@ -602,6 +667,7 @@ function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
       <DataTableCell rowHeader valign="middle" className={NAME_CELL}>
         <span className="flex min-w-0 items-center gap-2">
           <Grip />
+          <StarToggle kind={link.kind} id={link.key} on={!!link.starred} full={full} label={label} />
           {editing ? (
             <span className="flex min-w-0 flex-1 items-center gap-3">
               {glyph}

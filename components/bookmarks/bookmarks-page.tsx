@@ -84,6 +84,12 @@ export function BookmarksPage() {
   };
 
   const ready = bookmarks && positions && views && scope.ready;
+  /** Over the Listings, Wallets and Positions tables (ui-jobs 586). */
+  const starNote = (
+    <p className="mb-3 text-sm text-rb-500" data-star-note="">
+      Starred items appear in the profile menu, up to five.
+    </p>
+  );
   const counts: Record<Tab, number> = {
     overview: 0,
     focus: scope.views.length,
@@ -272,6 +278,7 @@ export function BookmarksPage() {
               </section>
             </div>
           )}
+          {tab === "wallets" && bookmarks.length > 0 && starNote}
           {tab === "wallets" && (
             <BookmarkList
               bookmarks={bookmarks}
@@ -288,6 +295,7 @@ export function BookmarksPage() {
               }
             />
           )}
+          {tab === "positions" && positions.length > 0 && starNote}
           {tab === "positions" && (
             <SavedLinkList
               kind="position"
@@ -302,6 +310,7 @@ export function BookmarksPage() {
               }
             />
           )}
+          {tab === "listings" && views.length > 0 && starNote}
           {tab === "listings" && (
             <SavedLinkList
               kind="view"

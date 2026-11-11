@@ -373,8 +373,8 @@ const mHeaderBeta = await mHomePage.locator('header[data-anatomy="H2"]').first()
 check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
 const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
 check(mFooterBeta, "home @390: the beta pill is in the footer");
-// The profile control's menu (ui-jobs 504, 582): a menu button; with nothing
-// saved, the theme switch, Start here and each group's hint row; a full-width sheet at
+// The profile control's menu (ui-jobs 504, 582, 586): a menu button; with
+// nothing saved, the theme switch, Start here and Advanced, no group; a full-width sheet at
 // the foot of the screen (ui-jobs 507)
 // below md; Escape closes it and returns focus.
 const h20 = mHomePage.locator('header [data-anatomy="H20"]');
@@ -389,12 +389,10 @@ const sheet = await mHomePage.evaluate(() => {
     role: m?.getAttribute("role"),
     width: r ? Math.round(r.width) : 0,
     bottom: r ? Math.round(r.bottom) : 0,
-    empty: !!m?.querySelector("[data-profile-menu-empty]"),
+    empty: !m?.querySelector("[data-profile-menu-group]"),
     themes: [...(m?.querySelectorAll("[data-theme-option]") ?? [])].map((b) => b.textContent.trim()).join(","),
-    manage: !!m?.querySelector('[data-profile-menu-group="wallets"][href="/bookmarks?tab=wallets"]'),
-    start:
-      !!m?.querySelector('a[data-profile-menu-start][href="/start"]') &&
-      !!m?.querySelector("[data-profile-menu-empty]"),
+    manage: !!m?.querySelector("[data-profile-menu-prov]"),
+    start: !!m?.querySelector('a[data-profile-menu-start][href="/start"]'),
     scrim: !!document.querySelector("[data-profile-menu-scrim]"),
   };
 });
@@ -407,7 +405,7 @@ check(
     sheet.start &&
     sheet.scrim &&
     sheet.themes === "Light,Dark,Auto",
-  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: the theme switch, Start here, the hint rows, the Wallets heading to its tab (${JSON.stringify(sheet)})`,
+  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: the theme switch, Start here, no group, the provenance inspector switch (${JSON.stringify(sheet)})`,
 );
 // A press on the dim closes the sheet.
 await mHomePage.waitForTimeout(300);
