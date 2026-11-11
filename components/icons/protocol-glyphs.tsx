@@ -849,6 +849,16 @@ const GLYPHS: Record<string, Glyph> = {
       },
     ],
   },
+  // Balancer: the three stacked stones of public/icons/protocols/balancer.png, each
+  // ellipse measured off that image (ui-jobs 569).
+  "balancer-v3": {
+    viewBox: "24 23 208 208",
+    paths: [
+      { d: "M75 65.5a52 17.5 0 1 0 104 0a52 17.5 0 1 0 -104 0Z" },
+      { d: "M57 109a70 22.5 0 1 0 140 0a70 22.5 0 1 0 -140 0Z" },
+      { d: "M40 162.5a87.5 28 0 1 0 175 0a87.5 28 0 1 0 -175 0Z" },
+    ],
+  },
   uniswap: {
     viewBox: "0 0 20 22",
     inset: 0.18,
@@ -981,6 +991,11 @@ const GLYPHS: Record<string, Glyph> = {
 // Uniswap's explorers, on every chain, draw Uniswap's mark.
 for (const id of ["uniswap-v3", "uniswap-v4", "uniswap-v3-base", "uniswap-v3-arbitrum", "uniswap-v4-arbitrum"])
   GLYPHS[id] = GLYPHS.uniswap;
+// Uniswap's two explorers draw Uniswap's mark.
+GLYPHS["uniswap-v3"] = GLYPHS.uniswap;
+GLYPHS["uniswap-v4"] = GLYPHS.uniswap;
+// Balancer V3's other chains draw its mark.
+GLYPHS["balancer-v3-arbitrum"] = GLYPHS["balancer-v3"];
 
 export function hasProtocolGlyph(id: string): boolean {
   return id in GLYPHS;

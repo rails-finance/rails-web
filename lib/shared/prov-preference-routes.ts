@@ -72,6 +72,8 @@ export const PROV_PREFERENCE_ROUTES: readonly string[] = [
   "/ethereum/alchemix/v2/[lineKey]/[account]",
   "/ethereum/asymmetry/[collateralType]/[troveId]",
   "/ethereum/asymmetry/branches",
+  "/ethereum/balancer-v3/[wallet]",
+  "/ethereum/balancer-v3/position/[pool]/[wallet]",
   "/ethereum/compound-v2/[wallet]",
   "/ethereum/compound-v2/markets",
   "/ethereum/compound-v2/markets/[asset]",

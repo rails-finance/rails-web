@@ -115,7 +115,11 @@ export type SessionProtocol =
   // Euler V2 on Base and Arbitrum, at `/base/euler-v2` and `/arbitrum/euler-v2`:
   // a position is one account's holding in one vault, read at two blocks.
   | "euler-v2-base"
-  | "euler-v2-arbitrum";
+  | "euler-v2-arbitrum"
+  // Balancer V3 on Ethereum, at `/ethereum/balancer-v3`: a pool share is the
+  // wallet's balance of the pool's shares in the Vault (ui-jobs 569).
+  | "balancer-v3"
+  | "balancer-v3-arbitrum";
 
 /** What a saved entry is: a wallet, a position page or a listing view. */
 export type SavedKind = "wallet" | "position" | "view";

@@ -314,6 +314,9 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   // visited, and no census of holders is built.
   "euler-v2-base",
   "euler-v2-arbitrum",
+  // Balancer V3, for the Uniswap reason (ui-jobs 569).
+  "balancer-v3",
+  "balancer-v3-arbitrum",
   // Sky Savings, for the same reason: an sUSDS balance carries no debt and no
   // threshold (Miles, 2026-09-29, rails-ops TO-DO-sky-savings-scoping §6.1).
   // It has a listing all the same; this set keeps it out of the count.
