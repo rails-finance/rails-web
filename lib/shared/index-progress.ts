@@ -181,12 +181,6 @@ export interface StatusCell {
   entry: StatusEntry | null;
 }
 
-export interface StatusRow {
-  key: string;
-  name: string;
-  cells: StatusCell[];
-}
-
 /** The cells from /progress (the fill only). */
 export const cellsFromProgress = (p: IndexProgress): StatusCell[] =>
   p.indexes.map((e) => ({ protocol: e.protocol, key: e.protocol, chain: e.chain, kind: "fill", fill: e, entry: null }));
@@ -267,15 +261,4 @@ export function pipelineNewestBlockTime(e: StatusEntry): Secs | null {
     (t): t is Secs => t != null,
   );
   return times.length ? Math.max(...times) : null;
-}
-
-/** Cells grouped into protocol rows, in the order each key first appears. */
-export function statusRows(cells: StatusCell[], name: (key: string, chain: number) => string): StatusRow[] {
-  const rows = new Map<string, StatusRow>();
-  for (const c of cells) {
-    const row = rows.get(c.key) ?? { key: c.key, name: name(c.key, c.chain), cells: [] };
-    row.cells.push(c);
-    rows.set(c.key, row);
-  }
-  return [...rows.values()];
 }

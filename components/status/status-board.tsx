@@ -21,7 +21,9 @@ import {
   DataTableHeader,
   DataTableRow,
   DATA_TABLE_PILL,
+  type DataTableDir,
 } from "@/components/shared/data-table/data-table";
+import { ChainToggleButtons } from "@/components/shared/chain-toggle";
 import { NEXT_STAGE_WORDS, nextItems } from "@/lib/status/next";
 import { CHAINS, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
@@ -43,21 +45,18 @@ import {
   VISIT_FAIL_LATE,
   VISIT_FAIL_STALLED,
   type VisitReads,
-  statusRows,
   type Heartbeat,
   type IndexProgress,
   type IndexProgressEntry,
   type IndexStatus,
   type StatusCell,
   type StatusEntry,
-  type StatusRow,
 } from "@/lib/shared/index-progress";
 
 /** The page's data: /status where the server has it, else /progress. */
 export type StatusSource = { route: "status"; data: IndexStatus } | { route: "progress"; data: IndexProgress };
 
-const ROBINHOOD = 4663;
-const chainName = (id: number) => CHAINS[id as ChainId]?.name ?? (id === ROBINHOOD ? "Robinhood Chain" : `Chain ${id}`);
+const chainName = (id: number) => CHAINS[id as ChainId]?.name ?? `Chain ${id}`;
 
 /** A chain's mark at the row's size. */
 function ChainMark({ id }: { id: number }) {
@@ -130,40 +129,70 @@ function pipelineLine(e: StatusEntry, now: number): string {
   return b != null ? `No write time stored. The newest row is from a block of ${utcTime(b)}.` : "No write time stored.";
 }
 
-/** A chain's cell on a protocol's row: the heartbeat dot and how far the index has read. */
-function ChainCell({ c, now }: { c: StatusCell; now: number }) {
-  let hb: Heartbeat = "none";
-  let title = "";
-  let text = "";
-  let muted = false;
+/** What a row shows for one protocol on one chain. */
+interface CellView {
+  hb: Heartbeat;
+  /** The status column's word. */
+  status: string;
+  /** How far the index has read: a percent, "Full", "Partial" or "On visit". */
+  index: string;
+  /** The index column's sort key: percent read, 100 for a full index, -1 on visit. */
+  indexRank: number;
+  /** The last write or visit, unix seconds. */
+  last: number | null;
+  /** What keeps it current. */
+  lane: string;
+  title: string;
+}
+
+const STATUS_WORDS: Record<Heartbeat, string> = {
+  fresh: "Arriving",
+  late: "Late",
+  stalled: "Stalled",
+  none: "Not measured",
+};
+
+function cellView(c: StatusCell, now: number): CellView {
+  const live = c.entry?.live;
+  const lane = live ? laneWords(live.lane) : c.fill ? "The full-history fill" : "–";
   if (c.fill) {
-    hb = heartbeatState(c.fill, now);
-    title = heartbeatLine(c.fill, now);
-    text = percentWords(c.fill);
-    muted = c.fill.percent == null && !c.fill.atHead;
-  } else if (c.kind === "pipeline" && c.entry) {
-    hb = pipelineState(c.entry, now);
-    title = pipelineLine(c.entry, now);
-    // A roster entry with no `history` is indexed from deployment.
-    text = rosterFor(c.key, c.chain)?.history ? "Partial" : "Full";
-  } else {
-    const v = c.entry?.live?.visitReads;
-    hb = visitState(v);
-    title = `No index yet; reads when a page opens. ${visitLine(v)}`;
-    text = "On visit";
-    muted = true;
+    const hb = heartbeatState(c.fill, now);
+    return {
+      hb,
+      status: STATUS_WORDS[hb],
+      index: percentWords(c.fill),
+      indexRank: c.fill.atHead ? 100 : (c.fill.percent ?? 0),
+      last: heartbeatTime(c.fill),
+      lane,
+      title: heartbeatLine(c.fill, now),
+    };
   }
-  return (
-    <span
-      className="inline-flex items-center gap-2 text-sm"
-      data-anatomy="Y1.1"
-      title={title}
-      data-status-cell={`${c.protocol}-${c.chain}`}
-    >
-      <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[hb]}`} aria-label={HEARTBEAT_WORDS[hb]} />
-      <span className={`tabular-nums ${muted ? "text-rb-500" : "text-foreground"}`}>{text}</span>
-    </span>
-  );
+  if (c.kind === "pipeline" && c.entry) {
+    const hb = pipelineState(c.entry, now);
+    // A roster entry with no `history` is indexed from deployment.
+    const partial = Boolean(rosterFor(c.key, c.chain)?.history);
+    return {
+      hb,
+      status: STATUS_WORDS[hb],
+      index: partial ? "Partial" : "Full",
+      indexRank: partial ? 50 : 100,
+      last: pipelineHeartbeat(c.entry),
+      lane,
+      title: pipelineLine(c.entry, now),
+    };
+  }
+  const v = live?.visitReads;
+  const hb = visitState(v);
+  const lastVisit = v?.lastVisitAt ? Date.parse(v.lastVisitAt) / 1000 : null;
+  return {
+    hb,
+    status: STATUS_WORDS[hb],
+    index: "On visit",
+    indexRank: -1,
+    last: lastVisit,
+    lane,
+    title: `No index yet; reads when a page opens. ${visitLine(v)}`,
+  };
 }
 
 /** One figure: its name, its value and where it comes from. */
@@ -231,11 +260,7 @@ function ChainDetail({ e, now }: { e: IndexProgressEntry; now: number }) {
   const hb = heartbeatState(e, now);
   return (
     <section>
-      <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-        <span className={`h-2 w-2 rounded-full ${DOT[hb]}`} />
-        {chainName(e.chain)}
-      </h3>
-      <p className="mt-1 text-xs text-rb-500">{heartbeatLine(e, now)}</p>
+      <p className="text-xs text-rb-500">{heartbeatLine(e, now)}</p>
 
       <dl className="mt-3 flex flex-col gap-y-1.5 text-sm">
         <Figure
@@ -387,11 +412,7 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
   const hb = b ? pipelineState(e, now) : visitState(live?.visitReads);
   return (
     <section>
-      <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-        <span className={`h-2 w-2 rounded-full ${DOT[hb]}`} />
-        {chainName(e.chain)}
-      </h3>
-      <p className="mt-1 text-xs text-rb-500">
+      <p className="text-xs text-rb-500">
         {b
           ? pipelineLine(e, now)
           : `No index yet. Its pages read the chain when they open. ${visitLine(live?.visitReads)}`}
@@ -493,49 +514,68 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
   );
 }
 
-/** The chains the table has a column for, in the site's order. */
+/** The chains the toggle offers, in the site's order. */
 const CHAIN_ORDER = [1, 8453, 42161, 10, 5042, 11155111];
-function chainColumns(cells: StatusCell[]): number[] {
-  const present = [...new Set(cells.map((c) => c.chain))];
+function chainsOf(cells: StatusCell[]): ChainId[] {
+  const present = [...new Set(cells.map((c) => c.chain))].filter((c): c is ChainId => c in CHAINS);
   const rank = (c: number) => (CHAIN_ORDER.includes(c) ? CHAIN_ORDER.indexOf(c) : CHAIN_ORDER.length);
   return present.sort((x, y) => rank(x) - rank(y));
 }
 
-function Row({ row, chains, now }: { row: StatusRow; chains: number[]; now: number }) {
+type SortKey = "name" | "status" | "index" | "last";
+const STATUS_RANK: Record<Heartbeat, number> = { stalled: 0, late: 1, none: 2, fresh: 3 };
+
+interface Line {
+  cell: StatusCell;
+  name: string;
+  markId: string;
+  view: CellView;
+}
+
+function Row({ line, now }: { line: Line; now: number }) {
   const [open, setOpen] = useState(false);
-  const first = row.cells[0];
+  const { cell: c, view: v } = line;
   return (
     <Fragment>
       <DataTableGroupRow
         open={open}
         onToggle={() => setOpen((o) => !o)}
-        data-status-row={row.key}
+        data-status-row={`${c.key}-${c.chain}`}
         label={
           <span className="inline-flex items-center gap-2.5">
-            <Mark id={rosterFor(row.key, first.chain)?.id ?? row.key} name={row.name} />
-            {row.name}
+            <Mark id={line.markId} name={line.name} />
+            {line.name}
           </span>
         }
-        cells={chains.map((ch) => {
-          const c = row.cells.find((x) => x.chain === ch);
-          return (
-            <DataTableCell key={ch} valign="middle" label={c ? chainName(ch) : undefined}>
-              {c ? <ChainCell c={c} now={now} /> : null}
+        cells={
+          <>
+            <DataTableCell valign="middle" label="Status">
+              <span className="inline-flex items-center gap-2 text-sm" data-anatomy="Y1.1" title={v.title}>
+                <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[v.hb]}`} aria-hidden />
+                <span className={v.hb === "none" ? "text-rb-500" : "text-foreground"}>{v.status}</span>
+              </span>
             </DataTableCell>
-          );
-        })}
+            <DataTableCell valign="middle" label="Index" className="text-sm tabular-nums">
+              <span className={v.indexRank < 0 ? "text-rb-500" : "text-foreground"}>{v.index}</span>
+            </DataTableCell>
+            <DataTableCell valign="middle" label="Last write" className="text-sm tabular-nums text-rb-500">
+              {v.last != null ? `${ageWords(now - v.last)} ago` : "–"}
+            </DataTableCell>
+            <DataTableCell valign="middle" label="Kept current by" className="text-sm text-rb-500">
+              {v.lane}
+            </DataTableCell>
+          </>
+        }
       />
       {open && (
         <DataTableRow drawer>
-          <DataTableCell colSpan={chains.length + 1} wide className="pb-6">
-            <div className="flex flex-col gap-5 sm:pl-[2.25rem]" data-anatomy="Y1.2">
-              {row.cells.map((c) =>
-                c.fill ? (
-                  <ChainDetail key={c.chain} e={c.fill} now={now} />
-                ) : c.entry ? (
-                  <PipelineDetail key={c.chain} e={c.entry} now={now} />
-                ) : null,
-              )}
+          <DataTableCell colSpan={5} wide className="pb-6">
+            <div className="sm:pl-[2.25rem]" data-anatomy="Y1.2">
+              {c.fill ? (
+                <ChainDetail e={c.fill} now={now} />
+              ) : c.entry ? (
+                <PipelineDetail e={c.entry} now={now} />
+              ) : null}
             </div>
           </DataTableCell>
         </DataTableRow>
@@ -616,39 +656,81 @@ export function StatusBoard({ source }: { source: StatusSource }) {
 
   const cells =
     source.route === "status" ? cellsFromStatus(source.data, protocolLabel) : cellsFromProgress(source.data);
-  const rows = statusRows(cells, (key, chain) => {
-    const fill = cells.find((c) => c.key === key && c.fill)?.fill;
-    return rosterFor(key, chain)?.label ?? (fill ? fill.label.split(" · ")[0] : key);
+  const chains = chainsOf(cells);
+  const [chain, setChain] = useState<ChainId>(chains[0] ?? 1);
+  const [sort, setSort] = useState<{ key: SortKey; dir: DataTableDir }>({ key: "status", dir: "asc" });
+  const atHead = (protocol: string, ch: number) =>
+    cells.some((c) => c.protocol === protocol && c.chain === ch && c.fill?.atHead === true);
+
+  const lines: Line[] = cells
+    .filter((c) => c.chain === chain)
+    .map((c) => {
+      const entry = rosterFor(c.key, c.chain);
+      const name = entry?.label ?? (c.fill ? c.fill.label.split(" · ")[0] : c.key);
+      return { cell: c, name, markId: entry?.id ?? c.key, view: cellView(c, now) };
+    });
+  const byName = (a: Line, b: Line) => a.name.localeCompare(b.name, "en-US");
+  const cmp: Record<SortKey, (a: Line, b: Line) => number> = {
+    name: byName,
+    status: (a, b) => STATUS_RANK[a.view.hb] - STATUS_RANK[b.view.hb] || byName(a, b),
+    index: (a, b) => a.view.indexRank - b.view.indexRank || byName(a, b),
+    last: (a, b) => (a.view.last ?? -Infinity) - (b.view.last ?? -Infinity) || byName(a, b),
+  };
+  const sign = sort.dir === "asc" ? 1 : -1;
+  lines.sort((a, b) => sign * cmp[sort.key](a, b));
+  const sortBy = (key: SortKey) => ({
+    dir: sort.key === key ? sort.dir : null,
+    onSort: () =>
+      setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" })),
   });
-  const chains = chainColumns(cells);
-  const atHead = (protocol: string, chain: number) =>
-    cells.some((c) => c.protocol === protocol && c.chain === chain && c.fill?.atHead === true);
+
   return (
     <div className="mt-10">
+      <div className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0" data-anatomy="Y4">
+        <ChainToggleButtons chainId={chain} onChange={setChain} chains={chains} />
+      </div>
+      {/* Below sm the table stacks into cards with no header row; the sort is a select. */}
+      <label className="mb-3 flex items-center gap-2 text-xs text-rb-500 sm:hidden" data-anatomy="Y1.4">
+        Sort by
+        <select
+          value={`${sort.key}:${sort.dir}`}
+          onChange={(e) => {
+            const [key, dir] = e.target.value.split(":") as [SortKey, DataTableDir];
+            setSort({ key, dir });
+          }}
+          className="rounded-sm border border-rb-200 bg-transparent px-1.5 py-1 text-foreground dark:border-rb-700"
+        >
+          <option value="status:asc">Status, problems first</option>
+          <option value="name:asc">Protocol, A to Z</option>
+          <option value="index:asc">Index, least read first</option>
+          <option value="last:asc">Last write, oldest first</option>
+        </select>
+      </label>
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-rb-500" data-anatomy="Y2">
         {(["fresh", "late", "stalled", "none"] as const).map((h) => (
           <span key={h} className="inline-flex items-center gap-1.5">
             <span className={`h-1.5 w-1.5 rounded-full ${DOT[h]}`} />
             {h === "fresh"
-              ? "Data arriving"
+              ? "Arriving: on schedule"
               : h === "late"
                 ? `Late: past 1.5 times its schedule, or ${pct(VISIT_FAIL_LATE)} of visit reads failing`
                 : h === "stalled"
                   ? `Stalled: past 3 times its schedule, or ${pct(VISIT_FAIL_STALLED)} failing`
-                  : "No write time or visit to measure"}
+                  : "Not measured: no write time or visit"}
           </span>
         ))}
       </div>
-      <DataTable label="Indexing progress by protocol and chain" anatomy="Y1" stacked stackBelow="lg">
+      <DataTable label={`Indexing status on ${chainName(chain)}`} anatomy="Y1" stacked>
         <DataTableHead>
-          <DataTableHeader label="Protocol" />
-          {chains.map((c) => (
-            <DataTableHeader key={c} label={chainName(c)} />
-          ))}
+          <DataTableHeader label="Protocol" sort={sortBy("name")} />
+          <DataTableHeader label="Status" sort={sortBy("status")} />
+          <DataTableHeader label="Index" sort={sortBy("index")} />
+          <DataTableHeader label="Last write" sort={sortBy("last")} />
+          <DataTableHeader label="Kept current by" />
         </DataTableHead>
         <DataTableBody>
-          {rows.map((r) => (
-            <Row key={r.key} row={r} chains={chains} now={now} />
+          {lines.map((l) => (
+            <Row key={`${l.cell.key}-${l.cell.chain}`} line={l} now={now} />
           ))}
         </DataTableBody>
       </DataTable>
