@@ -1005,7 +1005,15 @@ const GLYPHS: Record<string, Glyph> = {
 };
 
 // Uniswap's explorers, on every chain, draw Uniswap's mark.
-for (const id of ["uniswap-v3", "uniswap-v4", "uniswap-v3-base", "uniswap-v3-arbitrum", "uniswap-v4-arbitrum"])
+for (const id of [
+  "uniswap-v3",
+  "uniswap-v4",
+  "uniswap-v3-base",
+  "uniswap-v3-arbitrum",
+  "uniswap-v4-arbitrum",
+  "uniswap-v3-optimism",
+  "uniswap-v4-optimism",
+])
   GLYPHS[id] = GLYPHS.uniswap;
 // Balancer V3's other chains draw its mark.
 GLYPHS["balancer-v3-arbitrum"] = GLYPHS["balancer-v3"];

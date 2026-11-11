@@ -113,6 +113,8 @@ export type SessionProtocol =
   | "uniswap-v3-base"
   | "uniswap-v3-arbitrum"
   | "uniswap-v4-arbitrum"
+  | "uniswap-v3-optimism"
+  | "uniswap-v4-optimism"
   | "pancakeswap-v3-base"
   | "pancakeswap-v3-arbitrum"
   // Lido on Ethereum, at `/ethereum/lido`: a wallet's stake is its stETH

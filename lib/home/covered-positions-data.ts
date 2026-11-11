@@ -304,6 +304,8 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   "uniswap-v3-base",
   "uniswap-v3-arbitrum",
   "uniswap-v4-arbitrum",
+  "uniswap-v3-optimism",
+  "uniswap-v4-optimism",
   "pancakeswap-v3-base",
   "pancakeswap-v3-arbitrum",
   // Compound V3 on Optimism: no census of accounts (ui-jobs 578).

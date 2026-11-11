@@ -1034,6 +1034,37 @@ const SPECS: ProtocolSpec[] = [
     subPages: [],
   },
   {
+    // Uniswap V3 and V4 on Optimism (rails-ops ui-jobs 578), on the same pages
+    // as Arbitrum's, read from the chain when a page opens. Unlaunched while
+    // Miles reads it.
+    id: "uniswap-v3-optimism",
+    session: "uniswap-v3-optimism",
+    label: "Uniswap V3",
+    chainId: 10,
+    slug: "uniswap-v3",
+    protocolKey: "uniswap-v3",
+    tags: ["Liquidity"],
+    desc: "Uniswap V3 on Optimism: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
+    id: "uniswap-v4-optimism",
+    session: "uniswap-v4-optimism",
+    label: "Uniswap V4",
+    chainId: 10,
+    slug: "uniswap-v4",
+    protocolKey: "uniswap-v4",
+    tags: ["Liquidity"],
+    desc: "Uniswap's singleton pools on Optimism, hooks included: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
     // The first entry here whose WHOLE PRODUCT is vaults, and therefore a
     // roster subject rather than a section (rails-ops decision 0027 point 2).
     // The `vaults` segment is kept although nothing else lives under this door,
@@ -1263,6 +1294,8 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "uniswap-v3-base": "Position",
   "uniswap-v3-arbitrum": "Position",
   "uniswap-v4-arbitrum": "Position",
+  "uniswap-v3-optimism": "Position",
+  "uniswap-v4-optimism": "Position",
   "pancakeswap-v3-base": "Position",
   "pancakeswap-v3-arbitrum": "Position",
   // A wallet's stETH and wstETH; the page names it a stake.

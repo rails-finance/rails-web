@@ -1,6 +1,6 @@
 // The Uniswap-family deployments Rails reads (rails-ops ui-jobs 556, 568, 573
-// and 575): Uniswap V3 and V4 on Ethereum, V3 on Base, V3 and V4 on Arbitrum,
-// and PancakeSwap V3 on Base and Arbitrum. One table per (protocol, chain): the
+// and 575): Uniswap V3 and V4 on Ethereum, V3 on Base, V3 and V4 on Arbitrum
+// and Optimism (578), and PancakeSwap V3 on Base and Arbitrum. One table per (protocol, chain): the
 // contracts a receipt names, the chain's native coin and its wrapped token,
 // and whether rails-server reads a position's history there (Base's keyless
 // gateway serves no whole-life logs). The addresses match rails-server's
@@ -15,7 +15,7 @@ import type { UniswapVersion } from "./types";
 
 export type UniProtocol = "uniswap" | "pancakeswap";
 /** The chains the at-block routes answer for. */
-export type UniChainId = 1 | 8453 | 42161;
+export type UniChainId = 1 | 8453 | 42161 | 10;
 
 export interface UniDeployment {
   protocol: UniProtocol;
@@ -84,6 +84,21 @@ export const UNI_DEPLOYMENTS: readonly UniDeployment[] = [
     v3Npm: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
     v4PositionManager: "0xd88F38F930b7952f2DB2432Cb002E7abbF3dD869",
     v4StateView: "0x76Fd297e2D437cd7f76d50F01AfE6160f86e9990",
+    masterChef: null,
+    history: true,
+  },
+  {
+    protocol: "uniswap",
+    protocolName: "Uniswap",
+    chainId: 10,
+    chainName: "Optimism",
+    chainSlug: "optimism",
+    versions: ["v3", "v4"],
+    native: ETH,
+    wrapped: { symbol: "WETH", address: "0x4200000000000000000000000000000000000006", decimals: 18 },
+    v3Npm: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+    v4PositionManager: "0x3C3Ea4B57a46241e54610e5f022E5c45859A1017",
+    v4StateView: "0xc18a3169788F4F75A170290584ECA6395C75Ecdb",
     masterChef: null,
     history: true,
   },

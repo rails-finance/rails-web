@@ -56,6 +56,8 @@ export const ORACLE_USD_REASON: Record<string, string> = {
   "uniswap-v3-base": UNISWAP_REASON,
   "uniswap-v3-arbitrum": UNISWAP_REASON,
   "uniswap-v4-arbitrum": UNISWAP_REASON,
+  "uniswap-v3-optimism": UNISWAP_REASON,
+  "uniswap-v4-optimism": UNISWAP_REASON,
   "pancakeswap-v3-base": PANCAKESWAP_REASON,
   "pancakeswap-v3-arbitrum": PANCAKESWAP_REASON,
   "compound-v3-optimism":

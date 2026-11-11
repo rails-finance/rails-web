@@ -141,6 +141,8 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/uniswap-v3-base", "/base/uniswap-v3"],
   ["/uniswap-v3-arbitrum", "/arbitrum/uniswap-v3"],
   ["/uniswap-v4-arbitrum", "/arbitrum/uniswap-v4"],
+  ["/uniswap-v3-optimism", "/optimism/uniswap-v3"],
+  ["/uniswap-v4-optimism", "/optimism/uniswap-v4"],
   ["/pancakeswap-v3-base", "/base/pancakeswap-v3"],
   ["/pancakeswap-v3-arbitrum", "/arbitrum/pancakeswap-v3"],
   // Lido never had a pre-0016 path; the row is for check:routes.
