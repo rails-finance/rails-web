@@ -392,7 +392,9 @@ test("no em dash, no restricted words, sentence case on every face string", () =
 
 // ── Velodrome on Optimism: the same modules on Velodrome's site (lib/aerodrome/sites.ts, ui-jobs 578) ──
 const { VELODROME, AERODROME, siteOf } = await import("../../lib/aerodrome/sites.ts");
-const { depositorLimit, notIndexed, frontDoorWords, POSITION_PAGE } = await import("../../lib/aerodrome/words.ts");
+const { depositorLimit, notIndexed, frontDoorWords, cardWords, POSITION_PAGE } = await import(
+  "../../lib/aerodrome/words.ts"
+);
 const OP_USDC = { address: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", symbol: "USDC", decimals: 6 };
 const VELO = { address: "0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db", symbol: "VELO", decimals: 18 };
 /** VELO/USDC at 0.025 USDC and VELO/WETH at 0.00001 WETH, VELO token1 in both, as on chain. */
@@ -454,6 +456,13 @@ test("Velodrome: the words name VELO, Velodrome and Optimism, and state the stak
   assert.equal(depositorLimit(AERODROME), null);
   assert.match(notIndexed(VELODROME, "position"), /^Not indexed yet on Optimism/);
   assert.equal(notIndexed(AERODROME, "wallet"), null);
+  assert.equal(notIndexed(AERODROME, "position"), null);
+  // The owner tip states what the card shows; the limit is said once, in the line under the title.
+  assert.doesNotMatch(cardWords(VELODROME).ownerTip, /does not yet name/);
+  assert.equal(
+    cardWords(AERODROME).ownerTip,
+    "The wallet that staked the position. The gauge holds the position while it is staked.",
+  );
   assert.doesNotMatch(words, /—/);
   assert.doesNotMatch(words, /\b(fold|footgun|honest|itself|actually|exactly)\b/i);
 });

@@ -62,10 +62,10 @@ export const depositorLimit = (site: SlipstreamSite): string | null =>
     ? null
     : `On ${site.chainName}, Rails does not yet name the wallet that staked a position, so ${site.reward.symbol} to claim is worked out from the gauge's reads.`;
 
-/** Off Base, the line under a position and a wallet's positions while the site has no index;
- *  null on Base, whose pages carry none. */
+/** The line under a position and a wallet's positions where the site says it is not indexed yet
+ *  (sites.ts `saysNotIndexed`); null where it does not. */
 export const notIndexed = (site: SlipstreamSite, what: "position" | "wallet"): string | null =>
-  site.chainId === 8453
+  !site.saysNotIndexed
     ? null
     : `Not indexed yet on ${site.chainName}: ${what === "position" ? "this position's history arrives" : "a listing of positions and their history arrive"} when Rails indexes ${site.label} there.`;
 
@@ -85,7 +85,7 @@ export const cardWords = (site: SlipstreamSite) => {
     claimableTip: `${R} the gauge has paid this position and the wallet that staked it can claim now.`,
     ownerTip: site.namesDepositor
       ? "The wallet that staked the position. The gauge holds the position while it is staked."
-      : `The gauge holds the position while it is staked. On ${site.chainName}, Rails does not yet name the wallet that staked it.`,
+      : "The gauge holds the position while it is staked.",
     foot: (q: string) => `In ${q}, at the pool's own price. Rails prices nothing in dollars here.`,
     rangeLabel: "The range against the price",
     stakedBadge: "Staked",

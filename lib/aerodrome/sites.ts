@@ -32,6 +32,9 @@ export interface SlipstreamSite {
    *  on Base it finds the deposit's block by time; elsewhere that lookup does not exist yet, and
    *  `staked.depositor` and `staked.earned` answer null. */
   namesDepositor: boolean;
+  /** Whether the position and wallet pages carry the "Not indexed yet" line: Optimism's do, as its
+   *  other explorers do; Base's carry none. */
+  saysNotIndexed: boolean;
   /** The Base day grid's note in a receipt; null where the grid needs none. */
   gridNote: string | null;
   docs: { label: string; href: string };
@@ -64,6 +67,7 @@ export const AERODROME: SlipstreamSite = {
     weth: "0x7f670f78B17dEC44d5Ef68a48740b6f8849cc2e6",
   },
   namesDepositor: true,
+  saysNotIndexed: false,
   gridNote: "Base has no fixed count of blocks a day",
   docs: { label: "Aerodrome documentation", href: "https://aerodrome.finance/docs" },
 };
@@ -94,6 +98,7 @@ export const VELODROME: SlipstreamSite = {
     weth: "0x58e6433A6903886E440Ddf519eCC573c4046a6b2",
   },
   namesDepositor: false,
+  saysNotIndexed: true,
   gridNote: null,
   docs: { label: "Velodrome documentation", href: "https://velodrome.finance/docs" },
 };
