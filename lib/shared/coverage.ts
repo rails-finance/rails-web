@@ -973,6 +973,8 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     oracleUsd: { why: ORACLE_USD_REASON.lido },
     forensics: {
       why: "a stake holds no loan, so there is no threshold to breach and no liquidation to trace",
+    },
+  }),
   // Fluid's vaults on Base (ui-jobs 574), read on visit: the position page
   // reads the position and its vault at the head and 30 days back.
   // Unlaunched, so the matrix does not draw it yet.
@@ -982,6 +984,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     forensics: {
       why: "a liquidation names no position in its event, and history waits until Rails indexes Fluid on Base",
     },
+  }),
   // Euler V2 on Base and Arbitrum (read-on-visit-candidates-572.md, row 10).
   // `dashboard`: a holding's page reads the account and the vault at the head
   // and 30 days back from rails-server's at-block routes. Dollars come from
@@ -994,6 +997,7 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   "euler-v2-arbitrum": explorerDepth({
     dashboard: true,
     oracleUsd: EULER_USD_CELL,
+  }),
   // Balancer V3 on Ethereum (ui-jobs 569): the pool-share page reads the
   // wallet's share and the pool in the Vault at the head and 30 days back.
   "balancer-v3": explorerDepth({

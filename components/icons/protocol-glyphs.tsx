@@ -849,14 +849,20 @@ const GLYPHS: Record<string, Glyph> = {
       },
     ],
   },
-  // Balancer: the three stacked stones of public/icons/protocols/balancer.png, each
-  // ellipse measured off that image (ui-jobs 569).
+  // Balancer: Balancer's official mark, three stacked stones, on its own
+  // 512 canvas (ui-jobs 569).
   "balancer-v3": {
-    viewBox: "24 23 208 208",
+    viewBox: "0 0 512 512",
     paths: [
-      { d: "M75 65.5a52 17.5 0 1 0 104 0a52 17.5 0 1 0 -104 0Z" },
-      { d: "M57 109a70 22.5 0 1 0 140 0a70 22.5 0 1 0 -140 0Z" },
-      { d: "M40 162.5a87.5 28 0 1 0 175 0a87.5 28 0 1 0 -175 0Z" },
+      {
+        d: "M375.644 126.065C375.644 148.144 322.077 166.043 255.999 166.043C189.921 166.043 136.355 148.144 136.355 126.065C136.355 103.985 189.921 86.0862 255.999 86.0862C322.077 86.0862 375.644 103.985 375.644 126.065Z",
+      },
+      {
+        d: "M455.407 343.283C455.407 316.07 406.59 292.669 336.623 282.322L334.811 282.69C311.212 287.346 284.413 289.978 256 289.978C226.856 289.978 199.409 287.208 175.376 282.322C105.409 292.669 56.5918 316.07 56.5918 343.283C56.5918 380.082 145.869 409.914 256 409.914C366.13 409.914 455.407 380.082 455.407 343.283Z",
+      },
+      {
+        d: "M415.526 223.347C415.526 199.799 369.838 179.82 306.468 172.762L304.833 173.026C289.752 175.398 273.267 176.704 256 176.704C238.105 176.704 221.053 175.302 205.531 172.764C142.161 179.819 96.4734 199.801 96.4734 223.347C96.4734 252.786 167.895 276.652 256 276.652C344.104 276.652 415.526 252.786 415.526 223.347Z",
+      },
     ],
   },
   uniswap: {
@@ -991,9 +997,6 @@ const GLYPHS: Record<string, Glyph> = {
 // Uniswap's explorers, on every chain, draw Uniswap's mark.
 for (const id of ["uniswap-v3", "uniswap-v4", "uniswap-v3-base", "uniswap-v3-arbitrum", "uniswap-v4-arbitrum"])
   GLYPHS[id] = GLYPHS.uniswap;
-// Uniswap's two explorers draw Uniswap's mark.
-GLYPHS["uniswap-v3"] = GLYPHS.uniswap;
-GLYPHS["uniswap-v4"] = GLYPHS.uniswap;
 // Balancer V3's other chains draw its mark.
 GLYPHS["balancer-v3-arbitrum"] = GLYPHS["balancer-v3"];
 
