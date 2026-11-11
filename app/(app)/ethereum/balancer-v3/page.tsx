@@ -12,5 +12,5 @@ export const metadata = listingMetadata({
 });
 
 export default function Page() {
-  return <BalancerFrontDoor />;
+  return <BalancerFrontDoor chainId={1} />;
 }

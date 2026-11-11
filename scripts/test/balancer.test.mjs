@@ -141,3 +141,11 @@ test("a wallet row and the words that say what the search misses", () => {
   assert.equal(FRONT_DOOR.rowShare(w.share), "0.907% of the pool");
   assert.match(FRONT_DOOR.notFound, /received by transfer, or staked in a gauge/);
 });
+
+test("each chain names itself on the front door and in a receipt's grid", async () => {
+  const { BAL_CHAINS, balChain } = await import("../../lib/balancer/chains.ts");
+  assert.match(FRONT_DOOR.line(BAL_CHAINS[42161].name), /on Arbitrum,/);
+  assert.match(balChain(42161).grid, /UTC midnight/);
+  assert.equal(balChain(1).session, "balancer-v3");
+  assert.equal(balChain(42161).session, "balancer-v3-arbitrum");
+});

@@ -8,7 +8,8 @@
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { BalPosition } from "@/lib/balancer/position";
 import { walletRow } from "@/lib/balancer/position";
-import { BALANCER_FIRST_BLOCK, type BalPositionRead, type BalPositionsRead, type BlockRef } from "@/lib/balancer/types";
+import { balChain } from "@/lib/balancer/chains";
+import type { BalPositionRead, BalPositionsRead, BlockRef } from "@/lib/balancer/types";
 import type { BalLineKey } from "@/lib/balancer/words";
 
 const n = (v: number) => v.toLocaleString("en-US");
@@ -28,8 +29,7 @@ const bothVia = (c: BalReceiptContext) =>
   c.r.past ? via(`blocks ${n(c.r.then.block)} and ${n(c.r.head.block)}`) : headVia(c);
 const chain = (label: string, value: string): ProvInput => ({ label, value, kind: "chain", pclass: "state" });
 const derived = (label: string, value: string): ProvInput => ({ label, value, kind: "derived" });
-const thenLine = (c: BalReceiptContext) =>
-  c.r.past ? `, and at ${at(c.r.then)}, the multiple of 7,200 blocks 30 days below the head` : "";
+const thenLine = (c: BalReceiptContext) => (c.r.past ? `, and at ${at(c.r.then)}, ${balChain(c.r.chainId).grid}` : "");
 
 /** The card's figures. */
 export function cardProv(key: "share" | "holds" | "rate" | "added", c: BalReceiptContext): Provenance {
@@ -87,9 +87,9 @@ export function cardProv(key: "share" | "holds" | "rate" | "added", c: BalReceip
         kind: "chain",
         pclass: "emitted",
         source: first ? { block: first.block, txHash: first.txHash } : source,
-        summary: `First added — the earliest LiquidityAdded the Vault emitted for this pool with this wallet as provider, read from block ${n(BALANCER_FIRST_BLOCK)} to ${n(r.head.block)}: ${r.flows.length} adds and removes in all.`,
+        summary: `First added — the earliest LiquidityAdded the Vault emitted for this pool with this wallet as provider, read from block ${n(balChain(r.chainId).firstBlock)} to ${n(r.head.block)}: ${r.flows.length} adds and removes in all.`,
         contract: vaultC(r),
-        via: `rails-server · eth_getLogs ${n(BALANCER_FIRST_BLOCK)}–${n(r.head.block)}`,
+        via: `rails-server · eth_getLogs ${n(balChain(r.chainId).firstBlock)}–${n(r.head.block)}`,
         inputs: first
           ? [chain("block", n(first.block)), chain("transaction", first.txHash)]
           : [chain("logs found", "0")],
@@ -203,7 +203,7 @@ export function finderProv(r: BalPositionsRead): Provenance {
     kind: "chain",
     pclass: "emitted",
     source: { block: r.head.block },
-    summary: `Pools found — the Vault's LiquidityAdded logs with this wallet as provider, blocks ${n(s?.from ?? BALANCER_FIRST_BLOCK)} to ${n(s?.to ?? r.head.block)}: ${n(s?.logs ?? 0)} adds across ${n(s?.pools ?? 0)} pools, ${n(r.checked)} checked with balanceOf at ${at(r.head)}.`,
+    summary: `Pools found — the Vault's LiquidityAdded logs with this wallet as provider, blocks ${n(s?.from ?? balChain(r.chainId).firstBlock)} to ${n(s?.to ?? r.head.block)}: ${n(s?.logs ?? 0)} adds across ${n(s?.pools ?? 0)} pools, ${n(r.checked)} checked with balanceOf at ${at(r.head)}.`,
     contract: vaultC(r),
     via: `rails-server · eth_getLogs, then eth_call @ block ${n(r.head.block)}`,
     inputs: [

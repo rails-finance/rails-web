@@ -1,5 +1,5 @@
-// A wallet's share of one Balancer V3 pool on Ethereum (rails-ops ui-jobs 569),
-// at `/ethereum/balancer-v3/position/<pool>/<wallet>`: the card, then the
+// A wallet's share of one Balancer V3 pool (rails-ops ui-jobs 569), at
+// `/<chain>/balancer-v3/position/<pool>/<wallet>`: the card, then the
 // readout under it. One read of rails-server's at-block route
 // (lib/api/fetch-balancer.ts) serves both. The layout is Uniswap's
 // (components/protocol/uniswap/uniswap-position-page.tsx).
@@ -18,20 +18,32 @@ import { BalancerPositionCard } from "@/components/protocol/balancer/balancer-po
 import { BalancerReadout } from "@/components/protocol/balancer/balancer-readout";
 import { fetchBalancerPosition } from "@/lib/api/fetch-balancer";
 import { balPosition } from "@/lib/balancer/position";
+import { BAL_CHAINS, type BalChainId } from "@/lib/balancer/chains";
 import { POSITION_PAGE } from "@/lib/balancer/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { explorerHref } from "@/lib/shared/protocols";
 
 /** One read per request: the metadata and the page share it. */
-export const loadBalancerPosition = cache((pool: string, wallet: string) => fetchBalancerPosition(1, pool, wallet));
+export const loadBalancerPosition = cache((chainId: BalChainId, pool: string, wallet: string) =>
+  fetchBalancerPosition(chainId, pool, wallet),
+);
 
-export async function BalancerPositionPage({ pool, wallet: raw }: { pool: string; wallet: string }) {
+export async function BalancerPositionPage({
+  chainId,
+  pool,
+  wallet: raw,
+}: {
+  chainId: BalChainId;
+  pool: string;
+  wallet: string;
+}) {
   if (!isWallet(pool) || !isWallet(raw)) notFound();
   const wallet = raw.toLowerCase();
-  const answer = await loadBalancerPosition(pool.toLowerCase(), wallet);
+  const answer = await loadBalancerPosition(chainId, pool.toLowerCase(), wallet);
   if (answer.kind === "not-found") notFound();
-  const session = "balancer-v3";
-  const home = explorerHref(1, session);
+  const chain = BAL_CHAINS[chainId];
+  const session = chain.session;
+  const home = explorerHref(chainId, session);
   if (answer.kind === "error")
     return (
       <div className="py-8">
@@ -46,7 +58,7 @@ export async function BalancerPositionPage({ pool, wallet: raw }: { pool: string
   const title = POSITION_PAGE.title(p);
   // Focus (ui-jobs 557): the pool share is in focus when one of the pool's tokens is.
   return (
-    <AimGate keys={r.tokens.map((t) => assetKey(1, t.address))} chain={1} what="This pool share">
+    <AimGate keys={r.tokens.map((t) => assetKey(chainId, t.address))} chain={chainId} what="This pool share">
       <div className="min-h-screen">
         <div className="py-8">
           <header className="mb-5" data-skel-section="page-header">
@@ -63,7 +75,7 @@ export async function BalancerPositionPage({ pool, wallet: raw }: { pool: string
                 {title}
               </h2>
             </ReadTierTitleRow>
-            <p className="text-xs text-rb-500">{POSITION_PAGE.sub(p)}</p>
+            <p className="text-xs text-rb-500">{POSITION_PAGE.sub(p, chain.name)}</p>
           </header>
           <div className="flex flex-col gap-6">
             <BalancerPositionCard r={r} />

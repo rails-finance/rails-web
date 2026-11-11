@@ -318,6 +318,22 @@ const SPECS: ProtocolSpec[] = [
     subPages: [],
   },
   {
+    // Balancer V3 on Arbitrum (rails-ops ui-jobs 569): Ethereum's explorer on
+    // the same Vault address, its 30-day read at a UTC midnight's block.
+    id: "balancer-v3-arbitrum",
+    session: "balancer-v3-arbitrum",
+    label: "Balancer V3",
+    chainId: 42161,
+    slug: "balancer-v3",
+    protocolKey: "balancer-v3",
+    tags: ["Liquidity"],
+    desc: "Pool shares on Arbitrum: a wallet's part of each pool's tokens and the pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    readTier: "visit",
+    subPages: [],
+  },
+  {
     // Alchemix V3's ETHEREUM lines — alUSD and alETH. Two entries rather than a
     // chain switch, for the reason aave-v3 / aave-v3-base are two: a position's
     // identity is the (chain, line) pair, and a token id on one chain says
@@ -960,6 +976,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   aerodrome: "Position",
   // A Vault balance of a pool's shares; the page names it a pool share.
   "balancer-v3": "Position",
+  "balancer-v3-arbitrum": "Position",
 };
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",

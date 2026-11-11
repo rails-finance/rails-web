@@ -1,5 +1,5 @@
-// A wallet's Balancer V3 pool shares on Ethereum (rails-ops ui-jobs 569), at
-// `/ethereum/balancer-v3/<wallet>`: the pools the wallet holds a share of,
+// A wallet's Balancer V3 pool shares on one chain (rails-ops ui-jobs 569), at
+// `/<chain>/balancer-v3/<wallet>`: the pools the wallet holds a share of,
 // found from the liquidity it added (BalancerWalletList). The layout is
 // Uniswap's (components/protocol/uniswap/uniswap-wallet-positions.tsx).
 //
@@ -13,15 +13,16 @@ import { isWallet } from "@/components/protocol/uniswap/uniswap-wallet-positions
 import { BalancerWalletList } from "@/components/protocol/balancer/balancer-wallet-list";
 import { fetchBalancerPositions } from "@/lib/api/fetch-balancer";
 import { FRONT_DOOR } from "@/lib/balancer/words";
+import { BAL_CHAINS, type BalChainId } from "@/lib/balancer/chains";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { explorerHref } from "@/lib/shared/protocols";
 
-export async function BalancerWalletPositions({ wallet: raw }: { wallet: string }) {
+export async function BalancerWalletPositions({ chainId, wallet: raw }: { chainId: BalChainId; wallet: string }) {
   if (!isWallet(raw)) notFound();
   const wallet = raw.toLowerCase();
-  const session = "balancer-v3";
-  const home = explorerHref(1, session);
-  const answer = await fetchBalancerPositions(1, wallet);
+  const session = BAL_CHAINS[chainId].session;
+  const home = explorerHref(chainId, session);
+  const answer = await fetchBalancerPositions(chainId, wallet);
   return (
     <div className="min-h-screen">
       <div className="py-8" data-balancer-wallet-page={wallet}>

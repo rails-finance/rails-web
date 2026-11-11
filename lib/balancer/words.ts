@@ -12,7 +12,8 @@ import { day, num, pct, share } from "../uniswap/words";
 export const LABEL = "Balancer V3";
 
 export const FRONT_DOOR = {
-  line: "A wallet's Balancer V3 pool shares on Ethereum, each with its part of the pool's tokens and the pool over the last 30 days.",
+  line: (chain: string) =>
+    `A wallet's Balancer V3 pool shares on ${chain}, each with its part of the pool's tokens and the pool over the last 30 days.`,
   heading: "Balancer V3 pool shares",
   none: "Rails found no Balancer V3 pool this wallet holds a share of.",
   /** What the search does not reach, said on every wallet page. */
@@ -26,8 +27,8 @@ export const FRONT_DOOR = {
 
 export const POSITION_PAGE = {
   title: (p: BalPosition) => `${p.symbol} · Balancer V3`,
-  sub: (p: BalPosition) =>
-    [p.name !== p.symbol ? p.name : null, p.feePct == null ? null : `swap fee ${num(p.feePct)}%`, "Ethereum"]
+  sub: (p: BalPosition, chain: string) =>
+    [p.name !== p.symbol ? p.name : null, p.feePct == null ? null : `swap fee ${num(p.feePct)}%`, chain]
       .filter(Boolean)
       .join(" · "),
   unanswered: "The read of this pool did not answer. Try again in a minute.",

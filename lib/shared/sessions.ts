@@ -101,7 +101,8 @@ export type SessionProtocol =
   | "aerodrome"
   // Balancer V3 on Ethereum, at `/ethereum/balancer-v3`: a pool share is the
   // wallet's balance of the pool's shares in the Vault (ui-jobs 569).
-  | "balancer-v3";
+  | "balancer-v3"
+  | "balancer-v3-arbitrum";
 
 /** What a saved entry is: a wallet, a position page or a listing view. */
 export type SavedKind = "wallet" | "position" | "view";

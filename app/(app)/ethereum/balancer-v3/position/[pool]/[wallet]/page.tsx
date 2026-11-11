@@ -22,5 +22,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
   const { pool, wallet } = await params;
-  return <BalancerPositionPage pool={pool} wallet={wallet} />;
+  return <BalancerPositionPage chainId={1} pool={pool} wallet={wallet} />;
 }

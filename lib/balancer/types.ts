@@ -84,5 +84,3 @@ export interface BalPositionsRead {
 
 /** The Vault, the same address on Ethereum, Arbitrum and Base. */
 export const BALANCER_VAULT = "0xbA1333333333a1BA1108E8412f11850A5C319bA9";
-/** The Vault's first block on Ethereum, where the wallet search starts. */
-export const BALANCER_FIRST_BLOCK = 21_336_938;

@@ -16,6 +16,7 @@ import { assetKey } from "@/lib/shared/asset-family";
 import { walletRow } from "@/lib/balancer/position";
 import { finderProv, walletShareProv } from "@/lib/balancer/provenance";
 import type { BalPositionsRead } from "@/lib/balancer/types";
+import type { ChainId } from "@/lib/shared/chains";
 import { FRONT_DOOR } from "@/lib/balancer/words";
 
 const SCOPE = "balancer-wallet";
@@ -27,8 +28,8 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
   const finder = finderProv(r);
   const scoped = useScopedRows(
     r.positions,
-    (row) => row.tokens.map((t) => assetKey(1, t.address)),
-    () => 1,
+    (row) => row.tokens.map((t) => assetKey(r.chainId, t.address)),
+    () => r.chainId,
   );
   const title = "Pools with a share";
   return (
@@ -37,12 +38,12 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
         title={title}
         stamp={
           <SectionReadStamp
-            chainId={1}
+            chainId={r.chainId as ChainId}
             block={r.head.block}
             blockTime={r.head.time}
             info={(at) => {
               const base = readStampProv({
-                chainId: 1,
+                chainId: r.chainId as ChainId,
                 block: r.head.block,
                 at,
                 what: "Every figure in this section",

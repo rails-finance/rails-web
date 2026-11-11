@@ -21,5 +21,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
   const { wallet } = await params;
-  return <BalancerWalletPositions wallet={wallet} />;
+  return <BalancerWalletPositions chainId={1} wallet={wallet} />;
 }

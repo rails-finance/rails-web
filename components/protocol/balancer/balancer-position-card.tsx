@@ -12,12 +12,21 @@ import { PoolReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
 import { balPosition } from "@/lib/balancer/position";
 import { cardProv, readContracts, type BalReceiptContext } from "@/lib/balancer/provenance";
 import type { BalPositionRead } from "@/lib/balancer/types";
+import type { ChainId } from "@/lib/shared/chains";
 import { CARD_WORDS, cardExplainer, rateText } from "@/lib/balancer/words";
 import { day, num, share } from "@/lib/uniswap/words";
 
 /** Every figure's read stamp on a Balancer page. */
 export function BalancerReadStamp({ c, what }: { c: BalReceiptContext; what: string }) {
-  return <PoolReadStamp chainId={1} head={c.r.head} then={c.r.then} contracts={readContracts(c)} what={what} />;
+  return (
+    <PoolReadStamp
+      chainId={c.r.chainId as ChainId}
+      head={c.r.head}
+      then={c.r.then}
+      contracts={readContracts(c)}
+      what={what}
+    />
+  );
 }
 
 function slots(r: BalPositionRead): PositionCardSlots {

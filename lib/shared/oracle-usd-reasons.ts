@@ -44,6 +44,8 @@ export const ORACLE_USD_REASON: Record<string, string> = {
     "a pool prices itself: every figure is in the pool's quote token at the pool's price, and Uniswap runs no USD feed",
   "balancer-v3":
     "a pool share is a claim on the pool's tokens, and Balancer runs no USD feed, so every figure is in the pool's own tokens",
+  "balancer-v3-arbitrum":
+    "a pool share is a claim on the pool's tokens, and Balancer runs no USD feed, so every figure is in the pool's own tokens",
   aerodrome:
     "a pool prices itself: every figure is in the pool's quote token at the pool's price, AERO through Aerodrome's own AERO pools, and Aerodrome runs no USD feed",
 };
