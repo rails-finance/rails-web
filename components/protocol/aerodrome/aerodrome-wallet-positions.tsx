@@ -33,7 +33,7 @@ export async function AerodromeWalletPositions({ wallet: raw }: { wallet: string
           fallbackHref={home}
           showStamp={false}
           priceReason={ORACLE_USD_REASON[session]}
-          owner={{ wallet, filterProtocol: null }}
+          owner={{ wallet, chain: 8453, filterProtocol: null }}
           tools={false}
         />
         <ReadTierTitleRow id={session}>

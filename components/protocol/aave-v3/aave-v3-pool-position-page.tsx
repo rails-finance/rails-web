@@ -682,7 +682,7 @@ export function AaveV3PoolPositionView({
             <DetailTopRow
               session={d.session}
               wallet={wallet}
-              owner={{ wallet }}
+              owner={{ wallet, chain: d.chainId }}
               assets={stripAssets}
               closed={view != null && view.status !== "open"}
               // The card's ⋮ carries the menu; an event page draws no Tools.

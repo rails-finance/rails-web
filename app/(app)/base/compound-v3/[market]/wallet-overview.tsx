@@ -91,7 +91,7 @@ export function CompoundBaseWalletOverview({
       <DetailTopRow
         session="compound-base"
         wallet={wallet}
-        owner={{ wallet }}
+        owner={{ wallet, chain: 8453 }}
         assets={stripAssets(head)}
         closed={markets.length > 0 && markets.every((m) => m.chain == null)}
         tools={false}

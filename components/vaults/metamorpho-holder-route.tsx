@@ -480,6 +480,7 @@ export async function MetaMorphoHolderRoute({ chainId, params }: Props & { chain
               priceReason={ORACLE_USD_REASON[session]}
               owner={{
                 wallet: lookup.address,
+                chain: chainId,
                 ensName: lookup.ensName,
                 filterProtocol: null,
                 // The bookmark the card's wallet pill carried: the position page's

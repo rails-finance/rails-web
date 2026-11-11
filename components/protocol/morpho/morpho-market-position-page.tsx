@@ -265,7 +265,7 @@ export function MorphoMarketPositionView({
         <DetailTopRow
           session={d.session}
           wallet={wallet}
-          owner={{ wallet, vault: vaultOwner }}
+          owner={{ wallet, chain: d.chainId, vault: vaultOwner }}
           assets={stripAssets}
           priceReason={ORACLE_USD_REASON[d.session]}
           closed={closed}

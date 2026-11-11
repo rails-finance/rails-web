@@ -63,7 +63,7 @@ export async function AerodromePositionPage({ deployment, id }: { deployment: st
               priceInfo: cardProv("price", { p, r }),
             })}
             priceReason={ORACLE_USD_REASON[session]}
-            owner={wallet ? { wallet, filterProtocol: null, href: `${home}/${wallet}` } : undefined}
+            owner={wallet ? { wallet, chain: 8453, filterProtocol: null, href: `${home}/${wallet}` } : undefined}
             tools={false}
           />
           <ReadTierTitleRow id={session}>

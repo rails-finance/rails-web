@@ -29,7 +29,7 @@ import { ToolsMenu } from "@/components/shared/tools-menu";
 import { WalletElsewhereLine } from "@/components/shared/wallet-elsewhere-line";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { protocolForSession } from "@/lib/shared/protocols";
-import type { ChainId } from "@/lib/shared/chains";
+import { CHAINS, type ChainId } from "@/lib/shared/chains";
 import { fetchAddressKind, type AddressKind } from "@/lib/api/fetch-address-kind";
 import { ProtocolGlyph, ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { Prov, ProvReceiptsScope, provInspector, useReceiptRegistry } from "@/components/shared/provenance";
@@ -86,7 +86,11 @@ function SafeIcon({ className }: { className?: string }) {
  *  carries its name when it answers one. Where the chain names who runs the
  *  account (ui-jobs 440), the label is the kind's word, a middle dot and the
  *  product ("Safe · DeFi Saver"), and the tip says what the product can do. */
-function addressKindWords(k: Exclude<AddressKind, { kind: "account" }>): {
+function addressKindWords(
+  k: Exclude<AddressKind, { kind: "account" }>,
+  /** The chain the contract tip names; Ethereum where the page names none. */
+  chainName = "Ethereum",
+): {
   Icon: LucideIcon | ComponentType<{ className?: string }>;
   label: string | null;
   tip: string;
@@ -136,14 +140,23 @@ function addressKindWords(k: Exclude<AddressKind, { kind: "account" }>): {
         Icon: FileCode2,
         label: named ?? null,
         tip: named
-          ? `A smart contract named ${named}: a program on Ethereum, not a wallet someone holds a key to.`
-          : "A smart contract: a program on Ethereum, not a wallet someone holds a key to.",
+          ? `A smart contract named ${named}: a program on ${chainName}, not a wallet someone holds a key to.`
+          : `A smart contract: a program on ${chainName}, not a wallet someone holds a key to.`,
       };
     }
   }
 }
 
-function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainId }) {
+function AddressKindLabel({
+  wallet,
+  chainId,
+  chainName,
+}: {
+  wallet: string;
+  chainId: ChainId;
+  /** The chain the contract tip names; Ethereum where omitted. */
+  chainName?: string;
+}) {
   const [kind, setKind] = useState<AddressKind | null>(null);
   const registry = useReceiptRegistry();
   useEffect(() => {
@@ -157,7 +170,7 @@ function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainI
     };
   }, [wallet, chainId]);
   if (!kind || kind.kind === "account") return null;
-  const w = addressKindWords(kind);
+  const w = addressKindWords(kind, chainName);
   const manager = kind.kind === "safe" || kind.kind === "contract" ? kind.manager : undefined;
   const info = manager && (kind.kind === "safe" || kind.kind === "contract") ? managerProv(kind, chainId) : null;
   const tip = (
@@ -218,6 +231,9 @@ function AddressKindLabel({ wallet, chainId }: { wallet: string; chainId: ChainI
 export interface PositionOwner {
   /** The wallet; null or undefined while the page has not read it. */
   wallet: string | null | undefined;
+  /** The page's chain, which a contract's tip names ("a program on Base"); the tip says Ethereum
+   *  where omitted. */
+  chain?: ChainId;
   ensName?: string | null;
   /** Where a pill (a vault, or a page passing `href`) filters its listing to
    *  this wallet. Defaults to the page's session; null leaves the label
@@ -284,7 +300,13 @@ export function PositionWalletHeading({
         <>
           {pill && owner.prefix}
           {pill && (owner.wrap ? owner.wrap(pill) : pill)}
-          {owner.wallet && chainId != null && <AddressKindLabel wallet={owner.wallet} chainId={chainId} />}
+          {owner.wallet && chainId != null && (
+            <AddressKindLabel
+              wallet={owner.wallet}
+              chainId={chainId}
+              chainName={owner.chain != null ? CHAINS[owner.chain].name : undefined}
+            />
+          )}
           {owner.extra}
         </>
       }

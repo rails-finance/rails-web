@@ -516,6 +516,7 @@ export default function BasedollarTroveDetail({
           wallet={view?.owner ?? view?.lastOwner ?? null}
           owner={{
             wallet: view?.owner ?? view?.lastOwner ?? null,
+            chain: BASE_CHAIN_ID,
             prefix:
               !view?.owner && view?.lastOwner ? (
                 <span className="text-rb-400" title="Last owner (trove closed)">
