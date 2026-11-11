@@ -26,8 +26,6 @@ export const FRONT_DOOR = {
   rowShare: (s: number) => `${share(s)} of the pool`,
   /** A row's gauge stake: the gauge holds these shares for the wallet. */
   rowStaked: (s: number) => `Staked in a gauge: ${share(s)} of the pool`,
-  /** A row whose shares are all in a gauge, in place of its share of the pool. */
-  rowAllStaked: "All staked in a gauge",
   stakedTip: "Pool shares this wallet staked in the pool's gauge. The gauge holds them and pays rewards on them.",
 };
 
@@ -63,16 +61,18 @@ export const POSITION_PAGE = {
 export const CARD_WORDS = {
   heading: "Pool share summary",
   share: "Share of pool",
-  shareTip: "The wallet's pool shares as a part of all the pool's shares.",
+  shareTip: "The wallet's pool shares, in the wallet and staked in a gauge, as a part of all the pool's shares.",
   holds: "Holds now",
   holdsTip:
     "The wallet's part of each token the pool holds: the pool's balance of it times the wallet's share of the pool. Withdrawing pays out about these amounts.",
   rate: "Value per share, 30 days",
   rateTip:
     "How much the pool's value per share changed over the last 30 days. It grows with the swap fees the pool keeps and its tokens' own yield.",
-  staked: "Staked in a gauge",
-  stakedTip:
-    "The wallet's pool shares staked in the pool's gauge, as a part of all the pool's shares. The gauge holds them and pays rewards on them.",
+  /** The share's split where some shares are staked. */
+  split: (held: number, staked: number) => `${num(held)} in the wallet, ${num(staked)} staked in a gauge`,
+  /** First added, where the wallet holds or stakes shares but added none itself: the value, and the line under it. */
+  byTransfer: "By transfer",
+  byTransferSub: "No add by this wallet; its shares came by transfer",
   added: "First added",
   addedTip: "When this wallet first added liquidity to this pool.",
   none: "This wallet holds no shares of this pool now.",
@@ -87,6 +87,7 @@ export const READOUT = {
   title: "How the share and its pool are doing",
   sub: "Measured from the chain over the last 30 days. Rails does not forecast, rate or recommend.",
   explainerLabel: "explanation of these lines",
+  stakedWithheld: "Staked shares are read at the head only, so no 30-day change is shown.",
 };
 
 export type BalLineKey = "shares" | "share" | `token:${number}` | "rate" | "status";
@@ -95,30 +96,36 @@ export interface BalLine {
   label: string;
   yours: string | null;
   pool: string | null;
+  /** Why the wallet's 30-day change is not shown, under its figure. */
+  withheld?: string;
 }
 
 /** The readout's lines, in drawing order. */
 export function readoutLines(p: BalPosition): BalLine[] {
   const t = p.then;
-  const on = t ? ` on ${day(t.at.time)}` : "";
+  // The wallet's past side reads its Vault balance only, so with a stake the
+  // wallet's parts show the head alone; the pool's parts keep the window.
+  const w = p.windowWithheld ? null : t;
+  const on = w ? ` on ${day(w.at.time)}` : "";
   const lines: BalLine[] = [
     {
       key: "shares",
       label: "Pool shares",
-      yours: t ? `${num(p.now.shares)} now, against ${num(t.shares)}${on}.` : `${num(p.now.shares)} now.`,
+      yours: w ? `${num(p.now.shares)} now, against ${num(w.shares)}${on}.` : `${num(p.now.shares)} now.`,
       pool: t ? `All holders: ${num(p.now.supply)}, against ${num(t.supply)}.` : `All holders: ${num(p.now.supply)}.`,
+      ...(p.windowWithheld ? { withheld: READOUT.stakedWithheld } : {}),
     },
     {
       key: "share",
       label: "Share of pool",
-      yours: t ? `${share(p.now.share)} now, against ${share(t.share)}.` : `${share(p.now.share)} now.`,
+      yours: w ? `${share(p.now.share)} now, against ${share(w.share)}.` : `${share(p.now.share)} now.`,
       pool: null,
     },
     ...p.tokens.map((tok, i) => ({
       key: `token:${i}` as const,
       label: tok.symbol,
-      yours: t
-        ? `Your part: ${num(p.now.holds[i])}, against ${num(t.holds[i])}.`
+      yours: w
+        ? `Your part: ${num(p.now.holds[i])}, against ${num(w.holds[i])}.`
         : `Your part: ${num(p.now.holds[i])}.`,
       pool: t
         ? `The pool holds ${num(p.now.pool[i])}, against ${num(t.pool[i])}.`

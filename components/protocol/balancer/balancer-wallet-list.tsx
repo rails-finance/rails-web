@@ -95,11 +95,7 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-foreground">{w.symbol}</span>
                       <span className="block text-xs text-rb-500">
-                        {BigInt(row.balance) > BigInt(0) || !w.staked ? (
-                          <Prov info={walletShareProv(r, row)}>{FRONT_DOOR.rowShare(w.share)}</Prov>
-                        ) : (
-                          FRONT_DOOR.rowAllStaked
-                        )}
+                        <Prov info={walletShareProv(r, row)}>{FRONT_DOOR.rowShare(w.share)}</Prov>
                         {" · "}
                         {w.tokens.map((t) => t.symbol).join(", ")}
                       </span>

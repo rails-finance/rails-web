@@ -40,6 +40,15 @@ const chain = (label: string, value: string): ProvInput => ({ label, value, kind
 const derived = (label: string, value: string): ProvInput => ({ label, value, kind: "derived" });
 const thenLine = (c: BalReceiptContext) => (c.r.past ? `, and at ${at(c.r.then)}, ${balChain(c.r.chainId).grid}` : "");
 
+/** A stake's reads beside the Vault balance: each gauge's balanceOf(wallet). */
+const stakeInputs = (staked: readonly BalStaked[] | undefined, wallet: string): ProvInput[] =>
+  (staked ?? []).map((g) => chain(`${g.gauge}.balanceOf(${wallet})`, g.balance));
+/** The wallet's shares: its Vault balance, plus its gauge stakes where it has any. */
+const sharesTerm = (staked: readonly BalStaked[] | undefined) =>
+  staked?.length ? "(balanceOf(pool, wallet) + Σ gauge.balanceOf(wallet))" : "balanceOf(pool, wallet)";
+const sharesWords = (staked: readonly BalStaked[] | undefined) =>
+  staked?.length ? "the wallet's pool shares, in the wallet and staked in its gauges," : "the wallet's pool shares";
+
 /** The card's figures. */
 export function cardProv(key: "share" | "holds" | "rate" | "added", c: BalReceiptContext): Provenance {
   const { p, r } = c;
@@ -50,12 +59,13 @@ export function cardProv(key: "share" | "holds" | "rate" | "added", c: BalReceip
         kind: "derived",
         pclass: "state",
         source,
-        summary: `Share of pool — the wallet's pool shares over all the pool's shares at ${at(r.head)}: ${fig(p.now.share * 100)}%.`,
+        summary: `Share of pool — ${sharesWords(r.staked)} over all the pool's shares at ${at(r.head)}: ${fig(p.now.share * 100)}%.`,
         contract: vaultC(r),
         via: headVia(c),
-        formula: "balanceOf(pool, wallet) ÷ totalSupply(pool)",
+        formula: `${sharesTerm(r.staked)} ÷ totalSupply(pool)`,
         inputs: [
           chain(`balanceOf(${r.pool}, ${r.wallet})`, r.balance),
+          ...stakeInputs(r.staked, r.wallet),
           chain(`totalSupply(${r.pool})`, r.now.totalSupply),
         ],
       };
@@ -64,13 +74,14 @@ export function cardProv(key: "share" | "holds" | "rate" | "added", c: BalReceip
         kind: "derived",
         pclass: "state",
         source,
-        summary: `Holds now — the wallet's part of each token at ${at(r.head)}: the Vault's balance of the token in the pool times the wallet's shares over all shares.`,
+        summary: `Holds now — the wallet's part of each token at ${at(r.head)}: the Vault's balance of the token in the pool times ${sharesWords(r.staked)} over all shares.`,
         contract: vaultC(r),
         via: headVia(c),
-        formula: "balancesRaw[i] × balanceOf(pool, wallet) ÷ totalSupply(pool) ÷ 10^decimals[i]",
+        formula: `balancesRaw[i] × ${sharesTerm(r.staked)} ÷ totalSupply(pool) ÷ 10^decimals[i]`,
         inputs: [
           chain(`getPoolTokenInfo(${r.pool}) · balancesRaw`, r.now.balancesRaw.join(", ")),
           chain("balanceOf(pool, wallet)", r.balance),
+          ...stakeInputs(r.staked, r.wallet),
           chain("totalSupply(pool)", r.now.totalSupply),
           ...p.tokens.map((t, i) => derived(t.symbol, fig(p.now.holds[i]))),
         ],
@@ -116,8 +127,12 @@ export function lineProv(key: BalLineKey, part: "yours" | "pool", c: BalReceiptC
     return part === "yours"
       ? {
           ...base,
-          summary: `Pool shares — the wallet's shares at ${at(r.head)}${thenLine(c)}.`,
-          inputs: [chain("balanceOf · head", r.balance), chain("balanceOf · then", r.past?.balance ?? "no answer")],
+          summary: p.windowWithheld
+            ? `Pool shares — ${sharesWords(r.staked)} at ${at(r.head)}. The gauges are read at the head only, so no 30-day change is stated.`
+            : `Pool shares — the wallet's shares at ${at(r.head)}${thenLine(c)}.`,
+          inputs: p.windowWithheld
+            ? [chain("balanceOf · head", r.balance), ...stakeInputs(r.staked, r.wallet)]
+            : [chain("balanceOf · head", r.balance), chain("balanceOf · then", r.past?.balance ?? "no answer")],
         }
       : {
           ...base,
@@ -130,11 +145,11 @@ export function lineProv(key: BalLineKey, part: "yours" | "pool", c: BalReceiptC
   if (key === "share")
     return {
       ...base,
-      summary: `Share of pool — the wallet's shares over all shares at ${at(r.head)}${thenLine(c)}.`,
-      formula: "balanceOf(pool, wallet) ÷ totalSupply(pool)",
+      summary: `Share of pool — ${sharesWords(r.staked)} over all shares at ${at(r.head)}${p.windowWithheld ? "" : thenLine(c)}.`,
+      formula: `${sharesTerm(r.staked)} ÷ totalSupply(pool)`,
       inputs: [
         derived("head", `${fig(p.now.share * 100)}%`),
-        ...(p.then ? [derived("then", `${fig(p.then.share * 100)}%`)] : []),
+        ...(p.then && !p.windowWithheld ? [derived("then", `${fig(p.then.share * 100)}%`)] : []),
       ],
     };
   if (key.startsWith("token:")) {
@@ -143,9 +158,12 @@ export function lineProv(key: BalLineKey, part: "yours" | "pool", c: BalReceiptC
     return part === "yours"
       ? {
           ...base,
-          summary: `Your ${t.symbol} — the pool's ${t.symbol} times the wallet's share of the pool at ${at(r.head)}${thenLine(c)}.`,
-          formula: "balancesRaw[i] × balanceOf(pool, wallet) ÷ totalSupply(pool)",
-          inputs: [derived("head", fig(p.now.holds[i])), ...(p.then ? [derived("then", fig(p.then.holds[i]))] : [])],
+          summary: `Your ${t.symbol} — the pool's ${t.symbol} times the wallet's share of the pool at ${at(r.head)}${p.windowWithheld ? "" : thenLine(c)}.`,
+          formula: `balancesRaw[i] × ${sharesTerm(r.staked)} ÷ totalSupply(pool)`,
+          inputs: [
+            derived("head", fig(p.now.holds[i])),
+            ...(p.then && !p.windowWithheld ? [derived("then", fig(p.then.holds[i]))] : []),
+          ],
         }
       : {
           ...base,
@@ -225,12 +243,13 @@ export function walletShareProv(r: BalPositionsRead, row: BalPositionsRead["posi
     kind: "derived",
     pclass: "state",
     source: { block: r.head.block },
-    summary: `Share of pool — the wallet's shares over all the pool's shares at ${at(r.head)}: ${fig(w.share * 100)}%.`,
+    summary: `Share of pool — ${sharesWords(row.staked)} over all the pool's shares at ${at(r.head)}: ${fig(w.share * 100)}%.`,
     contract: vaultC(r),
     via: `rails-server · eth_call @ block ${n(r.head.block)}`,
-    formula: "balanceOf(pool, wallet) ÷ totalSupply(pool)",
+    formula: `${sharesTerm(row.staked)} ÷ totalSupply(pool)`,
     inputs: [
       chain(`balanceOf(${row.pool}, ${r.wallet})`, row.balance),
+      ...stakeInputs(row.staked, r.wallet),
       chain(`totalSupply(${row.pool})`, row.totalSupply),
     ],
   };

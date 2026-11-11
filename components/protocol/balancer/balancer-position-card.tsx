@@ -10,7 +10,7 @@ import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { PoolReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
-import { balPosition, stakedOf } from "@/lib/balancer/position";
+import { balPosition } from "@/lib/balancer/position";
 import { cardProv, readContracts, stakedProv, type BalReceiptContext } from "@/lib/balancer/provenance";
 import type { BalPositionRead } from "@/lib/balancer/types";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
@@ -35,8 +35,22 @@ function slots(r: BalPositionRead): PositionCardSlots {
   const p = balPosition(r);
   const c = { p, r };
   const [first, ...rest] = p.tokens.map((t, i) => `${num(p.now.holds[i])} ${t.symbol}`);
-  const staked = stakedOf(r.staked, r.now.totalSupply);
+  const staked = p.split?.staked ?? null;
+  const byTransfer = !p.firstAdd && p.now.shares > 0;
   const stakedReceipt = staked ? stakedProv({ ...r, totalSupply: r.now.totalSupply, staked: r.staked ?? [] }) : null;
+  const gaugeLinks = staked?.gauges.map((g) => (
+    <span key={g}>
+      {" "}
+      <a
+        href={`${chainMeta(r.chainId as ChainId).explorerBase}/address/${g}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`${INLINE_LINK} font-mono`}
+      >
+        {short(g)}
+      </a>
+    </span>
+  ));
   const heads: PositionCardHead[] = [
     {
       id: "share",
@@ -46,6 +60,12 @@ function slots(r: BalPositionRead): PositionCardSlots {
       sub: (
         <span data-figure="shares">
           <Prov info={cardProv("share", c)}>{num(p.now.shares)} pool shares</Prov>
+          {p.split && stakedReceipt && (
+            <span className="block" data-figure="staked">
+              <Prov info={stakedReceipt}>{CARD_WORDS.split(p.split.held, p.split.staked.shares)}</Prov>
+              {gaugeLinks}
+            </span>
+          )}
         </span>
       ),
     },
@@ -66,43 +86,21 @@ function slots(r: BalPositionRead): PositionCardSlots {
       labelTip: CARD_WORDS.rateTip,
       value: <Prov info={cardProv("rate", c)}>{rateText(p)}</Prov>,
     },
-    ...(staked && stakedReceipt
-      ? [
-          {
-            id: "staked",
-            label: CARD_WORDS.staked,
-            labelTip: CARD_WORDS.stakedTip,
-            value: <Prov info={stakedReceipt}>{share(staked.share)}</Prov>,
-            sub: (
-              <span data-figure="staked">
-                <Prov info={stakedReceipt}>{num(staked.shares)} pool shares</Prov>
-                {staked.gauges.map((g) => (
-                  <span key={g}>
-                    {" in "}
-                    <a
-                      href={`${chainMeta(r.chainId as ChainId).explorerBase}/address/${g}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`${INLINE_LINK} font-mono`}
-                    >
-                      {short(g)}
-                    </a>
-                  </span>
-                ))}
-              </span>
-            ),
-          },
-        ]
-      : []),
     {
       id: "added",
       label: CARD_WORDS.added,
       labelTip: CARD_WORDS.addedTip,
-      value: <Prov info={cardProv("added", c)}>{p.firstAdd ? day(p.firstAdd.time) : "None found"}</Prov>,
+      value: (
+        <Prov info={cardProv("added", c)}>
+          {p.firstAdd ? day(p.firstAdd.time) : byTransfer ? CARD_WORDS.byTransfer : "None found"}
+        </Prov>
+      ),
       sub: (
         <span data-figure="flows">
           <Prov info={cardProv("added", c)}>
-            {p.adds} {p.adds === 1 ? "add" : "adds"}, {p.removes} {p.removes === 1 ? "remove" : "removes"}
+            {byTransfer
+              ? CARD_WORDS.byTransferSub
+              : `${p.adds} ${p.adds === 1 ? "add" : "adds"}, ${p.removes} ${p.removes === 1 ? "remove" : "removes"}`}
           </Prov>
         </span>
       ),
@@ -111,7 +109,7 @@ function slots(r: BalPositionRead): PositionCardSlots {
   return {
     surface: "detail",
     heading: CARD_WORDS.heading,
-    status: p.now.shares === 0 && !staked ? { word: "No shares now", tone: "muted", tip: CARD_WORDS.none } : null,
+    status: p.now.shares === 0 ? { word: "No shares now", tone: "muted", tip: CARD_WORDS.none } : null,
     identity: <span className="text-xs text-rb-500">{p.tokens.map((t) => t.symbol).join(" · ")}</span>,
     heads,
     counters: null,

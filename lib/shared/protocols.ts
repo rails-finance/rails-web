@@ -534,6 +534,7 @@ const SPECS: ProtocolSpec[] = [
     positionListing: false,
     history: "none",
     unlaunched: true,
+    listing: false,
     subPages: [],
   },
   {
