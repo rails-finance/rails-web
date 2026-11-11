@@ -996,6 +996,18 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
       why: "liquidations are events, and history waits until Rails indexes Morpho Blue on Arc",
     },
   }),
+  // Aave V4 on Arc (ui-jobs 577): the account page reads the spoke account at
+  // the head and its balances 30 days back; Markets, a spoke's reserves and
+  // Hubs read every reserve at the head. Unlaunched, so the matrix does not
+  // draw it yet.
+  "aave-v4-arc": explorerDepth({
+    dashboard: true,
+    oracleUsd: true,
+    views: true,
+    forensics: {
+      why: "liquidations are events, and history waits until Rails indexes Aave V4 on Arc",
+    },
+  }),
   // Euler V2 on Base and Arbitrum (read-on-visit-candidates-572.md, row 10).
   // `dashboard`: a holding's page reads the account and the vault at the head
   // and 30 days back from rails-server's at-block routes. Dollars come from
@@ -1558,6 +1570,8 @@ export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
   "fluid-base",
   // Morpho Blue on Arc (ui-jobs 577): a wallet's positions on the front door.
   "morpho-arc",
+  // Aave V4 on Arc (ui-jobs 577): a wallet's spoke accounts on the front door.
+  "aave-v4-arc",
   // Euler V2 on Base and Arbitrum, position-first as Uniswap is: a wallet's
   // accounts are read when it is visited.
   "euler-v2-base",
@@ -1808,6 +1822,8 @@ export const COVERAGE_NOTES: Record<string, string> = {
   "morpho-arc":
     "Morpho Blue on Arc is the same contract as on Ethereum, Base and Arbitrum, read a different way. Rails lists the markets from Morpho's CreateMarket log, and each page reads the markets and the wallet's position in each when it opens. A position page reads the position and its market again at the UTC midnight 30 days before, so the interest over those 30 days is stated where the shares are the same at both. Each market's oracle prices the collateral in its loan token; a dollar figure takes the loan token at its Chainlink feed on Arc, and a market whose loan token has none there stays in that token. There is no listing, history or liquidation record until Rails indexes Morpho Blue on Arc.",
   "fluid-base": `Fluid on Base is the same protocol as on Ethereum, read a different way. Each page reads the position and its vault from Fluid's VaultResolver when it opens, and again at the UTC midnight 30 days before, so the interest over those 30 days comes from the vault's exchange prices at the two blocks. Collateral and debt are stated in the vault's tokens, and the ratio in the vault oracle's debt-per-collateral price, the figure the liquidation engine judges. ${FLUID_BASE_DOLLARS ? "Fluid runs no USD feed, so a side's dollar value comes from the Aave V3 Base oracle at the same block, and a side Aave does not list, or a side held as DEX pool shares, stays in its own unit." : "Fluid runs no USD feed, so no figure is in dollars."} There is no listing, history or liquidation record until Rails indexes Fluid on Base.`,
+  "aave-v4-arc":
+    "Aave V4 on Arc is the same protocol as on Ethereum and Base: one Core hub lends to three spokes, Main, Forex and USDC Maple. Each page reads the hub, the spokes and each spoke's oracle when it opens. An account page reads the spoke account's balances, shares, health factor and terms at that block, and its balances and shares again at the UTC midnight 30 days before, so the interest over those 30 days is stated where the shares are the same at both. Every dollar figure is a balance at the spoke oracle's price at the same block. There is no listing, history, holder ranking or liquidation record until Rails indexes Aave V4 on Arc.",
   "euler-v2-base": EULER_NOTE,
   "euler-v2-arbitrum": EULER_NOTE,
   "balancer-v3":

@@ -241,6 +241,8 @@ const GLYPHS: Record<string, Glyph> = {
   "aave-v4": AAVE_V4_MARK,
   // Aave V4 on Base: the Ethereum mark, its own deployment.
   "aave-v4-base": AAVE_V4_MARK,
+  // Aave V4 on Arc: the Ethereum mark, its own deployment.
+  "aave-v4-arc": AAVE_V4_MARK,
   alchemix: ALCHEMIX_MARK,
   // Alchemix on Base: the Ethereum mark, its own deployment.
   "alchemix-base": ALCHEMIX_MARK,

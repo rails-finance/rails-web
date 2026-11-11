@@ -11,6 +11,10 @@
 /base/fluid
 /base/fluid/[wallet]
 /base/fluid/position/[id]
+/arc/aave-v4
+/arc/aave-v4/[wallet]
+/arc/aave-v4/markets/[spoke]
+/arc/aave-v4/spoke/[spoke]/[wallet]
 /base/alchemix/[lineKey]/[tokenId]
 /base/alchemix/[lineKey]/[tokenId]/event/[eventId]
 /base/alchemix/lines

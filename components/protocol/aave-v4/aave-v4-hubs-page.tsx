@@ -57,6 +57,7 @@ import {
   hubAssetCountProv,
   hubPositionsProv,
   pricedAmountProv,
+  hubAssetProv,
   storedAmountProv,
   storedRateProv,
   storedRatioProv,
@@ -112,6 +113,8 @@ function hubHead(s: V4Stored, h: V4Hub, prices: Prices): ProductHead {
   const bor = fmtUsd(borrowed);
   const partial = supSum.unpriced.length > 0 || borSum.unpriced.length > 0;
   const n = h.spokes.length;
+  /** Arc: the hub's totals, which count its tokenization and treasury spokes too. */
+  const own = h.assets.some((x) => x.hubTotal);
   const figures: HeadFigure[] = [
     {
       slot: "roster",
@@ -120,15 +123,15 @@ function hubHead(s: V4Stored, h: V4Hub, prices: Prices): ProductHead {
     },
     {
       slot: "sizeIn",
-      label: "Supplied",
+      label: own ? "Hub supplied" : "Supplied",
       tip: sup.title,
-      value: <PricedTotal sum={supSum} info={storedValueProv("supplied", `The ${h.label} hub`, c, supSum)} />,
+      value: <PricedTotal sum={supSum} info={storedValueProv("supplied", `The ${h.label} hub`, c, supSum, own)} />,
     },
     {
       slot: "sizeOut",
-      label: "Borrowed",
+      label: own ? "Hub borrowed" : "Borrowed",
       tip: bor.title,
-      value: <PricedTotal sum={borSum} info={storedValueProv("borrowed", `The ${h.label} hub`, c, borSum)} />,
+      value: <PricedTotal sum={borSum} info={storedValueProv("borrowed", `The ${h.label} hub`, c, borSum, own)} />,
     },
     ...(supplied > 0 && !partial
       ? [
@@ -162,6 +165,12 @@ function hubHead(s: V4Stored, h: V4Hub, prices: Prices): ProductHead {
       </p>
     ),
     figures,
+    notes: own ? (
+      <p className="text-[12px] text-rb-500" data-hub-own-totals="">
+        Supplied, borrowed and liquidity are the hub&apos;s totals, its tokenization and treasury spokes included; each
+        asset&apos;s credit lines show the lending spokes alone.
+      </p>
+    ) : undefined,
     aside: (
       <div data-prov-exempt="">
         <div className="mb-1.5 text-[11px] uppercase tracking-wider text-rb-500">Lends to</div>
@@ -275,7 +284,7 @@ function CreditLines({ s, a, prices }: { s: V4Stored; a: V4HubAsset; prices: Pri
                 <Prov info={storedAmountProv("add cap", scope, c)}>{capText(l.addCap, a.symbol)}</Prov>
               </DataTableCell>
               <DataTableCell align="right" className={NUM}>
-                <Prov info={pricedAmountProv(storedAmountProv("supplied", scope, c), a.symbol, p)}>
+                <Prov info={pricedAmountProv(storedAmountProv("supplied", scope, c), a.symbol, p, c)}>
                   <span title={sup.title}>{sup.display}</span>
                 </Prov>
               </DataTableCell>
@@ -283,7 +292,7 @@ function CreditLines({ s, a, prices }: { s: V4Stored; a: V4HubAsset; prices: Pri
                 <Prov info={storedAmountProv("draw cap", scope, c)}>{capText(l.drawCap, a.symbol)}</Prov>
               </DataTableCell>
               <DataTableCell align="right" className={NUM}>
-                <Prov info={pricedAmountProv(storedAmountProv("borrowed", scope, c), a.symbol, p)}>
+                <Prov info={pricedAmountProv(storedAmountProv("borrowed", scope, c), a.symbol, p, c)}>
                   <span title={drawn.title}>{drawn.display}</span>
                 </Prov>
               </DataTableCell>
@@ -326,7 +335,14 @@ function AssetRow({ s, h, a, prices }: { s: V4Stored; h: V4Hub; a: V4HubAsset; p
   const amount = (what: "supplied" | "borrowed" | "liquidity", tokens: number) => {
     const v = usd(tokens, price, a.symbol);
     return (
-      <Prov info={pricedAmountProv(storedAmountProv(what, scope, c), a.symbol, p)}>
+      <Prov
+        info={pricedAmountProv(
+          a.hubTotal ? hubAssetProv(what, scope, c) : storedAmountProv(what, scope, c),
+          a.symbol,
+          p,
+          c,
+        )}
+      >
         <span title={v.title}>{v.display}</span>
       </Prov>
     );
@@ -558,7 +574,7 @@ function HubsBody({ d }: { d: V4Deployment }) {
         <SubPageHeader
           protocol={protocolOf(d)}
           title="Hubs"
-          learnMore={aaveV4Modal(d.chain === "base" ? "base_hub" : "hubs")}
+          learnMore={aaveV4Modal(d.chain === "base" ? "base_hub" : d.chain === "arc" ? "arc_hub" : "hubs")}
         />
         {body}
       </div>
