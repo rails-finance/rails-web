@@ -1,5 +1,5 @@
-// About this explorer — Uniswap V3 and V4 on Ethereum, Base and Arbitrum, and
-// PancakeSwap V3 on Base and Arbitrum (ui-jobs 567, 568, 573, 575), drawn on
+// About this explorer — Uniswap V3 and V4 on Ethereum, Base, Arbitrum and Optimism, and
+// PancakeSwap V3 on Base and Arbitrum (ui-jobs 567, 568, 573, 575, 578), drawn on
 // the typed template (rails-ops standards/info-page-template.md). One page for
 // every version and chain: they differ in the contracts Rails reads, V4's
 // hooks, PancakeSwap's farm, and whether the chain's reads include a
@@ -207,6 +207,17 @@ function reads(version: UniswapVersion, d: UniDeployment): InfoReads {
           and no figure since its first deposit.
         </>,
       ] as const);
+  // Optimism's regenesis (November 2021) kept its state and dropped its logs: a V3 position minted
+  // before it has no event before that date.
+  const regenesis =
+    d.chainId === 10 && version === "v3"
+      ? ([
+          <>
+            Optimism kept no events from before its regenesis in November 2021. A position numbered below 69,993 was
+            opened before it: its page shows the events since then, and its opening day is its first deposit after it.
+          </>,
+        ] as const)
+      : undefined;
   if (version === "v3")
     return {
       contracts: [
@@ -234,7 +245,7 @@ function reads(version: UniswapVersion, d: UniDeployment): InfoReads {
         { name: "Each token", reads: "its symbol and decimals, and the pool's balance of it." },
       ],
       how,
-      ...(notes ? { notes } : {}),
+      ...(notes ? { notes } : regenesis ? { notes: regenesis } : {}),
     };
   return {
     contracts: [
@@ -253,6 +264,18 @@ function reads(version: UniswapVersion, d: UniDeployment): InfoReads {
       { name: "Each token", reads: "its symbol and decimals." },
     ],
     how,
+    // Arc (ui-jobs 577): a V4 pool's address(0) side is the chain's gas coin, USDC there.
+    ...(d.native.symbol !== "ETH"
+      ? {
+          notes: [
+            <>
+              On {d.chainName}, {d.native.symbol} is the gas coin. A V4 pool can hold it as the chain&apos;s native
+              coin, counted in {d.native.decimals} decimals, or through its ERC-20 at {d.wrapped.address}, counted in{" "}
+              {d.wrapped.decimals}. The two are one balance, and Rails names both {d.native.symbol}.
+            </>,
+          ] as const,
+        }
+      : {}),
   };
 }
 

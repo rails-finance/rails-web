@@ -13,3 +13,6 @@
 /optimism/aave-v3/markets
 /optimism/compound-v3/[market]
 /optimism/compound-v3/[market]/[wallet]
+/optimism/morpho
+/optimism/morpho/[wallet]
+/optimism/morpho/[wallet]/[market]

@@ -613,7 +613,7 @@ export function VaultRoster({
         sheetCount={{ total: fundedShown.length, noun: "funded vaults" }}
         countFor={(draft) => funded.filter(passesFor(draft)).length}
         mobileSort={table ? mobileSort : undefined}
-        // The view menu (N1.7: save this view, copy its link) where the URL
+        // The view menu (N1.7: save listing, copy its link) where the URL
         // holds the whole view, facets included.
         viewMenu={facetsInUrl}
         skel={`${skel}-facets`}

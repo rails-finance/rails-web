@@ -1,6 +1,6 @@
 // The Uniswap-family deployments Rails reads (rails-ops ui-jobs 556, 568, 573
-// and 575): Uniswap V3 and V4 on Ethereum, V3 on Base, V3 and V4 on Arbitrum,
-// and PancakeSwap V3 on Base and Arbitrum. One table per (protocol, chain): the
+// and 575): Uniswap V3 and V4 on Ethereum, V3 on Base, V3 and V4 on Arbitrum
+// and Optimism (578), and PancakeSwap V3 on Base and Arbitrum. One table per (protocol, chain): the
 // contracts a receipt names, the chain's native coin and its wrapped token,
 // and whether rails-server reads a position's history there (Base's keyless
 // gateway serves no whole-life logs). The addresses match rails-server's
@@ -15,7 +15,7 @@ import type { UniswapVersion } from "./types";
 
 export type UniProtocol = "uniswap" | "pancakeswap";
 /** The chains the at-block routes answer for. */
-export type UniChainId = 1 | 8453 | 42161;
+export type UniChainId = 1 | 8453 | 42161 | 10 | 5042;
 
 export interface UniDeployment {
   protocol: UniProtocol;
@@ -84,6 +84,39 @@ export const UNI_DEPLOYMENTS: readonly UniDeployment[] = [
     v3Npm: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
     v4PositionManager: "0xd88F38F930b7952f2DB2432Cb002E7abbF3dD869",
     v4StateView: "0x76Fd297e2D437cd7f76d50F01AfE6160f86e9990",
+    masterChef: null,
+    history: true,
+  },
+  // Arc (ui-jobs 577): USDC is the gas coin, 18 decimals as a pool's address(0) side. Arc has no
+  // wrapped USDC; the ERC-20 at 0x3600…0000 is an interface over the same balance at 6 decimals, and
+  // stands as the wrapped token, named apart on a pair card.
+  {
+    protocol: "uniswap",
+    protocolName: "Uniswap",
+    chainId: 5042,
+    chainName: "Arc",
+    chainSlug: "arc",
+    versions: ["v3", "v4"],
+    native: { symbol: "USDC", decimals: 18 },
+    wrapped: { symbol: "ERC-20 USDC", address: "0x3600000000000000000000000000000000000000", decimals: 6 },
+    v3Npm: "0x39654A85A4C05127f5Fd6ED22CAeC077A0fB1377",
+    v4PositionManager: "0x6049c9a0e26405C0985f9E3685C87d0aE917f82B",
+    v4StateView: "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
+    masterChef: null,
+    history: true,
+  },
+  {
+    protocol: "uniswap",
+    protocolName: "Uniswap",
+    chainId: 10,
+    chainName: "Optimism",
+    chainSlug: "optimism",
+    versions: ["v3", "v4"],
+    native: ETH,
+    wrapped: { symbol: "WETH", address: "0x4200000000000000000000000000000000000006", decimals: 18 },
+    v3Npm: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
+    v4PositionManager: "0x3C3Ea4B57a46241e54610e5f022E5c45859A1017",
+    v4StateView: "0xc18a3169788F4F75A170290584ECA6395C75Ecdb",
     masterChef: null,
     history: true,
   },

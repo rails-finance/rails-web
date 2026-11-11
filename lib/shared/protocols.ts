@@ -258,6 +258,23 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
+    // Morpho Blue on Optimism (rails-ops ui-jobs 578), Arc's pages on
+    // Optimism's deployment, fed by rails-server's /api/at-block/morpho-optimism
+    // routes. Unlaunched while Miles reads it.
+    id: "morpho-optimism",
+    session: "morpho-optimism",
+    label: "Morpho Blue",
+    chainId: 10,
+    slug: "morpho",
+    protocolKey: "morpho",
+    tags: ["Lend", "Borrow"],
+    desc: "Morpho Blue on Optimism: a wallet's positions across every market, each with its collateral, debt and LTV against the market's line, and 30 days of interest",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+  },
+  {
     id: "aave-v4",
     session: "aave-v4",
     label: "Aave V4",
@@ -522,6 +539,28 @@ const SPECS: ProtocolSpec[] = [
     history: "none",
     unlaunched: true,
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+  },
+  {
+    // Velodrome Slipstream on Optimism (rails-ops ui-jobs 578), on Aerodrome's
+    // pages (lib/aerodrome/sites.ts): a front door taking a wallet, its
+    // positions at `<route>/<wallet>`, each opening
+    // `<route>/position/<deployment>/<id>` (ids overlap across the two position
+    // managers). Reads come from rails-server's /api/at-block/velodrome routes.
+    // Unlaunched while Miles reads it.
+    id: "velodrome",
+    session: "velodrome",
+    label: "Velodrome",
+    chainId: 10,
+    slug: "velodrome",
+    // Hue 30, Velodrome's red #FF1100 in oklch (the mark's outer band, from
+    // the favicon on velodrome.finance).
+    brand: 30,
+    tags: ["Liquidity"],
+    desc: "Concentrated liquidity on Optimism, staked or not: a position's range, fees or VELO and pool over the last 30 days",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [],
   },
   {
     id: "dolomite",
@@ -837,6 +876,37 @@ const SPECS: ProtocolSpec[] = [
     subPages: [],
   },
   {
+    // Uniswap V3 and V4 on Arc (rails-ops ui-jobs 577), on the same pages as
+    // Arbitrum's, read from the chain when a page opens. Unlaunched while
+    // Miles reads it.
+    id: "uniswap-v3-arc",
+    session: "uniswap-v3-arc",
+    label: "Uniswap V3",
+    chainId: 5042,
+    slug: "uniswap-v3",
+    protocolKey: "uniswap-v3",
+    tags: ["Liquidity"],
+    desc: "Uniswap V3 on Arc: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
+    id: "uniswap-v4-arc",
+    session: "uniswap-v4-arc",
+    label: "Uniswap V4",
+    chainId: 5042,
+    slug: "uniswap-v4",
+    protocolKey: "uniswap-v4",
+    tags: ["Liquidity"],
+    desc: "Uniswap's singleton pools on Arc, hooks included: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
     // Pendle on Ethereum, phase 1: a wallet's PT, YT and LP per market at a
     // pinned block, from the routers' events and chain reads. A Pendle market
     // is not a share vault and holds no loan, so there is no position listing
@@ -1011,6 +1081,37 @@ const SPECS: ProtocolSpec[] = [
     protocolKey: "uniswap-v4",
     tags: ["Liquidity"],
     desc: "Uniswap's singleton pools on Arbitrum, hooks included: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
+    // Uniswap V3 and V4 on Optimism (rails-ops ui-jobs 578), on the same pages
+    // as Arbitrum's, read from the chain when a page opens. Unlaunched while
+    // Miles reads it.
+    id: "uniswap-v3-optimism",
+    session: "uniswap-v3-optimism",
+    label: "Uniswap V3",
+    chainId: 10,
+    slug: "uniswap-v3",
+    protocolKey: "uniswap-v3",
+    tags: ["Liquidity"],
+    desc: "Uniswap V3 on Optimism: a position's range, fees and pool over the last 30 days",
+    positionListing: false,
+    unlaunched: true,
+    history: "none",
+    subPages: [],
+  },
+  {
+    id: "uniswap-v4-optimism",
+    session: "uniswap-v4-optimism",
+    label: "Uniswap V4",
+    chainId: 10,
+    slug: "uniswap-v4",
+    protocolKey: "uniswap-v4",
+    tags: ["Liquidity"],
+    desc: "Uniswap's singleton pools on Optimism, hooks included: a position's range, fees and pool over the last 30 days",
     positionListing: false,
     unlaunched: true,
     history: "none",
@@ -1215,6 +1316,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "morpho-base": "Position",
   "morpho-arbitrum": "Position",
   "morpho-arc": "Position",
+  "morpho-optimism": "Position",
   spark: "Position",
   compound: "Position",
   "compound-base": "Position",
@@ -1242,11 +1344,16 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "uniswap-v3": "Position",
   "uniswap-v4": "Position",
   aerodrome: "Position",
+  velodrome: "Position",
   "uniswap-v3-base": "Position",
   "uniswap-v3-arbitrum": "Position",
   "uniswap-v4-arbitrum": "Position",
+  "uniswap-v3-optimism": "Position",
+  "uniswap-v4-optimism": "Position",
   "pancakeswap-v3-base": "Position",
   "pancakeswap-v3-arbitrum": "Position",
+  "uniswap-v3-arc": "Position",
+  "uniswap-v4-arc": "Position",
   // A wallet's stETH and wstETH; the page names it a stake.
   lido: "Stake",
   "fluid-base": "Position",

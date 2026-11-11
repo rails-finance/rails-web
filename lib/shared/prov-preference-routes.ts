@@ -27,6 +27,8 @@ export const PROV_PREFERENCE_ROUTES: readonly string[] = [
   "/arbitrum/pancakeswap-v3/position/[id]",
   "/arbitrum/uniswap-v3/position/[id]",
   "/arbitrum/uniswap-v4/position/[id]",
+  "/arc/uniswap-v3/position/[id]",
+  "/arc/uniswap-v4/position/[id]",
   "/base/aave-v3/[wallet]",
   "/base/aave-v3/markets",
   "/base/aave-v3/markets/[asset]",
@@ -131,6 +133,9 @@ export const PROV_PREFERENCE_ROUTES: readonly string[] = [
   "/ethereum/yearn/vaults",
   "/ethereum/yearn/vaults/[vault]",
   "/ethereum/yearn/vaults/[vault]/[holder]",
+  "/optimism/uniswap-v3/position/[id]",
+  "/optimism/uniswap-v4/position/[id]",
+  "/optimism/velodrome/position/[deployment]/[id]",
   "/sepolia/polaris/[market]/[id]",
   "/sepolia/polaris/markets",
 ];

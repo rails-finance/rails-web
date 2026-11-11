@@ -36,7 +36,7 @@ export interface ListToolbarProps<F extends BaseListFilters> {
   /** The search box's skeleton anchor (`data-skel-section`); "listing-toolbar"
    *  by default. */
   skel?: string;
-  /** The ⋮ at the row's right end (N1.7): save this view, copy its link
+  /** The ⋮ at the row's right end (N1.7): save listing, copy its link
    *  (ui-jobs 521). The chain-truth listings draw it. */
   viewMenu?: boolean;
   /** The sheet's figure and noun ("Show 80 funded vaults") where the page

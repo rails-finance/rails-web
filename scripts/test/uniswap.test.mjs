@@ -484,3 +484,71 @@ test("an Arbitrum pair names the native coin by address and its wrapped token", 
   );
   assert.deepEqual(pairCards(read, "no-such-pair"), []);
 });
+
+test("Optimism: its pairs name Optimism's tokens, and a card names the chain", async () => {
+  const { CHAIN_PAIRS } = await import("../../lib/uniswap/pairs.ts");
+  const { dayGridPhrase } = await import("../../lib/uniswap/types.ts");
+  const t = CHAIN_PAIRS[10].tokens;
+  assert.deepEqual(
+    [t.ETH.param, t.WETH.address, t.USDC.address, t.OP.address],
+    [
+      "native",
+      "0x4200000000000000000000000000000000000006",
+      "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+      "0x4200000000000000000000000000000000000042",
+    ],
+  );
+  assert.equal(dayGridPhrase(10), "one at the first block at or after each UTC midnight");
+  const O_WETH = { address: t.WETH.address, symbol: "WETH", decimals: 18 };
+  const O_USDC = { address: t.USDC.address, symbol: "USDC", decimals: 6 };
+  const read = {
+    chainId: 10,
+    reads: READS,
+    tokens: [{ address: "0x0000000000000000000000000000000000000000", symbol: "ETH", decimals: 18 }, O_USDC, O_WETH],
+    pools: [
+      {
+        version: "v3",
+        fee: 3000,
+        tickSpacing: 60,
+        key: "0xc1738D90E2E26C35784A0d3E3d8A9f795074bcA4",
+        token0: O_USDC.address,
+        token1: O_WETH.address,
+        at: [0, 1, 2, 3].map((k) => stableAt(k, 0.0006)),
+      },
+    ],
+  };
+  const [c] = pairCards(read, "eth-usdc");
+  assert.equal(PAIR_DOOR.card.sub(c), "Uniswap V3 · 0.3% · Optimism · no hook");
+});
+
+test("Arc: native USDC (18 decimals) and its ERC-20 (6) quote a pair; a card names the ERC-20 pool apart", async () => {
+  const { CHAIN_PAIRS } = await import("../../lib/uniswap/pairs.ts");
+  const { dayGridPhrase } = await import("../../lib/uniswap/types.ts");
+  const t = CHAIN_PAIRS[5042].tokens;
+  assert.deepEqual(
+    [t.USDC.param, t.USDC.decimals, t["ERC-20 USDC"].address, t["ERC-20 USDC"].decimals, t.EURC.address],
+    ["native", 18, "0x3600000000000000000000000000000000000000", 6, "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1"],
+  );
+  assert.equal(dayGridPhrase(5042), "one at the first multiple of 1,000 blocks at or after each UTC midnight");
+  const R_USDC = { address: "0x3600000000000000000000000000000000000000", symbol: "USDC", decimals: 6 };
+  const R_EURC = { address: "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1", symbol: "EURC", decimals: 6 };
+  const read = {
+    chainId: 5042,
+    reads: READS,
+    tokens: [R_EURC, { address: "0x0000000000000000000000000000000000000000", symbol: "USDC", decimals: 18 }, R_USDC],
+    pools: [
+      {
+        version: "v4",
+        fee: 500,
+        tickSpacing: 10,
+        key: "0xarc-erc20",
+        token0: R_USDC.address,
+        token1: R_EURC.address,
+        at: [0, 1, 2, 3].map((k) => stableAt(k, 0.0006, { balance0: null, balance1: null })),
+      },
+    ],
+  };
+  const [c] = pairCards(read, "eurc-usdc");
+  assert.equal(c.weth, true);
+  assert.equal(PAIR_DOOR.card.sub(c), "Uniswap V4 · 0.05% (ERC-20 USDC) · Arc · no hook");
+});

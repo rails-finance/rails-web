@@ -15,6 +15,8 @@ import type { FamilyPick } from "@/lib/shared/asset-family";
 
 /** The saved focus views and the one in use (lib/shared/focus-views.ts). */
 export const FOCUS_VIEWS_KEY = "rails-focus-views";
+/** The one saved view the profile menu (H20) offers, by id (ui-jobs 582). */
+export const FOCUS_MENU_KEY = "rails-focus-menu-view";
 export const ASSETS_PARAM = "assets";
 export const CHAINS_PARAM = "chains";
 

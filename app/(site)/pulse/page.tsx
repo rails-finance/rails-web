@@ -1,5 +1,7 @@
 "use client";
 
+// focus: Rails' own news timeline, shown whole under any focus (Miles, 2026-11-11).
+
 import { TimelinePage } from "@/components/pulse/TimelinePage";
 
 export default function PulsePage() {

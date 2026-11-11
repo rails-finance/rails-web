@@ -683,10 +683,13 @@ function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
 export function FocusViewList({
   views,
   active,
+  menu,
   empty,
 }: {
   views: FocusView[];
   active: string | null;
+  /** The view the profile menu offers (ui-jobs 582). */
+  menu: string | null;
   empty: ReactNode;
 }) {
   const moveOf = useRowDrag("view", focusViews.move);
@@ -739,6 +742,7 @@ export function FocusViewList({
               key={v.id}
               view={v}
               inUse={v.id === active}
+              inMenu={v.id === menu}
               phone={isPhone}
               onRemove={() => remove(v.id)}
               move={moveOf(i, views.length, v.id)}
@@ -757,12 +761,14 @@ const UNDO_MS = 8000;
 function FocusViewRow({
   view,
   inUse,
+  inMenu,
   phone,
   onRemove,
   move,
 }: {
   view: FocusView;
   inUse: boolean;
+  inMenu: boolean;
   phone: boolean;
   onRemove: () => void;
   move: RowMove;
@@ -819,6 +825,18 @@ function FocusViewRow({
           },
         ]
       : []),
+    // The profile menu offers one view (ui-jobs 582): this one, or this
+    // press to make it the one.
+    ...(inMenu
+      ? []
+      : [
+          {
+            key: "show-in-menu",
+            label: "Show in menu",
+            onSelect: () => focusViews.showInMenu(view.id),
+            hooks: { "data-focus-view-menu": "show-in-menu" },
+          },
+        ]),
     ...moveItems(move, (to) => focusViews.move(view.id, to), true),
     {
       key: "copy",
@@ -860,7 +878,14 @@ function FocusViewRow({
               onCancel={() => setEditing(false)}
             />
           ) : (
-            <span className="truncate text-sm font-bold text-foreground">{label}</span>
+            <>
+              <span className="truncate text-sm font-bold text-foreground">{label}</span>
+              {inMenu && (
+                <span className="shrink-0 text-xs text-rb-500" data-focus-view-in-menu="">
+                  In menu
+                </span>
+              )}
+            </>
           )}
         </span>
       </DataTableCell>

@@ -15,8 +15,11 @@
 // chain focus leaves out (an explorer's pages, `/base`, an asset page on that
 // chain), an explorer the asset focus hides (it lists none of the assets, or
 // Rails has no asset list for it), and an asset page outside the focus.
+// Show all on an explorer's gate shows the whole explorer, the page gates
+// inside it included, until the reader leaves that explorer (Miles,
+// 2026-11-11: one press).
 
-import { useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { rowAssetKeys } from "@/lib/shared/focus-row-keys";
 import { useExplorerScope } from "@/lib/shared/explorer-scope";
@@ -93,6 +96,9 @@ function usePeek(): [boolean, () => void] {
   return [peekAt === pathname, () => setPeekAt(pathname)];
 }
 
+/** True inside an explorer the reader opened with the shell gate's Show all. */
+const ExplorerLifted = createContext(false);
+
 export function AimGate({
   keys,
   chain,
@@ -105,8 +111,9 @@ export function AimGate({
   children: ReactNode;
 }) {
   const scope = useAssetScope();
+  const lifted = useContext(ExplorerLifted);
   const [peek, setPeek] = usePeek();
-  if (peek || scope.matches(keys, chain))
+  if (lifted || peek || scope.matches(keys, chain))
     return (
       <div data-scope-list="" {...(scope.ready ? { "data-scope-ready": "" } : {})}>
         {children}
@@ -161,7 +168,15 @@ export function FocusChainGate({ children }: { children: ReactNode }) {
   const ex = useExplorerScope();
   const [peek, setPeek] = usePeek();
   const at = routeOf(usePathname());
+  // The explorer opened with Show all; left behind when the reader leaves it.
+  const [lifted, setLifted] = useState<string | null>(null);
+  const here = at?.explorer?.id ?? null;
+  useEffect(() => {
+    if (lifted && here !== lifted) setLifted(null);
+  }, [here, lifted]);
+  if (here && lifted === here) return <ExplorerLifted.Provider value>{children}</ExplorerLifted.Provider>;
   if (!at || peek) return <>{children}</>;
+  const liftExplorer = () => (here ? setLifted(here) : setPeek());
   const name = chainNameOf(at.chain);
   const hold = (ready: boolean) => (
     <div data-chain-gate="" data-scope-list="" {...(ready ? { "data-scope-ready": "" } : {})}>
@@ -173,7 +188,7 @@ export function FocusChainGate({ children }: { children: ReactNode }) {
     return (
       <OutOfFocus
         what={at.explorer ? `${at.explorer.label} on ${name}` : at.token ? "This asset" : name}
-        onPeek={setPeek}
+        onPeek={liftExplorer}
       />
     );
   if (at.token && !scope.matches([`${at.chain}:${at.token}`], at.chain))
@@ -183,7 +198,7 @@ export function FocusChainGate({ children }: { children: ReactNode }) {
     if (!ex.ready) return hold(false);
     if (ex.on) {
       const w = explorerWhy(at.explorer, ex.statusOf(at.explorer.id), scope.keys);
-      if (w) return <OutOfFocus what={`${at.explorer.label} on ${name}`} why={w.why} onPeek={setPeek} />;
+      if (w) return <OutOfFocus what={`${at.explorer.label} on ${name}`} why={w.why} onPeek={liftExplorer} />;
     }
   }
   return hold(true);

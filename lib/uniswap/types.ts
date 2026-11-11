@@ -54,7 +54,8 @@ export interface UniLogAmount {
 /** The grid every past read stands on: a fixed count of blocks a day on Ethereum (12-second
  *  slots). Base has none: two-second blocks until Denim (block 53,556,127, 5 Nov 2026), five a
  *  second since, so its reads stand on UTC midnights. Arbitrum's blocks have no fixed time, so its
- *  reads stand on the first multiple of 1,000 blocks at or after each UTC midnight. */
+ *  reads stand on the first multiple of 1,000 blocks at or after each UTC midnight. Optimism's
+ *  blocks are two seconds, and its reads stand on the first block at or after each UTC midnight. */
 export type { UniChainId } from "./deployments";
 export const DAY_BLOCKS_BY_CHAIN: Readonly<Partial<Record<UniChainId, number>>> = { 1: 7_200 };
 
@@ -62,9 +63,10 @@ export const DAY_BLOCKS_BY_CHAIN: Readonly<Partial<Record<UniChainId, number>>> 
 export function dayGridPhrase(chainId: UniChainId): string {
   const n = DAY_BLOCKS_BY_CHAIN[chainId];
   if (n) return `one each ${n.toLocaleString("en-US")} blocks`;
-  return chainId === 42161
-    ? "one at the first multiple of 1,000 blocks at or after each UTC midnight"
-    : "one at each UTC midnight";
+  if (chainId === 42161 || chainId === 5042)
+    return "one at the first multiple of 1,000 blocks at or after each UTC midnight";
+  if (chainId === 10) return "one at the first block at or after each UTC midnight";
+  return "one at each UTC midnight";
 }
 
 /** GET /api/at-block/<uniswap|pancakeswap>/position?chain=&version=&id= */

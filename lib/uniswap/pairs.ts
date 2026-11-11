@@ -88,7 +88,9 @@ type PairSpec = { base: string; quote: string };
 
 /** Each chain's tokens and pairs. Base's tokens from Circle (USDC), Coinbase (cbBTC) and Lido
  *  (wstETH); Arbitrum's from Circle (USDC), the WBTC and Lido deployments; each symbol and decimals
- *  checked against the chain through the pair route on 11 Nov 2026. */
+ *  checked against the chain through the pair route on 11 Nov 2026. Optimism's from Circle (USDC),
+ *  the WBTC and Lido deployments and Optimism's predeploy (OP), each symbol and decimals read on chain
+ *  on 11 Nov 2026. */
 export const CHAIN_PAIRS: Record<UniChainId, { tokens: Record<string, PairToken>; pairs: Record<string, PairSpec> }> = {
   1: { tokens: PAIR_TOKENS, pairs: PAIRS },
   8453: {
@@ -117,6 +119,36 @@ export const CHAIN_PAIRS: Record<UniChainId, { tokens: Record<string, PairToken>
       "wbtc-eth": { base: "WBTC", quote: "ETH" },
       "wbtc-usdc": { base: "WBTC", quote: "USDC" },
       "wsteth-eth": { base: "wstETH", quote: "ETH" },
+    },
+  },
+  10: {
+    tokens: {
+      ...nativeTokens(uniDeployment("uniswap", 10)),
+      USDC: tok("USDC", "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", 6),
+      WBTC: tok("WBTC", "0x68f180fcCe6836688e9084f035309E29Bf0A2095", 8),
+      wstETH: tok("wstETH", "0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb", 18),
+      OP: tok("OP", "0x4200000000000000000000000000000000000042", 18),
+    },
+    pairs: {
+      "eth-usdc": { base: "ETH", quote: "USDC" },
+      "op-eth": { base: "OP", quote: "ETH" },
+      "wbtc-eth": { base: "WBTC", quote: "ETH" },
+      "wsteth-eth": { base: "wstETH", quote: "ETH" },
+    },
+  },
+  // Arc's from Arc's contract addresses page (EURC, WETH, cirBTC), each symbol and decimals read on
+  // chain on 11 Nov 2026. USDC is the native coin; a pair naming it reads its ERC-20 pools as well.
+  5042: {
+    tokens: {
+      ...nativeTokens(uniDeployment("uniswap", 5042)),
+      EURC: tok("EURC", "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1", 6),
+      WETH: tok("WETH", "0x128cC466B61f542da60c70e3aA11c10e19B84EDB", 18),
+      cirBTC: tok("cirBTC", "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0", 8),
+    },
+    pairs: {
+      "eurc-usdc": { base: "EURC", quote: "USDC" },
+      "weth-usdc": { base: "WETH", quote: "USDC" },
+      "cirbtc-usdc": { base: "cirBTC", quote: "USDC" },
     },
   },
 };

@@ -62,6 +62,9 @@ export type SessionProtocol =
   // Morpho Blue on Arc, at `/arc/morpho`: a position is a wallet's place in
   // one market, read from the chain when a page opens (ui-jobs 577).
   | "morpho-arc"
+  // Morpho Blue on Optimism, at `/optimism/morpho`: the same reader as Arc's,
+  // on Optimism's deployment (ui-jobs 578).
+  | "morpho-optimism"
   | "spark"
   | "compound"
   | "compound-base"
@@ -110,8 +113,12 @@ export type SessionProtocol =
   | "uniswap-v3-base"
   | "uniswap-v3-arbitrum"
   | "uniswap-v4-arbitrum"
+  | "uniswap-v3-optimism"
+  | "uniswap-v4-optimism"
   | "pancakeswap-v3-base"
   | "pancakeswap-v3-arbitrum"
+  | "uniswap-v3-arc"
+  | "uniswap-v4-arc"
   // Lido on Ethereum, at `/ethereum/lido`: a wallet's stake is its stETH
   // shares and wstETH, with its withdrawal requests (ui-jobs 570).
   | "lido"
@@ -124,6 +131,9 @@ export type SessionProtocol =
   // Aave V3 on Optimism, at `/optimism/aave-v3`: a position is a wallet's
   // account on the Pool, read from the chain when a page opens (ui-jobs 578).
   | "aave-v3-optimism"
+  // Velodrome Slipstream on Optimism, at `/optimism/velodrome`: Aerodrome's
+  // pages on Optimism's two position managers (ui-jobs 578).
+  | "velodrome"
   // Euler V2 on Base and Arbitrum, at `/base/euler-v2` and `/arbitrum/euler-v2`:
   // a position is one account's holding in one vault, read at two blocks.
   | "euler-v2-base"

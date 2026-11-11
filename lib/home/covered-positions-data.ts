@@ -297,15 +297,21 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   // is visited; no census of holders is built, and nothing in a pool is a loan.
   "uniswap-v3",
   "uniswap-v4",
-  // Aerodrome Slipstream, for the Uniswap reason (ui-jobs 566).
+  // Aerodrome Slipstream, for the Uniswap reason (ui-jobs 566), and Velodrome
+  // on Optimism (ui-jobs 578).
   "aerodrome",
+  "velodrome",
   // Uniswap on Base and Arbitrum and PancakeSwap V3, for the same reason
   // (ui-jobs 568, 573, 575).
   "uniswap-v3-base",
   "uniswap-v3-arbitrum",
   "uniswap-v4-arbitrum",
+  "uniswap-v3-optimism",
+  "uniswap-v4-optimism",
   "pancakeswap-v3-base",
   "pancakeswap-v3-arbitrum",
+  "uniswap-v3-arc",
+  "uniswap-v4-arc",
   // Compound V3 on Optimism: no census of accounts (ui-jobs 578).
   "compound-v3-optimism",
   // Lido (ui-jobs 570): a stake carries no debt and no threshold.
@@ -314,6 +320,8 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   "fluid-base",
   // Morpho Blue on Arc: no census of positions (ui-jobs 577).
   "morpho-arc",
+  // Morpho Blue on Optimism: no census of positions (ui-jobs 578).
+  "morpho-optimism",
   // Aave V4 on Arc: no census of accounts (ui-jobs 577).
   "aave-v4-arc",
   // Aave V3 on Optimism: no census of accounts (ui-jobs 578).

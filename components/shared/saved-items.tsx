@@ -145,7 +145,7 @@ export function SavePositionRow({ identityText, ended }: { identityText: () => s
 }
 
 /** The listing's ⋮ at the right end of its sort and filter row (N1.7, ui-jobs
- *  521): "Save this view" and "Copy link". The default name is the protocol,
+ *  521): "Save listing" and "Copy link". The default name is the protocol,
  *  the chain and the active filters. `filterLabels` are the active filters'
  *  chip texts. */
 export function ListingViewMenu({ filterLabels }: { filterLabels: string[] }) {
@@ -167,7 +167,7 @@ export function ListingViewMenu({ filterLabels }: { filterLabels: string[] }) {
               const at = currentPageKey();
               const place = placeOf(window.location.pathname);
               const name = [place.protocol?.name, place.chain?.name, ...filterLabels].filter(Boolean).join(" · ");
-              toggleSavedLink({ kind: "view", key: at, name: name || "Saved view", ...place });
+              toggleSavedLink({ kind: "view", key: at, name: name || "Saved listing", ...place });
               setKey(at);
             }}
             onCopy={() => {
@@ -202,8 +202,8 @@ function ViewRows({
     <>
       <ToolsMenuItem
         icon={mark(!!saved)}
-        title={saved ? "Remove from saved" : "Save this view"}
-        subtitle={saved ? savedName(saved) : "Keep it in your saved views"}
+        title={saved ? "Remove from saved" : "Save listing"}
+        subtitle={saved ? savedName(saved) : "Keep it in your saved listings"}
         item="save-view"
         onClick={onSave}
       />

@@ -10,8 +10,10 @@ import type { BlockRef, UniToken } from "../uniswap/types";
 /** Slipstream's three position managers: the first factory, the factory with gauge caps, and gauges v3.
  *  Token ids overlap across them, so a position is keyed by both. */
 export type AeroDeployment = "initial" | "caps" | "gv3";
-export const AERO_DEPLOYMENTS: readonly AeroDeployment[] = ["initial", "caps", "gv3"];
-export const isDeployment = (d: string): d is AeroDeployment => (AERO_DEPLOYMENTS as readonly string[]).includes(d);
+/** Velodrome's two on Optimism: the first factory and gauges v2. */
+export type VeloDeployment = "initial" | "gv2";
+/** A position manager's name on any Slipstream site (lib/aerodrome/sites.ts). */
+export type SlipstreamDeployment = AeroDeployment | VeloDeployment;
 
 /** The contracts the receipts name (checked on chain 10 Nov 2026). */
 export const AERO_CONTRACTS = {
@@ -76,11 +78,11 @@ export interface AeroPriceLeg {
 
 export interface AeroStaked {
   gauge: string;
-  /** The wallet that staked it; null when none is found. */
+  /** The wallet that staked it; null when none is found, and always off Base. */
   depositor: string | null;
   /** Gauges v3 only. */
   depositTimestamp: number | null;
-  /** Claimable AERO (wei) after any early-unstake penalty; null without a depositor. */
+  /** Claimable AERO (wei) after any early-unstake penalty; null without a depositor (always off Base). */
   earned: string | null;
   /** AERO settled at the gauge's last update for this id, unpaid. */
   rewards: string;
@@ -90,10 +92,11 @@ export interface AeroStaked {
   minStakeSeconds: number | null;
 }
 
-/** GET /api/at-block/aerodrome/position?deployment=&id= */
+/** GET /api/at-block/aerodrome/position?deployment=&id=, and /api/at-block/velodrome/position?chain=10&…,
+ *  where `aero` carries VELO's price legs. */
 export interface AeroPositionRead {
-  chainId: 8453;
-  deployment: AeroDeployment;
+  chainId: 8453 | 10;
+  deployment: SlipstreamDeployment;
   nfpm: string;
   id: string;
   head: BlockRef;
@@ -124,10 +127,10 @@ export interface AeroPositionRead {
 
 /** GET /api/at-block/aerodrome/positions?owner= */
 export interface AeroPositionsRead {
-  chainId: 8453;
+  chainId: 8453 | 10;
   head: BlockRef;
   positions: {
-    deployment: AeroDeployment;
+    deployment: SlipstreamDeployment;
     id: string;
     token0: UniToken;
     token1: UniToken;

@@ -954,14 +954,29 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
   "uniswap-v3-base": UNISWAP_FAMILY_DEPTH("uniswap-v3-base"),
   "uniswap-v3-arbitrum": UNISWAP_FAMILY_DEPTH("uniswap-v3-arbitrum"),
   "uniswap-v4-arbitrum": UNISWAP_FAMILY_DEPTH("uniswap-v4-arbitrum"),
+  // Uniswap V3 and V4 on Optimism (ui-jobs 578), the same rows.
+  "uniswap-v3-optimism": UNISWAP_FAMILY_DEPTH("uniswap-v3-optimism"),
+  "uniswap-v4-optimism": UNISWAP_FAMILY_DEPTH("uniswap-v4-optimism"),
   "pancakeswap-v3-base": UNISWAP_FAMILY_DEPTH("pancakeswap-v3-base"),
   "pancakeswap-v3-arbitrum": UNISWAP_FAMILY_DEPTH("pancakeswap-v3-arbitrum"),
+  // Uniswap V3 and V4 on Arc (ui-jobs 577), the same rows.
+  "uniswap-v3-arc": UNISWAP_FAMILY_DEPTH("uniswap-v3-arc"),
+  "uniswap-v4-arc": UNISWAP_FAMILY_DEPTH("uniswap-v4-arc"),
   // Aerodrome Slipstream on Base (ui-jobs 566), on Uniswap V3's row: the
   // position page reads the pool, the position and its gauge at the head and
   // 30 days back.
   aerodrome: explorerDepth({
     dashboard: true,
     oracleUsd: { why: ORACLE_USD_REASON.aerodrome },
+    forensics: {
+      why: "a liquidity position holds no loan, so there is no threshold to breach and no liquidation to trace",
+    },
+  }),
+  // Velodrome Slipstream on Optimism (ui-jobs 578), Aerodrome's row on
+  // Aerodrome's pages. Unlaunched, so the matrix does not draw it yet.
+  velodrome: explorerDepth({
+    dashboard: true,
+    oracleUsd: { why: ORACLE_USD_REASON.velodrome },
     forensics: {
       why: "a liquidity position holds no loan, so there is no threshold to breach and no liquidation to trace",
     },
@@ -994,6 +1009,16 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     views: true,
     forensics: {
       why: "liquidations are events, and history waits until Rails indexes Morpho Blue on Arc",
+    },
+  }),
+  // Morpho Blue on Optimism (ui-jobs 578): Arc's reads on Optimism's
+  // deployment. Unlaunched, so the matrix does not draw it yet.
+  "morpho-optimism": explorerDepth({
+    dashboard: true,
+    oracleUsd: { why: ORACLE_USD_REASON["morpho-optimism"] },
+    views: true,
+    forensics: {
+      why: "liquidations are events, and history waits until Rails indexes Morpho Blue on Optimism",
     },
   }),
   // Aave V4 on Arc (ui-jobs 577): the account page reads the spoke account at
@@ -1581,19 +1606,27 @@ export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
   "uniswap-v4",
   // Aerodrome Slipstream (ui-jobs 566), position-first as Uniswap is.
   "aerodrome",
+  // Velodrome Slipstream on Optimism (ui-jobs 578), as Aerodrome.
+  "velodrome",
   // Uniswap on Base and Arbitrum and PancakeSwap V3 (ui-jobs 568, 573, 575),
   // position-first as Uniswap is on Ethereum.
   "uniswap-v3-base",
   "uniswap-v3-arbitrum",
   "uniswap-v4-arbitrum",
+  "uniswap-v3-optimism",
+  "uniswap-v4-optimism",
   "pancakeswap-v3-base",
   "pancakeswap-v3-arbitrum",
+  "uniswap-v3-arc",
+  "uniswap-v4-arc",
   // Lido (ui-jobs 570), wallet-first as Uniswap is.
   "lido",
   // Fluid on Base (ui-jobs 574), read on visit: a wallet's positions on the front door.
   "fluid-base",
   // Morpho Blue on Arc (ui-jobs 577): a wallet's positions on the front door.
   "morpho-arc",
+  // Morpho Blue on Optimism (ui-jobs 578): a wallet's positions on the front door.
+  "morpho-optimism",
   // Aave V4 on Arc (ui-jobs 577): a wallet's spoke accounts on the front door.
   "aave-v4-arc",
   // Aave V3 on Optimism (ui-jobs 578): a wallet's account on the front door.
@@ -1728,6 +1761,8 @@ export const VIEW_NOTES: Record<string, string> = {
     "The Base Pool's full reserve roster (sizes, rates, risk configuration and oracle prices), with every risk parameter decoded from the reserve's configuration.",
   "morpho-arc":
     "Every market Morpho Blue has created on Arc, from its CreateMarket log, read at the block the page opens: grouped by the token each lends, with sizes, rates and utilisation.",
+  "morpho-optimism":
+    "Every market Morpho Blue has created on Optimism, from its CreateMarket log, read at the block the page opens: grouped by the token each lends, with sizes, rates and utilisation.",
   "morpho-arbitrum":
     "The census's 258 markets, read at one block: the funded ones in dollar stables or WETH ranked by supply in dollars, the rest listed in their loan tokens.",
   "aave-v3-arbitrum":
@@ -1849,15 +1884,27 @@ export const COVERAGE_NOTES: Record<string, string> = {
     "A Uniswap V3 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
   "uniswap-v4-arbitrum":
     "A Uniswap V4 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
+  "uniswap-v3-optimism":
+    "A Uniswap V3 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
+  "uniswap-v4-optimism":
+    "A Uniswap V4 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
   "pancakeswap-v3-base":
     "A PancakeSwap V3 pool prices its two tokens against each other and PancakeSwap runs no USD feed, so every figure is in the pool's quote token at the pool's price, and CAKE in CAKE; a liquidity position holds no loan, so there is no liquidation to trace. On Base, Rails reads no position's events, so a position shows no opening day and no figure since its first deposit.",
   "pancakeswap-v3-arbitrum":
     "A PancakeSwap V3 pool prices its two tokens against each other and PancakeSwap runs no USD feed, so every figure is in the pool's quote token at the pool's price, and CAKE in CAKE; a liquidity position holds no loan, so there is no liquidation to trace.",
+  "uniswap-v3-arc":
+    "A Uniswap V3 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
+  "uniswap-v4-arc":
+    "A Uniswap V4 pool prices its two tokens against each other and Uniswap runs no USD feed, so every figure is in the pool's quote token at the pool's price; a liquidity position holds no loan, so there is no liquidation to trace.",
   aerodrome:
     "An Aerodrome Slipstream pool prices its two tokens against each other and Aerodrome runs no USD feed, so every figure is in the pool's quote token at the pool's price, and AERO is priced through Aerodrome's own AERO pools; a liquidity position holds no loan, so there is no liquidation to trace.",
+  velodrome:
+    "A Velodrome Slipstream pool prices its two tokens against each other and Velodrome runs no USD feed, so every figure is in the pool's quote token at the pool's price, and VELO is priced through Velodrome's own VELO pools; a liquidity position holds no loan, so there is no liquidation to trace. On Optimism, Rails does not yet name the wallet that staked a position. There is no listing, history or holder count until Rails indexes Velodrome on Optimism.",
   lido: "Lido accounts each holder's stake in stETH shares, and one wstETH is one share, so a stake is valued in ETH at Lido's share rate, which moves at each oracle report; Lido runs no USD feed. A wallet's withdrawal requests are listed by the withdrawal queue for their owner. A stake holds no loan, so there is no liquidation to trace.",
   "morpho-arc":
     "Morpho Blue on Arc is the same contract as on Ethereum, Base and Arbitrum, read a different way. Rails lists the markets from Morpho's CreateMarket log, and each page reads the markets and the wallet's position in each when it opens. A position page reads the position and its market again at the UTC midnight 30 days before, so the interest over those 30 days is stated where the shares are the same at both. Each market's oracle prices the collateral in its loan token; a dollar figure takes the loan token at its Chainlink feed on Arc, and a market whose loan token has none there stays in that token. There is no listing, history or liquidation record until Rails indexes Morpho Blue on Arc.",
+  "morpho-optimism":
+    "Morpho Blue on Optimism is the same contract as on Ethereum, Base and Arbitrum, read a different way. Rails lists the markets from Morpho's CreateMarket log, and each page reads the markets and the wallet's position in each when it opens. A position page reads the position and its market again at the UTC midnight 30 days before, so the interest over those 30 days is stated where the shares are the same at both. Each market's oracle prices the collateral in its loan token; a dollar figure takes the loan token at its Chainlink feed on Optimism, or at Aave V3's oracle there for a token with no feed, and a market whose loan token has neither stays in that token. There is no listing, history or liquidation record until Rails indexes Morpho Blue on Optimism.",
   "fluid-base": `Fluid on Base is the same protocol as on Ethereum, read a different way. Each page reads the position and its vault from Fluid's VaultResolver when it opens, and again at the UTC midnight 30 days before, so the interest over those 30 days comes from the vault's exchange prices at the two blocks. Collateral and debt are stated in the vault's tokens, and the ratio in the vault oracle's debt-per-collateral price, the figure the liquidation engine judges. ${FLUID_BASE_DOLLARS ? "Fluid runs no USD feed, so a side's dollar value comes from the Aave V3 Base oracle at the same block, and a side Aave does not list, or a side held as DEX pool shares, stays in its own unit." : "Fluid runs no USD feed, so no figure is in dollars."} There is no listing, history or liquidation record until Rails indexes Fluid on Base.`,
   "aave-v3-optimism":
     "Aave V3 on Optimism is the same protocol as on Ethereum, Base and Arbitrum: one Pool holding every reserve, with its own reserves, risk settings and oracle. Each page reads the Pool, the oracle and Aave's UiPoolDataProvider when it opens. An account page reads the account's balances, health factor and eMode category at that block, and its balances and each reserve's interest index again at the UTC midnight 30 days before, so the interest over those 30 days is stated where the balance did not move in between. Every dollar figure is a balance at Aave's oracle price at the same block. There is no listing, history, holder ranking or liquidation record until Rails indexes Aave V3 on Optimism.",

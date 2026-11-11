@@ -68,6 +68,12 @@ export function BookmarksPage() {
     if (new URLSearchParams(window.location.search).get("tab") === "backup")
       requestAnimationFrame(() => document.getElementById("saved-backup")?.scrollIntoView({ block: "start" }));
   }, []);
+  // A heading in the profile menu (H20) can change the tab while this page
+  // stays mounted (ui-jobs 582): read it again when the address changes.
+  useEffect(() => {
+    const t = tabFromUrl();
+    if (t !== tab) setTab(t);
+  });
   const choose = (t: Tab) => {
     setTab(t);
     const url = new URL(window.location.href);
@@ -220,8 +226,8 @@ export function BookmarksPage() {
                   "Listings",
                   "listing",
                   <>
-                    A listing with its filters and sort. Set them on any listing, then choose{" "}
-                    <Term>Save this view</Term> in the ⋮ at the end of its filter row.
+                    A listing with its filters and sort. Set them on any listing, then choose <Term>Save listing</Term>{" "}
+                    in the ⋮ at the end of its filter row.
                   </>,
                 )}
                 {kindCard(
@@ -304,8 +310,8 @@ export function BookmarksPage() {
                 <div data-anatomy="B3">
                   <p className="font-semibold text-foreground">No saved listings yet.</p>
                   <p className="mt-1 text-sm text-rb-500">
-                    To save one, set a listing&apos;s filters and sort, then choose Save this view in the ⋮ at the end
-                    of its filter row.
+                    To save one, set a listing&apos;s filters and sort, then choose Save listing in the ⋮ at the end of
+                    its filter row.
                   </p>
                 </div>
               }
@@ -313,9 +319,15 @@ export function BookmarksPage() {
           )}
           {tab === "focus" && (
             <>
+              {scope.views.length > 0 && (
+                <p className="mb-3 text-sm text-rb-500" data-focus-menu-note="">
+                  The profile menu offers one focus view. Choose it here with Show in menu.
+                </p>
+              )}
               <FocusViewList
                 views={scope.views}
                 active={scope.active?.id ?? null}
+                menu={scope.menuView?.id ?? null}
                 empty={
                   <div data-anatomy="B3">
                     <p className="font-semibold text-foreground">No focus views yet.</p>

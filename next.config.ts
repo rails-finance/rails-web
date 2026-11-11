@@ -136,19 +136,27 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/uniswap-v4", "/ethereum/uniswap-v4"],
   // Aerodrome never had a pre-0016 path; the row is for check:routes.
   ["/aerodrome", "/base/aerodrome"],
+  // Nor Velodrome (ui-jobs 578).
+  ["/velodrome", "/optimism/velodrome"],
   // Uniswap on Base and Arbitrum and PancakeSwap V3 never had pre-0016 paths;
   // the rows, keyed by roster id, are for check:routes.
   ["/uniswap-v3-base", "/base/uniswap-v3"],
   ["/uniswap-v3-arbitrum", "/arbitrum/uniswap-v3"],
   ["/uniswap-v4-arbitrum", "/arbitrum/uniswap-v4"],
+  ["/uniswap-v3-optimism", "/optimism/uniswap-v3"],
+  ["/uniswap-v4-optimism", "/optimism/uniswap-v4"],
   ["/pancakeswap-v3-base", "/base/pancakeswap-v3"],
   ["/pancakeswap-v3-arbitrum", "/arbitrum/pancakeswap-v3"],
+  ["/uniswap-v3-arc", "/arc/uniswap-v3"],
+  ["/uniswap-v4-arc", "/arc/uniswap-v4"],
   // Lido never had a pre-0016 path; the row is for check:routes.
   ["/lido", "/ethereum/lido"],
   // Fluid on Base never had a pre-0016 path; the row is for check:routes.
   ["/fluid-base", "/base/fluid"],
   // Morpho Blue on Arc never had a pre-0016 path; the row is for check:routes.
   ["/morpho-arc", "/arc/morpho"],
+  // Morpho Blue on Optimism never had a pre-0016 path; the row is for check:routes.
+  ["/morpho-optimism", "/optimism/morpho"],
   // Aave V4 on Arc never had a pre-0016 path; the row is for check:routes.
   ["/aave-v4-arc", "/arc/aave-v4"],
   // Aave V3 on Optimism never had a pre-0016 path; the row is for check:routes.
