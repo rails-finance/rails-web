@@ -24,7 +24,7 @@ import {
   type DataTableDir,
 } from "@/components/shared/data-table/data-table";
 import { ChainToggleButtons } from "@/components/shared/chain-toggle";
-import { NEXT_STAGE_WORDS, nextItems } from "@/lib/status/next";
+import { NEXT_STAGE_WORDS, nextItems, type NextItem } from "@/lib/status/next";
 import { CHAINS, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
 import { PROTOCOLS } from "@/lib/shared/protocols";
@@ -57,12 +57,6 @@ import {
 export type StatusSource = { route: "status"; data: IndexStatus } | { route: "progress"; data: IndexProgress };
 
 const chainName = (id: number) => CHAINS[id as ChainId]?.name ?? `Chain ${id}`;
-
-/** A chain's mark at the row's size. */
-function ChainMark({ id }: { id: number }) {
-  const cls = "h-4 w-4 shrink-0 text-rb-500";
-  return id in CHAINS ? <ChainGlyph id={id as ChainId} className={cls} /> : null;
-}
 
 /** The roster entry for a protocol key on a chain, else the key's first entry. */
 const rosterFor = (key: string, chain: number) =>
@@ -515,9 +509,11 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
 }
 
 /** The chains the toggle offers, in the site's order. */
-const CHAIN_ORDER = [1, 8453, 42161, 10, 5042, 11155111];
-function chainsOf(cells: StatusCell[]): ChainId[] {
-  const present = [...new Set(cells.map((c) => c.chain))].filter((c): c is ChainId => c in CHAINS);
+const CHAIN_ORDER = [1, 8453, 42161, 10, 5042, 4663, 11155111];
+function chainsOf(cells: StatusCell[], next: NextItem[]): ChainId[] {
+  const present = [...new Set([...cells.map((c) => c.chain), ...next.flatMap((i) => i.chains)])].filter(
+    (c): c is ChainId => c in CHAINS,
+  );
   const rank = (c: number) => (CHAIN_ORDER.includes(c) ? CHAIN_ORDER.indexOf(c) : CHAIN_ORDER.length);
   return present.sort((x, y) => rank(x) - rank(y));
 }
@@ -584,15 +580,14 @@ function Row({ line, now }: { line: Line; now: number }) {
   );
 }
 
-/** What Rails builds next (Y3): one row per item, in the list's order. */
-function NextTable({ atHead }: { atHead: (protocol: string, chain: number) => boolean }) {
-  const items = nextItems(atHead);
-  if (!items.length) return null;
+/** What comes to Rails next on one chain (Y3): one row per item, in the list's order. */
+function NextTable({ chain, items }: { chain: number; items: NextItem[] }) {
+  const here = items.filter((i) => i.chains.includes(chain));
+  if (!here.length) return null;
   return (
     <section className="mt-14">
-      <h2 className="text-xl font-semibold tracking-tight text-foreground">Next</h2>
-      <p className="mt-2 max-w-2xl text-sm text-rb-500">What Rails builds next, in order.</p>
-      <DataTable label="What Rails builds next" anatomy="Y3" stacked className="mt-4">
+      <h2 className="text-xl font-semibold tracking-tight text-foreground">Coming soon to Rails</h2>
+      <DataTable label={`Coming soon to Rails on ${chainName(chain)}`} anatomy="Y3" stacked className="mt-4">
         <DataTableHead>
           <DataTableHeader label="Protocol" />
           <DataTableHeader label="Stage" />
@@ -600,19 +595,12 @@ function NextTable({ atHead }: { atHead: (protocol: string, chain: number) => bo
           <DataTableHeader label="Source" />
         </DataTableHead>
         <DataTableBody>
-          {items.map((i) => (
+          {here.map((i) => (
             <DataTableRow key={i.key} data-next={i.key}>
               <DataTableCell rowHeader valign="middle">
                 <span className="inline-flex items-center gap-2.5 text-[14px] font-semibold text-foreground">
                   <Mark id={i.mark} name={i.name} />
                   {i.name}
-                  <span className="inline-flex items-center gap-1.5" aria-label={i.chains.map(chainName).join(", ")}>
-                    {i.chains.map((c) => (
-                      <span key={c} title={chainName(c)}>
-                        <ChainMark id={c} />
-                      </span>
-                    ))}
-                  </span>
                 </span>
               </DataTableCell>
               <DataTableCell valign="middle" label="Stage">
@@ -656,11 +644,12 @@ export function StatusBoard({ source }: { source: StatusSource }) {
 
   const cells =
     source.route === "status" ? cellsFromStatus(source.data, protocolLabel) : cellsFromProgress(source.data);
-  const chains = chainsOf(cells);
-  const [chain, setChain] = useState<ChainId>(chains[0] ?? 1);
-  const [sort, setSort] = useState<{ key: SortKey; dir: DataTableDir }>({ key: "status", dir: "asc" });
   const atHead = (protocol: string, ch: number) =>
     cells.some((c) => c.protocol === protocol && c.chain === ch && c.fill?.atHead === true);
+  const next = nextItems(atHead);
+  const chains = chainsOf(cells, next);
+  const [chain, setChain] = useState<ChainId>(chains[0] ?? 1);
+  const [sort, setSort] = useState<{ key: SortKey; dir: DataTableDir }>({ key: "status", dir: "asc" });
 
   const lines: Line[] = cells
     .filter((c) => c.chain === chain)
@@ -689,56 +678,62 @@ export function StatusBoard({ source }: { source: StatusSource }) {
       <div className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0" data-anatomy="Y4">
         <ChainToggleButtons chainId={chain} onChange={setChain} chains={chains} />
       </div>
-      {/* Below sm the table stacks into cards with no header row; the sort is a select. */}
-      <label className="mb-3 flex items-center gap-2 text-xs text-rb-500 sm:hidden" data-anatomy="Y1.4">
-        Sort by
-        <select
-          value={`${sort.key}:${sort.dir}`}
-          onChange={(e) => {
-            const [key, dir] = e.target.value.split(":") as [SortKey, DataTableDir];
-            setSort({ key, dir });
-          }}
-          className="rounded-sm border border-rb-200 bg-transparent px-1.5 py-1 text-foreground dark:border-rb-700"
-        >
-          <option value="status:asc">Status, problems first</option>
-          <option value="name:asc">Protocol, A to Z</option>
-          <option value="index:asc">Index, least read first</option>
-          <option value="last:asc">Last write, oldest first</option>
-        </select>
-      </label>
-      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-rb-500" data-anatomy="Y2">
-        {(["fresh", "late", "stalled", "none"] as const).map((h) => (
-          <span key={h} className="inline-flex items-center gap-1.5">
-            <span className={`h-1.5 w-1.5 rounded-full ${DOT[h]}`} />
-            {h === "fresh"
-              ? "Arriving: on schedule"
-              : h === "late"
-                ? `Late: past 1.5 times its schedule, or ${pct(VISIT_FAIL_LATE)} of visit reads failing`
-                : h === "stalled"
-                  ? `Stalled: past 3 times its schedule, or ${pct(VISIT_FAIL_STALLED)} failing`
-                  : "Not measured: no write time or visit"}
-          </span>
-        ))}
-      </div>
-      <DataTable label={`Indexing status on ${chainName(chain)}`} anatomy="Y1" stacked>
-        <DataTableHead>
-          <DataTableHeader label="Protocol" sort={sortBy("name")} />
-          <DataTableHeader label="Status" sort={sortBy("status")} />
-          <DataTableHeader label="Index" sort={sortBy("index")} />
-          <DataTableHeader label="Last write" sort={sortBy("last")} />
-          <DataTableHeader label="Kept current by" />
-        </DataTableHead>
-        <DataTableBody>
-          {lines.map((l) => (
-            <Row key={`${l.cell.key}-${l.cell.chain}`} line={l} now={now} />
-          ))}
-        </DataTableBody>
-      </DataTable>
-      <p className="mt-4 text-xs text-rb-500">
-        From /api/index/{source.route} on the Rails index server, as of {utcTime(asOf)}. The server answers from its
-        stored rows; opening this page reads no chain.
-      </p>
-      <NextTable atHead={atHead} />
+      {lines.length > 0 ? (
+        <>
+          {/* Below sm the table stacks into cards with no header row; the sort is a select. */}
+          <label className="mb-3 flex items-center gap-2 text-xs text-rb-500 sm:hidden" data-anatomy="Y1.4">
+            Sort by
+            <select
+              value={`${sort.key}:${sort.dir}`}
+              onChange={(e) => {
+                const [key, dir] = e.target.value.split(":") as [SortKey, DataTableDir];
+                setSort({ key, dir });
+              }}
+              className="rounded-sm border border-rb-200 bg-transparent px-1.5 py-1 text-foreground dark:border-rb-700"
+            >
+              <option value="status:asc">Status, problems first</option>
+              <option value="name:asc">Protocol, A to Z</option>
+              <option value="index:asc">Index, least read first</option>
+              <option value="last:asc">Last write, oldest first</option>
+            </select>
+          </label>
+          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-rb-500" data-anatomy="Y2">
+            {(["fresh", "late", "stalled", "none"] as const).map((h) => (
+              <span key={h} className="inline-flex items-center gap-1.5">
+                <span className={`h-1.5 w-1.5 rounded-full ${DOT[h]}`} />
+                {h === "fresh"
+                  ? "Arriving: on schedule"
+                  : h === "late"
+                    ? `Late: past 1.5 times its schedule, or ${pct(VISIT_FAIL_LATE)} of visit reads failing`
+                    : h === "stalled"
+                      ? `Stalled: past 3 times its schedule, or ${pct(VISIT_FAIL_STALLED)} failing`
+                      : "Not measured: no write time or visit"}
+              </span>
+            ))}
+          </div>
+          <DataTable label={`Indexing status on ${chainName(chain)}`} anatomy="Y1" stacked>
+            <DataTableHead>
+              <DataTableHeader label="Protocol" sort={sortBy("name")} />
+              <DataTableHeader label="Status" sort={sortBy("status")} />
+              <DataTableHeader label="Index" sort={sortBy("index")} />
+              <DataTableHeader label="Last write" sort={sortBy("last")} />
+              <DataTableHeader label="Kept current by" />
+            </DataTableHead>
+            <DataTableBody>
+              {lines.map((l) => (
+                <Row key={`${l.cell.key}-${l.cell.chain}`} line={l} now={now} />
+              ))}
+            </DataTableBody>
+          </DataTable>
+          <p className="mt-4 text-xs text-rb-500">
+            From /api/index/{source.route} on the Rails index server, as of {utcTime(asOf)}. The server answers from its
+            stored rows; opening this page reads no chain.
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-rb-500">No Rails explorer on {chainName(chain)} yet.</p>
+      )}
+      <NextTable chain={chain} items={next} />
     </div>
   );
 }

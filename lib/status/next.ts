@@ -40,7 +40,7 @@ export interface NextItem {
 export const NEXT: NextItem[] = [
   {
     key: "cow-l2",
-    name: "CoW Protocol",
+    name: "CoW",
     mark: "cow",
     chains: [8453, 42161],
     stage: "indexing",
@@ -57,7 +57,7 @@ export const NEXT: NextItem[] = [
     mark: "uniswap",
     chains: [8453],
     stage: "planned",
-    why: "Full history on Base, which takes weeks at the free gateway's 1,000 blocks a request.",
+    why: "Full history. Base's free gateway serves 1,000 blocks a request, so it takes weeks.",
     source: { label: "docs.uniswap.org", href: "https://docs.uniswap.org" },
     indexes: [{ protocol: "uniswap-v3", chain: 8453 }],
   },
@@ -67,7 +67,7 @@ export const NEXT: NextItem[] = [
     mark: "aerodrome",
     chains: [8453],
     stage: "planned",
-    why: "Full history on Base, which takes weeks at the free gateway's 1,000 blocks a request.",
+    why: "Full history. Base's free gateway serves 1,000 blocks a request, so it takes weeks.",
     source: { label: "aerodrome.finance", href: "https://aerodrome.finance" },
     indexes: [{ protocol: "aerodrome", chain: 8453 }],
   },
