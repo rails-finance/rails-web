@@ -31,13 +31,18 @@ import {
   bytesWords,
   cellsFromProgress,
   cellsFromStatus,
-  heartbeatAge,
   heartbeatIsWallTime,
   heartbeatState,
   heartbeatTime,
   percentWords,
   pipelineHeartbeat,
   pipelineNewestBlockTime,
+  pipelineState,
+  visitState,
+  writerState,
+  VISIT_FAIL_LATE,
+  VISIT_FAIL_STALLED,
+  type VisitReads,
   statusRows,
   type Heartbeat,
   type IndexProgress,
@@ -108,10 +113,19 @@ function heartbeatLine(e: IndexProgressEntry, now: number): string {
     : `${words}: last planned against the finalized block of ${utcTime(t)}, ${ageWords(now - t)} ago.`;
 }
 
+const pct = (x: number) => `${Math.round(x * 100)}%`;
+
+function visitLine(v: VisitReads | null | undefined): string {
+  if (!v?.lastHourVisits) return "No page visit in the last hour.";
+  const failed = v.failedShare != null ? `, ${pct(v.failedShare)} of reads failed` : "";
+  const p95 = v.p95Ms != null ? `, 95% answered within ${n(Math.round(v.p95Ms))} ms` : "";
+  return `${n(v.lastHourVisits)} visits in the last hour${failed}${p95}.`;
+}
+
 function pipelineLine(e: StatusEntry, now: number): string {
   const t = pipelineHeartbeat(e);
   if (t != null)
-    return `${HEARTBEAT_WORDS[heartbeatAge(t, now)]}: last write at ${utcTime(t)}, ${ageWords(now - t)} ago.`;
+    return `${HEARTBEAT_WORDS[pipelineState(e, now)]}: last write at ${utcTime(t)}, ${ageWords(now - t)} ago.`;
   const b = pipelineNewestBlockTime(e);
   return b != null ? `No write time stored. The newest row is from a block of ${utcTime(b)}.` : "No write time stored.";
 }
@@ -128,13 +142,15 @@ function ChainCell({ c, now }: { c: StatusCell; now: number }) {
     text = percentWords(c.fill);
     muted = c.fill.percent == null && !c.fill.atHead;
   } else if (c.kind === "pipeline" && c.entry) {
-    hb = heartbeatAge(pipelineHeartbeat(c.entry), now);
+    hb = pipelineState(c.entry, now);
     title = pipelineLine(c.entry, now);
     // A roster entry with no `history` is indexed from deployment.
     text = rosterFor(c.key, c.chain)?.history ? "Partial" : "Full";
   } else {
-    title = "No index yet.";
-    text = "Not started";
+    const v = c.entry?.live?.visitReads;
+    hb = visitState(v);
+    title = `No index yet; reads when a page opens. ${visitLine(v)}`;
+    text = "On visit";
     muted = true;
   }
   return (
@@ -144,9 +160,7 @@ function ChainCell({ c, now }: { c: StatusCell; now: number }) {
       title={title}
       data-status-cell={`${c.protocol}-${c.chain}`}
     >
-      {c.kind !== "not-started" && (
-        <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[hb]}`} aria-label={HEARTBEAT_WORDS[hb]} />
-      )}
+      <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[hb]}`} aria-label={HEARTBEAT_WORDS[hb]} />
       <span className={`tabular-nums ${muted ? "text-rb-500" : "text-foreground"}`}>{text}</span>
     </span>
   );
@@ -370,16 +384,17 @@ const laneWords = (lane: string) =>
 function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
   const b = e.backfill;
   const live = e.live;
-  const t = pipelineHeartbeat(e);
-  const hb = b ? heartbeatAge(t, now) : "none";
+  const hb = b ? pipelineState(e, now) : visitState(live?.visitReads);
   return (
     <section>
       <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
-        {b && <span className={`h-2 w-2 rounded-full ${DOT[hb]}`} />}
+        <span className={`h-2 w-2 rounded-full ${DOT[hb]}`} />
         {chainName(e.chain)}
       </h3>
       <p className="mt-1 text-xs text-rb-500">
-        {b ? pipelineLine(e, now) : "No index yet. Its pages read the chain when they open."}
+        {b
+          ? pipelineLine(e, now)
+          : `No index yet. Its pages read the chain when they open. ${visitLine(live?.visitReads)}`}
       </p>
       <dl className="mt-3 flex flex-col gap-y-1.5 text-sm">
         {b && <Figure name="Indexed by" value={pipelineWords(b.pipeline)} source="the server's pipeline table" />}
@@ -429,6 +444,27 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
         {live?.visitReads && (
           <Figure name="Live reads" value={live.visitReads.gateway} source="gateway for reads at the head" />
         )}
+        {live?.visitReads?.lastHourVisits != null && (
+          <Figure
+            name="Last hour"
+            value={
+              <>
+                {visitLine(live.visitReads)}
+                {live.visitReads.byCause && Object.keys(live.visitReads.byCause).length > 0 && (
+                  <span className="text-rb-500">
+                    {" "}
+                    Failed:{" "}
+                    {Object.entries(live.visitReads.byCause)
+                      .map(([k, v]) => `${k.replace(/[-_]/g, " ")} ${n(v)}`)
+                      .join(", ")}
+                    .
+                  </span>
+                )}
+              </>
+            }
+            source="visit tally, hourly"
+          />
+        )}
       </dl>
       {live && live.writers.length > 0 && (
         <div className="mt-4" data-anatomy="Y1.3">
@@ -437,7 +473,13 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
             {live.writers.map((w) => (
               <li key={w.name} className="border-l-2 border-rb-200 pl-3 text-xs dark:border-rb-700">
                 <span className="font-semibold text-foreground">{w.name}</span>
+                <span
+                  className={`ml-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle ${DOT[writerState(w, now)]}`}
+                />
                 <span className="text-rb-500"> · {WRITER_KIND[w.kind] ?? w.kind}</span>
+                {w.expectEverySec ? (
+                  <span className="text-rb-500"> · runs every {ageWords(w.expectEverySec)}</span>
+                ) : null}
                 <div className="mt-0.5 text-rb-500">
                   {w.lastWriteAt ? `Last write ${utcTime(Date.parse(w.lastWriteAt) / 1000)}` : "No write time stored"}
                   {w.newest && ` · newest row at block ${n(w.newest.block)}`}
@@ -588,12 +630,12 @@ export function StatusBoard({ source }: { source: StatusSource }) {
           <span key={h} className="inline-flex items-center gap-1.5">
             <span className={`h-1.5 w-1.5 rounded-full ${DOT[h]}`} />
             {h === "fresh"
-              ? "Wrote within the hour"
+              ? "Data arriving"
               : h === "late"
-                ? "Late, over an hour"
+                ? `Late: past 1.5 times its schedule, or ${pct(VISIT_FAIL_LATE)} of visit reads failing`
                 : h === "stalled"
-                  ? "Stalled, over three hours"
-                  : "No write time stored"}
+                  ? `Stalled: past 3 times its schedule, or ${pct(VISIT_FAIL_STALLED)} failing`
+                  : "No write time or visit to measure"}
           </span>
         ))}
       </div>

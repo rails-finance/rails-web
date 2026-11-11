@@ -121,6 +121,19 @@ export interface StatusWriter {
   kind: "processor" | "copy-worker" | "mv-refresh";
   lastWriteAt: string | null;
   newest: { block: number; time: Secs | null } | null;
+  /** How often the writer runs, from its schedule; null where none is stored. */
+  expectEverySec?: number | null;
+}
+
+/** The last hour of reads made when a page opens (the tier-request tally). */
+export interface VisitReads {
+  gateway: string;
+  lastHourVisits?: number;
+  failedShare?: number | null;
+  byCause?: Record<string, number>;
+  p95Ms?: number | null;
+  bytes?: number;
+  lastVisitAt?: string | null;
 }
 
 export interface StatusBackfill
@@ -135,7 +148,7 @@ export interface StatusLive {
   checkpoint: { block: number; time: Secs | null; updatedAt?: string | null } | null;
   head: { block: number; time: Secs | null } | null;
   writers: StatusWriter[];
-  visitReads: { gateway: string } | null;
+  visitReads: VisitReads | null;
   unreachable?: { error: string };
 }
 
@@ -205,6 +218,38 @@ export function cellsFromStatus(s: IndexStatus, name: (key: string, chain: numbe
       entry,
     };
   });
+}
+
+/** Visit reads: amber from a 10% failure share in the last hour, red from 50%;
+ *  none with no visit in the hour. */
+export const VISIT_FAIL_LATE = 0.1;
+export const VISIT_FAIL_STALLED = 0.5;
+
+export function visitState(v: VisitReads | null | undefined): Heartbeat {
+  if (!v || !v.lastHourVisits || v.failedShare == null) return "none";
+  return v.failedShare >= VISIT_FAIL_STALLED ? "stalled" : v.failedShare >= VISIT_FAIL_LATE ? "late" : "fresh";
+}
+
+/** A writer's state against its schedule: late past 1.5 times its cadence,
+ *  stalled past 3 times; the fixed hour and three hours where no cadence is
+ *  stored. */
+export function writerState(w: StatusWriter, now: Secs): Heartbeat {
+  const t = isoSecs(w.lastWriteAt);
+  if (t == null) return "none";
+  const every = w.expectEverySec;
+  if (!every) return heartbeatAge(t, now);
+  const age = now - t;
+  return age > 3 * every ? "stalled" : age > 1.5 * every ? "late" : "fresh";
+}
+
+const RANK: Record<Heartbeat, number> = { none: 0, fresh: 1, late: 2, stalled: 3 };
+
+/** A pipeline's state: the worst of its writers that stamp a write time, else
+ *  the backfill's heartbeat by the fixed ages. */
+export function pipelineState(e: StatusEntry, now: Secs): Heartbeat {
+  const states = (e.live?.writers ?? []).map((w) => writerState(w, now)).filter((h) => h !== "none");
+  if (states.length) return states.reduce((a, b) => (RANK[b] > RANK[a] ? b : a));
+  return heartbeatAge(isoSecs(e.backfill?.heartbeatAt), now);
 }
 
 /** A pipeline's heartbeat: the backfill's wall time, else the newest write any
