@@ -464,6 +464,26 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "pools", label: "Pools overview", tab: "Pools" }],
   },
   {
+    // Lido on Ethereum (rails-ops ui-jobs 570): a front door taking a wallet
+    // and stating Lido's totals, the wallet's stake (stETH and wstETH) and its
+    // withdrawal requests at `<route>/<wallet>`. A wallet holds one Lido stake,
+    // so its wallet page is its position page. Reads come from rails-server's
+    // at-block routes (lib/api/fetch-lido.ts).
+    id: "lido",
+    session: "lido",
+    label: "Lido",
+    chainId: 1,
+    slug: "lido",
+    // Hue 240, a draft read off Lido's blue mark (public/icons/protocols/lido.png).
+    brand: 240,
+    tags: ["Staking"],
+    desc: "Staked ether on Ethereum: a wallet's stETH and wstETH in ETH, its change over the last 30 days, and its withdrawal requests",
+    positionListing: false,
+    unlaunched: true,
+    readTier: "visit",
+    subPages: [],
+  },
+  {
     id: "liquity-v1",
     session: "liquity-v1",
     label: "Liquity V1",
@@ -1039,6 +1059,8 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "uniswap-v4-arbitrum": "Position",
   "pancakeswap-v3-base": "Position",
   "pancakeswap-v3-arbitrum": "Position",
+  // A wallet's stETH and wstETH; the page names it a stake.
+  lido: "Stake",
 };
 
 /** The listing-tab vocabulary: the position noun pluralised ("Troves",

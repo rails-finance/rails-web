@@ -105,7 +105,10 @@ export type SessionProtocol =
   | "uniswap-v3-arbitrum"
   | "uniswap-v4-arbitrum"
   | "pancakeswap-v3-base"
-  | "pancakeswap-v3-arbitrum";
+  | "pancakeswap-v3-arbitrum"
+  // Lido on Ethereum, at `/ethereum/lido`: a wallet's stake is its stETH
+  // shares and wstETH, with its withdrawal requests (ui-jobs 570).
+  | "lido";
 
 /** What a saved entry is: a wallet, a position page or a listing view. */
 export type SavedKind = "wallet" | "position" | "view";

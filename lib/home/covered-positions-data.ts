@@ -306,6 +306,8 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   "uniswap-v4-arbitrum",
   "pancakeswap-v3-base",
   "pancakeswap-v3-arbitrum",
+  // Lido (ui-jobs 570): a stake carries no debt and no threshold.
+  "lido",
   // Sky Savings, for the same reason: an sUSDS balance carries no debt and no
   // threshold (Miles, 2026-09-29, rails-ops TO-DO-sky-savings-scoping §6.1).
   // It has a listing all the same; this set keeps it out of the count.

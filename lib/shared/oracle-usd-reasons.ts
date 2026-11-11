@@ -52,6 +52,7 @@ export const ORACLE_USD_REASON: Record<string, string> = {
   "uniswap-v4-arbitrum": UNISWAP_REASON,
   "pancakeswap-v3-base": PANCAKESWAP_REASON,
   "pancakeswap-v3-arbitrum": PANCAKESWAP_REASON,
+  lido: "a stake is ETH at Lido's share rate, and Lido runs no USD feed, so every figure is in ETH",
   aerodrome:
     "a pool prices itself: every figure is in the pool's quote token at the pool's price, AERO through Aerodrome's own AERO pools, and Aerodrome runs no USD feed",
 };
