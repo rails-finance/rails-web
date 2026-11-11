@@ -92,7 +92,7 @@ const FOUNDATION: { title: string; detail: string }[] = [
   },
   {
     title: "No modeled state",
-    detail: "every number replayed from the protocol's on-chain events, nothing estimated or interpolated",
+    detail: "every number read from the chain, nothing estimated or interpolated",
   },
   {
     title: "Provenance on every figure",

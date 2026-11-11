@@ -35,7 +35,7 @@ export function StructuredData() {
     "@type": "WebApplication",
     name: "Rails",
     applicationCategory: "FinanceApplication",
-    description: `Dedicated, on-chain-verifiable explorers for ${protocolCount} DeFi protocols on ${chainNames}, plus Polaris on Sepolia, every position replayed from the protocol's on-chain events, with a receipt on every number.`,
+    description: `Dedicated, on-chain-verifiable explorers for ${protocolCount} DeFi protocols on ${chainNames}, plus Polaris on Sepolia, every position read from the chain, with a receipt on every number.`,
     url: SITE_URL,
     operatingSystem: "Web",
     offers: {

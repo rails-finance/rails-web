@@ -213,7 +213,7 @@ function claimText(p: AeroPosition): string | null {
 }
 
 export const penaltyText = (pen: { bps: number; until: number }, reward: string = "AERO"): string =>
-  `Unstaking before ${dayTime(pen.until)} gives up ${pen.bps >= 10_000 ? "all" : feePct(pen.bps * 100)} of the ${reward} to claim.`;
+  `Claiming or unstaking before ${dayTime(pen.until)} gives up ${pen.bps >= 10_000 ? "all" : feePct(pen.bps * 100)} of the ${reward} to claim.`;
 
 /** The pool's two figures: fees per unstaked position, AERO per staked one; the holder's kind first. */
 function poolEarnText(p: AeroPosition): string {
@@ -379,7 +379,7 @@ export function readoutExplainer(p: AeroPosition, order: readonly LineKey[]): Ex
       bullets: [
         ["Each swap pays the pool's fee to the unstaked liquidity in range at that moment."],
         [`Staking a position in the pool's gauge earns ${R}, ${P}'s token, at the rate the gauge pays.`],
-        [`Each week ${R} holders who lock their ${R} vote on how much ${R} each pool's gauge pays out.`],
+        [`Each week ${R} holders who lock their ${R} vote on how much ${R} each pool's gauge pays out the week after.`],
         ["Those voters receive the pool's trading fees from staked liquidity and a share from unstaked liquidity."],
         [`${R} is valued in the pool's quote token through ${P}'s own ${R} pools, at the price now.`],
       ],
