@@ -268,7 +268,7 @@ export function countProv(
     kind: "derived",
     pclass: "emitted",
     source: { block: c.through },
-    summary: `${what}, from Rails's index of the Vault's pool-share Transfer events from block ${n(balChain(c.chainId).firstBlock)} through block ${n(c.through)}.`,
+    summary: `${what}. Counted from Rails's index of the Vault's pool-share Transfer events from block ${n(balChain(c.chainId).firstBlock)} through block ${n(c.through)}.`,
     contract: { name: "Balancer V3 Vault", address: BALANCER_VAULT },
     via: `rails-server · position index through block ${n(c.through)}`,
     inputs: [chain("indexed through", n(c.through)), derived(key, n(key === "positions" ? c.positions : c.holders))],
