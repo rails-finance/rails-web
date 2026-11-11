@@ -6,6 +6,8 @@
 // Each line states one fact from rails-ops reference documents or the
 // protocol's official docs, and `source` names where a reader can check it.
 
+import { ROBINHOOD_CHAIN_ID as ROBINHOOD } from "../shared/chains";
+
 export type NextStage = "indexing" | "building" | "built" | "surveyed" | "planned";
 
 export const NEXT_STAGE_WORDS: Record<NextStage, string> = {
@@ -34,8 +36,6 @@ export interface NextItem {
    *  once every one is at the head in the status table. */
   indexes?: { protocol: string; chain: number }[];
 }
-
-const ROBINHOOD = 4663;
 
 export const NEXT: NextItem[] = [
   {

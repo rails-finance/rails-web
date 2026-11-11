@@ -11,7 +11,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ProtocolIcon, hasProtocolGlyph } from "@/components/icons/protocol-glyphs";
-import { ChainGlyph, HomeOnlyChainGlyph } from "@/components/icons/chain-glyphs";
+import { ChainGlyph } from "@/components/icons/chain-glyphs";
 import {
   DataTable,
   DataTableBody,
@@ -57,9 +57,7 @@ const chainName = (id: number) => CHAINS[id as ChainId]?.name ?? (id === ROBINHO
 /** A chain's mark at the row's size. */
 function ChainMark({ id }: { id: number }) {
   const cls = "h-4 w-4 shrink-0 text-rb-500";
-  if (id in CHAINS) return <ChainGlyph id={id as ChainId} className={cls} />;
-  if (id === ROBINHOOD) return <HomeOnlyChainGlyph id="robinhood" className={cls} />;
-  return null;
+  return id in CHAINS ? <ChainGlyph id={id as ChainId} className={cls} /> : null;
 }
 
 /** The roster entry for a protocol key on a chain, else the key's first entry. */
@@ -357,11 +355,11 @@ const WRITER_KIND: Record<string, string> = {
 
 /** The pipeline's name as the page writes it ("sieve", "processor:x"). */
 const pipelineWords = (p: string) =>
-  p === "sieve" ? "Sieve, from Ethereum peers" : p.startsWith("processor:") ? `Processor ${p.slice(10)}` : p;
+  p === "sieve" ? "Sieve" : p.startsWith("processor:") ? `Processor ${p.slice(10)}` : p;
 
 const laneWords = (lane: string) =>
   lane === "visit-reads"
-    ? "Read on visit"
+    ? "Reads when a page opens"
     : lane.startsWith("sieve:")
       ? `Sieve (${lane.slice(6)})`
       : lane.startsWith("processor:")
