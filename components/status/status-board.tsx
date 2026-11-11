@@ -63,21 +63,15 @@ function heartbeatLine(e: IndexProgressEntry, now: number): string {
 
 function Chip({ e, now }: { e: IndexProgressEntry; now: number }) {
   const hb = heartbeatState(e, now);
-  const pct = e.atHead ? 100 : (e.percent ?? 0);
   return (
     <span
-      className="relative inline-flex items-center gap-1.5 overflow-hidden rounded-full border border-rb-200 py-1 pl-2 pr-2.5 text-xs dark:border-rb-700"
+      className="inline-flex items-center gap-1.5 rounded-full border border-rb-200 py-1 pl-2 pr-2.5 text-xs dark:border-rb-700"
       title={heartbeatLine(e, now)}
       data-status-chip={`${e.protocol}-${e.chain}`}
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT[hb]}`} aria-label={HEARTBEAT_WORDS[hb]} />
       <span className="text-rb-500">{chainName(e.chain)}</span>
       <span className="font-medium tabular-nums text-foreground">{percentWords(e)}</span>
-      <span
-        aria-hidden
-        className={`absolute bottom-0 left-0 h-[2px] ${e.atHead ? "bg-green-500/60" : "bg-rb-400/70"}`}
-        style={{ width: `${pct}%` }}
-      />
     </span>
   );
 }
