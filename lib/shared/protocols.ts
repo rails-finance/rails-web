@@ -524,6 +524,28 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
+    // Velodrome Slipstream on Optimism (rails-ops ui-jobs 578), on Aerodrome's
+    // pages (lib/aerodrome/sites.ts): a front door taking a wallet, its
+    // positions at `<route>/<wallet>`, each opening
+    // `<route>/position/<deployment>/<id>` (ids overlap across the two position
+    // managers). Reads come from rails-server's /api/at-block/velodrome routes.
+    // Unlaunched while Miles reads it.
+    id: "velodrome",
+    session: "velodrome",
+    label: "Velodrome",
+    chainId: 10,
+    slug: "velodrome",
+    // Hue 30, Velodrome's red #FF1100 in oklch (the mark's outer band, from
+    // the favicon on velodrome.finance).
+    brand: 30,
+    tags: ["Liquidity"],
+    desc: "Concentrated liquidity on Optimism, staked or not: a position's range, fees or VELO and pool over the last 30 days",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [],
+  },
+  {
     id: "dolomite",
     session: "dolomite",
     label: "Dolomite",
@@ -1242,6 +1264,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "uniswap-v3": "Position",
   "uniswap-v4": "Position",
   aerodrome: "Position",
+  velodrome: "Position",
   "uniswap-v3-base": "Position",
   "uniswap-v3-arbitrum": "Position",
   "uniswap-v4-arbitrum": "Position",

@@ -297,8 +297,10 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   // is visited; no census of holders is built, and nothing in a pool is a loan.
   "uniswap-v3",
   "uniswap-v4",
-  // Aerodrome Slipstream, for the Uniswap reason (ui-jobs 566).
+  // Aerodrome Slipstream, for the Uniswap reason (ui-jobs 566), and Velodrome
+  // on Optimism (ui-jobs 578).
   "aerodrome",
+  "velodrome",
   // Uniswap on Base and Arbitrum and PancakeSwap V3, for the same reason
   // (ui-jobs 568, 573, 575).
   "uniswap-v3-base",

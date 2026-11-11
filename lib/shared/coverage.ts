@@ -966,6 +966,15 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
       why: "a liquidity position holds no loan, so there is no threshold to breach and no liquidation to trace",
     },
   }),
+  // Velodrome Slipstream on Optimism (ui-jobs 578), Aerodrome's row on
+  // Aerodrome's pages. Unlaunched, so the matrix does not draw it yet.
+  velodrome: explorerDepth({
+    dashboard: true,
+    oracleUsd: { why: ORACLE_USD_REASON.velodrome },
+    forensics: {
+      why: "a liquidity position holds no loan, so there is no threshold to breach and no liquidation to trace",
+    },
+  }),
   // Lido on Ethereum (ui-jobs 570): the stake page reads stETH, wstETH and
   // the withdrawal queue at the head and 30 days back.
   lido: explorerDepth({
@@ -1581,6 +1590,8 @@ export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
   "uniswap-v4",
   // Aerodrome Slipstream (ui-jobs 566), position-first as Uniswap is.
   "aerodrome",
+  // Velodrome Slipstream on Optimism (ui-jobs 578), as Aerodrome.
+  "velodrome",
   // Uniswap on Base and Arbitrum and PancakeSwap V3 (ui-jobs 568, 573, 575),
   // position-first as Uniswap is on Ethereum.
   "uniswap-v3-base",
@@ -1855,6 +1866,8 @@ export const COVERAGE_NOTES: Record<string, string> = {
     "A PancakeSwap V3 pool prices its two tokens against each other and PancakeSwap runs no USD feed, so every figure is in the pool's quote token at the pool's price, and CAKE in CAKE; a liquidity position holds no loan, so there is no liquidation to trace.",
   aerodrome:
     "An Aerodrome Slipstream pool prices its two tokens against each other and Aerodrome runs no USD feed, so every figure is in the pool's quote token at the pool's price, and AERO is priced through Aerodrome's own AERO pools; a liquidity position holds no loan, so there is no liquidation to trace.",
+  velodrome:
+    "A Velodrome Slipstream pool prices its two tokens against each other and Velodrome runs no USD feed, so every figure is in the pool's quote token at the pool's price, and VELO is priced through Velodrome's own VELO pools; a liquidity position holds no loan, so there is no liquidation to trace. On Optimism, Rails does not yet name the wallet that staked a position. There is no listing, history or holder count until Rails indexes Velodrome on Optimism.",
   lido: "Lido accounts each holder's stake in stETH shares, and one wstETH is one share, so a stake is valued in ETH at Lido's share rate, which moves at each oracle report; Lido runs no USD feed. A wallet's withdrawal requests are listed by the withdrawal queue for their owner. A stake holds no loan, so there is no liquidation to trace.",
   "morpho-arc":
     "Morpho Blue on Arc is the same contract as on Ethereum, Base and Arbitrum, read a different way. Rails lists the markets from Morpho's CreateMarket log, and each page reads the markets and the wallet's position in each when it opens. A position page reads the position and its market again at the UTC midnight 30 days before, so the interest over those 30 days is stated where the shares are the same at both. Each market's oracle prices the collateral in its loan token; a dollar figure takes the loan token at its Chainlink feed on Arc, and a market whose loan token has none there stays in that token. There is no listing, history or liquidation record until Rails indexes Morpho Blue on Arc.",

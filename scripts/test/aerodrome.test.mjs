@@ -389,3 +389,71 @@ test("no em dash, no restricted words, sentence case on every face string", () =
     assert.doesNotMatch(words, /\b(fold|footgun|honest|itself|actually|exactly)\b/i);
   }
 });
+
+// ── Velodrome on Optimism: the same modules on Velodrome's site (lib/aerodrome/sites.ts, ui-jobs 578) ──
+const { VELODROME, AERODROME, siteOf } = await import("../../lib/aerodrome/sites.ts");
+const { depositorLimit, notIndexed, frontDoorWords, POSITION_PAGE } = await import("../../lib/aerodrome/words.ts");
+const OP_USDC = { address: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", symbol: "USDC", decimals: 6 };
+const VELO = { address: "0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db", symbol: "VELO", decimals: 18 };
+/** VELO/USDC at 0.025 USDC and VELO/WETH at 0.00001 WETH, VELO token1 in both, as on chain. */
+const VELO_LEGS = {
+  usdc: {
+    ...LEGS.usdc,
+    pool: VELODROME.rewardPools.usdc,
+    token0: OP_USDC.address,
+    token1: VELO.address,
+    now: { reserve0: (BigInt(50_000) * BigInt(1e6)).toString(), reserve1: (BigInt(2_000_000) * E18).toString() },
+  },
+  weth: {
+    ...LEGS.weth,
+    pool: VELODROME.rewardPools.weth,
+    token1: VELO.address,
+    now: { reserve0: (BigInt(10) * E18).toString(), reserve1: (BigInt(1_000_000) * E18).toString() },
+  },
+};
+/** The staked position on Optimism: no depositor and no earned(), as rails-server answers off Base. */
+const veloStaked = () =>
+  staked({ chainId: 10, deployment: "gv2", token1: OP_USDC, aero: VELO_LEGS }, { depositor: null, earned: null });
+
+test("Velodrome: the site by chain, VELO priced through Velodrome's legs, claimable from the reads", () => {
+  assert.equal(siteOf(10), VELODROME);
+  assert.equal(siteOf(8453), AERODROME);
+  assert.equal(siteOf(undefined), AERODROME);
+  const p = aeroPosition(veloStaked());
+  assert.equal(p.site, VELODROME);
+  assert.equal(p.aeroPrice.route.via, "usdc-leg");
+  close(p.aeroPrice.price, 0.025);
+  // Base's USDC is no quote here: the same read on Optimism's legs prices against Optimism's USDC.
+  assert.equal(aeroInQuote(veloStaked(), WETH, USDC, 3000, VELODROME).route.via, "weth-then-pool");
+  assert.equal(p.holder, null);
+  assert.equal(p.aero.claimableFrom, "arithmetic");
+  close(p.aero.claimable, p.aero.claimableArithmetic);
+});
+
+test("Velodrome: the words name VELO, Velodrome and Optimism, and state the staked limit and the missing index", () => {
+  const p = aeroPosition(veloStaked());
+  const lines = readoutLines(p);
+  const words = [
+    POSITION_PAGE.title(p),
+    POSITION_PAGE.sub(p),
+    ...lines.flatMap((l) => [l.label, l.yours, l.pool]),
+    ...readoutExplainer(
+      p,
+      lines.map((l) => l.key),
+    ).flatMap((g) => [g.title, ...g.bullets.flat()]),
+    ...cardExplainer(p).flatMap((g) => [g.title, ...g.bullets.flat()]),
+    ...Object.values(frontDoorWords(VELODROME)).filter((v) => typeof v === "string"),
+  ]
+    .filter(Boolean)
+    .map((s) => (typeof s === "string" ? s : s.fig))
+    .join("\n");
+  assert.doesNotMatch(words, /\bAERO\b|Aerodrome|\bBase\b/);
+  assert.match(words, /VELO/);
+  assert.match(POSITION_PAGE.sub(p), /Slipstream \(gauges v2\) · .* · Optimism · staked$/);
+  assert.match(depositorLimit(VELODROME), /^On Optimism, Rails does not yet name the wallet that staked a position/);
+  assert.equal(depositorLimit(AERODROME), null);
+  assert.match(notIndexed(VELODROME, "position"), /^Not indexed yet on Optimism/);
+  assert.equal(notIndexed(AERODROME, "wallet"), null);
+  assert.doesNotMatch(words, /—/);
+  assert.doesNotMatch(words, /\b(fold|footgun|honest|itself|actually|exactly)\b/i);
+});

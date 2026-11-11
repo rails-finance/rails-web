@@ -1,5 +1,6 @@
-// A wallet's Aerodrome Slipstream positions on Base (U3; rails-ops ui-jobs
-// 566), at `/base/aerodrome/<wallet>`: the positions that hold liquidity,
+// A wallet's Slipstream positions on a site (U3; rails-ops ui-jobs 566, 578),
+// at `<site route>/<wallet>`: Aerodrome on Base, Velodrome on Optimism. The
+// positions that hold liquidity,
 // staked in a gauge on the wallet's behalf or held by it, each row saying
 // which and opening its page. Ids and pairs only: each position's page
 // carries the figures and their receipts. The layout is Uniswap's
@@ -14,16 +15,25 @@ import { isWallet } from "@/components/protocol/uniswap/uniswap-wallet-positions
 import { poolTokenKeys } from "@/components/protocol/uniswap/pool-focus-keys";
 import { PoolWalletList } from "@/components/protocol/uniswap/pool-wallet-list";
 import { fetchAerodromePositions } from "@/lib/api/fetch-aerodrome";
-import { FRONT_DOOR } from "@/lib/aerodrome/words";
+import { AERODROME, type SlipstreamSite } from "@/lib/aerodrome/sites";
+import { frontDoorWords, notIndexed } from "@/lib/aerodrome/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { explorerHref } from "@/lib/shared/protocols";
 
-export async function AerodromeWalletPositions({ wallet: raw }: { wallet: string }) {
+export async function AerodromeWalletPositions({
+  wallet: raw,
+  site = AERODROME,
+}: {
+  wallet: string;
+  site?: SlipstreamSite;
+}) {
   if (!isWallet(raw)) notFound();
   const wallet = raw.toLowerCase();
-  const session = "aerodrome";
-  const home = explorerHref(8453, session);
-  const answer = await fetchAerodromePositions(wallet);
+  const session = site.id;
+  const chain = site.chainId;
+  const FRONT_DOOR = frontDoorWords(site);
+  const home = explorerHref(chain, session);
+  const answer = await fetchAerodromePositions(wallet, site);
   const all = answer.kind === "ok" ? answer.data.positions : [];
   return (
     <div className="py-8" data-anatomy="U3" data-aerodrome-wallet={wallet}>
@@ -33,7 +43,7 @@ export async function AerodromeWalletPositions({ wallet: raw }: { wallet: string
           fallbackHref={home}
           showStamp={false}
           priceReason={ORACLE_USD_REASON[session]}
-          owner={{ wallet, chain: 8453, filterProtocol: null }}
+          owner={{ wallet, chain, filterProtocol: null }}
           tools={false}
         />
         <HistoryTitleRow id={session}>
@@ -54,8 +64,8 @@ export async function AerodromeWalletPositions({ wallet: raw }: { wallet: string
             href: `${home}/position/${p.deployment}/${p.id}`,
             label: FRONT_DOOR.row(p),
             sub: p.staked ? FRONT_DOOR.staked : FRONT_DOOR.unstaked,
-            keys: poolTokenKeys(8453, [p.token0, p.token1]),
-            chain: 8453,
+            keys: poolTokenKeys(chain, [p.token0, p.token1]),
+            chain,
             attrs: {
               "data-aerodrome-position-row": `${p.deployment}:${p.id}`,
               "data-staked": p.staked ? "true" : "false",
@@ -65,6 +75,11 @@ export async function AerodromeWalletPositions({ wallet: raw }: { wallet: string
       )}
       {answer.kind === "ok" && answer.data.truncated && (
         <p className="mt-3 text-sm text-rb-500">{FRONT_DOOR.truncated}</p>
+      )}
+      {notIndexed(site, "wallet") && (
+        <p className="mt-6 text-sm text-rb-500" data-not-indexed={site.chainName.toLowerCase()}>
+          {notIndexed(site, "wallet")}
+        </p>
       )}
     </div>
   );
