@@ -109,6 +109,11 @@ interface FilterDropdownProps {
   align?: "left" | "right";
   /** Override the default list-filter icon shown in minimal/multi mode. */
   triggerIcon?: React.ReactNode;
+  /** Multi mode: draw no glyph in the trigger (a name already says what the control is). */
+  noTriggerIcon?: boolean;
+  /** Multi mode: the words at rest in place of "All", and the narrowed trigger reads the
+   *  selected labels in place of a count badge. */
+  restLabel?: string;
   /** Minimal mode: print `label` beside the icon from sm up, and give the trigger a
    *  hover tooltip. For a control whose icon alone does not say what it does. */
   showLabel?: boolean;
@@ -144,6 +149,8 @@ export function FilterDropdown({
   trigger,
   align = "left",
   triggerIcon,
+  noTriggerIcon = false,
+  restLabel,
   showLabel = false,
   triggerTitle,
   variant = "ghost",
@@ -198,7 +205,7 @@ export function FilterDropdown({
 
   // Build trigger label: "All", or "X, Y, and N more" when many selected
   const selectedLabels = (() => {
-    if (isAll) return "All";
+    if (isAll) return restLabel ?? "All";
     const labels = options.filter((o) => selectedSet.has(o.key)).map((o) => o.label);
     if (labels.length <= 2) return labels.join(", ");
     return `${labels.slice(0, 2).join(", ")}, and ${labels.length - 2} more`;
@@ -257,7 +264,7 @@ export function FilterDropdown({
               variant === "button" ? "h-7 gap-2 px-2.5 rounded-md text-xs" : "gap-1.5 px-2 py-1 rounded text-xs"
             }`}
           >
-            {(minimal || multi) && (triggerIcon ?? <ListFilterIcon size={12} />)}
+            {(minimal || multi) && !(multi && noTriggerIcon) && (triggerIcon ?? <ListFilterIcon size={12} />)}
             {/* A single pick at rest shows its glyph where it has one. */}
             {!minimal && !multi && isAll && triggerIcon}
             {minimal && showLabel && <span className="hidden sm:inline">{label}</span>}
@@ -269,7 +276,7 @@ export function FilterDropdown({
                 return sel?.icon ? <span className="shrink-0">{sel.icon}</span> : null;
               })()}
             {!minimal &&
-              (multi && !isAll ? (
+              (multi && !isAll && restLabel === undefined ? (
                 <span className={COUNT_BADGE}>{selectedSet.size}</span>
               ) : (
                 <span className="max-w-[240px] truncate">{selectedLabels}</span>
