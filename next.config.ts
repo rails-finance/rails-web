@@ -149,6 +149,8 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/fluid-base", "/base/fluid"],
   // Morpho Blue on Arc never had a pre-0016 path; the row is for check:routes.
   ["/morpho-arc", "/arc/morpho"],
+  // Morpho Blue on Optimism never had a pre-0016 path; the row is for check:routes.
+  ["/morpho-optimism", "/optimism/morpho"],
   // Aave V4 on Arc never had a pre-0016 path; the row is for check:routes.
   ["/aave-v4-arc", "/arc/aave-v4"],
   // Aave V3 on Optimism never had a pre-0016 path; the row is for check:routes.

@@ -314,6 +314,8 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   "fluid-base",
   // Morpho Blue on Arc: no census of positions (ui-jobs 577).
   "morpho-arc",
+  // Morpho Blue on Optimism: no census of positions (ui-jobs 578).
+  "morpho-optimism",
   // Aave V4 on Arc: no census of accounts (ui-jobs 577).
   "aave-v4-arc",
   // Aave V3 on Optimism: no census of accounts (ui-jobs 578).

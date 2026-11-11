@@ -996,6 +996,16 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
       why: "liquidations are events, and history waits until Rails indexes Morpho Blue on Arc",
     },
   }),
+  // Morpho Blue on Optimism (ui-jobs 578): Arc's reads on Optimism's
+  // deployment. Unlaunched, so the matrix does not draw it yet.
+  "morpho-optimism": explorerDepth({
+    dashboard: true,
+    oracleUsd: { why: ORACLE_USD_REASON["morpho-optimism"] },
+    views: true,
+    forensics: {
+      why: "liquidations are events, and history waits until Rails indexes Morpho Blue on Optimism",
+    },
+  }),
   // Aave V4 on Arc (ui-jobs 577): the account page reads the spoke account at
   // the head and its balances 30 days back; Markets, a spoke's reserves and
   // Hubs read every reserve at the head. Unlaunched, so the matrix does not
@@ -1594,6 +1604,8 @@ export const EXPLORERS_WITHOUT_LISTING = new Set<string>([
   "fluid-base",
   // Morpho Blue on Arc (ui-jobs 577): a wallet's positions on the front door.
   "morpho-arc",
+  // Morpho Blue on Optimism (ui-jobs 578): a wallet's positions on the front door.
+  "morpho-optimism",
   // Aave V4 on Arc (ui-jobs 577): a wallet's spoke accounts on the front door.
   "aave-v4-arc",
   // Aave V3 on Optimism (ui-jobs 578): a wallet's account on the front door.
@@ -1728,6 +1740,8 @@ export const VIEW_NOTES: Record<string, string> = {
     "The Base Pool's full reserve roster (sizes, rates, risk configuration and oracle prices), with every risk parameter decoded from the reserve's configuration.",
   "morpho-arc":
     "Every market Morpho Blue has created on Arc, from its CreateMarket log, read at the block the page opens: grouped by the token each lends, with sizes, rates and utilisation.",
+  "morpho-optimism":
+    "Every market Morpho Blue has created on Optimism, from its CreateMarket log, read at the block the page opens: grouped by the token each lends, with sizes, rates and utilisation.",
   "morpho-arbitrum":
     "The census's 258 markets, read at one block: the funded ones in dollar stables or WETH ranked by supply in dollars, the rest listed in their loan tokens.",
   "aave-v3-arbitrum":
@@ -1858,6 +1872,8 @@ export const COVERAGE_NOTES: Record<string, string> = {
   lido: "Lido accounts each holder's stake in stETH shares, and one wstETH is one share, so a stake is valued in ETH at Lido's share rate, which moves at each oracle report; Lido runs no USD feed. A wallet's withdrawal requests are listed by the withdrawal queue for their owner. A stake holds no loan, so there is no liquidation to trace.",
   "morpho-arc":
     "Morpho Blue on Arc is the same contract as on Ethereum, Base and Arbitrum, read a different way. Rails lists the markets from Morpho's CreateMarket log, and each page reads the markets and the wallet's position in each when it opens. A position page reads the position and its market again at the UTC midnight 30 days before, so the interest over those 30 days is stated where the shares are the same at both. Each market's oracle prices the collateral in its loan token; a dollar figure takes the loan token at its Chainlink feed on Arc, and a market whose loan token has none there stays in that token. There is no listing, history or liquidation record until Rails indexes Morpho Blue on Arc.",
+  "morpho-optimism":
+    "Morpho Blue on Optimism is the same contract as on Ethereum, Base and Arbitrum, read a different way. Rails lists the markets from Morpho's CreateMarket log, and each page reads the markets and the wallet's position in each when it opens. A position page reads the position and its market again at the UTC midnight 30 days before, so the interest over those 30 days is stated where the shares are the same at both. Each market's oracle prices the collateral in its loan token; a dollar figure takes the loan token at its Chainlink feed on Optimism, or at Aave V3's oracle there for a token with no feed, and a market whose loan token has neither stays in that token. There is no listing, history or liquidation record until Rails indexes Morpho Blue on Optimism.",
   "fluid-base": `Fluid on Base is the same protocol as on Ethereum, read a different way. Each page reads the position and its vault from Fluid's VaultResolver when it opens, and again at the UTC midnight 30 days before, so the interest over those 30 days comes from the vault's exchange prices at the two blocks. Collateral and debt are stated in the vault's tokens, and the ratio in the vault oracle's debt-per-collateral price, the figure the liquidation engine judges. ${FLUID_BASE_DOLLARS ? "Fluid runs no USD feed, so a side's dollar value comes from the Aave V3 Base oracle at the same block, and a side Aave does not list, or a side held as DEX pool shares, stays in its own unit." : "Fluid runs no USD feed, so no figure is in dollars."} There is no listing, history or liquidation record until Rails indexes Fluid on Base.`,
   "aave-v3-optimism":
     "Aave V3 on Optimism is the same protocol as on Ethereum, Base and Arbitrum: one Pool holding every reserve, with its own reserves, risk settings and oracle. Each page reads the Pool, the oracle and Aave's UiPoolDataProvider when it opens. An account page reads the account's balances, health factor and eMode category at that block, and its balances and each reserve's interest index again at the UTC midnight 30 days before, so the interest over those 30 days is stated where the balance did not move in between. Every dollar figure is a balance at Aave's oracle price at the same block. There is no listing, history, holder ranking or liquidation record until Rails indexes Aave V3 on Optimism.",

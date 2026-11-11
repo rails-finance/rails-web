@@ -258,6 +258,23 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
+    // Morpho Blue on Optimism (rails-ops ui-jobs 578), Arc's pages on
+    // Optimism's deployment, fed by rails-server's /api/at-block/morpho-optimism
+    // routes. Unlaunched while Miles reads it.
+    id: "morpho-optimism",
+    session: "morpho-optimism",
+    label: "Morpho Blue",
+    chainId: 10,
+    slug: "morpho",
+    protocolKey: "morpho",
+    tags: ["Lend", "Borrow"],
+    desc: "Morpho Blue on Optimism: a wallet's positions across every market, each with its collateral, debt and LTV against the market's line, and 30 days of interest",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+  },
+  {
     id: "aave-v4",
     session: "aave-v4",
     label: "Aave V4",
@@ -1215,6 +1232,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   "morpho-base": "Position",
   "morpho-arbitrum": "Position",
   "morpho-arc": "Position",
+  "morpho-optimism": "Position",
   spark: "Position",
   compound: "Position",
   "compound-base": "Position",

@@ -1,7 +1,8 @@
-// A wallet's Morpho Blue positions on Arc (U3; rails-ops ui-jobs 577), at
-// `/arc/morpho/<wallet>`: each market the wallet holds a position in, with its
-// collateral, debt or supply in dollars where Arc has a feed for the loan
-// token, and its LTV, each opening the position's page. The layout is Aave V4
+// A wallet's Morpho Blue positions read on visit (U3; rails-ops ui-jobs 577 and
+// 578), at `/arc/morpho/<wallet>` or `/optimism/morpho/<wallet>`: each market the
+// wallet holds a position in, with its collateral, debt or supply in dollars
+// where the chain has a price for the loan token, and its LTV, each opening the
+// position's page. The layout is Aave V4
 // on Arc's (components/protocol/aave-v4-arc/aave-v4-arc-wallet.tsx).
 //
 // SERVER-ONLY: the read uses the bearer token.
@@ -13,13 +14,17 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { Prov } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { MorphoArcReceipts } from "@/components/protocol/morpho-arc/morpho-arc-receipts";
+import { MorphoAtBlockReceipts } from "@/components/protocol/morpho-at-block/morpho-at-block-receipts";
 import { ROW } from "@/components/protocol/uniswap/uniswap-wallet-positions";
-import { fetchMorphoArcWallet } from "@/lib/api/fetch-morpho-arc";
-import { morphoArcWalletPositions, type ArcMorphoFigures } from "@/lib/morpho-arc/position";
-import { morphoArcProv, type MorphoArcReceiptContext } from "@/lib/morpho-arc/provenance";
-import { MORPHO_ARC_ROUTE, MORPHO_ARC_SESSION, isArcWallet, type ArcMorphoWalletRead } from "@/lib/morpho-arc/types";
-import { amount, CARD_WORDS, FRONT_DOOR, pairName, pctText, usd } from "@/lib/morpho-arc/words";
+import { fetchMorphoAtBlockWallet } from "@/lib/api/fetch-morpho-at-block";
+import { morphoAtBlockWalletPositions, type MorphoAtBlockFigures } from "@/lib/morpho-at-block/position";
+import { morphoAtBlockProv, type MorphoAtBlockReceiptContext } from "@/lib/morpho-at-block/provenance";
+import {
+  isMorphoWallet,
+  type MorphoAtBlockDeployment,
+  type MorphoAtBlockWalletRead,
+} from "@/lib/morpho-at-block/types";
+import { amount, CARD_WORDS, frontDoorWords, pairName, pctText, usd } from "@/lib/morpho-at-block/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 
 function Figure({
@@ -30,7 +35,7 @@ function Figure({
   valueUsd,
   unit,
 }: {
-  c: MorphoArcReceiptContext;
+  c: MorphoAtBlockReceiptContext;
   usdKey: "usd-collateral" | "usd-debt" | "usd-supplied";
   unitKey: "collateral" | "debt" | "supplied";
   value: number;
@@ -38,13 +43,13 @@ function Figure({
   unit: string;
 }) {
   return valueUsd != null ? (
-    <Prov info={morphoArcProv(usdKey, c)}>{usd(valueUsd)}</Prov>
+    <Prov info={morphoAtBlockProv(usdKey, c)}>{usd(valueUsd)}</Prov>
   ) : (
-    <Prov info={morphoArcProv(unitKey, c)}>{amount(value, unit)}</Prov>
+    <Prov info={morphoAtBlockProv(unitKey, c)}>{amount(value, unit)}</Prov>
   );
 }
 
-function rowFigures(f: ArcMorphoFigures, c: MorphoArcReceiptContext) {
+function rowFigures(f: MorphoAtBlockFigures, c: MorphoAtBlockReceiptContext) {
   const parts: React.ReactNode[] = [];
   if (f.collateral > 0 && f.collateralToken)
     parts.push(
@@ -84,25 +89,27 @@ function rowFigures(f: ArcMorphoFigures, c: MorphoArcReceiptContext) {
   if (f.ltv != null)
     parts.push(
       <span key="l">
-        {CARD_WORDS.ltv} <Prov info={morphoArcProv("ltv", c)}>{pctText(f.ltv, 1)}</Prov>
+        {CARD_WORDS.ltv} <Prov info={morphoAtBlockProv("ltv", c)}>{pctText(f.ltv, 1)}</Prov>
       </span>,
     );
   return parts.flatMap((p, i) => (i ? [" · ", p] : [p]));
 }
 
-export async function MorphoArcWallet({ wallet: raw }: { wallet: string }) {
-  if (!isArcWallet(raw)) notFound();
+export async function MorphoAtBlockWallet({ dep, wallet: raw }: { dep: MorphoAtBlockDeployment; wallet: string }) {
+  if (!isMorphoWallet(raw)) notFound();
   const wallet = raw.toLowerCase();
-  const session = MORPHO_ARC_SESSION;
-  const answer = await fetchMorphoArcWallet(wallet);
-  const r: ArcMorphoWalletRead | null = answer.kind === "ok" ? answer.data : null;
-  const rows = r ? morphoArcWalletPositions(r) : [];
+  const session = dep.session;
+  const FRONT_DOOR = frontDoorWords(dep);
+  const hook = (name: string, value: string) => ({ [`data-morpho-${dep.key}-${name}`]: value });
+  const answer = await fetchMorphoAtBlockWallet(dep, wallet);
+  const r: MorphoAtBlockWalletRead | null = answer.kind === "ok" ? answer.data : null;
+  const rows = r ? morphoAtBlockWalletPositions(r) : [];
   return (
-    <div className="py-8" data-anatomy="U3" data-morpho-arc-wallet={wallet}>
+    <div className="py-8" data-anatomy="U3" {...hook("wallet", wallet)}>
       <header className="mb-5">
         <DetailTopRow
           session={session}
-          fallbackHref={MORPHO_ARC_ROUTE}
+          fallbackHref={dep.route}
           showStamp={false}
           priceReason={ORACLE_USD_REASON[session]}
           owner={{ wallet, filterProtocol: null }}
@@ -116,22 +123,18 @@ export async function MorphoArcWallet({ wallet: raw }: { wallet: string }) {
       {!r ? (
         <p className="text-sm text-rb-500">{FRONT_DOOR.unanswered}</p>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-rb-500" data-morpho-arc-none="">
+        <p className="text-sm text-rb-500" {...hook("none", "")}>
           {FRONT_DOOR.none}
         </p>
       ) : (
-        <MorphoArcReceipts scopeId="morpho-arc-wallet">
+        <MorphoAtBlockReceipts scopeId={`${dep.session}-wallet`}>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {rows.map((f) => {
               const m = r.positions.find((x) => x.id === f.id)!;
-              const c: MorphoArcReceiptContext = { f, m, p: m.position, head: r.head };
+              const c: MorphoAtBlockReceiptContext = { dep, f, m, p: m.position, head: r.head };
               return (
                 <li key={f.id}>
-                  <Link
-                    href={`${MORPHO_ARC_ROUTE}/${wallet}/${f.id}`}
-                    className={ROW}
-                    data-morpho-arc-position-row={f.id}
-                  >
+                  <Link href={`${dep.route}/${wallet}/${f.id}`} className={ROW} {...hook("position-row", f.id)}>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-foreground">{pairName(f)}</span>
                       <span className="block text-xs text-rb-500">{FRONT_DOOR.rowSub(f)}</span>
@@ -146,7 +149,7 @@ export async function MorphoArcWallet({ wallet: raw }: { wallet: string }) {
               );
             })}
           </ul>
-        </MorphoArcReceipts>
+        </MorphoAtBlockReceipts>
       )}
       <ProvInspectorLayer />
     </div>

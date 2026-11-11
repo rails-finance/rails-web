@@ -36,6 +36,8 @@ export const ORACLE_USD_REASON: Record<string, string> = {
     "prices are in the market's loan token (each market's oracle quotes the collateral in it), so the loan token has no price; Morpho Blue has no USD oracle",
   "morpho-arbitrum":
     "prices are in the market's loan token, which each market's oracle quotes the collateral in; Morpho Blue has no USD oracle, so the wallet's dollar totals convert the loan token at the Aave V3 Arbitrum oracle's price",
+  "morpho-optimism":
+    "each market's oracle prices the collateral in its loan token, and Morpho Blue has no USD oracle, so a dollar value takes the loan token at its Chainlink feed on Optimism, or at Aave V3's oracle there for a token with no feed, at the block the page reads; a loan token with neither stays in its unit",
   "morpho-arc":
     "each market's oracle prices the collateral in its loan token, and Morpho Blue has no USD oracle, so a dollar value takes the loan token at its Chainlink feed on Arc at the block the page reads; a loan token with no feed there stays in its unit",
   "morpho-base":

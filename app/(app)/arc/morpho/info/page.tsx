@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage, type InfoReads, type InfoView } from "@/components/shared/protocol-info-page";
 import { MORPHO_INFO_SHARED } from "@/components/protocol/morpho/morpho-info";
-import { MORPHO_ARC_CONTRACTS, MORPHO_ARC_ROUTE } from "@/lib/morpho-arc/types";
+import { MORPHO_ARC } from "@/lib/morpho-at-block/types";
 import { ARC_CHAIN_ID } from "@/lib/shared/chains";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -26,7 +26,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
       <>
         <p>
           Enter a wallet address or ENS name on the{" "}
-          <Link href={MORPHO_ARC_ROUTE} className={INLINE_LINK}>
+          <Link href={MORPHO_ARC.route} className={INLINE_LINK}>
             front door
           </Link>{" "}
           to see the markets it lends to, borrows from or holds collateral in.
@@ -53,7 +53,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <p>
         The{" "}
-        <Link href={`${MORPHO_ARC_ROUTE}/markets`} className={INLINE_LINK}>
+        <Link href={`${MORPHO_ARC.route}/markets`} className={INLINE_LINK}>
           markets overview
         </Link>{" "}
         groups every market Morpho Blue has created on Arc by the token it lends, with each group&apos;s supply,
@@ -69,13 +69,13 @@ const reads: InfoReads = {
   contracts: [
     {
       name: "Morpho Blue",
-      address: MORPHO_ARC_CONTRACTS.morpho,
+      address: MORPHO_ARC.contracts.morpho,
       reads:
         "each market's supplied and borrowed totals, its last update and its fee, and a wallet's supply, borrowing and collateral in each market. Its log of created markets is the list of every market.",
     },
     {
       name: "AdaptiveCurveIRM",
-      address: MORPHO_ARC_CONTRACTS.adaptiveCurveIrm,
+      address: MORPHO_ARC.contracts.adaptiveCurveIrm,
       reads: "each market's borrow rate and its rate at target, the rate the curve sets at 90% utilisation.",
     },
     {
@@ -105,7 +105,7 @@ export default function InfoPage() {
           The Rails Morpho Blue explorer on Arc shows any wallet&apos;s positions across every market: the collateral,
           the debt or the supply, the LTV against the market&apos;s line and the interest over the last 30 days. It also
           shows{" "}
-          <Link href={`${MORPHO_ARC_ROUTE}/markets`} className={INLINE_LINK}>
+          <Link href={`${MORPHO_ARC.route}/markets`} className={INLINE_LINK}>
             the markets
           </Link>
           .

@@ -1,7 +1,8 @@
-// Morpho Blue on Arc's market pages (rails-ops ui-jobs 577): rails-server's
-// markets and market answers in the shapes the shared Morpho pages draw
-// (lib/morpho/roster.tsx, lib/morpho/product.tsx), so /arc/morpho/markets and
-// a market's page are Ethereum's, Base's and Arbitrum's pages on Arc's read.
+// The market pages of Morpho Blue read on visit, Arc's and Optimism's (rails-ops
+// ui-jobs 577 and 578): rails-server's markets and market answers in the shapes
+// the shared Morpho pages draw (lib/morpho/roster.tsx, lib/morpho/product.tsx),
+// so /arc/morpho/markets, /optimism/morpho/markets and a market's page are
+// Ethereum's, Base's and Arbitrum's pages on the chain's read.
 // Totals are as Blue stored them, the roster's rule
 // (lib/sources/chain/morpho-markets.ts). Pure.
 
@@ -15,18 +16,22 @@ import type { MorphoOracleFeed } from "@/lib/api/fetch-morpho-position";
 import type { MorphoRosterMarks } from "@/lib/morpho/markets-shape";
 import { atRateCeiling, fullyBorrowedShare } from "@/lib/vaults/illiquid";
 import type {
-  ArcMorphoMarket,
-  ArcMorphoMarketRead,
-  ArcMorphoMarketsRead,
-  ArcMorphoToken,
-} from "@/lib/morpho-arc/types";
-import { ZERO_ADDRESS } from "@/lib/morpho-arc/types";
-import { listedMarkets } from "@/lib/morpho-arc/unlisted";
+  MorphoAtBlockMarket,
+  MorphoAtBlockMarketRead,
+  MorphoAtBlockMarketsRead,
+  MorphoAtBlockToken,
+} from "@/lib/morpho-at-block/types";
+import { ZERO_ADDRESS } from "@/lib/morpho-at-block/types";
+import { listedMarkets } from "@/lib/morpho-at-block/unlisted";
 
 const YEAR = 31_536_000;
 const scale = (raw: string, decimals: number) => Number(raw) / 10 ** decimals;
 
-function row(m: ArcMorphoMarket, createdBlock: number, tokens: Record<string, ArcMorphoToken>): MorphoMarketRow | null {
+function row(
+  m: MorphoAtBlockMarket,
+  createdBlock: number,
+  tokens: Record<string, MorphoAtBlockToken>,
+): MorphoMarketRow | null {
   const s = m.state;
   if (!s) return null;
   const loan = tokens[m.loanToken];
@@ -67,7 +72,7 @@ function row(m: ArcMorphoMarket, createdBlock: number, tokens: Record<string, Ar
 }
 
 /** The markets answer as the roster's response. Every figure is chain-read at `head.block`. */
-export function arcMarketsResponse(r: ArcMorphoMarketsRead): MorphoMarketsChainResponse {
+export function atBlockMarketsResponse(r: MorphoAtBlockMarketsRead): MorphoMarketsChainResponse {
   // The markets rails-server marks unlisted (a test token, no supply ever) stay off the list and
   // its counts; each keeps its page.
   const rows = listedMarkets(r.markets).flatMap((m) => {
@@ -115,7 +120,8 @@ export function arcMarketsResponse(r: ArcMorphoMarketsRead): MorphoMarketsChainR
       idleCapital: rows.filter((x) => x.totalSupply > 0 && x.totalBorrow === 0).length,
       neverFunded: rows.filter((x) => x.totalSupply === 0).length,
       idleMarkets: rows.filter((x) => x.isIdle).length,
-      loanTokens: groups.length,
+      // The idle market that names no loan token is a group of its own, not a loan token.
+      loanTokens: groups.filter((g) => g.loanToken !== ZERO_ADDRESS).length,
       lltvs: [...lltvs.entries()].sort((a, b) => b[0] - a[0]).map(([lltv, c]) => ({ lltv, ...c })),
     },
     chainStale: false,
@@ -124,7 +130,7 @@ export function arcMarketsResponse(r: ArcMorphoMarketsRead): MorphoMarketsChainR
 
 /** The roster's rate-ceiling marks from the answer's rateAtTarget, at the head's time. Price
  *  sources for repeated pairs are left out: the markets answer names no oracle feeds. */
-export function arcRosterMarks(r: ArcMorphoMarketsRead): MorphoRosterMarks {
+export function atBlockRosterMarks(r: MorphoAtBlockMarketsRead): MorphoRosterMarks {
   const marks: MorphoRosterMarks = { ceiling: {}, priceSources: {} };
   for (const m of r.markets) {
     if (!m.state || m.rateAtTarget == null) continue;
@@ -139,7 +145,7 @@ export function arcRosterMarks(r: ArcMorphoMarketsRead): MorphoRosterMarks {
 }
 
 /** One market's answer as the market page's response. */
-export function arcMarketResponse(r: ArcMorphoMarketRead): MorphoMarketChainResponse {
+export function atBlockMarketResponse(r: MorphoAtBlockMarketRead): MorphoMarketChainResponse {
   const m = r.market;
   const loan = r.tokens[m.loanToken];
   const coll = r.tokens[m.collateralToken];

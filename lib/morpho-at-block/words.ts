@@ -1,8 +1,12 @@
-// The words of Morpho Blue's Arc pages (rails-ops ui-jobs 577). The card's
+// The words of Morpho Blue's pages read on visit, Arc's and Optimism's (rails-ops
+// ui-jobs 577 and 578): the same sentences with the chain's name. The card's
 // labels are the Morpho card's (components/protocol/morpho/morpho-position-card.tsx);
 // the interest lines are Aave V4 on Arc's.
 
-import type { ArcMorphoFigures, ArcMorphoPositionFigures } from "@/lib/morpho-arc/position";
+import type { MorphoAtBlockFigures, MorphoAtBlockPositionFigures } from "@/lib/morpho-at-block/position";
+import type { MorphoAtBlockDeployment } from "@/lib/morpho-at-block/types";
+
+type Dep = Pick<MorphoAtBlockDeployment, "chain" | "aaveOracle">;
 
 export const LABEL = "Morpho Blue";
 
@@ -13,7 +17,7 @@ const num = (x: number) =>
   });
 
 /** "cirBTC / USDC", or the loan token alone on a market with no collateral. */
-export const pairName = (f: Pick<ArcMorphoFigures, "collateralToken" | "loan">) =>
+export const pairName = (f: Pick<MorphoAtBlockFigures, "collateralToken" | "loan">) =>
   f.collateralToken ? `${f.collateralToken.symbol} / ${f.loan.symbol}` : `${f.loan.symbol}, no collateral`;
 
 export const amount = (x: number, unit: string) => `${num(x)} ${unit}`;
@@ -21,22 +25,35 @@ export const usd = (x: number) =>
   `$${x.toLocaleString("en-US", { maximumFractionDigits: x >= 100 ? 0 : 2, minimumFractionDigits: x >= 100 ? 0 : 2 })}`;
 export const pctText = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%`;
 
-export const FRONT_DOOR = {
-  line: "A wallet's Morpho Blue positions on Arc, each with its collateral, debt and LTV against the market's line, in dollars where Arc has a price feed for the loan token, and its interest over the last 30 days.",
+export const frontDoorWords = ({ chain }: Dep) => ({
+  line: `A wallet's Morpho Blue positions on ${chain}, each with its collateral, debt and LTV against the market's line, in dollars where ${chain} has a price feed for the loan token, and its interest over the last 30 days.`,
   links: { markets: "Markets" },
   heading: "Morpho Blue positions",
-  none: "This address holds no Morpho Blue position on Arc.",
+  none: `This address holds no Morpho Blue position on ${chain}.`,
   unanswered: "The read of this wallet's positions did not answer. Try again in a minute.",
-  rowSub: (f: ArcMorphoFigures) => `LLTV ${pctText(f.lltv, 1)}`,
-  read: (n: number) => `Read across all ${n.toLocaleString("en-US")} markets on Arc.`,
-};
+  rowSub: (f: MorphoAtBlockFigures) => `LLTV ${pctText(f.lltv, 1)}`,
+  read: (n: number) => `Read across all ${n.toLocaleString("en-US")} markets on ${chain}.`,
+});
 
-export const POSITION_PAGE = {
-  title: (f: ArcMorphoFigures) => `${pairName(f)} · Morpho Blue`,
-  sub: (f: ArcMorphoFigures) => `LLTV ${pctText(f.lltv, 1)} · Arc`,
+export const positionPageWords = ({ chain }: Dep) => ({
+  title: (f: MorphoAtBlockFigures) => `${pairName(f)} · Morpho Blue`,
+  sub: (f: MorphoAtBlockFigures) => `LLTV ${pctText(f.lltv, 1)} · ${chain}`,
   unanswered: "The read of this position did not answer. Try again in a minute.",
   empty: "This wallet holds nothing in this market.",
-};
+  notIndexed: `Not indexed yet on ${chain}: this position's history and liquidations arrive when Rails indexes Morpho Blue there.`,
+});
+
+/** The card's foot: which read prices the loan token in dollars. */
+export function dollarFoot(f: Pick<MorphoAtBlockFigures, "usd" | "loan">, { chain, aaveOracle }: Dep): string {
+  const L = f.loan.symbol;
+  if (f.usd?.feed.source === "aave-oracle")
+    return `Dollar values use Aave V3's oracle on ${chain} for ${L}; collateral is valued through the market's oracle in ${L}.`;
+  if (f.usd)
+    return `Dollar values use the Chainlink ${f.usd.feed.description ?? `${L} / USD`} feed on ${chain}; collateral is valued through the market's oracle in ${L}.`;
+  return aaveOracle
+    ? `${chain} has no Chainlink feed for ${L} in Aave's address book and Aave V3's oracle there does not price it, so the figures stay in ${L}.`
+    : `${chain} has no Chainlink feed for ${L} in Aave's address book, so the figures stay in ${L}.`;
+}
 
 export const CARD_WORDS = {
   heading: "Position summary",
@@ -67,14 +84,10 @@ export const CARD_WORDS = {
   } as Record<"opened" | "changed" | "unread", string>,
   unpriced: "no dollar price",
   noDebt: "no debt",
-  foot: (f: ArcMorphoFigures) =>
-    f.usd
-      ? `Dollar values use the Chainlink ${f.usd.feed.description ?? `${f.loan.symbol} / USD`} feed on Arc; collateral is valued through the market's oracle in ${f.loan.symbol}.`
-      : `Arc has no Chainlink feed for ${f.loan.symbol} in Aave's address book, so the figures stay in ${f.loan.symbol}.`,
 };
 
 /** The card's (i): what the position is, in plain words. */
-export function cardExplainer(f: ArcMorphoPositionFigures): { title: string; bullets: string[] }[] {
+export function cardExplainer(f: MorphoAtBlockPositionFigures, { chain }: Dep): { title: string; bullets: string[] }[] {
   const out: { title: string; bullets: string[] }[] = [];
   const holds: string[] = [];
   if (f.collateral > 0 && f.collateralToken)
@@ -83,7 +96,7 @@ export function cardExplainer(f: ArcMorphoPositionFigures): { title: string; bul
   out.push({
     title: "The position",
     bullets: [
-      `This wallet holds ${holds.length ? holds.join(" and ") : "nothing"}${f.debt > 0 ? ` and owes ${amount(f.debt, f.loan.symbol)}` : ""} in one Morpho Blue market on Arc.`,
+      `This wallet holds ${holds.length ? holds.join(" and ") : "nothing"}${f.debt > 0 ? ` and owes ${amount(f.debt, f.loan.symbol)}` : ""} in one Morpho Blue market on ${chain}.`,
       "A Morpho Blue market lends one token against one collateral token, under one oracle, one rate model and one LLTV, all fixed when the market was created.",
     ],
   });
@@ -108,13 +121,20 @@ export const MARKET_LIST_WORDS = {
     return parts.length ? `Not listed here: ${parts.join(" and ")}. Each keeps its own page.` : null;
   },
   idle: "The idle market names no loan token, collateral, oracle or rate model, so nothing can be borrowed from it.",
+  /** An idle market that lends a token (Optimism's USDC one). */
+  idleLends: (loan: string) =>
+    `The idle ${loan} market names no collateral, oracle or rate model, so nothing can be borrowed from it.`,
   idleLink: "Its page",
   /** The roster head's word for the listed markets holding no supply. */
   emptyNow: "empty now",
+  /** The roster explainer's words after that count. */
+  emptyNowWords: { one: "is empty now", many: "are empty now" },
   page: {
     "test-token": "This market isn't listed on the markets page: it lends a test token (ERC20Mock, E20M).",
     "never-funded": "This market isn't listed on the markets page: nothing has ever been supplied to it.",
   } as Record<"test-token" | "never-funded", string>,
   idlePage:
     "This is the idle market: it names no loan token, collateral, oracle or rate model, so nothing can be supplied or borrowed in it.",
+  idleLendsPage: (loan: string) =>
+    `This is an idle ${loan} market: it names no collateral, oracle or rate model, so ${loan} supplied here earns nothing and nothing can be borrowed.`,
 };
