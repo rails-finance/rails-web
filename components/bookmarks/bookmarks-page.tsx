@@ -5,7 +5,7 @@
 // Backup (B4, ui-jobs 521, 530 and 557; broadest first), over the chosen
 // kind's list (B2), the same components the wallet panel draws
 // (components/shared/bookmark-list.tsx), or the backup controls.
-// The tab rides in the URL (`?tab=focus`, `?tab=listings`, `?tab=positions`,
+// The tab rides in the URL (`?tab=focus`, `?tab=listings`, `?tab=wallets`, `?tab=positions`,
 // `?tab=backup`; the old `?tab=views` opens Listings). With no tab, Wallets. With no saved
 // wallets, the wallets tab's empty state (B3) says how to make one, offers
 // Start here and the sample wallet (lib/shared/sample-wallet.ts); export and
@@ -54,7 +54,12 @@ export function BookmarksPage() {
   const views = useSavedLinks("view");
   const scope = useAssetScope();
   const [tab, setTab] = useState<Tab>("wallets");
-  useEffect(() => setTab(tabFromUrl()), []);
+  // Read from the address on every render: a heading in the profile menu
+  // (H20) can change the tab while this page stays mounted (ui-jobs 582).
+  useEffect(() => {
+    const t = tabFromUrl();
+    if (t !== tab) setTab(t);
+  });
   const choose = (t: Tab) => {
     setTab(t);
     const url = new URL(window.location.href);
@@ -192,9 +197,15 @@ export function BookmarksPage() {
           )}
           {tab === "focus" && (
             <>
+              {scope.views.length > 0 && (
+                <p className="mb-3 text-sm text-rb-500" data-focus-menu-note="">
+                  The profile menu offers one focus view. Choose it here with Show in menu.
+                </p>
+              )}
               <FocusViewList
                 views={scope.views}
                 active={scope.active?.id ?? null}
+                menu={scope.menuView?.id ?? null}
                 empty={
                   <div data-anatomy="B3">
                     <p className="font-semibold text-foreground">No focus views yet.</p>

@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, GripVertical, MoreVertical, Upload } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, GripVertical, MoreVertical, Upload } from "lucide-react";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { INPLACE_TEXT, NAV_BUTTON, POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
 
@@ -644,10 +644,13 @@ function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
 export function FocusViewList({
   views,
   active,
+  menu,
   empty,
 }: {
   views: FocusView[];
   active: string | null;
+  /** The view the profile menu offers (ui-jobs 582). */
+  menu: string | null;
   empty: ReactNode;
 }) {
   const moveOf = useRowDrag("view", focusViews.move);
@@ -692,6 +695,7 @@ export function FocusViewList({
             key={v.id}
             view={v}
             inUse={v.id === active}
+            inMenu={v.id === menu}
             phone={isPhone}
             onRemove={() => remove(v.id)}
             move={moveOf(i, views.length, v.id)}
@@ -707,12 +711,14 @@ const UNDO_MS = 8000;
 function FocusViewRow({
   view,
   inUse,
+  inMenu,
   phone,
   onRemove,
   move,
 }: {
   view: FocusView;
   inUse: boolean;
+  inMenu: boolean;
   phone: boolean;
   onRemove: () => void;
   move: RowMove;
@@ -814,6 +820,28 @@ function FocusViewRow({
     </button>
   );
 
+  // The profile menu offers one view (ui-jobs 582): this one, or a press to
+  // make it the one. On a phone the press is in the row's ⋮ menu.
+  const menuMark = inMenu ? (
+    <span
+      className="inline-flex shrink-0 items-center justify-end gap-1 text-xs text-rb-500 sm:min-w-24"
+      data-focus-view-in-menu=""
+    >
+      <Check className="size-3" strokeWidth={3} aria-hidden="true" />
+      In menu
+    </span>
+  ) : phone ? null : (
+    <button
+      type="button"
+      onClick={() => focusViews.showInMenu(view.id)}
+      aria-label={`Show ${label} in the profile menu`}
+      className={`min-w-24 shrink-0 text-right text-xs font-semibold ${INPLACE_TEXT}`}
+      data-focus-view-show-in-menu={view.id}
+    >
+      Show in menu
+    </button>
+  );
+
   return (
     <div
       className={`${rowClasses} ${move.dragging ? "opacity-50" : ""} ${move.target ? "border-t-teal-500" : ""}`}
@@ -834,6 +862,7 @@ function FocusViewRow({
         <span className="block truncate text-sm font-bold text-foreground">{label}</span>
         {view.name && <span className="mt-0.5 block truncate text-xs text-rb-500">{holds}</span>}
       </span>
+      {menuMark}
       {use}
       {phone ? (
         <div className="relative shrink-0">
@@ -856,6 +885,11 @@ function FocusViewRow({
               {inUse && (
                 <RowMenuItem onClick={() => focusViews.use(null)} data="turn-off">
                   Turn off
+                </RowMenuItem>
+              )}
+              {!inMenu && (
+                <RowMenuItem onClick={() => focusViews.showInMenu(view.id)} data="show-in-menu">
+                  Show in menu
                 </RowMenuItem>
               )}
               <RowMenuItem onClick={startEdit} data="rename">

@@ -30,6 +30,7 @@ import { notifyUrlChanged } from "@/lib/shared/use-url-search-params";
 import {
   ASSETS_PARAM,
   CHAINS_PARAM,
+  FOCUS_MENU_KEY,
   FOCUS_VIEWS_KEY,
   formatAssetsParam,
   formatChainsParam,
@@ -145,8 +146,10 @@ interface Snapshot {
   stored: Focus;
   /** What a link proposes; null when the URL names nothing Rails knows. */
   link: FocusProposal | null;
+  /** The view chosen for the profile menu, by id; null when none is chosen. */
+  menu: string | null;
 }
-const EMPTY: Snapshot = { saved: NO_VIEWS, stored: NO_FOCUS, link: null };
+const EMPTY: Snapshot = { saved: NO_VIEWS, stored: NO_FOCUS, link: null, menu: null };
 let cache: { raw: string; snap: Snapshot } = { raw: "", snap: EMPTY };
 
 const newId = () => `v${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -167,20 +170,22 @@ function sweepOldStores() {
 function readRaw(): string {
   sweepOldStores();
   let held = "";
+  let menu = "";
   try {
     held = localStorage.getItem(FOCUS_VIEWS_KEY) ?? "";
+    menu = localStorage.getItem(FOCUS_MENU_KEY) ?? "";
   } catch {}
   const sp = new URLSearchParams(window.location.search);
   const a = sp.get(ASSETS_PARAM);
   const c = sp.get(CHAINS_PARAM);
   const n = sp.get(VIEW_PARAM);
-  return [held, a ?? "\u0001", c ?? "\u0001", n ?? ""].join("\u0000");
+  return [held, a ?? "\u0001", c ?? "\u0001", n ?? "", menu].join("\u0000");
 }
 
 function snapshot(): Snapshot {
   const raw = readRaw();
   if (raw === cache.raw) return cache.snap;
-  const [s, a, c, n] = raw.split("\u0000");
+  const [s, a, c, n, m] = raw.split("\u0000");
   let saved: FocusViews = NO_VIEWS;
   try {
     saved = readViews(s ? JSON.parse(s) : null, knownChain);
@@ -194,7 +199,7 @@ function snapshot(): Snapshot {
   const chains = c === "\u0001" ? [] : (parseChainsParam(c, CHAIN_SLUGS) ?? []);
   const focus = { assets, chains };
   const link = focusOn(focus) ? { focus, name: n.trim().slice(0, 60) || null } : null;
-  cache = { raw, snap: { saved, stored: activeFocus(saved), link } };
+  cache = { raw, snap: { saved, stored: activeFocus(saved), link, menu: m || null } };
   return cache.snap;
 }
 
@@ -282,6 +287,13 @@ export const focusViews = {
   },
   /** An edit to one view; emptied, it is removed. */
   edit: (id: string, f: Focus) => writeSaved(editView(saved(), id, f)),
+  /** The view the profile menu offers (ui-jobs 582): one at a time. */
+  showInMenu(id: string) {
+    try {
+      localStorage.setItem(FOCUS_MENU_KEY, id);
+    } catch {}
+    window.dispatchEvent(new Event(CHANGE));
+  },
   /** The saved views for a backup file. */
   list: (): FocusView[] => saved().views,
   /** A backup file's views merged in; the view in use stays. */
@@ -325,6 +337,9 @@ export interface AssetScope {
   /** The saved views, in the reader's order, and the one in use. */
   views: FocusView[];
   active: FocusView | null;
+  /** The one view the profile menu offers: the one chosen on /bookmarks, else
+   *  the view in use, else the first saved (ui-jobs 582). */
+  menuView: FocusView | null;
   /** The asset keys the picks reach on the focused chains; null when no asset is picked. */
   keys: Set<string> | null;
   /** A chain passes chain focus. */
@@ -387,6 +402,8 @@ export function useAssetScope(): AssetScope {
   }, []);
   const dismissLink = useCallback(() => dropLink(), []);
   const clear = useCallback(() => writeSaved(setActive(saved(), null)), []);
+  const views = ready ? snap.saved.views : NO_VIEWS.views;
+  const active = ready ? activeView(snap.saved) : null;
 
   return {
     ready,
@@ -394,8 +411,9 @@ export function useAssetScope(): AssetScope {
     picks,
     chains,
     link: ready ? snap.link : null,
-    views: ready ? snap.saved.views : NO_VIEWS.views,
-    active: ready ? activeView(snap.saved) : null,
+    views,
+    active,
+    menuView: views.find((v) => v.id === snap.menu) ?? active ?? views[0] ?? null,
     keys,
     chainOk,
     matches,

@@ -26,9 +26,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { protocolForPathname } from "@/lib/shared/protocols";
 import { CHAINS } from "@/lib/shared/chains";
-import { useChainListing, useExplorerScope, type ExplorerStatus } from "@/lib/shared/explorer-scope";
+import { useChainListing, type ExplorerStatus } from "@/lib/shared/explorer-scope";
 import { createPortal } from "react-dom";
 import { Check, Lightbulb, Link2, ListFilter, X } from "lucide-react";
 import { FocusAvatar } from "@/components/shared/focus-avatar";
@@ -59,7 +58,7 @@ import {
   type AssetPick,
   manageHref,
 } from "@/lib/shared/asset-scope";
-import { INLINE_LINK, OVERLAY_HEADING, PAGE_LINK, PAGE_SCRIM, RESET_LINK } from "@/lib/shared/ui-grammar";
+import { OVERLAY_HEADING, PAGE_LINK, PAGE_SCRIM, RESET_LINK } from "@/lib/shared/ui-grammar";
 
 const chainName = (c: number) => SCOPE_CHAINS[c] ?? chainNameOf(c);
 const symbolOf = (p: Pick<AssetPick, "chain" | "token">) =>
@@ -554,32 +553,6 @@ export function explorerWhy(
   return status === "none"
     ? { why: `${entry.label} lists none of your assets`, kind: "none" }
     : { why: `Rails has no asset list for ${entry.label} yet`, kind: "unknown" };
-}
-
-/** Why Focus hides the explorer this page belongs to; nothing where it shows. */
-export function ExplorerScopeLine({
-  keys,
-  className = "mx-auto max-w-7xl px-4 pb-1.5 text-xs text-rb-500 md:px-6",
-  onLeave,
-}: {
-  keys: Set<string> | null;
-  className?: string;
-  /** Called as the link is followed (the menu closes). */
-  onLeave?: () => void;
-}) {
-  const entry = protocolForPathname(usePathname());
-  const ex = useExplorerScope();
-  if (!entry || !keys || !ex.on) return null;
-  const w = explorerWhy(entry, ex.statusOf(entry.id), keys);
-  if (!w) return null;
-  return (
-    <p className={className} data-explorer-scope={w.kind}>
-      {w.why} ·{" "}
-      <Link href={manageHref(false)} onClick={onLeave} className={`font-semibold ${INLINE_LINK}`}>
-        Where your assets are listed
-      </Link>
-    </p>
-  );
 }
 
 function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void; label: string }) {

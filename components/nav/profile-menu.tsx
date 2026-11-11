@@ -1,19 +1,26 @@
 "use client";
 
-// The profile control (H20) and its menu (rails-ops ui-jobs 504): the facehash
-// with a chevron, a menu button. The menu has no heading of its own: each group
-// carries its own label (ui-jobs 524). Top down: with nothing saved, focus
-// views included, "New to Rails? Start here" to /start as a blue button across
-// the top (ui-jobs 509);
-// the filled bookmark and "Saved wallets", then the first ten in the reader's
-// order (lib/shared/sessions.ts; /bookmarks orders them) or, with none, how to
-// save one; "Saved positions" (ui-jobs 530) and "Saved views" (ui-jobs 521),
-// the first five of each, drawn when there is one; "Manage saved items →" to
-// /bookmarks; the theme switch. Beside Focus, the "Provenance inspector"
-// switch (decision 0062; ui-jobs 571). From md a dropdown under the control, right
-// edges aligned; below md a sheet from the foot of the screen over a dim (ui-jobs 507), rising
-// over 220ms (globals.css `.profile-sheet`). Rows show what the
-// browser holds (name, ENS, address) and read nothing.
+// The profile control (H20) and its menu (rails-ops ui-jobs 504, redrawn in
+// 582 to Miles's mockup of 11 Nov 2026). The menu has no heading of its own.
+// Top down: the theme as a three-way segment; with nothing saved, "New to
+// Rails? Start here" to /start (ui-jobs 509); then four groups, Focus,
+// Listings, Wallets and Positions, each under a heading that links to its tab
+// on /bookmarks (a cog at the group's right on hover or keyboard focus; on a
+// touch screen see HEADING_TOUCH); last, Advanced, holding the provenance
+// inspector switch (decision 0062; ui-jobs 571).
+//
+// Focus offers one saved view, the one chosen on /bookmarks?tab=focus (else
+// the view in use, else the first saved; lib/shared/asset-scope.ts
+// `menuView`), and Off. Wallets lists the first ten saved in the reader's
+// order (lib/shared/sessions.ts; /bookmarks orders them), Listings and
+// Positions the first five. A group with nothing saved keeps its heading and
+// shows one hint row to its tab. Long names fade at the line's end
+// (`FADE`); rows read nothing, showing what the browser holds.
+//
+// From md a dropdown under the control, right edges aligned, dropping in with
+// a small bounce (globals.css `.profile-drop`); below md a sheet from the foot
+// of the screen over a dim (ui-jobs 507), rising over 220ms
+// (`.profile-sheet`).
 //
 // The face is the first saved wallet's; with none, the sample wallet's
 // (lib/shared/sample-wallet.ts). Until the browser's list is read a faint
@@ -23,83 +30,121 @@
 // page wherever the control sits (H2 below md, the column's corner from md;
 // components/nav/rail-shell.tsx). Escape, a press outside and a lookup close
 // it, and focus returns to the control; the arrow keys, Home and End move
-// through its items. The dropdown drops in with a small bounce
-// (globals.css `.profile-drop`, the wallet panel's spring timing).
+// through its items.
 
 import { CHROME_HOVER, CHROME_HOVER_ON } from "@/components/nav/chrome-hover";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Bookmark,
-  Check,
-  ChevronDown,
-  Crosshair,
-  ListFilter,
-  Monitor,
-  Moon,
-  Settings,
-  Signpost,
-  Sun,
-} from "lucide-react";
+import { Check, ChevronDown, CircleHelp, Crosshair, Monitor, Moon, Settings, Signpost, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
 import { Facehash } from "@/components/shared/facehash";
 import { FocusAvatar } from "@/components/shared/focus-avatar";
-import { ExplorerScopeLine, FocusRows, ViewIcons, viewName } from "@/components/shared/asset-scope-strip";
+import { ViewIcons, viewName } from "@/components/shared/asset-scope-strip";
 import { useBookmarks } from "@/components/shared/bookmark-list";
 import { savedName, useSavedLinks } from "@/components/shared/saved-items";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
-import { BOOKMARKS_NAME } from "@/components/shared/bookmarks-name";
+import { ChainGlyph } from "@/components/shared/chain-toggle";
 import { walletHref } from "@/components/shared/front-door-search";
 import { SAMPLE_WALLET } from "@/lib/shared/sample-wallet";
-import { focusViews, openFocusPanel, useAssetScope } from "@/lib/shared/asset-scope";
+import { focusViews, useAssetScope } from "@/lib/shared/asset-scope";
 import { focusShort } from "@/components/shared/aim-gate";
-import { CTRL_OFF, CTRL_ON, INPLACE_TEXT, START_CTA } from "@/lib/shared/ui-grammar";
+import { START_CTA } from "@/lib/shared/ui-grammar";
+import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
 
 const BOOKMARKS_PATH = "/bookmarks";
-/** A text press in the menu is 44px tall on a phone. */
-const MENU_TAP = "inline-flex min-h-11 items-center sm:min-h-0";
 /** The control's and the menu's accessible name: what the menu holds as a whole. */
 const MENU_NAME = "Saved and settings";
-/** A group's small label (Saved wallets, Saved positions, Saved views). */
-const GROUP_LABEL = "flex items-center gap-2 px-3 pb-2 pt-2 text-sm font-semibold text-foreground";
-/** "New to Rails? Start here" across the menu's top. */
-const START_BUTTON = `mb-1 flex w-full ${START_CTA}`;
 /** The guided way in (G, /start), reached from this menu (ui-jobs 509). */
 const START_PATH = "/start";
 /** The menu lists this many wallets, and this many of each other kind; the
  *  rest are on /bookmarks. */
 const MENU_ROWS = 10;
 const MENU_LINK_ROWS = 5;
-/** The menu lists this many focus views, and the view in use's first rows. */
-const MENU_FOCUS_VIEWS = 5;
-const MENU_FOCUS_ROWS = 3;
-const FOCUS_RING = "focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500";
 
-/** A focus view's radio mark: ticked for the view in use. */
-function RadioMark({ on }: { on: boolean }) {
+/** The room between the menu's groups (Miles's mockup: about 32px). */
+const GROUP = "mt-8";
+/** A row: 44px tall, a blue rounded outline on hover and keyboard focus. */
+const ITEM =
+  "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-left text-[15px] text-foreground outline-none transition-shadow hover:ring-1 hover:ring-blue-500 focus-visible:ring-[1.5px] focus-visible:ring-blue-500";
+/** A long name fades at the line's end, with no ellipsis. */
+const FADE =
+  "min-w-0 flex-1 overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,#000_calc(100%-2rem),transparent)]";
+/** A group's label, muted (Advanced; the linked headings add the blue). */
+const LABEL = "px-3 text-[15px] text-rb-500";
+
+/** On a touch screen nothing hovers, so a heading shows that it links in one
+ *  of two ways. The cog always shown, muted, is in use; Miles is weighing the
+ *  headings drawn blue instead. Swap `HEADING_TOUCH` to change it. */
+const TOUCH_HEADINGS = {
+  cog: { head: "", cog: "[@media(hover:none)]:opacity-100" },
+  blue: { head: "[@media(hover:none)]:text-blue-600 dark:[@media(hover:none)]:text-[var(--text-link)]", cog: "" },
+} as const;
+const HEADING_TOUCH = TOUCH_HEADINGS.cog;
+
+const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+
+/** A group's heading: a link to its tab on /bookmarks, blue with the cog at
+ *  the group's right on hover or keyboard focus. */
+function GroupHeading({
+  id,
+  group,
+  tab,
+  label,
+  onDone,
+}: {
+  id: string;
+  group: string;
+  tab: string;
+  label: string;
+  onDone: () => void;
+}) {
   return (
-    <span
-      className={`inline-flex size-4 shrink-0 items-center justify-center rounded-full border ${
-        on
-          ? "border-teal-600 bg-teal-600 text-white dark:border-teal-500 dark:bg-teal-500"
-          : "border-rb-300 dark:border-rb-600"
-      }`}
-      aria-hidden="true"
+    <Link
+      id={id}
+      href={`${BOOKMARKS_PATH}?tab=${tab}`}
+      role="menuitem"
+      onClick={onDone}
+      className={`group/head flex min-h-8 items-center justify-between rounded-lg text-rb-500 outline-none transition-colors hover:text-blue-600 focus-visible:text-blue-600 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)] ${LABEL} ${HEADING_TOUCH.head}`}
+      data-profile-menu-group={group}
     >
-      {on && <Check className="size-3" strokeWidth={3} />}
-    </span>
+      {label}
+      <Settings
+        className={`size-[18px] shrink-0 opacity-0 transition-opacity group-hover/head:opacity-100 group-focus-visible/head:opacity-100 ${HEADING_TOUCH.cog}`}
+        aria-hidden="true"
+      />
+    </Link>
   );
 }
 
-const ITEM =
-  "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors focus:outline-none focus-visible:bg-rb-100 hover:bg-rb-100 dark:hover:bg-rb-800 dark:focus-visible:bg-rb-800";
+/** A group with nothing saved: one muted row to the place to add one. */
+function EmptyHint({ href, onDone, children }: { href: string; onDone: () => void; children: ReactNode }) {
+  return (
+    <Link href={href} role="menuitem" onClick={onDone} className={`${ITEM} text-rb-500`} data-profile-menu-empty="">
+      {children}
+    </Link>
+  );
+}
 
-const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+/** The radio mark of a Focus row: ticked for the view in use, or Off. */
+function RadioMark({ on }: { on: boolean }) {
+  return (
+    <span
+      className={`inline-flex size-5 shrink-0 items-center justify-center rounded-full border ${
+        on
+          ? "border-teal-600 bg-teal-600 text-white dark:border-teal-500 dark:bg-teal-500 dark:text-rb-950"
+          : "border-rb-300 dark:border-rb-700"
+      }`}
+      aria-hidden="true"
+    >
+      {on && <Check className="size-3.5" strokeWidth={3} />}
+    </span>
+  );
+}
 
 function WalletRow({ session, onDone }: { session: WalletSession; onDone: () => void }) {
   const primary = session.addresses[0];
@@ -110,20 +155,23 @@ function WalletRow({ session, onDone }: { session: WalletSession; onDone: () => 
       href={walletHref(primary)}
       role="menuitem"
       onClick={onDone}
-      className={ITEM}
+      className={`${ITEM} gap-4`}
       data-profile-menu-wallet={primary}
     >
       <span className="shrink-0" style={{ borderRadius: 5, boxShadow: "0 0 0 2px var(--facehash-ring)" }}>
-        <Facehash address={primary} size={20} />
+        <Facehash address={primary} size={22} />
       </span>
-      <span className="min-w-0 flex-1 truncate font-semibold text-foreground">{name ?? short(primary)}</span>
+      <span className="min-w-0 flex-1 truncate font-medium">{name ?? short(primary)}</span>
       {name && <span className="shrink-0 font-mono text-xs text-rb-500">{short(primary)}</span>}
     </Link>
   );
 }
 
-/** A saved position or view: the explorer's mark, the name, the chain. */
+/** A saved listing or position: the explorer's and the chain's marks, then
+ *  the name (a position's chain after it, muted), fading at the line's end. */
 function LinkRow({ link, onDone }: { link: SavedLink; onDone: () => void }) {
+  const chain = link.chain ? Number(link.chain.id) : NaN;
+  const after = link.ended?.word ?? (link.kind === "position" ? link.chain?.name : undefined);
   return (
     <Link
       href={link.key}
@@ -133,16 +181,18 @@ function LinkRow({ link, onDone }: { link: SavedLink; onDone: () => void }) {
       data-profile-menu-link={link.kind}
       data-href={link.key}
     >
-      <span className="flex size-5 shrink-0 items-center justify-center text-rb-500">
-        {link.protocol && <ProtocolIcon id={link.protocol.id} className="size-4" />}
+      <span className="flex shrink-0 items-center gap-1.5 text-rb-500">
+        <span className="flex size-4 items-center justify-center">
+          {link.protocol && <ProtocolIcon id={link.protocol.id} className="size-4" />}
+        </span>
+        <span className="flex size-4 items-center justify-center">
+          {Number.isInteger(chain) && <ChainGlyph chainId={chain as ChainId} className="h-4 w-auto" />}
+        </span>
       </span>
-      <span className="min-w-0 flex-1 truncate font-semibold text-foreground">{savedName(link)}</span>
-      {link.ended ? (
-        <span className="shrink-0 text-xs text-rb-500">{link.ended.word}</span>
-      ) : (
-        link.kind === "position" &&
-        link.chain && <span className="shrink-0 text-xs text-rb-500">{link.chain.name}</span>
-      )}
+      <span className={`${FADE} font-medium`}>
+        {savedName(link)}
+        {after && <span className="ml-3 font-normal text-rb-500">{after}</span>}
+      </span>
     </Link>
   );
 }
@@ -153,7 +203,8 @@ const THEMES = [
   { value: "system", label: "Auto", Icon: Monitor },
 ] as const;
 
-/** Light, dark or the system's, as three radio items in the menu. */
+/** Light, dark or the system's: a three-way segment, the one chosen on a
+ *  raised tile. */
 function ThemeSwitch() {
   const { theme, setTheme } = useTheme();
   return (
@@ -167,12 +218,14 @@ function ThemeSwitch() {
             role="menuitemradio"
             aria-checked={on}
             onClick={() => setTheme(value)}
-            className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
-              on ? CTRL_ON : CTRL_OFF
+            className={`flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg px-2 text-sm transition-colors outline-none focus-visible:ring-[1.5px] focus-visible:ring-blue-500 ${
+              on
+                ? "bg-rb-100 font-medium text-foreground dark:bg-rb-800"
+                : "text-rb-500 hover:text-foreground hover:ring-1 hover:ring-blue-500"
             }`}
             data-theme-option={value}
           >
-            <Icon className="size-3.5 shrink-0" aria-hidden="true" />
+            <Icon className="size-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
             {label}
           </button>
         );
@@ -182,6 +235,8 @@ function ThemeSwitch() {
 }
 
 const ITEMS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]';
+const PROV_HELP =
+  "Keeps the inspector on across the pages that support it: click an underlined figure to see where it comes from.";
 
 /** The standing provenance inspector (decision 0062; ui-jobs 571): arms the
  *  inspector on arrival on every page that has passed the coverage gate
@@ -195,21 +250,26 @@ function ProvInspectorSwitch() {
       aria-checked={on}
       onClick={() => setProvPreference(!on)}
       className={ITEM}
-      title="Arms the inspector on every page that supports it"
       data-anatomy="H20.1"
       data-profile-menu-prov={on ? "on" : "off"}
     >
-      <Crosshair className="size-4 shrink-0" aria-hidden="true" />
-      <span className="min-w-0 flex-1 truncate text-foreground">Provenance inspector</span>
+      <Crosshair className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+      <span className="flex min-w-0 flex-1 items-center gap-1.5">
+        <span className="truncate">Provenance inspector</span>
+        <span className="inline-flex shrink-0 text-rb-400" title={PROV_HELP} data-profile-menu-prov-help="">
+          <CircleHelp className="size-3.5" aria-hidden="true" />
+          <span className="sr-only">{PROV_HELP}</span>
+        </span>
+      </span>
       <span
-        className={`relative inline-flex h-4 w-7 shrink-0 rounded-full transition-colors ${
+        className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
           on ? "bg-teal-500" : "bg-rb-300 dark:bg-rb-700"
         }`}
         aria-hidden="true"
       >
         <span
-          className={`absolute top-0.5 size-3 rounded-full bg-white shadow transition-transform ${
-            on ? "translate-x-3.5" : "translate-x-0.5"
+          className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform ${
+            on ? "translate-x-[18px]" : "translate-x-0.5"
           }`}
         />
       </span>
@@ -237,22 +297,19 @@ export function ProfileMenu() {
 
   const face = bookmarks == null ? null : (bookmarks[0]?.addresses[0] ?? SAMPLE_WALLET);
   const rows = (bookmarks ?? []).slice(0, MENU_ROWS);
-  const links = [
-    { kind: "positions", label: "Saved positions", rows: (positions ?? []).slice(0, MENU_LINK_ROWS) },
-    { kind: "views", label: "Saved views", rows: (views ?? []).slice(0, MENU_LINK_ROWS) },
-  ].filter((g) => g.rows.length > 0);
+  const listings = (views ?? []).slice(0, MENU_LINK_ROWS);
+  const held = (positions ?? []).slice(0, MENU_LINK_ROWS);
   const focusOn = scope.ready && scope.on;
+  const menuView = scope.menuView;
   /** Anything saved, focus views included, takes "Start here" out of the menu. */
-  const anything = rows.length > 0 || links.length > 0 || (scope.ready && scope.views.length > 0);
-  /** The Focus section shows with Focus on or any view saved. */
-  const focusShown = scope.ready && (scope.on || scope.views.length > 0);
-  const menuViews = scope.views.slice(0, MENU_FOCUS_VIEWS);
+  const anything = rows.length > 0 || listings.length > 0 || held.length > 0 || (scope.ready && scope.views.length > 0);
   const focusLabel = scope.active?.name || focusShort(scope.picks, scope.chains);
 
   const close = useCallback((refocus = true) => {
     setOpen(false);
     if (refocus) requestAnimationFrame(() => trigger.current?.focus());
   }, []);
+  const done = useCallback(() => close(false), [close]);
 
   // A navigation closes it.
   useEffect(() => setOpen(false), [pathname]);
@@ -331,6 +388,25 @@ export function ProfileMenu() {
     };
   }, [open, close]);
 
+  const linkGroups = [
+    { kind: "listings", tab: "listings", label: "Listings", rows: listings, hint: "Save a listing" },
+    { kind: "positions", tab: "positions", label: "Positions", rows: held, hint: "Save a position" },
+  ] as const;
+  const linkGroup = (g: (typeof linkGroups)[number]) => (
+    <div key={g.kind} role="group" aria-labelledby={`${menuId}-${g.kind}`} className={GROUP}>
+      <GroupHeading id={`${menuId}-${g.kind}`} group={g.kind} tab={g.tab} label={g.label} onDone={done} />
+      <div className="mt-1" data-profile-menu-links={g.kind}>
+        {g.rows.length > 0 ? (
+          g.rows.map((l) => <LinkRow key={l.key} link={l} onDone={done} />)
+        ) : (
+          <EmptyHint href={`${BOOKMARKS_PATH}?tab=${g.tab}`} onDone={done}>
+            {g.hint}
+          </EmptyHint>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <>
       <button
@@ -383,189 +459,89 @@ export function ProfileMenu() {
               role="menu"
               aria-label={MENU_NAME}
               data-profile-menu=""
-              className={`fixed z-[var(--z-popover)] border border-rb-200 bg-background p-2 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
+              className={`fixed z-[var(--z-popover)] border border-rb-200 bg-background px-3 pb-4 pt-3 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
                 place.phone
-                  ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-2xl border-x-0 border-b-0 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+                  ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-2xl border-x-0 border-b-0 pb-[max(1rem,env(safe-area-inset-bottom))]"
                   : "profile-drop w-80 rounded-xl"
               }`}
               style={place.phone ? undefined : { top: place.top, right: place.right }}
             >
-              {/* With Focus on or a focus view saved, the menu opens with
-                  Focus (Miles, 10 Nov 2026): the saved views as a switcher
-                  with Off, what the view in use holds, and its presses. */}
-              {focusShown && (
-                <div role="group" aria-labelledby={`${menuId}-focus`} className="pb-2" data-profile-menu-focus="">
-                  <p id={`${menuId}-focus`} className={GROUP_LABEL}>
-                    <ListFilter className="size-4 shrink-0" aria-hidden="true" />
-                    Focus mode
-                  </p>
-                  <div data-profile-menu-focus-views={scope.views.length}>
-                    {menuViews.map((v) => {
-                      const on = scope.active?.id === v.id;
-                      return (
-                        <div key={v.id}>
-                          <button
-                            type="button"
-                            role="menuitemradio"
-                            aria-checked={on}
-                            onClick={() => focusViews.use(v.id)}
-                            className={ITEM}
-                            data-profile-menu-focus-view={v.id}
-                          >
-                            <RadioMark on={on} />
-                            <span className="flex min-w-0 flex-1 items-center">
-                              <ViewIcons picks={v.assets} chains={v.chains} />
-                              <span className={`truncate ${on ? "font-semibold text-foreground" : "text-foreground"}`}>
-                                {viewName(v)}
-                              </span>
-                            </span>
-                          </button>
-                          {on && (
-                            <div className="pb-1 pl-11 pr-3">
-                              <FocusRows picks={v.assets} chains={v.chains} max={MENU_FOCUS_ROWS} size={16} />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {scope.views.length > MENU_FOCUS_VIEWS && (
-                      <Link
-                        href={`${BOOKMARKS_PATH}?tab=focus`}
-                        role="menuitem"
-                        onClick={() => close(false)}
-                        className={`${ITEM} text-xs text-blue-600 dark:text-[var(--text-link)]`}
-                      >
-                        All {scope.views.length} focus views →
-                      </Link>
-                    )}
-                    <button
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={!scope.on}
-                      onClick={() => scope.clear()}
-                      className={ITEM}
-                      data-profile-menu-focus-off=""
-                    >
-                      <RadioMark on={!scope.on} />
-                      <span className="flex-1 text-foreground">Off</span>
-                    </button>
-                  </div>
-                  {/* On an explorer's page that the focus hides: why (the
-                      strip's second line, Miles 10 Nov 2026). */}
-                  <ExplorerScopeLine
-                    keys={scope.keys}
-                    className="px-3 pb-2 pt-1 text-xs leading-snug text-rb-500"
-                    onLeave={() => close(false)}
-                  />
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 pt-1 text-xs">
-                    {scope.on && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        onClick={() => {
-                          close(false);
-                          openFocusPanel("edit");
-                        }}
-                        className={`rounded font-semibold ${FOCUS_RING} ${INPLACE_TEXT} ${MENU_TAP}`}
-                        data-profile-menu-focus-change=""
-                      >
-                        Change
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={() => {
-                        close(false);
-                        focusViews.create();
-                      }}
-                      className={`rounded font-semibold ${FOCUS_RING} ${INPLACE_TEXT} ${MENU_TAP}`}
-                      data-profile-menu-focus-new=""
-                    >
-                      New view
-                    </button>
-                  </div>
-                  <div className="mx-1 mt-3 border-t border-rb-200 dark:border-rb-800" />
-                </div>
-              )}
-              {/* With none saved, the way in fills the menu's top (Miles, 6 Nov
-                  2026); with a wallet saved there is none (ui-jobs 509). */}
+              <ThemeSwitch />
+              {/* With nothing saved, the way in, after the theme (Miles, 11
+                  Nov 2026); with anything saved there is none (ui-jobs 509). */}
               {!anything && (
                 <Link
                   href={START_PATH}
                   role="menuitem"
-                  onClick={() => close(false)}
-                  className={START_BUTTON}
+                  onClick={done}
+                  className={`mt-6 flex w-full ${START_CTA}`}
                   data-profile-menu-start=""
                 >
                   New to Rails? Start here
-                  <Signpost className="size-4 shrink-0 ml-auto" aria-hidden="true" />
+                  <Signpost className="ml-auto size-4 shrink-0" aria-hidden="true" />
                 </Link>
               )}
-              <div role="group" aria-labelledby={`${menuId}-wallets`}>
-                <p id={`${menuId}-wallets`} className={GROUP_LABEL} data-profile-menu-group="wallets">
-                  <Bookmark className="size-4 shrink-0" fill="currentColor" aria-hidden="true" />
-                  {BOOKMARKS_NAME}
-                </p>
-                {rows.length > 0 ? (
-                  <div className="pb-1" data-profile-menu-wallets="">
-                    {rows.map((s) => (
-                      <WalletRow key={s.key} session={s} onDone={() => close(false)} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="px-3 pb-1 text-sm text-rb-500" data-profile-menu-empty="">
-                    To save a wallet, press the bookmark beside its address on its wallet page.
-                  </p>
-                )}
-              </div>
-              {links.map((g) => (
-                <div key={g.kind} role="group" aria-labelledby={`${menuId}-${g.kind}`}>
-                  <p id={`${menuId}-${g.kind}`} className={GROUP_LABEL} data-profile-menu-group={g.kind}>
-                    <Bookmark className="size-4 shrink-0" fill="currentColor" aria-hidden="true" />
-                    {g.label}
-                  </p>
-                  <div className="pb-1" data-profile-menu-links={g.kind}>
-                    {g.rows.map((l) => (
-                      <LinkRow key={l.key} link={l} onDone={() => close(false)} />
-                    ))}
-                  </div>
+              {/* Focus: the one view chosen for this menu and Off (ui-jobs
+                  582); the others are on /bookmarks?tab=focus. */}
+              <div role="group" aria-labelledby={`${menuId}-focus`} className={GROUP} data-profile-menu-focus="">
+                <GroupHeading id={`${menuId}-focus`} group="focus" tab="focus" label="Focus" onDone={done} />
+                <div className="mt-1" data-profile-menu-focus-views={scope.views.length}>
+                  {menuView ? (
+                    <>
+                      <button
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={scope.active?.id === menuView.id}
+                        onClick={() => focusViews.use(menuView.id)}
+                        className={ITEM}
+                        data-profile-menu-focus-view={menuView.id}
+                      >
+                        <RadioMark on={scope.active?.id === menuView.id} />
+                        <span className="flex min-w-0 flex-1 items-center">
+                          <ViewIcons picks={menuView.assets} chains={menuView.chains} />
+                          <span className={`${FADE} ml-1 font-medium`}>{viewName(menuView)}</span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={!scope.on}
+                        onClick={() => scope.clear()}
+                        className={ITEM}
+                        data-profile-menu-focus-off=""
+                      >
+                        <RadioMark on={!scope.on} />
+                        Off
+                      </button>
+                    </>
+                  ) : (
+                    <EmptyHint href={`${BOOKMARKS_PATH}?tab=focus`} onDone={done}>
+                      Make a focus view
+                    </EmptyHint>
+                  )}
                 </div>
-              ))}
-              {anything && <div className="mx-1 border-t border-rb-200 dark:border-rb-800" />}
-              <div className="py-1">
-                {/* Focus mode's way in while it is off (ui-jobs 557): opens its
-                    panel (components/shared/asset-scope-strip.tsx). */}
-                {!focusShown && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      close(false);
-                      focusViews.create();
-                    }}
-                    className={ITEM}
-                    data-profile-menu-assets={scope.picks.length}
-                  >
-                    <ListFilter className="size-4 shrink-0" aria-hidden="true" />
-                    <span className="min-w-0 flex-1 truncate text-foreground">Focus mode</span>
-                    <span className="shrink-0 truncate text-xs text-rb-500">Off</span>
-                  </button>
-                )}
-                <ProvInspectorSwitch />
-                <Link
-                  href={BOOKMARKS_PATH}
-                  role="menuitem"
-                  onClick={() => close(false)}
-                  className={`${ITEM} text-blue-600 dark:text-[var(--text-link)]`}
-                  data-profile-menu-manage=""
-                >
-                  <Settings className="size-4 shrink-0" aria-hidden="true" />
-                  Manage saved items →
-                </Link>
               </div>
-              <div className="px-1 pb-1 pt-1">
-                <ThemeSwitch />
+              {linkGroup(linkGroups[0])}
+              <div role="group" aria-labelledby={`${menuId}-wallets`} className={GROUP}>
+                <GroupHeading id={`${menuId}-wallets`} group="wallets" tab="wallets" label="Wallets" onDone={done} />
+                <div className="mt-1" data-profile-menu-wallets="">
+                  {rows.length > 0 ? (
+                    rows.map((s) => <WalletRow key={s.key} session={s} onDone={done} />)
+                  ) : (
+                    <EmptyHint href={`${BOOKMARKS_PATH}?tab=wallets`} onDone={done}>
+                      Save a wallet
+                    </EmptyHint>
+                  )}
+                </div>
+              </div>
+              {linkGroup(linkGroups[1])}
+              <div role="group" aria-labelledby={`${menuId}-advanced`} className={GROUP}>
+                <p id={`${menuId}-advanced`} className={`${LABEL} flex min-h-8 items-center`}>
+                  Advanced
+                </p>
+                <div className="mt-1">
+                  <ProvInspectorSwitch />
+                </div>
               </div>
             </div>
           </>,
