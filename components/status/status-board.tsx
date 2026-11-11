@@ -1,14 +1,23 @@
 "use client";
 
-// The status page's board (rails-ops ui-jobs 583): one row per protocol with a
-// chip per chain (percent read and a heartbeat dot); opening a row shows each
+// The status page's board (rails-ops ui-jobs 583): the house table (D1), one
+// row per protocol and a column per chain (a heartbeat dot and the percent
+// read); opening a row (D8) shows each
 // chain's figures, each with its source, and the filters' receipts. The page
 // refreshes its data every minute and the dots' ages every 30 s.
 
-import { useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
-import { DiscChevron } from "@/components/shared/expand-chevron";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableGroupRow,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
 import { CHAINS, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
 import { PROTOCOLS } from "@/lib/shared/protocols";
@@ -61,17 +70,19 @@ function heartbeatLine(e: IndexProgressEntry, now: number): string {
   return `${HEARTBEAT_WORDS[heartbeatState(e, now)]}: last planned against the finalized block of ${utcTime(t)}, ${ageWords(now - t)} ago.`;
 }
 
-function Chip({ e, now }: { e: IndexProgressEntry; now: number }) {
+/** A chain's cell on a protocol's row: the heartbeat dot and the percent read. */
+function ChainCell({ e, now }: { e: IndexProgressEntry; now: number }) {
   const hb = heartbeatState(e, now);
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full border border-rb-200 py-1 pl-2 pr-2.5 text-xs dark:border-rb-700"
+      className="inline-flex items-center gap-2 text-sm"
       title={heartbeatLine(e, now)}
-      data-status-chip={`${e.protocol}-${e.chain}`}
+      data-status-cell={`${e.protocol}-${e.chain}`}
     >
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT[hb]}`} aria-label={HEARTBEAT_WORDS[hb]} />
-      <span className="text-rb-500">{chainName(e.chain)}</span>
-      <span className="font-medium tabular-nums text-foreground">{percentWords(e)}</span>
+      <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[hb]}`} aria-label={HEARTBEAT_WORDS[hb]} />
+      <span className={`tabular-nums ${e.percent == null && !e.atHead ? "text-rb-500" : "text-foreground"}`}>
+        {percentWords(e)}
+      </span>
     </span>
   );
 }
@@ -140,7 +151,7 @@ function Contracts({ chain, contracts }: { chain: number; contracts: string[] })
 function ChainDetail({ e, now }: { e: IndexProgressEntry; now: number }) {
   const hb = heartbeatState(e, now);
   return (
-    <section className="border-t border-rb-200 pt-4 first:border-t-0 first:pt-0 dark:border-rb-700">
+    <section>
       <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
         <span className={`h-2 w-2 rounded-full ${DOT[hb]}`} />
         {chainName(e.chain)}
@@ -228,9 +239,9 @@ function ChainDetail({ e, now }: { e: IndexProgressEntry; now: number }) {
       {e.sources && e.sources.length > 0 && (
         <div className="mt-4">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-rb-500">Receipts</h4>
-          <ul className="mt-2 flex flex-col gap-2">
+          <ul className="mt-2 flex flex-col gap-3">
             {e.sources.map((s) => (
-              <li key={s.filter} className="rounded-lg bg-sunken px-3 py-2 text-xs">
+              <li key={s.filter} className="border-l-2 border-rb-200 pl-3 text-xs dark:border-rb-700">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                   <span className="font-semibold text-foreground">{s.filter}</span>
                   <span className="text-rb-500 tabular-nums">
@@ -265,35 +276,49 @@ function ChainDetail({ e, now }: { e: IndexProgressEntry; now: number }) {
   );
 }
 
-function Row({ row, now }: { row: ProtocolRow; now: number }) {
+/** The chains the table has a column for, in the site's order. */
+const CHAIN_ORDER = [1, 8453, 42161, 10, 5042002];
+function chainColumns(indexes: IndexProgressEntry[]): number[] {
+  const present = [...new Set(indexes.map((e) => e.chain))];
+  const rank = (c: number) => (CHAIN_ORDER.includes(c) ? CHAIN_ORDER.indexOf(c) : CHAIN_ORDER.length);
+  return present.sort((x, y) => rank(x) - rank(y));
+}
+
+function Row({ row, chains, now }: { row: ProtocolRow; chains: number[]; now: number }) {
   const [open, setOpen] = useState(false);
   return (
-    <li className="rounded-xl bg-raised" data-status-row={row.protocol}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="disc-row flex w-full flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-left"
-      >
-        <span className="flex flex-1 items-center gap-2.5 sm:w-44 sm:flex-none">
-          <ProtocolIcon id={iconId(row.protocol)} className="h-5 w-5 shrink-0" />
-          <span className="font-semibold text-foreground">{row.name}</span>
-        </span>
-        <span className="order-3 flex w-full flex-wrap gap-1.5 sm:order-none sm:w-auto sm:flex-1">
-          {row.indexes.map((e) => (
-            <Chip key={e.chain} e={e} now={now} />
-          ))}
-        </span>
-        <DiscChevron isOpen={open} />
-      </button>
+    <Fragment>
+      <DataTableGroupRow
+        open={open}
+        onToggle={() => setOpen((o) => !o)}
+        data-status-row={row.protocol}
+        label={
+          <span className="inline-flex items-center gap-2.5">
+            <ProtocolIcon id={iconId(row.protocol)} className="h-5 w-5 shrink-0" />
+            {row.name}
+          </span>
+        }
+        cells={chains.map((c) => {
+          const e = row.indexes.find((x) => x.chain === c);
+          return (
+            <DataTableCell key={c} valign="middle" label={e ? chainName(c) : undefined}>
+              {e ? <ChainCell e={e} now={now} /> : null}
+            </DataTableCell>
+          );
+        })}
+      />
       {open && (
-        <div className="flex flex-col gap-4 px-4 pb-4">
-          {row.indexes.map((e) => (
-            <ChainDetail key={e.chain} e={e} now={now} />
-          ))}
-        </div>
+        <DataTableRow drawer>
+          <DataTableCell colSpan={chains.length + 1} wide className="pb-6">
+            <div className="flex flex-col gap-5 sm:pl-[2.25rem]">
+              {row.indexes.map((e) => (
+                <ChainDetail key={e.chain} e={e} now={now} />
+              ))}
+            </div>
+          </DataTableCell>
+        </DataTableRow>
       )}
-    </li>
+    </Fragment>
   );
 }
 
@@ -313,6 +338,7 @@ export function StatusBoard({ progress }: { progress: IndexProgress }) {
   }, [router]);
 
   const rows = protocolRows(progress.indexes);
+  const chains = chainColumns(progress.indexes);
   return (
     <div className="mt-10">
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-rb-500">
@@ -329,11 +355,19 @@ export function StatusBoard({ progress }: { progress: IndexProgress }) {
           </span>
         ))}
       </div>
-      <ul className="flex flex-col gap-2">
-        {rows.map((r) => (
-          <Row key={r.protocol} row={r} now={now} />
-        ))}
-      </ul>
+      <DataTable label="Indexing progress by protocol and chain" stacked>
+        <DataTableHead>
+          <DataTableHeader label="Protocol" />
+          {chains.map((c) => (
+            <DataTableHeader key={c} label={chainName(c)} />
+          ))}
+        </DataTableHead>
+        <DataTableBody>
+          {rows.map((r) => (
+            <Row key={r.protocol} row={r} chains={chains} now={now} />
+          ))}
+        </DataTableBody>
+      </DataTable>
       <p className="mt-4 text-xs text-rb-500">
         From {ROUTE} on the Rails index server, as of {utcTime(asOf)}. The server answers from its stored rows; opening
         this page reads no chain.
