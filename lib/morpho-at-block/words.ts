@@ -127,6 +127,8 @@ export const MARKET_LIST_WORDS = {
   idleLink: "Its page",
   /** The roster head's word for the listed markets holding no supply. */
   emptyNow: "empty now",
+  /** The roster explainer's words after that count. */
+  emptyNowWords: { one: "is empty now", many: "are empty now" },
   page: {
     "test-token": "This market isn't listed on the markets page: it lends a test token (ERC20Mock, E20M).",
     "never-funded": "This market isn't listed on the markets page: nothing has ever been supplied to it.",

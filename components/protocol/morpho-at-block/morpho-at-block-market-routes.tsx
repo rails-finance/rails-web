@@ -74,6 +74,7 @@ export async function MorphoAtBlockMarketsRoute({ dep }: { dep: Dep }) {
       chainId={dep.chainId}
       note={note}
       unfundedLabel={MARKET_LIST_WORDS.emptyNow}
+      unfundedWords={MARKET_LIST_WORDS.emptyNowWords}
     />
   );
 }

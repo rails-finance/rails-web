@@ -772,7 +772,11 @@ function Group({
   );
 }
 
-function RosterExplainer({ d }: { d: MorphoRosterData }) {
+/** The explainer's words for the markets holding no supply, after their count: one, several. */
+type UnfundedWords = { one: string; many: string };
+const NEVER_SUPPLIED: UnfundedWords = { one: "has never been supplied", many: "have never been supplied" };
+
+function RosterExplainer({ d, unfunded }: { d: MorphoRosterData; unfunded: UnfundedWords }) {
   const s = d.summary;
   return (
     <>
@@ -782,9 +786,15 @@ function RosterExplainer({ d }: { d: MorphoRosterData }) {
           fixed when it was created. Anyone can create one.
         </ExplainBullet>
         <ExplainBullet>
-          <Fig bold>{s.total.toLocaleString("en-US")}</Fig> markets exist here;{" "}
-          <Fig bold>{s.funded.toLocaleString("en-US")}</Fig> hold supply and{" "}
-          <Fig bold>{s.neverFunded.toLocaleString("en-US")}</Fig> never have.
+          <Fig bold>{s.total.toLocaleString("en-US")}</Fig> markets exist here, and{" "}
+          <Fig bold>{s.funded.toLocaleString("en-US")}</Fig> hold supply.
+          {s.neverFunded > 0 && (
+            <>
+              {" "}
+              <Fig bold>{s.neverFunded.toLocaleString("en-US")}</Fig>{" "}
+              {s.neverFunded === 1 ? unfunded.one : unfunded.many}.
+            </>
+          )}
         </ExplainBullet>
       </ExplainGroup>
       <ExplainGroup title="Reading the table">
@@ -823,6 +833,9 @@ type RosterProps = {
   /** The head's word for the markets holding no supply; "never funded" where absent. Arc's list
    *  leaves out the never-supplied markets, so its zero-supply ones are "empty now" (ui-jobs 577). */
   unfundedLabel?: string;
+  /** The explainer's words after the count of markets holding no supply; "has never been supplied"
+   *  where absent ("is empty now" on Arc and Optimism, ui-jobs 578). */
+  unfundedWords?: UnfundedWords;
 };
 
 /** The roster reads `?all=1` from the URL; the static render, before the
@@ -840,7 +853,14 @@ function RosterWithParams(props: RosterProps) {
   return <RosterView {...props} all={all} />;
 }
 
-function RosterView({ data, chainId, all, note, unfundedLabel = "never funded" }: RosterProps & { all: boolean }) {
+function RosterView({
+  data,
+  chainId,
+  all,
+  note,
+  unfundedLabel = "never funded",
+  unfundedWords = NEVER_SUPPLIED,
+}: RosterProps & { all: boolean }) {
   const root = `/${chainMeta(chainId).slug}/morpho`;
   const pathname = usePathname();
   const r: Read = { chainId, block: data.blockNumber, fromLogs: data.totalsSource === "sieve" };
@@ -934,7 +954,7 @@ function RosterView({ data, chainId, all, note, unfundedLabel = "never funded" }
     ),
     readAt: readAtOf(r, "Every figure on this page"),
     tools: { links },
-    explainer: { body: <RosterExplainer d={data} />, label: "roster explanation" },
+    explainer: { body: <RosterExplainer d={data} unfunded={unfundedWords} />, label: "roster explanation" },
     learnMore: null,
     anatomy: "M4",
   };

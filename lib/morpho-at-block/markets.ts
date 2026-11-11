@@ -120,7 +120,8 @@ export function atBlockMarketsResponse(r: MorphoAtBlockMarketsRead): MorphoMarke
       idleCapital: rows.filter((x) => x.totalSupply > 0 && x.totalBorrow === 0).length,
       neverFunded: rows.filter((x) => x.totalSupply === 0).length,
       idleMarkets: rows.filter((x) => x.isIdle).length,
-      loanTokens: groups.length,
+      // The idle market that names no loan token is a group of its own, not a loan token.
+      loanTokens: groups.filter((g) => g.loanToken !== ZERO_ADDRESS).length,
       lltvs: [...lltvs.entries()].sort((a, b) => b[0] - a[0]).map(([lltv, c]) => ({ lltv, ...c })),
     },
     chainStale: false,
