@@ -790,9 +790,11 @@ export function StatusBoard({ source }: { source: StatusSource }) {
           </div>
           {allowance?.remaining != null && allowance.allowanceToday != null && (
             <p className="mb-3 text-xs text-rb-500" data-anatomy="Y2.1">
-              The free gateway&apos;s daily allowance: {mb(allowance.remaining)} of {mb(allowance.allowanceToday)} left
+              {providerWords(allowance.host)}&apos;s daily allowance, one for every chain: {mb(allowance.remaining)} of{" "}
+              {mb(allowance.allowanceToday)} left
               {allowance.floorBytes != null && `, ${mb(allowance.floorBytes)} kept in reserve`}
-              {allowance.resetsAt && `, resets at ${hhmm(allowance.resetsAt)}`}. One allowance serves every network.
+              {allowance.resetsAt && `, resets at ${hhmm(allowance.resetsAt)}`}. The full-history fill and reads on
+              visit draw on it; Sieve does not.
             </p>
           )}
           <DataTable
