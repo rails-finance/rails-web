@@ -283,6 +283,25 @@ const SPECS: ProtocolSpec[] = [
     ],
   },
   {
+    // Aave V3 on Optimism (rails-ops ui-jobs 578): one Pool, read from the
+    // chain when a page opens. A front door taking a wallet, its account at
+    // `<route>/<wallet>`, and the market overview and reserve pages that
+    // Ethereum, Base and Arbitrum draw, fed by rails-server's
+    // /api/at-block/aave-v3-optimism routes. Unlaunched while Miles reads it.
+    id: "aave-v3-optimism",
+    session: "aave-v3-optimism",
+    label: "Aave V3",
+    chainId: 10,
+    slug: "aave-v3",
+    protocolKey: "aave-v3",
+    tags: ["Lend", "Borrow"],
+    desc: "Aave V3 on Optimism: a wallet's account on the Pool, its balances in dollars at Aave's oracle, its health factor and 30 days of interest",
+    positionListing: false,
+    readTier: "visit",
+    unlaunched: true,
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+  },
+  {
     // Aave's VAULT LAYER, and a third Aave row on Ethereum beside the two pool
     // explorers — intended (rails-ops decision 0028 point 5). The door is
     // unstamped because savings GHO and Umbrella stake tokens are Aave-wide
@@ -1176,6 +1195,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   lido: "Stake",
   "fluid-base": "Position",
   "aave-v4-arc": "Position",
+  "aave-v3-optimism": "Position",
   // One account's holding in one vault.
   "euler-v2-base": "Position",
   "euler-v2-arbitrum": "Position",
