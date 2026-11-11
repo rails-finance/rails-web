@@ -220,8 +220,8 @@ export function BookmarksPage() {
                   "Listings",
                   "listing",
                   <>
-                    A listing with its filters and sort. Set them on any listing, then choose{" "}
-                    <Term>Save this view</Term> in the ⋮ at the end of its filter row.
+                    A listing with its filters and sort. Set them on any listing, then choose <Term>Save listing</Term>{" "}
+                    in the ⋮ at the end of its filter row.
                   </>,
                 )}
                 {kindCard(
@@ -304,8 +304,8 @@ export function BookmarksPage() {
                 <div data-anatomy="B3">
                   <p className="font-semibold text-foreground">No saved listings yet.</p>
                   <p className="mt-1 text-sm text-rb-500">
-                    To save one, set a listing&apos;s filters and sort, then choose Save this view in the ⋮ at the end
-                    of its filter row.
+                    To save one, set a listing&apos;s filters and sort, then choose Save listing in the ⋮ at the end of
+                    its filter row.
                   </p>
                 </div>
               }

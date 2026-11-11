@@ -12,7 +12,7 @@
 // lead zone: one protocol on one chain. Worked example: the vault index table
 // (components/vaults/vault-index-table.tsx, V6).
 //
-// FACETS (ListToolbar, kept in the URL so Save this view and Copy link keep
+// FACETS (ListToolbar, kept in the URL so Save listing and Copy link keep
 // them): Underlying (the Rails label of the protocol behind the yield token,
 // lib/pendle/underlying.ts, "Not labelled" a value of its own), Maturity
 // (active by default; `?maturity=matured` or `all`), Asset. The search narrows

@@ -557,11 +557,7 @@ await phone.close();
   const items = await sp
     .locator('[data-view-menu] [role="menu"] [data-menu-item]')
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-menu-item")));
-  check(
-    "SV the listing ⋮ holds Save this view and Copy link",
-    items.join() === "save-view,copy-view-link",
-    items.join(),
-  );
+  check("SV the listing ⋮ holds Save listing and Copy link", items.join() === "save-view,copy-view-link", items.join());
   await sp.locator('[data-menu-item="save-view"]').click();
   const saved = (await read("rails-saved")).find((r) => r.kind === "view");
   check(
