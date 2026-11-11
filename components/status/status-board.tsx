@@ -38,6 +38,7 @@ import {
   cellsFromProgress,
   cellsFromStatus,
   heartbeatIsWallTime,
+  errorKind,
   fillStall,
   fillState,
   heartbeatTime,
@@ -557,6 +558,8 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
                   · {w.expectEverySec ? `runs every ${ageWords(w.expectEverySec)}` : "runs on events"}
                 </span>
                 <div className="mt-0.5 text-rb-500">
+                  {w.lastRunAt &&
+                    `Last ran ${utcTime(Date.parse(w.lastRunAt) / 1000)}${w.lastRunOk === false ? ` and failed (${errorKind(w.lastRunError ?? null) ?? "Error"})` : ""} · `}
                   {w.lastWriteAt ? `Last write ${utcTime(Date.parse(w.lastWriteAt) / 1000)}` : "No write time stored"}
                   {w.newest && ` · newest row at block ${n(w.newest.block)}`}
                 </div>

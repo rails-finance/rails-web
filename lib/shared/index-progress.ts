@@ -166,6 +166,10 @@ export interface StatusWriter {
   newest: { block: number; time: Secs | null } | null;
   /** How often the writer runs, from its schedule; null where none is stored. */
   expectEverySec?: number | null;
+  /** The writer's last poll, whether it wrote rows or not, and its outcome. */
+  lastRunAt?: string | null;
+  lastRunOk?: boolean | null;
+  lastRunError?: string | null;
 }
 
 /** The last hour of reads made when a page opens (the tier-request tally). */
@@ -342,10 +346,14 @@ export function visitState(v: VisitReads | null | undefined): Heartbeat {
 /** A writer's state against its schedule: late past 1.5 times its cadence,
  *  stalled past 3 times. */
 export function writerState(w: StatusWriter, now: Secs): Heartbeat {
-  const t = isoSecs(w.lastWriteAt);
+  // Its last poll where the writer records one (a quiet protocol writes no
+  // rows), else its newest write.
+  const ran = isoSecs(w.lastRunAt);
+  const t = ran ?? isoSecs(w.lastWriteAt);
   const every = w.expectEverySec;
   // An event-driven writer has no schedule to be late against.
   if (t == null || !every) return "none";
+  if (ran != null && w.lastRunOk === false) return "late";
   const age = now - t;
   return age > 3 * every ? "stalled" : age > 1.5 * every ? "late" : "fresh";
 }
