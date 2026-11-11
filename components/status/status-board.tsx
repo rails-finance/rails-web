@@ -34,7 +34,8 @@ import {
   cellsFromProgress,
   cellsFromStatus,
   heartbeatIsWallTime,
-  heartbeatState,
+  fillStall,
+  fillState,
   heartbeatTime,
   percentWords,
   pipelineHeartbeat,
@@ -97,13 +98,20 @@ const utcTime = (t: number) => {
 
 const n = (x: number) => x.toLocaleString("en-US");
 
+const STALL_WORDS = {
+  "not-gaining": "No blocks read over the last samples, though the fill still reports.",
+  behind: "Read to the head, then fell behind it; the fill still reports.",
+} as const;
+
 function heartbeatLine(e: IndexProgressEntry, now: number): string {
   const t = heartbeatTime(e);
   if (t == null) return "The fill has not reported this index yet.";
-  const words = HEARTBEAT_WORDS[heartbeatState(e, now)];
-  return heartbeatIsWallTime(e)
+  const words = HEARTBEAT_WORDS[fillState(e, now)];
+  const line = heartbeatIsWallTime(e)
     ? `${words}: the fill last wrote at ${utcTime(t)}, ${ageWords(now - t)} ago.`
     : `${words}: last planned against the finalized block of ${utcTime(t)}, ${ageWords(now - t)} ago.`;
+  const stall = fillStall(e);
+  return stall ? `${line} ${STALL_WORDS[stall]}` : line;
 }
 
 const CAUSE_WORDS: Record<string, string> = {
@@ -156,10 +164,11 @@ function cellView(c: StatusCell, now: number): CellView {
   const live = c.entry?.live;
   const lane = live ? laneWords(live.lane) : c.fill ? "The full-history fill" : "–";
   if (c.fill) {
-    const hb = heartbeatState(c.fill, now);
+    const hb = fillState(c.fill, now);
+    const stall = fillStall(c.fill);
     return {
       hb,
-      status: STATUS_WORDS[hb],
+      status: stall && hb === "late" ? "Not gaining" : STATUS_WORDS[hb],
       index: percentWords(c.fill),
       indexRank: c.fill.atHead ? 100 : (c.fill.percent ?? 0),
       last: heartbeatTime(c.fill),
@@ -257,7 +266,6 @@ function Contracts({ chain, contracts }: { chain: number; contracts: string[] })
 }
 
 function ChainDetail({ e, now }: { e: IndexProgressEntry; now: number }) {
-  const hb = heartbeatState(e, now);
   return (
     <section>
       <p className="text-xs text-rb-500">{heartbeatLine(e, now)}</p>

@@ -88,6 +88,25 @@ export function heartbeatAge(t: Secs | null, now: Secs): Heartbeat {
 
 export const heartbeatState = (e: IndexProgressEntry, now: Secs): Heartbeat => heartbeatAge(heartbeatTime(e), now);
 
+/** Whether a fill is moving. The fill writes its sample every 10 min even
+ *  while it holds an index, so a fresh heartbeat alone does not mean blocks
+ *  are being read. "not-gaining": no blocks read over the pace window (an
+ *  hour or more of samples); "behind": read to within rounding of the head,
+ *  then fell more than 30 min of blocks behind it. Null when neither holds. */
+export function fillStall(e: IndexProgressEntry): "not-gaining" | "behind" | null {
+  if (e.atHead) return null;
+  if (e.percent != null && e.percent >= 99.95) return "behind";
+  if (e.pace && e.pace.blocksPerHour === 0) return "not-gaining";
+  return null;
+}
+
+/** A fill's state: its heartbeat's age, and never better than late while it
+ *  is not moving. */
+export function fillState(e: IndexProgressEntry, now: Secs): Heartbeat {
+  const hb = heartbeatState(e, now);
+  return fillStall(e) && (hb === "fresh" || hb === "none") ? "late" : hb;
+}
+
 /** "4 min", "2 h 10 min", "3 days": the age of a time, for a heartbeat. */
 export function ageWords(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
