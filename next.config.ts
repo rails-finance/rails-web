@@ -125,6 +125,8 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/morpho-arbitrum", "/arbitrum/morpho"],
   // Compound V3 on Arbitrum never had a pre-0016 path; the row is for check:routes.
   ["/compound-v3-arbitrum", "/arbitrum/compound-v3"],
+  // Compound V3 on Optimism never had a pre-0016 path; the row is for check:routes.
+  ["/compound-v3-optimism", "/optimism/compound-v3"],
   // CoW never had a pre-0016 path; the row is for check:routes.
   ["/cow", "/ethereum/cow"],
   // Pendle never had a pre-0016 path; the row is for check:routes.

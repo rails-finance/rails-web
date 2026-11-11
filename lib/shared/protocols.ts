@@ -493,6 +493,25 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
+    // Compound V3 on Optimism (rails-ops ui-jobs 578): three Comets, read from
+    // the chain when a page opens. A front door taking a wallet, its Comets at
+    // `<route>/<wallet>`, one Comet's account at `<route>/<comet>/<wallet>`, and
+    // the Markets pages Ethereum, Base and Arbitrum draw, fed by rails-server's
+    // /api/at-block/compound-v3-optimism routes. Unlaunched while Miles reads it.
+    id: "compound-v3-optimism",
+    session: "compound-v3-optimism",
+    label: "Compound V3",
+    chainId: 10,
+    slug: "compound-v3",
+    protocolKey: "compound",
+    tags: ["Lend", "Borrow"],
+    desc: "Compound V3 on Optimism: a wallet's account in each of three Comets, its balances at each Comet's price feeds, its borrowing limit and 30 days of interest",
+    positionListing: false,
+    readTier: "visit",
+    unlaunched: true,
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+  },
+  {
     id: "dolomite",
     session: "dolomite",
     label: "Dolomite",
@@ -1184,6 +1203,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   compound: "Position",
   "compound-base": "Position",
   "compound-v3-arbitrum": "Position",
+  "compound-v3-optimism": "Position",
   "compound-v2": "Position",
   dolomite: "Account",
   pwn: "Loans",

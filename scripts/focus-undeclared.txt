@@ -57,6 +57,8 @@
 /ethereum/uniswap-v3/position/[id]
 /ethereum/uniswap-v4/[wallet]
 /ethereum/uniswap-v4/position/[id]
+/optimism/compound-v3/[market]
+/optimism/compound-v3/[market]/[wallet]
 /pulse
 /sepolia/polaris/[market]/[id]
 /sepolia/polaris/[market]/[id]/event/[eventId]
