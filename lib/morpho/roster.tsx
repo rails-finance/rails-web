@@ -23,13 +23,18 @@
 //   • The loan-token page (/markets/<loanToken>): the token's head, the same
 //     table for its markets that carry the book, then the markets that repeat
 //     one pair, the small ones and the never funded.
+//   • Focus (ui-jobs 557): a market counts when its loan or its collateral
+//     token is in focus. The roster judges every row that carries a book (the
+//     vault view steps aside) and keeps the groups with one; the loan-token
+//     page is held behind an AimGate when none of its markets counts, and its
+//     tables keep the markets that do.
 //
 // Every row opens its market's page. Sizes and rates are stored and live reads
 // at one block (lib/sources/chain/morpho-markets.ts); the market id and the
 // oracle sit in the collateral cell's receipt.
 
 import Link from "next/link";
-import { Fragment, Suspense, useMemo, useState, type ReactNode } from "react";
+import { Fragment, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { ExplainBullet, ExplainGroup, ExplainSub, Fig } from "@/components/shared/explain-groups";
@@ -39,6 +44,9 @@ import { ProvSection, SectionHeading, type SectionMenuLink } from "@/components/
 import { ProductHeadSection, ToolsFor } from "@/components/shared/product/product-head";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { AimGate } from "@/components/shared/aim-gate";
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { assetKey } from "@/lib/shared/asset-family";
 import { AssetUnit } from "@/components/shared/asset-unit";
 import { TokenPairIcons } from "@/components/shared/token-pair-icons";
 import {
@@ -636,6 +644,31 @@ function groupViews(groups: MorphoRosterGroup[], filter: "lent" | "all" | "none"
     .sort((a, b) => b.g.lentOwn - a.g.lentOwn || b.rows.length - a.rows.length);
 }
 
+/** A market's keys under Focus: its loan and collateral tokens. */
+const marketKeys = (chainId: number, m: { loanToken: string; collateralToken: string | null }): string[] => [
+  assetKey(chainId, m.loanToken),
+  ...(m.collateralToken ? [assetKey(chainId, m.collateralToken)] : []),
+];
+
+/** The views narrowed to the rows Focus keeps, counts and totals over them. */
+function keptViews(views: GroupView[], kept: ReadonlySet<MorphoRosterRow>): GroupView[] {
+  return views
+    .map((v) => {
+      const rows = v.rows.filter((m) => kept.has(m));
+      return {
+        ...v,
+        rows,
+        count: rows.length,
+        totalSupply: rows.reduce((s, m) => s + m.totalSupply, 0),
+        totalBorrow: rows.reduce((s, m) => s + m.totalBorrow, 0),
+        // The vault view's line steps aside: Focus chose these rows.
+        lent: null,
+        filtered: true,
+      };
+    })
+    .filter((v) => v.rows.length > 0);
+}
+
 const VIEW_LINK = `cursor-pointer ${INLINE_LINK}`;
 
 /** A loan token's group: a disclosure whose heading states the token's book. */
@@ -846,9 +879,26 @@ function RosterView({ data, chainId, all, note, unfundedLabel = "never funded" }
   const r: Read = { chainId, block: data.blockNumber, fromLogs: data.totalsSource === "sieve" };
   const [sort, onSort] = useSort();
   const filter = data.vaults !== "read" ? "none" : all ? "all" : "lent";
-  const views = useMemo(() => groupViews(data.groups, filter), [data.groups, filter]);
-  const hidden = filter === "lent" ? data.groups.length - views.length : 0;
+  // Focus judges every row that carries a book, whatever the vault view.
+  const allViews = useMemo(() => groupViews(data.groups, filter === "none" ? "none" : "all"), [data.groups, filter]);
+  const allRows = useMemo(() => allViews.flatMap((v) => v.rows), [allViews]);
+  const scoped = useScopedRows(
+    allRows,
+    (m) => marketKeys(chainId, m),
+    () => chainId,
+  );
+  const focusing = scoped.on && !scoped.peek;
+  const views = useMemo(
+    () => (focusing ? keptViews(allViews, new Set(scoped.rows)) : groupViews(data.groups, filter)),
+    [focusing, allViews, scoped.rows, data.groups, filter],
+  );
+  const hidden = filter === "lent" && !focusing ? data.groups.length - views.length : 0;
   const [open, setOpen] = useState<Set<string>>(() => new Set(views[0] ? [views[0].g.loanToken] : []));
+  // The first group Focus keeps opens, as the largest does on arrival.
+  const firstKept = focusing ? views[0]?.g.loanToken : undefined;
+  useEffect(() => {
+    if (firstKept) setOpen((p) => (p.has(firstKept) ? p : new Set([...p, firstKept])));
+  }, [firstKept]);
   const toggle = (t: string) =>
     setOpen((p) => {
       const n = new Set(p);
@@ -990,7 +1040,7 @@ function RosterView({ data, chainId, all, note, unfundedLabel = "never funded" }
                 }
               >
                 <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
-                  {filter === "lent"
+                  {filter === "lent" && !focusing
                     ? "Loan tokens with the most markets a vault lends into first. Open one for its markets."
                     : "Loan tokens with the most funded markets first. Open one for its markets."}
                 </p>
@@ -1002,7 +1052,8 @@ function RosterView({ data, chainId, all, note, unfundedLabel = "never funded" }
                   </p>
                 )}
               </SectionHeading>
-              <div className="mt-3">
+              <ScopeNote scoped={scoped} noun={["market", "markets"]} className="mt-2" />
+              <div className="mt-3" {...scoped.listProps}>
                 {views.map((v) => (
                   <Group
                     key={v.g.loanToken}
@@ -1150,17 +1201,41 @@ function FamilyBlock({
   );
 }
 
-export function MorphoLoanTokenPage({
-  g,
-  block,
-  fromLogs,
-  chainId,
-}: {
+type LoanTokenProps = {
   g: MorphoLoanTokenViewData;
   block: number;
   fromLogs: boolean;
   chainId: ChainId;
-}) {
+};
+
+/** The loan-token page, held behind an AimGate when none of its markets has a
+ *  token in focus. */
+export function MorphoLoanTokenPage(props: LoanTokenProps) {
+  const { g, chainId } = props;
+  const keys = useMemo(
+    () => [
+      assetKey(chainId, g.loanToken),
+      ...[...g.material, ...g.families.flatMap((f) => f.markets), ...g.dust, ...g.empties].flatMap((m) =>
+        m.collateralToken ? [assetKey(chainId, m.collateralToken)] : [],
+      ),
+    ],
+    [g, chainId],
+  );
+  const root = `/${chainMeta(chainId).slug}/morpho`;
+  return (
+    <div className="min-h-screen" data-anatomy="R1" data-morpho-loan-token={g.loanToken}>
+      <div className="py-8">
+        <SubPageHeader protocol={protocolForHref(root)!} title={`${g.loanSymbol} markets`} />
+        <AimGate keys={keys} chain={chainId} what={`Morpho Blue's ${g.loanSymbol} markets`}>
+          <LoanTokenBody {...props} />
+        </AimGate>
+      </div>
+      <ProvInspectorLayer />
+    </div>
+  );
+}
+
+function LoanTokenBody({ g, block, fromLogs, chainId }: LoanTokenProps) {
   const root = `/${chainMeta(chainId).slug}/morpho`;
   const r: Read = { chainId, block, fromLogs };
   const [sort, onSort] = useSort();
@@ -1260,6 +1335,14 @@ export function MorphoLoanTokenPage({
     learnMore: null,
     anatomy: "M4",
   };
+  // Focus: the markets whose loan or collateral token is in focus (every one,
+  // where the loan token is).
+  const byMarket = (m: { collateralToken: string | null }) => marketKeys(chainId, { loanToken: g.loanToken, ...m });
+  const material = useScopedRows(g.material, byMarket, () => chainId);
+  const families = useScopedRows(g.families, byMarket, () => chainId);
+  const dust = useScopedRows(g.dust, byMarket, () => chainId);
+  const empties = useScopedRows(g.empties, byMarket, () => chainId);
+  const emptiesCount = empties.on ? empties.rows.reduce((n, e) => n + e.count, 0) : g.emptiesCount;
   const csv = (rows: MorphoMarketRow[], name: string) => ({
     exports: {
       csv: {
@@ -1270,97 +1353,101 @@ export function MorphoLoanTokenPage({
   });
 
   return (
-    <div className="min-h-screen" data-anatomy="R1" data-morpho-loan-token={g.loanToken}>
-      <div className="py-8">
-        <SubPageHeader protocol={protocolForHref(root)!} title={`${g.loanSymbol} markets`} />
-        <ProductHeadSection head={head} titled={false} />
+    <>
+      <ProductHeadSection head={head} titled={false} />
 
-        {g.material.length > 0 && (
-          <ProvSection
-            scope="token-markets"
-            className="mb-8"
-            data-morpho-markets-table=""
-            data-skel-section="page-table"
+      {g.material.length > 0 && (
+        <ProvSection scope="token-markets" className="mb-8" data-morpho-markets-table="" data-skel-section="page-table">
+          <SectionHeading
+            title="Markets"
+            menu={<ToolsFor scope="token-markets" title="Markets" tools={csv(material.rows, "markets")} />}
           >
-            <SectionHeading
-              title="Markets"
-              menu={<ToolsFor scope="token-markets" title="Markets" tools={csv(g.material, "markets")} />}
-            >
-              <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">The markets that carry the book.</p>
-            </SectionHeading>
+            <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">The markets that carry the book.</p>
+          </SectionHeading>
+          <ScopeNote scoped={material} noun={["market", "markets"]} className="mt-2" />
+          {material.rows.length > 0 && (
             <div className="mt-3">
-              <MarketsTable rows={g.material} r={r} label={`${g.loanSymbol} markets`} sort={sort} onSort={onSort} />
+              <MarketsTable rows={material.rows} r={r} label={`${g.loanSymbol} markets`} sort={sort} onSort={onSort} />
             </div>
-          </ProvSection>
-        )}
+          )}
+        </ProvSection>
+      )}
 
-        {g.families.length > 0 && (
-          <ProvSection scope="token-families" className="mb-8" data-morpho-families="">
-            <SectionHeading
-              title="Markets that repeat one pair"
-              menu={
-                <ToolsFor
-                  scope="token-families"
-                  title="Markets that repeat one pair"
-                  tools={csv(
-                    g.families.flatMap((f) => f.markets),
-                    "repeats",
-                  )}
-                />
-              }
-            >
-              <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
-                Ten or more markets with one collateral and one LLTV, differing only in their oracle.
-              </p>
-            </SectionHeading>
-            <div className="mt-2">
-              {g.families.map((f) => (
-                <FamilyBlock key={`${f.collateralToken}:${f.lltv}`} f={f} g={g} r={r} sort={sort} onSort={onSort} />
-              ))}
-            </div>
-          </ProvSection>
-        )}
-
-        {g.dust.length > 0 && (
-          <ProvSection scope="token-small" className="mb-8" data-morpho-dust="">
-            <SectionHeading
-              title="Smaller markets"
-              menu={<ToolsFor scope="token-small" title="Smaller markets" tools={csv(g.dust, "smaller")} />}
-            >
-              <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500" data-prov-exempt="">
-                {g.dust.length.toLocaleString("en-US")} funded markets, each under 0.1% of the book.
-              </p>
-            </SectionHeading>
-            <Disclosure label={`${g.dust.length.toLocaleString("en-US")} markets`}>
-              <MarketsTable rows={g.dust} r={r} label={`Smaller ${g.loanSymbol} markets`} sort={sort} onSort={onSort} />
-            </Disclosure>
-          </ProvSection>
-        )}
-
-        {g.emptiesCount > 0 && (
-          <section className="mb-8" data-morpho-never-funded="">
-            <h2 className="text-sm font-semibold text-foreground">Never funded</h2>
-            <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500" data-prov-exempt="">
-              {g.emptiesCount.toLocaleString("en-US")} {g.emptiesCount === 1 ? "market has" : "markets have"} never held
-              supply. Creating one costs only gas.
+      {g.families.length > 0 && (
+        <ProvSection scope="token-families" className="mb-8" data-morpho-families="">
+          <SectionHeading
+            title="Markets that repeat one pair"
+            menu={
+              <ToolsFor
+                scope="token-families"
+                title="Markets that repeat one pair"
+                tools={csv(
+                  families.rows.flatMap((f) => f.markets),
+                  "repeats",
+                )}
+              />
+            }
+          >
+            <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
+              Ten or more markets with one collateral and one LLTV, differing only in their oracle.
             </p>
-            <Disclosure label="them">
-              <p className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] tabular-nums text-rb-500" data-prov-exempt="">
-                {g.empties.map((e) => (
-                  <span key={`${e.collateralToken ?? "idle"}:${e.lltv}`}>
-                    <span className={e.collateralSymbol && !e.collateralNamed ? "font-mono" : ""}>
-                      {e.collateralSymbol ?? "idle"}
-                    </span>{" "}
-                    · <span className="text-foreground">{pctText(e.lltv)}</span>
-                    {e.count > 1 && <> ×{e.count}</>}
-                  </span>
-                ))}
-              </p>
+          </SectionHeading>
+          <ScopeNote scoped={families} noun={["pair", "pairs"]} className="mt-2" />
+          <div className="mt-2">
+            {families.rows.map((f) => (
+              <FamilyBlock key={`${f.collateralToken}:${f.lltv}`} f={f} g={g} r={r} sort={sort} onSort={onSort} />
+            ))}
+          </div>
+        </ProvSection>
+      )}
+
+      {g.dust.length > 0 && (
+        <ProvSection scope="token-small" className="mb-8" data-morpho-dust="">
+          <SectionHeading
+            title="Smaller markets"
+            menu={<ToolsFor scope="token-small" title="Smaller markets" tools={csv(dust.rows, "smaller")} />}
+          >
+            <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500" data-prov-exempt="">
+              {g.dust.length.toLocaleString("en-US")} funded markets, each under 0.1% of the book.
+            </p>
+          </SectionHeading>
+          <ScopeNote scoped={dust} noun={["market", "markets"]} />
+          {dust.rows.length > 0 && (
+            <Disclosure label={`${dust.rows.length.toLocaleString("en-US")} markets`}>
+              <MarketsTable
+                rows={dust.rows}
+                r={r}
+                label={`Smaller ${g.loanSymbol} markets`}
+                sort={sort}
+                onSort={onSort}
+              />
             </Disclosure>
-          </section>
-        )}
-      </div>
-      <ProvInspectorLayer />
-    </div>
+          )}
+        </ProvSection>
+      )}
+
+      {emptiesCount > 0 && (
+        <section className="mb-8" data-morpho-never-funded="">
+          <h2 className="text-sm font-semibold text-foreground">Never funded</h2>
+          <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500" data-prov-exempt="">
+            {emptiesCount.toLocaleString("en-US")} {emptiesCount === 1 ? "market has" : "markets have"} never held
+            supply. Creating one costs only gas.
+          </p>
+          <Disclosure label="them">
+            <p className="flex flex-wrap gap-x-4 gap-y-1 text-[12px] tabular-nums text-rb-500" data-prov-exempt="">
+              {empties.rows.map((e) => (
+                <span key={`${e.collateralToken ?? "idle"}:${e.lltv}`}>
+                  <span className={e.collateralSymbol && !e.collateralNamed ? "font-mono" : ""}>
+                    {e.collateralSymbol ?? "idle"}
+                  </span>{" "}
+                  · <span className="text-foreground">{pctText(e.lltv)}</span>
+                  {e.count > 1 && <> ×{e.count}</>}
+                </span>
+              ))}
+            </p>
+          </Disclosure>
+        </section>
+      )}
+    </>
   );
 }

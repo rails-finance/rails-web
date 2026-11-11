@@ -12,6 +12,8 @@ import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { AimGate } from "@/components/shared/aim-gate";
+import { poolTokenKeys } from "@/components/protocol/uniswap/pool-focus-keys";
 import { UniswapPositionCard } from "@/components/protocol/uniswap/uniswap-position-card";
 import { UniswapReadout } from "@/components/protocol/uniswap/uniswap-readout";
 import { fetchUniswapPosition } from "@/lib/api/fetch-uniswap";
@@ -112,7 +114,7 @@ export async function UniswapPositionPage({
   const p = poolPosition(r, protocol);
   const title = POSITION_PAGE.title(p);
   const holderHref = `${home}/${p.holder.toLowerCase()}`;
-  return (
+  const page = (
     <div className="min-h-screen">
       <div className="py-8">
         <header className="mb-5" data-skel-section="page-header">
@@ -151,5 +153,13 @@ export async function UniswapPositionPage({
       </div>
       <ProvInspectorLayer />
     </div>
+  );
+  // Focus (ui-jobs 557): the position is in focus when either side of its pair is.
+  // The Base and Arbitrum routes gate the page themselves (uniswap-focus.tsx).
+  if (chainId !== 1) return page;
+  return (
+    <AimGate keys={poolTokenKeys(1, [r.token0, r.token1])} chain={1} what="This position">
+      {page}
+    </AimGate>
   );
 }

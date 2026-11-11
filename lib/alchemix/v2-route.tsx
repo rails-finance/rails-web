@@ -14,6 +14,7 @@ import type { PositionCardModel } from "@/lib/share/position-card";
 import { formatNumber } from "@/lib/utils/format";
 import { AlchemixV2PositionView } from "@/components/protocol/alchemix/v2-position-view";
 import { PositionReadProvider } from "@/components/shared/position-read";
+import { alchemixV2FocusSource } from "@/lib/alchemix/focus-source";
 import { chainRead } from "@/lib/shared/position-read";
 import { timedRead } from "@/lib/shared/position-read-server";
 import { RouteNotFound } from "@/components/shared/route-not-found";
@@ -68,7 +69,11 @@ export async function AlchemixV2PositionPage({
   // The card states the Alchemist read its debt stands on (ui-jobs 512).
   const stamp = await timedRead(chainRead(read.position.frozenDebt?.asOfBlock, null), deployment.chainId);
   return (
-    <PositionReadProvider key={`${lineKey}:${account.toLowerCase()}`} read={stamp}>
+    <PositionReadProvider
+      focus={{ source: alchemixV2FocusSource(read.position) }}
+      key={`${lineKey}:${account.toLowerCase()}`}
+      read={stamp}
+    >
       <AlchemixV2PositionView
         key={`${lineKey}:${account.toLowerCase()}`}
         deployment={deployment}

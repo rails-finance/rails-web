@@ -9,8 +9,8 @@
 
 import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { ArrowRight } from "lucide-react";
+import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { fetchUniswapPositions } from "@/lib/api/fetch-uniswap";
@@ -18,6 +18,8 @@ import type { SessionProtocol } from "@/lib/shared/sessions";
 import { uniExplorer, type UniChainId, type UniProtocol } from "@/lib/uniswap/deployments";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { poolTokenKeys } from "@/components/protocol/uniswap/pool-focus-keys";
+import { PoolWalletList, UniswapOtherCount } from "@/components/protocol/uniswap/pool-wallet-list";
 import type { UniswapVersion } from "@/lib/uniswap/types";
 import { FRONT_DOOR } from "@/lib/uniswap/words";
 
@@ -50,7 +52,11 @@ export async function UniswapWalletPositions({
   const answer = await fetchUniswapPositions(wallet, protocol, chainId);
   const all = answer.kind === "ok" ? answer.data.positions : [];
   const mine = all.filter((p) => p.version === version);
-  const others = all.filter((p) => p.version === other).length;
+  const others = all.filter((p) => p.version === other);
+  // Focus (ui-jobs 557): on Ethereum the list keeps the positions with a side
+  // of their pair in focus and counts what it kept; the Base and Arbitrum
+  // routes pass `focusRow` and gate each row themselves (uniswap-focus.tsx).
+  const counted = !focusRow;
   return (
     <div className="py-8" data-anatomy="U3" data-uniswap-wallet={wallet}>
       <header className="mb-5">
@@ -72,6 +78,17 @@ export async function UniswapWalletPositions({
         <p className="text-sm text-rb-500" data-uniswap-none="">
           {FRONT_DOOR.none(version, protocol)}
         </p>
+      ) : counted ? (
+        <PoolWalletList
+          rows={mine.map((p) => ({
+            key: p.id,
+            href: `${home}/position/${p.id}`,
+            label: FRONT_DOOR.row(p, version),
+            keys: poolTokenKeys(chainId, [p.token0, p.token1]),
+            chain: chainId,
+            attrs: { "data-uniswap-position-row": p.id },
+          }))}
+        />
       ) : (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {mine.map((p) => {
@@ -107,10 +124,19 @@ export async function UniswapWalletPositions({
       {answer.kind === "ok" && answer.data.truncated && (
         <p className="mt-3 text-sm text-rb-500">{FRONT_DOOR.truncated}</p>
       )}
-      {others > 0 && (
+      {others.length > 0 && counted && (
+        <UniswapOtherCount
+          others={others.map((p) => poolTokenKeys(chainId, [p.token0, p.token1]))}
+          version={other}
+          chain={chainId}
+          protocol={protocol}
+          href={`${uniExplorer(protocol, chainId, other).route}/${wallet}`}
+        />
+      )}
+      {others.length > 0 && !counted && (
         <p className="mt-4 text-sm">
           <Link href={`${uniExplorer(protocol, chainId, other).route}/${wallet}`} className={INLINE_LINK}>
-            {FRONT_DOOR.other(other, others, protocol)}
+            {FRONT_DOOR.other(other, others.length, protocol)}
           </Link>
         </p>
       )}

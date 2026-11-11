@@ -7,6 +7,11 @@
 // Protocol-aggregate, read-only: the Pool's full reserve roster — size, rates,
 // risk parameters, oracle prices — read live from the Pool + IAaveOracle.
 // Framing: present, don't rank — no score, no risk valence.
+//
+// Focus (ui-jobs 557): the overview keeps the Pools with a reserve in focus
+// (MarketRoster's useScopedRows); a Pool's page is held behind its AimGate
+// when none of its reserves is in focus, and its table keeps the reserves that
+// are (components/shared/product/market-page.tsx).
 
 import { AaveMarketPage, AaveMarketsOverview } from "@/lib/aave-family/product";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";

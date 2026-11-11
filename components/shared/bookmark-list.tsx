@@ -4,22 +4,37 @@
 // (/bookmarks, rails-ops ui-jobs 480), and `useBookmarks`, which the profile
 // control (H20) reads for its face and its menu. The list lives in this
 // origin's localStorage under `rails-bookmarks` (lib/shared/sessions.ts), in
-// the reader's order: with `reorder`, rows move by drag and drop and by their
-// move-up and move-down buttons (ui-jobs 504).
+// the reader's order: with `reorder`, rows move by drag and drop (from sm) and
+// by Move up and Move down in their ⋮ (ui-jobs 504). Each list is the house
+// table (components/shared/data-table), stacked below sm, every action in the
+// row's ⋮ (D7).
 
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
-import Link from "next/link";
-import { ChevronDown, ChevronUp, GripVertical, MoreVertical, Upload } from "lucide-react";
+import { GripVertical, Upload } from "lucide-react";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { INPLACE_TEXT, NAV_BUTTON, POSITION_TAG_TONE } from "@/lib/shared/ui-grammar";
 
 import { BookmarkSummary } from "@/components/bookmarks/bookmark-summary";
 import { Facehash } from "@/components/shared/facehash";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+  DataTableRowLink,
+  DataTableRowMenu,
+  type DataTableRowMenuItem,
+} from "@/components/shared/data-table/data-table";
 
 import { walletHref } from "@/components/shared/front-door-search";
 import { focusName, ViewIcons, viewName } from "@/components/shared/asset-scope-strip";
-import { focusViews, scopeLink, type FocusView } from "@/lib/shared/asset-scope";
+import { ChainGlyph } from "@/components/icons/chain-glyphs";
+import { launchedChains } from "@/lib/shared/protocols";
+import type { ChainId } from "@/lib/shared/chains";
+import { chainNameOf, focusViews, openFocusPanel, scopeLink, type FocusView } from "@/lib/shared/asset-scope";
 import {
   bookmarksBackupFilename,
   exportBookmarks,
@@ -54,12 +69,10 @@ export function useBookmarks(): WalletSession[] | null {
   return bookmarks;
 }
 
-/** One list of bookmark rows, or `empty` when there are none. A row opens
- *  `/wallet/<address>`; with `summary`, the wallet's protocols draw under its
- *  name (B2.1). */
 /** Drag and drop within one kind's list (ui-jobs 504): the row being dragged
- *  and the index it would land at. */
+ *  and the index it would land at. Not on a phone, where a drag is a scroll. */
 function useRowDrag(kind: SavedKind, onMove?: (id: string, to: number) => void) {
+  const phone = useMediaQuery(PHONE_QUERY);
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<number | null>(null);
   const drag = (i: number, id: string) => ({
@@ -67,6 +80,8 @@ function useRowDrag(kind: SavedKind, onMove?: (id: string, to: number) => void) 
     onDragStart: (e: DragEvent) => {
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", id);
+      // A press on a cell's cover link drags the link; the picture is the row.
+      e.dataTransfer.setDragImage(e.currentTarget as Element, 24, 24);
       setDragging(id);
     },
     onDragOver: (e: DragEvent) => {
@@ -88,7 +103,7 @@ function useRowDrag(kind: SavedKind, onMove?: (id: string, to: number) => void) 
   const moveOf = (i: number, count: number, id: string): RowMove => ({
     index: i,
     count,
-    drag: drag(i, id),
+    drag: phone ? {} : drag(i, id),
     dragging: dragging === id,
     target: over === i && dragging !== id,
   });
@@ -113,16 +128,24 @@ export function BookmarkList({
   const moveOf = useRowDrag("wallet");
   if (bookmarks.length === 0) return <>{empty}</>;
   return (
-    <div className="flex flex-col gap-1" data-bookmark-list="">
-      {bookmarks.map((s, i) => (
-        <BookmarkRow
-          key={s.key}
-          session={s}
-          summary={summary}
-          move={reorder ? moveOf(i, bookmarks.length, s.addresses[0]) : undefined}
-        />
-      ))}
-    </div>
+    <DataTable caption="Saved wallets" stacked rowHeight="one" tableClassName="text-sm" data-bookmark-list="">
+      <DataTableHead>
+        <DataTableHeader label="Wallet" />
+        {summary && <DataTableHeader label="Positions" />}
+        <DataTableHeader label="Address" />
+        {ACTIONS_HEADER}
+      </DataTableHead>
+      <DataTableBody>
+        {bookmarks.map((s, i) => (
+          <BookmarkRow
+            key={s.key}
+            session={s}
+            summary={summary}
+            move={reorder ? moveOf(i, bookmarks.length, s.addresses[0]) : undefined}
+          />
+        ))}
+      </DataTableBody>
+    </DataTable>
   );
 }
 
@@ -141,11 +164,26 @@ export function SavedLinkList({
   const moveOf = useRowDrag(kind);
   if (links.length === 0) return <>{empty}</>;
   return (
-    <div className="flex flex-col gap-1" data-bookmark-list={kind}>
-      {links.map((l, i) => (
-        <SavedLinkRow key={l.key} link={l} move={moveOf(i, links.length, l.key)} />
-      ))}
-    </div>
+    <DataTable
+      caption={kind === "position" ? "Saved positions" : "Saved listings"}
+      stacked
+      rowHeight="one"
+      tableClassName="text-sm"
+      data-bookmark-list={kind}
+    >
+      <DataTableHead>
+        <DataTableHeader label="Name" />
+        <DataTableHeader label="Explorer" />
+        <DataTableHeader label="Chain" />
+        {kind === "position" && <DataTableHeader label="Status" />}
+        {ACTIONS_HEADER}
+      </DataTableHead>
+      <DataTableBody>
+        {links.map((l, i) => (
+          <SavedLinkRow key={l.key} link={l} move={moveOf(i, links.length, l.key)} />
+        ))}
+      </DataTableBody>
+    </DataTable>
   );
 }
 
@@ -256,7 +294,7 @@ export function BookmarkBackup({ className = "", empty = false }: { className?: 
 }
 
 const ICON_BUTTON =
-  "cursor-pointer rounded-md p-1.5 text-rb-500 transition-colors hover:bg-rb-200 dark:hover:bg-rb-800 focus-ring";
+  "inline-flex cursor-pointer items-center justify-center rounded-md p-1.5 text-rb-500 transition-colors hover:bg-rb-200 focus-ring dark:hover:bg-rb-800 [@media(hover:none)]:size-11";
 
 function Glyph({ children, strokeWidth = 2 }: { children: ReactNode; strokeWidth?: number }) {
   return (
@@ -283,49 +321,6 @@ const TICK = (
   </Glyph>
 );
 
-/** Copy the wallet address (or a saved page's link) to the clipboard,
- *  flashing a tick for ~1.2s. */
-function CopyButton({ text, what = "Copy address" }: { text: string; what?: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1200);
-      }}
-      title={what}
-      aria-label={what}
-      className={`${ICON_BUTTON} hover:text-foreground`}
-    >
-      {copied ? (
-        TICK
-      ) : (
-        <Glyph>
-          <rect width="14" height="14" x="8" y="8" rx="2" />
-          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-        </Glyph>
-      )}
-    </button>
-  );
-}
-
-const PENCIL = (
-  <Glyph>
-    <path d="M12 20h9" />
-    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
-  </Glyph>
-);
-
-const BIN = (
-  <Glyph>
-    <path d="M3 6h18" />
-    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-  </Glyph>
-);
-
 const CROSS = (
   <Glyph>
     <path d="M18 6 6 18" />
@@ -333,68 +328,162 @@ const CROSS = (
   </Glyph>
 );
 
-/** A row's move-up and move-down buttons (ui-jobs 504). */
-function MoveButtons({ label, move, onMove }: { label: string; move: RowMove; onMove: (to: number) => void }) {
-  const cls = `${ICON_BUTTON} hover:text-foreground disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent`;
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => onMove(move.index - 1)}
-        disabled={move.index === 0}
-        title="Move up"
-        aria-label={`Move ${label} up`}
-        className={cls}
-        data-bookmark-move="up"
-      >
-        <ChevronUp className="size-3" aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        onClick={() => onMove(move.index + 1)}
-        disabled={move.index === move.count - 1}
-        title="Move down"
-        aria-label={`Move ${label} down`}
-        className={cls}
-        data-bookmark-move="down"
-      >
-        <ChevronDown className="size-3" aria-hidden="true" />
-      </button>
-    </>
-  );
-}
-
 interface RowMove {
   index: number;
   count: number;
+  /** The row's drag handlers; empty on a phone, where the ⋮ moves it. */
   drag: Record<string, unknown>;
   dragging: boolean;
   target: boolean;
 }
 
+/** The teal line over the row a dragged row would land on, drawn on the
+ *  cells (a table row draws no shadow of its own). */
+const DROP_LINE = "[&>*]:shadow-[inset_0_2px_0_var(--color-teal-500)]";
+
+/** A row's drag handlers and its dragging or drop-target look. */
+function rowDrag(move: RowMove | undefined, editing: boolean): { props: Record<string, unknown>; className: string } {
+  if (!move || editing) return { props: {}, className: "" };
+  return {
+    props: move.drag,
+    className: `${move.dragging ? "opacity-50" : ""} ${move.target ? DROP_LINE : ""}`,
+  };
+}
+
+/** The drag cue at the start of a reorderable row's name, from sm. */
+function Grip() {
+  return (
+    <GripVertical
+      className="hidden size-4 shrink-0 cursor-grab text-rb-400 opacity-0 transition-opacity group-hover/dt-row:opacity-100 active:cursor-grabbing sm:block"
+      aria-hidden="true"
+      data-bookmark-grip=""
+    />
+  );
+}
+
+/** Move up and Move down for a row's ⋮, each where the row can go. */
+function moveItems(move: RowMove | undefined, onMove: (to: number) => void, focus = false): DataTableRowMenuItem[] {
+  if (!move) return [];
+  const items: DataTableRowMenuItem[] = [];
+  if (move.index > 0)
+    items.push({
+      key: "up",
+      label: "Move up",
+      onSelect: () => onMove(move.index - 1),
+      hooks: { "data-bookmark-move": "up", "data-focus-view-menu": focus ? "up" : undefined },
+    });
+  if (move.index < move.count - 1)
+    items.push({
+      key: "down",
+      label: "Move down",
+      onSelect: () => onMove(move.index + 1),
+      hooks: { "data-bookmark-move": "down", "data-focus-view-menu": focus ? "down" : undefined },
+    });
+  return items;
+}
+
+/** Copy to the clipboard, with "Copied" beside the ⋮ for ~1.2s. */
+function useCopy(): [ReactNode, (text: string) => void] {
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const t = window.setTimeout(() => setCopied(false), 1200);
+    return () => window.clearTimeout(t);
+  }, [copied]);
+  const note = (
+    <span role="status" className="mr-1 align-middle text-xs text-rb-500">
+      {copied ? "Copied" : ""}
+    </span>
+  );
+  return [
+    note,
+    (text: string) => {
+      void navigator.clipboard?.writeText(text);
+      setCopied(true);
+    },
+  ];
+}
+
+/** The name, edited in place: Enter or the tick saves, Escape or the cross
+ *  cancels. An empty name returns the row to its default. */
+function RenameField({
+  label,
+  initial,
+  placeholder,
+  maxLength,
+  onSave,
+  onCancel,
+}: {
+  label: string;
+  initial: string;
+  placeholder: string;
+  maxLength?: number;
+  onSave: (name: string) => void;
+  onCancel: () => void;
+}) {
+  const [draft, setDraft] = useState(initial);
+  return (
+    <span className="flex min-w-0 flex-1 items-center gap-1">
+      <input
+        autoFocus
+        aria-label={label}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onSave(draft);
+          } else if (e.key === "Escape") {
+            e.preventDefault();
+            onCancel();
+          }
+        }}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        className="min-w-0 flex-1 rounded border border-rb-300 bg-raised px-1.5 py-0.5 text-base font-bold outline-none sm:text-sm dark:border-rb-700"
+      />
+      <button
+        type="button"
+        onClick={() => onSave(draft)}
+        title="Save name"
+        aria-label="Save name"
+        className={`${ICON_BUTTON} hover:text-teal-600 dark:hover:text-teal-400`}
+      >
+        {TICK}
+      </button>
+      <button
+        type="button"
+        onClick={onCancel}
+        title="Cancel"
+        aria-label="Cancel rename"
+        className={`${ICON_BUTTON} hover:text-foreground`}
+      >
+        {CROSS}
+      </button>
+    </span>
+  );
+}
+
+const NAME_CELL = "sm:w-full sm:max-w-0 sm:min-w-[200px]";
+const MENU_CELL = "dt-row-menu w-px whitespace-nowrap";
+const ACTIONS_HEADER = <DataTableHeader label={<span className="sr-only">Actions</span>} />;
+
+function shortAddress(a: string): string {
+  return `${a.slice(0, 6)}…${a.slice(-4)}`;
+}
+
+/** A saved wallet (D4): the facehash and name open its page; its positions,
+ *  its address and the ⋮ follow. */
 function BookmarkRow({ session, summary, move }: { session: WalletSession; summary?: boolean; move?: RowMove }) {
   const [editing, setEditing] = useState(false);
-  const [draftName, setDraftName] = useState("");
+  const [copied, copy] = useCopy();
 
   const primary = session.addresses[0];
   const ens = session.ensNames[primary] || null;
-  const fallback = ens || `${primary.slice(0, 6)}…${primary.slice(-4)}`;
+  const fallback = ens || shortAddress(primary);
   const label = session.customName || fallback;
-
-  const startEdit = () => {
-    setDraftName(session.customName ?? "");
-    setEditing(true);
-  };
-  // renameSession persists and dispatches SESSIONS_CHANGED_EVENT, so the
-  // list's sync reads this row's new label.
-  const commitEdit = () => {
-    renameSession(session.key, draftName);
-    setEditing(false);
-  };
-  const cancelEdit = () => {
-    setEditing(false);
-    setDraftName("");
-  };
+  const href = walletHref(primary);
+  const d = rowDrag(move, editing);
 
   const avatar = (
     <div style={{ borderRadius: 6, boxShadow: "0 0 0 2px var(--facehash-ring)" }} className="shrink-0">
@@ -402,245 +491,195 @@ function BookmarkRow({ session, summary, move }: { session: WalletSession; summa
     </div>
   );
 
-  const rowClasses =
-    "group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-colors hover:border-blue-500 hover:bg-rb-100 dark:hover:bg-rb-900";
-
-  if (editing) {
-    return (
-      <div className={rowClasses} data-bookmark-row="" data-editing="">
-        {avatar}
-        <input
-          autoFocus
-          aria-label="Wallet name"
-          value={draftName}
-          onChange={(e) => setDraftName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              commitEdit();
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              cancelEdit();
-            }
-          }}
-          placeholder={fallback}
-          className="min-w-0 flex-1 rounded border border-rb-300 bg-raised px-1.5 py-0.5 text-base font-bold outline-none sm:text-sm dark:border-rb-700"
-        />
-        <div className="flex shrink-0 items-center gap-0.5">
-          <button
-            type="button"
-            onClick={commitEdit}
-            title="Save name"
-            aria-label="Save name"
-            className={`${ICON_BUTTON} hover:text-green-500`}
-          >
-            {TICK}
-          </button>
-          <button
-            type="button"
-            onClick={cancelEdit}
-            title="Cancel"
-            aria-label="Cancel rename"
-            className={`${ICON_BUTTON} hover:text-foreground`}
-          >
-            {CROSS}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div
-      className={`${rowClasses} ${move?.dragging ? "opacity-50" : ""} ${move?.target ? "border-t-teal-500" : ""}`}
+    <DataTableRow
+      href={editing ? undefined : href}
+      className={d.className}
       data-bookmark-row=""
-      {...move?.drag}
+      data-editing={editing ? "" : undefined}
+      {...d.props}
     >
-      {move && (
-        <GripVertical
-          className="size-4 shrink-0 cursor-grab text-rb-400 active:cursor-grabbing"
-          aria-hidden="true"
-          data-bookmark-grip=""
-        />
+      <DataTableCell rowHeader valign="middle" className="sm:w-[38%] sm:max-w-0 sm:min-w-[200px]">
+        <span className="flex min-w-0 items-center gap-2">
+          {move && <Grip />}
+          {editing ? (
+            <span className="flex min-w-0 flex-1 items-center gap-3">
+              {avatar}
+              <RenameField
+                label="Wallet name"
+                initial={session.customName ?? ""}
+                placeholder={fallback}
+                onSave={(name) => {
+                  // renameSession persists and dispatches SESSIONS_CHANGED_EVENT,
+                  // so the list's sync reads this row's new label.
+                  renameSession(session.key, name);
+                  setEditing(false);
+                }}
+                onCancel={() => setEditing(false)}
+              />
+            </span>
+          ) : (
+            <DataTableRowLink
+              href={href}
+              draggable={false}
+              className="flex min-w-0 items-center gap-3"
+              data-bookmark-open=""
+            >
+              {avatar}
+              <span className="truncate text-sm font-bold" title={primary}>
+                {label}
+              </span>
+            </DataTableRowLink>
+          )}
+        </span>
+      </DataTableCell>
+      {summary && (
+        <DataTableCell label="Positions" valign="middle" wide className="sm:min-w-[220px]">
+          <BookmarkSummary address={primary} />
+        </DataTableCell>
       )}
-      <div className="min-w-0 flex-1">
-        <Link
-          href={walletHref(primary)}
-          draggable={false}
-          className="flex min-w-0 items-center gap-3"
-          data-bookmark-open=""
-        >
-          {avatar}
-          <span className="truncate text-sm font-bold text-foreground" title={primary}>
-            {label}
-          </span>
-        </Link>
-        {/* Under the name, past the facehash's 24px and the 12px gap. */}
-        {summary && (
-          <div className="mt-1 pl-9">
-            <BookmarkSummary address={primary} />
-          </div>
-        )}
-      </div>
-      <div className="flex shrink-0 items-center gap-0.5">
-        {move && <MoveButtons label={label} move={move} onMove={(to) => moveSaved("wallet", primary, to)} />}
-        <CopyButton text={primary} />
-        <button
-          type="button"
-          onClick={startEdit}
-          title="Rename"
-          aria-label="Rename saved wallet"
-          className={`${ICON_BUTTON} hover:text-foreground`}
-        >
-          {PENCIL}
-        </button>
-        <button
-          type="button"
-          onClick={() => removeBookmark(primary)}
-          title="Remove from saved wallets"
-          aria-label="Remove from saved wallets"
-          className={`${ICON_BUTTON} hover:text-red-400`}
-        >
-          {BIN}
-        </button>
-      </div>
-    </div>
+      <DataTableCell label="Address" valign="middle" className="whitespace-nowrap">
+        <span className="font-mono text-xs text-rb-500" title={primary}>
+          {shortAddress(primary)}
+        </span>
+      </DataTableCell>
+      <DataTableCell valign="middle" className={MENU_CELL}>
+        {copied}
+        <DataTableRowMenu
+          label={`Actions for ${label}`}
+          items={[
+            ...moveItems(move, (to) => moveSaved("wallet", primary, to)),
+            {
+              key: "copy",
+              label: "Copy address",
+              onSelect: () => copy(primary),
+              hooks: { "data-bookmark-action": "copy" },
+            },
+            {
+              key: "rename",
+              label: "Rename",
+              onSelect: () => setEditing(true),
+              hooks: { "data-bookmark-action": "rename" },
+            },
+            {
+              key: "remove",
+              label: "Remove",
+              onSelect: () => removeBookmark(primary),
+              hooks: { "data-bookmark-action": "remove" },
+            },
+          ]}
+        />
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 
-const KIND_NOUN = { position: "position", view: "view" } as const;
+const KIND_NOUN = { position: "position", view: "listing" } as const;
 
-/** A saved position or view: the explorer's mark, the name, the chain and a
- *  closed position's tag under it; move, copy link, rename and remove as a
- *  wallet row has them. */
+/** A saved position or listing (D4): the explorer's mark and the name open
+ *  the page; its explorer, chain, a closed position's tag and the ⋮ follow. */
 function SavedLinkRow({ link, move }: { link: SavedLink; move: RowMove }) {
   const [editing, setEditing] = useState(false);
-  const [draftName, setDraftName] = useState("");
+  const [copied, copy] = useCopy();
   const label = link.customName || link.name;
   const noun = KIND_NOUN[link.kind];
-  const commitEdit = () => {
-    renameSaved(link.kind, link.key, draftName);
-    setEditing(false);
-  };
-  const rowClasses =
-    "group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 transition-colors hover:border-blue-500 hover:bg-rb-100 dark:hover:bg-rb-900";
+  const phone = useMediaQuery(PHONE_QUERY);
+  const d = rowDrag(move, editing);
   const glyph = (
     <span className="flex size-6 shrink-0 items-center justify-center text-rb-500">
       {link.protocol ? <ProtocolIcon id={link.protocol.id} className="size-5" /> : null}
     </span>
   );
 
-  if (editing) {
-    return (
-      <div className={rowClasses} data-bookmark-row={link.kind} data-editing="">
-        {glyph}
-        <input
-          autoFocus
-          aria-label={`Saved ${noun} name`}
-          value={draftName}
-          onChange={(e) => setDraftName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              commitEdit();
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              setEditing(false);
-            }
-          }}
-          placeholder={link.name}
-          className="min-w-0 flex-1 rounded border border-rb-300 bg-raised px-1.5 py-0.5 text-base font-bold outline-none sm:text-sm dark:border-rb-700"
-        />
-        <div className="flex shrink-0 items-center gap-0.5">
-          <button
-            type="button"
-            onClick={commitEdit}
-            title="Save name"
-            aria-label="Save name"
-            className={`${ICON_BUTTON} hover:text-green-500`}
-          >
-            {TICK}
-          </button>
-          <button
-            type="button"
-            onClick={() => setEditing(false)}
-            title="Cancel"
-            aria-label="Cancel rename"
-            className={`${ICON_BUTTON} hover:text-foreground`}
-          >
-            {CROSS}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const where = [link.kind === "position" ? link.protocol?.name : null, link.chain?.name].filter(Boolean).join(" · ");
   return (
-    <div
-      className={`${rowClasses} ${move.dragging ? "opacity-50" : ""} ${move.target ? "border-t-teal-500" : ""}`}
+    <DataTableRow
+      href={editing ? undefined : link.key}
+      className={d.className}
       data-bookmark-row={link.kind}
-      {...move.drag}
+      data-editing={editing ? "" : undefined}
+      {...d.props}
     >
-      <GripVertical
-        className="size-4 shrink-0 cursor-grab text-rb-400 active:cursor-grabbing"
-        aria-hidden="true"
-        data-bookmark-grip=""
-      />
-      <Link
-        href={link.key}
-        draggable={false}
-        className="flex min-w-0 flex-1 items-center gap-3"
-        data-bookmark-open={link.key}
-      >
-        {glyph}
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-bold text-foreground">{label}</span>
-          {(where || link.ended) && (
-            <span className="mt-0.5 flex items-center gap-2 text-xs text-rb-500">
-              {where && <span className="truncate">{where}</span>}
-              {link.ended && <SavedEndedTag ended={link.ended} />}
+      <DataTableCell rowHeader valign="middle" className={NAME_CELL}>
+        <span className="flex min-w-0 items-center gap-2">
+          <Grip />
+          {editing ? (
+            <span className="flex min-w-0 flex-1 items-center gap-3">
+              {glyph}
+              <RenameField
+                label={`Saved ${noun} name`}
+                initial={link.customName ?? ""}
+                placeholder={link.name}
+                onSave={(name) => {
+                  renameSaved(link.kind, link.key, name);
+                  setEditing(false);
+                }}
+                onCancel={() => setEditing(false)}
+              />
             </span>
+          ) : (
+            <DataTableRowLink
+              href={link.key}
+              draggable={false}
+              className="flex min-w-0 items-center gap-3"
+              data-bookmark-open={link.key}
+            >
+              {glyph}
+              <span className="truncate text-sm font-bold">{label}</span>
+            </DataTableRowLink>
           )}
         </span>
-      </Link>
-      <div className="flex shrink-0 items-center gap-0.5">
-        <MoveButtons label={label} move={move} onMove={(to) => moveSaved(link.kind, link.key, to)} />
-        <CopyButton
-          text={typeof window === "undefined" ? link.key : `${window.location.origin}${link.key}`}
-          what="Copy link"
+      </DataTableCell>
+      {/* A stacked card draws no cell for what the entry lacks. */}
+      {(!phone || link.protocol) && (
+        <DataTableCell label="Explorer" valign="middle" className="whitespace-nowrap text-foreground/80">
+          {link.protocol?.name}
+        </DataTableCell>
+      )}
+      {(!phone || link.chain) && (
+        <DataTableCell label="Chain" valign="middle" className="whitespace-nowrap text-foreground/80">
+          {link.chain?.name}
+        </DataTableCell>
+      )}
+      {link.kind === "position" && (!phone || link.ended) && (
+        <DataTableCell label="Status" valign="middle" className="whitespace-nowrap">
+          {link.ended && <SavedEndedTag ended={link.ended} />}
+        </DataTableCell>
+      )}
+      <DataTableCell valign="middle" className={MENU_CELL}>
+        {copied}
+        <DataTableRowMenu
+          label={`Actions for ${label}`}
+          items={[
+            ...moveItems(move, (to) => moveSaved(link.kind, link.key, to)),
+            {
+              key: "copy",
+              label: "Copy link",
+              onSelect: () => copy(`${window.location.origin}${link.key}`),
+              hooks: { "data-bookmark-action": "copy" },
+            },
+            {
+              key: "rename",
+              label: "Rename",
+              onSelect: () => setEditing(true),
+              hooks: { "data-bookmark-action": "rename" },
+            },
+            {
+              key: "remove",
+              label: "Remove",
+              onSelect: () => removeSaved(link.kind, link.key),
+              hooks: { "data-bookmark-action": "remove" },
+            },
+          ]}
         />
-        <button
-          type="button"
-          onClick={() => {
-            setDraftName(link.customName ?? "");
-            setEditing(true);
-          }}
-          title="Rename"
-          aria-label={`Rename saved ${noun}`}
-          className={`${ICON_BUTTON} hover:text-foreground`}
-        >
-          {PENCIL}
-        </button>
-        <button
-          type="button"
-          onClick={() => removeSaved(link.kind, link.key)}
-          title={`Remove from saved ${noun}s`}
-          aria-label={`Remove from saved ${noun}s`}
-          className={`${ICON_BUTTON} hover:text-red-400`}
-        >
-          {BIN}
-        </button>
-      </div>
-    </div>
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 
-/** The saved Focus views (ui-jobs 557), or `empty` when there are none: rows
- *  moved, renamed and removed as the saved links are, with the link copied
- *  (`&view=` carrying the name) and Use putting a view in use. A removed view
- *  can be put back for a few seconds (Undo). On a phone a row keeps its name,
- *  Use or In use and a ⋮ that holds the rest. */
+/** The saved Focus views (ui-jobs 557), or `empty` when there are none: a
+ *  table moved, renamed and removed as the saved links are, with the link
+ *  copied (`&view=` carrying the name) and Use putting a view in use. A
+ *  removed view can be put back for a few seconds (Undo). */
 export function FocusViewList({
   views,
   active,
@@ -686,24 +725,35 @@ export function FocusViewList({
   return (
     <>
       {undo}
-      <div className="flex flex-col gap-1" data-bookmark-list="focus">
-        {views.map((v, i) => (
-          <FocusViewRow
-            key={v.id}
-            view={v}
-            inUse={v.id === active}
-            phone={isPhone}
-            onRemove={() => remove(v.id)}
-            move={moveOf(i, views.length, v.id)}
-          />
-        ))}
-      </div>
+      <DataTable caption="Focus views" stacked rowHeight="one" tableClassName="text-sm" data-bookmark-list="focus">
+        <DataTableHead>
+          <DataTableHeader label="Name" />
+          <DataTableHeader label="Assets" />
+          <DataTableHeader label="Chains" />
+          <DataTableHeader label={<span className="sr-only">In use</span>} />
+          {ACTIONS_HEADER}
+        </DataTableHead>
+        <DataTableBody>
+          {views.map((v, i) => (
+            <FocusViewRow
+              key={v.id}
+              view={v}
+              inUse={v.id === active}
+              phone={isPhone}
+              onRemove={() => remove(v.id)}
+              move={moveOf(i, views.length, v.id)}
+            />
+          ))}
+        </DataTableBody>
+      </DataTable>
     </>
   );
 }
 
 const UNDO_MS = 8000;
 
+/** A focus view (B2.2): not a link, so the plain hover block. Its name, the
+ *  assets and chains it holds, Use or In use, and the ⋮. */
 function FocusViewRow({
   view,
   inUse,
@@ -718,76 +768,14 @@ function FocusViewRow({
   move: RowMove;
 }) {
   const [editing, setEditing] = useState(false);
-  const [draftName, setDraftName] = useState("");
-  const [menu, setMenu] = useState(false);
+  const [copied, copy] = useCopy();
   const label = viewName(view);
   const holds = focusName(view.assets, view.chains);
-  const link = () => (typeof window === "undefined" ? "" : scopeLink(view.assets, view.chains, view.name, "/"));
-  const commitEdit = () => {
-    focusViews.rename(view.id, draftName);
-    setEditing(false);
-  };
-  const startEdit = () => {
-    setDraftName(view.name ?? "");
-    setEditing(true);
-  };
-  // Not a link, so no hover frame (blue marks a way off the page).
-  const rowClasses = "group flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5";
-  const glyph = (
-    <span className="flex w-8 shrink-0 items-center justify-center">
-      <ViewIcons picks={view.assets} chains={view.chains} />
-    </span>
-  );
-
-  if (editing) {
-    return (
-      <div className={rowClasses} data-bookmark-row="focus" data-anatomy="B2.2" data-editing="">
-        {glyph}
-        <input
-          autoFocus
-          aria-label="Focus view name"
-          value={draftName}
-          onChange={(e) => setDraftName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              commitEdit();
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              setEditing(false);
-            }
-          }}
-          placeholder={holds}
-          maxLength={60}
-          className="min-w-0 flex-1 rounded border border-rb-300 bg-raised px-1.5 py-0.5 text-base font-bold outline-none sm:text-sm dark:border-rb-700"
-        />
-        <div className="flex shrink-0 items-center gap-0.5">
-          <button
-            type="button"
-            onClick={commitEdit}
-            title="Save name"
-            aria-label="Save name"
-            className={`${ICON_BUTTON} hover:text-green-500`}
-          >
-            {TICK}
-          </button>
-          <button
-            type="button"
-            onClick={() => setEditing(false)}
-            title="Cancel"
-            aria-label="Cancel rename"
-            className={`${ICON_BUTTON} hover:text-foreground`}
-          >
-            {CROSS}
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const d = rowDrag(move, editing);
 
   const use = inUse ? (
     phone ? (
-      <span className="shrink-0 text-xs font-semibold text-foreground" data-focus-view-in-use="">
+      <span className="text-xs font-semibold text-foreground" data-focus-view-in-use="">
         In use
       </span>
     ) : (
@@ -795,7 +783,7 @@ function FocusViewRow({
         type="button"
         onClick={() => focusViews.use(null)}
         aria-label={`${label} is in use. Turn off`}
-        className="group/use min-w-12 shrink-0 text-right text-xs font-semibold text-foreground"
+        className="group/use min-w-12 cursor-pointer text-left text-xs font-semibold text-foreground"
         data-focus-view-in-use=""
       >
         <span className="group-hover/use:hidden group-focus-visible/use:hidden">In use</span>
@@ -807,118 +795,138 @@ function FocusViewRow({
       type="button"
       onClick={() => focusViews.use(view.id)}
       aria-label={`Use ${label}`}
-      className={`shrink-0 text-xs font-semibold ${INPLACE_TEXT} min-h-11 min-w-11 sm:min-h-0 sm:min-w-0`}
+      className={`cursor-pointer text-xs font-semibold ${INPLACE_TEXT} min-h-11 min-w-11 text-left sm:min-h-0 sm:min-w-0`}
       data-focus-view-use={view.id}
     >
       Use
     </button>
   );
 
+  const items: DataTableRowMenuItem[] = [
+    {
+      key: "edit",
+      label: "Edit",
+      onSelect: () => openFocusPanel("edit", view.id),
+      hooks: { "data-focus-view-menu": "edit" },
+    },
+    ...(inUse && phone
+      ? [
+          {
+            key: "turn-off",
+            label: "Turn off",
+            onSelect: () => focusViews.use(null),
+            hooks: { "data-focus-view-menu": "turn-off" },
+          },
+        ]
+      : []),
+    ...moveItems(move, (to) => focusViews.move(view.id, to), true),
+    {
+      key: "copy",
+      label: "Copy link",
+      onSelect: () => copy(scopeLink(view.assets, view.chains, view.name, "/")),
+      hooks: { "data-focus-view-menu": "copy" },
+    },
+    {
+      key: "rename",
+      label: "Rename",
+      onSelect: () => setEditing(true),
+      hooks: { "data-focus-view-menu": "rename" },
+    },
+    { key: "remove", label: "Remove", onSelect: onRemove, hooks: { "data-focus-view-menu": "remove" } },
+  ];
+
   return (
-    <div
-      className={`${rowClasses} ${move.dragging ? "opacity-50" : ""} ${move.target ? "border-t-teal-500" : ""}`}
+    <DataTableRow
+      className={d.className}
       data-bookmark-row="focus"
       data-anatomy="B2.2"
       data-focus-view-row={view.id}
-      {...(phone ? {} : move.drag)}
+      data-editing={editing ? "" : undefined}
+      {...d.props}
     >
-      {!phone && (
-        <GripVertical
-          className="size-4 shrink-0 cursor-grab text-rb-400 active:cursor-grabbing"
-          aria-hidden="true"
-          data-bookmark-grip=""
-        />
-      )}
-      {glyph}
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-bold text-foreground">{label}</span>
-        {view.name && <span className="mt-0.5 block truncate text-xs text-rb-500">{holds}</span>}
-      </span>
-      {use}
-      {phone ? (
-        <div className="relative shrink-0">
-          <button
-            type="button"
-            onClick={() => setMenu((m) => !m)}
-            aria-label={`More for ${label}`}
-            aria-expanded={menu}
-            className="inline-flex size-11 items-center justify-center rounded-md text-rb-500 hover:text-foreground"
-            data-focus-view-more=""
-          >
-            <MoreVertical className="size-4" aria-hidden="true" />
-          </button>
-          {menu && (
-            <div
-              className="overlay-panel absolute right-0 top-full z-[var(--z-dropdown)] mt-1 flex w-48 flex-col py-1"
-              role="menu"
-              onClick={() => setMenu(false)}
-            >
-              {inUse && (
-                <RowMenuItem onClick={() => focusViews.use(null)} data="turn-off">
-                  Turn off
-                </RowMenuItem>
-              )}
-              <RowMenuItem onClick={startEdit} data="rename">
-                Rename
-              </RowMenuItem>
-              <RowMenuItem onClick={() => void navigator.clipboard?.writeText(link())} data="copy">
-                Copy link
-              </RowMenuItem>
-              {move.index > 0 && (
-                <RowMenuItem onClick={() => focusViews.move(view.id, move.index - 1)} data="up">
-                  Move up
-                </RowMenuItem>
-              )}
-              {move.index < move.count - 1 && (
-                <RowMenuItem onClick={() => focusViews.move(view.id, move.index + 1)} data="down">
-                  Move down
-                </RowMenuItem>
-              )}
-              <RowMenuItem onClick={onRemove} data="remove">
-                Remove
-              </RowMenuItem>
-            </div>
+      <DataTableCell rowHeader valign="middle" className="sm:w-[34%] sm:max-w-0 sm:min-w-[200px]">
+        <span className="flex min-w-0 items-center gap-2">
+          <Grip />
+          {editing ? (
+            <RenameField
+              label="Focus view name"
+              initial={view.name ?? ""}
+              placeholder={holds}
+              maxLength={60}
+              onSave={(name) => {
+                focusViews.rename(view.id, name);
+                setEditing(false);
+              }}
+              onCancel={() => setEditing(false)}
+            />
+          ) : (
+            <span className="truncate text-sm font-bold text-foreground">{label}</span>
           )}
-        </div>
-      ) : (
-        <div className="flex shrink-0 items-center gap-0.5">
-          <MoveButtons label={label} move={move} onMove={(to) => focusViews.move(view.id, to)} />
-          <CopyButton text={link()} what="Copy link" />
-          <button
-            type="button"
-            onClick={startEdit}
-            title="Rename"
-            aria-label="Rename focus view"
-            className={`${ICON_BUTTON} hover:text-foreground`}
-          >
-            {PENCIL}
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            title="Remove focus view"
-            aria-label="Remove focus view"
-            className={`${ICON_BUTTON} hover:text-red-400`}
-          >
-            {BIN}
-          </button>
-        </div>
-      )}
-    </div>
+        </span>
+      </DataTableCell>
+      <DataTableCell label="Assets" valign="middle" className="sm:w-[40%] sm:max-w-0">
+        {view.assets.length ? (
+          <span className="flex min-w-0 items-center gap-1 text-foreground/80">
+            <ViewIcons picks={view.assets} chains={[]} />
+            <span className="truncate">{focusName(view.assets, [])}</span>
+          </span>
+        ) : (
+          <span className="text-rb-500">All assets</span>
+        )}
+      </DataTableCell>
+      <DataTableCell label="Chains" valign="middle" className="whitespace-nowrap">
+        <ViewChainToggles view={view} />
+      </DataTableCell>
+      <DataTableCell valign="middle" className="whitespace-nowrap">
+        {use}
+      </DataTableCell>
+      <DataTableCell valign="middle" className={MENU_CELL}>
+        {copied}
+        <DataTableRowMenu label={`Actions for ${label}`} items={items} />
+      </DataTableCell>
+    </DataTableRow>
   );
 }
 
-function RowMenuItem({ onClick, data, children }: { onClick: () => void; data: string; children: ReactNode }) {
+/** A view's chains as one toggle per launched chain (Miles, 10 Nov 2026):
+ *  in focus in text ink, the rest dimmed; a press adds or drops the chain, as
+ *  the panel's Chains part does. None pressed is every chain. A view of
+ *  chains alone keeps its last chain, since an emptied view is removed. */
+function ViewChainToggles({ view }: { view: FocusView }) {
+  const all = launchedChains().map((c) => c.id);
+  const toggle = (id: number) =>
+    focusViews.edit(view.id, {
+      assets: view.assets,
+      chains: view.chains.includes(id)
+        ? view.chains.filter((c) => c !== id)
+        : all.filter((c) => c === id || view.chains.includes(c)),
+    });
   return (
-    <button
-      type="button"
-      role="menuitem"
-      onClick={onClick}
-      className="min-h-11 px-3 text-left text-sm text-foreground hover:bg-rb-100 dark:hover:bg-rb-800"
-      data-focus-view-menu={data}
-    >
-      {children}
-    </button>
+    <span className="relative z-[2] flex items-center gap-0.5" role="group" aria-label={`Chains in ${viewName(view)}`}>
+      {all.map((id) => {
+        const on = view.chains.includes(id);
+        const last = on && view.chains.length === 1 && view.assets.length === 0;
+        const name = chainNameOf(id);
+        return (
+          <button
+            key={id}
+            type="button"
+            aria-pressed={on}
+            disabled={last}
+            onClick={() => toggle(id)}
+            title={last ? `${name} is this view's only part` : on ? `Drop ${name}` : `Add ${name}`}
+            className={`inline-flex size-11 items-center justify-center rounded-md transition-colors sm:size-7 ${
+              on ? "text-foreground" : "text-rb-400/80 hover:text-rb-500 dark:text-rb-600 dark:hover:text-rb-400"
+            } ${last ? "cursor-default" : "cursor-pointer hover:bg-rb-200/60 dark:hover:bg-rb-800"}`}
+            data-focus-view-chain={id}
+          >
+            <ChainGlyph id={id as ChainId} className="h-3.5 w-3.5" />
+            <span className="sr-only">{name}</span>
+          </button>
+        );
+      })}
+      {view.chains.length === 0 && <span className="ml-1.5 text-xs text-rb-500">All</span>}
+    </span>
   );
 }
 

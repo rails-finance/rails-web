@@ -36,6 +36,7 @@ import { marketModal, useAaveMarket, type AaveMarketRead } from "@/components/sh
 import { MarketPage } from "@/components/shared/product/market-page";
 import { DataTableAmount } from "@/components/shared/data-table/data-table";
 import { MarketRoster } from "@/components/shared/product/market-roster";
+import { assetKey } from "@/lib/shared/asset-family";
 import { positionEntry } from "@/components/shared/product/position-entry";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { ASSET_CLASS_COLOR, ASSET_CLASS_TITLE } from "@/lib/aave-v4/asset-class";
@@ -526,11 +527,6 @@ export function aaveMarketModel(m: AaveMarketConfig, read: AaveMarketRead, overv
   };
 }
 
-/** One market on the roster: its panel, read through its own proxy. */
-function useOverviewMarket(m: AaveMarketConfig): Loadable<MarketModel> {
-  return aaveMarketModel(m, useAaveMarket(m), true);
-}
-
 const protocolOf = (m: AaveMarketConfig) => {
   const p = protocolForHref(m.listingHref);
   if (!p) throw new Error(`aave-family product: no roster entry for ${m.listingHref}`);
@@ -559,12 +555,30 @@ export function AaveMarketPage({ market: m }: { market: AaveMarketConfig }) {
  *  Ethereum's Core, Prime and EtherFi, a panel each. */
 export function AaveMarketsOverview({ markets }: { markets: readonly AaveMarketConfig[] }) {
   const byKey = new Map(markets.map((m) => [m.key, m]));
-  const useMarket = (k: string) => useOverviewMarket(byKey.get(k as AaveMarketConfig["key"])!);
+  // Focus (ui-jobs 557): every Pool is read here, so the roster can keep the
+  // Pools with a reserve in focus before their panels draw.
+  const reads = new Map(
+    markets.map((m) => [
+      m.key,
+      // eslint-disable-next-line react-hooks/rules-of-hooks -- `markets` is a module constant, so the hooks keep their order
+      useAaveMarket(m),
+    ]),
+  );
+  const useMarket = (k: string) =>
+    aaveMarketModel(byKey.get(k as AaveMarketConfig["key"])!, reads.get(k as AaveMarketConfig["key"])!, true);
+  const keysOf = (k: string) => {
+    const m = byKey.get(k as AaveMarketConfig["key"])!;
+    const model = aaveMarketModel(m, reads.get(k as AaveMarketConfig["key"])!, false);
+    if (model.state !== "ok" || !model.data.reserves) return [];
+    return model.data.reserves.rows.map((r) => assetKey(m.chainId, r.asset.address));
+  };
   return (
     <MarketRoster
       header={{ protocol: protocolOf(markets[0]), title: "Market overview", learnMore: marketModal(markets[0]) }}
       markets={markets.map((m) => ({ key: m.key, name: m.marketLabel }))}
       useMarket={useMarket}
+      keysOf={keysOf}
+      keysPending={[...reads.values()].some((r) => r.loading && !r.data)}
     />
   );
 }

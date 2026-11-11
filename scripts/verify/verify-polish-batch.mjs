@@ -460,7 +460,7 @@ await phone.close();
     if (!localStorage.getItem("rails-bookmarks")) localStorage.setItem("rails-bookmarks", JSON.stringify(rows));
   }, held);
   const bp = await ctx.newPage();
-  await bp.goto(`${BASE}/bookmarks`, { waitUntil: "networkidle" });
+  await bp.goto(`${BASE}/bookmarks?tab=wallets`, { waitUntil: "networkidle" });
   await bp.waitForSelector("[data-bookmark-row]");
   const order = () =>
     bp.locator("[data-bookmark-open]").evaluateAll((as) => as.map((a) => a.getAttribute("href").split("/").pop()));
@@ -470,7 +470,8 @@ await phone.close();
     first.join() === [W[2], W[1], W[0]].join(),
     first.join(),
   );
-  await bp.locator("[data-bookmark-row]").first().locator('[data-bookmark-move="down"]').click();
+  await bp.locator("[data-bookmark-row]").first().locator("[data-row-menu]").click();
+  await bp.locator('[data-row-menu-list] [data-bookmark-move="down"]').click();
   await bp.reload({ waitUntil: "networkidle" });
   await bp.waitForSelector("[data-bookmark-row]");
   const moved = await order();
@@ -602,8 +603,8 @@ await phone.close();
     );
   const viewHref = await sp.locator('[data-bookmark-row="view"] a').first().getAttribute("href");
   check(
-    "SV /bookmarks tabs Focus views, Listings, Wallets, Positions, Backup; the old ?tab=views opens Listings with the view opening its URL",
-    tabs.join() === "focus,listings*,wallets,positions,backup" && viewHref === VIEW,
+    "SV /bookmarks tabs Overview, Focus views, Listings, Wallets, Positions; the old ?tab=views opens Listings with the view opening its URL",
+    tabs.join() === "overview,focus,listings*,wallets,positions" && viewHref === VIEW,
     JSON.stringify({ tabs, viewHref }),
   );
   await ctx.close();

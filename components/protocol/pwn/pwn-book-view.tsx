@@ -43,12 +43,16 @@ import {
   bookInterestShareProv,
 } from "@/lib/pwn/event-provenance";
 import { formatExact } from "@/lib/utils/format";
-import type { PwnLoanBook } from "@/lib/pwn/loan-book";
+import type { PwnBookCollateralLine, PwnBookCreditLine, PwnLoanBook } from "@/lib/pwn/loan-book";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { AssetUnit } from "@/components/shared/asset-unit";
+import { useMemo } from "react";
+import { AimGate } from "@/components/shared/aim-gate";
+import { ScopeNote, useScopedRows, type ScopedRows } from "@/components/shared/asset-scope-note";
+import { assetKey } from "@/lib/shared/asset-family";
 import {
   DataTable,
   DataTableBody,
@@ -127,7 +131,7 @@ function OpenBookSection({ book }: { book: PwnLoanBook }) {
 
 // ── 2 · What secures the loans ───────────────────────────────────────────────
 
-function CollateralSection({ book }: { book: PwnLoanBook }) {
+function CollateralSection({ scoped }: { scoped: ScopedRows<PwnBookCollateralLine> }) {
   return (
     <section className="mt-8">
       <h2 className="text-sm font-semibold text-foreground">What secures the loans</h2>
@@ -136,66 +140,69 @@ function CollateralSection({ book }: { book: PwnLoanBook }) {
         the protocol&rsquo;s Token Bundler wrapper, which rolls several assets into one ERC-1155 bundle (its contents
         are chain-readable and shown on each loan&rsquo;s page). Each line carries the asset&rsquo;s own outcome record.
       </p>
+      <ScopeNote scoped={scoped} noun={["asset", "assets"]} className="mt-2" />
 
       {/* The house table (rails-ops ui-jobs 539: D1, D6 cards below sm),
           unlinked, on the page's ground. */}
-      <DataTable
-        className="mt-3"
-        label="What secures the loans, by asset"
-        stacked
-        tableClassName="text-sm sm:min-w-[36rem]"
-      >
-        <DataTableHead>
-          <DataTableHeader label="Asset" />
-          <DataTableHeader label="Kind" />
-          <DataTableHeader label="Loans" align="right" />
-          <DataTableHeader label="Running" align="right" />
-          <DataTableHeader label="Repaid" align="right" />
-          <DataTableHeader label="Defaulted" align="right" />
-        </DataTableHead>
-        <DataTableBody>
-          {book.collateral.map((c) => (
-            <DataTableRow key={c.address} data-pwn-collateral={c.address}>
-              <DataTableCell rowHeader>
-                <a
-                  href={explorerUrl(MAINNET_CHAIN_ID, "address", c.address)}
-                  target="_blank"
-                  rel="noopener"
-                  className="link-external text-foreground"
-                  title={c.address}
-                >
-                  {c.named ? c.symbol : <span className="font-mono text-[0.85em]">{c.symbol}</span>}
-                </a>
-                {c.isBundle && <span className="ml-1.5 text-[11px] text-rb-500">the protocol&rsquo;s wrapper</span>}
-                {!c.named && !c.isBundle && <span className="ml-1.5 text-[11px] text-rb-500">unnamed contract</span>}
-              </DataTableCell>
-              <DataTableCell label="Kind" className="whitespace-nowrap text-rb-500">
-                {c.category ? CATEGORY_LABEL[c.category] : "—"}
-              </DataTableCell>
-              <DataTableCell label="Loans" align="right" className={NUM}>
-                <Prov info={bookCollateralLineProv(c.symbol)}>{c.loans}</Prov>
-              </DataTableCell>
-              <DataTableCell label="Running" align="right" className={NUM}>
-                <Prov info={bookCollateralLineProv(c.symbol, "open")}>{c.open}</Prov>
-              </DataTableCell>
-              <DataTableCell label="Repaid" align="right" className={NUM}>
-                <Prov info={bookCollateralLineProv(c.symbol, "repaid")}>{c.repaid}</Prov>
-              </DataTableCell>
-              <DataTableCell label="Defaulted" align="right" className={NUM}>
-                <Prov info={bookCollateralLineProv(c.symbol, "defaulted")}>{c.defaulted}</Prov>
-                {c.unclaimed > 0 && <span className="text-rb-500"> ({c.unclaimed} unclaimed)</span>}
-              </DataTableCell>
-            </DataTableRow>
-          ))}
-        </DataTableBody>
-      </DataTable>
+      {scoped.rows.length > 0 && (
+        <DataTable
+          className="mt-3"
+          label="What secures the loans, by asset"
+          stacked
+          tableClassName="text-sm sm:min-w-[36rem]"
+        >
+          <DataTableHead>
+            <DataTableHeader label="Asset" />
+            <DataTableHeader label="Kind" />
+            <DataTableHeader label="Loans" align="right" />
+            <DataTableHeader label="Running" align="right" />
+            <DataTableHeader label="Repaid" align="right" />
+            <DataTableHeader label="Defaulted" align="right" />
+          </DataTableHead>
+          <DataTableBody>
+            {scoped.rows.map((c) => (
+              <DataTableRow key={c.address} data-pwn-collateral={c.address}>
+                <DataTableCell rowHeader>
+                  <a
+                    href={explorerUrl(MAINNET_CHAIN_ID, "address", c.address)}
+                    target="_blank"
+                    rel="noopener"
+                    className="link-external text-foreground"
+                    title={c.address}
+                  >
+                    {c.named ? c.symbol : <span className="font-mono text-[0.85em]">{c.symbol}</span>}
+                  </a>
+                  {c.isBundle && <span className="ml-1.5 text-[11px] text-rb-500">the protocol&rsquo;s wrapper</span>}
+                  {!c.named && !c.isBundle && <span className="ml-1.5 text-[11px] text-rb-500">unnamed contract</span>}
+                </DataTableCell>
+                <DataTableCell label="Kind" className="whitespace-nowrap text-rb-500">
+                  {c.category ? CATEGORY_LABEL[c.category] : "—"}
+                </DataTableCell>
+                <DataTableCell label="Loans" align="right" className={NUM}>
+                  <Prov info={bookCollateralLineProv(c.symbol)}>{c.loans}</Prov>
+                </DataTableCell>
+                <DataTableCell label="Running" align="right" className={NUM}>
+                  <Prov info={bookCollateralLineProv(c.symbol, "open")}>{c.open}</Prov>
+                </DataTableCell>
+                <DataTableCell label="Repaid" align="right" className={NUM}>
+                  <Prov info={bookCollateralLineProv(c.symbol, "repaid")}>{c.repaid}</Prov>
+                </DataTableCell>
+                <DataTableCell label="Defaulted" align="right" className={NUM}>
+                  <Prov info={bookCollateralLineProv(c.symbol, "defaulted")}>{c.defaulted}</Prov>
+                  {c.unclaimed > 0 && <span className="text-rb-500"> ({c.unclaimed} unclaimed)</span>}
+                </DataTableCell>
+              </DataTableRow>
+            ))}
+          </DataTableBody>
+        </DataTable>
+      )}
     </section>
   );
 }
 
 // ── 3 · What the loans owe ───────────────────────────────────────────────────
 
-function CreditSection({ book }: { book: PwnLoanBook }) {
+function CreditSection({ scoped }: { scoped: ScopedRows<PwnBookCreditLine> }) {
   return (
     <section className="mt-8">
       <h2 className="text-sm font-semibold text-foreground">What the loans owe</h2>
@@ -204,79 +211,82 @@ function CreditSection({ book }: { book: PwnLoanBook }) {
         price between themselves, so there is no unit the whole book could be totalled in, and this view does not invent
         one.
       </p>
+      <ScopeNote scoped={scoped} noun={["token", "tokens"]} className="mt-2" />
 
-      <DataTable
-        className="mt-3"
-        label="What the loans owe, by token"
-        stacked
-        tableClassName="text-sm sm:min-w-[36rem]"
-      >
-        <DataTableHead>
-          <DataTableHeader label="Token" />
-          <DataTableHeader label="Loans" align="right" />
-          <DataTableHeader label="Advanced (lifetime)" align="right" />
-          <DataTableHeader label="Outstanding" align="right" />
-          <DataTableHeader label="Owed at deadline" align="right" />
-        </DataTableHead>
-        <DataTableBody>
-          {book.credit.map((t) => {
-            const unit = <AssetUnit symbol={t.symbol} address={t.address} named={t.named} />;
-            return (
-              <DataTableRow key={t.address} data-pwn-credit={t.address}>
-                <DataTableCell rowHeader>
-                  <a
-                    href={explorerUrl(MAINNET_CHAIN_ID, "address", t.address)}
-                    target="_blank"
-                    rel="noopener"
-                    className="link-external text-foreground"
-                    title={t.address}
-                  >
-                    {t.named ? t.symbol : <span className="font-mono text-[0.85em]">{t.symbol}</span>}
-                  </a>
-                </DataTableCell>
-                <DataTableCell label="Loans" align="right" className={NUM}>
-                  <Prov info={bookCreditCountProv(t.symbol)}>{t.loans}</Prov>
-                </DataTableCell>
-                <DataTableCell label="Advanced (lifetime)" align="right" className={NUM}>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Prov info={bookPrincipalProv(t.symbol, "advanced")} value={formatExact(t.principalAdvanced)}>
-                      <AmountText value={t.principalAdvanced} format="compact" />
-                    </Prov>
-                    {unit}
-                  </span>
-                </DataTableCell>
-                <DataTableCell label="Outstanding" align="right" className={NUM}>
-                  {t.open > 0 ? (
+      {scoped.rows.length > 0 && (
+        <DataTable
+          className="mt-3"
+          label="What the loans owe, by token"
+          stacked
+          tableClassName="text-sm sm:min-w-[36rem]"
+        >
+          <DataTableHead>
+            <DataTableHeader label="Token" />
+            <DataTableHeader label="Loans" align="right" />
+            <DataTableHeader label="Advanced (lifetime)" align="right" />
+            <DataTableHeader label="Outstanding" align="right" />
+            <DataTableHeader label="Owed at deadline" align="right" />
+          </DataTableHead>
+          <DataTableBody>
+            {scoped.rows.map((t) => {
+              const unit = <AssetUnit symbol={t.symbol} address={t.address} named={t.named} />;
+              return (
+                <DataTableRow key={t.address} data-pwn-credit={t.address}>
+                  <DataTableCell rowHeader>
+                    <a
+                      href={explorerUrl(MAINNET_CHAIN_ID, "address", t.address)}
+                      target="_blank"
+                      rel="noopener"
+                      className="link-external text-foreground"
+                      title={t.address}
+                    >
+                      {t.named ? t.symbol : <span className="font-mono text-[0.85em]">{t.symbol}</span>}
+                    </a>
+                  </DataTableCell>
+                  <DataTableCell label="Loans" align="right" className={NUM}>
+                    <Prov info={bookCreditCountProv(t.symbol)}>{t.loans}</Prov>
+                  </DataTableCell>
+                  <DataTableCell label="Advanced (lifetime)" align="right" className={NUM}>
                     <span className="inline-flex items-center gap-1.5">
-                      <Prov
-                        info={bookPrincipalProv(t.symbol, "outstanding")}
-                        value={formatExact(t.principalOutstanding)}
-                      >
-                        <AmountText value={t.principalOutstanding} format="compact" />
+                      <Prov info={bookPrincipalProv(t.symbol, "advanced")} value={formatExact(t.principalAdvanced)}>
+                        <AmountText value={t.principalAdvanced} format="compact" />
                       </Prov>
                       {unit}
                     </span>
-                  ) : (
-                    <span className="text-rb-500">—</span>
-                  )}
-                </DataTableCell>
-                <DataTableCell label="Owed at deadline" align="right" className={NUM}>
-                  {t.repayOwed != null ? (
-                    <span className="inline-flex items-center gap-1.5">
-                      <Prov info={bookRepayOwedProv(t.symbol)} value={formatExact(t.repayOwed)}>
-                        <AmountText value={t.repayOwed} format="compact" />
-                      </Prov>
-                      {unit}
-                    </span>
-                  ) : (
-                    <span className="text-rb-500">—</span>
-                  )}
-                </DataTableCell>
-              </DataTableRow>
-            );
-          })}
-        </DataTableBody>
-      </DataTable>
+                  </DataTableCell>
+                  <DataTableCell label="Outstanding" align="right" className={NUM}>
+                    {t.open > 0 ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Prov
+                          info={bookPrincipalProv(t.symbol, "outstanding")}
+                          value={formatExact(t.principalOutstanding)}
+                        >
+                          <AmountText value={t.principalOutstanding} format="compact" />
+                        </Prov>
+                        {unit}
+                      </span>
+                    ) : (
+                      <span className="text-rb-500">—</span>
+                    )}
+                  </DataTableCell>
+                  <DataTableCell label="Owed at deadline" align="right" className={NUM}>
+                    {t.repayOwed != null ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Prov info={bookRepayOwedProv(t.symbol)} value={formatExact(t.repayOwed)}>
+                          <AmountText value={t.repayOwed} format="compact" />
+                        </Prov>
+                        {unit}
+                      </span>
+                    ) : (
+                      <span className="text-rb-500">—</span>
+                    )}
+                  </DataTableCell>
+                </DataTableRow>
+              );
+            })}
+          </DataTableBody>
+        </DataTable>
+      )}
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
         &ldquo;Advanced&rdquo; is every principal ever handed over in the token; &ldquo;outstanding&rdquo; is the
         principal of the loans not yet settled, running or defaulted and unclaimed; &ldquo;owed at deadline&rdquo; adds
@@ -421,8 +431,16 @@ function DefaultsSection({ book }: { book: PwnLoanBook }) {
 
 // ── The view ─────────────────────────────────────────────────────────────────
 
+/** A collateral or credit line's key under Focus (ui-jobs 557). */
+const lineKeys = (t: { address: string }): string[] => [assetKey(MAINNET_CHAIN_ID, t.address)];
+
 export function PwnBookView({ book }: { book: PwnLoanBook }) {
   const registry = useReceiptRegistry();
+  // Focus: the book is held behind the gate when none of the tokens it lends
+  // or holds is in focus; the collateral and credit tables keep the ones that are.
+  const collateral = useScopedRows(book.collateral, lineKeys, () => MAINNET_CHAIN_ID);
+  const credit = useScopedRows(book.credit, lineKeys, () => MAINNET_CHAIN_ID);
+  const keys = useMemo(() => [...book.collateral, ...book.credit].flatMap(lineKeys), [book]);
 
   if (book.stale) {
     return (
@@ -437,59 +455,61 @@ export function PwnBookView({ book }: { book: PwnLoanBook }) {
   }
 
   return (
-    <ProvReceiptsScope registry={registry}>
-      {/* The vitals band. Only the population slot is filled, and that is the
+    <AimGate keys={keys} chain={MAINNET_CHAIN_ID} what="PWN's loan book">
+      <ProvReceiptsScope registry={registry}>
+        {/* The vitals band. Only the population slot is filled, and that is the
           whole of what PWN can state at the book level: there is no pool and
           no roster of markets to count, and with no protocol oracle — the two
           parties price each loan between themselves — there is no unit the
           book could be totalled in, so the size slots and any usage ratio
           would have to be invented. Same-token sums only, per section below.
           Do not add a USD total here. */}
-      <VitalsBand
-        className="mb-4"
-        vitals={[
-          {
-            slot: "population",
-            label: "Loans ever struck",
-            value: <Prov info={bookLoanCountProv()}>{book.totals.loans}</Prov>,
-          },
-        ]}
-        notes={
-          <>
-            <span>
-              <Prov info={bookStatusCountProv("open")}>
-                <span className="text-foreground">{book.totals.open}</span>
-              </Prov>{" "}
-              running
-            </span>
-            <span>
-              <Prov info={bookStatusCountProv("repaid")}>
-                <span className="text-foreground">{book.totals.repaid}</span>
-              </Prov>{" "}
-              repaid
-            </span>
-            <span>
-              <Prov info={bookStatusCountProv("defaulted")}>
-                <span className="text-foreground">{book.totals.defaulted}</span>
-              </Prov>{" "}
-              defaulted
-              {book.totals.unclaimed > 0 && (
-                <>
-                  {" "}
-                  (<Prov info={bookStatusCountProv("unclaimed")}>{book.totals.unclaimed}</Prov> not yet claimed)
-                </>
-              )}
-            </span>
-          </>
-        }
-      />
+        <VitalsBand
+          className="mb-4"
+          vitals={[
+            {
+              slot: "population",
+              label: "Loans ever struck",
+              value: <Prov info={bookLoanCountProv()}>{book.totals.loans}</Prov>,
+            },
+          ]}
+          notes={
+            <>
+              <span>
+                <Prov info={bookStatusCountProv("open")}>
+                  <span className="text-foreground">{book.totals.open}</span>
+                </Prov>{" "}
+                running
+              </span>
+              <span>
+                <Prov info={bookStatusCountProv("repaid")}>
+                  <span className="text-foreground">{book.totals.repaid}</span>
+                </Prov>{" "}
+                repaid
+              </span>
+              <span>
+                <Prov info={bookStatusCountProv("defaulted")}>
+                  <span className="text-foreground">{book.totals.defaulted}</span>
+                </Prov>{" "}
+                defaulted
+                {book.totals.unclaimed > 0 && (
+                  <>
+                    {" "}
+                    (<Prov info={bookStatusCountProv("unclaimed")}>{book.totals.unclaimed}</Prov> not yet claimed)
+                  </>
+                )}
+              </span>
+            </>
+          }
+        />
 
-      <OpenBookSection book={book} />
-      <CollateralSection book={book} />
-      <CreditSection book={book} />
-      <TermsSection book={book} />
-      <DefaultsSection book={book} />
-    </ProvReceiptsScope>
+        <OpenBookSection book={book} />
+        <CollateralSection scoped={collateral} />
+        <CreditSection scoped={credit} />
+        <TermsSection book={book} />
+        <DefaultsSection book={book} />
+      </ProvReceiptsScope>
+    </AimGate>
   );
 }
 

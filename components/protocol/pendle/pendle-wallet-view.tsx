@@ -11,6 +11,8 @@ import { Prov, ProvReceiptsScope, useReceiptRegistry } from "@/components/shared
 import { PositionCard, type PositionCardSlots } from "@/components/shared/position-card";
 
 import { BlockRef } from "@/components/shared/block-ref";
+import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
+import { rowAssetKeys } from "@/lib/shared/focus-row-keys";
 import { SECTION_HEADING, CARD_INSET_START } from "@/lib/shared/ui-grammar";
 import { PendleReadNotice } from "@/components/protocol/pendle/pendle-read-notice";
 import { UnderlyingLabel, positionClosed } from "@/components/protocol/pendle/pendle-position-card";
@@ -30,6 +32,8 @@ import { entryApyProv, impliedApyProv, maturityProv, valueProv } from "@/lib/pen
 import { pendleWalletHref } from "@/lib/pendle/routes";
 import type { PendlePosition, PendleWalletPositions } from "@/lib/pendle/types";
 import type { PendleReadFailure } from "@/lib/sources/api/pendle";
+
+const NONE: PendlePosition[] = [];
 
 function ListingCard({ p, w }: { p: PendlePosition; w: PendleWalletPositions }) {
   const t = p.tokens;
@@ -122,8 +126,15 @@ export function PendleWalletView({
   data: PendleWalletPositions | null;
   failure: PendleReadFailure | null;
 }) {
-  const open = data?.positions.filter((p) => !positionClosed(p)) ?? [];
-  const closed = data?.positions.filter((p) => positionClosed(p)) ?? [];
+  // Focus (ui-jobs 557): the markets whose PT, YT, SY, yield token or LP is in focus.
+  const scoped = useScopedRows(
+    data?.positions ?? NONE,
+    (p) => rowAssetKeys(p.tokens, PENDLE_CHAIN_ID),
+    () => PENDLE_CHAIN_ID,
+  );
+  const narrowed = scoped.on && !scoped.peek;
+  const open = scoped.rows.filter((p) => !positionClosed(p));
+  const closed = scoped.rows.filter((p) => positionClosed(p));
   const registry = useReceiptRegistry();
   return (
     <ProvReceiptsScope registry={registry}>
@@ -138,29 +149,33 @@ export function PendleWalletView({
         {data && data.positions.length === 0 && (
           <p className="text-sm text-rb-500">No Pendle router event names this wallet.</p>
         )}
-        {open.length > 0 && (
-          <section className="space-y-3" aria-label="Open positions" data-pendle-open="">
-            <h2 className={`${SECTION_HEADING} ${CARD_INSET_START}`}>
-              Open positions <span className="tabular-nums text-rb-500">{open.length}</span>
-            </h2>
-            {open.map((p) => (
-              <ListingCard key={p.tokens.market.address} p={p} w={data!} />
-            ))}
-          </section>
-        )}
-        {closed.length > 0 && (
-          <section className="space-y-3" aria-label="Closed positions" data-pendle-closed="">
-            <h2 className={`${SECTION_HEADING} ${CARD_INSET_START}`}>
-              Closed <span className="tabular-nums text-rb-500">{closed.length}</span>
-            </h2>
-            {closed.map((p) => (
-              <ListingCard key={p.tokens.market.address} p={p} w={data!} />
-            ))}
-          </section>
-        )}
-        {data && (data.unplacedYts.length > 0 || data.truncated) && (
+        {data && data.positions.length > 0 && <ScopeNote scoped={scoped} noun={["market", "markets"]} />}
+        <div className="space-y-6" {...scoped.listProps}>
+          {open.length > 0 && (
+            <section className="space-y-3" aria-label="Open positions" data-pendle-open="">
+              <h2 className={`${SECTION_HEADING} ${CARD_INSET_START}`}>
+                Open positions <span className="tabular-nums text-rb-500">{open.length}</span>
+              </h2>
+              {open.map((p) => (
+                <ListingCard key={p.tokens.market.address} p={p} w={data!} />
+              ))}
+            </section>
+          )}
+          {closed.length > 0 && (
+            <section className="space-y-3" aria-label="Closed positions" data-pendle-closed="">
+              <h2 className={`${SECTION_HEADING} ${CARD_INSET_START}`}>
+                Closed <span className="tabular-nums text-rb-500">{closed.length}</span>
+              </h2>
+              {closed.map((p) => (
+                <ListingCard key={p.tokens.market.address} p={p} w={data!} />
+              ))}
+            </section>
+          )}
+        </div>
+        {/* A YT with no market names nothing the focus can judge, so it is left out under Focus. */}
+        {data && ((!narrowed && data.unplacedYts.length > 0) || data.truncated) && (
           <div className={`space-y-1 text-xs text-rb-500 ${CARD_INSET_START}`} data-pendle-notes="">
-            {data.unplacedYts.length > 0 && (
+            {!narrowed && data.unplacedYts.length > 0 && (
               <p>
                 This wallet minted or redeemed{" "}
                 {data.unplacedYts.length === 1 ? "a YT" : `${data.unplacedYts.length} YTs`} whose market none of its
