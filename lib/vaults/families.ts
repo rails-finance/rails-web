@@ -23,9 +23,9 @@ export type VaultFamily = "metamorpho" | "sgho" | "stata" | "umbrella-stake" | "
  *  on Base, `morpho` on Ethereum. */
 export type VaultExplorer = "morpho-base" | "morpho" | "aave-vaults" | "yearn";
 
-/** The census's word for a family. The Base census writes `morpho` for every
- *  MetaMorpho vault; Yearn has no census. */
-export type VaultCensusFamily = "morpho" | "sgho" | "stata" | "umbrella-stake";
+/** The census's word for a family. The census writes `morpho` for every
+ *  MetaMorpho vault and `yearn-v3` for Yearn V3. */
+export type VaultCensusFamily = "morpho" | "sgho" | "stata" | "umbrella-stake" | "yearn-v3";
 
 export interface VaultFamilyEntry {
   /** Maple's explorer is a lender explorer with no vault holder pages, so it

@@ -47,8 +47,10 @@ import type { RawAmount } from "@/lib/sources/chain/morpho-base-vault";
  *  mechanics deployed by one issuer. A single-valued axis is not a facet, so
  *  Base's listing offers no family menu and the word only ever appears on a
  *  card, beside the share symbol, as the mechanism that vault runs on. The
- *  curator who runs it is a NAME and never reaches a row. */
-export type VaultPositionFamily = AaveVaultFamily | "morpho";
+ *  curator who runs it is a NAME and never reaches a row. Ethereum's census
+ *  also writes `morpho` for MetaMorpho there and `yearn-v3` for Yearn V3
+ *  (ui-jobs 584). */
+export type VaultPositionFamily = AaveVaultFamily | "morpho" | "yearn-v3";
 
 /** The holder-shape vocabulary the census classifier writes, which is the same
  *  set `AaveVaultHolderShape["kind"]` carries on the vault page — the two

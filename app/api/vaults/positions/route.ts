@@ -52,13 +52,12 @@ import { LISTING_CACHE_CONTROL, proxyCacheControl } from "@/lib/api/proxy-cache"
 import { readerIpFromRequest } from "@/lib/api/reader-ip";
 import {
   isVaultPositionShape,
-  vaultPositionValueFrom,
   type VaultCensusRow,
   type VaultPositionLive,
   type VaultPositionRow,
 } from "@/lib/aave-vaults/vault-position";
 import { VAULT_SIZE_BRACKETS, VAULT_SIZE_UNPRICED } from "@/lib/aave-vaults/position-list-filter-dimensions";
-import { AAVE_VAULT_FAMILY_ORDER } from "@/lib/aave-vaults/vault-catalog";
+import { toRow, VAULT_POSITION_FAMILIES, type BackendPositionRow } from "@/lib/vaults/position-row";
 import { loadMorphoBaseVaultRoster } from "@/lib/morpho-base/vault-roster";
 import { resolveErc20Meta } from "@/lib/sources/chain/erc20-meta";
 import { metaMorphoRosterEntry } from "@/lib/metamorpho/vault-roster";
@@ -82,7 +81,7 @@ const CENSUS_CHAINS: readonly ChainId[] = [MAINNET_CHAIN_ID, BASE_CHAIN_ID];
  *  MetaMorpho's (ui-jobs 486) and Yearn V3's (ui-jobs 584); rails-server
  *  scopes a chain-1 read to Aave's three unless `families` names others. */
 const FAMILIES_BY_CHAIN: Record<number, readonly string[]> = {
-  [MAINNET_CHAIN_ID]: [...AAVE_VAULT_FAMILY_ORDER, "morpho", "yearn-v3"],
+  [MAINNET_CHAIN_ID]: VAULT_POSITION_FAMILIES,
   [BASE_CHAIN_ID]: ["morpho"],
 };
 
@@ -115,64 +114,8 @@ const amount = (raw: bigint, decimals: number): RawAmount => ({
   value: Number(raw) / Math.pow(10, decimals),
 });
 
-/** The backend's row shape as Phase 1 shipped it (camelCase, flat). */
-interface BackendPositionRow {
-  chainId: number;
-  vault: string;
-  holder: string;
-  family: string;
-  symbol: string | null;
-  shareDecimals: number | null;
-  balance: string;
-  live: boolean;
-  transferCount: number;
-  firstBlock: number;
-  lastBlock: number;
-  shape: string | null;
-  shapeDetail: Record<string, unknown> | null;
-  censusBlock: number;
-  /** mig 206 — null where the vault is unpriced, or before the price pass. */
-  valueUsdE8?: string | null;
-  sharePpm?: string | null;
-}
-
 /** Is this a family word the chain's own census writes? */
 const isFamilyOn = (chainId: number, v: string): boolean => (FAMILIES_BY_CHAIN[chainId] ?? []).includes(v);
-
-const isVaultFamily = (v: string): v is VaultPositionRow["family"] =>
-  (AAVE_VAULT_FAMILY_ORDER as readonly string[]).includes(v) || v === "morpho";
-
-/** Reshape one backend row into the two-lane row the listing renders. The live
- *  lane is filled in afterwards; here it is null, which reads as unread. */
-function toRow(r: BackendPositionRow, chainId: number, census: VaultCensusRow | null): VaultPositionRow {
-  return {
-    chainId: r.chainId,
-    vault: r.vault.toLowerCase(),
-    holder: r.holder.toLowerCase(),
-    // A family the web tier does not know is not silently renamed: the row
-    // keeps the census's word where it is one this tier knows, and otherwise
-    // falls back to the chain's own single family — never to another chain's.
-    family: isVaultFamily(r.family) ? r.family : chainId === BASE_CHAIN_ID ? "morpho" : "stata",
-    symbol: r.symbol,
-    shareDecimals: r.shareDecimals,
-    census: {
-      block: r.censusBlock,
-      balance: r.balance,
-      live: r.live,
-      transferCount: r.transferCount,
-      firstBlock: r.firstBlock,
-      lastBlock: r.lastBlock,
-      shape: r.shape != null && isVaultPositionShape(r.shape) ? r.shape : null,
-      shapeDetail: r.shapeDetail,
-      sharePpm: r.sharePpm ?? null,
-    },
-    live: null,
-    asset: null,
-    firstSeenAt: null,
-    lastActivityAt: null,
-    value: vaultPositionValueFrom(census, r.valueUsdE8 ?? null),
-  };
-}
 
 type OverlayAsset = { address: string; symbol: string; decimals: number };
 

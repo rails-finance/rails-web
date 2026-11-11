@@ -20,10 +20,9 @@ import type { VaultPositionFamily } from "@/lib/aave-vaults/vault-position";
 import { familyOfCensus, VAULT_FAMILIES } from "@/lib/vaults/families";
 
 /** Every venue this mark stands for. WIDER than `VaultPositionFamily`, which is
- *  the census's vocabulary: the census counts positions, and Yearn has no
- *  position lane here — a Yearn venue reaches this component from a roster row
- *  and from nowhere else. A census family is assignable to this, so the position
- *  surfaces pass what they have always passed. */
+ *  the census's vocabulary (a Yearn census row is `yearn-v3`); a roster row
+ *  passes `yearn`, and Maple has no census. A census family is assignable to
+ *  this, so the position surfaces pass what they have always passed. */
 export type VaultVenue = VaultPositionFamily | "yearn" | "maple";
 
 /** Which explorer's mark stands for the venue each family was deployed by

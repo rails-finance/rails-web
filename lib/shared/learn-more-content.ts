@@ -1481,6 +1481,7 @@ const VAULT_EVENT_LINKS: Record<VaultPositionFamily | "yearn", LearnMoreLink[]> 
   "umbrella-stake": [{ label: "Umbrella", url: "https://aave.com/docs/aave-v3/umbrella" }],
   morpho: [{ label: "Morpho vaults", url: "https://docs.morpho.org/learn/concepts/vault/" }],
   yearn: [{ label: "Yearn documentation", url: "https://docs.yearn.fi/getting-started/intro" }],
+  "yearn-v3": [{ label: "Yearn documentation", url: "https://docs.yearn.fi/getting-started/intro" }],
 };
 
 /** The "?" on a vault timeline row (ui-jobs 309): what a row is and what its

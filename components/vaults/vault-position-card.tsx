@@ -60,6 +60,7 @@ const n = (v: number) => v.toLocaleString("en-US");
 const FAMILY_SINGULAR: Record<VaultPositionFamily, string> = {
   ...AAVE_FAMILY_SINGULAR,
   morpho: "MetaMorpho vault",
+  "yearn-v3": "Yearn V3 vault",
 };
 
 /** Which chain a row was censused on, and the routes that follow from it. */
