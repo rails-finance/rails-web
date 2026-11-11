@@ -146,7 +146,7 @@ export const CHAINS: Record<ChainId, ChainMeta> = {
   },
   4663: {
     id: 4663,
-    name: "Robinhood Chain",
+    name: "Robinhood",
     slug: "robinhood",
     // The explorer Robinhood's docs link (docs.robinhood.com/chain, the network
     // table). The site runs Blockscout.
