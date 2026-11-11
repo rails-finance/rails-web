@@ -12,7 +12,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { fetchUniswapPositions } from "@/lib/api/fetch-uniswap";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { uniExplorer, type UniChainId, type UniProtocol } from "@/lib/uniswap/deployments";
@@ -62,9 +62,9 @@ export async function UniswapWalletPositions({
           owner={{ wallet, filterProtocol: null, ...(chainId === 1 ? {} : { chain: chainId }) }}
           tools={false}
         />
-        <ReadTierTitleRow id={session}>
+        <HistoryTitleRow id={session}>
           <h2 className="text-lg font-semibold text-foreground">{FRONT_DOOR.heading(version, protocol)}</h2>
-        </ReadTierTitleRow>
+        </HistoryTitleRow>
       </header>
       {answer.kind !== "ok" ? (
         <p className="text-sm text-rb-500">{FRONT_DOOR.unanswered}</p>

@@ -110,12 +110,24 @@ type ProtocolSpec = {
    *  is the one that puts it back in the nav, the sitemap and the matrix.
    *  Omitted means launched; `true` is the only other value. */
   unlaunched?: true;
-  /** "visit": the explorer reads its figures from the chain when a page opens
-   *  and has no history, listing or holder count until Rails indexes it
-   *  (rails-ops decision 0061). Every surface that shows the roster draws
-   *  `ReadTierTag` for it; the field goes in the commit that indexes the
-   *  explorer. Omitted means indexed. */
-  readTier?: "visit";
+  /** How far back Rails's index of this explorer reaches (rails-ops decisions
+   *  0061 and 0063), drawn as the history tag (`HistoryTag`) on every surface
+   *  that shows the roster:
+   *  - "none": not yet indexed. Figures are read from the chain when a page
+   *    opens, and the tag reads "Read on visit".
+   *  - "from-date": indexed from a start block after the protocol's
+   *    deployment. The tag reads "History from <start date>", the date drawn
+   *    from the index's start block (app/api/history-start/route.ts), so a
+   *    backfill moves it with no edit here.
+   *  Omitted means indexed from deployment, with no tag; the field goes in the
+   *  commit where the index's start block reaches the deployment block. */
+  history?: "none" | "from-date";
+  /** `false`: indexed, but no listing page draws the index yet, so the
+   *  explorer answers one wallet or one position at a time (/coverage's "In
+   *  every explorer" caveat names it). The field goes in the change that adds
+   *  the listing. Omitted means it has one, or it is not indexed (`history:
+   *  "none"`), which the caveat words on its own. */
+  listing?: false;
   /** This explorer's protocol-level sub-pages, in tab order. The first is the
    *  overview beside the position listing — the branch roster, market roster,
    *  system state, hub comparison or loan book — and every explorer carries
@@ -227,6 +239,25 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
+    // Morpho Blue on Arc (rails-ops ui-jobs 577), read from the chain when a
+    // page opens: a front door taking a wallet, its positions at
+    // `<route>/<wallet>`, each opening `<route>/<wallet>/<market id>`; the
+    // Markets pages are the shared Morpho pages, fed by rails-server's
+    // /api/at-block/morpho-arc routes. Unlaunched while Miles reads it.
+    id: "morpho-arc",
+    session: "morpho-arc",
+    label: "Morpho Blue",
+    chainId: 5042,
+    slug: "morpho",
+    protocolKey: "morpho",
+    tags: ["Lend", "Borrow"],
+    desc: "Morpho Blue on Arc: a wallet's positions across every market, each with its collateral, debt and LTV against the market's line, and 30 days of interest",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+  },
+  {
     id: "aave-v4",
     session: "aave-v4",
     label: "Aave V4",
@@ -275,12 +306,31 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Lend", "Borrow"],
     desc: "Aave V4 on Arc: a wallet's accounts on the Core hub's three spokes, each with its balances in dollars at the spoke's oracle, its health factor and 30 days of interest",
     positionListing: false,
-    readTier: "visit",
+    history: "none",
     unlaunched: true,
     subPages: [
       { segment: "markets", label: "Markets", tab: "Markets" },
       { segment: "hubs", label: "Hubs", tab: "Hubs" },
     ],
+  },
+  {
+    // Aave V3 on Optimism (rails-ops ui-jobs 578): one Pool, read from the
+    // chain when a page opens. A front door taking a wallet, its account at
+    // `<route>/<wallet>`, and the market overview and reserve pages that
+    // Ethereum, Base and Arbitrum draw, fed by rails-server's
+    // /api/at-block/aave-v3-optimism routes. Unlaunched while Miles reads it.
+    id: "aave-v3-optimism",
+    session: "aave-v3-optimism",
+    label: "Aave V3",
+    chainId: 10,
+    slug: "aave-v3",
+    protocolKey: "aave-v3",
+    tags: ["Lend", "Borrow"],
+    desc: "Aave V3 on Optimism: a wallet's account on the Pool, its balances in dollars at Aave's oracle, its health factor and 30 days of interest",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
     // Aave's VAULT LAYER, and a third Aave row on Ethereum beside the two pool
@@ -319,7 +369,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Concentrated liquidity on Base, staked or not: a position's range, fees or AERO and pool over the last 30 days",
     positionListing: false,
-    readTier: "visit",
+    history: "none",
     subPages: [],
   },
   {
@@ -327,7 +377,9 @@ const SPECS: ProtocolSpec[] = [
     // front door taking a wallet, the pools it holds a share of at
     // `<route>/<wallet>`, each opening `<route>/position/<pool>/<wallet>` (a
     // pool share is a Vault balance, so the pool and the wallet name it). Reads
-    // come from rails-server's at-block routes (lib/api/fetch-balancer.ts).
+    // come from rails-server's at-block routes (lib/api/fetch-balancer.ts); a
+    // wallet's pools are found in Rails's index of the Vault's transfers since
+    // deployment, so it carries no `history`.
     id: "balancer-v3",
     session: "balancer-v3",
     label: "Balancer V3",
@@ -336,8 +388,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Pool shares on Ethereum: a wallet's part of each pool's tokens and the pool over the last 30 days",
     positionListing: false,
-    unlaunched: true,
-    readTier: "visit",
+    listing: false,
     subPages: [],
   },
   {
@@ -352,8 +403,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Pool shares on Arbitrum: a wallet's part of each pool's tokens and the pool over the last 30 days",
     positionListing: false,
-    unlaunched: true,
-    readTier: "visit",
+    listing: false,
     subPages: [],
   },
   {
@@ -455,6 +505,25 @@ const SPECS: ProtocolSpec[] = [
     subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
   },
   {
+    // Compound V3 on Optimism (rails-ops ui-jobs 578): three Comets, read from
+    // the chain when a page opens. A front door taking a wallet, its Comets at
+    // `<route>/<wallet>`, one Comet's account at `<route>/<comet>/<wallet>`, and
+    // the Markets pages Ethereum, Base and Arbitrum draw, fed by rails-server's
+    // /api/at-block/compound-v3-optimism routes. Unlaunched while Miles reads it.
+    id: "compound-v3-optimism",
+    session: "compound-v3-optimism",
+    label: "Compound V3",
+    chainId: 10,
+    slug: "compound-v3",
+    protocolKey: "compound",
+    tags: ["Lend", "Borrow"],
+    desc: "Compound V3 on Optimism: a wallet's account in each of three Comets, its balances at each Comet's price feeds, its borrowing limit and 30 days of interest",
+    positionListing: false,
+    history: "none",
+    unlaunched: true,
+    subPages: [{ segment: "markets", label: "Market overview", tab: "Markets" }],
+  },
+  {
     id: "dolomite",
     session: "dolomite",
     label: "Dolomite",
@@ -506,7 +575,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Lend", "Borrow"],
     desc: "Euler's vaults on Base: a wallet's 256 accounts, each loan with its collateral and health, and each deposit over the last 30 days",
     positionListing: false,
-    readTier: "visit",
+    history: "none",
     unlaunched: true,
     subPages: [],
   },
@@ -520,8 +589,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Lend", "Borrow"],
     desc: "Euler's vaults on Arbitrum: a wallet's 256 accounts, each loan with its collateral and health, and each deposit over the last 30 days",
     positionListing: false,
-    readTier: "visit",
-    unlaunched: true,
+    listing: false,
     subPages: [],
   },
   {
@@ -550,7 +618,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Borrow", "CDP"],
     desc: "Fluid vault positions on Base: a position's collateral, debt, ratio to its limits and interest over the last 30 days",
     positionListing: false,
-    readTier: "visit",
+    history: "none",
     unlaunched: true,
     subPages: [],
   },
@@ -593,7 +661,7 @@ const SPECS: ProtocolSpec[] = [
     desc: "Staked ether on Ethereum: a wallet's stETH and wstETH in ETH, its change over the last 30 days, and its withdrawal requests",
     positionListing: false,
     unlaunched: true,
-    readTier: "visit",
+    history: "none",
     subPages: [],
   },
   {
@@ -751,7 +819,7 @@ const SPECS: ProtocolSpec[] = [
     desc: "PancakeSwap V3 on Base, staked in its farm or not: a position's range, fees, CAKE and pool over the last 30 days",
     positionListing: false,
     unlaunched: true,
-    readTier: "visit",
+    history: "none",
     subPages: [],
   },
   {
@@ -765,7 +833,7 @@ const SPECS: ProtocolSpec[] = [
     desc: "PancakeSwap V3 on Arbitrum, staked in its farm or not: a position's range, fees, CAKE and pool over the last 30 days",
     positionListing: false,
     unlaunched: true,
-    readTier: "visit",
+    history: "none",
     subPages: [],
   },
   {
@@ -886,7 +954,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Concentrated liquidity on Ethereum: a position's range, fees and pool over the last 30 days, read from the pool at two blocks",
     positionListing: false,
-    readTier: "visit",
+    history: "none",
     subPages: [],
   },
   {
@@ -899,7 +967,7 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Liquidity"],
     desc: "Uniswap's singleton pools on Ethereum, hooks included: a position's range, fees and pool over the last 30 days",
     positionListing: false,
-    readTier: "visit",
+    history: "none",
     subPages: [],
   },
   {
@@ -917,7 +985,7 @@ const SPECS: ProtocolSpec[] = [
     desc: "Uniswap V3 on Base: a position's range, fees and pool over the last 30 days",
     positionListing: false,
     unlaunched: true,
-    readTier: "visit",
+    history: "none",
     subPages: [],
   },
   {
@@ -931,7 +999,7 @@ const SPECS: ProtocolSpec[] = [
     desc: "Uniswap V3 on Arbitrum: a position's range, fees and pool over the last 30 days",
     positionListing: false,
     unlaunched: true,
-    readTier: "visit",
+    history: "none",
     subPages: [],
   },
   {
@@ -945,7 +1013,7 @@ const SPECS: ProtocolSpec[] = [
     desc: "Uniswap's singleton pools on Arbitrum, hooks included: a position's range, fees and pool over the last 30 days",
     positionListing: false,
     unlaunched: true,
-    readTier: "visit",
+    history: "none",
     subPages: [],
   },
   {
@@ -1009,6 +1077,11 @@ export const PROTOCOLS: ProtocolEntry[] = SPECS.map((spec) => {
  *  The rule of thumb: if the surface is how a reader FINDS an explorer, it
  *  reads this; if it is how a page the reader is already on draws itself, it
  *  reads `PROTOCOLS`. */
+/** A roster entry's history kind, by its roster id; null for an explorer
+ *  indexed from deployment, which wears no history tag. */
+export const historyOf = (id: string): "none" | "from-date" | null =>
+  PROTOCOLS.find((p) => p.id === id)?.history ?? null;
+
 export const LAUNCHED_PROTOCOLS: ProtocolEntry[] = PROTOCOLS.filter((p) => !p.unlaunched);
 
 /** One row per distinct launched protocol VERSION — the roster deduplicated on
@@ -1141,10 +1214,12 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   morpho: "Position",
   "morpho-base": "Position",
   "morpho-arbitrum": "Position",
+  "morpho-arc": "Position",
   spark: "Position",
   compound: "Position",
   "compound-base": "Position",
   "compound-v3-arbitrum": "Position",
+  "compound-v3-optimism": "Position",
   "compound-v2": "Position",
   dolomite: "Account",
   pwn: "Loans",
@@ -1176,6 +1251,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   lido: "Stake",
   "fluid-base": "Position",
   "aave-v4-arc": "Position",
+  "aave-v3-optimism": "Position",
   // One account's holding in one vault.
   "euler-v2-base": "Position",
   "euler-v2-arbitrum": "Position",

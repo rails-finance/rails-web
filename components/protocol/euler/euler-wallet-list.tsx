@@ -47,7 +47,7 @@ export function EulerWalletList({ w, home }: { w: EulerWalletRead; home: string 
               {rows
                 .filter((r) => r.index === i)
                 .map((r) => (
-                  <li key={r.vault}>
+                  <li key={`${r.vault}:${r.kind}`}>
                     <Link
                       href={`${home}/position/${r.account.toLowerCase()}/${r.vault.toLowerCase()}`}
                       className={ROW}

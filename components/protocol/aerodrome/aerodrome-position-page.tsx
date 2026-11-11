@@ -9,7 +9,7 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AerodromePositionCard } from "@/components/protocol/aerodrome/aerodrome-position-card";
 import { AerodromeReadout } from "@/components/protocol/aerodrome/aerodrome-readout";
@@ -66,11 +66,11 @@ export async function AerodromePositionPage({ deployment, id }: { deployment: st
             owner={wallet ? { wallet, chain: 8453, filterProtocol: null, href: `${home}/${wallet}` } : undefined}
             tools={false}
           />
-          <ReadTierTitleRow id={session}>
+          <HistoryTitleRow id={session}>
             <h2 className="text-lg font-semibold text-foreground" data-aerodrome-position={`${deployment}:${id}`}>
               {title}
             </h2>
-          </ReadTierTitleRow>
+          </HistoryTitleRow>
           <p className="text-xs text-rb-500">{POSITION_PAGE.sub(p)}</p>
         </header>
         <div className="flex flex-col gap-6">

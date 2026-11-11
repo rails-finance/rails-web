@@ -1,14 +1,15 @@
 // A wallet's Euler V2 accounts on one chain (J3), at `/<chain>/euler-v2/<wallet>`:
 // each account that borrows, has collateral enabled or (account 0) holds a
 // deposit, its holdings on rows that open their pages (J3.2). The line under the
-// heading states the narrowing (J3.1). The layout is Uniswap's
+// heading states the narrowing (J3.1) where deposits were read on account 0 alone; on a chain the
+// position index serves, the index's deposits on accounts 1–255 lift it and the line goes. The layout is Uniswap's
 // (components/protocol/uniswap/uniswap-wallet-positions.tsx).
 //
 // SERVER-ONLY: the read uses the bearer token.
 
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AimGate } from "@/components/shared/aim-gate";
 import { EulerWalletList } from "@/components/protocol/euler/euler-wallet-list";
@@ -41,12 +42,14 @@ export async function EulerWalletAccounts({ chain, wallet: raw }: { chain: Euler
               owner={{ wallet, filterProtocol: null }}
               tools={false}
             />
-            <ReadTierTitleRow id={session}>
+            <HistoryTitleRow id={session}>
               <h2 className="text-lg font-semibold text-foreground">{FRONT_DOOR.heading}</h2>
-            </ReadTierTitleRow>
-            <p className="text-xs text-rb-500" data-anatomy="J3.1" data-euler-narrowing="">
-              {FRONT_DOOR.narrowing}
-            </p>
+            </HistoryTitleRow>
+            {!(answer.kind === "ok" && answer.data.deposits?.source === "index") && (
+              <p className="text-xs text-rb-500" data-anatomy="J3.1" data-euler-narrowing="">
+                {FRONT_DOOR.narrowing}
+              </p>
+            )}
           </header>
           {answer.kind !== "ok" ? (
             <p className="text-sm text-rb-500">{FRONT_DOOR.unanswered}</p>

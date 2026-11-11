@@ -56,10 +56,30 @@ export interface BalPositionRead {
   balance: string;
   now: BalPoolAt;
   past: (BalPoolAt & { balance: string }) | null;
+  /** The wallet's shares of this pool staked in its gauges at the head, where the server reads them. */
+  staked?: BalStaked[];
+  /** The wallet's adds and removes in this pool, oldest first: Rails's index, then the chain's logs above it. */
   flows: BalFlow[];
+  /** The index's reach from its coverage route, read beside the position by
+   *  the web (lib/api/fetch-balancer.ts); null where coverage did not answer. */
+  indexThrough?: number | null;
 }
 
-export type BalFinderSource = "liquidity-added";
+/** Why a route refused: the index has no reach from the deployment on the
+ *  chain, or it is more than a day of blocks below the head. */
+export type BalIndexRefusal = "index_unavailable" | "index_behind";
+
+/** Where the wallet finder looked: "index", Rails's position index of the
+ *  Vault's pool-share Transfer events from deployment through `to`; "tail",
+ *  the Transfer logs read from the chain after the index, through the head. */
+export type BalFinderSource = "index" | "tail";
+
+/** Shares of a pool staked in its gauge: the gauge holds them for the wallet. */
+export interface BalStaked {
+  gauge: string;
+  /** The wallet's staked shares, 18 decimals. */
+  balance: string;
+}
 
 /** GET /api/at-block/balancer/positions */
 export interface BalPositionsRead {
@@ -74,10 +94,13 @@ export interface BalPositionsRead {
     pool: string;
     name: string | null;
     symbol: string | null;
+    /** The wallet's own pool shares, 18 decimals. */
     balance: string;
     totalSupply: string;
     tokens: BalToken[];
     balancesRaw: string[];
+    /** Shares of this pool the wallet has staked in a gauge, where the server reads them. */
+    staked?: BalStaked[];
   }[];
   truncated: boolean;
 }

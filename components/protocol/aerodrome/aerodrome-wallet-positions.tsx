@@ -11,7 +11,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ROW, isWallet } from "@/components/protocol/uniswap/uniswap-wallet-positions";
 import { fetchAerodromePositions } from "@/lib/api/fetch-aerodrome";
 import { FRONT_DOOR } from "@/lib/aerodrome/words";
@@ -36,9 +36,9 @@ export async function AerodromeWalletPositions({ wallet: raw }: { wallet: string
           owner={{ wallet, chain: 8453, filterProtocol: null }}
           tools={false}
         />
-        <ReadTierTitleRow id={session}>
+        <HistoryTitleRow id={session}>
           <h2 className="text-lg font-semibold text-foreground">{FRONT_DOOR.heading}</h2>
-        </ReadTierTitleRow>
+        </HistoryTitleRow>
       </header>
       {answer.kind !== "ok" ? (
         <p className="text-sm text-rb-500">{FRONT_DOOR.unanswered}</p>

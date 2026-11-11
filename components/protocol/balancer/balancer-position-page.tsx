@@ -9,7 +9,7 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AimGate } from "@/components/shared/aim-gate";
 import { assetKey } from "@/lib/shared/asset-family";
@@ -19,7 +19,7 @@ import { BalancerReadout } from "@/components/protocol/balancer/balancer-readout
 import { fetchBalancerPosition } from "@/lib/api/fetch-balancer";
 import { balPosition } from "@/lib/balancer/position";
 import { BAL_CHAINS, type BalChainId } from "@/lib/balancer/chains";
-import { POSITION_PAGE } from "@/lib/balancer/words";
+import { POSITION_PAGE, REFUSED } from "@/lib/balancer/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { explorerHref } from "@/lib/shared/protocols";
 
@@ -44,12 +44,12 @@ export async function BalancerPositionPage({
   const chain = BAL_CHAINS[chainId];
   const session = chain.session;
   const home = explorerHref(chainId, session);
-  if (answer.kind === "error")
+  if (answer.kind === "error" || answer.kind === "refused")
     return (
       <div className="py-8">
         <DetailTopRow session={session} fallbackHref={`${home}/${wallet}`} showStamp={false} />
-        <p className="mt-6 text-sm text-rb-500" data-position-unanswered="">
-          {POSITION_PAGE.unanswered}
+        <p className="mt-6 text-sm text-rb-500" data-position-unanswered={answer.kind === "refused" ? answer.code : ""}>
+          {answer.kind === "refused" ? REFUSED[answer.code] : POSITION_PAGE.unanswered}
         </p>
       </div>
     );
@@ -70,11 +70,11 @@ export async function BalancerPositionPage({
               owner={{ wallet, filterProtocol: null, href: `${home}/${wallet}` }}
               tools={false}
             />
-            <ReadTierTitleRow id={session}>
+            <HistoryTitleRow id={session}>
               <h2 className="text-lg font-semibold text-foreground" data-balancer-position={`${r.pool}:${r.wallet}`}>
                 {title}
               </h2>
-            </ReadTierTitleRow>
+            </HistoryTitleRow>
             <p className="text-xs text-rb-500">{POSITION_PAGE.sub(p, chain.name)}</p>
           </header>
           <div className="flex flex-col gap-6">

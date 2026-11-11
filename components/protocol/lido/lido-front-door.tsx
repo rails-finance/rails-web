@@ -7,12 +7,12 @@
 import Link from "next/link";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
-import { ReadTierTag, isReadOnVisit } from "@/components/shared/read-tier-tag";
+import { HistoryLine } from "@/components/shared/history-tag";
 import { Prov } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { PoolReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
-import { READ_TIER } from "@/lib/shared/read-tier";
 import { NAV_PILL } from "@/lib/shared/ui-grammar";
+import { historyOf } from "@/lib/shared/protocols";
 import { lidoTotals } from "@/lib/lido/stake";
 import { totalsProv } from "@/lib/lido/provenance";
 import type { LidoProtocolRead } from "@/lib/lido/types";
@@ -90,27 +90,21 @@ function Totals({ r }: { r: LidoProtocolRead }) {
 }
 
 export function LidoFrontDoor({ r }: { r: LidoProtocolRead | null }) {
-  const tiered = isReadOnVisit(ID);
+  const tagged = historyOf(ID) != null;
   return (
     <div
       className="flex min-h-[calc(100svh-10rem)] flex-col items-center justify-center py-12"
       data-anatomy="N5"
       data-front-door={ID}
     >
-      <h1 className={`${tiered ? "mb-4" : "mb-8"} flex items-center gap-3`}>
+      <h1 className={`${tagged ? "mb-4" : "mb-8"} flex items-center gap-3`}>
         <ProtocolIcon id={ID} className="h-11 w-11 shrink-0 text-foreground" />
         <span className="text-3xl font-semibold leading-none text-foreground">{LABEL}</span>
       </h1>
-      {tiered && (
-        <p
-          className="mb-8 flex max-w-xl flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm text-rb-500"
-          data-anatomy="H23.2"
-          data-read-tier-line=""
-        >
-          <ReadTierTag tip={false} />
-          <span>{READ_TIER.line}</span>
-        </p>
-      )}
+      <HistoryLine
+        id={ID}
+        className="mb-8 flex max-w-xl flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm text-rb-500"
+      />
       <div className="w-full max-w-xl">
         <FrontDoorSearch href={(wallet) => `${ROUTE}/${wallet}`} />
       </div>

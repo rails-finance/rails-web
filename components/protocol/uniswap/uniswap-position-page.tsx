@@ -10,7 +10,7 @@
 import { cache } from "react";
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { UniswapPositionCard } from "@/components/protocol/uniswap/uniswap-position-card";
 import { UniswapReadout } from "@/components/protocol/uniswap/uniswap-readout";
@@ -137,11 +137,11 @@ export async function UniswapPositionPage({
             }}
             tools={false}
           />
-          <ReadTierTitleRow id={session}>
+          <HistoryTitleRow id={session}>
             <h2 className="text-lg font-semibold text-foreground" data-uniswap-position={`${version}:${id}`}>
               {title}
             </h2>
-          </ReadTierTitleRow>
+          </HistoryTitleRow>
           <p className="text-xs text-rb-500">{POSITION_PAGE.sub(p)}</p>
         </header>
         <div className="flex flex-col gap-6">
