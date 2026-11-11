@@ -3,17 +3,19 @@
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { RevealTip } from "@/components/shared/reveal-tip";
-import { historyOf } from "@/lib/shared/protocols";
+import { PROTOCOLS, historyOf } from "@/lib/shared/protocols";
+import { CHAINS } from "@/lib/shared/chains";
 import { HISTORY_NONE, historyDate, historyWords, type HistoryKind } from "@/lib/shared/history-tier";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 /** A from-date line's link to the status page, where the fill's progress shows (decision 0064 point 3). */
-function ProgressLink({ kind }: { kind: HistoryKind }) {
+function ProgressLink({ id, kind }: { id: string; kind: HistoryKind }) {
   if (kind !== "from-date") return null;
+  const chain = PROTOCOLS.find((p) => p.id === id)?.chainId;
   return (
     <>
       {" "}
-      <Link href="/status" className={INLINE_LINK} data-history-progress>
+      <Link href={chain ? `/status/${CHAINS[chain].slug}` : "/status"} className={INLINE_LINK} data-history-progress>
         See how far it has read
       </Link>
     </>
@@ -104,7 +106,7 @@ export function HistoryLine({ id, className }: { id: string; className: string }
       <HistoryTag id={id} tip={false} />
       <span>
         {w.line}
-        <ProgressLink kind={w.kind} />
+        <ProgressLink id={id} kind={w.kind} />
       </span>
     </p>
   );
@@ -122,7 +124,7 @@ export function InfoHistoryLine({ id }: { id: string }) {
       </span>
       <span className="text-foreground">{w.line}</span>
       {w.kind === "none" && <> {HISTORY_NONE.waits}</>}
-      <ProgressLink kind={w.kind} />
+      <ProgressLink id={id} kind={w.kind} />
     </p>
   );
 }

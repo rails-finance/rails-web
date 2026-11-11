@@ -16,6 +16,7 @@ import {
   DataTableRow,
 } from "@/components/shared/data-table/data-table";
 import { DOT, STATUS_WORDS } from "@/components/status/status-grammar";
+import { SieveLink } from "@/components/status/lane-text";
 import { formatDate } from "@/lib/date";
 import {
   ageWords,
@@ -128,8 +129,8 @@ export function PricesView({ prices, now }: { prices: PricesSection; now: number
   return (
     <div data-anatomy="Y5">
       <p className="mb-4 max-w-2xl text-sm text-rb-500">
-        Every dollar figure on Rails rests on stored prices. Rails&apos; Sieve indexer reads each Chainlink round and
-        rate update from Ethereum peers, and the fillers below write them as prices.
+        Every dollar figure on Rails rests on stored prices. Rails reads each Chainlink round and rate update from
+        Ethereum peers with <SieveLink />, and the fillers below write them as prices.
       </p>
       {down && (
         <p className="mb-4 text-sm text-red-600 dark:text-red-400">
@@ -170,7 +171,9 @@ export function PricesView({ prices, now }: { prices: PricesSection; now: number
                 {l.everyWords}
               </DataTableCell>
               <DataTableCell valign="middle" label="Read from" className="text-sm text-rb-500">
-                <span title={laneTitle}>Sieve, from Ethereum peers</span>
+                <span title={laneTitle}>
+                  <SieveLink />, from Ethereum peers
+                </span>
               </DataTableCell>
               <DataTableCell valign="middle" label="Reference">
                 <Source href={l.source}>{l.sourceLabel}</Source>

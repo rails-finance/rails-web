@@ -286,6 +286,13 @@ const nextConfig: NextConfig = {
         destination: "/",
         permanent: true,
       },
+      // Status is one page per chain, as coverage is; the bare path opens
+      // Ethereum's (rails-ops ui-jobs 583).
+      {
+        source: "/status",
+        destination: "/status/ethereum",
+        permanent: false,
+      },
       // Coverage is one page per chain; the bare path opens Ethereum's.
       // Temporary, so a chain chooser can take /coverage later.
       {

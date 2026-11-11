@@ -23,9 +23,11 @@ import {
   DATA_TABLE_PILL,
   type DataTableDir,
 } from "@/components/shared/data-table/data-table";
-import { ChainToggleButtons } from "@/components/shared/chain-toggle";
+import Link from "next/link";
+import { ChainGlyph as ToggleGlyph, SEGMENT_SHELL, segmentClass } from "@/components/shared/chain-toggle";
 import { DOT, STATUS_WORDS } from "@/components/status/status-grammar";
 import { PricesView } from "@/components/status/prices-view";
+import { LaneText } from "@/components/status/lane-text";
 import { NEXT_STAGE_WORDS, nextItems, type NextItem } from "@/lib/status/next";
 import { CHAINS, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { formatDate } from "@/lib/date";
@@ -463,7 +465,13 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
           : `No index yet. Its pages read the chain when they open. ${visitLine(live?.visitReads)}`}
       </p>
       <dl className="mt-3 flex flex-col gap-y-1.5 text-sm">
-        {b && <Figure name="Indexed by" value={pipelineWords(b.pipeline)} source="the server's pipeline table" />}
+        {b && (
+          <Figure
+            name="Indexed by"
+            value={<LaneText text={pipelineWords(b.pipeline)} />}
+            source="the server's pipeline table"
+          />
+        )}
         {b?.start && (
           <Figure name="Starts at" value={<BlockAt chain={e.chain} {...b.start} />} source="lowest stored block" />
         )}
@@ -486,7 +494,7 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
             name="Kept current by"
             value={
               <>
-                {laneWords(live.lane, live.visitReads?.gateway)}
+                <LaneText text={laneWords(live.lane, live.visitReads?.gateway)} />
                 {live.checkpoint && (
                   <span className="text-rb-500">
                     {" "}
@@ -615,7 +623,7 @@ function Row({ line, now, allowance }: { line: Line; now: number; allowance: All
               {v.last != null ? `${ageWords(now - v.last)} ago` : "–"}
             </DataTableCell>
             <DataTableCell valign="middle" label="Kept current by" className="text-sm text-rb-500">
-              {v.lane}
+              <LaneText text={v.lane} />
             </DataTableCell>
           </>
         }
@@ -689,7 +697,41 @@ function NextTable({ chain, items }: { chain: number; items: NextItem[] }) {
   );
 }
 
-export function StatusBoard({ source }: { source: StatusSource }) {
+/** What a /status/<view> route shows: one chain, or the Prices view. */
+export type StatusView = { kind: "chain"; chain: ChainId } | { kind: "prices" };
+
+/** The chain segments and Prices as links between the /status routes (Y4). */
+function StatusToggle({ chains, view, prices }: { chains: ChainId[]; view: StatusView; prices: boolean }) {
+  return (
+    <nav className={`${SEGMENT_SHELL} flex-wrap`} aria-label="Status by chain">
+      {chains.map((id) => {
+        const active = view.kind === "chain" && view.chain === id;
+        return (
+          <Link
+            key={id}
+            href={`/status/${CHAINS[id].slug}`}
+            aria-current={active ? "page" : undefined}
+            className={segmentClass(active)}
+          >
+            <ToggleGlyph chainId={id} className="h-3.5 w-3.5 max-[380px]:hidden" />
+            {CHAINS[id].name}
+          </Link>
+        );
+      })}
+      {prices && (
+        <Link
+          href="/status/prices"
+          aria-current={view.kind === "prices" ? "page" : undefined}
+          className={`${segmentClass(view.kind === "prices")} whitespace-nowrap`}
+        >
+          Prices
+        </Link>
+      )}
+    </nav>
+  );
+}
+
+export function StatusBoard({ source, view }: { source: StatusSource; view: StatusView }) {
   const router = useRouter();
   const asOf = Date.parse(source.data.asOf) / 1000;
   // The server's time first, so the markup matches; the browser's clock after.
@@ -712,8 +754,8 @@ export function StatusBoard({ source }: { source: StatusSource }) {
   const chains = chainsOf(cells, next);
   const allowance = source.route === "status" ? (source.data.allowance ?? null) : null;
   const prices = source.route === "status" ? (source.data.prices ?? null) : null;
-  const [pricesOpen, setPricesOpen] = useState(false);
-  const [chain, setChain] = useState<ChainId>(chains[0] ?? 1);
+  const pricesOpen = view.kind === "prices";
+  const chain: ChainId = view.kind === "chain" ? view.chain : 1;
   const [sort, setSort] = useState<{ key: SortKey; dir: DataTableDir }>({ key: "status", dir: "asc" });
 
   const lines: Line[] = cells
@@ -741,18 +783,12 @@ export function StatusBoard({ source }: { source: StatusSource }) {
   return (
     <div className="mt-10">
       <div className="-mx-4 mb-6 overflow-x-auto px-4 sm:mx-0 sm:px-0" data-anatomy="Y4">
-        <ChainToggleButtons
-          chainId={chain}
-          onChange={(c) => {
-            setChain(c);
-            setPricesOpen(false);
-          }}
-          chains={chains}
-          extra={prices ? { label: "Prices", active: pricesOpen, onSelect: () => setPricesOpen(true) } : undefined}
-        />
+        <StatusToggle chains={chains} view={view} prices={Boolean(prices)} />
       </div>
       {pricesOpen && prices ? (
         <PricesView prices={prices} now={now} />
+      ) : pricesOpen ? (
+        <p className="text-sm text-rb-500">The index server does not report prices yet.</p>
       ) : lines.length > 0 ? (
         <>
           {/* Below sm the table stacks into cards with no header row; the sort is a select. */}
@@ -794,7 +830,7 @@ export function StatusBoard({ source }: { source: StatusSource }) {
               {mb(allowance.allowanceToday)} left
               {allowance.floorBytes != null && `, ${mb(allowance.floorBytes)} kept in reserve`}
               {allowance.resetsAt && `, resets at ${hhmm(allowance.resetsAt)}`}. The full-history fill and reads on
-              visit draw on it; Sieve does not.
+              visit draw on it.
             </p>
           )}
           <DataTable
