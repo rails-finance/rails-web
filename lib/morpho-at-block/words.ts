@@ -40,6 +40,7 @@ export const positionPageWords = ({ chain }: Dep) => ({
   sub: (f: MorphoAtBlockFigures) => `LLTV ${pctText(f.lltv, 1)} · ${chain}`,
   unanswered: "The read of this position did not answer. Try again in a minute.",
   empty: "This wallet holds nothing in this market.",
+  notIndexed: `Not indexed yet on ${chain}: this position's history and liquidations arrive when Rails indexes Morpho Blue there.`,
 });
 
 /** The card's foot: which read prices the loan token in dollars. */

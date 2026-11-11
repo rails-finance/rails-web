@@ -59,6 +59,11 @@
 /ethereum/uniswap-v4/position/[id]
 /optimism/compound-v3/[market]
 /optimism/compound-v3/[market]/[wallet]
+/optimism/morpho
+/optimism/morpho/[wallet]
+/optimism/morpho/[wallet]/[market]
+/optimism/morpho/markets
+/optimism/morpho/markets/[loanToken]
 /pulse
 /sepolia/polaris/[market]/[id]
 /sepolia/polaris/[market]/[id]/event/[eventId]

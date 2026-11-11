@@ -369,6 +369,8 @@ const GLYPHS: Record<string, Glyph> = {
   "morpho-arbitrum": MORPHO_MARK,
   // Morpho Blue on Arc: the Ethereum mark, its own deployment.
   "morpho-arc": MORPHO_MARK,
+  // Morpho Blue on Optimism: the same mark, its own deployment.
+  "morpho-optimism": MORPHO_MARK,
   "sky-savings": {
     viewBox: "0 0 512 512",
     paths: [

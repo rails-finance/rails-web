@@ -6,7 +6,11 @@
 // block (decision 0059 point 1); this module is where they live.
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
-import type { MorphoAtBlockFigures, MorphoAtBlockPositionFigures, AtBlockInterest } from "@/lib/morpho-at-block/position";
+import type {
+  MorphoAtBlockFigures,
+  MorphoAtBlockPositionFigures,
+  AtBlockInterest,
+} from "@/lib/morpho-at-block/position";
 import {
   type MorphoAtBlockDeployment,
   type MorphoAtBlockMarket,
@@ -41,7 +45,10 @@ const oracleIn = (
   note,
   ...(contract ? { contract } : {}),
 });
-const morphoOf = (dep: MorphoAtBlockDeployment) => ({ name: `Morpho Blue (${dep.chain})`, address: dep.contracts.morpho });
+const morphoOf = (dep: MorphoAtBlockDeployment) => ({
+  name: `Morpho Blue (${dep.chain})`,
+  address: dep.contracts.morpho,
+});
 type UsdSource = NonNullable<MorphoAtBlockFigures["usd"]>;
 const viaAave = (u: UsdSource) => u.feed.source === "aave-oracle";
 /** The contract a loan token's dollar price was read from. */

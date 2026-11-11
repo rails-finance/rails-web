@@ -11,15 +11,19 @@ const ZERO = "0x0000000000000000000000000000000000000000";
 export const listedMarkets = <M extends Pick<MorphoAtBlockMarket, "unlisted">>(ms: readonly M[]): M[] =>
   ms.filter((m) => !m.unlisted);
 
-/** How many markets the list leaves out, by reason, and the idle market where there is one. */
+/** How many markets the list leaves out, by reason, and the idle markets: `idle` the first, `idles`
+ *  every one (Optimism has two, one naming no token and one lending USDC). */
 export function atBlockUnlisted(r: Pick<MorphoAtBlockMarketsRead, "markets">): {
   test: number;
   never: number;
   idle: MorphoAtBlockMarket | null;
+  idles: MorphoAtBlockMarket[];
 } {
+  const idles = r.markets.filter((m) => m.collateralToken === ZERO && m.oracle === ZERO && m.irm === ZERO);
   return {
     test: r.markets.filter((m) => m.unlisted === "test-token").length,
     never: r.markets.filter((m) => m.unlisted === "never-funded").length,
-    idle: r.markets.find((m) => m.collateralToken === ZERO && m.oracle === ZERO && m.irm === ZERO) ?? null,
+    idle: idles[0] ?? null,
+    idles,
   };
 }

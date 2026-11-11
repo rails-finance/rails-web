@@ -3,6 +3,7 @@
 import type { Metadata } from "next";
 import { positionMetadata } from "@/lib/shared/page-metadata";
 import { MorphoAtBlockWallet } from "@/components/protocol/morpho-at-block/morpho-at-block-wallet";
+import { MORPHO_ARC } from "@/lib/morpho-at-block/types";
 
 interface Props {
   params: Promise<{ wallet: string }>;
@@ -17,5 +18,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
   const { wallet } = await params;
-  return <MorphoAtBlockWallet wallet={wallet} />;
+  return <MorphoAtBlockWallet dep={MORPHO_ARC} wallet={wallet} />;
 }

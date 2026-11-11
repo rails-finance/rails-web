@@ -2,7 +2,7 @@
 // rails-server's /api/at-block/morpho-arc/position on 11 Nov 2026, rails-ops ui-jobs 577): the debt
 // from shares at the totals compounded since the last update, the collateral through the oracle,
 // the LTV and room to borrow, dollars at the USDC/USD feed, 30-day interest where the shares match,
-// and the withheld cases.
+// and the withheld cases. Then Optimism's deployment (ui-jobs 578): a real position, the AaveOracle price, the foot.
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -203,4 +203,148 @@ test("the markets list leaves out the test-token and never-supplied markets, and
   );
   const u = atBlockUnlisted(r);
   assert.deepEqual([u.test, u.never, u.idle?.id], [1, 1, "0xidle"], "the line's counts and the idle market");
+});
+
+// Optimism (rails-ops ui-jobs 578): wallet 0x88cd…b6e8's WBTC/USDC borrow, read through rails-server's
+// /api/at-block/morpho-optimism/position on 11 Nov 2026. Its borrow shares moved inside the 30 days.
+const OP_READ = {
+  chainId: 10,
+  head: {
+    block: 159401075,
+    time: 1794400927,
+  },
+  then: {
+    block: 158082212,
+    time: 1791763201,
+  },
+  provider: "optimism.gateway.tenderly.co",
+  wallet: "0x88cd0d18e608b689fbab5644b83b08f7a267b6e8",
+  market: {
+    id: "0x8e77af0efaf4a3d59f37126c77f6f0ee7b56bcb1363c0986b8f6087b93ba833e",
+    loanToken: "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+    collateralToken: "0x68f180fcce6836688e9084f035309e29bf0a2095",
+    oracle: "0x78900c74cc6b50819f19a04acd561e94606137ac",
+    irm: "0x8cd70a8f399428456b29546bc5dbe10ab6a06ef6",
+    lltv: "860000000000000000",
+    state: {
+      totalSupplyAssets: "438916713206",
+      totalSupplyShares: "422527799807233456",
+      totalBorrowAssets: "380152918810",
+      totalBorrowShares: "364056602443360623",
+      lastUpdate: "1794400555",
+      fee: "0",
+    },
+    borrowRate: "1976256180",
+    rateAtTarget: "2033702600",
+    price: "738597328643000000000000000000000000000",
+  },
+  position: {
+    supplyShares: "0",
+    borrowShares: "343252122114835888",
+    collateral: "848555312",
+  },
+  past: {
+    position: {
+      supplyShares: "0",
+      borrowShares: "336537626599415933",
+      collateral: "848555312",
+    },
+    state: {
+      totalSupplyAssets: "478907648927",
+      totalSupplyShares: "463531363864022193",
+      totalBorrowAssets: "435594162031",
+      totalBorrowShares: "419670180356703212",
+      lastUpdate: "1791761095",
+      fee: "0",
+    },
+    borrowRate: "1892065507",
+  },
+  tokens: {
+    "0x0b2c639c533813f4aa9d7837caf62653d097ff85": {
+      symbol: "USDC",
+      decimals: 6,
+      name: "USD Coin",
+    },
+    "0x68f180fcce6836688e9084f035309e29bf0a2095": {
+      symbol: "WBTC",
+      decimals: 8,
+      name: "Wrapped BTC",
+    },
+  },
+  usdFeeds: [
+    {
+      token: "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+      feed: "0x16a9fa2fda030272ce99b29cf780dfa30361e0f3",
+      name: "USDC__USD",
+      description: "USDC / USD",
+      decimals: 8,
+      answer: "99971629",
+      updatedAt: "1794339931",
+      source: "chainlink",
+    },
+  ],
+};
+
+test("Optimism: the WBTC/USDC borrow, its dollars at the Chainlink USDC feed", () => {
+  const f = morphoAtBlockPosition(OP_READ);
+  near(f.collateral, 8.48555312, 1e-9, "collateral in WBTC");
+  near(f.oraclePrice, 73859.7328643, 0.001, "one WBTC in USDC at the oracle");
+  near(f.debt, (343252122114835888 / 364056602443360623) * 380152.91881, 1, "debt in USDC");
+  near(f.ltv, f.debt / f.collateralInLoan, 1e-12, "LTV");
+  assert.equal(f.usd.feed.source, "chainlink", "the price names its source");
+  near(f.debtUsd, f.debt * 0.99971629, 1e-6, "debt at the USDC/USD feed");
+  assert.equal(f.debtInterest.state, "changed", "the shares moved inside the 30 days");
+});
+
+test("Optimism: a loan token with no feed takes Aave V3's oracle price, 8 decimals", () => {
+  const usdFeeds = [
+    {
+      token: OP_READ.market.loanToken,
+      feed: "0xd81eb3728a631871a7ebbad631b5f424909f0c77",
+      name: "AaveOracle",
+      description: null,
+      decimals: 8,
+      answer: "100010000",
+      updatedAt: null,
+      source: "aave-oracle",
+    },
+  ];
+  const f = morphoAtBlockPosition({ ...OP_READ, usdFeeds });
+  near(f.usd.price, 1.0001, 1e-12, "getAssetPrice ÷ 10^8");
+  assert.equal(f.usd.feed.source, "aave-oracle", "named as the AaveOracle's");
+  near(f.collateralUsd, f.collateralInLoan * 1.0001, 1e-6, "collateral at the oracle, then the Aave price");
+});
+
+const { dollarFoot } = await import("../../lib/morpho-at-block/words.ts");
+const { MORPHO_ARC, MORPHO_OPTIMISM } = await import("../../lib/morpho-at-block/types.ts");
+
+test("the card's foot names the read that priced the loan token", () => {
+  const arc = morphoAtBlockPosition(READ);
+  assert.equal(
+    dollarFoot(arc, MORPHO_ARC),
+    "Dollar values use the Chainlink USDC / USD feed on Arc; collateral is valued through the market's oracle in USDC.",
+    "Arc's line as it was",
+  );
+  assert.equal(
+    dollarFoot(morphoAtBlockPosition({ ...READ, usdFeeds: [] }), MORPHO_ARC),
+    "Arc has no Chainlink feed for USDC in Aave's address book, so the figures stay in USDC.",
+    "Arc's unpriced line as it was",
+  );
+  const op = morphoAtBlockPosition({
+    ...OP_READ,
+    usdFeeds: [
+      { ...OP_READ.usdFeeds[0], feed: MORPHO_OPTIMISM.aaveOracle.address, source: "aave-oracle", decimals: 8 },
+    ],
+  });
+  assert.match(
+    dollarFoot(op, MORPHO_OPTIMISM),
+    /^Dollar values use Aave V3's oracle on Optimism for USDC;/,
+    "the Aave source",
+  );
+  assert.match(
+    dollarFoot(morphoAtBlockPosition({ ...OP_READ, usdFeeds: [] }), MORPHO_OPTIMISM),
+    /^Optimism has no Chainlink feed for USDC in Aave's address book and Aave V3's oracle there does not price it/,
+    "neither source",
+  );
+  assert.equal(MORPHO_OPTIMISM.contracts.morpho, "0xce95afbb8ea029495c66020883f87aae8864af92", "Morpho on Optimism");
 });

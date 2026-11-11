@@ -1,6 +1,7 @@
 "use client";
 
-// A Morpho Blue position on Arc (rails-ops ui-jobs 577), on the shared
+// A Morpho Blue position read on visit, on Arc or Optimism (rails-ops ui-jobs
+// 577 and 578), on the shared
 // position card with the Morpho card's headlines: Collateral, Debt (or
 // Supplied), LTV against the market's LLTV, and the borrow rate (or the supply
 // rate); the panel's rows carry each side's amount and dollars, the 30 days'
@@ -12,7 +13,6 @@ import { PositionCard, type PositionCardSlots, type PositionPanelRow } from "@/c
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { PoolReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
-import { ARC_CHAIN_ID } from "@/lib/shared/chains";
 import { morphoAtBlockPosition, type AtBlockInterest } from "@/lib/morpho-at-block/position";
 import {
   morphoAtBlockProv,
@@ -20,8 +20,8 @@ import {
   type MorphoAtBlockFigure,
   type MorphoAtBlockReceiptContext,
 } from "@/lib/morpho-at-block/provenance";
-import type { MorphoAtBlockPositionRead } from "@/lib/morpho-at-block/types";
-import { amount, CARD_WORDS, cardExplainer, pctText, usd } from "@/lib/morpho-at-block/words";
+import type { MorphoAtBlockDeployment, MorphoAtBlockPositionRead } from "@/lib/morpho-at-block/types";
+import { amount, CARD_WORDS, cardExplainer, dollarFoot, pctText, usd } from "@/lib/morpho-at-block/words";
 
 function interestValue(c: MorphoAtBlockReceiptContext, side: "supply" | "debt", i: AtBlockInterest) {
   if (i.state !== "ok")
@@ -70,9 +70,9 @@ function sideValue(
   );
 }
 
-function slots(r: MorphoAtBlockPositionRead): PositionCardSlots {
+function slots(r: MorphoAtBlockPositionRead, dep: MorphoAtBlockDeployment): PositionCardSlots {
   const f = morphoAtBlockPosition(r);
-  const c: MorphoAtBlockReceiptContext = { f, m: r.market, p: r.position, head: r.head, r, pf: f };
+  const c: MorphoAtBlockReceiptContext = { dep, f, m: r.market, p: r.position, head: r.head, r, pf: f };
   const L = f.loan.symbol;
   const C = f.collateralToken?.symbol ?? "";
   const borrows = f.debt > 0;
@@ -191,31 +191,35 @@ function slots(r: MorphoAtBlockPositionRead): PositionCardSlots {
             label: CARD_WORDS.borrowRate,
             labelTip: CARD_WORDS.borrowRateTip,
             value:
-              f.borrowApr != null ? <Prov info={morphoAtBlockProv("borrow-rate", c)}>{pctText(f.borrowApr)}</Prov> : null,
+              f.borrowApr != null ? (
+                <Prov info={morphoAtBlockProv("borrow-rate", c)}>{pctText(f.borrowApr)}</Prov>
+              ) : null,
           }
         : {
             id: "supply-rate",
             label: CARD_WORDS.supplyRate,
             labelTip: CARD_WORDS.supplyRateTip,
             value:
-              f.supplyApr != null ? <Prov info={morphoAtBlockProv("supply-rate", c)}>{pctText(f.supplyApr)}</Prov> : null,
+              f.supplyApr != null ? (
+                <Prov info={morphoAtBlockProv("supply-rate", c)}>{pctText(f.supplyApr)}</Prov>
+              ) : null,
           },
     ],
     counters: null,
     menu: { exports: null },
     stamp: (
       <PoolReadStamp
-        chainId={ARC_CHAIN_ID}
+        chainId={dep.chainId}
         head={r.head}
         then={r.then}
-        contracts={readContracts(r, f)}
+        contracts={readContracts(r, f, dep)}
         what="Every figure on this card"
       />
     ),
     explainer: {
       body: (
         <div data-position-explanation="">
-          {cardExplainer(f).map((g) => (
+          {cardExplainer(f, dep).map((g) => (
             <ExplainGroup key={g.title} title={g.title}>
               {g.bullets.map((b, i) => (
                 <ExplainBullet key={i}>{b}</ExplainBullet>
@@ -226,20 +230,20 @@ function slots(r: MorphoAtBlockPositionRead): PositionCardSlots {
       ),
     },
     learnMore: null,
-    foot: <p className="mt-3 text-xs text-rb-500">{CARD_WORDS.foot(f)}</p>,
+    foot: <p className="mt-3 text-xs text-rb-500">{dollarFoot(f, dep)}</p>,
     panel: [left, right],
   };
 }
 
-export function MorphoAtBlockPositionCard({ r }: { r: MorphoAtBlockPositionRead }) {
+export function MorphoAtBlockPositionCard({ r, dep }: { r: MorphoAtBlockPositionRead; dep: MorphoAtBlockDeployment }) {
   return (
     <div
-      data-position-card={`morpho-arc:${r.market.id}:${r.wallet}`}
+      data-position-card={`${dep.session}:${r.market.id}:${r.wallet}`}
       data-market={r.market.id}
       data-live-block={r.head.block}
       data-then-block={r.then.block}
     >
-      <PositionCard slots={slots(r)} />
+      <PositionCard slots={slots(r, dep)} />
     </div>
   );
 }

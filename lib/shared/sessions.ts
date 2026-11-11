@@ -62,6 +62,9 @@ export type SessionProtocol =
   // Morpho Blue on Arc, at `/arc/morpho`: a position is a wallet's place in
   // one market, read from the chain when a page opens (ui-jobs 577).
   | "morpho-arc"
+  // Morpho Blue on Optimism, at `/optimism/morpho`: the same reader as Arc's,
+  // on Optimism's deployment (ui-jobs 578).
+  | "morpho-optimism"
   | "spark"
   | "compound"
   | "compound-base"

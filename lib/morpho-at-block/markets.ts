@@ -27,7 +27,11 @@ import { listedMarkets } from "@/lib/morpho-at-block/unlisted";
 const YEAR = 31_536_000;
 const scale = (raw: string, decimals: number) => Number(raw) / 10 ** decimals;
 
-function row(m: MorphoAtBlockMarket, createdBlock: number, tokens: Record<string, MorphoAtBlockToken>): MorphoMarketRow | null {
+function row(
+  m: MorphoAtBlockMarket,
+  createdBlock: number,
+  tokens: Record<string, MorphoAtBlockToken>,
+): MorphoMarketRow | null {
   const s = m.state;
   if (!s) return null;
   const loan = tokens[m.loanToken];

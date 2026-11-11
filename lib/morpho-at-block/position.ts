@@ -98,7 +98,10 @@ export const tokenFacts = (address: string, tokens: Record<string, MorphoAtBlock
 };
 
 /** The loan token's USD price as read, or null where the chain has none for it. */
-export function loanUsd(loanToken: string, feeds: readonly AtBlockUsdFeed[]): { price: number; feed: AtBlockUsdFeed } | null {
+export function loanUsd(
+  loanToken: string,
+  feeds: readonly AtBlockUsdFeed[],
+): { price: number; feed: AtBlockUsdFeed } | null {
   const f = feeds.find((x) => x.token === loanToken.toLowerCase());
   if (!f || f.answer == null || f.decimals == null) return null;
   const price = Number(f.answer) / 10 ** f.decimals;
@@ -244,7 +247,9 @@ export function morphoAtBlockPosition(r: MorphoAtBlockPositionRead): MorphoAtBlo
 }
 
 /** A wallet's positions, largest dollar value first (unpriced last, by creation). */
-export function morphoAtBlockWalletPositions(r: MorphoAtBlockWalletRead): (MorphoAtBlockFigures & { createdBlock: number })[] {
+export function morphoAtBlockWalletPositions(
+  r: MorphoAtBlockWalletRead,
+): (MorphoAtBlockFigures & { createdBlock: number })[] {
   return r.positions
     .map((m) => ({
       ...morphoAtBlockFigures(m, m.position, r.head.time, r.tokens, r.usdFeeds),

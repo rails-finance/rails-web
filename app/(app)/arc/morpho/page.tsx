@@ -4,6 +4,7 @@
 
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { MorphoAtBlockFrontDoor } from "@/components/protocol/morpho-at-block/morpho-at-block-front-door";
+import { MORPHO_ARC } from "@/lib/morpho-at-block/types";
 
 export const metadata = listingMetadata({
   title: "Morpho Blue on Arc",
@@ -11,5 +12,5 @@ export const metadata = listingMetadata({
 });
 
 export default function Page() {
-  return <MorphoAtBlockFrontDoor />;
+  return <MorphoAtBlockFrontDoor dep={MORPHO_ARC} />;
 }

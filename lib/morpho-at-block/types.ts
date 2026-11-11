@@ -19,6 +19,8 @@ export interface MorphoAtBlockDeployment {
   /** Aave V3's AaveOracle on the chain, which prices a loan token with no Chainlink feed (rails-server
    *  names it as a price's `source`); null where rails-server reads only Chainlink feeds. */
   aaveOracle: { name: string; address: string } | null;
+  /** The position page's "Not indexed yet" line, as every Optimism explorer carries (ui-jobs 578). */
+  notIndexedLine: boolean;
 }
 
 /** Morpho's addresses page (docs.morpho.org, Morpho Blue, Arc), checked on chain 11 Nov 2026. */
@@ -34,6 +36,7 @@ export const MORPHO_ARC: MorphoAtBlockDeployment = {
     adaptiveCurveIrm: "0xf02615d094fc02fc031c35fe705e175aa4653f20",
   },
   aaveOracle: null,
+  notIndexedLine: false,
 };
 
 /** Morpho's addresses page (docs.morpho.org, Morpho Blue, OP Mainnet), checked on chain 11 Nov 2026:
@@ -51,6 +54,7 @@ export const MORPHO_OPTIMISM: MorphoAtBlockDeployment = {
   },
   // Aave V3 Optimism's AaveOracle (aave-address-book AaveV3Optimism.sol).
   aaveOracle: { name: "Aave V3 Optimism oracle", address: "0xd81eb3728a631871a7ebbad631b5f424909f0c77" },
+  notIndexedLine: true,
 };
 
 export const MORPHO_ARC_CONTRACTS = MORPHO_ARC.contracts;
