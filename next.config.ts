@@ -145,6 +145,9 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/lido", "/ethereum/lido"],
   // Fluid on Base never had a pre-0016 path; the row is for check:routes.
   ["/fluid-base", "/base/fluid"],
+  // Euler V2 never had a pre-0016 path; the rows are for check:routes.
+  ["/euler-v2-base", "/base/euler-v2"],
+  ["/euler-v2-arbitrum", "/arbitrum/euler-v2"],
   // Polaris never had a pre-0016 path; the row exists because check:routes
   // wants every explorer forwarded from its bare slug, and a bare /polaris is
   // the address anyone will guess.

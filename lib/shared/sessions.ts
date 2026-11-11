@@ -111,7 +111,11 @@ export type SessionProtocol =
   | "lido"
   // Fluid's vaults on Base, at `/base/fluid`: a position is a VaultFactory NFT,
   // read from the chain when a page opens (ui-jobs 574).
-  | "fluid-base";
+  | "fluid-base"
+  // Euler V2 on Base and Arbitrum, at `/base/euler-v2` and `/arbitrum/euler-v2`:
+  // a position is one account's holding in one vault, read at two blocks.
+  | "euler-v2-base"
+  | "euler-v2-arbitrum";
 
 /** What a saved entry is: a wallet, a position page or a listing view. */
 export type SavedKind = "wallet" | "position" | "view";

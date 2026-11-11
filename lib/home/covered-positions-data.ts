@@ -310,6 +310,10 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   "lido",
   // Fluid on Base, read on visit: no census of positions (ui-jobs 574).
   "fluid-base",
+  // Euler V2 on Base and Arbitrum: a wallet's accounts are read when it is
+  // visited, and no census of holders is built.
+  "euler-v2-base",
+  "euler-v2-arbitrum",
   // Sky Savings, for the same reason: an sUSDS balance carries no debt and no
   // threshold (Miles, 2026-09-29, rails-ops TO-DO-sky-savings-scoping §6.1).
   // It has a listing all the same; this set keeps it out of the count.
