@@ -15,7 +15,7 @@ import type { UniswapVersion } from "./types";
 
 export type UniProtocol = "uniswap" | "pancakeswap";
 /** The chains the at-block routes answer for. */
-export type UniChainId = 1 | 8453 | 42161 | 10;
+export type UniChainId = 1 | 8453 | 42161 | 10 | 5042;
 
 export interface UniDeployment {
   protocol: UniProtocol;
@@ -84,6 +84,24 @@ export const UNI_DEPLOYMENTS: readonly UniDeployment[] = [
     v3Npm: "0xC36442b4a4522E871399CD717aBDD847Ab11FE88",
     v4PositionManager: "0xd88F38F930b7952f2DB2432Cb002E7abbF3dD869",
     v4StateView: "0x76Fd297e2D437cd7f76d50F01AfE6160f86e9990",
+    masterChef: null,
+    history: true,
+  },
+  // Arc (ui-jobs 577): USDC is the gas coin, 18 decimals as a pool's address(0) side. Arc has no
+  // wrapped USDC; the ERC-20 at 0x3600…0000 is an interface over the same balance at 6 decimals, and
+  // stands as the wrapped token, named apart on a pair card.
+  {
+    protocol: "uniswap",
+    protocolName: "Uniswap",
+    chainId: 5042,
+    chainName: "Arc",
+    chainSlug: "arc",
+    versions: ["v3", "v4"],
+    native: { symbol: "USDC", decimals: 18 },
+    wrapped: { symbol: "ERC-20 USDC", address: "0x3600000000000000000000000000000000000000", decimals: 6 },
+    v3Npm: "0x39654A85A4C05127f5Fd6ED22CAeC077A0fB1377",
+    v4PositionManager: "0x6049c9a0e26405C0985f9E3685C87d0aE917f82B",
+    v4StateView: "0xF3334192D15450CdD385c8B70e03f9A6bD9E673b",
     masterChef: null,
     history: true,
   },

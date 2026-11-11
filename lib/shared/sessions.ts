@@ -117,6 +117,8 @@ export type SessionProtocol =
   | "uniswap-v4-optimism"
   | "pancakeswap-v3-base"
   | "pancakeswap-v3-arbitrum"
+  | "uniswap-v3-arc"
+  | "uniswap-v4-arc"
   // Lido on Ethereum, at `/ethereum/lido`: a wallet's stake is its stETH
   // shares and wstETH, with its withdrawal requests (ui-jobs 570).
   | "lido"

@@ -136,6 +136,21 @@ export const CHAIN_PAIRS: Record<UniChainId, { tokens: Record<string, PairToken>
       "wsteth-eth": { base: "wstETH", quote: "ETH" },
     },
   },
+  // Arc's from Arc's contract addresses page (EURC, WETH, cirBTC), each symbol and decimals read on
+  // chain on 11 Nov 2026. USDC is the native coin; a pair naming it reads its ERC-20 pools as well.
+  5042: {
+    tokens: {
+      ...nativeTokens(uniDeployment("uniswap", 5042)),
+      EURC: tok("EURC", "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1", 6),
+      WETH: tok("WETH", "0x128cC466B61f542da60c70e3aA11c10e19B84EDB", 18),
+      cirBTC: tok("cirBTC", "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0", 8),
+    },
+    pairs: {
+      "eurc-usdc": { base: "EURC", quote: "USDC" },
+      "weth-usdc": { base: "WETH", quote: "USDC" },
+      "cirbtc-usdc": { base: "cirBTC", quote: "USDC" },
+    },
+  },
 };
 
 /** A chain's pair by its key, or null. */

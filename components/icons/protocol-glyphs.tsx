@@ -1070,6 +1070,7 @@ for (const id of [
   "uniswap-v4-optimism",
 ])
   GLYPHS[id] = GLYPHS.uniswap;
+for (const id of ["uniswap-v3-arc", "uniswap-v4-arc"]) GLYPHS[id] = GLYPHS.uniswap;
 // Balancer V3's other chains draw its mark.
 GLYPHS["balancer-v3-arbitrum"] = GLYPHS["balancer-v3"];
 
