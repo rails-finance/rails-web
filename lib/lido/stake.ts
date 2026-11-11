@@ -51,8 +51,9 @@ export interface LidoRequestRow {
 export interface ShareCause {
   /** The requests made after the past read, the oldest first. */
   requests: LidoRequestRow[];
-  /** Their shares. */
+  /** Their shares, and the stETH they locked (each request's amountOfStETH). */
   requested: number;
+  requestedSteth: number;
   /** "all": the requests account for the drop, to rounding; "part": for part
    *  of the change; "none": no request was made after the past read. */
   fit: "all" | "part" | "none";
@@ -98,6 +99,7 @@ export function shareCause(thenRaw: bigint, nowRaw: bigint, thenTime: number, ro
   if (thenRaw === nowRaw) return null;
   const made = rows.filter((q) => q.timestamp > thenTime).sort((a, b) => a.timestamp - b.timestamp);
   const requestedRaw = made.reduce((a, q) => a + BigInt(q.amountOfShares), ZERO);
+  const stethRaw = made.reduce((a, q) => a + BigInt(q.amountOfStETH), ZERO);
   // Shares that moved beside the requests: the change plus what went into them.
   const restRaw = nowRaw - thenRaw + requestedRaw;
   const within = (restRaw < ZERO ? -restRaw : restRaw) <= ROUNDING_WEI * BigInt(Math.max(made.length, 1));
@@ -105,6 +107,7 @@ export function shareCause(thenRaw: bigint, nowRaw: bigint, thenTime: number, ro
   return {
     requests: made.map(requestRow),
     requested: units(requestedRaw),
+    requestedSteth: units(stethRaw),
     fit,
     rest: fit === "all" ? 0 : units(restRaw),
   };

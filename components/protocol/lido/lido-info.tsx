@@ -150,8 +150,8 @@ export function LidoInfo() {
       guide={
         <>
           Press a figure&apos;s label to read what it means. The (i) under a section says what its figures mean for the
-          wallet, and the ? on the stake card explains how Lido staking works. A section&apos;s ⋮ traces its figures to
-          the chain.
+          wallet; open the stake card&apos;s (i), and the ? at its end opens &ldquo;How Lido staking works&rdquo;. A
+          section&apos;s ⋮ traces its figures to the chain.
         </>
       }
       notCovered="stVaults, Lido on other chains, node operators and the LDO token aren't covered here."

@@ -23,7 +23,7 @@ export const rateText = (x: number): string =>
 export const signed = (x: number): string => (x === 0 ? "0" : `${x > 0 ? "+" : "−"}${num(Math.abs(x))}`);
 
 export const FRONT_DOOR = {
-  line: "A wallet's stETH and wstETH on Ethereum, valued in ETH at Lido's share rate, with its change over the last 30 days and its withdrawal requests.",
+  line: "Lido stakes ether on Ethereum's validators and gives each depositor stETH, a token whose balance tracks their stake; Rails shows a wallet's stETH and wstETH in ETH, their change over 30 days and their withdrawal requests.",
   totalsTitle: "Lido now",
   pooled: "Ether staked",
   pooledTip:
@@ -32,7 +32,7 @@ export const FRONT_DOOR = {
   sharesTip: "All stETH shares outstanding. One wstETH is one share.",
   rate: "Share rate",
   rateTip:
-    "The ETH one stETH share is worth. It moves when Lido's oracle reports the validators' balances, about once a day: normally up, and down after slashing or penalties.",
+    "The ETH one stETH share is worth. It moves when Lido's oracle, a committee whose majority must agree, reports the validators' balances, about once a day: normally up, and down after slashing or penalties.",
   queue: "Waiting to withdraw",
   queueTip: "stETH in withdrawal requests the queue has not finalized yet.",
   rateSub: (t: LidoTotals) => `${pct(t.rateGrowth, 3)} over 30 days`,
@@ -61,7 +61,7 @@ export const CARD_WORDS = {
   rateTip:
     "The ETH one stETH share is worth. It moves at each oracle report, about once a day: normally up, and down after slashing or penalties.",
   none: "This wallet holds no stETH or wstETH now.",
-  foot: "Amounts are in ETH at Lido's share rate. Rails states a dollar figure only from an oracle price read at a named block, and none is wired for stETH yet.",
+  foot: "Amounts are in ETH. Rails takes dollar values only from an on-chain price feed, and none is wired for stETH yet.",
   sharesSub: (shares: number) => `${num(shares)} shares`,
   wstethSub: (eth: number) => `worth ${num(eth)} ETH`,
   rateSub: (s: LidoStake) => `${pct(s.rateGrowth, 3)} over 30 days`,
@@ -105,7 +105,7 @@ const moved = (x: number): string =>
 /** Why the shares changed, from the requests made since the past read and the rest. */
 export function causeText(c: ShareCause): string {
   if (c.fit === "none") return moved(c.rest);
-  const into = `${num(c.requested)} shares went into ${requestNames(c.requests)}`;
+  const into = `${num(c.requested)} shares (${num(c.requestedSteth)} stETH) went into ${requestNames(c.requests)}`;
   return c.fit === "all" ? into : `${into}; ${moved(c.rest).replace(/^\S+ shares/, (m) => `the other ${m}`)}`;
 }
 
@@ -183,19 +183,39 @@ function legs(s: LidoStake): string {
 
 /** The card's (i): this wallet's stake first, then one line of the general lesson. */
 export function cardExplainer(s: LidoStake): ExplainGroupWords[] {
+  const dust = s.now.shares > 0 && s.now.shares < 1e-4;
   const held =
     s.now.shares === 0
       ? "This wallet holds no stETH or wstETH now."
-      : `This wallet holds ${num(s.now.shares)} shares, ${legs(s)}; at ${rateText(s.now.rate)} a share they are worth ${num(s.now.eth)} ETH.`;
+      : dust
+        ? `This wallet holds a remainder under 0.0001 shares, worth ${s.now.eth < 1e-4 ? "under 0.0001" : num(s.now.eth)} ETH.${s.now.stethShares > 0 ? " Sending a whole stETH balance can leave a wei or two behind." : ""}`
+        : `This wallet holds ${num(s.now.shares)} shares, ${legs(s)}; at ${rateText(s.now.rate)} a share they are worth ${num(s.now.eth)} ETH.`;
   return [
     {
       title: "This stake",
       bullets: [
         held,
         "The shares stay the same until the wallet moves them; their worth moves with the share rate at each oracle report.",
+        ...queued(s),
       ],
     },
   ];
+}
+
+/** The card's pointer to the wallet's requests: what sits in the queue, with no total. */
+function queued(s: LidoStake): string[] {
+  const other = s.now.shares > 0 ? "Another " : "";
+  const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+  if (s.waitingSteth > 0 && s.claimableEth > 0)
+    return [
+      cap(
+        `${other}${num(s.waitingSteth)} stETH waits in Lido's withdrawal queue, and ${num(s.claimableEth)} ETH there is ready to claim, below.`,
+      ),
+    ];
+  if (s.waitingSteth > 0) return [cap(`${other}${num(s.waitingSteth)} stETH waits in Lido's withdrawal queue, below.`)];
+  if (s.claimableEth > 0)
+    return [cap(`${other}${num(s.claimableEth)} ETH sits in Lido's withdrawal queue, ready to claim, below.`)];
+  return [];
 }
 
 /** The readout's (i). */
@@ -241,6 +261,7 @@ export function requestsExplainer(s: LidoStake): ExplainGroupWords[] {
 const DOCS_TOKENS = "https://docs.lido.fi/guides/lido-tokens-integration-guide";
 const DOCS_QUEUE = "https://docs.lido.fi/contracts/withdrawal-queue-erc721";
 const DOCS_LIDO = "https://docs.lido.fi/contracts/lido";
+const DOCS_ORACLE = "https://docs.lido.fi/contracts/accounting-oracle";
 
 /** The stake card's "?" (T4): how Lido staking works, the same on every wallet. */
 export const LIDO_LEARN_MORE: LearnMoreContent = {
@@ -251,9 +272,9 @@ export const LIDO_LEARN_MORE: LearnMoreContent = {
   details: [
     {
       bold: "Shares and the share rate",
-      text: "The share rate is the ETH one share is worth: all the ether Lido accounts for over all shares. Lido's oracle reports the validators' balances, normally once a day, and the rate moves at each report. It normally rises; slashing or penalties can lower it, and Lido's docs say daily reports have never been negative.",
+      text: "The share rate is the ETH one share is worth: all the ether Lido accounts for over all shares. Lido's oracle is a committee of members run by node operators the Lido DAO selects; once more than half agree, it reports the validators' balances on chain, normally once a day, and the rate moves at each report. It normally rises; slashing or penalties can lower it, and Lido's docs say daily reports have never been negative.",
       sources: [
-        { label: "accounting oracle", url: DOCS_TOKENS },
+        { label: "accounting oracle", url: DOCS_ORACLE },
         { label: "oracle report", url: DOCS_LIDO },
       ],
     },
