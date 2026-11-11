@@ -11,5 +11,4 @@ export const SITE_LEAD = `Rails is a set of read-only explorers for ${LAUNCHED_P
 
 /** The second sentence of /about and of its description: how every figure is
  *  sourced. */
-export const SITE_METHOD =
-  "Every position is read from the chain, with a receipt showing where each number came from.";
+export const SITE_METHOD = "Every position is read from the chain, with a receipt showing where each number came from.";
