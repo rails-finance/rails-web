@@ -20,7 +20,6 @@ export const amount = (x: number, unit: string) => `${num(x)} ${unit}`;
 export const usd = (x: number) =>
   `$${x.toLocaleString("en-US", { maximumFractionDigits: x >= 100 ? 0 : 2, minimumFractionDigits: x >= 100 ? 0 : 2 })}`;
 export const pctText = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%`;
-export const hfText = (x: number) => (x >= 100 ? "> 100" : x.toFixed(2));
 
 export const FRONT_DOOR = {
   line: "A wallet's Morpho Blue positions on Arc, each with its collateral, debt and LTV against the market's line, in dollars where Arc has a price feed for the loan token, and its interest over the last 30 days.",
@@ -51,7 +50,8 @@ export const CARD_WORDS = {
   ltvTip: "Debt divided by the collateral's value at the market's oracle price. The market liquidates at its LLTV.",
   ltvLine: (lltv: number) => `of ${pctText(lltv, 1)} LLTV`,
   borrowRate: "Borrow rate",
-  borrowRateTip: "The market's borrow rate from its rate model, a year, simple. It follows how much of the market is lent out.",
+  borrowRateTip:
+    "The market's borrow rate from its rate model, a year, simple. It follows how much of the market is lent out.",
   supplyRate: "Supply rate",
   supplyRateTip: "The borrow rate times the share lent out, less the market's fee: what supply earns, a year, simple.",
   room: "Room to borrow",
@@ -77,7 +77,8 @@ export const CARD_WORDS = {
 export function cardExplainer(f: ArcMorphoPositionFigures): { title: string; bullets: string[] }[] {
   const out: { title: string; bullets: string[] }[] = [];
   const holds: string[] = [];
-  if (f.collateral > 0 && f.collateralToken) holds.push(`${amount(f.collateral, f.collateralToken.symbol)} as collateral`);
+  if (f.collateral > 0 && f.collateralToken)
+    holds.push(`${amount(f.collateral, f.collateralToken.symbol)} as collateral`);
   if (f.supplied > 0) holds.push(`${amount(f.supplied, f.loan.symbol)} lent to the market`);
   out.push({
     title: "The position",

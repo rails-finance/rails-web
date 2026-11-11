@@ -27,7 +27,12 @@ const chain = (label: string, value: string, note?: string): ProvInput => ({
   pclass: "state",
   ...(note ? { note } : {}),
 });
-const oracleIn = (label: string, value: string, note: string, contract?: { name: string; address: string }): ProvInput => ({
+const oracleIn = (
+  label: string,
+  value: string,
+  note: string,
+  contract?: { name: string; address: string },
+): ProvInput => ({
   label,
   value,
   kind: "chain",
@@ -62,13 +67,25 @@ export function readContracts(r: ArcMorphoPositionRead, f: ArcMorphoFigures) {
     ...(f.collateralToken
       ? [{ name: `${pairName(f)} oracle`, address: r.market.oracle, reads: "the collateral's price in the loan token" }]
       : []),
-    ...(f.usd ? [{ name: `Chainlink ${f.usd.feed.description ?? "USD"} feed`, address: f.usd.feed.feed, reads: "the loan token's USD price" }] : []),
+    ...(f.usd
+      ? [
+          {
+            name: `Chainlink ${f.usd.feed.description ?? "USD"} feed`,
+            address: f.usd.feed.feed,
+            reads: "the loan token's USD price",
+          },
+        ]
+      : []),
   ];
 }
 
 const rateInputs = (c: MorphoArcReceiptContext): ProvInput[] => [
   chain("borrowRateView", c.m.borrowRate ?? "—", "per second, WAD, on the market as stored"),
-  chain("market lastUpdate", c.m.state?.lastUpdate ?? "—", `${c.f.totals ? n(c.f.totals.elapsed) : "—"} seconds before the block`),
+  chain(
+    "market lastUpdate",
+    c.m.state?.lastUpdate ?? "—",
+    `${c.f.totals ? n(c.f.totals.elapsed) : "—"} seconds before the block`,
+  ),
 ];
 const usdInput = (c: MorphoArcReceiptContext): ProvInput =>
   c.f.usd
@@ -120,10 +137,18 @@ export function morphoArcProv(key: MorphoArcFigure, c: MorphoArcReceiptContext):
         pclass: "state",
         source,
         contract: morphoC,
-        summary: `${C} posted as collateral in the ${pair} market, read at ${at(head)}.`,
+        summary: `${C} collateral. Posted in the ${pair} market, read at ${at(head)}.`,
         via: `${v} · position(id, wallet).collateral ÷ 10^${f.collateralToken?.decimals ?? 18}`,
-        inputs: [chain("position · collateral", p.collateral, `${f.collateralToken?.decimals ?? 18} decimals`), chain("market id", m.id)],
-        scaling: { raw: p.collateral, from: "call", places: f.collateralToken?.decimals ?? 18, why: `${C} counts in that many decimals` },
+        inputs: [
+          chain("position · collateral", p.collateral, `${f.collateralToken?.decimals ?? 18} decimals`),
+          chain("market id", m.id),
+        ],
+        scaling: {
+          raw: p.collateral,
+          from: "call",
+          places: f.collateralToken?.decimals ?? 18,
+          why: `${C} counts in that many decimals`,
+        },
       };
     case "debt":
     case "supplied": {
@@ -134,13 +159,19 @@ export function morphoArcProv(key: MorphoArcFigure, c: MorphoArcReceiptContext):
         pclass: "state",
         source,
         contract: morphoC,
-        summary: `${L} ${debt ? "owed to" : "lent to"} the ${pair} market at ${at(head)}: the wallet's ${debt ? "borrow" : "supply"} shares at the market's totals, with the interest since the market last settled (rounded ${debt ? "up" : "down"}, as Morpho does).`,
+        summary: `${L} ${debt ? "debt" : "supplied"}. The wallet's ${debt ? "borrow" : "supply"} shares in the ${pair} market at its totals, with the interest since the market last settled, at ${at(head)}; rounded ${debt ? "up" : "down"}, as Morpho rounds.`,
         via: `${v} · position, market and the IRM's borrowRateView`,
         formula: `shares × (total ${debt ? "borrow" : "supply"} assets + 1) ÷ (total ${debt ? "borrow" : "supply"} shares + 10^6), the totals compounded since lastUpdate`,
         inputs: [
           chain(`position · ${debt ? "borrowShares" : "supplyShares"}`, shares),
-          chain(`market · total${debt ? "Borrow" : "Supply"}Assets`, (debt ? s?.totalBorrowAssets : s?.totalSupplyAssets) ?? "—"),
-          chain(`market · total${debt ? "Borrow" : "Supply"}Shares`, (debt ? s?.totalBorrowShares : s?.totalSupplyShares) ?? "—"),
+          chain(
+            `market · total${debt ? "Borrow" : "Supply"}Assets`,
+            (debt ? s?.totalBorrowAssets : s?.totalSupplyAssets) ?? "—",
+          ),
+          chain(
+            `market · total${debt ? "Borrow" : "Supply"}Shares`,
+            (debt ? s?.totalBorrowShares : s?.totalSupplyShares) ?? "—",
+          ),
           ...rateInputs(c),
         ],
       };
@@ -150,16 +181,22 @@ export function morphoArcProv(key: MorphoArcFigure, c: MorphoArcReceiptContext):
     case "usd-supplied": {
       const what = key === "usd-collateral" ? `${C} collateral` : key === "usd-debt" ? `${L} debt` : `${L} supplied`;
       const amountText =
-        key === "usd-collateral" ? `${fig(f.collateral)} ${C}` : key === "usd-debt" ? `${fig(f.debt)} ${L}` : `${fig(f.supplied)} ${L}`;
+        key === "usd-collateral"
+          ? `${fig(f.collateral)} ${C}`
+          : key === "usd-debt"
+            ? `${fig(f.debt)} ${L}`
+            : `${fig(f.supplied)} ${L}`;
       return {
         kind: "chain-derived",
         pclass: "oracle",
         source,
-        contract: f.usd ? { name: `Chainlink ${f.usd.feed.description ?? "USD"} feed`, address: f.usd.feed.feed } : undefined,
+        contract: f.usd
+          ? { name: `Chainlink ${f.usd.feed.description ?? "USD"} feed`, address: f.usd.feed.feed }
+          : undefined,
         summary:
           key === "usd-collateral"
-            ? `${what} in USD at ${at(head)}: the collateral at the market's oracle price in ${L}, then ${L} at its Chainlink feed on Arc.`
-            : `${what} in USD at ${at(head)}: the amount at ${L}'s Chainlink feed on Arc.`,
+            ? `${what} in USD. The collateral at the market's oracle price in ${L}, then ${L} at its Chainlink feed on Arc, at ${at(head)}.`
+            : `${what} in USD. The amount at ${L}'s Chainlink feed on Arc, at ${at(head)}.`,
         via: `${v} · ${key === "usd-collateral" ? "oracle price() × " : ""}feed latestRoundData`,
         formula: key === "usd-collateral" ? "collateral × oracle price ÷ 10^36 × feed answer" : "amount × feed answer",
         inputs: [derivedIn(what, amountText), ...(key === "usd-collateral" ? [priceInput(c)] : []), usdInput(c)],
@@ -174,8 +211,8 @@ export function morphoArcProv(key: MorphoArcFigure, c: MorphoArcReceiptContext):
         contract: { name: "Market oracle", address: m.oracle },
         summary:
           key === "ltv"
-            ? `LTV at ${at(head)}: the debt over the collateral's value in ${L} at the market's oracle. Morpho liquidates once it passes the LLTV, ${(f.lltv * 100).toFixed(1)}%, fixed when the market was created.`
-            : `Health factor at ${at(head)}: the collateral's value in ${L} times the LLTV, over the debt. Below 1 the position can be liquidated.`,
+            ? `LTV. The debt over the collateral's value in ${L} at the market's oracle, at ${at(head)}. Morpho liquidates once it passes the LLTV, ${(f.lltv * 100).toFixed(1)}%, fixed when the market was created.`
+            : `Health factor. The collateral's value in ${L} times the LLTV, over the debt, at ${at(head)}. Below 1 the position can be liquidated.`,
         via: `${v} · position, market, oracle price()`,
         formula: key === "ltv" ? "debt ÷ (collateral × price ÷ 10^36)" : "collateral × price ÷ 10^36 × LLTV ÷ debt",
         inputs: [
@@ -194,10 +231,11 @@ export function morphoArcProv(key: MorphoArcFigure, c: MorphoArcReceiptContext):
         contract: { name: "Adaptive Curve IRM", address: m.irm },
         summary:
           key === "borrow-rate"
-            ? `Borrow rate at ${at(head)}: the market's rate model's borrowRateView on the market as stored, per second, times a year.`
-            : `Supply rate at ${at(head)}: the borrow rate times the share of supply lent out, less the market's fee.`,
+            ? `Borrow rate. The market rate model's borrowRateView on the market as stored, per second, times a year, at ${at(head)}.`
+            : `Supply rate. The borrow rate times the share of supply lent out, less the market's fee, at ${at(head)}.`,
         via: `${v} · IRM borrowRateView`,
-        formula: key === "borrow-rate" ? "borrowRateView × 31,536,000 ÷ 10^18" : "borrow rate × utilisation × (1 − fee)",
+        formula:
+          key === "borrow-rate" ? "borrowRateView × 31,536,000 ÷ 10^18" : "borrow rate × utilisation × (1 − fee)",
         inputs: [
           chain("borrowRateView", m.borrowRate ?? "—", "per second, WAD"),
           ...(key === "supply-rate"
@@ -217,11 +255,16 @@ export function morphoArcProv(key: MorphoArcFigure, c: MorphoArcReceiptContext):
         contract: { name: "Market oracle", address: m.oracle },
         summary:
           key === "room"
-            ? `Room to borrow at ${at(head)}: what the collateral can carry at the LLTV, less the debt.`
-            : `Liquidates on a drop of: how far the collateral's price in ${L} can fall before the LTV reaches the LLTV, at ${at(head)}.`,
+            ? `Room to borrow. What the collateral can carry at the LLTV, less the debt, at ${at(head)}.`
+            : `Liquidation drop. How far the collateral's price in ${L} can fall before the LTV reaches the LLTV, at ${at(head)}.`,
         via: `${v} · position, market, oracle price()`,
         formula: key === "room" ? "collateral × price ÷ 10^36 × LLTV − debt" : "1 − LTV ÷ LLTV",
-        inputs: [derivedIn(`${L} debt`, fig(f.debt)), derivedIn(`${C} collateral`, fig(f.collateral)), priceInput(c), chain("LLTV", m.lltv, "WAD")],
+        inputs: [
+          derivedIn(`${L} debt`, fig(f.debt)),
+          derivedIn(`${C} collateral`, fig(f.collateral)),
+          priceInput(c),
+          chain("LLTV", m.lltv, "WAD"),
+        ],
       };
     default:
       return interestProv(key, c);
@@ -240,7 +283,11 @@ function interestProv(key: MorphoArcFigure, c: MorphoArcReceiptContext): Provena
   const L = f.loan.symbol;
   const base: ProvInput[] = [
     chain(`position · ${sup ? "supplyShares" : "borrowShares"}, both dates`, shares, "the same at both reads"),
-    chain(`market · total${sup ? "Supply" : "Borrow"}Assets now`, (sup ? m.state?.totalSupplyAssets : m.state?.totalBorrowAssets) ?? "—", `at ${at(head)}`),
+    chain(
+      `market · total${sup ? "Supply" : "Borrow"}Assets now`,
+      (sup ? m.state?.totalSupplyAssets : m.state?.totalBorrowAssets) ?? "—",
+      `at ${at(head)}`,
+    ),
     chain(
       `market · total${sup ? "Supply" : "Borrow"}Assets 30 days back`,
       (sup ? past?.state.totalSupplyAssets : past?.state.totalBorrowAssets) ?? "—",
@@ -254,14 +301,9 @@ function interestProv(key: MorphoArcFigure, c: MorphoArcReceiptContext): Provena
     pclass: usdKey ? "oracle" : "state",
     source: { block: head.block },
     contract: morphoC,
-    summary: `${sup ? "Interest earned" : "Interest gathered on the debt"} over the 30 days from ${at(then)} to ${at(head)}: the same shares valued at the market's totals at each date${usdKey ? `, at ${L}'s Chainlink feed now` : ""}.${i?.state === "ok" ? ` ${fig(i.amount)} ${L}.` : ""}`,
+    summary: `${sup ? "Interest earned, 30 days" : "Interest on the debt, 30 days"}. The same shares valued at the market's totals at ${at(then)} and ${at(head)}${usdKey ? `, at ${L}'s Chainlink feed now` : ""}.${i?.state === "ok" ? ` ${fig(i.amount)} ${L}.` : ""}`,
     via: via(`blocks ${n(then.block)} and ${n(head.block)}`),
     formula: "shares at the totals now − shares at the totals 30 days back",
     inputs: usdKey ? [...base, usdInput(c)] : base,
   };
-}
-
-/** A wallet page row's figure. */
-export function morphoArcWalletProv(key: "usd-collateral" | "usd-debt" | "usd-supplied" | "collateral" | "debt" | "supplied" | "ltv", c: MorphoArcReceiptContext): Provenance {
-  return morphoArcProv(key, c);
 }

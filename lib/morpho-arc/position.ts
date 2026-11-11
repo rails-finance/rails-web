@@ -20,9 +20,11 @@ import type {
   ArcMorphoToken,
   ArcMorphoWalletRead,
   ArcUsdFeed,
-} from "@/lib/morpho-arc/types";
-import { ZERO_ADDRESS } from "@/lib/morpho-arc/types";
+} from "./types";
 
+// Relative imports and the zero address inline: scripts/test/morpho-arc.test.mjs loads this
+// module under node's type stripping, which resolves no `@/` path.
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const B = (v: string | number) => BigInt(v);
 const WAD = B("1000000000000000000");
 const VIRTUAL_SHARES = B(1000000);
@@ -242,7 +244,10 @@ export function morphoArcPosition(r: ArcMorphoPositionRead): ArcMorphoPositionFi
 /** A wallet's positions, largest dollar value first (unpriced last, by creation). */
 export function morphoArcWalletPositions(r: ArcMorphoWalletRead): (ArcMorphoFigures & { createdBlock: number })[] {
   return r.positions
-    .map((m) => ({ ...morphoArcFigures(m, m.position, r.head.time, r.tokens, r.usdFeeds), createdBlock: m.createdBlock }))
+    .map((m) => ({
+      ...morphoArcFigures(m, m.position, r.head.time, r.tokens, r.usdFeeds),
+      createdBlock: m.createdBlock,
+    }))
     .sort((a, b) => {
       const va = (a.collateralUsd ?? 0) + (a.suppliedUsd ?? 0);
       const vb = (b.collateralUsd ?? 0) + (b.suppliedUsd ?? 0);

@@ -14,7 +14,12 @@ import type {
 import type { MorphoOracleFeed } from "@/lib/api/fetch-morpho-position";
 import type { MorphoRosterMarks } from "@/lib/morpho/markets-shape";
 import { atRateCeiling, fullyBorrowedShare } from "@/lib/vaults/illiquid";
-import type { ArcMorphoMarket, ArcMorphoMarketRead, ArcMorphoMarketsRead, ArcMorphoToken } from "@/lib/morpho-arc/types";
+import type {
+  ArcMorphoMarket,
+  ArcMorphoMarketRead,
+  ArcMorphoMarketsRead,
+  ArcMorphoToken,
+} from "@/lib/morpho-arc/types";
 import { ZERO_ADDRESS } from "@/lib/morpho-arc/types";
 
 const YEAR = 31_536_000;
