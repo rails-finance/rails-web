@@ -8,7 +8,7 @@
 
 import { ROBINHOOD_CHAIN_ID as ROBINHOOD } from "../shared/chains";
 
-export type NextStage = "indexing" | "building" | "built" | "surveyed" | "planned";
+export type NextStage = "indexing" | "building" | "built" | "surveyed" | "planned" | "considering";
 
 export const NEXT_STAGE_WORDS: Record<NextStage, string> = {
   indexing: "Indexing",
@@ -16,6 +16,7 @@ export const NEXT_STAGE_WORDS: Record<NextStage, string> = {
   built: "Built, launch pending",
   surveyed: "Surveyed",
   planned: "Planned",
+  considering: "Considering",
 };
 
 export interface NextItem {
@@ -28,8 +29,6 @@ export interface NextItem {
   /** Chain ids, in the order the row draws them. */
   chains: number[];
   stage: NextStage;
-  /** Held on a ruling; shown beside the stage. */
-  held?: boolean;
   why: string;
   source: { label: string; href: string };
   /** The server's (protocol, chain) index keys; the item leaves this list
@@ -113,8 +112,7 @@ export const NEXT: NextItem[] = [
     name: "Derive V3",
     mark: "derive",
     chains: [1],
-    stage: "planned",
-    held: true,
+    stage: "considering",
     why: "Custody on Ethereum and trading off-chain, so positions would show as Derive reports them.",
     source: { label: "docs.derive.xyz", href: "https://docs.derive.xyz" },
   },

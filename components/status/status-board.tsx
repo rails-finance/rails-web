@@ -608,7 +608,6 @@ function NextTable({ chain, items }: { chain: number; items: NextItem[] }) {
                   <span className={`whitespace-nowrap px-1.5 py-0.5 text-xs ${DATA_TABLE_PILL}`}>
                     {NEXT_STAGE_WORDS[i.stage]}
                   </span>
-                  {i.held && <span className={`px-1.5 py-0.5 text-xs ${DATA_TABLE_PILL}`}>Held</span>}
                 </span>
               </DataTableCell>
               <DataTableCell valign="middle" label="Why" wide className="text-sm text-rb-600 dark:text-rb-300">
