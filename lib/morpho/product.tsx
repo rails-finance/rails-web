@@ -154,8 +154,17 @@ function curveRead(x: Ctx): { rat: number; u: number; elapsed: number } | null {
 
 // ── Figures ──────────────────────────────────────────────────────────────────
 
+const ZERO_LOAN_TOKEN = "0x0000000000000000000000000000000000000000";
+
 function Size({ x, side }: { x: Ctx; side: "supplied" | "borrowed" | "available" }) {
   const m = x.d.market;
+  // An idle market that names no loan token (Arc's first market) holds nothing to size.
+  if (m.isIdle && m.loanToken === ZERO_LOAN_TOKEN)
+    return (
+      <span className="text-rb-500" title="This market names no loan token, collateral, oracle or rate model.">
+        no loan token
+      </span>
+    );
   if (!m.amountsTrusted)
     return (
       <span

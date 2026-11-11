@@ -109,6 +109,8 @@ export const MARKET_LIST_WORDS = {
   },
   idle: "The idle market names no loan token, collateral, oracle or rate model, so nothing can be borrowed from it.",
   idleLink: "Its page",
+  /** The roster head's word for the listed markets holding no supply. */
+  emptyNow: "empty now",
   page: {
     "test-token": "This market isn't listed on the markets page: it lends a test token (ERC20Mock, E20M).",
     "never-funded": "This market isn't listed on the markets page: nothing has ever been supplied to it.",

@@ -820,6 +820,9 @@ type RosterProps = {
   chainId: ChainId;
   /** A line under the head (Arc's unlisted markets and its idle market, ui-jobs 577). */
   note?: ReactNode;
+  /** The head's word for the markets holding no supply; "never funded" where absent. Arc's list
+   *  leaves out the never-supplied markets, so its zero-supply ones are "empty now" (ui-jobs 577). */
+  unfundedLabel?: string;
 };
 
 /** The roster reads `?all=1` from the URL; the static render, before the
@@ -837,7 +840,7 @@ function RosterWithParams(props: RosterProps) {
   return <RosterView {...props} all={all} />;
 }
 
-function RosterView({ data, chainId, all, note }: RosterProps & { all: boolean }) {
+function RosterView({ data, chainId, all, note, unfundedLabel = "never funded" }: RosterProps & { all: boolean }) {
   const root = `/${chainMeta(chainId).slug}/morpho`;
   const pathname = usePathname();
   const r: Read = { chainId, block: data.blockNumber, fromLogs: data.totalsSource === "sieve" };
@@ -925,7 +928,7 @@ function RosterView({ data, chainId, all, note }: RosterProps & { all: boolean }
     ],
     notes: (
       <span data-prov-exempt="">
-        {s.borrowed.toLocaleString("en-US")} have borrowing · {s.neverFunded.toLocaleString("en-US")} never funded
+        {s.borrowed.toLocaleString("en-US")} have borrowing · {s.neverFunded.toLocaleString("en-US")} {unfundedLabel}
         {s.idleMarkets > 0 && ` · ${s.idleMarkets} idle`}
       </span>
     ),

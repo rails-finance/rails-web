@@ -48,5 +48,12 @@ export default async function MorphoArcMarketsPage() {
       )}
     </div>
   );
-  return <MorphoRosterPage data={withRosterMarks(d, arcRosterMarks(answer.data))} chainId={ARC_CHAIN_ID} note={note} />;
+  return (
+    <MorphoRosterPage
+      data={withRosterMarks(d, arcRosterMarks(answer.data))}
+      chainId={ARC_CHAIN_ID}
+      note={note}
+      unfundedLabel={MARKET_LIST_WORDS.emptyNow}
+    />
+  );
 }
