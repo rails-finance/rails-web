@@ -89,7 +89,8 @@ const NAMES = ALL.map((f) => f.name);
 
 const mtokenOf = (f: Fixture) => (m: string) =>
   f.deployment === "eth" ? (MOONWELL_MARKET_BY_KEY[m]?.mtoken ?? m) : m.toLowerCase();
-const rows = (f: Fixture) => moonwellFlowRows(f.events, mtokenOf(f));
+// The underlying addresses feed the icons only, which this check does not read.
+const rows = (f: Fixture) => moonwellFlowRows(f.events, mtokenOf(f), () => null);
 function live(f: Fixture): Record<string, CTokenLiveMarket> {
   const out: Record<string, CTokenLiveMarket> = {};
   for (const m of f.chain.markets)

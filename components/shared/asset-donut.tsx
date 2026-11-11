@@ -26,7 +26,9 @@ export interface BreakdownAsset {
   /** Stable key, and the row's `data-breakdown-row`. */
   id: string;
   symbol: string;
-  address?: string;
+  /** The token's address, for the row's icon (AssetMark): null only where
+   *  no token stands behind the symbol or the data names none. */
+  address: string | null;
   /** The traced token amount. */
   amount: ReactNode;
   /** The oracle USD value, for the share, the order and the row's figure (in
@@ -411,7 +413,13 @@ export function AssetBreakdownPanel({
                           focusable
                           className="focus-ring -m-1 inline-flex rounded-full p-1"
                         >
-                          <TokenChipIcon symbol={a.symbol} address={a.address} size={14} filterable={false} untitled />
+                          <TokenChipIcon
+                            symbol={a.symbol}
+                            address={a.address ?? undefined}
+                            size={14}
+                            filterable={false}
+                            untitled
+                          />
                         </RevealTip>
                       </span>
                     </th>

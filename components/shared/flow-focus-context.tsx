@@ -14,6 +14,7 @@ import { formatUtcDay, parseUtcDay } from "@/hooks/useTimelineEvents";
 import { useTimelineDisplay } from "@/components/shared/timeline-display-context";
 import { shortDate, shortDateYear } from "@/lib/shared/format-event";
 import { buildFlowModel, type FlowModel, type FlowTimeline } from "@/lib/shared/flows-timeline";
+import type { AssetMark } from "@/lib/shared/asset-mark";
 import {
   createFlowFocusStore,
   type FlowFocusState,
@@ -33,6 +34,14 @@ export const FlowFocusContext = createContext<FlowFocusValue | null>(null);
 
 export function useFlowFocus(): FlowFocusValue | null {
   return useContext(FlowFocusContext);
+}
+
+/** An asset's mark on the flows and timeline surfaces (AssetMark): its
+ *  address from the page's flow model (`FlowTimeline.addresses`), the book a
+ *  family fills with its tokens' addresses. */
+export function useFlowMark(): (symbol: string) => AssetMark {
+  const book = useFlowFocus()?.model?.addresses;
+  return (symbol) => ({ symbol, address: book?.[symbol] ?? null });
 }
 
 const NOOP_STORE = createFlowFocusStore();

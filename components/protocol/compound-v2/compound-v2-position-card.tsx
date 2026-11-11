@@ -47,6 +47,7 @@ import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import type { AssetBreakdown } from "@/components/shared/asset-donut";
+import type { AssetMark } from "@/lib/shared/asset-mark";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { formatUsd } from "@/lib/shared/format-event";
@@ -122,6 +123,15 @@ export interface CompoundV2PositionView {
 /** The figure a supply line asserts: the current value (interest included)
  *  when the chain read landed, the replayed principal otherwise. */
 const supplyAmount = (r: CompoundV2SupplyAmount): number => r.current ?? r.principal;
+
+/** A market's underlying token address, for its icon: the catalog's (none
+ *  for cETH, whose ETH mark resolves by symbol). The timeline's chips read the
+ *  same address from the row's flows. */
+const underlyingOf = (market: string): string | undefined => COMPOUND_V2_MARKET_BY_KEY[market]?.underlying ?? undefined;
+const markOf = (r: { market: string; symbol: string }): AssetMark => ({
+  symbol: r.symbol,
+  address: underlyingOf(r.market) ?? null,
+});
 
 /** On-chain oracle USD for one line; null when Compound didn't price it. */
 function lineUsd(v: CompoundV2PositionView, market: string, amount: number): number | null {
@@ -259,7 +269,12 @@ function peakValue(lines: CompoundV2PeakAmount[], side: "supply" | "debt"): Reac
       {lines.map((r) => (
         <div key={r.market}>
           <Prov info={side === "supply" ? peakSupplyProv(r.symbol) : peakDebtProv(r.symbol)}>
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            <AssetAmount
+              value={r.amount}
+              symbol={r.symbol}
+              address={underlyingOf(r.market)}
+              exact={formatUnitsExact(r.amountRaw, r.decimals)}
+            />
           </Prov>
         </div>
       ))}
@@ -400,6 +415,7 @@ export function useCompoundV2CardSlots({
         <AssetAmount
           value={supplyAmount(r)}
           symbol={r.symbol}
+          address={underlyingOf(r.market)}
           exact={r.current != null ? formatUnitsExact(r.cTokensRaw, 8) : String(r.principal)}
           {...(r.current != null ? { exactUnit: r.cSymbol } : {})}
         />
@@ -409,7 +425,12 @@ export function useCompoundV2CardSlots({
   const borrowUnit = (r: CompoundV2BorrowAmount) => (
     <div key={r.market}>
       <Prov info={borrowProv(r, serverReadOf(chain))}>
-        <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+        <AssetAmount
+          value={r.amount}
+          symbol={r.symbol}
+          address={underlyingOf(r.market)}
+          exact={formatUnitsExact(r.amountRaw, r.decimals)}
+        />
       </Prov>
     </div>
   );
@@ -428,7 +449,7 @@ export function useCompoundV2CardSlots({
           <TokenStack lines={suppliesShown.map(supplyUnit)} />
         ),
       total: collUsd != null ? { usd: collUsd.usd, info: usdProv(marketBy, "Collateral", collUsd.fixed) } : undefined,
-      assets: v.supplies.length > 0 ? <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} /> : undefined,
+      assets: v.supplies.length > 0 ? <InlineAssetCluster assets={suppliesShown.map(markOf)} /> : undefined,
     },
     {
       id: "debt",
@@ -440,7 +461,7 @@ export function useCompoundV2CardSlots({
           <TokenStack lines={borrowsShown.map(borrowUnit)} />
         ),
       total: debtUsd != null ? { usd: debtUsd.usd, info: usdProv(marketBy, "Borrowed", debtUsd.fixed) } : undefined,
-      assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} /> : undefined,
+      assets: v.borrows.length > 0 ? <InlineAssetCluster assets={borrowsShown.map(markOf)} /> : undefined,
     },
   ];
   // One market on a side: its amount with its icon, the dollars beneath (the
@@ -454,6 +475,7 @@ export function useCompoundV2CardSlots({
           <AssetAmount
             value={supplyAmount(r)}
             symbol={r.symbol}
+            address={underlyingOf(r.market)}
             exact={r.current != null ? formatUnitsExact(r.cTokensRaw, 8) : String(r.principal)}
             {...(r.current != null ? { exactUnit: r.cSymbol } : {})}
           />
@@ -474,7 +496,12 @@ export function useCompoundV2CardSlots({
       ...heads[1],
       value: (
         <Prov info={borrowProv(r, serverReadOf(chain))}>
-          <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+          <AssetAmount
+            value={r.amount}
+            symbol={r.symbol}
+            address={underlyingOf(r.market)}
+            exact={formatUnitsExact(r.amountRaw, r.decimals)}
+          />
         </Prov>
       ),
       assets: undefined,
@@ -519,7 +546,7 @@ export function useCompoundV2CardSlots({
       const usd = lineUsd(v, r.market, supplyAmount(r));
       return {
         id: `supply-${r.market}`,
-        symbol: r.symbol,
+        ...markOf(r),
         usd,
         amount: (
           <>
@@ -544,7 +571,7 @@ export function useCompoundV2CardSlots({
       const usd = lineUsd(v, r.market, r.amount);
       return {
         id: `borrow-${r.market}`,
-        symbol: r.symbol,
+        ...markOf(r),
         usd,
         amount: (
           <>

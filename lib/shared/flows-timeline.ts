@@ -372,8 +372,10 @@ export interface FlowTimeline {
   labels?: { collateral: string; debt: string };
   /** A family's own words for the one-sided bar; each unset one keeps the default. */
   words?: FlowWords;
-  /** Token addresses by symbol, for an icon a symbol alone does not resolve
-   *  (a Pendle PT, whose mark is read through its address). */
+  /** Token addresses by symbol: the address every flows and timeline icon
+   *  resolves through (lib/shared/asset-mark.ts), so the headline, the
+   *  panels and the event cards draw the card's mark for an asset whose
+   *  symbol has none of its own (a Pendle PT, a long-tail cToken underlying). */
   addresses?: Record<string, string>;
   /** The daily series holds prices only on the days a price was recorded (a
    *  family with no daily price lane builds it from its events): a day or a

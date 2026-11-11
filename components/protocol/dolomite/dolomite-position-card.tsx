@@ -39,7 +39,7 @@ import {
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import type { AssetBreakdown } from "@/components/shared/asset-donut";
-import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
+import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -349,7 +349,10 @@ export function useDolomiteCardSlots({
             <LegLines lines={supplyLines.lines} side="supply" />
           ) : null,
         total: collUsd != null ? { usd: collUsd, info: dolomiteUsdProv("Collateral", v.marketReadBy) } : undefined,
-        assets: v.supplies.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(suppliesShown)} /> : undefined,
+        assets:
+          v.supplies.length > 0 ? (
+            <InlineAssetCluster assets={loadedMarks(suppliesShown.map(withAddress))} />
+          ) : undefined,
       },
       {
         id: "debt",
@@ -361,7 +364,8 @@ export function useDolomiteCardSlots({
             <LegLines lines={borrowLines.lines} side="debt" />
           ) : null,
         total: debtUsd != null ? { usd: debtUsd, info: dolomiteUsdProv("Borrowed", v.marketReadBy) } : undefined,
-        assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={loadedSymbols(borrowsShown)} /> : undefined,
+        assets:
+          v.borrows.length > 0 ? <InlineAssetCluster assets={loadedMarks(borrowsShown.map(withAddress))} /> : undefined,
       },
     ];
     // One market on a side: its amount with its icon, the dollars beneath
@@ -477,6 +481,10 @@ export function useDolomiteCardSlots({
   };
 }
 
+/** A market row with its token's address for the icon (AssetMark): null
+ *  where the page did not resolve the token. */
+const withAddress = (r: DolomiteBalanceAmount) => ({ ...r, address: r.token ?? null });
+
 /** One side's markets for the donut's breakdown (asset-donut.tsx), with the
  *  dust control where lines are hidden. */
 function marketBreakdown(
@@ -491,7 +499,7 @@ function marketBreakdown(
       return {
         id: `${side}-${r.marketId}`,
         symbol: r.symbol,
-        address: r.token,
+        address: r.token ?? null,
         usd,
         amount: r.decimalsUnread ? (
           <TokenAmountNotLoaded label={r.symbol} />
