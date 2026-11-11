@@ -16,5 +16,3 @@
 /optimism/morpho
 /optimism/morpho/[wallet]
 /optimism/morpho/[wallet]/[market]
-/optimism/morpho/markets
-/optimism/morpho/markets/[loanToken]
