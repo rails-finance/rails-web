@@ -20,8 +20,7 @@ import { protocolForSession } from "@/lib/shared/protocols";
 import { CHAINS, explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { shortAddress } from "@/lib/shared/asset-roster";
-import { ReadTierTag } from "@/components/shared/read-tier-tag";
-import { READ_TIER } from "@/lib/shared/read-tier";
+import { InfoHistoryLine } from "@/components/shared/history-tag";
 
 export interface InfoDocLink {
   label: string;
@@ -200,16 +199,9 @@ export function ProtocolInfoPage({
       <h1 className="text-2xl font-semibold text-foreground" data-anatomy="I1">
         About this explorer
       </h1>
-      {/* Decision 0061: a "Read on visit" explorer's page opens with the tag
-          and both of the tier's sentences. */}
-      {entry?.readTier && (
-        <p className="mt-3 max-w-3xl text-sm text-rb-500" data-anatomy="H23.2" data-read-tier-line="">
-          <span className="mr-2 inline-flex align-[1px]">
-            <ReadTierTag tip={false} />
-          </span>
-          <span className="text-foreground">{READ_TIER.line}</span> {READ_TIER.waits}
-        </p>
-      )}
+      {/* Decisions 0061 and 0063: an explorer with a `history` opens with
+          its tag and line. */}
+      {entry?.history && <InfoHistoryLine id={entry.id} />}
       <div className="mt-3 max-w-3xl space-y-2 text-sm text-rb-500" data-anatomy="I2">
         <p>{tracks}</p>
 

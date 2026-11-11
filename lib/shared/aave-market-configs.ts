@@ -10,7 +10,13 @@
 // catalog.ts asV3Market), is one Pool's panel and reserves table. A sub-route
 // would collide with the reserve page's `[asset]` segment.
 
-import { ARBITRUM_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
+import {
+  ARBITRUM_CHAIN_ID,
+  BASE_CHAIN_ID,
+  MAINNET_CHAIN_ID,
+  OPTIMISM_CHAIN_ID,
+  type ChainId,
+} from "@/lib/shared/chains";
 import { asV3Market, type AaveV3MarketKey } from "@/lib/aave-v3/asset-catalog";
 import { SEAMLESS_FREEZE_DATE, SEAMLESS_FREEZE_TX } from "@/lib/seamless/asset-catalog";
 import { explorerUrl } from "@/lib/shared/chains";
@@ -21,6 +27,7 @@ export type AaveMarketKey =
   | "aave-v3-etherfi"
   | "aave-v3-base"
   | "aave-v3-arbitrum"
+  | "aave-v3-optimism"
   | "spark"
   | "seamless";
 
@@ -45,7 +52,7 @@ export interface AaveMarketConfig {
   marketLabel: string;
   purpose: string;
   /** Which Aave V3 market explainer the "?" opens; SparkLend has its own. */
-  modal: "aave-v3" | "aave-v3-base" | "aave-v3-arbitrum" | "seamless" | "spark";
+  modal: "aave-v3" | "aave-v3-base" | "aave-v3-arbitrum" | "aave-v3-optimism" | "seamless" | "spark";
   /** Listing URL filtered to one asset on one side, where the listing supports it. */
   assetHref?: (symbol: string, side: "supply" | "borrow") => string;
   /** Off-site pages the market head's ⋮ carries besides the Pool and oracle. */
@@ -141,6 +148,25 @@ export const AAVE_V3_ARBITRUM_MARKET: AaveMarketConfig = {
   modal: "aave-v3-arbitrum",
 };
 
+/** Aave V3 on Optimism (ui-jobs 578): read on visit through rails-server's
+ *  /api/at-block/aave-v3-optimism/markets, held 30 s there. No listing, so the
+ *  positions href is the front door. */
+export const AAVE_V3_OPTIMISM_MARKET: AaveMarketConfig = {
+  key: "aave-v3-optimism",
+  chainId: OPTIMISM_CHAIN_ID,
+  apiRoute: "/api/aave-v3-optimism/market",
+  marketHref: "/optimism/aave-v3/markets",
+  marketQuery: "",
+  reservesHref: "/optimism/aave-v3/markets",
+  listingHref: "/optimism/aave-v3",
+  positionsHref: "/optimism/aave-v3",
+  protocolName: "Aave V3",
+  marketLabel: "Aave V3 · Optimism",
+  purpose:
+    "Aave V3's Optimism deployment: its own Pool, its own reserves and its own risk parameters, separate from the Ethereum market of the same name.",
+  modal: "aave-v3-optimism",
+};
+
 export const SPARK_MARKET: AaveMarketConfig = {
   key: "spark",
   chainId: MAINNET_CHAIN_ID,
@@ -200,6 +226,8 @@ export function aaveMarketConfig(key: AaveMarketKey): AaveMarketConfig {
       return AAVE_V3_BASE_MARKET;
     case "aave-v3-arbitrum":
       return AAVE_V3_ARBITRUM_MARKET;
+    case "aave-v3-optimism":
+      return AAVE_V3_OPTIMISM_MARKET;
     case "spark":
       return SPARK_MARKET;
     case "seamless":

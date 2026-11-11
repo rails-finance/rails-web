@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { PairDoorCards } from "@/components/start/pair-door";
 import { InFocusSymbol, StartOutOfFocus } from "@/components/start/start-focus";
 import { fetchUniswapPair } from "@/lib/api/fetch-uniswap";
@@ -44,9 +44,9 @@ export async function UniswapPairPage({
     <div className="py-8" data-anatomy="G10.1" data-uniswap-pair={`${x.id}:${pair}`}>
       <header className="mb-5">
         <DetailTopRow session={x.id as SessionProtocol} fallbackHref={x.route} showStamp={false} tools={false} />
-        <ReadTierTitleRow id={x.id}>
+        <HistoryTitleRow id={x.id}>
           <h2 className="text-lg font-semibold text-foreground">{PAIR_DOOR.heading(spec.base, spec.quote)}</h2>
-        </ReadTierTitleRow>
+        </HistoryTitleRow>
         <p className="text-xs text-rb-500">
           {versionLabel(version, protocol)} · {x.deployment.chainName}
         </p>

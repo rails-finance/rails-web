@@ -358,6 +358,14 @@ export function walletFindProv(w: EulerWalletRead): Provenance {
       chain("getControllers(account i), getCollaterals(account i)", "i = 0 … 255; account i = wallet XOR i"),
       chain(`getProxyListLength() · ${w.factory}`, String(w.vaultCount)),
       chain("balanceOf(wallet) on each vault", `${w.vaultCount} calls`),
+      ...(w.deposits?.source === "index"
+        ? [
+            derived(
+              "Rails's position index · vault-share Transfers to and from the 256 accounts",
+              `through block ${n(w.deposits.through)}; each balance read again at the head`,
+            ),
+          ]
+        : []),
     ],
   };
 }

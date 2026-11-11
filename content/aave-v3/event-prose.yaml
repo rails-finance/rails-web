@@ -2223,6 +2223,8 @@ L5:
       Aave V3 on Base is one Pool holding every reserve, apart from Aave V3 on Ethereum. This page reads each reserve's size, rates and settings from that Pool.
     intro_arbitrum: |-
       Aave V3 on Arbitrum is one Pool holding every reserve, apart from Aave V3 on Ethereum. This section reads each reserve's size, rates and settings from that Pool.
+    intro_optimism: |-
+      Aave V3 on Optimism is one Pool holding every reserve, apart from Aave V3 on Ethereum. This page reads each reserve's size, rates and settings from that Pool when you open it.
     intro_seamless: |-
       Seamless is an Aave V3 fork on Base: one Pool holding every reserve, all frozen since April 2025. This page reads each reserve's size, rates and settings from that Pool.
     detailsHeading: |-

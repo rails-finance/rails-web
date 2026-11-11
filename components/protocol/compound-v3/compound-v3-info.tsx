@@ -2,6 +2,8 @@
 // typed template (rails-ops standards/info-page-template.md). One component so the routes
 // share the glossary and the page's shape; what differs per chain is the markets, the listing
 // and the market view, each stated from that chain's roster (lib/compound*/asset-catalog.ts).
+// Optimism's info page (app/(app)/optimism/compound-v3/info) takes the glossary and the
+// "how it works" items from here.
 
 import Link from "next/link";
 import {
@@ -31,7 +33,7 @@ const SEARCH_1 =
 const SEARCH_2 =
   "You can search by wallet address, which finds the wallets already read. To read any other wallet, enter it on the protocol page. The listing filters by Debt, Collateral and Transactions, and sorts by last activity, last opened, collateral or debt.";
 
-const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
+export const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Comet",
     definition:
@@ -82,7 +84,7 @@ const GLOSSARY: readonly [InfoTerm, ...InfoTerm[]] = [
   },
 ];
 
-const WHAT_IT_IS = (
+export const WHAT_IT_IS = (
   <>
     Compound V3 is a lending protocol. People supply crypto to earn interest, or deposit{" "}
     <GlossaryLink term="Collateral">collateral</GlossaryLink> and borrow against it. On this page an account is the
@@ -90,7 +92,7 @@ const WHAT_IT_IS = (
   </>
 );
 
-const ONE_BASE_ASSET = (
+export const ONE_BASE_ASSET = (
   <>
     Each market is a smart contract called a <GlossaryLink term="Comet">Comet</GlossaryLink>, with one{" "}
     <GlossaryLink term="Base asset">base asset</GlossaryLink>. Suppliers of the base asset earn interest, and borrowers
@@ -98,14 +100,14 @@ const ONE_BASE_ASSET = (
   </>
 );
 
-const INTEREST = (
+export const INTEREST = (
   <>
     The <GlossaryLink term="Interest rate">interest rate</GlossaryLink> on supplying and on borrowing rises as more of
     the base asset is lent out. Each market sets its own rates.
   </>
 );
 
-const LIQUIDATION_ITEM = (
+export const LIQUIDATION_ITEM = (
   <>
     When an account&apos;s debt passes what its collateral covers, anyone can trigger its{" "}
     <GlossaryLink term="Liquidation">liquidation</GlossaryLink>, and the market takes over its debt and collateral.

@@ -202,6 +202,8 @@ const GLYPHS: Record<string, Glyph> = {
   // And Base's Comets are the same protocol again, on another chain.
   "compound-base": COMPOUND_MARK,
   "compound-v3-arbitrum": COMPOUND_MARK,
+  // Compound V3 on Optimism: the same mark, its own deployment.
+  "compound-v3-optimism": COMPOUND_MARK,
   // Paths are authored in a ~0–160 space; the two source group transforms
   // (outer scale+translate, inner translate) map them into the 50×50 viewBox.
   asymmetry: {
@@ -236,6 +238,8 @@ const GLYPHS: Record<string, Glyph> = {
   "aave-v3-base": AAVE_V3_MARK,
   // Aave V3 on Arbitrum — the same mark, its own deployment.
   "aave-v3-arbitrum": AAVE_V3_MARK,
+  // Aave V3 on Optimism: the Ethereum mark, its own deployment.
+  "aave-v3-optimism": AAVE_V3_MARK,
   // Aave's vault layer — same protocol, same mark, its own roster subject.
   "aave-vaults": AAVE_V3_MARK,
   "aave-v4": AAVE_V4_MARK,

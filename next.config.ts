@@ -125,6 +125,8 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/morpho-arbitrum", "/arbitrum/morpho"],
   // Compound V3 on Arbitrum never had a pre-0016 path; the row is for check:routes.
   ["/compound-v3-arbitrum", "/arbitrum/compound-v3"],
+  // Compound V3 on Optimism never had a pre-0016 path; the row is for check:routes.
+  ["/compound-v3-optimism", "/optimism/compound-v3"],
   // CoW never had a pre-0016 path; the row is for check:routes.
   ["/cow", "/ethereum/cow"],
   // Pendle never had a pre-0016 path; the row is for check:routes.
@@ -149,6 +151,8 @@ const LEGACY_EXPLORER_PATHS: [string, string][] = [
   ["/morpho-arc", "/arc/morpho"],
   // Aave V4 on Arc never had a pre-0016 path; the row is for check:routes.
   ["/aave-v4-arc", "/arc/aave-v4"],
+  // Aave V3 on Optimism never had a pre-0016 path; the row is for check:routes.
+  ["/aave-v3-optimism", "/optimism/aave-v3"],
   // Euler V2 never had a pre-0016 path; the rows are for check:routes.
   ["/euler-v2-base", "/base/euler-v2"],
   ["/euler-v2-arbitrum", "/arbitrum/euler-v2"],

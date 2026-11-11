@@ -68,6 +68,9 @@ export type SessionProtocol =
   // Compound V3 on Arbitrum, at `/arbitrum/compound-v3`: its own four Comets,
   // so its own scope.
   | "compound-v3-arbitrum"
+  // Compound V3 on Optimism, at `/optimism/compound-v3`: a position is a wallet's
+  // account in one Comet, read from the chain when a page opens (ui-jobs 578).
+  | "compound-v3-optimism"
   | "compound-v2"
   | "dolomite"
   | "pwn"
@@ -118,6 +121,9 @@ export type SessionProtocol =
   // Aave V4 on Arc, at `/arc/aave-v4`: a position is a wallet's account on one
   // spoke, read from the chain when a page opens (ui-jobs 577).
   | "aave-v4-arc"
+  // Aave V3 on Optimism, at `/optimism/aave-v3`: a position is a wallet's
+  // account on the Pool, read from the chain when a page opens (ui-jobs 578).
+  | "aave-v3-optimism"
   // Euler V2 on Base and Arbitrum, at `/base/euler-v2` and `/arbitrum/euler-v2`:
   // a position is one account's holding in one vault, read at two blocks.
   | "euler-v2-base"

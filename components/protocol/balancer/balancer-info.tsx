@@ -1,6 +1,7 @@
 // About this explorer — Balancer V3 on one chain (ui-jobs 569), drawn on the
 // typed template (rails-ops standards/info-page-template.md). The contracts in
-// "How Rails reads it" are the ones rails-server's balancer-at-block.ts reads.
+// "How Rails reads it" are the ones rails-server's balancer-at-block.ts reads
+// and Rails's position index records (decision 0063 point 2).
 // Each chain's /info page draws it.
 
 import type { ReactNode } from "react";
@@ -94,8 +95,12 @@ const views = (chainId: BalChainId): readonly [InfoView, ...InfoView[]] => [
             share&apos;s page.
           </li>
           <li>
-            Pools are found from the liquidity the wallet added. Pool shares it received by transfer, or staked in a{" "}
-            <GlossaryLink term="Gauge">gauge</GlossaryLink>, are not found from its address.
+            Shares the wallet staked in a pool&apos;s <GlossaryLink term="Gauge">gauge</GlossaryLink> show under the
+            pool&apos;s row, with the gauge&apos;s address.
+          </li>
+          <li>
+            The front door counts every pool share held on {BAL_CHAINS[chainId].name}: one holding for each address and
+            pool, wallets and contracts both, since gauges and routers hold pool shares too.
           </li>
         </ul>
       </>
@@ -105,9 +110,9 @@ const views = (chainId: BalChainId): readonly [InfoView, ...InfoView[]] => [
     heading: "Pool share page",
     body: (
       <p>
-        The pool share page shows the wallet&apos;s share of the pool, its part of each token, how the pool&apos;s value
-        per share moved over the last 30 days, and when the wallet first added. Under it, one line per measure compares
-        the wallet and the pool now with 30 days back.
+        The pool share page shows the wallet&apos;s share of the pool, its part of each token, any shares staked in the
+        pool&apos;s gauge, how the pool&apos;s value per share moved over the last 30 days, and when the wallet first
+        added. Under it, one line per measure compares the wallet and the pool now with 30 days back.
       </p>
     ),
   },
@@ -118,17 +123,18 @@ const contracts: InfoReadContract[] = [
     name: "Vault",
     address: BALANCER_VAULT,
     reads:
-      "a wallet's shares of a pool and all the pool's shares, the pool's tokens and its balance of each, its value per share, its swap fee and whether it is paused or in recovery; and the liquidity a wallet added or removed, from the Vault's events.",
+      "a wallet's shares of a pool and all the pool's shares, the pool's tokens and its balance of each, its value per share, its swap fee and whether it is paused or in recovery; and from its events, every transfer of pool shares and the liquidity each wallet added or removed.",
   },
   { name: "Each pool", reads: "its name and symbol." },
+  { name: "Each gauge", reads: "the pool it stakes and a wallet's staked shares." },
   { name: "Each token", reads: "its symbol and decimals." },
 ];
 
 const reads = (chainId: BalChainId): InfoReads => ({
   contracts: contracts as [InfoReadContract, ...InfoReadContract[]],
-  how: `Rails's server reads the Vault at the block current when you open a page, and at ${chainId === 1 ? "a block 30 days back" : "the block at the UTC midnight 30 days back"}. A past block's answers are stored once that block is final, so a later visit reads only the newest block again. To find a wallet's pools, Rails reads the Vault's record of the liquidity that wallet added since the Vault's first block, then each pool's share balance now.`,
+  how: `Rails keeps an index of the Vault's events on ${BAL_CHAINS[chainId].name} from its first block: every transfer of pool shares, with each mint and burn, and every add and remove of liquidity. The figures are read live: Rails's server reads the Vault and the gauges at the block current when you open a page, and the Vault at ${chainId === 1 ? "a block 30 days back" : "the block at the UTC midnight 30 days back"}. A past block's answers are stored once that block is final, so a later visit reads only the newest block again. To find a wallet's pools, Rails looks up the transfers naming that wallet in the index, reads the Vault's logs from the index's last block to the current one, then reads each pool's share balance and gauge stake now.`,
   notes: [
-    "The Vault records each add with the wallet that received the shares, so one search of its events finds a wallet's pools. A transfer of shares between wallets is not in that record, and a gauge holds the shares staked in it.",
+    "A wallet that stakes its shares in a gauge sends them to the gauge, so the Vault counts them as the gauge's. Rails reads the gauges the index shows a wallet sending shares to, and counts a stake where the gauge's pool matches.",
   ],
 });
 
@@ -143,7 +149,7 @@ export function BalancerInfo({ chainId }: { chainId: BalChainId }) {
           one it shows the wallet&apos;s part of the pool&apos;s tokens and the pool over the last 30 days.
         </>
       }
-      notCovered="Balancer V2 pools, gauges and staked shares, BAL rewards and veBAL aren't covered here."
+      notCovered="Balancer V2 pools, BAL and other gauge rewards, and veBAL aren't covered here."
       glossary={glossary}
       howItWorks={howItWorks}
       reads={reads(chainId)}

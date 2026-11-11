@@ -3,7 +3,7 @@
 // Compound V3's product adapter (rails-ops ui-jobs 549/550; decision 0059): the
 // Comet read (`loadCompoundV3Markets`, one pinned-block read of a chain's
 // Comets) mapped into the shared product model, for Ethereum, Base and
-// Arbitrum. `/<chain>/compound-v3/markets` is the roster (A1), one head per
+// Arbitrum, and Optimism, whose Comets rails-server reads when the page opens. `/<chain>/compound-v3/markets` is the roster (A1), one head per
 // Comet; `/<chain>/compound-v3/markets/<comet>` is a Comet's page (A2), its
 // head then its collateral. A Comet's slug is its roster key (`usdc`, `weth`),
 // the key its positions' routes already use.
@@ -42,6 +42,7 @@ import {
   ARBITRUM_CHAIN_ID,
   BASE_CHAIN_ID,
   MAINNET_CHAIN_ID,
+  OPTIMISM_CHAIN_ID,
   chainMeta,
   explorerUrl,
   type ChainId,
@@ -50,6 +51,8 @@ import { protocolForSession } from "@/lib/shared/protocols";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { headReadOf, type ServerRead } from "@/lib/shared/server-head-read";
 import { cometDeploymentOf, type CompoundDeploymentKey } from "@/lib/compound/deployments";
+import { COMPOUND_OPTIMISM_DEPLOYMENT } from "@/lib/compound-v3-optimism/asset-catalog";
+import type { CometDeployment } from "@/lib/compound/asset-catalog";
 import {
   type CompoundMarketCoords,
   cvBaseBorrowMinProv,
@@ -102,7 +105,13 @@ interface ChainSpec {
   positions?: { href: string; title: string; subtitle: string };
 }
 
-const CHAINS: Record<CompoundDeploymentKey, ChainSpec> = {
+/** A chain with Comets: the three indexed deployments and Optimism, read when a page opens. */
+export type CometChainKey = CompoundDeploymentKey | "optimism";
+
+const rosterOf = (chain: CometChainKey): CometDeployment =>
+  chain === "optimism" ? COMPOUND_OPTIMISM_DEPLOYMENT : cometDeploymentOf(chain);
+
+const CHAINS: Record<CometChainKey, ChainSpec> = {
   ethereum: {
     chainId: MAINNET_CHAIN_ID,
     session: "compound",
@@ -129,12 +138,19 @@ const CHAINS: Record<CompoundDeploymentKey, ChainSpec> = {
       subtitle: "Every Compound V3 wallet read on Arbitrum",
     },
   },
+  optimism: {
+    chainId: OPTIMISM_CHAIN_ID,
+    session: "compound-v3-optimism",
+    name: "Optimism",
+    root: "/optimism/compound-v3",
+    listing: null,
+  },
 };
 
 /** The overview of a chain's Comets. */
-export const compoundMarketsHref = (chain: CompoundDeploymentKey) => `${CHAINS[chain].root}/markets`;
+export const compoundMarketsHref = (chain: CometChainKey) => `${CHAINS[chain].root}/markets`;
 /** One Comet's page. */
-export const cometHref = (chain: CompoundDeploymentKey, key: string) => `${compoundMarketsHref(chain)}/${key}`;
+export const cometHref = (chain: CometChainKey, key: string) => `${compoundMarketsHref(chain)}/${key}`;
 
 // ── Formats ──────────────────────────────────────────────────────────────────
 
@@ -167,14 +183,14 @@ const sameKink = (m: CompoundV3MarketRow) => Math.abs(m.supplyKink - m.borrowKin
 
 interface Ctx {
   m: CompoundV3MarketRow;
-  chain: CompoundDeploymentKey;
+  chain: CometChainKey;
   spec: ChainSpec;
   block: number;
   readBy: ServerRead | undefined;
   coords: CompoundMarketCoords;
 }
 
-function ctxOf(data: CompoundV3MarketsResponse, chain: CompoundDeploymentKey, m: CompoundV3MarketRow): Ctx {
+function ctxOf(data: CompoundV3MarketsResponse, chain: CometChainKey, m: CompoundV3MarketRow): Ctx {
   const readBy = headReadOf(data.head, data.blockNumber, data.stored);
   return {
     m,
@@ -441,7 +457,7 @@ function head(c: Ctx, overview: boolean): ProductHead {
     overview ? { label: `View ${m.label}`, href: page, hooks: { "data-comet-link": m.key } } : null,
     positionEntry({ href: listing, name: m.label, noun: COMPOUND_V3_TERMS.position }),
   ].filter((e): e is EntryLink => e != null);
-  const links: SectionMenuLink[] = [
+  const links = [
     overview
       ? { item: "comet", title: m.label, subtitle: "Its rates, reserves and collateral", href: page, internal: true }
       : {
@@ -453,7 +469,9 @@ function head(c: Ctx, overview: boolean): ProductHead {
         },
     listing
       ? { item: "positions", title: "Positions", subtitle: `Every ${m.label} position`, href: listing, internal: true }
-      : { item: "positions", ...spec.positions!, internal: true },
+      : spec.positions
+        ? { item: "positions", ...spec.positions, internal: true }
+        : null,
     {
       item: "info",
       title: "About Compound V3",
@@ -468,7 +486,7 @@ function head(c: Ctx, overview: boolean): ProductHead {
       href: explorerUrl(spec.chainId, "address", m.comet),
     },
     { item: "docs", title: "Compound's docs", subtitle: "docs.compound.xyz", href: DOCS },
-  ];
+  ].filter((l): l is SectionMenuLink => l != null);
   const size = (side: "supplied" | "borrowed") => {
     const value = side === "supplied" ? m.totalSupplyValue : m.totalBorrowValue;
     const base = side === "supplied" ? m.totalSupplyBase : m.totalBorrowBase;
@@ -835,7 +853,7 @@ const FAILED = "The Comets could not be read at this block. This view reads the 
 
 export function cometModel(
   data: CompoundV3MarketsResponse,
-  chain: CompoundDeploymentKey,
+  chain: CometChainKey,
   key: string,
   overview: boolean,
 ): Loadable<MarketModel> {
@@ -865,7 +883,7 @@ const LEARN_MORE: LearnMoreContent = {
   links: [{ label: "Compound III docs", url: `${DOCS}/` }],
 };
 
-const protocolOf = (chain: CompoundDeploymentKey) => protocolForSession(CHAINS[chain].session)!;
+const protocolOf = (chain: CometChainKey) => protocolForSession(CHAINS[chain].session)!;
 
 /** A chain's Comets (A1): a head per Comet. */
 export function CompoundMarketsOverview({
@@ -873,17 +891,17 @@ export function CompoundMarketsOverview({
   chain,
 }: {
   data: CompoundV3MarketsResponse;
-  chain: CompoundDeploymentKey;
+  chain: CometChainKey;
 }): ReactNode {
   const useMarket = (k: string) => cometModel(data, chain, k, true);
   return (
     <MarketRoster
       header={{ protocol: protocolOf(chain), title: "Markets", learnMore: LEARN_MORE }}
-      markets={cometDeploymentOf(chain).markets.map((m) => ({ key: m.key, name: m.label }))}
+      markets={rosterOf(chain).markets.map((m) => ({ key: m.key, name: m.label }))}
       useMarket={useMarket}
       keysOf={(k) =>
         rowAssetKeys(
-          cometDeploymentOf(chain).markets.find((m) => m.key === k),
+          rosterOf(chain).markets.find((m) => m.key === k),
           protocolOf(chain).chainId,
         )
       }
@@ -898,10 +916,10 @@ export function CompoundCometPage({
   comet,
 }: {
   data: CompoundV3MarketsResponse;
-  chain: CompoundDeploymentKey;
+  chain: CometChainKey;
   comet: string;
 }): ReactNode {
-  const label = cometDeploymentOf(chain).markets.find((m) => m.key === comet)?.label ?? comet;
+  const label = rosterOf(chain).markets.find((m) => m.key === comet)?.label ?? comet;
   return (
     <MarketPage
       header={{ protocol: protocolOf(chain), title: label, learnMore: LEARN_MORE }}

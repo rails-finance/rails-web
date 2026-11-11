@@ -1,7 +1,7 @@
 // One Aave V4 spoke account on Arc (components/protocol/aave-v4-arc/aave-v4-arc-position-page.tsx).
 
 import type { Metadata } from "next";
-import { positionMetadata } from "@/lib/shared/page-metadata";
+import { positionMetadata, readAtHeadDescription } from "@/lib/shared/page-metadata";
 import { arcSpokeBySlug } from "@/lib/aave-v4-arc/types";
 import { AaveV4ArcPositionPage } from "@/components/protocol/aave-v4-arc/aave-v4-arc-position-page";
 
@@ -17,6 +17,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     session: "aave-v4-arc",
     subject: wallet,
     market: arcSpokeBySlug(spoke)?.name ?? spoke,
+    description: readAtHeadDescription,
     canonicalPath: `/arc/aave-v4/spoke/${spoke}/${wallet}`,
   });
 }

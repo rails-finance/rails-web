@@ -10,7 +10,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { Prov } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { MorphoAtBlockReceipts } from "@/components/protocol/morpho-at-block/morpho-at-block-receipts";
@@ -108,9 +108,9 @@ export async function MorphoAtBlockWallet({ wallet: raw }: { wallet: string }) {
           owner={{ wallet, filterProtocol: null }}
           tools={false}
         />
-        <ReadTierTitleRow id={session}>
+        <HistoryTitleRow id={session}>
           <h2 className="text-lg font-semibold text-foreground">{FRONT_DOOR.heading}</h2>
-        </ReadTierTitleRow>
+        </HistoryTitleRow>
         {r && <p className="text-xs text-rb-500">{FRONT_DOOR.read(r.marketsRead)}</p>}
       </header>
       {!r ? (

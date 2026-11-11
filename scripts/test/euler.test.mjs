@@ -257,3 +257,45 @@ test("walletRows: loans first within an account, the raw amount kept for the rec
   );
   assert.equal(rows[0].amount, 1681.877428);
 });
+
+test("walletRows: a loan vault the account also holds shares in draws its loan, then its deposit", () => {
+  const rows = walletRows({
+    chainId: 42161,
+    evc: loan.evc,
+    factory: loan.factory,
+    head: HEAD,
+    provider: "test",
+    owner: loan.owner,
+    vaultCount: 193,
+    findCalls: 705,
+    deposits: { source: "index", through: 523_259_630 },
+    truncated: false,
+    accounts: [
+      {
+        index: 2,
+        account: loan.account,
+        controllers: loan.controllers,
+        collaterals: [],
+        holdings: [
+          {
+            vault: loan.controllers[0],
+            vaultSymbol: "eWETH-1",
+            asset: AERO,
+            shares: "3463908846206924",
+            assets: "3463909001596505",
+            debt: "1579697396192297",
+            collateral: false,
+            controller: true,
+          },
+        ],
+      },
+    ],
+  });
+  assert.deepEqual(
+    rows.map((r) => [r.kind, r.raw]),
+    [
+      ["loan", "1579697396192297"],
+      ["deposit", "3463909001596505"],
+    ],
+  );
+});

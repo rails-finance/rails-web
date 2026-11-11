@@ -141,6 +141,7 @@ interface AaveMarketConfig {
     | "aave-v3-etherfi"
     | "aave-v3-base"
     | "aave-v3-arbitrum"
+    | "aave-v3-optimism"
     | "seamless"
     | "spark";
   poolName: string;
@@ -616,6 +617,12 @@ const CONFIGS: Record<string, AaveMarketConfig> = {
     poolName: "Aave V3 Arbitrum Pool",
     oracleName: "Aave V3 Arbitrum IAaveOracle",
     lane: "GET /api/chain/aave-v3-arbitrum/market",
+  },
+  "aave-v3-optimism": {
+    protocol: "aave-v3-optimism",
+    poolName: "Aave V3 Optimism Pool",
+    oracleName: "Aave V3 Optimism IAaveOracle",
+    lane: "GET /api/at-block/aave-v3-optimism/markets",
   },
   seamless: {
     protocol: "seamless",

@@ -133,7 +133,7 @@ export const metadata: Metadata = {
         // fresh rather than served stale from their cache. Bump the hash
         // (`shasum -a 256 public/og/home.png | cut -c1-8`) whenever
         // `pnpm og` changes this file's bytes.
-        url: "/og/home-dfb83697.png",
+        url: "/og/home-2adee7bf.png",
         width: 1200,
         height: 630,
         alt: `Look up a wallet on Rails: ${PROTOCOL_COUNT} DeFi protocols on ${PRODUCTION_CHAIN_NAMES}, plus Polaris on Sepolia`,
@@ -144,7 +144,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: SITE_TITLE,
     description: OG_DESCRIPTION,
-    images: ["/og/home-dfb83697.png"],
+    images: ["/og/home-2adee7bf.png"],
     creator: TWITTER_HANDLE,
     site: TWITTER_HANDLE,
   },
