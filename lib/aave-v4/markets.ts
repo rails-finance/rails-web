@@ -17,6 +17,7 @@ import type { V4ReserveHead } from "@/lib/api/fetch-aave-v4-reserve";
 import { assetClass, type AssetClass } from "@/lib/aave-v4/asset-class";
 import { spokeFromSlug, spokeSlugOfKey } from "@/lib/aave-v4/spoke-meta";
 import type { ServerRead } from "@/lib/shared/server-head-read";
+import type { ArcMarketsRead } from "@/lib/aave-v4-arc/types";
 
 export type V4HubKey = HubTierKey | "equities";
 
@@ -35,15 +36,19 @@ export const isV4HubKey = (x: unknown): x is V4HubKey =>
 
 /** One deployment's routes. */
 export interface V4Deployment {
-  chainId: 1 | 8453;
-  chain: "ethereum" | "base";
+  chainId: 1 | 8453 | 5042;
+  chain: "ethereum" | "base" | "arc";
   /** The explorer's root: "/ethereum/aave-v4". */
   root: string;
 }
 
 export const V4_ETHEREUM: V4Deployment = { chainId: 1, chain: "ethereum", root: "/ethereum/aave-v4" };
 export const V4_BASE: V4Deployment = { chainId: 8453, chain: "base", root: "/base/aave-v4" };
-export const v4Deployment = (chain: string): V4Deployment => (chain === "base" ? V4_BASE : V4_ETHEREUM);
+export const V4_ARC: V4Deployment = { chainId: 5042, chain: "arc", root: "/arc/aave-v4" };
+export const v4Deployment = (chain: string): V4Deployment =>
+  chain === "base" ? V4_BASE : chain === "arc" ? V4_ARC : V4_ETHEREUM;
+/** Whether the deployment's figures are read from the chain when a page opens (Arc), with no store behind them. */
+export const readOnVisit = (d: V4Deployment) => d.chain === "arc";
 
 /** uint40 max: the hub's "no cap" (MAX_ALLOWED_SPOKE_CAP). */
 const MAX_CAP = 1_099_511_627_775;
@@ -89,6 +94,8 @@ export interface V4Line {
   drawnApr: number | null;
   /** The hub's liquidity fee, a fraction; null where the store does not hold it. */
   liquidityFee: number | null;
+  /** Arc: the spoke oracle's price, read with the line at the head. */
+  held?: { price: number; block: number; priceSource: string | null };
   /** Base: the stored row's oracle price and the facts only Base stores. */
   base?: {
     reserveId: number;
@@ -275,6 +282,55 @@ export function storedFromBase(data: V4BaseReserves): V4Stored {
   };
 }
 
+/** Arc's lines (`/api/at-block/aave-v4-arc/markets`), read at the head when the page opens. */
+export function storedFromArc(data: ArcMarketsRead): V4Stored {
+  const name = new Map(data.spokes.map((sp) => [sp.key, sp.name]));
+  const dec = new Map(data.spokes.map((sp) => [sp.key, sp.priceDecimals]));
+  const fee = new Map(data.assets.map((a) => [a.assetId, a.liquidityFee]));
+  const rate = new Map(data.assets.map((a) => [a.assetId, a.drawnRate]));
+  const lines: V4Line[] = data.reserves.map((r) => {
+    const f = fee.get(r.assetId);
+    const dr = rate.get(r.assetId);
+    return {
+      hub: "core",
+      spokeKey: r.spoke,
+      spokeSlug: r.spoke,
+      spokeName: name.get(r.spoke) ?? r.spoke,
+      symbol: r.symbol,
+      underlying: r.underlying.toLowerCase(),
+      decimals: r.decimals,
+      cls: assetClass(r.symbol),
+      collateralFactor: r.collateralFactor ? r.collateralFactor / 10_000 : null,
+      cfBlock: data.head.block,
+      addCap: capOf(r.addCap),
+      drawCap: capOf(r.drawCap),
+      supplied: tokens(r.spokeAdded, r.decimals),
+      borrowed: tokens(r.spokeOwed, r.decimals),
+      active: r.active,
+      halted: r.halted,
+      borrowable: r.borrowable,
+      drawnApr: dr != null ? Number(dr) / RAY : null,
+      liquidityFee: f != null ? f / 10_000 : null,
+      held:
+        r.price != null
+          ? {
+              price: Number(r.price) / 10 ** (dec.get(r.spoke) ?? 8),
+              block: data.head.block,
+              priceSource: r.priceSource,
+            }
+          : undefined,
+    };
+  });
+  return {
+    d: V4_ARC,
+    block: data.head.block,
+    readAt: new Date(data.head.time * 1000).toISOString(),
+    lines,
+    spokes: spokesOf(lines, () => null),
+    hubPositions: {},
+  };
+}
+
 // ── Links ────────────────────────────────────────────────────────────────────
 
 export const marketsHref = (d: V4Deployment) => `${d.root}/markets`;
@@ -282,7 +338,7 @@ export const spokeHref = (d: V4Deployment, slug: string) => `${d.root}/markets/$
 export const hubsHref = (d: V4Deployment) => `${d.root}/hubs`;
 /** The listing filtered to one spoke. */
 export const spokePositionsHref = (d: V4Deployment, key: string) =>
-  d.chain === "base" ? d.root : `${d.root}?spokes=${key}`;
+  d.chain === "ethereum" ? `${d.root}?spokes=${key}` : d.root;
 
 /** Whether a spoke lists `underlying` from more than one hub. */
 export const listedTwice = (spoke: V4Spoke, underlying: string) =>
@@ -314,7 +370,7 @@ const bps = (s: string | null | undefined): number | null => {
 const flag = (s: string | null | undefined): boolean | null => (s == null ? null : s === "true");
 
 export interface V4ReserveFigures {
-  chainId: 1 | 8453;
+  chainId: 1 | 8453 | 5042;
   block: number;
   blockTime: number;
   readBy: ServerRead;
@@ -546,9 +602,10 @@ export function priceBook(
   for (const sp of [...s.spokes].sort((a, b) => a.name.localeCompare(b.name)))
     for (const l of sp.lines) if (!spokeOf.has(l.underlying)) spokeOf.set(l.underlying, sp.name);
   const base = new Map(s.lines.filter((l) => l.base).map((l) => [l.underlying, l.base!]));
+  const held = new Map(s.lines.filter((l) => l.held).map((l) => [l.underlying, l.held!]));
   return (underlying) => {
     const a = underlying.toLowerCase();
-    const b = base.get(a);
+    const b = base.get(a) ?? held.get(a);
     if (b) return { usd: b.price, via: "oracle", spoke: spokeOf.get(a), block: b.block };
     const o = oracle?.prices[a]?.usd;
     if (o != null && Number.isFinite(o)) return { usd: o, via: "oracle", spoke: spokeOf.get(a), block: oracle?.block };

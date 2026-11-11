@@ -50,6 +50,7 @@ import {
   type V4Line,
   type V4ReserveFigures,
   type V4Spoke,
+  readOnVisit,
 } from "@/lib/aave-v4/markets";
 import {
   availableProv,
@@ -74,7 +75,7 @@ import {
   V4StateTags,
   type V4Names,
 } from "@/components/protocol/aave-v4/aave-v4-market-parts";
-import { headQuery, namesOf, PREMIUM_LINE, protocolOf, RATE_TIP, useV4Stored } from "@/lib/aave-v4/product";
+import { headQuery, headRead, namesOf, PREMIUM_LINE, protocolOf, RATE_TIP, useV4Stored } from "@/lib/aave-v4/product";
 import { chainMeta, explorerUrl } from "@/lib/shared/chains";
 import { formatCompactTitled } from "@/lib/shared/format-compact";
 import { ratePercentText } from "@/lib/shared/rate-percent";
@@ -197,13 +198,17 @@ function reserveHead(d: V4Deployment, sp: V4Spoke, l: V4Line, f: V4ReserveFigure
       href: `${hubsHref(d)}#hub-${l.hub}`,
       internal: true,
     },
-    {
-      item: "positions",
-      title: `${sp.name} positions`,
-      subtitle: "Every position on the spoke",
-      href: spokePositionsHref(d, sp.key),
-      internal: true,
-    },
+    ...(readOnVisit(d)
+      ? []
+      : [
+          {
+            item: "positions",
+            title: `${sp.name} positions`,
+            subtitle: "Every position on the spoke",
+            href: spokePositionsHref(d, sp.key),
+            internal: true,
+          },
+        ]),
     {
       item: "asset",
       title: names.symbol,
@@ -415,9 +420,9 @@ function indexedSections(
         : undefined,
     },
     body:
-      d.chain === "base" ? (
+      d.chain !== "ethereum" ? (
         <p className={NOTE} data-reserve-not-indexed="">
-          Not indexed yet on Base.
+          Not indexed yet on {chainMeta(d.chainId).name}.
         </p>
       ) : h && h.points.length > 0 ? (
         <div className="rounded-lg bg-raised p-4">
@@ -441,8 +446,21 @@ function indexedSections(
       ),
   };
   const hd = x.holders;
-  const holders: ProductSection[] =
-    hd.state === "ok"
+  const holders: ProductSection[] = readOnVisit(d)
+    ? [
+        {
+          scope: "reserve-holders",
+          anatomy: "M3.7 M3.8",
+          title: "Largest suppliers and borrowers",
+          tools: {},
+          body: (
+            <p className={NOTE} data-reserve-not-indexed="">
+              Not indexed yet on {chainMeta(d.chainId).name}.
+            </p>
+          ),
+        },
+      ]
+    : hd.state === "ok"
       ? (["suppliers", "borrowers"] as const).map((side) => {
           const rows = hd.data[side];
           const amountLabel = side === "suppliers" ? "Supplied" : "Borrowed";
@@ -533,14 +551,14 @@ function changesSection(
     anatomy: "M3.6",
     title: "Configuration changes",
   };
-  if (d.chain === "base")
+  if (d.chain !== "ethereum")
     return {
       ...base,
       tools: {},
       body: (
         <p className={NOTE} data-reserve-not-indexed="">
-          <Prov info={configChangesBaseProv(f, names)}>
-            Rails has not indexed Aave V4&apos;s configuration changes on Base yet.
+          <Prov info={configChangesBaseProv(f, names, chainMeta(d.chainId).name)}>
+            Rails has not indexed Aave V4&apos;s configuration changes on {chainMeta(d.chainId).name} yet.
           </Prov>
         </p>
       ),
@@ -672,7 +690,7 @@ export function AaveV4ReservePage({
   const asked = isV4HubKey(hub) ? hub : null;
   const line = asked ? (same.find((l) => l.hub === asked) ?? null) : same.length === 1 ? same[0] : null;
   const choose = !line && same.length > 1;
-  const head = useV4Read<V4ReserveHead>("head", sp && line ? headQuery(sp, line) : null);
+  const head = useV4Read<V4ReserveHead>(headRead(d), sp && line ? headQuery(sp, line) : null);
   const [span, setSpan] = useState<HistorySpan>("1Y");
   const from = useMemo(
     () => (span === "All" ? null : new Date(Date.now() - 365 * 86_400_000).toISOString().slice(0, 10)),
@@ -682,7 +700,7 @@ export function AaveV4ReservePage({
     "history",
     d.chain === "ethereum" && line ? { hub: line.hub, asset: addr, ...(from ? { from } : {}) } : null,
   );
-  const holders = useV4Read<V4Holders>("holders", sp && line ? headQuery(sp, line) : null);
+  const holders = useV4Read<V4Holders>("holders", !readOnVisit(d) && sp && line ? headQuery(sp, line) : null);
   const configLog = useV4Read<V4ConfigLog>(
     "config-log",
     d.chain === "ethereum" && sp && line ? headQuery(sp, line) : null,
@@ -796,7 +814,7 @@ export function AaveV4ReservePage({
     <ReservePage
       protocol={protocolOf(d)}
       backHref={back}
-      learnMore={aaveV4Modal("hubs")}
+      learnMore={aaveV4Modal(d.chain === "arc" ? "arc_hub" : "hubs")}
       reserve={reserve}
       what={sp?.name ?? "the spoke"}
       missing={{

@@ -260,6 +260,29 @@ const SPECS: ProtocolSpec[] = [
     ],
   },
   {
+    // Aave V4 on Arc (rails-ops ui-jobs 577): the Core hub and its three
+    // lending spokes (Main, Forex, USDC Maple), read from the chain when a
+    // page opens. A front door taking a wallet, its spoke accounts at
+    // `<route>/<wallet>`, each opening `<route>/spoke/<spoke>/<wallet>`; the
+    // Markets and Hubs pages are Ethereum's and Base's, fed by rails-server's
+    // /api/at-block/aave-v4-arc routes. Unlaunched while Miles reads it.
+    id: "aave-v4-arc",
+    session: "aave-v4-arc",
+    label: "Aave V4",
+    chainId: 5042,
+    slug: "aave-v4",
+    protocolKey: "aave-v4",
+    tags: ["Lend", "Borrow"],
+    desc: "Aave V4 on Arc: a wallet's accounts on the Core hub's three spokes, each with its balances in dollars at the spoke's oracle, its health factor and 30 days of interest",
+    positionListing: false,
+    readTier: "visit",
+    unlaunched: true,
+    subPages: [
+      { segment: "markets", label: "Markets", tab: "Markets" },
+      { segment: "hubs", label: "Hubs", tab: "Hubs" },
+    ],
+  },
+  {
     // Aave's VAULT LAYER, and a third Aave row on Ethereum beside the two pool
     // explorers — intended (rails-ops decision 0028 point 5). The door is
     // unstamped because savings GHO and Umbrella stake tokens are Aave-wide
@@ -1152,6 +1175,7 @@ export const POSITION_NOUN: Record<SessionProtocol, string> = {
   // A wallet's stETH and wstETH; the page names it a stake.
   lido: "Stake",
   "fluid-base": "Position",
+  "aave-v4-arc": "Position",
   // One account's holding in one vault.
   "euler-v2-base": "Position",
   "euler-v2-arbitrum": "Position",

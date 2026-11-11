@@ -310,6 +310,8 @@ const NOT_POSITION_EXPLORERS = new Set<string>([
   "lido",
   // Fluid on Base, read on visit: no census of positions (ui-jobs 574).
   "fluid-base",
+  // Aave V4 on Arc: no census of accounts (ui-jobs 577).
+  "aave-v4-arc",
   // Euler V2 on Base and Arbitrum: a wallet's accounts are read when it is
   // visited, and no census of holders is built.
   "euler-v2-base",

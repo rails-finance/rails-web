@@ -112,6 +112,9 @@ export type SessionProtocol =
   // Fluid's vaults on Base, at `/base/fluid`: a position is a VaultFactory NFT,
   // read from the chain when a page opens (ui-jobs 574).
   | "fluid-base"
+  // Aave V4 on Arc, at `/arc/aave-v4`: a position is a wallet's account on one
+  // spoke, read from the chain when a page opens (ui-jobs 577).
+  | "aave-v4-arc"
   // Euler V2 on Base and Arbitrum, at `/base/euler-v2` and `/arbitrum/euler-v2`:
   // a position is one account's holding in one vault, read at two blocks.
   | "euler-v2-base"

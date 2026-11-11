@@ -27,7 +27,8 @@ import { PricesProvider, usePrices, useRequestPrices } from "@/lib/shared/prices
 import { listSymbols, NO_PRICE_HINT } from "@/lib/aave-v4/unpriced";
 import { fetchAaveV4Hubs } from "@/lib/api/fetch-aave-v4-hubs";
 import { useV4Heads, type V4Read, type V4ReserveHead } from "@/lib/api/fetch-aave-v4-reserve";
-import { AAVE_V4_BASE_API_ROOT, AAVE_V4_ORACLE_ROUTE } from "@/lib/aave-v4/deployment-routes";
+import { AAVE_V4_ARC_API_ROOT, AAVE_V4_BASE_API_ROOT, AAVE_V4_ORACLE_ROUTE } from "@/lib/aave-v4/deployment-routes";
+import type { ArcMarketsRead } from "@/lib/aave-v4-arc/types";
 import { aaveV4Modal, aaveV4PositionModal } from "@/lib/aave-v4/event-templates";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { ASSET_CLASS_COLOR, ASSET_CLASS_TITLE } from "@/lib/aave-v4/asset-class";
@@ -41,6 +42,8 @@ import {
   settleHead,
   spokeHref,
   spokePositionsHref,
+  readOnVisit,
+  storedFromArc,
   storedFromBase,
   storedFromHubs,
   V4_HUB_LABEL,
@@ -129,7 +132,11 @@ export function useV4Stored(d: V4Deployment): Loadable<V4Stored> {
         ? fetch(`${AAVE_V4_BASE_API_ROOT}/reserves`, { cache: "no-store" })
             .then((r) => (r.ok ? (r.json() as Promise<V4BaseReserves>) : Promise.reject(new Error(`${r.status}`))))
             .then(storedFromBase)
-        : fetchAaveV4Hubs().then(storedFromHubs);
+        : d.chain === "arc"
+          ? fetch(`${AAVE_V4_ARC_API_ROOT}/markets`, { cache: "no-store" })
+              .then((r) => (r.ok ? (r.json() as Promise<ArcMarketsRead>) : Promise.reject(new Error(`${r.status}`))))
+              .then(storedFromArc)
+          : fetchAaveV4Hubs().then(storedFromHubs);
     read
       .then((s) => live && setOut({ state: "ok", data: s }))
       .catch((e) => live && setOut({ state: "error", message: e instanceof Error ? e.message : "The read failed." }));
@@ -225,7 +232,9 @@ export function StructureLine({ d, hubs }: { d: V4Deployment; hubs: V4HubKey[] }
 }
 
 /** What the spoke is, in one line: its "?" intro, where the file words this spoke. */
-const purposeOf = (name: string): string | undefined => {
+const purposeOf = (name: string, d?: V4Deployment): string | undefined => {
+  // The file words Ethereum's and Base's spokes; Arc's share their names and not their terms.
+  if (d && readOnVisit(d)) return undefined;
   const intro = aaveV4PositionModal(name).intro;
   return intro === aaveV4PositionModal("").intro ? undefined : intro;
 };
@@ -241,6 +250,15 @@ function spokeLinks(d: V4Deployment, sp: V4Spoke, roster: boolean): SectionMenuL
           internal: true,
         }
       : { item: "markets", title: "Markets", subtitle: "Every Aave V4 spoke", href: marketsHref(d), internal: true },
+    ...positionsLink(d, sp),
+    { item: "hubs", title: "Hubs", subtitle: "The liquidity this spoke draws", href: hubsHref(d), internal: true },
+  ];
+}
+
+/** The menu's Positions row; none where the deployment lists no positions (Arc). */
+function positionsLink(d: V4Deployment, sp: V4Spoke): SectionMenuLink[] {
+  if (readOnVisit(d)) return [];
+  return [
     {
       item: "positions",
       title: "Positions",
@@ -248,7 +266,6 @@ function spokeLinks(d: V4Deployment, sp: V4Spoke, roster: boolean): SectionMenuL
       href: spokePositionsHref(d, sp.key),
       internal: true,
     },
-    { item: "hubs", title: "Hubs", subtitle: "The liquidity this spoke draws", href: hubsHref(d), internal: true },
   ];
 }
 
@@ -275,14 +292,16 @@ function rosterMarkdown(r: RosterSpoke, s: V4Stored): string {
   return [
     `# ${r.sp.name}`,
     "",
-    ...(purposeOf(r.sp.name) ? [purposeOf(r.sp.name)!, ""] : []),
+    ...(purposeOf(r.sp.name, s.d) ? [purposeOf(r.sp.name, s.d)!, ""] : []),
     `- Draws from: ${andList(r.sp.hubs.map((h) => V4_HUB_LABEL[h]))}`,
     `- Reserves: ${r.sp.lines.length}`,
     `- Supplied: ${fmtUsd(r.supplied.usd).display}${r.supplied.unpriced.length ? ` (leaves out ${listSymbols(r.supplied.unpriced)})` : ""}`,
     `- Borrowed: ${fmtUsd(r.borrowed.usd).display}${r.borrowed.unpriced.length ? ` (leaves out ${listSymbols(r.borrowed.unpriced)})` : ""}`,
     ...(r.sp.positions != null ? [`- Positions: ${r.sp.positions.toLocaleString("en-US")}`] : []),
     "",
-    s.block != null ? `Stored from the hub contracts at block ${s.block.toLocaleString("en-US")}.` : "",
+    s.block != null
+      ? `${readOnVisit(s.d) ? "Read" : "Stored"} from the hub contracts at block ${s.block.toLocaleString("en-US")}.`
+      : "",
   ].join("\n");
 }
 
@@ -295,7 +314,9 @@ function rosterHead(s: V4Stored, r: RosterSpoke): ProductHead {
   const listing = spokePositionsHref(d, sp.key);
   const entries = [
     { label: `View ${sp.name} reserves`, href: spokeHref(d, sp.slug), hooks: { "data-market-reserves-link": "" } },
-    positionEntry({ href: listing, name: sp.name, noun: V4_TERMS.position, count: sp.positions ?? undefined }),
+    readOnVisit(d)
+      ? null
+      : positionEntry({ href: listing, name: sp.name, noun: V4_TERMS.position, count: sp.positions ?? undefined }),
   ].filter((e): e is EntryLink => e != null);
   const figures: HeadFigure[] = [
     {
@@ -328,9 +349,9 @@ function rosterHead(s: V4Stored, r: RosterSpoke): ProductHead {
   return {
     scope: `spoke-${sp.slug}`,
     title: sp.name,
-    titleHref: listing,
+    titleHref: readOnVisit(d) ? spokeHref(d, sp.slug) : listing,
     subtitle: <StructureLine d={d} hubs={sp.hubs} />,
-    purpose: purposeOf(sp.name),
+    purpose: purposeOf(sp.name, d),
     figures,
     entries,
     readAt: storedReadAt(s, `Every figure on ${sp.name}`),
@@ -378,7 +399,11 @@ function RosterBody({ d }: { d: V4Deployment }) {
     s && book ? roster.map((r) => ({ key: r.sp.slug, name: r.sp.name })) : [{ key: "spokes", name: "Spokes" }];
   return (
     <MarketRoster
-      header={{ protocol: protocolOf(d), title: "Markets", learnMore: aaveV4Modal("hubs") }}
+      header={{
+        protocol: protocolOf(d),
+        title: "Markets",
+        learnMore: aaveV4Modal(d.chain === "arc" ? "arc_hub" : "hubs"),
+      }}
       markets={markets}
       useMarket={useMarket}
     />
@@ -437,6 +462,8 @@ export const namesOf = (sp: V4Spoke, l: V4Line): V4Names => ({
 
 /** The head read's question for a line: always naming the hub. */
 export const headQuery = (sp: V4Spoke, l: V4Line) => ({ spoke: sp.key, asset: l.underlying, hub: l.hub });
+/** The head read a deployment's reserve takes: Arc's goes to its own route. */
+export const headRead = (d: V4Deployment) => (d.chain === "arc" ? ("arc-head" as const) : ("head" as const));
 
 const NUM = "tabular-nums text-[13px]";
 const RATE = "whitespace-nowrap tabular-nums text-[13px] text-foreground/80";
@@ -714,13 +741,7 @@ function reservesTable(d: V4Deployment, sp: V4Spoke, rows: V4Row[], c: StoredCoo
     emptyFiltered: "No reserves match this filter.",
     tools: {
       links: [
-        {
-          item: "positions",
-          title: "Positions",
-          subtitle: `Every ${sp.name} position`,
-          href: spokePositionsHref(d, sp.key),
-          internal: true,
-        },
+        ...positionsLink(d, sp),
         { item: "hubs", title: "Hubs", subtitle: "The liquidity this spoke draws", href: hubsHref(d), internal: true },
       ],
       exports: {
@@ -775,7 +796,7 @@ function LiquidationLine({ f, spoke }: { f: V4ReserveFigures; spoke: string }) {
   );
 }
 
-function spokeMarkdown(sp: V4Spoke, rows: V4Row[], block: number): string {
+function spokeMarkdown(sp: V4Spoke, rows: V4Row[], block: number, d?: V4Deployment): string {
   const lines = rows.map(({ line: l, f, price }) => {
     const a = (n: number) => amountText(n, price?.usd ?? null, l.symbol).display;
     return `- ${l.symbol} (${V4_HUB_LABEL[l.hub]}): supplied ${a(f?.spokeSupplied ?? l.supplied)}, borrowed ${a(f?.spokeBorrowed ?? l.borrowed)}${f?.supplyApr != null ? `, supply rate ${ratePercentText(f.supplyApr)}` : ""}${f?.drawnApr != null ? `, borrow rate ${ratePercentText(f.drawnApr)}` : ""}`;
@@ -783,7 +804,7 @@ function spokeMarkdown(sp: V4Spoke, rows: V4Row[], block: number): string {
   return [
     `# ${sp.name}, an Aave V4 spoke`,
     "",
-    ...(purposeOf(sp.name) ? [purposeOf(sp.name)!, ""] : []),
+    ...(purposeOf(sp.name, d) ? [purposeOf(sp.name, d)!, ""] : []),
     `Draws from the ${andList(sp.hubs.map((h) => V4_HUB_LABEL[h]))} ${sp.hubs.length === 1 ? "hub" : "hubs"}.`,
     "",
     ...lines,
@@ -833,13 +854,17 @@ function spokeHead(d: V4Deployment, s: V4Stored, sp: V4Spoke, rows: V4Row[]): Pr
       slot: "sizeIn",
       label: "Supplied",
       tip: sup.title,
-      value: <PricedTotal sum={supSum} info={spokeValueProv(sp.name, "supplied", block, read.length, supSum)} />,
+      value: (
+        <PricedTotal sum={supSum} info={spokeValueProv(sp.name, "supplied", block, read.length, supSum, d.chainId)} />
+      ),
     },
     {
       slot: "sizeOut",
       label: "Borrowed",
       tip: bor.title,
-      value: <PricedTotal sum={borSum} info={spokeValueProv(sp.name, "borrowed", block, read.length, borSum)} />,
+      value: (
+        <PricedTotal sum={borSum} info={spokeValueProv(sp.name, "borrowed", block, read.length, borSum, d.chainId)} />
+      ),
     },
     ...(sp.positions != null
       ? [
@@ -854,19 +879,21 @@ function spokeHead(d: V4Deployment, s: V4Stored, sp: V4Spoke, rows: V4Row[]): Pr
   const tools: SectionTools = {
     links: spokeLinks(d, sp, false),
     exports: {
-      markdown: { build: () => spokeMarkdown(sp, rows, block), copySubtitle: "This spoke as Markdown, for an LLM" },
+      markdown: { build: () => spokeMarkdown(sp, rows, block, d), copySubtitle: "This spoke as Markdown, for an LLM" },
     },
   };
   return {
     scope: `spoke-${sp.slug}`,
     title: sp.name,
-    titleHref: listing,
+    titleHref: readOnVisit(d) ? undefined : listing,
     subtitle: <StructureLine d={d} hubs={sp.hubs} />,
-    purpose: purposeOf(sp.name),
+    purpose: purposeOf(sp.name, d),
     figures,
     aside: <DrawsFrom d={d} sp={sp} rows={rows} />,
     entries: [
-      positionEntry({ href: listing, name: sp.name, noun: V4_TERMS.position, count: sp.positions ?? undefined }),
+      readOnVisit(d)
+        ? null
+        : positionEntry({ href: listing, name: sp.name, noun: V4_TERMS.position, count: sp.positions ?? undefined }),
     ].filter((e): e is EntryLink => e != null),
     notes: first ? <LiquidationLine f={first} spoke={sp.name} /> : undefined,
     readAt:
@@ -920,9 +947,9 @@ function spokeHead(d: V4Deployment, s: V4Stored, sp: V4Spoke, rows: V4Row[]): Pr
 }
 
 /** A spoke's rows, once every head read has settled. */
-export function useSpokeRows(sp: V4Spoke | null, book: V4PriceBook | null): Loadable<V4Row[]> {
+export function useSpokeRows(sp: V4Spoke | null, book: V4PriceBook | null, d?: V4Deployment): Loadable<V4Row[]> {
   const qs = useMemo(() => (sp ? sp.lines.map((l) => headQuery(sp, l)) : null), [sp]);
-  const heads = useV4Heads(qs);
+  const heads = useV4Heads(qs, d ? headRead(d) : "head");
   if (!sp) return { state: "loading" };
   if (!heads || !book) return { state: "loading" };
   if (heads.every((h) => h.state !== "ok"))
@@ -953,7 +980,7 @@ function SpokeBody({ d, slug }: { d: V4Deployment; slug: string }) {
   const s = stored.state === "ok" ? stored.data : null;
   const sp = s?.spokes.find((x) => x.slug === slug) ?? null;
   const book = useV4PriceBook(s);
-  const rows = useSpokeRows(sp, book);
+  const rows = useSpokeRows(sp, book, d);
   let market: Loadable<MarketModel>;
   if (stored.state === "error") market = stored;
   else if (!s) market = { state: "loading" };
@@ -966,7 +993,11 @@ function SpokeBody({ d, slug }: { d: V4Deployment; slug: string }) {
     };
   return (
     <MarketPage
-      header={{ protocol: protocolOf(d), title: sp ? `${sp.name} spoke` : "Spoke", learnMore: aaveV4Modal("hubs") }}
+      header={{
+        protocol: protocolOf(d),
+        title: sp ? `${sp.name} spoke` : "Spoke",
+        learnMore: aaveV4Modal(d.chain === "arc" ? "arc_hub" : "hubs"),
+      }}
       market={market}
       what={sp?.name ?? "the spoke"}
     />

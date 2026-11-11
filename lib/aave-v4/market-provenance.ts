@@ -20,26 +20,41 @@ import type { PricedSum, V4Price, V4ReserveFigures } from "@/lib/aave-v4/markets
 
 const STORED_ETH = "GET /api/aave-v4/hubs";
 const STORED_BASE = "GET /api/aave-v4-base/reserves";
+const STORED_ARC = "GET /api/at-block/aave-v4-arc/markets";
 const HEAD = "GET /api/at-block/aave-v4/reserve";
+const HEAD_ARC = "GET /api/at-block/aave-v4-arc/reserve";
+const headLane = (x: { chainId: number }) => (x.chainId === 5042 ? HEAD_ARC : HEAD);
 const HOLDERS = "GET /api/aave-v4/reserve-holders";
 const HISTORY = "GET /api/aave-v4/hub-asset-history";
 
 const n = (v: number) => v.toLocaleString("en-US");
 
 export interface StoredCoords {
-  chainId: 1 | 8453;
+  chainId: 1 | 8453 | 5042;
   block: number | null;
 }
 
-const storedLane = (c: StoredCoords) => (c.chainId === 8453 ? STORED_BASE : STORED_ETH);
+const storedLane = (c: StoredCoords) =>
+  c.chainId === 8453 ? STORED_BASE : c.chainId === 5042 ? STORED_ARC : STORED_ETH;
+/** Arc's lines are read at the head when the page opens; the other deployments' are stored. */
+const onVisit = (c: StoredCoords) => c.chainId === 5042;
+const lineClass = (c: StoredCoords) => (onVisit(c) ? ("state" as const) : ("indexed" as const));
 const atStored = (c: StoredCoords) => (c.block != null ? ` at block ${n(c.block)}` : "");
 
 /** The read stamp over a stored payload. */
 export function storedStampProv(c: StoredCoords, what: string, at: number | null): Provenance {
   const time = at == null ? "" : ` (${new Date(at * 1000).toISOString().slice(0, 19).replace("T", " ")} UTC)`;
+  if (onVisit(c))
+    return {
+      kind: "chain",
+      pclass: "state",
+      source: { block: c.block ?? undefined },
+      summary: `${what} comes from rails-server's read of the hub, spoke and oracle contracts${atStored(c)}${time}, made when the page opened. The stamp shows the time of that read.`,
+      via: `${storedLane(c)} · hub getSpokeConfig, getSpokeAddedAssets, getSpokeTotalOwed per spoke, spoke oracle getReservePrice, at the head`,
+    };
   return {
     kind: "chain",
-    pclass: "indexed",
+    pclass: lineClass(c),
     source: { block: c.block ?? undefined },
     summary: `${what} comes from rails-server's store of the hub contracts, read${atStored(c)}${time} by its Aave V4 refresher. The stamp shows the time of that read.`,
     via: `${storedLane(c)} · hub getSpokeConfig, getSpokeAddedAssets, getSpokeTotalOwed per spoke, stored each cycle`,
@@ -51,7 +66,7 @@ export function storedStampProv(c: StoredCoords, what: string, at: number | null
 /** A count of a spoke's reserves. */
 export const reserveCountProv = (spoke: string, count: number, c: StoredCoords): Provenance => ({
   kind: "chain",
-  pclass: "indexed",
+  pclass: lineClass(c),
   source: { block: c.block ?? undefined },
   summary: `${spoke} reserves. ${count} in all, one per token and hub the spoke draws that token from, each a line the hub keeps for the spoke${atStored(c)}.`,
   via: `${storedLane(c)} · one line per (hub, asset, spoke) · counted`,
@@ -60,7 +75,7 @@ export const reserveCountProv = (spoke: string, count: number, c: StoredCoords):
 /** A count of a hub's assets. */
 export const hubAssetCountProv = (hub: string, count: number, c: StoredCoords): Provenance => ({
   kind: "chain",
-  pclass: "indexed",
+  pclass: lineClass(c),
   source: { block: c.block ?? undefined },
   summary: `${hub} hub assets. ${count} in all, each an asset the hub holds for at least one spoke's credit line${atStored(c)}.`,
   via: `${storedLane(c)} · distinct assets over the hub's lines · counted`,
@@ -124,12 +139,17 @@ export function storedValueProv(
     : "";
   const gap = sum.unpriced.length ? ` The total leaves out ${list(sum.unpriced)}, which no price source holds.` : "";
   const inputs: ProvInput[] = [
-    { label: "amount", kind: "chain", pclass: "indexed", note: `the hub's ${getter}, stored` },
+    {
+      label: "amount",
+      kind: "chain",
+      pclass: lineClass(c),
+      note: `the hub's ${getter}, ${onVisit(c) ? "read at the head" : "stored"}`,
+    },
     {
       label: "price",
       kind: "chain",
       pclass: "oracle",
-      note: "the spoke oracle's getReservePrice (GET /api/oracle/aave-v4; on Base, stored with the row)",
+      note: "the spoke oracle's getReservePrice (GET /api/oracle/aave-v4; on Base, stored with the row; on Arc, read with the line)",
     },
   ];
   if (sum.market.length)
@@ -160,7 +180,8 @@ export function storedValueProv(
 }
 
 /** A token amount's receipt, revalued in USD at its price. */
-export function pricedAmountProv(amount: Provenance, symbol: string, p: V4Price | null): Provenance {
+/** `c`, where the amount is a stored line's: Arc's lines class as a state read. */
+export function pricedAmountProv(amount: Provenance, symbol: string, p: V4Price | null, c?: StoredCoords): Provenance {
   if (!p) return amount;
   const oracle = p.via === "oracle";
   const [head, ...rest] = amount.summary.split(". ");
@@ -172,7 +193,10 @@ export function pricedAmountProv(amount: Provenance, symbol: string, p: V4Price 
     summary: `${head}, in USD. ${body} Valued at ${oracle ? "the spoke oracle's price" : "an off-chain market price (DefiLlama), the oracle holding none"}.`,
     via: `${amount.via} · × ${oracle ? "spoke oracle getReservePrice" : "DefiLlama price"}`,
     formula: "amount × price",
-    inputs: [{ label: "amount", kind: "chain", pclass: "indexed", note: amount.via }, priceLeaf(symbol, p)],
+    inputs: [
+      { label: "amount", kind: "chain", pclass: c ? lineClass(c) : "indexed", note: amount.via },
+      priceLeaf(symbol, p),
+    ],
   };
 }
 
@@ -198,7 +222,7 @@ export function storedAmountProv(
   };
   return {
     kind: what === "liquidity" ? "chain-derived" : "chain",
-    pclass: "indexed",
+    pclass: lineClass(c),
     source: { block: c.block ?? undefined },
     summary: `${scope}, ${what}. ${words[what][0].toUpperCase()}${words[what].slice(1)}${atStored(c)}.${what === "liquidity" ? ` ${ESTIMATE}` : ""}`,
     via: `${storedLane(c)} · ${via[what]}`,
@@ -212,7 +236,7 @@ const ESTIMATE = "An estimate from stored totals; each spoke's reserve page read
 export function storedRatioProv(what: "utilisation" | "credit used", scope: string, c: StoredCoords): Provenance {
   return {
     kind: "chain-derived",
-    pclass: "indexed",
+    pclass: lineClass(c),
     source: { block: c.block ?? undefined },
     summary:
       what === "utilisation"
@@ -232,20 +256,20 @@ export function storedRateProv(
   if (what === "drawn rate")
     return {
       kind: "chain",
-      pclass: "indexed",
+      pclass: lineClass(c),
       summary: `${scope}, drawn rate. The rate the hub set for the asset when it last accrued interest, the same for every spoke drawing it, as an APR. Borrowers pay it plus a premium set by their collateral's risk.`,
-      via: `${storedLane(c)} · hub UpdateAsset log · drawnRate ÷ 10^27`,
+      via: `${storedLane(c)} · ${onVisit(c) ? "hub getAssetDrawnRate(assetId)" : "hub UpdateAsset log · drawnRate"} ÷ 10^27`,
     };
   if (what === "liquidity fee")
     return {
       kind: "chain",
-      pclass: "indexed",
+      pclass: lineClass(c),
       summary: `${scope}, liquidity fee. The share of borrowers' interest the hub keeps; suppliers get the rest.`,
       via: `${storedLane(c)} · hub getAssetConfig(assetId).liquidityFee, in basis points`,
     };
   return {
     kind: "chain-derived",
-    pclass: "indexed",
+    pclass: lineClass(c),
     source: { block: c.block ?? undefined },
     summary: `${scope}, supply rate. The drawn rate × borrowed ÷ supplied × (1 − liquidity fee), as an APR. Borrowed carries the premium, so the rate includes what borrowers pay above the drawn rate. ${ESTIMATE}`,
     via: `${storedLane(c)} · drawnRate × (Σ owed ÷ Σ added) × (1 − liquidityFee)`,
@@ -263,14 +287,14 @@ export function storedTermProv(
   if (what === "collateral factor")
     return {
       kind: "chain",
-      pclass: block != null ? "state" : "indexed",
+      pclass: block != null ? "state" : lineClass(c),
       source: { block: block ?? c.block ?? undefined },
       summary: `${scope}, collateral factor. The share of the asset's value the spoke counts toward a borrow, at the reserve's current config key${block != null ? `, read at block ${n(block)}` : ""}. A position keeps the factor it last took.`,
       via: `${storedLane(c)} · spoke getDynamicReserveConfig(reserveId, key).collateralFactor`,
     };
   return {
     kind: "chain",
-    pclass: "indexed",
+    pclass: lineClass(c),
     source: { block: c.block ?? undefined },
     summary: `${scope}, line status. Whether the hub lets the spoke add and draw (active) or has halted the line${atStored(c)}.`,
     via: `${storedLane(c)} · hub getSpokeConfig(assetId, spoke).active, .halted`,
@@ -394,10 +418,11 @@ export function v4ConfigChangeProv(
 export function configChangesBaseProv(
   f: V4ReserveFigures,
   o: { symbol: string; spoke: string; hub: string },
+  chain = "Base",
 ): Provenance {
   return {
     kind: "chain",
-    summary: `Every change to ${o.symbol}'s settings on ${o.spoke} is an event on-chain. The ${o.spoke} spoke logs its reserve, collateral and liquidation settings, the ${o.hub} hub the asset's settings and this spoke's credit line. ${CONFIG_LOG} reads them from Ethereum's tables; Base has none yet.`,
+    summary: `Every change to ${o.symbol}'s settings on ${o.spoke} is an event on-chain. The ${o.spoke} spoke logs its reserve, collateral and liquidation settings, the ${o.hub} hub the asset's settings and this spoke's credit line. ${CONFIG_LOG} reads them from Ethereum's tables; ${chain} has none yet.`,
     contract: spokeContract(f, o.spoke),
     inputs: [
       {
@@ -435,7 +460,7 @@ export function headValueProv(
     source: { block: f.block },
     summary: `${o.symbol} ${what} ${scope}. The tokens ${words}, read from the hub${atHead(f)}${priced ? ", valued at the spoke oracle's price at the same block" : ""}.`,
     contract: hubContract(f, o.hub),
-    via: `${HEAD} · hub ${call}${priced ? " · × oracle getReservePrice" : ""}`,
+    via: `${headLane(f)} · hub ${call}${priced ? " · × oracle getReservePrice" : ""}`,
     formula: priced ? "amount × price" : undefined,
     inputs: priced
       ? [
@@ -460,6 +485,7 @@ export function spokeValueProv(
   block: number,
   count: number,
   sum: PricedSum,
+  chainId: number = 1,
 ): Provenance {
   const call = what === "supplied" ? "getSpokeAddedAssets" : "getSpokeTotalOwed";
   const market = sum.market.length
@@ -471,7 +497,7 @@ export function spokeValueProv(
     pclass: sum.market.length ? "offchain" : "oracle",
     source: { block },
     summary: `${spoke} ${what}${sum.unpriced.length ? " (partial)" : ""}. Each of its ${count} reserves' ${what === "supplied" ? "added assets" : "owed, drawn and premium,"} on the hub it draws from, read near block ${n(block)} and valued at the spoke oracle's price, then added up.${market}${gap}`,
-    via: `${HEAD} per reserve · hub ${call}(assetId, spoke) × oracle getReservePrice · summed`,
+    via: `${chainId === 5042 ? HEAD_ARC : HEAD} per reserve · hub ${call}(assetId, spoke) × oracle getReservePrice · summed`,
     formula: "Σ (amount × price)",
   };
 }
@@ -486,7 +512,7 @@ export function availableProv(f: V4ReserveFigures, o: { symbol: string; spoke: s
     source: { block: f.block },
     summary: `${o.symbol} available to ${o.spoke}. The hub's liquidity, capped by the draw cap less what the spoke owes${atHead(f)}${priced ? ", valued at the spoke oracle's price at the same block" : ""}.`,
     contract: hubContract(f, o.hub),
-    via: `${HEAD} · min(hub getAssetLiquidity, getSpokeConfig.drawCap − getSpokeTotalOwed)${priced ? " · × oracle getReservePrice" : ""}`,
+    via: `${headLane(f)} · min(hub getAssetLiquidity, getSpokeConfig.drawCap − getSpokeTotalOwed)${priced ? " · × oracle getReservePrice" : ""}`,
     formula: priced ? "min(liquidity, draw cap − owed) × price" : "min(liquidity, draw cap − owed)",
     inputs: [
       {
@@ -534,7 +560,7 @@ export function utilisationProv(f: V4ReserveFigures, o: { symbol: string; hub: s
     source: { block: f.block },
     summary: `${o.symbol} utilisation on the ${o.hub} hub. Drawn ÷ (drawn + liquidity), the usage its rate strategy reads${atHead(f)}.`,
     contract: hubContract(f, o.hub),
-    via: `${HEAD} · hub getAssetOwed drawn ÷ (drawn + getAssetLiquidity)`,
+    via: `${headLane(f)} · hub getAssetOwed drawn ÷ (drawn + getAssetLiquidity)`,
     formula: "drawn ÷ (drawn + liquidity)",
   };
 }
@@ -547,7 +573,7 @@ export function drawnRateProv(f: V4ReserveFigures, o: { symbol: string; hub: str
     source: { block: f.block },
     summary: `${o.symbol} borrow rate on the ${o.hub} hub. The drawn rate${atHead(f)}, as an APR. Each borrower pays it plus a premium set by the collateral risk of what it posts.`,
     contract: hubContract(f, o.hub),
-    via: `${HEAD} · hub getAssetDrawnRate(assetId) ÷ 10^27`,
+    via: `${headLane(f)} · hub getAssetDrawnRate(assetId) ÷ 10^27`,
     scaling: f.raw.hub.drawnRateRay
       ? {
           raw: f.raw.hub.drawnRateRay,
@@ -569,7 +595,7 @@ export function supplyRateProv(f: V4ReserveFigures, o: { symbol: string; hub: st
     source: { block: f.block },
     summary: `${o.symbol} supply rate on the ${o.hub} hub. As an APR, the drawn rate × utilisation × (1 + premium ÷ drawn) × (1 − liquidity fee)${atHead(f)}. Suppliers earn the premium borrowers pay as well as the drawn rate, less the hub's fee.`,
     contract: hubContract(f, o.hub),
-    via: `${HEAD} · getAssetDrawnRate × usage × (1 + premium ÷ drawn, from getAssetOwed) × (1 − getAssetConfig.liquidityFee)`,
+    via: `${headLane(f)} · getAssetDrawnRate × usage × (1 + premium ÷ drawn, from getAssetOwed) × (1 − getAssetConfig.liquidityFee)`,
     formula: "drawn rate × utilisation × (1 + premium ÷ drawn) × (1 − liquidity fee)",
     inputs: [
       { label: "drawn rate", value: pct(f.drawnApr), kind: "chain", pclass: "state", note: "hub getAssetDrawnRate" },
@@ -606,7 +632,7 @@ export function creditUsedProv(f: V4ReserveFigures, o: { symbol: string; spoke: 
     source: { block: f.block },
     summary: `${o.symbol} credit used by ${o.spoke} on the ${o.hub} hub. What the spoke owes ÷ the draw cap the hub set for it${atHead(f)}.`,
     contract: hubContract(f, o.hub),
-    via: `${HEAD} · hub getSpokeTotalOwed ÷ getSpokeConfig.drawCap`,
+    via: `${headLane(f)} · hub getSpokeTotalOwed ÷ getSpokeConfig.drawCap`,
     formula: "owed ÷ draw cap",
   };
 }
@@ -632,7 +658,7 @@ export function headParamProv(
     source: { block: f.block },
     summary: `${what} (${side === "hub" ? `the ${o.hub} hub` : `the ${o.spoke} spoke`}). ${meaning[0].toUpperCase()}${meaning.slice(1)}, read${atHead(f)}.`,
     contract,
-    via: `${HEAD} · ${side === "hub" ? "hub" : side === "oracle" ? "spoke oracle" : "spoke"} ${call}`,
+    via: `${headLane(f)} · ${side === "hub" ? "hub" : side === "oracle" ? "spoke oracle" : "spoke"} ${call}`,
   };
 }
 
@@ -662,7 +688,7 @@ export function curveProv(f: V4ReserveFigures, o: { symbol: string; hub: string 
     source: { block: f.block },
     summary: `${o.symbol} rate curve on the ${o.hub} hub. The drawn rate the hub's interest rate strategy sets at each utilisation, from its getInterestRateData${atHead(f)}. The supply line multiplies by utilisation, by 1 + premium ÷ drawn and by 1 − the liquidity fee.`,
     contract: f.strategy ? { name: `${o.hub} rate strategy`, address: f.strategy } : undefined,
-    via: `${HEAD} · strategy getInterestRateData(assetId), basis points`,
+    via: `${headLane(f)} · strategy getInterestRateData(assetId), basis points`,
     formula: "base + growth₁ × U ÷ optimal, then + growth₂ × (U − optimal) ÷ (1 − optimal)",
     inputs,
   };
@@ -676,7 +702,7 @@ export function liquidationConfigProv(f: V4ReserveFigures, spoke: string): Prove
     source: { block: f.block },
     summary: `${spoke}'s liquidation settings. The health factor a liquidation aims to restore, the health factor at which the bonus reaches its maximum, and the share of the maximum bonus paid from the start, read${atHead(f)}.`,
     contract: spokeContract(f, spoke),
-    via: `${HEAD} · spoke getLiquidationConfig()`,
+    via: `${headLane(f)} · spoke getLiquidationConfig()`,
   };
 }
 

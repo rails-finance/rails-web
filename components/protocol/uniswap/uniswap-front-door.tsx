@@ -23,6 +23,7 @@ export function PoolFrontDoor({
   line,
   route,
   extra,
+  links,
 }: {
   id: string;
   label: string;
@@ -30,6 +31,8 @@ export function PoolFrontDoor({
   route: string;
   /** A second line under `line`. */
   extra?: string;
+  /** The explorer's protocol pages, before the info page's door (Aave V4 on Arc's Markets and Hubs). */
+  links?: { href: string; label: string }[];
 }) {
   const tiered = isReadOnVisit(id);
   return (
@@ -60,7 +63,12 @@ export function PoolFrontDoor({
       <p className="mt-6 max-w-xl text-center text-sm text-rb-500">{line}</p>
       {extra && <p className="mt-2 max-w-xl text-center text-sm text-rb-500">{extra}</p>}
       {/* The info page's door, as the shared front door draws it. */}
-      <nav aria-label="Explorer sections" className="mt-6 flex justify-center">
+      <nav aria-label="Explorer sections" className="mt-6 flex flex-wrap justify-center gap-2">
+        {links?.map((l) => (
+          <Link key={l.href} href={l.href} className={NAV_PILL}>
+            {l.label}
+          </Link>
+        ))}
         <Link href={`${route}/info`} className={NAV_PILL}>
           About {label} on Rails
         </Link>

@@ -275,7 +275,7 @@ function CreditLines({ s, a, prices }: { s: V4Stored; a: V4HubAsset; prices: Pri
                 <Prov info={storedAmountProv("add cap", scope, c)}>{capText(l.addCap, a.symbol)}</Prov>
               </DataTableCell>
               <DataTableCell align="right" className={NUM}>
-                <Prov info={pricedAmountProv(storedAmountProv("supplied", scope, c), a.symbol, p)}>
+                <Prov info={pricedAmountProv(storedAmountProv("supplied", scope, c), a.symbol, p, c)}>
                   <span title={sup.title}>{sup.display}</span>
                 </Prov>
               </DataTableCell>
@@ -283,7 +283,7 @@ function CreditLines({ s, a, prices }: { s: V4Stored; a: V4HubAsset; prices: Pri
                 <Prov info={storedAmountProv("draw cap", scope, c)}>{capText(l.drawCap, a.symbol)}</Prov>
               </DataTableCell>
               <DataTableCell align="right" className={NUM}>
-                <Prov info={pricedAmountProv(storedAmountProv("borrowed", scope, c), a.symbol, p)}>
+                <Prov info={pricedAmountProv(storedAmountProv("borrowed", scope, c), a.symbol, p, c)}>
                   <span title={drawn.title}>{drawn.display}</span>
                 </Prov>
               </DataTableCell>
@@ -326,7 +326,7 @@ function AssetRow({ s, h, a, prices }: { s: V4Stored; h: V4Hub; a: V4HubAsset; p
   const amount = (what: "supplied" | "borrowed" | "liquidity", tokens: number) => {
     const v = usd(tokens, price, a.symbol);
     return (
-      <Prov info={pricedAmountProv(storedAmountProv(what, scope, c), a.symbol, p)}>
+      <Prov info={pricedAmountProv(storedAmountProv(what, scope, c), a.symbol, p, c)}>
         <span title={v.title}>{v.display}</span>
       </Prov>
     );
@@ -558,7 +558,7 @@ function HubsBody({ d }: { d: V4Deployment }) {
         <SubPageHeader
           protocol={protocolOf(d)}
           title="Hubs"
-          learnMore={aaveV4Modal(d.chain === "base" ? "base_hub" : "hubs")}
+          learnMore={aaveV4Modal(d.chain === "base" ? "base_hub" : d.chain === "arc" ? "arc_hub" : "hubs")}
         />
         {body}
       </div>
