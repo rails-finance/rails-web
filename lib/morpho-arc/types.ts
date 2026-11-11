@@ -35,10 +35,14 @@ export interface ArcMorphoMarket extends ArcMorphoParams {
   borrowRate: Str;
   rateAtTarget: Str;
   price: Str;
+  /** Why the markets list leaves the market out: a test token, or no supply ever (rails-server's
+   *  unlistedReason). Absent on a position's read. */
+  unlisted?: "test-token" | "never-funded" | null;
 }
 export interface ArcMorphoListedMarket extends ArcMorphoMarket {
   createdBlock: number;
   createdTx: string;
+  createdTime: number;
 }
 export interface ArcMorphoToken {
   symbol: Str;

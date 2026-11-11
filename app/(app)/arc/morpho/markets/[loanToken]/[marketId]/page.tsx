@@ -9,7 +9,8 @@ import { MorphoMarketPage } from "@/lib/morpho/product";
 import { marketViewData } from "@/lib/morpho/markets-shape";
 import { fetchMorphoArcMarket } from "@/lib/api/fetch-morpho-arc";
 import { arcMarketResponse } from "@/lib/morpho-arc/markets";
-import { MORPHO_ARC_ROUTE } from "@/lib/morpho-arc/types";
+import { MORPHO_ARC_ROUTE, ZERO_ADDRESS } from "@/lib/morpho-arc/types";
+import { MARKET_LIST_WORDS } from "@/lib/morpho-arc/words";
 import { ARC_CHAIN_ID } from "@/lib/shared/chains";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
@@ -46,6 +47,15 @@ export default async function MorphoArcMarketRoute({ params }: Params) {
   if (a.kind === "not-found") notFound();
   const data = a.kind === "ok" ? arcMarketResponse(a.data) : null;
   if (data && data.params.loanToken !== token) notFound();
+  // A market the list leaves out keeps its page and says why; the idle market says what it is.
+  const m = a.kind === "ok" ? a.data.market : null;
+  const idle = m != null && m.collateralToken === ZERO_ADDRESS && m.oracle === ZERO_ADDRESS && m.irm === ZERO_ADDRESS;
+  const line = m?.unlisted ? MARKET_LIST_WORDS.page[m.unlisted] : idle ? MARKET_LIST_WORDS.idlePage : null;
+  const note = line ? (
+    <p className="mb-6 max-w-2xl text-[13px] text-rb-500" data-morpho-arc-market-note={m?.unlisted ?? "idle"}>
+      {line}
+    </p>
+  ) : null;
   return (
     <>
       <MorphoMarketPage
@@ -53,6 +63,7 @@ export default async function MorphoArcMarketRoute({ params }: Params) {
         chainId={ARC_CHAIN_ID}
         pair="Morpho Blue market"
         positions={{ href: MORPHO_ARC_ROUTE, label: "A wallet's Morpho Blue positions on Arc" }}
+        note={note}
       />
       <ProvInspectorLayer />
     </>

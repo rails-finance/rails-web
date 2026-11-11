@@ -21,6 +21,7 @@ import type {
   ArcMorphoToken,
 } from "@/lib/morpho-arc/types";
 import { ZERO_ADDRESS } from "@/lib/morpho-arc/types";
+import { listedMarkets } from "@/lib/morpho-arc/unlisted";
 
 const YEAR = 31_536_000;
 const scale = (raw: string, decimals: number) => Number(raw) / 10 ** decimals;
@@ -67,7 +68,9 @@ function row(m: ArcMorphoMarket, createdBlock: number, tokens: Record<string, Ar
 
 /** The markets answer as the roster's response. Every figure is chain-read at `head.block`. */
 export function arcMarketsResponse(r: ArcMorphoMarketsRead): MorphoMarketsChainResponse {
-  const rows = r.markets.flatMap((m) => {
+  // The markets rails-server marks unlisted (a test token, no supply ever) stay off the list and
+  // its counts; each keeps its page.
+  const rows = listedMarkets(r.markets).flatMap((m) => {
     const x = row(m, m.createdBlock, r.tokens);
     return x ? [x] : [];
   });

@@ -815,7 +815,12 @@ function RosterExplainer({ d }: { d: MorphoRosterData }) {
   );
 }
 
-type RosterProps = { data: MorphoRosterData; chainId: ChainId };
+type RosterProps = {
+  data: MorphoRosterData;
+  chainId: ChainId;
+  /** A line under the head (Arc's unlisted markets and its idle market, ui-jobs 577). */
+  note?: ReactNode;
+};
 
 /** The roster reads `?all=1` from the URL; the static render, before the
  *  params are known, draws the default view. */
@@ -832,7 +837,7 @@ function RosterWithParams(props: RosterProps) {
   return <RosterView {...props} all={all} />;
 }
 
-function RosterView({ data, chainId, all }: RosterProps & { all: boolean }) {
+function RosterView({ data, chainId, all, note }: RosterProps & { all: boolean }) {
   const root = `/${chainMeta(chainId).slug}/morpho`;
   const pathname = usePathname();
   const r: Read = { chainId, block: data.blockNumber, fromLogs: data.totalsSource === "sieve" };
@@ -940,6 +945,7 @@ function RosterView({ data, chainId, all }: RosterProps & { all: boolean }) {
         ) : (
           <>
             <ProductHeadSection head={head} titled={false} />
+            {note}
             <ProvSection
               scope="markets-table"
               className="mb-8"

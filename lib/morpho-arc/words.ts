@@ -96,3 +96,23 @@ export function cardExplainer(f: ArcMorphoPositionFigures): { title: string; bul
     });
   return out;
 }
+
+/** The markets pages' lines on the markets they leave out and on the idle market (the manager's
+ *  ruling, 11 Nov 2026). */
+export const MARKET_LIST_WORDS = {
+  unlisted: (test: number, never: number) => {
+    const parts = [
+      ...(test ? [`${test} that ${test === 1 ? "lends a test token" : "lend test tokens"}`] : []),
+      ...(never ? [`${never} that ${never === 1 ? "has" : "have"} never been supplied`] : []),
+    ];
+    return parts.length ? `Not listed here: ${parts.join(" and ")}. Each keeps its own page.` : null;
+  },
+  idle: "The idle market names no loan token, collateral, oracle or rate model, so nothing can be borrowed from it.",
+  idleLink: "Its page",
+  page: {
+    "test-token": "This market isn't listed on the markets page: it lends a test token (ERC20Mock, E20M).",
+    "never-funded": "This market isn't listed on the markets page: nothing has ever been supplied to it.",
+  } as Record<"test-token" | "never-funded", string>,
+  idlePage:
+    "This is the idle market: it names no loan token, collateral, oracle or rate model, so nothing can be supplied or borrowed in it.",
+};

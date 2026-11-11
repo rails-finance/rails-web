@@ -146,3 +146,61 @@ test("the wallet's positions, largest dollar value first", () => {
     "the larger collateral first",
   );
 });
+
+// The markets list (lib/morpho-arc/unlisted.ts): the markets rails-server marks unlisted stay off the
+// list; the idle market stays.
+const { listedMarkets, arcUnlisted } = await import("../../lib/morpho-arc/unlisted.ts");
+
+test("the markets list leaves out the test-token and never-supplied markets, and keeps the idle market", () => {
+  const ZERO = "0x0000000000000000000000000000000000000000";
+  const state = (supply) => ({
+    totalSupplyAssets: supply,
+    totalSupplyShares: supply === "0" ? "0" : supply + "000000",
+    totalBorrowAssets: "0",
+    totalBorrowShares: "0",
+    lastUpdate: "100",
+    fee: "0",
+  });
+  const mk = (id, o) => ({
+    ...READ.market,
+    id,
+    createdBlock: 1,
+    createdTx: "0x",
+    createdTime: 100,
+    state: state("1000000"),
+    unlisted: null,
+    ...o,
+  });
+  const markets = [
+    mk("0xidle", {
+      loanToken: ZERO,
+      collateralToken: ZERO,
+      oracle: ZERO,
+      irm: ZERO,
+      lltv: "980000000000000000",
+      state: state("0"),
+    }),
+    mk("0xbtc", {}),
+    mk("0xmock", { unlisted: "test-token" }),
+    mk("0xdead", { unlisted: "never-funded", state: state("0") }),
+  ];
+  const r = {
+    chainId: 5042,
+    head: READ.head,
+    provider: "arc.gateway.tenderly.co",
+    morpho: "0x34cd04070dd72b14e241112f6d83812df5af7fcd",
+    irm: READ.market.irm,
+    list: { from: 1, keptTo: 2, toBlock: 3 },
+    markets,
+    tokens: READ.tokens,
+    loanTokenSupply: {},
+    usdFeeds: READ.usdFeeds,
+  };
+  assert.deepEqual(
+    listedMarkets(markets).map((m) => m.id),
+    ["0xidle", "0xbtc"],
+    "the two unlisted markets are left out; the idle market stays",
+  );
+  const u = arcUnlisted(r);
+  assert.deepEqual([u.test, u.never, u.idle?.id], [1, 1, "0xidle"], "the line's counts and the idle market");
+});

@@ -747,6 +747,7 @@ export function MorphoMarketPage({
   chainId,
   pair,
   vaults,
+  note,
   listing,
   positions,
 }: {
@@ -757,6 +758,9 @@ export function MorphoMarketPage({
   pair: string;
   /** "Supplied by vaults", where the chain has a vault roster. */
   vaults?: ReactNode;
+  /** A line under the head about this market's place on the explorer (Arc's unlisted and idle
+   *  markets, ui-jobs 577). */
+  note?: ReactNode;
   /** The positions listing fixed to this market, where the explorer has one. */
   listing?: ReactNode;
   /** Every position on the explorer: the ⋮'s link, and the head's entry where there is no listing. */
@@ -806,6 +810,7 @@ export function MorphoMarketPage({
       what={`the ${pair} market`}
       hooks={{ "data-morpho-market-page": data?.market.id }}
     >
+      {note}
       {vaults}
       {holders && <ProductSectionBlock s={holders} />}
       {x && listing && (
