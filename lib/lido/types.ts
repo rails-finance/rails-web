@@ -17,6 +17,8 @@ interface Contracts {
   queue: string;
 }
 
+export type LidoWindowState = "ok" | "opened" | "changed";
+
 /** A wallet's stake at one block. */
 export interface LidoStakeAt {
   /** stETH shares the wallet holds. */
@@ -45,6 +47,9 @@ export interface LidoRequest {
 export interface LidoStakeRead extends Contracts {
   chainId: number;
   wallet: string;
+  /** "ok" where the wallet's shares (stETH shares plus wstETH) are equal at both reads, "opened" where
+   *  they were zero then and are above zero now, "changed" otherwise. Earned is stated only when "ok". */
+  windowState: LidoWindowState;
   head: BlockRef;
   then: BlockRef;
   provider: string;

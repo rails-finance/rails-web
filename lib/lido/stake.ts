@@ -2,14 +2,15 @@
 // days back (rails-ops ui-jobs 570; the reads are lib/lido/types.ts). stETH
 // accounts in shares and one wstETH is one share, so the stake is the sum of
 // both in shares, valued in ETH at the share rate (ETH per share), which moves
-// at each oracle report. What the shares held 30 days back earned is those
-// shares valued at today's rate less then's (decision 0048: stated legs only);
-// shares that moved in or out since are a change in shares, with no reason
-// given. No dollar figure (decision 0047).
+// at each oracle report. What the shares earned over 30 days is stated only
+// where the shares are equal at both reads: those shares valued at today's rate
+// less then's (decision 0048: stated legs only). A stake opened or changed
+// inside the window states its change in shares, with no reason given, and no
+// earnings. No dollar figure (decision 0047).
 //
 // Pure: scripts/test/lido.test.mjs reads it.
 
-import type { LidoProtocolRead, LidoRequest, LidoStakeRead } from "./types";
+import type { LidoProtocolRead, LidoRequest, LidoStakeRead, LidoWindowState } from "./types";
 
 const ZERO = BigInt(0);
 const ONE = BigInt(10) ** BigInt(18);
@@ -56,8 +57,10 @@ export interface LidoStake {
   rateGrowth: number;
   /** Shares now less shares then. */
   shareChange: number;
-  /** The shares held then, valued at today's rate less then's, in ETH. */
-  earned: number;
+  /** The server's window state: earnings are stated only where the shares match at both reads. */
+  windowState: LidoWindowState;
+  /** The shares held then, valued at today's rate less then's, in ETH; null unless the window is "ok". */
+  earned: number | null;
   requests: LidoRequestRow[];
   /** stETH in requests not yet finalized, and ETH ready to claim. */
   waitingSteth: number;
@@ -113,7 +116,8 @@ export function lidoStake(r: LidoStakeRead): LidoStake {
     },
     rateGrowth: growth(r.past.rate, r.now.rate),
     shareChange: units(nowShares - thenShares),
-    earned: gainOn(thenShares, r.past.rate, r.now.rate),
+    windowState: r.windowState,
+    earned: r.windowState === "ok" ? gainOn(thenShares, r.past.rate, r.now.rate) : null,
     requests,
     waitingSteth: requests.filter((q) => q.state === "waiting").reduce((a, q) => a + q.steth, 0),
     claimableEth: requests.reduce((a, q) => a + (q.claimable ?? 0), 0),

@@ -125,7 +125,7 @@ export function lineProv(key: "shares" | "rate" | "earned", c: LidoReceiptContex
     kind: "derived",
     pclass: "state",
     source,
-    summary: `Earned — the shares the wallet held at ${thenAt(r)}, times the share rate at ${at(r.head)} less the rate then.`,
+    summary: `Earned — the shares the wallet held at ${thenAt(r)} and still holds, times the share rate at ${at(r.head)} less the rate then.`,
     contract: stethC(r),
     via: bothVia(r),
     formula: "(sharesOf + wstETH.balanceOf) then × (getPooledEthByShares(1e18) now − then) ÷ 1e18",
@@ -133,7 +133,7 @@ export function lineProv(key: "shares" | "rate" | "earned", c: LidoReceiptContex
       derived("shares then", fig(s.then.shares)),
       chain("getPooledEthByShares(1e18) · head", r.now.rate),
       chain("getPooledEthByShares(1e18) · then", r.past.rate),
-      derived("earned, ETH", fig(s.earned)),
+      derived("earned, ETH", s.earned === null ? "not stated" : fig(s.earned)),
     ],
   };
 }

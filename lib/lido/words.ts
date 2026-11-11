@@ -75,7 +75,16 @@ export interface LidoLine {
   key: LidoLineKey;
   label: string;
   text: string;
+  /** Set where the line states no figure: the window's state. */
+  withheld?: "opened" | "changed";
 }
+
+export const WINDOW_WORDS = {
+  openedShort: "Opened inside the 30 days",
+  changedShort: "Changed inside the 30 days",
+  opened: "This stake opened inside the 30 days, so Rails does not state its earnings yet.",
+  changed: "Its shares changed inside the 30 days, so Rails does not state its earnings yet.",
+};
 
 /** The readout's lines, in drawing order. */
 export function readoutLines(s: LidoStake, thenTime: number): LidoLine[] {
@@ -94,14 +103,21 @@ export function readoutLines(s: LidoStake, thenTime: number): LidoLine[] {
       label: "Share rate",
       text: `${rateText(s.now.rate)} per share now, against ${rateText(s.then.rate)}: ${pct(s.rateGrowth, 3)}.`,
     },
-    {
-      key: "earned",
-      label: "Earned",
-      text:
-        s.then.shares === 0
-          ? `This wallet held no shares on ${on}.`
-          : `${num(s.earned)} ETH: the ${num(s.then.shares)} shares held on ${on}, valued at today's rate less that day's.`,
-    },
+    s.windowState === "ok" && s.earned !== null
+      ? {
+          key: "earned",
+          label: "Earned",
+          text:
+            s.then.shares === 0
+              ? `This wallet held no shares on ${on}.`
+              : `${num(s.earned)} ETH: the ${num(s.then.shares)} shares held on ${on}, valued at today's rate less that day's.`,
+        }
+      : {
+          key: "earned",
+          label: "Earned",
+          text: s.windowState === "opened" ? WINDOW_WORDS.openedShort : WINDOW_WORDS.changedShort,
+          withheld: s.windowState === "opened" ? "opened" : "changed",
+        },
   ];
 }
 
@@ -142,13 +158,18 @@ export function cardExplainer(): ExplainGroupWords[] {
 }
 
 /** The readout's (i). */
-export function readoutExplainer(): ExplainGroupWords[] {
+export function readoutExplainer(s: LidoStake): ExplainGroupWords[] {
   return [
     {
       title: "The lines",
       bullets: [
         "Each line compares the block when the page was read with a block 30 days earlier.",
-        "Earned is the shares the wallet held 30 days back times the rise in the share rate since. Shares that moved in or out in between are stated as a change in shares, and earn nothing in this figure.",
+        "Earned is stated only where the wallet held the same shares at both blocks: those shares times the rise in the share rate since.",
+        ...(s.windowState === "opened"
+          ? [WINDOW_WORDS.opened]
+          : s.windowState === "changed"
+            ? [WINDOW_WORDS.changed]
+            : []),
       ],
     },
   ];

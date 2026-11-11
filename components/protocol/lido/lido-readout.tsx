@@ -2,7 +2,9 @@
 
 // "How the stake changed over 30 days" (U8; rails-ops ui-jobs 570): the
 // wallet's shares then and now, the share rate then and now, and what the shares
-// held then earned at the rate's rise, each line traced to its reads
+// earned at the rate's rise where they match at both reads ("Opened" or
+// "Changed inside the 30 days" otherwise, the (i) saying why), each figure
+// traced to its reads
 // (lib/lido/provenance.ts). The section is one receipts scope its ⋮ arms
 // (decision 0059). The layout is Balancer's and Uniswap's readout.
 
@@ -46,9 +48,15 @@ export function LidoReadout({ r }: { r: LidoStakeRead }) {
               data-lido-line={l.key}
             >
               <span className="text-xs font-semibold text-rb-500 sm:pt-0.5">{l.label}</span>
-              <p className="min-w-0 text-[13px] leading-snug text-foreground">
-                <Prov info={lineProv(l.key, c)}>{l.text}</Prov>
-              </p>
+              {l.withheld ? (
+                <p className="min-w-0 text-[13px] leading-snug text-rb-500" data-window-withheld={l.withheld}>
+                  {l.text}
+                </p>
+              ) : (
+                <p className="min-w-0 text-[13px] leading-snug text-foreground">
+                  <Prov info={lineProv(l.key, c)}>{l.text}</Prov>
+                </p>
+              )}
             </li>
           ))}
         </ul>
@@ -59,7 +67,7 @@ export function LidoReadout({ r }: { r: LidoStakeRead }) {
         slot={{
           body: (
             <>
-              {readoutExplainer().map((g) => (
+              {readoutExplainer(s).map((g) => (
                 <ExplainGroup key={g.title} title={g.title}>
                   {g.bullets.map((b, i) => (
                     <ExplainBullet key={i}>{b}</ExplainBullet>

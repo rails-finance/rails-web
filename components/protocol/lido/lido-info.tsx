@@ -91,7 +91,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
           <li>The card states the stake in ETH, its stETH and wstETH apart, and the share rate.</li>
           <li>
             Under it, the stake 30 days back: the shares then and now, the share rate then and now, and what the shares
-            held then earned at the rate&apos;s rise.
+            earned at the rate&apos;s rise.
           </li>
           <li>
             Then the wallet&apos;s withdrawal requests: each one&apos;s stETH, when it was made, and whether it waits,
@@ -132,6 +132,7 @@ const reads: InfoReads = {
   contracts,
   how: "Rails's server reads these contracts at the block current when you open a page, and at a block 30 days back. A past block's answers are stored once that block is final, so a later visit reads only the newest block again. A wallet's withdrawal requests are listed by the queue for their owner, so Rails reads no events.",
   notes: [
+    "Earnings over 30 days are stated only where the wallet's shares are the same at both reads; a stake opened or changed inside the window says so instead.",
     "The share rate moves only at each oracle report, so a figure read between two reports stands at the last report's rate.",
   ],
 };

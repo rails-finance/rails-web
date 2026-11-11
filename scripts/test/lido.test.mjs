@@ -23,7 +23,9 @@ export async function resolve(specifier, context, next) {
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
 const { gainOn, growth, lidoStake, lidoTotals, requestRow, units } = await import("../../lib/lido/stake.ts");
-const { readoutLines, REQUESTS, rateText, signed } = await import("../../lib/lido/words.ts");
+const { readoutExplainer, readoutLines, REQUESTS, rateText, signed, WINDOW_WORDS } = await import(
+  "../../lib/lido/words.ts"
+);
 
 const RATE_NOW = "1248899063481582992";
 const RATE_THEN = "1246088839423097632";
@@ -34,6 +36,7 @@ const read = (over = {}) => ({
   wsteth: "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
   queue: "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
   wallet: "0x1B7a4C3797236A1C37f8741c0Be35c2c72736fFf",
+  windowState: "ok",
   head: { block: 26_388_003, time: 1_794_355_763 },
   then: { block: 26_172_000, time: 1_791_755_291 },
   provider: "mainnet.gateway.tenderly.co",
@@ -99,14 +102,14 @@ test("the share rate's growth and a gain on shares, exact before they become num
   assert.ok(Math.abs(gainOn(`90${E}`, RATE_THEN, RATE_NOW) - 0.25292015) < 1e-6);
 });
 
-test("a stake: both legs in shares and ETH, the change in shares, what the shares held then earned", () => {
-  const s = lidoStake(read());
+test("a stake: both legs in shares and ETH, the change in shares; earnings withheld where the shares changed", () => {
+  const s = lidoStake(read({ windowState: "changed" }));
   assert.equal(s.now.shares, 100);
   assert.equal(s.now.wsteth, 20);
   assert.equal(s.then.shares, 90);
   assert.equal(s.shareChange, 10);
   assert.ok(Math.abs(s.now.eth - 124.8899) < 1e-3);
-  assert.ok(Math.abs(s.earned - 0.25292015) < 1e-6);
+  assert.equal(s.earned, null);
   assert.equal(s.waitingSteth, 1000);
   assert.ok(Math.abs(s.claimableEth - 2) < 1e-9);
 });
@@ -123,16 +126,43 @@ test("a request's state: waiting, ready to claim, claimed", () => {
   assert.match(REQUESTS.summary(lidoStake(read())), /1,000 stETH waiting · 2 ETH ready to claim/);
 });
 
+const SAME = { past: { stethShares: `80${E}`, wstethBalance: `20${E}`, rate: RATE_THEN } };
+
+test("the window's three states: Earned where the shares match, Opened or Changed inside the 30 days otherwise", () => {
+  const ok = lidoStake(read(SAME));
+  assert.ok(Math.abs(ok.earned - 100 * (1.248899063481582992 - 1.246088839423097632)) < 1e-9);
+  const okLine = readoutLines(ok, read().then.time)[2];
+  assert.match(okLine.text, /^0\.281 ETH: the 100 shares held on/);
+  assert.equal(okLine.withheld, undefined);
+  for (const [state, short, long] of [
+    ["opened", WINDOW_WORDS.openedShort, WINDOW_WORDS.opened],
+    ["changed", WINDOW_WORDS.changedShort, WINDOW_WORDS.changed],
+  ]) {
+    const s = lidoStake(read({ windowState: state }));
+    assert.equal(s.earned, null);
+    const line = readoutLines(s, read().then.time)[2];
+    assert.equal(line.text, short);
+    assert.equal(line.withheld, state);
+    assert.ok(readoutExplainer(s)[0].bullets.includes(long));
+  }
+  assert.equal(readoutExplainer(ok)[0].bullets.length, 2);
+});
+
 test("the readout: shares, rate, earned; no shares then says so", () => {
-  const lines = readoutLines(lidoStake(read()), read().then.time);
+  const lines = readoutLines(lidoStake(read(SAME)), read().then.time);
   assert.deepEqual(
     lines.map((l) => l.key),
     ["shares", "rate", "earned"],
   );
-  assert.match(lines[0].text, /a change of \+10 shares/);
+  assert.match(lines[0].text, /the same as on/);
+  assert.match(readoutLines(lidoStake(read({ windowState: "changed" })), 0)[0].text, /a change of \+10 shares/);
   assert.match(lines[1].text, /^1\.248899 ETH per share now/);
   assert.match(lines[2].text, /shares held on .*, valued at today's rate less that day's/);
-  const fresh = readoutLines(lidoStake(read({ past: { stethShares: "0", wstethBalance: "0", rate: RATE_THEN } })), 0);
+  const none = { stethShares: "0", wstethBalance: "0" };
+  const fresh = readoutLines(
+    lidoStake(read({ now: { ...read().now, ...none }, past: { ...none, rate: RATE_THEN } })),
+    0,
+  );
   assert.match(fresh[2].text, /held no shares/);
   for (const l of lines) assert.doesNotMatch(l.text, /, not |honest|fold/i);
 });
