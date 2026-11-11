@@ -20,7 +20,7 @@
  * explorer gains a capability, flip its cell in the same change (CLAUDE.md).
  */
 
-import { EULER_DOLLARS } from "@/lib/euler/types";
+import { EULER_DOLLARS, EULER_INDEXED } from "@/lib/euler/types";
 import { LAUNCHED_PROTOCOLS, PROTOCOLS, isLaunchedChain, type ProtocolEntry } from "@/lib/shared/protocols";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID, type ChainId } from "@/lib/shared/chains";
 // The `oracleUsd: { why }` text below is shared with the position views' price
@@ -1786,14 +1786,17 @@ export const VIEW_NOTES: Record<string, string> = {
  * Rendered on /coverage; each explorer's /info page carries the
  * reader-facing consequence in plain words instead.
  */
-/** Euler V2's coverage note; its dollar sentence follows EULER_DOLLARS (lib/euler/types.ts). */
-const EULER_NOTE = [
-  "Each wallet has 256 Euler accounts. Rails finds every account that borrows or has a deposit enabled as collateral, from the connector's lists for all 256. A deposit not used as collateral is read on the wallet's first account only, across every vault on the chain; on the other 255 it is not found.",
-  EULER_DOLLARS
-    ? "Each vault prices in its own unit of account through its oracle: dollars where that unit is USD, and the unit's token otherwise."
-    : "Figures are in each asset, and in the unit's token where a vault's unit of account is a token.",
-  "The 30-day figures come from the vault's share price and interest index at a block 30 days back, applied to what the account holds now.",
-].join(" ");
+/** Euler V2's coverage note per chain; its finding sentence follows EULER_INDEXED and its dollar sentence EULER_DOLLARS (lib/euler/types.ts). */
+const eulerNote = (indexed: boolean) =>
+  [
+    indexed
+      ? "Each wallet has 256 Euler accounts. Rails finds every account that borrows or has a deposit enabled as collateral, from the connector's lists for all 256, and every other deposit from its index of Euler's events since deployment."
+      : "Each wallet has 256 Euler accounts. Rails finds every account that borrows or has a deposit enabled as collateral, from the connector's lists for all 256. A deposit not used as collateral is read on the wallet's first account only, across every vault on the chain; on the other 255 it is not found.",
+    EULER_DOLLARS
+      ? "Each vault prices in its own unit of account through its oracle: dollars where that unit is USD, and the unit's token otherwise."
+      : "Figures are in each asset, and in the unit's token where a vault's unit of account is a token.",
+    "The 30-day figures come from the vault's share price and interest index at a block 30 days back, applied to what the account holds now.",
+  ].join(" ");
 
 export const COVERAGE_NOTES: Record<string, string> = {
   "aave-vaults":
@@ -1860,8 +1863,8 @@ export const COVERAGE_NOTES: Record<string, string> = {
     "Aave V3 on Optimism is the same protocol as on Ethereum, Base and Arbitrum: one Pool holding every reserve, with its own reserves, risk settings and oracle. Each page reads the Pool, the oracle and Aave's UiPoolDataProvider when it opens. An account page reads the account's balances, health factor and eMode category at that block, and its balances and each reserve's interest index again at the UTC midnight 30 days before, so the interest over those 30 days is stated where the balance did not move in between. Every dollar figure is a balance at Aave's oracle price at the same block. There is no listing, history, holder ranking or liquidation record until Rails indexes Aave V3 on Optimism.",
   "aave-v4-arc":
     "Aave V4 on Arc is the same protocol as on Ethereum and Base: one Core hub lends to three spokes, Main, Forex and USDC Maple. Each page reads the hub, the spokes and each spoke's oracle when it opens. An account page reads the spoke account's balances, shares, health factor and terms at that block, and its balances and shares again at the UTC midnight 30 days before, so the interest over those 30 days is stated where the shares are the same at both. Every dollar figure is a balance at the spoke oracle's price at the same block. There is no listing, history, holder ranking or liquidation record until Rails indexes Aave V4 on Arc.",
-  "euler-v2-base": EULER_NOTE,
-  "euler-v2-arbitrum": EULER_NOTE,
+  "euler-v2-base": eulerNote(EULER_INDEXED[8453]),
+  "euler-v2-arbitrum": eulerNote(EULER_INDEXED[42161]),
   "balancer-v3":
     "A Balancer V3 pool share is a balance the Vault keeps for each pool, and a claim on the pool's tokens in proportion to all shares, so every figure is in those tokens and Balancer runs no USD feed. Rails finds a wallet's pools in its index of every pool-share transfer since the Vault's first block, and reads the shares the wallet staked in a pool's gauge. A pool share holds no loan, so there is no liquidation to trace.",
   "balancer-v3-arbitrum":

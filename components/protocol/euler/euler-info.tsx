@@ -12,7 +12,7 @@ import {
   type InfoTerm,
   type InfoView,
 } from "@/components/shared/protocol-info-page";
-import { EULER_CONTRACTS, EULER_DOLLARS, EULER_SESSION, type EulerChainId } from "@/lib/euler/types";
+import { EULER_CONTRACTS, EULER_DOLLARS, EULER_INDEXED, EULER_SESSION, type EulerChainId } from "@/lib/euler/types";
 import { CHAIN_NAME } from "@/lib/euler/words";
 import { explorerHref } from "@/lib/shared/protocols";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -100,7 +100,14 @@ function views(chain: EulerChainId): readonly [InfoView, ...InfoView[]] {
           </p>
           <ul className={`${UL} mt-2`}>
             <li>Every account that borrows, or has a deposit enabled as collateral, is found on all 256 accounts.</li>
-            <li>A deposit not used as collateral is found on account 0, the wallet&apos;s own address.</li>
+            {EULER_INDEXED[chain] ? (
+              <li>
+                A deposit not used as collateral is found on every account, from Rails&apos;s index of Euler on{" "}
+                {CHAIN_NAME[chain]}.
+              </li>
+            ) : (
+              <li>A deposit not used as collateral is found on account 0, the wallet&apos;s own address.</li>
+            )}
             <li>
               Each row names what the account supplies or borrows, in which vault, and opens that holding&apos;s page.
             </li>
@@ -149,10 +156,14 @@ function reads(chain: EulerChainId): InfoReads {
   ];
   return {
     contracts,
-    how: "Rails's server reads these contracts at the block current when you open a page, and at a block 30 days back. Finding a wallet's accounts is one batch of about a thousand calls. A past block's answers are stored once that block is final, so a later visit reads only the newest block again.",
-    notes: [
-      "A deposit not enabled as collateral is visible only in the vault's own balance, so finding it on every account would take a balance call per vault for each of 256 accounts. Rails reads it on account 0 only.",
-    ],
+    how: EULER_INDEXED[chain]
+      ? `Rails indexes every vault's and the connector's events on ${CHAIN_NAME[chain]} from Euler's deployment. A wallet's deposits on all 256 accounts come from that index, and each is read again at the block current when you open a page, and at a block 30 days back. A past block's answers are stored once that block is final.`
+      : "Rails's server reads these contracts at the block current when you open a page, and at a block 30 days back. Finding a wallet's accounts is one batch of about a thousand calls. A past block's answers are stored once that block is final, so a later visit reads only the newest block again.",
+    notes: EULER_INDEXED[chain]
+      ? []
+      : [
+          "A deposit not enabled as collateral is visible only in the vault's own balance, so finding it on every account would take a balance call per vault for each of 256 accounts. Rails reads it on account 0 only.",
+        ],
   };
 }
 

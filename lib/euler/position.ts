@@ -235,15 +235,20 @@ export function walletRows(w: EulerWalletRead): EulerWalletRow[] {
   return w.accounts.flatMap((a) =>
     [...a.holdings]
       .sort((x, y) => Number(y.controller) - Number(x.controller))
-      .map((h) => ({
+      // A loan vault the account also holds shares in draws its loan, then its deposit.
+      .flatMap((h) => [
+        ...(h.controller ? [{ h, kind: "loan" as const }] : []),
+        ...(!h.controller || BigInt(h.shares) > BigInt(0) ? [{ h, kind: "deposit" as const }] : []),
+      ])
+      .map(({ h, kind }) => ({
         index: a.index,
         account: a.account,
         vault: h.vault,
         vaultSymbol: h.vaultSymbol,
         asset: h.asset,
-        kind: h.controller ? ("loan" as const) : ("deposit" as const),
-        amount: scaled(h.controller ? h.debt : h.assets, h.asset.decimals),
-        raw: h.controller ? h.debt : h.assets,
+        kind,
+        amount: scaled(kind === "loan" ? h.debt : h.assets, h.asset.decimals),
+        raw: kind === "loan" ? h.debt : h.assets,
         collateral: h.collateral,
       })),
   );
