@@ -73,6 +73,12 @@ interface FeedLine {
 
 export function PricesView({ prices, now }: { prices: PricesSection; now: number }) {
   const down = prices.lane.unreachable;
+  // Every feed and rate is captured from Ethereum by Rails' oracle Sieve lane;
+  // the reference column links where the feed's interval is published.
+  const cp = prices.lane.checkpoint;
+  const laneTitle = cp
+    ? `Rails' oracle Sieve lane reads these events from Ethereum peers; checkpoint ${n(cp.block)}.`
+    : "Rails' oracle Sieve lane reads these events from Ethereum peers.";
   const feeds: FeedLine[] = [
     ...prices.feeds.map((f) => {
       const t = f.lastRound?.time ?? null;
@@ -122,8 +128,8 @@ export function PricesView({ prices, now }: { prices: PricesSection; now: number
   return (
     <div data-anatomy="Y5">
       <p className="mb-4 max-w-2xl text-sm text-rb-500">
-        Every dollar figure on Rails rests on stored prices: Chainlink rounds and rate updates captured from Ethereum,
-        then written as prices by the fillers below.
+        Every dollar figure on Rails rests on stored prices. Rails&apos; Sieve indexer reads each Chainlink round and
+        rate update from Ethereum peers, and the fillers below write them as prices.
       </p>
       {down && (
         <p className="mb-4 text-sm text-red-600 dark:text-red-400">
@@ -141,11 +147,12 @@ export function PricesView({ prices, now }: { prices: PricesSection; now: number
       <h2 className="mb-3 text-lg font-semibold tracking-tight text-foreground">Price feeds and rate updates</h2>
       <DataTable label="Price feeds and rate updates" anatomy="Y5.1" stacked tableClassName="sm:table-fixed">
         <DataTableHead>
-          <DataTableHeader label="Feed" className="sm:w-[28%]" />
-          <DataTableHeader label="Status" className="sm:w-[18%]" />
-          <DataTableHeader label="Last update" className="sm:w-[16%]" />
+          <DataTableHeader label="Feed" className="sm:w-[24%]" />
+          <DataTableHeader label="Status" className="sm:w-[13%]" />
+          <DataTableHeader label="Last update" className="sm:w-[14%]" />
           <DataTableHeader label="Updates at least every" />
-          <DataTableHeader label="Source" className="sm:w-[14%]" />
+          <DataTableHeader label="Read from" className="sm:w-[18%]" />
+          <DataTableHeader label="Reference" className="sm:w-[12%]" />
         </DataTableHead>
         <DataTableBody>
           {feeds.map((l) => (
@@ -162,7 +169,10 @@ export function PricesView({ prices, now }: { prices: PricesSection; now: number
               <DataTableCell valign="middle" label="Updates at least every" className="text-sm text-rb-500">
                 {l.everyWords}
               </DataTableCell>
-              <DataTableCell valign="middle" label="Source">
+              <DataTableCell valign="middle" label="Read from" className="text-sm text-rb-500">
+                <span title={laneTitle}>Sieve, from Ethereum peers</span>
+              </DataTableCell>
+              <DataTableCell valign="middle" label="Reference">
                 <Source href={l.source}>{l.sourceLabel}</Source>
               </DataTableCell>
             </DataTableRow>

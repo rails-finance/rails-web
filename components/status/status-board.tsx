@@ -182,7 +182,7 @@ interface CellView {
 
 function cellView(c: StatusCell, now: number, allowance: Allowance | null): CellView {
   const live = c.entry?.live;
-  const lane = live ? laneWords(live.lane) : c.fill ? "The full-history fill" : "–";
+  const lane = live ? laneWords(live.lane, live.visitReads?.gateway) : c.fill ? "The full-history fill" : "–";
   if (c.fill) {
     const hb = fillState(c.fill, now);
     const stall = fillStall(c.fill);
@@ -424,11 +424,28 @@ const WRITER_KIND: Record<string, string> = {
 const pipelineWords = (p: string) =>
   p === "sieve" ? "Sieve" : p.startsWith("processor:") ? `Processor ${p.slice(10)}` : p;
 
-const laneWords = (lane: string) =>
+/** A gateway host as the provider that runs it. */
+const providerWords = (host: string | null | undefined) =>
+  !host
+    ? "the chain"
+    : /gateway\.tenderly\.co$/.test(host)
+      ? "Tenderly's free gateway"
+      : /alchemy\.com$/.test(host)
+        ? "Alchemy"
+        : host;
+
+const SIEVE_LANES: Record<string, string> = {
+  ethereum: "Sieve, from Ethereum peers",
+  base: "Sieve (Base)",
+  arbitrum: "Sieve (Arbitrum)",
+};
+
+/** What keeps an index current, with where a read on visit comes from. */
+const laneWords = (lane: string, gateway?: string | null) =>
   lane === "visit-reads"
-    ? "Reads when a page opens"
+    ? `Read on visit, from ${providerWords(gateway)}`
     : lane.startsWith("sieve:")
-      ? `Sieve (${lane.slice(6)})`
+      ? (SIEVE_LANES[lane.slice(6)] ?? `Sieve (${lane.slice(6)})`)
       : lane.startsWith("processor:")
         ? `Processor ${lane.slice(10)}`
         : lane;
@@ -469,7 +486,7 @@ function PipelineDetail({ e, now }: { e: StatusEntry; now: number }) {
             name="Kept current by"
             value={
               <>
-                {laneWords(live.lane)}
+                {laneWords(live.lane, live.visitReads?.gateway)}
                 {live.checkpoint && (
                   <span className="text-rb-500">
                     {" "}
