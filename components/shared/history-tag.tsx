@@ -1,9 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { historyOf } from "@/lib/shared/protocols";
 import { HISTORY_NONE, historyDate, historyWords, type HistoryKind } from "@/lib/shared/history-tier";
+import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+
+/** A from-date line's link to the status page, where the fill's progress shows (decision 0064 point 3). */
+function ProgressLink({ kind }: { kind: HistoryKind }) {
+  if (kind !== "from-date") return null;
+  return (
+    <>
+      {" "}
+      <Link href="/status" className={INLINE_LINK} data-history-progress>
+        See how far it has read
+      </Link>
+    </>
+  );
+}
 
 /** Each from-date explorer's start time, asked once per page load. */
 const starts = new Map<string, Promise<number | null>>();
@@ -87,7 +102,10 @@ export function HistoryLine({ id, className }: { id: string; className: string }
   return (
     <p className={className} data-anatomy="H23.2" data-history-line={w.kind}>
       <HistoryTag id={id} tip={false} />
-      <span>{w.line}</span>
+      <span>
+        {w.line}
+        <ProgressLink kind={w.kind} />
+      </span>
     </p>
   );
 }
@@ -104,6 +122,7 @@ export function InfoHistoryLine({ id }: { id: string }) {
       </span>
       <span className="text-foreground">{w.line}</span>
       {w.kind === "none" && <> {HISTORY_NONE.waits}</>}
+      <ProgressLink kind={w.kind} />
     </p>
   );
 }

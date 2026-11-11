@@ -76,6 +76,7 @@ function ChainCell({ e, now }: { e: IndexProgressEntry; now: number }) {
   return (
     <span
       className="inline-flex items-center gap-2 text-sm"
+      data-anatomy="Y1.1"
       title={heartbeatLine(e, now)}
       data-status-cell={`${e.protocol}-${e.chain}`}
     >
@@ -237,7 +238,7 @@ function ChainDetail({ e, now }: { e: IndexProgressEntry; now: number }) {
       </dl>
 
       {e.sources && e.sources.length > 0 && (
-        <div className="mt-4">
+        <div className="mt-4" data-anatomy="Y1.3">
           <h4 className="text-xs font-semibold uppercase tracking-wider text-rb-500">Receipts</h4>
           <ul className="mt-2 flex flex-col gap-3">
             {e.sources.map((s) => (
@@ -310,7 +311,7 @@ function Row({ row, chains, now }: { row: ProtocolRow; chains: number[]; now: nu
       {open && (
         <DataTableRow drawer>
           <DataTableCell colSpan={chains.length + 1} wide className="pb-6">
-            <div className="flex flex-col gap-5 sm:pl-[2.25rem]">
+            <div className="flex flex-col gap-5 sm:pl-[2.25rem]" data-anatomy="Y1.2">
               {row.indexes.map((e) => (
                 <ChainDetail key={e.chain} e={e} now={now} />
               ))}
@@ -341,7 +342,7 @@ export function StatusBoard({ progress }: { progress: IndexProgress }) {
   const chains = chainColumns(progress.indexes);
   return (
     <div className="mt-10">
-      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-rb-500">
+      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-rb-500" data-anatomy="Y2">
         {(["fresh", "late", "stalled", "none"] as const).map((h) => (
           <span key={h} className="inline-flex items-center gap-1.5">
             <span className={`h-1.5 w-1.5 rounded-full ${DOT[h]}`} />
@@ -355,7 +356,7 @@ export function StatusBoard({ progress }: { progress: IndexProgress }) {
           </span>
         ))}
       </div>
-      <DataTable label="Indexing progress by protocol and chain" stacked>
+      <DataTable label="Indexing progress by protocol and chain" anatomy="Y1" stacked>
         <DataTableHead>
           <DataTableHeader label="Protocol" />
           {chains.map((c) => (
