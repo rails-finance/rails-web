@@ -20,8 +20,7 @@
 // From md a dropdown under the control, right edges aligned, dropping in with
 // a small bounce (globals.css `.profile-drop`), no taller than the window
 // below it, scrolling within itself; below md a sheet from the foot of the
-// screen over a dim (ui-jobs 507), rising over 220ms (`.profile-sheet`). TEMP:
-// `?menu=panel` draws it as a right-hand panel instead (see PANEL_PARAM).
+// screen over a dim (ui-jobs 507), rising over 220ms (`.profile-sheet`).
 //
 // The face is the first saved wallet's; with none, the sample wallet's
 // (lib/shared/sample-wallet.ts). Until the browser's list is read a faint
@@ -57,7 +56,6 @@ import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
 import { menuEntries } from "@/lib/shared/sessions";
-import { SPRING_EASING } from "@/components/nav/wallet-panel";
 
 const BOOKMARKS_PATH = "/bookmarks";
 /** The control's and the menu's accessible name: what the menu holds as a whole. */
@@ -66,26 +64,6 @@ const MENU_NAME = "Saved and settings";
 const START_PATH = "/start";
 /** The gap kept under the dropdown when it scrolls within the window. */
 const DROP_MARGIN = 16;
-
-// ── TEMP (ui-jobs 586): the menu as a right-hand panel, for Miles to compare
-// with the dropdown on localhost. `?menu=panel` on any page turns it on for
-// the tab (sessionStorage), `?menu=drop` turns it off. Below md both are the
-// sheet. To drop it: delete this block and every `panel` branch below; to
-// promote it: return true here and delete the dropdown branches.
-const PANEL_PARAM = "menu";
-const PANEL_KEY = "rails-profile-menu-variant";
-function readPanelVariant(): boolean {
-  try {
-    const asked = new URLSearchParams(window.location.search).get(PANEL_PARAM);
-    if (asked === "panel" || asked === "drop") sessionStorage.setItem(PANEL_KEY, asked);
-    return sessionStorage.getItem(PANEL_KEY) === "panel";
-  } catch {
-    return false;
-  }
-}
-/** The panel's width from md. */
-const PANEL_WIDTH = 380;
-// ── end TEMP
 
 /** The room between the menu's groups (Miles's mockup: about 32px). */
 const GROUP = "mt-8";
@@ -301,9 +279,6 @@ export function ProfileMenu() {
     top: number;
     right: number;
     phone: boolean;
-    /** TEMP (ui-jobs 586): the right-hand panel; the rail's right edge. */
-    panel: boolean;
-    railRight: number;
   } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   // When a press outside closed the menu, the click that ends the same press
@@ -331,24 +306,18 @@ export function ProfileMenu() {
   }, []);
   const done = useCallback(() => close(false), [close]);
 
-  // A navigation closes it. TEMP (ui-jobs 586): and keeps `?menu=` for the tab.
-  useEffect(() => {
-    setOpen(false);
-    readPanelVariant();
-  }, [pathname]);
+  // A navigation closes it.
+  useEffect(() => setOpen(false), [pathname]);
 
   // Placed under the control: from md its right edge on the control's, below
   // md across the viewport.
   const measure = useCallback(() => {
     const r = trigger.current?.getBoundingClientRect();
     if (!r) return;
-    const rail = document.querySelector<HTMLElement>('aside[data-anatomy="H1"]');
     setPlace({
       top: r.bottom + 8,
       right: window.innerWidth - r.right,
       phone: window.innerWidth < 768,
-      panel: readPanelVariant(),
-      railRight: rail && rail.getClientRects().length > 0 ? rail.getBoundingClientRect().right : 0,
     });
   }, []);
   useLayoutEffect(() => {
@@ -362,29 +331,10 @@ export function ProfileMenu() {
     };
   }, [open, measure]);
 
-  // TEMP (ui-jobs 586): the panel slides in from the right on the wallet
-  // panel's spring, over its scrim's fade; none under reduced motion.
-  const sheetLike = !!place && !place.phone && place.panel;
-  useLayoutEffect(() => {
-    if (!open || !sheetLike || !menu.current) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const spring = CSS.supports("transition-timing-function", "linear(0, 1)")
-      ? SPRING_EASING
-      : "cubic-bezier(0.22, 1, 0.36, 1)";
-    menu.current.animate([{ transform: "translateX(100%)" }, { transform: "translateX(0)" }], {
-      duration: 300,
-      easing: spring,
-    });
-    document
-      .querySelector<HTMLElement>("[data-profile-menu-scrim]")
-      ?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: "cubic-bezier(0.22, 1, 0.36, 1)" });
-  }, [open, sheetLike]);
-
   // Below md the sheet holds the page still under it, as the wallet panel
-  // does, and scrolls within itself past 85% of the screen (ui-jobs 507);
-  // the panel (TEMP) does the same.
+  // does, and scrolls within itself past 85% of the screen (ui-jobs 507).
   useEffect(() => {
-    if (!open || (window.innerWidth >= 768 && !readPanelVariant())) return;
+    if (!open || window.innerWidth >= 768) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -425,11 +375,7 @@ export function ProfileMenu() {
         e.preventDefault();
         go(items.length - 1);
       } else if (e.key === "Tab") {
-        // TEMP (ui-jobs 586): the panel keeps the focus inside, as H16 does.
-        if (window.innerWidth >= 768 && readPanelVariant()) {
-          e.preventDefault();
-          go(e.shiftKey ? at - 1 : at + 1);
-        } else close(false);
+        close(false);
       }
     };
     document.addEventListener("pointerdown", onPointer);
@@ -497,13 +443,10 @@ export function ProfileMenu() {
           <>
             {/* Below md the sheet dims the page under it, as the wallet
                 panel's scrim does (H16.1); a press on it closes the sheet. */}
-            {(place.phone || place.panel) && (
+            {place.phone && (
               <div
                 aria-hidden="true"
-                className="fixed inset-y-0 right-0 z-[var(--z-popover)] bg-white/60 dark:bg-rb-950/70"
-                // TEMP (ui-jobs 586): the panel's scrim leaves the rail
-                // undimmed, as H16.1 does.
-                style={{ left: place.phone ? 0 : place.railRight }}
+                className="fixed inset-0 z-[var(--z-popover)] bg-white/60 dark:bg-rb-950/70"
                 data-profile-menu-scrim=""
               />
             )}
@@ -513,22 +456,18 @@ export function ProfileMenu() {
               role="menu"
               aria-label={MENU_NAME}
               data-profile-menu=""
-              data-profile-menu-variant={place.phone ? "sheet" : place.panel ? "panel" : "drop"}
+              data-profile-menu-variant={place.phone ? "sheet" : "drop"}
               className={`fixed z-[var(--z-popover)] overflow-y-auto overscroll-contain border border-rb-200 bg-background px-3 pb-4 pt-3 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
                 place.phone
                   ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] rounded-t-2xl border-x-0 border-b-0 pb-[max(1rem,env(safe-area-inset-bottom))]"
-                  : place.panel
-                    ? "inset-y-0 right-0 border-y-0 border-r-0 px-5 pt-6"
-                    : "profile-drop w-80 rounded-xl"
+                  : "profile-drop w-80 rounded-xl"
               }`}
               // The dropdown stops above the window's foot and scrolls within
               // itself (ui-jobs 586).
               style={
                 place.phone
                   ? undefined
-                  : place.panel
-                    ? { width: PANEL_WIDTH }
-                    : { top: place.top, right: place.right, maxHeight: `calc(100dvh - ${place.top + DROP_MARGIN}px)` }
+                  : { top: place.top, right: place.right, maxHeight: `calc(100dvh - ${place.top + DROP_MARGIN}px)` }
               }
             >
               <ThemeSwitch />

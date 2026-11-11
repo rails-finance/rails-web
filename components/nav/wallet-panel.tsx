@@ -93,11 +93,9 @@ const EASE_IN = "200ms cubic-bezier(0.22, 1, 0.36, 1)";
 /** The slide in (ui-jobs 514): a damped spring (damping ratio 0.72) sampled
  *  into `linear()`, overshooting by 3.8% at 165ms and settling by 300ms
  *  (Miles asked for it quicker, 6 Nov 2026). Browsers without `linear()` take
- *  EASE_IN. `SPRING_EASING` is the curve alone, for the profile menu's
- *  panel (TEMP, ui-jobs 586). */
-export const SPRING_EASING =
-  "linear(0, 0.0199, 0.0718, 0.1453, 0.2321, 0.3253, 0.4198, 0.5116, 0.598, 0.6771, 0.7478, 0.8096, 0.8625, 0.9068, 0.9431, 0.972, 0.9945, 1.0113, 1.0233, 1.0313, 1.036, 1.0381, 1.0383, 1.0369, 1.0345, 1.0314, 1.0279, 1.0243, 1.0207, 1.0173, 1.0141, 1.0112, 1.0086, 1.0064, 1.0045, 1.0029, 1.0017, 1.0007, 0.9999, 0.9993, 1)";
-const SPRING_IN = `300ms ${SPRING_EASING}`;
+ *  EASE_IN. */
+const SPRING_IN =
+  "300ms linear(0, 0.0199, 0.0718, 0.1453, 0.2321, 0.3253, 0.4198, 0.5116, 0.598, 0.6771, 0.7478, 0.8096, 0.8625, 0.9068, 0.9431, 0.972, 0.9945, 1.0113, 1.0233, 1.0313, 1.036, 1.0381, 1.0383, 1.0369, 1.0345, 1.0314, 1.0279, 1.0243, 1.0207, 1.0173, 1.0141, 1.0112, 1.0086, 1.0064, 1.0045, 1.0029, 1.0017, 1.0007, 0.9999, 0.9993, 1)";
 /** How far the panel reaches left of its edge, out of sight under the rail (or
  *  the viewport's edge) at rest, so the overshoot never opens a gap there. */
 const BLEED = 24;
