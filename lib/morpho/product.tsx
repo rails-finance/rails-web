@@ -770,7 +770,9 @@ function PositionsSection({ x, all, children }: { x: Ctx; all: { href: string; l
           />
         }
       >
-        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">Every borrower in the {x.pair} market.</p>
+        <p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-rb-500">
+          Every borrower in the {x.pair.endsWith("market") ? x.pair : `${x.pair} market`}.
+        </p>
       </SectionHeading>
       <div className="-mt-6">{children}</div>
     </ProvSection>
