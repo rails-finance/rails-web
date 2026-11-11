@@ -249,7 +249,7 @@ export function positionMetadata(opts: {
 /** A read-on-visit position page's description (rails-ops decision 0061): the
  *  position is read at the head, so there is no replay to name. */
 export const readAtHeadDescription = ({ label, noun }: { label: string; noun: string }) =>
-  `This ${label} ${noun} read from the chain at the latest block, with a receipt on every number.`;
+  `This ${label} ${noun}, read from the chain at the latest block, with a receipt on every number.`;
 
 /** Per-position page title for a surface that names its own SUBJECT rather than
  *  its explorer — the two vault-position routes, today.
