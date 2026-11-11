@@ -520,8 +520,6 @@ const SPECS: ProtocolSpec[] = [
     tags: ["Lend", "Borrow"],
     desc: "Euler's vaults on Arbitrum: a wallet's 256 accounts, each loan with its collateral and health, and each deposit over the last 30 days",
     positionListing: false,
-    readTier: "visit",
-    unlaunched: true,
     subPages: [],
   },
   {
