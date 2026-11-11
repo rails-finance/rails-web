@@ -10,7 +10,7 @@
 import Link from "next/link";
 import { ProtocolInfoPage, type InfoReads, type InfoView } from "@/components/shared/protocol-info-page";
 import { MORPHO_INFO_SHARED } from "@/components/protocol/morpho/morpho-info";
-import { MORPHO_ARC_CONTRACTS, MORPHO_ARC_ROUTE } from "@/lib/morpho-arc/types";
+import { MORPHO_ARC_CONTRACTS, MORPHO_ARC_ROUTE } from "@/lib/morpho-at-block/types";
 import { ARC_CHAIN_ID } from "@/lib/shared/chains";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";

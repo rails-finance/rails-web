@@ -1,8 +1,8 @@
-// A wallet's Morpho Blue positions on Arc (components/protocol/morpho-arc/morpho-arc-wallet.tsx).
+// A wallet's Morpho Blue positions on Arc (components/protocol/morpho-at-block/morpho-at-block-wallet.tsx).
 
 import type { Metadata } from "next";
 import { positionMetadata } from "@/lib/shared/page-metadata";
-import { MorphoArcWallet } from "@/components/protocol/morpho-arc/morpho-arc-wallet";
+import { MorphoAtBlockWallet } from "@/components/protocol/morpho-at-block/morpho-at-block-wallet";
 
 interface Props {
   params: Promise<{ wallet: string }>;
@@ -17,5 +17,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
   const { wallet } = await params;
-  return <MorphoArcWallet wallet={wallet} />;
+  return <MorphoAtBlockWallet wallet={wallet} />;
 }

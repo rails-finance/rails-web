@@ -1,8 +1,8 @@
-// One Morpho Blue position on Arc (components/protocol/morpho-arc/morpho-arc-position-page.tsx).
+// One Morpho Blue position on Arc (components/protocol/morpho-at-block/morpho-at-block-position-page.tsx).
 
 import type { Metadata } from "next";
 import { positionMetadata } from "@/lib/shared/page-metadata";
-import { MorphoArcPositionPage } from "@/components/protocol/morpho-arc/morpho-arc-position-page";
+import { MorphoAtBlockPositionPage } from "@/components/protocol/morpho-at-block/morpho-at-block-position-page";
 
 interface Props {
   params: Promise<{ wallet: string; market: string }>;
@@ -22,5 +22,5 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
   const { wallet, market } = await params;
-  return <MorphoArcPositionPage wallet={wallet} market={market} />;
+  return <MorphoAtBlockPositionPage wallet={wallet} market={market} />;
 }

@@ -1,5 +1,6 @@
-// The figures of a Morpho Blue position on Arc (rails-ops ui-jobs 577), from
-// rails-server's raw reads (lib/morpho-arc/types.ts). Pure and client-safe.
+// The figures of a Morpho Blue position read on visit, on Arc or Optimism
+// (rails-ops ui-jobs 577 and 578), from
+// rails-server's raw reads (lib/morpho-at-block/types.ts). Pure and client-safe.
 //
 // A market's totals are as Blue last settled them; the figures here bring them
 // to the read's block the way Blue's MorphoBalancesLib does: the IRM's
@@ -8,18 +9,19 @@
 // recipient. Shares convert to assets with SharesMathLib's virtual shares and
 // assets (1e6 and 1): supply rounds down, debt rounds up.
 //
-// Dollars (decision 0047): the loan token at its Chainlink feed on Arc at the
-// same block; collateral at the market's oracle price into the loan token,
-// then at that feed. A market whose loan token has no feed there has none.
+// Dollars (decision 0047): the loan token at the price rails-server read at the
+// same block (its Chainlink feed, or on Optimism Aave V3's oracle where there is
+// no feed); collateral at the market's oracle price into the loan token, then at
+// that price. A market whose loan token has neither has none.
 
 import type {
-  ArcMorphoMarket,
-  ArcMorphoPosition,
-  ArcMorphoPositionRead,
-  ArcMorphoState,
-  ArcMorphoToken,
-  ArcMorphoWalletRead,
-  ArcUsdFeed,
+  MorphoAtBlockMarket,
+  MorphoAtBlockPosition,
+  MorphoAtBlockPositionRead,
+  MorphoAtBlockState,
+  MorphoAtBlockToken,
+  MorphoAtBlockWalletRead,
+  AtBlockUsdFeed,
 } from "./types";
 
 // Relative imports and the zero address inline: scripts/test/morpho-arc.test.mjs loads this
@@ -61,7 +63,7 @@ export interface Totals {
 }
 
 /** The market's totals at `time`: as stored, with the interest since its last update. */
-export function accrue(s: ArcMorphoState, borrowRate: string | null, time: number): Totals {
+export function accrue(s: MorphoAtBlockState, borrowRate: string | null, time: number): Totals {
   const elapsed = Math.max(0, time - Number(s.lastUpdate));
   let supplyAssets = B(s.totalSupplyAssets);
   let supplyShares = B(s.totalSupplyShares);
@@ -81,12 +83,12 @@ export function accrue(s: ArcMorphoState, borrowRate: string | null, time: numbe
   return { supplyAssets, supplyShares, borrowAssets, borrowShares, accrued, elapsed };
 }
 
-export interface ArcTokenFacts {
+export interface AtBlockTokenFacts {
   address: string;
   symbol: string;
   decimals: number;
 }
-export const tokenFacts = (address: string, tokens: Record<string, ArcMorphoToken>): ArcTokenFacts => {
+export const tokenFacts = (address: string, tokens: Record<string, MorphoAtBlockToken>): AtBlockTokenFacts => {
   const t = tokens[address.toLowerCase()];
   return {
     address: address.toLowerCase(),
@@ -95,8 +97,8 @@ export const tokenFacts = (address: string, tokens: Record<string, ArcMorphoToke
   };
 };
 
-/** The loan token's USD price at its feed, or null where Arc has none for it. */
-export function loanUsd(loanToken: string, feeds: readonly ArcUsdFeed[]): { price: number; feed: ArcUsdFeed } | null {
+/** The loan token's USD price as read, or null where the chain has none for it. */
+export function loanUsd(loanToken: string, feeds: readonly AtBlockUsdFeed[]): { price: number; feed: AtBlockUsdFeed } | null {
   const f = feeds.find((x) => x.token === loanToken.toLowerCase());
   if (!f || f.answer == null || f.decimals == null) return null;
   const price = Number(f.answer) / 10 ** f.decimals;
@@ -105,14 +107,14 @@ export function loanUsd(loanToken: string, feeds: readonly ArcUsdFeed[]): { pric
 
 const scale = (raw: bigint, decimals: number) => Number(raw) / 10 ** decimals;
 
-export type ArcInterest =
+export type AtBlockInterest =
   | { state: "ok"; amount: number; raw: bigint; usd: number | null }
   | { state: "opened" | "changed" | "unread" };
 
-export interface ArcMorphoFigures {
+export interface MorphoAtBlockFigures {
   id: string;
-  loan: ArcTokenFacts;
-  collateralToken: ArcTokenFacts | null;
+  loan: AtBlockTokenFacts;
+  collateralToken: AtBlockTokenFacts | null;
   isIdle: boolean;
   /** 0..1 */
   lltv: number;
@@ -139,8 +141,8 @@ export interface ArcMorphoFigures {
   borrowApr: number | null;
   supplyApr: number | null;
   utilization: number | null;
-  /** The loan token's USD price; null where Arc has no feed for it. */
-  usd: { price: number; feed: ArcUsdFeed } | null;
+  /** The loan token's USD price; null where the chain has none for it. */
+  usd: { price: number; feed: AtBlockUsdFeed } | null;
   suppliedUsd: number | null;
   debtUsd: number | null;
   collateralUsd: number | null;
@@ -149,13 +151,13 @@ export interface ArcMorphoFigures {
 }
 
 /** A position's figures at the read's block. */
-export function morphoArcFigures(
-  m: ArcMorphoMarket,
-  p: ArcMorphoPosition,
+export function morphoAtBlockFigures(
+  m: MorphoAtBlockMarket,
+  p: MorphoAtBlockPosition,
   time: number,
-  tokens: Record<string, ArcMorphoToken>,
-  feeds: readonly ArcUsdFeed[],
-): ArcMorphoFigures {
+  tokens: Record<string, MorphoAtBlockToken>,
+  feeds: readonly AtBlockUsdFeed[],
+): MorphoAtBlockFigures {
   const loan = tokenFacts(m.loanToken, tokens);
   const isIdle = m.collateralToken === ZERO_ADDRESS;
   const coll = isIdle ? null : tokenFacts(m.collateralToken, tokens);
@@ -209,20 +211,20 @@ export function morphoArcFigures(
   };
 }
 
-export interface ArcMorphoPositionFigures extends ArcMorphoFigures {
+export interface MorphoAtBlockPositionFigures extends MorphoAtBlockFigures {
   /** The interest the supply earned and the debt gathered over the 30 days, where the shares
    *  are the same at both reads. */
-  supplyInterest: ArcInterest | null;
-  debtInterest: ArcInterest | null;
+  supplyInterest: AtBlockInterest | null;
+  debtInterest: AtBlockInterest | null;
   pastTotals: Totals | null;
 }
 
 /** One position, with the 30 days' interest from the market at the two blocks. */
-export function morphoArcPosition(r: ArcMorphoPositionRead): ArcMorphoPositionFigures {
-  const f = morphoArcFigures(r.market, r.position, r.head.time, r.tokens, r.usdFeeds);
+export function morphoAtBlockPosition(r: MorphoAtBlockPositionRead): MorphoAtBlockPositionFigures {
+  const f = morphoAtBlockFigures(r.market, r.position, r.head.time, r.tokens, r.usdFeeds);
   const past = r.past;
   const pastTotals = past ? accrue(past.state, past.borrowRate, r.then.time) : null;
-  const side = (key: "supplyShares" | "borrowShares"): ArcInterest | null => {
+  const side = (key: "supplyShares" | "borrowShares"): AtBlockInterest | null => {
     const now = B(r.position[key]);
     if (now === B(0)) return null;
     if (!past || !pastTotals || !f.totals) return { state: "unread" };
@@ -242,10 +244,10 @@ export function morphoArcPosition(r: ArcMorphoPositionRead): ArcMorphoPositionFi
 }
 
 /** A wallet's positions, largest dollar value first (unpriced last, by creation). */
-export function morphoArcWalletPositions(r: ArcMorphoWalletRead): (ArcMorphoFigures & { createdBlock: number })[] {
+export function morphoAtBlockWalletPositions(r: MorphoAtBlockWalletRead): (MorphoAtBlockFigures & { createdBlock: number })[] {
   return r.positions
     .map((m) => ({
-      ...morphoArcFigures(m, m.position, r.head.time, r.tokens, r.usdFeeds),
+      ...morphoAtBlockFigures(m, m.position, r.head.time, r.tokens, r.usdFeeds),
       createdBlock: m.createdBlock,
     }))
     .sort((a, b) => {

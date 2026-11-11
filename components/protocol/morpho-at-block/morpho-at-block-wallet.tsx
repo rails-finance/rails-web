@@ -13,13 +13,13 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
 import { Prov } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { MorphoArcReceipts } from "@/components/protocol/morpho-arc/morpho-arc-receipts";
+import { MorphoAtBlockReceipts } from "@/components/protocol/morpho-at-block/morpho-at-block-receipts";
 import { ROW } from "@/components/protocol/uniswap/uniswap-wallet-positions";
-import { fetchMorphoArcWallet } from "@/lib/api/fetch-morpho-arc";
-import { morphoArcWalletPositions, type ArcMorphoFigures } from "@/lib/morpho-arc/position";
-import { morphoArcProv, type MorphoArcReceiptContext } from "@/lib/morpho-arc/provenance";
-import { MORPHO_ARC_ROUTE, MORPHO_ARC_SESSION, isArcWallet, type ArcMorphoWalletRead } from "@/lib/morpho-arc/types";
-import { amount, CARD_WORDS, FRONT_DOOR, pairName, pctText, usd } from "@/lib/morpho-arc/words";
+import { fetchMorphoAtBlockWallet } from "@/lib/api/fetch-morpho-at-block";
+import { morphoAtBlockWalletPositions, type MorphoAtBlockFigures } from "@/lib/morpho-at-block/position";
+import { morphoAtBlockProv, type MorphoAtBlockReceiptContext } from "@/lib/morpho-at-block/provenance";
+import { MORPHO_ARC_ROUTE, MORPHO_ARC_SESSION, isMorphoWallet, type MorphoAtBlockWalletRead } from "@/lib/morpho-at-block/types";
+import { amount, CARD_WORDS, FRONT_DOOR, pairName, pctText, usd } from "@/lib/morpho-at-block/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 
 function Figure({
@@ -30,7 +30,7 @@ function Figure({
   valueUsd,
   unit,
 }: {
-  c: MorphoArcReceiptContext;
+  c: MorphoAtBlockReceiptContext;
   usdKey: "usd-collateral" | "usd-debt" | "usd-supplied";
   unitKey: "collateral" | "debt" | "supplied";
   value: number;
@@ -38,13 +38,13 @@ function Figure({
   unit: string;
 }) {
   return valueUsd != null ? (
-    <Prov info={morphoArcProv(usdKey, c)}>{usd(valueUsd)}</Prov>
+    <Prov info={morphoAtBlockProv(usdKey, c)}>{usd(valueUsd)}</Prov>
   ) : (
-    <Prov info={morphoArcProv(unitKey, c)}>{amount(value, unit)}</Prov>
+    <Prov info={morphoAtBlockProv(unitKey, c)}>{amount(value, unit)}</Prov>
   );
 }
 
-function rowFigures(f: ArcMorphoFigures, c: MorphoArcReceiptContext) {
+function rowFigures(f: MorphoAtBlockFigures, c: MorphoAtBlockReceiptContext) {
   const parts: React.ReactNode[] = [];
   if (f.collateral > 0 && f.collateralToken)
     parts.push(
@@ -84,19 +84,19 @@ function rowFigures(f: ArcMorphoFigures, c: MorphoArcReceiptContext) {
   if (f.ltv != null)
     parts.push(
       <span key="l">
-        {CARD_WORDS.ltv} <Prov info={morphoArcProv("ltv", c)}>{pctText(f.ltv, 1)}</Prov>
+        {CARD_WORDS.ltv} <Prov info={morphoAtBlockProv("ltv", c)}>{pctText(f.ltv, 1)}</Prov>
       </span>,
     );
   return parts.flatMap((p, i) => (i ? [" · ", p] : [p]));
 }
 
-export async function MorphoArcWallet({ wallet: raw }: { wallet: string }) {
-  if (!isArcWallet(raw)) notFound();
+export async function MorphoAtBlockWallet({ wallet: raw }: { wallet: string }) {
+  if (!isMorphoWallet(raw)) notFound();
   const wallet = raw.toLowerCase();
   const session = MORPHO_ARC_SESSION;
-  const answer = await fetchMorphoArcWallet(wallet);
-  const r: ArcMorphoWalletRead | null = answer.kind === "ok" ? answer.data : null;
-  const rows = r ? morphoArcWalletPositions(r) : [];
+  const answer = await fetchMorphoAtBlockWallet(wallet);
+  const r: MorphoAtBlockWalletRead | null = answer.kind === "ok" ? answer.data : null;
+  const rows = r ? morphoAtBlockWalletPositions(r) : [];
   return (
     <div className="py-8" data-anatomy="U3" data-morpho-arc-wallet={wallet}>
       <header className="mb-5">
@@ -120,11 +120,11 @@ export async function MorphoArcWallet({ wallet: raw }: { wallet: string }) {
           {FRONT_DOOR.none}
         </p>
       ) : (
-        <MorphoArcReceipts scopeId="morpho-arc-wallet">
+        <MorphoAtBlockReceipts scopeId="morpho-arc-wallet">
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {rows.map((f) => {
               const m = r.positions.find((x) => x.id === f.id)!;
-              const c: MorphoArcReceiptContext = { f, m, p: m.position, head: r.head };
+              const c: MorphoAtBlockReceiptContext = { f, m, p: m.position, head: r.head };
               return (
                 <li key={f.id}>
                   <Link
@@ -146,7 +146,7 @@ export async function MorphoArcWallet({ wallet: raw }: { wallet: string }) {
               );
             })}
           </ul>
-        </MorphoArcReceipts>
+        </MorphoAtBlockReceipts>
       )}
       <ProvInspectorLayer />
     </div>

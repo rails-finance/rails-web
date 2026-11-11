@@ -5,10 +5,10 @@
 // Markets page.
 
 import { PoolFrontDoor } from "@/components/protocol/uniswap/uniswap-front-door";
-import { FRONT_DOOR, LABEL } from "@/lib/morpho-arc/words";
-import { MORPHO_ARC_ROUTE, MORPHO_ARC_SESSION } from "@/lib/morpho-arc/types";
+import { FRONT_DOOR, LABEL } from "@/lib/morpho-at-block/words";
+import { MORPHO_ARC_ROUTE, MORPHO_ARC_SESSION } from "@/lib/morpho-at-block/types";
 
-export function MorphoArcFrontDoor() {
+export function MorphoAtBlockFrontDoor() {
   return (
     <PoolFrontDoor
       id={MORPHO_ARC_SESSION}

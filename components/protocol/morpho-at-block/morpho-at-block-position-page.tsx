@@ -1,6 +1,6 @@
 // One Morpho Blue position on Arc (rails-ops ui-jobs 577), at
 // `/arc/morpho/<wallet>/<market id>`: the position card, read from
-// rails-server's at-block route (lib/api/fetch-morpho-arc.ts). The layout is
+// rails-server's at-block route (lib/api/fetch-morpho-at-block.ts). The layout is
 // Aave V4 on Arc's (components/protocol/aave-v4-arc/aave-v4-arc-position-page.tsx).
 //
 // SERVER-ONLY: the read uses the bearer token.
@@ -11,24 +11,24 @@ import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
-import { MorphoArcPositionCard } from "@/components/protocol/morpho-arc/morpho-arc-position-card";
-import { fetchMorphoArcPosition } from "@/lib/api/fetch-morpho-arc";
-import { morphoArcFigures } from "@/lib/morpho-arc/position";
-import { MORPHO_ARC_ROUTE, MORPHO_ARC_SESSION, isArcMarketId, isArcWallet } from "@/lib/morpho-arc/types";
-import { POSITION_PAGE } from "@/lib/morpho-arc/words";
+import { MorphoAtBlockPositionCard } from "@/components/protocol/morpho-at-block/morpho-at-block-position-card";
+import { fetchMorphoAtBlockPosition } from "@/lib/api/fetch-morpho-at-block";
+import { morphoAtBlockFigures } from "@/lib/morpho-at-block/position";
+import { MORPHO_ARC_ROUTE, MORPHO_ARC_SESSION, isMorphoMarketId, isMorphoWallet } from "@/lib/morpho-at-block/types";
+import { POSITION_PAGE } from "@/lib/morpho-at-block/words";
 import { morphoMarketHref } from "@/lib/morpho/market-routes";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { ARC_CHAIN_ID } from "@/lib/shared/chains";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 /** One read per request: the metadata and the page share it. */
-export const loadMorphoArcPosition = cache((id: string, wallet: string) => fetchMorphoArcPosition(id, wallet));
+export const loadMorphoAtBlockPosition = cache((id: string, wallet: string) => fetchMorphoAtBlockPosition(id, wallet));
 
-export async function MorphoArcPositionPage({ market: rawId, wallet: raw }: { market: string; wallet: string }) {
-  if (!isArcWallet(raw) || !isArcMarketId(rawId)) notFound();
+export async function MorphoAtBlockPositionPage({ market: rawId, wallet: raw }: { market: string; wallet: string }) {
+  if (!isMorphoWallet(raw) || !isMorphoMarketId(rawId)) notFound();
   const wallet = raw.toLowerCase();
   const id = rawId.toLowerCase();
-  const answer = await loadMorphoArcPosition(id, wallet);
+  const answer = await loadMorphoAtBlockPosition(id, wallet);
   if (answer.kind === "not-found") notFound();
   const session = MORPHO_ARC_SESSION;
   const home = `${MORPHO_ARC_ROUTE}/${wallet}`;
@@ -52,7 +52,7 @@ export async function MorphoArcPositionPage({ market: rawId, wallet: raw }: { ma
       </div>
     );
   const r = answer.data;
-  const f = morphoArcFigures(r.market, r.position, r.head.time, r.tokens, r.usdFeeds);
+  const f = morphoAtBlockFigures(r.market, r.position, r.head.time, r.tokens, r.usdFeeds);
   const held = r.position.supplyShares !== "0" || r.position.borrowShares !== "0" || r.position.collateral !== "0";
   return (
     <div className="min-h-screen">
@@ -72,7 +72,7 @@ export async function MorphoArcPositionPage({ market: rawId, wallet: raw }: { ma
           </p>
         </header>
         {held ? (
-          <MorphoArcPositionCard r={r} />
+          <MorphoAtBlockPositionCard r={r} />
         ) : (
           <p className="text-sm text-rb-500" data-morpho-arc-empty="">
             {POSITION_PAGE.empty}

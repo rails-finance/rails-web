@@ -13,7 +13,7 @@
 
 import { ARBITRUM_CHAIN_ID, ARC_CHAIN_ID, BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { MORPHO_ARBITRUM_IRM } from "@/lib/morpho-arbitrum/asset-catalog";
-import { MORPHO_ARC_CONTRACTS } from "@/lib/morpho-arc/types";
+import { MORPHO_ARC_CONTRACTS } from "@/lib/morpho-at-block/types";
 
 /** The AdaptiveCurveIRM on each chain, lowercased. Each answers `MORPHO()`
  *  with its chain's Morpho Blue (read 9 Nov 2026). */

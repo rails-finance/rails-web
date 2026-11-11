@@ -6,7 +6,7 @@
 import type { ReactNode } from "react";
 import { ProvReceiptsScope, useReceiptRegistry } from "@/components/shared/provenance";
 
-export function MorphoArcReceipts({ scopeId, children }: { scopeId: string; children: ReactNode }) {
+export function MorphoAtBlockReceipts({ scopeId, children }: { scopeId: string; children: ReactNode }) {
   const registry = useReceiptRegistry();
   return (
     <ProvReceiptsScope registry={registry} scopeId={scopeId}>

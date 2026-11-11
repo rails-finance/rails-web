@@ -15,7 +15,7 @@
 // resolved separately via the ERC20 multicall).
 
 import { MORPHO_ARBITRUM_BLUE } from "@/lib/morpho-arbitrum/asset-catalog";
-import { MORPHO_ARC_CONTRACTS } from "@/lib/morpho-arc/types";
+import { MORPHO_ARC_CONTRACTS } from "@/lib/morpho-at-block/types";
 
 /** Morpho Blue singleton (mainnet, lowercase). The one contract every market,
  *  position, and event belongs to — the provenance dock names it. */

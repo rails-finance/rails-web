@@ -7,10 +7,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MorphoMarketPage } from "@/lib/morpho/product";
 import { marketViewData } from "@/lib/morpho/markets-shape";
-import { fetchMorphoArcMarket } from "@/lib/api/fetch-morpho-arc";
-import { arcMarketResponse } from "@/lib/morpho-arc/markets";
-import { MORPHO_ARC_ROUTE, ZERO_ADDRESS } from "@/lib/morpho-arc/types";
-import { MARKET_LIST_WORDS } from "@/lib/morpho-arc/words";
+import { fetchMorphoAtBlockMarket } from "@/lib/api/fetch-morpho-at-block";
+import { atBlockMarketResponse } from "@/lib/morpho-at-block/markets";
+import { MORPHO_ARC_ROUTE, ZERO_ADDRESS } from "@/lib/morpho-at-block/types";
+import { MARKET_LIST_WORDS } from "@/lib/morpho-at-block/words";
 import { ARC_CHAIN_ID } from "@/lib/shared/chains";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 
 const ADDRESS = /^0x[0-9a-f]{40}$/;
 const MARKET_ID = /^0x[0-9a-f]{64}$/;
-const load = cache((id: string) => fetchMorphoArcMarket(id));
+const load = cache((id: string) => fetchMorphoAtBlockMarket(id));
 
 type Params = { params: Promise<{ loanToken: string; marketId: string }> };
 
@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const id = marketId.toLowerCase();
   if (!ADDRESS.test(token) || !MARKET_ID.test(id)) return { title: "Morpho Blue market on Arc" };
   const a = await load(id);
-  const m = a.kind === "ok" ? arcMarketResponse(a.data).market : null;
+  const m = a.kind === "ok" ? atBlockMarketResponse(a.data).market : null;
   // The idle market names no loan token, so it is named as the idle market.
   const pair = !m
     ? "Morpho Blue market"
@@ -52,7 +52,7 @@ export default async function MorphoArcMarketRoute({ params }: Params) {
   if (!ADDRESS.test(token) || !MARKET_ID.test(id)) notFound();
   const a = await load(id);
   if (a.kind === "not-found") notFound();
-  const data = a.kind === "ok" ? arcMarketResponse(a.data) : null;
+  const data = a.kind === "ok" ? atBlockMarketResponse(a.data) : null;
   if (data && data.params.loanToken !== token) notFound();
   // A market the list leaves out keeps its page and says why; the idle market says what it is.
   const m = a.kind === "ok" ? a.data.market : null;

@@ -1,4 +1,4 @@
-// lib/morpho-arc/position.ts against wallet 0x6844…b68a's cirBTC/USDC position on Arc (read through
+// lib/morpho-at-block/position.ts against wallet 0x6844…b68a's cirBTC/USDC position on Arc (read through
 // rails-server's /api/at-block/morpho-arc/position on 11 Nov 2026, rails-ops ui-jobs 577): the debt
 // from shares at the totals compounded since the last update, the collateral through the oracle,
 // the LTV and room to borrow, dollars at the USDC/USD feed, 30-day interest where the shares match,
@@ -7,8 +7,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-const { accrue, morphoArcPosition, morphoArcWalletPositions, toAssetsUp, wTaylorCompounded } = await import(
-  "../../lib/morpho-arc/position.ts"
+const { accrue, morphoAtBlockPosition, morphoAtBlockWalletPositions, toAssetsUp, wTaylorCompounded } = await import(
+  "../../lib/morpho-at-block/position.ts"
 );
 
 const READ = {
@@ -89,7 +89,7 @@ test("the market's totals compound from the last update to the block", () => {
 });
 
 test("the position: debt, collateral through the oracle, LTV, room and dollars", () => {
-  const f = morphoArcPosition(READ);
+  const f = morphoAtBlockPosition(READ);
   near(f.debt, 8025.9, 0.2, "debt in USDC");
   near(f.collateral, 0.18334232, 1e-9, "collateral in cirBTC");
   near(f.oraclePrice, 73921.4869, 0.001, "one cirBTC in USDC at the oracle");
@@ -102,25 +102,25 @@ test("the position: debt, collateral through the oracle, LTV, room and dollars",
 });
 
 test("30 days of interest where the shares match, withheld where they do not", () => {
-  const f = morphoArcPosition(READ);
+  const f = morphoAtBlockPosition(READ);
   assert.equal(f.debtInterest.state, "ok", "the same shares at both reads");
   near(f.debtInterest.amount, 22.57, 0.05, "interest over the 30 days, USDC");
   assert.equal(f.supplyInterest, null, "no supply side");
-  const changed = morphoArcPosition({
+  const changed = morphoAtBlockPosition({
     ...READ,
     past: { ...READ.past, position: { ...READ.past.position, borrowShares: "1" } },
   });
   assert.equal(changed.debtInterest.state, "changed", "a different share count");
-  const opened = morphoArcPosition({
+  const opened = morphoAtBlockPosition({
     ...READ,
     past: { ...READ.past, position: { ...READ.past.position, borrowShares: "0" } },
   });
   assert.equal(opened.debtInterest.state, "opened", "none 30 days back");
-  assert.equal(morphoArcPosition({ ...READ, past: null }).debtInterest.state, "unread", "the past read failed");
+  assert.equal(morphoAtBlockPosition({ ...READ, past: null }).debtInterest.state, "unread", "the past read failed");
 });
 
 test("a loan token with no feed on Arc has no dollar figure", () => {
-  const f = morphoArcPosition({ ...READ, usdFeeds: [] });
+  const f = morphoAtBlockPosition({ ...READ, usdFeeds: [] });
   assert.equal(f.debtUsd, null, "no debt dollars");
   assert.equal(f.collateralUsd, null, "no collateral dollars");
   assert.equal(f.debtInterest.usd, null, "no interest dollars");
@@ -134,7 +134,7 @@ test("the wallet's positions, largest dollar value first", () => {
     position: { ...READ.position, collateral: "1" },
   };
   const big = { ...READ.market, createdBlock: 1, position: READ.position };
-  const rows = morphoArcWalletPositions({
+  const rows = morphoAtBlockWalletPositions({
     ...READ,
     list: { from: 1, keptTo: 2, toBlock: 3 },
     marketsRead: 2,
@@ -147,9 +147,9 @@ test("the wallet's positions, largest dollar value first", () => {
   );
 });
 
-// The markets list (lib/morpho-arc/unlisted.ts): the markets rails-server marks unlisted stay off the
+// The markets list (lib/morpho-at-block/unlisted.ts): the markets rails-server marks unlisted stay off the
 // list; the idle market stays.
-const { listedMarkets, arcUnlisted } = await import("../../lib/morpho-arc/unlisted.ts");
+const { listedMarkets, atBlockUnlisted } = await import("../../lib/morpho-at-block/unlisted.ts");
 
 test("the markets list leaves out the test-token and never-supplied markets, and keeps the idle market", () => {
   const ZERO = "0x0000000000000000000000000000000000000000";
@@ -201,6 +201,6 @@ test("the markets list leaves out the test-token and never-supplied markets, and
     ["0xidle", "0xbtc"],
     "the two unlisted markets are left out; the idle market stays",
   );
-  const u = arcUnlisted(r);
+  const u = atBlockUnlisted(r);
   assert.deepEqual([u.test, u.never, u.idle?.id], [1, 1, "0xidle"], "the line's counts and the idle market");
 });

@@ -7,16 +7,16 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MorphoLoanTokenPage } from "@/lib/morpho/roster";
 import { loanTokenViewData } from "@/lib/morpho/markets-shape";
-import { fetchMorphoArcMarkets } from "@/lib/api/fetch-morpho-arc";
-import { arcMarketsResponse } from "@/lib/morpho-arc/markets";
+import { fetchMorphoAtBlockMarkets } from "@/lib/api/fetch-morpho-at-block";
+import { atBlockMarketsResponse } from "@/lib/morpho-at-block/markets";
 import { ARC_CHAIN_ID } from "@/lib/shared/chains";
 
 export const dynamic = "force-dynamic";
 
 const ADDRESS = /^0x[0-9a-f]{40}$/;
 const load = cache(async () => {
-  const a = await fetchMorphoArcMarkets();
-  return a.kind === "ok" ? arcMarketsResponse(a.data) : null;
+  const a = await fetchMorphoAtBlockMarkets();
+  return a.kind === "ok" ? atBlockMarketsResponse(a.data) : null;
 });
 
 type Params = { params: Promise<{ loanToken: string }> };
