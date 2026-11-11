@@ -11,16 +11,16 @@
 //
 // Focus offers one saved view, the one chosen on /bookmarks?tab=focus (else
 // the view in use, else the first saved; lib/shared/asset-scope.ts
-// `menuView`), and Off. Wallets lists the first ten saved in the reader's
-// order (lib/shared/sessions.ts; /bookmarks orders them), Listings and
-// Positions the first five. A group with nothing saved keeps its heading and
-// shows one hint row to its tab. Long names fade at the line's end
-// (`FADE`); rows read nothing, showing what the browser holds.
+// `menuView`), and Off. Listings, Wallets and Positions each list the items
+// starred on /bookmarks, up to five, or with none starred the first five, in
+// the reader's order (ui-jobs 586; lib/shared/sessions.ts `menuEntries`). A
+// group is drawn only when it holds something. Long names fade at the line's
+// end (`FADE`); rows read nothing, showing what the browser holds.
 //
 // From md a dropdown under the control, right edges aligned, dropping in with
-// a small bounce (globals.css `.profile-drop`); below md a sheet from the foot
-// of the screen over a dim (ui-jobs 507), rising over 220ms
-// (`.profile-sheet`).
+// a small bounce (globals.css `.profile-drop`), no taller than the window
+// below it, scrolling within itself; below md a sheet from the foot of the
+// screen over a dim (ui-jobs 507), rising over 220ms (`.profile-sheet`).
 //
 // The face is the first saved wallet's; with none, the sample wallet's
 // (lib/shared/sample-wallet.ts). Until the browser's list is read a faint
@@ -33,7 +33,7 @@
 // through its items.
 
 import { CHROME_HOVER, CHROME_HOVER_ON } from "@/components/nav/chrome-hover";
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -55,16 +55,15 @@ import { START_CTA } from "@/lib/shared/ui-grammar";
 import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
+import { menuEntries } from "@/lib/shared/sessions";
 
 const BOOKMARKS_PATH = "/bookmarks";
 /** The control's and the menu's accessible name: what the menu holds as a whole. */
 const MENU_NAME = "Saved and settings";
 /** The guided way in (G, /start), reached from this menu (ui-jobs 509). */
 const START_PATH = "/start";
-/** The menu lists this many wallets, and this many of each other kind; the
- *  rest are on /bookmarks. */
-const MENU_ROWS = 10;
-const MENU_LINK_ROWS = 5;
+/** The gap kept under the dropdown when it scrolls within the window. */
+const DROP_MARGIN = 16;
 
 /** The room between the menu's groups (Miles's mockup: about 32px). */
 const GROUP = "mt-8";
@@ -117,15 +116,6 @@ function GroupHeading({
         className={`size-[18px] shrink-0 opacity-0 transition-opacity group-hover/head:opacity-100 group-focus-visible/head:opacity-100 ${HEADING_TOUCH.cog}`}
         aria-hidden="true"
       />
-    </Link>
-  );
-}
-
-/** A group with nothing saved: one muted row to the place to add one. */
-function EmptyHint({ href, onDone, children }: { href: string; onDone: () => void; children: ReactNode }) {
-  return (
-    <Link href={href} role="menuitem" onClick={onDone} className={`${ITEM} text-rb-500`} data-profile-menu-empty="">
-      {children}
     </Link>
   );
 }
@@ -285,7 +275,11 @@ export function ProfileMenu() {
   const scope = useAssetScope();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [place, setPlace] = useState<{ top: number; right: number; phone: boolean } | null>(null);
+  const [place, setPlace] = useState<{
+    top: number;
+    right: number;
+    phone: boolean;
+  } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   // When a press outside closed the menu, the click that ends the same press
   // can land on the control under the dim and would open it again: a press on
@@ -296,9 +290,10 @@ export function ProfileMenu() {
   useEffect(() => setMounted(true), []);
 
   const face = bookmarks == null ? null : (bookmarks[0]?.addresses[0] ?? SAMPLE_WALLET);
-  const rows = (bookmarks ?? []).slice(0, MENU_ROWS);
-  const listings = (views ?? []).slice(0, MENU_LINK_ROWS);
-  const held = (positions ?? []).slice(0, MENU_LINK_ROWS);
+  // The starred of each kind, or the first five (ui-jobs 586).
+  const rows = menuEntries(bookmarks ?? []);
+  const listings = menuEntries(views ?? []);
+  const held = menuEntries(positions ?? []);
   const focusOn = scope.ready && scope.on;
   const menuView = scope.menuView;
   /** Anything saved, focus views included, takes "Start here" out of the menu. */
@@ -319,7 +314,11 @@ export function ProfileMenu() {
   const measure = useCallback(() => {
     const r = trigger.current?.getBoundingClientRect();
     if (!r) return;
-    setPlace({ top: r.bottom + 8, right: window.innerWidth - r.right, phone: window.innerWidth < 768 });
+    setPlace({
+      top: r.bottom + 8,
+      right: window.innerWidth - r.right,
+      phone: window.innerWidth < 768,
+    });
   }, []);
   useLayoutEffect(() => {
     if (!open) return;
@@ -388,24 +387,22 @@ export function ProfileMenu() {
     };
   }, [open, close]);
 
+  // A group is drawn only when it holds something (ui-jobs 586).
   const linkGroups = [
-    { kind: "listings", tab: "listings", label: "Listings", rows: listings, hint: "Save a listing" },
-    { kind: "positions", tab: "positions", label: "Positions", rows: held, hint: "Save a position" },
+    { kind: "listings", tab: "listings", label: "Listings", rows: listings },
+    { kind: "positions", tab: "positions", label: "Positions", rows: held },
   ] as const;
-  const linkGroup = (g: (typeof linkGroups)[number]) => (
-    <div key={g.kind} role="group" aria-labelledby={`${menuId}-${g.kind}`} className={GROUP}>
-      <GroupHeading id={`${menuId}-${g.kind}`} group={g.kind} tab={g.tab} label={g.label} onDone={done} />
-      <div className="mt-1" data-profile-menu-links={g.kind}>
-        {g.rows.length > 0 ? (
-          g.rows.map((l) => <LinkRow key={l.key} link={l} onDone={done} />)
-        ) : (
-          <EmptyHint href={`${BOOKMARKS_PATH}?tab=${g.tab}`} onDone={done}>
-            {g.hint}
-          </EmptyHint>
-        )}
+  const linkGroup = (g: (typeof linkGroups)[number]) =>
+    g.rows.length > 0 && (
+      <div key={g.kind} role="group" aria-labelledby={`${menuId}-${g.kind}`} className={GROUP}>
+        <GroupHeading id={`${menuId}-${g.kind}`} group={g.kind} tab={g.tab} label={g.label} onDone={done} />
+        <div className="mt-1" data-profile-menu-links={g.kind}>
+          {g.rows.map((l) => (
+            <LinkRow key={l.key} link={l} onDone={done} />
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
 
   return (
     <>
@@ -459,12 +456,19 @@ export function ProfileMenu() {
               role="menu"
               aria-label={MENU_NAME}
               data-profile-menu=""
-              className={`fixed z-[var(--z-popover)] border border-rb-200 bg-background px-3 pb-4 pt-3 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
+              data-profile-menu-variant={place.phone ? "sheet" : "drop"}
+              className={`fixed z-[var(--z-popover)] overflow-y-auto overscroll-contain border border-rb-200 bg-background px-3 pb-4 pt-3 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
                 place.phone
-                  ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto overscroll-contain rounded-t-2xl border-x-0 border-b-0 pb-[max(1rem,env(safe-area-inset-bottom))]"
+                  ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] rounded-t-2xl border-x-0 border-b-0 pb-[max(1rem,env(safe-area-inset-bottom))]"
                   : "profile-drop w-80 rounded-xl"
               }`}
-              style={place.phone ? undefined : { top: place.top, right: place.right }}
+              // The dropdown stops above the window's foot and scrolls within
+              // itself (ui-jobs 586).
+              style={
+                place.phone
+                  ? undefined
+                  : { top: place.top, right: place.right, maxHeight: `calc(100dvh - ${place.top + DROP_MARGIN}px)` }
+              }
             >
               <ThemeSwitch />
               {/* With nothing saved, the way in, after the theme (Miles, 11
@@ -483,10 +487,10 @@ export function ProfileMenu() {
               )}
               {/* Focus: the one view chosen for this menu and Off (ui-jobs
                   582); the others are on /bookmarks?tab=focus. */}
-              <div role="group" aria-labelledby={`${menuId}-focus`} className={GROUP} data-profile-menu-focus="">
-                <GroupHeading id={`${menuId}-focus`} group="focus" tab="focus" label="Focus" onDone={done} />
-                <div className="mt-1" data-profile-menu-focus-views={scope.views.length}>
-                  {menuView ? (
+              {menuView && (
+                <div role="group" aria-labelledby={`${menuId}-focus`} className={GROUP} data-profile-menu-focus="">
+                  <GroupHeading id={`${menuId}-focus`} group="focus" tab="focus" label="Focus" onDone={done} />
+                  <div className="mt-1" data-profile-menu-focus-views={scope.views.length}>
                     <>
                       <button
                         type="button"
@@ -514,26 +518,20 @@ export function ProfileMenu() {
                         Off
                       </button>
                     </>
-                  ) : (
-                    <EmptyHint href={`${BOOKMARKS_PATH}?tab=focus`} onDone={done}>
-                      Make a focus view
-                    </EmptyHint>
-                  )}
+                  </div>
                 </div>
-              </div>
+              )}
               {linkGroup(linkGroups[0])}
-              <div role="group" aria-labelledby={`${menuId}-wallets`} className={GROUP}>
-                <GroupHeading id={`${menuId}-wallets`} group="wallets" tab="wallets" label="Wallets" onDone={done} />
-                <div className="mt-1" data-profile-menu-wallets="">
-                  {rows.length > 0 ? (
-                    rows.map((s) => <WalletRow key={s.key} session={s} onDone={done} />)
-                  ) : (
-                    <EmptyHint href={`${BOOKMARKS_PATH}?tab=wallets`} onDone={done}>
-                      Save a wallet
-                    </EmptyHint>
-                  )}
+              {rows.length > 0 && (
+                <div role="group" aria-labelledby={`${menuId}-wallets`} className={GROUP}>
+                  <GroupHeading id={`${menuId}-wallets`} group="wallets" tab="wallets" label="Wallets" onDone={done} />
+                  <div className="mt-1" data-profile-menu-wallets="">
+                    {rows.map((s) => (
+                      <WalletRow key={s.key} session={s} onDone={done} />
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
               {linkGroup(linkGroups[1])}
               <div role="group" aria-labelledby={`${menuId}-advanced`} className={GROUP}>
                 <p id={`${menuId}-advanced`} className={`${LABEL} flex min-h-8 items-center`}>

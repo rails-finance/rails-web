@@ -165,6 +165,8 @@ export interface WalletSession {
   preset?: boolean;
   /** User-provided display name, overrides ENS / short address. */
   customName?: string;
+  /** Starred on /bookmarks: shown in the profile menu (ui-jobs 586). */
+  starred?: boolean;
 }
 
 /** A saved position (530) or listing view (521): a page on this site by its
@@ -183,6 +185,8 @@ export interface SavedLink {
   /** A closed position's status tag at the last read of its card. */
   ended?: { word: string; tone: string };
   savedAt: number;
+  /** Starred on /bookmarks: shown in the profile menu (ui-jobs 586). */
+  starred?: boolean;
 }
 
 export type SavedEntry = WalletSession | SavedLink;
@@ -470,6 +474,48 @@ export function renameSession(key: string, customName: string): void {
   renameSaved("wallet", key, customName);
 }
 
+/** The profile menu shows at most this many of each kind (ui-jobs 586). */
+export const MENU_STARS = 5;
+
+/** What the profile menu shows of one kind: the starred entries, or with
+ *  none starred the first `MENU_STARS`, in the reader's order. */
+export function menuEntries<T extends SavedEntry>(rows: T[]): T[] {
+  const starred = rows.filter((r) => r.starred);
+  return (starred.length ? starred : rows).slice(0, MENU_STARS);
+}
+
+/** Keep at most `MENU_STARS` stars per kind, the first in the reader's
+ *  order (an import can bring more). */
+function capStars(rows: SavedEntry[]): SavedEntry[] {
+  const seen: Record<SavedKind, number> = { wallet: 0, position: 0, view: 0 };
+  return rows.map((r) => {
+    if (!r.starred) return r;
+    const kind = kindOf(r);
+    seen[kind] += 1;
+    if (seen[kind] <= MENU_STARS) return r;
+    const { starred: _starred, ...rest } = r;
+    void _starred;
+    return rest as SavedEntry;
+  });
+}
+
+/** Star or unstar an entry; a star past `MENU_STARS` of its kind is refused.
+ *  Returns whether the entry is starred after the press. */
+export function toggleStar(kind: SavedKind, id: string): boolean {
+  const want = idFor(kind, id);
+  const sessions = loadSessions();
+  const target = sessions.find((s) => kindOf(s) === kind && idOf(s) === want);
+  if (!target) return false;
+  if (target.starred) {
+    delete target.starred;
+  } else {
+    if (sessions.filter((s) => kindOf(s) === kind && s.starred).length >= MENU_STARS) return false;
+    target.starred = true;
+  }
+  saveSessions(sessions);
+  return !!target.starred;
+}
+
 /** Remove an entry of any kind. */
 export function removeSaved(kind: SavedKind, id: string): void {
   const want = idFor(kind, id);
@@ -637,6 +683,8 @@ export function importBookmarks(source: string): BookmarksImportResult {
     if (prev) {
       // The file's name fills a name the reader has not given here.
       if (!prev.customName && r.customName) prev.customName = r.customName;
+      // A star the file carries fills one not given here (capped below).
+      if (!prev.starred && r.starred) prev.starred = true;
     } else if (!newLinks.has(linkId(r))) {
       newLinks.set(linkId(r), { ...r, savedAt: typeof r.savedAt === "number" ? r.savedAt : Date.now() });
     }
@@ -658,7 +706,7 @@ export function importBookmarks(source: string): BookmarksImportResult {
 
   const read = new Set(wallets.map(primaryOf)).size + new Set(links.map(linkId)).size;
   try {
-    writeAll(rows);
+    writeAll(capStars(rows));
   } catch {
     throw new Error("This browser wouldn't let the items be saved. Check that site data is allowed.");
   }
