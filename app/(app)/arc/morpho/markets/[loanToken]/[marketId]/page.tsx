@@ -29,7 +29,12 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   if (!ADDRESS.test(token) || !MARKET_ID.test(id)) return { title: "Morpho Blue market on Arc" };
   const a = await load(id);
   const m = a.kind === "ok" ? arcMarketResponse(a.data).market : null;
-  const pair = m ? `${m.collateralSymbol ?? "no collateral"} / ${m.loanSymbol}` : "Morpho Blue market";
+  // The idle market names no loan token, so it is named as the idle market.
+  const pair = !m
+    ? "Morpho Blue market"
+    : m.isIdle && m.loanToken === ZERO_ADDRESS
+      ? "Idle market"
+      : `${m.collateralSymbol ?? "no collateral"} / ${m.loanSymbol}`;
   return {
     title: `${pair} · Morpho Blue on Arc`,
     description: `One Morpho Blue market on Arc, ${pair}: what it holds, what it pays and charges, its rate curve, its oracle price and its terms.`,
