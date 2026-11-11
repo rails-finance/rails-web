@@ -14,7 +14,7 @@ export const LABEL = "Balancer V3";
 
 export const FRONT_DOOR = {
   line: (chain: string) =>
-    `A wallet's Balancer V3 pool shares on ${chain}, each with its part of the pool's tokens and the pool over the last 30 days.`,
+    `Balancer V3 keeps pools of tokens that traders swap against, and liquidity providers hold shares of each pool: here, a wallet's pool shares on ${chain}, each with its part of the pool's tokens and the pool over the last 30 days.`,
   heading: "Balancer V3 pool shares",
   none: "Rails found no Balancer V3 pool this wallet holds a share of.",
   /** How the pools were found, said on every wallet page. */
@@ -24,8 +24,8 @@ export const FRONT_DOOR = {
     `This wallet has held shares of more pools than Rails reads at once: Rails checked the ${checked} it touched most recently and shows at most ${held}.`,
   unanswered: "The read of this wallet's pools did not answer. Try again in a minute.",
   rowShare: (s: number) => `${share(s)} of the pool`,
-  /** A row's gauge stake: the gauge holds these shares for the wallet. */
-  rowStaked: (s: number) => `Staked in a gauge: ${share(s)} of the pool`,
+  /** A row's gauge stake, part of the row's share: the gauge holds these shares for the wallet. */
+  rowStaked: (s: number) => `Of which staked in a gauge: ${share(s)}`,
   stakedTip: "Pool shares this wallet staked in the pool's gauge. The gauge holds them and pays rewards on them.",
 };
 
@@ -37,7 +37,8 @@ export const COUNT_WORDS = {
     "Each holding is one address's shares in one pool. The address is a wallet or a contract, such as a gauge or a router that holds pool shares.",
   holders: "Holders",
   holdersTip: "The addresses that hold shares of at least one pool, wallets and contracts both.",
-  line: (chain: string) => `Every pool share held on ${chain} now, from Rails's record of the Vault since it launched.`,
+  line: (chain: string) =>
+    `Every pool share held on ${chain} now, from Rails's record of Balancer V3 since it launched.`,
   unanswered: "Rails's count of pool shares did not answer. Try again in a minute.",
 };
 
@@ -91,7 +92,7 @@ export const READOUT = {
   title: "How the share and its pool are doing",
   sub: "Measured from the chain over the last 30 days. Rails does not forecast, rate or recommend.",
   explainerLabel: "explanation of these lines",
-  stakedWithheld: "Staked shares are read at the head only, so no 30-day change is shown.",
+  stakedWithheld: "Staked shares are read at the head only, so none of the wallet's figures shows a 30-day change.",
 };
 
 export type BalLineKey = "shares" | "share" | `token:${number}` | "rate" | "status";
@@ -196,7 +197,7 @@ export function cardExplainer(p: BalPosition): ExplainGroupWords[] {
       }`,
     held && "Swaps change the pool's mix of tokens, so these amounts move while the share stays the same.",
     yielding.length > 0 &&
-      `${yielding.length <= 2 ? yielding.join(" and ") : `${yielding.length} of its tokens`} earn yield: the pool counts each at its rate, a growing amount of underlying asset per token.`,
+      `${yielding.length <= 2 ? yielding.join(" and ") : `${yielding.length} of its tokens`} earn yield: the pool counts each at its rate, a growing amount of its underlying asset.`,
   ];
   const t = p.then;
   const rate =

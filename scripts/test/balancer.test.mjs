@@ -168,7 +168,7 @@ test("shares staked in a gauge sum into a part of the pool", () => {
   assert.equal(w.staked.shares, 10);
   assert.equal(w.staked.share, 0.01);
   assert.equal(w.staked.gauges.length, 2);
-  assert.equal(FRONT_DOOR.rowStaked(w.staked.share), "Staked in a gauge: 1.000% of the pool");
+  assert.equal(FRONT_DOOR.rowStaked(w.staked.share), "Of which staked in a gauge: 1.000%");
   assert.equal(walletRow({ ...row, staked: [] }).staked, null);
   assert.equal(walletRow({ ...row, balance: "5000000000000000000" }).share, 0.015);
 });
@@ -181,7 +181,10 @@ test("a stake counts in the card's share and withholds the wallet's 30-day lines
   assert.equal(p.split.held, plain.now.shares);
   assert.equal(p.windowWithheld, true);
   const lines = readoutLines(p);
-  assert.equal(lines[0].withheld, "Staked shares are read at the head only, so no 30-day change is shown.");
+  assert.equal(
+    lines[0].withheld,
+    "Staked shares are read at the head only, so none of the wallet's figures shows a 30-day change.",
+  );
   for (const l of lines) if (l.yours) assert.doesNotMatch(l.yours, /against/);
   assert.match(lines[0].pool, /against/);
   assert.equal(plain.windowWithheld, false);
