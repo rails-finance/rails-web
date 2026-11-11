@@ -127,7 +127,10 @@ export function storedValueProv(
   scope: string,
   c: StoredCoords,
   sum: PricedSum,
+  /** The amounts are the hub's totals per asset (Arc), not its lines per spoke. */
+  hubTotals = false,
 ): Provenance {
+  if (hubTotals) return hubValueProv(side, scope, c, sum);
   const getter = side === "supplied" ? "getSpokeAddedAssets" : "getSpokeTotalOwed";
   const words =
     side === "supplied"
@@ -179,6 +182,29 @@ export function storedValueProv(
   };
 }
 
+/** A hub's supplied or borrowed in USD from its own totals per asset, at the spoke oracle's price. */
+function hubValueProv(side: "supplied" | "borrowed", scope: string, c: StoredCoords, sum: PricedSum): Provenance {
+  const getter = side === "supplied" ? "getAddedAssets" : "getAssetTotalOwed";
+  const gap = sum.unpriced.length ? ` The total leaves out ${list(sum.unpriced)}, which no price source holds.` : "";
+  return {
+    kind: sum.market.length ? "derived" : "chain-derived",
+    pclass: sum.market.length ? "offchain" : "oracle",
+    source: { block: c.block ?? undefined },
+    summary: `${scope} ${side}, the hub's total${sum.unpriced.length ? " (partial)" : ""}. Each asset's ${side === "supplied" ? "added assets" : "total owed"} over every spoke the hub lends to${atStored(c)}, its tokenization and treasury spokes included, valued at the spoke oracle's price, then added up.${gap}`,
+    via: `${storedLane(c)} · hub ${getter}(assetId) per asset · × spoke oracle getReservePrice · summed`,
+    formula: "Σ (amount × price)",
+    inputs: [
+      { label: "amount", kind: "chain", pclass: lineClass(c), note: `the hub's ${getter}, read at the head` },
+      {
+        label: "price",
+        kind: "chain",
+        pclass: "oracle",
+        note: "the spoke oracle's getReservePrice, read with the line",
+      },
+    ],
+  };
+}
+
 /** A token amount's receipt, revalued in USD at its price. */
 /** `c`, where the amount is a stored line's: Arc's lines class as a state read. */
 export function pricedAmountProv(amount: Provenance, symbol: string, p: V4Price | null, c?: StoredCoords): Provenance {
@@ -226,6 +252,28 @@ export function storedAmountProv(
     source: { block: c.block ?? undefined },
     summary: `${scope}, ${what}. ${words[what][0].toUpperCase()}${words[what].slice(1)}${atStored(c)}.${what === "liquidity" ? ` ${ESTIMATE}` : ""}`,
     via: `${storedLane(c)} · ${via[what]}`,
+  };
+}
+
+/** A hub asset's own total over every spoke it lends to (Arc): its tokenization and treasury
+ *  spokes' balances are in it, so the lending spokes' credit lines add up to less. */
+export function hubAssetProv(what: "supplied" | "borrowed" | "liquidity", scope: string, c: StoredCoords): Provenance {
+  const call: Record<typeof what, string> = {
+    supplied: "hub getAddedAssets(assetId)",
+    borrowed: "hub getAssetTotalOwed(assetId)",
+    liquidity: "hub getAssetLiquidity(assetId)",
+  };
+  const words: Record<typeof what, string> = {
+    supplied: "The tokens added to the hub by every spoke (Aave's added assets)",
+    borrowed: "The tokens every spoke owes the hub, drawn and premium, with interest",
+    liquidity: "The tokens the hub holds undrawn",
+  };
+  return {
+    kind: "chain",
+    pclass: lineClass(c),
+    source: { block: c.block ?? undefined },
+    summary: `${scope}, ${what}, the hub's total. ${words[what]}${atStored(c)}, its tokenization and treasury spokes included; the credit lines below are the lending spokes' alone.`,
+    via: `${storedLane(c)} · ${call[what]}`,
   };
 }
 

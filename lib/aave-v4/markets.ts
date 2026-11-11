@@ -134,6 +134,9 @@ export interface V4Stored {
   spokes: V4Spoke[];
   /** Hub key → per-hub open positions (Ethereum). */
   hubPositions: Partial<Record<V4HubKey, number>>;
+  /** Arc: each hub asset's own totals over every spoke (lending, tokenization and treasury), in
+   *  tokens, by hub and underlying. Hubs reads these in place of the sum of the lending spokes' lines. */
+  hubTotals?: Partial<Record<V4HubKey, Record<string, { supplied: number; borrowed: number; liquidity: number }>>>;
 }
 
 function spokesOf(lines: V4Line[], positions: (key: string) => number | null): V4Spoke[] {
@@ -328,6 +331,18 @@ export function storedFromArc(data: ArcMarketsRead): V4Stored {
     lines,
     spokes: spokesOf(lines, () => null),
     hubPositions: {},
+    hubTotals: {
+      core: Object.fromEntries(
+        data.assets.map((a) => [
+          a.underlying.toLowerCase(),
+          {
+            supplied: tokens(a.added, a.decimals),
+            borrowed: tokens(a.totalOwed, a.decimals),
+            liquidity: tokens(a.liquidity, a.decimals),
+          },
+        ]),
+      ),
+    },
   };
 }
 
@@ -524,6 +539,9 @@ export interface V4HubAsset {
   supplyApr: number | null;
   liquidityFee: number | null;
   lines: V4Line[];
+  /** Supplied, borrowed and liquidity are the hub's figures for the asset (Arc), which
+   *  count every spoke; the lines below them are the lending spokes' only. */
+  hubTotal?: true;
 }
 
 export interface V4Hub {
@@ -542,8 +560,9 @@ export function hubsOf(s: V4Stored): V4Hub[] {
     const by = new Map<string, V4Line[]>();
     for (const l of ls) by.set(l.underlying, [...(by.get(l.underlying) ?? []), l]);
     const assets: V4HubAsset[] = [...by.values()].map((g) => {
-      const supplied = g.reduce((a, l) => a + l.supplied, 0);
-      const borrowed = g.reduce((a, l) => a + l.borrowed, 0);
+      const own = s.hubTotals?.[hub]?.[g[0].underlying];
+      const supplied = own ? own.supplied : g.reduce((a, l) => a + l.supplied, 0);
+      const borrowed = own ? own.borrowed : g.reduce((a, l) => a + l.borrowed, 0);
       const drawnApr = g.find((l) => l.drawnApr != null)?.drawnApr ?? null;
       const liquidityFee = g.find((l) => l.liquidityFee != null)?.liquidityFee ?? null;
       const utilisation = supplied > 0 ? borrowed / supplied : null;
@@ -555,12 +574,13 @@ export function hubsOf(s: V4Stored): V4Hub[] {
         cls: g[0].cls,
         supplied,
         borrowed,
-        liquidity: Math.max(0, supplied - borrowed),
+        liquidity: own ? own.liquidity : Math.max(0, supplied - borrowed),
         utilisation,
         drawnApr,
         supplyApr: drawnApr != null && utilisation != null ? drawnApr * utilisation * (1 - (liquidityFee ?? 0)) : null,
         liquidityFee,
         lines: g,
+        ...(own ? { hubTotal: true as const } : {}),
       };
     });
     const spokes = new Map<string, { key: string; slug: string; name: string }>();
