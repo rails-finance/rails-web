@@ -514,7 +514,7 @@ await phone.close();
 // `rails-saved` with a kind per entry, started from the wallet-only
 // `rails-bookmarks`, which keeps its old shape for builds from before. A
 // wallet such a build adds there joins the list and the views stay; the
-// profile menu groups Wallets, Positions, Views in that order, and /bookmarks
+// profile menu groups Focus, Listings, Wallets, Positions in that order (ui-jobs 582), and /bookmarks
 // has the same three tabs, each row opening its saved page. A listing's ⋮
 // (N1.7) saves the view under its URL.
 {
@@ -588,7 +588,11 @@ await phone.close();
   const groups = await sp
     .locator("[data-profile-menu-group]")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-profile-menu-group")));
-  check("SV profile menu groups: wallets, views", groups.join() === "wallets,views", groups.join());
+  check(
+    "SV profile menu groups: focus, listings, wallets, positions",
+    groups.join() === "focus,listings,wallets,positions",
+    groups.join(),
+  );
   await sp.keyboard.press("Escape");
   await sp.goto(`${BASE}/bookmarks?tab=views`, { waitUntil: "networkidle" });
   await sp.waitForSelector('[data-bookmark-row="view"]');

@@ -68,6 +68,12 @@ export function BookmarksPage() {
     if (new URLSearchParams(window.location.search).get("tab") === "backup")
       requestAnimationFrame(() => document.getElementById("saved-backup")?.scrollIntoView({ block: "start" }));
   }, []);
+  // A heading in the profile menu (H20) can change the tab while this page
+  // stays mounted (ui-jobs 582): read it again when the address changes.
+  useEffect(() => {
+    const t = tabFromUrl();
+    if (t !== tab) setTab(t);
+  });
   const choose = (t: Tab) => {
     setTab(t);
     const url = new URL(window.location.href);
@@ -313,9 +319,15 @@ export function BookmarksPage() {
           )}
           {tab === "focus" && (
             <>
+              {scope.views.length > 0 && (
+                <p className="mb-3 text-sm text-rb-500" data-focus-menu-note="">
+                  The profile menu offers one focus view. Choose it here with Show in menu.
+                </p>
+              )}
               <FocusViewList
                 views={scope.views}
                 active={scope.active?.id ?? null}
+                menu={scope.menuView?.id ?? null}
                 empty={
                   <div data-anatomy="B3">
                     <p className="font-semibold text-foreground">No focus views yet.</p>

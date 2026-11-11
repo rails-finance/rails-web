@@ -373,8 +373,8 @@ const mHeaderBeta = await mHomePage.locator('header[data-anatomy="H2"]').first()
 check(!/beta/i.test(mHeaderBeta), "home @390: the header carries no beta pill");
 const mFooterBeta = await mHomePage.locator("footer [data-phone-beta]").isVisible();
 check(mFooterBeta, "home @390: the beta pill is in the footer");
-// The profile control's menu (ui-jobs 504): a menu button; with nothing
-// saved, the line on saving one and the theme switch; a full-width sheet at
+// The profile control's menu (ui-jobs 504, 582): a menu button; with nothing
+// saved, the theme switch, Start here and each group's hint row; a full-width sheet at
 // the foot of the screen (ui-jobs 507)
 // below md; Escape closes it and returns focus.
 const h20 = mHomePage.locator('header [data-anatomy="H20"]');
@@ -391,7 +391,7 @@ const sheet = await mHomePage.evaluate(() => {
     bottom: r ? Math.round(r.bottom) : 0,
     empty: !!m?.querySelector("[data-profile-menu-empty]"),
     themes: [...(m?.querySelectorAll("[data-theme-option]") ?? [])].map((b) => b.textContent.trim()).join(","),
-    manage: !!m?.querySelector('[data-profile-menu-manage][href="/bookmarks"]'),
+    manage: !!m?.querySelector('[data-profile-menu-group="wallets"][href="/bookmarks?tab=wallets"]'),
     start:
       !!m?.querySelector('a[data-profile-menu-start][href="/start"]') &&
       !!m?.querySelector("[data-profile-menu-empty]"),
@@ -407,7 +407,7 @@ check(
     sheet.start &&
     sheet.scrim &&
     sheet.themes === "Light,Dark,Auto",
-  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: Start here across the top, how to save, Manage saved items, the theme switch (${JSON.stringify(sheet)})`,
+  `home @390: H20 opens a full-width sheet at the screen's foot over a dim: the theme switch, Start here, the hint rows, the Wallets heading to its tab (${JSON.stringify(sheet)})`,
 );
 // A press on the dim closes the sheet.
 await mHomePage.waitForTimeout(300);
