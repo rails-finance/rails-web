@@ -113,8 +113,7 @@ export interface VaultSummary {
   createdBlock: number | null;
   /** The position census for this vault: every address it counted, live and
    *  closed (a floor), and how many held shares at its block. Null where the
-   *  read names no census (Maple; Yearn on the rosters and the index) or the
-   *  census did not answer. */
+   *  read names no census (Maple) or the census did not answer. */
   census: { holders: number; live: number; sumMatches: boolean; atBlock: number } | null;
   /** The block every figure above was read at, and when that read was taken. */
   readAt: { block: number; timestamp: string };
@@ -235,8 +234,12 @@ export const aaveEthereumVaultSummaries = (
 
 /** A Yearn V3 vault on Ethereum. Its share has the asset's decimals (Yearn V3's
  *  `decimals()` returns the asset's); the directory reads no `totalSupply()`
- *  and no role manager, and there is no census. */
-export function yearnVaultSummary(r: YearnVaultDirectoryRow, d: YearnVaultDirectoryResponse): VaultSummary {
+ *  and no role manager. */
+export function yearnVaultSummary(
+  r: YearnVaultDirectoryRow,
+  d: YearnVaultDirectoryResponse,
+  census?: VaultCensusRow,
+): VaultSummary {
   const standing: VaultStanding[] = [];
   if (r.endorsed === true) standing.push("endorsed");
   if (r.shutdown === true) standing.push("shut-down");
@@ -258,13 +261,18 @@ export function yearnVaultSummary(r: YearnVaultDirectoryRow, d: YearnVaultDirect
     steward: null,
     standing,
     createdBlock: r.createdBlock,
-    census: null,
+    census: censusOf(census),
     readAt: readAt(d),
   };
 }
 
-export const yearnVaultSummaries = (d: YearnVaultDirectoryResponse): VaultSummary[] =>
-  d.rows.map((r) => yearnVaultSummary(r, d));
+export const yearnVaultSummaries = (
+  d: YearnVaultDirectoryResponse,
+  census: readonly VaultCensusRow[] = [],
+): VaultSummary[] => {
+  const by = censusByVault(census);
+  return d.rows.map((r) => yearnVaultSummary(r, d, by.get(r.address)));
+};
 
 /** A Maple syrup pool on Ethereum (ERC-4626), from the pools page's read
  *  (lib/sources/chain/maple-pool-state.ts): `totalAssets()`, `totalSupply()`
@@ -372,8 +380,8 @@ export function aaveEthereumVaultPageSummary(
   };
 }
 
-/** A Yearn V3 vault's page read, with its census row where the census answered. */
-export function yearnVaultPageSummary(d: YearnVaultResponse, census: VaultCensusRow | null = null): VaultSummary {
+/** A Yearn V3 vault's page read. */
+export function yearnVaultPageSummary(d: YearnVaultResponse, census: VaultCensusRow | null): VaultSummary {
   const v = d.vault;
   const standing: VaultStanding[] = [];
   if (v.endorsed === true) standing.push("endorsed");

@@ -634,7 +634,7 @@ check(
   await page.waitForSelector('[data-anatomy="V5"]', { timeout: 120_000 }).catch(() => null);
   const strip = await readVaultStrip(page);
   const store = await readStoreSeries(BASE, 8453, stripVault);
-  vaultStripChecks(check, "17", strip, store, { chain: 8453, vault: stripVault, censusFamily: true });
+  vaultStripChecks(check, "17", strip, store, { chain: 8453, vault: stripVault });
 }
 
 // ── 16: the default view (ui-jobs 485) ──────────────────────────────────────

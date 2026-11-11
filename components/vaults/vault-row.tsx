@@ -14,8 +14,8 @@
 // Headlines, in this order: Total assets · Share price · Yield · Holders. The
 // first two are in the vault's asset. Yield is decision 0047's figure where the
 // store's series measures 30 days, else no figure and a subline. Holders is the census's floor,
-// linked to the positions listing filtered to this vault, and a dash where
-// there is no census. The steward is not on the row.
+// linked to the positions listing filtered to this vault where the family has
+// one (Yearn has none), and a dash where there is no census. The steward is not on the row.
 //
 // The whole card is one link to the vault's page. The link lies under the
 // card, which takes no pointer events, so a press anywhere reaches it; the

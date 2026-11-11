@@ -90,7 +90,7 @@ export const VAULT_FAMILIES: Record<VaultFamily, VaultFamilyEntry> = {
     label: "Yearn V3",
     singular: "Yearn V3 vault",
     kind: "Allocator vault",
-    census: null,
+    census: "yearn-v3",
     served: "yearn-v3",
   },
   "maple-pool": {

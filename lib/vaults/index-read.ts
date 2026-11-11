@@ -8,8 +8,8 @@
 // and Maple's two syrup pools, which keep their pools page and join here
 // as rows (survey 2026-10-20 §7.6). Each roster is read by its loader at its
 // block, the same read its page makes, and the index names each
-// block. Holders is each roster's census where it has one; Yield is the daily
-// store's (decision 0047), which serves no Maple series.
+// block. Holders is each roster's census, which every roster but Maple's has;
+// Yield is the daily store's (decision 0047), which serves no Maple series.
 //
 // CACHED FOR FIVE MINUTES, THE ROSTERS' WINDOW (ui-jobs 479). The index is the
 // same read for every reader, so the whole of it goes through Next's data cache
@@ -51,6 +51,7 @@ import { loadAssetScales } from "@/lib/vaults/asset-scale";
 import { loadVaultYields } from "@/lib/vaults/yield-read";
 import type { VaultYield } from "@/lib/vaults/yield";
 import { vaultIndexKey, type VaultIndexRoster } from "@/lib/vaults/index-rosters";
+import type { VaultCensusFamily } from "@/lib/vaults/families";
 
 export interface VaultIndexRead {
   vaults: VaultSummary[];
@@ -80,9 +81,9 @@ const CENSUS_TIMEOUT_MS = 5000;
 /** One chain's census header: the rows' Holders. An unanswered census leaves
  *  the figure out. Read from rails-server direct, as the positions proxy reads
  *  it, because a cached read names no reader to sign for. `families` scopes
- *  the read: chain 1 holds Aave's three families, its default, and MetaMorpho's
- *  `morpho`. */
-async function loadCensus(chainId: number, families?: string): Promise<VaultCensusRow[] | null> {
+ *  the read: chain 1 holds Aave's three families, its default, MetaMorpho's
+ *  `morpho` and Yearn's `yearn-v3`. */
+async function loadCensus(chainId: number, families?: VaultCensusFamily): Promise<VaultCensusRow[] | null> {
   const base = process.env.RAILS_API_URL;
   if (!base) return null;
   try {
@@ -113,32 +114,43 @@ const loadMaplePools = unstable_cache(
 );
 
 async function readVaultIndex(): Promise<VaultIndexRead> {
-  const [morphoRead, morphoEthRead, aaveRead, yearnRead, maple, baseCensusRead, ethCensusRead, ethMorphoCensusRead] =
-    await Promise.all([
-      loadMetaMorphoVaultDirectory(BASE_CHAIN_ID).catch(
-        unread<MorphoBaseVaultDirectoryResponse | null>("Morpho's vault directory (Base)", null),
-      ),
-      loadMetaMorphoVaultDirectory(MAINNET_CHAIN_ID).catch(
-        unread<MorphoBaseVaultDirectoryResponse | null>("Morpho's vault directory (Ethereum)", null),
-      ),
-      loadAaveEthereumVaultDirectory().catch(
-        unread<AaveEthereumVaultDirectoryResponse | null>("Aave's vault directory", null),
-      ),
-      loadYearnEthereumVaultDirectory().catch(
-        unread<YearnVaultDirectoryResponse | null>("Yearn's vault directory", null),
-      ),
-      loadMaplePools().catch((error) => {
-        console.error("Maple's pools did not answer for the vault index:", error);
-        return { states: [] as MaplePoolState[], readAt: new Date().toISOString() };
-      }),
-      loadCensus(BASE_CHAIN_ID),
-      loadCensus(MAINNET_CHAIN_ID),
-      loadCensus(MAINNET_CHAIN_ID, "morpho"),
-    ]);
+  const [
+    morphoRead,
+    morphoEthRead,
+    aaveRead,
+    yearnRead,
+    maple,
+    baseCensusRead,
+    ethCensusRead,
+    ethMorphoCensusRead,
+    yearnCensusRead,
+  ] = await Promise.all([
+    loadMetaMorphoVaultDirectory(BASE_CHAIN_ID).catch(
+      unread<MorphoBaseVaultDirectoryResponse | null>("Morpho's vault directory (Base)", null),
+    ),
+    loadMetaMorphoVaultDirectory(MAINNET_CHAIN_ID).catch(
+      unread<MorphoBaseVaultDirectoryResponse | null>("Morpho's vault directory (Ethereum)", null),
+    ),
+    loadAaveEthereumVaultDirectory().catch(
+      unread<AaveEthereumVaultDirectoryResponse | null>("Aave's vault directory", null),
+    ),
+    loadYearnEthereumVaultDirectory().catch(
+      unread<YearnVaultDirectoryResponse | null>("Yearn's vault directory", null),
+    ),
+    loadMaplePools().catch((error) => {
+      console.error("Maple's pools did not answer for the vault index:", error);
+      return { states: [] as MaplePoolState[], readAt: new Date().toISOString() };
+    }),
+    loadCensus(BASE_CHAIN_ID),
+    loadCensus(MAINNET_CHAIN_ID),
+    loadCensus(MAINNET_CHAIN_ID, "morpho"),
+    loadCensus(MAINNET_CHAIN_ID, "yearn-v3"),
+  ]);
 
   const baseCensus = baseCensusRead ?? [];
   const ethCensus = ethCensusRead ?? [];
   const ethMorphoCensus = ethMorphoCensusRead ?? [];
+  const yearnCensus = yearnCensusRead ?? [];
   const morpho: MorphoBaseVaultDirectoryResponse = morphoRead ?? {
     ...staleAt(),
     chainId: BASE_CHAIN_ID,
@@ -170,7 +182,7 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
     (address) => aaveVaultAttestation(address, aave.rows.find((r) => r.address === address)!.family).kind === "book",
     ethCensus,
   );
-  const yearnVaults = yearnVaultSummaries(yearn);
+  const yearnVaults = yearnVaultSummaries(yearn, yearnCensus);
   const mapleBlock = maple.states[0]?.blockNumber ?? 0;
   const mapleStale = maple.states.length === 0;
   const mapleVaults = mapleStale
@@ -231,6 +243,7 @@ async function readVaultIndex(): Promise<VaultIndexRead> {
       baseCensusRead,
       ethCensusRead,
       ethMorphoCensusRead,
+      yearnCensusRead,
       baseYieldsRead,
       ethYieldsRead,
     ].some((r) => r == null),

@@ -74,11 +74,8 @@ const DATE = /\b\d{1,2} [A-Z][a-z]{2} \d{4}\b/g;
 const WINDOW = /\b\d+ days\b/g;
 const PCT = /[+\-−]?[\d,]+(?:\.\d+)?%/g;
 
-/**
- * The checks. `censusFamily`: false on Yearn, whose Holders tile states that
- * there is no census.
- */
-export function vaultStripChecks(check, id, strip, store, { chain, vault, censusFamily }) {
+/** The checks. Every family the strip draws for has a census (Yearn's since ui-jobs 585). */
+export function vaultStripChecks(check, id, strip, store, { chain, vault }) {
   check(
     `${id}a the strip (V5) draws under the vault card and above "Where the assets are", tiles Total assets, Share price, Holders`,
     strip != null &&
@@ -150,23 +147,10 @@ export function vaultStripChecks(check, id, strip, store, { chain, vault, census
   );
 
   const holders = strip.tiles.find((t) => t.tile === "holders");
-  if (censusFamily) {
-    check(
-      `${id}d the Holders tile draws the store's series, or the census's read with no line`,
-      holders != null &&
-        (holders.change != null || holders.none === "young" || (holders.census != null && holders.days == null)),
-      holders ? `"${holders.sentence}"` : "no tile",
-    );
-  } else {
-    // Yearn has no census, so until the store serves a holders series the tile
-    // says so; once it serves one the tile draws it (components/vaults/vault-strip.tsx),
-    // and ${id}b has held its change and days to the store.
-    check(
-      `${id}d the Holders tile on Yearn draws the store's series, or states that there is no census and draws no line`,
-      holders != null &&
-        (holders.change != null ||
-          (holders.census === "none" && /no census/.test(holders.sentence) && holders.days == null)),
-      holders ? `"${holders.sentence}"` : "no tile",
-    );
-  }
+  check(
+    `${id}d the Holders tile draws the store's series, or the census's read with no line`,
+    holders != null &&
+      (holders.change != null || holders.none === "young" || (holders.census != null && holders.days == null)),
+    holders ? `"${holders.sentence}"` : "no tile",
+  );
 }

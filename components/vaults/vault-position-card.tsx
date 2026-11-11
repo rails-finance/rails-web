@@ -1,8 +1,8 @@
 "use client";
 
 // One vault HOLDING as a listing card — the pair `(vault, holder)` — for the
-// Aave vault layer on Ethereum and MetaMorpho on Base (Yearn has no census and
-// no listing). The card is a slot builder (rails-ops TO-DO-position-card 322,
+// Aave vault layer on Ethereum and MetaMorpho on Base (Yearn has no listing).
+// The card is a slot builder (rails-ops TO-DO-position-card 322,
 // 323, 324): `vaultCardSlots` turns the census row and the listing's live read
 // into one `PositionCardSlots` object and the shared `PositionCard` draws it.
 // The holder page draws components/vaults/vault-holding-plain-card.tsx (V8).

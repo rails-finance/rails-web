@@ -13,8 +13,9 @@
 // scope this renders inside.
 //
 // THE PRESET (ui-jobs 485). The roster opens on the vaults people use: a vault
-// with a census when it counts 100+ current holders, a Yearn vault when the
-// Registry endorses it, any other vault always (Maple's pools). A removable
+// with a census when it counts 100+ current holders, a Yearn vault the census
+// has no row for when the Registry endorses it, any other vault always
+// (Maple's pools). A removable
 // default chip; `?show=all` lifts it, and a link whose facets it would empty
 // opens without it. A roster with neither signal has no preset.
 //
@@ -146,7 +147,7 @@ const rawOf = (v: VaultSummary) => BigInt(v.totalAssets?.raw ?? "0");
 /** Size's key: what the vault holds, its stated total less `lostAssets` (ui-jobs 543). */
 const heldOf = (v: VaultSummary) => (v.totalAssets ? heldAssetsRaw(v.totalAssets.raw, v.lostAssets?.raw) : BigInt(0));
 
-/** Has the vault a signal the preset reads: a census, or Yearn's endorsement. */
+/** Has the vault a signal the preset reads: a census, else Yearn's endorsement. */
 const hasSignal = (v: VaultSummary) => v.census != null || v.family === "yearn-v3";
 
 type SortKey = "holders" | "size" | "newest";
@@ -312,7 +313,8 @@ export function VaultRoster({
 
   // ── the preset and the sort: what this roster has the signals for ──────────
   const withCensus = useMemo(() => vaults.some((v) => v.census != null), [vaults]);
-  const withYearn = useMemo(() => vaults.some((v) => v.family === "yearn-v3"), [vaults]);
+  // Endorsement decides only for a Yearn vault the census has no row for.
+  const withYearn = useMemo(() => vaults.some((v) => v.family === "yearn-v3" && v.census == null), [vaults]);
   const presetParts = [
     ...(withCensus ? [`${ROSTER_HOLDERS_MIN}+ holders`] : []),
     ...(withYearn ? [withCensus || vaults.some((v) => v.family !== "yearn-v3") ? "Yearn endorsed" : "Endorsed"] : []),

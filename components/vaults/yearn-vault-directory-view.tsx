@@ -13,7 +13,8 @@
 // call 1). The address sits beside every name: four names on this roster are
 // each carried by three vaults.
 //
-// No census: the Holders slot reads "no census" until Yearn has one.
+// Holders is the position census's (ui-jobs 585); with no positions listing,
+// the figure links nowhere.
 
 import type { ReactNode } from "react";
 import type { ServerRead } from "@/lib/shared/server-head-read";
@@ -62,6 +63,7 @@ export function YearnVaultDirectoryView({
   chainStale,
   catalogSize,
   censusBlock,
+  holdersBlock,
   /** Rows whose endorsement read did not answer, by address: the row draws no
    *  pill for them, and the verifier tells unread from false. */
   endorsementUnread,
@@ -76,6 +78,8 @@ export function YearnVaultDirectoryView({
   chainStale: boolean;
   catalogSize: number;
   censusBlock: number;
+  /** The position census's block; null where the census did not answer. */
+  holdersBlock: number | null;
   endorsementUnread: readonly string[];
 }) {
   const coords: YearnVaultCoords = { blockNumber: blockNumber || undefined, readBy };
@@ -120,7 +124,10 @@ export function YearnVaultDirectoryView({
               <Prov info={yearnRosterCensusProv(coords, { catalogSize, censusBlock })}>
                 The {n(catalogSize)} vaults the Yearn V3 factories had deployed on Ethereum at block {n(censusBlock)}
               </Prov>
-              ; <Prov info={yearnEndorsedCountProv(coords, endorsed, catalogSize)}>{n(endorsed)} are endorsed</Prov>.
+              ; <Prov info={yearnEndorsedCountProv(coords, endorsed, catalogSize)}>{n(endorsed)} are endorsed</Prov>
+              {holdersBlock != null
+                ? `. Holders counts every address that has held a share by census block ${n(holdersBlock)}.`
+                : "."}
             </>
           ),
           listingHref: null,
@@ -136,7 +143,7 @@ export function YearnVaultDirectoryView({
               }}
             />
           ),
-          drawer: <YearnRosterDrawer block={readBlock} />,
+          drawer: <YearnRosterDrawer block={readBlock} withHolders={holdersBlock != null} />,
         }}
       />
     </ProvSection>
@@ -144,7 +151,7 @@ export function YearnVaultDirectoryView({
 }
 
 /** The listing intro drawer (standards/explanation-copy-charter.md §8a). */
-function YearnRosterDrawer({ block }: { block: ReactNode }) {
+function YearnRosterDrawer({ block, withHolders }: { block: ReactNode; withHolders: boolean }) {
   return (
     <>
       <h3 className="text-[13px] font-semibold text-foreground">What a Yearn V3 vault is</h3>
@@ -167,7 +174,9 @@ function YearnRosterDrawer({ block }: { block: ReactNode }) {
         ordered or added together. Yield is Rails&rsquo;s figure: the share price&rsquo;s growth over 30 days,
         annualised simply, net of the fees the vault takes inside the share; gauge rewards paid outside the share are
         not in it. An empty vault answered zero to <code>totalAssets()</code>: a deployment never funded looks the same
-        as one whose depositors have all left. Yearn has no holder census here yet.
+        as one whose depositors have all left.
+        {withHolders &&
+          " Holders counts every address the census has seen hold a share, live and closed, at its own block: a floor, since an address is often a wrapper."}
       </p>
     </>
   );

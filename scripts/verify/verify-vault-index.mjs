@@ -31,7 +31,7 @@
 //   7  every row links under its protocol, to a vault its roster lists (a
 //      Maple pool to /ethereum/maple/pools/<key>); two links per protocol answer 200
 //   8  the rosters' heads link the index
-//   9  the index draws no receipt and offers no provenance inspector (ui-jobs 538);
+//   9  the index's rows carry receipts and the page offers the inspector (ui-jobs 571);
 //      every Total assets and Share price figure names its asset
 //  10  the default view (ui-jobs 485): the preset's rows against ?show=all,
 //      its chip, the counts line, its removal and Reset, and the table's
@@ -384,14 +384,16 @@ for (const k of KEYS) {
   );
 }
 
-// ── 9: no receipts and no inspector (ui-jobs 538) ───────────────────────
+// ── 9: receipts and the inspector (ui-jobs 571, decision 0062) ──────────
+// /vaults became inspectable: each row traces its figures, and the page
+// offers the inspector. ui-jobs 538's "no receipts" no longer holds.
 {
   const receipts = await page
     .locator("[data-vault-index] .prov-locate-box, [data-vault-index] [data-prov-covered]")
     .count();
-  check("9a the index draws no receipt", receipts === 0, `${receipts} receipt spans`);
+  check("9a the index's rows carry receipts", receipts > 0, `${receipts} receipt spans`);
   const tools = await page.locator("button.prov-inspect-toggle, [data-prov-tripwire]").count();
-  check("9b the page offers no provenance inspector", tools === 0, `${tools} inspector controls`);
+  check("9b the page offers the provenance inspector", tools > 0, `${tools} inspector controls`);
 }
 
 // ── 9c: no figure reads unitless (decision 0028 point 8) ────────────────────

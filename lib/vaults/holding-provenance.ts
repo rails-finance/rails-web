@@ -58,7 +58,7 @@ const holdingClaimProv_ = (c: HoldingCoords, label = "Claim"): Provenance => ({
 });
 
 /** First seen from the replay: the block of this address's first Transfer in
- *  the vault, where no census exists (Yearn). */
+ *  the vault, on a holding page that reads no census row (Yearn). */
 const holdingFirstSeenProv_ = (c: HoldingCoords, block: number): Provenance => ({
   kind: "chain-derived",
   pclass: "emitted",

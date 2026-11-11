@@ -4,10 +4,10 @@
 // words; this module adds Fees, Where the money is lent and Who holds it.
 // Each states a reading; nothing here rates, forecasts or recommends.
 //
-// Pure: type imports, and the steward note from health-words.ts.
+// Pure: type imports, the family table and the steward note from health-words.ts.
 
 import type { CompareSort } from "./compare";
-import type { VaultFamily } from "./families";
+import { VAULT_FAMILIES, type VaultFamily } from "./families";
 import { STEWARD_ATTESTATION } from "./health-words";
 
 export const COMPARE_TITLE = "Compare vaults";
@@ -155,7 +155,7 @@ export const HOLDER_WORDS = {
     `${address}${shape ? `, ${shape}` : ""}: ${share} of the vault`,
   othersTitle: (share: string) => `Every other holder: ${share} of the vault`,
   noCensus: (family: VaultFamily) =>
-    family === "yearn-v3" || family === "maple-pool" ? "No holder count yet." : "The census did not answer.",
+    VAULT_FAMILIES[family].census == null ? "No holder count yet." : "The census did not answer.",
   /** The donut's name for a screen reader. */
   aria: (live: string) => `The largest holders' shares of the vault, of ${live} holders`,
 };

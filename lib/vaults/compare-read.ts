@@ -12,7 +12,7 @@
 //     stake tokens set none; Savings GHO's and Maple's are not read.
 //   Where the money is lent: as the vault's page states it.
 //   Who holds it: the census's six largest live holders and its live count
-//     (Yearn and Maple have no census).
+//     (Maple has no census).
 //
 // No figure here is scored; the page sorts by the figures it states. Like the
 // index, the page carries no receipts: each vault's page keeps them.
@@ -349,7 +349,8 @@ const CENSUS_TIMEOUT_MS = 5000;
 async function holdersOf(v: VaultSummary): Promise<CompareHolders> {
   const none = { kind: "none" as const, why: HOLDER_WORDS.noCensus(v.family) };
   const base = process.env.RAILS_API_URL;
-  if (!base || !v.census || VAULT_FAMILIES[v.family].census == null) return none;
+  const family = VAULT_FAMILIES[v.family].census;
+  if (!base || !v.census || family == null) return none;
   const qs = new URLSearchParams({
     chain: String(v.chainId),
     vault: v.address,
@@ -359,7 +360,8 @@ async function holdersOf(v: VaultSummary): Promise<CompareHolders> {
     limit: String(DONUT_HOLDERS),
     overlay: "0",
   });
-  if (v.family === "metamorpho" && v.chainId === 1) qs.set("families", "morpho");
+  // Each family's own census word: a chain-1 read without it answers Aave's three.
+  qs.set("families", family);
   try {
     const res = await fetch(
       `${base}/api/vaults/positions?${qs.toString()}`,

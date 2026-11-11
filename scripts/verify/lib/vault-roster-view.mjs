@@ -2,8 +2,8 @@
 // components/vaults/vault-roster.tsx), as the roster verifiers check it.
 // ----------------------------------------------------------------------------
 // A roster opens on its preset: a vault with a census when it counts 100+
-// current holders, a Yearn vault when the Registry endorses it, any other
-// vault kept. `?show=all` lifts it. The sort is Holders where a census
+// current holders, a Yearn vault the census has no row for when the Registry
+// endorses it, any other vault kept. `?show=all` lifts it. The sort is Holders where a census
 // exists (else Size), `?sortBy=size` and `?sortBy=newest` the others. Every
 // row carries the hooks this reads (`data-holders-live`, `data-standing`,
 // `data-vault-family`, `data-created-block`, `data-total-assets-raw`).

@@ -320,7 +320,7 @@ const page = await context.newPage();
 
 // ── 0: the roster answers, and states one block ─────────────────────────────
 // ui-jobs 485: every row, by size, which is what the roster checks below read;
-// the last section checks the default view (endorsed, Size) against it.
+// the last section checks the default view (100+ holders, Holders) against it.
 const res0 = await page.goto(`${BASE}/ethereum/yearn/vaults?show=all&sortBy=size`, { waitUntil: "networkidle" });
 check("0a GET /ethereum/yearn/vaults answers 200", res0?.status() === 200, `status ${res0?.status()}`);
 await page.waitForSelector("[data-roster-panel] [data-vault-row]", { timeout: 120_000 });
@@ -894,7 +894,7 @@ if ((await page.locator("[data-prov-tripwire]").count()) > 0) {
   await page.waitForSelector('[data-anatomy="V5"]', { timeout: 120_000 }).catch(() => null);
   const strip = await readVaultStrip(page);
   const store = await readStoreSeries(BASE, 1, stripVault);
-  vaultStripChecks(check, "17", strip, store, { chain: 1, vault: stripVault, censusFamily: false });
+  vaultStripChecks(check, "17", strip, store, { chain: 1, vault: stripVault });
 }
 
 // ── the default view (ui-jobs 485) ──────────────────────────────────────────
@@ -905,7 +905,6 @@ await checkRosterView({
   scope: "[data-roster-panel]",
   check,
   tag: "20",
-  holders: false,
 });
 
 await browser.close();
