@@ -108,7 +108,10 @@ export type SessionProtocol =
   | "pancakeswap-v3-arbitrum"
   // Lido on Ethereum, at `/ethereum/lido`: a wallet's stake is its stETH
   // shares and wstETH, with its withdrawal requests (ui-jobs 570).
-  | "lido";
+  | "lido"
+  // Fluid's vaults on Base, at `/base/fluid`: a position is a VaultFactory NFT,
+  // read from the chain when a page opens (ui-jobs 574).
+  | "fluid-base";
 
 /** What a saved entry is: a wallet, a position page or a listing view. */
 export type SavedKind = "wallet" | "position" | "view";

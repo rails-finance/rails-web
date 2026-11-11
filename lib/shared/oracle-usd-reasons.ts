@@ -16,6 +16,8 @@
 // debt token, the market's loan token, the vault's own asset — or with no
 // figure at all.
 
+import { FLUID_BASE_DOLLARS } from "@/lib/fluid-base/dollars";
+
 /** Keyed by `ProtocolEntry.id`; absent means the explorer prices in USD or has
  *  not been ruled out. */
 const UNISWAP_REASON =
@@ -55,4 +57,7 @@ export const ORACLE_USD_REASON: Record<string, string> = {
   lido: "a stake is ETH at Lido's share rate, and Lido runs no USD feed, so every figure is in ETH",
   aerodrome:
     "a pool prices itself: every figure is in the pool's quote token at the pool's price, AERO through Aerodrome's own AERO pools, and Aerodrome runs no USD feed",
+  "fluid-base": FLUID_BASE_DOLLARS
+    ? "each vault's oracle prices the collateral in the vault's debt token and Fluid runs no USD feed, so a side's dollar value is its amount at the Aave V3 Base oracle's price at the head; a side Aave does not list, or a DEX-share side, stays in its own unit"
+    : "debt-token units by design: each vault's oracle prices the collateral in the vault's debt token (the space its liquidation engine judges in); Fluid runs no USD feed",
 };
