@@ -32,6 +32,10 @@ const BORROWED = /^aave_v4_|_svr$/;
 const RANK: Record<Heartbeat, number> = { stalled: 0, late: 1, paused: 2, none: 3, fresh: 4 };
 const n = (x: number) => x.toLocaleString("en-US");
 
+/** No <Prov> figures: the status page states each figure's source beside it
+ *  and links the feed's Chainlink page or the protocol's docs. */
+const PROV_EXEMPT = "a status page about Rails' pipelines; each row names its source and links it";
+
 function Status({ hb, title }: { hb: Heartbeat; title?: string }) {
   return (
     <span className="inline-flex items-center gap-2 text-sm" title={title} data-anatomy="Y5.3">
