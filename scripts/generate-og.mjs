@@ -423,7 +423,7 @@ function homeHtml(protocols, glyphs) {
     <div class="roster">${tiles + chip}</div>
 
     <h1>Look up a <em>wallet</em> on Rails</h1>
-    <p class="sub">${count} DeFi protocols, every position replayed from the protocol&rsquo;s own on-chain events</p>`);
+    <p class="sub">${count} DeFi protocols, every position read from the chain</p>`);
 }
 
 function explorerHtml(p, glyphs) {
