@@ -81,6 +81,8 @@ export const PROV_PREFERENCE_ROUTES: readonly string[] = [
   "/ethereum/fx/[position]",
   "/ethereum/fx/pools",
   "/ethereum/fx/pools/[pool]",
+  "/ethereum/lido",
+  "/ethereum/lido/[wallet]",
   "/ethereum/liquity-v1/[wallet]",
   "/ethereum/liquity-v1/system",
   "/ethereum/liquity-v2/branches",

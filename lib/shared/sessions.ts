@@ -98,7 +98,10 @@ export type SessionProtocol =
   | "uniswap-v4"
   // Aerodrome Slipstream on Base, at `/base/aerodrome`: a position is an NFT
   // id on one of three position managers, staked in its gauge or not (ui-jobs 566).
-  | "aerodrome";
+  | "aerodrome"
+  // Lido on Ethereum, at `/ethereum/lido`: a wallet's stake is its stETH
+  // shares and wstETH, with its withdrawal requests (ui-jobs 570).
+  | "lido";
 
 /** What a saved entry is: a wallet, a position page or a listing view. */
 export type SavedKind = "wallet" | "position" | "view";

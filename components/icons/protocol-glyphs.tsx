@@ -423,6 +423,14 @@ const GLYPHS: Record<string, Glyph> = {
       },
     ],
   },
+  // Lido: the two pieces of public/icons/protocols/lido.png, the upper
+  // diamond and the drop below its notch, each measured off that image
+  // (ui-jobs 570).
+  lido: {
+    viewBox: "0 0 256 256",
+    inset: 0.06,
+    paths: [{ d: "M128 2L192 100L128 130L64 100Z" }, { d: "M54 116L128 152L202 116A88 88 0 1 1 54 116Z" }],
+  },
   // Basedollar's mark is two-tone (yellow disc, brown detail); the glyph keeps
   // only the detail — ring, rays, arch and base bars — so it reads as a
   // silhouette in currentColor. Traced from basedollar.org/favicon.svg, whose
