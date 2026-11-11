@@ -21,6 +21,10 @@ import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 const DOCS = { label: "Balancer V3 documentation", href: "https://docs.balancer.fi" };
 const VAULT_DOCS = { label: "The Vault", href: "https://docs.balancer.fi/concepts/vault/" };
+const RATE_DOCS = {
+  label: "Rate providers",
+  href: "https://docs.balancer.fi/concepts/core-concepts/rate-providers.html",
+};
 
 const UL = "list-disc space-y-1 pl-5";
 
@@ -44,6 +48,12 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
     sources: [DOCS],
   },
   {
+    term: "Yield-bearing token",
+    definition:
+      "A yield-bearing token earns yield, so the amount of its underlying asset one token is worth grows. A pool counts it at that rate, which a rate provider contract reports.",
+    sources: [RATE_DOCS],
+  },
+  {
     term: "Gauge",
     definition:
       "A gauge is a contract beside a pool where holders stake their pool shares to earn BAL and other rewards. Staked shares are held by the gauge.",
@@ -65,8 +75,9 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
     each token.
   </>,
   <>
-    Each swap pays a fee, part of which stays in the pool, and some pools hold tokens that earn yield. Both raise what
-    each share is worth in the pool&apos;s tokens.
+    Each swap pays a fee, part of which stays in the pool, and some pools hold{" "}
+    <GlossaryLink term="Yield-bearing token">tokens that earn yield</GlossaryLink>. Both raise what each share is worth
+    in the pool&apos;s tokens.
   </>,
   <>
     Swaps change how much of each token the pool holds, so a holder&apos;s part of each token moves while their share of

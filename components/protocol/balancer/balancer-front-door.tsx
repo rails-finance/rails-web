@@ -5,6 +5,7 @@
 // index's count of the pool shares held on the chain (U11; decision 0063).
 
 import { Prov } from "@/components/shared/provenance";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { PoolFrontDoor } from "@/components/protocol/uniswap/uniswap-front-door";
 import { BAL_CHAINS, type BalChainId } from "@/lib/balancer/chains";
@@ -35,8 +36,8 @@ function Count({ chainId, count }: { chainId: BalChainId; count: BalCount }) {
       <dl className="mt-2 grid grid-cols-2 gap-3 rounded-xl border border-rb-200 px-4 py-3 dark:border-rb-500/30">
         {cells.map((x) => (
           <div key={x.key} data-balancer-count-cell={x.key}>
-            <dt className="text-xs font-semibold text-rb-500" title={x.tip}>
-              {x.label}
+            <dt className="text-xs font-semibold text-rb-500">
+              <HeadingTip text={x.label} tip={x.tip} />
             </dt>
             <dd className="text-sm text-foreground tabular-nums">
               <Prov info={countProv(x.key, c)}>{x.value.toLocaleString("en-US")}</Prov>

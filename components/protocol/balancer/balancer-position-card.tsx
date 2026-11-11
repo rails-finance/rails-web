@@ -6,6 +6,7 @@
 // pool's gauge, and when it first added. Every
 // figure in the pool's tokens, each with its receipt.
 
+import Link from "next/link";
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
@@ -14,6 +15,8 @@ import { balPosition } from "@/lib/balancer/position";
 import { cardProv, readContracts, stakedProv, type BalReceiptContext } from "@/lib/balancer/provenance";
 import type { BalPositionRead } from "@/lib/balancer/types";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
+import { balChain } from "@/lib/balancer/chains";
+import { explorerHref } from "@/lib/shared/protocols";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { CARD_WORDS, cardExplainer, rateText } from "@/lib/balancer/words";
 import { day, num, share, short } from "@/lib/uniswap/words";
@@ -100,7 +103,13 @@ function slots(r: BalPositionRead): PositionCardSlots {
           <Prov info={cardProv("added", c)}>
             {byTransfer
               ? CARD_WORDS.byTransferSub
-              : `${p.adds} ${p.adds === 1 ? "add" : "adds"}, ${p.removes} ${p.removes === 1 ? "remove" : "removes"}`}
+              : [
+                  `${p.adds} ${p.adds === 1 ? "add" : "adds"}, ${p.removes} ${p.removes === 1 ? "remove" : "removes"}`,
+                  // The latest move's day, where it is not the first add.
+                  p.lastMove && p.priorMove ? CARD_WORDS.last(p.lastMove) : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
           </Prov>
         </span>
       ),
@@ -125,6 +134,14 @@ function slots(r: BalPositionRead): PositionCardSlots {
               ))}
             </ExplainGroup>
           ))}
+          <p className="mt-3 text-sm">
+            <Link
+              href={`${explorerHref(r.chainId as ChainId, balChain(r.chainId).session)}/info`}
+              className={INLINE_LINK}
+            >
+              {CARD_WORDS.infoLink}
+            </Link>
+          </p>
         </div>
       ),
     },

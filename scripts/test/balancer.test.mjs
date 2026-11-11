@@ -23,7 +23,9 @@ export async function resolve(specifier, context, next) {
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
 const { balPosition, fraction, sharesOf, units, walletRow } = await import("../../lib/balancer/position.ts");
-const { readoutLines, rateText, FRONT_DOOR } = await import("../../lib/balancer/words.ts");
+const { cardExplainer, readoutExplainer, readoutLines, rateText, CARD_WORDS, FRONT_DOOR } = await import(
+  "../../lib/balancer/words.ts"
+);
 
 const HEAD = { block: 26_387_748, time: 1_794_336_000 };
 const THEN = { block: 26_164_800, time: 1_791_660_000 };
@@ -192,4 +194,37 @@ test("each chain names itself on the front door and in a receipt's grid", async 
   assert.match(balChain(42161).grid, /UTC midnight/);
   assert.equal(balChain(1).session, "balancer-v3");
   assert.equal(balChain(42161).session, "balancer-v3-arbitrum");
+});
+
+test("the card's (i) tells this position's story in its own figures", () => {
+  const groups = cardExplainer(balPosition(read()));
+  assert.deepEqual(
+    groups.map((g) => g.title),
+    ["Holdings", "Rate", "History"],
+  );
+  const all = groups.flatMap((g) => g.bullets);
+  assert.ok(all.some((b) => /waEthWETH and rETH earn yield/.test(b)));
+  assert.ok(
+    all.some((b) => /^This wallet held 10 shares on .*; those added since had only part of the window\.$/.test(b)),
+  );
+  assert.ok(all.some((b) => /^Its latest move was an add on .*, after a remove on /.test(b)));
+  for (const b of all) {
+    assert.ok(b.split(" ").length <= 20, b);
+    assert.doesNotMatch(b, /\b(you|your|safe|good|bad|should)\b/i);
+  }
+  // None held at the past block: the change predates the wallet's shares.
+  const none = cardExplainer(balPosition(read({ past: { ...read().past, balance: "0" } }))).flatMap((g) => g.bullets);
+  assert.ok(
+    none.some((b) => /held none on .*, so the change was measured before its current shares were added/.test(b)),
+  );
+  assert.equal(CARD_WORDS.last({ kind: "add", time: 1_790_000_000 }), "last 21 Sept 2026");
+});
+
+test("the readout names all the pool's shares, and its (i) the past block per chain", () => {
+  const lines = readoutLines(balPosition(read()));
+  assert.match(lines[0].pool, /^All shares: /);
+  assert.match(readoutExplainer(1)[0].bullets[0], /30 to 31 days back/);
+  assert.match(readoutExplainer(42161)[0].bullets[0], /UTC midnight/);
+  const staked = [{ gauge: "0x62A66eB9aBf7a788F48D0ce7C0C065df9e09dA19", balance: read().balance }];
+  assert.match(readoutLines(balPosition(read({ staked })))[0].pool, / on \d+ \w+ 2026\.$/);
 });

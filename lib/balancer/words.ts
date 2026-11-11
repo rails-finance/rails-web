@@ -4,9 +4,9 @@
 // forecasts or recommends. The faces name no contract or function: those are
 // in each figure's receipt (lib/balancer/provenance.ts; decision 0059).
 //
-// Pure, with type imports only: scripts/test/balancer.test.mjs reads it.
+// Pure, importing only its sibling pure modules: scripts/test/balancer.test.mjs reads it.
 
-import type { BalPosition } from "./position";
+import { rateTokens, type BalMove, type BalPosition } from "./position";
 import type { BalIndexRefusal } from "./types";
 import { day, num, pct, share } from "../uniswap/words";
 
@@ -67,7 +67,7 @@ export const CARD_WORDS = {
     "The wallet's part of each token the pool holds: the pool's balance of it times the wallet's share of the pool. Withdrawing pays out about these amounts.",
   rate: "Value per share, 30 days",
   rateTip:
-    "How much the pool's value per share changed over the last 30 days. It grows with the swap fees the pool keeps and its tokens' own yield.",
+    "How much the pool's value per share changed over the last 30 days. It is the same for every share, and grows with the swap fees the pool keeps and its tokens' yield.",
   /** The share's split where some shares are staked. */
   split: (held: number, staked: number) => `${num(held)} in the wallet, ${num(staked)} staked in a gauge`,
   /** First added, where the wallet holds or stakes shares but added none itself: the value, and the line under it. */
@@ -76,7 +76,11 @@ export const CARD_WORDS = {
   added: "First added",
   addedTip: "When this wallet first added liquidity to this pool.",
   none: "This wallet holds no shares of this pool now.",
-  foot: "Amounts are in each of the pool's tokens. Balancer states no dollar price for a pool share.",
+  /** After the add and remove counts: the latest move's day. */
+  last: (m: BalMove) => `last ${day(m.time)}`,
+  foot: "Amounts are in each of the pool's tokens. Rails states no dollar figure for them or for what was added, so it cannot say whether this share is up or down.",
+  /** The link at the foot of the card's (i) pane. */
+  infoLink: "How Balancer V3 works",
 };
 
 /** The value-per-share change, or why there is none. */
@@ -112,7 +116,10 @@ export function readoutLines(p: BalPosition): BalLine[] {
       key: "shares",
       label: "Pool shares",
       yours: w ? `${num(p.now.shares)} now, against ${num(w.shares)}${on}.` : `${num(p.now.shares)} now.`,
-      pool: t ? `All holders: ${num(p.now.supply)}, against ${num(t.supply)}.` : `All holders: ${num(p.now.supply)}.`,
+      // With the wallet's side withheld, the pool's side carries the past day.
+      pool: t
+        ? `All shares: ${num(p.now.supply)}, against ${num(t.supply)}${w ? "" : ` on ${day(t.at.time)}`}.`
+        : `All shares: ${num(p.now.supply)}.`,
       ...(p.windowWithheld ? { withheld: READOUT.stakedWithheld } : {}),
     },
     {
@@ -164,35 +171,90 @@ export interface ExplainGroupWords {
   bullets: string[];
 }
 
-/** The card's (i). */
+const moveWord = (m: BalMove) => (m.kind === "add" ? "an add" : "a remove");
+const rose = (x: number) => {
+  const size = pct(Math.abs(x)).replace("+", "");
+  return pct(x) === size ? "held level" : `${x > 0 ? "rose" : "fell"} ${size}`;
+};
+
+/** The card's (i): this position's holdings, the pool's value per share
+ *  against when the wallet held its shares, and its adds and removes
+ *  (rails-ops standards/prose-limits-and-zones.md 3.3: Holdings, Rate, History). */
 export function cardExplainer(p: BalPosition): ExplainGroupWords[] {
-  const n = p.tokens.length;
-  return [
-    {
-      title: "What a pool share is",
-      bullets: [
-        `A Balancer V3 pool holds ${n} tokens, and its shares are a claim on all of them in proportion. This wallet holds ${share(p.now.share)} of the shares, so it can withdraw about ${share(p.now.share)} of each token.`,
-        "Swaps change how much of each token the pool holds, so the wallet's part of each token moves while its share stays the same.",
-      ],
-    },
-    {
-      title: "Value per share",
-      bullets: [
-        "The pool keeps part of each swap fee, and tokens that earn yield grow in value, so each share's claim grows. The change over 30 days measures that growth.",
-      ],
-    },
+  const held = p.now.shares > 0;
+  const yielding = rateTokens(p);
+  const holdings = [
+    held
+      ? `This wallet holds ${num(p.now.shares)} pool shares, ${share(p.now.share)} of the pool.`
+      : "This wallet holds no shares of this pool now.",
+    held &&
+      // A paused pool outside recovery mode pays nothing out until it reopens.
+      `${p.paused && !p.recoveryMode ? "Its share comes to" : "It could withdraw"} about ${
+        p.tokens.length === 2
+          ? `${num(p.now.holds[0])} ${p.tokens[0].symbol} and ${num(p.now.holds[1])} ${p.tokens[1].symbol}.`
+          : `${share(p.now.share)} of each of the pool's ${p.tokens.length} tokens.`
+      }`,
+    held && "Swaps change the pool's mix of tokens, so these amounts move while the share stays the same.",
+    yielding.length > 0 &&
+      `${yielding.length <= 2 ? yielding.join(" and ") : `${yielding.length} of its tokens`} earn yield: the pool counts each at its rate, a growing amount of underlying asset per token.`,
   ];
+  const t = p.then;
+  const rate =
+    p.rateChange == null
+      ? []
+      : [
+          `Value per share ${rose(p.rateChange)} over 30 days, with the swap fees the pool keeps and its tokens' yield.`,
+          "It is the pool's figure, the same for every share.",
+          p.windowWithheld && held
+            ? "Staked shares are read now only, so this wallet's holding 30 days back is not shown."
+            : t && t.shares < p.now.shares
+              ? t.shares === 0
+                ? `This wallet held none on ${day(t.at.time)}, so the change was measured before its current shares were added.`
+                : `This wallet held ${num(t.shares)} shares on ${day(t.at.time)}; those ${p.firstAdd ? "added" : "received"} since had only part of the window.`
+              : null,
+        ];
+  const history = [
+    p.firstAdd && `This wallet first added on ${day(p.firstAdd.time)}.`,
+    p.lastMove && p.priorMove
+      ? `Its latest move was ${moveWord(p.lastMove)} on ${day(p.lastMove.time)}, after ${moveWord(p.priorMove)} on ${day(p.priorMove.time)}.`
+      : p.lastMove && !p.firstAdd
+        ? `Its only move was ${moveWord(p.lastMove)} on ${day(p.lastMove.time)}.`
+        : null,
+  ];
+  const keep = (b: (string | false | null)[]) => b.filter((x): x is string => typeof x === "string");
+  return [
+    { title: "Holdings", bullets: keep(holdings) },
+    { title: "Rate", bullets: keep(rate) },
+    { title: "History", bullets: keep(history) },
+  ].filter((g) => g.bullets.length > 0);
 }
 
-/** The readout's (i), one group per kind of line. */
-export function readoutExplainer(): ExplainGroupWords[] {
+/** The readout's (i): how the lines compare, then one bullet per kind of line. */
+export function readoutExplainer(chainId: number): ExplainGroupWords[] {
   return [
     {
-      title: "The lines",
+      title: "How it compares",
       bullets: [
-        "Each line compares the block when the page was read with the UTC midnight 30 days earlier: the wallet's figure first, then the pool's.",
-        "A wallet's part of a token is the pool's balance of it times the wallet's share of the pool.",
-        "Value per share is the pool's own measure of what one share is worth in its tokens, rate-adjusted, so a change in it is growth for every holder.",
+        chainId === 42161
+          ? "Each line sets the block read now against the block at UTC midnight 30 days back, on the date shown."
+          : "Each line sets the block read now against a block 30 to 31 days back, on the date shown.",
+        "The wallet's figure comes first, then the pool's.",
+      ],
+    },
+    {
+      title: "The wallet",
+      bullets: [
+        "Pool shares: the wallet's count, then all the shares of the pool, whoever holds them.",
+        "Share of pool: the wallet's shares over all the shares.",
+        "A token line: Your part is what the share would pay out of the pool's balance, not what was deposited.",
+      ],
+    },
+    {
+      title: "The pool",
+      bullets: [
+        "Value per share: what one share claims of the pool's tokens, counted at their rates.",
+        "Pool: Trading means swaps, adds and removes are open. Paused stops all three.",
+        "In recovery mode, holders can withdraw their tokens in proportion.",
       ],
     },
   ];

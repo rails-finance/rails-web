@@ -83,7 +83,7 @@ export function BalancerReadout({ r, title }: { r: BalPositionRead; title: strin
         slot={{
           body: (
             <>
-              {readoutExplainer().map((g) => (
+              {readoutExplainer(r.chainId).map((g) => (
                 <ExplainGroup key={g.title} title={g.title}>
                   {g.bullets.map((b, i) => (
                     <ExplainBullet key={i}>{b}</ExplainBullet>

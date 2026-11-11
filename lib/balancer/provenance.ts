@@ -136,7 +136,7 @@ export function lineProv(key: BalLineKey, part: "yours" | "pool", c: BalReceiptC
         }
       : {
           ...base,
-          summary: `All holders — the pool's shares outstanding at ${at(r.head)}${thenLine(c)}.`,
+          summary: `All shares — the pool's shares outstanding at ${at(r.head)}${thenLine(c)}.`,
           inputs: [
             chain("totalSupply · head", r.now.totalSupply),
             chain("totalSupply · then", r.past?.totalSupply ?? "no answer"),
