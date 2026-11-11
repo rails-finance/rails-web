@@ -41,40 +41,21 @@ export interface IndexProgressEntry {
   percent: number | null;
   atHead: boolean;
   rows: number;
-  requests: number;
-  bytesRead: number;
+  /** On /progress only. */
+  requests?: number;
+  bytesRead?: number;
   pace: { blocksPerHour: number; headBlocksPerHour: number; since: Secs } | null;
   eta: string | null;
   check: IndexCheck | null;
   sources?: IndexSource[];
   sieve?: { tables: { table: string; fromBlock: number }[]; checkpoint: number };
+  /** Wall time (ISO) of the fill's last hourly sample for this index. */
+  heartbeatAt?: string | null;
 }
 
 export interface IndexProgress {
   asOf: string;
   indexes: IndexProgressEntry[];
-}
-
-/** One protocol's row: its name and its indexes in the server's order. */
-export interface ProtocolRow {
-  protocol: string;
-  name: string;
-  indexes: IndexProgressEntry[];
-}
-
-/** The protocol's name from the server's label ("CoW Protocol · Base"). */
-export const protocolName = (e: IndexProgressEntry): string => e.label.split(" · ")[0] ?? e.protocol;
-
-/** The indexes grouped by protocol, in the order each protocol first appears
- *  (the server puts CoW first, decision 0064 point 5). */
-export function protocolRows(indexes: IndexProgressEntry[]): ProtocolRow[] {
-  const rows = new Map<string, ProtocolRow>();
-  for (const e of indexes) {
-    const row = rows.get(e.protocol) ?? { protocol: e.protocol, name: protocolName(e), indexes: [] };
-    row.indexes.push(e);
-    rows.set(e.protocol, row);
-  }
-  return [...rows.values()];
 }
 
 /** The fill plans each index every 10 min against the chain's finalized
@@ -85,16 +66,27 @@ export const HEARTBEAT_STALLED = 3 * 60 * 60;
 
 export type Heartbeat = "fresh" | "late" | "stalled" | "none";
 
-/** The time of the index's last heartbeat: the finalized head the fill last
- *  planned it against. Null when the fill has not planned it yet. */
-export const heartbeatTime = (e: IndexProgressEntry): Secs | null => e.head?.time ?? null;
+const isoSecs = (iso: string | null | undefined): Secs | null => {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t / 1000 : null;
+};
 
-export function heartbeatState(e: IndexProgressEntry, now: Secs): Heartbeat {
-  const t = heartbeatTime(e);
+/** The time of the index's last heartbeat: the wall time of the fill's last
+ *  sample where the server sends it, else the finalized head the fill last
+ *  planned against. Null when the fill has not planned it yet. */
+export const heartbeatTime = (e: IndexProgressEntry): Secs | null => isoSecs(e.heartbeatAt) ?? e.head?.time ?? null;
+
+/** Whether `heartbeatTime` is a wall time (true) or a block's time. */
+export const heartbeatIsWallTime = (e: IndexProgressEntry): boolean => isoSecs(e.heartbeatAt) != null;
+
+export function heartbeatAge(t: Secs | null, now: Secs): Heartbeat {
   if (t == null) return "none";
   const age = now - t;
   return age > HEARTBEAT_STALLED ? "stalled" : age > HEARTBEAT_LATE ? "late" : "fresh";
 }
+
+export const heartbeatState = (e: IndexProgressEntry, now: Secs): Heartbeat => heartbeatAge(heartbeatTime(e), now);
 
 /** "4 min", "2 h 10 min", "3 days": the age of a time, for a heartbeat. */
 export function ageWords(seconds: number): string {
@@ -120,4 +112,125 @@ export function percentWords(e: IndexProgressEntry): string {
 export function bytesWords(n: number): string {
   if (n >= 1e9) return `${(n / 1e9).toFixed(1)} GB`;
   return `${(n / 1e6).toFixed(1)} MB`;
+}
+
+// ── GET /api/index/status: every explorer's backfill and live lane ──────────
+
+export interface StatusWriter {
+  name: string;
+  kind: "processor" | "copy-worker" | "mv-refresh";
+  lastWriteAt: string | null;
+  newest: { block: number; time: Secs | null } | null;
+}
+
+export interface StatusBackfill
+  extends Omit<IndexProgressEntry, "protocol" | "chain" | "label" | "rows" | "atHead" | "requests" | "bytesRead"> {
+  pipeline: string;
+  rows: number | null;
+  atHead: boolean | null;
+}
+
+export interface StatusLive {
+  lane: string;
+  checkpoint: { block: number; time: Secs | null; updatedAt?: string | null } | null;
+  head: { block: number; time: Secs | null } | null;
+  writers: StatusWriter[];
+  visitReads: { gateway: string } | null;
+  unreachable?: { error: string };
+}
+
+export interface StatusEntry {
+  protocol: string;
+  chain: number;
+  /** The web roster's key where it differs from the server's. */
+  web?: string | null;
+  backfill: StatusBackfill | null;
+  live: StatusLive | null;
+}
+
+export interface IndexStatus {
+  asOf: string;
+  entries: StatusEntry[];
+  lanes?: { lane: string; chain: number; checkpoint: StatusLive["checkpoint"]; unreachable?: { error: string } }[];
+  gateways?: unknown[];
+}
+
+/** One cell of the status table, from either route. */
+export interface StatusCell {
+  protocol: string;
+  /** The roster's protocol key (`protocolKey ?? id`). */
+  key: string;
+  chain: number;
+  /** "fill": the full-history fill, with every figure; "pipeline": Sieve or a
+   *  processor, with its marks; "not-started": no index yet. */
+  kind: "fill" | "pipeline" | "not-started";
+  fill: IndexProgressEntry | null;
+  entry: StatusEntry | null;
+}
+
+export interface StatusRow {
+  key: string;
+  name: string;
+  cells: StatusCell[];
+}
+
+/** The cells from /progress (the fill only). */
+export const cellsFromProgress = (p: IndexProgress): StatusCell[] =>
+  p.indexes.map((e) => ({ protocol: e.protocol, key: e.protocol, chain: e.chain, kind: "fill", fill: e, entry: null }));
+
+/** The cells from /status. A fill entry keeps /progress's figures. */
+export function cellsFromStatus(s: IndexStatus, name: (key: string, chain: number) => string): StatusCell[] {
+  return s.entries.map((entry) => {
+    const key = entry.web ?? entry.protocol;
+    const b = entry.backfill;
+    if (b?.pipeline === "fill") {
+      const { pipeline: _pipeline, ...figures } = b;
+      void _pipeline;
+      const fill: IndexProgressEntry = {
+        ...figures,
+        protocol: entry.protocol,
+        chain: entry.chain,
+        label: name(key, entry.chain),
+        rows: b.rows ?? 0,
+        atHead: b.atHead ?? false,
+      };
+      return { protocol: entry.protocol, key, chain: entry.chain, kind: "fill", fill, entry };
+    }
+    return {
+      protocol: entry.protocol,
+      key,
+      chain: entry.chain,
+      kind: b ? "pipeline" : "not-started",
+      fill: null,
+      entry,
+    };
+  });
+}
+
+/** A pipeline's heartbeat: the backfill's wall time, else the newest write any
+ *  writer stamped. Null when none stamps a wall time. */
+export function pipelineHeartbeat(e: StatusEntry): Secs | null {
+  const times = [e.backfill?.heartbeatAt, ...(e.live?.writers ?? []).map((w) => w.lastWriteAt)]
+    .map(isoSecs)
+    .filter((t): t is Secs => t != null);
+  return times.length ? Math.max(...times) : null;
+}
+
+/** The time of a pipeline's newest stored row, for one that stamps no write time. */
+export function pipelineNewestBlockTime(e: StatusEntry): Secs | null {
+  const times = [e.backfill?.through?.time, ...(e.live?.writers ?? []).map((w) => w.newest?.time)].filter(
+    (t): t is Secs => t != null,
+  );
+  return times.length ? Math.max(...times) : null;
+}
+
+/** Cells grouped into protocol rows, in the order each key first appears. */
+export function statusRows(cells: StatusCell[], name: (key: string, chain: number) => string): StatusRow[] {
+  const rows = new Map<string, StatusRow>();
+  for (const c of cells) {
+    const row = rows.get(c.key) ?? { key: c.key, name: name(c.key, c.chain), cells: [] };
+    row.cells.push(c);
+    rows.set(c.key, row);
+  }
+  return [...rows.values()];
 }

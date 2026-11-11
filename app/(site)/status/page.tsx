@@ -1,6 +1,6 @@
-import { fetchIndexProgress } from "@/lib/api/fetch-index";
+import { fetchIndexProgress, fetchIndexStatus } from "@/lib/api/fetch-index";
 import { listingMetadata } from "@/lib/shared/page-metadata";
-import { StatusBoard } from "@/components/status/status-board";
+import { StatusBoard, type StatusSource } from "@/components/status/status-board";
 
 // focus: Rails' own indexing status, a page about Rails itself.
 
@@ -17,7 +17,16 @@ export const metadata = listingMetadata({
 export const revalidate = 60;
 
 export default async function StatusPage() {
-  const answer = await fetchIndexProgress();
+  // /status covers every explorer; a server without it answers 404, and the
+  // page falls back to /progress (the fill only).
+  const status = await fetchIndexStatus();
+  const progress = status.kind === "ok" ? null : await fetchIndexProgress();
+  const source: StatusSource | null =
+    status.kind === "ok"
+      ? { route: "status", data: status.data }
+      : progress?.kind === "ok"
+        ? { route: "progress", data: progress.data }
+        : null;
   return (
     <div className="container mx-auto md:px-6 px-4 pt-32 pb-16 max-w-4xl">
       <h1 className="font-sans font-semibold tracking-tight text-foreground text-[clamp(28px,4vw,40px)]">Status</h1>
@@ -25,8 +34,8 @@ export default async function StatusPage() {
         Rails reads every protocol&apos;s history from its deployment block. This page shows how far each index has
         read, chain by chain, and when each last reported.
       </p>
-      {answer.kind === "ok" ? (
-        <StatusBoard progress={answer.data} />
+      {source ? (
+        <StatusBoard source={source} />
       ) : (
         <p className="mt-10 rounded-xl bg-raised p-4 text-sm text-rb-500">
           The index server did not answer. Its figures show here when it does.

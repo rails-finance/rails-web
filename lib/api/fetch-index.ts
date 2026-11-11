@@ -8,7 +8,7 @@ import "server-only";
 // SERVER-ONLY: reads RAILS_API_URL and the bearer token.
 
 import { readAtBlock, type UniAnswer } from "@/lib/api/fetch-uniswap";
-import type { IndexProgress } from "@/lib/shared/index-progress";
+import type { IndexProgress, IndexStatus } from "@/lib/shared/index-progress";
 
 /** GET /api/index/<protocol>/<chain>/coverage */
 export interface IndexCoverage {
@@ -46,4 +46,10 @@ export function fetchIndexCount(protocol: string, chainId: number): Promise<UniA
  *  a minute's cache keeps the page within a minute of the last heartbeat. */
 export function fetchIndexProgress(): Promise<UniAnswer<IndexProgress>> {
   return readAtBlock("/api/index/progress", 60, "index progress");
+}
+
+/** GET /api/index/status: every explorer's backfill and live lane, from
+ *  stored rows only (the status page). */
+export function fetchIndexStatus(): Promise<UniAnswer<IndexStatus>> {
+  return readAtBlock("/api/index/status", 60, "index status");
 }
