@@ -556,7 +556,7 @@ const MIGRATED = "rails-bookmarks-migrated";
  *  the wallet view (`data-bookmark-open`, not the protocol links under the
  *  name) and its label. */
 async function bookmarkRows(page) {
-  await page.goto(`${BASE_URL}/bookmarks`, { waitUntil: "networkidle", timeout: 180_000 });
+  await page.goto(`${BASE_URL}/bookmarks?tab=wallets`, { waitUntil: "networkidle", timeout: 180_000 });
   await page.waitForSelector("[data-bookmark-open]", { timeout: 15_000 }).catch(() => {});
   return page.evaluate(() =>
     [...document.querySelectorAll("[data-bookmark-open]")].map((a) => ({

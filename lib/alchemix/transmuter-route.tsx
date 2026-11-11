@@ -5,6 +5,7 @@
 // one cached read per request.
 
 import { PositionReadProvider } from "@/components/shared/position-read";
+import { transmuterFocusSource } from "@/lib/alchemix/focus-source";
 import { indexReadAt } from "@/lib/shared/position-read-server";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -74,7 +75,11 @@ export async function TransmuterPositionPage({
     );
   }
   return (
-    <PositionReadProvider key={`${lineKey}:${nftId}`} read={indexRead}>
+    <PositionReadProvider
+      focus={{ source: transmuterFocusSource(deployment, read.position) }}
+      key={`${lineKey}:${nftId}`}
+      read={indexRead}
+    >
       <TransmuterPositionView key={`${lineKey}:${nftId}`} deployment={deployment} position={read.position} />
     </PositionReadProvider>
   );

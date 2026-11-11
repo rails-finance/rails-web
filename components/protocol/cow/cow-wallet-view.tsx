@@ -6,7 +6,7 @@
 // the first page again through the trades proxy, and "Show more" reads the
 // next page below the last row.
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
@@ -22,8 +22,13 @@ import { formatDate } from "@/lib/date";
 import { COW_CHAIN_ID, type CowTokenLabel } from "@/lib/cow/trade";
 import type { CowTrade, CowTradesPage, CowWalletTokens } from "@/lib/cow/types";
 import { SECTION_HEADING, CARD_INSET_START } from "@/lib/shared/ui-grammar";
+import { useAssetScope } from "@/lib/shared/asset-scope";
+import { assetKey } from "@/lib/shared/asset-family";
+import { FocusCountNote } from "@/components/shared/asset-scope-note";
 
 const PAGE = 50;
+/** The most tokens the trades route filters by at once. */
+const MAX_FILTER = 20;
 const n = (v: number) => v.toLocaleString("en-US");
 
 /** The date once a day: a row names it where the row above is another UTC day. */
@@ -67,15 +72,40 @@ export function CowWalletView({
   // The trade rows' receipts scope; each card holds its own inside it.
   const registry = useReceiptRegistry();
 
+  // Focus (ui-jobs 557): the trades whose sell or buy token is in focus. The
+  // wallet's tokens are judged here and the trades read through the route's
+  // token filter, so the count and the pages are the focus's. Show all lifts
+  // it on this page until the page is left.
+  const scope = useAssetScope();
+  const [peek, setPeek] = useState(false);
+  const focused = scope.ready && scope.on && !peek;
+  const inFocus = useMemo(
+    () =>
+      new Set(
+        (tokens?.tokens ?? [])
+          .map((t) => t.address.toLowerCase())
+          .filter((a) => scope.matches([assetKey(COW_CHAIN_ID, a)], COW_CHAIN_ID)),
+      ),
+    [tokens, scope.matches],
+  );
+  const focusTokens = useMemo(() => [...inFocus].slice(0, MAX_FILTER), [inFocus]);
+  /** The tokens a read filters by: the chosen ones (those in focus, under Focus), else the focus's. */
+  const filterOf = useCallback(
+    (chosen: string[]) => (!focused ? chosen : chosen.length ? chosen.filter((t) => inFocus.has(t)) : focusTokens),
+    [focused, inFocus, focusTokens],
+  );
+
   const options: AssetChooserOption[] = useMemo(
     () =>
-      (tokens?.tokens ?? []).map((t) => ({
-        address: t.address,
-        symbol: t.symbol,
-        count: t.trades,
-        last: t.lastBlock,
-      })),
-    [tokens],
+      (tokens?.tokens ?? [])
+        .filter((t) => !focused || inFocus.has(t.address.toLowerCase()))
+        .map((t) => ({
+          address: t.address,
+          symbol: t.symbol,
+          count: t.trades,
+          last: t.lastBlock,
+        })),
+    [tokens, focused, inFocus],
   );
   const labelOf = useCallback(
     (address: string): CowTokenLabel => {
@@ -116,13 +146,35 @@ export function CowWalletView({
     setPair(p);
     const qs = queryString(nextTokens, p);
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
-    void read(nextTokens, p);
+    void read(filterOf(nextTokens), p);
   };
+
+  // The server's first page is drawn before the focus is read; under Focus,
+  // or when Show all lifts it, the trades are read again. `readFor` names
+  // what the trades in hand were read for: "all" is the server's page.
+  const want = focused ? `f:${filterOf(selected).join(",")}` : "all";
+  const [readFor, setReadFor] = useState("all");
+  const nothingInFocus = focused && filterOf(selected).length === 0;
+  useEffect(() => {
+    if (!scope.ready || !tokens || readFor === want) return;
+    setReadFor(want);
+    if (nothingInFocus) {
+      reqId.current++;
+      setTrades([]);
+      setNext(null);
+      setMatched(0);
+      setLoading(null);
+      return;
+    }
+    void read(filterOf(selected), pair);
+    // A read follows the focus and Show all; the chooser reads on its own.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scope.ready, want, tokens]);
 
   const summary = tokens?.summary ?? null;
   const asOf = tokens?.asOf ?? initial?.asOf ?? null;
   const total = summary?.trades ?? null;
-  const filtered = selected.length > 0;
+  const filtered = selected.length > 0 || focused;
   const countLine =
     matched == null || total == null
       ? null
@@ -174,10 +226,26 @@ export function CowWalletView({
         <section className="space-y-4" data-anatomy="P3" aria-label="Trades">
           <div className={`flex flex-wrap items-baseline justify-between gap-2 ${CARD_INSET_START}`}>
             <h2 className={SECTION_HEADING}>Trades</h2>
-            {countLine && (
+            {scope.ready && scope.on && !selected.length && total != null ? (
               <span className="text-xs tabular-nums text-rb-500" aria-live="polite" data-cow-count="">
-                {loading === "filter" ? "Reading…" : countLine}
+                {loading === "filter" || readFor !== want ? (
+                  "Reading…"
+                ) : (
+                  <FocusCountNote
+                    shown={focused ? (matched ?? 0) : total}
+                    total={total}
+                    noun={["trade", "trades"]}
+                    peek={peek}
+                    setPeek={setPeek}
+                  />
+                )}
               </span>
+            ) : (
+              countLine && (
+                <span className="text-xs tabular-nums text-rb-500" aria-live="polite" data-cow-count="">
+                  {loading === "filter" ? "Reading…" : countLine}
+                </span>
+              )
             )}
           </div>
           <div className={CARD_INSET_START}>
@@ -199,6 +267,10 @@ export function CowWalletView({
             <div
               className={loading === "filter" ? "opacity-60 transition-opacity" : "transition-opacity"}
               data-cow-trades=""
+              // Held hidden until the focus is read and its trades are in, so the
+              // server's unfiltered page does not draw and then vanish.
+              data-scope-list=""
+              {...(scope.ready && readFor === want && loading !== "filter" ? { "data-scope-ready": "" } : {})}
             >
               {trades.map((t, i) => (
                 <EventDateContext.Provider
@@ -217,7 +289,7 @@ export function CowWalletView({
                   </SpineTipContext.Provider>
                 </EventDateContext.Provider>
               ))}
-              {trades.length === 0 && loading == null && !failed && (
+              {trades.length === 0 && loading == null && !failed && !nothingInFocus && (
                 <p className="py-6 text-sm text-rb-500">No trade of this wallet matches the chosen tokens.</p>
               )}
             </div>
@@ -227,7 +299,7 @@ export function CowWalletView({
             <div className={CARD_INSET_START}>
               <button
                 type="button"
-                onClick={() => void read(selected, pair, next)}
+                onClick={() => void read(filterOf(selected), pair, next)}
                 disabled={loading != null}
                 className="inline-flex h-8 items-center rounded-full border border-teal-500/60 px-3 text-xs font-semibold text-teal-600 transition-colors hover:bg-teal-500/10 disabled:opacity-50 dark:text-teal-400"
                 data-cow-more=""

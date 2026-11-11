@@ -80,11 +80,11 @@ type PanelMode = "edit" | "new" | "link";
  *  OPEN_SCOPE_PANEL) and the arrival dialog. */
 export function AssetScopeStrip() {
   const scope = useAssetScope();
-  const [panel, setPanel] = useState<{ mode: PanelMode; draft?: FocusProposal } | null>(null);
+  const [panel, setPanel] = useState<{ mode: PanelMode; draft?: FocusProposal; view?: string } | null>(null);
   useEffect(() => {
     const show = (e: Event) => {
-      const mode = (e as CustomEvent<PanelMode | undefined>).detail === "new" ? "new" : "edit";
-      setPanel({ mode });
+      const d = (e as CustomEvent<{ mode?: PanelMode; view?: string } | undefined>).detail;
+      setPanel({ mode: d?.mode === "new" ? "new" : "edit", view: d?.view });
     };
     window.addEventListener(OPEN_SCOPE_PANEL, show);
     return () => window.removeEventListener(OPEN_SCOPE_PANEL, show);
@@ -94,7 +94,9 @@ export function AssetScopeStrip() {
 
   return (
     <>
-      {panel && <AssetScopePanel mode={panel.mode} proposal={panel.draft} onClose={() => setPanel(null)} />}
+      {panel && (
+        <AssetScopePanel mode={panel.mode} view={panel.view} proposal={panel.draft} onClose={() => setPanel(null)} />
+      )}
       {link && !panel && (
         <FocusLinkIntro
           key={linkValue}
@@ -729,28 +731,31 @@ const keyOf = (p: Pick<AssetPick, "chain" | "token">) => optionKey({ chain: p.ch
  */
 function AssetScopePanel({
   mode: initial,
+  view,
   proposal,
   onClose,
 }: {
   mode: PanelMode;
+  /** The saved view "edit" opens on; the view in use when absent. */
+  view?: string;
   proposal?: FocusProposal;
   onClose: () => void;
 }) {
   const scope = useAssetScope();
   const isPhone = useMediaQuery(PHONE_QUERY);
   const [copied, setCopied] = useState(false);
-  const [mode] = useState<PanelMode>(initial === "edit" && !scope.active ? "new" : initial);
-  const [viewId, setViewId] = useState<string | null>(mode === "edit" ? (scope.active?.id ?? null) : null);
+  // Read from the store: the scope hook is not hydrated on this first render.
+  const [target] = useState(() => (initial === "edit" ? focusViews.find(view) : null));
+  const [mode] = useState<PanelMode>(initial === "edit" && !target ? "new" : initial);
+  const [viewId, setViewId] = useState<string | null>(target?.id ?? null);
   const [draft, setDraft] = useState<Focus>(() =>
     mode === "link" && proposal
       ? proposal.focus
-      : mode === "edit" && scope.active
-        ? { assets: scope.active.assets, chains: scope.active.chains }
+      : target
+        ? { assets: target.assets, chains: target.chains }
         : { assets: [], chains: [] },
   );
-  const [name, setName] = useState<string>(
-    (mode === "link" ? proposal?.name : mode === "edit" ? scope.active?.name : null) ?? "",
-  );
+  const [name, setName] = useState<string>((mode === "link" ? proposal?.name : target?.name) ?? "");
   const linkMode = mode === "link";
 
   // A link's proposal closed without a choice is "Not now".

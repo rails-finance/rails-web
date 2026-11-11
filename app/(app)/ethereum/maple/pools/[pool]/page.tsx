@@ -10,6 +10,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { RailHeader } from "@/components/shared/rail-header";
 import { MaplePoolPage } from "@/components/vaults/maple-pool-page";
 import { Suspense } from "react";
@@ -74,25 +75,29 @@ export default async function MaplePoolRoute({ params, searchParams }: Props) {
           </p>
         )}
 
-        {s ? (
-          <MaplePoolPage
-            pool={p}
-            state={s}
-            readAt={new Date().toISOString()}
-            protects={
-              <Suspense fallback={null}>
-                <VaultProtectsSection
-                  subject={{ chainId: 1, address: p.pool, kind: "maple-pool" }}
-                  vaultName={p.symbol}
-                />
-              </Suspense>
-            }
-          />
-        ) : (
-          <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500" data-maple-pool-unread="">
-            This pool could not be read from chain just now, so no figure is stated for it.
-          </p>
-        )}
+        {/* Focus (ui-jobs 557): the pool is held behind the gate when neither its
+            share token nor its funds asset is in focus. */}
+        <FocusSourceGate source={{ share: p.pool, asset: p.asset }} chain={1} what="This Maple pool">
+          {s ? (
+            <MaplePoolPage
+              pool={p}
+              state={s}
+              readAt={new Date().toISOString()}
+              protects={
+                <Suspense fallback={null}>
+                  <VaultProtectsSection
+                    subject={{ chainId: 1, address: p.pool, kind: "maple-pool" }}
+                    vaultName={p.symbol}
+                  />
+                </Suspense>
+              }
+            />
+          ) : (
+            <p className="max-w-3xl text-[13px] leading-relaxed text-rb-500" data-maple-pool-unread="">
+              This pool could not be read from chain just now, so no figure is stated for it.
+            </p>
+          )}
+        </FocusSourceGate>
 
         {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
         <ProvInspectorLayer />

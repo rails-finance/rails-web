@@ -26,6 +26,9 @@ import { loadFrankencoinBook } from "@/lib/sources/api/frankencoin-system-book";
 import { protocolForHref } from "@/lib/shared/protocols";
 import { PriceStrip } from "@/components/shared/price-strip";
 import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { AimGate } from "@/components/shared/aim-gate";
+import { assetKey } from "@/lib/shared/asset-family";
+import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
 
 // ISR, ten minutes. This is a protocol aggregate, not a wallet's page: the
 // same render serves every visitor, so re-reading the contracts per request
@@ -42,6 +45,10 @@ export const metadata = {
 
 const PROTOCOL = protocolForHref("/ethereum/frankencoin")!;
 
+/** Focus (ui-jobs 557): the system counts by its own tokens, ZCHF and FPS.
+ *  The page names no collateral token, only counts of them. */
+const FOCUS_KEYS = [TOKEN_ADDRESSES.ZCHF, TOKEN_ADDRESSES.FPS].map((t) => assetKey(1, t));
+
 export default async function FrankencoinSystemPage() {
   // Read straight from the loaders rather than through this deployment's own
   // API routes — same code, one less hop on the server.
@@ -57,8 +64,10 @@ export default async function FrankencoinSystemPage() {
           stamp={<FrankencoinSystemStamp data={data} />}
         />
 
-        <FrankencoinSystemView data={data} book={book} />
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+        <AimGate keys={FOCUS_KEYS} chain={1} what="Frankencoin's system">
+          <FrankencoinSystemView data={data} book={book} />
+          <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
+        </AimGate>
         <ProvInspectorLayer />
       </div>
     </div>

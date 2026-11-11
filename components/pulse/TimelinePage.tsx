@@ -5,6 +5,9 @@ import { AlertCircle, Loader2, Pin } from "lucide-react";
 import type { TimelineEvent, TimelinePlatform } from "@/types/pulse";
 import { PulseTimelineItem } from "./item";
 import { formatMonthYear } from "@/lib/date";
+import { useAssetScope } from "@/lib/shared/asset-scope";
+import { FocusCountNote } from "@/components/shared/asset-scope-note";
+import { tickerKeys } from "./focus-tickers";
 
 const XIcon = ({ className = "size-4" }: { className?: string }) => (
   <svg viewBox="0 0 24 24" aria-hidden="true" className={className} fill="currentColor">
@@ -108,10 +111,22 @@ export function TimelinePage({ title, description, dataSources = DEFAULT_DATA_SO
     () => [...events].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
     [events],
   );
-  const filteredEvents = useMemo(() => {
+  const platformEvents = useMemo(() => {
     if (platformFilter === "all") return sortedEvents;
     return sortedEvents.filter((event) => event.platform === platformFilter);
   }, [sortedEvents, platformFilter]);
+  // Focus (ui-jobs 557): a post that names assets by `$TICKER` shows when one
+  // of them is in focus; a post that names none is about Rails and stays.
+  const scope = useAssetScope();
+  const [peek, setPeek] = useState(false);
+  const focusKeys = scope.keys;
+  const filteredEvents = useMemo(() => {
+    if (!focusKeys || peek) return platformEvents;
+    return platformEvents.filter((event) => {
+      const keys = tickerKeys(`${event.content} ${event.subtitle ?? ""}`);
+      return keys.length === 0 || keys.some((k) => focusKeys.has(k));
+    });
+  }, [platformEvents, focusKeys, peek]);
 
   // Group events by month/year
   const groupedEvents = useMemo(() => {
@@ -155,6 +170,18 @@ export function TimelinePage({ title, description, dataSources = DEFAULT_DATA_SO
           />
         ))}
       </div>
+
+      {focusKeys && !loading && (
+        <p className="text-xs text-rb-500">
+          <FocusCountNote
+            shown={filteredEvents.length}
+            total={platformEvents.length}
+            noun={["post", "posts"]}
+            peek={peek}
+            setPeek={setPeek}
+          />
+        </p>
+      )}
 
       {loading && (
         <div className="flex items-center gap-2 text-rb-500">

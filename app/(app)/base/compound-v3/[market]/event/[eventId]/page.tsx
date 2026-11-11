@@ -4,6 +4,9 @@
 // event's own log names its Comet (an event id is `<tx>-<logIndex>-<kind>`,
 // and the log's address is the Comet). An event neither places goes to the
 // wallet's holder view.
+//
+// focus: a redirect; the market page and the wallet overview it lands on
+// declare their own.
 
 import { notFound, permanentRedirect } from "next/navigation";
 import { decodeEventId } from "@/lib/shared/page-metadata";
