@@ -25,7 +25,7 @@ import {
   DataTableRowLink,
 } from "@/components/shared/data-table/data-table";
 import { explorerName } from "@/lib/shared/protocols";
-import { ReadTierTag } from "@/components/shared/read-tier-tag";
+import { HistoryTag } from "@/components/shared/history-tag";
 import type { ChainId } from "@/lib/shared/chains";
 
 /** Popovers and tooltips open their copy with a capital, applied HERE and only
@@ -375,9 +375,9 @@ export function DepthMatrix({ comingSoon, chainId }: DepthMatrixProps) {
                     <DataTableRowLink href={p.href} className="text-sm font-semibold">
                       <span className="whitespace-nowrap">{p.label}</span>
                     </DataTableRowLink>
-                    {p.readTier && (
+                    {p.history && (
                       <span className="ml-2 align-[1px]">
-                        <ReadTierTag />
+                        <HistoryTag id={p.id} />
                       </span>
                     )}
                     <p className="text-xs leading-snug text-rb-500 mt-0.5">{p.desc}</p>

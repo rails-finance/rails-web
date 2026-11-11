@@ -8,7 +8,7 @@
 
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
-import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
+import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AimGate } from "@/components/shared/aim-gate";
 import { EulerWalletList } from "@/components/protocol/euler/euler-wallet-list";
@@ -41,9 +41,9 @@ export async function EulerWalletAccounts({ chain, wallet: raw }: { chain: Euler
               owner={{ wallet, filterProtocol: null }}
               tools={false}
             />
-            <ReadTierTitleRow id={session}>
+            <HistoryTitleRow id={session}>
               <h2 className="text-lg font-semibold text-foreground">{FRONT_DOOR.heading}</h2>
-            </ReadTierTitleRow>
+            </HistoryTitleRow>
             <p className="text-xs text-rb-500" data-anatomy="J3.1" data-euler-narrowing="">
               {FRONT_DOOR.narrowing}
             </p>

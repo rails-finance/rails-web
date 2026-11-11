@@ -8,9 +8,9 @@
 import Link from "next/link";
 import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
-import { ReadTierTag, isReadOnVisit } from "@/components/shared/read-tier-tag";
-import { READ_TIER } from "@/lib/shared/read-tier";
+import { HistoryLine } from "@/components/shared/history-tag";
 import { NAV_PILL } from "@/lib/shared/ui-grammar";
+import { historyOf } from "@/lib/shared/protocols";
 import { uniExplorer, type UniChainId, type UniProtocol } from "@/lib/uniswap/deployments";
 import type { UniswapVersion } from "@/lib/uniswap/types";
 import { FRONT_DOOR, versionLabel } from "@/lib/uniswap/words";
@@ -34,29 +34,23 @@ export function PoolFrontDoor({
   /** The explorer's protocol pages, before the info page's door (Aave V4 on Arc's Markets and Hubs). */
   links?: { href: string; label: string }[];
 }) {
-  const tiered = isReadOnVisit(id);
+  const tagged = historyOf(id) != null;
   return (
     <div
       className="flex min-h-[calc(100svh-10rem)] flex-col items-center justify-center py-12"
       data-anatomy="N5"
       data-front-door={id}
     >
-      <h1 className={`${tiered ? "mb-4" : "mb-8"} flex items-center gap-3`}>
+      <h1 className={`${tagged ? "mb-4" : "mb-8"} flex items-center gap-3`}>
         <ProtocolIcon id={id} className="h-11 w-11 shrink-0 text-foreground" />
         <span className="text-3xl font-semibold leading-none text-foreground">{label}</span>
       </h1>
-      {/* Decision 0061: the tag and its line on a row of their own under the
+      {/* Decisions 0061 and 0063: the tag and its line on a row of their own under the
           name, so the heading stays centred. */}
-      {tiered && (
-        <p
-          className="mb-8 flex max-w-xl flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm text-rb-500"
-          data-anatomy="H23.2"
-          data-read-tier-line=""
-        >
-          <ReadTierTag tip={false} />
-          <span>{READ_TIER.line}</span>
-        </p>
-      )}
+      <HistoryLine
+        id={id}
+        className="mb-8 flex max-w-xl flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm text-rb-500"
+      />
       <div className="w-full max-w-xl">
         <FrontDoorSearch href={(wallet) => `${route}/${wallet}`} />
       </div>
