@@ -65,6 +65,9 @@ export type SessionProtocol =
   // Compound V3 on Arbitrum, at `/arbitrum/compound-v3`: its own four Comets,
   // so its own scope.
   | "compound-v3-arbitrum"
+  // Compound V3 on Optimism, at `/optimism/compound-v3`: a position is a wallet's
+  // account in one Comet, read from the chain when a page opens (ui-jobs 578).
+  | "compound-v3-optimism"
   | "compound-v2"
   | "dolomite"
   | "pwn"
