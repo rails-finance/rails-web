@@ -7,6 +7,7 @@
 //
 // SERVER-ONLY: the read uses the bearer token.
 
+import { Fragment, type ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight } from "lucide-react";
@@ -31,11 +32,14 @@ export async function UniswapWalletPositions({
   wallet: raw,
   protocol = "uniswap",
   chainId = 1,
+  focusRow,
 }: {
   version: UniswapVersion;
   wallet: string;
   protocol?: UniProtocol;
   chainId?: UniChainId;
+  /** Wraps each row for Focus mode (the route page's gate); rows are drawn bare without it. */
+  focusRow?: (tokens: string[], row: ReactNode) => ReactNode;
 }) {
   if (!isWallet(raw)) notFound();
   const wallet = raw.toLowerCase();
@@ -55,7 +59,7 @@ export async function UniswapWalletPositions({
           fallbackHref={home}
           showStamp={false}
           priceReason={ORACLE_USD_REASON[session]}
-          owner={{ wallet, filterProtocol: null }}
+          owner={{ wallet, filterProtocol: null, ...(chainId === 1 ? {} : { chain: chainId }) }}
           tools={false}
         />
         <ReadTierTitleRow id={session}>
@@ -70,27 +74,34 @@ export async function UniswapWalletPositions({
         </p>
       ) : (
         <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {mine.map((p) => (
-            <li key={p.id}>
-              <Link href={`${home}/position/${p.id}`} className={ROW} data-uniswap-position-row={p.id}>
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                  {FRONT_DOOR.row(p, version)}
-                </span>
-                {p.staked && (
-                  <span
-                    className="shrink-0 rounded-full border border-rb-300 px-1.5 py-px text-[11px] text-rb-500 dark:border-rb-500"
-                    data-uniswap-staked=""
-                  >
-                    {FRONT_DOOR.staked}
+          {mine.map((p) => {
+            const row = (
+              <li key={p.id}>
+                <Link href={`${home}/position/${p.id}`} className={ROW} data-uniswap-position-row={p.id}>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                    {FRONT_DOOR.row(p, version)}
                   </span>
-                )}
-                <ArrowRight
-                  className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-[var(--text-link)]"
-                  aria-hidden="true"
-                />
-              </Link>
-            </li>
-          ))}
+                  {p.staked && (
+                    <span
+                      className="shrink-0 rounded-full border border-rb-300 px-1.5 py-px text-[11px] text-rb-500 dark:border-rb-500"
+                      data-uniswap-staked=""
+                    >
+                      {FRONT_DOOR.staked}
+                    </span>
+                  )}
+                  <ArrowRight
+                    className="ml-auto h-4 w-4 shrink-0 text-blue-600 dark:text-[var(--text-link)]"
+                    aria-hidden="true"
+                  />
+                </Link>
+              </li>
+            );
+            return focusRow ? (
+              <Fragment key={p.id}>{focusRow([p.token0.address, p.token1.address], row)}</Fragment>
+            ) : (
+              row
+            );
+          })}
         </ul>
       )}
       {answer.kind === "ok" && answer.data.truncated && (

@@ -12,6 +12,7 @@ import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { ReadTierTitleRow } from "@/components/shared/read-tier-tag";
 import { PairDoorCards } from "@/components/start/pair-door";
+import { InFocusSymbol, StartOutOfFocus } from "@/components/start/start-focus";
 import { fetchUniswapPair } from "@/lib/api/fetch-uniswap";
 import type { SessionProtocol } from "@/lib/shared/sessions";
 import { uniExplorer, type UniChainId, type UniProtocol } from "@/lib/uniswap/deployments";
@@ -70,7 +71,13 @@ export async function UniswapPairPage({
         ))}
       </ul>
       {answer.kind === "ok" ? (
-        <PairDoorCards base={spec.base} quote={spec.quote} cards={cards} protocol={protocol} v4={version === "v4"} />
+        // Focus: the cards show where the pair's symbols are in focus, as on /start.
+        <InFocusSymbol
+          symbols={[spec.base, spec.quote]}
+          fallback={<StartOutOfFocus what={PAIR_DOOR.chip(spec.base, spec.quote)} />}
+        >
+          <PairDoorCards base={spec.base} quote={spec.quote} cards={cards} protocol={protocol} v4={version === "v4"} />
+        </InFocusSymbol>
       ) : (
         <p className="text-sm text-rb-500">{PAIR_DOOR.unanswered}</p>
       )}

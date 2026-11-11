@@ -169,6 +169,9 @@ export const CARD_WORDS = {
   holdsTip: "The two tokens the position's liquidity holds at the pool's price now.",
   worthTip: (q: string) => `Both tokens valued in ${q} at the pool's price now.`,
   uncollectedTip: "Fees the position has earned and the owner has not collected yet.",
+  /** A staked PancakeSwap position: MasterChefV3's recorded staker collects its fees. */
+  uncollectedTipStaked: (staker: string) =>
+    `Fees the position has earned and its staker, ${short(staker)}, has not collected yet.`,
   openedTip: "The day the position took its first deposit.",
   cake: "CAKE not yet harvested",
   cakeTip: "CAKE PancakeSwap's farm has paid this staked position that the staker has not harvested yet.",

@@ -98,7 +98,7 @@ function slots(r: UniPositionRead, protocol: UniProtocol): PositionCardSlots {
     {
       id: "uncollected",
       label: CARD_WORDS.uncollected,
-      labelTip: CARD_WORDS.uncollectedTip,
+      labelTip: p.staked ? CARD_WORDS.uncollectedTipStaked(p.staked.user) : CARD_WORDS.uncollectedTip,
       value: (
         <Prov info={cardProv("uncollected", c)}>
           {num(p.uncollected)} {Q}

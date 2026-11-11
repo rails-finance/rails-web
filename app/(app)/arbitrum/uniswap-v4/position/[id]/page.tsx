@@ -2,7 +2,12 @@
 
 import type { Metadata } from "next";
 import { positionMetadata } from "@/lib/shared/page-metadata";
-import { UniswapPositionPage } from "@/components/protocol/uniswap/uniswap-position-page";
+import { UniswapPositionFocus } from "@/components/protocol/uniswap/uniswap-focus";
+import {
+  UniswapPositionPage,
+  isPositionId,
+  loadUniswapPosition,
+} from "@/components/protocol/uniswap/uniswap-position-page";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -21,5 +26,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function Page({ params }: Props) {
   const { id } = await params;
-  return <UniswapPositionPage version="v4" protocol="uniswap" chainId={42161} id={id} />;
+  // Focus: the page is gated by the position's two tokens (the read is shared with the page).
+  const answer = isPositionId(id) ? await loadUniswapPosition("v4", id, "uniswap", 42161) : null;
+  const tokens = answer?.kind === "ok" ? [answer.data.token0.address, answer.data.token1.address] : null;
+  return (
+    <UniswapPositionFocus tokens={tokens} protocol="uniswap" chain={42161}>
+      <UniswapPositionPage version="v4" protocol="uniswap" chainId={42161} id={id} />
+    </UniswapPositionFocus>
+  );
 }

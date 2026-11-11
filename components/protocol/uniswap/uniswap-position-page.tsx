@@ -129,7 +129,12 @@ export async function UniswapPositionPage({
               priceInfo: cardProv("price", { p, r }),
             })}
             priceReason={ORACLE_USD_REASON[session]}
-            owner={{ wallet: p.holder, filterProtocol: null, href: holderHref }}
+            owner={{
+              wallet: p.holder,
+              filterProtocol: null,
+              href: holderHref,
+              ...(chainId === 1 ? {} : { chain: chainId }),
+            }}
             tools={false}
           />
           <ReadTierTitleRow id={session}>
