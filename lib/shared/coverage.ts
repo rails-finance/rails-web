@@ -1064,14 +1064,14 @@ export const DEPTH: Record<string, Record<DepthKey, DepthCell>> = {
     dashboard: true,
     oracleUsd: { why: ORACLE_USD_REASON["balancer-v3"] },
     forensics: {
-      why: "a pool share holds no loan, so there is no threshold to breach and no liquidation to trace",
+      why: "BPT holds no loan, so there is no threshold to breach and no liquidation to trace",
     },
   }),
   "balancer-v3-arbitrum": explorerDepth({
     dashboard: true,
     oracleUsd: { why: ORACLE_USD_REASON["balancer-v3-arbitrum"] },
     forensics: {
-      why: "a pool share holds no loan, so there is no threshold to breach and no liquidation to trace",
+      why: "BPT holds no loan, so there is no threshold to breach and no liquidation to trace",
     },
   }),
   // Liquidation forensics (2026-07-14): same valued two-leg treatment as Aave
@@ -1913,9 +1913,9 @@ export const COVERAGE_NOTES: Record<string, string> = {
   "euler-v2-base": eulerNote(EULER_INDEXED[8453]),
   "euler-v2-arbitrum": eulerNote(EULER_INDEXED[42161]),
   "balancer-v3":
-    "A Balancer V3 pool share is a balance the Vault keeps for each pool, and a claim on the pool's tokens in proportion to all shares, so every figure is in those tokens and Balancer runs no USD feed. Rails finds a wallet's pools in its index of every pool-share transfer since the Vault's first block, and reads the shares the wallet staked in a pool's gauge. A pool share holds no loan, so there is no liquidation to trace.",
+    "A Balancer Pool Token (BPT) is a balance the Vault keeps for each pool, and a claim on the pool's tokens in proportion to the BPT total supply, so every figure is in those tokens and Balancer runs no USD feed. Rails finds a wallet's pools in its index of every pool-share transfer since the Vault's first block, and reads the shares the wallet staked in a pool's gauge. A pool share holds no loan, so there is no liquidation to trace.",
   "balancer-v3-arbitrum":
-    "A Balancer V3 pool share is a balance the Vault keeps for each pool, and a claim on the pool's tokens in proportion to all shares, so every figure is in those tokens and Balancer runs no USD feed. Rails finds a wallet's pools in its index of every pool-share transfer since the Vault's first block, and reads the shares the wallet staked in a pool's gauge. A pool share holds no loan, so there is no liquidation to trace.",
+    "A Balancer Pool Token (BPT) is a balance the Vault keeps for each pool, and a claim on the pool's tokens in proportion to the BPT total supply, so every figure is in those tokens and Balancer runs no USD feed. Rails finds a wallet's pools in its index of every pool-share transfer since the Vault's first block, and reads the shares the wallet staked in a pool's gauge. A pool share holds no loan, so there is no liquidation to trace.",
   alchemix:
     "Alchemix states no dollar figure for a position because the protocol has none. The Alchemist values collateral as vault shares at the vault's share price, in the asset underneath, and counts each synthetic as one unit of that asset. It runs no USD feed, so a position's debt, collateral and collateralisation are stated in that asset, and the dollar figure beside the collateral is a market price the page labels as one. Debt is a read rather than a replay. A redemption emits one number with no account attached and applies a single survival ratio to every open position at once, and the weights behind it have no public getter, so the explorer reads each V3 position's debt and collateral from getCDP at the block a figure names, at every block where one can step, and checks its event replay against that read to the wei. Each line's replay stays the served figure only until that line's first redemption. The amount set aside for repayment accrues every block, so it is stated at the block it was read and never carried forward or added to a debt taken at another block. Share prices are stored with the Alchemist readings only, so Transmuter positions and V2 accounts state amounts in the synthetic or in vault shares with no price read at the block. V2 closed on 2 April 2026 and is served as a record frozen at block 24,794,239: every account re-read at head returned the same bytes. A V2 debt is signed, a negative one is a credit, and the swept collateral appears in no position's figure. A V2 figure is never added to its V3 successor's, because the V3 position is what the V2 one became. No position has been liquidated on any line yet, so the liquidation card is built and has nothing to show.",
 };

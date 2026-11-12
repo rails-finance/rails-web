@@ -57,7 +57,7 @@ export async function BalancerPositionPage({
   const title = POSITION_PAGE.title(p);
   // Focus (ui-jobs 557): the pool share is in focus when one of the pool's tokens is.
   return (
-    <AimGate keys={r.tokens.map((t) => assetKey(chainId, t.address))} chain={chainId} what="This pool share">
+    <AimGate keys={r.tokens.map((t) => assetKey(chainId, t.address))} chain={chainId} what="This BPT holding">
       <div className="min-h-screen">
         <div className="py-8">
           <header className="mb-5" data-skel-section="page-header">

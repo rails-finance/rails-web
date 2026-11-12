@@ -124,11 +124,11 @@ test("the readout: the wallet's rows, then the pool's, each a past figure and a 
   const [wallet, pool] = table.groups;
   assert.deepEqual(
     wallet.rows.map((r) => r.label),
-    ["Pool shares", "Share of pool", "waEthWETH", "rETH"],
+    ["BPT", "Share of pool", "waEthWETH", "rETH"],
   );
   assert.deepEqual(
     pool.rows.map((r) => r.label),
-    ["All pool shares", "waEthWETH", "rETH", "Value per share", "Swap fee", "Status"],
+    ["BPT total supply", "waEthWETH", "rETH", "BPT rate", "Swap fee", "Status"],
   );
   assert.equal(pool.rows[4].now, "0.04%");
   assert.equal(pool.rows[5].now, "Open");
@@ -161,7 +161,7 @@ test("a wallet row and the words that say what the search misses", () => {
   assert.equal(w.staked, null);
   assert.equal(
     FRONT_DOOR.found("Ethereum"),
-    "Pools are found from every transfer of pool shares to or from this wallet since Balancer V3 launched on Ethereum.",
+    "Pools are found from every transfer of BPT to or from this wallet since Balancer V3 launched on Ethereum.",
   );
 });
 
@@ -221,7 +221,7 @@ test("the card's (i) tells this position's story in its own figures", () => {
   const all = groups.flatMap((g) => g.bullets);
   assert.ok(all.some((b) => /waEthWETH and rETH earn yield/.test(b)));
   assert.ok(
-    all.some((b) => /^This wallet held 10 shares on .*; those added since had only part of the window\.$/.test(b)),
+    all.some((b) => /^This wallet held 10 BPT on .*; the BPT added since had only part of the window\.$/.test(b)),
   );
   assert.ok(all.some((b) => /^Its latest move was an add on .*, after a remove on /.test(b)));
   for (const b of all) {
@@ -230,14 +230,12 @@ test("the card's (i) tells this position's story in its own figures", () => {
   }
   // None held at the past block: the change predates the wallet's shares.
   const none = cardExplainer(balPosition(read({ past: { ...read().past, balance: "0" } }))).flatMap((g) => g.bullets);
-  assert.ok(
-    none.some((b) => /held none on .*, so the change was measured before its current shares were added/.test(b)),
-  );
+  assert.ok(none.some((b) => /held none on .*, so the change was measured before its current BPT was added/.test(b)));
   assert.equal(CARD_WORDS.last({ kind: "add", time: 1_790_000_000 }), "last 21 Sept 2026");
 });
 
 test("the readout names all the pool's shares, and its (i) the past block per chain", () => {
-  assert.equal(readoutTable(balPosition(read())).groups[1].rows[0].label, "All pool shares");
+  assert.equal(readoutTable(balPosition(read())).groups[1].rows[0].label, "BPT total supply");
   assert.match(readoutExplainer(1)[0].bullets[0], /30 to 31 days back/);
   assert.match(readoutExplainer(42161)[0].bullets[0], /UTC midnight/);
   const staked = [{ gauge: "0x62A66eB9aBf7a788F48D0ce7C0C065df9e09dA19", balance: read().balance }];
@@ -246,8 +244,8 @@ test("the readout names all the pool's shares, and its (i) the past block per ch
 
 test("the readout's (i) says the share of pool moves with other holders and what the swap fee does", () => {
   const [compare, wallet, pool] = readoutExplainer(42161);
-  assert.match(compare.bullets.join(" "), /staked shares has figures for now only/);
-  assert.match(wallet.bullets.join(" "), /rises when other holders withdraw/);
+  assert.match(compare.bullets.join(" "), /staked BPT has figures for now only/);
+  assert.match(wallet.bullets.join(" "), /rises when other liquidity providers withdraw/);
   assert.match(pool.bullets.join(" "), /charged on each swap/);
 });
 
