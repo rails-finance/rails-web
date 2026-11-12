@@ -23,7 +23,7 @@ export async function resolve(specifier, context, next) {
 register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
 const { balPosition, fraction, sharesOf, units, walletRow } = await import("../../lib/balancer/position.ts");
-const { cardExplainer, readoutExplainer, readoutLines, rateText, CARD_WORDS, FRONT_DOOR } = await import(
+const { cardExplainer, readoutExplainer, readoutTable, rateText, rateSub, CARD_WORDS, FRONT_DOOR } = await import(
   "../../lib/balancer/words.ts"
 );
 
@@ -111,22 +111,37 @@ test("a pool younger than the window: no past side, no rate change", () => {
   const p = balPosition(read({ past: null }));
   assert.equal(p.then, null);
   assert.equal(p.rateChange, null);
-  assert.equal(rateText(p), "Pool younger than 30 days");
-  const rate = readoutLines(p).find((l) => l.key === "rate");
-  assert.equal(rate.pool, "The pool is younger than 30 days.");
+  assert.equal(rateText(p), "—");
+  assert.equal(rateSub(p), "pool under 30 days old");
+  const table = readoutTable(p);
+  assert.equal(table.then, null);
+  assert.equal(table.groups[1].rows.find((r) => r.key === "rate").now, "—");
 });
 
-test("the readout: shares, share, one line per token, value per share, the pool", () => {
-  const lines = readoutLines(balPosition(read()));
+test("the readout: the wallet's rows, then the pool's, each a past figure and a present one", () => {
+  const table = readoutTable(balPosition(read()));
+  assert.match(table.then, /^\d+ \w+ 2026$/);
+  const [wallet, pool] = table.groups;
   assert.deepEqual(
-    lines.map((l) => l.key),
-    ["shares", "share", "token:0", "token:1", "rate", "status"],
+    wallet.rows.map((r) => r.label),
+    ["Pool shares", "Share of pool", "waEthWETH", "rETH"],
   );
-  assert.equal(lines[2].label, "waEthWETH");
-  assert.equal(lines[5].pool, "Swap fee 0.04%. Open for trading: swaps, adds and removes.");
-  const recovery = readoutLines(balPosition(read({ recoveryMode: true })));
-  assert.match(recovery[5].pool, /recovery mode/);
-  for (const l of lines) for (const s of [l.yours, l.pool]) if (s) assert.doesNotMatch(s, /, not |honest|fold/i);
+  assert.deepEqual(
+    pool.rows.map((r) => r.label),
+    ["All pool shares", "waEthWETH", "rETH", "Value per share", "Swap fee", "Status"],
+  );
+  assert.equal(pool.rows[4].now, "0.04%");
+  assert.equal(pool.rows[5].now, "Open");
+  assert.equal(readoutTable(balPosition(read({ recoveryMode: true }))).groups[1].rows[5].now, "Recovery mode");
+  // Every cell is a figure or a single word: no sentence at the top level.
+  for (const r of [...wallet.rows, ...pool.rows])
+    for (const x of [r.then, r.now]) if (x) assert.doesNotMatch(x, /\.$|, | \w+ \w+ /);
+  // A wallet with no shares at either block has no rows.
+  const gone = readoutTable(balPosition(read({ balance: "0", past: { ...read().past, balance: "0" } })));
+  assert.deepEqual(
+    gone.groups.map((g) => g.title),
+    ["The pool"],
+  );
 });
 
 test("a wallet row and the words that say what the search misses", () => {
@@ -182,20 +197,16 @@ test("a stake counts in the card's share and withholds the wallet's 30-day lines
   assert.ok(Math.abs(p.now.share - 2 * plain.now.share) < 1e-12);
   assert.equal(p.split.held, plain.now.shares);
   assert.equal(p.windowWithheld, true);
-  const lines = readoutLines(p);
-  assert.equal(
-    lines[0].withheld,
-    "Staked shares are read at the head only, so none of the wallet's figures shows a 30-day change.",
-  );
-  for (const l of lines) if (l.yours) assert.doesNotMatch(l.yours, /against/);
-  assert.match(lines[0].pool, /against/);
+  const [wallet, pool] = readoutTable(p).groups;
+  for (const r of wallet.rows) assert.equal(r.then, null);
+  assert.notEqual(pool.rows[0].then, null);
   assert.equal(plain.windowWithheld, false);
-  assert.equal(readoutLines(plain)[0].withheld, undefined);
+  assert.notEqual(readoutTable(plain).groups[0].rows[0].then, null);
 });
 
 test("each chain names itself on the front door and in a receipt's grid", async () => {
   const { BAL_CHAINS, balChain } = await import("../../lib/balancer/chains.ts");
-  assert.match(FRONT_DOOR.line(BAL_CHAINS[42161].name), /on Arbitrum,/);
+  assert.match(FRONT_DOOR.line(BAL_CHAINS[42161].name), /on Arbitrum\.$/);
   assert.match(balChain(42161).grid, /UTC midnight/);
   assert.equal(balChain(1).session, "balancer-v3");
   assert.equal(balChain(42161).session, "balancer-v3-arbitrum");
@@ -226,17 +237,16 @@ test("the card's (i) tells this position's story in its own figures", () => {
 });
 
 test("the readout names all the pool's shares, and its (i) the past block per chain", () => {
-  const lines = readoutLines(balPosition(read()));
-  assert.match(lines[0].pool, /^All shares: /);
+  assert.equal(readoutTable(balPosition(read())).groups[1].rows[0].label, "All pool shares");
   assert.match(readoutExplainer(1)[0].bullets[0], /30 to 31 days back/);
   assert.match(readoutExplainer(42161)[0].bullets[0], /UTC midnight/);
   const staked = [{ gauge: "0x62A66eB9aBf7a788F48D0ce7C0C065df9e09dA19", balance: read().balance }];
-  assert.match(readoutLines(balPosition(read({ staked })))[0].pool, / on \d+ \w+ 2026\.$/);
+  assert.match(readoutTable(balPosition(read({ staked }))).then, /^\d+ \w+ 2026$/);
 });
 
 test("the readout's (i) says the share of pool moves with other holders and what the swap fee does", () => {
   const [compare, wallet, pool] = readoutExplainer(42161);
-  assert.match(compare.bullets.join(" "), /staked shares, its figures show now only/);
+  assert.match(compare.bullets.join(" "), /staked shares has figures for now only/);
   assert.match(wallet.bullets.join(" "), /rises when other holders withdraw/);
   assert.match(pool.bullets.join(" "), /charged on each swap/);
 });

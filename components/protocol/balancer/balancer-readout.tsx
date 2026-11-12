@@ -1,81 +1,94 @@
 "use client";
 
-// "How the share and its pool are doing" (U5; rails-ops ui-jobs 569):
-// one line per measure over the last 30 days, the wallet's figure first, then
-// the pool's, each part traced to its reads (lib/balancer/provenance.ts). The
-// section is one receipts scope its ⋮ arms (decision 0059). The layout is
-// Uniswap's readout (components/protocol/uniswap/uniswap-readout.tsx).
+// The readout under the card (U5; rails-ops ui-jobs 569): a table of two
+// columns, the block 30 days back and the block read now, the wallet's rows
+// first, then the pool's, each figure traced to its reads
+// (lib/balancer/provenance.ts). The section is one receipts scope its ⋮ arms
+// (decision 0059).
 
-import { Prov, type Provenance } from "@/components/shared/provenance";
+import { Prov } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { SectionExplainer } from "@/components/shared/section-explainer";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { BalancerReadStamp } from "@/components/protocol/balancer/balancer-position-card";
 import { balPosition } from "@/lib/balancer/position";
-import { lineProv } from "@/lib/balancer/provenance";
+import { lineProv, type BalReceiptContext } from "@/lib/balancer/provenance";
 import type { BalPositionRead } from "@/lib/balancer/types";
-import { READOUT, readoutExplainer, readoutLines, type BalLine } from "@/lib/balancer/words";
+import { READOUT, readoutExplainer, readoutTable, type BalRow, type BalTable } from "@/lib/balancer/words";
 
 const SCOPE = "balancer-readout";
 
-function Part({ text, info, muted }: { text: string; info: Provenance | null; muted: boolean }) {
-  return (
-    <p className={`text-[13px] leading-snug ${muted ? "text-rb-500" : "text-foreground"}`}>
-      {info ? <Prov info={info}>{text}</Prov> : text}
-    </p>
-  );
+function Figure({ row, text, c }: { row: BalRow; text: string; c: BalReceiptContext }) {
+  const info = lineProv(row.key, row.part, c);
+  return info ? <Prov info={info}>{text}</Prov> : <>{text}</>;
 }
 
-const markdown = (title: string, lines: BalLine[]) =>
+const markdown = (heading: string, title: string, t: BalTable) =>
   [
-    `## ${READOUT.title}: ${title}`,
-    "",
-    ...lines.map((l) => `- **${l.label}**: ${[l.yours, l.withheld, l.pool].filter(Boolean).join(" ")}`),
-    "",
-    READOUT.sub,
+    `## ${heading}: ${title}`,
+    ...t.groups.flatMap((g) => [
+      "",
+      `### ${g.title}`,
+      "",
+      t.then ? `| | ${t.then} | ${READOUT.now} |` : `| | ${READOUT.now} |`,
+      t.then ? "|---|---:|---:|" : "|---|---:|",
+      ...g.rows.map((r) =>
+        t.then ? `| ${r.label} | ${r.single ? "" : (r.then ?? "—")} | ${r.now} |` : `| ${r.label} | ${r.now} |`,
+      ),
+    ]),
   ].join("\n");
 
 export function BalancerReadout({ r, title }: { r: BalPositionRead; title: string }) {
   const p = balPosition(r);
   const c = { p, r };
-  const lines = readoutLines(p);
+  const table = readoutTable(p);
+  const heading = READOUT.title(p);
+  const cols = table.then
+    ? "grid-cols-[minmax(0,1fr)_5rem_5rem] sm:grid-cols-[minmax(0,1fr)_7rem_7rem]"
+    : "grid-cols-[minmax(0,1fr)_5rem] sm:grid-cols-[minmax(0,1fr)_7rem]";
   return (
     <ProvSection scope={SCOPE} data-anatomy="U5" data-pool-readout={`${r.pool}:${r.wallet}`}>
       <SectionHeading
-        title={READOUT.title}
+        title={heading}
         stamp={<BalancerReadStamp c={c} what="Every figure in this section" />}
         menu={
           <SectionMenu
             scope={SCOPE}
-            title={READOUT.title}
-            exports={{ markdown: { build: () => markdown(title, lines) } }}
+            title={heading}
+            exports={{ markdown: { build: () => markdown(heading, title, table) } }}
           />
         }
-      >
-        <p className="text-xs text-rb-500">{READOUT.sub}</p>
-      </SectionHeading>
-      <div className="mt-2 rounded-xl border border-rb-200 px-4 py-3 dark:border-rb-500/30">
-        <ul className="divide-y divide-rb-200 dark:divide-rb-500/30">
-          {lines.map((l) => (
-            <li
-              key={l.key}
-              className="grid gap-x-4 gap-y-0.5 py-2.5 first:pt-0 last:pb-0 sm:grid-cols-[7rem_minmax(0,1fr)]"
-              data-anatomy="U5.1"
-              data-pool-line={l.key}
-            >
-              <span className="text-xs font-semibold text-rb-500 sm:pt-0.5">{l.label}</span>
-              <div className="min-w-0 space-y-0.5">
-                {l.yours && <Part text={l.yours} info={lineProv(l.key, "yours", c)} muted={false} />}
-                {l.withheld && (
-                  <p className="text-[13px] leading-snug text-rb-500" data-window-withheld="staked">
-                    {l.withheld}
-                  </p>
-                )}
-                {l.pool && <Part text={l.pool} info={lineProv(l.key, "pool", c)} muted={l.yours !== null} />}
-              </div>
-            </li>
-          ))}
-        </ul>
+      />
+      <div className="mt-2 max-w-2xl rounded-xl border border-rb-200 px-4 py-3 dark:border-rb-500/30">
+        {table.groups.map((g, gi) => (
+          <div key={g.title} className={gi > 0 ? "mt-4" : undefined} data-readout-group={g.title}>
+            <div className={`grid ${cols} gap-x-4 pb-1.5 text-xs text-rb-500`}>
+              <span className="font-semibold text-foreground">{g.title}</span>
+              {table.then && <span className="text-right">{gi === 0 ? table.then : ""}</span>}
+              <span className="text-right">{gi === 0 ? READOUT.now : ""}</span>
+            </div>
+            <ul className="divide-y divide-rb-200 border-t border-rb-200 dark:divide-rb-500/30 dark:border-rb-500/30">
+              {g.rows.map((row) => (
+                <li
+                  key={`${row.part}:${row.label}`}
+                  className={`grid ${cols} gap-x-4 py-2 text-[13px] leading-snug tabular-nums`}
+                  data-anatomy="U5.1"
+                  data-pool-line={row.key}
+                >
+                  <span className="text-rb-500">{row.label}</span>
+                  {table.then && (
+                    <span className="text-right text-rb-500">
+                      {row.single ? "" : row.then == null ? "—" : <Figure row={row} text={row.then} c={c} />}
+                    </span>
+                  )}
+                  <span className="text-right text-foreground">
+                    <Figure row={row} text={row.now} c={c} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
       <SectionExplainer
         label={READOUT.explainerLabel}

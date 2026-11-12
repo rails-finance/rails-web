@@ -17,7 +17,7 @@ export const LABEL = "Balancer V3";
 
 export const FRONT_DOOR = {
   line: (chain: string) =>
-    `Balancer V3 keeps pools of tokens that traders swap against, and liquidity providers hold shares of each pool: here, a wallet's pool shares on ${chain}, each with its part of the pool's tokens and the pool over the last 30 days.`,
+    `Balancer V3 pools hold tokens that traders swap against, and liquidity providers own shares of each pool. Look up a wallet to see its pool shares on ${chain}.`,
   heading: "Balancer V3 pool shares",
   none: "Rails found no Balancer V3 pool this wallet holds a share of.",
   /** How the pools were found, said on every wallet page. */
@@ -56,10 +56,7 @@ export const REFUSED: Record<BalIndexRefusal, string> = {
 
 export const POSITION_PAGE = {
   title: (p: BalPosition) => `${p.symbol} · Balancer V3`,
-  sub: (p: BalPosition, chain: string) =>
-    [p.name !== p.symbol ? p.name : null, p.feePct == null ? null : `swap fee ${num(p.feePct)}%`, chain]
-      .filter(Boolean)
-      .join(" · "),
+  sub: (p: BalPosition, chain: string) => [p.name !== p.symbol ? p.name : null, chain].filter(Boolean).join(" · "),
   unanswered: "The read of this pool did not answer. Try again in a minute.",
 };
 
@@ -67,110 +64,114 @@ export const CARD_WORDS = {
   heading: "Pool share summary",
   share: "Share of pool",
   shareTip: "The wallet's pool shares, in the wallet and staked in a gauge, as a part of all the pool's shares.",
-  holds: "Holds now",
+  holds: "Tokens",
   holdsTip:
     "The wallet's part of each token the pool holds: the pool's balance of it times the wallet's share of the pool. Withdrawing pays out about these amounts.",
-  rate: "Pool value per share, 30 days",
+  rate: "Share value",
+  rateSub: "over 30 days",
+  rateYoung: "pool under 30 days old",
+  rateUnread: "not read",
   rateTip:
     "How much the pool's value per share changed over the last 30 days. It is the same for every share, and grows from the swap fees the pool keeps and its tokens' yield.",
   /** The share's split where some shares are staked. */
   split: (held: number, staked: number) => `${num(held)} in the wallet, ${num(staked)} staked in a gauge`,
-  /** First added, where the wallet holds or stakes shares but added none itself: the value, and the line under it. */
-  byTransfer: "By transfer",
-  byTransferSub: "No add by this wallet; its shares came by transfer",
+  /** Under an empty First added: the wallet holds or stakes shares it added none of, or has no move on record. */
+  byTransferSub: "shares came by transfer",
+  noMoves: "no adds or removes found",
+  closed: "Closed",
   added: "First added",
   addedTip: "When this wallet first added liquidity to this pool.",
   none: "This wallet holds no shares of this pool now.",
   /** After the add and remove counts: the latest move's day. */
   last: (m: BalMove) => `last ${day(m.time)}`,
-  foot: "Amounts are in each of the pool's tokens. Rails states no dollar figure for them or for what was added, so it cannot say whether this share is up or down.",
   /** The link at the foot of the card's (i) pane. */
   infoLink: "How Balancer V3 works",
 };
 
-/** The value-per-share change, or why there is none. */
-export const rateText = (p: BalPosition): string =>
-  p.rateChange == null ? (p.then ? "Not read" : "Pool younger than 30 days") : pct(p.rateChange);
+/** The value-per-share change; an empty value where there is none, its reason on the line under it. */
+export const rateText = (p: BalPosition): string => (p.rateChange == null ? "—" : pct(p.rateChange));
+export const rateSub = (p: BalPosition): string =>
+  p.rateChange == null ? (p.then ? CARD_WORDS.rateUnread : CARD_WORDS.rateYoung) : CARD_WORDS.rateSub;
 
 export const READOUT = {
-  title: "How the share and its pool are doing",
-  sub: "Measured from the chain over the last 30 days. Rails does not forecast, rate or recommend.",
-  explainerLabel: "explanation of these lines",
-  stakedWithheld: "Staked shares are read at the head only, so none of the wallet's figures shows a 30-day change.",
+  /** The section's heading: the window where the pool has a past read, the present where it has none. */
+  title: (p: BalPosition) => (p.then ? "Last 30 days" : "Pool now"),
+  now: "Now",
+  wallet: "This wallet",
+  pool: "The pool",
+  explainerLabel: "explanation of this table",
 };
 
 export type BalLineKey = "shares" | "share" | `token:${number}` | "rate" | "status";
-export interface BalLine {
+export interface BalRow {
   key: BalLineKey;
+  /** Whose figure it is: the receipt's side. */
+  part: "yours" | "pool";
   label: string;
-  yours: string | null;
-  pool: string | null;
-  /** Why the wallet's 30-day change is not shown, under its figure. */
-  withheld?: string;
+  /** The figure at the past block; null where the row has none. */
+  then: string | null;
+  now: string;
+  /** A fact with no past side by nature (a change, a setting): its past cell stays blank. */
+  single?: true;
+}
+export interface BalTable {
+  /** The past column's date; null for a pool younger than the window. */
+  then: string | null;
+  groups: { title: string; rows: BalRow[] }[];
 }
 
-/** The readout's lines, in drawing order. */
-export function readoutLines(p: BalPosition): BalLine[] {
+/** The readout as a table: a past column and a present one, the wallet's rows, then the pool's. */
+export function readoutTable(p: BalPosition): BalTable {
   const t = p.then;
   // The wallet's past side reads its Vault balance only, so with a stake the
-  // wallet's parts show the head alone; the pool's parts keep the window.
+  // wallet's rows show the present alone; the pool's rows keep the window.
   const w = p.windowWithheld ? null : t;
-  const on = w ? ` on ${day(w.at.time)}` : "";
-  const lines: BalLine[] = [
-    {
-      key: "shares",
-      label: "Pool shares",
-      yours: w ? `${num(p.now.shares)} now, against ${num(w.shares)}${on}.` : `${num(p.now.shares)} now.`,
-      // With the wallet's side withheld, the pool's side carries the past day.
-      pool: t
-        ? `All shares: ${num(p.now.supply)}, against ${num(t.supply)}${w ? "" : ` on ${day(t.at.time)}`}.`
-        : `All shares: ${num(p.now.supply)}.`,
-      ...(p.windowWithheld ? { withheld: READOUT.stakedWithheld } : {}),
-    },
-    {
-      key: "share",
-      label: "Share of pool",
-      yours: w ? `${share(p.now.share)} now, against ${share(w.share)}.` : `${share(p.now.share)} now.`,
-      pool: null,
-    },
-    ...p.tokens.map((tok, i) => ({
-      key: `token:${i}` as const,
-      label: tok.symbol,
-      yours: w
-        ? `Your part: ${num(p.now.holds[i])}, against ${num(w.holds[i])}.`
-        : `Your part: ${num(p.now.holds[i])}.`,
-      pool: t
-        ? `The pool holds ${num(p.now.pool[i])}, against ${num(t.pool[i])}.`
-        : `The pool holds ${num(p.now.pool[i])}.`,
-    })),
-    {
-      key: "rate",
-      label: "Value per share",
-      yours: null,
-      pool:
-        p.rateChange == null
-          ? t
-            ? "Not read for this pool."
-            : "The pool is younger than 30 days."
-          : `${pct(p.rateChange)} over 30 days, from the swap fees the pool keeps and its tokens' yield.`,
-    },
-    {
-      key: "status",
-      label: "Pool",
-      yours: null,
-      pool: [
-        p.feePct == null ? null : `Swap fee ${num(p.feePct)}%.`,
-        p.paused ? "This pool is paused: no swaps, adds or removes." : null,
-        p.recoveryMode
-          ? `${p.paused ? "It is" : "This pool is"} in recovery mode: holders can withdraw their tokens in proportion.`
-          : null,
-        !p.paused && !p.recoveryMode ? "Open for trading: swaps, adds and removes." : null,
-      ]
-        .filter(Boolean)
-        .join(" "),
-    },
+  const wallet: BalRow[] = [
+    { key: "shares", part: "yours", label: "Pool shares", then: w ? num(w.shares) : null, now: num(p.now.shares) },
+    { key: "share", part: "yours", label: "Share of pool", then: w ? share(w.share) : null, now: share(p.now.share) },
+    ...p.tokens.map(
+      (tok, i): BalRow => ({
+        key: `token:${i}`,
+        part: "yours",
+        label: tok.symbol,
+        then: w ? num(w.holds[i]) : null,
+        now: num(p.now.holds[i]),
+      }),
+    ),
   ];
-  return lines;
+  const status = [p.paused ? "Paused" : null, p.recoveryMode ? "Recovery mode" : null].filter(Boolean).join(" · ");
+  const pool: BalRow[] = [
+    { key: "shares", part: "pool", label: "All pool shares", then: t ? num(t.supply) : null, now: num(p.now.supply) },
+    ...p.tokens.map(
+      (tok, i): BalRow => ({
+        key: `token:${i}`,
+        part: "pool",
+        label: tok.symbol,
+        then: t ? num(t.pool[i]) : null,
+        now: num(p.now.pool[i]),
+      }),
+    ),
+    { key: "rate", part: "pool", label: "Value per share", then: null, now: rateText(p), single: true },
+    ...(p.feePct == null
+      ? []
+      : [
+          {
+            key: "status",
+            part: "pool",
+            label: "Swap fee",
+            then: null,
+            now: `${num(p.feePct)}%`,
+            single: true,
+          } as BalRow,
+        ]),
+    { key: "status", part: "pool", label: "Status", then: null, now: status || "Open", single: true },
+  ];
+  // A wallet with no shares at either block has no rows: the section is the pool's alone.
+  const held = p.now.shares > 0 || (w != null && w.shares > 0);
+  return {
+    then: t ? day(t.at.time) : null,
+    groups: [...(held ? [{ title: READOUT.wallet, rows: wallet }] : []), { title: READOUT.pool, rows: pool }],
+  };
 }
 
 export interface ExplainGroupWords {
@@ -213,13 +214,14 @@ export function cardExplainer(p: BalPosition): ExplainGroupWords[] {
           `Value per share ${rose(p.rateChange)} over 30 days, from the swap fees the pool keeps and its tokens' yield.`,
           "It is the pool's figure, the same for every share.",
           p.windowWithheld && held
-            ? "Staked shares are read now only, so this wallet's holding 30 days back is not shown."
+            ? "Staked shares are read now only, so this wallet has no figure from 30 days back."
             : t && t.shares < p.now.shares
               ? t.shares === 0
                 ? `This wallet held none on ${day(t.at.time)}, so the change was measured before its current shares were added.`
                 : `This wallet held ${num(t.shares)} shares on ${day(t.at.time)}; those ${p.firstAdd ? "added" : "received"} since had only part of the window.`
               : null,
         ];
+  const limit = "Amounts are in the pool's tokens, so a gain or loss in dollars is outside this page.";
   const history = [
     p.firstAdd && `This wallet first added on ${day(p.firstAdd.time)}.`,
     p.lastMove && p.priorMove
@@ -231,38 +233,40 @@ export function cardExplainer(p: BalPosition): ExplainGroupWords[] {
   const keep = (b: (string | false | null)[]) => b.filter((x): x is string => typeof x === "string");
   return [
     { title: "Holdings", bullets: keep(holdings) },
-    { title: "Rate", bullets: keep(rate) },
+    { title: "Rate", bullets: keep([...rate, held ? limit : null]) },
     { title: "History", bullets: keep(history) },
   ].filter((g) => g.bullets.length > 0);
 }
 
-/** The readout's (i): how the lines compare, then one bullet per kind of line. */
+/** The readout's (i): how the columns compare, then one bullet per kind of row. */
 export function readoutExplainer(chainId: number): ExplainGroupWords[] {
   return [
     {
       title: "How it compares",
       bullets: [
         chainId === 42161
-          ? "Each line sets the block read now against the block at UTC midnight 30 days back, on the date shown."
-          : "Each line sets the block read now against a block 30 to 31 days back, on the date shown.",
-        "The wallet's figure comes first, then the pool's. Where the wallet has staked shares, its figures show now only.",
+          ? "The first column is the block at UTC midnight 30 days back, on the date shown."
+          : "The first column is a block 30 to 31 days back, on the date shown.",
+        "Now is the block this page read.",
+        "A wallet with staked shares has figures for now only.",
       ],
     },
     {
-      title: "The wallet",
+      title: READOUT.wallet,
       bullets: [
-        "Pool shares: the wallet's count, then all the shares of the pool, whoever holds them.",
-        "Share of pool: the wallet's shares over all the shares. It rises when other holders withdraw and falls when they add, with the wallet's count unchanged.",
-        "A token line: Your part is what the share would pay out of the pool's balance, not what was deposited.",
+        "Pool shares: the wallet's count, in the wallet and staked.",
+        "Share of pool: the wallet's shares over all the pool's shares. It rises when other holders withdraw and falls when they add.",
+        "A token row: what the share would pay out of the pool's balance today.",
       ],
     },
     {
-      title: "The pool",
+      title: READOUT.pool,
       bullets: [
+        "All pool shares: every share of the pool, whoever holds it.",
+        "A token row: the pool's balance of that token.",
         "Value per share: what one share claims of the pool's tokens, counted at their rates.",
         "Swap fee: charged on each swap. The part the pool keeps raises value per share.",
-        "Pool: Open for trading means swaps, adds and removes all work. Paused stops all three.",
-        "In recovery mode, holders can withdraw their tokens in proportion.",
+        "Status: Open means swaps, adds and removes all work. Paused stops all three. Recovery mode lets holders withdraw in proportion.",
       ],
     },
   ];

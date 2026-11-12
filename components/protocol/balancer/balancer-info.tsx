@@ -85,6 +85,7 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
   <>
     Every figure is in the pool&apos;s own tokens. Balancer runs no USD feed, and Rails states no dollar figure here.
   </>,
+  <>Rails does not forecast, rate or recommend.</>,
 ];
 
 const views = (chainId: BalChainId): readonly [InfoView, ...InfoView[]] => [
