@@ -96,17 +96,17 @@ function requestNames(rows: LidoRequestRow[]): string {
   return `withdrawal requests ${ids.slice(0, -1).join(", ")} and ${ids[ids.length - 1]}`;
 }
 
-/** Shares that moved in or out of the wallet beside its requests. */
-const moved = (x: number): string =>
+/** Shares that moved in or out of the wallet beside its requests, with their ETH at the current rate. */
+const moved = (x: number, eth: number, other: boolean): string =>
   x > 0
-    ? `${num(x)} shares moved into the wallet (staked, received or bought)`
-    : `${num(-x)} shares moved out of the wallet (sent or sold)`;
+    ? `${other ? "the other " : ""}${num(x)} shares (${num(eth)} ETH) came into the wallet by transfers Rails does not trace`
+    : `${other ? "the other " : ""}${num(-x)} shares (${num(-eth)} ETH) left the wallet by transfers Rails does not trace`;
 
 /** Why the shares changed, from the requests made since the past read and the rest. */
 export function causeText(c: ShareCause): string {
-  if (c.fit === "none") return moved(c.rest);
+  if (c.fit === "none") return moved(c.rest, c.restEth, false);
   const into = `${num(c.requested)} shares (${num(c.requestedSteth)} stETH) went into ${requestNames(c.requests)}`;
-  return c.fit === "all" ? into : `${into}; ${moved(c.rest).replace(/^\S+ shares/, (m) => `the other ${m}`)}`;
+  return c.fit === "all" ? into : `${into}; ${moved(c.rest, c.restEth, true)}`;
 }
 
 /** The readout's lines, in drawing order. */
@@ -161,10 +161,15 @@ export const REQUESTS = {
   state: { waiting: "Waiting", claimable: "Ready to claim", claimed: "Claimed" } as const,
   /** What each state means, on the state word. */
   stateTip: {
-    waiting: "In Lido's queue until an oracle report finalizes it.",
+    waiting: (q: LidoRequestRow) =>
+      `In Lido's queue until an oracle report finalizes it; it then pays up to ${num(q.steth)} ETH.`,
     claimable: "Finalized: the owner claims this ETH with a transaction.",
     claimed: "Claimed: the ETH was paid out.",
-  } as const,
+  },
+  tip: (q: LidoRequestRow): string => {
+    const t = REQUESTS.stateTip[q.state];
+    return typeof t === "string" ? t : t(q);
+  },
   row: (q: LidoRequestRow) => `${num(q.steth)} stETH, requested ${day(q.time)}`,
   claim: (q: LidoRequestRow) => (q.claimable == null ? null : `${num(q.claimable)} ETH to claim`),
 };
@@ -265,6 +270,7 @@ export function requestsExplainer(s: LidoStake): ExplainGroupWords[] {
             ]
           : []),
         "A request pays at most the stETH locked when it was made: rewards while it waits in the queue are not paid.",
+        ...(waiting.length > 0 ? ["Lido's docs state no fixed wait for finalizing."] : []),
         ...(s.claimableEth > 0
           ? [
               `The ${num(s.claimableEth)} ETH ready to claim stays in the queue until the owner claims it with a transaction.`,

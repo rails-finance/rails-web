@@ -60,6 +60,8 @@ export interface ShareCause {
   /** Shares that moved in (above zero) or out (below zero) of the wallet
    *  beside the requests; zero where they account for the whole change. */
   rest: number;
+  /** The rest in ETH at the current share rate. */
+  restEth: number;
 }
 
 export interface LidoStake {
@@ -95,7 +97,13 @@ const ROUNDING_WEI = BigInt(1000);
 
 /** The change in shares from `thenRaw` to `nowRaw`, matched against the
  *  requests made after `thenTime` (unix seconds). Pure. */
-export function shareCause(thenRaw: bigint, nowRaw: bigint, thenTime: number, rows: LidoRequest[]): ShareCause | null {
+export function shareCause(
+  thenRaw: bigint,
+  nowRaw: bigint,
+  thenTime: number,
+  rows: LidoRequest[],
+  rateNow: string | bigint = ONE,
+): ShareCause | null {
   if (thenRaw === nowRaw) return null;
   const made = rows.filter((q) => q.timestamp > thenTime).sort((a, b) => a.timestamp - b.timestamp);
   const requestedRaw = made.reduce((a, q) => a + BigInt(q.amountOfShares), ZERO);
@@ -110,6 +118,7 @@ export function shareCause(thenRaw: bigint, nowRaw: bigint, thenTime: number, ro
     requestedSteth: units(stethRaw),
     fit,
     rest: fit === "all" ? 0 : units(restRaw),
+    restEth: fit === "all" ? 0 : units((restRaw * BigInt(rateNow)) / ONE),
   };
 }
 
@@ -167,7 +176,7 @@ export function lidoStake(r: LidoStakeRead): LidoStake {
     claimableEth: requests.reduce((a, q) => a + (q.claimable ?? 0), 0),
     requestCount: r.requests.count,
     truncated: r.requests.truncated,
-    cause: shareCause(thenShares, nowShares, r.then.time, r.requests.rows),
+    cause: shareCause(thenShares, nowShares, r.then.time, r.requests.rows, r.now.rate),
   };
 }
 

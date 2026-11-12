@@ -27,6 +27,7 @@ const { gainOn, growth, lidoStake, lidoTotals, requestRow, shareCause, units } =
 );
 const {
   cardExplainer,
+  causeText,
   earnedMeaning,
   rateCause,
   readoutExplainer,
@@ -207,7 +208,7 @@ test("the readout: shares, rate, earned; no shares then says so", () => {
   // From 90 to 100 shares with 800.7 + 1.6 shares requested after the past read (#141000 is older): part.
   assert.match(
     readoutLines(lidoStake(read({ windowState: "changed" })), 0)[0].text,
-    /: 802\.3 shares \(1,002 stETH\) went into withdrawal requests #141290 and #141346; the other 812\.3 shares moved into the wallet \(staked, received or bought\)\.$/,
+    /: 802\.3 shares \(1,002 stETH\) went into withdrawal requests #141290 and #141346; the other 812\.3 shares \([\d,.]+ ETH\) came into the wallet by transfers Rails does not trace\.$/,
   );
   assert.match(lines[1].text, /^1\.248899 ETH per share now/);
   assert.match(lines[2].text, /shares held on .*, valued at today's rate less that day's/);
@@ -277,6 +278,12 @@ test("the shares' change named from the requests made since the past read", () =
   const out = shareCause(BigInt(BADA.then), BigInt(BADA.now), BADA.thenTime, [{ ...BADA.request, timestamp: 1 }]);
   assert.equal(out.fit, "none");
   assert.ok(Math.abs(out.rest + 4.0033) < 1e-9);
+  assert.match(causeText(out), /^4\.003 shares \([\d,.]+ ETH\) left the wallet by transfers Rails does not trace$/);
+  assert.equal(
+    REQUESTS.tip(s.requests[0]),
+    "In Lido's queue until an oracle report finalizes it; it then pays up to 5 ETH.",
+  );
+  assert.match(requestsExplainer(s)[0].bullets.join(" "), /Lido's docs state no fixed wait for finalizing\./);
   // A request for one share against a drop of 4.0033: part, and the rest moved out.
   const part = shareCause(BigInt(BADA.then), BigInt(BADA.now), BADA.thenTime, [
     { ...BADA.request, amountOfShares: `1${E}` },

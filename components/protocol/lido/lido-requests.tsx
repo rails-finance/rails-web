@@ -84,8 +84,8 @@ export function LidoRequests({ r }: { r: LidoStakeRead }) {
                   </p>
                   <p className={`text-[13px] leading-snug ${TONE[q.state]}`}>
                     <Prov info={info}>
-                      <TitleTip title={REQUESTS.stateTip[q.state]}>
-                        <TipLabel text={claim ?? REQUESTS.state[q.state]} tip={REQUESTS.stateTip[q.state]} />
+                      <TitleTip title={REQUESTS.tip(q)}>
+                        <TipLabel text={claim ?? REQUESTS.state[q.state]} tip={REQUESTS.tip(q)} />
                       </TitleTip>
                     </Prov>
                   </p>
