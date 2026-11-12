@@ -25,7 +25,7 @@ export const signed = (x: number): string => (x === 0 ? "0" : `${x > 0 ? "+" : "
 export const FRONT_DOOR = {
   line: "Lido stakes ether on Ethereum's validators and gives each depositor stETH, a token whose balance tracks their stake. Look up a wallet to see its stETH and wstETH in ETH, and its withdrawal requests.",
   totalsTitle: "Lido now",
-  pooled: "Ether staked",
+  pooled: "Total pooled ether",
   pooledTip:
     "All the ether Lido accounts for, which every stETH share is a claim on: the ether on its validators, and the buffered ether deposited and not yet sent to validators.",
   shares: "Shares",
@@ -53,7 +53,7 @@ export const CARD_WORDS = {
   stakeTip: "The wallet's stETH and wstETH together, in ETH at the share rate.",
   steth: "stETH",
   stethTip:
-    "stETH held in this wallet. Its balance is the ETH its shares are worth, so it moves at each oracle report.",
+    "stETH held in this wallet. Its balance is the ETH its shares are worth, so it moves at each oracle report, which Lido calls a rebase.",
   wsteth: "wstETH",
   wstethTip:
     "wstETH held in this wallet. One wstETH is one stETH share, so its count stays the same while its worth in ETH moves.",
@@ -181,12 +181,12 @@ export const REQUESTS = {
     `This wallet owns ${count.toLocaleString("en-US")} withdrawal requests; Rails shows the newest ${shown}.`,
   summary: (s: LidoStake) =>
     [
-      s.waitingSteth > 0 ? `${num(s.waitingSteth)} stETH waiting` : null,
-      s.claimableEth > 0 ? `${num(s.claimableEth)} ETH ready to claim` : null,
+      s.waitingSteth > 0 ? `${num(s.waitingSteth)} stETH not finalized` : null,
+      s.claimableEth > 0 ? `${num(s.claimableEth)} ETH claimable` : null,
     ]
       .filter(Boolean)
       .join(" · "),
-  state: { waiting: "Waiting", claimable: "Ready to claim", claimed: "Claimed" } as const,
+  state: { waiting: "Not finalized", claimable: "Claimable", claimed: "Claimed" } as const,
   /** What each state means, on the state word. */
   stateTip: {
     waiting: (q: LidoRequestRow) =>
@@ -241,12 +241,12 @@ function queued(s: LidoStake): string[] {
   if (s.waitingSteth > 0 && s.claimableEth > 0)
     return [
       cap(
-        `${other}${num(s.waitingSteth)} stETH waits in Lido's withdrawal queue, and ${num(s.claimableEth)} ETH there is ready to claim, below.`,
+        `${other}${num(s.waitingSteth)} stETH waits in Lido's withdrawal queue, and ${num(s.claimableEth)} ETH there is claimable, below.`,
       ),
     ];
   if (s.waitingSteth > 0) return [cap(`${other}${num(s.waitingSteth)} stETH waits in Lido's withdrawal queue, below.`)];
   if (s.claimableEth > 0)
-    return [cap(`${other}${num(s.claimableEth)} ETH sits in Lido's withdrawal queue, ready to claim, below.`)];
+    return [cap(`${other}${num(s.claimableEth)} ETH sits in Lido's withdrawal queue, claimable, below.`)];
   return [];
 }
 
@@ -309,14 +309,14 @@ export function requestsExplainer(s: LidoStake): ExplainGroupWords[] {
       bullets: [
         ...(s.waitingSteth > 0
           ? [
-              `The ${num(s.waitingSteth)} stETH in ${waiting.length === 1 ? "the waiting request" : `${waiting.length} waiting requests`} left this wallet's shares when ${waiting.length === 1 ? "it was" : "they were"} made, so it is outside Stake now.`,
+              `The ${num(s.waitingSteth)} stETH in ${waiting.length === 1 ? "the request not yet finalized" : `${waiting.length} requests not yet finalized`} left this wallet's shares when ${waiting.length === 1 ? "it was" : "they were"} made, so it is outside Stake now.`,
             ]
           : []),
         "A request pays at most the stETH locked when it was made: rewards while it waits in the queue are not paid.",
         ...(waiting.length > 0 ? ["Lido's docs state no fixed wait for finalizing."] : []),
         ...(s.claimableEth > 0
           ? [
-              `The ${num(s.claimableEth)} ETH ready to claim stays in the queue until the owner claims it with a transaction.`,
+              `The ${num(s.claimableEth)} claimable ETH stays in the queue until the owner claims it with a transaction.`,
             ]
           : ["Once finalized, the ETH stays in the queue until the owner claims it with a transaction."]),
         REQUESTS.what,
@@ -369,7 +369,7 @@ export const LIDO_LEARN_MORE: LearnMoreContent = {
   ],
   stepsHeading: "Leaving through the withdrawal queue:",
   steps: [
-    "The holder requests a withdrawal: the stETH or wstETH is locked in Lido's queue, and an NFT for the request goes to the holder.",
+    "The holder requests a withdrawal: the stETH or wstETH is locked in Lido's queue, and an unstETH NFT for the request goes to the holder.",
     "An oracle report finalizes requests in order once there is ether to pay them. Lido's docs state no fixed wait.",
     "The NFT's owner claims the ETH with a transaction. A request pays at most the stETH locked when it was made: rewards earned while it waits are not paid.",
   ],

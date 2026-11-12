@@ -49,7 +49,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Withdrawal request",
     definition:
-      "A withdrawal request locks stETH in Lido's withdrawal queue, as an NFT owned by the wallet that made it. An oracle report finalizes it once there is ether to pay it; then the owner claims the ETH with a transaction, at most the stETH locked when the request was made.",
+      "A withdrawal request locks stETH in Lido's withdrawal queue, as an unstETH NFT owned by the wallet that made it. An oracle report finalizes it once there is ether to pay it; then the owner claims the ETH with a transaction, at most the stETH locked when the request was made.",
     sources: [QUEUE_DOCS],
   },
 ];
@@ -95,8 +95,8 @@ const views: readonly [InfoView, ...InfoView[]] = [
             change, the share rate then and now, and what the shares earned at the rate&apos;s change.
           </li>
           <li>
-            Then the wallet&apos;s withdrawal requests: each one&apos;s stETH, when it was made, and whether it waits or
-            is ready to claim.
+            Then the wallet&apos;s withdrawal requests: each one&apos;s stETH, when it was made, and whether it is
+            finalized and claimable.
           </li>
         </ul>
       </>
