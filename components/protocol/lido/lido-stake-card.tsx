@@ -3,6 +3,8 @@
 // A wallet's Lido stake (U7; rails-ops ui-jobs 570), on the shared position
 // card: the stake in ETH, its stETH and wstETH legs, and the share rate over
 // 30 days. Every figure in ETH at Lido's share rate, each with its receipt.
+// The (i) tells this wallet's stake in words; the ? (C4) is "How Lido staking
+// works", the same on every wallet.
 
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
@@ -11,7 +13,7 @@ import { PoolReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
 import { lidoStake } from "@/lib/lido/stake";
 import { cardProv, readContracts, type LidoReceiptContext } from "@/lib/lido/provenance";
 import type { LidoStakeRead } from "@/lib/lido/types";
-import { CARD_WORDS, cardExplainer, num, rateText } from "@/lib/lido/words";
+import { CARD_WORDS, LIDO_LEARN_MORE, cardExplainer, num, rateText } from "@/lib/lido/words";
 
 /** Every figure's read stamp on a Lido stake page. */
 export function LidoReadStamp({ c, what }: { c: LidoReceiptContext; what: string }) {
@@ -79,7 +81,7 @@ function slots(r: LidoStakeRead): PositionCardSlots {
     explainer: {
       body: (
         <div data-position-explanation="">
-          {cardExplainer().map((g) => (
+          {cardExplainer(s).map((g) => (
             <ExplainGroup key={g.title} title={g.title}>
               {g.bullets.map((b, i) => (
                 <ExplainBullet key={i}>{b}</ExplainBullet>
@@ -89,7 +91,7 @@ function slots(r: LidoStakeRead): PositionCardSlots {
         </div>
       ),
     },
-    learnMore: null,
+    learnMore: LIDO_LEARN_MORE,
     foot: <p className="mt-3 text-xs text-rb-500">{CARD_WORDS.foot}</p>,
     panel: [[], []],
   };

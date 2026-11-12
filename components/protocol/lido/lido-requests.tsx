@@ -3,7 +3,8 @@
 // A wallet's Lido withdrawal requests (U9; rails-ops ui-jobs 570): one row per
 // request the wallet owns (U9.1), the newest first, with its stETH at request,
 // when it was made, and whether it waits, is ready to claim (with the ETH it
-// pays) or was claimed. One receipts scope its ⋮ arms; the read stamp's
+// pays) or was claimed, each state word explaining itself on hover or press;
+// the (i) says what the requests mean for the wallet. One receipts scope its ⋮ arms; the read stamp's
 // receipt names the ids the queue holds for the wallet.
 
 import { Prov } from "@/components/shared/provenance";
@@ -12,7 +13,11 @@ import { SectionReadStamp, readStampProv } from "@/components/shared/read-stamp"
 import { lidoStake } from "@/lib/lido/stake";
 import { readContracts, requestProv, requestsFinderProv } from "@/lib/lido/provenance";
 import { REQUEST_CAP, type LidoStakeRead } from "@/lib/lido/types";
-import { REQUESTS } from "@/lib/lido/words";
+import { REQUESTS, requestsExplainer } from "@/lib/lido/words";
+import { SectionExplainer } from "@/components/shared/section-explainer";
+import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
+import { TitleTip } from "@/components/shared/reveal-tip";
+import { TipLabel } from "@/components/shared/tip-label";
 
 const SCOPE = "lido-requests";
 const TONE = {
@@ -78,12 +83,33 @@ export function LidoRequests({ r }: { r: LidoStakeRead }) {
                     <Prov info={info}>{REQUESTS.row(q)}</Prov>
                   </p>
                   <p className={`text-[13px] leading-snug ${TONE[q.state]}`}>
-                    <Prov info={info}>{claim ?? REQUESTS.state[q.state]}</Prov>
+                    <Prov info={info}>
+                      <TitleTip title={REQUESTS.tip(q)}>
+                        <TipLabel text={claim ?? REQUESTS.state[q.state]} tip={REQUESTS.tip(q)} />
+                      </TitleTip>
+                    </Prov>
                   </p>
                 </li>
               );
             })}
           </ul>
+          <SectionExplainer
+            label={REQUESTS.explainerLabel}
+            className="mt-2"
+            slot={{
+              body: (
+                <>
+                  {requestsExplainer(s).map((g) => (
+                    <ExplainGroup key={g.title} title={g.title}>
+                      {g.bullets.map((b, i) => (
+                        <ExplainBullet key={i}>{b}</ExplainBullet>
+                      ))}
+                    </ExplainGroup>
+                  ))}
+                </>
+              ),
+            }}
+          />
         </>
       )}
       {s.truncated && <p className="mt-3 text-sm text-rb-500">{REQUESTS.truncated(s.requestCount, REQUEST_CAP)}</p>}

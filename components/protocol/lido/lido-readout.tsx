@@ -2,9 +2,10 @@
 
 // "How the stake changed over 30 days" (U8; rails-ops ui-jobs 570): the
 // wallet's shares then and now, the share rate then and now, and what the shares
-// earned at the rate's rise where they match at both reads ("Opened" or
-// "Changed inside the 30 days" otherwise, the (i) saying why), each figure
-// traced to its reads
+// earned at the rate's change where they match at both reads (otherwise the
+// line says why it states none), each figure traced to its reads. The Shares
+// line names what changed them from the requests made since the past read
+// (lib/lido/stake.ts `shareCause`)
 // (lib/lido/provenance.ts). The section is one receipts scope its ⋮ arms
 // (decision 0059). The layout is Balancer's and Uniswap's readout.
 

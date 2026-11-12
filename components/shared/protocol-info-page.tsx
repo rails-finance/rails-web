@@ -172,6 +172,9 @@ export interface ProtocolInfoPageProps {
   views: readonly [InfoView, ...InfoView[]];
   /** Slot 5: the search and filter line, only where the listing has them. */
   search?: ReactNode;
+  /** Slot I6, how to read the pages, where the explorer's pages differ from the
+   *  default sentence (an explorer with no event cards). */
+  guide?: ReactNode;
   /** One sentence naming what a reader might expect here and will not find, shown beside the coverage door. Omit it when nothing is expected and missing. */
   notCovered?: string;
   /** Slot 6: the official documentation, the page's final line. */
@@ -186,6 +189,7 @@ export function ProtocolInfoPage({
   reads,
   views,
   search,
+  guide,
   notCovered,
   docs,
 }: ProtocolInfoPageProps) {
@@ -251,8 +255,12 @@ export function ProtocolInfoPage({
         )}
 
         <p className="mt-5" data-anatomy="I6">
-          Tap the (i) beside any figure to see where it comes from. Inside, the ? explains that kind of event in
-          general.
+          {guide ?? (
+            <>
+              Tap the (i) beside any figure to see where it comes from. Inside, the ? explains that kind of event in
+              general.
+            </>
+          )}
         </p>
       </div>
       <p className="mt-4 text-sm text-rb-500" data-anatomy="I3">

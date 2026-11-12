@@ -5,8 +5,10 @@
 // at each oracle report. What the shares earned over 30 days is stated only
 // where the shares are equal at both reads: those shares valued at today's rate
 // less then's (decision 0048: stated legs only). A stake opened or changed
-// inside the window states its change in shares, with no reason given, and no
-// earnings. No dollar figure (decision 0047).
+// inside the window states its change in shares, and no earnings; the part of
+// the change its withdrawal requests made since the past read account for is
+// named from those requests (`shareCause`), the rest is shares that moved in or
+// out of the wallet. No dollar figure (decision 0047).
 //
 // Pure: scripts/test/lido.test.mjs reads it.
 
@@ -44,6 +46,24 @@ export interface LidoRequestRow {
   claimable: number | null;
 }
 
+/** What accounts for a change in shares, from stated legs only: the wallet's
+ *  withdrawal requests made after the past read, and the rest of the change. */
+export interface ShareCause {
+  /** The requests made after the past read, the oldest first. */
+  requests: LidoRequestRow[];
+  /** Their shares, and the stETH they locked (each request's amountOfStETH). */
+  requested: number;
+  requestedSteth: number;
+  /** "all": the requests account for the drop, to rounding; "part": for part
+   *  of the change; "none": no request was made after the past read. */
+  fit: "all" | "part" | "none";
+  /** Shares that moved in (above zero) or out (below zero) of the wallet
+   *  beside the requests; zero where they account for the whole change. */
+  rest: number;
+  /** The rest in ETH at the current share rate. */
+  restEth: number;
+}
+
 export interface LidoStake {
   wallet: string;
   now: LidoSide & {
@@ -67,6 +87,39 @@ export interface LidoStake {
   claimableEth: number;
   requestCount: number;
   truncated: boolean;
+  /** Why the shares changed, where they did; null where they match at both reads. */
+  cause: ShareCause | null;
+}
+
+/** Rounding between a request's recorded shares and the drop it made: the
+ *  queue's share conversion rounds down, by a wei or two per request. */
+const ROUNDING_WEI = BigInt(1000);
+
+/** The change in shares from `thenRaw` to `nowRaw`, matched against the
+ *  requests made after `thenTime` (unix seconds). Pure. */
+export function shareCause(
+  thenRaw: bigint,
+  nowRaw: bigint,
+  thenTime: number,
+  rows: LidoRequest[],
+  rateNow: string | bigint = ONE,
+): ShareCause | null {
+  if (thenRaw === nowRaw) return null;
+  const made = rows.filter((q) => q.timestamp > thenTime).sort((a, b) => a.timestamp - b.timestamp);
+  const requestedRaw = made.reduce((a, q) => a + BigInt(q.amountOfShares), ZERO);
+  const stethRaw = made.reduce((a, q) => a + BigInt(q.amountOfStETH), ZERO);
+  // Shares that moved beside the requests: the change plus what went into them.
+  const restRaw = nowRaw - thenRaw + requestedRaw;
+  const within = (restRaw < ZERO ? -restRaw : restRaw) <= ROUNDING_WEI * BigInt(Math.max(made.length, 1));
+  const fit = made.length === 0 ? "none" : within ? "all" : "part";
+  return {
+    requests: made.map(requestRow),
+    requested: units(requestedRaw),
+    requestedSteth: units(stethRaw),
+    fit,
+    rest: fit === "all" ? 0 : units(restRaw),
+    restEth: fit === "all" ? 0 : units((restRaw * BigInt(rateNow)) / ONE),
+  };
 }
 
 /** ETH that `sharesRaw` gained between two rates (rates per 1e18 shares), exact before it becomes a number. */
@@ -123,6 +176,7 @@ export function lidoStake(r: LidoStakeRead): LidoStake {
     claimableEth: requests.reduce((a, q) => a + (q.claimable ?? 0), 0),
     requestCount: r.requests.count,
     truncated: r.requests.truncated,
+    cause: shareCause(thenShares, nowShares, r.then.time, r.requests.rows, r.now.rate),
   };
 }
 

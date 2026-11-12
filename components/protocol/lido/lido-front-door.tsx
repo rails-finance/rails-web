@@ -9,6 +9,7 @@ import { ProtocolIcon } from "@/components/icons/protocol-glyphs";
 import { FrontDoorSearch } from "@/components/shared/front-door-search";
 import { HistoryLine } from "@/components/shared/history-tag";
 import { Prov } from "@/components/shared/provenance";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { PoolReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
 import { NAV_PILL } from "@/lib/shared/ui-grammar";
@@ -71,8 +72,8 @@ function Totals({ r }: { r: LidoProtocolRead }) {
       <dl className="mt-2 grid grid-cols-2 gap-3 rounded-xl border border-rb-200 px-4 py-3 dark:border-rb-500/30">
         {cells.map((c) => (
           <div key={c.key} data-lido-total={c.key}>
-            <dt className="text-xs font-semibold text-rb-500" title={c.tip}>
-              {c.label}
+            <dt className="text-xs font-semibold text-rb-500">
+              <HeadingTip text={c.label} tip={c.tip} />
             </dt>
             <dd className="text-sm text-foreground tabular-nums">
               <Prov info={totalsProv(c.key, r, t)}>{c.value}</Prov>
