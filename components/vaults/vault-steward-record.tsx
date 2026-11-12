@@ -5,8 +5,10 @@
 // steward runs now and what each holds, rolled up from the /vaults directory
 // by lib/vaults/steward-record.ts. The steward is the curator, else the owner;
 // a Maple pool's delegate. Rails states the facts with their receipts and
-// scores nothing. The later parts of the record (vaults run before, bad-debt
-// episodes, illiquid stretches, time to response) join this section.
+// scores nothing. Its bad-debt episodes (V14.1, components/vaults/vault-bad-
+// debt-episodes.tsx) stream in under the vaults table on MetaMorpho pages; the
+// later parts (vaults run before, illiquid stretches, time to response) join
+// this section.
 //
 // Held is total assets in each vault's asset. The directory carries no USD,
 // so the rows order by asset: the page's vault's asset first, then the others
@@ -93,8 +95,11 @@ const leadOf = (v: VaultSummary) =>
 export function VaultStewardRecord({
   record,
   role,
+  badDebt,
 }: {
   record: StewardRecordRead;
+  /** The bad-debt episodes (V14.1), drawn under the vaults table. */
+  badDebt?: ReactNode;
   /** The page's read of the steward's role: the heading where the directory did not answer. */
   role: VaultSteward["role"];
 }) {
@@ -202,6 +207,7 @@ export function VaultStewardRecord({
           </p>
         </>
       )}
+      {badDebt}
     </ProvSection>
   );
 }

@@ -7,8 +7,9 @@
 // vault and of Blue, the fee and the guardian at the same block
 // (lib/vaults/config-read.ts); Holders and Who holds it are the census's
 // (lib/vaults/holders-read.ts), Yield the daily store's, the steward's record
-// the /vaults directory's (lib/vaults/steward-record.ts). What protects it and
-// The protocol underneath stream behind their own Suspense.
+// the /vaults directory's (lib/vaults/steward-record.ts). What protects it,
+// The protocol underneath and the record's bad-debt episodes stream behind
+// their own Suspense.
 //
 // THE PAGE LINKS TO THE FILTERED LISTING, IT DOES NOT LIST. The Holders
 // headline links to the position listing filtered to this address. What ONE
@@ -34,6 +35,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { VaultProtectsSection } from "@/components/vaults/vault-protects-section";
+import { VaultBadDebtSection } from "@/components/vaults/vault-bad-debt-section";
 import { MorphoBaseVaultPage as MorphoBaseVaultPageView } from "@/components/vaults/morpho-base-vault-page";
 import { listingMetadata } from "@/lib/shared/page-metadata";
 import { RailHeader } from "@/components/shared/rail-header";
@@ -141,6 +143,11 @@ export async function MetaMorphoVaultRoute({
               config={config}
               holders={holders}
               stewardRecord={stewardRecord}
+              badDebt={
+                <Suspense fallback={null}>
+                  <VaultBadDebtSection chainId={chainId} vault={address} />
+                </Suspense>
+              }
               protects={
                 <Suspense fallback={null}>
                   <VaultProtectsSection

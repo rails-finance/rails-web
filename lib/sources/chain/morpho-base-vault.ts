@@ -899,3 +899,76 @@ export async function loadMorphoBaseHolderShape(
     assetIsVaultAsset: false,
   };
 }
+
+/** The markets in each vault's withdraw queue, and each market's params, read
+ *  at one head block: the reads `loadMorphoBaseVault` makes for its legs,
+ *  batched across vaults (rails-ops ui-jobs 554, the steward's bad-debt
+ *  episodes). A vault that does not answer `withdrawQueueLength` is left out of
+ *  `queues`. Ids lowercased, 0x-prefixed; `lltv` raw at 1e18. */
+export interface MetaMorphoWithdrawQueues {
+  blockNumber: number;
+  queues: Record<string, string[]>;
+  params: Record<string, { loanToken: string; collateralToken: string; oracle: string; irm: string; lltv: string }>;
+}
+
+export async function readMetaMorphoWithdrawQueues(
+  chainId: MetaMorphoChainId,
+  vaults: string[],
+): Promise<MetaMorphoWithdrawQueues> {
+  const client = vaultHeadClient(chainId);
+  const blockNumber = await client.getBlockNumber();
+  const addrs = vaults.map((v) => v.toLowerCase() as `0x${string}`);
+  const lengths = (await client.multicall({
+    contracts: addrs.map((address) => ({ address, abi: VAULT_ABI, functionName: "withdrawQueueLength" as const })),
+    allowFailure: true,
+    blockNumber,
+  })) as Call[];
+  const slots: { vault: string; i: number }[] = [];
+  addrs.forEach((vault, k) => {
+    const len = ok(lengths[k]) as bigint | undefined;
+    for (let i = 0; len != null && i < Number(len); i++) slots.push({ vault, i });
+  });
+  const entries = (await client.multicall({
+    contracts: slots.map((s) => ({
+      address: s.vault as `0x${string}`,
+      abi: VAULT_ABI,
+      functionName: "withdrawQueue" as const,
+      args: [BigInt(s.i)],
+    })),
+    allowFailure: true,
+    blockNumber,
+  })) as Call[];
+  const queues: Record<string, string[]> = {};
+  addrs.forEach((vault, k) => {
+    if (ok(lengths[k]) != null) queues[vault] = [];
+  });
+  slots.forEach((s, k) => {
+    const id = ok(entries[k]) as string | undefined;
+    if (typeof id === "string") queues[s.vault].push(id.toLowerCase());
+  });
+  const ids = [...new Set(Object.values(queues).flat())];
+  const blue = MORPHO_BASE_BLUE as `0x${string}`;
+  const reads = (await client.multicall({
+    contracts: ids.map((id) => ({
+      address: blue,
+      abi: BLUE_ABI,
+      functionName: "idToMarketParams" as const,
+      args: [id as `0x${string}`],
+    })),
+    allowFailure: true,
+    blockNumber,
+  })) as Call[];
+  const params: MetaMorphoWithdrawQueues["params"] = {};
+  ids.forEach((id, k) => {
+    const p = ok(reads[k]) as MarketParamsTuple | undefined;
+    if (p)
+      params[id] = {
+        loanToken: p[0].toLowerCase(),
+        collateralToken: p[1].toLowerCase(),
+        oracle: p[2].toLowerCase(),
+        irm: p[3].toLowerCase(),
+        lltv: String(p[4]),
+      };
+  });
+  return { blockNumber: Number(blockNumber), queues, params };
+}
