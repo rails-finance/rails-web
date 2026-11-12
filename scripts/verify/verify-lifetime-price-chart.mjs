@@ -860,7 +860,7 @@ const PAGES = [
     ...forkPace("ebisu", "weETH", "ebUSD", "last"),
     path: "/ethereum/ebisu/weeth/106525219326064530299176858413070691994107358379893271777150080609961810096862",
     lwOnly: true,
-    changes: { day: 20457, name: "Minimum ratio", from: "128 %", to: "120 %", block: 24160712 },
+    changes: { day: 20457, name: "Minimum Collateral Ratio", from: "128 %", to: "120 %", block: 24160712 },
     level: {
       asset: "weETH",
       endDay: 20624,
@@ -873,7 +873,11 @@ const PAGES = [
     ...forkPace("ebisu", "stcUSD", "ebUSD", "today"),
     path: "/ethereum/ebisu/stcusd/6774201543947923016744174294482881587816035374101342731108014726689376691497",
     lwOnly: true,
-    level: { asset: "stcUSD", card: "liquidates-at", help: ["115% minimum, which no governance log has moved"] },
+    level: {
+      asset: "stcUSD",
+      card: "liquidates-at",
+      help: ["115% Minimum Collateral Ratio (MCR), which no governance log has moved"],
+    },
   },
   {
     // Closed on 8 Nov 2026 00:10 UTC (day 20765): no "Liquidates at" since.
@@ -881,14 +885,14 @@ const PAGES = [
     ...forkPace("asymmetry", "scrvUSD", "USDaf", "last"),
     path: "/ethereum/asymmetry/scrvusd/21455407195608252231693499135014282170032223495298941722085434215551435526302",
     lwOnly: true,
-    level: { asset: "scrvUSD", endDay: 20765, help: ["today's 110% minimum, held across the life"] },
+    level: { asset: "scrvUSD", endDay: 20765, help: ["today's 90.91% Max LTV, held across the life"] },
   },
   {
     id: "asymmetry ysybold 4577 (closed)",
     ...forkPace("asymmetry", "ysyBOLD", "USDaf", "last"),
     path: "/ethereum/asymmetry/ysybold/45771828629529054463940548704077640517998892185928814218152521258795699925919",
     lwOnly: true,
-    level: { asset: "ysyBOLD", endDay: 20392, help: ["today's", "minimum, held across the life"] },
+    level: { asset: "ysyBOLD", endDay: 20392, help: ["today's", "Max LTV, held across the life"] },
   },
   {
     id: "basedollar cbeth 6846",

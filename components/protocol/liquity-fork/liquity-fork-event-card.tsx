@@ -46,7 +46,7 @@ import { LiquityForkEventExplainer, liquityForkLearnMoreContent } from "./liquit
 import { liquityForkStateFigures, liquityForkStateStats, type LiquityForkStateProvs } from "./liquity-fork-state-stats";
 import { buildForkLiquidationForensics, forkLiquidationStats, forkRedemptionStats } from "./liquity-fork-forensics";
 import { liquityForkSheet, type LiquityForkSheetBranch } from "./liquity-fork-sheet";
-import { FORK_ESCROW_WORDS, type LiquityForkEscrow } from "./liquity-fork-escrow";
+import { forkEscrowWords, type LiquityForkEscrow } from "./liquity-fork-escrow";
 import { liquityForkT1Words } from "@/lib/shared/liquity-fork-head-words";
 import { liquityT1Caption } from "@/lib/liquity/event-prose";
 import { L1_WORDS } from "@/lib/liquity/event-templates";
@@ -159,7 +159,9 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
       symbol: fork.escrow.constant.symbol,
       address: fork.escrow.constant.address,
       direction: isOpenEvent ? "right" : "left",
-      verb: isOpenEvent ? FORK_ESCROW_WORDS.spineSent : FORK_ESCROW_WORDS.spineReturned,
+      verb: isOpenEvent
+        ? forkEscrowWords(fork.escrow.constant).spineSent
+        : forkEscrowWords(fork.escrow.constant).spineReturned,
       value: fork.escrow.constant.amount,
       display: String(fork.escrow.constant.amount),
     });
@@ -286,17 +288,20 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
             : { tokens: tokens.length > 0 ? tokens : undefined, ...(isOpenEvent ? rateFlank : {}), isLast: !!isLast };
 
   // ── T2 ──
-  const stats = liquityForkStateStats(ctx, coords, debtSymbol, provs);
-  const cells = chainTruthCells(stats, { inputs: { "Collateral ratio": ["collateral", "debt"] } });
+  const terms = fork.words.terms;
+  const stats = liquityForkStateStats(ctx, coords, debtSymbol, provs, terms);
+  const cells = chainTruthCells(stats, { inputs: { [terms.ratio]: ["collateral", "debt"] } });
   // A redemption's fee and the whole redemption this Trove was a slice of; a
   // liquidation's legs (where its debt went, the surplus left for the owner)
   // and the whole-trove valued block, at the branch's MCR for the block. The
   // branch price a redemption emitted stands in the price row.
   const noteStats = [
-    ...forkRedemptionStats(ctx, coords, provs, debtSymbol).filter((s) => s.label !== "Branch price"),
+    ...forkRedemptionStats(ctx, coords, provs, debtSymbol, terms).filter((s) => s.label !== "Branch price"),
     ...forkLiquidationStats(ctx, coords, provs.liquidationLegProv, debtSymbol),
   ];
-  const forensics = isLiq ? buildForkLiquidationForensics(ctx, coords, provs, { stablecoin: debtSymbol }) : undefined;
+  const forensics = isLiq
+    ? buildForkLiquidationForensics(ctx, coords, provs, { stablecoin: debtSymbol, terms })
+    : undefined;
 
   // The price row: the gas of the owner's transactions only (a redeemer, a
   // liquidator or a batch manager paid for theirs), and the branch price the
@@ -349,6 +354,7 @@ export function LiquityForkEventCard({ event, isLast, eventNumber, fork }: Liqui
     actionLabel: event.actionLabel,
     flows: event.flows,
     escrow: fork.escrow,
+    terms,
   });
 
   const buildTeaser = () => liquityForkExplainerTeaser(ctx, coords, fork.words, provs);

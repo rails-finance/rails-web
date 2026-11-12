@@ -2295,7 +2295,8 @@ test("the price view's Liquity V2 marks: each row at its block, redemptions at t
   // The level's last point is the card's figure at the live read.
   assert.equal(levelAt(s, 104)![1], liqWeth(8100, 19));
   assert.equal(levelAt(s, 105), null);
-  assert.equal(s.level!.formula, "debt × 110% ÷ collateral after each event, with interest accruing between");
+  // Liquity V2 states the level against its Max LTV, 1 ÷ the MCR (decision 0065).
+  assert.equal(s.level!.formula, "debt ÷ (collateral × 90.91%) after each event, with interest accruing between");
   // The runway at today, as the card: (price − level) ÷ price.
   const share = runwayShare(2100, levelAt(s, 104)![1]);
   assert.equal(runwayPct(share), String(Math.round(((2100 - liqWeth(8100, 19)) / 2100) * 100)));
@@ -2966,7 +2967,12 @@ test("a fork's level (ui-jobs 328 step 6): the MCR in force at each day's end, s
     live: null,
     priceView: { collateralType: "WETH", fork: { name: "Basedollar", mcr: 1.1, stepsRead: false, pricedRows: "x" } },
   })!.priceMarks!["coll:WETH"]!;
-  assert.ok(held.help!.includes("today's 110% minimum, held across the life"), held.help);
+  // Basedollar states the limit as a Max LTV, 1 ÷ the MCR (decision 0065).
+  assert.ok(held.help!.includes("today's 90.91% Max LTV, held across the life"), held.help);
+  assert.equal(
+    levelFormulaAt(held.level!, 104),
+    "debt ÷ (collateral × 90.91%) after each event, with interest accruing between",
+  );
   assert.ok(held.level!.summary.includes("no earlier value is listed"), held.level!.summary);
 });
 

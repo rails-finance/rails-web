@@ -49,18 +49,26 @@ import { AssetPopover } from "@/components/shared/asset-popover";
 import { UserGlyph } from "@/components/shared/rate-pill";
 import { HighlightableValue } from "@/components/shared/highlightable-value";
 import { FadeNumber } from "@/components/ui/FadeNumber";
-import { Prov, type Provenance } from "@/components/shared/provenance";
+import { Prov, type Provenance, type ProvInput } from "@/components/shared/provenance";
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { useEnsName } from "@/lib/ens/use-ens-names";
 import { formatMonthDayYear } from "@/lib/date";
-import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
+import { CARD_VOCAB } from "@/lib/shared/card-vocab";
 import { troveCardTips } from "@/lib/liquity/trove-card-tips";
 import type { PositionPanelRow } from "@/components/shared/position-card-panel";
 import { formatExactFromString, formatPrice, formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { getTokenAddress } from "@/lib/shared/token-addresses";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
 import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
-import { LTV_LABEL, liquityV2Mcr, ltvPct } from "@/lib/liquity/ltv";
+import {
+  LTV_LABEL,
+  LTV_LIQUIDATION_PRICE_FORMULA,
+  fmtLtv,
+  liquityFamilyTerms,
+  liquityV2Mcr,
+  ltvPct,
+  type LiquityFamilyTerms,
+} from "@/lib/liquity/ltv";
 import { LIQUITY_FORK_CARD_CONFIGS, type LiquityForkCardConfig } from "@/lib/shared/liquity-fork-card-config";
 import { liquityTroveFaceProv, trovePeakCollProv, trovePeakDebtProv } from "@/lib/liquity/trove-card-provenance";
 import { liquityPositionContent } from "@/lib/shared/learn-more-content";
@@ -234,28 +242,47 @@ function listingCrProv(
   deps: Pick<ForkCardDeps, "resolveBranch" | "defaultPriceFeed">,
   symbol: string,
   stale: boolean,
+  t: LiquityFamilyTerms,
 ): Provenance {
+  const priceNote = stale
+    ? " (lastGoodPrice: the live fetch failed, so it may lag)"
+    : " (fetchPrice simulated at head)";
+  const contract = {
+    name: `${cfg.name} ${symbol} PriceFeed`,
+    address: deps.resolveBranch(symbol)?.priceFeed ?? deps.defaultPriceFeed,
+  };
+  const inputs: ProvInput[] = [
+    { label: "collateral", kind: "chain", pclass: "emitted", note: "latest emitted coll" },
+    { label: "oracle price", kind: "chain", pclass: "oracle", note: "PriceFeed.fetchPrice (simulated)" },
+    { label: "debt", kind: "chain", pclass: "emitted", note: "latest emitted debt" },
+  ];
+  // The docs state a Trove's risk as LTV (decision 0065): the inverse of the
+  // contract's getCurrentICR.
+  if (t.ltv)
+    return {
+      kind: "chain-derived",
+      pclass: "oracle",
+      summary: `LTV. The Trove's ${cfg.debtSymbol} debt ÷ its replayed collateral × the ${symbol} branch's PriceFeed price${priceNote}: 1 ÷ the collateral ratio the TroveManager's getCurrentICR computes (identity verified BigInt-exact). The branch liquidates above its Max LTV, 1 ÷ its MCR.`,
+      contract,
+      via: "debt ÷ (collateral × branch PriceFeed price)",
+      formula: "debt ÷ (coll × price)",
+      inputs,
+    };
   return {
     kind: "chain-derived",
     pclass: "oracle",
-    summary: `Collateral ratio. The Trove's replayed collateral × the ${symbol} branch's PriceFeed price${stale ? " (lastGoodPrice: the live fetch failed, so it may lag)" : " (fetchPrice simulated at head)"} ÷ its ${cfg.debtSymbol} debt. The same formula the TroveManager's getCurrentICR computes (identity verified BigInt-exact); the branch liquidates below its MCR.`,
-    contract: {
-      name: `${cfg.name} ${symbol} PriceFeed`,
-      address: deps.resolveBranch(symbol)?.priceFeed ?? deps.defaultPriceFeed,
-    },
+    summary: `${t.ratio}. The Trove's replayed collateral × the ${symbol} branch's PriceFeed price${priceNote} ÷ its ${cfg.debtSymbol} debt. The same formula the TroveManager's getCurrentICR computes (identity verified BigInt-exact); the branch liquidates below its MCR.`,
+    contract,
     via: "collateral × branch PriceFeed price ÷ debt",
     formula: "coll × price ÷ debt",
-    inputs: [
-      { label: "collateral", kind: "chain", pclass: "emitted", note: "latest emitted coll" },
-      { label: "oracle price", kind: "chain", pclass: "oracle", note: "PriceFeed.fetchPrice (simulated)" },
-      { label: "debt", kind: "chain", pclass: "emitted", note: "latest emitted debt" },
-    ],
+    inputs,
   };
 }
 
 function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFamilyCardOps {
   const vocab = forkLiveVocab(protocol);
   const cfg = LIQUITY_FORK_CARD_CONFIGS[protocol];
+  const terms = liquityFamilyTerms(protocol);
   return {
     shortId: deps.shortId,
     collateralAddress: (ct) => deps.resolveBranch(ct)?.collateralAddr,
@@ -289,20 +316,40 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
         debt: deps.positionDebtProv(coords),
         rate: deps.positionRateProv(coords),
         collUsd: vocab.forkUsdProv("Collateral", ct),
-        cr: listingCrProv(cfg, deps, ct, v.priceStale ?? false),
-        liq: {
-          kind: "derived",
-          summary:
-            "Liquidation price. The collateral price at which this Trove would hit its branch's minimum " +
-            "collateral ratio (MCR); below it the Trove becomes eligible for liquidation. Computed from the " +
-            "Trove's own replayed debt and collateral against the branch's MCR constant.",
-          formula: "debt × MCR ÷ collateral",
-          inputs: [
-            { label: "debt", kind: "chain", pclass: "emitted", note: "latest emitted debt" },
-            { label: "MCR", value: `${mcrPct ?? "—"}%`, kind: "chain", pclass: "indexed", note: "branch constant" },
-            { label: "collateral", kind: "chain", pclass: "emitted", note: "latest emitted coll" },
-          ],
-        },
+        cr: listingCrProv(cfg, deps, ct, v.priceStale ?? false, terms),
+        liq: terms.ltv
+          ? {
+              kind: "derived",
+              summary:
+                "Liquidation price. The collateral price at which this Trove's LTV would reach its branch's Max " +
+                "LTV, 1 ÷ the branch's MCR; above it the Trove becomes eligible for liquidation. Computed from the " +
+                "Trove's own replayed debt and collateral against the branch's MCR constant.",
+              formula: LTV_LIQUIDATION_PRICE_FORMULA,
+              inputs: [
+                { label: "debt", kind: "chain", pclass: "emitted", note: "latest emitted debt" },
+                {
+                  label: "Max LTV",
+                  value: mcrPct ? fmtLtv(10000 / mcrPct, 2) : "—",
+                  kind: "derived",
+                  note: "1 ÷ MCR",
+                },
+                { label: "MCR", value: `${mcrPct ?? "—"}%`, kind: "chain", pclass: "indexed", note: "branch constant" },
+                { label: "collateral", kind: "chain", pclass: "emitted", note: "latest emitted coll" },
+              ],
+            }
+          : {
+              kind: "derived",
+              summary:
+                "Liquidation price. The collateral price at which this Trove would hit its branch's minimum " +
+                "collateral ratio (MCR); below it the Trove becomes eligible for liquidation. Computed from the " +
+                "Trove's own replayed debt and collateral against the branch's MCR constant.",
+              formula: "debt × MCR ÷ collateral",
+              inputs: [
+                { label: "debt", kind: "chain", pclass: "emitted", note: "latest emitted debt" },
+                { label: "MCR", value: `${mcrPct ?? "—"}%`, kind: "chain", pclass: "indexed", note: "branch constant" },
+                { label: "collateral", kind: "chain", pclass: "emitted", note: "latest emitted coll" },
+              ],
+            },
       };
     },
     peakCollateralProv: (v) => deps.peakCollateralProv({ collateralType: v.collateralType, troveId: v.id }),
@@ -551,10 +598,10 @@ export function useLiquityCardSlots({
   const priceUsd = lv ? lv.priceUsd : (v.priceUsd ?? null);
   const collUsd = lv ? (lv.priceUsd != null ? lv.entireColl * lv.priceUsd : null) : (v.collateralUsd ?? null);
   const crPct = lv ? lv.icrPct : (v.collateralRatioPct ?? null);
-  // Liquity V2 states the ratio the docs' way, as LTV (debt ÷ collateral
-  // value; decision 0065); the forks keep the collateral ratio until their
-  // docs are read.
-  const ltvCard = protocol === "liquity-v2";
+  // Each deployment states the ratio its docs' way (decision 0065): LTV, debt
+  // ÷ collateral value, or a collateral ratio.
+  const terms = liquityFamilyTerms(protocol);
+  const ltvCard = terms.ltv;
 
   // A headline's asset icon opens the asset's popover (ui-jobs 248): the exact
   // figure, the contract, and for the collateral the branch's price where the
@@ -632,7 +679,7 @@ export function useLiquityCardSlots({
       : v.status === "closed"
         ? { word: "Closed", tone: "muted" }
         : zombie
-          ? { word: "Dormant", tone: "muted" }
+          ? { word: terms.dormant, tone: "muted" }
           : null;
 
   // The listing names the owner; the delegate shows under Interest rate.
@@ -729,9 +776,8 @@ export function useLiquityCardSlots({
       ) : undefined,
     };
   } else {
-    // Liquity V2's docs name the party a delegate (decision 0065); the forks
-    // keep "Batch manager" until their own docs are read.
-    const managerWord = protocol === "liquity-v2" ? "Delegate" : "Batch manager";
+    // The party a Trove's rate is delegated to, in the docs' word (decision 0065).
+    const managerWord = terms.delegate.charAt(0).toUpperCase() + terms.delegate.slice(1);
     const managerName =
       v.batch?.managerName ?? (v.batch?.managerAddress ? ops.shortId(v.batch.managerAddress) : managerWord);
     const manager = (
@@ -810,7 +856,7 @@ export function useLiquityCardSlots({
           }
         : {
             id: "collateral-ratio",
-            label: ratioLabel("cdp"),
+            label: terms.ratio,
             value:
               crPct != null && crPct > 0 ? (
                 <Prov info={fp.cr}>
@@ -911,7 +957,7 @@ export function useLiquityCardSlots({
       <span data-liq-none="no-debt">None</span>
     ) : null;
   // Each heading's read-more (decision 0038), in the branch's symbols.
-  const tips = troveCardTips(ct, cfg.debtSymbol, ltvCard);
+  const tips = troveCardTips(ct, cfg.debtSymbol, terms);
   const HEAD_TIP = tips.heads;
   const ROW_TIP = tips.rows;
   const tipRow = (r: PositionPanelRow): PositionPanelRow =>
@@ -924,7 +970,7 @@ export function useLiquityCardSlots({
       (panel?.[0] ?? []).map(tipRow),
       [
         ...(panel?.[1] ?? []),
-        ...(liqValue ? [{ id: "liquidates-at", label: "Liquidates at", value: liqValue }] : []),
+        ...(liqValue ? [{ id: "liquidates-at", label: terms.liquidationPrice, value: liqValue }] : []),
       ].map(tipRow),
     ],
   };

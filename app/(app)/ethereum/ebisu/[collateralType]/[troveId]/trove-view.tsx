@@ -467,6 +467,7 @@ export default function EbisuTroveDetail({
   const terminalPane =
     view && view.status !== "open" ? (
       <LiquityForkClosedExplanation
+        protocol="ebisu"
         status={view.status}
         collateralSymbol={view.collateralType}
         debtSymbol={DEBT_SYMBOL}

@@ -53,6 +53,7 @@ import type { LiquityForkBranchesResponse, LiquityForkBranchState } from "@/lib/
 import { AmountText } from "@/components/shared/amount-text";
 import { BlockRef } from "@/components/shared/block-ref";
 import { INLINE_LINK, INPLACE_TEXT } from "@/lib/shared/ui-grammar";
+import { liquityFamilyTerms } from "@/lib/liquity/ltv";
 
 const ratePct = (x: number) => `${x.toFixed(2)}%`;
 const ratio = (x: number) => `${(x * 100).toFixed(1)}%`;
@@ -115,6 +116,9 @@ function BranchCard({
   wiring: Required<LiquityForkUrlWiring>;
 }) {
   const vocab = forkLiveVocab(data.protocol, forkReadBy(data));
+  // The deployment's documented terms (decision 0065).
+  const terms = liquityFamilyTerms(data.protocol);
+  const Branch = terms.branch.charAt(0).toUpperCase() + terms.branch.slice(1);
   const sym = branch.symbol;
 
   if (branch.stale) {
@@ -168,7 +172,7 @@ function BranchCard({
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
         <div>
-          <div className="text-[11px] text-rb-500">Branch debt</div>
+          <div className="text-[11px] text-rb-500">{Branch} debt</div>
           <div className="mt-0.5 text-xs tabular-nums text-foreground">
             {/* The unit rides in the children, so no `symbol` prop — the
                 receipts row renders display + symbol and would double it. */}
@@ -185,7 +189,7 @@ function BranchCard({
           </div>
         </div>
         <div>
-          <div className="text-[11px] text-rb-500">Branch collateral</div>
+          <div className="text-[11px] text-rb-500">{Branch} collateral</div>
           <div className="mt-0.5 text-xs tabular-nums text-foreground">
             {branch.branchColl != null ? (
               <>
@@ -221,7 +225,7 @@ function BranchCard({
                 <Prov info={vocab.zombieProv(sym, branch.idsCapped)}>
                   {branch.idsCapped ? `≥${branch.zombieCount}` : branch.zombieCount}
                 </Prov>{" "}
-                dormant
+                {terms.dormant.toLowerCase()}
               </span>
             )}
           </div>
@@ -295,9 +299,9 @@ function BranchCard({
       )}
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-        {data.protocol === "liquity-v2" ? (
-          // Liquity V2's docs state the per-Trove limit as a Max LTV, 1 ÷ MCR
-          // (decision 0065); the forks keep the MCR.
+        {terms.ltv ? (
+          // The docs state the per-Trove limit as a Max LTV, 1 ÷ MCR
+          // (decision 0065).
           <>
             Liquidates above Max LTV{" "}
             <Prov
@@ -322,7 +326,7 @@ function BranchCard({
           </>
         ) : (
           <>
-            Liquidates below{" "}
+            Liquidates below the {terms.limitText} of{" "}
             <Prov info={vocab.branchConstantProv("Minimum collateral ratio", "MCR", sym)}>{ratio(branch.mcr)}</Prov> per
             trove.
           </>
@@ -429,14 +433,14 @@ export function LiquityForkBranchesView({
           routes across the branches by how much of each is unbacked, then sweeps the branch it lands on from the LOWEST
           user-set interest rate up, so a borrower&rsquo;s rate is also their place in this queue. Being redeemed
           isn&rsquo;t a penalty: the trove gives up collateral and sheds the same value of debt, and its{" "}
-          {learnMore.ltv ? "LTV falls" : "collateral ratio rises"}.
+          {learnMore.terms.ltv ? "LTV falls" : `${learnMore.terms.ratioText} rises`}.
         </p>
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
           A branch&rsquo;s queue is its troves in rate order, which is the listing sorted that way. One link per branch
           below. Two things that order leaves out: a Trove redeemed below the minimum debt drops out of the sorted list,
           and the branch&rsquo;s most recent one with debt left is redeemed ahead of everything in it, whatever rate it
-          carries, so those sit under the listing&rsquo;s Dormant status rather than in these links; and how much is
-          redeemed before any one trove is stated on that trove&rsquo;s own page.
+          carries, so those sit under the listing&rsquo;s {learnMore.terms.dormant} status rather than in these links;
+          and how much is redeemed before any one trove is stated on that trove&rsquo;s own page.
         </p>
         {queued.length > 0 ? (
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5">

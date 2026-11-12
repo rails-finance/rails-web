@@ -11,6 +11,10 @@ import { formatExact } from "@/lib/utils/format";
 import { formatCompactUsd, formatUsdValue } from "@/components/shared/economics-chart-primitives";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 import { forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
+import { liquityFamilyTerms, type LiquityFamilyTerms } from "@/lib/liquity/ltv";
+
+/** The fee drawing debt adds, named as the deployment's docs name it. */
+const upfrontInSentence = (t: LiquityFamilyTerms): string => `the ${t.upfrontFeeText}`;
 import { formatCompact } from "@/lib/shared/format-compact";
 
 const DUST = 1e-9;
@@ -175,8 +179,9 @@ export function liquityForkEconomicsExplanation(
 
   bullets.push(
     <span key="mechanic">
-      {name} is a Liquity V2 fork: this trove carries an interest rate (set by its owner or delegated to a batch
-      manager) that accrues into the debt, and redemptions sweep the branch&apos;s lowest rates first.
+      {name} is a Liquity V2 fork: this trove carries an interest rate (set by its owner or by a{" "}
+      {liquityFamilyTerms(name).delegate}) that accrues into the debt, and redemptions sweep the branch&apos;s lowest
+      rates first.
     </span>,
   );
 
@@ -301,7 +306,7 @@ export function liquityForkEconomicsContent({
     stepsHeading: "How the tower is built:",
     steps: [
       "Deposited, withdrawn, borrowed and repaid are summed from the trove's own signed balance deltas, event by event.",
-      'Debt increases counted as "borrowed" include new draws, the one-time upfront fee, and interest applied whenever an operation touched the trove.',
+      `Debt increases counted as "borrowed" include new draws, ${upfrontInSentence(liquityFamilyTerms(name))}, and interest applied whenever an operation touched the trove.`,
       "Redemptions and liquidations are kept apart from voluntary flows, each in its own bar.",
       "USD values use the branch's oracle price for collateral, and appear only once that on-chain price has loaded.",
       "The borrower's net outcome from redemptions sets the debt they cleared against the collateral they took, valued at the price each Redemption log emitted, and again at the latest block's price.",
@@ -310,7 +315,7 @@ export function liquityForkEconomicsContent({
     details: [
       {
         bold: "User-set (or delegated) interest",
-        text: "each trove carries its own annual rate (set by the borrower or a batch manager they delegate to), accruing continuously into the debt.",
+        text: `each trove carries its own annual rate (set by the borrower or a ${liquityFamilyTerms(name).delegate} they delegate to), accruing continuously into the debt.`,
       },
       {
         bold: "Redemption queue",

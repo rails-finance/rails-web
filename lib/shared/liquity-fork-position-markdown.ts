@@ -8,6 +8,7 @@
 // computed numbers rather than leaving an LLM to guess. A PURE function of
 // the data already in scope on the detail page — no fetching.
 
+import { fmtLtv, liquityFamilyTerms } from "@/lib/liquity/ltv";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork-position";
 import { num, amt, usd, fmtUtc, txCell } from "@/lib/shared/position-markdown";
@@ -74,6 +75,8 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
   const live = chain && !chain.chainStale ? chain : null;
   const coll = view.collateralType;
   const lines: string[] = [];
+  // The deployment's documented terms (decision 0065).
+  const t = liquityFamilyTerms(protocolLabel);
 
   lines.push(`# ${protocolLabel} Trove (${coll} branch)`);
   lines.push("");
@@ -82,14 +85,14 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
       `Balances are the replayed TroveUpdated events upgraded to the branch contracts' live reads where taken ` +
       `(getLatestTroveData: entire debt/coll incl. accrued interest and pending redistribution; redemptions can ` +
       `shrink these between events), USD is the branch's PriceFeed (the price it liquidates and redeems with), ` +
-      `the collateral ratio is the TroveManager's getCurrentICR, and ${debtSymbol} debt is stated at its $1 ` +
+      `${t.ltv ? "the LTV is 1 ÷ the TroveManager's getCurrentICR" : `the ${t.ratioText} is the TroveManager's getCurrentICR`}, and ${debtSymbol} debt is stated at its $1 ` +
       `redemption face (the protocol's mechanism). Everything drifts as the market and position change. ` +
       `Not financial advice.`,
   );
   lines.push("");
   lines.push(`- **Trove:** ${view.id} (${coll} branch)`);
   lines.push(`- **Status:** ${view.status[0].toUpperCase() + view.status.slice(1)}`);
-  if (view.isBatched) lines.push(`- **Interest batch:** managed by a batch manager (debt derived from batch shares)`);
+  if (view.isBatched) lines.push(`- **Interest batch:** managed by a ${t.delegate} (debt derived from batch shares)`);
   lines.push("");
 
   if (view.status !== "open") {
@@ -144,7 +147,7 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
       lines.push(
         `- **Interest rate:** ${num(live.annualInterestRatePct, 2)}% annual ${
           view.isBatched
-            ? "(the batch's current rate, set by its interest-batch manager for every member)"
+            ? `(the batch's current rate, set by its ${t.delegate} for every member)`
             : "(user-set, adjustable any time)"
         }`,
       );
@@ -157,11 +160,13 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
         );
       if (live.icr != null)
         lines.push(
-          `- **Collateral ratio:** ${pct(live.icr)} (the TroveManager's getCurrentICR) vs the branch minimum ${pct(live.mcr, 0)} (MCR)`,
+          t.ltv
+            ? `- **LTV:** ${num(100 / live.icr, 1)}% (1 ÷ the TroveManager's getCurrentICR) vs the branch's Max LTV ${fmtLtv(100 / live.mcr, 2)} (1 ÷ its ${pct(live.mcr, 0)} MCR)`
+            : `- **${t.ratio}:** ${pct(live.icr)} (the TroveManager's getCurrentICR) vs the branch's ${t.limitText} ${pct(live.mcr, 0)}`,
         );
       if (live.liqPriceUsd != null)
         lines.push(
-          `- **Liquidation price:** ${usd(live.liqPriceUsd)} per ${coll} (entire debt × MCR ÷ entire collateral)` +
+          `- **Liquidation price:** ${usd(live.liqPriceUsd)} per ${coll} (${t.ltv ? "entire debt ÷ (entire collateral × Max LTV)" : "entire debt × MCR ÷ entire collateral"})` +
             (live.priceUsd != null && live.priceUsd > live.liqPriceUsd
               ? `, ${num((1 - live.liqPriceUsd / live.priceUsd) * 100, 0)}% below the current price`
               : ""),
@@ -169,23 +174,25 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
       if (live.status === "zombie") {
         lines.push(
           live.redeemedFirst
-            ? `- **Redemption queue:** Dormant (Zombie in the contracts): a partial redemption left the Trove below the minimum debt; it is the branch's lastZombieTroveId, which the next redemption on this branch takes first`
+            ? `- **Redemption queue:** ${t.dormant === "Zombie" ? "Zombie" : `${t.dormant} (Zombie in the contracts)`}: a partial redemption left the Trove below the minimum debt; it is the branch's lastZombieTroveId, which the next redemption on this branch takes first`
             : live.entireDebt > 0
-              ? `- **Redemption queue:** Dormant (Zombie in the contracts): below the minimum debt and not the branch's lastZombieTroveId, so no redemption reaches it`
-              : `- **Redemption queue:** Dormant (Zombie in the contracts): redemption cancelled all of its debt; it sits outside the queue with nothing left to redeem, and closing it returns its ${coll} to the owner`,
+              ? `- **Redemption queue:** ${t.dormant === "Zombie" ? "Zombie" : `${t.dormant} (Zombie in the contracts)`}: below the minimum debt and not the branch's lastZombieTroveId, so no redemption reaches it`
+              : `- **Redemption queue:** ${t.dormant === "Zombie" ? "Zombie" : `${t.dormant} (Zombie in the contracts)`}: redemption cancelled all of its debt; it sits outside the queue with nothing left to redeem, and closing it returns its ${coll} to the owner`,
         );
       } else if (live.debtInFront != null) {
         lines.push(
-          `- **Redemption queue (this branch):** ${amt(live.debtInFront)} ${debtSymbol} of debt is redeemed before this one (${live.trovesAhead ?? 0} trove${(live.trovesAhead ?? 0) === 1 ? "" : "s"}): the branch's last dormant Trove (lastZombieTroveId) when it has debt, then the same or lower interest rates; redemptions take it at $1 face`,
+          `- **Redemption queue (this branch):** ${amt(live.debtInFront)} ${debtSymbol} of debt is redeemed before this one (${live.trovesAhead ?? 0} trove${(live.trovesAhead ?? 0) === 1 ? "" : "s"}): the branch's last ${t.dormantNoun} (lastZombieTroveId) when it has debt, then the same or lower interest rates; redemptions take it at $1 face`,
         );
       }
       if (live.branchTcr != null)
         lines.push(
-          `- **Branch:** ${pct(live.branchTcr, 0)} collateralised overall (${amt(live.branchDebt ?? 0)} ${debtSymbol} total debt); new borrowing gates below ${pct(live.ccr, 0)} (CCR), shutdown possible below ${pct(live.scr, 0)} (SCR)`,
+          t.ltv
+            ? `- **Branch:** Total Collateral Ratio (TCR) ${pct(live.branchTcr, 0)} (${amt(live.branchDebt ?? 0)} ${debtSymbol} total debt); new borrowing gates below the ${pct(live.ccr, 0)} Critical Collateral Ratio (CCR), shutdown possible below ${pct(live.scr, 0)}`
+            : `- **Branch:** ${pct(live.branchTcr, 0)} collateralised overall (${amt(live.branchDebt ?? 0)} ${debtSymbol} total debt); new borrowing gates below ${pct(live.ccr, 0)} (CCR), shutdown possible below ${pct(live.scr, 0)} (SCR)`,
         );
       else if (live.branchDebt != null && live.branchDebt < 1)
         lines.push(
-          `- **Branch:** carries no ${debtSymbol} debt at present, so it has no branch-level collateral ratio to state`,
+          `- **Branch:** carries no ${debtSymbol} debt at present, so it has no ${t.ltv ? "TCR" : "branch-level collateral ratio"} to state`,
         );
       lines.push("");
     } else {
@@ -197,7 +204,7 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
       lines.push(
         `- **Interest rate:** ${num(view.interestRate, 2)}% annual ${
           view.isBatched
-            ? "(its batch's rate as of the trove's last event; the interest-batch manager can have moved the batch since)"
+            ? `(its batch's rate as of the trove's last event; the ${t.delegate} can have moved the batch since)`
             : "(user-set)"
         }`,
       );
