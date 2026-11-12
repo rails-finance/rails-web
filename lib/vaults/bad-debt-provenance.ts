@@ -154,3 +154,47 @@ export function lltvText(raw: string): string {
   const bp = Number(BigInt(raw) / BigInt("100000000000000")); // 1e14: hundredths of a percent
   return `${(bp / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
 }
+
+/** The vault's part over its total assets at block − 1. */
+export const badDebtOfVaultProv = (e: BadDebtEpisode): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  source: { block: e.readBlock },
+  summary: `Of the vault — the vault's part of this bad debt over the vault's totalAssets() at ${chainWord(e)} block ${n(e.readBlock)}, the block before ${row(e)}. Both are in ${e.market.loanSymbol}, the vault's asset. ${RULE}`,
+  contract: { name: e.vault.name ?? "vault", address: e.vault.address },
+  via: "vault's part ÷ MetaMorpho.totalAssets() @ block − 1, in the same Multicall3 call as the shares",
+  formula: "vault's part ÷ vault totalAssets, floored to the millionth",
+  inputs: [
+    {
+      label: "Vault's part (raw)",
+      value: e.vaultPart,
+      kind: "chain-derived",
+      note: `floor(badDebtAssets × position.supplyShares ÷ market.totalSupplyShares) at block ${n(e.readBlock)}`,
+    },
+    {
+      label: "Vault's total assets (raw)",
+      value: e.vaultAssets ?? undefined,
+      kind: "chain",
+      pclass: "state",
+      note: `totalAssets() on ${e.vault.address} at block ${n(e.readBlock)}`,
+      contract: { name: e.vault.name ?? "vault", address: e.vault.address },
+    },
+  ],
+  verify: {
+    kind: "recompute",
+    text: `To check: ask any archive node for totalAssets() on ${e.vault.address} at ${chainWord(e)} block ${n(e.readBlock)}, and divide the vault's part by it.`,
+  },
+});
+
+/** The count of liquidations that cost a vault 0.01% of its assets or more. */
+export const badDebtLargeCountProv = (count: number, of: number): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary: `Liquidations at 0.01% of a vault or more — ${n(count)} of the ${n(of)} liquidations with bad debt in its vaults, where one vault's part was 0.01% of its totalAssets() or more, both read at the block before the liquidation.`,
+  via: "vault's part ÷ MetaMorpho.totalAssets() @ block − 1 ≥ 0.0001",
+  formula: "count(liquidations where some vault's part ÷ its total assets ≥ 0.01%)",
+  verify: {
+    kind: "recompute",
+    text: "To check: for each liquidation listed, divide each vault's part by its totalAssets() at the block before, and count the liquidations where one reaches 0.0001.",
+  },
+});

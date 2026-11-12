@@ -4,8 +4,10 @@
 //
 //   vault's part = floor(badDebtAssets × vaultSupplyShares ÷ totalSupplyShares)
 //
-// with both share counts read at the block before the liquidation. BigInt
-// throughout; a share of zero means the vault was not exposed. Pure: no `@/`
+// with both share counts read at the block before the liquidation, and "of the
+// vault" is that part over the vault's totalAssets() at the same block, in
+// parts per million. BigInt throughout; a share of zero means the vault was not
+// exposed, and zero total assets give no figure. Pure: no `@/`
 // import, so scripts/test/vault-bad-debt-share.test.mjs loads it directly.
 
 const ZERO = BigInt(0);
@@ -28,4 +30,14 @@ export function supplySharePercent(vaultShares: bigint, totalShares: bigint, pla
   const scale = BigInt(10) ** BigInt(places);
   const scaled = (held * BigInt(100) * scale) / totalShares;
   return Number(scaled) / Number(scale);
+}
+
+/** One basis point, 0.01%, in parts per million. */
+export const ONE_BP_PPM = 100;
+
+/** The vault's part over its total assets at the same block, in parts per
+ *  million, floored. Null where the total assets did not read or read zero. */
+export function ofVaultPpm(part: bigint, vaultAssets: bigint | null): number | null {
+  if (vaultAssets == null || vaultAssets <= ZERO) return null;
+  return Number((part * BigInt(1_000_000)) / vaultAssets);
 }

@@ -12,7 +12,9 @@
 //  - One Multicall3 eth_call per bad-debt block, at block − 1, reads
 //    Morpho.market(id).totalSupplyShares and Morpho.position(id, vault)
 //    .supplyShares for every steward vault in each market liquidated in that
-//    block. The vault's part is lib/vaults/bad-debt-share.ts. A supply or
+//    block, and each of those vaults' totalAssets() in the same call. The
+//    vault's part, and that part over its total assets, are
+//    lib/vaults/bad-debt-share.ts. A supply or
 //    withdrawal by the vault earlier in the same block is not seen.
 //  - A past block's answer never changes, so each block's read is cached for
 //    good, keyed by chain, block and its sorted market:vault pairs.
@@ -36,7 +38,7 @@ import { morphoMarketHref } from "@/lib/morpho/market-routes";
 import { loadStewardRecord } from "@/lib/vaults/steward-record";
 import { vaultIndexHref } from "@/lib/vaults/index-rosters";
 import { vaultDisplayName, type VaultSummary } from "@/lib/vaults/summary";
-import { supplySharePercent, vaultBadDebtPart } from "@/lib/vaults/bad-debt-share";
+import { ofVaultPpm, supplySharePercent, vaultBadDebtPart } from "@/lib/vaults/bad-debt-share";
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
@@ -44,6 +46,8 @@ const BLUE_ABI = parseAbi([
   "function market(bytes32) view returns (uint128 totalSupplyAssets, uint128 totalSupplyShares, uint128 totalBorrowAssets, uint128 totalBorrowShares, uint128 lastUpdate, uint128 fee)",
   "function position(bytes32, address) view returns (uint256 supplyShares, uint128 borrowShares, uint128 collateral)",
 ]);
+
+const VAULT_ABI = parseAbi(["function totalAssets() view returns (uint256)"]);
 
 /** One vault hit by one liquidation's bad debt. Raw integers as strings. */
 export interface BadDebtEpisode {
@@ -77,6 +81,11 @@ export interface BadDebtEpisode {
   vaultPart: string;
   /** The vault's share of the market's supply, percent, floored to 6 places. */
   sharePercent: number;
+  /** The vault's totalAssets() at block − 1, raw in its asset (the loan token). */
+  vaultAssets: string | null;
+  /** The vault's part over its total assets, parts per million, floored; null
+   *  where totalAssets did not read or read zero. */
+  ofVaultPpm: number | null;
 }
 
 export type BadDebtRead =
@@ -98,8 +107,12 @@ export type BadDebtRead =
     };
 
 /** One block's at-block answer: per market, its total supply shares and each
- *  asked vault's supply shares, as strings. */
-type BlockShares = Record<string, { total: string; vaults: Record<string, string> }>;
+ *  asked vault's supply shares; per vault, its totalAssets() (null where the
+ *  call did not answer, as for a vault not yet deployed). Strings. */
+interface BlockShares {
+  markets: Record<string, { total: string; vaults: Record<string, string> }>;
+  assets: Record<string, string | null>;
+}
 
 /** `pairs` is the sorted `marketId:vault,vault;…` list: the cache key's half. */
 async function readBlockShares(chainId: number, readBlock: number, pairs: string): Promise<BlockShares> {
@@ -108,29 +121,48 @@ async function readBlockShares(chainId: number, readBlock: number, pairs: string
     const [m, vs] = p.split(":");
     return { m: m as `0x${string}`, vaults: vs.split(",") as `0x${string}`[] };
   });
-  const contracts = plan.flatMap(({ m, vaults }) => [
-    { address: blue, abi: BLUE_ABI, functionName: "market" as const, args: [m] as const },
-    ...vaults.map((v) => ({ address: blue, abi: BLUE_ABI, functionName: "position" as const, args: [m, v] as const })),
-  ]);
+  const vaultSet = [...new Set(plan.flatMap((p) => p.vaults))].sort() as `0x${string}`[];
+  const contracts = [
+    ...plan.flatMap(({ m, vaults }) => [
+      { address: blue, abi: BLUE_ABI, functionName: "market" as const, args: [m] as const },
+      ...vaults.map((v) => ({
+        address: blue,
+        abi: BLUE_ABI,
+        functionName: "position" as const,
+        args: [m, v] as const,
+      })),
+    ]),
+    ...vaultSet.map((v) => ({ address: v, abi: VAULT_ABI, functionName: "totalAssets" as const })),
+  ];
   // batchSize 0: the whole block is one aggregate3 eth_call.
   const res = await chainBatchClient(chainId as MorphoLiquidationsChainId).multicall({
     contracts,
-    allowFailure: false,
+    allowFailure: true,
     blockNumber: BigInt(readBlock),
     batchSize: 0,
   });
-  const out: BlockShares = {};
+  // Blue answers market() and position() for any id and address; a failure
+  // there is a failed read, and nothing is cached.
+  const blueRead = (i: number) => {
+    const r = res[i];
+    if (r.status !== "success") throw new Error(`Morpho Blue call ${i} at block ${readBlock} did not answer`);
+    return r.result as readonly bigint[];
+  };
+  const out: BlockShares = { markets: {}, assets: {} };
   let k = 0;
   for (const { m, vaults } of plan) {
-    const market = res[k++] as readonly bigint[];
-    const entry = { total: String(market[1]), vaults: {} as Record<string, string> };
-    for (const v of vaults) entry.vaults[v] = String((res[k++] as readonly bigint[])[0]);
-    out[m] = entry;
+    const entry = { total: String(blueRead(k++)[1]), vaults: {} as Record<string, string> };
+    for (const v of vaults) entry.vaults[v] = String(blueRead(k++)[0]);
+    out.markets[m] = entry;
+  }
+  for (const v of vaultSet) {
+    const r = res[k++];
+    out.assets[v] = r.status === "success" ? String(r.result) : null;
   }
   return out;
 }
 
-const cachedBlockShares = unstable_cache(readBlockShares, ["vault-bad-debt-block-shares", "1"], {
+const cachedBlockShares = unstable_cache(readBlockShares, ["vault-bad-debt-block-shares", "2"], {
   revalidate: false,
 });
 
@@ -220,7 +252,7 @@ async function chainEpisodes(
   blocks.forEach((block, bi) => {
     const read = shares[bi]!;
     for (const { id, l } of byBlock.get(block)!) {
-      const m = read[id];
+      const m = read.markets[id];
       const p = q.params[id];
       const loan = tokens.get(p.loanToken);
       if (!loan) continue;
@@ -261,6 +293,8 @@ async function chainEpisodes(
           totalShares: m.total,
           vaultPart: part.toString(),
           sharePercent: supplySharePercent(vs, total, 6) ?? 0,
+          vaultAssets: read.assets[vault] ?? null,
+          ofVaultPpm: ofVaultPpm(part, read.assets[vault] != null ? BigInt(read.assets[vault]!) : null),
         });
       }
     }

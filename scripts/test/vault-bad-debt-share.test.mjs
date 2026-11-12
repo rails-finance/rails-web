@@ -4,7 +4,7 @@
 // Run: npm test
 import test from "node:test";
 import assert from "node:assert/strict";
-import { supplySharePercent, vaultBadDebtPart } from "../../lib/vaults/bad-debt-share.ts";
+import { ONE_BP_PPM, ofVaultPpm, supplySharePercent, vaultBadDebtPart } from "../../lib/vaults/bad-debt-share.ts";
 
 const B = (v) => BigInt(v);
 
@@ -35,4 +35,18 @@ test("the supply share in percent, floored to two places", () => {
   assert.equal(supplySharePercent(B(1), B(3)), 33.33);
   assert.equal(supplySharePercent(B(199803), B("1005329475093")), 0);
   assert.equal(supplySharePercent(B(199803), B("1005329475093"), 6), 0.000019);
+});
+
+test("of the vault: the part over its total assets, in ppm, floored", () => {
+  // 146,573 over 23,300,000,000 (23.3K USDC) = 6.29 ppm
+  assert.equal(ofVaultPpm(B(146573), B("23300000000")), 6);
+  assert.equal(ofVaultPpm(B(1), B(10000)), 100); // one basis point
+  assert.equal(ofVaultPpm(B(0), B(10000)), 0);
+  assert.equal(ofVaultPpm(B(5), B(5)), 1_000_000);
+  assert.ok(ofVaultPpm(B(1), B(10001)) < ONE_BP_PPM);
+});
+
+test("of the vault: zero or unread assets give no figure", () => {
+  assert.equal(ofVaultPpm(B(10), B(0)), null);
+  assert.equal(ofVaultPpm(B(10), null), null);
 });
