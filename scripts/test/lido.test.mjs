@@ -126,7 +126,7 @@ test("a stake: both legs in shares and ETH, the change in shares; earnings withh
   assert.ok(Math.abs(s.claimableEth - 2) < 1e-9);
 });
 
-test("a request's state: waiting, ready to claim, claimed", () => {
+test("a request's state: not finalized, claimable, claimed", () => {
   const rows = read().requests.rows.map(requestRow);
   assert.deepEqual(
     rows.map((q) => q.state),
@@ -135,7 +135,7 @@ test("a request's state: waiting, ready to claim, claimed", () => {
   assert.equal(rows[0].claimable, null);
   assert.equal(REQUESTS.claim(rows[1]), "2 ETH to claim");
   assert.equal(REQUESTS.state[rows[2].state], "Claimed");
-  assert.match(REQUESTS.summary(lidoStake(read())), /1,000 stETH waiting · 2 ETH ready to claim/);
+  assert.match(REQUESTS.summary(lidoStake(read())), /1,000 stETH not finalized · 2 ETH claimable/);
 });
 
 const SAME = { past: { stethShares: `80${E}`, wstethBalance: `20${E}`, rate: RATE_THEN } };
@@ -313,7 +313,10 @@ test("the shares' change named from the requests made since the past read", () =
     cardExplainer(s)[0].bullets[0],
     /^This wallet holds 401\.2 shares, all as wstETH; at 1\.248899 ETH a share/,
   );
-  assert.match(requestsExplainer(s)[0].bullets[0], /^The 5 stETH in the waiting request left this wallet's shares/);
+  assert.match(
+    requestsExplainer(s)[0].bullets[0],
+    /^The 5 stETH in the request not yet finalized left this wallet's shares/,
+  );
   assert.equal(cardExplainer(s)[0].bullets[2], "Another 5 stETH waits in Lido's withdrawal queue, below.");
 });
 
@@ -350,7 +353,7 @@ test("a full request leaves a remainder: the cause names its stETH, the card say
     card[0],
     "This wallet holds a remainder under 0.0001 shares, worth under 0.0001 ETH. Sending a whole stETH balance can leave a wei or two behind.",
   );
-  assert.equal(card[2], "Another 3.226 ETH sits in Lido's withdrawal queue, ready to claim, below.");
+  assert.equal(card[2], "Another 3.226 ETH sits in Lido's withdrawal queue, claimable, below.");
 });
 
 test("a row's note: why the shares moved and why Earned is empty, in a few words", async () => {
