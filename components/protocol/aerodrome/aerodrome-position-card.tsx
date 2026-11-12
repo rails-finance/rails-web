@@ -1,10 +1,10 @@
 "use client";
 
-// An Aerodrome position's card (U1; rails-ops ui-jobs 566): Uniswap's card
+// An Aerodrome position's card (U1; rails-ops ui-jobs 566, 594): Uniswap's card
 // (components/protocol/uniswap/uniswap-position-card.tsx) with staking in it.
-// The two tokens it holds now and its worth in the pool's quote token; then,
-// unstaked, the fees not yet collected, or, staked, the AERO to claim and the
-// wallet that staked it; then the range drawn against the price.
+// The two tokens it holds now and its value in the pool's quote token; then,
+// unstaked, its uncollected fees, or, staked, the AERO to claim and the wallet
+// that staked it; then the range drawn against the price.
 
 import { Prov } from "@/components/shared/provenance";
 import { PositionCard, type PositionCardHead, type PositionCardSlots } from "@/components/shared/position-card";
@@ -14,7 +14,7 @@ import { PoolReadStamp, Segs } from "@/components/protocol/uniswap/uniswap-reado
 import { aeroPosition } from "@/lib/aerodrome/position";
 import { cardProv, readContracts, type AeroReceiptContext } from "@/lib/aerodrome/provenance";
 import type { AeroPositionRead } from "@/lib/aerodrome/types";
-import { cardExplainer, cardWords } from "@/lib/aerodrome/words";
+import { aeroStatus, cardExplainer, cardWords } from "@/lib/aerodrome/words";
 import { num, positionNumber, short, shown } from "@/lib/uniswap/words";
 
 /** Every figure's read stamp on an Aerodrome page. */
@@ -32,19 +32,25 @@ function slots(r: AeroPositionRead): PositionCardSlots {
   const R = p.site.reward.symbol;
   const CARD_WORDS = cardWords(p.site);
   const words = cardExplainer(p);
+  const closed = BigInt(p.liquidity) === BigInt(0);
+  const unit = (sym: string) => <span className="text-base font-medium">{sym}</span>;
   const heads: PositionCardHead[] = [
     {
       id: "holds",
       label: CARD_WORDS.holds,
       labelTip: CARD_WORDS.holdsTip,
-      value: (
+      value: closed ? (
+        "—"
+      ) : (
         <Prov info={cardProv("holds", c)}>
-          {num(p.holds.base)} {B}
+          {num(p.holds.base)} {unit(B)}
         </Prov>
       ),
-      sub: (
+      sub: closed ? undefined : (
         <span data-figure="holds-quote">
-          and {num(p.holds.quote)} {Q}
+          <Prov info={cardProv("holds", c)}>
+            {num(p.holds.quote)} {Q}
+          </Prov>
         </span>
       ),
     },
@@ -52,9 +58,11 @@ function slots(r: AeroPositionRead): PositionCardSlots {
       id: "worth",
       label: CARD_WORDS.worth,
       labelTip: CARD_WORDS.worthTip(Q),
-      value: (
+      value: closed ? (
+        "—"
+      ) : (
         <Prov info={cardProv("worth", c)}>
-          {num(p.valueNow)} {Q}
+          {num(p.valueNow)} {unit(Q)}
         </Prov>
       ),
     },
@@ -67,7 +75,7 @@ function slots(r: AeroPositionRead): PositionCardSlots {
       value:
         p.aero.claimable === null ? null : (
           <Prov info={cardProv("claimable", c)}>
-            {num(p.aero.claimable)} {R}
+            {num(p.aero.claimable)} {unit(R)}
           </Prov>
         ),
       sub:
@@ -82,27 +90,30 @@ function slots(r: AeroPositionRead): PositionCardSlots {
       label: CARD_WORDS.owner,
       labelTip: CARD_WORDS.ownerTip,
       value: (
-        <Prov info={cardProv("owner", c)}>
-          {p.holder ? <span className="font-mono">{short(p.holder)}</span> : CARD_WORDS.gaugeOnly}
-        </Prov>
+        <Prov info={cardProv("owner", c)}>{p.holder ? <span className="font-mono">{short(p.holder)}</span> : "—"}</Prov>
       ),
+      sub: p.holder ? undefined : <span data-figure="owner-none">{CARD_WORDS.ownerNone}</span>,
     });
   } else {
     heads.push({
       id: "uncollected",
       label: CARD_WORDS.uncollected,
       labelTip: CARD_WORDS.uncollectedTip,
-      value: (
-        <Prov info={cardProv("uncollected", c)}>
-          {num(p.uncollected ?? 0)} {Q}
-        </Prov>
-      ),
+      value:
+        closed && !p.uncollected ? (
+          "—"
+        ) : (
+          <Prov info={cardProv("uncollected", c)}>
+            {num(p.uncollected ?? 0)} {unit(Q)}
+          </Prov>
+        ),
     });
   }
+  const status = aeroStatus(p);
   return {
     surface: "detail",
     heading: CARD_WORDS.heading,
-    status: null,
+    status: status ? { word: status.word, tone: "muted", tip: status.tip } : null,
     identity: (
       <span className="text-xs text-rb-500">
         {positionNumber(p.id)} · {p.staked ? CARD_WORDS.stakedBadge : CARD_WORDS.unstakedBadge}
@@ -128,7 +139,7 @@ function slots(r: AeroPositionRead): PositionCardSlots {
       ),
     },
     learnMore: null,
-    band: (
+    band: closed ? undefined : (
       <div className="mt-4" data-anatomy="U1.1">
         <div className="mb-1 text-xs text-rb-500">{CARD_WORDS.rangeLabel}</div>
         <RangeBar
@@ -140,7 +151,6 @@ function slots(r: AeroPositionRead): PositionCardSlots {
         />
       </div>
     ),
-    foot: <p className="mt-3 text-xs text-rb-500">{CARD_WORDS.foot(Q)}</p>,
     panel: [[], []],
   };
 }

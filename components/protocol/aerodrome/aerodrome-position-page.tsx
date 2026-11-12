@@ -1,7 +1,7 @@
 // One Slipstream position (rails-ops ui-jobs 566, 578), at
 // `<site route>/position/<deployment>/<id>`: Aerodrome on Base, Velodrome on
 // Optimism (lib/aerodrome/sites.ts). The position card, then the
-// six-line readout under it. One read of rails-server's at-block route
+// readout table under it. One read of rails-server's at-block route
 // (lib/api/fetch-aerodrome.ts) serves both. The layout is Uniswap's
 // (components/protocol/uniswap/uniswap-position-page.tsx).
 //
@@ -22,7 +22,7 @@ import { aeroPosition } from "@/lib/aerodrome/position";
 import { cardProv } from "@/lib/aerodrome/provenance";
 import { AERODROME, isSiteDeployment, type SlipstreamSite } from "@/lib/aerodrome/sites";
 import type { SlipstreamDeployment } from "@/lib/aerodrome/types";
-import { depositorLimit, notIndexed, POSITION_PAGE } from "@/lib/aerodrome/words";
+import { notIndexed, POSITION_PAGE } from "@/lib/aerodrome/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { explorerHref } from "@/lib/shared/protocols";
 
@@ -60,7 +60,6 @@ export async function AerodromePositionPage({
   const p = aeroPosition(r);
   const title = POSITION_PAGE.title(p);
   const wallet = p.holder?.toLowerCase() ?? null;
-  const limit = p.staked ? depositorLimit(site) : null;
   // Focus (ui-jobs 557): the position is in focus when either side of its pair is.
   return (
     <AimGate keys={poolTokenKeys(chain, [r.token0, r.token1])} chain={chain} what="This position">
@@ -89,11 +88,6 @@ export async function AerodromePositionPage({
               </h2>
             </HistoryTitleRow>
             <p className="text-xs text-rb-500">{POSITION_PAGE.sub(p)}</p>
-            {limit && (
-              <p className="mt-1 text-xs text-rb-500" data-slipstream-limit="depositor">
-                {limit}
-              </p>
-            )}
           </header>
           <div className="flex flex-col gap-6">
             <AerodromePositionCard r={r} />

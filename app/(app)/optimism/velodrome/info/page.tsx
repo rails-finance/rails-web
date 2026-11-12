@@ -77,6 +77,7 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
     Every figure is in the pool&apos;s quote token, the one it prices the other in, at the pool&apos;s price. VELO is
     valued through Velodrome&apos;s own VELO pools, and Rails states no dollar figure here.
   </>,
+  <>Rails does not forecast, rate or recommend.</>,
 ];
 
 const views: readonly [InfoView, ...InfoView[]] = [
