@@ -20,10 +20,11 @@ export function SiteFooter() {
   // entry point (with recent/pinned in its dropdown). The chrome stays
   // simple: one route to discover, one to drill in.
   return (
-    // The raised tone on every page (rb-100, rb-800 in dark), 64px clear of
-    // the content above it; on home the page's gradient carries those 64px
-    // (app/(site)/page.tsx) so no canvas band shows (ui-jobs 509).
-    <footer className={`${home ? "" : "mt-16 "}bg-raised`} data-anatomy="H9">
+    // No ground of its own: the section above carries through, and a hairline
+    // at its top is the division (Miles, 12 Nov 2026; ui-jobs 602). 64px clear
+    // of the content above; on home the lower gradient carries those 64px
+    // (app/(site)/page.tsx) and the footer takes the gradient's end tone.
+    <footer className={`border-t border-rb-200 ${home ? "bg-rb-50 dark:bg-rb-600" : "mt-16"}`} data-anatomy="H9">
       <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Rails Info */}
