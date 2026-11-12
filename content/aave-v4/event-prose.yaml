@@ -1506,7 +1506,7 @@ L5:
       - bold: |-
           Collateral factor
         text: |-
-          each collateral counts at a share of its value set by the spoke; the event cards' collateral ratio times this factor is the health factor.
+          each collateral counts at a share of its value set by the spoke, and the counted collateral is what backs the debt.
       - bold: |-
           Health factor
         text: |-
@@ -1583,7 +1583,7 @@ L5:
       - bold: |-
           Credit line and utilization
         text: |-
-          the cap a hub grants a spoke to draw an asset; utilisation is how much of that line is drawn.
+          the cap a hub grants a spoke to borrow an asset; utilization is how much of an asset's liquidity is borrowed.
       - bold: |-
           Collateral factor
         text: |-
@@ -1622,7 +1622,7 @@ L5:
       - bold: |-
           Credit line and utilization
         text: |-
-          the cap the hub grants a spoke to draw an asset; utilisation is how much of the hub's asset is drawn.
+          the cap the hub grants a spoke to borrow an asset; utilization is how much of the hub's asset is borrowed.
       - bold: |-
           Collateral factor
         text: |-

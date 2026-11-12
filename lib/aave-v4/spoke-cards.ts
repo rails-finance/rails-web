@@ -1078,7 +1078,9 @@ export function liquidationBufferFrom(
 ): LiquidationBuffer {
   if (healthFactor == null || totalDebtUsd <= 0)
     return { dropPct: null, liquidatable: false, atLine: false, single: null };
-  if (healthFactor <= 1) return { dropPct: 0, liquidatable: true, atLine: false, single: null };
+  // Below 1.0 the spoke liquidates (aave.com/docs/aave-v4/positions/liquidations,
+  // `canLiquidate`: healthFactor < 1e18); at exactly 1 the position is at the line.
+  if (healthFactor < 1) return { dropPct: 0, liquidatable: true, atLine: false, single: null };
 
   const dropPct = (1 - 1 / healthFactor) * 100;
   const collateral = assetLiqPrices.filter((a) => a.liqPrice != null && a.currentPrice > 0);

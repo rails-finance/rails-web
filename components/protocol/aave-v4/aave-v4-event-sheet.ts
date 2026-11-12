@@ -45,7 +45,7 @@ const WORDS = {
   fall: "Collateral can fall",
   fall_caption: "Before liquidation, if the debt’s value holds.",
   no_debt: "No debt",
-  liquidatable: "At or below 1",
+  liquidatable: "Below 1",
   one_asset: "One asset on both sides",
   ltv: "LTV",
   borrowable: "Remaining borrowing power",
@@ -74,7 +74,7 @@ const TIPS = {
   total: (side: FlowSide) =>
     `The ${side}'s total in dollars after this event: every asset's balance on the spoke at its price at this block. Where the side holds one asset, its amount stands beside the dollars.`,
   health:
-    "The spoke's health factor for the position at the end of this event's block, from getUserAccountData: the collateral weighted by its collateral factors, divided by the debt; at or below 1 the position can be liquidated.",
+    "The spoke's health factor for the position at the end of this event's block, from getUserAccountData: the collateral weighted by its collateral factors, divided by the debt; below 1.0 the position can be liquidated.",
   fall: "How far the collateral's total value can fall, the debt's value held, before the health factor reaches 1: one less one over the health factor.",
   ltv: "Loan to value: the debt's dollar value as a share of the supplied assets' dollar value after this event, at the prices at this block.",
   borrowable:
@@ -546,7 +546,7 @@ export function aaveV4Sheet({
   const supplied = holdingsOf(ctx, "supply");
   const owed = holdingsOf(ctx, "debt");
   const sameAsset = supplied.length === 1 && owed.length === 1 && supplied[0].symbol === owed[0].symbol;
-  const drop = !sameAsset && h != null && h > 1 && h < HF_CAP ? (1 - 1 / h) * 100 : null;
+  const drop = !sameAsset && h != null && h >= 1 && h < HF_CAP ? (1 - 1 / h) * 100 : null;
   const hfText = hfLabelV4(h);
   const risk: SheetStat[] = [
     {
@@ -582,7 +582,7 @@ export function aaveV4Sheet({
                   ? WORDS.one_asset
                   : h == null
                     ? WORDS.no_debt
-                    : h <= 1
+                    : h < 1
                       ? WORDS.liquidatable
                       : "—",
             },

@@ -155,7 +155,7 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
 
   // Health factor — Aave's own liquidation trigger (liquidates at 1.0).
   if (card.healthFactor != null) {
-    out.push(`- **Health factor:** ${num(card.healthFactor, 2)} (Aave liquidates at 1.0)`);
+    out.push(`- **Health factor:** ${num(card.healthFactor, 2)} (liquidatable below 1.0)`);
   }
 
   // Liquidation buffer — single collateral → concrete liq price; multi → the
@@ -163,7 +163,7 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
   // never a single asset's solo price for a multi-collateral basket).
   const buf = liquidationBuffer(card);
   if (buf.liquidatable) {
-    out.push(`- **Liquidation:** position is at or below a 1.0 health factor — liquidatable now.`);
+    out.push(`- **Liquidation:** position is below a 1.0 health factor — liquidatable now.`);
   } else if (buf.single) {
     let line = `- **Liquidation price:** ${usd(buf.single.liqPrice)} / ${buf.single.symbol} (current ${usd(buf.single.currentPrice)}`;
     if (buf.dropPct != null) line += ` — a ${num(buf.dropPct, 1)}% drop reaches liquidation`;

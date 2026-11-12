@@ -235,8 +235,9 @@ export function getSpokeMeta(name: string): SpokeMeta | null {
 // backend still emits the pre-rename display name ("Global Dollar") for the
 // usdg_pendle spoke on at least one deploy, while the key itself is stable.
 //
-// Treasury has no deployed address yet (rails-server-onboarding's config notes
-// it as "unknown"), so it is intentionally omitted here too.
+// Treasury (0xB9B0…3155) is omitted: the Core hub lists it as its fee receiver,
+// supply only, with no reserves and no wallet's position (rails-ops
+// reference/official-docs/aave-v4.md, Docs and chain disagree, entry 4).
 export const SPOKE_ADDRESS_BY_KEY: Record<string, `0x${string}`> = {
   main: "0x94e7a5dcbe816e498b89ab752661904e2f56c485",
   bluechip: "0x973a023a77420ba610f06b3858ad991df6d85a08",
