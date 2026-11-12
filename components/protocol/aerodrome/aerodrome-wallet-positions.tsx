@@ -11,6 +11,7 @@
 import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { isWallet } from "@/components/protocol/uniswap/uniswap-wallet-positions";
 import { poolTokenKeys } from "@/components/protocol/uniswap/pool-focus-keys";
 import { PoolWalletList } from "@/components/protocol/uniswap/pool-wallet-list";
@@ -51,7 +52,9 @@ export async function AerodromeWalletPositions({
         </HistoryTitleRow>
       </header>
       {answer.kind !== "ok" ? (
-        <p className="text-sm text-rb-500">{FRONT_DOOR.unanswered}</p>
+        <UnansweredLine ceiling={answer.kind === "ceiling"} className="text-sm text-rb-500">
+          {FRONT_DOOR.unanswered}
+        </UnansweredLine>
       ) : all.length === 0 ? (
         <p className="text-sm text-rb-500" data-aerodrome-none="">
           {FRONT_DOOR.none}

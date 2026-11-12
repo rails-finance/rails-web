@@ -25,6 +25,7 @@ import { useAaveV3PositionState } from "@/hooks/useAaveV3PositionState";
 import { sparkEventState } from "@/lib/spark/event-state";
 import { EventPageContext } from "@/components/shared/event-page-aside";
 import { aaveFamilyEmodeWords } from "@/lib/aave-v3/head-words";
+import { aaveFamilyTerms } from "@/lib/aave-family/terms";
 import { V3_HEAD_WORDS } from "@/lib/aave-v3/event-templates";
 import { SPARK_HEAD_WORDS } from "@/lib/spark/event-templates";
 import { useContext } from "react";
@@ -37,21 +38,27 @@ const NO_RESERVE: SparkContext = { eventType: "emode", reserveSymbol: "", side: 
 
 const name = (id: number, label: string | null): string => (id === 0 ? "none" : (label ?? `category ${id}`));
 
-/** "Switched to ETH e-mode: borrow up to 90.00%, liquidation at 93.00%". */
-function headline(s: Switch): string {
-  if (s.toId === 0) return `Left ${name(s.fromId, s.fromLabel)} e-mode: each asset's own limits`;
+/** "Switched to ETH E-Mode: borrow up to 90.00%, liquidation at 93.00%", in
+ *  the family's spelling (lib/aave-family/terms.ts). */
+function headline(s: Switch, em: string): string {
+  if (s.toId === 0) return `Left ${name(s.fromId, s.fromLabel)} ${em}: each asset's own limits`;
   const limits =
     s.ltvBps != null && s.liquidationThresholdBps != null
       ? `: borrow up to ${bpsPct(s.ltvBps)}, liquidation at ${bpsPct(s.liquidationThresholdBps)}`
       : "";
-  return `Switched to ${name(s.toId, s.toLabel)} e-mode${limits}`;
+  return `Switched to ${name(s.toId, s.toLabel)} ${em}${limits}`;
 }
 
-function switchProv(s: Switch, coords: { txHash: string; blockNumber: number }, pool: V3PoolIdentity): Provenance {
+function switchProv(
+  s: Switch,
+  coords: { txHash: string; blockNumber: number },
+  pool: V3PoolIdentity,
+  em: string,
+): Provenance {
   return {
     kind: "chain",
     pclass: "emitted",
-    summary: `The account's e-mode category changed from ${name(s.fromId, s.fromLabel)} to ${name(s.toId, s.toLabel)} in this transaction.${s.toId !== 0 && s.ltvBps != null && s.liquidationThresholdBps != null ? ` At this block the category lent up to ${bpsPct(s.ltvBps)} of the collateral it covers and liquidated at ${bpsPct(s.liquidationThresholdBps)}.` : ""}`,
+    summary: `The account's ${em} category changed from ${name(s.fromId, s.fromLabel)} to ${name(s.toId, s.toLabel)} in this transaction.${s.toId !== 0 && s.ltvBps != null && s.liquidationThresholdBps != null ? ` At this block the category lent up to ${bpsPct(s.ltvBps)} of the collateral it covers and liquidated at ${bpsPct(s.liquidationThresholdBps)}.` : ""}`,
     contract: { name: pool.name, address: pool.address },
     source: { block: coords.blockNumber, txHash: coords.txHash },
     via: `Pool UserEModeSet log (categoryId ${s.toId}) in tx ${coords.txHash.slice(0, 10)}… at block ${coords.blockNumber}${s.toId !== 0 ? " · the category's figures read from the Pool at the block" : ""}`,
@@ -104,6 +111,8 @@ export function AaveFamilyEmodeSwitchCard({
           state: undefined,
         };
   const coords = { txHash: event.txHash, blockNumber: event.blockNumber };
+  const protocol = pool.protocol === "Seamless" ? "seamless" : /spark/i.test(pool.name) ? "spark" : "aave";
+  const em = aaveFamilyTerms(protocol === "aave" ? "aave-v3" : protocol).emode;
   const v3Coords: V3Coords = {
     txHash: event.txHash,
     blockNumber: event.blockNumber,
@@ -120,11 +129,11 @@ export function AaveFamilyEmodeSwitchCard({
   const emodeCell: EventCellSpec = {
     kind: "stat",
     key: "emode",
-    label: "E-mode",
+    label: em,
     changed: true,
     value: {
-      before: { text: s.fromId === 0 ? "None" : name(s.fromId, s.fromLabel), info: switchProv(s, coords, pool) },
-      after: { text: s.toId === 0 ? "None" : name(s.toId, s.toLabel), info: switchProv(s, coords, pool) },
+      before: { text: s.fromId === 0 ? "None" : name(s.fromId, s.fromLabel), info: switchProv(s, coords, pool, em) },
+      after: { text: s.toId === 0 ? "None" : name(s.toId, s.toLabel), info: switchProv(s, coords, pool, em) },
     },
   };
   // The health factor either side, from the account read at N−1 and N: the
@@ -164,7 +173,6 @@ export function AaveFamilyEmodeSwitchCard({
           },
         }
       : null;
-  const protocol = pool.protocol === "Seamless" ? "seamless" : /spark/i.test(pool.name) ? "spark" : "aave";
   // The timeline's head is words; the event page's card keeps its headline.
   const page = useContext(EventPageContext) != null;
   const words = aaveFamilyEmodeWords(s.toId, s.toLabel, protocol === "spark" ? SPARK_HEAD_WORDS : V3_HEAD_WORDS);
@@ -182,11 +190,11 @@ export function AaveFamilyEmodeSwitchCard({
     spine: { icon: "rate-change", iconDirection: entering ? "up" : "down", isLast: !!isLast },
     head: page
       ? {
-          label: "E-mode",
+          label: em,
           deltas: [],
           note: (
             <span data-emode-switch="">
-              <Prov info={switchProv(s, coords, pool)}>{headline(s)}</Prov>
+              <Prov info={switchProv(s, coords, pool, em)}>{headline(s, em)}</Prov>
             </span>
           ),
         }
@@ -196,14 +204,14 @@ export function AaveFamilyEmodeSwitchCard({
           clauses: words.category
             ? [
                 <span key="category" data-emode-switch="">
-                  <Prov info={switchProv(s, coords, pool)}>{words.category}</Prov>
+                  <Prov info={switchProv(s, coords, pool, em)}>{words.category}</Prov>
                 </span>,
               ]
             : undefined,
         },
-    caption: page ? "E-mode" : words.category ? `${words.kind} ${sep} ${words.category}` : words.kind,
+    caption: page ? em : words.category ? `${words.kind} ${sep} ${words.category}` : words.kind,
     cells: hfCell ? [emodeCell, hfCell] : [emodeCell],
-    ledgers: { none: "an e-mode switch moves no reserve" },
+    ledgers: { none: `an ${em} switch moves no reserve` },
     notes:
       read.status === "loading" ? (
         <div className="px-5 pb-2 text-xs text-rb-500" data-spark-account-state="loading">
@@ -219,7 +227,7 @@ export function AaveFamilyEmodeSwitchCard({
         <p className="text-sm leading-relaxed">
           {entering ? (
             <>
-              The account chose the {name(s.toId, s.toLabel)} e-mode category. Collateral the category covers now counts
+              The account chose the {name(s.toId, s.toLabel)} {em} category. Collateral the category covers now counts
               at the category&rsquo;s limits
               {s.ltvBps != null && s.liquidationThresholdBps != null
                 ? ` (borrow up to ${bpsPct(s.ltvBps)}, liquidation at ${bpsPct(s.liquidationThresholdBps)})`
@@ -228,7 +236,7 @@ export function AaveFamilyEmodeSwitchCard({
             </>
           ) : (
             <>
-              The account left the {name(s.fromId, s.fromLabel)} e-mode category: each asset counts at its own limits
+              The account left the {name(s.fromId, s.fromLabel)} {em} category: each asset counts at its own limits
               again.
             </>
           )}

@@ -12,6 +12,7 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AimGate } from "@/components/shared/aim-gate";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { EulerWalletList } from "@/components/protocol/euler/euler-wallet-list";
 import { isWallet } from "@/components/protocol/uniswap/uniswap-wallet-positions";
 import { fetchEulerWallet } from "@/lib/api/fetch-euler";
@@ -52,7 +53,9 @@ export async function EulerWalletAccounts({ chain, wallet: raw }: { chain: Euler
             )}
           </header>
           {answer.kind !== "ok" ? (
-            <p className="text-sm text-rb-500">{FRONT_DOOR.unanswered}</p>
+            <UnansweredLine ceiling={answer.kind === "ceiling"} className="text-sm text-rb-500">
+              {FRONT_DOOR.unanswered}
+            </UnansweredLine>
           ) : answer.data.accounts.length === 0 ? (
             <p className="text-sm text-rb-500" data-euler-none="">
               {FRONT_DOOR.none}

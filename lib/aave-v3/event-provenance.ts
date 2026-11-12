@@ -22,6 +22,7 @@
 // would count it twice. The card's balances come from a different lane (the
 // scaled-delta reduction, decisions 0008/0011) and say so.
 
+import { aaveFamilyTermsOfPool } from "@/lib/aave-family/terms";
 import type { CaptureSource } from "@/lib/shared/capture-source";
 import type { V3PoolIdentity } from "./pool-context";
 import type { Provenance, ProvInput, ProvScaling, ProvVerify } from "@/components/shared/provenance";
@@ -1170,7 +1171,7 @@ export const emodeCategoryProv = (
     kind: "chain",
     pclass: "emitted",
     verify: txVerify(coords),
-    summary: `eMode ${when} this transaction — ${vals.id === 0 ? "no category" : vals.name}: the efficiency-mode category the position had chosen ${upTo(when)} this transaction. A reserve in the category is borrowed against at the category's loan-to-value and liquidation threshold, in place of the ones set on the reserve.`,
+    summary: `${aaveFamilyTermsOfPool(coords.pool).emode} ${when} this transaction — ${vals.id === 0 ? "no category" : vals.name}: the ${aaveFamilyTermsOfPool(coords.pool).emode} category the position had chosen ${upTo(when)} this transaction. A reserve in the category is borrowed against at the category's loan-to-value and liquidation threshold, in place of the ones set on the reserve.`,
     contract: poolOf(coords),
     via: `${V3_INDEX_VIA} · last UserEModeSet log ${orderCut(when)} (block, tx index)${vals.id === 0 ? "" : ` · label: Pool ${vals.generation === "legacy" ? "getEModeCategoryData" : "getEModeCategoryLabel"} read at the block`}`,
     inputs: eventInputs(coords, [
@@ -1239,7 +1240,7 @@ export const accountTotalProv = (
                 label: "liquidation thresholds",
                 kind: "chain" as const,
                 pclass: "state" as const,
-                note: "each reserve's configuration, or its eMode category's, read at the block",
+                note: `each reserve's configuration, or its ${aaveFamilyTermsOfPool(coords.pool).emode} category's, read at the block`,
               },
             ]
           : []),
@@ -1316,7 +1317,7 @@ export const accountRatioProv = (
     {
       kind: "chain-derived",
       pclass: "state",
-      summary: `${which === "ltv" ? "Loan to value" : "Liquidation threshold"} ${when} this transaction — each collateral reserve's ${which === "ltv" ? "loan-to-value" : "liquidation threshold"} averaged by what that reserve is worth in US dollars, the way ${ACCOUNT_RULE} averages it.${vals.emode ? " A reserve in the position's eMode category counts at the category's figure." : ""} ${which === "ltv" ? "It is the share of the collateral the position could borrow against." : "Debt above this share of the collateral makes the position liquidatable."} The Pool writes the share in hundredths of a percent, so ${vals.bps} stands for ${(vals.bps / 100).toFixed(2).replace(/\.?0+$/, "")}%.`,
+      summary: `${which === "ltv" ? "Loan to value" : "Liquidation threshold"} ${when} this transaction — each collateral reserve's ${which === "ltv" ? "loan-to-value" : "liquidation threshold"} averaged by what that reserve is worth in US dollars, the way ${ACCOUNT_RULE} averages it.${vals.emode ? ` A reserve in the position's ${aaveFamilyTermsOfPool(coords.pool).emode} category counts at the category's figure.` : ""} ${which === "ltv" ? "It is the share of the collateral the position could borrow against." : "Debt above this share of the collateral makes the position liquidatable."} The Pool writes the share in hundredths of a percent, so ${vals.bps} stands for ${(vals.bps / 100).toFixed(2).replace(/\.?0+$/, "")}%.`,
       contract: poolOf(coords),
       via: `Σ (collateral value × ${which === "ltv" ? "LTV" : "liquidation threshold"}) ÷ Σ collateral value, configuration read at the block = ${vals.bps} bps`,
       formula: which === "ltv" ? "Σ value × LTV ÷ Σ value" : "Σ value × threshold ÷ Σ value",
@@ -1331,7 +1332,7 @@ export const accountRatioProv = (
           label: which === "ltv" ? "LTVs" : "liquidation thresholds",
           kind: "chain",
           pclass: "state",
-          note: "each reserve's configuration, or its eMode category's, read at the block",
+          note: `each reserve's configuration, or its ${aaveFamilyTermsOfPool(coords.pool).emode} category's, read at the block`,
         },
       ]),
     },

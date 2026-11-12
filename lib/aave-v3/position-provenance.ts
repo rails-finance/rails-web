@@ -128,7 +128,7 @@ export function userEmodeProv(label: string, pool: V3PoolLane): Provenance {
     kind: "chain",
     pclass: "state",
     verify: STATE_VERIFY,
-    summary: `eMode ${label} — the efficiency-mode category this wallet has chosen, as the Pool gives it at the latest block. A reserve in the category is borrowed against at the category's loan-to-value and liquidation threshold, in place of the ones set on the reserve.`,
+    summary: `E-Mode ${label} — the E-Mode category this wallet has chosen, as the Pool gives it at the latest block. A reserve in the category is borrowed against at the category's loan-to-value and liquidation threshold, in place of the ones set on the reserve.`,
     contract: poolContractFor(pool),
     via: `GET ${laneRoute(pool)} · Pool.getUserEMode @ head · category label`,
   };

@@ -111,7 +111,7 @@ export function aaveV3CtLabel(
   if (!isFee && ctx.eventType === "transfer_out" && ctx.sale)
     return `Sold${ctx.reserveSymbol ? ` ${ctx.reserveSymbol} → ${ctx.sale.leg.symbol}` : ""}`;
   return isFee
-    ? "Liquidation fee"
+    ? "Liquidation protocol fee"
     : viaGateway
       ? "Withdraw as ETH"
       : payout

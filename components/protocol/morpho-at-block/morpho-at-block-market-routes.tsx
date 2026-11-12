@@ -16,6 +16,7 @@ import { cache, type ComponentProps } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { MorphoLoanTokenPage, MorphoRosterPage } from "@/lib/morpho/roster";
 import { loanTokenViewData, marketViewData, rosterData, withRosterMarks } from "@/lib/morpho/markets-shape";
 import type { MorphoMarketPage } from "@/lib/morpho/product";
@@ -36,7 +37,7 @@ const hook = (dep: Dep, name: string, value: string) => ({ [`data-morpho-${dep.k
 /** One markets read per request: the loan-token page's metadata and body share it. */
 const loadMarkets = cache(async (api: Dep["api"]) => {
   const a = await fetchMorphoAtBlockMarkets({ api });
-  return a.kind === "ok" ? atBlockMarketsResponse(a.data) : null;
+  return a.kind === "ok" ? atBlockMarketsResponse(a.data) : a.kind === "ceiling" ? ("ceiling" as const) : null;
 });
 /** One market read per request: the market page's metadata and body share it. */
 const loadMarket = cache((api: Dep["api"], id: string) => fetchMorphoAtBlockMarket({ api }, id));
@@ -45,7 +46,13 @@ const loadMarket = cache((api: Dep["api"], id: string) => fetchMorphoAtBlockMark
 export async function MorphoAtBlockMarketsRoute({ dep }: { dep: Dep }) {
   const answer = await fetchMorphoAtBlockMarkets(dep);
   if (answer.kind !== "ok")
-    return <MorphoRosterPage data={rosterData(STALE_MARKETS, null, "none")} chainId={dep.chainId} />;
+    return (
+      <MorphoRosterPage
+        data={rosterData(STALE_MARKETS, null, "none")}
+        chainId={dep.chainId}
+        readCeiling={answer.kind === "ceiling"}
+      />
+    );
   const d = rosterData(atBlockMarketsResponse(answer.data), null, "none");
   const u = atBlockUnlisted(answer.data);
   const unlisted = MARKET_LIST_WORDS.unlisted(u.test, u.never);
@@ -83,7 +90,8 @@ export async function MorphoAtBlockMarketsRoute({ dep }: { dep: Dep }) {
 export async function morphoAtBlockLoanTokenMetadata(dep: Dep, loanToken: string): Promise<Metadata> {
   const token = loanToken.toLowerCase();
   if (!ADDRESS.test(token)) return { title: `Morpho Blue markets on ${dep.chain}` };
-  const g = (await loadMarkets(dep.api))?.groups.find((x) => x.loanToken === token);
+  const read = await loadMarkets(dep.api);
+  const g = read === "ceiling" ? undefined : read?.groups.find((x) => x.loanToken === token);
   const name = g?.loanNamed ? g.loanSymbol : `${token.slice(0, 6)}…${token.slice(-4)}`;
   return {
     title: `${name} markets · Morpho Blue on ${dep.chain}`,
@@ -98,11 +106,11 @@ export async function MorphoAtBlockLoanTokenRoute({ dep, loanToken }: { dep: Dep
   const token = loanToken.toLowerCase();
   if (!ADDRESS.test(token)) notFound();
   const data = await loadMarkets(dep.api);
-  if (!data)
+  if (!data || data === "ceiling")
     return (
-      <p className="py-12 text-center text-sm text-rb-500">
+      <UnansweredLine ceiling={data === "ceiling"} className="py-12 text-center text-sm text-rb-500">
         The market roster could not be read from the chain. Reload to try again.
-      </p>
+      </UnansweredLine>
     );
   const g = data.groups.find((x) => x.loanToken === token);
   if (!g) notFound();
@@ -175,5 +183,6 @@ export async function morphoAtBlockMarketPageProps(
     pair: "Morpho Blue market",
     positions: { href: dep.route, label: `A wallet's Morpho Blue positions on ${dep.chain}` },
     note,
+    readCeiling: a.kind === "ceiling",
   };
 }

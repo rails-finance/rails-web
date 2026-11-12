@@ -11,6 +11,7 @@ import "server-only";
 // SERVER-ONLY: reads RAILS_API_URL and the bearer token.
 
 import { createAuthFetchOptions } from "@/lib/api/fetch-with-auth";
+import { isReadCeiling } from "@/lib/shared/read-ceiling";
 import type { UniChainId, UniProtocol } from "@/lib/uniswap/deployments";
 import type { UniPairRead, UniPositionRead, UniPositionsRead, UniswapVersion } from "@/lib/uniswap/types";
 
@@ -20,8 +21,8 @@ const route = (protocol: UniProtocol, chainId: UniChainId, page: string, qs: Rec
   return `/api/at-block/${protocol}/${page}?${q}`;
 };
 
-/** An answer, a 404 from the route, or no answer. */
-export type UniAnswer<T> = { kind: "ok"; data: T } | { kind: "not-found" } | { kind: "error" };
+/** An answer, a 404 from the route, the daily read ceiling's 503 (lib/shared/read-ceiling.ts), or no answer. */
+export type UniAnswer<T> = { kind: "ok"; data: T } | { kind: "not-found" } | { kind: "ceiling" } | { kind: "error" };
 
 /** One at-block route's answer; `who` names the protocol in the log. Aerodrome's client reads through it. */
 export async function readAtBlock<T>(path: string, revalidate: number, who = "uniswap"): Promise<UniAnswer<T>> {
@@ -30,6 +31,7 @@ export async function readAtBlock<T>(path: string, revalidate: number, who = "un
   try {
     const res = await fetch(`${base}${path}`, createAuthFetchOptions({ next: { revalidate } }));
     if (res.status === 404) return { kind: "not-found" };
+    if (res.status === 503 && isReadCeiling(503, await res.json().catch(() => null))) return { kind: "ceiling" };
     if (!res.ok) {
       console.error(`${who}: ${path} answered ${res.status}`);
       return { kind: "error" };

@@ -76,7 +76,7 @@ export function aaveVaultCardContent(family: "sgho" | "stata" | "umbrella-stake"
       ? "Savings GHO takes GHO and issues shares that convert to more GHO over time. An index the vault stores sets the conversion, and Aave governance sets the rate the index moves at."
       : family === "stata"
         ? "A static aToken wraps an Aave V3 supply position in shares whose count does not change. The aToken it holds earns the reserve's interest, so a share converts to more of the asset over time."
-        : "An Umbrella stake token takes a deposit and stands behind one Aave V3 reserve. If that reserve runs a deficit, the token's owner can slash the stake to cover it.";
+        : "An Umbrella stake token takes a deposit and stands behind one Aave V3 reserve. If that reserve runs a deficit, the token's owner can slash the stake: take part of it to cover the shortfall.";
   const details =
     family === "sgho"
       ? [
@@ -283,7 +283,7 @@ export function suppliedByContent(family: "morpho" | "aave"): LearnMoreContent {
     : {
         title: "Vaults over this reserve",
         intro:
-          "A static aToken wraps a supply position in this reserve. An Umbrella stake stands behind it: its owner can slash the stake to cover a deficit on the reserve.",
+          "A static aToken wraps a supply position in this reserve. An Umbrella stake stands behind it: its owner can slash the stake, taking part of it to cover a deficit on the reserve.",
         detailsHeading: "Key concepts:",
         details: [
           { bold: "Amount", text: "the wrapper's total assets; for a stake, what it holds in the reserve's asset." },

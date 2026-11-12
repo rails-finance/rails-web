@@ -12,8 +12,8 @@ test("frozen collateral: maximum 0, current ratio from the totals", () => {
     avgLiquidationThreshold: 0.78,
   });
   assert.deepEqual(lines, [
-    "- **Loan-to-value:** 73.8% (debt over collateral); liquidation at 78%",
-    "- **Maximum loan-to-value:** 0%, so the account can borrow no more",
+    "- **LTV:** 73.8% (debt over collateral); liquidation at 78%",
+    "- **Max LTV:** 0%, so the account can borrow no more",
   ]);
 });
 
@@ -24,8 +24,5 @@ test("normal account: maximum 75%", () => {
     ltv: 0.75,
     avgLiquidationThreshold: 0.8,
   });
-  assert.deepEqual(lines, [
-    "- **Loan-to-value:** 37.5% (debt over collateral); liquidation at 80%",
-    "- **Maximum loan-to-value:** 75%",
-  ]);
+  assert.deepEqual(lines, ["- **LTV:** 37.5% (debt over collateral); liquidation at 80%", "- **Max LTV:** 75%"]);
 });

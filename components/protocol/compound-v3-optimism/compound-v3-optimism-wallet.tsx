@@ -13,6 +13,7 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { Prov } from "@/components/shared/provenance";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { CompoundV3OptimismReceipts } from "@/components/protocol/compound-v3-optimism/compound-v3-optimism-receipts";
 import { ROW } from "@/components/protocol/uniswap/uniswap-wallet-positions";
 import { fetchCompoundV3OptimismWallet } from "@/lib/api/fetch-compound-v3-optimism";
@@ -50,9 +51,9 @@ export async function CompoundV3OptimismWallet({ wallet: raw }: { wallet: string
         <p className="text-xs text-rb-500">{WALLET_PAGE.sub}</p>
       </header>
       {answer.kind !== "ok" ? (
-        <p className="text-sm text-rb-500" data-position-unanswered="">
+        <UnansweredLine ceiling={answer.kind === "ceiling"} className="text-sm text-rb-500" data-position-unanswered="">
           {WALLET_PAGE.unanswered}
-        </p>
+        </UnansweredLine>
       ) : held.length === 0 ? (
         <p className="text-sm text-rb-500" data-compound-v3-optimism-empty="">
           {WALLET_PAGE.empty}

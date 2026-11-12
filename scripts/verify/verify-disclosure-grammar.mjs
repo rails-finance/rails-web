@@ -736,7 +736,7 @@ const SHEET_WORDS_SUBJECTS = [
     risk: ["Health factor", "Collateral can fall"],
     limits: ["LTV", "Still borrowable"],
     params: ["Max LTV", "Liquidation threshold"],
-    optional: ["eMode"],
+    optional: ["E-Mode"],
   },
   {
     name: "Aave V3 0xc593…5948 Repay with collateral",
@@ -745,7 +745,7 @@ const SHEET_WORDS_SUBJECTS = [
     risk: ["Health factor", "Collateral can fall"],
     limits: ["LTV", "Still borrowable"],
     params: ["Max LTV", "Liquidation threshold"],
-    optional: ["eMode"],
+    optional: ["E-Mode"],
   },
   // The families that moved to the sheet (ui-jobs 330), one subject each, the
   // fixtures verify-event-share.mjs holds. `carried`: the sides whose carry

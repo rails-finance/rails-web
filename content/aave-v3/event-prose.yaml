@@ -236,7 +236,7 @@ placeholders:
   emode_lt:
     rounding: ratio_frac
     means: |-
-      The e-mode category's liquidation threshold.
+      The E-Mode category's liquidation threshold.
   rate:
     rounding: ratio_frac
     means: |-
@@ -317,7 +317,7 @@ words:
   t1_written_off: |-
     Debt written off
   t1_fee_paid: |-
-    Liquidation fee paid
+    Liquidation protocol fee paid
   t1_transferred: |-
     Transferred
   t1_to: |-
@@ -354,9 +354,9 @@ words:
   t1_supply_from_swap: |-
     Supplied from a swap
   t1_emode: |-
-    E-mode
+    E-Mode
   t1_emode_off: |-
-    E-mode off
+    E-Mode off
   t1_emode_category: |-
     category
   t1_leg_seized: |-
@@ -419,9 +419,9 @@ position_words:
   inert_many: |-
     The supplied {inert_assets} back nothing: their liquidation threshold is zero, so they support no borrowing.
   ltv_cap: |-
-    Borrowing stands at {ltv} of the collateral, against a {max_ltv} cap.
+    Borrowing stands at {ltv} of the collateral, against a {max_ltv} Max LTV.
   ltv_cap_zero: |-
-    Borrowing stands at {ltv} of the collateral, and the cap is 0%, so nothing more can be borrowed.
+    Borrowing stands at {ltv} of the collateral, and the Max LTV is 0%, so nothing more can be borrowed.
   liq_single: |-
     If {liq_symbol} falls about {drop} to {liq_price}, the account can be liquidated.
   liq_basket: |-
@@ -429,7 +429,7 @@ position_words:
   capacity: |-
     About {capacity} more could be borrowed at current prices.
   emode: |-
-    The {emode} e-mode category sets a {emode_lt} liquidation threshold for {emode_assets}.
+    The {emode} E-Mode category sets a {emode_lt} liquidation threshold for {emode_assets}.
   rate: |-
     The debt accrues at a {rate} borrow rate.
   rate_avg: |-
@@ -549,9 +549,9 @@ shared_sentences:
       A governance change to a liquidation threshold took the health factor from {hf_prev} to {hf_before} since then.
   prior.emode:
     when: |-
-      the health factor moved since the previous event, an e-mode switch the largest cause
+      the health factor moved since the previous event, an E-Mode switch the largest cause
     text: |-
-      The e-mode switch took the health factor from {hf_prev} to {hf_before} since the previous event.
+      The E-Mode switch took the health factor from {hf_prev} to {hf_before} since the previous event.
   prior.plain:
     when: |-
       the health factor moved since the previous event, cause unread
@@ -1387,7 +1387,7 @@ templates:
 
   - id: aave3.liq_fee
     title: |-
-      Liquidation fee
+      Liquidation protocol fee
     when: |-
       transfer_out to the treasury in a liquidation's transaction
     L5: liquidation
@@ -1596,7 +1596,7 @@ L5:
     title: |-
       How supplying works
     intro: |-
-      Supplying deposits an asset into the Pool, which mints aTokens for it. The deposit earns the variable supply rate and, while on as collateral, backs borrowing.
+      Supplying puts an asset into the Pool, which mints aTokens for it. The supply earns the variable supply rate and, while on as collateral, backs borrowing.
     detailsHeading: |-
       Key concepts:
     details:
@@ -1619,7 +1619,7 @@ L5:
       - bold: |-
           Supplying for someone else
         text: |-
-          anyone can supply on behalf of any account; the deposit belongs to that account.
+          anyone can supply on behalf of any account; the supply belongs to that account.
     links:
       - label: |-
           Supplying tokens
@@ -1756,7 +1756,7 @@ L5:
         text: |-
           the liquidator repays part of one debt asset and takes collateral worth that plus the asset's bonus, set by governance.
       - bold: |-
-          Protocol fee
+          Liquidation protocol fee
         text: |-
           a share of the bonus goes to the treasury as aTokens in the same transaction, on a separate row.
         text_seamless: |-
@@ -1824,7 +1824,7 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Not a deposit or withdrawal
+          Not a supply or withdrawal
         text: |-
           custody changes hands and no new value enters the Pool, so the lifetime flows give it a separate row.
       - bold: |-
@@ -2237,13 +2237,13 @@ L5:
         text_seamless: |-
           supplied less borrowed: what suppliers can withdraw and borrowers can take.
       - bold: |-
-          Supply rate, borrow rate and utilisation
+          Supply rate, borrow rate and utilization
         text: |-
-          the yearly rates paid and charged; utilisation is borrowed divided by supplied, and the rate climbs past the kink, the tick on the blue bar.
+          the yearly rates paid and charged; utilization is borrowed ÷ supplied, and the rate climbs past the optimal utilization, the tick on the blue bar.
       - bold: |-
           Collateral
         text: |-
-          loan-to-value / liquidation threshold; "Not collateral" at a loan-to-value of 0, "eMode only" where an eMode category lends one.
+          loan-to-value / liquidation threshold; "Not collateral" at a loan-to-value of 0, "E-Mode only" where an E-Mode category lends one.
       - bold: |-
           Caps near binding
         text: |-
@@ -2251,7 +2251,7 @@ L5:
       - bold: |-
           Details
         text: |-
-          each row's Details opens the oracle price, reserve factor, liquidation bonus, kink and eMode categories.
+          each row's Details opens the oracle price, reserve factor, liquidation bonus, optimal utilization and E-Mode categories.
     links:
       - label: |-
           Reserve parameters
@@ -2260,7 +2260,7 @@ L5:
           Interest rates
         doc: INTEREST_RATES
       - label: |-
-          E-mode
+          E-Mode
         doc: EMODE_HELP
       - label: |-
           Supply limits
@@ -2280,7 +2280,7 @@ glossary:
   - bold: |-
       Supplied
     text: |-
-      Supplied assets are the assets a wallet has deposited to earn interest. In return, Aave gives the wallet an interest-bearing token (an aToken) whose balance grows with interest and can be exchanged back for the supplied asset.
+      Supplied assets are the assets a wallet has supplied to earn interest. In return, Aave gives the wallet an interest-bearing token (an aToken) whose balance grows with interest and can be exchanged back for the supplied asset.
     sources: [{ label: "Supply", doc: OVERVIEW_SUPPLY }]
   - bold: |-
       Collateral
@@ -2297,6 +2297,11 @@ glossary:
     text: |-
       The health factor is a score for the safety of one account in one market. It is the value of the collateral, weighted by each asset's liquidation threshold, divided by the debt. Below 1 the account can be liquidated.
     sources: [{ label: "Health factor", doc: HF }]
+  - bold: |-
+      LTV and Max LTV
+    text: |-
+      LTV is an account's debt as a share of its collateral's value. Max LTV is the most it can borrow, each collateral asset counted at its reserve's loan-to-value. Aave's docs use "LTV" for that ceiling a reserve allows.
+    sources: [{ label: "Reserves", doc: RESERVE }]
   - bold: |-
       Liquidation
     text: |-

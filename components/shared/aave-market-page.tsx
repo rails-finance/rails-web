@@ -69,6 +69,7 @@ export function useAaveMarket(m: AaveMarketConfig): AaveMarketRead {
           pool: data.pool,
           oracle: data.oracle,
           capAutomator: data.capAutomator,
+          deprecated: m.deprecatedCollateral?.assets,
         })
       : null;
   return { data, loading, error, readBy, view };
