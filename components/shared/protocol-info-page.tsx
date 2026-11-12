@@ -21,6 +21,7 @@ import { CHAINS, explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/share
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { shortAddress } from "@/lib/shared/asset-roster";
 import { InfoHistoryLine } from "@/components/shared/history-tag";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 
 export interface InfoDocLink {
   label: string;
@@ -105,6 +106,41 @@ function InfoReadsSection({ reads, chainId }: { reads: InfoReads; chainId: Chain
   );
 }
 
+/** One place where the protocol's docs and its contracts or chain say
+ *  different things (ui-jobs 609): the difference in one line, the docs'
+ *  words as a quoted link, and what the chain holds, with its receipt where
+ *  one exists. */
+export interface InfoDocsAndChain {
+  /** The difference, one plain sentence. */
+  claim: string;
+  docs: { words: string; href: string };
+  chain: { words: string; prov?: Provenance };
+}
+
+export const DOCS_AND_CHAIN_HEADING = "Where the docs and the chain differ";
+
+/** The docs-and-chain section, after the glossary whose terms it qualifies.
+ *  Drawn only where an explorer passes at least one entry. */
+function InfoDocsAndChainSection({ items }: { items: readonly InfoDocsAndChain[] }) {
+  return (
+    <section data-info-docs-chain="">
+      <h2 className={H}>{DOCS_AND_CHAIN_HEADING}</h2>
+      <ul className={UL}>
+        {items.map((d) => (
+          <li key={d.claim} data-info-docs-chain-item="">
+            {d.claim} <span className="text-rb-400">Docs:</span>{" "}
+            <a href={d.docs.href} className={INLINE_LINK} target="_blank" rel="noopener">
+              &ldquo;{d.docs.words}&rdquo;
+            </a>
+            . <span className="text-rb-400">Chain:</span>{" "}
+            {d.chain.prov ? <Prov info={d.chain.prov}>{d.chain.words}</Prov> : d.chain.words}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** The glossary's heading: one word, one place to change it. */
 export const GLOSSARY_HEADING = "Glossary";
 
@@ -179,6 +215,9 @@ export interface ProtocolInfoPageProps {
   notCovered?: string;
   /** Slot 6: the official documentation, the page's final line. */
   docs: InfoDocLink;
+  /** After the glossary: where the protocol's docs and its contracts or chain
+   *  differ, with both sources. Absent or empty, nothing is drawn. */
+  docsAndChain?: readonly InfoDocsAndChain[];
 }
 
 export function ProtocolInfoPage({
@@ -192,6 +231,7 @@ export function ProtocolInfoPage({
   guide,
   notCovered,
   docs,
+  docsAndChain,
 }: ProtocolInfoPageProps) {
   const entry = protocolForSession(session);
   const chainId = entry?.chainId ?? MAINNET_CHAIN_ID;
@@ -240,6 +280,8 @@ export function ProtocolInfoPage({
             </div>
           ))}
         </dl>
+
+        {docsAndChain && docsAndChain.length > 0 && <InfoDocsAndChainSection items={docsAndChain} />}
 
         {views.map((v) => (
           <section key={v.heading}>
