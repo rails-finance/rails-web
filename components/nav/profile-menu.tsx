@@ -57,6 +57,7 @@ import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
 import { menuEntries } from "@/lib/shared/sessions";
+import { RevealTip } from "@/components/shared/reveal-tip";
 
 const BOOKMARKS_PATH = "/bookmarks";
 /** The control's and the menu's accessible name: what the menu holds as a whole. */
@@ -227,33 +228,52 @@ function ThemeSwitch() {
 
 const ITEMS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]';
 const PROV_HELP =
-  "Keeps the inspector on across the pages that support it: click an underlined figure to see where it comes from.";
+  "Underlines each figure that has a receipt: click one to see the contract call, the block and the maths behind it. Switched on here, it stays on across the pages that support it.";
 
 /** The standing provenance inspector (decision 0062; ui-jobs 571): arms the
  *  inspector on arrival on every page that has passed the coverage gate
- *  (lib/shared/prov-preference-routes.ts). Off by default. */
+ *  (lib/shared/prov-preference-routes.ts). Off by default.
+ *
+ *  The row is one switch; its "?" opens the house tooltip (RevealTip) and is
+ *  a sibling of the switch, standing over the switch's stretched hit area
+ *  (`after:inset-0`), so a press on it explains and never toggles (ui-jobs 602). */
 function ProvInspectorSwitch() {
   const on = useProvPreference();
   return (
-    <button
-      type="button"
-      role="menuitemcheckbox"
-      aria-checked={on}
-      onClick={() => setProvPreference(!on)}
-      className={ITEM}
+    <div
+      // ITEM's row, its ring answering the switch's hover and focus.
+      className="relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-[15px] text-foreground has-[[role=menuitemcheckbox]:hover]:ring-1 has-[[role=menuitemcheckbox]:hover]:ring-blue-500 has-[[role=menuitemcheckbox]:focus-visible]:ring-[1.5px] has-[[role=menuitemcheckbox]:focus-visible]:ring-blue-500"
       data-anatomy="H20.1"
-      data-profile-menu-prov={on ? "on" : "off"}
     >
       <Crosshair className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-      <span className="flex min-w-0 flex-1 items-center gap-1.5">
-        <span className="truncate">Provenance inspector</span>
-        <span className="inline-flex shrink-0 text-rb-400" title={PROV_HELP} data-profile-menu-prov-help="">
+      <button
+        type="button"
+        role="menuitemcheckbox"
+        aria-checked={on}
+        onClick={() => setProvPreference(!on)}
+        className="min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:rounded-lg after:content-['']"
+        data-profile-menu-prov={on ? "on" : "off"}
+      >
+        Provenance inspector
+      </button>
+      <RevealTip
+        // `!static`: the bubble stands on the row (the menu clips a bubble
+        // anchored at the "?"), opening up from the row's left edge.
+        className="-ml-1.5 !static"
+        wrap
+        tip={<span className="block w-64 font-normal leading-snug">{PROV_HELP}</span>}
+      >
+        <button
+          type="button"
+          aria-label="About the provenance inspector"
+          className="relative z-10 inline-flex rounded-full p-0.5 text-rb-400 hover:text-foreground focus-visible:outline-2 focus-visible:outline-blue-500"
+          data-profile-menu-prov-help=""
+        >
           <CircleHelp className="size-3.5" aria-hidden="true" />
-          <span className="sr-only">{PROV_HELP}</span>
-        </span>
-      </span>
+        </button>
+      </RevealTip>
       <span
-        className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
+        className={`pointer-events-none relative ml-auto inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
           on ? "bg-teal-500" : "bg-rb-300 dark:bg-rb-700"
         }`}
         aria-hidden="true"
@@ -264,7 +284,7 @@ function ProvInspectorSwitch() {
           }`}
         />
       </span>
-    </button>
+    </div>
   );
 }
 
