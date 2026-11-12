@@ -83,6 +83,8 @@ export interface LidoRow {
   then: string | null;
   now: string;
   single?: true;
+  /** One line under the label, up to eight words: why the shares moved, or why Earned is empty. */
+  note?: string;
   /** Set where Earned states no figure: the window's state. */
   withheld?: "opened" | "changed";
 }
@@ -119,6 +121,20 @@ export function causeText(c: ShareCause): string {
   return c.fit === "all" ? into : `${into}; ${moved(c.rest, c.restEth, true)}`;
 }
 
+/** Why the shares moved, in a few words under the row; the (i) gives the full account. */
+export function causeNote(c: ShareCause): string {
+  const to = c.requests.length === 1 ? `request #${c.requests[0].id}` : `${c.requests.length} requests`;
+  const rest = `${signed(c.rest)} by transfer`;
+  if (c.fit === "none") return rest;
+  return c.fit === "all" ? `${num(c.requested)} to ${to}` : `${num(c.requested)} to ${to}, ${rest}`;
+}
+
+/** Why Earned is empty, in a few words under the row. */
+export const WINDOW_NOTE = {
+  opened: "stake opened inside the 30 days",
+  changed: "shares changed inside the 30 days",
+};
+
 /** The readout as a table: a past column and a present one, the wallet's rows, then Lido's. */
 export function readoutTable(s: LidoStake, thenTime: number): LidoTable {
   const stated = s.windowState === "ok" && s.earned !== null && s.then.shares > 0;
@@ -128,14 +144,20 @@ export function readoutTable(s: LidoStake, thenTime: number): LidoTable {
       {
         title: READOUT.wallet,
         rows: [
-          { key: "shares", label: "Shares", then: num(s.then.shares), now: num(s.now.shares) },
+          {
+            key: "shares",
+            label: "Shares",
+            then: num(s.then.shares),
+            now: num(s.now.shares),
+            ...(s.cause ? { note: causeNote(s.cause) } : {}),
+          },
           {
             key: "earned",
             label: "Earned",
             then: null,
             now: stated ? `${num(s.earned as number)} ETH` : "—",
             single: true,
-            ...(s.windowState === "ok" ? {} : { withheld: s.windowState }),
+            ...(s.windowState === "ok" ? {} : { withheld: s.windowState, note: WINDOW_NOTE[s.windowState] }),
           },
         ],
       },

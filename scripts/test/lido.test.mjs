@@ -352,3 +352,19 @@ test("a full request leaves a remainder: the cause names its stETH, the card say
   );
   assert.equal(card[2], "Another 3.226 ETH sits in Lido's withdrawal queue, ready to claim, below.");
 });
+
+test("a row's note: why the shares moved and why Earned is empty, in a few words", async () => {
+  const { causeNote, WINDOW_NOTE } = await import("../../lib/lido/words.ts");
+  const changed = lidoStake(read({ windowState: "changed" }));
+  const [shares, earned] = readoutTable(changed, read().then.time).groups[0].rows;
+  assert.equal(shares.note, causeNote(changed.cause));
+  assert.match(shares.note, /^802\.3 to 2 requests, \+812\.3 by transfer$/);
+  assert.equal(earned.note, WINDOW_NOTE.changed);
+  const same = readoutTable(lidoStake(read(SAME)), read().then.time).groups[0].rows;
+  assert.equal(same[0].note, undefined);
+  assert.equal(same[1].note, undefined);
+  for (const n of [shares.note, earned.note]) {
+    assert.ok(n.split(" ").length <= 8, n);
+    assert.doesNotMatch(n, /\.$|^[A-Z]/);
+  }
+});

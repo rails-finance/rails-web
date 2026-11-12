@@ -16,6 +16,9 @@ export interface ThenNowRow {
   now: string;
   /** A fact with no past side by nature (a change, a setting). */
   single?: true;
+  /** One line under the label: why a figure moved or why a cell is empty. Up to
+   *  eight words, lower case, no full stop; the (i) carries the full account. */
+  note?: string;
   info: Provenance | null;
   /** The row's `data-*` hooks. */
   data?: Record<string, string>;
@@ -41,7 +44,9 @@ export function thenNowMarkdown({ then, now, groups }: ThenNowWords): string[] {
     then ? `| | ${then} | ${now} |` : `| | ${now} |`,
     then ? "|---|---:|---:|" : "|---|---:|",
     ...g.rows.map((r) =>
-      then ? `| ${r.label} | ${r.single ? "" : (r.then ?? "—")} | ${r.now} |` : `| ${r.label} | ${r.now} |`,
+      then
+        ? `| ${r.label}${r.note ? ` (${r.note})` : ""} | ${r.single ? "" : (r.then ?? "—")} | ${r.now} |`
+        : `| ${r.label}${r.note ? ` (${r.note})` : ""} | ${r.now} |`,
     ),
   ]);
 }
@@ -67,7 +72,14 @@ export function ThenNowTable({ then, now, groups, rowAnatomy }: ThenNowWords & {
                 data-anatomy={rowAnatomy}
                 {...row.data}
               >
-                <span className="text-rb-500">{row.label}</span>
+                <span className="text-rb-500">
+                  {row.label}
+                  {row.note && (
+                    <span className="block text-xs text-rb-500/80" data-row-note="">
+                      {row.note}
+                    </span>
+                  )}
+                </span>
                 {then && (
                   <span className="text-right text-rb-500">
                     {row.single ? "" : row.then == null ? "—" : figure(row.then, row.info)}

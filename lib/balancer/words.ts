@@ -113,6 +113,8 @@ export interface BalRow {
   now: string;
   /** A fact with no past side by nature (a change, a setting): its past cell stays blank. */
   single?: true;
+  /** One line under the label, up to eight words. */
+  note?: string;
 }
 export interface BalTable {
   /** The past column's date; null for a pool younger than the window. */
@@ -127,7 +129,14 @@ export function readoutTable(p: BalPosition): BalTable {
   // wallet's rows show the present alone; the pool's rows keep the window.
   const w = p.windowWithheld ? null : t;
   const wallet: BalRow[] = [
-    { key: "shares", part: "yours", label: "Pool shares", then: w ? num(w.shares) : null, now: num(p.now.shares) },
+    {
+      key: "shares",
+      part: "yours",
+      label: "Pool shares",
+      then: w ? num(w.shares) : null,
+      now: num(p.now.shares),
+      ...(p.windowWithheld ? { note: "staked shares read now only" } : {}),
+    },
     { key: "share", part: "yours", label: "Share of pool", then: w ? share(w.share) : null, now: share(p.now.share) },
     ...p.tokens.map(
       (tok, i): BalRow => ({
