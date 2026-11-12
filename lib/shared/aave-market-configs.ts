@@ -179,7 +179,7 @@ export const SPARK_MARKET: AaveMarketConfig = {
   protocolName: "SparkLend",
   marketLabel: "SparkLend",
   purpose:
-    "The single SparkLend market: an Aave-V3-architecture Pool governed by Sky, centred on stablecoin liquidity against sDAI, ETH and BTC collateral.",
+    "The single SparkLend market: an Aave-V3-architecture Pool governed by Sky, centred on stablecoin liquidity against WETH, wstETH, weETH, WBTC and cbBTC collateral.",
   modal: "spark",
   assetHref: (symbol, side) =>
     `/ethereum/spark?${side === "supply" ? "supply" : "borrow"}=${encodeURIComponent(symbol)}`,

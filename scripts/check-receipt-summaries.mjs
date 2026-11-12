@@ -111,11 +111,6 @@ const C_KEEP = [
     phrase: "The protocol's own oracle-priced account state, not an event-replay approximation.",
     why: "Health-factor-adjacent account state; a reader who thought this was a replayed approximation could distrust an exact, protocol-computed figure near the liquidation line.",
   },
-  {
-    file: "lib/spark/position-provenance.ts",
-    phrase: "The reserve's own pool-wide rate/state, not an event-replay approximation.",
-    why: "Same exactness guarantee for reserve-level rate/state.",
-  },
 ];
 
 const plain = []; // rule C hits in enforced files

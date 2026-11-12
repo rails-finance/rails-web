@@ -35,6 +35,7 @@
 import type { Provenance } from "@/components/shared/provenance";
 import { aaveFamilyEndLabel, aaveFamilyRateNoun, type RateStepNote } from "@/lib/shared/market-note";
 import { MARKET_NAME, POOL_BY_MARKET } from "./asset-catalog";
+import { APY_FORMULA } from "@/lib/aave-family/apy";
 
 const shortHex = (a: string) => (a.length > 12 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a);
 
@@ -111,9 +112,23 @@ const rateLeafNote = (note: RateStepNote, which: "earlier" | "later"): string =>
   );
 };
 
+/** The Pool's stored rate at one end: the note's figure, or, where the note
+ *  states an APY (SparkLend), the rate it was compounded from. */
+const poolRateAt = (note: RateStepNote, which: "earlier" | "later"): number =>
+  note.poolRate
+    ? which === "earlier"
+      ? note.poolRate.from
+      : note.poolRate.to
+    : which === "earlier"
+      ? note.from.value
+      : note.to.value;
+
+/** Where the note states an APY, how it comes from the stored rate. */
+const APY_SENTENCE = "Each end's APY is that rate compounded every second over a 365-day year.";
+
 const rateLeaf = (note: RateStepNote, which: "earlier" | "later") => ({
   label: `rate ${which}`,
-  value: pct(which === "earlier" ? note.from.value : note.to.value),
+  value: pct(poolRateAt(note, which)),
   kind: "chain" as const,
   pclass: (which === "later" && note.live ? "state" : "emitted") as "state" | "emitted",
   note: rateLeafNote(note, which),
@@ -137,7 +152,7 @@ export const aaveFamilyRateStepProv = (
       ? `The ${quantity} at each end of the stretch — the earlier one is the reserve's last ReserveDataUpdated at ` +
         `or before this position's last touch, the rate that touch left in force; the later one is the Pool's ` +
         `getReserveData read at the chain head. The rate belongs to the reserve: how much of it every account ` +
-        `has borrowed sets it, and nobody picks it. ${RAY_SENTENCE}`
+        `has borrowed sets it, and nobody picks it. ${RAY_SENTENCE}${note.poolRate ? ` ${APY_SENTENCE}` : ""}`
       : part === "delta"
         ? `How far the ${quantity} has moved since this position's last touch — the rate that touch left in ` +
           `force against the Pool's read just now. It is the move in the rate alone; the position's balances ` +
@@ -152,7 +167,7 @@ export const aaveFamilyRateStepProv = (
         `event, so it is the rate that action left in force. The later is the last one strictly before the ` +
         `position's next touch and outside that touch's transaction, so a large borrow's effect on the ` +
         `reserve's usage stays out of what the market did. Nothing is drawn between the two: the position ` +
-        `transacted nothing there. ${RAY_SENTENCE}`
+        `transacted nothing there. ${RAY_SENTENCE}${note.poolRate ? ` ${APY_SENTENCE}` : ""}`
       : part === "delta"
         ? `How far the ${quantity} moved across the stretch — the rate before the position's next touch against ` +
           `the rate its earlier action left in force. It is the move in the rate alone; the position's balances ` +
@@ -167,8 +182,9 @@ export const aaveFamilyRateStepProv = (
       : part === "delta"
         ? String(note.deltaPp)
         : `${note.from.block} → ${note.to.block}`;
+  const apy = note.poolRate != null && part !== "blocks";
   return {
-    kind: "chain",
+    kind: apy ? "chain-derived" : "chain",
     pclass: "emitted",
     summary,
     contract: poolOf(note),
@@ -178,7 +194,15 @@ export const aaveFamilyRateStepProv = (
       ? `${ratesRoute(note)} · ReserveDataUpdated log · ${rateField(note)} ÷10^27 as of the position's last touch · ` +
         `getReserveData at the head (${overlayRoute(note)})`
       : `${ratesRoute(note)} · ReserveDataUpdated log · ${rateField(note)} ÷10^27, read around the position's two touches`,
-    ...(part === "delta" ? { formula: "(rate before the next touch − rate after the earlier action) × 100" } : {}),
+    ...(part === "delta"
+      ? {
+          formula: apy
+            ? `(APY before the next touch − APY after the earlier action) × 100, APY = ${APY_FORMULA}`
+            : "(rate before the next touch − rate after the earlier action) × 100",
+        }
+      : apy
+        ? { formula: `APY = ${APY_FORMULA}` }
+        : {}),
     verify: {
       kind: "recompute",
       text: note.live
@@ -267,8 +291,8 @@ export const aaveFamilyRateStepInterestProv = (note: RateStepNote, part: "amount
         `events moved on this side, before any interest. It is held still across the stretch, so the interest ` +
         `figures beside it move only the rate.`
       : `The yearly interest the ${note.marketSymbol} this position held ${holding} at block ${note.from.block} ` +
-        `would ${verb} at the ${part === "before" ? "earlier" : "later"} rate (${pct(rate)} a year) — the amount ` +
-        `times the rate. The chain never stated this figure: it holds the earlier touch's balance still and ` +
+        `would ${verb} at the ${part === "before" ? "earlier" : "later"} ${note.poolRate ? "APY" : "rate"} (${pct(rate)}${note.poolRate ? "" : " a year"}) — the amount ` +
+        `times the ${note.poolRate ? "APY" : "rate"}. The chain never stated this figure: it holds the earlier touch's balance still and ` +
         `moves only the rate. What the position ${isSupply ? "earned" : "paid"} is what the reserve's index did ` +
         `to the balance across the stretch, which ${
           part === "after" && note.live ? "this position's next touch will record" : "the position's next row records"
@@ -304,7 +328,7 @@ export const aaveFamilyRateStepInterestProv = (note: RateStepNote, part: "amount
         ? []
         : [
             {
-              label: `rate ${part}`,
+              label: `${note.poolRate ? "APY" : "rate"} ${part}`,
               value: pct(rate),
               kind: "chain" as const,
               pclass: (part === "after" && note.live ? "state" : "emitted") as "state" | "emitted",

@@ -146,7 +146,7 @@ export function sparkRiskCells({
             {
               content: `LTV ${bpsPct(state.emodeAfter.ltvBps)} · liquidation at ${bpsPct(state.emodeAfter.liquidationThresholdBps)}${
                 outside.length > 0
-                  ? ` (outside e-mode: ${outside
+                  ? ` (outside E-mode: ${outside
                       .map(
                         (r) =>
                           `${r.symbol} ${bpsPct(r.ltvBps as number)} · ${bpsPct(r.liquidationThresholdBps as number)}`,
