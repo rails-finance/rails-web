@@ -345,6 +345,7 @@ export function aaveConfigTile({
                 kind: "address",
                 id: "owner",
                 label: "Owner",
+                tip: "The address that can slash the stake: take part of it to cover a shortfall on the reserve it stands behind.",
                 note: "can slash the stake to cover a deficit",
                 address: u.owner,
                 read: u.owner != null,
