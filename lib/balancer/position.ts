@@ -8,7 +8,7 @@
 //
 // Pure: scripts/test/balancer.test.mjs reads it.
 
-import type { BalPoolAt, BalPositionRead, BalPositionsRead, BalStaked, BalToken, BlockRef } from "./types";
+import type { BalFlow, BalPoolAt, BalPositionRead, BalPositionsRead, BalStaked, BalToken, BlockRef } from "./types";
 
 const ZERO = BigInt(0);
 const SCALE = BigInt(10) ** BigInt(18);
@@ -79,7 +79,22 @@ export interface BalPosition {
   firstAdd: BlockRef | null;
   adds: number;
   removes: number;
+  /** The wallet's latest add or remove, and the one before it; null where none. */
+  lastMove: BalMove | null;
+  priorMove: BalMove | null;
 }
+
+export interface BalMove {
+  kind: "add" | "remove";
+  time: number;
+}
+
+/** Balancer's TokenType WITH_RATE: the pool counts the token at its rate provider's rate. */
+const WITH_RATE = 1;
+
+/** The pool's tokens that carry a rate provider, by symbol. */
+export const rateTokens = (p: BalPosition): string[] =>
+  p.tokens.filter((t) => t.tokenType === WITH_RATE).map((t) => t.symbol);
 
 function side(tokens: readonly BalToken[], at: BlockRef, p: BalPoolAt, shares: string): BalSide {
   return {
@@ -117,7 +132,13 @@ export function balPosition(r: BalPositionRead): BalPosition {
     firstAdd: first ? { block: first.block, time: first.time } : null,
     adds: r.flows.filter((f) => f.kind === "add").length,
     removes: r.flows.filter((f) => f.kind === "remove").length,
+    lastMove: move(r.flows.at(-1)),
+    priorMove: move(r.flows.at(-2)),
   };
+}
+
+function move(f: BalFlow | undefined): BalMove | null {
+  return f ? { kind: f.kind, time: f.time } : null;
 }
 
 /** The wallet's shares staked in the pool's gauges, summed, and as a part of

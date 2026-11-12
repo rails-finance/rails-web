@@ -1104,7 +1104,7 @@ function AaveV4SpokeTowerBlock({
           {flowsPending && (
             <div data-flows-read="pending">
               <div className="flex min-h-[28px] items-center">{title}</div>
-              <LifetimeFlowsSkeleton />
+              <LifetimeFlowsSkeleton viewToggle={false} />
             </div>
           )}
           <div id="aave-v4-flows-ledger" hidden={!ledgerShown}>

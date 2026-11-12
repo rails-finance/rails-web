@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Prov } from "@/components/shared/provenance";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { SectionReadStamp, readStampProv } from "@/components/shared/read-stamp";
 import { ScopeNote, useScopedRows } from "@/components/shared/asset-scope-note";
@@ -19,7 +20,7 @@ import { finderProv, gaugeContracts, stakedProv, walletShareProv } from "@/lib/b
 import type { BalPositionsRead } from "@/lib/balancer/types";
 import { chainMeta, type ChainId } from "@/lib/shared/chains";
 import { balChain } from "@/lib/balancer/chains";
-import { FRONT_DOOR } from "@/lib/balancer/words";
+import { FRONT_DOOR, share } from "@/lib/balancer/words";
 import { short } from "@/lib/uniswap/words";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -111,7 +112,9 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
                       data-anatomy="U6.2"
                       data-balancer-staked={row.pool.toLowerCase()}
                     >
-                      <span title={FRONT_DOOR.stakedTip}>
+                      <HeadingTip text={FRONT_DOOR.rowStakedLabel} tip={FRONT_DOOR.stakedTip} />
+                      {": "}
+                      <span>
                         <Prov
                           info={stakedProv({
                             chainId: r.chainId,
@@ -123,7 +126,7 @@ export function BalancerWalletList({ r, home }: { r: BalPositionsRead; home: str
                             staked: row.staked ?? [],
                           })}
                         >
-                          {FRONT_DOOR.rowStaked(w.staked.share)}
+                          {share(w.staked.share)}
                         </Prov>
                       </span>
                       {w.staked.gauges.map((g) => (
