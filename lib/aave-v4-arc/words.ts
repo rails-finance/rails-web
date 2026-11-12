@@ -66,11 +66,17 @@ export const CARD_WORDS = {
   collateralFlag: "collateral",
   notCollateral: "not collateral",
   borrowRateTip: (premium: number) =>
-    `The borrow rate is the hub's drawn rate, a year. This account pays a premium of ${pctText(premium)} of its drawn debt on top, set by its collateral's risk. The 30-day line is the interest added over the last 30 days.`,
+    `The borrow rate is the hub's drawn rate, a year. This account pays a premium of ${pctText(premium)} of its drawn debt on top, set by its collateral's risk.`,
   interestTip:
     "Interest over 30 days: what the hub's rates added to this balance since the UTC midnight 30 days back, from the balances at the two dates.",
-  interest30: { earned: "Interest, 30 days:", owed: "Interest, 30 days:" },
-  rateLabel: "Borrow rate",
+  reserves: "Reserves",
+  columns: {
+    asset: "Asset",
+    amount: "Amount",
+    factor: "Collateral factor",
+    rate: "Borrow rate",
+    interest: "Interest, 30 days",
+  },
   withheld: {
     opened: "opened inside the window",
     changed: "changed inside the window",

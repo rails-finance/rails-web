@@ -1,14 +1,26 @@
 "use client";
 
 // An Aave V4 spoke account on Arc (rails-ops ui-jobs 577), on the shared
-// position card: Supplied, Debt, Health factor and Borrow limit as headlines;
-// each supplied reserve in the left column and each borrowed one in the right,
-// with its amount, dollars at the spoke's oracle, collateral factor or borrow
-// rate, and interest over the last 30 days. Every figure is read when the page
-// opens; the read stamp names the blocks.
+// position card: Supplied, Debt, Health factor and Borrow limit as headlines,
+// and no stats; under them the reserves table (ui-jobs 622), one row per
+// supplied reserve and one per borrowed, with its amount, dollars at the
+// spoke's oracle, collateral factor, borrow rate and interest over the last 30
+// days. Every figure is read when the page opens; the read stamp names the
+// blocks.
 
 import { Prov } from "@/components/shared/provenance";
-import { PositionCard, type PositionCardSlots, type PositionPanelRow } from "@/components/shared/position-card";
+import { PositionCard, type PositionCardSlots } from "@/components/shared/position-card";
+import {
+  DataTable,
+  DataTableAmount,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableHeader,
+  DataTableRow,
+} from "@/components/shared/data-table/data-table";
+import { HeadingTip } from "@/components/shared/tip-label";
+import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { ExplainBullet, ExplainGroup } from "@/components/shared/explain-groups";
 import { PoolReadStamp } from "@/components/protocol/uniswap/uniswap-readout";
 import { CARD_VOCAB } from "@/lib/shared/card-vocab";
@@ -18,6 +30,7 @@ import { arcCardProv, arcReserveProv, readContracts, type ArcReceiptContext } fr
 import type { ArcPositionRead } from "@/lib/aave-v4-arc/types";
 import { amount, CARD_WORDS, cardExplainer, hfText, pctText, usd } from "@/lib/aave-v4-arc/words";
 
+/** The 30-day interest: the amount over its dollars, or why it is withheld. */
 function interestValue(c: ArcReceiptContext, x: ArcReserveFigures, side: "supply" | "debt", i: ArcInterest) {
   if (i.state !== "ok")
     return (
@@ -27,87 +40,113 @@ function interestValue(c: ArcReceiptContext, x: ArcReserveFigures, side: "supply
     );
   return (
     <span data-figure={`interest-${side}-${x.symbol}`}>
-      <Prov info={arcReserveProv(side === "supply" ? "interest-supply" : "interest-debt", c, x)}>
-        {amount(i.amount, x.symbol)}
-      </Prov>
-      {i.usd != null && (
-        <span className="text-rb-500">
-          {" · "}
-          <Prov info={arcReserveProv(side === "supply" ? "usd-interest-supply" : "usd-interest-debt", c, x)}>
-            {usd(i.usd)}
+      <DataTableAmount
+        amount={
+          <Prov info={arcReserveProv(side === "supply" ? "interest-supply" : "interest-debt", c, x)}>
+            {amount(i.amount, x.symbol)}
           </Prov>
-        </span>
-      )}
+        }
+        value={
+          i.usd != null ? (
+            <Prov info={arcReserveProv(side === "supply" ? "usd-interest-supply" : "usd-interest-debt", c, x)}>
+              {usd(i.usd)}
+            </Prov>
+          ) : undefined
+        }
+      />
     </span>
   );
 }
 
-/** One supplied reserve: amount · dollars · factor, then its 30-day interest. */
-function supplyRow(c: ArcReceiptContext, x: ArcReserveFigures): PositionPanelRow {
-  return {
-    id: `supplied-${x.symbol}`,
-    label: CARD_WORDS.supplyRow(x.symbol),
-    sub: x.isCollateral ? CARD_WORDS.collateralFlag : CARD_WORDS.notCollateral,
-    tip: CARD_WORDS.interestTip,
-    asset: { symbol: x.symbol, address: x.underlying },
-    value: (
-      <span data-figure={`supplied-${x.symbol}`}>
-        <Prov info={arcReserveProv("supplied", c, x)}>{amount(x.supplied, x.symbol)}</Prov>
-        <span className="text-rb-500">
-          {" · "}
-          {x.suppliedUsd == null ? (
-            CARD_WORDS.unpriced
-          ) : (
-            <Prov info={arcReserveProv("usd-supplied", c, x)}>{usd(x.suppliedUsd)}</Prov>
-          )}
-          {x.isCollateral && x.collateralFactor != null && (
-            <>
-              {" · factor "}
-              <Prov info={arcReserveProv("collateral-factor", c, x)}>{pctText(x.collateralFactor, 0)}</Prov>
-            </>
-          )}
-        </span>
-        {x.supplyInterest && (
-          <span className="mt-0.5 block text-xs text-rb-500">
-            {CARD_WORDS.interest30.earned} {interestValue(c, x, "supply", x.supplyInterest)}
+const NUM = "whitespace-nowrap tabular-nums text-[13px]";
+const COLS = CARD_WORDS.columns;
+
+/** One reserve the account holds on one side: the asset and side, the amount
+ *  over its dollars, the collateral factor (collateral only), the borrow rate
+ *  (debt only) and the 30-day interest. */
+function ReserveRow({ c, x, side }: { c: ArcReceiptContext; x: ArcReserveFigures; side: "supply" | "debt" }) {
+  const supply = side === "supply";
+  const id = supply ? `supplied-${x.symbol}` : `debt-${x.symbol}`;
+  const dollars = supply ? x.suppliedUsd : x.debtUsd;
+  const interest = supply ? x.supplyInterest : x.debtInterest;
+  const factor = supply && x.isCollateral && x.collateralFactor != null;
+  const rate = !supply && x.drawnApr != null;
+  // An empty cell takes no label, so a stacked card (D6) leaves it out.
+  return (
+    <DataTableRow data-reserve-row={id}>
+      <DataTableCell rowHeader>
+        <span className="flex items-center gap-2">
+          <TokenChipIcon symbol={x.symbol} address={x.underlying} size={20} filterable={false} />
+          <span className="min-w-0 text-[13px] leading-snug">
+            <span className="block font-medium text-foreground">
+              {supply ? CARD_WORDS.supplyRow(x.symbol) : CARD_WORDS.debtRow(x.symbol)}
+            </span>
+            {supply && (
+              <span className="block text-[12px] text-rb-500">
+                {x.isCollateral ? CARD_WORDS.collateralFlag : CARD_WORDS.notCollateral}
+              </span>
+            )}
           </span>
-        )}
-      </span>
-    ),
-  };
+        </span>
+      </DataTableCell>
+      <DataTableCell align="right" className={NUM} label={COLS.amount}>
+        <span data-figure={id}>
+          <DataTableAmount
+            amount={
+              <Prov info={arcReserveProv(supply ? "supplied" : "debt", c, x)}>
+                {amount(supply ? x.supplied : x.debt, x.symbol)}
+              </Prov>
+            }
+            value={
+              dollars == null ? (
+                CARD_WORDS.unpriced
+              ) : (
+                <Prov info={arcReserveProv(supply ? "usd-supplied" : "usd-debt", c, x)}>{usd(dollars)}</Prov>
+              )
+            }
+          />
+        </span>
+      </DataTableCell>
+      <DataTableCell align="right" className={NUM} label={factor ? COLS.factor : undefined}>
+        {factor && <Prov info={arcReserveProv("collateral-factor", c, x)}>{pctText(x.collateralFactor!, 0)}</Prov>}
+      </DataTableCell>
+      <DataTableCell align="right" className={NUM} label={rate ? COLS.rate : undefined}>
+        {rate && <Prov info={arcReserveProv("borrow-rate", c, x)}>{pctText(x.drawnApr!)}</Prov>}
+      </DataTableCell>
+      <DataTableCell align="right" className={NUM} label={interest ? COLS.interest : undefined}>
+        {interest && interestValue(c, x, side, interest)}
+      </DataTableCell>
+    </DataTableRow>
+  );
 }
 
-/** One borrowed reserve: amount · dollars, then its rate and 30-day interest. */
-function debtRow(c: ArcReceiptContext, x: ArcReserveFigures): PositionPanelRow {
-  return {
-    id: `debt-${x.symbol}`,
-    label: CARD_WORDS.debtRow(x.symbol),
-    tip: CARD_WORDS.borrowRateTip(c.p.riskPremium),
-    asset: { symbol: x.symbol, address: x.underlying },
-    value: (
-      <span data-figure={`debt-${x.symbol}`}>
-        <Prov info={arcReserveProv("debt", c, x)}>{amount(x.debt, x.symbol)}</Prov>
-        <span className="text-rb-500">
-          {" · "}
-          {x.debtUsd == null ? (
-            CARD_WORDS.unpriced
-          ) : (
-            <Prov info={arcReserveProv("usd-debt", c, x)}>{usd(x.debtUsd)}</Prov>
-          )}
-        </span>
-        {x.drawnApr != null && (
-          <span className="mt-0.5 block text-xs text-rb-500">
-            {CARD_WORDS.rateLabel} <Prov info={arcReserveProv("borrow-rate", c, x)}>{pctText(x.drawnApr)}</Prov>
-          </span>
-        )}
-        {x.debtInterest && (
-          <span className="mt-0.5 block text-xs text-rb-500">
-            {CARD_WORDS.interest30.owed} {interestValue(c, x, "debt", x.debtInterest)}
-          </span>
-        )}
-      </span>
-    ),
-  };
+/** The account's reserves under the headlines (ui-jobs 622): the house table,
+ *  supplied reserves first, then borrowed. */
+function ReservesTable({ c }: { c: ArcReceiptContext }) {
+  const { p } = c;
+  if (!p.supplied.length && !p.borrowed.length) return null;
+  return (
+    <DataTable label={CARD_WORDS.reserves} stacked className="mt-4" data-reserves-table="">
+      <DataTableHead>
+        <DataTableHeader label={COLS.asset} />
+        <DataTableHeader label={COLS.amount} align="right" />
+        <DataTableHeader label={COLS.factor} align="right" />
+        <DataTableHeader
+          label={<HeadingTip text={COLS.rate} tip={CARD_WORDS.borrowRateTip(c.p.riskPremium)} />}
+          align="right"
+        />
+        <DataTableHeader label={<HeadingTip text={COLS.interest} tip={CARD_WORDS.interestTip} />} align="right" />
+      </DataTableHead>
+      <DataTableBody>
+        {p.supplied.map((x) => (
+          <ReserveRow key={`s-${x.underlying}`} c={c} x={x} side="supply" />
+        ))}
+        {p.borrowed.map((x) => (
+          <ReserveRow key={`d-${x.underlying}`} c={c} x={x} side="debt" />
+        ))}
+      </DataTableBody>
+    </DataTable>
+  );
 }
 
 function slots(r: ArcPositionRead): PositionCardSlots {
@@ -174,8 +213,9 @@ function slots(r: ArcPositionRead): PositionCardSlots {
       ),
     },
     learnMore: null,
+    band: <ReservesTable c={c} />,
     foot: <p className="mt-3 text-xs text-rb-500">{CARD_WORDS.foot}</p>,
-    panel: [p.supplied.map((x) => supplyRow(c, x)), p.borrowed.map((x) => debtRow(c, x))],
+    panel: [[], []],
   };
 }
 
