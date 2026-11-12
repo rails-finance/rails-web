@@ -9,7 +9,8 @@
 // episodes, illiquid stretches, time to response) join this section.
 //
 // Held is total assets in each vault's asset. The directory carries no USD,
-// so the rows order by asset, A to Z, then by amount within each asset.
+// so the rows order by asset: the page's vault's asset first, then the others
+// A to Z, by amount within each. Vaults holding nothing wait behind "Show all".
 
 import { useState, type ReactNode } from "react";
 import { Prov, type Provenance } from "@/components/shared/provenance";
@@ -61,20 +62,26 @@ const TITLE: Record<VaultSteward["role"], string> = {
 /** The record's key for a vault, as lib/vaults/steward-record.ts writes `current`. */
 const stewardVaultKey = (v: { chainId: number; address: string }) => `${v.chainId}:${v.address.toLowerCase()}`;
 
-const LISTED = "MetaMorpho and Maple vaults Rails lists on Base and Ethereum";
-
 /** The token a vault's amounts are in: its symbol, its address where the symbol did not decode. */
 const tokenOf = (v: VaultSummary) => (v.asset.named ? v.asset.symbol : v.asset.address);
 
-/** By asset, A to Z, then by total assets within each asset, most first; an unread figure last. */
-function byAssetThenAmount(a: VaultSummary, b: VaultSummary): number {
-  const t = tokenOf(a).localeCompare(tokenOf(b), "en-US");
-  if (t !== 0) return t;
-  if (!a.totalAssets || !b.totalAssets) return a.totalAssets ? -1 : b.totalAssets ? 1 : 0;
-  const x = BigInt(a.totalAssets.raw);
-  const y = BigInt(b.totalAssets.raw);
-  return x > y ? -1 : x < y ? 1 : 0;
-}
+/** The page's vault's asset first, then by asset A to Z; within each asset by
+ *  total assets, most first, an unread figure last. */
+const byAssetThenAmount =
+  (first: string) =>
+  (a: VaultSummary, b: VaultSummary): number => {
+    const fa = tokenOf(a) === first;
+    if (fa !== (tokenOf(b) === first)) return fa ? -1 : 1;
+    const t = tokenOf(a).localeCompare(tokenOf(b), "en-US");
+    if (t !== 0) return t;
+    if (!a.totalAssets || !b.totalAssets) return a.totalAssets ? -1 : b.totalAssets ? 1 : 0;
+    const x = BigInt(a.totalAssets.raw);
+    const y = BigInt(b.totalAssets.raw);
+    return x > y ? -1 : x < y ? 1 : 0;
+  };
+
+/** A vault whose total assets read zero. An unread figure is not empty. */
+const holdsNothing = (v: VaultSummary) => v.totalAssets != null && BigInt(v.totalAssets.raw) === BigInt(0);
 
 const rosterOf = (rosters: StewardRecordRoster[], v: VaultSummary) =>
   rosters.find((r) => r.chainId === v.chainId && r.protocol === vaultIndexProtocol(v));
@@ -121,14 +128,13 @@ export function VaultStewardRecord({
       <Prov info={countProv}>{n(count)}</Prov>
     </span>
   );
-  // The count's receipt names both figures.
-  const listedFig = (
-    <span data-steward-listed={listed}>
-      <Prov info={countProv}>{n(listed)}</Prov>
-    </span>
-  );
-  const sorted = [...vaults].sort(byAssetThenAmount);
-  const shown = all ? sorted : sorted.filter((v, i) => i < LIMIT || stewardVaultKey(v) === current);
+  const sorted = [...vaults].sort(byAssetThenAmount(tokenOf(self)));
+  const empty = sorted.filter((v) => holdsNothing(v) && stewardVaultKey(v) !== current).length;
+  const shown = all
+    ? sorted
+    : sorted
+        .filter((v) => stewardVaultKey(v) === current || !holdsNothing(v))
+        .filter((v, i) => i < LIMIT || stewardVaultKey(v) === current);
   const only = count === 1 && stewardVaultKey(self) === current;
 
   return (
@@ -143,15 +149,13 @@ export function VaultStewardRecord({
         <p className="mt-3 text-[13px] text-rb-500" data-steward-only="">
           <span className="font-mono">{short}</span> runs{" "}
           <span data-steward-count={count}>
-            <Prov info={countProv}>this vault only</Prov>
-          </span>
-          , of the {listedFig} {LISTED}.
+            <Prov info={countProv}>no other vault</Prov>
+          </span>{" "}
+          Rails lists on Base and Ethereum.
         </p>
       ) : (
         <>
-          <p className="mt-3 text-[13px] text-rb-500">
-            It runs {countFig} of the {listedFig} {LISTED}.
-          </p>
+          <p className="mt-3 text-[13px] text-rb-500">It runs {countFig} vaults Rails lists on Base and Ethereum.</p>
           <div className="mt-3">
             <DataTable
               label={`The vaults ${shortAddress(steward.address)} runs`}
@@ -186,9 +190,15 @@ export function VaultStewardRecord({
               Show all {n(sorted.length)}
             </button>
           )}
+          {!all && empty > 0 && (
+            <span className="text-[13px] text-rb-500" data-steward-empty={empty}>
+              {" "}
+              &middot; {n(empty)} of them hold nothing
+            </span>
+          )}
           <p className="mt-2 text-[13px] text-rb-500" data-steward-order="">
-            By asset, A to Z, then by total assets within each asset. Held is each vault&rsquo;s total assets in its
-            asset.
+            {tokenOf(self)} first, as this vault&rsquo;s asset, then the others A to Z; within each asset, by total
+            assets. Held is each vault&rsquo;s total assets in its asset.
           </p>
         </>
       )}
