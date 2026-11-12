@@ -24,7 +24,33 @@ register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 const { aeroPosition, claimableWei, penaltyNow, aeroInQuote, legPrice, poolAside, floorOf } = await import(
   "../../lib/aerodrome/position.ts"
 );
-const { readoutLines, readoutExplainer, cardExplainer, STAKED_EARNS } = await import("../../lib/aerodrome/words.ts");
+const { readoutTable, readoutExplainer, cardExplainer, STAKED_EARNS } = await import("../../lib/aerodrome/words.ts");
+
+/** The table's rows by key, per group. */
+const rows = (p) => {
+  const t = readoutTable(p);
+  const [pos, pool] = t.groups.length === 2 ? t.groups : [null, t.groups[0]];
+  return {
+    yours: Object.fromEntries((pos?.rows ?? []).map((r) => [r.key, r])),
+    pool: Object.fromEntries(pool.rows.map((r) => [r.key, r])),
+  };
+};
+/** The reading contract on the words: every cell a figure or a single word, a note of eight words at
+ *  most, a label of one to three words with no punctuation (rails-ops standards/reading-contract.md). */
+function assertContract(table) {
+  for (const g of table.groups)
+    for (const r of g.rows) {
+      for (const x of [r.then, r.now]) if (x) assert.doesNotMatch(x, /\.$|, | \w+ \w+ /, `${r.label}: ${x}`);
+      assert.ok(r.label.split(" ").length <= 3, r.label);
+      assert.doesNotMatch(r.label, /[,.:;()]/, r.label);
+      if (r.note) {
+        assert.ok(r.note.split(" ").length <= 8, r.note);
+        assert.doesNotMatch(r.note, /\.$|^[A-Z]/, r.note);
+      }
+    }
+}
+const flat = (groups) =>
+  groups.flatMap((g) => g.bullets.map((b) => b.map((x) => (typeof x === "string" ? x : x.fig)).join("")));
 
 const Q128 = BigInt(2) ** BigInt(128);
 const E18 = BigInt(10) ** BigInt(18);
@@ -168,16 +194,20 @@ test("an unstaked position: fees over the window and uncollected at the head, as
   assert.equal(p.holder, "0x00000000000000000000000000000000000000aa");
   // Its share is of the unstaked liquidity in range: 1e15 of (1e20 − 6e19).
   close(p.shareOfPaying, 1e15 / 4e19);
-  const lines = readoutLines(p);
-  assert.equal(lines.find((l) => l.key === "fees").label, "Fees");
-  assert.match(
-    lines.find((l) => l.key === "fees").yours,
-    /^Earned [\d,.]+ (bn )?USDC in fees in the last 30 days\. Not yet collected/,
+  const table = readoutTable(p);
+  assertContract(table);
+  const { yours, pool } = rows(p);
+  assert.equal(yours.earned.label, "Swap fees");
+  assert.match(yours.earned.now, /^[\d,.]+ (bn )?USDC$/);
+  assert.equal(yours.share.label, "Unstaked liquidity share");
+  assert.equal(pool.swapFee.now, "0.05%");
+  assert.equal(pool.protocolFee.now, "10%");
+  assert.ok(
+    flat(readoutExplainer(p)).includes(
+      "Protocol fee: the share of an unstaked position's fees the pool's voters take.",
+    ),
   );
-  assert.match(
-    lines.find((l) => l.key === "steward").pool,
-    /The swap fee is 0\.05%\. The pool's voters take 10% of an unstaked position's fees\./,
-  );
+  assert.ok(flat(cardExplainer(p)).some((b) => b.startsWith("Uncollected fees come to ")));
 });
 
 test("a staked position: AERO over the window, priced through the leg matching the quote", () => {
@@ -195,16 +225,18 @@ test("a staked position: AERO over the window, priced through the leg matching t
   assert.equal(p.aero.claimableFrom, "arithmetic");
   close(p.aero.claimable, 1);
   close(p.shareOfPaying, 1e15 / 6e19);
-  const fees = readoutLines(p).find((l) => l.key === "fees");
-  assert.equal(fees.label, "AERO");
-  assert.ok(fees.yours.startsWith(STAKED_EARNS));
-  assert.match(
-    fees.yours,
-    /Earned 3 AERO in the last 30 days, worth 1\.5 USDC now\. To claim now: 1 AERO, worth 0\.5 USDC\./,
-  );
-  assert.doesNotMatch(fees.yours, /Claiming or unstaking before/);
+  const { yours, pool } = rows(p);
+  assert.equal(yours.earned.label, "AERO rewards");
+  assert.equal(yours.earned.now, "3 AERO");
+  assert.equal(yours.earned.note, "worth 1.5 USDC now");
+  assert.equal(yours.withEarned.label, "With AERO");
+  assert.equal(yours.share.label, "Staked liquidity share");
+  assert.equal(yours.penalty, undefined);
+  assertContract(readoutTable(p));
+  assert.equal(flat(readoutExplainer(p)).filter((b) => b === STAKED_EARNS).length, 1);
+  assert.ok(flat(cardExplainer(p)).includes("The wallet that staked it can claim 1 AERO now."));
   // The unstaked fee is not the staked holder's.
-  assert.doesNotMatch(readoutLines(p).find((l) => l.key === "steward").pool, /unstaked/);
+  assert.equal(pool.protocolFee, undefined);
 });
 
 test("claimable equals the gauge's earned() to the wei, on three positions read on Base", () => {
@@ -254,18 +286,20 @@ test("the early-unstake penalty applies only inside the minimum stake, and is sh
   const inside = aeroPosition(staked({}, s));
   assert.ok(inside.aero.penalty);
   close(inside.aero.claimable, 0); // all of the 1 AERO is forfeit
-  assert.match(
-    readoutLines(inside).find((l) => l.key === "fees").yours,
-    /Claiming or unstaking before .* gives up all of the AERO to claim\./,
+  const row = rows(inside).yours.penalty;
+  assert.equal(row.now, "All");
+  assert.match(row.note, /^until \d+ \w+ 2026, \d\d:\d\d UTC$/);
+  assert.ok(
+    flat(readoutExplainer(inside)).some((b) =>
+      /^Claiming or unstaking before .* gives up all of the AERO to claim\.$/.test(b),
+    ),
   );
-  assert.match(readoutLines(inside).find((l) => l.key === "withdrawals").yours, /Claiming or unstaking before/);
   const past = aeroPosition(staked({}, { ...s, depositTimestamp: HEAD.time - 3600 }));
   assert.equal(past.aero.penalty, null);
-  assert.doesNotMatch(
-    readoutLines(past)
-      .map((l) => `${l.yours} ${l.pool}`)
-      .join(" "),
-    /Claiming or unstaking before/,
+  assert.equal(rows(past).yours.penalty, undefined);
+  assert.equal(
+    flat(readoutExplainer(past)).some((b) => /Claiming or unstaking before/.test(b)),
+    false,
   );
 });
 
@@ -325,9 +359,14 @@ test("the set-aside rule: empty, young, thin at either read, above 10%", () => {
   thin.past.stakedLiquidity = "1000";
   const q = aeroPosition(thin);
   assert.equal(q.pool30d.aeroAside.kind, "thin");
-  assert.match(
-    readoutLines(q).find((l) => l.key === "fees").pool,
-    /AERO figure for a staked position is set aside: under 50,000 USDC of staked liquidity in range 30 days ago/,
+  assert.equal(rows(q).pool.fullRangeReward.now, "—");
+  assert.equal(rows(q).pool.fullRangeReward.note, "under 50,000 USDC staked in range then");
+  assert.ok(
+    flat(readoutExplainer(q)).some((b) =>
+      /AERO figure for a staked position is set aside: under 50,000 USDC of staked liquidity in range 30 days ago/.test(
+        b,
+      ),
+    ),
   );
 });
 
@@ -336,19 +375,24 @@ test("staked partway through the window: no figure, and the reason", () => {
   assert.equal(then.window.kind, "staked-inside");
   assert.equal(then.aero.earned30d, null);
   assert.equal(then.againstHoldingWithEarnings, null);
-  const fees = readoutLines(then).find((l) => l.key === "fees").yours;
-  assert.match(
-    fees,
-    /Staked on \d+ \w+ 2026, inside the window\. No read was taken that day, so Rails states no 30-day AERO figure\./,
+  assert.equal(rows(then).yours.earned.now, "—");
+  assert.equal(rows(then).yours.earned.note, "staked inside the 30 days");
+  assert.ok(
+    flat(readoutExplainer(then)).some((b) =>
+      /^Staked on \d+ \w+ 2026, inside the window; no read was taken that day, so it has no 30-day AERO figure\.$/.test(
+        b,
+      ),
+    ),
   );
-  // Claimable now still stands.
-  assert.match(fees, /To claim now: 1 AERO/);
+  // Claimable now still stands, on the card.
+  assert.ok(flat(cardExplainer(then)).includes("The wallet that staked it can claim 1 AERO now."));
 
   const off = aeroPosition(unstaked({ stakedThen: true }));
   assert.equal(off.window.kind, "unstaked-inside");
   assert.equal(off.fees30d, null);
   assert.ok(off.uncollected > 0);
-  assert.match(readoutLines(off).find((l) => l.key === "fees").yours, /left the gauge inside the window/);
+  assert.equal(rows(off).yours.earned.note, "left the gauge inside the 30 days");
+  assert.ok(flat(readoutExplainer(off)).some((b) => /left the gauge inside the window/.test(b)));
 });
 
 test("minted inside the window: the daily reads are clipped to the days it existed", () => {
@@ -361,9 +405,13 @@ test("minted inside the window: the daily reads are clipped to the days it exist
   assert.equal(p.daysInRange.read, 10);
   assert.equal(p.fees30d, null);
   assert.equal(p.againstHolding, null);
-  const lines = readoutLines(p);
-  assert.match(lines.find((l) => l.key === "range").yours, /of 10 daily reads since it was minted/);
-  assert.match(lines.find((l) => l.key === "fees").yours, /^Minted inside the window and first read on/);
+  const { yours } = rows(p);
+  assert.equal(yours.days.now, "10 of 10");
+  assert.equal(yours.days.note, "one read a day since minted");
+  assert.match(yours.earned.note, /^first figure on \d+ \w+ 2026$/);
+  assert.equal(yours["token:0"].note, "minted inside the 30 days");
+  assert.ok(flat(readoutExplainer(p)).some((b) => /^Minted inside the window and first read on/.test(b)));
+  assertContract(readoutTable(p));
 });
 
 test("no em dash, no restricted words, sentence case on every face string", () => {
@@ -373,13 +421,10 @@ test("no em dash, no restricted words, sentence case on every face string", () =
     staked({}, { depositTimestamp: HEAD.time - 1, penaltyBps: 10_000, minStakeSeconds: 30 }),
   ]) {
     const p = aeroPosition(r);
-    const lines = readoutLines(p);
+    // The table's empty cells are "—" by the reading contract; its labels and notes are words.
     const words = [
-      ...lines.flatMap((l) => [l.label, l.yours, l.pool]),
-      ...readoutExplainer(
-        p,
-        lines.map((l) => l.key),
-      ).flatMap((g) => [g.title, ...g.bullets.flat()]),
+      ...readoutTable(p).groups.flatMap((g) => [g.title, ...g.rows.flatMap((r) => [r.label, r.note])]),
+      ...readoutExplainer(p).flatMap((g) => [g.title, ...g.bullets.flat()]),
       ...cardExplainer(p).flatMap((g) => [g.title, ...g.bullets.flat()]),
     ]
       .filter(Boolean)
@@ -392,9 +437,7 @@ test("no em dash, no restricted words, sentence case on every face string", () =
 
 // ── Velodrome on Optimism: the same modules on Velodrome's site (lib/aerodrome/sites.ts, ui-jobs 578) ──
 const { VELODROME, AERODROME, siteOf } = await import("../../lib/aerodrome/sites.ts");
-const { depositorLimit, notIndexed, frontDoorWords, cardWords, POSITION_PAGE } = await import(
-  "../../lib/aerodrome/words.ts"
-);
+const { notIndexed, frontDoorWords, cardWords, POSITION_PAGE } = await import("../../lib/aerodrome/words.ts");
 const OP_USDC = { address: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85", symbol: "USDC", decimals: 6 };
 const VELO = { address: "0x9560e827aF36c94D2Ac33a39bCE1Fe78631088Db", symbol: "VELO", decimals: 18 };
 /** VELO/USDC at 0.025 USDC and VELO/WETH at 0.00001 WETH, VELO token1 in both, as on chain. */
@@ -434,15 +477,11 @@ test("Velodrome: the site by chain, VELO priced through Velodrome's legs, claima
 
 test("Velodrome: the words name VELO, Velodrome and Optimism, and state the staked limit and the missing index", () => {
   const p = aeroPosition(veloStaked());
-  const lines = readoutLines(p);
   const words = [
     POSITION_PAGE.title(p),
     POSITION_PAGE.sub(p),
-    ...lines.flatMap((l) => [l.label, l.yours, l.pool]),
-    ...readoutExplainer(
-      p,
-      lines.map((l) => l.key),
-    ).flatMap((g) => [g.title, ...g.bullets.flat()]),
+    ...readoutTable(p).groups.flatMap((g) => [g.title, ...g.rows.flatMap((r) => [r.label, r.note])]),
+    ...readoutExplainer(p).flatMap((g) => [g.title, ...g.bullets.flat()]),
     ...cardExplainer(p).flatMap((g) => [g.title, ...g.bullets.flat()]),
     ...Object.values(frontDoorWords(VELODROME)).filter((v) => typeof v === "string"),
   ]
@@ -450,14 +489,16 @@ test("Velodrome: the words name VELO, Velodrome and Optimism, and state the stak
     .map((s) => (typeof s === "string" ? s : s.fig))
     .join("\n");
   assert.doesNotMatch(words, /\bAERO\b|Aerodrome|\bBase\b/);
+  assertContract(readoutTable(p));
   assert.match(words, /VELO/);
-  assert.match(POSITION_PAGE.sub(p), /Slipstream \(gauges v2\) · .* · Optimism · staked$/);
-  assert.match(depositorLimit(VELODROME), /^On Optimism, Rails does not yet name the wallet that staked a position/);
-  assert.equal(depositorLimit(AERODROME), null);
+  assert.equal(POSITION_PAGE.sub(p), "Slipstream (gauges v2) · tick spacing 100 · Optimism");
+  // The wallet off Base is not named: the card says so under an empty Staked by, the receipt says why.
+  assert.equal(cardWords(VELODROME).ownerNone, "not named on Optimism");
+  assert.equal(cardWords(AERODROME).ownerNone, "no wallet found");
   assert.match(notIndexed(VELODROME, "position"), /^Not indexed yet on Optimism/);
   assert.equal(notIndexed(AERODROME, "wallet"), null);
   assert.equal(notIndexed(AERODROME, "position"), null);
-  // The owner tip states what the card shows; the limit is said once, in the line under the title.
+  // The owner tip states what the card shows.
   assert.doesNotMatch(cardWords(VELODROME).ownerTip, /does not yet name/);
   assert.equal(
     cardWords(AERODROME).ownerTip,

@@ -47,7 +47,7 @@ const stakeInputs = (staked: readonly BalStaked[] | undefined, wallet: string): 
 const sharesTerm = (staked: readonly BalStaked[] | undefined) =>
   staked?.length ? "(balanceOf(pool, wallet) + Σ gauge.balanceOf(wallet))" : "balanceOf(pool, wallet)";
 const sharesWords = (staked: readonly BalStaked[] | undefined) =>
-  staked?.length ? "the wallet's pool shares, in the wallet and staked in its gauges," : "the wallet's pool shares";
+  staked?.length ? "the wallet's BPT, in the wallet and staked in its gauges," : "the wallet's BPT";
 
 /** The card's figures. */
 export function cardProv(key: "share" | "holds" | "rate" | "added", c: BalReceiptContext): Provenance {
@@ -91,7 +91,7 @@ export function cardProv(key: "share" | "holds" | "rate" | "added", c: BalReceip
         kind: "derived",
         pclass: "state",
         source,
-        summary: `Value per share, 30 days — the pool's value per share at ${at(r.head)} over the same read${thenLine(c)}, less one.`,
+        summary: `BPT rate, 30 days — the pool's value per BPT at ${at(r.head)} over the same read${thenLine(c)}, less one.`,
         contract: vaultC(r),
         via: bothVia(c),
         formula: "getBptRate(pool) now ÷ getBptRate(pool) then − 1",
@@ -128,8 +128,8 @@ export function lineProv(key: BalLineKey, part: "yours" | "pool", c: BalReceiptC
       ? {
           ...base,
           summary: p.windowWithheld
-            ? `Pool shares — ${sharesWords(r.staked)} at ${at(r.head)}. The gauges are read at the head only, so no 30-day change is stated.`
-            : `Pool shares — the wallet's shares at ${at(r.head)}${thenLine(c)}.`,
+            ? `BPT — ${sharesWords(r.staked)} at ${at(r.head)}. The gauges are read at the head only, so no 30-day change is stated.`
+            : `BPT — the wallet's BPT at ${at(r.head)}${thenLine(c)}.`,
           inputs: p.windowWithheld
             ? [chain("balanceOf · head", r.balance), ...stakeInputs(r.staked, r.wallet)]
             : [chain("balanceOf · head", r.balance), chain("balanceOf · then", r.past?.balance ?? "no answer")],
@@ -262,13 +262,13 @@ export function countProv(
 ): Provenance {
   const what =
     key === "positions"
-      ? `Pool-share holdings — the (pool, holder) pairs with a balance above zero: ${n(c.positions)}`
-      : `Holders — the addresses holding shares of at least one pool, wallets and contracts both: ${n(c.holders)}`;
+      ? `BPT holdings — the (pool, holder) pairs with a balance above zero: ${n(c.positions)}`
+      : `Holders — the addresses holding BPT of at least one pool, wallets and contracts both: ${n(c.holders)}`;
   return {
     kind: "derived",
     pclass: "emitted",
     source: { block: c.through },
-    summary: `${what}. Counted from Rails's index of the Vault's pool-share Transfer events from block ${n(balChain(c.chainId).firstBlock)} through block ${n(c.through)}.`,
+    summary: `${what}. Counted from Rails's index of the Vault's BPT Transfer events from block ${n(balChain(c.chainId).firstBlock)} through block ${n(c.through)}.`,
     contract: { name: "Balancer V3 Vault", address: BALANCER_VAULT },
     via: `rails-server · position index through block ${n(c.through)}`,
     inputs: [chain("indexed through", n(c.through)), derived(key, n(key === "positions" ? c.positions : c.holders))],
@@ -284,7 +284,7 @@ export function finderProv(r: BalPositionsRead): Provenance {
   const through = idx?.to ?? r.head.block;
   const parts = [
     idx &&
-      `Rails's index of the Vault's pool-share Transfer events naming this wallet, blocks ${n(idx.from)} to ${n(idx.to)}: ${n(idx.logs)} transfers across ${n(idx.pools)} pools`,
+      `Rails's index of the Vault's BPT Transfer events naming this wallet, blocks ${n(idx.from)} to ${n(idx.to)}: ${n(idx.logs)} transfers across ${n(idx.pools)} pools`,
     tail &&
       `the Vault's Transfer logs to this wallet, blocks ${n(tail.from)} to ${n(tail.to)}: ${n(tail.logs)} across ${n(tail.pools)} pools`,
   ].filter(Boolean);

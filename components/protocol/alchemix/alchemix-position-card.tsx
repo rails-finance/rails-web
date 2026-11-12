@@ -118,7 +118,7 @@ export function collateralUsdText(
   return `$${formatCompactTitled(usd.usd).display}`;
 }
 
-/** The Deposited headline, on either surface. What a holder recognises is the
+/** The Deposit headline, on either surface. What a holder recognises is the
  *  asset underneath, so THE UNDERLYING LEADS, its dollar
  *  figure beneath where the card states one, and the share count the position
  *  holds is the line under that.
@@ -134,7 +134,7 @@ export function depositedHead(
   prov?: { shares?: Provenance; underlying?: Provenance; usd?: Provenance },
   block?: ReactNode,
 ): PositionCardHead {
-  const head = { id: "deposited", label: "Deposited" };
+  const head = { id: "deposited", label: "Deposit" };
   if (!c) return { ...head, value: NOT_SETTLED };
   const myt = c.mytSymbol ?? fallbackMytSymbol;
   const u = c.underlying;

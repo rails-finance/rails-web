@@ -162,24 +162,24 @@ const FX_RATIO = {
   held: true,
   help: ["the price each event was valued at", "rebalance ratio", "in force that day", "unchanged across this life"],
 };
-/** Alchemix V3's view (steps 6 and 8): the card's Collateralisation against
- *  its "Liquidates at", the lower bound read at each picked event's block
- *  (`atBlock`: the first day's line against the route's answer there); the
- *  share price's level today the price its "Liquidates on a share-price drop
- *  of" names; days with no reading dotted. */
+/** Alchemix V3's view (steps 6 and 8): the card's LTV against its
+ *  "Liquidation threshold", one over the lower bound read at each picked
+ *  event's block (`atBlock`: the first day's line against the route's answer
+ *  there); the share price's level today the price its "Drop to liquidation"
+ *  names; days with no reading dotted. */
 const alchemixRatio = (chain, alchemist) => ({
-  label: "Collateralisation",
-  liquidates: "below",
-  headRow: "collateralisation",
-  lineRow: "liquidation-line",
+  label: "LTV",
+  liquidates: "above",
+  headRow: "ltv",
+  lineRow: "liquidation-threshold",
   dropRow: "liquidates-on-drop",
   held: true,
   // eth-aleth/726 held collateral and no debt for 114 days before its mint.
   firstWithin: 160,
-  help: ["the vault's share price", "lower bound in force at each event", "drawn dotted"],
+  help: ["the vault's share price", "liquidation threshold in force at each event", "drawn dotted"],
   atBlock: (block) => [
     `/api/chain/alchemix/bound-at-block?chain=${chain}&alchemist=${alchemist}&block=${block}`,
-    (b) => b?.lowerBound,
+    (b) => (b?.lowerBound > 0 ? 1 / b.lowerBound : NaN),
   ],
 });
 const ALX_ETH_ALUSD = "0xeb83112d925268bede86654c13d423a987587e3e";
@@ -1040,9 +1040,9 @@ const PAGES = [
     lwOnly: true,
     band: { asset: "WBTC", closed: true },
   },
-  // Alchemix V3 (steps 6 and 8, `ratio` and `alchemix`): the
-  // collateralisation against the lower bound read at each picked event's
-  // block, over the vault's share price per reading.
+  // Alchemix V3 (steps 6 and 8, `ratio` and `alchemix`): the LTV against
+  // the liquidation threshold read at each picked event's block, over the
+  // vault's share price per reading.
   // Ethereum eth-alusd/1142 (open, 61 line redemptions) and eth-aleth/726
   // (closed with its collateral 26 Oct 2026); Base base-alusdb/23 (open) and
   // base-alusdb/29 (closed with its collateral). No Alchemist position has
@@ -1426,7 +1426,7 @@ async function checkRatio(page, tag, pg) {
   const head = r.headRow
     ? await page.$eval(`[data-panel-row="${r.headRow}"] dd`, (d) => d.textContent ?? "").catch(() => null)
     : await page.$eval(`[data-card-head="${r.head}"]`, (h) => h.textContent ?? "").catch(() => null);
-  // A closed Alchemist position's row reads "No debt".
+  // A closed Alchemist position's LTV row reads "—".
   const open = head != null && (!r.headRow || /%/.test(head));
   if (open) {
     check(
@@ -2471,7 +2471,7 @@ async function checkShareLine(page, tag) {
 }
 
 /** Alchemix V3 (step 6): the vault's share price stands in the list beside
- *  the collateralisation, one point per day with a reading at that reading's
+ *  the LTV, one point per day with a reading at that reading's
  *  block, drawn dotted between, today the card's "Share price" row to six
  *  places at the card's reading block; it carries the level; the bound line's
  *  receipt says it is today's, held across the life. */
@@ -2487,11 +2487,11 @@ async function checkAlchemixShare(page, tag, pg) {
   const listed = await page.$$eval("[data-price-asset]", (bs) => bs.map((b) => b.dataset.priceAsset));
   await page.keyboard.press("Escape");
   check(
-    `${tag}: the list holds the collateralisation and the share price alone`,
-    listed.length === 2 && listed[0] === "Collateralisation",
+    `${tag}: the list holds the LTV and the share price alone`,
+    listed.length === 2 && listed[0] === "LTV",
     listed.join(","),
   );
-  // The bound line's words, on the collateralisation.
+  // The threshold line's words, on the LTV.
   const sl = page.locator(PRICE_STRIP).first();
   await sl.focus();
   await page.keyboard.press("End");
@@ -2502,8 +2502,8 @@ async function checkAlchemixShare(page, tag, pg) {
   });
   const levelHelp = await howToRead(page);
   check(
-    `${tag}: the bound line's words say it is the bound in force at each event`,
-    /lower bound in force at each event/.test(levelHelp) &&
+    `${tag}: the threshold line's words say it is the threshold in force at each event`,
+    /liquidation threshold in force at each event/.test(levelHelp) &&
       /read at the block of each day's last event/.test(levelHelp),
     liqText || levelHelp.slice(0, 300),
   );
@@ -2536,7 +2536,7 @@ async function checkAlchemixShare(page, tag, pg) {
     };
   });
   const card = await page.$eval('[data-panel-row="share-price"] dd', (d) => d.textContent ?? "").catch(() => "");
-  const cardV = card.match(/= (\d+\.\d{6}) /)?.[1];
+  const cardV = card.match(/(\d+\.\d{6})/)?.[1];
   const chartV = end.text.match(/(\d+\.\d{6})/)?.[1];
   if (!pg.alchemix.closed) {
     const reading = await page
@@ -2560,7 +2560,7 @@ async function checkAlchemixShare(page, tag, pg) {
     help.includes("convertToAssets") && help.includes("drawn dotted"),
     help.slice(0, 400),
   );
-  await pick("Collateralisation");
+  await pick("LTV");
 }
 
 /** The card's top-row figure as `fmtNative` prints it

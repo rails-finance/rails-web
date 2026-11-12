@@ -22,7 +22,7 @@
 //   P3  L2 AGAINST CHAIN TRUTH — the copy states the chain-truth figures
 //       (ui-jobs 330), so each L2 figure is checked against its source. The
 //       token after-figures of the Collateral and Debt lines, a "CLOSED", the
-//       ratio's and the rate's before, and the yearly interest and fee equal
+//       LTV's and the rate's before, and the yearly interest and fee equal
 //       the event's state as the timeline API the page reads gives it
 //       (stateAfter and stateBefore at the log's precision, the operation, the
 //       event's price), at the precision the copy prints them. The figures the
@@ -240,7 +240,7 @@ function l2Checks(lines, c) {
   const rateBefore = c ? rawAt(sb.raw?.annualInterestRate, 16, sb.annualInterestRate) : null;
   for (const raw of lines) {
     const l = raw.replace(/^- /, "");
-    const m = /^(Collateral|Debt|Collateral Ratio|Interest Rate): (.*)$/.exec(l);
+    const m = /^(Collateral|Debt|LTV|Interest Rate): (.*)$/.exec(l);
     if (!m) {
       card.push(...(l.match(NUM) ?? []));
       continue;
@@ -265,7 +265,7 @@ function l2Checks(lines, c) {
     const after = parts.at(-1);
     const before = parts.length > 1 ? parts[0] : null;
     if (after === CLOSED) closedIs(`${what} after`);
-    else if (after === NOT_APPLICABLE)
+    else if (after === NOT_APPLICABLE || (what === "LTV" && after === "—"))
       state.push({
         what: `${what} after`,
         printed: after,
@@ -274,13 +274,10 @@ function l2Checks(lines, c) {
       });
     else if (after.match(NUM)) card.push(after.match(NUM)[0]);
     if (before && what === "Interest Rate") truth("Interest Rate before", before, rateBefore);
-    if (before && what === "Collateral Ratio" && c) {
+    // LTV, debt ÷ collateral value (decision 0065).
+    if (before && what === "LTV" && c) {
       const b = beforeAmounts(c);
-      truth(
-        "Collateral Ratio before",
-        before,
-        b.price > 0 && b.coll > 0 && b.debt > 0 ? ((b.coll * b.price) / b.debt) * 100 : null,
-      );
+      truth("LTV before", before, b.price > 0 && b.coll > 0 && b.debt > 0 ? (b.debt / (b.coll * b.price)) * 100 : null);
     }
     // "574.98 BOLD / year interest"; "+ 0.30% management fee · 86.25 BOLD / year".
     const feeAt = rest.findIndex((r) => /[\d.]+% management fee/.test(r));

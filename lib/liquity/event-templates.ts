@@ -11,6 +11,7 @@
 
 import type { LearnMoreContent } from "@/components/shared/learn-more-modal";
 import { FAQ_URLS } from "@/lib/shared/faq-urls";
+import { fmtMaxLtv } from "@/lib/liquity/ltv";
 import { eventProseEngine, fillWords } from "@/lib/shared/event-prose/engine";
 import type { EventTemplate as SharedTemplate, ModalData, ProseFile, Words } from "@/lib/shared/event-prose/types";
 import type { EchoKey } from "@/lib/liquity/event-prose";
@@ -97,10 +98,9 @@ function modal(key: L5Key, o: L5Options = {}): LearnMoreContent {
   const form = [...(delegated ? ["delegated"] : []), ...(o.zeroDebt ? ["zero_debt"] : [])];
   let values: Record<string, string> = {};
   if (key === "liquidation") {
-    const isETH = o.collateralType === "WETH" || o.collateralType === "ETH";
+    // The Max LTV is 1 ÷ the branch's MCR (lib/liquity/ltv.ts).
     values = {
-      min_cr: isETH ? "110%" : "120%",
-      max_ltv: isETH ? "90.91%" : "83.33%",
+      max_ltv: fmtMaxLtv(o.collateralType ?? "WETH") ?? "",
       coll_type: o.collateralType ?? FILE.L5_words.coll_type_unknown,
     };
   } else if (delegated) {

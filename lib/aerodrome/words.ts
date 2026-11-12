@@ -1,23 +1,31 @@
-// Every word of Aerodrome on Rails (rails-ops ui-jobs 566): the position
-// page's card and six readout lines, the explanation panes and the front
-// door. The readout is Uniswap's (lib/uniswap/words.ts), each line the
-// holder's figure first, then the pool's; what differs is staking. A staked
-// position earns AERO from the pool's gauge in place of trading fees, and its
-// NFT is held by the gauge. The faces name no contract or function: those are
-// in each figure's receipt (lib/aerodrome/provenance.ts; decision 0059).
+// Every word of Aerodrome on Rails (rails-ops ui-jobs 566, 594): the position
+// page's card, its then / now readout table, the explanation panes and the
+// front door. The table's shape is Uniswap's (lib/uniswap/words.ts
+// `readoutTable`), the position's rows first, then the pool's; what differs is
+// staking. A staked position earns AERO from the pool's gauge in place of
+// swap fees, and its NFT is held by the gauge. The faces name no contract or
+// function: those are in each figure's receipt (lib/aerodrome/provenance.ts;
+// decision 0059).
 //
 // Pure: scripts/test/aerodrome.test.mjs reads it.
 
 import {
+  cardStatus,
   day,
+  daysRow,
   num,
   pct,
   positionNumber,
+  priceRows,
+  rangeBullets,
+  READOUT,
   share,
-  shown,
+  shareText,
+  tokenRows,
+  WINDOW_NOTE,
   type ExplainGroupWords,
-  type LineKey,
-  type ReadoutLine,
+  type PoolRow,
+  type PoolTable,
   type Seg,
 } from "../uniswap/words";
 import type { AeroPosition, PoolAside } from "./position";
@@ -48,19 +56,11 @@ export const DEPLOYMENT_LABEL: Record<SlipstreamDeployment, string> = {
 
 export const POSITION_PAGE = {
   title: (p: AeroPosition) => `${p.base.symbol}/${p.quote.symbol} · ${p.site.label} · position ${positionNumber(p.id)}`,
-  sub: (p: AeroPosition) =>
-    `${DEPLOYMENT_LABEL[p.deployment]} · fee ${feePct(p.fees.lp)} · tick spacing ${p.tickSpacing} · ${p.site.chainName} · ${
-      p.staked ? "staked" : "not staked"
-    }`,
+  /** The pool's identity: its deployment, tick spacing and chain. Its fee can change, so the readout
+   *  carries it; whether the position is staked is beside its number on the card. */
+  sub: (p: AeroPosition) => `${DEPLOYMENT_LABEL[p.deployment]} · tick spacing ${p.tickSpacing} · ${p.site.chainName}`,
   unanswered: "The read of this position did not answer. Try again in a minute.",
 };
-
-/** Off Base, rails-server does not name the wallet that staked a position (sites.ts `namesDepositor`):
- *  the page says so once, under a staked position's title. */
-export const depositorLimit = (site: SlipstreamSite): string | null =>
-  site.namesDepositor
-    ? null
-    : `On ${site.chainName}, Rails does not yet name the wallet that staked a position, so ${site.reward.symbol} to claim is worked out from the gauge's reads.`;
 
 /** The line under a position and a wallet's positions where the site says it is not indexed yet
  *  (sites.ts `saysNotIndexed`); null where it does not. */
@@ -74,9 +74,9 @@ export const cardWords = (site: SlipstreamSite) => {
   const R = site.reward.symbol;
   return {
     heading: "Position summary",
-    holds: "Holds now",
-    worth: "Worth now",
-    uncollected: "Fees not yet collected",
+    holds: "Tokens",
+    worth: "Value",
+    uncollected: "Uncollected fees",
     claimable: `${R} to claim`,
     owner: "Staked by",
     holdsTip: "The two tokens the position's liquidity holds at the pool's price now.",
@@ -86,70 +86,47 @@ export const cardWords = (site: SlipstreamSite) => {
     ownerTip: site.namesDepositor
       ? "The wallet that staked the position. The gauge holds the position while it is staked."
       : "The gauge holds the position while it is staked.",
-    foot: (q: string) => `In ${q}, at the pool's own price. Rails prices nothing in dollars here.`,
-    rangeLabel: "The range against the price",
+    /** Under an empty Staked by: why no wallet is named. */
+    ownerNone: site.namesDepositor ? "no wallet found" : `not named on ${site.chainName}`,
+    rangeLabel: "Range",
     stakedBadge: "Staked",
     unstakedBadge: "Not staked",
-    gaugeOnly: "Staked in the gauge",
   };
 };
 
-/** "12.5 AERO, worth 3.1 USDC", or "12.5 AERO" where AERO has no price in the quote. */
-export function aeroText(amount: number, value: number | null, q: string, reward: string = "AERO"): string {
-  return value === null ? `${num(amount)} ${reward}` : `${num(amount)} ${reward}, worth ${num(value)} ${q}`;
-}
+/** The card's status word: Closed, Out of range, or none (Uniswap's). */
+export const aeroStatus = (p: AeroPosition) => cardStatus(p);
 
-/** The card's (i): the status lead is the first group's first bullet (charter §4). */
+/** The card's (i) (rails-ops standards/prose-limits-and-zones.md 3.3: Holdings, Risk). */
 export function cardExplainer(p: AeroPosition): ExplainGroupWords[] {
   const Q = p.quote.symbol;
   const B = p.base.symbol;
   const R = p.site.reward.symbol;
-  const s = shown(p);
-  const position: Seg[][] = [
-    ["This position is worth ", { fig: `${num(p.valueNow)} ${Q}` }, " at the pool's price."],
-    [
-      "The position holds ",
-      { fig: `${num(p.holds.base)} ${B}` },
-      " and ",
-      { fig: `${num(p.holds.quote)} ${Q}` },
-      " now.",
-    ],
-  ];
+  const closed = BigInt(p.liquidity) === BigInt(0);
+  const holdings: Seg[][] = closed
+    ? [["This position holds no liquidity now."]]
+    : [
+        ["This position is worth ", { fig: `${num(p.valueNow)} ${Q}` }, " at the pool's price."],
+        ["It holds ", { fig: `${num(p.holds.base)} ${B}` }, " and ", { fig: `${num(p.holds.quote)} ${Q}` }, " now."],
+      ];
   if (p.aero && p.aero.claimable !== null)
-    position.push(["The wallet that staked it can claim ", { fig: `${num(p.aero.claimable)} ${R}` }, " now."]);
-  else if (p.uncollected !== null)
-    position.push(["Fees not yet collected come to ", { fig: `${num(p.uncollected)} ${Q}` }, "."]);
-  position.push(
-    p.range.full
-      ? ["The position is full range, so it is in range at every price."]
-      : [
-          "The position's range runs from ",
-          { fig: num(s.low) },
-          " to ",
-          { fig: num(s.high) },
-          ` ${s.unit}; the price is `,
-          { fig: num(s.price) },
-          ".",
-        ],
+    holdings.push(["The wallet that staked it can claim ", { fig: `${num(p.aero.claimable)} ${R}` }, " now."]);
+  else if (p.uncollected !== null && (!closed || p.uncollected > 0))
+    holdings.push(["Uncollected fees come to ", { fig: `${num(p.uncollected)} ${Q}` }, "."]);
+  holdings.push(
+    p.staked
+      ? [`A staked position is held by the pool's gauge, which pays it ${R} while it is in range.`]
+      : ["An unstaked position earns the pool's swap fees while it is in range."],
   );
   return [
-    { title: "This position", bullets: position },
-    {
-      title: "How it counts",
-      bullets: [
-        [`Every figure is in ${Q}, priced by the pool; ${R} is priced through ${p.site.label}'s ${R} pools.`],
-        ["The two amounts follow the price: as it moves, the position trades one token for the other."],
-        p.staked
-          ? [`A staked position is held by the pool's gauge, which pays it ${R} while it is in range.`]
-          : ["An unstaked position earns the pool's trading fees while it is in range."],
-      ],
-    },
-  ];
+    { title: "Holdings", bullets: holdings },
+    { title: "Risk", bullets: closed ? [] : rangeBullets(p, p.staked ? `earns no ${R}` : "earns no fees") },
+  ].filter((g) => g.bullets.length > 0);
 }
 
-// ── The readout: Uniswap's lines (lib/uniswap/words.ts READOUT), Aerodrome's words ──
+// ── The readout: Uniswap's then / now table, Aerodrome's rows ─────────────
 
-/** Why a pool figure is set aside, after "set aside: ". */
+/** Why a pool figure is set aside, after "set aside: ", in the readout's (i). */
 export function asideText(a: PoolAside, which: "staked" | "unstaked", quote: string): string {
   switch (a.kind) {
     case "empty":
@@ -157,9 +134,26 @@ export function asideText(a: PoolAside, which: "staked" | "unstaked", quote: str
     case "young":
       return "the pool is younger than 30 days";
     case "thin":
-      return `under ${quote === "WETH" ? `${a.floor} WETH` : `${a.floor.toLocaleString("en-US")} ${quote}`} of ${which} liquidity in range ${a.at === "now" ? "now" : "30 days ago"}, which inflates the figure`;
+      return `under ${floorText(a.floor, quote)} of ${which} liquidity in range ${a.at === "now" ? "now" : "30 days ago"}, which inflates the figure`;
     case "spike":
       return "a 30-day figure above 10%, which thin liquidity produces";
+  }
+}
+
+const floorText = (floor: number, quote: string) =>
+  quote === "WETH" ? `${floor} WETH` : `${floor.toLocaleString("en-US")} ${quote}`;
+
+/** Why a pool figure is set aside, in a few words under its row. */
+export function asideNote(a: PoolAside, which: "staked" | "unstaked", quote: string): string {
+  switch (a.kind) {
+    case "empty":
+      return `no ${which} liquidity in range`;
+    case "young":
+      return "pool under 30 days old";
+    case "thin":
+      return `under ${floorText(a.floor, quote)} ${which} in range ${a.at === "now" ? "now" : "then"}`;
+    case "spike":
+      return "above 10%, from thin liquidity";
   }
 }
 
@@ -168,248 +162,308 @@ export const stakedEarns = (site: SlipstreamSite): string =>
   `A staked position earns ${site.reward.symbol} in place of trading fees, which go to the voters who direct ${site.reward.symbol} to this pool.`;
 export const STAKED_EARNS = stakedEarns(AERODROME);
 
-/** The holder's earnings over the window, or why there is no figure. */
-function earnedText(p: AeroPosition): string | null {
-  const Q = p.quote.symbol;
+/** Why the position has no 30-day figure, in full, for the (i); null where it has one. */
+export function windowText(p: AeroPosition): string | null {
   const R = p.site.reward.symbol;
   const w = p.window;
   switch (w.kind) {
     case "no-pool":
+    case "whole":
       return null;
     case "minted":
       // A gauge's deposit time before the first daily read dates the position earlier; the first
       // figure stands on the first midnight after it.
       if (w.stakedAt !== null && (w.firstSeen === null || w.stakedAt < w.firstSeen))
-        return `Minted inside the window and staked on ${day(w.stakedAt)}, so its first 30-day figure is on ${day(Math.ceil(w.stakedAt / DAY) * DAY + 30 * DAY)}.`;
+        return `Minted inside the window and staked on ${day(w.stakedAt)}, so its first 30-day figure is on ${day(firstOn(w.stakedAt))}.`;
       return w.firstSeen !== null
         ? `Minted inside the window and first read on ${day(w.firstSeen)}, so its first 30-day figure is on ${day(w.firstSeen + 30 * DAY)}.`
-        : "Minted inside the window, so Rails states no 30-day figure yet.";
+        : "Minted inside the window, so it has no 30-day figure yet.";
     case "liquidity-changed":
-      return "Its liquidity changed inside the window, so Rails does not state its 30-day figure yet.";
+      return "Its liquidity changed inside the window, so it has no 30-day figure yet.";
     case "staked-inside":
       return w.at !== null
-        ? `Staked on ${day(w.at)}, inside the window. No read was taken that day, so Rails states no 30-day ${R} figure.`
-        : `Staked inside the window, on a day the gauge does not record, so Rails states no 30-day ${R} figure.`;
+        ? `Staked on ${day(w.at)}, inside the window; no read was taken that day, so it has no 30-day ${R} figure.`
+        : `Staked inside the window, on a day the gauge does not record, so it has no 30-day ${R} figure.`;
     case "unstaked-inside":
-      return "It left the gauge inside the window and earns fees only from that day, which the reads do not show, so Rails states no 30-day fee figure.";
-    case "whole":
-      if (p.aero)
-        return p.aero.earned30d !== null
-          ? `Earned ${num(p.aero.earned30d)} ${R} in the last 30 days${p.aero.earned30dValue !== null && p.aero.earned30d > 0 ? `, worth ${num(p.aero.earned30dValue)} ${Q} now` : ""}.`
-          : null;
-      return p.fees30d !== null ? `Earned ${num(p.fees30d)} ${Q} in fees in the last 30 days.` : null;
+      return "It left the gauge inside the window and earns fees only from that day, which the reads do not show, so it has no 30-day fee figure.";
   }
 }
 
-/** The holder's claimable AERO, and the penalty while it applies. */
-function claimText(p: AeroPosition): string | null {
-  const a = p.aero;
-  if (!a || a.claimable === null) return null;
-  const Q = p.quote.symbol;
-  const R = p.site.reward.symbol;
-  const claim =
-    a.claimable > 0 ? `To claim now: ${aeroText(a.claimable, a.claimableValue, Q, R)}.` : "Nothing to claim now.";
-  return a.penalty ? `${claim} ${penaltyText(a.penalty, R)}` : claim;
+const firstOn = (stakedAt: number) => Math.ceil(stakedAt / DAY) * DAY + 30 * DAY;
+
+/** Why the position has no 30-day figure, in a few words under its row. */
+function windowNote(p: AeroPosition): string | undefined {
+  const w = p.window;
+  switch (w.kind) {
+    case "no-pool":
+      return "pool under 30 days old";
+    case "whole":
+      return undefined;
+    case "minted":
+      if (w.stakedAt !== null && (w.firstSeen === null || w.stakedAt < w.firstSeen))
+        return WINDOW_NOTE.firstOn(firstOn(w.stakedAt));
+      return w.firstSeen !== null ? WINDOW_NOTE.firstOn(w.firstSeen + 30 * DAY) : WINDOW_NOTE.minted;
+    case "liquidity-changed":
+      return WINDOW_NOTE.changed;
+    case "staked-inside":
+      return "staked inside the 30 days";
+    case "unstaked-inside":
+      return "left the gauge inside the 30 days";
+  }
 }
 
 export const penaltyText = (pen: { bps: number; until: number }, reward: string = "AERO"): string =>
   `Claiming or unstaking before ${dayTime(pen.until)} gives up ${pen.bps >= 10_000 ? "all" : feePct(pen.bps * 100)} of the ${reward} to claim.`;
 
-/** The pool's two figures: fees per unstaked position, AERO per staked one; the holder's kind first. */
-function poolEarnText(p: AeroPosition): string {
+/** The pool's two figures in full, for the (i): fees per unstaked position, AERO per staked one, the
+ *  holder's kind first, and why either is set aside. */
+export function poolEarnText(p: AeroPosition): string[] {
   const Q = p.quote.symbol;
   const R = p.site.reward.symbol;
   const pool = p.pool30d;
+  // A young pool: the table's (i) says so once, under How it compares.
+  if (pool.fullRangeFees === null) return [];
   // Both set aside for one reason: said once.
   if (pool.feesAside && pool.aeroAside && pool.feesAside.kind === pool.aeroAside.kind && pool.feesAside.kind !== "thin")
-    return `The pool's fee and ${R} figures are set aside: ${asideText(pool.feesAside, "unstaked", Q)}.`;
+    return [`The pool's fee and ${R} figures are set aside: ${asideText(pool.feesAside, "unstaked", Q)}.`];
   if (pool.feesAside?.kind === "thin" && pool.aeroAside?.kind === "thin" && pool.feesAside.at === pool.aeroAside.at)
-    return `The pool's fee and ${R} figures are set aside: under ${pool.feesAside.floor.toLocaleString("en-US")} ${Q} of unstaked or of staked liquidity in range ${pool.feesAside.at === "now" ? "now" : "30 days ago"}, which inflates them.`;
+    return [
+      `The pool's fee and ${R} figures are set aside: under ${pool.feesAside.floor.toLocaleString("en-US")} ${Q} of unstaked or of staked liquidity in range ${pool.feesAside.at === "now" ? "now" : "30 days ago"}, which inflates them.`,
+    ];
   const fees =
     pool.feesAside !== null
       ? `The pool's fee figure for an unstaked position is set aside: ${asideText(pool.feesAside, "unstaked", Q)}.`
-      : `A full-range unstaked position in this pool earned ${share(pool.fullRangeFees ?? 0)} of its value in fees in 30 days.`;
+      : "Full range fees: what a full-range unstaked position in this pool earned in fees in 30 days, as a share of its value.";
   const aero =
     pool.aeroAside !== null
       ? `The pool's ${R} figure for a staked position is set aside: ${asideText(pool.aeroAside, "staked", Q)}.`
       : pool.fullRangeAero !== null
-        ? `A full-range staked position earned ${share(pool.fullRangeAero)} of its value in ${R} in 30 days.`
-        : `${R} has no price in this pool's quote token, so Rails states no ${R} figure for the pool.`;
-  return p.staked ? `${aero} ${fees}` : `${fees} ${aero}`;
+        ? `Full range ${R}: what a full-range staked position earned in ${R} in 30 days, as a share of its value.`
+        : `${R} has no price in this pool's quote token, so the pool has no ${R} figure.`;
+  return p.staked ? [aero, fees] : [fees, aero];
 }
 
-/** The six lines in drawing order: Range leads when the position is out of range. */
-export function readoutLines(p: AeroPosition): ReadoutLine[] {
+/** The readout as a table: the position's rows, then the pool's. */
+export function readoutTable(p: AeroPosition): PoolTable {
   const B = p.base.symbol;
   const Q = p.quote.symbol;
   const R = p.site.reward.symbol;
-  const s = shown(p);
+  const closed = BigInt(p.liquidity) === BigInt(0);
   const minted = p.window.kind === "minted";
+  const why = windowNote(p);
+  const a = p.aero;
 
-  // Range
-  const onlyHolds = p.holds.base === 0 ? Q : p.holds.quote === 0 ? B : null;
-  const earns = p.staked ? `earns no ${R}` : "earns no fees";
-  const now = p.range.full
-    ? "In range at every price: the position is full range."
-    : p.inRange
-      ? `In range: the price, ${num(s.price)} ${s.unit}, sits inside ${num(s.low)} to ${num(s.high)}.`
-      : `Out of range, ${s.side} it: the price is ${num(s.price)} ${s.unit}, the range ${num(s.low)} to ${num(s.high)}. It holds only ${onlyHolds ?? "one token"} and ${earns} while the price is outside.`;
-  const dir = p.daysInRange;
-  const days =
-    dir && dir.read > 0
-      ? minted
-        ? `In range on ${dir.inRange} of ${dir.read} daily reads since it was minted.`
-        : `In range on ${dir.inRange} of the last ${dir.read} days, read once a day.`
-      : null;
-  const range: ReadoutLine = {
-    key: "range",
-    label: "Range",
-    yours: [now, days].filter(Boolean).join(" "),
-    pool:
-      s.then !== null
-        ? `The price moved ${pct(s.price / s.then - 1, 1)} in 30 days, from ${num(s.then)} to ${num(s.price)} ${s.unit}.`
-        : null,
+  const earned: PoolRow = p.staked
+    ? {
+        key: "earned",
+        part: "yours",
+        label: `${R} rewards`,
+        then: null,
+        now: a && a.earned30d !== null ? `${num(a.earned30d)} ${R}` : "—",
+        single: true,
+        ...(a && a.earned30d !== null
+          ? a.earned30dValue !== null && a.earned30d > 0
+            ? { note: `worth ${num(a.earned30dValue)} ${Q} now` }
+            : {}
+          : why
+            ? { note: why }
+            : {}),
+      }
+    : {
+        key: "earned",
+        part: "yours",
+        label: "Swap fees",
+        then: null,
+        now: p.fees30d !== null ? `${num(p.fees30d)} ${Q}` : "—",
+        single: true,
+        ...(p.fees30d === null && why ? { note: why } : {}),
+      };
+  const against: PoolRow[] =
+    p.againstHolding !== null
+      ? [
+          {
+            key: "against",
+            part: "yours",
+            label: "Against holding",
+            then: null,
+            now: pct(p.againstHolding),
+            single: true,
+          },
+          ...(p.againstHoldingWithEarnings !== null
+            ? [
+                {
+                  key: "withEarned",
+                  part: "yours",
+                  label: p.staked ? `With ${R}` : "With fees",
+                  then: null,
+                  now: pct(p.againstHoldingWithEarnings),
+                  single: true,
+                } as PoolRow,
+              ]
+            : []),
+        ]
+      : [];
+  const open: PoolRow[] = closed
+    ? []
+    : [
+        {
+          key: "share",
+          part: "yours",
+          label: p.staked ? "Staked liquidity share" : "Unstaked liquidity share",
+          then: null,
+          now: shareText(p.inRange, p.shareOfPaying),
+          single: true,
+          ...(p.inRange ? {} : { note: "out of range" }),
+        },
+        ...(a?.penalty
+          ? [
+              {
+                key: "penalty",
+                part: "yours",
+                label: "Unstake penalty",
+                then: null,
+                now: a.penalty.bps >= 10_000 ? "All" : feePct(a.penalty.bps * 100),
+                single: true,
+                note: `until ${dayTime(a.penalty.until)}`,
+              } as PoolRow,
+            ]
+          : []),
+        {
+          key: "withdrawals",
+          part: "yours",
+          label: "Withdrawals",
+          then: null,
+          now: "Open",
+          single: true,
+          ...(p.staked ? { note: "unstake from the gauge first" } : {}),
+        },
+      ];
+  const position: PoolRow[] = [
+    ...tokenRows(
+      "yours",
+      B,
+      Q,
+      p.holds,
+      p.holdsThen,
+      // Said once: the fees row carries the same reason where it has it.
+      p.holdsThen === null && p.priceThen !== null && why !== WINDOW_NOTE.minted ? WINDOW_NOTE.minted : undefined,
+    ),
+    ...daysRow(closed ? null : p.daysInRange, minted ? "minted" : null),
+    earned,
+    ...against,
+    ...open,
+  ];
+
+  const pool30 = p.pool30d;
+  const young = pool30.fullRangeFees === null;
+  const feesRow: PoolRow = {
+    key: "fullRange",
+    part: "pool",
+    label: "Full range fees",
+    then: null,
+    now: young || pool30.feesAside ? "—" : share(pool30.fullRangeFees ?? 0),
+    single: true,
+    ...(young
+      ? { note: "pool under 30 days old" }
+      : pool30.feesAside
+        ? { note: asideNote(pool30.feesAside, "unstaked", Q) }
+        : {}),
   };
-
-  // Fees, or AERO while staked
-  const uncollected =
-    !p.staked && p.uncollected !== null && p.uncollected > 0 ? `Not yet collected: ${num(p.uncollected)} ${Q}.` : null;
-  const fees: ReadoutLine = {
-    key: "fees",
-    label: p.staked ? R : "Fees",
-    yours:
-      [p.staked ? stakedEarns(p.site) : null, earnedText(p), p.staked ? claimText(p) : uncollected]
-        .filter(Boolean)
-        .join(" ") || null,
-    pool: p.pool30d.fullRangeFees === null ? "The pool is younger than 30 days." : poolEarnText(p),
+  const rewardRow: PoolRow = {
+    key: "fullRangeReward",
+    part: "pool",
+    label: `Full range ${R}`,
+    then: null,
+    now: young || pool30.aeroAside || pool30.fullRangeAero === null ? "—" : share(pool30.fullRangeAero),
+    single: true,
+    ...(young
+      ? { note: "pool under 30 days old" }
+      : pool30.aeroAside
+        ? { note: asideNote(pool30.aeroAside, "staked", Q) }
+        : pool30.fullRangeAero === null
+          ? { note: `${R} has no price in ${Q}` }
+          : {}),
   };
-
-  // Against holding
-  const earnedWord = p.staked ? `the ${R} it earned, valued now` : "the fees it earned";
-  const against: ReadoutLine = {
-    key: "against",
-    label: "Against holding",
-    yours: minted
-      ? "Minted inside the window."
-      : p.window.kind === "liquidity-changed"
-        ? "Its liquidity changed inside the window, so Rails does not state this yet."
-        : p.againstHolding !== null
-          ? `${pct(p.againstHolding)} against holding the tokens it held on ${day(p.then.time)}, both valued at today's price${
-              p.againstHoldingWithEarnings !== null ? `; ${pct(p.againstHoldingWithEarnings)} with ${earnedWord}` : ""
-            }.`
-          : null,
-    pool: null,
-  };
-
-  // Size
-  const b = p.pool30d.balances;
-  const b30 = p.pool30d.balancesThen;
-  const size: ReadoutLine = {
-    key: "size",
-    label: "Size",
-    yours: p.inRange
-      ? `${p.shareOfPaying >= 0.0001 ? share(p.shareOfPaying, 2) : "Under 0.01%"} of the ${
-          p.staked
-            ? `staked liquidity in range now, which shares the pool's ${R}`
-            : "unstaked liquidity in range now, which shares the pool's fees"
-        }.`
-      : "None of the liquidity in range now: the position is out of range.",
-    pool: b
-      ? `The pool holds ${num(b.base)} ${B} and ${num(b.quote)} ${Q}${b30 ? `; 30 days ago ${num(b30.base)} ${B} and ${num(b30.quote)} ${Q}` : ""}.`
-      : null,
-  };
-
-  // Withdrawals
-  const withdrawals: ReadoutLine = {
-    key: "withdrawals",
-    label: "Withdrawals",
-    yours: p.staked
-      ? `Can be unstaked from the gauge and withdrawn at any block. The pool has no pause.${
-          p.aero?.penalty ? ` ${penaltyText(p.aero.penalty, R)}` : ""
-        }`
-      : "Can be withdrawn at any block. The pool has no pause.",
-    pool: null,
-  };
-
-  // Steward: the swap fee and the unstaked fee, at both ends where they changed.
   const f = p.fees;
-  const swap =
-    f.lpThen !== null && f.lpThen !== f.lp
-      ? `The swap fee is ${feePct(f.lp)}, ${feePct(f.lpThen)} 30 days ago.`
-      : `The swap fee is ${feePct(f.lp)}.`;
-  const cut = (x: number) => (x > 0 ? feePct(x) : "none");
-  const unstaked = p.staked
-    ? null
-    : f.unstakedThen !== null && f.unstakedThen !== f.unstaked
-      ? `The pool's voters take ${cut(f.unstaked)} of an unstaked position's fees now, ${cut(f.unstakedThen)} 30 days ago.`
-      : `The pool's voters take ${cut(f.unstaked)} of an unstaked position's fees.`;
-  const setBy = p.staked
-    ? `${p.site.label} sets it through a fee module on the pool's factory, and can change it.`
-    : `${p.site.label} sets both through fee modules on the pool's factory, and can change them.`;
-  const steward: ReadoutLine = {
-    key: "steward",
-    label: "Steward",
-    yours: null,
-    pool: [swap, unstaked, setBy].filter(Boolean).join(" "),
+  const cut = (x: number) => (x > 0 ? feePct(x) : "None");
+  const b = pool30.balances;
+  const pool: PoolRow[] = [
+    ...priceRows(p),
+    ...(b ? tokenRows("pool", B, Q, b, pool30.balancesThen) : []),
+    ...(p.staked ? [rewardRow, feesRow] : [feesRow, rewardRow]),
+    {
+      key: "swapFee",
+      part: "pool",
+      label: "Swap fee",
+      then: f.lpThen !== null ? feePct(f.lpThen) : null,
+      now: feePct(f.lp),
+    },
+    ...(p.staked
+      ? []
+      : [
+          {
+            key: "protocolFee",
+            part: "pool",
+            label: "Protocol fee",
+            then: f.unstakedThen !== null ? cut(f.unstakedThen) : null,
+            now: cut(f.unstaked),
+          } as PoolRow,
+        ]),
+  ];
+  const held = !closed || (p.holdsThen !== null && (p.holdsThen.base > 0 || p.holdsThen.quote > 0));
+  return {
+    then: p.priceThen !== null ? day(p.then.time) : null,
+    groups: [...(held ? [{ title: READOUT.position, rows: position }] : []), { title: READOUT.pool, rows: pool }],
   };
-
-  return p.inRange || p.range.full
-    ? [size, fees, range, withdrawals, against, steward]
-    : [range, size, fees, withdrawals, against, steward];
 }
 
-/** The readout's (i): one group per line, in the lines' order. Each bullet stands alone. */
-export function readoutExplainer(p: AeroPosition, order: readonly LineKey[]): ExplainGroupWords[] {
+/** The readout's (i): how the columns compare, then what the position's rows and the pool's mean. */
+export function readoutExplainer(p: AeroPosition): ExplainGroupWords[] {
   const R = p.site.reward.symbol;
   const P = p.site.label;
-  // Aerodrome draws no CAKE line (PancakeSwap's, lib/uniswap/words.ts).
-  const groups: Record<Exclude<LineKey, "cake">, ExplainGroupWords> = {
-    range: {
-      title: "Range",
-      bullets: [
-        [
-          p.staked
-            ? `A staked position earns ${R} only while the pool's price sits inside its range.`
-            : "A position earns fees only while the pool's price sits inside its range.",
-        ],
-      ],
+  const closed = BigInt(p.liquidity) === BigInt(0);
+  const wt = windowText(p);
+  const position: Seg[][] = [
+    [
+      p.staked
+        ? stakedEarns(p.site)
+        : "Each swap pays the pool's fee to the unstaked liquidity in range at that moment.",
+    ],
+    ...(wt ? [[wt]] : []),
+    ["Against holding compares the position now with keeping the tokens it held 30 days ago, both at today's price."],
+    [
+      p.staked
+        ? `The position's share is of the staked liquidity in range now, which splits the gauge's ${R}.`
+        : "The position's share is of the unstaked liquidity in range now, which splits the swap fees.",
+    ],
+    ...(p.aero?.penalty ? [[penaltyText(p.aero.penalty, R)]] : []),
+    p.staked
+      ? ["The gauge holds a staked position until the wallet that staked it takes it back, at any block."]
+      : ["A Slipstream pool has no pause and no step that can stop or charge a withdrawal."],
+  ];
+  const pool: Seg[][] = [
+    ...poolEarnText(p).map((t): Seg[] => [t]),
+    ...(p.staked ? [] : [["Protocol fee: the share of an unstaked position's fees the pool's voters take."]]),
+    [
+      p.staked
+        ? `${P} sets the swap fee through a fee module on the pool's factory, and can change it from swap to swap.`
+        : `${P} sets both fees through fee modules on the pool's factory, and can change them from swap to swap.`,
+    ],
+  ];
+  return [
+    {
+      title: "How it compares",
+      bullets:
+        p.priceThen !== null
+          ? [
+              ["The first column is the block at a UTC midnight 30 days back, on the date shown."],
+              ["Now is the block this page read."],
+            ]
+          : [["The pool is younger than 30 days, so the table shows now only."]],
     },
-    fees: {
-      title: p.staked ? R : "Fees",
-      bullets: [
-        ["Each swap pays the pool's fee to the unstaked liquidity in range at that moment."],
-        [`Staking a position in the pool's gauge earns ${R}, ${P}'s token, at the rate the gauge pays.`],
-        [`Each week ${R} holders who lock their ${R} vote on how much ${R} each pool's gauge pays out the week after.`],
-        ["Those voters receive the pool's trading fees from staked liquidity and a share from unstaked liquidity."],
-        [`${R} is valued in the pool's quote token through ${P}'s own ${R} pools, at the price now.`],
-      ],
-    },
-    against: {
-      title: "Against holding",
-      bullets: [["Against holding compares the position now with keeping the tokens it held 30 days ago."]],
-    },
-    size: {
-      title: "Size",
-      bullets: [
-        [
-          p.staked
-            ? `The position's share is of the staked liquidity in range now, which splits the gauge's ${R}.`
-            : "The position's share is of the unstaked liquidity in range now, which splits the swap fees.",
-        ],
-      ],
-    },
-    withdrawals: {
-      title: "Withdrawals",
-      bullets: p.staked
-        ? [["The gauge holds a staked position until the wallet that staked it takes it back."]]
-        : [["A Slipstream pool has no step that can stop or charge a withdrawal."]],
-    },
-    steward: {
-      title: "Steward",
-      bullets: [[`${P}'s fee modules can set a pool's fee from swap to swap.`]],
-    },
-  };
-  return order.flatMap((k) => (k === "cake" ? [] : [groups[k]]));
+    { title: READOUT.position, bullets: closed && !p.holdsThen ? [] : position },
+    { title: READOUT.pool, bullets: pool },
+  ].filter((g) => g.bullets.length > 0);
 }
 
 // ── The front door and a wallet's positions ────────────────────────────────

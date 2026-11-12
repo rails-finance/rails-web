@@ -50,6 +50,7 @@ import {
 import { collChangeProv, debtChangeProv, liquityRedistOnAdjust } from "@/lib/liquity/event-provenance";
 import { isNoChangeAdjust, LIQUITY_MIN_DEBT, TROVE_DELTA_EPSILON } from "@/lib/liquity/trove-ops";
 import { getBatchManagerByAddress, getBatchManagerName } from "@/lib/liquity/batch-managers";
+import { liquityV2MaxLtvPct } from "@/lib/liquity/ltv";
 import { formatDate } from "@/lib/date";
 import { formatGasCost } from "@/lib/shared/format-event";
 import { usdShown } from "@/lib/shared/usd-display";
@@ -468,6 +469,7 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
   const safety = stateBefore && stateAfter ? liquityEventSafety(ctx, previousEvent) : null;
   if (safety) {
     v.mcr = safety.mcr;
+    if (safety.mcr > 0) v.max_ltv = 100 / safety.mcr;
     if (safety.crBefore != null) v.cr_before_same_price = safety.crBefore;
     if (safety.crAfter != null) v.cr_after = safety.crAfter;
     if (safety.liqPriceBefore != null) v.liq_price_before = safety.liqPriceBefore;
@@ -731,9 +733,16 @@ export function liquityEventProse(input: LiquityProseInput): LiquityEventProse {
       v.coll_liquidated = collLiquidated;
       v.coll_liquidated_usd = collUsd;
       v.liquidation_price = liq.price;
-      v.cr_at_liquidation =
+      // The LTV at the liquidation's price: the debt it cleared over the
+      // collateral it took, the inverse of the collateral ratio.
+      const crAtLiquidation =
         collUsd > 0 && debtCleared > 0 ? (collUsd / debtCleared) * 100 : stateBefore.collateralRatio;
-      sp.say("liq.what");
+      const maxLtv = liquityV2MaxLtvPct(ctx.collateralType);
+      if (crAtLiquidation > 0 && maxLtv != null) {
+        v.ltv_at_liquidation = 10000 / crAtLiquidation;
+        v.max_ltv = maxLtv;
+        sp.say("liq.what");
+      }
       const claimable = liq.collSurplus > 0 && liq.debtRedistributed === 0;
       const surplusUsd = liq.collSurplus * liq.price;
       if (claimable) {
@@ -1016,13 +1025,16 @@ export function liquityL2(input: LiquityProseInput, accrual: LiquityAccrual): Li
     }
     lines.push(debtLine);
 
+    // LTV, the inverse of the collateral ratio the state carries.
     const crHasChange = fig.cr.before !== 0 && fig.cr.before !== fig.cr.after;
-    const crAfter = isClose
+    const ltvAfter = isClose
       ? L2_WORDS.closed
-      : stateAfter.debt === 0
-        ? L2_WORDS.not_applicable
-        : `${fig.cr.after.toFixed(2)}%`;
-    lines.push(`${L2_WORDS.collateral_ratio}: ${arrow(crHasChange ? `${fig.cr.before.toFixed(2)}%` : null, crAfter)}`);
+      : stateAfter.debt === 0 || !(fig.cr.after > 0)
+        ? "—"
+        : `${(10000 / fig.cr.after).toFixed(2)}%`;
+    lines.push(
+      `${L2_WORDS.ltv}: ${arrow(crHasChange && fig.cr.before > 0 ? `${(10000 / fig.cr.before).toFixed(2)}%` : null, ltvAfter)}`,
+    );
   }
   if (fig.showGrid) {
     const r = fig.rate;

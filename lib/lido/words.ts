@@ -23,9 +23,9 @@ export const rateText = (x: number): string =>
 export const signed = (x: number): string => (x === 0 ? "0" : `${x > 0 ? "+" : "−"}${num(Math.abs(x))}`);
 
 export const FRONT_DOOR = {
-  line: "Lido stakes ether on Ethereum's validators and gives each depositor stETH, a token whose balance tracks their stake; Rails shows a wallet's stETH and wstETH in ETH, their change over 30 days and their withdrawal requests.",
+  line: "Lido stakes ether on Ethereum's validators and gives each depositor stETH, a token whose balance tracks their stake. Look up a wallet to see its stETH and wstETH in ETH, and its withdrawal requests.",
   totalsTitle: "Lido now",
-  pooled: "Ether staked",
+  pooled: "Total pooled ether",
   pooledTip:
     "All the ether Lido accounts for, which every stETH share is a claim on: the ether on its validators, and the buffered ether deposited and not yet sent to validators.",
   shares: "Shares",
@@ -49,11 +49,11 @@ export const STAKE_PAGE = {
 
 export const CARD_WORDS = {
   heading: "Stake summary",
-  stake: "Stake now",
+  stake: "Stake",
   stakeTip: "The wallet's stETH and wstETH together, in ETH at the share rate.",
   steth: "stETH",
   stethTip:
-    "stETH held in this wallet. Its balance is the ETH its shares are worth, so it moves at each oracle report.",
+    "stETH held in this wallet. Its balance is the ETH its shares are worth, so it moves at each oracle report, which Lido calls a rebase.",
   wsteth: "wstETH",
   wstethTip:
     "wstETH held in this wallet. One wstETH is one stETH share, so its count stays the same while its worth in ETH moves.",
@@ -61,31 +61,43 @@ export const CARD_WORDS = {
   rateTip:
     "The ETH one stETH share is worth. It moves at each oracle report, about once a day: normally up, and down after slashing or penalties.",
   none: "This wallet holds no stETH or wstETH now.",
-  foot: "Amounts are in ETH. Rails takes dollar values only from an on-chain price feed, and none is wired for stETH yet.",
+  closed: "Closed",
   sharesSub: (shares: number) => `${num(shares)} shares`,
   wstethSub: (eth: number) => `worth ${num(eth)} ETH`,
   rateSub: (s: LidoStake) => `${pct(s.rateGrowth, 3)} over 30 days`,
 };
 
 export const READOUT = {
-  title: "How the stake changed over 30 days",
-  sub: "Measured from the chain at the head and 30 days back. Rails does not forecast, rate or recommend.",
-  explainerLabel: "explanation of these lines",
+  title: "Last 30 days",
+  now: "Now",
+  wallet: "This wallet",
+  lido: "Lido",
+  explainerLabel: "explanation of this table",
 };
 
 export type LidoLineKey = "shares" | "rate" | "earned";
-export interface LidoLine {
+export interface LidoRow {
   key: LidoLineKey;
   label: string;
-  text: string;
-  /** Set where the line states no figure: the window's state. */
+  /** The figure at the past block; null on a row with no past side. */
+  then: string | null;
+  now: string;
+  single?: true;
+  /** One line under the label, up to eight words: why the shares moved, or why Earned is empty. */
+  note?: string;
+  /** Set where Earned states no figure: the window's state. */
   withheld?: "opened" | "changed";
 }
+export interface LidoTable {
+  /** The past column's date. */
+  then: string;
+  groups: { title: string; rows: LidoRow[] }[];
+}
 
-/** The Earned line where it states no figure: the reason, on the line. */
+/** Why Earned states no figure, in the table's (i). */
 export const WINDOW_WORDS = {
-  opened: "Not stated: the stake opened inside the 30 days, and Rails reads only their two ends.",
-  changed: "Not stated: the shares changed inside the 30 days, and Rails reads only their two ends.",
+  opened: "Earned has no figure: the stake opened inside the 30 days, and the page reads only their two ends.",
+  changed: "Earned has no figure: the shares changed inside the 30 days, and the page reads only their two ends.",
 };
 
 /** "#141400", "#141400 and #141401", "#1, #2 and #3", or a count past three. */
@@ -99,8 +111,8 @@ function requestNames(rows: LidoRequestRow[]): string {
 /** Shares that moved in or out of the wallet beside its requests, with their ETH at the current rate. */
 const moved = (x: number, eth: number, other: boolean): string =>
   x > 0
-    ? `${other ? "the other " : ""}${num(x)} shares (${num(eth)} ETH) came into the wallet by transfers Rails does not trace`
-    : `${other ? "the other " : ""}${num(-x)} shares (${num(-eth)} ETH) left the wallet by transfers Rails does not trace`;
+    ? `${other ? "the other " : ""}${num(x)} shares (${num(eth)} ETH) came into the wallet by transfers this page does not trace`
+    : `${other ? "the other " : ""}${num(-x)} shares (${num(-eth)} ETH) left the wallet by transfers this page does not trace`;
 
 /** Why the shares changed, from the requests made since the past read and the rest. */
 export function causeText(c: ShareCause): string {
@@ -109,56 +121,72 @@ export function causeText(c: ShareCause): string {
   return c.fit === "all" ? into : `${into}; ${moved(c.rest, c.restEth, true)}`;
 }
 
-/** The readout's lines, in drawing order. */
-export function readoutLines(s: LidoStake, thenTime: number): LidoLine[] {
-  const on = day(thenTime);
-  return [
-    {
-      key: "shares",
-      label: "Shares",
-      text:
-        s.cause === null
-          ? `${num(s.now.shares)} now, the same as on ${on}.`
-          : `${num(s.now.shares)} now, against ${num(s.then.shares)} on ${on}: ${causeText(s.cause)}.`,
-    },
-    {
-      key: "rate",
-      label: "Share rate",
-      text: `${rateText(s.now.rate)} per share now, against ${rateText(s.then.rate)}: ${pct(s.rateGrowth, 3)}.`,
-    },
-    s.windowState === "ok" && s.earned !== null
-      ? {
-          key: "earned",
-          label: "Earned",
-          text:
-            s.then.shares === 0
-              ? `This wallet held no shares on ${on}.`
-              : `${num(s.earned)} ETH: the ${num(s.then.shares)} shares held on ${on}, valued at today's rate less that day's.`,
-        }
-      : {
-          key: "earned",
-          label: "Earned",
-          text: s.windowState === "opened" ? WINDOW_WORDS.opened : WINDOW_WORDS.changed,
-          withheld: s.windowState === "opened" ? "opened" : "changed",
-        },
-  ];
+/** Why the shares moved, in a few words under the row; the (i) gives the full account. */
+export function causeNote(c: ShareCause): string {
+  const to = c.requests.length === 1 ? `request #${c.requests[0].id}` : `${c.requests.length} requests`;
+  const rest = `${signed(c.rest)} by transfer`;
+  if (c.fit === "none") return rest;
+  return c.fit === "all" ? `${num(c.requested)} to ${to}` : `${num(c.requested)} to ${to}, ${rest}`;
+}
+
+/** Why Earned is empty, in a few words under the row. */
+export const WINDOW_NOTE = {
+  opened: "stake opened inside the 30 days",
+  changed: "shares changed inside the 30 days",
+};
+
+/** The readout as a table: a past column and a present one, the wallet's rows, then Lido's. */
+export function readoutTable(s: LidoStake, thenTime: number): LidoTable {
+  const stated = s.windowState === "ok" && s.earned !== null && s.then.shares > 0;
+  return {
+    then: day(thenTime),
+    groups: [
+      {
+        title: READOUT.wallet,
+        rows: [
+          {
+            key: "shares",
+            label: "Shares",
+            then: num(s.then.shares),
+            now: num(s.now.shares),
+            ...(s.cause ? { note: causeNote(s.cause) } : {}),
+          },
+          {
+            key: "earned",
+            label: "Earned",
+            then: null,
+            now: stated ? `${num(s.earned as number)} ETH` : "—",
+            single: true,
+            ...(s.windowState === "ok" ? {} : { withheld: s.windowState, note: WINDOW_NOTE[s.windowState] }),
+          },
+        ],
+      },
+      {
+        title: READOUT.lido,
+        rows: [
+          { key: "rate", label: "Share rate", then: rateText(s.then.rate), now: rateText(s.now.rate) },
+          { key: "rate", label: "Rate change", then: null, now: pct(s.rateGrowth, 3), single: true },
+        ],
+      },
+    ],
+  };
 }
 
 export const REQUESTS = {
   title: "Withdrawal requests",
-  sub: "Each request locks stETH in Lido's withdrawal queue until an oracle report finalizes it; then its owner claims the ETH.",
+  what: "Each request locks stETH in Lido's withdrawal queue until an oracle report finalizes it. Its owner then claims the ETH.",
   explainerLabel: "explanation of these requests",
   none: "This wallet has no withdrawal request open or unclaimed.",
   truncated: (count: number, shown: number) =>
     `This wallet owns ${count.toLocaleString("en-US")} withdrawal requests; Rails shows the newest ${shown}.`,
   summary: (s: LidoStake) =>
     [
-      s.waitingSteth > 0 ? `${num(s.waitingSteth)} stETH waiting` : null,
-      s.claimableEth > 0 ? `${num(s.claimableEth)} ETH ready to claim` : null,
+      s.waitingSteth > 0 ? `${num(s.waitingSteth)} stETH not finalized` : null,
+      s.claimableEth > 0 ? `${num(s.claimableEth)} ETH claimable` : null,
     ]
       .filter(Boolean)
       .join(" · "),
-  state: { waiting: "Waiting", claimable: "Ready to claim", claimed: "Claimed" } as const,
+  state: { waiting: "Not finalized", claimable: "Claimable", claimed: "Claimed" } as const,
   /** What each state means, on the state word. */
   stateTip: {
     waiting: (q: LidoRequestRow) =>
@@ -200,6 +228,7 @@ export function cardExplainer(s: LidoStake): ExplainGroupWords[] {
         held,
         "The shares stay the same until the wallet moves them; their worth moves with the share rate at each oracle report.",
         ...queued(s),
+        ...(s.now.shares > 0 ? ["Amounts are in ETH, so ETH's dollar price is outside this page."] : []),
       ],
     },
   ];
@@ -212,12 +241,12 @@ function queued(s: LidoStake): string[] {
   if (s.waitingSteth > 0 && s.claimableEth > 0)
     return [
       cap(
-        `${other}${num(s.waitingSteth)} stETH waits in Lido's withdrawal queue, and ${num(s.claimableEth)} ETH there is ready to claim, below.`,
+        `${other}${num(s.waitingSteth)} stETH waits in Lido's withdrawal queue, and ${num(s.claimableEth)} ETH there is claimable, below.`,
       ),
     ];
   if (s.waitingSteth > 0) return [cap(`${other}${num(s.waitingSteth)} stETH waits in Lido's withdrawal queue, below.`)];
   if (s.claimableEth > 0)
-    return [cap(`${other}${num(s.claimableEth)} ETH sits in Lido's withdrawal queue, ready to claim, below.`)];
+    return [cap(`${other}${num(s.claimableEth)} ETH sits in Lido's withdrawal queue, claimable, below.`)];
   return [];
 }
 
@@ -236,24 +265,38 @@ export function earnedMeaning(s: LidoStake): string | null {
     : "Earned is the fall in the shares' worth in ETH at the share rate. It is in ETH, so ETH's dollar price is outside it.";
 }
 
-/** The readout's (i). */
+/** The readout's (i): how the columns compare, then this wallet's rows, Earned, and Lido's rate. */
 export function readoutExplainer(s: LidoStake): ExplainGroupWords[] {
   const why = rateCause(s.rateGrowth);
   const earned = earnedMeaning(s);
-  return [
+  const cause = s.cause ? causeText(s.cause) : null;
+  const groups: ExplainGroupWords[] = [
     {
-      title: "The lines",
+      title: "How it compares",
+      bullets: ["The first column is a block 30 days back, on the date shown.", "Now is the block this page read."],
+    },
+    {
+      title: READOUT.wallet,
       bullets: [
-        "Each line compares the block when the page was read with a block 30 days earlier.",
-        ...(why ? [why] : []),
-        "Earned is stated only where the wallet held the same shares at both blocks: those shares times the change in the share rate since.",
-        ...(earned ? [earned] : []),
+        ...(cause ? [`The shares changed: ${cause}.`] : ["The shares are the same at both blocks."]),
         ...(s.cause && s.cause.fit !== "all"
           ? ["Wrapping stETH into wstETH, or back, leaves the share count unchanged, so it is not among these moves."]
           : []),
       ],
     },
+    {
+      title: "Earned",
+      bullets: [
+        ...(s.windowState === "ok"
+          ? ["Earned is the shares held at both blocks, times the change in the share rate between them."]
+          : [WINDOW_WORDS[s.windowState]]),
+        ...(s.windowState === "ok" && s.then.shares === 0 ? ["This wallet held no shares at the first block."] : []),
+        ...(earned ? earned.split(/(?<=\.) /).slice(1) : []),
+      ],
+    },
+    { title: READOUT.lido, bullets: why ? [why] : [] },
   ];
+  return groups.filter((g) => g.bullets.length > 0);
 }
 
 /** The withdrawal requests' (i): what this wallet's requests mean for it. */
@@ -266,16 +309,17 @@ export function requestsExplainer(s: LidoStake): ExplainGroupWords[] {
       bullets: [
         ...(s.waitingSteth > 0
           ? [
-              `The ${num(s.waitingSteth)} stETH in ${waiting.length === 1 ? "the waiting request" : `${waiting.length} waiting requests`} left this wallet's shares when ${waiting.length === 1 ? "it was" : "they were"} made, so it is outside Stake now.`,
+              `The ${num(s.waitingSteth)} stETH in ${waiting.length === 1 ? "the request not yet finalized" : `${waiting.length} requests not yet finalized`} left this wallet's shares when ${waiting.length === 1 ? "it was" : "they were"} made, so it is outside Stake now.`,
             ]
           : []),
         "A request pays at most the stETH locked when it was made: rewards while it waits in the queue are not paid.",
         ...(waiting.length > 0 ? ["Lido's docs state no fixed wait for finalizing."] : []),
         ...(s.claimableEth > 0
           ? [
-              `The ${num(s.claimableEth)} ETH ready to claim stays in the queue until the owner claims it with a transaction.`,
+              `The ${num(s.claimableEth)} claimable ETH stays in the queue until the owner claims it with a transaction.`,
             ]
           : ["Once finalized, the ETH stays in the queue until the owner claims it with a transaction."]),
+        REQUESTS.what,
       ],
     },
   ];
@@ -325,7 +369,7 @@ export const LIDO_LEARN_MORE: LearnMoreContent = {
   ],
   stepsHeading: "Leaving through the withdrawal queue:",
   steps: [
-    "The holder requests a withdrawal: the stETH or wstETH is locked in Lido's queue, and an NFT for the request goes to the holder.",
+    "The holder requests a withdrawal: the stETH or wstETH is locked in Lido's queue, and an unstETH NFT for the request goes to the holder.",
     "An oracle report finalizes requests in order once there is ether to pay them. Lido's docs state no fixed wait.",
     "The NFT's owner claims the ETH with a transaction. A request pays at most the stETH locked when it was made: rewards earned while it waits are not paid.",
   ],

@@ -464,11 +464,11 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/ethereum/alchemix/lines",
+    "page": "/ethereum/alchemix/markets",
     "chain": "ethereum",
     "protocol": "alchemix",
     "state": "system",
-    "picked_for": "the explorer's lines sub-page",
+    "picked_for": "the explorer's markets sub-page",
     "source": "lib/shared/protocols.ts"
   },
   {
@@ -544,11 +544,11 @@
     "source": "lib/shared/protocols.ts"
   },
   {
-    "page": "/base/alchemix/lines",
+    "page": "/base/alchemix/markets",
     "chain": "base",
     "protocol": "alchemix",
     "state": "system",
-    "picked_for": "the explorer's lines sub-page",
+    "picked_for": "the explorer's markets sub-page",
     "source": "lib/shared/protocols.ts"
   },
   {

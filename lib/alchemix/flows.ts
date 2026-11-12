@@ -4,7 +4,7 @@
 // "Alchemix").
 // ----------------------------------------------------------------------------
 // One unit, the asset under the line's vault (USDC or WETH), as the card's
-// collateralisation counts it: the collateral is MYT shares at the vault's
+// LTV counts it: the collateral is MYT shares at the vault's
 // share price, and each unit of the synthetic owed counts as one unit of that
 // asset, the Alchemist's accounting (`FlowTimeline.unit`). No USD.
 //
@@ -102,7 +102,7 @@ export function alchemixFlowBuckets(): FlowBucket[] {
     { key: AX.withdrawn, label: "Withdrawn", event: "Withdraw", side: "collateral", dir: "out" },
     {
       key: AX.forcedColl,
-      label: "Put against set-aside debt",
+      label: "Put against earmarked debt",
       event: "Force repay",
       side: "collateral",
       dir: "out",
@@ -514,7 +514,7 @@ export function alchemixShareLine(points: PricePoint[], o: AlchemixFlowOptions):
       read: `Share price on {day} — the ${u} one ${sh} was worth at block {block}, read with the getCDP reading there. A day with no reading keeps the last one's.`,
       formula: `convertToAssets(1 ${sh}) at the block`,
     },
-    help: `at each reading on this position's timeline (the position's events and the line's redemptions): the ${u} one ${sh} is worth, the vault's convertToAssets, and today the card's share price. No daily share price is recorded for the vault, so a day with no reading keeps the last one's, drawn dotted.`,
+    help: `at each reading on this position's timeline (the position's events and the market's redemptions): the ${u} one ${sh} is worth, the vault's convertToAssets, and today the card's share price. No daily share price is recorded for the vault, so a day with no reading keeps the last one's, drawn dotted.`,
   };
 }
 

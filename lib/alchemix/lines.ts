@@ -35,7 +35,7 @@ export interface AlchemixLine {
   displayName: string;
   /** The Alchemist's `protocolFee`, in basis points, read from chain
    *  2026-09-25 and again 2026-09-27 (rails-ops decisions/0032): charged in
-   *  vault shares on a repay's set-aside part, and on every redemption on top
+   *  vault shares on a repay's earmarked part, and on every redemption on top
    *  of the shares the Transmuter gets. Stated on the repay and redemption
    *  cards. */
   protocolFeeBps: number;

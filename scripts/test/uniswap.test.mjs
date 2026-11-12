@@ -22,8 +22,43 @@ register(`data:text/javascript,${encodeURIComponent(hooks)}`);
 
 const { poolPosition, hookPermissions, protocolCut, amountsFor } = await import("../../lib/uniswap/position.ts");
 const { pairCards, orderCards } = await import("../../lib/uniswap/pairs.ts");
-const { readoutLines, readoutExplainer, cardExplainer, cutSentence, cutShort, num, pct, PAIR_DOOR, POSITION_PAGE } =
-  await import("../../lib/uniswap/words.ts");
+const {
+  readoutTable,
+  readoutExplainer,
+  cardExplainer,
+  cardStatus,
+  cutSentence,
+  cutShort,
+  num,
+  pct,
+  PAIR_DOOR,
+  POSITION_PAGE,
+} = await import("../../lib/uniswap/words.ts");
+
+/** The table's rows by key, per group. */
+const rows = (p) => {
+  const [pos, pool] = readoutTable(p).groups.length === 2 ? readoutTable(p).groups : [null, readoutTable(p).groups[0]];
+  return {
+    yours: Object.fromEntries((pos?.rows ?? []).map((r) => [r.key, r])),
+    pool: Object.fromEntries(pool.rows.map((r) => [r.key, r])),
+  };
+};
+/** The reading contract on the words: every cell a figure or a single word, a note of eight words at
+ *  most, a label of one to three words with no punctuation (rails-ops standards/reading-contract.md). */
+function assertContract(table) {
+  for (const g of table.groups)
+    for (const r of g.rows) {
+      for (const x of [r.then, r.now]) if (x) assert.doesNotMatch(x, /\.$|, | \w+ \w+ /, `${r.label}: ${x}`);
+      assert.ok(r.label.split(" ").length <= 3, r.label);
+      assert.doesNotMatch(r.label, /[,.:;()]/, r.label);
+      if (r.note) {
+        assert.ok(r.note.split(" ").length <= 8, r.note);
+        assert.doesNotMatch(r.note, /\.$|^[A-Z]/, r.note);
+      }
+    }
+}
+const flat = (groups) =>
+  groups.flatMap((g) => g.bullets.map((b) => b.map((x) => (typeof x === "string" ? x : x.fig)).join("")));
 
 const Q128 = BigInt(2) ** BigInt(128);
 const sqrtX96 = (tick) => BigInt(Math.round(Math.sqrt(Math.pow(1.0001, tick)) * 2 ** 96)).toString();
@@ -108,24 +143,45 @@ test("an out-of-range V3 position: Range leads, it holds only the base, and earn
   assert.equal(p.uncollected, 30.6);
   assert.deepEqual(p.daysInRange, { inRange: 0, read: 30, from: HEAD.block - 29 * 7200, to: HEAD.block });
 
-  const lines = readoutLines(p);
-  assert.deepEqual(
-    lines.map((l) => l.key),
-    ["range", "size", "fees", "withdrawals", "against", "steward"],
-  );
-  const by = Object.fromEntries(lines.map((l) => [l.key, l]));
-  assert.match(
-    by.range.yours,
-    /^Out of range, below it: the price is 2,1\d\d USDT per WETH, the range 4,2\d\d to 5,5\d\d\./,
-  );
-  assert.match(by.range.yours, /It holds only WETH and earns no fees while the price is outside\./);
-  assert.match(by.range.yours, /In range on 0 of the last 30 days, read once a day\.$/);
-  assert.equal(by.fees.yours, "Earned 0 USDT in fees in the last 30 days. Not yet collected: 30.6 USDT.");
-  assert.equal(by.size.yours, "None of the liquidity in range now: the position is out of range.");
-  assert.equal(by.withdrawals.yours, "Can be withdrawn at any block. The pool has no pause and no hook.");
-  assert.match(by.steward.pool, /^Nobody can change this pool's 0\.3% fee\. Uniswap takes 1\/6 of the swap fees/);
-  assert.match(by.against.pool, /^Since its first deposit on /);
-  assert.match(by.size.pool, /^The pool holds 1,000 WETH and 2 M USDT; 30 days ago/);
+  assert.deepEqual(cardStatus(p), { word: "Out of range", tip: "The pool's price is outside the position's range." });
+  const risk = flat(cardExplainer(p).filter((g) => g.title === "Risk"));
+  assert.match(risk[0], /^The position's range runs from 4,2\d\d to 5,5\d\d USDT per WETH\.$/);
+  assert.match(risk[1], /^The pool's price is 2,1\d\d, below the range\.$/);
+  assert.equal(risk[2], "It holds only WETH and earns no fees while the price is outside.");
+  const table = readoutTable(p);
+  assertContract(table);
+  assert.match(table.then, /^\d+ \w+ 2026$/);
+  const { yours, pool } = rows(p);
+  assert.deepEqual(Object.keys(yours), [
+    "token:0",
+    "token:1",
+    "days",
+    "earned",
+    "against",
+    "withEarned",
+    "deposits",
+    "share",
+    "withdrawals",
+    "minted",
+  ]);
+  assert.equal(yours["token:0"].label, "WETH");
+  assert.equal(yours.days.now, "0 of 30");
+  assert.equal(yours.days.note, "one read a day");
+  assert.equal(yours.earned.label, "Swap fees");
+  assert.equal(yours.earned.now, "0 USDT");
+  assert.equal(yours.share.now, "0%");
+  assert.equal(yours.share.note, "out of range");
+  assert.equal(yours.withdrawals.now, "Open");
+  assert.equal(pool.price.label, "WETH price");
+  assert.match(pool.price.now, /^2,1\d\d USDT$/);
+  assert.equal(pool["balance:0"].now, "1,000");
+  assert.equal(pool["balance:1"].now, "2 M");
+  assert.equal(pool.protocolFee.now, "1/6");
+  const ex = flat(readoutExplainer(p));
+  assert.ok(ex.includes("Nobody can change this pool's 0.3% fee."));
+  assert.ok(ex.some((b) => /^Uniswap takes 1\/6 of the swap fees/.test(b)));
+  assert.ok(ex.some((b) => /^Since its first deposit on /.test(b)));
+  assert.ok(ex.includes("The pool has no pause and no hook, so nothing can stop or charge a withdrawal."));
 });
 
 test("fees over the window are liquidity times the change in fee growth inside", () => {
@@ -140,15 +196,24 @@ test("fees over the window are liquidity times the change in fee growth inside",
   assert.equal(p.inRange, true);
   assert.equal(p.fees30d, 2);
   assert.ok(p.againstHolding !== null && p.againstHoldingWithFees > p.againstHolding);
-  assert.equal(readoutLines(p)[0].key, "size");
+  assert.equal(cardStatus(p), null);
+  assert.equal(rows(p).yours.earned.now, "2 USDT");
 });
 
 test("a position whose liquidity changed in the window states no 30-day fees", () => {
   const r = v3OutOfRange();
   r.past.positionLiquidity = "1";
-  const by = Object.fromEntries(readoutLines(poolPosition(r)).map((l) => [l.key, l]));
-  assert.match(by.fees.yours, /^Its liquidity changed inside the window/);
-  assert.match(by.against.yours, /^Its liquidity changed inside the window/);
+  const { yours } = rows(poolPosition(r));
+  assert.equal(yours.earned.now, "—");
+  assert.equal(yours.earned.note, "liquidity changed inside the 30 days");
+  // The empty against-holding rows go: the fees row says why.
+  assert.equal(yours.against, undefined);
+  assert.equal(yours.withEarned, undefined);
+  assert.ok(
+    flat(readoutExplainer(poolPosition(r))).includes(
+      "Its liquidity changed inside the window, so it has no 30-day figure yet.",
+    ),
+  );
 });
 
 test("a position opened inside the window says when its first 30-day figure lands", () => {
@@ -156,10 +221,17 @@ test("a position opened inside the window says when its first 30-day figure land
   r.opened = { block: HEAD.block - 7200, time: HEAD.time - DAY };
   r.past.positionLiquidity = null;
   r.daily = r.daily.slice(0, 2);
-  const by = Object.fromEntries(readoutLines(poolPosition(r)).map((l) => [l.key, l]));
-  assert.match(by.fees.yours, /^Opened on .*, inside the window: its first 30-day figure is on /);
-  assert.equal(by.against.yours, "Opened inside the window.");
-  assert.match(by.range.yours, /In range on 0 of 2 daily reads since it opened on /);
+  const p = poolPosition(r);
+  const { yours } = rows(p);
+  assert.match(yours.earned.note, /^first figure on \d+ \w+ 2026$/);
+  assert.equal(yours["token:0"].then, null);
+  assert.equal(yours["token:0"].note, "minted inside the 30 days");
+  assert.equal(yours.days.now, "0 of 2");
+  assert.match(yours.days.note, /^one read a day since \d+ \w+ 2026$/);
+  assert.ok(
+    flat(readoutExplainer(p)).some((b) => /^Minted on .*, inside the window: its first 30-day figure is on /.test(b)),
+  );
+  assertContract(readoutTable(p));
 });
 
 test("a hooked V4 pool with a dynamic fee: the hook's actions in words, no function names", () => {
@@ -197,31 +269,27 @@ test("a hooked V4 pool with a dynamic fee: the hook's actions in words, no funct
   assert.equal(p.quote.symbol, "WETH");
   assert.equal(p.dynamicFee, true);
   assert.equal(p.lpFeePct, 3);
-  const lines = readoutLines(p);
-  const by = Object.fromEntries(lines.map((l) => [l.key, l]));
-  assert.equal(
-    by.withdrawals.yours,
-    "Can be withdrawn at any block. The pool's hook 0x0000…00cc runs on swaps, and has no permission on withdrawals.",
-  );
-  assert.equal(
-    by.steward.pool,
-    "The hook 0x0000…00cc sets this pool's fee, 3% now. Uniswap adds a 0.05% protocol fee to each swap, paid by the swapper on top of the pool's fee.",
-  );
-  assert.equal(by.size.pool, "Rails does not read a V4 pool's balances yet: V4 keeps every pool in one contract.");
-  assert.equal(by.against.pool, "Since its first deposit: Rails does not read a V4 position's own deposits yet.");
-  const MACHINERY = /\(\)|slot0|feeGrowth|NPM|StateView|PositionManager|beforeSwap|afterSwap|DEX lane|block \d/;
-  for (const l of lines) {
-    assert.doesNotMatch(l.yours ?? "", MACHINERY, l.key);
-    assert.doesNotMatch(l.pool ?? "", MACHINERY, l.key);
-  }
-  const groups = readoutExplainer(
-    p,
-    lines.map((l) => l.key),
-  );
-  assert.deepEqual(
-    groups.map((g) => g.title),
-    lines.map((l) => l.label),
-  );
+  assert.equal(POSITION_PAGE.sub(p), "Dynamic fee · Ethereum · hook 0x0000…00cc");
+  const table = readoutTable(p);
+  assertContract(table);
+  const { yours, pool } = rows(p);
+  assert.equal(yours.withdrawals.now, "Open");
+  assert.equal(yours.withdrawals.note, "the hook has no withdrawal permission");
+  assert.equal(pool.lpFee.now, "3%");
+  assert.equal(pool.lpFee.note, "set by its hook");
+  assert.equal(pool.protocolFee.now, "0.05%");
+  assert.equal(pool.balances.now, "—");
+  assert.equal(pool.balances.note, "one contract holds every V4 pool");
+  assert.equal(yours.deposits.note, "deposits not read for V4");
+  const ex = flat(readoutExplainer(p));
+  assert.ok(ex.includes("The pool's hook 0x0000…00cc runs on swaps, and has no permission on withdrawals."));
+  assert.ok(ex.includes("The hook 0x0000…00cc sets this pool's fee, and can change it at any swap."));
+  assert.ok(ex.some((b) => b.startsWith("Uniswap adds a 0.05% protocol fee to each swap, paid by the swapper")));
+  const MACHINERY =
+    /\(\)|slot0|feeGrowth|NPM|StateView|PositionManager|beforeSwap|afterSwap|DEX lane|block \d[\d,]{3,}/;
+  for (const g of table.groups)
+    for (const r of g.rows) for (const x of [r.label, r.now, r.note ?? ""]) assert.doesNotMatch(x, MACHINERY, r.key);
+  for (const b of ex) assert.doesNotMatch(b, MACHINERY);
 });
 
 test("a hook with withdrawal permissions says it can block or take from a withdrawal", () => {
@@ -229,10 +297,12 @@ test("a hook with withdrawal permissions says it can block or take from a withdr
   const hook = "0x0000000000000000000000000000000000000200";
   assert.deepEqual(hookPermissions(hook), ["beforeRemoveLiquidity"]);
   const r = { ...v3OutOfRange(), version: "v4", hooks: hook, history: null };
-  const by = Object.fromEntries(readoutLines(poolPosition(r)).map((l) => [l.key, l]));
-  assert.equal(
-    by.withdrawals.yours,
-    "The pool's hook 0x0000…0200 runs on every withdrawal and can block it or take from it.",
+  const p = poolPosition(r);
+  assert.equal(rows(p).yours.withdrawals.now, "Via hook");
+  assert.ok(
+    flat(readoutExplainer(p)).includes(
+      "The pool's hook 0x0000…0200 runs on every withdrawal and can block it or take from it.",
+    ),
   );
 });
 
@@ -421,28 +491,30 @@ test("a staked PancakeSwap position belongs to its staker and states its CAKE", 
   assert.equal(p.holder, STAKER);
   assert.ok(Math.abs(p.staked.pendingCake - 0.112817202380908321) < 1e-12);
   assert.equal(POSITION_PAGE.title(p).includes("PancakeSwap V3"), true);
-  assert.match(POSITION_PAGE.sub(p), /· Base · staked in PancakeSwap's farm$/);
-  const by = Object.fromEntries(readoutLines(p).map((l) => [l.key, l]));
-  assert.equal(by.cake.yours, "Staked in PancakeSwap's farm: 0.1128 Cake not yet harvested.");
-  assert.equal(
-    by.cake.pool,
-    "A staked position keeps earning the pool's swap fees, and earns CAKE while it is in range.",
-  );
-  assert.match(by.withdrawals.yours, /^Can be withdrawn at any block by the staker/);
-  assert.match(by.steward.pool, /PancakeSwap takes 32% of the swap fees/);
-  // Base reads no history: the against line says so.
-  assert.equal(by.against.pool, "Since its first deposit: Rails does not read a position's deposits on Base yet.");
-  assert.ok(cardExplainer(p)[0].bullets.some((b) => b.some((s) => typeof s === "string" && s.includes("farm"))));
+  assert.equal(POSITION_PAGE.sub(p), "Fee 0.3% · Base");
+  const { yours, pool } = rows(p);
+  assert.equal(yours.earned.label, "Trading fees");
+  assert.equal(yours.withdrawals.note, "by the staker, through the farm");
+  assert.equal(pool.protocolFee.now, "32%");
+  // Base reads no history: the deposits row says so.
+  assert.equal(yours.deposits.now, "—");
+  assert.equal(yours.deposits.note, "deposits not read on Base");
+  assertContract(readoutTable(p));
+  const ex = flat(readoutExplainer(p));
+  assert.ok(ex.includes("A staked position keeps earning the pool's swap fees, and earns CAKE while it is in range."));
+  assert.ok(ex.some((b) => /PancakeSwap takes 32% of the swap fees/.test(b)));
+  const holdings = flat(cardExplainer(p).filter((g) => g.title === "Holdings"));
+  assert.ok(holdings.includes("The position is staked in PancakeSwap's farm, with 0.1128 Cake not yet harvested."));
+  assert.ok(holdings.some((b) => b.startsWith("Unclaimed fees come to ")));
 });
 
-test("an unstaked PancakeSwap position earns no CAKE; a Uniswap one draws no CAKE line", () => {
+test("an unstaked PancakeSwap position earns no CAKE; a Uniswap one says nothing of CAKE", () => {
   const r = { ...v3OutOfRange(), chainId: 42161, staked: null };
-  const cake = readoutLines(poolPosition(r, "pancakeswap")).find((l) => l.key === "cake");
-  assert.equal(cake.yours, "Not staked in PancakeSwap's farm, so it earns no CAKE.");
-  assert.equal(cake.pool, null);
-  const uni = readoutLines(poolPosition({ ...v3OutOfRange(), chainId: 42161 }));
+  const holdings = flat(cardExplainer(poolPosition(r, "pancakeswap")));
+  assert.ok(holdings.includes("Not staked in PancakeSwap's farm, so it earns no CAKE."));
+  const uni = flat(cardExplainer(poolPosition({ ...v3OutOfRange(), chainId: 42161 })));
   assert.equal(
-    uni.some((l) => l.key === "cake"),
+    uni.some((b) => b.includes("CAKE")),
     false,
   );
 });
@@ -450,10 +522,40 @@ test("an unstaked PancakeSwap position earns no CAKE; a Uniswap one draws no CAK
 test("a Base position younger than the window, with no opening day, says so", () => {
   const r = { ...v3OutOfRange(), chainId: 8453, opened: null, history: null };
   r.past = { ...r.past, positionLiquidity: null };
-  const by = Object.fromEntries(readoutLines(poolPosition(r)).map((l) => [l.key, l]));
-  assert.match(by.fees.yours, /^It did not exist 30 days ago, so Rails states no 30-day fees yet\./);
-  assert.equal(by.against.yours, "It did not exist 30 days ago.");
-  assert.equal(by.range.yours.includes("daily"), false);
+  const p = poolPosition(r);
+  const { yours } = rows(p);
+  assert.equal(yours.earned.note, "minted inside the 30 days");
+  assert.equal(yours.against, undefined);
+  // The token rows' past side is empty for the same reason, said once on the fees row.
+  assert.equal(yours["token:0"].then, null);
+  assert.equal(yours["token:0"].note, undefined);
+  assert.equal(yours.days, undefined);
+  assert.ok(flat(readoutExplainer(p)).includes("It did not exist 30 days ago, so it has no 30-day figure yet."));
+});
+
+test("a closed position: the card says Closed, and the table keeps the pool's rows alone", () => {
+  const r = v3OutOfRange();
+  r.liquidity = "0";
+  r.past.positionLiquidity = "0";
+  const p = poolPosition(r);
+  assert.equal(cardStatus(p).word, "Closed");
+  const table = readoutTable(p);
+  assert.deepEqual(
+    table.groups.map((g) => g.title),
+    ["The pool"],
+  );
+  assertContract(table);
+  assert.deepEqual(flat(cardExplainer(p).filter((g) => g.title === "Holdings")), [
+    "This position holds no liquidity now.",
+    "Uncollected fees come to 30.6 USDT.",
+  ]);
+  // Closed inside the window: the position's rows stay, with no zero for an open position's share.
+  r.past.positionLiquidity = "1000000000000000";
+  const left = rows(poolPosition(r)).yours;
+  assert.equal(left["token:0"].now, "0");
+  assert.notEqual(left["token:0"].then, null);
+  assert.equal(left.share, undefined);
+  assert.equal(left.withdrawals, undefined);
 });
 
 test("an Arbitrum pair names the native coin by address and its wrapped token", () => {

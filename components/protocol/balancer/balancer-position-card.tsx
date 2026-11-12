@@ -62,7 +62,7 @@ function slots(r: BalPositionRead): PositionCardSlots {
       value: <Prov info={cardProv("share", c)}>{share(p.now.share)}</Prov>,
       sub: (
         <span data-figure="shares">
-          <Prov info={cardProv("share", c)}>{num(p.now.shares)} pool shares</Prov>
+          <Prov info={cardProv("share", c)}>{num(p.now.shares)} BPT</Prov>
           {p.split && stakedReceipt && (
             <span className="block" data-figure="staked">
               <Prov info={stakedReceipt}>{CARD_WORDS.split(p.split.held, p.split.staked.shares)}</Prov>

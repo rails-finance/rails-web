@@ -206,7 +206,7 @@ export function upfrontFeeProv(
       info: {
         kind: "chain-derived",
         verify: changeVerify(coords),
-        summary: `Upfront fee (${debtSym}) charged by this rate change — the delegate changed the batch's rate within 7 days of its previous change, so the protocol added a one-off fee to every Trove in the batch. No log states it per trove: it is the rest of the debt's move once the interest and management fee since the previous event are taken out.`,
+        summary: `Upfront Borrowing Fee (${debtSym}) charged by this rate change — the delegate changed the batch's rate within 7 days of its previous change, so the protocol added a one-off fee to every Trove in the batch. No log states it per trove: it is the rest of the debt's move once the interest and management fee since the previous event are taken out.`,
         formula: "debt after − debt before − interest − management fee",
         inputs: eventInputs({ ...coords, asset: debtSym }),
       },
@@ -222,7 +222,7 @@ export function upfrontFeeProv(
       kind: "chain",
       pclass: "emitted",
       verify: changeVerify(coords),
-      summary: `Upfront fee (${debtSym}) charged by this operation — a one-off borrowing fee added to the trove's debt.`,
+      summary: `Upfront Borrowing Fee (${debtSym}) charged by this operation — a one-off borrowing fee added to the trove's debt.`,
       contract: { name: "TroveManager", address: TROVE_MANAGER[(ctx.collateralType ?? "").toLowerCase()] },
       via: `${streamVia()} · ${originSeg(troveOperation.origin?.debtIncreaseFromUpfrontFee, {
         event: "TroveOperation",
@@ -458,6 +458,14 @@ export const LIQUITY_V2_GAS_ESCROW: LiquityGasEscrow = {
   address: "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
   source: "Constants.sol ETH_GAS_COMPENSATION",
   label: "0.0375 WETH",
+  // The docs' name ("a liquidation reserve of 0.0375 ETH"; decision 0065).
+  terms: {
+    name: "Liquidation reserve",
+    sent: "held as the liquidation reserve since the open",
+    held: "held as the liquidation reserve",
+    returned: "liquidation reserve returned",
+    paid: "liquidation reserve paid to the liquidator",
+  },
 };
 
 /** The escrow's receipt at an event: the constant, and the transaction whose

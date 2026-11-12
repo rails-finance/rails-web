@@ -411,6 +411,9 @@ const nextConfig: NextConfig = {
       // here because Next's `redirects` matcher is case-insensitive — a
       // `source: "/aave-v4/spoke/Main/:wallet"` rule would also catch the
       // canonical lowercase `main` and self-loop.
+      // Alchemix's overview page took the docs' word, markets, on 12 Nov 2026.
+      { source: "/ethereum/alchemix/lines", destination: "/ethereum/alchemix/markets", permanent: true },
+      { source: "/base/alchemix/lines", destination: "/base/alchemix/markets", permanent: true },
     ];
   },
 };

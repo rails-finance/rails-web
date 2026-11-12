@@ -9,7 +9,7 @@ import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { AeroPosition, AeroPriceRoute } from "@/lib/aerodrome/position";
 import { AERODROME, type SlipstreamSite } from "@/lib/aerodrome/sites";
 import type { AeroPositionRead } from "@/lib/aerodrome/types";
-import type { LineKey } from "@/lib/uniswap/words";
+import type { RowKey } from "@/lib/uniswap/words";
 
 const n = (v: number) => v.toLocaleString("en-US");
 const date = (t: number) => new Date(t * 1000).toISOString().slice(0, 10);
@@ -100,7 +100,7 @@ export function cardProv(
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Holds now — the two amounts the position's liquidity ${r.liquidity} holds between ticks ${r.tickLower} and ${r.tickUpper} at the pool's square-root price at ${at(r.head)}.`,
+        summary: `Tokens — the two amounts the position's liquidity ${r.liquidity} holds between ticks ${r.tickLower} and ${r.tickUpper} at the pool's square-root price at ${at(r.head)}.`,
         contract: nfpm(c),
         via: headVia(c),
         formula: "Uniswap V3's amounts for liquidity L over [√Pa, √Pb] at √P, which Slipstream keeps",
@@ -117,7 +117,7 @@ export function cardProv(
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Worth now — the position's two amounts valued in ${Q} at the pool's price at ${at(r.head)}: ${fig(p.valueNow)} ${Q}.`,
+        summary: `Value — the position's two amounts valued in ${Q} at the pool's price at ${at(r.head)}: ${fig(p.valueNow)} ${Q}.`,
         contract: poolC(c),
         via: headVia(c),
         formula: "base amount × price + quote amount",
@@ -132,7 +132,7 @@ export function cardProv(
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Fees not yet collected — the fees owed on record plus the liquidity times the growth of fees inside the range since the position last settled, at ${at(r.head)}, valued in ${Q} at the pool's price. The pool's fee growth counts unstaked liquidity only, after the unstaked fee.`,
+        summary: `Uncollected fees — the fees owed on record plus the liquidity times the growth of fees inside the range since the position last settled, at ${at(r.head)}, valued in ${Q} at the pool's price. The pool's fee growth counts unstaked liquidity only, after the unstaked fee.`,
         contract: nfpm(c),
         via: headVia(c),
         formula: "tokensOwed + L × (feeGrowthInside − feeGrowthInsideLast) ÷ 2^128, per token",
@@ -271,7 +271,7 @@ function earnedProv(c: AeroReceiptContext): Provenance | null {
     kind: "derived",
     pclass: "state",
     source: head,
-    summary: `Fees, 30 days — the position's liquidity ${r.liquidity}, the same at both blocks and unstaked at both, times the growth of fees inside its range between ${both(c)}, valued in ${Q} at the pool's price now.`,
+    summary: `Swap fees — the position's liquidity ${r.liquidity}, the same at both blocks and unstaked at both, times the growth of fees inside its range between ${both(c)}, valued in ${Q} at the pool's price now.`,
     contract: poolC(c),
     via: bothVia(c),
     formula: "L × (feeGrowthInside now − feeGrowthInside then) ÷ 2^128, per token",
@@ -287,8 +287,63 @@ function earnedProv(c: AeroReceiptContext): Provenance | null {
 
 const L = (x: bigint | null) => (x === null ? "–" : x.toString());
 
-/** One readout line's two parts; null where the part states no read. */
-export function lineProv(key: LineKey, part: "yours" | "pool", c: AeroReceiptContext): Provenance | null {
+/** A readout row's receipt; null where the row states no read. */
+export function lineProv(key: RowKey, c: AeroReceiptContext): Provenance | null {
+  switch (key) {
+    case "token:0":
+    case "token:1":
+      return holdsProv(c);
+    case "days":
+      return partProv("range", "yours", c);
+    case "earned":
+      return partProv("fees", "yours", c);
+    case "against":
+    case "withEarned":
+      return c.p.againstHolding === null ? earnedProv(c) : partProv("against", "yours", c);
+    case "share":
+      return partProv("size", "yours", c);
+    case "penalty":
+    case "withdrawals":
+      return partProv("withdrawals", "yours", c);
+    case "price":
+    case "move":
+      return c.r.past ? partProv("range", "pool", c) : cardProv("price", c);
+    case "balance:0":
+    case "balance:1":
+      return partProv("size", "pool", c);
+    case "fullRange":
+    case "fullRangeReward":
+      return partProv("fees", "pool", c);
+    case "swapFee":
+    case "protocolFee":
+      return partProv("steward", "pool", c);
+    default:
+      return null;
+  }
+}
+
+/** The position's two amounts now and at the past block, each its liquidity at that block's price. */
+function holdsProv(c: AeroReceiptContext): Provenance {
+  const { p, r } = c;
+  const now = cardProv("holds", c);
+  const past = r.past;
+  if (!past || past.positionLiquidity === null || !p.holdsThen) return now;
+  return {
+    ...now,
+    summary: `Tokens — the two amounts the position's liquidity holds between ticks ${r.tickLower} and ${r.tickUpper}: ${r.liquidity} at the pool's square-root price at ${at(r.head)}, and ${past.positionLiquidity} at the square-root price at ${at(r.then)}.`,
+    via: bothVia(c),
+    inputs: [
+      ...(now.inputs ?? []),
+      chain(`positions(${p.id}) · liquidity · ${at(r.then)}`, past.positionLiquidity),
+      chain(`sqrtPriceX96 · ${at(r.then)}`, past.sqrtPriceX96),
+      derived(`${p.base.symbol} then`, fig(p.holdsThen.base)),
+      derived(`${p.quote.symbol} then`, fig(p.holdsThen.quote)),
+    ],
+  };
+}
+
+/** One part of the readout's facts; null where it states no read. */
+function partProv(key: string, part: "yours" | "pool", c: AeroReceiptContext): Provenance | null {
   const { p, r } = c;
   const head = { block: r.head.block };
   const Q = p.quote.symbol;
@@ -311,7 +366,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: AeroReceiptCon
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Price move — the pool's square-root price at ${at(r.then)} and at ${at(r.head)}, squared and scaled by the tokens' decimals.`,
+        summary: `Price change — the pool's square-root price at ${at(r.then)} and at ${at(r.head)}, squared and scaled by the tokens' decimals.`,
         contract: poolC(c),
         via: bothVia(c),
         formula: "price now ÷ price then − 1",
@@ -330,7 +385,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: AeroReceiptCon
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Full-range fees and ${R} — the growth of the pool's fee counters between ${both(c)}, which grow per unit of unstaked liquidity (in range, less the staked part), as a share of a full-range position's value at the price now; and the growth of its reward counter, which grows by the gauge's rewardRate per unit of staked liquidity, valued the same way. ${routeOf(c)} A figure is set aside when its liquidity in range was under ${pool.floor === null ? "no floor (this quote token has none)" : `${n(pool.floor)} ${Q}`} at either read, when the pool is younger than 30 days, or when it is above 10%.`,
+        summary: `Full range fees and full range ${R} — the growth of the pool's fee counters between ${both(c)}, which grow per unit of unstaked liquidity (in range, less the staked part), as a share of a full-range position's value at the price now; and the growth of its reward counter, which grows by the gauge's rewardRate per unit of staked liquidity, valued the same way. ${routeOf(c)} A figure is set aside when its liquidity in range was under ${pool.floor === null ? "no floor (this quote token has none)" : `${n(pool.floor)} ${Q}`} at either read, when the pool is younger than 30 days, or when it is above 10%.`,
         contract: poolC(c),
         via: bothVia(c),
         formula: `fees: (Δg0 × P + Δg1) ÷ (2 × √P), g in units of 2^128; ${R}: Δg ÷ 2^128 ÷ 10^18 × ${R} price ÷ (2 × √P valued in the quote)`,
@@ -386,7 +441,7 @@ export function lineProv(key: LineKey, part: "yours" | "pool", c: AeroReceiptCon
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Share in range — the position's liquidity over the pool's ${p.staked ? "staked liquidity in range" : "unstaked liquidity in range (all liquidity in range, less the staked part)"} at ${at(r.head)}.`,
+        summary: `Active liquidity share — the position's liquidity over the pool's ${p.staked ? "staked liquidity in range" : "unstaked liquidity in range (all liquidity in range, less the staked part)"} at ${at(r.head)}.`,
         contract: poolC(c),
         via: headVia(c),
         formula: p.staked ? "L ÷ stakedLiquidity" : "L ÷ (liquidity − stakedLiquidity)",

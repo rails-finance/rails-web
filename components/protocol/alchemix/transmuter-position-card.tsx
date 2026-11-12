@@ -11,7 +11,7 @@
 // in blocks, and the maturity the server serves was settled from the value in
 // force when the position was created (never the parameter read at head, which
 // has moved six times per mainnet line). Whether it has matured is said against
-// the block the line is indexed to. The days are an estimate at the chain's
+// the block the market is indexed to. The days are an estimate at the chain's
 // block time and say so. A maturing position headlines the date that estimate
 // lands on, marked "≈", with the block under it and the arithmetic on hover and
 // in the receipt. A matured or claimed one keeps the block: the data carries no
@@ -160,7 +160,7 @@ export function transmuterHeads(
     );
     title =
       `Estimated: block ${block(m.maturationBlock)} is ${block(estimate.blocksRemaining)} blocks past block ` +
-      `${block(estimate.referenceBlock)}, the block the line is indexed to. At ${estimate.secondsPerBlock} seconds a block ` +
+      `${block(estimate.referenceBlock)}, the block the market is indexed to. At ${estimate.secondsPerBlock} seconds a block ` +
       `that is ${about ?? `${block(estimate.blocksRemaining * estimate.secondsPerBlock)} seconds`} from now.`;
     note = (
       <>
@@ -171,7 +171,7 @@ export function transmuterHeads(
   } else if (p.status !== "claimed" && m.referenceBlock != null && m.matured) {
     note = (
       <>
-        matured; the line is indexed to <BlockRef block={m.referenceBlock} size={12} />
+        matured; the market is indexed to <BlockRef block={m.referenceBlock} size={12} />
       </>
     );
   }

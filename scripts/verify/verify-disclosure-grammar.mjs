@@ -722,12 +722,12 @@ const SHEET_WORDS_SUBJECTS = [
     name: "Liquity V2 Trove …545773770 #3",
     path: "/ethereum/liquity-v2/trove/WETH/29779854367542649123526514384205099621162281315544372345570836626121545773770",
     id: "0xe5509980170a44f3f5878afd1b13d3e797cba9789b1509de475fcb9fb97ad930_1",
-    risk: ["Collateral Ratio", "Liquidates at"],
+    risk: ["LTV", "Liquidates at"],
     limits: ["Interest Rate"],
-    params: ["Minimum ratio", "Critical ratio"],
+    params: ["Max LTV", "Critical Collateral Ratio (CCR)"],
     optional: ["Delegate's fee"],
-    // The gas compensation escrow, a footnote under Risk and Limits (ui-jobs 388).
-    note: /^0\.0375 WETH \(\$[\d,.]+\) held in escrow$/,
+    // The liquidation reserve, a footnote under Risk and Limits (ui-jobs 388).
+    note: /^0\.0375 WETH \(\$[\d,.]+\) held as the liquidation reserve$/,
   },
   {
     name: "Aave V3 0x9ff6…0de5 Borrow",

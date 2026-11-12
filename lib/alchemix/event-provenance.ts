@@ -33,6 +33,7 @@
 import type { RedemptionNet } from "@/lib/alchemix/redemption-net";
 import type { Provenance, ProvInput, ProvVerify } from "@/components/shared/provenance";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
+import { ltvExact, ltvOfCollateralization } from "@/lib/alchemix/ltv";
 
 /** Where the figures on this page were captured from, in custody terms. */
 const ALCHEMIX_VIA = "captured Alchemist + position NFT logs (alchemix_v3_*)";
@@ -65,7 +66,7 @@ function txVerify(coords: AlchemixCoords): ProvVerify | undefined {
 function coordInputs(coords: AlchemixCoords, extra: ProvInput[] = []): ProvInput[] {
   const inputs: ProvInput[] = [...extra];
   inputs.push({
-    label: "line",
+    label: "market",
     value: coords.lineKey,
     kind: "offchain",
     note: "one synthetic on one chain — the scope a token id is unique inside",
@@ -124,7 +125,7 @@ export function resolvedAtCaptureProv(
     contract: alchemistContract(coords),
     via: `${ALCHEMIX_VIA} · ${debt ? "debt_credit" : "collateral_fee"}${raw ? `: ${raw}` : ""}`,
     formula: debt
-      ? "min(the offered amount converted to debt at this block, the position's debt, the line's total debt)"
+      ? "min(the offered amount converted to debt at this block, the position's debt, the market's total debt)"
       : "the protocol fee leg of the same transaction's share transfer",
     verify: {
       kind: "recompute",
@@ -178,7 +179,7 @@ export function debtClearedFromReadingsProv(
       { label: "debt read at the redemption", value: `block ${atBlock}`, kind: "chain" },
       {
         label: "what the log gives",
-        value: "one line-wide amount, no position named",
+        value: "one market-wide amount, no position named",
         kind: "chain",
         note: "which is why the figure comes from the readings",
       },
@@ -228,7 +229,7 @@ export function redemptionCountProv(count: number, coords: AlchemixCoords): Prov
   return {
     kind: "chain",
     pclass: "indexed",
-    summary: "Redemptions on this timeline — the number of the line's Redemption logs this position's timeline lists",
+    summary: "Redemptions on this timeline — the number of the market's Redemption logs this position's timeline lists",
     contract: alchemistContract(coords),
     via: "count of Redemption logs on this position's timeline",
     inputs: coordInputs(coords, [{ label: "Redemption logs", value: String(count), kind: "chain", pclass: "indexed" }]),
@@ -263,7 +264,7 @@ export function collateralTakenFromReadingsProv(
       { label: "collateral read at the redemption", value: `block ${atBlock}`, kind: "chain" },
       {
         label: "where it went",
-        value: "the line's Transmuter",
+        value: "the market's Transmuter",
         kind: "chain",
         note: "it backs the debt the redemption cleared",
       },
@@ -304,7 +305,7 @@ export function takenRunProv(
 }
 
 /** The change on one axis between the reading before a card and the reading at
- *  it: two readings, subtracted. On set-aside the two readings are true at
+ *  it: two readings, subtracted. On earmarked debt the two readings are true at
  *  their own blocks, and the receipt names both. */
 export function readingChangeProv(
   label: string,
@@ -371,7 +372,7 @@ export function stateAtBlockFromReadingProv(
         label: "what the figure is",
         value: "one reading of the Alchemist at this block",
         kind: "chain",
-        note: "a redemption moves debt across the whole line, so the position's own events cannot reach this figure",
+        note: "a redemption moves debt across the whole market, so the position's own events cannot reach this figure",
       },
       {
         label: "this position's events in the block",
@@ -381,7 +382,7 @@ export function stateAtBlockFromReadingProv(
           ? "the reading covers all of them, so it is the state after the last of them"
           : eventsInBlock === 1
             ? "this event alone, so the reading is its state-after"
-            : "none — the block belongs to a line-scope event, and the reading is the state after it",
+            : "none — the block belongs to a market-wide event, and the reading is the state after it",
       },
       // The two unit caveats the card face used to carry in prose, each on the
       // receipt of the figure it governs and nowhere else.
@@ -395,7 +396,7 @@ export function stateAtBlockFromReadingProv(
             },
           ]
         : []),
-      ...(label === "Set aside for repayment"
+      ...(label.startsWith("Earmarked")
         ? [
             {
               label: "how long it holds",
@@ -428,7 +429,7 @@ export function eventsAloneDebtProv(
   return {
     kind: "chain-derived",
     pclass: "indexed",
-    summary: `${symbol} debt from this position's events alone. Every mint, burn, repay and liquidation it emitted, added up to block ${reducedToBlock}. A redemption clears debt with no event of the position's to show it, so from the line's first redemption at block ${validToBlock} this sum can sit above the debt read now.`,
+    summary: `${symbol} debt from this position's events alone. Every mint, burn, repay and liquidation it emitted, added up to block ${reducedToBlock}. A redemption clears debt with no event of the position's to show it, so from the market's first redemption at block ${validToBlock} this sum can sit above the debt read now.`,
     contract: alchemistContract(coords),
     via: `${ALCHEMIX_VIA} · replayed per position`,
     formula: "Σ debt added by the position's own events − Σ debt they cleared",
@@ -440,7 +441,7 @@ export function eventsAloneDebtProv(
         label: "exact to",
         value: `block ${validToBlock}`,
         kind: "chain",
-        note: "the line's first redemption; past it the sum can differ from the debt read",
+        note: "the market's first redemption; past it the sum can differ from the debt read",
       },
     ]),
     scaling: { raw, from: "log", places: 18, why: `${symbol} carries 18 decimals` },
@@ -468,7 +469,7 @@ export function liveFigureProv(
     inputs: coordInputs(coords, [
       {
         label: "reading",
-        value: `debt, collateral and set aside for repayment at block ${asOfBlock}`,
+        value: `debt, collateral and earmarked debt at block ${asOfBlock}`,
         kind: "chain",
         note: "one call, one block — which is what lets these three stand together",
       },
@@ -530,26 +531,26 @@ export function usdProv(symbol: string, pricePerUnit: number, priceSource: strin
         label: "priced at",
         value: pricedAt,
         kind: "offchain",
-        note: "on a Base line this is the mainnet twin of the same asset",
+        note: "on a Base market this is the mainnet twin of the same asset",
       },
     ],
   };
 }
 
 /** The shares a self-liquidation used on the debt left after its force repay:
- *  `SelfLiquidated.amount` states both parts, so the set-aside part the same
+ *  `SelfLiquidated.amount` states both parts, so the earmarked part the same
  *  transaction's `ForceRepay` states is taken off (lib/alchemix/self-liquidation.ts). */
 export function selfLiquidationRestProv(symbol: string, raw: string, coords: AlchemixCoords): Provenance {
   return {
     kind: "chain-derived",
     pclass: "emitted",
-    summary: `${symbol} that paid the rest of the debt — the close's amount less the set-aside part its force repay states`,
+    summary: `${symbol} that paid the rest of the debt — the close's amount less the earmarked part its force repay states`,
     contract: alchemistContract(coords),
     via: `${ALCHEMIX_VIA} · SelfLiquidated.amount − ForceRepay.creditToYield`,
     formula: "SelfLiquidated.amount − ForceRepay.creditToYield, both in this transaction",
     verify: txVerify(coords),
     source: { block: coords.blockNumber, txHash: coords.txHash },
-    inputs: coordInputs(coords, [{ label: "where it went", value: "the line's Transmuter", kind: "chain" }]),
+    inputs: coordInputs(coords, [{ label: "where it went", value: "the market's Transmuter", kind: "chain" }]),
     scaling: { raw, from: "log", places: 18, why: `${symbol} carries 18 decimals` },
   };
 }
@@ -596,11 +597,15 @@ export function closeFromReadingProv(
 }
 
 // ── The position's health ───────────────────────────────────────────────────
+//
+// Alchemix states the ratio as LTV, the debt over the collateral's value
+// (lib/alchemix/ltv.ts). The Alchemist's getters state the inverse, so each
+// receipt shows the raw it read and divides one by it.
 
-/** The collateralisation: `totalValue(tokenId)` over the debt, both at one
- *  block. `totalValue` is the collateral in debt-token units, where the
- *  contract counts one unit of the underlying as one unit of debt. */
-export function collateralisationProv(
+/** The LTV: the debt over `totalValue(tokenId)`, both at one block.
+ *  `totalValue` is the collateral in debt-token units, where the contract
+ *  counts one unit of the underlying as one unit of debt. */
+export function ltvProv(
   collateralValueRaw: string,
   debtRaw: string,
   asOfBlock: number,
@@ -609,50 +614,60 @@ export function collateralisationProv(
   return {
     kind: "chain-derived",
     pclass: "state",
-    summary: "Collateralisation — the collateral in the underlying over the debt, at one block",
+    summary: "LTV — the debt over the collateral's value in the underlying, at one block",
     contract: alchemistContract(coords),
-    formula: "totalValue(tokenId) ÷ debt",
+    formula: `debt ÷ totalValue(tokenId) = ${ltvExact(Number(debtRaw) / Number(collateralValueRaw))}`,
     via: `totalValue(${coords.tokenId}) and getCDP(${coords.tokenId}) at block ${asOfBlock}`,
     verify: {
       kind: "recompute",
-      text: `Call totalValue(${coords.tokenId}) and getCDP(${coords.tokenId}) at block ${asOfBlock} and divide`,
+      text: `Call getCDP(${coords.tokenId}) and totalValue(${coords.tokenId}) at block ${asOfBlock} and divide the debt by the value`,
     },
     source: { block: asOfBlock },
     inputs: coordInputs(coords, [
+      { label: "debt", value: debtRaw, kind: "chain", note: "getCDP's debt, 18 decimals" },
       {
         label: "collateral value",
         value: collateralValueRaw,
         kind: "chain",
         note: "totalValue: the vault shares in the underlying, one underlying counted as one unit of debt, 18 decimals",
       },
-      { label: "debt", value: debtRaw, kind: "chain", note: "getCDP's debt, 18 decimals" },
     ]),
   };
 }
 
-/** One of the line's two ratios, read from the Alchemist at the reading's
- *  block. Both have setters, so neither is a constant. */
+/** The line's Max LTV or liquidation threshold: one over the getter the
+ *  Alchemist states it as, read at the reading's block. Both getters have
+ *  setters, so neither is a constant. */
 export function lineRatioProv(
   getter: "minimumCollateralization" | "collateralizationLowerBound",
   raw: string,
   asOfBlock: number,
   coords: AlchemixCoords,
 ): Provenance {
+  const ltv = ltvOfCollateralization(raw);
   return {
-    kind: "chain",
+    kind: "chain-derived",
     pclass: "state",
     summary:
       getter === "minimumCollateralization"
-        ? "Minimum collateralisation — a mint or a withdrawal must leave the position above it"
-        : "Liquidation line — at or below it, anyone may liquidate the position",
+        ? "Max LTV — a mint or a withdrawal must leave the position's LTV below it"
+        : "Liquidation threshold — at or above this LTV, anyone may liquidate the position",
     contract: alchemistContract(coords),
     via: `${getter}() at block ${asOfBlock}`,
-    verify: { kind: "recompute", text: `Call ${getter}() on the Alchemist at block ${asOfBlock}` },
+    formula: `1 ÷ ${getter}${ltv != null ? ` = 1e18 ÷ ${raw} = ${ltvExact(ltv)}` : ""}`,
+    verify: {
+      kind: "recompute",
+      text: `Call ${getter}() on the Alchemist at block ${asOfBlock} and divide 1e18 by it`,
+    },
     source: { block: asOfBlock },
     inputs: coordInputs(coords, [
-      { label: getter, value: raw, kind: "chain", note: "1e18 is 100%; governance can change it" },
+      {
+        label: getter,
+        value: raw,
+        kind: "chain",
+        note: "collateral over debt, 1e18 is 100%; governance can change it",
+      },
     ]),
-    scaling: { raw, from: "call", places: 16, why: "a 1e18-scaled ratio, shown as a percentage" },
   };
 }
 
@@ -661,10 +676,10 @@ export function lineLiquidationsProv(count: number, throughBlock: number | null,
   return {
     kind: "chain-derived",
     pclass: "indexed",
-    summary: "Liquidations on this line — every Liquidated and BatchLiquidated log captured",
+    summary: "Liquidations on this market — every Liquidated and BatchLiquidated log captured",
     contract: alchemistContract(coords),
     via: `${ALCHEMIX_VIA}${throughBlock != null ? ` · to block ${throughBlock}` : ""}`,
-    verify: { kind: "rollup", text: "It counts the line's captured liquidation logs" },
+    verify: { kind: "rollup", text: "It counts the market's captured liquidation logs" },
     source: { block: throughBlock ?? undefined },
     inputs: coordInputs(coords, [{ label: "liquidations", value: String(count), kind: "chain-derived" }]),
   };
@@ -691,7 +706,7 @@ export function redemptionNetProv(
   return {
     kind: "chain-derived",
     pclass: "state",
-    summary: `Net for this position — the ${syntheticSymbol} debt cleared, valued at 1 ${underlyingSymbol} each as the protocol counts it, less the ${mytSymbol} taken, valued at the share price read at the redemption's block. The shares taken include the line's redemption fee${n.fee ? ` (${n.fee.bps / 100}%, ${fmtUnits(n.fee.sharesRaw, 18)} ${mytSymbol})` : ""}`,
+    summary: `Net for this position — the ${syntheticSymbol} debt cleared, valued at 1 ${underlyingSymbol} each as the protocol counts it, less the ${mytSymbol} taken, valued at the share price read at the redemption's block. The shares taken include the market's redemption fee${n.fee ? ` (${n.fee.bps / 100}%, ${fmtUnits(n.fee.sharesRaw, 18)} ${mytSymbol})` : ""}`,
     contract: alchemistContract(coords),
     via: `getCDP(${coords.tokenId}) at blocks ${n.fromBlock} and ${n.atBlock}, and the ${mytSymbol} share price at block ${n.atBlock}`,
     formula:
@@ -737,7 +752,7 @@ export function redemptionFeeProv(
   return {
     kind: "chain-derived",
     pclass: "state",
-    summary: `Redemption fee — the line's ${fee.bps / 100}% protocol fee, charged on every redemption in ${mytSymbol} on top of the shares the Transmuter gets, and paid to Alchemix's fee receiver. It is the main part of the net`,
+    summary: `Redemption fee — the market's ${fee.bps / 100}% protocol fee, charged on every redemption in ${mytSymbol} on top of the shares the Transmuter gets, and paid to Alchemix's fee receiver. It is the main part of the net`,
     contract: alchemistContract(coords),
     via: `protocolFee() = ${fee.bps} bps · getCDP(${coords.tokenId}) at blocks ${n.fromBlock} and ${n.atBlock} · the ${mytSymbol} share price at block ${n.atBlock}`,
     formula:
@@ -809,7 +824,7 @@ export function sharePriceProv(
   };
 }
 
-/** How far the share price could fall before the liquidation line. */
+/** How far the share price could fall before the liquidation threshold. */
 export function liquidationDistanceProv(
   collateralizationRaw: string,
   lowerBoundRaw: string,
@@ -817,25 +832,31 @@ export function liquidationDistanceProv(
   asOfBlock: number,
   coords: AlchemixCoords,
 ): Provenance {
-  const pct = (raw: string) => `${(Number(raw) / 1e16).toLocaleString("en-US", { maximumFractionDigits: 4 })}%`;
+  const ltv = ltvOfCollateralization(collateralizationRaw);
+  const threshold = ltvOfCollateralization(lowerBoundRaw);
   return {
     kind: "chain-derived",
     pclass: "state",
     summary:
-      "Distance to liquidation — the fall in the vault's share price that would take this position to the liquidation line. Debt and collateral are counted in one underlying, so the ratio moves with the share price alone",
+      "Distance to liquidation — the fall in the vault's share price that would take this position's LTV to the liquidation threshold. Debt and collateral are counted in one underlying, so the LTV moves with the share price alone",
     contract: alchemistContract(coords),
     via: `totalValue(${coords.tokenId}), getCDP(${coords.tokenId}) and collateralizationLowerBound() at block ${asOfBlock}`,
-    formula: `1 − ${pct(lowerBoundRaw)} ÷ ${pct(collateralizationRaw)} = ${(fall * 100).toLocaleString("en-US", { maximumFractionDigits: 4 })}%`,
-    verify: { kind: "recompute", text: "Recompute it from the collateralisation and the liquidation line beside it" },
+    formula: `1 − LTV ÷ liquidation threshold${ltv != null && threshold != null ? ` = 1 − ${ltvExact(ltv)} ÷ ${ltvExact(threshold)}` : ""} = ${(fall * 100).toLocaleString("en-US", { maximumFractionDigits: 4 })}%`,
+    verify: { kind: "recompute", text: "Recompute it from the LTV and the liquidation threshold beside it" },
     source: { block: asOfBlock },
     inputs: coordInputs(coords, [
       {
-        label: "collateralisation",
+        label: "totalValue ÷ debt",
         value: collateralizationRaw,
-        kind: "chain",
-        note: "totalValue ÷ debt, 1e18 is 100%",
+        kind: "chain-derived",
+        note: "1e18 is 100%; the LTV is 1 ÷ this",
       },
-      { label: "collateralizationLowerBound", value: lowerBoundRaw, kind: "chain", note: "1e18 is 100%" },
+      {
+        label: "collateralizationLowerBound",
+        value: lowerBoundRaw,
+        kind: "chain",
+        note: "1e18 is 100%; the liquidation threshold is 1 ÷ this",
+      },
     ]),
   };
 }
@@ -856,11 +877,11 @@ export function redemptionNetUnavailableProv(atBlock: number, coords: AlchemixCo
   };
 }
 
-/** Collateralisation at one reading: the reading's share count valued at the
- *  share price stored with it, over the reading's debt. The same ratio the
- *  position card reads from `totalValue`, taken here from the stored reading
- *  so a past block has one. */
-export function readingCollateralisationProv(
+/** LTV at one reading: the reading's debt over its share count valued at
+ *  the share price stored with it. The same ratio the position card reads
+ *  from `totalValue`, taken here from the stored reading so a past block has
+ *  one. */
+export function readingLtvProv(
   collateralRaw: string,
   sharePriceRaw: string,
   debtRaw: string,
@@ -873,13 +894,54 @@ export function readingCollateralisationProv(
   return {
     kind: "chain-derived",
     pclass: "state",
-    summary: `Collateralisation at block ${atBlock} — the ${mytSymbol} held, valued in ${underlyingSymbol} at the share price read with it, over the debt, one debt unit counted as one ${underlyingSymbol}`,
+    summary: `LTV at block ${atBlock} — the debt over the ${mytSymbol} held, valued in ${underlyingSymbol} at the share price read with it, one debt unit counted as one ${underlyingSymbol}`,
     contract: alchemistContract(coords),
     via: `getCDP(${coords.tokenId}) and the ${mytSymbol} share price at block ${atBlock}`,
-    formula: "collateral × share price ÷ debt",
+    formula: "debt ÷ (collateral × share price)",
     verify: {
       kind: "recompute",
-      text: `Call getCDP(${coords.tokenId}) and the vault's convertToAssets(1e18) at block ${atBlock}, then divide`,
+      text: `Call getCDP(${coords.tokenId}) and the vault's convertToAssets(1e18) at block ${atBlock}, then divide the debt by the collateral's value`,
+    },
+    source: { block: atBlock },
+    inputs: coordInputs(coords, [
+      { label: "debt", value: debtRaw, kind: "chain", note: "getCDP debt, 18 decimals" },
+      {
+        label: "collateral",
+        value: collateralRaw,
+        kind: "chain",
+        note: `getCDP collateral, ${mytSymbol} shares, 18 decimals`,
+      },
+      {
+        label: "share price",
+        value: sharePriceRaw,
+        kind: "chain",
+        note: `convertToAssets(1e18), ${underlyingDecimals} decimals of ${underlyingSymbol}`,
+      },
+    ]),
+  };
+}
+
+/** The collateral's value at one reading: the share count at the share price
+ *  stored with it. */
+export function readingCollateralValueProv(
+  collateralRaw: string,
+  sharePriceRaw: string,
+  atBlock: number,
+  underlyingDecimals: number,
+  mytSymbol: string,
+  underlyingSymbol: string,
+  coords: AlchemixCoords,
+): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `Collateral at block ${atBlock}, in ${underlyingSymbol} — the ${mytSymbol} held, valued at the share price read with it`,
+    contract: alchemistContract(coords),
+    via: `getCDP(${coords.tokenId}) and the ${mytSymbol} share price at block ${atBlock}`,
+    formula: "collateral × share price",
+    verify: {
+      kind: "recompute",
+      text: `Call getCDP(${coords.tokenId}) and the vault's convertToAssets(1e18) at block ${atBlock}, then multiply`,
     },
     source: { block: atBlock },
     inputs: coordInputs(coords, [
@@ -895,7 +957,6 @@ export function readingCollateralisationProv(
         kind: "chain",
         note: `convertToAssets(1e18), ${underlyingDecimals} decimals of ${underlyingSymbol}`,
       },
-      { label: "debt", value: debtRaw, kind: "chain", note: "getCDP debt, 18 decimals" },
     ]),
   };
 }
@@ -903,7 +964,7 @@ export function readingCollateralisationProv(
 /** A figure carried to a block with no reading of its own, from the reading
  *  in force there. Debt and collateral step only at blocks the sweep reads
  *  (decisions/0032 point 5), so the row in force at a block states them at
- *  that block. Set-aside grows every block and is never carried. */
+ *  that block. Earmarked debt grows every block and is never carried. */
 export function carriedReadingProv(
   label: string,
   symbol: string,
@@ -925,7 +986,7 @@ export function carriedReadingProv(
         label: "why it carries",
         value: `no step between blocks ${readBlock} and ${eventBlock}`,
         kind: "chain",
-        note: "debt and collateral move only at the position's own axis-moving events and the line's redemptions, and every such block carries a reading",
+        note: "debt and collateral move only at the position's own axis-moving events and the market's redemptions, and every such block carries a reading",
       },
     ]),
     scaling: { raw, from: "call", places: 18, why: `${symbol} carries 18 decimals` },

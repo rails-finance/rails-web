@@ -85,6 +85,7 @@ const howItWorks: readonly [ReactNode, ...ReactNode[]] = [
     Every figure is in the pool&apos;s quote token, the one it prices the other in, at the pool&apos;s price. AERO is
     valued through Aerodrome&apos;s own AERO pools, and Rails states no dollar figure here.
   </>,
+  <>Rails does not forecast, rate or recommend.</>,
 ];
 
 const views: readonly [InfoView, ...InfoView[]] = [

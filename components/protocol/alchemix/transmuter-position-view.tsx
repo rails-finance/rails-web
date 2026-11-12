@@ -203,7 +203,11 @@ export function TransmuterPositionView({
           idSubtitle="Copy the position ID"
           outside={
             p.transmuterUrl
-              ? { title: "The line's Transmuter", subtitle: "Open the contract on the explorer", url: p.transmuterUrl }
+              ? {
+                  title: "The market's Transmuter",
+                  subtitle: "Open the contract on the explorer",
+                  url: p.transmuterUrl,
+                }
               : null
           }
           pagePath={transmuterPositionPath(deployment, p.lineKey, p.nftId)}

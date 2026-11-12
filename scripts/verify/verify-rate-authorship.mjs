@@ -207,7 +207,7 @@ console.log("§3 Liquity V2 'How borrowing works' modal — on a batched trove")
   // Confirm this really is an openTroveAndJoinBatch — the reader for whom the
   // old sentence was flatly untrue. Without this the section would assert the
   // copy against an ordinary borrower and the fixture would prove nothing.
-  assert(/joined batch manager/i.test(openCard), "the fixture trove opened straight into a batch");
+  assert(/joined delegate/i.test(openCard), "the fixture trove opened straight into a batch");
 
   // The Learn-More trigger, scoped to THIS card — an unscoped document-wide
   // search picks up whichever card comes first in the DOM.
@@ -232,7 +232,7 @@ console.log("§3 Liquity V2 'How borrowing works' modal — on a batched trove")
   }, MODAL_SEL);
   assert(/How borrowing works/i.test(modal), "the borrowing modal is the one open");
   assert(
-    /the borrower sets the rate,? or delegates it to a batch manager/.test(modal),
+    /the borrower sets the rate,? or delegates it to a third party/.test(modal),
     "the modal names the delegation route",
   );
   assert(!modal.includes("the borrower chooses the rate"), "the modal no longer asserts sole borrower authorship");

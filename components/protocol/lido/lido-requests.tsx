@@ -56,9 +56,7 @@ export function LidoRequests({ r }: { r: LidoStakeRead }) {
           />
         }
         menu={<SectionMenu scope={SCOPE} title={REQUESTS.title} />}
-      >
-        <p className="text-xs text-rb-500">{REQUESTS.sub}</p>
-      </SectionHeading>
+      />
       {s.requests.length === 0 ? (
         <p className="mt-3 text-sm text-rb-500" data-lido-requests-none="">
           {REQUESTS.none}

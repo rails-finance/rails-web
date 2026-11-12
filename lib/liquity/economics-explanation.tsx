@@ -244,7 +244,7 @@ export function LiquityFlowsExplanation({
         <ExplainGroup title="Costs">
           {f.interestAccrued > 0 && <ExplainBullet>Interest {tok(f.interestAccrued, debt)}</ExplainBullet>}
           {costs.totalUpfrontFees > 0 && (
-            <ExplainBullet>Upfront fees {tok(costs.totalUpfrontFees, debt)}</ExplainBullet>
+            <ExplainBullet>Upfront Borrowing Fees {tok(costs.totalUpfrontFees, debt)}</ExplainBullet>
           )}
           {f.delegateFees > 0 && <ExplainBullet>Delegate fees {tok(f.delegateFees, debt)}</ExplainBullet>}
         </ExplainGroup>

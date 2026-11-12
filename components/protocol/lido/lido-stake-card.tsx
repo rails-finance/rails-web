@@ -72,8 +72,7 @@ function slots(r: LidoStakeRead): PositionCardSlots {
   return {
     surface: "detail",
     heading: CARD_WORDS.heading,
-    status: s.now.shares === 0 ? { word: "No stake now", tone: "muted", tip: CARD_WORDS.none } : null,
-    identity: <span className="text-xs text-rb-500">stETH · wstETH</span>,
+    status: s.now.shares === 0 ? { word: CARD_WORDS.closed, tone: "muted", tip: CARD_WORDS.none } : null,
     heads,
     counters: null,
     menu: { exports: null },
@@ -92,7 +91,6 @@ function slots(r: LidoStakeRead): PositionCardSlots {
       ),
     },
     learnMore: LIDO_LEARN_MORE,
-    foot: <p className="mt-3 text-xs text-rb-500">{CARD_WORDS.foot}</p>,
     panel: [[], []],
   };
 }

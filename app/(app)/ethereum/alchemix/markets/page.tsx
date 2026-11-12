@@ -1,5 +1,5 @@
-// Alchemix V3 on Ethereum — what the alUSD and alETH lines can say about their
-// own figures. Server-rendered; under Focus the lines in focus show (alchemix-lines-focus.tsx).
+// Alchemix V3 on Ethereum — what the alUSD and alETH markets can say about their
+// own figures. Server-rendered; under Focus the markets in focus show (alchemix-lines-focus.tsx).
 
 import { AlchemixLinesFocus } from "@/components/protocol/alchemix/alchemix-lines-focus";
 import { SubPageHeader } from "@/components/shared/sub-page-header";
@@ -16,10 +16,10 @@ import { unlaunchedRobotsForPath } from "@/lib/shared/page-metadata";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Alchemix lines",
+  title: "Alchemix markets",
   description:
-    "The alUSD and alETH lines, their Transmuters and the closed V2 record, and what each can say about its own figures, whether a position's debt is replayed from its events or read from the contract at a block.",
-  ...unlaunchedRobotsForPath(`${ALCHEMIX_ETHEREUM.basePath}/lines`),
+    "The alUSD and alETH markets, their Transmuters and the closed V2 record, and what each can say about its own figures, whether a position's debt is replayed from its events or read from the contract at a block.",
+  ...unlaunchedRobotsForPath(`${ALCHEMIX_ETHEREUM.basePath}/markets`),
 };
 
 const PROTOCOL = protocolForHref(ALCHEMIX_ETHEREUM.basePath)!;
@@ -35,7 +35,7 @@ export default async function AlchemixEthereumLinesPage() {
   return (
     <div className="min-h-screen">
       <div className="py-8">
-        <SubPageHeader protocol={PROTOCOL} title="Lines" learnMore={ALCHEMIX_HOW_IT_WORKS} />
+        <SubPageHeader protocol={PROTOCOL} title="Markets" learnMore={ALCHEMIX_HOW_IT_WORKS} />
         <AlchemixLinesFocus catalog={ALCHEMIX_ETHEREUM.lines} lines={lines} transmuter={transmuter} v2={v2} />
       </div>
     </div>

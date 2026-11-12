@@ -1,26 +1,26 @@
 #!/usr/bin/env node
-// The Uniswap position page (anatomy U1, U1.1, U2, U2.1; rails-ops TO-DO-ui-jobs 556, door 1):
-// the card, the six readout lines in their order, and the readout's (i), on three positions
-// whose shape does not move with the market. Structure and stable text only: no live figure is
-// pinned, and the one figure read (Worth) is compared between the chip and the card.
+// The Uniswap position page (anatomy U1, U1.1, U2, U2.1; rails-ops TO-DO-ui-jobs 556, door 1; 594):
+// the card, the readout's then / now table and its (i), on three positions whose shape does not
+// move with the market. Structure and stable text only: no live figure is pinned, and the one
+// figure read (Value) is compared between the chip and the card.
 // ----------------------------------------------------------------------------
 // Checks, per fixture:
 //   1. The page draws the card (`data-position-card=<version>:<id>`), the readout
-//      (`data-pool-readout`) and six lines (`data-pool-line`), each once, with no
-//      sideways scroll at 390px.
-//   2. Line order: Range first while out of range, Size first in range (words.ts
-//      `readoutLines`).
-//   3. The header's Worth chip writes the card's Worth figure character for character.
-//   4. The readout's (i) opens to one group per line, in the lines' order, at most
-//      eight bullets, inside one phone screen (844px).
+//      (`data-pool-readout`) with its two groups, This position and The pool
+//      (`data-readout-group`), and the rows every open position has (`data-pool-line`),
+//      each once, with no sideways scroll at 390px.
+//   2. The card's status word (`data-card-status`): "out of range" outside the range,
+//      "live" inside it (words.ts `cardStatus`).
+//   3. The header's Worth chip writes the card's Value figure character for character.
+//   4. The readout's (i) opens to How it compares, This position and The pool, inside
+//      one phone screen (844px).
 //   5. The fixture's own shape:
-//      V3 1083471  out of range: the range bar is not "in"; the Range line says
-//                  "Out of range" and "It holds only <one token>"; the card holds 0 of the
-//                  other token.
-//      V4 225457   hooked: the sub line names "hook 0x…"; the Withdrawals line names the
-//                  hook and says it "has no permission on withdrawals".
-//      V4 50101    full range: the range bar is "full"; the Range line reads "In range at
-//                  every price"; Withdrawals says the pool has no hook.
+//      V3 1083471  out of range: the range bar is not "in"; the share row reads 0% with
+//                  "out of range" under it; the card holds 0 of one token.
+//      V4 225457   hooked: the sub line names "hook 0x…"; Withdrawals reads Open with "the
+//                  hook has no withdrawal permission" under it.
+//      V4 50101    full range: the range bar is "full"; Withdrawals reads Open with no line
+//                  under it (no hook).
 //
 // Run with the dev server up:
 //   BASE=http://localhost:3000 node scripts/verify/verify-uniswap-position.mjs
@@ -31,30 +31,24 @@ import { chromium } from "playwright";
 const BASE = process.env.BASE ?? "http://localhost:3000";
 const NAV = { waitUntil: "domcontentloaded", timeout: 300000 };
 const WAIT = 180000;
-const LINES = ["range", "fees", "against", "size", "withdrawals", "steward"];
-const LABEL = {
-  range: "Range",
-  fees: "Fees",
-  against: "Against holding",
-  size: "Size",
-  withdrawals: "Withdrawals",
-  steward: "Steward",
-};
+/** The rows every open position draws (words.ts `readoutTable`). */
+const ROWS = ["token:0", "token:1", "earned", "against", "share", "withdrawals", "price", "fullRange", "protocolFee"];
+const GROUPS = ["This position", "The pool"];
+const PANE = ["How it compares", "This position", "The pool"];
 
 const FIXTURES = [
   {
     path: "/ethereum/uniswap-v3/position/1083471",
     key: "v3:1083471",
-    first: "range",
+    status: "out of range",
     shape: (g, tag) => {
       check(`${tag} 5a range bar out of range`, g.bar !== null && g.bar !== "in" && g.bar !== "full", g.bar);
-      check(`${tag} 5b Range line says out of range`, /^Out of range/.test(g.lines.range ?? ""), g.lines.range);
-      const only = /It holds only (\S+) and earns no fees/.exec(g.lines.range ?? "");
-      check(`${tag} 5c Range line names the one token it holds`, only !== null, g.lines.range);
-      const two = /([\d,.]+) (\S+?) ?and ([\d,.]+) (\S+)$/.exec(g.holds);
-      const zero =
-        two !== null && (two[1] === "0") !== (two[3] === "0") && only?.[1] === (two[1] === "0" ? two[4] : two[2]);
-      check(`${tag} 5d the card holds only that token`, zero, g.holds);
+      check(
+        `${tag} 5b the share row reads 0%, out of range`,
+        g.rows.share?.now === "0%" && g.rows.share?.note === "out of range",
+        JSON.stringify(g.rows.share),
+      );
+      check(`${tag} 5c the card holds 0 of one token`, /(^|\D)0 [A-Z]/.test(g.holds), g.holds);
     },
   },
   {
@@ -62,30 +56,23 @@ const FIXTURES = [
     key: "v4:225457",
     shape: (g, tag) => {
       check(`${tag} 5a the sub line names the hook`, /· hook 0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4}/.test(g.sub), g.sub);
-      const w = g.lines.withdrawals ?? "";
       check(
-        `${tag} 5b Withdrawals names the hook`,
-        /The pool's hook 0x[0-9a-fA-F]{4}…[0-9a-fA-F]{4} runs on/.test(w),
-        w,
+        `${tag} 5b Withdrawals: open, the hook has no withdrawal permission`,
+        g.rows.withdrawals?.now === "Open" && g.rows.withdrawals?.note === "the hook has no withdrawal permission",
+        JSON.stringify(g.rows.withdrawals),
       );
-      check(`${tag} 5c Withdrawals: no permission on withdrawals`, /has no permission on withdrawals\./.test(w), w);
     },
   },
   {
     path: "/ethereum/uniswap-v4/position/50101",
     key: "v4:50101",
-    first: "size",
+    status: "live",
     shape: (g, tag) => {
       check(`${tag} 5a range bar full`, g.bar === "full", g.bar);
       check(
-        `${tag} 5b Range line reads full range`,
-        /^In range at every price: the position is full range\./.test(g.lines.range ?? ""),
-        g.lines.range,
-      );
-      check(
-        `${tag} 5c Withdrawals: no hook`,
-        /The pool has no pause and no hook\./.test(g.lines.withdrawals ?? ""),
-        g.lines.withdrawals,
+        `${tag} 5b Withdrawals: open, no hook`,
+        g.rows.withdrawals?.now === "Open" && g.rows.withdrawals?.note === "",
+        JSON.stringify(g.rows.withdrawals),
       );
     },
   },
@@ -118,15 +105,23 @@ for (const f of FIXTURES) {
   await page.waitForTimeout(500);
   const g = await page.evaluate(() => {
     const t = (el) => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
-    const lineEls = [...document.querySelectorAll("[data-pool-readout] [data-pool-line]")];
-    const lines = {};
-    for (const el of lineEls) lines[el.getAttribute("data-pool-line")] = t(el.querySelector("div"));
+    const rowEls = [...document.querySelectorAll("[data-pool-readout] [data-pool-line]")];
+    const rows = {};
+    for (const el of rowEls)
+      rows[el.getAttribute("data-pool-line")] = {
+        now: t(el.lastElementChild),
+        note: t(el.querySelector("[data-row-note]")),
+      };
     const worthHead = document.querySelector('[data-position-card] [data-card-head="worth"]');
     const holdsHead = document.querySelector('[data-position-card] [data-card-head="holds"]');
     return {
       card: document.querySelector("[data-position-card]")?.getAttribute("data-position-card") ?? null,
-      order: lineEls.map((el) => el.getAttribute("data-pool-line")),
-      lines,
+      status: document.querySelector("[data-card-status]")?.getAttribute("data-card-status") ?? null,
+      groups: [...document.querySelectorAll("[data-pool-readout] [data-readout-group]")].map((el) =>
+        el.getAttribute("data-readout-group"),
+      ),
+      keys: rowEls.map((el) => el.getAttribute("data-pool-line")),
+      rows,
       bar: document.querySelector("[data-range-bar]")?.getAttribute("data-range-bar") ?? null,
       // The title sits in a HistoryTitleRow (567), so climb to the header's own child, then read its next sibling.
       sub: (() => {
@@ -146,15 +141,16 @@ for (const f of FIXTURES) {
 
   // ── 1. The parts ─────────────────────────────────────────────────────────
   check(`${tag} 1b the card is this position`, g.card === f.key, g.card);
+  check(`${tag} 1c the table's two groups`, g.groups.join("|") === GROUPS.join("|"), g.groups.join(","));
   check(
-    `${tag} 1c six lines, each once`,
-    g.order.length === 6 && LINES.every((k) => g.order.includes(k)),
-    g.order.join(","),
+    `${tag} 1d the rows every open position has`,
+    ROWS.every((k) => g.keys.includes(k)),
+    ROWS.filter((k) => !g.keys.includes(k)).join(",") || "all present",
   );
-  check(`${tag} 1d no sideways scroll at 390px`, g.sw <= g.cw, `${g.sw} vs ${g.cw}`);
+  check(`${tag} 1e no sideways scroll at 390px`, g.sw <= g.cw, `${g.sw} vs ${g.cw}`);
 
-  // ── 2. Line order ────────────────────────────────────────────────────────
-  if (f.first) check(`${tag} 2 ${LABEL[f.first]} leads`, g.order[0] === f.first, g.order[0]);
+  // ── 2. The status word ───────────────────────────────────────────────────
+  if (f.status) check(`${tag} 2 the card's status is ${f.status}`, g.status === f.status, g.status);
 
   // ── 3. Chip and card agree ───────────────────────────────────────────────
   const fig = /([\d,.]+(?: (?:M|bn))? \S+)$/.exec(g.worth)?.[1] ?? null;
@@ -165,26 +161,24 @@ for (const f of FIXTURES) {
   );
 
   // ── 4. The readout's (i) ─────────────────────────────────────────────────
-  await page.locator('[data-pool-readout] button[aria-label="Show explanation of these lines"]').click();
+  await page.locator('[data-pool-readout] button[aria-label="Show explanation of this table"]').click();
   await page.waitForTimeout(400);
   const pane = await page.evaluate(() => {
     const el = [...document.querySelectorAll("[data-pool-readout] [data-nosnippet]")].at(-1);
     if (!el) return null;
     return {
       titles: [...el.querySelectorAll("h4")].map((h) => h.textContent.trim()),
-      bullets: el.querySelectorAll("li").length,
       h: Math.round(el.getBoundingClientRect().height),
     };
   });
   check(`${tag} 4a the (i) opens`, pane !== null);
   if (pane) {
     check(
-      `${tag} 4b one group per line, in the lines' order`,
-      pane.titles.join("|") === g.order.map((k) => LABEL[k]).join("|"),
+      `${tag} 4b How it compares, This position, The pool`,
+      pane.titles.join("|") === PANE.join("|"),
       pane.titles.join(","),
     );
-    check(`${tag} 4c at most eight bullets`, pane.bullets >= 6 && pane.bullets <= 8, String(pane.bullets));
-    check(`${tag} 4d inside one phone screen`, pane.h <= 844, `${pane.h}px`);
+    check(`${tag} 4c inside one phone screen`, pane.h <= 844, `${pane.h}px`);
   }
 
   // ── 5. The fixture's shape ───────────────────────────────────────────────

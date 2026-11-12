@@ -31,7 +31,7 @@ const alchemist = (coords: AlchemixV2Coords) => ({ name: "Alchemist V2", address
 function inputs(coords: AlchemixV2Coords, extra: ProvInput[] = []): ProvInput[] {
   const out: ProvInput[] = [
     ...extra,
-    { label: "line", value: coords.lineKey, kind: "offchain", note: "one synthetic, V2" },
+    { label: "market", value: coords.lineKey, kind: "offchain", note: "one synthetic, V2" },
     { label: "account", value: coords.account, kind: "chain", note: "a V2 position is a wallet account" },
   ];
   if (coords.blockNumber != null) out.push({ label: "block", value: String(coords.blockNumber), kind: "chain" });

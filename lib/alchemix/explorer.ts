@@ -15,7 +15,7 @@ import { alchemixEventHeading } from "@/lib/alchemix/event-label";
 
 const WORDS = {
   timeline_link: "See the whole history in the timeline.",
-  line: "Line",
+  line: "Market",
   position: "Position",
   copy_position: "Copy the position's token id",
   owner: "Owner",
