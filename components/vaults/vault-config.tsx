@@ -13,8 +13,8 @@
 //   no rule under it.
 // - Row: label left, value right-aligned to the column's edge, on one
 //   baseline; a hairline between rows, none under a column's last row.
-// - Label: 14px semibold muted, the value's size; dotted underline only
-//   when it has a tip.
+// - Label: 14px semibold muted, the value's size; with a tip, the shared
+//   HeadingTip (its cue on hover).
 // - Value: 14px medium foreground. An address: short form in mono, copy
 //   button, explorer icon button ("View on Etherscan" / "View on Basescan").
 // - Detail of the value (chain id, block, a contract's name): 12px muted,
@@ -28,6 +28,7 @@ import { Prov, type Provenance } from "@/components/shared/provenance";
 import { ProvSection, SectionMenu } from "@/components/shared/section-menu";
 import { readStampProv, SectionReadStamp, type ReadContract } from "@/components/shared/read-stamp";
 import { CopyFact } from "@/components/shared/event-page-aside";
+import { HeadingTip } from "@/components/shared/tip-label";
 import { chainMeta, explorerUrl, type ChainId } from "@/lib/shared/chains";
 import { shortAddress } from "@/lib/shared/vault-amount-text";
 import type { ServerRead } from "@/lib/shared/server-head-read";
@@ -35,18 +36,16 @@ import type { ServerRead } from "@/lib/shared/server-head-read";
 /** The section's receipts scope. */
 const SCOPE = "vault-config";
 
-const LABEL =
-  "cursor-help text-[14px] font-semibold text-rb-500 tip-underline";
+const LABEL = "text-[14px] font-semibold text-rb-500";
 
 const MUTED = "text-[13px] font-normal text-rb-500";
 
 function Term({ label, tip }: { label: string; tip?: string }) {
-  return tip ? (
-    <abbr title={tip} className={LABEL}>
-      {label}
-    </abbr>
-  ) : (
-    <span className="text-[14px] font-semibold text-rb-500">{label}</span>
+  // The shared heading tip: a keyboard control that opens on a press (ui-jobs 602).
+  return (
+    <span className={LABEL}>
+      <HeadingTip text={label} tip={tip} />
+    </span>
   );
 }
 

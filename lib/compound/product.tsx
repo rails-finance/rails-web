@@ -574,19 +574,31 @@ function head(c: Ctx, overview: boolean): ProductHead {
 const TIP_PROSE = "block w-64 whitespace-normal text-left font-normal normal-nums leading-snug";
 const TIPPED = "cursor-help tip-underline";
 
+/** A tip on a label, mark or bar: a keyboard control (Tab, then Enter or
+ *  Space) whose accessible name is `name` and the tip, as the shared
+ *  HeadingTip's (ui-jobs 602). */
 function Tip({
   text,
+  name,
   children,
   align,
   className,
 }: {
   text: string;
+  /** What the control is called: the visible text, or what a bar shows. */
+  name: string;
   children: ReactNode;
   align?: "start" | "end";
   className?: string;
 }) {
   return (
-    <RevealTip tip={<span className={TIP_PROSE}>{text}</span>} align={align} className={className}>
+    <RevealTip
+      tip={<span className={TIP_PROSE}>{text}</span>}
+      label={`${name}: ${text}`}
+      focusable
+      align={align}
+      className={`focus-ring rounded-sm ${className ?? ""}`}
+    >
       {children}
     </RevealTip>
   );
@@ -603,7 +615,7 @@ const CREDITED_TIP =
  *  label below it (D6). */
 function TipLabel({ text, tip, align }: { text: string; tip: string; align: "start" | "end" }) {
   return (
-    <Tip text={tip} align={align}>
+    <Tip text={tip} name={text} align={align}>
       <span className={TIPPED}>{text}</span>
     </Tip>
   );
@@ -652,6 +664,7 @@ function CollateralRow({ x, c }: { x: CompoundV3CollateralRow; c: Ctx }) {
                 ? `Supply cap ${qty(x.supplyCap)} ${x.symbol}, ${pctText(x.capUsed, 0)} used. The bar is supplied ÷ cap.`
                 : "The supply cap is zero: no more of this asset can enter the market. What is supplied entered before the cap was set."
             }
+            name="Supply cap"
             className="min-w-12 flex-1"
           >
             <div className="w-full [&>div]:mt-0">
@@ -665,12 +678,13 @@ function CollateralRow({ x, c }: { x: CompoundV3CollateralRow; c: Ctx }) {
           {/* A ratio of two receipted figures (supplied, cap): no receipt of its own. */}
           <span className="w-11 shrink-0 text-right text-rb-500" data-prov-exempt="">
             {x.capUsed == null ? (
-              <Tip text="The supply cap is zero: no more can be added; what is in stays." align="end">
+              <Tip text="The supply cap is zero: no more can be added; what is in stays." name="Cap 0" align="end">
                 <span className={TIPPED}>Cap 0</span>
               </Tip>
             ) : x.capUsed > 1 ? (
               <Tip
                 text="Governance lowered the supply cap below what is already supplied. Nothing more can enter until supply falls under the cap; what is in stays."
+                name={`${pctText(x.capUsed, 0)} of the cap`}
                 align="end"
               >
                 <span className={TIPPED}>{pctText(x.capUsed, 0)}</span>
@@ -691,7 +705,7 @@ function CollateralRow({ x, c }: { x: CompoundV3CollateralRow; c: Ctx }) {
         label={<TipLabel text="Borrow" tip={BORROW_TIP} align="start" />}
       >
         {x.borrowCollateralFactor === 0 ? (
-          <Tip text="Borrowing against this asset is switched off." align="end">
+          <Tip text="Borrowing against this asset is switched off." name="Borrowing off" align="end">
             <span className={`${TIPPED} text-rb-500`}>Off</span>
           </Tip>
         ) : (
