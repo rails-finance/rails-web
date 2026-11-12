@@ -85,13 +85,16 @@ export function flowPriceSeries(t: FlowTimeline): FlowPriceSeries[] {
   for (const [asset, obs] of Object.entries(t.dailyPrices)) {
     const m = meta.get(asset);
     if (!m || face.has(m.side) || (t.unit && m.symbol === t.unit.symbol) || t.shareLine?.asset === asset) continue;
+    // The icon's address: the timeline's book (`addresses`), else the key
+    // where the family keys its assets by token address.
+    const address = t.addresses?.[m.symbol] ?? (asset.startsWith("0x") ? asset : undefined);
     const source =
       t.priceSource ??
       (t.carriedWhy?.[asset] ? "the position's events, on the days they priced it" : "daily price store");
     const s = dayObsPriceSeries(obs, {
       key: asset,
       // The panel's timeline names no chain: 0 stands for unknown.
-      asset: { symbol: m.symbol, ...(asset.startsWith("0x") ? { address: asset } : {}), chain: 0 },
+      asset: { symbol: m.symbol, ...(address ? { address } : {}), chain: 0 },
       unit: t.unit ? t.unit.symbol : "usd",
       source,
       scale: t.unit?.scale ?? 0,

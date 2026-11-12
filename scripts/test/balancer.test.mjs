@@ -234,17 +234,23 @@ test("the readout names all the pool's shares, and its (i) the past block per ch
   assert.match(readoutLines(balPosition(read({ staked })))[0].pool, / on \d+ \w+ 2026\.$/);
 });
 
-test("each chain's pages live under the URL slug balancer-v3, not the roster session", async () => {
-  const { BAL_CHAINS, balChain } = await import("../../lib/balancer/chains.ts");
-  assert.equal(BAL_CHAINS[1].home, "/ethereum/balancer-v3");
-  assert.equal(BAL_CHAINS[42161].home, "/arbitrum/balancer-v3");
-  assert.equal(`${balChain(42161).home}/info`, "/arbitrum/balancer-v3/info");
-  assert.ok(!BAL_CHAINS[42161].home.includes(BAL_CHAINS[42161].session));
-});
-
 test("the readout's (i) says the share of pool moves with other holders and what the swap fee does", () => {
   const [compare, wallet, pool] = readoutExplainer(42161);
   assert.match(compare.bullets.join(" "), /staked shares, its figures show now only/);
   assert.match(wallet.bullets.join(" "), /rises when other holders withdraw/);
   assert.match(pool.bullets.join(" "), /charged on each swap/);
+});
+
+test("each chain's explorer path is the URL slug's, with a page behind it", async () => {
+  const { BAL_CHAINS } = await import("../../lib/balancer/chains.ts");
+  // The Arbitrum roster session is "balancer-v3-arbitrum"; its pages live under the slug.
+  assert.equal(BAL_CHAINS[42161].home, "/arbitrum/balancer-v3");
+  assert.equal(BAL_CHAINS[1].home, "/ethereum/balancer-v3");
+  const { existsSync } = await import("node:fs");
+  for (const c of Object.values(BAL_CHAINS)) {
+    const dir = new URL(`../../app/(app)${c.home}/`, import.meta.url);
+    assert.ok(existsSync(new URL("page.tsx", dir)), `${c.home} has a front door`);
+    assert.ok(existsSync(new URL("info/page.tsx", dir)), `${c.home}/info exists`);
+    assert.ok(existsSync(new URL("position/[pool]/[wallet]/page.tsx", dir)), `${c.home}/position exists`);
+  }
 });

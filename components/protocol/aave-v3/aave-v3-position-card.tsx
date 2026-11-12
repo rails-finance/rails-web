@@ -39,7 +39,7 @@ import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
 import { PanelFigure } from "@/components/shared/position-card-panel";
 import { TokenFigure } from "@/components/shared/token-figure";
-import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
+import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { ExactSpan } from "@/components/shared/amount-text";
@@ -236,7 +236,12 @@ function ReserveAmounts({
           {r.decimalsUnread ? (
             <TokenAmountNotLoaded address={r.address} label={r.symbol} />
           ) : (
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            <AssetAmount
+              value={r.amount}
+              symbol={r.symbol}
+              address={r.address}
+              exact={formatUnitsExact(r.amountRaw, r.decimals)}
+            />
           )}
         </Prov>
       ))}
@@ -432,6 +437,7 @@ export function useAaveV3CardSlots({
                 <AssetAmount
                   value={r.amount}
                   symbol={r.symbol}
+                  address={r.address}
                   exact={formatUnitsExact(r.amountRaw, r.decimals)}
                   iconSize={iconSize}
                 />
@@ -461,7 +467,7 @@ export function useAaveV3CardSlots({
               breakdown:
                 peakOthers.length > 1
                   ? {
-                      symbols: loadedSymbols(peakOthers),
+                      assets: loadedMarks(peakOthers),
                       panel: (
                         <span className="text-sm font-semibold tabular-nums text-foreground">{othersLines(16)}</span>
                       ),
@@ -575,7 +581,7 @@ export function useAaveV3CardSlots({
         ),
       pending: reserves.length > 0 && pending,
       total: usd != null ? { usd, info: dep.usd(usdWhat, v.market) } : undefined,
-      assets: reserves.length > 0 && usd != null ? <InlineAssetCluster symbols={loadedSymbols(shown)} /> : undefined,
+      assets: reserves.length > 0 && usd != null ? <InlineAssetCluster assets={loadedMarks(shown)} /> : undefined,
     };
   };
 
@@ -809,7 +815,7 @@ export function useAaveV3CardSlots({
             tip: NOT_COLLATERAL_TIP,
             value: <Prov info={dep.usd("Supplied, not collateral", v.market)}>{formatCompactUsd(otherUsd)}</Prov>,
             breakdown: {
-              symbols: loadedSymbols(othersSplit.shown),
+              assets: loadedMarks(othersSplit.shown),
               total: { usd: otherUsd, info: dep.usd("Supplied, not collateral", v.market) },
               panel: (
                 <AssetBreakdownPanel

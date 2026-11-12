@@ -36,7 +36,7 @@ import type { SparkLife } from "@/lib/spark/lives";
 import { AssetAmount } from "@/components/shared/asset-amount";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import { AssetBreakdownPanel, type AssetBreakdown } from "@/components/shared/asset-donut";
-import { TokenAmountNotLoaded, loadedSymbols } from "@/components/shared/not-loaded";
+import { TokenAmountNotLoaded, loadedMarks } from "@/components/shared/not-loaded";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { Icon } from "@/components/icons/icon";
@@ -251,7 +251,12 @@ function TokenStack({
             <Prov
               info={side === "supply" ? positionSupplyProv(r.symbol, atBlock) : positionDebtProv(r.symbol, atBlock)}
             >
-              <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+              <AssetAmount
+                value={r.amount}
+                symbol={r.symbol}
+                address={r.address}
+                exact={formatUnitsExact(r.amountRaw, r.decimals)}
+              />
             </Prov>
           )}
         </span>
@@ -286,6 +291,7 @@ function PeakLines({
               <AssetAmount
                 value={r.amount}
                 symbol={r.symbol}
+                address={r.address}
                 exact={formatUnitsExact(r.amountRaw, r.decimals)}
                 iconSize={iconSize}
               />
@@ -485,7 +491,7 @@ export function useSparkCardSlots({
             breakdown:
               peakOthers.length > 1
                 ? {
-                    symbols: loadedSymbols(peakOthers),
+                    assets: loadedMarks(peakOthers),
                     panel: (
                       <span className="text-sm font-semibold tabular-nums text-foreground" data-spark-peak-breakdown="">
                         <PeakLines reserves={peakOthers} side="supply" iconSize={16} />
@@ -546,9 +552,7 @@ export function useSparkCardSlots({
         label: id === "collateral" ? CARD_VOCAB.collateral : CARD_VOCAB.debt,
         labelTip: detail ? (id === "collateral" ? COLLATERAL_TIP : DEBT_TIP) : undefined,
         assets:
-          reserves.length > 0 ? (
-            <InlineAssetCluster symbols={loadedSymbols(splitDust(ranked, usdOf).shown)} />
-          ) : undefined,
+          reserves.length > 0 ? <InlineAssetCluster assets={loadedMarks(splitDust(ranked, usdOf).shown)} /> : undefined,
         total:
           usd != null ? { usd, info: sparkUsdProvOnchain(id === "collateral" ? "Collateral" : "Borrowed") } : undefined,
         // One oracle-USD figure leads each side; where a reserve is unpriced the
@@ -669,7 +673,7 @@ export function useSparkCardSlots({
         </span>
       ),
       breakdown: {
-        symbols: loadedSymbols(splitDust(othersRanked, usdOf).shown),
+        assets: loadedMarks(splitDust(othersRanked, usdOf).shown),
         total,
         panel: (
           <AssetBreakdownPanel

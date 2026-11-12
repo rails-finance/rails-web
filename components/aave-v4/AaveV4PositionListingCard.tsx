@@ -23,6 +23,7 @@
 import { ListingTag } from "@/components/shared/listing-tag";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import { symbolOnly } from "@/lib/shared/asset-mark";
 import { Icon } from "@/components/icons/icon";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { useMemo } from "react";
@@ -292,7 +293,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
             collateralOnChain,
           )
         : {
-            assets: symbols.length > 0 ? <InlineAssetCluster symbols={symbols} /> : undefined,
+            assets: symbols.length > 0 ? <InlineAssetCluster assets={symbols.map(symbolOnly)} /> : undefined,
             value: collateralValue,
           }),
     },
@@ -308,7 +309,7 @@ export function AaveV4PositionListingCard({ row }: { row: AaveV4SpokePositionRow
               : {
                   assets:
                     calc.borrowingSymbols.length > 0 ? (
-                      <InlineAssetCluster symbols={calc.borrowingSymbols} />
+                      <InlineAssetCluster assets={calc.borrowingSymbols.map(symbolOnly)} />
                     ) : undefined,
                   value: debtValue,
                 }),

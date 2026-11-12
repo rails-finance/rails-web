@@ -16,7 +16,7 @@
 
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { Fragment, useEffect, useRef, useSyncExternalStore } from "react";
-import { CalendarRange, Coins, Layers, ListFilter, Wallet, X } from "lucide-react";
+import { CalendarRange, Coins, ListFilter, Wallet, X } from "lucide-react";
 import { FilterDropdown, DisplaySettingsIcon, type FilterOption } from "@/components/shared/filter-dropdown";
 import { actionNoun } from "@/lib/shared/event-action-nouns";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
@@ -676,7 +676,8 @@ const PILL_GLYPH: Record<TimelineFilterPillSpec["axis"], React.ReactNode> = {
   // The same glyphs as the controls they undo, so a pill points at its menu.
   action: <ListFilter size={12} aria-hidden />,
   asset: <Coins size={12} aria-hidden />,
-  version: <Layers size={12} aria-hidden />,
+  // The version pill names the version and carries no glyph.
+  version: null,
   counterparty: <Wallet size={12} aria-hidden />,
   date: <CalendarRange size={12} aria-hidden />,
 };
@@ -689,7 +690,7 @@ export function TimelineFilterPill({ pill }: { pill: TimelineFilterPillSpec }) {
         title={pill.title}
         data-filter-pill-words=""
       >
-        <span className="text-rb-500">{PILL_GLYPH[pill.axis]}</span>
+        {PILL_GLYPH[pill.axis] && <span className="text-rb-500">{PILL_GLYPH[pill.axis]}</span>}
         <span className="whitespace-nowrap">
           {pill.verb && `${pill.verb} `}
           {pill.names.map((n, i) => (
@@ -907,7 +908,11 @@ export function TimelineToolbar({
               align="right"
               // "V2" is a name, not prose.
               verbatimLabels
-              triggerIcon={<Layers size={12} />}
+              noTriggerIcon
+              restLabel={[...versionOptions]
+                .reverse()
+                .map((o) => o.label)
+                .join(" & ")}
               sheetStatus={countLine}
               onToggle={(v) => tl.toggleHiddenVersion(v)}
             />

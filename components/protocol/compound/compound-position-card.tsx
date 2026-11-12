@@ -484,7 +484,9 @@ export function useCompoundCardSlots({
     const baseExact = formatExactDecimal(
       formatUnitsExact(eff.isChain ? v.current!.amountRaw : v.base.amountRaw, v.base.decimals).replace(/^-/, ""),
     );
-    const supplySymbols = lines.filter((l) => !l.collateral?.decimalsUnread).map((l) => l.symbol);
+    const supplyMarks = lines
+      .filter((l) => !l.collateral?.decimalsUnread)
+      .map((l) => ({ symbol: l.symbol, address: l.address }));
     const lending = eff.side === "lend";
 
     // Supply side: the oracle-USD total with the asset cluster; where any leg
@@ -514,8 +516,7 @@ export function useCompoundCardSlots({
             ))}
           </div>
         ),
-      assets:
-        supplyUsd != null && supplySymbols.length > 0 ? <InlineAssetCluster symbols={supplySymbols} /> : undefined,
+      assets: supplyUsd != null && supplyMarks.length > 0 ? <InlineAssetCluster assets={supplyMarks} /> : undefined,
       total:
         supplyUsd != null
           ? { usd: supplyUsd, info: compoundUsdProvOnchain(lending ? "Lent base" : "Collateral", coords) }

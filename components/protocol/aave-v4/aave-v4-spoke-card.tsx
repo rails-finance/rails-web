@@ -31,6 +31,7 @@ import { Icon } from "@/components/icons/icon";
 import { ToolsMenuItem } from "@/components/shared/tools-menu";
 import { RevealTip } from "@/components/shared/reveal-tip";
 import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
+import { symbolOnly } from "@/lib/shared/asset-mark";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
 import { type HubTier, hubChipLabel } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { type AaveSpokeCardInfo, liquidationBuffer, rateSymbolLabel, yearlyDebtCost } from "@/lib/aave-v4/spoke-cards";
@@ -401,7 +402,9 @@ export function useAaveV4SpokeCardSlots({
   // position is never worth under a cent, so that reading means a price still
   // loading.
   const supplyUsdPending = spoke.supplyingSymbols.length > 0 && spoke.totalSupplyUsd < 0.01;
-  const cluster = (symbols: string[]) => (symbols.length > 0 ? <InlineAssetCluster symbols={symbols} /> : undefined);
+  // The spoke's rows name their reserves by symbol alone.
+  const cluster = (symbols: string[]) =>
+    symbols.length > 0 ? <InlineAssetCluster assets={symbols.map(symbolOnly)} /> : undefined;
   const onc = spoke.onchainUsd;
 
   // A side of one asset states its amount, the dollars beneath; a side of
@@ -532,7 +535,7 @@ export function useAaveV4SpokeCardSlots({
           tip: "Assets held here that no price source covers. The dollar figures above leave them out and are marked partial.",
           value: (
             <span className="inline-flex flex-wrap items-center gap-x-1.5">
-              <InlineAssetCluster symbols={spoke.unpricedSymbols} size={16} overlap={4} max={6} />
+              <InlineAssetCluster assets={spoke.unpricedSymbols.map(symbolOnly)} size={16} overlap={4} max={6} />
               no price source
             </span>
           ),

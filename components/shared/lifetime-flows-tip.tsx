@@ -36,6 +36,7 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { MobileSheet } from "@/components/shared/mobile-sheet";
 import { Prov, provInspector } from "@/components/shared/provenance";
 import { TokenChipIcon } from "@/components/shared/token-chip-icon";
+import { useFlowMark } from "@/components/shared/flow-focus-context";
 import { PHONE_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import {
   flowAssetProv,
@@ -436,6 +437,7 @@ export function SegmentPanelBody({
 }) {
   const cursor = useContext(FlowCursorContext);
   const unit = useFlowUnit(side);
+  const markOf = useFlowMark();
   const partDollars = apportionDollars(
     parts.map((p) => p.usd),
     Math.round(seg.value),
@@ -454,7 +456,9 @@ export function SegmentPanelBody({
         <ul className="flex flex-col gap-0.5" data-flow-panel-assets="">
           {shownParts.map((p, i) => (
             <li key={p.symbol} className="flex items-center gap-1.5 text-rb-500">
-              {p.token !== false && <TokenChipIcon symbol={p.symbol} size={14} />}
+              {p.token !== false && (
+                <TokenChipIcon symbol={p.symbol} address={markOf(p.symbol).address ?? undefined} size={14} />
+              )}
               <span>{p.symbol}</span>
               <span className="ml-auto tabular-nums">
                 <Prov info={flowAssetProv(p.symbol, seg, side, when, isLive, daily)}>
@@ -503,6 +507,7 @@ function SideSumTable({
 }) {
   const cursor = useContext(FlowCursorContext);
   const unit = useFlowUnit(side);
+  const markOf = useFlowMark();
   const sum = sideSumRows(st, unit);
   const coll = side === "collateral";
   const heldWord = coll ? "Held" : "Owed";
@@ -560,7 +565,9 @@ function SideSumTable({
               <td />
               <td className="py-0.5 pr-2">
                 <span className="inline-flex items-center gap-1.5 pl-2">
-                  {h.amount != null && <TokenChipIcon symbol={h.symbol} size={14} />}
+                  {h.amount != null && (
+                    <TokenChipIcon symbol={h.symbol} address={markOf(h.symbol).address ?? undefined} size={14} />
+                  )}
                   {h.symbol}
                 </span>
               </td>
