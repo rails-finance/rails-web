@@ -143,18 +143,22 @@ placeholders:
     rounding: ratio_whole
     means: |-
       collateral ratio after the event, percent
-  cr_at_liquidation:
-    rounding: ratio_pair
+  ltv_at_liquidation:
+    rounding: ratio
     means: |-
-      collateral ratio at the liquidation's price, percent
+      the LTV at the liquidation's price, percent (debt ÷ collateral value)
+  max_ltv:
+    rounding: ratio
+    means: |-
+      the branch's Max LTV, 1 ÷ its minimum collateral ratio (90.91% for WETH)
   liq_price_before:
     rounding: usd
     means: |-
-      the price at which the trove would reach the minimum, before
+      the price at which the trove's LTV would reach the Max LTV, before
   liq_price_after:
     rounding: usd
     means: |-
-      the price at which the trove would reach the minimum, after
+      the price at which the trove's LTV would reach the Max LTV, after
   liq_distance_before:
     rounding: pct_whole
     means: |-
@@ -561,8 +565,8 @@ L2_words:
     At the latest block’s price, {price_today}, the redeemed {coll_symbol} would be worth {redemption_vs_today_usd} less than the debt it paid off
   redemption_today_higher: |-
     At the latest block’s price, {price_today}, the redeemed {coll_symbol} would be worth {redemption_vs_today_usd} more than the debt it paid off
-  collateral_ratio: |-
-    Collateral Ratio
+  ltv: |-
+    LTV
   # T2's balance sheet (ui-jobs 330): the event's rows a family names, and the
   # Risk and Limits rows.
   sheet_redistribution: |-
@@ -577,8 +581,8 @@ L2_words:
     Liquidates at
   delegate_fee: |-
     Delegate's fee
-  minimum_ratio: |-
-    Minimum ratio
+  max_ltv: |-
+    Max LTV
   critical_ratio: |-
     Critical Collateral Ratio (CCR)
   # The sheet's read-more, one per row: what the figure is and where it is read.
@@ -612,25 +616,23 @@ L2_words:
     The debt that liquidated Troves passed to this one, applied at this event.
   tip_debt_total: |-
     The Trove's debt after this event, from the TroveManager's log, at $1 per {debt_symbol}.
-  tip_cr: |-
-    The collateral's dollar value divided by the debt after this event, at Liquity's {coll_symbol} price at this block.
   tip_ltv: |-
     The debt divided by the collateral's dollar value after this event, at Liquity's {coll_symbol} price at this block.
   tip_liquidates_at: |-
-    The {coll_symbol} price at which the Trove's collateral ratio meets the branch's minimum: the debt times the minimum ratio, divided by the collateral.
+    The {coll_symbol} price at which the Trove's LTV reaches the branch's Max LTV: the debt divided by the collateral times the Max LTV.
   tip_rate: |-
     The annual interest rate on the Trove's debt after this event, from the TroveManager's log.
   tip_delegate_fee: |-
     The batch's annual management fee, set by its delegate and charged on top of the interest rate.
-  tip_minimum_ratio: |-
-    The collateral ratio below which a Trove on the {coll_symbol} branch can be liquidated, a constant of the branch's contracts.
+  tip_max_ltv: |-
+    The LTV above which a Trove on the {coll_symbol} branch can be liquidated, 1 ÷ the minimum collateral ratio the branch's contracts were deployed with.
   tip_critical_ratio: |-
     The branch-wide collateral ratio below which the {coll_symbol} branch restricts borrowing, a constant of the branch's contracts.
   # The liquidation reserve's footnote, under Risk and Limits on every
   # event from the open to the close or the liquidation (rails-ops
   # TO-DO-ui-jobs 388; the docs' name, decision 0065).
   tip_escrow_note: |-
-    The liquidation reserve: a refundable gas deposit of 0.0375 WETH every Trove sends to its branch's GasPool at its open, on every branch, held apart from its collateral and outside the collateral ratio. It returns on close and goes to the liquidator on a liquidation.
+    The liquidation reserve: a refundable gas deposit of 0.0375 WETH every Trove sends to its branch's GasPool at its open, on every branch, held apart from its collateral and outside the LTV. It returns on close and goes to the liquidator on a liquidation.
 
 # ── Copy for LLM: the block's context header ──
 context_words:
@@ -730,7 +732,7 @@ trove_words:
   card_tip_cr: |-
     The collateral's dollar value divided by the debt. Below the {coll_symbol} branch's minimum ratio the Trove can be liquidated.
   card_tip_ltv: |-
-    The debt divided by the collateral's dollar value. Above the {coll_symbol} branch's maximum the Trove can be liquidated.
+    The debt divided by the collateral's dollar value. Above the {coll_symbol} branch's Max LTV the Trove can be liquidated.
   card_tip_rate: |-
     The annual rate the debt accrues interest at, chosen by the owner or set by its delegate. Redemptions take Troves with lower rates first.
   card_tip_debt_in_front: |-
@@ -741,6 +743,8 @@ trove_words:
     A year's interest at today's rate: the debt times the annual interest rate. It moves with the rate and the debt.
   card_tip_liquidates_at: |-
     The {coll_symbol} price at which the Trove's collateral ratio meets the branch's minimum: the debt times the minimum ratio, divided by the collateral.
+  card_tip_liquidates_at_ltv: |-
+    The {coll_symbol} price at which the Trove's LTV reaches the branch's Max LTV: the debt divided by the collateral times the Max LTV.
   # ── The Trove listing: its heading, noun and search box ──
   listing_title: |-
     Liquity V2 Troves
@@ -883,7 +887,7 @@ trove_words:
   heading_history: |-
     History
   liq_lead: |-
-    Trove {id} was liquidated when its collateral ratio fell below the minimum threshold ({threshold}% for {coll_type}):
+    Trove {id} was liquidated when its LTV rose above the Max LTV ({max_ltv} for {coll_type}):
   liq_lifecycle: |-
     Trove was active for {duration} before liquidation from {range}
   liq_nft: |-
@@ -908,8 +912,8 @@ trove_words:
     The collateral is worth {usd} at the latest {coll_type} price of {price}
   coll_secures: |-
     {coll} collateral secures this position
-  coll_ratio: |-
-    Collateral ratio of {ratio} means the collateral is worth {multiple}× the debt
+  ltv_ratio: |-
+    LTV of {ltv} means the debt is worth {multiple}× the collateral
   liq_runway: |-
     {coll_type} would need to fall {drop} to {price} before the trove can be liquidated
   liq_runway_now: |-
@@ -982,7 +986,7 @@ trove_words:
 shared_sentences:
   market.fell:
     when: |-
-      the price fell since the trove's previous event by at least a quarter of the room the trove had above the minimum
+      the price fell since the trove's previous event by at least a quarter of the room the trove had below the Max LTV, in price
     text: |-
       {coll_symbol} had fallen {price_change} since the previous event, from {price_prev}.
   market.rose:
@@ -1819,7 +1823,7 @@ templates:
         when: |-
           variant destructive
         text: |-
-          This trove was liquidated: its collateral ratio had dropped to {cr_at_liquidation}, below the {mcr} liquidation line for {coll_symbol}.
+          This trove was liquidated: its LTV had risen to {ltv_at_liquidation}, above the {max_ltv} Max LTV for {coll_symbol}.
       liq.surplus:
         when: |-
           variant destructive, a surplus, not claimed yet
@@ -1992,7 +1996,7 @@ templates:
 #                          Liquity's FAQ (FAQ_URLS)
 # The interest-rate modal has `intro_delegated` and, on its first detail,
 # `text_delegated`: what it says when a delegate sets the trove's rate.
-# The liquidation modal's intro reads {min_cr}, {max_ltv} and {coll_type}.
+# The liquidation modal's intro reads {max_ltv} and {coll_type}.
 # Each concept that states a mechanism rests on a row of rails-ops
 # reference/official-docs/liquity-v2.md, and its link is that row's page.
 L5:
@@ -2003,7 +2007,7 @@ L5:
       An adjustment changes a trove without closing it. The owner can add or withdraw collateral, borrow more BOLD, or repay some of the debt.
     extraParagraphs:
       - |-
-        Adding collateral or repaying makes the trove safer. Withdrawing collateral or borrowing more brings it closer to liquidation. An adjustment must keep the LTV under the branch maximum (90.91% for WETH, a 110% collateral ratio), or it is rejected.
+        Adding collateral or repaying makes the trove safer. Withdrawing collateral or borrowing more brings it closer to liquidation. An adjustment must keep the LTV under the branch's Max LTV (90.91% for WETH), or it is rejected.
       - |-
         Adjusting doesn't change the interest rate, which is a separate action. The rate matters because it decides how early the trove is redeemed against.
     detailsHeading: |-
@@ -2074,7 +2078,7 @@ L5:
     title: |-
       How liquidations work
     intro: |-
-      A trove can be liquidated once its collateral ratio falls below {min_cr} for {coll_type}, a maximum LTV of {max_ltv}. Anyone can trigger the liquidation.
+      A trove can be liquidated once its LTV rises above the Max LTV of {max_ltv} for {coll_type}. Anyone can trigger the liquidation.
     detailsHeading: |-
       Key concepts:
     details:
@@ -2117,9 +2121,9 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Collateral ratio
+          LTV
         text: |-
-          the value of the collateral relative to the debt, which must stay above the branch minimum.
+          the debt relative to the value of the collateral, which must stay below the branch's Max LTV.
       - bold: |-
           Interest rate
         text: |-
@@ -2285,7 +2289,7 @@ L5:
       - bold: |-
           Trove
         text: |-
-          the borrowing position — collateral in, BOLD out, with a collateral ratio to keep above the threshold.
+          the borrowing position — collateral in, BOLD out, with an LTV to keep below the Max LTV.
       - bold: |-
           Interest rate
         text: |-

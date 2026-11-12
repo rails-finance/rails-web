@@ -7,6 +7,7 @@ import Link from "next/link";
 import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
+import { fmtMaxLtv } from "@/lib/liquity/ltv";
 
 export const metadata = infoMetadata("liquity-v2");
 
@@ -15,6 +16,10 @@ const BORROWING = `${DOCS}/borrowing-and-liquidations`;
 const REDEMPTIONS = `${DOCS}/redemptions-and-delegation`;
 
 const UL = "list-disc space-y-1 pl-5";
+
+// Each branch's Max LTV, 1 ÷ its MCR (lib/liquity/ltv.ts).
+const MAX_LTV_WETH = fmtMaxLtv("WETH");
+const MAX_LTV_LST = fmtMaxLtv("wstETH");
 
 const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
@@ -33,9 +38,9 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
     sources: [{ label: "What is Liquity V2", href: DOCS + "/general#what-is-liquity-v2" }],
   },
   {
-    term: "Collateral ratio",
+    term: "LTV",
     definition:
-      "The collateral ratio is the value of a Trove's collateral divided by its debt. A ratio of 110% means $110 of collateral for every $100 of debt.",
+      "LTV, loan-to-value, is a Trove's debt divided by the value of its collateral. An LTV of 80% means $80 of debt for every $100 of collateral. Each branch sets a Max LTV, and a Trove above it can be liquidated.",
     sources: [{ label: "Choosing an LTV", href: BORROWING + "#how-do-i-decide-on-my-ltv" }],
   },
   {
@@ -97,8 +102,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   },
   {
     term: "Liquidation",
-    definition:
-      "A Trove is liquidated when its collateral ratio falls below 110% on WETH or 120% on wstETH and rETH. The Stability Pool then absorbs the Trove's debt and takes its collateral. The borrower usually pays a 5% penalty and can claim the remaining collateral.",
+    definition: `A Trove is liquidated when its LTV rises above the Max LTV: ${MAX_LTV_WETH} on WETH or ${MAX_LTV_LST} on wstETH and rETH. The Stability Pool then absorbs the Trove's debt and takes its collateral. The borrower usually pays a 5% penalty and can claim the remaining collateral.`,
     sources: [{ label: "How liquidations work", href: BORROWING + "#how-do-liquidations-work-in-liquity-v2" }],
   },
   {
@@ -138,8 +142,8 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <ul className={UL}>
         <li>
-          Each card shows one Trove with its collateral, debt, interest rate and collateral ratio. The card also shows
-          the liquidation price, the collateral price at which the Trove would be liquidated.
+          Each card shows one Trove with its collateral, debt, interest rate and LTV. The card also shows the
+          liquidation price, the collateral price at which the Trove would be liquidated.
         </li>
         <li>A Trove in a batch shows the manager&apos;s name where Rails knows it.</li>
         <li>
@@ -154,9 +158,9 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <ul className={UL}>
         <li>
-          The top card shows the collateral, the debt and the collateral ratio. An open Trove also shows its interest
-          rate, its yearly cost, its liquidation price and the share of the redemption queue ahead of it. The queue is
-          the Troves in the order redemptions reach them.
+          The top card shows the collateral, the debt and the LTV. An open Trove also shows its interest rate, its
+          yearly cost, its liquidation price and the share of the redemption queue ahead of it. The queue is the Troves
+          in the order redemptions reach them.
         </li>
         <li>
           The wallet chip names the Trove&apos;s latest owner, and the history belongs to the Trove whoever held it.
@@ -182,7 +186,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <p>
         The branches page shows, for each branch, its debt, collateral, number of Troves, span of interest rates, TCR
-        and minimum collateral ratios. It links each branch to its Troves in redemption order.{" "}
+        and Max LTVs. It links each branch to its Troves in redemption order.{" "}
         <Link href="/ethereum/liquity-v2/branches" className={INLINE_LINK}>
           Open the branches page
         </Link>{" "}
@@ -233,9 +237,9 @@ export default function InfoPage() {
         <>
           Liquity V2 has three <GlossaryLink term="Branch">branches</GlossaryLink>: WETH, wstETH and rETH, which are
           forms of ETH. A Trove is <GlossaryLink term="Liquidation">liquidated</GlossaryLink> when its{" "}
-          <GlossaryLink term="Collateral ratio">collateral ratio</GlossaryLink> falls below 110% on WETH or 120% on the
-          others, and the <GlossaryLink term="Stability Pool">Stability Pool</GlossaryLink> absorbs it. Any shortfall is
-          a <GlossaryLink term="Redistribution">redistribution</GlossaryLink> to the branch&apos;s other Troves.
+          <GlossaryLink term="LTV">LTV</GlossaryLink> rises above {MAX_LTV_WETH} on WETH or {MAX_LTV_LST} on the others,
+          and the <GlossaryLink term="Stability Pool">Stability Pool</GlossaryLink> absorbs it. Any shortfall is a{" "}
+          <GlossaryLink term="Redistribution">redistribution</GlossaryLink> to the branch&apos;s other Troves.
         </>,
         <>
           Each branch has a <GlossaryLink term="TCR">TCR</GlossaryLink>. Below its Shutdown Collateral Ratio (SCR), or
@@ -245,7 +249,7 @@ export default function InfoPage() {
         </>,
       ]}
       views={views}
-      search="You can search by wallet address, ENS name or Trove ID. The listing filters by Status, Collateral, Redemptions (Redeemed or Never redeemed) and Delegation (Delegated or Individual), and sorts by Recent activity, Debt, Collateral, Ratio or Interest Rate."
+      search="You can search by wallet address, ENS name or Trove ID. The listing filters by Status, Collateral, Redemptions (Redeemed or Never redeemed) and Delegation (Delegated or Individual), and sorts by Recent activity, Debt, Collateral, LTV or Interest Rate."
       docs={{ label: "Liquity V2 documentation", href: DOCS }}
     />
   );

@@ -20,7 +20,7 @@ import { formatExact } from "@/lib/utils/format";
 import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isCollSurplusClaimEvent, isLiquityEvent } from "@/lib/shared/types/event-shape";
 import { claimMarkdownLabel } from "@/lib/shared/liquity-coll-surplus-claim";
-import { getLiquidationThreshold } from "@/lib/utils/liquidation-utils";
+import { fmtMaxLtv, liquityV2Mcr, ltvPct } from "@/lib/liquity/ltv";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
 import { actionLabel, getEventActionKey } from "@/lib/shared/event-filter-helpers";
 
@@ -156,8 +156,9 @@ function openHeadlines(args: TroveMarkdownArgs): string[] {
   const collateralUsd = currentPrice ? displayCollateral * currentPrice : null;
   const collateralRatio =
     collateralUsd && displayDebt > 0 ? (collateralUsd / displayDebt) * 100 : (trove.metrics.collateralRatio ?? null);
-  const mcr = getLiquidationThreshold(ct);
-  const liqPrice = displayCollateral > 0 && displayDebt > 0 ? (displayDebt * (mcr / 100)) / displayCollateral : null;
+  const mcr = liquityV2Mcr(ct);
+  const liqPrice =
+    mcr != null && displayCollateral > 0 && displayDebt > 0 ? (displayDebt * mcr) / displayCollateral : null;
 
   const annualInterestCost = (displayRecordedDebt * displayInterestRate) / 100;
   const dailyInterestCost = annualInterestCost / 365;
@@ -184,9 +185,10 @@ function openHeadlines(args: TroveMarkdownArgs): string[] {
     out.push(`- **Collateral:** ${amt(displayCollateral)} ${ct}`);
   }
 
-  // Collateral ratio
-  if (collateralRatio) {
-    out.push(`- **Collateral ratio:** ${num(collateralRatio, 1)}% (minimum ${mcr}% to avoid liquidation)`);
+  // LTV, the debt over the collateral's value (decision 0065)
+  const ltv = ltvPct(collateralRatio);
+  if (ltv != null) {
+    out.push(`- **LTV:** ${num(ltv, 1)}% (Max LTV ${fmtMaxLtv(ct) ?? "—"}; above it the trove can be liquidated)`);
   }
 
   // Liquidation price + buffer
@@ -233,9 +235,8 @@ function closedOrLiquidatedHeadlines(trove: TroveSummary): string[] {
   const out: string[] = [];
   out.push("## Headlines");
   if (trove.status === "liquidated") {
-    const mcr = getLiquidationThreshold(trove.collateralType);
     out.push(
-      `- This trove was **liquidated** when its collateral ratio fell below the ${mcr}% minimum for ${trove.collateralType}.`,
+      `- This trove was **liquidated** when its LTV rose above the ${fmtMaxLtv(trove.collateralType) ?? "branch's"} Max LTV for ${trove.collateralType}.`,
     );
   } else {
     out.push(`- This trove is **closed** — all debt was repaid and remaining collateral returned to the owner.`);

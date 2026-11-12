@@ -10,8 +10,9 @@ import { accrualNoun } from "@/lib/liquity/accrual";
 import { fillText, liquityL1Label, wordsAround, type LiquityEventProse } from "@/lib/liquity/event-prose";
 import { L1_WORDS, L2_WORDS } from "@/lib/liquity/event-templates";
 import { LinkedAddress } from "@/components/shared/linked-address";
-import { usePreferences } from "@/lib/shared/preferences-context";
-import { formatRatio, ratioLabel, useLiquityRatioColorClass } from "@/lib/shared/ratio-format";
+import { formatRatio, useLiquityRatioColorClass } from "@/lib/shared/ratio-format";
+import type { RatioMode } from "@/lib/shared/preferences";
+import { fmtLtv, mcrInput, maxLtvInput, LTV_LIQUIDATION_PRICE_FORMULA } from "@/lib/liquity/ltv";
 import { fmtDebt, fmtColl, fmtUsdWhole, fmtAccrued, fmtRateNum } from "@/lib/liquity/figure-format";
 import { Prov, type Provenance, type ProvVerify } from "@/components/shared/provenance";
 import { usdAt } from "@/components/shared/event-ledger";
@@ -95,7 +96,6 @@ export function useLiquityCells({
   blockNumber?: number;
   prose: LiquityEventProse;
 }): { cells: EventCells; sheet?: EventSheet } {
-  const { prefs } = usePreferences();
   const crColor = useLiquityRatioColorClass();
   const { stateBefore, stateAfter, troveOperation, liquidation } = ctx;
   const l2 = prose.L2;
@@ -387,8 +387,8 @@ export function useLiquityCells({
   const crAfterProv: Provenance = {
     kind: "chain-derived",
     summary:
-      "Collateral ratio after this event. The collateral's dollar value divided by the debt, at Liquity's price for this block.",
-    formula: "collateral × price ÷ debt × 100",
+      "LTV after this event. The debt divided by the collateral's dollar value, at Liquity's price for this block.",
+    formula: "debt ÷ (collateral × price) × 100",
     inputs: [
       {
         label: "collateral",
@@ -403,8 +403,8 @@ export function useLiquityCells({
   const crBeforeProv: Provenance = {
     kind: "chain-derived",
     summary:
-      "Collateral ratio before this event. The collateral's dollar value divided by the debt before this event, both at Liquity's price for this event's block, so the change from before to after is the event's alone.",
-    formula: "collateral × price ÷ debt × 100",
+      "LTV before this event. The debt before this event divided by the collateral's dollar value, both at Liquity's price for this event's block, so the change from before to after is the event's alone.",
+    formula: "debt ÷ (collateral × price) × 100",
     inputs: [
       { label: "collateral", value: `${toLocaleStringHelper(beforeColl)} ${collSym}`, kind: "chain", note: "before" },
       ...priceInput,
@@ -678,10 +678,11 @@ export function useLiquityCells({
         : undefined,
   };
 
-  // ── Collateral ratio, both sides at this event's price ──
-  // In the displayed mode's units (percentage points): CR is linear, so its
-  // delta is after − before; LTV is 1/CR, so the converted values are diffed.
-  const mode = prefs.ratioMode;
+  // ── LTV, both sides at this event's price ──
+  // Liquity V2 states the ratio as LTV (decision 0065): the state carries the
+  // collateral ratio, so each side is converted (LTV = 10000 ÷ CR%) and the
+  // converted values are diffed. A rising LTV is the riskier move.
+  const mode: RatioMode = "ltv";
   const crChanged = beforeCollRatio !== afterCollRatio;
   const beforeDisp = mode === "ltv" ? 10000 / beforeCollRatio : beforeCollRatio;
   const afterDisp = mode === "ltv" ? 10000 / afterCollRatio : afterCollRatio;
@@ -689,14 +690,14 @@ export function useLiquityCells({
   const ratioCanToggle = !isClose && stateAfter.debt !== 0 && isFinite(afterDisp);
   const ratioDeltaProv: Provenance = {
     kind: "derived",
-    summary: `${ratioLabel(mode)} change at this event, in percentage points. The ratio after minus the ratio before.`,
+    summary: `${L2_WORDS.ltv} change at this event, in percentage points. The LTV after minus the LTV before.`,
     via: "after − before",
-    formula: mode === "ltv" ? "(10000 ÷ after) − (10000 ÷ before)" : "after − before",
+    formula: "LTV after − LTV before",
   };
   const ratio: EventCellSpec = {
     kind: "stat",
     key: "ratio",
-    label: ratioLabel(mode),
+    label: L2_WORDS.ltv,
     changed: crChanged,
     inputs: ["collateral", "debt"],
     value: {
@@ -708,7 +709,7 @@ export function useLiquityCells({
       ...(isClose
         ? { closed: L2_WORDS.closed }
         : stateAfter.debt === 0
-          ? { none: L2_WORDS.not_applicable }
+          ? { none: "—" }
           : {
               after: fig(formatRatio(afterCollRatio, mode, 2), crAfterProv),
               afterClass: crChanged ? crColor(afterCollRatio, ctx.collateralType) : undefined,
@@ -776,12 +777,11 @@ export function useLiquityCells({
     debtUpfront: L2_WORDS.tip_debt_upfront_fee,
     debtRedist: L2_WORDS.tip_debt_redistribution,
     debtTotal: fillText(L2_WORDS.tip_debt_total, { debt_symbol: debtSym }),
-    cr: fillText(L2_WORDS.tip_cr, { coll_symbol: collSym }),
     ltv: fillText(L2_WORDS.tip_ltv, { coll_symbol: collSym }),
     liquidatesAt: fillText(L2_WORDS.tip_liquidates_at, { coll_symbol: collSym }),
     rate: L2_WORDS.tip_rate,
     delegateFee: L2_WORDS.tip_delegate_fee,
-    minimumRatio: fillText(L2_WORDS.tip_minimum_ratio, { coll_symbol: collSym }),
+    maxLtv: fillText(L2_WORDS.tip_max_ltv, { coll_symbol: collSym }),
     criticalRatio: fillText(L2_WORDS.tip_critical_ratio, { coll_symbol: collSym }),
   };
 
@@ -999,7 +999,7 @@ export function useLiquityCells({
   // swaps to its change since the previous event.
   const prevAfter = prevCtx?.stateAfter;
   const prevCr = prevAfter && prevAfter.collateralRatio > 0 && prevAfter.debt > 0 ? prevAfter.collateralRatio : null;
-  const disp = (cr: number) => (mode === "ltv" ? 10000 / cr : cr);
+  const disp = (cr: number) => 10000 / cr;
   const open = !isClose && stateAfter.debt > 0;
   const pts = (a: number) => `${a.toFixed(2)} pts`;
   const sinceProv = (what: string, formula: string): Provenance => ({
@@ -1013,31 +1013,32 @@ export function useLiquityCells({
   const usd2 = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const liqProv: Provenance = {
     kind: "chain-derived",
-    summary: `The ${collSym} price at which this Trove's collateral ratio meets the branch's minimum, ${(safety.mcr * 100).toFixed(0)}%. The debt times the minimum ratio, divided by the collateral, after this event.`,
-    formula: "debt × minimum ratio ÷ collateral",
+    summary: `The ${collSym} price at which this Trove's LTV reaches the branch's Max LTV${safety.mcr > 0 ? `, ${fmtLtv(100 / safety.mcr, 2)}` : ""}. The debt divided by the collateral times the Max LTV, after this event.`,
+    formula: LTV_LIQUIDATION_PRICE_FORMULA,
     inputs: [
       { label: "debt", value: `${toLocaleStringHelper(stateAfter.debt)} ${debtSym}`, kind: "chain", note: "after" },
       { label: "collateral", value: `${formatColl(collAfter)} ${collSym}`, kind: "chain", note: "after" },
-      { label: "minimum ratio", value: `${(safety.mcr * 100).toFixed(0)}%`, kind: "chain", pclass: "state" },
+      maxLtvInput(collSym),
+      mcrInput(collSym),
     ],
   };
   const risk: SheetStat[] = [
     {
       key: "ratio",
-      label: ratioLabel(mode),
+      label: L2_WORDS.ltv,
       value: isClose
         ? { none: L2_WORDS.closed }
         : stateAfter.debt === 0
-          ? { none: L2_WORDS.not_applicable }
+          ? { none: "—" }
           : { text: formatRatio(afterCollRatio, mode, 2), info: crAfterProv },
       tone: open ? crColor(afterCollRatio, ctx.collateralType) : undefined,
-      tip: mode === "ltv" ? TIP.ltv : TIP.cr,
+      tip: TIP.ltv,
       change:
         open && prevCr != null
           ? {
               text: changeText(disp(afterCollRatio) - disp(prevCr), pts),
               info: sinceProv(
-                `${ratioLabel(mode)} change since the previous event, in percentage points`,
+                `${L2_WORDS.ltv} change since the previous event, in percentage points`,
                 "after − after the previous event",
               ),
             }
@@ -1103,12 +1104,17 @@ export function useLiquityCells({
   const params: SheetStat[] = branch
     ? [
         {
-          key: "minimum-ratio",
-          label: L2_WORDS.minimum_ratio,
-          tip: TIP.minimumRatio,
+          key: "max-ltv",
+          label: L2_WORDS.max_ltv,
+          tip: TIP.maxLtv,
           value: {
-            text: `${(branch.mcr * 100).toFixed(0)}%`,
-            info: paramProv("minimum collateral ratio (MCR)", branch.mcr * 100),
+            text: fmtLtv(100 / branch.mcr, 2),
+            info: {
+              kind: "derived",
+              summary: `The ${collSym} branch's Max LTV: ${fmtLtv(100 / branch.mcr, 2)}. 1 ÷ the branch's minimum collateral ratio (MCR), a constant its contracts were deployed with.`,
+              formula: "1 ÷ MCR",
+              inputs: [mcrInput(collSym)],
+            },
           },
         },
         {

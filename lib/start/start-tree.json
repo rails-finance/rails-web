@@ -238,6 +238,10 @@
       "line": "Each list opens with the positions closest to liquidation first.",
       "sorts": [
         {
+          "sortBy": "ltv",
+          "sortOrder": "desc"
+        },
+        {
           "sortBy": "ratio",
           "sortOrder": "asc"
         },

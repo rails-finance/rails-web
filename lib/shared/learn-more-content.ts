@@ -1,6 +1,7 @@
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
 import { SEAMLESS_DOCS_URL } from "@/lib/aave-v3/protocol-name";
 import { FAQ_URLS, AAVE_FAQ_URLS } from "@/lib/shared/faq-urls";
+import { fmtMaxLtv } from "@/lib/liquity/ltv";
 import type { VaultPositionFamily } from "@/lib/aave-vaults/vault-position";
 import { indefiniteArticle, viewWord } from "@/lib/utils/format";
 
@@ -166,19 +167,20 @@ export function liquityPositionContent(opts: {
   isBatched?: boolean;
 }): LearnMoreContent {
   const { collateralType, status, isBatched } = opts;
-  const isETH = collateralType === "WETH" || collateralType === "ETH";
-  const minCR = isETH ? "110%" : "120%";
+  // The docs state a Trove's risk as LTV against the branch's Max LTV
+  // (decision 0065): 1 ÷ the branch's MCR.
+  const maxLtv = fmtMaxLtv(collateralType) ?? "the branch's Max LTV";
 
   if (status === "liquidated") {
     return {
       title: "About this position",
       intro:
-        "This trove was liquidated when its collateral ratio fell below the minimum threshold. The panel above reconstructs its final state: peak debt, collateral, and how long it stayed open.",
+        "This trove was liquidated when its LTV rose above the Max LTV. The panel above reconstructs its final state: peak debt, collateral, and how long it stayed open.",
       detailsHeading: "Key concepts:",
       details: [
         {
-          bold: "Liquidation threshold",
-          text: `a trove is liquidated once its collateral ratio drops below ${minCR} for ${collateralType}. Anyone can trigger the liquidation.`,
+          bold: "Max LTV",
+          text: `a trove is liquidated once its LTV rises above ${maxLtv} for ${collateralType}. Anyone can trigger the liquidation.`,
         },
         {
           bold: "Trove NFT",
@@ -218,8 +220,8 @@ export function liquityPositionContent(opts: {
   // Open trove — the live, interactive case.
   const details: LearnMoreContent["details"] = [
     {
-      bold: "Collateral ratio",
-      text: `the collateral's USD value relative to the debt. It must stay above ${minCR} for ${collateralType} or the trove can be liquidated.`,
+      bold: "LTV",
+      text: `the debt relative to the collateral's USD value. It must stay below ${maxLtv} for ${collateralType} or the trove can be liquidated.`,
     },
   ];
   if (isBatched) {
@@ -249,7 +251,7 @@ export function liquityPositionContent(opts: {
   );
 
   const links: LearnMoreContent["links"] = [
-    { label: "How do I decide on my collateral ratio?", url: FAQ_URLS.LTV_COLLATERAL_RATIO },
+    { label: "How do I decide on my LTV?", url: FAQ_URLS.LTV_COLLATERAL_RATIO },
   ];
   if (isBatched) {
     links.push({ label: "What is interest-rate delegation?", url: FAQ_URLS.DELEGATION });
@@ -1026,6 +1028,9 @@ export interface LiquityForkLearnMoreParams {
   minDebt?: number;
   /** One live-verified link (site or docs root) — the fallback below. */
   docsLink?: { label: string; url: string };
+  /** The deployment's docs state a Trove's ratio as LTV (Liquity V2,
+   *  decision 0065); absent, the collateral ratio. */
+  ltv?: boolean;
   /** Question-level docs links, keyed by the card topic that wants them. */
   docsByTopic?: {
     trove?: { label: string; url: string }[];
@@ -1113,11 +1118,11 @@ export function liquityForkRateContent(p: LiquityForkLearnMoreParams): LearnMore
 export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
   return {
     title: "How redemptions work",
-    intro: `Any ${p.stablecoin} holder can redeem it against the system at $1 face value, the peg mechanism. Redemptions are routed across branches by their unbacked portions and, within a branch, sweep the LOWEST user-set interest rates first (not the lowest collateral ratio, the V1 difference).`,
+    intro: `Any ${p.stablecoin} holder can redeem it against the system at $1 face value, the peg mechanism. Redemptions are routed across branches by their unbacked portions and, within a branch, sweep the LOWEST user-set interest rates first (${p.ltv ? "not the highest LTV" : "not the lowest collateral ratio"}, the V1 difference).`,
     stepsHeading: "What happens to a redeemed Trove:",
     steps: [
       "It gives up collateral at the branch oracle price and sheds the same value of debt. Net value is preserved.",
-      "Its collateral ratio RISES as a result.",
+      p.ltv ? "Its LTV FALLS as a result." : "Its collateral ratio RISES as a result.",
       `A partial redemption that leaves the Trove below the minimum debt makes it dormant (Zombie in the contracts) and takes it out of the rate-ordered queue. The branch's most recent dormant Trove with debt left is redeemed first.`,
     ],
     links: forkLinks(p, "redemption"),

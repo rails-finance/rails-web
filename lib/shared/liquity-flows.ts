@@ -40,11 +40,11 @@ import { branchMcr } from "@/lib/liquity/event-safety";
 import {
   getLiquidationThreshold,
   LIQUIDATION_PRICE_FORMULA,
-  liquidationPriceSummary,
   troveLiquidationPrice,
 } from "@/lib/utils/liquidation-utils";
 import { compareWithinBlock } from "@/lib/shared/event-order";
 import { forkMcrAt, type ForkMcrStep } from "@/lib/shared/liquity-fork-ops";
+import { fmtMaxLtv, ltvLiquidationPriceSummary } from "@/lib/liquity/ltv";
 
 /** Liquity V2's year (Constants.sol `ONE_YEAR = 365 days`); its forks share it. */
 const ONE_YEAR_S = 31_536_000;
@@ -739,8 +739,10 @@ function liquityPriceMarks(
                     },
                   }
                 : {
-                    formula: `${LIQUIDATION_PRICE_FORMULA.replace("MCR", `${mcrPct}%`)} after each event, with interest accruing between`,
-                    summary: liquidationPriceSummary(collateralType, mcrPct),
+                    // Liquity V2: the level in LTV terms, as its docs state
+                    // the limit (decision 0065).
+                    formula: `debt ÷ (collateral × ${fmtMaxLtv(collateralType) ?? "Max LTV"}) after each event, with interest accruing between`,
+                    summary: ltvLiquidationPriceSummary(collateralType, collateralType),
                   }),
             },
           }
