@@ -12,7 +12,7 @@
 import type { LearnMoreContent, LearnMoreLink } from "@/components/shared/learn-more-modal";
 import { forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
 import { fmtLtv, liquityFamilyTerms } from "@/lib/liquity/ltv";
-import { liquityShutdownConcept } from "@/lib/shared/learn-more-content";
+import { liquityShutdownSentence } from "@/lib/shared/learn-more-content";
 
 export interface LiquityForkPositionContentParams {
   /** Display name ("Ebisu" | "Asymmetry" | "Base Dollar"). */
@@ -111,22 +111,21 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
       text: `the borrower sets the rate, or delegates it to a ${t.delegate}. Lower rates cost less but sit earlier in the redemption queue.`,
     });
   }
-  if (isZombie) {
-    details.push({
-      bold: t.dormantNoun.charAt(0).toUpperCase() + t.dormantNoun.slice(1),
-      text: `a redemption can leave a Trove below its branch's minimum debt. It then leaves the rate-ordered queue: while it is the branch's most recent one still owing ${debtSymbol}, the next redemption on the branch takes from it first. The owner can bring its debt back above the minimum, which returns it to the queue, or close it and take back the collateral${reserve ? ` and the ${reserve} liquidation reserve` : ""}.${t.dormant === "Zombie" ? "" : " The contracts tag it Zombie."}`,
-    });
-  }
   details.push(
     {
       bold: "Redemption exposure",
-      text: `any ${debtSymbol} holder can redeem it against the system at $1 face value, sweeping each branch's queue from the lowest user-set interest rate upward, ${t.ltv ? "not the highest LTV" : `not the lowest ${t.ratioText}`}. A redeemed Trove gives up collateral worth the debt it sheds: it deleverages, but its net value is preserved.`,
+      text: `any ${debtSymbol} holder can redeem it against the system at $1 face value, sweeping each branch's queue from the lowest user-set interest rate upward, ${t.ltv ? "not the highest LTV" : `not the lowest ${t.ratioText}`}. A redeemed Trove gives up collateral worth the debt it sheds: it deleverages, but its net value is preserved.${
+        // The Trove modal holds five Key concepts (modal grammar §4): a
+        // dormant Trove's rule rides here rather than as a sixth.
+        isZombie
+          ? ` A redemption that leaves a Trove below the minimum debt makes it ${t.dormantText}${t.dormant === "Zombie" ? "" : " (Zombie in the contracts)"}, out of the rate-ordered queue. While it is the branch's most recent one owing ${debtSymbol}, the next redemption takes from it first.`
+          : ""
+      }`,
     },
     {
       bold: "Branch scoping",
-      text: `each collateral type is its own ${t.branch === "branch" ? "branch" : `${t.branch} (a branch)`} with its own oracle, ${t.limitText} and redemption queue, so one branch's stress does not liquidate another's Troves.`,
+      text: `each collateral type is its own ${t.branch === "branch" ? "branch" : `${t.branch} (a branch)`} with its own oracle, ${t.limitText} and redemption queue, so one branch's stress does not liquidate another's Troves. ${liquityShutdownSentence(t)}`,
     },
-    liquityShutdownConcept(t, "position"),
     {
       bold: "Trove NFT",
       text: "ownership of a Trove is an ERC-721 NFT. One address can hold many Troves, each a separate position.",

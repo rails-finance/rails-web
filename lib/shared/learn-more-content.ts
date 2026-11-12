@@ -153,24 +153,30 @@ export function lifetimeFlowsStackContent(opts: {
 
 // ── CoW ─────────────────────────────────────────────────────────────
 
-// ── Liquity family — a branch's shutdown, one Key concept (ui-jobs 612) ─────
+// ── Liquity family — what a branch's shutdown changes (ui-jobs 612) ────────
 //
-// What a shutdown changes, in Liquity V2's docs' terms ("What is Shutdown
-// Mode?": interest stops accruing, standard redemptions skip the branch, a
-// shutdown redemption pays a collateral bonus). General, so every family's
-// modal carries it whether or not a branch is shut down (modal grammar §1).
+// In Liquity V2's docs' terms ("What is Shutdown Mode?": interest stops
+// accruing, standard redemptions skip the branch, a shutdown redemption pays a
+// collateral bonus). General, so every family's modal carries it whether or not
+// a branch is shut down (modal grammar §1). The Trove modals hold five Key
+// concepts (modal grammar §4), so there it is one sentence of "Branch scoping"
+// (`liquityShutdownSentence`); the redemption and flows modals carry it as a
+// concept of its own.
+export function liquityShutdownSentence(terms: Pick<LiquityFamilyTerms, "branch" | "shutdownBonus">): string {
+  const bonus = terms.shutdownBonus ? `a ${terms.shutdownBonus} bonus` : "a bonus";
+  return `A shut-down ${terms.branch} stops borrowing, adjustments and interest; standard redemptions skip it, and a shutdown redemption takes collateral at ${bonus}.`;
+}
+
 export function liquityShutdownConcept(
   terms: Pick<LiquityFamilyTerms, "branch" | "shutdownBonus">,
-  surface: "position" | "redemption" | "flows",
+  surface: "redemption" | "flows",
 ): { bold: string; text: string } {
   const branch = terms.branch;
   const bonus = terms.shutdownBonus ? `a ${terms.shutdownBonus} bonus` : "a bonus";
   const text =
-    surface === "position"
-      ? `when a ${branch} shuts down, borrowing, adjustments and rate changes stop, and its Troves' interest stops accruing. Standard redemptions skip it; a shutdown redemption takes collateral at ${bonus} to the redeemer.`
-      : surface === "redemption"
-        ? `standard redemptions skip a shut-down ${branch}. A shutdown redemption takes its collateral at ${bonus} to the redeemer, from the Troves the redeemer picks.`
-        : `a Trove's interest stops accruing when its ${branch} shuts down.`;
+    surface === "redemption"
+      ? `standard redemptions skip a shut-down ${branch}. A shutdown redemption takes its collateral at ${bonus} to the redeemer, from the Troves the redeemer picks.`
+      : `a Trove's interest stops accruing when its ${branch} shuts down.`;
   return { bold: "Branch shutdown", text };
 }
 
@@ -264,9 +270,8 @@ export function liquityPositionContent(opts: {
     },
     {
       bold: "Branch scoping",
-      text: `each collateral type is its own branch with its own redemption queue. A redemption is split across branches in proportion to each branch's unbacked debt, so the queue this trove stands in is the ${collateralType} branch's own.`,
+      text: `each collateral type is its own branch with its own redemption queue. A redemption is split across branches in proportion to each branch's unbacked debt, so the queue this trove stands in is the ${collateralType} branch's own. ${liquityShutdownSentence(LIQUITY_FAMILY_TERMS["liquity-v2"])}`,
     },
-    liquityShutdownConcept(LIQUITY_FAMILY_TERMS["liquity-v2"], "position"),
     {
       bold: "Trove NFT",
       text: "ownership of a trove is an ERC-721 NFT. One address can hold many troves, each a separate position.",
