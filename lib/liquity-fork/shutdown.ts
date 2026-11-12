@@ -93,3 +93,15 @@ export function branchShutdownState(
   if (live?.shutDown === true && live.at != null) return { at: live.at, record: null, live, disagree: false };
   return null;
 }
+
+/** Every branch of a deployment is shut down: the branches page states the
+ *  deployment's state in place of how redemption reaches its branches. */
+export function allBranchesShutDown(branches: readonly { shutdown?: BranchShutdownState | null }[]): boolean {
+  return branches.length > 0 && branches.every((b) => b.shutdown != null);
+}
+
+/** The branches page's title: how redemption reaches the branches, or, with
+ *  every branch shut down, the branches alone. */
+export function branchesPageTitle(branches: readonly { shutdown?: BranchShutdownState | null }[]): string {
+  return allBranchesShutDown(branches) ? "Branches" : "Branches & how redemption reaches them";
+}
