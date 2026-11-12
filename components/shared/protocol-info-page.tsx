@@ -23,6 +23,15 @@ import { shortAddress } from "@/lib/shared/asset-roster";
 import { InfoHistoryLine } from "@/components/shared/history-tag";
 import { Prov, type Provenance } from "@/components/shared/provenance";
 
+/** Slot I6, the pointer line, where an explorer passes no `guide`: true of a
+ *  page whose cards carry all four controls (label tip, (i), ?, ⋮). */
+const GUIDE_DEFAULT =
+  "Press a figure's label to read what it means. The (i) under a card says what its figures mean for that position, and the ? beside it explains how that kind of position works. A card's ⋮ menu traces each figure to the chain.";
+
+/** Slot I6 for an explorer whose cards have no ?, passed as its `guide`. */
+export const GUIDE_NO_LEARN_MORE =
+  "Press a figure's label to read what it means. The (i) under a section says what its figures mean for the wallet. A section's ⋮ menu traces each figure to the chain.";
+
 export interface InfoDocLink {
   label: string;
   href: string;
@@ -209,7 +218,7 @@ export interface ProtocolInfoPageProps {
   /** Slot 5: the search and filter line, only where the listing has them. */
   search?: ReactNode;
   /** Slot I6, how to read the pages, where the explorer's pages differ from the
-   *  default sentence (an explorer with no event cards). */
+   *  default sentence (`GUIDE_NO_LEARN_MORE` where its cards have no ?). */
   guide?: ReactNode;
   /** One sentence naming what a reader might expect here and will not find, shown beside the coverage door. Omit it when nothing is expected and missing. */
   notCovered?: string;
@@ -297,12 +306,7 @@ export function ProtocolInfoPage({
         )}
 
         <p className="mt-5" data-anatomy="I6">
-          {guide ?? (
-            <>
-              Tap the (i) beside any figure to see where it comes from. Inside, the ? explains that kind of event in
-              general.
-            </>
-          )}
+          {guide ?? GUIDE_DEFAULT}
         </p>
       </div>
       <p className="mt-4 text-sm text-rb-500" data-anatomy="I3">

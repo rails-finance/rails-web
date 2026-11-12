@@ -13,6 +13,7 @@ import {
   type InfoReads,
   type InfoTerm,
   type InfoView,
+  GUIDE_NO_LEARN_MORE,
 } from "@/components/shared/protocol-info-page";
 import { BALANCER_VAULT } from "@/lib/balancer/types";
 import { BAL_CHAINS, type BalChainId } from "@/lib/balancer/chains";
@@ -152,6 +153,7 @@ export function BalancerInfo({ chainId }: { chainId: BalChainId }) {
   const chain = BAL_CHAINS[chainId];
   return (
     <ProtocolInfoPage
+      guide={GUIDE_NO_LEARN_MORE}
       session={chain.session}
       tracks={
         <>

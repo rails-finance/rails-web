@@ -7,7 +7,13 @@
 // layout's strip covers this route.
 
 import Link from "next/link";
-import { GlossaryLink, ProtocolInfoPage, type InfoReads, type InfoView } from "@/components/shared/protocol-info-page";
+import {
+  GlossaryLink,
+  ProtocolInfoPage,
+  type InfoReads,
+  type InfoView,
+  GUIDE_NO_LEARN_MORE,
+} from "@/components/shared/protocol-info-page";
 import { aaveV3Glossary } from "@/lib/aave-v3/event-templates";
 import { AAVE_V3_OPTIMISM_CONTRACTS as C, OP_ROUTE } from "@/lib/aave-v3-optimism/types";
 import { infoMetadata } from "@/lib/shared/page-metadata";
@@ -82,6 +88,7 @@ const reads: InfoReads = {
 export default function InfoPage() {
   return (
     <ProtocolInfoPage
+      guide={GUIDE_NO_LEARN_MORE}
       session="aave-v3-optimism"
       tracks={
         <>

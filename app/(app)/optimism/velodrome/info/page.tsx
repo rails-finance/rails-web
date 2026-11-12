@@ -14,6 +14,7 @@ import {
   type InfoReads,
   type InfoTerm,
   type InfoView,
+  GUIDE_NO_LEARN_MORE,
 } from "@/components/shared/protocol-info-page";
 import { VELODROME } from "@/lib/aerodrome/sites";
 import { DEPLOYMENT_LABEL } from "@/lib/aerodrome/words";
@@ -164,6 +165,7 @@ const reads: InfoReads = {
 export default function InfoPage() {
   return (
     <ProtocolInfoPage
+      guide={GUIDE_NO_LEARN_MORE}
       session="velodrome"
       tracks={
         <>

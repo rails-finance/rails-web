@@ -13,6 +13,7 @@ import {
   type InfoReads,
   type InfoTerm,
   type InfoView,
+  GUIDE_NO_LEARN_MORE,
 } from "@/components/shared/protocol-info-page";
 import { FLUID_BASE_CONTRACTS } from "@/lib/fluid-base/types";
 import { FLUID_BASE_DOLLARS } from "@/lib/fluid-base/dollars";
@@ -145,6 +146,7 @@ const reads: InfoReads = {
 export default function InfoPage() {
   return (
     <ProtocolInfoPage
+      guide={GUIDE_NO_LEARN_MORE}
       session="fluid-base"
       tracks={
         <>

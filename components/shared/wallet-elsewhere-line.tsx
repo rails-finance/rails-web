@@ -5,8 +5,10 @@
 // the wallet view. Read after mount from /api/chain/wallet/<address>/summary,
 // so the page's render does not wait on it; nothing is drawn while it loads,
 // when it fails, or when the page's position is the wallet's only one. It
-// counts every position, the page's included, in the wallet view's words
-// (W1), so the two read alike (Miles, 6 Nov 2026).
+// counts every position Rails holds for the address, in the wallet view's
+// words (W1), so the two read alike (Miles, 6 Nov 2026), and names that scope:
+// "On Rails:" where the page's position is counted, "Also on Rails:" where it
+// is not (ui-jobs 613).
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -47,7 +49,7 @@ export function WalletElsewhereLine({ wallet }: { wallet: string }) {
       const matched = rest.length < c.positions.length;
       // Nothing else to open: the page's position is the wallet's only one.
       if (rest.length === 0) return;
-      const text = walletLineText(c.positions);
+      const text = walletLineText(c.positions, matched);
       setLine(text ? { text, matched } : null);
     });
     return () => {

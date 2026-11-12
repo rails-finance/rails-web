@@ -11,6 +11,7 @@ import {
   type InfoReads,
   type InfoTerm,
   type InfoView,
+  GUIDE_NO_LEARN_MORE,
 } from "@/components/shared/protocol-info-page";
 import { EULER_CONTRACTS, EULER_DOLLARS, EULER_INDEXED, EULER_SESSION, type EulerChainId } from "@/lib/euler/types";
 import { CHAIN_NAME } from "@/lib/euler/words";
@@ -170,6 +171,7 @@ function reads(chain: EulerChainId): InfoReads {
 export function EulerInfoPage({ chain }: { chain: EulerChainId }) {
   return (
     <ProtocolInfoPage
+      guide={GUIDE_NO_LEARN_MORE}
       session={EULER_SESSION[chain]}
       tracks={
         <>
