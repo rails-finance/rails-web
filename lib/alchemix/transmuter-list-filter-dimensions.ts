@@ -70,8 +70,8 @@ export function transmuterListDimensions(chainId: ChainId): SerializableDimensio
   return [
     {
       id: "line",
-      label: "Line",
-      group: "Line",
+      label: "Market",
+      group: "Market",
       cardinality: "multi",
       param: "line",
       options: linesForChain(chainId).map((l) => ({ value: l.key, label: l.displayName })),

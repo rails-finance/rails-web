@@ -72,8 +72,8 @@ export function v2ListDimensions(chainId: ChainId): SerializableDimension<V2List
   return [
     {
       id: "line",
-      label: "Line",
-      group: "Line",
+      label: "Market",
+      group: "Market",
       cardinality: "multi",
       param: "line",
       options: v2LinesForChain(chainId).map((l) => ({ value: l.key, label: l.displayName })),

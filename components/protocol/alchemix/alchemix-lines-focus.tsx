@@ -58,7 +58,7 @@ export function AlchemixLinesFocus({
     !!all?.length && shown?.length === 0;
   return (
     <div {...scoped.listProps}>
-      <ScopeNote scoped={scoped} noun={["line", "lines"]} className="mb-4" />
+      <ScopeNote scoped={scoped} noun={["market", "markets"]} className="mb-4" />
       {!emptied(lines, shownLines) && (
         <AlchemixCoverageGroup title="Alchemist positions">
           <AlchemixLinesPanel lines={shownLines} />

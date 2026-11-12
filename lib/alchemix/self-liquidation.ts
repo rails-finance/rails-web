@@ -2,7 +2,7 @@
 // ----------------------------------------------------------------------------
 // `selfLiquidate` (AlchemistV3.sol) runs in three steps and emits two logs:
 //
-//   1. `_forceRepay(account.earmarked)` pays the debt set aside for repayment
+//   1. `_forceRepay(account.earmarked)` pays the earmarked debt
 //      from the collateral, takes the line's protocol fee on those shares, and
 //      emits `ForceRepay(amount, creditToYield, protocolFeeTotal)`.
 //   2. The rest of the debt is paid from the collateral, in shares at that
@@ -12,7 +12,7 @@
 //      `Transfer` in the same transaction.
 //
 // `SelfLiquidated(amount)` then states step 1's `creditToYield` PLUS step 2's
-// shares. Read beside the `ForceRepay`, the set-aside shares are in both logs,
+// shares. Read beside the `ForceRepay`, the earmarked shares are in both logs,
 // so a total that adds the two counts them twice; that double count, less the
 // unstated sweep, is what left eth-aleth/795's lifetime flows 0.035 mixWETH
 // short (rails-ops decisions/0032, "What a self-liquidation does with the
@@ -28,19 +28,19 @@ import type { AlchemistEvent } from "@/lib/alchemix/explainer-clauses";
 import type { AlchemixReading } from "@/lib/alchemix/readings-before";
 
 export interface SelfLiquidationSplit {
-  /** `SelfLiquidated.amount`: every share that paid debt, set-aside part included. */
+  /** `SelfLiquidated.amount`: every share that paid debt, earmarked part included. */
   totalRaw: bigint;
   /** The same transaction's `ForceRepay.creditToYield`: shares that paid the
-   *  debt set aside for repayment. Zero where the close had none to pay. */
+   *  earmarked debt. Zero where the close had none to pay. */
   setAsideRaw: bigint;
   /** The same transaction's `ForceRepay.protocolFeeTotal`. */
   feeRaw: bigint;
-  /** Shares that paid the rest of the debt: total less the set-aside part. */
+  /** Shares that paid the rest of the debt: total less the earmarked part. */
   restRaw: bigint;
   /** Collateral swept back to the holder's chosen address. Null without a
    *  reading before the close on the timeline. */
   returnedRaw: bigint | null;
-  /** The debt the close paid off, set-aside part included: the reading before
+  /** The debt the close paid off, earmarked part included: the reading before
    *  it, since the close leaves none. Null without that reading. */
   debtBeforeRaw: bigint | null;
   /** The block of the reading `returnedRaw` is measured from. */

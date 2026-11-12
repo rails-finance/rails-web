@@ -5,7 +5,7 @@ import { proxyCacheControl } from "@/lib/api/proxy-cache";
 import { BASE_CHAIN_ID, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 
 // An Alchemist V3's collateralizationLowerBound at the end of one block, for
-// the Lifetime flows chart's collateralisation line (lib/alchemix/flows-health.ts).
+// the Lifetime flows chart's liquidation threshold line, one over it (lib/alchemix/flows-health.ts).
 // Proxy to rails-server's `/api/at-block/alchemix/bound`, which answers from
 // its at-block store and reads the chain once for a block it does not hold
 // (server mig 412; rails-ops decisions/0056). The backend's Cache-Control is

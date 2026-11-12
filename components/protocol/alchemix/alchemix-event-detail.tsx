@@ -138,12 +138,12 @@ function legStats(
       break;
     }
     case "force_repay":
-      stat("Paid off set-aside debt", "credit_to_yield", mytSymbol);
+      stat("Paid off earmarked debt", "credit_to_yield", mytSymbol);
       stat("Protocol fee", "protocol_fee_total", mytSymbol);
       stat("Requested", "amount", sym);
       break;
     case "self_liquidated": {
-      // The log's amount repeats the force repay's set-aside shares; the sweep
+      // The log's amount repeats the force repay's earmarked shares; the sweep
       // back to the holder has no log (lib/alchemix/self-liquidation.ts).
       const split = selfLiquidationSplit(leg, siblings, before);
       if (split && split.setAsideRaw > BigInt(0)) {
@@ -186,7 +186,7 @@ function legStats(
       stat("Fee in the asset underneath", "fee_in_underlying", mytSymbol);
       break;
     case "redemption": {
-      stat("Redeemed across the line", "amount", sym);
+      stat("Redeemed across the market", "amount", sym);
       // The per-position figures are not in the log: each is this position's
       // reading either side of the redemption, subtracted. A zero stands as an
       // answer; the unavailable case drops the row, which is the only way the
@@ -367,7 +367,7 @@ export function useAlchemixDetail({ legs, mytSymbol, coordsFor }: AlchemixEventD
       ) : null}
       {lineCtx ? (
         <p className="px-5 pb-3 text-[11px] leading-relaxed text-rb-500">
-          This event belongs to the whole line. It is on this timeline because it fell inside this position&rsquo;s
+          This event belongs to the whole market. It is on this timeline because it fell inside this position&rsquo;s
           life.
           {clearedSpan ? (
             <>

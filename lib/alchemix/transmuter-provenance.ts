@@ -26,7 +26,7 @@ function txVerify(coords: AlchemixCoords): ProvVerify | undefined {
 function inputs(coords: AlchemixCoords, extra: ProvInput[] = []): ProvInput[] {
   const out: ProvInput[] = [
     ...extra,
-    { label: "line", value: coords.lineKey, kind: "offchain", note: "one synthetic on one chain" },
+    { label: "market", value: coords.lineKey, kind: "offchain", note: "one synthetic on one chain" },
     { label: "position id", value: coords.tokenId, kind: "chain", note: "the Transmuter's own NFT" },
   ];
   if (coords.blockNumber != null) {
@@ -103,7 +103,7 @@ export function transmuterMaturityProv(
   return {
     ...block,
     summary:
-      "Estimated maturity date — the maturity block (the start block plus the timeToTransmute in force when the stake was made) less the block the line is indexed to, at the chain's block time, counted from when this page was read",
+      "Estimated maturity date — the maturity block (the start block plus the timeToTransmute in force when the stake was made) less the block the market is indexed to, at the chain's block time, counted from when this page was read",
     via: `${block.via} · (maturity block − indexed block) × seconds per block`,
     formula: `${block.formula}; (${maturationBlock} − ${e.referenceBlock}) × ${e.secondsPerBlock} s = ${seconds} s after ${new Date(e.fromMs).toISOString()} ≈ ${new Date(e.atMs).toISOString().slice(0, 10)}`,
     inputs: [
@@ -112,7 +112,7 @@ export function transmuterMaturityProv(
         label: "indexed block",
         value: String(e.referenceBlock),
         kind: "offchain",
-        note: "how far the indexer has read the line",
+        note: "how far the indexer has read the market",
       },
       {
         label: "blocks to go",

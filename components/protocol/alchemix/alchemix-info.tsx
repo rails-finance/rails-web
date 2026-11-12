@@ -1,6 +1,6 @@
 // The Alchemix explorer's /info page, shared by both chains and drawn on the
 // typed template (rails-ops standards/info-page-template.md). The deployment
-// decides which lines and tabs it names, so neither chain describes the other's.
+// decides which markets and tabs it names, so neither chain describes the other's.
 // Every link is docs.alchemix.fi, checked 200 with its anchor on 2026-11-02.
 
 import Link from "next/link";
@@ -50,8 +50,8 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
 
   const glossary: [InfoTerm, ...InfoTerm[]] = [
     {
-      term: "Line",
-      definition: `A line is one synthetic together with its collateral, and it has its own Alchemist and Transmuter. This explorer covers the ${lineNames} ${many ? "lines" : "line"}.`,
+      term: "Market",
+      definition: `A market is one synthetic together with its collateral, and it has its own Alchemist and Transmuter. This explorer covers the ${lineNames} ${many ? "markets" : "market"}.`,
       sources: [D.selfRepaying],
     },
     {
@@ -61,26 +61,26 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
       sources: [D.transmuter],
     },
     {
-      term: "Set aside for repayment",
+      term: "Earmarked debt",
       definition:
-        "Set-aside debt is the part of the debt that converting Transmuter deposits have repaid, shared across every open loan in proportion to what each owes.",
+        "Earmarked debt is set aside to be repaid by redemptions: the part of the debt that converting Transmuter deposits have repaid, shared across every open loan in proportion to what each owes.",
       sources: [D.transmuter, D.repays],
     },
     {
       term: "Redemption",
       definition:
-        "A redemption is a depositor's claim in the Transmuter. It swaps the depositor's tokens for MYT taken from the collateral of the line's open loans, which repays the set-aside debt on all of them.",
+        "A redemption is a depositor's claim in the Transmuter. It swaps the depositor's tokens for MYT taken from the collateral of the market's open loans, which repays the earmarked debt on all of them.",
       sources: [D.selfRepaying, D.transmuter],
     },
     {
       term: "MYT",
-      definition: `An MYT is a token that stands for a share of a pool of one asset, which a Morpho vault lends out to earn a return (${vaults}). It is the collateral of a loan, and each line has its own. Its value rises as the pool earns and falls if the pool loses money.`,
+      definition: `An MYT is a token that stands for a share of a pool of one asset, which a Morpho vault lends out to earn a return (${vaults}). It is the collateral of a loan, and each market has its own. Its value rises as the pool earns and falls if the pool loses money.`,
       sources: [D.myt],
     },
     {
       term: "Alchemist",
       definition:
-        "The Alchemist is the contract that holds a line's loans. Each loan is an NFT, so it can be transferred, and the wallet holding it may not be the one that opened it.",
+        "The Alchemist is the contract that holds a market's loans. Each loan is an NFT, so it can be transferred, and the wallet holding it may not be the one that opened it.",
       sources: [D.borrow],
     },
     {
@@ -91,9 +91,9 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
       sources: alusdb ? [D.alAssets, D.alUSDb] : [D.alAssets],
     },
     {
-      term: "Collateralisation",
+      term: "LTV",
       definition:
-        "Collateralisation is the collateral's value in the asset underneath, divided by the debt. If a falling share price takes it below the minimum the line requires, anyone can liquidate the loan, which takes enough of the holder's collateral to bring the loan back under its maximum. The rest of the collateral stays.",
+        "LTV is the debt divided by the collateral's value in the asset underneath. If a falling share price takes it to the market's liquidation threshold or above, anyone can liquidate the loan, which takes enough of the holder's collateral to bring the loan back under its max LTV. The rest of the collateral stays.",
       sources: [D.liquidation],
     },
   ];
@@ -104,7 +104,7 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
       tracks={
         <>
           The Rails Alchemix explorer shows every self-repaying Alchemix V3 loan on {chain}, on the {lineNames}{" "}
-          {many ? "lines" : "line"}, and the history of each one. It also shows{" "}
+          {many ? "markets" : "market"}, and the history of each one. It also shows{" "}
           <Link href={transmuterListingPath(deployment)} className={INLINE_LINK}>
             the Transmuter
           </Link>
@@ -125,29 +125,29 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
       glossary={glossary}
       howItWorks={[
         <>
-          <GlossaryLink term="Line">A line</GlossaryLink> pairs a synthetic token with its collateral, the asset locked
-          to back a loan. A loan on a line lets you borrow that token against the collateral, and it repays itself over
-          time with no payments from the borrower. The repayment comes from the{" "}
+          <GlossaryLink term="Market">A market</GlossaryLink> pairs a synthetic token with its collateral, the asset
+          locked to back a loan. A loan on a market lets you borrow that token against the collateral, and it repays
+          itself over time with no payments from the borrower. The repayment comes from the{" "}
           <GlossaryLink term="Transmuter">Transmuter</GlossaryLink>, where any holder of the token can deposit it to
           exchange it for collateral.
         </>,
         <>
-          As deposits convert, the matching debt is{" "}
-          <GlossaryLink term="Set aside for repayment">set aside</GlossaryLink> across every open loan, so each borrower
-          shares the repayment in proportion to what they owe. When a depositor claims, a{" "}
-          <GlossaryLink term="Redemption">redemption</GlossaryLink> swaps the depositor's tokens for collateral taken
-          from the loans, which repays debt on all of them.
+          As deposits convert, the matching debt is <GlossaryLink term="Earmarked debt">earmarked</GlossaryLink> across
+          every open loan, so each borrower shares the repayment in proportion to what they owe. When a depositor
+          claims, a <GlossaryLink term="Redemption">redemption</GlossaryLink> swaps the depositor's tokens for
+          collateral taken from the loans, which repays debt on all of them.
         </>,
         <>
-          A loan has three parts, shown here on the {example.displayName} line:
+          A loan has three parts, shown here on the {example.displayName} market:
           <ul className={`mt-1 ${UL}`}>
             <li>
-              Collateral: {example.myt} (this line&apos;s <GlossaryLink term="MYT">MYT</GlossaryLink> token) deposited
+              Collateral: {example.myt} (this market&apos;s <GlossaryLink term="MYT">MYT</GlossaryLink> token) deposited
               in the <GlossaryLink term="Alchemist">Alchemist</GlossaryLink>.
             </li>
             <li>
               Loan: {example.displayName} (the <GlossaryLink term="Synthetic">synthetic</GlossaryLink>) created against
-              the collateral. You can borrow up to 90% of the deposit&apos;s value, the loan-to-value limit.
+              the collateral. You can borrow up to 90% of the deposit&apos;s value, the max{" "}
+              <GlossaryLink term="LTV">LTV</GlossaryLink>.
             </li>
             <li>
               Repayment: redemptions over time, or the holder paying back {example.displayName} or {example.myt} at any
@@ -200,14 +200,14 @@ export function AlchemixInfoPage({ deployment }: { deployment: AlchemixDeploymen
           ),
         },
         {
-          heading: "Lines page",
+          heading: "Markets page",
           body: (
             <p>
-              This page shows how many redemptions each line has had. A redemption changes every open loan of the line
-              at once, so after a line&apos;s first redemption the explorer reads each loan&apos;s figures from the
-              contract, because after a redemption a loan&apos;s own events no longer add up to its figures.
-              <Link href={`${deployment.basePath}/lines`} className={INLINE_LINK}>
-                See the lines
+              This page shows how many redemptions each market has had. A redemption changes every open loan of the
+              market at once, so after a market&apos;s first redemption the explorer reads each loan&apos;s figures from
+              the contract, because after a redemption a loan&apos;s own events no longer add up to its figures.
+              <Link href={`${deployment.basePath}/markets`} className={INLINE_LINK}>
+                See the markets
               </Link>{" "}
               to check how many redemptions each has had.
             </p>

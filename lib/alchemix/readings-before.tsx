@@ -1,7 +1,7 @@
 "use client";
 
 // The reading BEFORE each block on an Alchemist position's timeline, so a card
-// can state before → after on debt, collateral and set-aside.
+// can state before → after on debt, collateral and earmarked debt.
 // ----------------------------------------------------------------------------
 // Every block where debt or collateral can step carries a `getCDP` reading, and
 // the timeline carries every one of those blocks inside the position's life:
@@ -11,7 +11,7 @@
 // debt and collateral right up to this block. That is two readings side by side,
 // never an accumulation of events.
 //
-// SET-ASIDE IS THE EXCEPTION, and the card says so on the figure: it grows
+// EARMARKED DEBT IS THE EXCEPTION, and the card says so on the figure: it grows
 // block by block between readings, so its "before" is the figure at the
 // earlier block, named on its receipt, and the move includes that growth. The
 // card's bullets say how much of it built up in between, and over how long
@@ -83,7 +83,7 @@ export const AlchemixReadingsInOrderContext = createContext<AlchemixReading[] | 
 /** The reading in force at a block with none of its own: the latest one at or
  *  before it. Debt and collateral step only at blocks the sweep reads (rails-ops
  *  decisions/0032 point 5), so this row states them at that block. Its
- *  set-aside does not carry: it grows every block. Null where no earlier
+ *  earmarked debt does not carry: it grows every block. Null where no earlier
  *  reading is on the timeline. */
 export function useReadingInForce(block: number | null | undefined): AlchemixReading | null {
   const list = useContext(AlchemixReadingsInOrderContext);
@@ -98,7 +98,7 @@ export function useReadingInForce(block: number | null | undefined): AlchemixRea
 
 /** The blocks on the timeline that hold a line-scope row (a redemption, a
  *  batch liquidation). The reading at such a block is past that row too, so a
- *  card in the same block cannot put set-aside's move down to its transaction. */
+ *  card in the same block cannot put earmarked debt's move down to its transaction. */
 export function lineEventBlocks(events: AlchemistEvent[]): Set<number> {
   const out = new Set<number>();
   for (const e of events) if (e.context.data.scope === "line") out.add(e.blockNumber);
@@ -112,8 +112,9 @@ export function useLineEventInBlock(block: number | null | undefined): boolean {
   return set != null && block != null && set.has(block);
 }
 
-/** The line's two ratios as the position card states them, read at its
- *  block. Null where the page has no current reading. */
+/** The line's two getters as the position card reads them, at its block:
+ *  the Max LTV and the liquidation threshold are one over each. Null where the
+ *  page has no current reading. */
 export interface AlchemixLineRatios {
   minimumRaw: string;
   lowerBoundRaw: string;
@@ -126,8 +127,8 @@ export function useAlchemixLineRatios(): AlchemixLineRatios | null {
   return useContext(AlchemixLineRatiosContext);
 }
 
-/** Collateralisation at one reading, 1e18-scaled: the share count at the
- *  share price read with it, over the debt. Null with no debt, no share
+/** Collateral over debt at one reading, 1e18-scaled (the LTV is one over
+ *  it): the share count at the share price read with it, over the debt. Null with no debt, no share
  *  price, or no underlying decimals. */
 export function readingCollateralisationRaw(
   r: Pick<AlchemixReading, "collateralRaw" | "debtRaw" | "sharePriceRaw">,

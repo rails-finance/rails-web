@@ -5,8 +5,8 @@
 // every balance a getCDP reading the rows carry, so nothing is read beyond the
 // page's rows and its live read. A page whose rows stop short of the whole
 // history withholds the panel: a replay of part of a history would state the
-// wrong lifetime. The chart opens on the card's collateralisation against the
-// Alchemist's lower bound read at each picked event's block
+// wrong lifetime. The chart opens on the card's LTV against the liquidation
+// threshold, one over the Alchemist's lower bound read at each picked event's block
 // (lib/alchemix/flows-health.ts), over the vault's share price per reading.
 // It also gives the page the value that ties the panel to the timeline
 // (components/shared/flow-focus-context.tsx).
@@ -55,8 +55,9 @@ export interface AlchemixFlowsInput {
   open: boolean;
   /** The page's live read, where it landed. */
   live: AlchemixLive | null;
-  /** The card's lower bound and collateralisation now, fractions (1.25 is
-   *  125 %); the collateralisation null with no debt. */
+  /** The card's lower bound and collateral over debt now, the getters'
+   *  terms, fractions (1.25 is 125 %); the LTV is one over each. The second
+   *  is null with no debt. */
   bound: number | null;
   collateralisation: number | null;
 }
@@ -113,7 +114,8 @@ export function useAlchemixFlows(p: AlchemixFlowsInput): {
   const replayedTimeline = useMemo(() => (replay && opts ? alchemixFlowTimeline(replay, opts) : null), [replay, opts]);
 
   // The health view in the card's terms (ui-jobs 328 steps 6 and 8): the
-  // collateralisation against the lower bound at each picked event's block.
+  // LTV against the liquidation threshold at each picked event's block. The
+  // two inputs stay the getters' terms; the view inverts them.
   const bound = p.bound != null && p.bound > 0 ? p.bound : null;
   const alchemist = useMemo(() => (wholeEvents ? alchemistOf(wholeEvents) : null), [wholeEvents]);
   const healthEvents = useMemo<HealthPick[]>(
@@ -152,7 +154,8 @@ export function useAlchemixFlows(p: AlchemixFlowsInput): {
     events: healthEvents,
     liveHf: rColl > 0 && rBound > 0 ? rColl / rBound : null,
     liveLevels,
-    liveLine: rBound > 0 ? rBound : null,
+    // The line is the liquidation threshold, one over the bound.
+    liveLine: rBound > 0 ? 1 / rBound : null,
   });
   // The share price line carries the shares' level, and the view prints as
   // the card does, its days with no reading dotted.

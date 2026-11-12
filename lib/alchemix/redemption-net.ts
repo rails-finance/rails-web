@@ -146,11 +146,11 @@ export function sumRedemptionNets(nets: (RedemptionNet | null)[]): RedemptionNet
 }
 
 /** How far the vault's share price could fall before the position reaches the
- *  line's liquidation line. Debt and collateral are counted in one underlying,
- *  so collateralisation moves with the share price alone: it scales by
- *  (1 − fall), and liquidation is at the lower bound, so
- *  fall = 1 − lowerBound ÷ collateralisation. Null with no debt; zero at or
- *  below the line. */
+ *  line's liquidation threshold. Debt and collateral are counted in one
+ *  underlying, so the LTV moves with the share price alone: it scales by
+ *  1 ÷ (1 − fall), and liquidation is at the threshold, 1 ÷ lowerBound, so
+ *  fall = 1 − LTV ÷ threshold = 1 − lowerBound ÷ (totalValue ÷ debt). Null
+ *  with no debt; zero at or past the threshold. */
 export function shareFallToLiquidation(collateralizationRaw: string | null, lowerBoundRaw: string): number | null {
   if (collateralizationRaw == null) return null;
   const ratio = Number(collateralizationRaw);

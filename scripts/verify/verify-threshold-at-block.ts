@@ -17,7 +17,7 @@
 // (/api/chain/dolomite/risk-log).
 //
 // Held: the picks are healthReadPicks' over the events; every day's line is
-// the answer of the latest pick on or before it (Alchemix the lower bound,
+// the answer of the latest pick on or before it (Alchemix one over the lower bound,
 // Dolomite 1 + the core's ratio for the account), the days before the first
 // pick taking its answer, dotted; the markers are the steps (Alchemix, seen
 // at a pick) or the setter logs that moved a value on a market the account
@@ -188,8 +188,8 @@ for (const f of F.alchemix) {
     });
     const t = flatTimeline(f.events, ALCHEMIX_MYT_KEY, ALCHEMIX_DEBT_KEY);
     const h = checkLine(f.name, t, reads, alchemixHealthSource(f.chain, "USDC", "mixUSDC"));
-    // Collateralisation = 2 ÷ 1 on every day: the line alone moves.
-    assert.ok(h.points.every((p) => Math.abs(p[1] - 2) < 1e-12));
+    // LTV = 1 ÷ 2 on every day: the line alone moves.
+    assert.ok(h.points.every((p) => Math.abs(p[1] - 0.5) < 1e-12));
     // No step in these lives: the bound has stood at one value, so no marker.
     const bounds = new Set(reads.map((r) => r.line));
     const changes = alchemixBoundChanges(h.level!.points, null, f.alchemist);
@@ -214,13 +214,13 @@ test("alchemix: a stepped answer moves the line on the pick's day and draws its 
   const c = changes[0];
   assert.equal(c.day, Math.floor(picks[k].timestamp / DAY_S));
   assert.equal(c.block, picks[k].blockNumber);
-  assert.equal(c.name, "Lower bound");
-  assert.equal(c.from, "105.3%");
-  assert.equal(c.to, "110.0%");
+  assert.equal(c.name, "Liquidation threshold");
+  assert.equal(c.from, "95.0%");
+  assert.equal(c.to, "90.9%");
   assert.match(c.prov.summary, /seen at the read at block/);
   // A step at today's card read is marked at the card's block.
   const today = alchemixBoundChanges(
-    [...h.level!.points.slice(0, -1), [h.level!.points.at(-1)![0], 1.2, null]],
+    [...h.level!.points.slice(0, -1), [h.level!.points.at(-1)![0], 1 / 1.2, null]],
     999,
     null,
   );
