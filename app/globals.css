@@ -526,9 +526,10 @@ html.dark {
    or mark that opens a tooltip. One strength for the whole site: change
    --tip-underline-alpha to re-tune every cue at once. `tip-underline` is the
    text form; --tip-underline-color is the same ink for a border-bottom cue
-   under an icon. */
+   under an icon. Set to 0% (ui-jobs 602, Miles 12 Nov 2026): an experiment
+   reading the text without the cue; 30% brings it back everywhere. */
 :root {
-  --tip-underline-alpha: 30%;
+  --tip-underline-alpha: 0%;
   --tip-underline-color: color-mix(in srgb, currentColor var(--tip-underline-alpha), transparent);
 }
 @utility tip-underline {

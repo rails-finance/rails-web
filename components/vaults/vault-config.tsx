@@ -36,7 +36,7 @@ import type { ServerRead } from "@/lib/shared/server-head-read";
 const SCOPE = "vault-config";
 
 const LABEL =
-  "cursor-help text-[14px] font-semibold text-rb-500 underline decoration-rb-400 decoration-dotted underline-offset-4 dark:decoration-rb-500";
+  "cursor-help text-[14px] font-semibold text-rb-500 tip-underline";
 
 const MUTED = "text-[13px] font-normal text-rb-500";
 
