@@ -30,7 +30,7 @@ export const FRONT_DOOR = {
   /** A row's gauge stake, part of the row's share: the gauge holds these shares for the wallet. */
   rowStakedLabel: "Of which staked in a gauge",
   rowStaked: (s: number) => `${FRONT_DOOR.rowStakedLabel}: ${share(s)}`,
-  stakedTip: "Pool shares this wallet staked in the pool's gauge. The gauge holds them and pays rewards on them.",
+  stakedTip: "Pool shares this wallet staked in the pool's gauge. The gauge holds them for the wallet.",
 };
 
 /** The index's count on the front door (rails-ops decision 0063). */

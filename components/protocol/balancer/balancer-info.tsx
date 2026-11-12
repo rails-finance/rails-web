@@ -55,7 +55,7 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Gauge",
     definition:
-      "A gauge is a contract beside a pool where holders stake their pool shares to earn BAL and other rewards. Staked shares are held by the gauge.",
+      "A gauge is a staking contract beside a pool. Shares staked in it are held by the gauge. Balancer's documentation says BAL emissions are halted and the gauge contracts are no longer used for them.",
     sources: [DOCS],
   },
   {
@@ -160,7 +160,7 @@ export function BalancerInfo({ chainId }: { chainId: BalChainId }) {
           one it shows the wallet&apos;s part of the pool&apos;s tokens and the pool over the last 30 days.
         </>
       }
-      notCovered="Balancer V2 pools, BAL and other gauge rewards, and veBAL aren't covered here."
+      notCovered="Balancer V2 pools, gauge rewards and veBAL aren't covered here."
       glossary={glossary}
       howItWorks={howItWorks}
       reads={reads(chainId)}
