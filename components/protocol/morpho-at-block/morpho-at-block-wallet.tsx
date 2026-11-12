@@ -10,6 +10,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight } from "lucide-react";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { Prov } from "@/components/shared/provenance";
@@ -121,7 +122,7 @@ export async function MorphoAtBlockWallet({ dep, wallet: raw }: { dep: MorphoAtB
         {r && <p className="text-xs text-rb-500">{FRONT_DOOR.read(r.marketsRead)}</p>}
       </header>
       {!r ? (
-        <p className="text-sm text-rb-500">{FRONT_DOOR.unanswered}</p>
+        <UnansweredLine ceiling={answer.kind === "ceiling"}>{FRONT_DOOR.unanswered}</UnansweredLine>
       ) : rows.length === 0 ? (
         <p className="text-sm text-rb-500" {...hook("none", "")}>
           {FRONT_DOOR.none}

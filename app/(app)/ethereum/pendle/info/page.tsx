@@ -3,7 +3,12 @@
 // (rails-ops standards/info-page-template.md). Every link is a page of
 // docs.pendle.finance, the host content/official-docs.json lists for pendle.
 
-import { ProtocolInfoPage, type InfoReads, type InfoTerm } from "@/components/shared/protocol-info-page";
+import {
+  ProtocolInfoPage,
+  type InfoReads,
+  type InfoTerm,
+  GUIDE_NO_LEARN_MORE,
+} from "@/components/shared/protocol-info-page";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import {
   PENDLE_LIMIT_ROUTER,
@@ -96,6 +101,7 @@ const reads: InfoReads = {
 export default function PendleInfoPage() {
   return (
     <ProtocolInfoPage
+      guide={GUIDE_NO_LEARN_MORE}
       session="pendle"
       tracks={
         <>

@@ -7,7 +7,13 @@
 // layout's strip covers this route.
 
 import Link from "next/link";
-import { GlossaryLink, ProtocolInfoPage, type InfoReads, type InfoView } from "@/components/shared/protocol-info-page";
+import {
+  GlossaryLink,
+  ProtocolInfoPage,
+  type InfoReads,
+  type InfoView,
+  GUIDE_NO_LEARN_MORE,
+} from "@/components/shared/protocol-info-page";
 import { aaveV3Glossary } from "@/lib/aave-v3/event-templates";
 import { AAVE_V3_OPTIMISM_CONTRACTS as C, OP_ROUTE } from "@/lib/aave-v3-optimism/types";
 import { infoMetadata } from "@/lib/shared/page-metadata";
@@ -66,7 +72,7 @@ const reads: InfoReads = {
     {
       name: "UiPoolDataProvider",
       address: C.uiPoolDataProvider,
-      reads: "an account's balances, collateral switches and eMode category in one call.",
+      reads: "an account's balances, collateral switches and E-Mode category in one call.",
     },
     { name: "AaveOracle", address: C.oracle, reads: "each reserve's dollar price." },
     { name: "PoolAddressesProvider", address: C.addressesProvider, reads: "the Pool and oracle it names." },
@@ -82,6 +88,7 @@ const reads: InfoReads = {
 export default function InfoPage() {
   return (
     <ProtocolInfoPage
+      guide={GUIDE_NO_LEARN_MORE}
       session="aave-v3-optimism"
       tracks={
         <>
@@ -108,7 +115,7 @@ export default function InfoPage() {
         <>
           A wallet&apos;s <GlossaryLink term="Collateral">collateral</GlossaryLink> backs all its{" "}
           <GlossaryLink term="Debt">debt</GlossaryLink> in the Pool under one{" "}
-          <GlossaryLink term="Health factor">health factor</GlossaryLink>. An eMode category lends higher thresholds to
+          <GlossaryLink term="Health factor">health factor</GlossaryLink>. An E-Mode category lends higher thresholds to
           related assets, such as ETH and its staked forms.
         </>,
         <>

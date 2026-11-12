@@ -20,7 +20,7 @@ export const metadata = listingMetadata({
   title: "Explore Seamless positions on Base",
   canonicalPath: "/base/seamless",
   description:
-    "Every Seamless account on Base, a lending market closed to new deposits and loans since April 2025: what each wallet still holds and owes.",
+    "Every Seamless account on Base, a lending market closed to new supply and borrowing since April 2025: what each wallet still holds and owes.",
 });
 
 async function SeamlessListingPage({ searchParams }: { searchParams: Promise<RawSearchParams> }) {

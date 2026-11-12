@@ -227,7 +227,7 @@ const PAGES = [
     health: true,
     changes: {
       day: 20348,
-      name: "E-mode “PT-USDe USDe Nov 2025” liquidation threshold",
+      name: "E-Mode “PT-USDe USDe Nov 2025” liquidation threshold",
       from: "91.50 %",
       to: "92 %",
       block: 23382225,

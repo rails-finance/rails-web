@@ -526,7 +526,8 @@ function HubsBody({ d }: { d: V4Deployment }) {
   const hubs = useMemo(() => (s ? hubsOf(s) : []), [s]);
   let body: ReactNode;
   if (stored.state === "loading" || (stored.state === "ok" && !prices)) body = <SkeletonBlock height={480} />;
-  else if (stored.state === "error") body = <ProductFailed what="the hubs" message={stored.message} />;
+  else if (stored.state === "error")
+    body = <ProductFailed what="the hubs" message={stored.message} ceiling={stored.ceiling} />;
   else
     body = (
       <>

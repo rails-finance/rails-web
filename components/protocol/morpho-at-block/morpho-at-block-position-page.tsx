@@ -12,6 +12,7 @@ import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { MorphoAtBlockPositionCard } from "@/components/protocol/morpho-at-block/morpho-at-block-position-card";
 import { fetchMorphoAtBlockPosition } from "@/lib/api/fetch-morpho-at-block";
 import { morphoAtBlockFigures } from "@/lib/morpho-at-block/position";
@@ -64,13 +65,17 @@ export async function MorphoAtBlockPositionPage({
       {words.notIndexed}
     </p>
   ) : null;
-  if (answer.kind === "error")
+  if (answer.kind === "error" || answer.kind === "ceiling")
     return (
       <div className="py-8">
         {head}
-        <p className="mt-6 text-sm text-rb-500" data-position-unanswered="">
+        <UnansweredLine
+          ceiling={answer.kind === "ceiling"}
+          className="mt-6 text-sm text-rb-500"
+          data-position-unanswered=""
+        >
           {words.unanswered}
-        </p>
+        </UnansweredLine>
       </div>
     );
   const r = answer.data;

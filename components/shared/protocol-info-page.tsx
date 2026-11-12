@@ -21,6 +21,16 @@ import { CHAINS, explorerUrl, MAINNET_CHAIN_ID, type ChainId } from "@/lib/share
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { shortAddress } from "@/lib/shared/asset-roster";
 import { InfoHistoryLine } from "@/components/shared/history-tag";
+import { Prov, type Provenance } from "@/components/shared/provenance";
+
+/** Slot I6, the pointer line, where an explorer passes no `guide`: true of a
+ *  page whose cards carry all four controls (label tip, (i), ?, ⋮). */
+const GUIDE_DEFAULT =
+  "Press a figure's label to read what it means. The (i) under a card says what its figures mean for that position, and the ? beside it explains how that kind of position works. A card's ⋮ menu traces each figure to the chain.";
+
+/** Slot I6 for an explorer whose cards have no ?, passed as its `guide`. */
+export const GUIDE_NO_LEARN_MORE =
+  "Press a figure's label to read what it means. The (i) under a section says what its figures mean for the wallet. A section's ⋮ menu traces each figure to the chain.";
 
 export interface InfoDocLink {
   label: string;
@@ -105,6 +115,41 @@ function InfoReadsSection({ reads, chainId }: { reads: InfoReads; chainId: Chain
   );
 }
 
+/** One place where the protocol's docs and its contracts or chain say
+ *  different things (ui-jobs 609): the difference in one line, the docs'
+ *  words as a quoted link, and what the chain holds, with its receipt where
+ *  one exists. */
+export interface InfoDocsAndChain {
+  /** The difference, one plain sentence. */
+  claim: string;
+  docs: { words: string; href: string };
+  chain: { words: string; prov?: Provenance };
+}
+
+export const DOCS_AND_CHAIN_HEADING = "Where the docs and the chain differ";
+
+/** The docs-and-chain section, after the glossary whose terms it qualifies.
+ *  Drawn only where an explorer passes at least one entry. */
+function InfoDocsAndChainSection({ items }: { items: readonly InfoDocsAndChain[] }) {
+  return (
+    <section data-info-docs-chain="">
+      <h2 className={H}>{DOCS_AND_CHAIN_HEADING}</h2>
+      <ul className={UL}>
+        {items.map((d) => (
+          <li key={d.claim} data-info-docs-chain-item="">
+            {d.claim} <span className="text-rb-400">Docs:</span>{" "}
+            <a href={d.docs.href} className={INLINE_LINK} target="_blank" rel="noopener">
+              &ldquo;{d.docs.words}&rdquo;
+            </a>
+            . <span className="text-rb-400">Chain:</span>{" "}
+            {d.chain.prov ? <Prov info={d.chain.prov}>{d.chain.words}</Prov> : d.chain.words}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /** The glossary's heading: one word, one place to change it. */
 export const GLOSSARY_HEADING = "Glossary";
 
@@ -173,12 +218,15 @@ export interface ProtocolInfoPageProps {
   /** Slot 5: the search and filter line, only where the listing has them. */
   search?: ReactNode;
   /** Slot I6, how to read the pages, where the explorer's pages differ from the
-   *  default sentence (an explorer with no event cards). */
+   *  default sentence (`GUIDE_NO_LEARN_MORE` where its cards have no ?). */
   guide?: ReactNode;
   /** One sentence naming what a reader might expect here and will not find, shown beside the coverage door. Omit it when nothing is expected and missing. */
   notCovered?: string;
   /** Slot 6: the official documentation, the page's final line. */
   docs: InfoDocLink;
+  /** After the glossary: where the protocol's docs and its contracts or chain
+   *  differ, with both sources. Absent or empty, nothing is drawn. */
+  docsAndChain?: readonly InfoDocsAndChain[];
 }
 
 export function ProtocolInfoPage({
@@ -192,6 +240,7 @@ export function ProtocolInfoPage({
   guide,
   notCovered,
   docs,
+  docsAndChain,
 }: ProtocolInfoPageProps) {
   const entry = protocolForSession(session);
   const chainId = entry?.chainId ?? MAINNET_CHAIN_ID;
@@ -241,6 +290,8 @@ export function ProtocolInfoPage({
           ))}
         </dl>
 
+        {docsAndChain && docsAndChain.length > 0 && <InfoDocsAndChainSection items={docsAndChain} />}
+
         {views.map((v) => (
           <section key={v.heading}>
             <h2 className={H}>{v.heading}</h2>
@@ -255,12 +306,7 @@ export function ProtocolInfoPage({
         )}
 
         <p className="mt-5" data-anatomy="I6">
-          {guide ?? (
-            <>
-              Tap the (i) beside any figure to see where it comes from. Inside, the ? explains that kind of event in
-              general.
-            </>
-          )}
+          {guide ?? GUIDE_DEFAULT}
         </p>
       </div>
       <p className="mt-4 text-sm text-rb-500" data-anatomy="I3">

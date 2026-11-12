@@ -71,7 +71,8 @@ export function ReservePage({
   );
   let body: ReactNode;
   if (reserve.state === "loading") body = <ProductLoading height={480} />;
-  else if (reserve.state === "error") body = <ProductFailed what={what} message={reserve.message} />;
+  else if (reserve.state === "error")
+    body = <ProductFailed what={what} message={reserve.message} ceiling={reserve.ceiling} />;
   else if (!data)
     body = (
       <div className="py-12 text-center text-rb-500" data-reserve-missing="">

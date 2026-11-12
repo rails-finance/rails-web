@@ -12,6 +12,7 @@ import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { CompoundV3OptimismPositionCard } from "@/components/protocol/compound-v3-optimism/compound-v3-optimism-position-card";
 import { fetchCompoundV3OptimismPosition } from "@/lib/api/fetch-compound-v3-optimism";
 import { compoundOptimismMarketOf } from "@/lib/compound-v3-optimism/asset-catalog";
@@ -42,13 +43,17 @@ export async function CompoundV3OptimismPositionPage({ market, wallet: raw }: { 
       tools={false}
     />
   );
-  if (answer.kind === "error")
+  if (answer.kind === "error" || answer.kind === "ceiling")
     return (
       <div className="py-8">
         {head}
-        <p className="mt-6 text-sm text-rb-500" data-position-unanswered="">
+        <UnansweredLine
+          ceiling={answer.kind === "ceiling"}
+          className="mt-6 text-sm text-rb-500"
+          data-position-unanswered=""
+        >
           {POSITION_PAGE.unanswered}
-        </p>
+        </UnansweredLine>
       </div>
     );
   const r = answer.data;

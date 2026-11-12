@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { AimGate } from "@/components/shared/aim-gate";
 import { assetKey } from "@/lib/shared/asset-family";
 import { isWallet } from "@/components/protocol/uniswap/uniswap-wallet-positions";
@@ -43,13 +44,17 @@ export async function BalancerPositionPage({
   const chain = BAL_CHAINS[chainId];
   const session = chain.session;
   const home = chain.home;
-  if (answer.kind === "error" || answer.kind === "refused")
+  if (answer.kind === "error" || answer.kind === "refused" || answer.kind === "ceiling")
     return (
       <div className="py-8">
         <DetailTopRow session={session} fallbackHref={`${home}/${wallet}`} showStamp={false} />
-        <p className="mt-6 text-sm text-rb-500" data-position-unanswered={answer.kind === "refused" ? answer.code : ""}>
+        <UnansweredLine
+          ceiling={answer.kind === "ceiling"}
+          className="mt-6 text-sm text-rb-500"
+          data-position-unanswered={answer.kind === "refused" ? answer.code : ""}
+        >
           {answer.kind === "refused" ? REFUSED[answer.code] : POSITION_PAGE.unanswered}
-        </p>
+        </UnansweredLine>
       </div>
     );
   const r = answer.data;

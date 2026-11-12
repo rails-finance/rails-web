@@ -13,6 +13,7 @@ import { DetailTopRow } from "@/components/shared/detail-back-row";
 import { HistoryTitleRow } from "@/components/shared/history-tag";
 import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AimGate } from "@/components/shared/aim-gate";
+import { UnansweredLine } from "@/components/shared/unanswered-line";
 import { poolTokenKeys } from "@/components/protocol/uniswap/pool-focus-keys";
 import { AerodromePositionCard } from "@/components/protocol/aerodrome/aerodrome-position-card";
 import { AerodromeReadout } from "@/components/protocol/aerodrome/aerodrome-readout";
@@ -47,13 +48,17 @@ export async function AerodromePositionPage({
   const session = site.id;
   const chain = site.chainId;
   const home = explorerHref(chain, session);
-  if (answer.kind === "error")
+  if (answer.kind === "error" || answer.kind === "ceiling")
     return (
       <div className="py-8">
         <DetailTopRow session={session} fallbackHref={home} showStamp={false} />
-        <p className="mt-6 text-sm text-rb-500" data-position-unanswered="">
+        <UnansweredLine
+          ceiling={answer.kind === "ceiling"}
+          className="mt-6 text-sm text-rb-500"
+          data-position-unanswered=""
+        >
           {POSITION_PAGE.unanswered}
-        </p>
+        </UnansweredLine>
       </div>
     );
   const r = answer.data;

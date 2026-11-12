@@ -872,7 +872,8 @@ export function cometModel(
   overview: boolean,
 ): Loadable<MarketModel> {
   const m = data.markets.find((x) => x.key === key);
-  if (data.chainStale || data.blockNumber <= 0 || !m) return { state: "error", message: FAILED };
+  if (data.chainStale || data.blockNumber <= 0 || !m)
+    return { state: "error", message: FAILED, ceiling: data.readCeiling };
   const c = ctxOf(data, chain, m);
   return { state: "ok", data: { head: head(c, overview), ...(overview ? {} : { sections: sections(c) }) } };
 }

@@ -81,7 +81,7 @@ export default function InfoPage() {
           heading: "Market page",
           body: (
             <p>
-              The market page lists every asset in the Pool with its size, its supply and borrow rates and its risk
+              The market page lists every asset in the Pool with its size, its supply and borrow APYs and its risk
               settings, read live.{" "}
               <Link href="/ethereum/spark/markets" className={INLINE_LINK}>
                 See the SparkLend market

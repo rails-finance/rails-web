@@ -6,6 +6,7 @@
 // it: the history's `source`, `dayClose` and `identity` are the route's own
 // sentences, quoted.
 
+import { APY_FORMULA } from "@/lib/aave-family/apy";
 import { powerOfTen, type Provenance } from "@/components/shared/provenance";
 import type {
   DeficitCover,
@@ -38,8 +39,29 @@ export function historyRateProv(
   symbol: string,
   p: HistoryPoint,
   h: ReserveHistory,
+  /** "apy" where the family states the rate compounded (SparkLend). */
+  form: "apr" | "apy" = "apr",
 ): Provenance {
   const field = side === "supply" ? "liquidityRate" : "variableBorrowRate";
+  if (form === "apy")
+    return {
+      kind: "chain-derived",
+      pclass: "emitted",
+      source: { block: p.log.block, txHash: p.log.txHash },
+      summary: `${symbol} ${side} APY at the ${p.date} close — ReserveDataUpdated's ${field} from ${h.source}, a rate a year in rays (${powerOfTen(27)} = 100%), compounded every second over a 365-day year. ${h.dayClose} That day closes at block ${block(p.closeBlock)}; the log in force is at block ${block(p.log.block)}.`,
+      via: `${HISTORY_ROUTE} · ReserveDataUpdated.${field} ÷ ${powerOfTen(27)}, compounded`,
+      formula: APY_FORMULA,
+      inputs: [
+        {
+          label: field,
+          value: p[field],
+          kind: "chain",
+          pclass: "emitted",
+          note: `ray, ${powerOfTen(27)} = 100% a year`,
+        },
+        { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+      ],
+    };
   return {
     kind: "chain",
     pclass: "emitted",

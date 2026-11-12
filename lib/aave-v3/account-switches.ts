@@ -9,6 +9,7 @@
 //
 // Client-safe: no RPC.
 
+import { AAVE_FAMILY_TERMS } from "@/lib/aave-family/terms";
 import type { BaseActivityEvent, EmodeSwitchFields } from "@/lib/shared/types/event-shape";
 import type { ServedTimelineRow } from "@/lib/shared/timeline-folder";
 import { explorerUrl, type ChainId } from "@/lib/shared/chains";
@@ -76,7 +77,7 @@ export function emodeSwitchEvents(
       timestamp: x.timestamp,
       wallet: wallet.toLowerCase(),
       actionType: "emode",
-      actionLabel: "E-mode",
+      actionLabel: AAVE_FAMILY_TERMS[arm].emode,
       flows: [],
       etherscanUrl: explorerUrl(chainId, "tx-logs", x.txHash),
     };

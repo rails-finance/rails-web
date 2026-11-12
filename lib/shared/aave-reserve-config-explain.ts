@@ -38,6 +38,8 @@ export interface ReserveExplainNames {
   symbol: string;
   /** The compact figure (lib/shared/compact-figure.ts `compactFigure`). */
   compact: (n: number) => string;
+  /** The family's spelling of the mode (lib/aave-family/terms.ts); "E-Mode" where absent. */
+  emode?: string;
 }
 
 export interface ReserveChangeExplained {
@@ -119,12 +121,12 @@ const WORDS = {
   borrowOnWhat: (n: N) => `The Pool lends ${n.symbol} again.`,
   borrowOffWhat: (n: N) => `The Pool stops lending ${n.symbol}; open loans stay open and can be repaid.`,
 
-  eModeWhat:
-    "An eMode category is a set of assets with its LTV, liquidation threshold and liquidation bonus; a borrower who chooses the category borrows on those terms.",
+  eModeWhat: (n: N) =>
+    `An ${n.emode ?? "E-Mode"} category is a set of assets with its LTV, liquidation threshold and liquidation bonus; a borrower who chooses the category borrows on those terms.`,
   joined: (n: N, cat: string) =>
     `Borrowers who choose ${cat} count ${n.symbol} at the category's LTV and liquidation threshold, and can borrow it there.`,
   leftAll: (n: N) =>
-    `${n.symbol} belongs to no eMode category now: every borrower counts it at the reserve's LTV and liquidation threshold.`,
+    `${n.symbol} belongs to no ${n.emode ?? "E-Mode"} category now: every borrower counts it at the reserve's LTV and liquidation threshold.`,
   collateralOn: (n: N, cat: string) =>
     `Borrowers who choose ${cat} count ${n.symbol} as collateral at the category's LTV and liquidation threshold.`,
   collateralOff: (n: N, cat: string) => `Borrowers in ${cat} lose the category's terms on ${n.symbol} collateral.`,
@@ -262,20 +264,20 @@ function eModeRow(n: N, c: ReserveChange, e: EModeState): Read | null {
       return {
         parts: [{ summary: c.words }],
         mark: mark("layers"),
-        bullets: [WORDS.eModeWhat, to === 0 ? WORDS.leftAll(n) : WORDS.joined(n, e.name(to))],
+        bullets: [WORDS.eModeWhat(n), to === 0 ? WORDS.leftAll(n) : WORDS.joined(n, e.name(to))],
       };
     }
     case "emode-collateral":
       return {
         parts: [{ summary: c.words }],
         mark: mark("layers"),
-        bullets: [WORDS.eModeWhat, on(r.collateral) ? WORDS.collateralOn(n, cat) : WORDS.collateralOff(n, cat)],
+        bullets: [WORDS.eModeWhat(n), on(r.collateral) ? WORDS.collateralOn(n, cat) : WORDS.collateralOff(n, cat)],
       };
     case "emode-borrowable":
       return {
         parts: [{ summary: c.words }],
         mark: mark("layers"),
-        bullets: [WORDS.eModeWhat, on(r.borrowable) ? WORDS.borrowableOn(n, cat) : WORDS.borrowableOff(n, cat)],
+        bullets: [WORDS.eModeWhat(n), on(r.borrowable) ? WORDS.borrowableOn(n, cat) : WORDS.borrowableOff(n, cat)],
       };
     case "emode-ltvzero":
       return {
@@ -300,7 +302,7 @@ function eModeRow(n: N, c: ReserveChange, e: EModeState): Read | null {
       const next = { ltv: Number(r.ltv), lt: Number(r.lt), bonus: Number(r.bonus) };
       const prev = e.terms.get(id);
       const per100 = (v: number) => String(v / 100);
-      const bullets: string[] = prev ? [] : [WORDS.eModeWhat];
+      const bullets: string[] = prev ? [] : [WORDS.eModeWhat(n)];
       if (!prev || prev.ltv !== next.ltv) bullets.push(WORDS.eLtv(cat, per100(next.ltv)));
       if (!prev || prev.lt !== next.lt) bullets.push(WORDS.eLt(cat, per100(next.lt)));
       if (!prev || prev.bonus !== next.bonus) bullets.push(WORDS.eBonus(cat, pct(next.bonus - 10_000)));
@@ -406,7 +408,7 @@ export function reserveChangesExplained(changes: ReserveChange[], n: N): Reserve
     name: (v) => {
       const id = Number(v);
       const label = labels.get(id);
-      return label ? `${label} (${id})` : `eMode category ${id}`;
+      return label ? `${label} (${id})` : `${n.emode ?? "E-Mode"} category ${id}`;
     },
     terms: new Map(),
     isolated: new Map(),
