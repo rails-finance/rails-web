@@ -287,6 +287,11 @@
      `--brand-strength: 0` on a card with no hue draws a grey zone. */
   --brand-zone-l: 0.93;
   --brand-zone-c: 0.035;
+  /* The blue band (hues 215 to 305, fullest at 260) is at sRGB's edge at
+     0.93, so its panel steps darker and stronger there, by up to these
+     (TO-DO-position-card 427): a 15° step then reads on the panel. */
+  --brand-zone-blue-l: -0.04;
+  --brand-zone-blue-c: 0.017;
   --brand-edge-l: 0.8;
   --brand-edge-c: 0.08;
   --brand-zone-text: color-mix(in oklch, var(--foreground) 25%, transparent);
@@ -302,6 +307,8 @@
      Morpho's near #1e3a7a, the 22 Oct 2026 mock-ups. */
   --brand-zone-l: 0.31;
   --brand-zone-c: 0.075;
+  --brand-zone-blue-l: 0;
+  --brand-zone-blue-c: 0.03;
   --brand-edge-l: 0.45;
   --brand-edge-c: 0.1;
   --brand-zone-text: color-mix(in oklch, var(--foreground) 25%, transparent);
@@ -469,7 +476,12 @@ html.dark {
 /* The sidebar's tint (C20): `--brand-hue` resolves on the element that draws
    it, inherited from the card's frame. */
 @utility bg-brand-zone {
-  background-color: oklch(var(--brand-zone-l) calc(var(--brand-zone-c) * var(--brand-strength, 1)) var(--brand-hue, 0));
+  --brand-blue: max(0, 1 - max(var(--brand-hue, 0) - 260, 260 - var(--brand-hue, 0)) / 45);
+  background-color: oklch(
+    calc(var(--brand-zone-l) + var(--brand-zone-blue-l) * var(--brand-blue) * var(--brand-strength, 1))
+      calc((var(--brand-zone-c) + var(--brand-zone-blue-c) * var(--brand-blue)) * var(--brand-strength, 1))
+      var(--brand-hue, 0)
+  );
 }
 @utility bg-brand-edge {
   background-color: oklch(var(--brand-edge-l) calc(var(--brand-edge-c) * var(--brand-strength, 1)) var(--brand-hue, 0));
