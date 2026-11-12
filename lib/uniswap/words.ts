@@ -35,6 +35,10 @@ export function pct(x: number, digits = 2): string {
 /** A share, unsigned: "0.312%". */
 export const share = (x: number, digits = 3): string => pct(x, digits).replace("+", "");
 
+/** A change against holding, stated the docs' way as a loss: a position worth 1.2% less reads "1.20%",
+ *  and one the fees carried past holding reads below zero. */
+export const loss = (x: number): string => pct(x === 0 ? 0 : -x).replace("+", "");
+
 /** "9 Nov 2026" from unix seconds. */
 export function day(ts: number): string {
   return new Date(ts * 1000).toLocaleDateString("en-GB", {
@@ -454,9 +458,9 @@ export function readoutTable(p: PoolPosition): PoolTable {
           {
             key: "against",
             part: "yours",
-            label: "Against holding",
+            label: "Impermanent loss",
             then: null,
-            now: pct(p.againstHolding),
+            now: loss(p.againstHolding),
             single: true,
           },
           {
@@ -464,7 +468,7 @@ export function readoutTable(p: PoolPosition): PoolTable {
             part: "yours",
             label: "With fees",
             then: null,
-            now: pct(p.againstHoldingWithFees),
+            now: loss(p.againstHoldingWithFees),
             single: true,
           },
         ]
@@ -623,7 +627,10 @@ export function readoutExplainer(p: PoolPosition): ExplainGroupWords[] {
         : p.liquidityChanged
           ? [["Its liquidity changed inside the window, so it has no 30-day figure yet."]]
           : []),
-    ["Against holding compares the position now with keeping the tokens it held 30 days ago, both at today's price."],
+    [
+      "Impermanent loss is how much less the position is worth now than the tokens it held 30 days ago, both at today's price.",
+      "With fees takes the 30-day fees off that loss. Below zero, the fees outweighed it.",
+    ],
     ...(sd
       ? [
           [
