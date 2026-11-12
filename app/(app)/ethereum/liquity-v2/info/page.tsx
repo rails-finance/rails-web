@@ -41,25 +41,25 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "Interest rate",
     definition:
-      "Each borrower sets the interest rate on a Trove and can change it. A change within 7 days of the last change adds an upfront fee. A low rate costs less but puts the Trove earlier in the redemption queue.",
+      "Each borrower sets the interest rate on a Trove and can change it. A change within 7 days of the last change adds an Upfront Borrowing Fee. A low rate costs less but puts the Trove earlier in the redemption queue.",
     sources: [{ label: "User-set rates", href: BORROWING + "#what-are-user-set-rates" }],
   },
   {
-    term: "Upfront fee",
+    term: "Upfront Borrowing Fee",
     definition:
-      "The upfront fee is charged when a borrower opens a Trove, adds debt, joins a batch, or changes the rate within 7 days of the last change. It equals 7 days of average interest and is added to the debt.",
+      "The Upfront Borrowing Fee is charged when a borrower opens a Trove, adds debt, joins a batch, or changes the rate within 7 days of the last change. It equals 7 days of average interest and is added to the debt.",
     sources: [{ label: "Other borrowing fees", href: BORROWING + "#are-there-any-other-fees-related-to-borrowing" }],
   },
   {
     term: "Liquidation reserve",
     definition:
-      "Opening a Trove also sets aside a reserve of 0.0375 WETH. It pays the gas, the fee for a transaction on Ethereum, if the Trove is ever liquidated. The reserve is returned when the Trove closes.",
+      "Opening a Trove also sets aside a liquidation reserve of 0.0375 WETH, a refundable gas deposit. It pays the gas, the fee for a transaction on Ethereum, if the Trove is ever liquidated. The reserve is returned when the Trove closes.",
     sources: [{ label: "Refundable gas deposit", href: BORROWING + "#what-is-the-refundable-gas-deposit" }],
   },
   {
-    term: "Batch manager",
+    term: "Delegate",
     definition:
-      "A batch manager sets one interest rate for all the Troves in its batch and charges a yearly management fee, which is added to the debt on top of the interest. A manager can change the rate only within a range set in advance. A Trove that leaves a batch sets its own interest rate again.",
+      "A delegate sets one interest rate for all the Troves in its batch and charges a yearly management fee, which is added to the debt on top of the interest. A delegate can change the rate only within a range set in advance. A Trove that leaves a batch sets its own interest rate again.",
     sources: [{ label: "Delegation of interest rates", href: REDEMPTIONS + "#what-is-delegation-of-interest-rates" }],
   },
   {
@@ -121,13 +121,13 @@ const glossary: readonly [InfoTerm, ...InfoTerm[]] = [
   {
     term: "TCR",
     definition:
-      "The total collateral ratio (TCR) is the collateral ratio of a whole branch: the value of all its collateral divided by all its debt. It shows the branch's overall health.",
+      "The Total Collateral Ratio (TCR) is the collateral ratio of a whole branch: the value of all its collateral divided by all its debt. It shows the branch's overall health.",
     sources: [{ label: "Safety Mode", href: BORROWING + "#what-is-safety-mode" }],
   },
   {
     term: "Shutdown",
     definition:
-      "A branch shuts down when its TCR falls below the shutdown ratio (110% for WETH, 120% for wstETH and rETH) or its price feed, the service that reports the collateral's price, fails. A shutdown is permanent.",
+      "A branch shuts down when its TCR falls below the Shutdown Collateral Ratio (SCR) (110% for WETH, 120% for wstETH and rETH) or its price feed, the service that reports the collateral's price, fails. A shutdown is permanent.",
     sources: [{ label: "Shutdown Mode", href: BORROWING + "#what-is-shutdown-mode" }],
   },
 ];
@@ -162,8 +162,8 @@ const views: readonly [InfoView, ...InfoView[]] = [
           The wallet chip names the Trove&apos;s latest owner, and the history belongs to the Trove whoever held it.
         </li>
         <li>
-          A Trove can change without its owner acting: interest accrues, a batch manager changes the batch&apos;s rate,
-          a redemption repays part of it, and a redistribution adds debt and collateral.
+          A Trove can change without its owner acting: interest accrues, a delegate changes the batch&apos;s rate, a
+          redemption repays part of it, and a redistribution adds debt and collateral.
         </li>
         <li>
           A Trove&apos;s NFT can be transferred to another wallet, which changes the owner and leaves the loan as it
@@ -171,7 +171,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
         </li>
         <li>The lifetime flows panel totals every borrow, repayment, fee and redemption, with the net result.</li>
         <li>
-          The timeline lists each event, newest first, including a batch manager&apos;s rate changes and the redemptions
+          The timeline lists each event, newest first, including a delegate&apos;s rate changes and the redemptions
           against the Trove.
         </li>
       </ul>
@@ -217,9 +217,9 @@ export default function InfoPage() {
         </>,
         <>
           The borrower sets the <GlossaryLink term="Interest rate">interest rate</GlossaryLink> and can change it, or
-          hand it to a <GlossaryLink term="Batch manager">batch manager</GlossaryLink> who sets one rate for many
-          Troves. Interest is added to the debt as it accrues, and the minimum debt is 2,000 BOLD. Opening a Trove adds
-          an <GlossaryLink term="Upfront fee">upfront fee</GlossaryLink> to the debt and holds a{" "}
+          hand it to a <GlossaryLink term="Delegate">delegate</GlossaryLink> who sets one rate for many Troves. Interest
+          is added to the debt as it accrues, and the minimum debt is 2,000 BOLD. Opening a Trove adds an{" "}
+          <GlossaryLink term="Upfront Borrowing Fee">Upfront Borrowing Fee</GlossaryLink> to the debt and holds a{" "}
           <GlossaryLink term="Liquidation reserve">liquidation reserve</GlossaryLink>.
         </>,
         <>
@@ -238,8 +238,8 @@ export default function InfoPage() {
           a <GlossaryLink term="Redistribution">redistribution</GlossaryLink> to the branch&apos;s other Troves.
         </>,
         <>
-          Each branch has a <GlossaryLink term="TCR">TCR</GlossaryLink>. Below the shutdown ratio, or when its price
-          feed (the service that reports the collateral&apos;s price) fails, the branch goes into{" "}
+          Each branch has a <GlossaryLink term="TCR">TCR</GlossaryLink>. Below its Shutdown Collateral Ratio (SCR), or
+          when its price feed (the service that reports the collateral&apos;s price) fails, the branch goes into{" "}
           <GlossaryLink term="Shutdown">shutdown</GlossaryLink>: borrowing, adjustments (changes to a Trove&apos;s
           collateral or debt), rate changes and batch operations stop, while closing and redemptions continue.
         </>,

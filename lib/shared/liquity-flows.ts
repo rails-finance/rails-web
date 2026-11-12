@@ -171,7 +171,14 @@ export function liquityFlowBuckets(surplusClaimed: boolean, family: LiquityFamil
     // Each inflow after Borrowed has its texture; interest is dashed
     // (standards/lexicon.md, lifetime bars' fills).
     { key: LQ.interest, label: "Interest", event: "", side: "debt", dir: "in", hatch: "dashes" },
-    { key: LQ.upfront, label: "Upfront fees", event: "Upfront fee", side: "debt", dir: "in", hatch: "checker" },
+    {
+      key: LQ.upfront,
+      label: "Upfront Borrowing Fees",
+      event: "Upfront Borrowing Fee",
+      side: "debt",
+      dir: "in",
+      hatch: "checker",
+    },
     { key: LQ.batchFee, label: "Batch management fees", event: "", side: "debt", dir: "in", hatch: "dots" },
     {
       key: LQ.redistDebt,

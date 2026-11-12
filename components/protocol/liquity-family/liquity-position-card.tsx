@@ -721,8 +721,11 @@ export function useLiquityCardSlots({
       ) : undefined,
     };
   } else {
+    // Liquity V2's docs name the party a delegate (decision 0065); the forks
+    // keep "Batch manager" until their own docs are read.
+    const managerWord = protocol === "liquity-v2" ? "Delegate" : "Batch manager";
     const managerName =
-      v.batch?.managerName ?? (v.batch?.managerAddress ? ops.shortId(v.batch.managerAddress) : "Batch manager");
+      v.batch?.managerName ?? (v.batch?.managerAddress ? ops.shortId(v.batch.managerAddress) : managerWord);
     const manager = (
       <span className="inline-flex items-center gap-1">
         <span className="text-pink-500/90" aria-hidden="true">
@@ -809,8 +812,8 @@ export function useLiquityCardSlots({
         sub: v.isBatched ? (
           v.batch?.managerAddress ? (
             <RevealTip
-              tip={`Batch manager ${v.batch.managerAddress}`}
-              label={`${managerName}, batch manager ${v.batch.managerAddress}`}
+              tip={`${managerWord} ${v.batch.managerAddress}`}
+              label={`${managerName}, ${managerWord.toLowerCase()} ${v.batch.managerAddress}`}
               focusable={detail}
               className="focus-ring rounded-sm"
             >

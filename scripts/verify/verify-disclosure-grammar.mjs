@@ -724,10 +724,10 @@ const SHEET_WORDS_SUBJECTS = [
     id: "0xe5509980170a44f3f5878afd1b13d3e797cba9789b1509de475fcb9fb97ad930_1",
     risk: ["Collateral Ratio", "Liquidates at"],
     limits: ["Interest Rate"],
-    params: ["Minimum ratio", "Critical ratio"],
+    params: ["Minimum ratio", "Critical Collateral Ratio (CCR)"],
     optional: ["Delegate's fee"],
-    // The gas compensation escrow, a footnote under Risk and Limits (ui-jobs 388).
-    note: /^0\.0375 WETH \(\$[\d,.]+\) held in escrow$/,
+    // The liquidation reserve, a footnote under Risk and Limits (ui-jobs 388).
+    note: /^0\.0375 WETH \(\$[\d,.]+\) held as the liquidation reserve$/,
   },
   {
     name: "Aave V3 0x9ff6…0de5 Borrow",

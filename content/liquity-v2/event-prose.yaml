@@ -63,7 +63,7 @@ roundings:
   span: |-
     hours under a day (5 hours), else days at one place (3.2 days)
   manager: |-
-    the batch manager's name and short address (ARM (0xe507…b60a)), linked to the explorer
+    the delegate's name and short address (ARM (0xe507…b60a)), linked to the explorer
   address: |-
     a short address (0xf060…45f8), linked to the explorer
   text: |-
@@ -190,7 +190,7 @@ placeholders:
   upfront_fee:
     rounding: debt
     means: |-
-      the upfront fee added to the debt
+      the Upfront Borrowing Fee added to the debt
   accrued_total:
     rounding: accrued
     means: |-
@@ -230,15 +230,15 @@ placeholders:
   rate_setter:
     rounding: text
     means: |-
-      the batch manager's name, where a batch manager sets the rate
+      the delegate's name, where a delegate sets the rate
   manager:
     rounding: manager
     means: |-
-      the batch manager
+      the delegate
   former_manager:
     rounding: address
     means: |-
-      the batch manager the trove left
+      the delegate the trove left
   batch_rate:
     rounding: rate
     means: |-
@@ -358,7 +358,7 @@ placeholders:
   move_upfront:
     rounding: accrued
     means: |-
-      the upfront fee: the rest of the move
+      the Upfront Borrowing Fee: the rest of the move
   block:
     rounding: count
     means: |-
@@ -448,14 +448,14 @@ L1_words:
     claimable, claimed
   zombie: |-
     Dormant
-  # The gas compensation escrow, 0.0375 WETH, its own leg on the open and the
+  # The liquidation reserve (the GasPool's gas compensation), 0.0375 WETH, its own leg on the open and the
   # close (rails-ops TO-DO-ui-jobs 363).
   escrow_leg: |-
-    Gas escrow
+    Liquidation reserve
   spine_escrow_sent: |-
-    gas compensation escrow sent
+    liquidation reserve sent
   spine_escrow_returned: |-
-    gas compensation escrow returned
+    liquidation reserve returned
   # A pending debt applied: its one spine leg, spoken.
   spine_debt_added: |-
     added to the debt
@@ -502,7 +502,7 @@ L1_words:
     claimed
   # The Liquity V2 forks (Ebisu, Asymmetry, Basedollar) read these t1 words
   # too (lib/shared/liquity-fork-head-words.ts); this one is theirs alone, a
-  # batch manager's cut to its annual fee.
+  # delegate's cut to its annual fee.
   t1_lowered_fee: |-
     Lowered management fee
 
@@ -568,7 +568,7 @@ L2_words:
   sheet_redistribution: |-
     Redistribution
   sheet_upfront_fee: |-
-    Upfront fee
+    Upfront Borrowing Fee
   sheet_fee: |-
     Management fee
   sheet_face: |-
@@ -580,7 +580,7 @@ L2_words:
   minimum_ratio: |-
     Minimum ratio
   critical_ratio: |-
-    Critical ratio
+    Critical Collateral Ratio (CCR)
   # The sheet's read-more, one per row: what the figure is and where it is read.
   tip_coll_last: |-
     The Trove's {coll_symbol} after its previous event, from the TroveManager's log, at Liquity's {coll_symbol} price at that event.
@@ -601,7 +601,7 @@ L2_words:
   tip_debt_interest_asset: |-
     The interest in {debt_symbol}, counted at its $1.00 face.
   tip_debt_fee: |-
-    The batch manager's management fee the debt accrued since the previous event, in {debt_symbol}.
+    The delegate's management fee the debt accrued since the previous event, in {debt_symbol}.
   tip_debt_before: |-
     The debt just before this event: the previous event's debt plus the {accrual_noun} since.
   tip_debt_event: |-
@@ -621,16 +621,16 @@ L2_words:
   tip_rate: |-
     The annual interest rate on the Trove's debt after this event, from the TroveManager's log.
   tip_delegate_fee: |-
-    The batch's annual management fee, set by its batch manager and charged on top of the interest rate.
+    The batch's annual management fee, set by its delegate and charged on top of the interest rate.
   tip_minimum_ratio: |-
     The collateral ratio below which a Trove on the {coll_symbol} branch can be liquidated, a constant of the branch's contracts.
   tip_critical_ratio: |-
     The branch-wide collateral ratio below which the {coll_symbol} branch restricts borrowing, a constant of the branch's contracts.
-  # The gas compensation escrow's footnote, under Risk and Limits on every
+  # The liquidation reserve's footnote, under Risk and Limits on every
   # event from the open to the close or the liquidation (rails-ops
-  # TO-DO-ui-jobs 388). Liquity's docs call it the liquidation reserve.
+  # TO-DO-ui-jobs 388; the docs' name, decision 0065).
   tip_escrow_note: |-
-    The gas compensation escrow: the 0.0375 WETH every Trove sends to its branch's GasPool at its open, on every branch, held apart from its collateral and outside the collateral ratio. Liquity calls it the liquidation reserve. It returns on close and goes to the liquidator on a liquidation.
+    The liquidation reserve: a refundable gas deposit of 0.0375 WETH every Trove sends to its branch's GasPool at its open, on every branch, held apart from its collateral and outside the collateral ratio. It returns on close and goes to the liquidator on a liquidation.
 
 # ── Copy for LLM: the block's context header ──
 context_words:
@@ -732,7 +732,7 @@ trove_words:
   card_tip_ltv: |-
     The debt divided by the collateral's dollar value. Above the {coll_symbol} branch's maximum the Trove can be liquidated.
   card_tip_rate: |-
-    The annual rate the debt accrues interest at, chosen by the owner or set by its batch manager. Redemptions take Troves with lower rates first.
+    The annual rate the debt accrues interest at, chosen by the owner or set by its delegate. Redemptions take Troves with lower rates first.
   card_tip_debt_in_front: |-
     The {debt_symbol} debt of the {coll_symbol} branch's Troves paying a lower interest rate. Redemptions take that debt before they reach this Trove.
   card_tip_troves_in_front: |-
@@ -840,7 +840,7 @@ trove_words:
   run_sheet_interest: |-
     Interest and management fee
   run_sheet_upfront: |-
-    Upfront fees
+    Upfront Borrowing Fees
   run_sheet_event: |-
     #{number} · {date}
   run_sheet_sum: |-
@@ -921,7 +921,7 @@ trove_words:
   delegate_visit: |-
     Visit {name} website
   delegate_fallback: |-
-    Batch Manager
+    Delegate
   debt_in_front: |-
     {debt} of debt at the same or lower rate is redeemed before or with this trove
   queue_share: |-
@@ -1153,7 +1153,7 @@ templates:
         when: |-
           the borrow charged an upfront fee
         text: |-
-          The owner borrowed {borrowed} {debt_symbol} more, paying an upfront fee of 7 days of average interest.
+          The owner borrowed {borrowed} {debt_symbol} more, paying an Upfront Borrowing Fee of 7 days of average interest.
       borrow.liq_distance:
         when: |-
           the trove has debt before and after
@@ -1250,7 +1250,7 @@ templates:
         when: |-
           variant add_borrow, an upfront fee
         text: |-
-          The owner added {added} {coll_symbol} of collateral and borrowed {borrowed} {debt_symbol} more, plus the upfront fee.
+          The owner added {added} {coll_symbol} of collateral and borrowed {borrowed} {debt_symbol} more, plus the Upfront Borrowing Fee.
       combined.what.add_repay:
         when: |-
           variant add_repay
@@ -1265,7 +1265,7 @@ templates:
         when: |-
           variant withdraw_borrow, an upfront fee
         text: |-
-          The owner withdrew {withdrawn} {coll_symbol} of collateral and borrowed {borrowed} {debt_symbol} more, plus the upfront fee.
+          The owner withdrew {withdrawn} {coll_symbol} of collateral and borrowed {borrowed} {debt_symbol} more, plus the Upfront Borrowing Fee.
       combined.what.withdraw_repay:
         when: |-
           variant withdraw_repay
@@ -1459,7 +1459,7 @@ templates:
         when: |-
           variant at_event, not a zombie, the trove is batched
         text: |-
-          It was redeemed because its {rate_after} rate, set by batch manager {rate_setter}, was among the lowest in the {coll_symbol} branch.
+          It was redeemed because its {rate_after} rate, set by delegate {rate_setter}, was among the lowest in the {coll_symbol} branch.
       redeem.why_owner:
         when: |-
           variant at_event, not a zombie, the owner sets the rate
@@ -1508,7 +1508,7 @@ templates:
 
   - id: liquity2.delegation.join
     title: |-
-      Join batch manager
+      Join delegate
     when: |-
       setInterestBatchManager
     L5: delegation
@@ -1523,19 +1523,19 @@ templates:
     sentences:
       join.what:
         when: |-
-          the batch manager is known
+          the delegate is known
         text: |-
-          This trove handed its interest rate to batch manager {manager}.
+          This trove handed its interest rate to delegate {manager}.
       join.what_plain:
         when: |-
-          the batch manager is not known
+          the delegate is not known
         text: |-
-          This trove handed its interest rate to a batch manager.
+          This trove handed its interest rate to a delegate.
       join.fee:
         when: |-
           joining charged an upfront fee
         text: |-
-          Joining the batch added a {upfront_fee} {debt_symbol} upfront fee to the debt.
+          Joining the batch added a {upfront_fee} {debt_symbol} Upfront Borrowing Fee to the debt.
       join.rate:
         when: |-
           the rate after is known
@@ -1556,7 +1556,7 @@ templates:
 
   - id: liquity2.delegation.leave
     title: |-
-      Leave batch manager
+      Leave delegate
     when: |-
       removeFromBatch
     L5: delegation
@@ -1570,14 +1570,14 @@ templates:
     sentences:
       leave.what:
         when: |-
-          the batch manager is known
+          the delegate is known
         text: |-
-          This trove left batch manager {former_manager}, so the owner sets its interest rate again.
+          This trove left delegate {former_manager}, so the owner sets its interest rate again.
       leave.what_plain:
         when: |-
-          the batch manager is not known
+          the delegate is not known
         text: |-
-          This trove left its batch manager, so the owner sets its interest rate again.
+          This trove left its delegate, so the owner sets its interest rate again.
       leave.fees:
         when: |-
           more than 0.01 of management fee accrued since the previous event
@@ -1587,7 +1587,7 @@ templates:
         when: |-
           leaving charged an upfront fee
         text: |-
-          Leaving the batch added a {upfront_fee} {debt_symbol} upfront fee to the debt.
+          Leaving the batch added a {upfront_fee} {debt_symbol} Upfront Borrowing Fee to the debt.
       leave.rate:
         when: |-
           the rate moved
@@ -1608,9 +1608,9 @@ templates:
 
   - id: liquity2.delegation.rate_update
     title: |-
-      Batch manager rate change
+      Delegate rate change
     when: |-
-      setBatchManagerAnnualInterestRate: the trove's batch manager set the batch's rate
+      setBatchManagerAnnualInterestRate: the trove's delegate set the batch's rate
     L5: delegation
     variants:
       raised: |-
@@ -1633,17 +1633,17 @@ templates:
         when: |-
           variant raised
         text: |-
-          The batch manager raised the delegated interest rate from {rate_before|rate_step} to {rate_after|rate_step} APR.
+          The delegate raised the delegated interest rate from {rate_before|rate_step} to {rate_after|rate_step} APR.
       bru.lowered:
         when: |-
           variant lowered
         text: |-
-          The batch manager lowered the delegated interest rate from {rate_before|rate_step} to {rate_after|rate_step} APR.
+          The delegate lowered the delegated interest rate from {rate_before|rate_step} to {rate_after|rate_step} APR.
       bru.kept:
         when: |-
           variant kept
         text: |-
-          The batch manager kept the delegated interest rate at {rate_after} APR.
+          The delegate kept the delegated interest rate at {rate_after} APR.
       bru.interest:
         when: |-
           the debt moved by 0.01 or more, interest of 0.005 or more
@@ -1658,7 +1658,7 @@ templates:
         when: |-
           the debt moved by 0.01 or more, the change fell inside the 7-day cooldown and left a remainder
         text: |-
-          Upfront fee {move_upfront} {debt_symbol}: the manager changed the rate again within 7 days.
+          Upfront Borrowing Fee {move_upfront} {debt_symbol}: the delegate changed the rate again within 7 days.
     order:
       - bru.raised
       - bru.lowered
@@ -1707,17 +1707,17 @@ templates:
         when: |-
           variant join_batch, manager and fee known
         text: |-
-          It joined batch manager {manager}, which sets its rate, for a {batch_fee_rate} management fee.
+          It joined delegate {manager}, which sets its rate, for a {batch_fee_rate} management fee.
       open.join_no_fee:
         when: |-
           variant join_batch, no management fee
         text: |-
-          It joined batch manager {manager}, which sets its rate.
+          It joined delegate {manager}, which sets its rate.
       open.join_plain:
         when: |-
           variant join_batch, manager not known
         text: |-
-          It joined a batch manager, which sets its rate.
+          It joined a delegate, which sets its rate.
     order:
       - open.what
       - liq.after
@@ -1895,7 +1895,7 @@ templates:
         when: |-
           a batch update rode with it
         text: |-
-          A batch manager applied the trove’s accrued interest at the same time.
+          A delegate applied the trove’s accrued interest at the same time.
     order:
       - apply.what
       - apply.what_coll
@@ -1991,7 +1991,7 @@ templates:
 #   links                  each a label and `faq`, an id the code resolves to
 #                          Liquity's FAQ (FAQ_URLS)
 # The interest-rate modal has `intro_delegated` and, on its first detail,
-# `text_delegated`: what it says when a batch manager sets the trove's rate.
+# `text_delegated`: what it says when a delegate sets the trove's rate.
 # The liquidation modal's intro reads {min_cr}, {max_ltv} and {coll_type}.
 # Each concept that states a mechanism rests on a row of rails-ops
 # reference/official-docs/liquity-v2.md, and its link is that row's page.
@@ -2010,7 +2010,7 @@ L5:
       Key concepts:
     details:
       - bold: |-
-          Upfront fee
+          Upfront Borrowing Fee
         text: |-
           borrowing more adds a one-time fee of 7 days of the branch's average interest to the debt.
       - bold: |-
@@ -2123,9 +2123,9 @@ L5:
       - bold: |-
           Interest rate
         text: |-
-          the borrower sets the rate or delegates it to a batch manager; lower rates cost less and are redeemed sooner.
+          the borrower sets the rate or delegates it to a third party; lower rates cost less and are redeemed sooner.
       - bold: |-
-          Upfront fee
+          Upfront Borrowing Fee
         text: |-
           a one-time borrowing fee of 7 days of average interest, added to the Trove's debt.
       - bold: |-
@@ -2187,18 +2187,18 @@ L5:
     title: |-
       How interest rates work
     intro: |-
-      Each trove carries an annual interest rate that is added to its debt over time. The borrower can change the rate at any time, or delegate it to a batch manager that sets one rate for many troves.
+      Each trove carries an annual interest rate that is added to its debt over time. The borrower can change the rate at any time, or hand it to a delegate that sets one rate for many troves.
     intro_delegated: |-
-      Each trove carries an annual interest rate that is added to its debt over time. This trove's rate is set by {delegate}, a batch manager that sets one rate for many troves.
+      Each trove carries an annual interest rate that is added to its debt over time. This trove's rate is set by {delegate}, a delegate that sets one rate for many troves.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
           Who sets the rate
         text: |-
-          the borrower sets the rate or delegates it to a batch manager; lower rates cost less but sit earlier in the redemption queue.
+          the borrower sets the rate or delegates it to a third party; lower rates cost less but sit earlier in the redemption queue.
         text_delegated: |-
-          the batch manager sets the rate for every trove in its batch; lower rates cost less but sit earlier in the redemption queue.
+          the delegate sets the rate for every trove in its batch; lower rates cost less but sit earlier in the redemption queue.
       - bold: |-
           Continuous accrual
         text: |-
@@ -2222,14 +2222,14 @@ L5:
     title: |-
       How interest delegation works
     intro: |-
-      A trove can hand its interest rate to a batch manager. The manager sets one rate for a group of troves and charges a management fee.
+      A trove can hand its interest rate to a delegate. The delegate sets one rate for a batch of troves and charges a management fee.
     detailsHeading: |-
       Key concepts:
     details:
       - bold: |-
-          Batch manager
+          Delegate
         text: |-
-          a delegate that sets a single interest rate, within a preset range, for every trove in its batch.
+          a third party that sets a single interest rate, within a preset range, for every trove in its batch.
       - bold: |-
           Management fee
         text: |-

@@ -443,7 +443,7 @@ export function useLiquityCells({
           pclass: "emitted",
           verify: txVerify,
           summary:
-            "The batch's annual management fee. Charged on top of the interest rate on every trove in the batch, set by its batch manager.",
+            "The batch's annual management fee. Charged on top of the interest rate on every trove in the batch, set by its delegate.",
           contract: tmContract,
           via: `${streamVia()} · BatchUpdated log · _annualManagementFee · ÷10^16`,
           inputs: eventInputs(coords),
@@ -1117,7 +1117,7 @@ export function useLiquityCells({
           tip: TIP.criticalRatio,
           value: {
             text: `${(branch.ccr * 100).toFixed(0)}%`,
-            info: paramProv("critical collateral ratio (CCR)", branch.ccr * 100),
+            info: paramProv("Critical Collateral Ratio (CCR)", branch.ccr * 100),
           },
         },
       ]

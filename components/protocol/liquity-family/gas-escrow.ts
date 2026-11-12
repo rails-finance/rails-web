@@ -47,7 +47,7 @@ export function gasEscrowNote(args: {
             info: {
               kind: "chain-derived",
               pclass: "oracle",
-              summary: `The gas compensation escrow in US dollars. ${e.label} times the ${e.symbol} price at this block.`,
+              summary: `The ${(e.terms?.name ?? "Gas compensation escrow").toLowerCase()} in US dollars. ${e.label} times the ${e.symbol} price at this block.`,
               formula: "amount × price",
               inputs: [
                 { label: "amount", value: e.label, kind: "chain", pclass: "state" },
@@ -62,5 +62,6 @@ export function gasEscrowNote(args: {
           }
         : undefined,
     tip,
+    terms: e.terms,
   });
 }

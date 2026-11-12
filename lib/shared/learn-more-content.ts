@@ -225,7 +225,7 @@ export function liquityPositionContent(opts: {
   if (isBatched) {
     details.push({
       bold: "Interest delegation",
-      text: "a batch manager sets this trove's rate and charges a management fee on top of the interest, both accruing to the debt.",
+      text: "a delegate sets this trove's rate and charges a management fee on top of the interest, both accruing to the debt.",
     });
   } else {
     details.push({
@@ -290,7 +290,7 @@ export function liquityLifetimeFlowsContent(opts: { isBatched?: boolean } = {}):
           : "the interest that accrues to the debt each day and year at the trove's chosen rate.",
       },
       {
-        bold: "Upfront fee",
+        bold: "Upfront Borrowing Fee",
         text: "a one-time borrowing fee taken when debt is drawn, equivalent to about 7 days of average interest.",
       },
       {
