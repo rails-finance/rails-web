@@ -186,9 +186,8 @@ function views(version: UniswapVersion, d: UniDeployment): readonly [InfoView, .
         <p>
           The position page shows the two tokens the position holds now, their worth in the quote token, its fees not
           yet collected{d.masterChef ? ", its CAKE not yet harvested where it is staked" : ""}
-          {d.history ? " and the day it opened" : ""}, with its range drawn against the price. Under it,{" "}
-          {d.masterChef ? "seven" : "six"} lines compare the position with its pool over the last 30 days: range, fees,
-          {d.masterChef ? " CAKE," : ""} against holding, size, withdrawals and steward.
+          {d.history ? " and the day it opened" : ""}, with its range drawn against the price. Under it, a table sets
+          the position and its pool now beside 30 days back.
         </p>
       ),
     },

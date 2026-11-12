@@ -365,7 +365,7 @@ export const ALCHEMIX_LIFETIME_FLOWS: LearnMoreContent = {
     },
     {
       bold: "LTV",
-      text: "the chart opens on the debt over the collateral, against the liquidation threshold. The liquidation threshold is today's, held across the life: it is not indexed at past blocks.",
+      text: "the chart opens on the debt over the collateral, against the liquidation threshold. The threshold is read at the block of the last event on each of the latest 60 days with events, and held from one read to the next. The days before the first read take its threshold, dotted.",
     },
     {
       bold: "Interest",

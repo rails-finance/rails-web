@@ -255,16 +255,6 @@ const aaveVaultReserveHopProv_ = (c: AaveVaultCoords, reserveSymbol: string): Pr
   formula: "stakeToken.asset() → (stataToken.asset() where that is a wrapper)",
 });
 
-/** How many funded vaults hold one asset — a count over the same reads. */
-const aaveVaultAssetGroupCountProv_ = (c: AaveVaultCoords, n: number): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `${n === 1 ? "One vault" : `${n} vaults`} over ${asset(c)} — the listed vaults whose \`asset()\` is ${asset(c)} and whose \`totalAssets()\` was above zero${atBlock(c)}. A vault that read zero sits in the trailing group.`,
-  via: `${LANE} · count of listed vaults per asset() @ the pinned block`,
-  formula: "count of listed vaults where asset() = this asset and totalAssets() > 0",
-});
-
 /** The address-book pill: Aave publishes this vault's address. */
 const aaveVaultBookProv_ = (c: AaveVaultCoords, attestation: AaveVaultAttestation): Provenance => ({
   kind: "offchain",
@@ -713,7 +703,6 @@ export const aaveVaultATokenProv = withServerRead(aaveVaultATokenProv_);
 export const aaveVaultCooldownProv = withServerRead(aaveVaultCooldownProv_);
 export const aaveVaultSlashableProv = withServerRead(aaveVaultSlashableProv_);
 export const aaveVaultReserveHopProv = withServerRead(aaveVaultReserveHopProv_);
-export const aaveVaultAssetGroupCountProv = withServerRead(aaveVaultAssetGroupCountProv_);
 export const aaveVaultBookProv = withServerRead(aaveVaultBookProv_);
 export const aaveVaultEmptyCountProv = withServerRead(aaveVaultEmptyCountProv_);
 export const aaveSghoAssetHeldProv = withServerRead(aaveSghoAssetHeldProv_);

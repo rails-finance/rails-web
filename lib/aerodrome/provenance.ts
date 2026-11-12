@@ -421,10 +421,10 @@ function partProv(key: string, part: "yours" | "pool", c: AeroReceiptContext): P
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Against holding — the tokens the same liquidity held at ${at(r.then)}, valued at the pool's price at ${at(r.head)}, against the position's worth now, without and with its 30-day ${p.staked ? `${p.site.reward.symbol}, valued now` : "fees"}.`,
+        summary: `Impermanent loss — how much less the position is worth now than the tokens the same liquidity held at ${at(r.then)}, valued at the pool's price at ${at(r.head)}, before and after its 30-day ${p.staked ? `${p.site.reward.symbol}, valued now` : "fees"}.`,
         contract: poolC(c),
         via: bothVia(c),
-        formula: "worth now ÷ held then valued now − 1; with earnings, (worth now + earnings) ÷ the same − 1",
+        formula: "1 − worth now ÷ held then valued now; with earnings, 1 − (worth now + earnings) ÷ the same",
         inputs: [
           chain(`sqrtPriceX96 · ${at(r.then)}`, past?.sqrtPriceX96 ?? "–"),
           derived(`held then, valued now, ${Q}`, fig(p.holdThen)),

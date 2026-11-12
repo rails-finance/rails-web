@@ -16,7 +16,7 @@ import { poolTokenKeys } from "@/components/protocol/uniswap/pool-focus-keys";
 import { PoolWalletList } from "@/components/protocol/uniswap/pool-wallet-list";
 import { fetchAerodromePositions } from "@/lib/api/fetch-aerodrome";
 import { AERODROME, type SlipstreamSite } from "@/lib/aerodrome/sites";
-import { frontDoorWords, notIndexed } from "@/lib/aerodrome/words";
+import { frontDoorWords } from "@/lib/aerodrome/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { explorerHref } from "@/lib/shared/protocols";
 
@@ -75,11 +75,6 @@ export async function AerodromeWalletPositions({
       )}
       {answer.kind === "ok" && answer.data.truncated && (
         <p className="mt-3 text-sm text-rb-500">{FRONT_DOOR.truncated}</p>
-      )}
-      {notIndexed(site, "wallet") && (
-        <p className="mt-6 text-sm text-rb-500" data-not-indexed={site.chainName.toLowerCase()}>
-          {notIndexed(site, "wallet")}
-        </p>
       )}
     </div>
   );

@@ -1330,13 +1330,17 @@ if (neverHeldCensus.length === 0) {
       .evaluateAll((els) => els.map((e) => e.getAttribute("data-vault-row"))),
   );
   await rosterPage.close();
+  // 2026-11-12 (ui-jobs 605): the roster is the house table (V6), whose Holders
+  // is the census's open count, unlinked at zero; so the rows with no link are
+  // the vaults no address holds at the census block, never-held ones among them.
   const notStated = neverHeldCensus.filter((c) => !statedNone.has(c.vault));
+  const noneOpen = censusRows.filter((c) => c.liveCount === 0 && CATALOG_BY_ADDRESS.has(c.vault));
   check(
-    "L6b every never-held vault is STATED on the roster page as 'no holder yet'",
-    notStated.length === 0 && statedNone.size === neverHeldCensus.length,
+    "L6b every never-held vault is STATED on the roster page with no holder (a 0, unlinked)",
+    notStated.length === 0 && statedNone.size === noneOpen.length,
     notStated.length
       ? `${notStated.length} of ${neverHeldCensus.length} not stated, e.g. ${notStated[0].vault}`
-      : `${statedNone.size} roster rows say "no holder yet", and the census counts ${neverHeldCensus.length}`,
+      : `${statedNone.size} roster rows state no open holder, the census counts ${noneOpen.length} (${neverHeldCensus.length} never held)`,
   );
   const rowBad = [];
   for (const c of neverHeldCensus.slice(0, 8)) {
@@ -1608,10 +1612,12 @@ async function rosterLinks() {
   return hrefs;
 }
 const rosterHrefs = await rosterLinks();
-const heldCensus = censusRows.filter((c) => c.participants > 0);
+// 2026-11-12 (ui-jobs 605): the table links Holders where the census counts an
+// open holder.
+const heldCensus = censusRows.filter((c) => c.liveCount > 0);
 const rosterMissing = heldCensus.filter((c) => !rosterHrefs.includes(`/base/morpho/vaults/positions?vault=${c.vault}`));
 check(
-  "L12a the roster page links every held vault to the listing filtered to it",
+  "L12a the roster page links every vault with an open holder to the listing filtered to it",
   heldCensus.length > 0 && rosterMissing.length === 0,
   rosterMissing.length
     ? `${rosterMissing.length} of ${heldCensus.length} unlinked, e.g. ${rosterMissing[0].vault}`

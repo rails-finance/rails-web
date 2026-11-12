@@ -22,7 +22,7 @@ import { aeroPosition } from "@/lib/aerodrome/position";
 import { cardProv } from "@/lib/aerodrome/provenance";
 import { AERODROME, isSiteDeployment, type SlipstreamSite } from "@/lib/aerodrome/sites";
 import type { SlipstreamDeployment } from "@/lib/aerodrome/types";
-import { notIndexed, POSITION_PAGE } from "@/lib/aerodrome/words";
+import { POSITION_PAGE } from "@/lib/aerodrome/words";
 import { ORACLE_USD_REASON } from "@/lib/shared/oracle-usd-reasons";
 import { explorerHref } from "@/lib/shared/protocols";
 
@@ -93,11 +93,6 @@ export async function AerodromePositionPage({
             <AerodromePositionCard r={r} />
             <AerodromeReadout r={r} title={title} />
           </div>
-          {notIndexed(site, "position") && (
-            <p className="mt-6 text-sm text-rb-500" data-not-indexed={site.chainName.toLowerCase()}>
-              {notIndexed(site, "position")}
-            </p>
-          )}
         </div>
         <ProvInspectorLayer />
       </div>

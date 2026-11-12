@@ -366,17 +366,6 @@ const vaultDirectorySharePriceProv_ = (c: MorphoVaultCoords): Provenance => ({
   via: `${lane(c)} · MetaMorpho.convertToAssets(one share) @ the pinned block`,
 });
 
-/** How many catalogued vaults in one asset hold something at the block — a
- *  count over the rows' `totalAssets()` reads, and the size of a group. */
-const vaultDirectoryGroupCountProv_ = (c: MorphoVaultCoords, n: number): Provenance => ({
-  kind: "chain-derived",
-  pclass: "state",
-  source: { block: c.blockNumber },
-  summary: `${n === 1 ? "One vault" : `${n.toLocaleString("en-US")} vaults`} denominated in ${asset(c)} with a non-zero \`totalAssets()\`${atBlock(c)} — a count over the directory's own reads, one per catalogued vault whose immutable \`asset()\` is ${asset(c)}. Vaults in this asset that read zero are counted in the trailing group instead, not dropped.`,
-  via: `${lane(c)} · count of catalogued vaults with asset() = ${asset(c)} and totalAssets() > 0 @ the pinned block`,
-  formula: `count of catalogued vaults where asset() = ${asset(c)} and totalAssets() > 0`,
-});
-
 /** How many catalogued vaults hold nothing at the block. A READING, not an
  *  omission: each answered zero to `totalAssets()`; a vault whose read did not
  *  answer is counted separately and never here. */
@@ -415,5 +404,4 @@ export const vaultDirectoryCensusProv = withServerRead(vaultDirectoryCensusProv_
 export const vaultDirectoryNameProv = withServerRead(vaultDirectoryNameProv_);
 export const vaultDirectoryTotalAssetsProv = withServerRead(vaultDirectoryTotalAssetsProv_);
 export const vaultDirectorySharePriceProv = withServerRead(vaultDirectorySharePriceProv_);
-export const vaultDirectoryGroupCountProv = withServerRead(vaultDirectoryGroupCountProv_);
 export const vaultDirectoryEmptyCountProv = withServerRead(vaultDirectoryEmptyCountProv_);

@@ -424,7 +424,6 @@ await checkRosterView({
   scope: "[data-vault-index]",
   check,
   tag: "10",
-  table: true,
 });
 
 // ── 11: a token link keeps the preset, and lifts it where it would empty ───

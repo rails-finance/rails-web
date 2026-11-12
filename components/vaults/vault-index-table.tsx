@@ -1,13 +1,15 @@
 "use client";
 
-// The cross-protocol vault index as a table (rails-ops ui-jobs 538, V6): the
-// rows of `/vaults`, drawn inside the shared roster's controls.
+// The vault table (rails-ops ui-jobs 538, V6): the rows of `/vaults` and of
+// every family's roster (ui-jobs 605), drawn inside the shared roster's controls.
 // ----------------------------------------------------------------------------
-// One row per vault in the house table (components/shared/data-table): the
-// lead zone (the protocol's tint, mark and chain, named for a screen reader
-// and in its tooltip), Vault (the asset's icon, the name linking the vault's
+// One row per vault in the house table (components/shared/data-table): on the
+// index the lead zone (the protocol's tint, mark and chain, named for a screen
+// reader and in its tooltip; `leadOf`), which a one-protocol roster omits
+// (ui-jobs 605), then Vault (the asset's icon, the name linking the vault's
 // page under its protocol, the standing pills beneath where there are any),
-// then Total assets, Share price, Yield and Holders (the census's open
+// then Kind (the family's kind; on a roster its family and release, as its
+// cards printed them, `kindOf`), Total assets, Share price, Yield and Holders (the census's open
 // count), Steward, and last the Compare tick (E2, ui-jobs 553 door 3). The
 // figures print as the row prints them (vaultHeads, yieldText), each in its
 // family's receipt at its roster's block (decision 0062 point 5; ui-jobs
@@ -29,8 +31,8 @@
 // (ui-jobs 543), and the cell prints the stated total.
 //
 // The whole row links the vault's page (the name is the one focusable link).
-// BELOW sm each row reads as a card (D6): the protocol's hue as its left edge,
-// the mark and chain beside the asset's icon, the name across, the figures
+// BELOW sm each row reads as a card (D6): on the index the mark and chain
+// beside the asset's icon, the name across, the figures
 // two by two under their labels; the toolbar sorts (N1.3, `useVaultIndexSort`).
 
 import Link from "next/link";
@@ -211,6 +213,12 @@ function InAsset({ v, children, ...rest }: { v: VaultSummary; children: ReactNod
   );
 }
 
+/** The hooks the vault card's pills carry (VaultPills), on the same pills. */
+const BADGE_HOOK: Partial<Record<VaultStanding, Record<string, string>>> = {
+  endorsed: { "data-endorsed-badge": "" },
+  "shut-down": { "data-shutdown-badge": "" },
+};
+
 /** A standing pill on a row, on the table's pill ground. */
 const PILL = `${DATA_TABLE_PILL} px-1.5 py-0.5 text-[11px]`;
 
@@ -259,6 +267,7 @@ export function VaultIndexTable({
   yieldOf,
   receiptsOf,
   leadOf,
+  kindOf,
   hrefOf,
   holdersHrefOf,
   hooksOf,
@@ -271,8 +280,12 @@ export function VaultIndexTable({
   /** The row's receipts: its family's, at its roster's block. */
   receiptsOf: (v: VaultSummary) => VaultRowReceipts;
   /** The lead zone's `protocols.ts` id (the roster entry the vault's
-   *  directory sits under); null falls back to the family's venue. */
-  leadOf: (v: VaultSummary) => string | null;
+   *  directory sits under); null falls back to the family's venue. Null in
+   *  place of the function omits the lead column, header and cells: a
+   *  one-protocol roster (ui-jobs 605). */
+  leadOf: ((v: VaultSummary) => string | null) | null;
+  /** The Kind cell's words; absent, the family's kind. */
+  kindOf?: (v: VaultSummary) => string;
   hrefOf: (v: VaultSummary) => string;
   holdersHrefOf: (v: VaultSummary) => string | null;
   hooksOf: (v: VaultSummary) => Record<string, string>;
@@ -328,7 +341,7 @@ export function VaultIndexTable({
         rowHeight="one"
       >
         <DataTableHead>
-          <DataTableLeadHeader plain />
+          {leadOf && <DataTableLeadHeader plain />}
           {COLUMNS.map((c) => [
             c.key === "assets" && <DataTableHeader key="kind" label="Kind" data-col-head="kind" />,
             <DataTableHeader
@@ -417,12 +430,14 @@ export function VaultIndexTable({
                   data-token={tokenOf(v)}
                   {...hooksOf(v)}
                 >
-                  <DataTableLeadCell
-                    plain
-                    protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
-                    protocolName={VAULT_INDEX_PROTOCOL_LABEL[vaultIndexProtocol(v)]}
-                    chain={v.chainId as ChainId}
-                  />
+                  {leadOf && (
+                    <DataTableLeadCell
+                      plain
+                      protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
+                      protocolName={VAULT_INDEX_PROTOCOL_LABEL[vaultIndexProtocol(v)]}
+                      chain={v.chainId as ChainId}
+                    />
+                  )}
                   {/* From sm one line: icon, name (truncating, its full text in a
                     title), the standing pills after it. Below sm (D6) the name
                     wraps and the pills take their own line from the card's edge. */}
@@ -441,10 +456,12 @@ export function VaultIndexTable({
                           untitled
                         />
                       </span>
-                      <DataTableLeadMark
-                        protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
-                        chain={v.chainId as ChainId}
-                      />
+                      {leadOf && (
+                        <DataTableLeadMark
+                          protocol={leadOf(v) ?? VAULT_FAMILIES[v.family].venue}
+                          chain={v.chainId as ChainId}
+                        />
+                      )}
                       <DataTableRowLink
                         href={href}
                         className="min-w-0 flex-1 text-sm font-semibold break-words sm:min-w-[7rem] sm:flex-initial sm:truncate"
@@ -458,7 +475,13 @@ export function VaultIndexTable({
                         // From sm the pills give way before the name's first 7rem.
                         <span className="flex flex-wrap gap-1 max-sm:basis-full sm:min-w-0 sm:flex-nowrap sm:overflow-hidden">
                           {v.standing.map((st) => (
-                            <span key={st} className={`${PILL} sm:truncate`} title={pillTitle(st, v)} data-pill={st}>
+                            <span
+                              key={st}
+                              className={`${PILL} sm:truncate`}
+                              title={pillTitle(st, v)}
+                              data-pill={st}
+                              {...BADGE_HOOK[st]}
+                            >
                               {traced(receipts.standing?.[st], STANDING_WORD[st])}
                             </span>
                           ))}
@@ -478,7 +501,7 @@ export function VaultIndexTable({
                   </DataTableCell>
                   <DataTableCell label="Kind" valign="middle" className="whitespace-nowrap" data-col="kind">
                     <span className="text-sm text-foreground" data-cell="kind">
-                      {VAULT_FAMILIES[v.family].kind}
+                      {kindOf ? kindOf(v) : VAULT_FAMILIES[v.family].kind}
                     </span>
                   </DataTableCell>
                   {cell(

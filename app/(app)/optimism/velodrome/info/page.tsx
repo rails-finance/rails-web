@@ -172,7 +172,7 @@ export default function InfoPage() {
           30 days.
         </>
       }
-      notCovered="Velodrome's basic pools, its VELO locks and its voting aren't covered here."
+      notCovered="Velodrome's basic pools, its VELO locks and its voting aren't covered here. Not indexed yet on Optimism: a listing of positions and each position's history arrive when Rails indexes Velodrome there."
       glossary={glossary}
       howItWorks={howItWorks}
       reads={reads}

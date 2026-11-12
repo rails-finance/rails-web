@@ -321,10 +321,10 @@ function partProv(key: string, part: "yours" | "pool", c: UniReceiptContext): Pr
         kind: "derived",
         pclass: "state",
         source: head,
-        summary: `Against holding — the tokens the same liquidity held at ${at(r.then)}, valued at the pool's price at ${at(r.head)}, against the position's worth now, without and with its 30-day fees.`,
+        summary: `Impermanent loss — how much less the position is worth now than the tokens the same liquidity held at ${at(r.then)}, valued at the pool's price at ${at(r.head)}, before and after its 30-day fees.`,
         contract: poolContract(c),
         via: via(c, `blocks ${n(r.then.block)} and ${n(r.head.block)}`),
-        formula: "worth now ÷ held then valued now − 1; with fees, (worth now + fees) ÷ the same − 1",
+        formula: "1 − worth now ÷ held then valued now; with fees, 1 − (worth now + fees) ÷ the same",
         inputs: [
           chain(`sqrtPriceX96 · ${at(r.then)}`, past?.sqrtPriceX96 ?? "–"),
           derived(`held then, valued now, ${Q}`, fig(p.holdThen)),

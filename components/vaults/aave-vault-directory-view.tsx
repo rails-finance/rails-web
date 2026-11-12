@@ -2,11 +2,11 @@
 
 // The roster: every vault Aave's own enumerators name on Ethereum, at one block.
 // ----------------------------------------------------------------------------
-// The VAULTS tab of the Aave vaults rail (/ethereum/aave/vaults). One vault row
-// (V1, components/vaults/vault-row.tsx) per vault, grouped by asset like every
-// roster, through the shared roster (components/vaults/vault-roster.tsx). The
-// family is a facet and a pill on the row: a reader narrowing to one asset
-// still sees which rows are a slashable stake and which are wrapped supply.
+// The VAULTS tab of the Aave vaults rail (/ethereum/aave/vaults). One table row
+// (V6) per vault, through the shared roster (components/vaults/vault-roster.tsx;
+// ui-jobs 605). The family is a facet and the Kind cell on the row: a reader
+// narrowing to one asset still sees which rows are a slashable stake and which
+// are wrapped supply. Compare ticks as on /vaults (E2, E3).
 // The family's own mechanic reads (deposit cap, wrapped aToken, cooldown and
 // slashing) are on the vault's page; the mechanics in words are in the intro
 // drawer, with Aave's own pages.
@@ -20,13 +20,13 @@ import { Prov } from "@/components/shared/provenance";
 import { ProvSection } from "@/components/shared/section-menu";
 import { isoSeconds, RosterBlock } from "@/components/vaults/roster-read-stamp";
 import { ROSTER_SCOPE, RosterMenu, VaultRoster, type VaultRosterFacet } from "@/components/vaults/vault-roster";
+import { CompareBar } from "@/components/vaults/compare-selection";
 import { AaveFirstPartySources } from "@/components/vaults/aave-first-party-sources";
 import { AAVE_FAMILY_LABEL } from "@/components/vaults/aave-vault-format";
 import { MAINNET_CHAIN_ID } from "@/lib/shared/chains";
 import { ethereumVaultHref, ethereumVaultRosterHref, ethereumVaultsListingHref } from "@/lib/vaults/routes";
 import { AAVE_VAULT_FAMILY_ORDER, type AaveVaultFamily } from "@/lib/aave-vaults/vault-catalog";
 import {
-  aaveVaultAssetGroupCountProv,
   aaveVaultCatalogueProv,
   aaveVaultEmptyCountProv,
   type AaveVaultCoords,
@@ -83,52 +83,55 @@ export function AaveVaultDirectoryView({
     />
   );
   return (
-    <ProvSection scope={ROSTER_SCOPE} as="div">
-      <VaultRoster
-        initialSearch={initialSearch}
-        readTime={readBy?.blockTime}
-        vaults={vaults}
-        yields={yields}
-        chainId={MAINNET_CHAIN_ID}
-        blockNumber={blockNumber}
-        chainStale={chainStale}
-        skel="directory"
-        facets={FACETS}
-        hrefOf={(v) => ethereumVaultHref(v.address)}
-        holdersHrefOf={(v) => ethereumVaultsListingHref({ vault: v.address })}
-        receiptsOf={(v) => aaveRowReceipts(coords, v)}
-        hooksOf={(v) => ({ "data-family": v.family })}
-        groupCountProv={(assetSymbol, count) => aaveVaultAssetGroupCountProv({ ...coords, assetSymbol }, count)}
-        emptyCountProv={(count) => aaveVaultEmptyCountProv(coords, count, counts.catalogSize)}
-        head={{
-          censusFigure: "directory-catalogue",
-          census: (
-            <>
-              <Prov info={aaveVaultCatalogueProv(coords, counts)}>
-                Aave&rsquo;s contracts name {n(counts.catalogSize)} vaults at this block
-              </Prov>
-              {censusBlock != null
-                ? `; Holders counts every address that has held a share by census block ${n(censusBlock)}.`
-                : "."}
-            </>
-          ),
-          listingHref: ethereumVaultsListingHref(),
-          infoHref: `${ethereumVaultRosterHref()}/info`,
-          menu: (
-            <RosterMenu
-              listingHref={ethereumVaultsListingHref()}
-              infoHref={`${ethereumVaultRosterHref()}/info`}
-              docs={{
-                title: "Aave's documentation",
-                subtitle: "aave.com: Savings GHO",
-                href: "https://aave.com/docs/ecosystem/gho/sgho",
-              }}
-            />
-          ),
-          drawer: <AaveRosterDrawer counts={counts} block={readBlock} />,
-        }}
-      />
-    </ProvSection>
+    <>
+      <ProvSection scope={ROSTER_SCOPE} as="div">
+        <VaultRoster
+          initialSearch={initialSearch}
+          readTime={readBy?.blockTime}
+          vaults={vaults}
+          yieldOf={(v) => yields[v.address]}
+          kindOf={(v) => v.releaseLabel}
+          chainId={MAINNET_CHAIN_ID}
+          blockNumber={blockNumber}
+          chainStale={chainStale}
+          skel="directory"
+          facets={FACETS}
+          hrefOf={(v) => ethereumVaultHref(v.address)}
+          holdersHrefOf={(v) => ethereumVaultsListingHref({ vault: v.address })}
+          receiptsOf={(v) => aaveRowReceipts(coords, v)}
+          hooksOf={(v) => ({ "data-family": v.family })}
+          emptyCountProv={(count) => aaveVaultEmptyCountProv(coords, count, counts.catalogSize)}
+          head={{
+            censusFigure: "directory-catalogue",
+            census: (
+              <>
+                <Prov info={aaveVaultCatalogueProv(coords, counts)}>
+                  Aave&rsquo;s contracts name {n(counts.catalogSize)} vaults at this block
+                </Prov>
+                {censusBlock != null
+                  ? `; Holders counts every address holding a share at census block ${n(censusBlock)}.`
+                  : "."}
+              </>
+            ),
+            listingHref: ethereumVaultsListingHref(),
+            infoHref: `${ethereumVaultRosterHref()}/info`,
+            menu: (
+              <RosterMenu
+                listingHref={ethereumVaultsListingHref()}
+                infoHref={`${ethereumVaultRosterHref()}/info`}
+                docs={{
+                  title: "Aave's documentation",
+                  subtitle: "aave.com: Savings GHO",
+                  href: "https://aave.com/docs/ecosystem/gho/sgho",
+                }}
+              />
+            ),
+            drawer: <AaveRosterDrawer counts={counts} block={readBlock} />,
+          }}
+        />
+      </ProvSection>
+      <CompareBar />
+    </>
   );
 }
 
@@ -147,11 +150,11 @@ function AaveRosterDrawer({ counts, block }: { counts: { stataCount: number; sta
       </p>
       <h3 className="text-[13px] font-semibold text-foreground">What this page is</h3>
       <p>
-        One row is one vault, grouped by asset: savings GHO, the {n(counts.stataCount)} static aTokens{" "}
-        <code>getStataTokens()</code> returns and the {n(counts.stakeCount)} stake tokens <code>getStkTokens()</code>{" "}
-        returns, every one read at {block}. Both calls answer their whole family, so the list is complete at that block.
-        Outside it: Aave&rsquo;s deployments on other chains, the legacy static-aToken factory, and any ERC-4626 Aave
-        has not published. The census that counts Holders runs on its own block.
+        One row is one vault: savings GHO, the {n(counts.stataCount)} static aTokens <code>getStataTokens()</code>{" "}
+        returns and the {n(counts.stakeCount)} stake tokens <code>getStkTokens()</code> returns, every one read at{" "}
+        {block}. Both calls answer their whole family, so the list is complete at that block. Outside it: Aave&rsquo;s
+        deployments on other chains, the legacy static-aToken factory, and any ERC-4626 Aave has not published. The
+        census that counts Holders runs on its own block.
       </p>
       <h3 className="text-[13px] font-semibold text-foreground">What the figures leave out</h3>
       <p>
