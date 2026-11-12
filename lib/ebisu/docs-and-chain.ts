@@ -77,6 +77,7 @@ export const EBISU_DOCS_AND_CHAIN: readonly InfoDocsAndChain[] = [
     claim:
       "The site and docs do not mention a shutdown; the Ethereum deployment was shut down on 20 Aug 2026 and the collateral in its pools withdrawn on 21 Oct 2026.",
     docs: {
+      label: "Site",
       lead: "the borrow page lists an Ethereum table with a Borrow button and the rows",
       quotes: [
         { words: "sUSDe 0.00 sUSDe $0 932.59 ebUSD", href: "https://ebisu.money/borrow" },

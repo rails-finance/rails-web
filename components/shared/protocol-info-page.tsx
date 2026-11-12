@@ -140,6 +140,9 @@ export interface InfoDocsAndChain {
     /** Words before the quotes, where the docs side is what a page shows
      *  rather than a sentence it states. */
     lead?: string;
+    /** The label before the quotes; "Docs" where absent, "Site" for the
+     *  protocol's website. */
+    label?: string;
     quotes: readonly [InfoDocsQuote, ...InfoDocsQuote[]];
     /** The day the pages were read, "12 Nov 2026". */
     read?: string;
@@ -167,7 +170,8 @@ function InfoDocsAndChainSection({ items }: { items: readonly InfoDocsAndChain[]
         <ul className={UL}>
           {items.map((d) => (
             <li key={d.claim} data-info-docs-chain-item="">
-              {d.claim} <span className="text-rb-400">Docs:</span> {d.docs.lead && `${d.docs.lead} `}
+              {d.claim} <span className="text-rb-400">{d.docs.label ?? "Docs"}:</span>{" "}
+              {d.docs.lead && `${d.docs.lead} `}
               {d.docs.quotes.map((q, i) => (
                 <span key={i}>
                   {i > 0 && (i === d.docs.quotes.length - 1 ? " and " : ", ")}
