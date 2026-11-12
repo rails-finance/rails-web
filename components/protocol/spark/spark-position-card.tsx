@@ -51,6 +51,7 @@ import {
   sparkPeakSupplyProv,
   sparkPeakBorrowProv,
   sparkLiqPriceProv,
+  sparkLiqDropProv,
 } from "@/lib/spark/event-provenance";
 import { accountDataProv, reserveDataProv, avgBorrowRateProv } from "@/lib/spark/position-provenance";
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
@@ -765,7 +766,7 @@ export function useSparkCardSlots({
       right.push({
         id: "liquidates-on-drop",
         label: "Liquidates on a drop of",
-        value: `${read.dropPct.toFixed(0)}%`,
+        value: <Prov info={sparkLiqDropProv()}>{read.dropPct.toFixed(0)}%</Prov>,
         tip: "How far the collateral's value at SparkLend's oracle prices can fall before the health factor reaches 1.",
       });
     }

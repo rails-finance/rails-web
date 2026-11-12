@@ -37,7 +37,7 @@ import { InlineAssetCluster } from "@/components/shared/inline-asset-cluster";
 import type { AssetBreakdown } from "@/components/shared/asset-donut";
 import { WalletPill } from "@/components/shared/wallet-pill";
 import { formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
-import { Prov } from "@/components/shared/provenance";
+import { Prov, type Provenance } from "@/components/shared/provenance";
 import { useMoonwellDeployment } from "@/lib/moonwell/deployment-context";
 import { moonwellPositionModal } from "@/lib/moonwell/event-templates";
 import type { MoonwellCardCaptions } from "@/lib/moonwell/economics";
@@ -217,19 +217,38 @@ function UsdFigure({
   return form === "cents" ? figure : <TitleTip title={formatUsdValue(usd)}>{figure}</TitleTip>;
 }
 
+/** A line's share of its side: its oracle USD over the side's, both from the
+ *  receipt `usd` names, so the share carries that read as its input. */
+function shareProv(usd: Provenance, line: string, side: string): Provenance {
+  return {
+    kind: "chain-derived",
+    pclass: usd.pclass,
+    summary: `Share of ${side} — ${line} in USD over the sum of ${side} in USD, each a balance times the price the Comptroller's oracle reads, rounded to a whole percent.`,
+    contract: usd.contract,
+    via: `${usd.via ?? "chain balance × Comptroller oracle getUnderlyingPrice"} · line USD ÷ side USD`,
+    formula: "line USD ÷ Σ side USD",
+    inputs: [
+      { label: "line USD", kind: "chain-derived", pclass: "oracle", note: "balance × oracle price" },
+      { label: "side USD", kind: "chain-derived", pclass: "oracle", note: `Σ balance × oracle price over ${side}` },
+    ],
+  };
+}
+
 /** A panel row's value for one market line: the amount, then its USD and its
- *  share of the side. */
+ *  share of the side (`side` names it in the share's receipt). */
 function LineValue({
   amount,
   usd,
   share,
   usdWhat,
+  side,
   marketBy,
 }: {
   amount: ReactNode;
   usd: number | null;
   share: number | null;
   usdWhat: string;
+  side: string;
   marketBy?: ServerRead;
 }) {
   const dep = useMoonwellDeployment();
@@ -245,7 +264,9 @@ function LineValue({
           {share != null && (
             <>
               {" · "}
-              <PanelFigure>{shareText(share)}</PanelFigure>
+              <Prov info={stampServerRead(shareProv(dep.card.usd(usdWhat), usdWhat, side), marketBy)}>
+                <PanelFigure>{shareText(share)}</PanelFigure>
+              </Prov>
             </>
           )}
         </>
@@ -577,6 +598,7 @@ export function useMoonwellCardSlots({
           usd={usd}
           share={usd != null && total ? usd / total : null}
           usdWhat={`${r.symbol} supplied`}
+          side={kind === "collateral" ? "the collateral" : "the supplies not entered as collateral"}
           marketBy={marketBy}
         />
       ),

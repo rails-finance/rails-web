@@ -431,6 +431,19 @@ export const sparkLiqPriceProv = (sym: string): Provenance => ({
   ],
 });
 
+/** The drop the whole collateral can take before liquidation: a function of
+ *  the Pool's health factor alone, so its one input is that read. */
+export const sparkLiqDropProv = (): Provenance => ({
+  kind: "chain-derived",
+  pclass: "state",
+  summary:
+    "Drop to liquidation — how far the collateral's value at SparkLend's oracle prices can fall, the debt standing still, before the health factor reaches 1 and the account can be liquidated.",
+  contract: SPARK,
+  via: "1 − 1 ÷ Pool getUserAccountData health factor",
+  formula: "1 − 1 ÷ health factor",
+  inputs: [{ label: "health factor", kind: "chain", pclass: "state", note: "Pool getUserAccountData" }],
+});
+
 /** Accrued interest on the debt leg — the current rebased debt (scaled-balance
  *  reduction, = variableDebtToken balanceOf) minus the net borrowed principal
  *  replayed from the position's own Pool events. Both legs chain-derived, so the
