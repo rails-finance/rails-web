@@ -38,6 +38,10 @@ export default function AboutPage() {
         <Link href="/about/architecture" className={LINK}>
           How the data gets to the page
         </Link>
+        {" · "}
+        <Link href="/about/provenance" className={LINK}>
+          How to check a figure
+        </Link>
       </p>
 
       <section className="mt-14">

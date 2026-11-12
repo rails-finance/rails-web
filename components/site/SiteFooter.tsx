@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { LwNotice } from "@/components/shared/lw-attribution";
-import { Activity, DraftingCompass, FileText, Home, Info, LayoutGrid, Signpost } from "lucide-react";
+import { Activity, DraftingCompass, FileText, Home, Info, LayoutGrid, ReceiptText, Signpost } from "lucide-react";
 import { INPLACE_TEXT } from "@/lib/shared/ui-grammar";
 import { DonateModal } from "@/components/site/DonateModal";
 import { FeedbackCluster } from "@/components/shared/feedback-cluster";
@@ -150,6 +150,15 @@ export function SiteFooter() {
                   >
                     <DraftingCompass className="w-4 h-4 shrink-0" aria-hidden="true" />
                     <span>Architecture</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/about/provenance"
+                    className="flex items-center gap-2 text-rb-500 hover:text-blue-600 dark:hover:text-[var(--text-link)] text-sm transition-colors duration-150"
+                  >
+                    <ReceiptText className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    <span>Receipts</span>
                   </Link>
                 </li>
                 <li>

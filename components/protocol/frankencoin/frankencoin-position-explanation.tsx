@@ -10,7 +10,8 @@
 // figures are the position contract read at head; the mechanisms behind them
 // are the card's "?" (position_* in the same file). Frankencoin has no health
 // factor and no USD: the risk is the declared price, a running challenge or
-// pause, and the expiry.
+// pause, and the expiry. The challenge phases and a running cooldown are
+// stated here and not among the card's stats (TO-DO-position-card 341).
 
 import type { ReactNode } from "react";
 import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-position";
@@ -21,7 +22,7 @@ import { arrangeByHeading } from "@/lib/shared/event-prose/nodes";
 import { FRANKENCOIN_WORDS, positionWords } from "@/lib/frankencoin/event-templates";
 import { positionNodes } from "@/lib/frankencoin/position-nodes";
 import { formatDate } from "@/lib/date";
-import { gapText } from "@/lib/frankencoin/figures";
+import { gapText, phaseText } from "@/lib/frankencoin/figures";
 import { AmountText } from "@/components/shared/amount-text";
 import { Prov } from "@/components/shared/provenance";
 import { formatUnitsExact } from "@/lib/utils/format";
@@ -30,6 +31,7 @@ import {
   liveInterestProv,
   liveLiqPriceProv,
   liveMintedProv,
+  liveChallengePeriodProv,
 } from "@/lib/frankencoin/live-provenance";
 import { LinkedAddress } from "@/components/shared/linked-address";
 import type { FrankencoinEnding } from "./frankencoin-position-card";
@@ -181,6 +183,14 @@ export function FrankencoinPositionExplanation({
         positionNodes("challenged_now", { challenged: strong(chain.challengedAmount as number), coll_symbol: sym }),
       ),
     );
+  }
+  if (!chain.isClosed && !challenging && chain.challengePeriod != null && chain.challengePeriod > 0) {
+    const phase = (
+      <Prov info={liveChallengePeriodProv(chain.position, serverReadOf(chain))}>
+        <H>{phaseText(chain.challengePeriod)}</H>
+      </Prov>
+    );
+    bullets.push(bulletOf("risk", "phases", positionNodes("challenge_phases", { phase })));
   }
   if (!chain.isClosed && chain.cooldownActive && chain.cooldownUntil != null) {
     bullets.push(

@@ -195,44 +195,11 @@ const check = (name, cond, detail = "") => {
 
 const browser = await chromium.launch();
 
-async function open(width, url, { flattenRuns = true } = {}) {
+async function open(width, url) {
   const ctx = await browser.newContext({
     viewport: { width, height: 900 },
     permissions: ["clipboard-read", "clipboard-write"],
   });
-  // "Collapse like events" defaults on (TimelineDisplayProvider) and, for a
-  // wallet whose activity clusters into long same-kind streaks, can swallow
-  // the very event these checks click into a run row — whose member cards
-  // mount only once the row is expanded, and whose `?at=` landing never
-  // resolves for a run-nested target (chain-truth-timeline.tsx's own
-  // documented gap, a later pass, not this batch's to close). Flattening
-  // runs for every context here tests the event-share feature on its own
-  // terms, independent of that separate, already-tracked limitation.
-  //
-  // ⚠️ NOT ON A SERVED-FOLDER PAGE. Since rails-ops decision 0021 the flag
-  // does nothing there: a served page's folders are not a reader's choice, and
-  // a stored `collapseRuns: false` opens none of them. (Before 0021 it opened
-  // every folder in view, one read each, and the SparkLend subject ran out
-  // this file's 900 s.) Writing it would state a flattening that does not
-  // happen, so a served page is tested as a reader meets it: the `?at=`
-  // landing resolves by event key, and `verifyServedFolders` passes
-  // `flattenRuns: false` for the same reason.
-  //
-  // Every Aave V3, SparkLend and Moonwell Base page is served unless it opts
-  // out with `?folders=0`. So the test is made here, off the URL, rather than
-  // left to each caller: the listing subjects, the "View in timeline" link and
-  // the fabricated-id pages all reach those families without saying so.
-  const target = new URL(url);
-  const servedFolders =
-    /^\/(ethereum\/(aave-v3|spark)|base\/moonwell)\/0x/.test(target.pathname) &&
-    target.searchParams.get("folders") !== "0";
-  if (flattenRuns && !servedFolders) {
-    await ctx.addInitScript(() => {
-      try {
-        localStorage.setItem("timeline-display-v3", JSON.stringify({ collapseRuns: false }));
-      } catch {}
-    });
-  }
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -1664,7 +1631,7 @@ async function verifyServedFolders(name, { listingPath, rowHrefRe, apiPath, para
 
   // ── 1 + 2 + 8: the page itself, with `?folders=1` ──────────────────────
   const pageUrl = `${BASE}${rowHref}${rowHref.includes("?") ? "&" : "?"}folders=1`;
-  const { ctx, page } = await open(1280, pageUrl, { flattenRuns: false });
+  const { ctx, page } = await open(1280, pageUrl);
   await page.waitForSelector("[data-event-id]", { timeout: 60000 }).catch(() => {});
   const presses = await exhaustPaging(page);
   const folderRows = await page.locator(GROUP_FRAME).count();
@@ -1743,7 +1710,6 @@ async function verifyServedFolders(name, { listingPath, rowHrefRe, apiPath, para
     const { ctx: landCtx, page: landPage } = await open(
       1280,
       `${BASE}${positionPath}?at=${encodeURIComponent(memberId)}&folders=1`,
-      { flattenRuns: false },
     );
     await landPage.waitForSelector(`[data-event-id="${memberId}"]`, { timeout: 60000 }).catch(() => {});
     check(
@@ -2524,7 +2490,7 @@ async function factsOnPositionPage(positionPath, eventId) {
  *  Null where this subject's life has no group, which is a fact about the
  *  subject and is reported as one rather than passed over. */
 async function idInsideACollapsedRun(positionPath) {
-  const grouped = await open(1280, `${BASE}${positionPath}`, { flattenRuns: false });
+  const grouped = await open(1280, `${BASE}${positionPath}`);
   await grouped.page.waitForSelector("[data-event-id]", { timeout: 60000 }).catch(() => {});
   await exhaustPaging(grouped.page);
   const shown = new Set(await eventIds(grouped.page));
@@ -2586,7 +2552,7 @@ async function verifyVaultOwn(name, subject, { runPath = null } = {}) {
   )
     return;
   const runLink = `${BASE}${runFrom}/event/${encodeURIComponent(run.hidden)}`;
-  const { ctx: runCtx, page: runPage, errors: runErrors } = await open(1280, runLink, { flattenRuns: false });
+  const { ctx: runCtx, page: runPage, errors: runErrors } = await open(1280, runLink);
   const runIds = await eventIds(runPage);
   check(
     `${name} · own: an event inside a collapsed run pins to exactly one card`,

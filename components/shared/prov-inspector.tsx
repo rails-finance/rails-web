@@ -39,6 +39,7 @@ import {
   receiptLabel,
   resolveClass,
   type ProvInspectorPin,
+  type ProvReceiptEntry,
 } from "./provenance";
 import { usePriceStripActive } from "@/components/shared/price-strip";
 import { useParams, usePathname } from "next/navigation";
@@ -337,9 +338,6 @@ function InspectorPopover({ pin }: { pin: ProvInspectorPin }) {
     };
   }, [pin]);
 
-  // The distance ladder, opened from the head's class dots.
-  const [ladderOpen, setLadderOpen] = useState(false);
-
   // Click-away closes the popover, not the mode — pointerdown, so a click on
   // the NEXT value first closes this popover, then pins the new one. A modal
   // opened from the popover (the ladder, compact notation) portals outside it
@@ -356,7 +354,34 @@ function InspectorPopover({ pin }: { pin: ProvInspectorPin }) {
 
   if (typeof document === "undefined") return null;
 
-  const e = pin.entry;
+  return createPortal(
+    <div
+      ref={ref}
+      className={`prov-inspect-pop${sheet ? " prov-inspect-sheet" : ""}`}
+      style={sheet ? undefined : pos ? { top: pos.top, left: pos.left } : { top: 0, left: 0, visibility: "hidden" }}
+      role="dialog"
+      aria-label={`Provenance: ${receiptLabel(pin.entry.info)}`}
+      data-prov-chrome=""
+    >
+      <ReceiptCard entry={pin.entry} onClose={() => provInspector.unpin()} />
+    </div>,
+    document.body,
+  );
+}
+
+/** The popover's content: the receipt head (class dots, label, value, close)
+ *  over the embedded receipt. Exported for /about/provenance, which draws a
+ *  receipt from fixed example data in a static `.prov-inspect-pop` frame; there
+ *  it has no close (`onClose` absent). */
+export function ReceiptCard({
+  entry: e,
+  onClose,
+}: {
+  entry: Pick<ProvReceiptEntry, "info" | "value" | "display" | "symbol" | "source">;
+  onClose?: () => void;
+}) {
+  // The distance ladder, opened from the head's class dots.
+  const [ladderOpen, setLadderOpen] = useState(false);
   const { vcls, isComputed, leaves } = classifyValue(e.info);
   // The panel rows' bullet grammar: one dot per distinct class involved,
   // nearest the chain first.
@@ -373,15 +398,8 @@ function InspectorPopover({ pin }: { pin: ProvInspectorPin }) {
         ? `Computed · ${CLASS_META[involved[0]]}`
         : CLASS_META[involved[0]];
 
-  return createPortal(
-    <div
-      ref={ref}
-      className={`prov-inspect-pop${sheet ? " prov-inspect-sheet" : ""}`}
-      style={sheet ? undefined : pos ? { top: pos.top, left: pos.left } : { top: 0, left: 0, visibility: "hidden" }}
-      role="dialog"
-      aria-label={`Provenance: ${receiptLabel(e.info)}`}
-      data-prov-chrome=""
-    >
+  return (
+    <>
       <div className="prov-inspect-head">
         <button
           type="button"
@@ -401,9 +419,11 @@ function InspectorPopover({ pin }: { pin: ProvInspectorPin }) {
           {/* a value that renders its own ticker (ExactSpan) already reads "… UNI" */}
           {e.symbol && !e.display.endsWith(` ${e.symbol}`) ? ` ${e.symbol}` : ""}
         </span>
-        <button type="button" className="prov-inspect-close" onClick={() => provInspector.unpin()} aria-label="Close">
-          <X aria-hidden />
-        </button>
+        {onClose && (
+          <button type="button" className="prov-inspect-close" onClick={onClose} aria-label="Close">
+            <X aria-hidden />
+          </button>
+        )}
       </div>
       {/* The whole receipt, no second click: summary prose, via, formula,
           operand rows, coordinates — the embedded receipt (its trim already
@@ -413,7 +433,6 @@ function InspectorPopover({ pin }: { pin: ProvInspectorPin }) {
         <ProvReceipt embedded info={e.info} value={e.value} display={e.display} symbol={e.symbol} source={e.source} />
       </div>
       {ladderOpen && <LadderModal onClose={() => setLadderOpen(false)} />}
-    </div>,
-    document.body,
+    </>
   );
 }

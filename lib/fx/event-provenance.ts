@@ -686,17 +686,6 @@ export const lifetimeInTxFundingProv = (unit: string, rows: number): Provenance 
 
 // ── the card's thresholds, trigger price and rebalance split ─────────────────
 
-/** The anchor oracle price the debt ratio was judged at, recovered from the
- *  settled sweep: getPositionDebtRatio = debts ÷ (colls × anchor price). */
-export const anchorPriceProv = (sym: string, block?: number | null): Provenance => ({
-  kind: "chain-derived",
-  pclass: "oracle",
-  summary: `The anchor price the debt ratio uses — the settled debt divided by the settled collateral times the debt ratio, all three from the pool's getPosition and getPositionDebtRatio${block != null ? ` at block ${block}` : ""}. The ratio is debts × 1e36 ÷ (colls × anchor price) on chain (scripts/verify-fx-chain.mjs check 5), so this recovers the anchor leg in USD per ${sym}.`,
-  contract: { name: "AaveFundingPool", address: "" },
-  via: "settled debts ÷ (settled colls × settled debt ratio)",
-  formula: "debts ÷ (colls × ratio)",
-});
-
 /** A pool line: rebalance or liquidation debt ratio, with its bonus. */
 export const poolLineProv = (
   which: "rebalance" | "liquidate",
