@@ -194,6 +194,8 @@ export interface AeroPosition {
   inRange: boolean;
   side: "below" | "above" | "in";
   holds: Amounts;
+  /** The position's own amounts at the past block; null where it did not exist then. */
+  holdsThen: Amounts | null;
   valueNow: number;
   /** The swap fee and the unstaked fee, in pips, at both reads. */
   fees: { lp: number; lpThen: number | null; unstaked: number; unstakedThen: number | null };
@@ -433,6 +435,10 @@ export function aeroPosition(r: AeroPositionRead): AeroPosition {
     inRange,
     side: inRange ? "in" : price < low ? "below" : "above",
     holds: px.amounts(a0, a1),
+    holdsThen:
+      past && past.positionLiquidity !== null
+        ? px.amounts(...amountsFor(BigInt(past.positionLiquidity), sqrtFromX96(past.sqrtPriceX96), tl, tu))
+        : null,
     valueNow,
     fees: {
       lp: now.lpFee,

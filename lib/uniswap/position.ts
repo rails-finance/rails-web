@@ -207,6 +207,9 @@ export interface PoolPosition {
   inRange: boolean;
   side: "below" | "above" | "in";
   holds: Amounts;
+  /** The position's own amounts at the past block (its liquidity then, at the price then); null where
+   *  it did not exist then. */
+  holdsThen: Amounts | null;
   valueNow: number;
   uncollected: number;
   uncollectedAmounts: Amounts;
@@ -379,6 +382,10 @@ export function poolPosition(r: UniPositionRead, protocol: UniProtocol = "uniswa
     inRange,
     side: inRange ? "in" : price < low ? "below" : "above",
     holds: px.amounts(a0, a1),
+    holdsThen:
+      past && past.positionLiquidity !== null
+        ? px.amounts(...amountsFor(BigInt(past.positionLiquidity), sqrtFromX96(past.sqrtPriceX96), tl, tu))
+        : null,
     valueNow,
     uncollected,
     uncollectedAmounts: px.amounts(Number(owed0), Number(owed1)),

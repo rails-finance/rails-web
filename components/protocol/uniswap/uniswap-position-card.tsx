@@ -1,8 +1,9 @@
 "use client";
 
-// A Uniswap position's card (U1; rails-ops ui-jobs 556, door 1): the two
-// tokens it holds now, its worth in the pool's quote token, the fees not yet
-// collected and the day it opened, then its range drawn against the price.
+// A Uniswap position's card (U1; rails-ops ui-jobs 556, door 1; 594): the two
+// tokens it holds now, its value in the pool's quote token, its uncollected
+// fees (PancakeSwap: unclaimed, and pending CAKE where staked), then its range
+// drawn against the price. Closed or out of range is the status word.
 // On the shared detail card (its ⋮, read stamp and (i)); the figures are
 // plain and the chain stays in each figure's receipt (decision 0059 point 1).
 
@@ -14,7 +15,7 @@ import { poolPosition } from "@/lib/uniswap/position";
 import { cardProv } from "@/lib/uniswap/provenance";
 import type { UniProtocol } from "@/lib/uniswap/deployments";
 import type { UniPositionRead } from "@/lib/uniswap/types";
-import { CARD_WORDS, cardExplainer, day, num, positionNumber, shown } from "@/lib/uniswap/words";
+import { CARD_WORDS, cardExplainer, cardStatus, isClosed, num, positionNumber, shown } from "@/lib/uniswap/words";
 
 /** The range against the price, on a log scale padded around both. Uniswap's and Aerodrome's cards
  *  share it: `s` is the prices as shown (lib/uniswap/words.ts `shown`). */
@@ -69,19 +70,24 @@ function slots(r: UniPositionRead, protocol: UniProtocol): PositionCardSlots {
   const B = p.base.symbol;
   const Q = p.quote.symbol;
   const words = cardExplainer(p);
+  const closed = isClosed(p);
   const heads: PositionCardHead[] = [
     {
       id: "holds",
       label: CARD_WORDS.holds,
       labelTip: CARD_WORDS.holdsTip,
-      value: (
+      value: closed ? (
+        "—"
+      ) : (
         <Prov info={cardProv("holds", c)}>
-          {num(p.holds.base)} {B}
+          {num(p.holds.base)} <span className="text-base font-medium">{B}</span>
         </Prov>
       ),
-      sub: (
+      sub: closed ? undefined : (
         <span data-figure="holds-quote">
-          and {num(p.holds.quote)} {Q}
+          <Prov info={cardProv("holds", c)}>
+            {num(p.holds.quote)} {Q}
+          </Prov>
         </span>
       ),
     },
@@ -89,23 +95,30 @@ function slots(r: UniPositionRead, protocol: UniProtocol): PositionCardSlots {
       id: "worth",
       label: CARD_WORDS.worth,
       labelTip: CARD_WORDS.worthTip(Q),
-      value: (
+      value: closed ? (
+        "—"
+      ) : (
         <Prov info={cardProv("worth", c)}>
-          {num(p.valueNow)} {Q}
+          {num(p.valueNow)} <span className="text-base font-medium">{Q}</span>
         </Prov>
       ),
     },
     {
       id: "uncollected",
-      label: CARD_WORDS.uncollected,
-      labelTip: p.staked ? CARD_WORDS.uncollectedTipStaked(p.staked.user) : CARD_WORDS.uncollectedTip,
-      value: (
-        <Prov info={cardProv("uncollected", c)}>
-          {num(p.uncollected)} {Q}
-        </Prov>
-      ),
+      label: CARD_WORDS.uncollected(p.protocol),
+      labelTip: p.staked
+        ? CARD_WORDS.uncollectedTipStaked(p.staked.user, p.protocol)
+        : CARD_WORDS.uncollectedTip(p.protocol),
+      value:
+        closed && p.uncollected === 0 ? (
+          "—"
+        ) : (
+          <Prov info={cardProv("uncollected", c)}>
+            {num(p.uncollected)} <span className="text-base font-medium">{Q}</span>
+          </Prov>
+        ),
     },
-    // PancakeSwap: CAKE not yet harvested, where the position is staked in the farm.
+    // PancakeSwap: CAKE rewards not yet harvested, where the position is staked in the farm.
     ...(p.staked
       ? [
           {
@@ -114,29 +127,30 @@ function slots(r: UniPositionRead, protocol: UniProtocol): PositionCardSlots {
             labelTip: CARD_WORDS.cakeTip,
             value: (
               <Prov info={cardProv("cake", c)}>
-                {num(p.staked.pendingCake)} {p.staked.cake.symbol}
+                {num(p.staked.pendingCake)} <span className="text-base font-medium">{p.staked.cake.symbol}</span>
               </Prov>
             ),
           },
         ]
       : []),
-    // Opened: where the chain's reads include the position's history (none on Base).
-    ...(p.historyRead
-      ? [
-          {
-            id: "opened",
-            label: CARD_WORDS.opened,
-            labelTip: CARD_WORDS.openedTip,
-            value: p.opened ? <Prov info={cardProv("opened", c)}>{day(p.opened.time)}</Prov> : null,
-          },
-        ]
-      : []),
   ];
+  const status = cardStatus(p);
   return {
     surface: "detail",
     heading: CARD_WORDS.heading,
-    status: null,
-    identity: <span className="text-xs text-rb-500">{positionNumber(p.id)}</span>,
+    status: status ? { word: status.word, tone: "muted", tip: status.tip } : null,
+    identity: (
+      <span className="text-xs text-rb-500">
+        {positionNumber(p.id)}
+        {/* PancakeSwap: whether the farm holds it. */}
+        {p.staked !== undefined && (
+          <>
+            {" · "}
+            <Prov info={cardProv("cake", c)}>{p.staked ? CARD_WORDS.staked : CARD_WORDS.unstaked}</Prov>
+          </>
+        )}
+      </span>
+    ),
     heads,
     counters: null,
     menu: { exports: null },
@@ -157,7 +171,7 @@ function slots(r: UniPositionRead, protocol: UniProtocol): PositionCardSlots {
       ),
     },
     learnMore: null,
-    band: (
+    band: closed ? undefined : (
       <div className="mt-4" data-anatomy="U1.1">
         <div className="mb-1 text-xs text-rb-500">{CARD_WORDS.rangeLabel}</div>
         <RangeBar
@@ -169,7 +183,6 @@ function slots(r: UniPositionRead, protocol: UniProtocol): PositionCardSlots {
         />
       </div>
     ),
-    foot: <p className="mt-3 text-xs text-rb-500">{CARD_WORDS.foot(Q)}</p>,
     panel: [[], []],
   };
 }

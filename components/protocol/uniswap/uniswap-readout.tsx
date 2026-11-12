@@ -1,17 +1,18 @@
 "use client";
 
-// "How the position and its pool are doing" (U2; rails-ops ui-jobs 556, door
-// 1): six lines beside the position card, each the holder's figure first,
-// then the pool's, each part traced to its reads (lib/uniswap/provenance.ts).
-// Range leads while the position is out of range. Every word is
+// The readout under a pool position's card (U2; rails-ops ui-jobs 556, 594): a
+// then / now table (components/shared/then-now-table.tsx), the block 30 days
+// back and the block read now, the position's rows first, then the pool's,
+// each figure traced to its reads (lib/uniswap/provenance.ts). Every word is
 // lib/uniswap/words.ts's; no colour carries a verdict. The section is one
 // receipts scope its ⋮ arms (decision 0059).
 
-import { Prov, type Provenance } from "@/components/shared/provenance";
+import type { Provenance } from "@/components/shared/provenance";
 import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 import { SectionReadStamp, readStampProv } from "@/components/shared/read-stamp";
 import { SectionExplainer } from "@/components/shared/section-explainer";
 import { ExplainBullet, ExplainGroup, Fig } from "@/components/shared/explain-groups";
+import { ThenNowTable, thenNowMarkdown, type ThenNowWords } from "@/components/shared/then-now-table";
 import type { ChainId } from "@/lib/shared/chains";
 import { poolPosition } from "@/lib/uniswap/position";
 import { lineProv, readContracts, type UniReceiptContext } from "@/lib/uniswap/provenance";
@@ -20,9 +21,10 @@ import type { BlockRef, UniPositionRead } from "@/lib/uniswap/types";
 import {
   READOUT,
   readoutExplainer,
-  readoutLines,
+  readoutTable,
   type ExplainGroupWords,
-  type ReadoutLine,
+  type PoolRow,
+  type PoolTable,
   type Seg,
 } from "@/lib/uniswap/words";
 
@@ -84,48 +86,13 @@ export function Segs({ segs }: { segs: Seg[] }) {
   );
 }
 
-function Part({ text, info, muted }: { text: string; info: Provenance | null; muted: boolean }) {
-  return (
-    <p className={`text-[13px] leading-snug ${muted ? "text-rb-500" : "text-foreground"}`}>
-      {info ? <Prov info={info}>{text}</Prov> : text}
-    </p>
-  );
-}
-
-type LineProv = (key: ReadoutLine["key"], part: "yours" | "pool") => Provenance | null;
-
-function Line({ line, prov }: { line: ReadoutLine; prov: LineProv }) {
-  return (
-    <li
-      className="grid gap-x-4 gap-y-0.5 py-2.5 first:pt-0 last:pb-0 sm:grid-cols-[7rem_minmax(0,1fr)]"
-      data-anatomy="U2.1"
-      data-pool-line={line.key}
-    >
-      <span className="text-xs font-semibold text-rb-500 sm:pt-0.5">{line.label}</span>
-      <div className="min-w-0 space-y-0.5">
-        {line.yours && <Part text={line.yours} info={prov(line.key, "yours")} muted={false} />}
-        {line.pool && <Part text={line.pool} info={prov(line.key, "pool")} muted={line.yours !== null} />}
-      </div>
-    </li>
-  );
-}
-
-const markdown = (title: string, lines: ReadoutLine[]) =>
-  [
-    `## ${READOUT.title}: ${title}`,
-    "",
-    ...lines.map((l) => `- **${l.label}**: ${[l.yours, l.pool].filter(Boolean).join(" ")}`),
-    "",
-    READOUT.sub,
-  ].join("\n");
-
 /** A pool position's readout section (U2): Uniswap's and Aerodrome's pages share it, each with its
- *  own lines, words and receipts. */
+ *  own table, words and receipts. */
 export function PoolReadout({
   scope,
   readoutKey,
   title,
-  lines,
+  table,
   groups,
   prov,
   stamp,
@@ -134,35 +101,39 @@ export function PoolReadout({
   /** `data-pool-readout`: the position's key. */
   readoutKey: string;
   title: string;
-  lines: ReadoutLine[];
+  table: PoolTable;
   groups: ExplainGroupWords[];
-  prov: LineProv;
+  prov: (row: PoolRow) => Provenance | null;
   stamp: React.ReactNode;
 }) {
+  const words: ThenNowWords = {
+    then: table.then,
+    now: READOUT.now,
+    groups: table.groups.map((g) => ({
+      title: g.title,
+      rows: g.rows.map((row) => ({
+        ...row,
+        id: `${row.part}:${row.key}:${row.label}`,
+        info: prov(row),
+        data: { "data-pool-line": row.key },
+      })),
+    })),
+  };
+  const heading = READOUT.title(table);
   return (
     <ProvSection scope={scope} data-anatomy="U2" data-pool-readout={readoutKey}>
       <SectionHeading
-        title={READOUT.title}
+        title={heading}
         stamp={stamp}
         menu={
           <SectionMenu
             scope={scope}
-            title={READOUT.title}
-            exports={{ markdown: { build: () => markdown(title, lines) } }}
+            title={heading}
+            exports={{ markdown: { build: () => [`## ${heading}: ${title}`, ...thenNowMarkdown(words)].join("\n") } }}
           />
         }
-      >
-        <p className="text-xs text-rb-500" data-pool-disclaimer="">
-          {READOUT.sub}
-        </p>
-      </SectionHeading>
-      <div className="mt-2 rounded-xl border border-rb-200 px-4 py-3 dark:border-rb-500/30">
-        <ul className="divide-y divide-rb-200 dark:divide-rb-500/30">
-          {lines.map((l) => (
-            <Line key={l.key} line={l} prov={prov} />
-          ))}
-        </ul>
-      </div>
+      />
+      <ThenNowTable {...words} rowAnatomy="U2.1" />
       <SectionExplainer
         label={READOUT.explainerLabel}
         className="mt-2"
@@ -197,18 +168,14 @@ export function UniswapReadout({
 }) {
   const p = poolPosition(r, protocol);
   const c = { p, r };
-  const lines = readoutLines(p);
   return (
     <PoolReadout
       scope={READOUT_SCOPE}
       readoutKey={`${p.version}:${p.id}`}
       title={title}
-      lines={lines}
-      groups={readoutExplainer(
-        p,
-        lines.map((l) => l.key),
-      )}
-      prov={(key, part) => lineProv(key, part, c)}
+      table={readoutTable(p)}
+      groups={readoutExplainer(p)}
+      prov={(row) => lineProv(row.key, c)}
       stamp={<UniswapReadStamp c={c} what="Every figure in this section" />}
     />
   );
