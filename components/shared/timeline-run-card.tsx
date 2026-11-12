@@ -662,7 +662,7 @@ export function TimelineRunCard({
           phoneCaption={
             <>
               {kindWord}
-              {countMark} &middot; <span className="text-foreground">{range}</span>
+              {countMark} &middot; <span className="whitespace-nowrap text-foreground">{range}</span>
             </>
           }
           spokenCaption={`${kindWord}, ${spokenRange}`}
