@@ -81,7 +81,7 @@ export default function InfoPage() {
           body: (
             <p>
               The system page shows the total collateral ratio against the 150% line, the Stability Pool against the
-              system's debt, and the <GlossaryLink term="Fees">base rate</GlossaryLink> that the fees start from and
+              system's debt, and the <GlossaryLink term="Fees">baseRate</GlossaryLink> that the fees start from and
               decay from.{" "}
               <Link href="/ethereum/liquity-v1/system" className={INLINE_LINK}>
                 See the system state and redemption queue

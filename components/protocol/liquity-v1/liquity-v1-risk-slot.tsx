@@ -111,7 +111,7 @@ export function liquityV1Panel(chain: LiquityV1PositionChainResponse): PositionP
             {
               id: "troves-in-front",
               label: "Troves in front",
-              tip: "How many Troves sit ahead of this one in the redemption queue, counted from the same sweep of the protocol's sorted Trove list.",
+              tip: "How many Troves are ahead of this one in line for redemption, counted from the same sweep of the protocol's sorted Trove list.",
               value: (
                 <Prov info={stampServerRead(trovesAheadProv(), serverReadOf(chain))}>
                   {chain.trovesAhead.toLocaleString("en-US")}

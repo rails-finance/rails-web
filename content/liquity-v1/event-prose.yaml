@@ -947,7 +947,7 @@ L5:
       - bold: |-
           Redemption fee
         text: |-
-          paid by the redeemer out of the ETH received: 0.5% plus a base rate that rises with recent redemptions.
+          paid by the redeemer out of the ETH received: 0.5% plus a baseRate that rises with recent redemptions.
       - bold: |-
           Net outcome
         text: |-
@@ -1285,7 +1285,7 @@ glossary:
   - bold: |-
       Fees
     text: |-
-      Liquity charges a one-time borrowing fee on each draw (0.5% to 5%) and a redemption fee that redeemers pay. Both start from the base rate, which rises after redemptions and decays back toward zero over time.
+      Liquity charges a one-time borrowing fee on each draw (0.5% to 5%) and a redemption fee that redeemers pay. Both start from the baseRate, which rises after redemptions and decays back toward zero over time.
     sources: [{ label: "Borrowing FAQ", doc: FAQ_BORROWING }, { label: "Redemptions FAQ", doc: FAQ_REDEMPTIONS }]
   - bold: |-
       Liquidation reserve
