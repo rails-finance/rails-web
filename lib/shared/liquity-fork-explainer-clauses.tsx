@@ -944,7 +944,7 @@ function eventSlots(
         redFeeFig() != null
           ? clause(
               <>
-                The redeemer paid a {t.redemptionFee === "Fee kept" ? "fee" : "redemption fee"} of {redFeeFig()}
+                The redeemer paid a redemption fee of {redFeeFig()}
                 {feePct != null ? <> ({feePct.toFixed(2)}% of the collateral redeemed from this Trove)</> : null}, and
                 the Trove kept it as collateral.
               </>,

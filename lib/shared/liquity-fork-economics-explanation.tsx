@@ -14,8 +14,7 @@ import { forkLiquidationReserve } from "@/lib/shared/liquity-fork-ops";
 import { liquityFamilyTerms, type LiquityFamilyTerms } from "@/lib/liquity/ltv";
 
 /** The fee drawing debt adds, named as the deployment's docs name it. */
-const upfrontInSentence = (t: LiquityFamilyTerms): string =>
-  t.upfrontFeeText === "one-time borrowing fee" ? "the one-time upfront fee" : `the ${t.upfrontFeeText}`;
+const upfrontInSentence = (t: LiquityFamilyTerms): string => `the ${t.upfrontFeeText}`;
 import { formatCompact } from "@/lib/shared/format-compact";
 
 const DUST = 1e-9;

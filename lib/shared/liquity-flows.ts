@@ -655,7 +655,7 @@ function forkLevelWords(
   const t = liquityFamilyTerms(f.name);
   const lim = forkLimitOf(f);
   // The limit's short name in a sentence: "minimum", "MCR" or "Max LTV".
-  const word = t.ltv ? "Max LTV" : t.limitText === "minimum" ? "minimum" : "MCR";
+  const word = t.limitShort;
   const steps = [...(f.mcrBefore ?? [])].sort((a, b) => a.untilBlock - b.untilBlock);
   const formula = (m: number) =>
     t.ltv
@@ -687,12 +687,12 @@ function forkLevelWords(
 function forkLevelHelp(f: LiquityForkLevel): string {
   const t = liquityFamilyTerms(f.name);
   const lim = forkLimitOf(f);
-  const word = t.ltv ? "Max LTV" : t.limitText === "minimum" ? "minimum" : "MCR";
+  const word = t.limitShort;
   const at =
     (f.mcrBefore?.length ?? 0) > 0
       ? `at the ${word} in force each day (${forkMcrWords(f)})`
       : f.stepsRead
-        ? `at the branch's ${lim(f.mcr)} ${t.ltv || word === "minimum" ? word : t.limitText}, which no governance log has moved`
+        ? `at the branch's ${lim(f.mcr)} ${t.ltv ? word : t.limitText}, which no governance log has moved`
         : `at today's ${lim(f.mcr)} ${word}, held across the life`;
   const priced = f.pricedRows
     ? ` The branch PriceFeed's price is recorded on the Trove's ${f.pricedRows} alone, and today's is read live; between them the last one is carried.`

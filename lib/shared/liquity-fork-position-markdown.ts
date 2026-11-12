@@ -147,7 +147,7 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
       lines.push(
         `- **Interest rate:** ${num(live.annualInterestRatePct, 2)}% annual ${
           view.isBatched
-            ? `(the batch's current rate, set by its ${t.delegate === "batch manager" ? "interest-batch manager" : t.delegate} for every member)`
+            ? `(the batch's current rate, set by its ${t.delegate} for every member)`
             : "(user-set, adjustable any time)"
         }`,
       );
@@ -162,7 +162,7 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
         lines.push(
           t.ltv
             ? `- **LTV:** ${num(100 / live.icr, 1)}% (1 ÷ the TroveManager's getCurrentICR) vs the branch's Max LTV ${fmtLtv(100 / live.mcr, 2)} (1 ÷ its ${pct(live.mcr, 0)} MCR)`
-            : `- **${t.ratio}:** ${pct(live.icr)} (the TroveManager's getCurrentICR) vs the branch ${t.limitText === "minimum" ? "minimum" : t.limitText} ${pct(live.mcr, 0)}${t.limitText === "minimum" ? " (MCR)" : ""}`,
+            : `- **${t.ratio}:** ${pct(live.icr)} (the TroveManager's getCurrentICR) vs the branch's ${t.limitText} ${pct(live.mcr, 0)}`,
         );
       if (live.liqPriceUsd != null)
         lines.push(
@@ -174,10 +174,10 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
       if (live.status === "zombie") {
         lines.push(
           live.redeemedFirst
-            ? `- **Redemption queue:** ${t.dormant} (Zombie in the contracts): a partial redemption left the Trove below the minimum debt; it is the branch's lastZombieTroveId, which the next redemption on this branch takes first`
+            ? `- **Redemption queue:** ${t.dormant === "Zombie" ? "Zombie" : `${t.dormant} (Zombie in the contracts)`}: a partial redemption left the Trove below the minimum debt; it is the branch's lastZombieTroveId, which the next redemption on this branch takes first`
             : live.entireDebt > 0
-              ? `- **Redemption queue:** ${t.dormant} (Zombie in the contracts): below the minimum debt and not the branch's lastZombieTroveId, so no redemption reaches it`
-              : `- **Redemption queue:** ${t.dormant} (Zombie in the contracts): redemption cancelled all of its debt; it sits outside the queue with nothing left to redeem, and closing it returns its ${coll} to the owner`,
+              ? `- **Redemption queue:** ${t.dormant === "Zombie" ? "Zombie" : `${t.dormant} (Zombie in the contracts)`}: below the minimum debt and not the branch's lastZombieTroveId, so no redemption reaches it`
+              : `- **Redemption queue:** ${t.dormant === "Zombie" ? "Zombie" : `${t.dormant} (Zombie in the contracts)`}: redemption cancelled all of its debt; it sits outside the queue with nothing left to redeem, and closing it returns its ${coll} to the owner`,
         );
       } else if (live.debtInFront != null) {
         lines.push(
@@ -204,7 +204,7 @@ export function liquityForkTroveToMarkdown(args: LiquityForkTroveMarkdownArgs): 
       lines.push(
         `- **Interest rate:** ${num(view.interestRate, 2)}% annual ${
           view.isBatched
-            ? `(its batch's rate as of the trove's last event; the ${t.delegate === "batch manager" ? "interest-batch manager" : t.delegate} can have moved the batch since)`
+            ? `(its batch's rate as of the trove's last event; the ${t.delegate} can have moved the batch since)`
             : "(user-set)"
         }`,
       );

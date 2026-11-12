@@ -326,7 +326,7 @@ function BranchCard({
           </>
         ) : (
           <>
-            Liquidates below {terms.limitText === "minimum" ? null : <>the {terms.limitText} of </>}
+            Liquidates below the {terms.limitText} of{" "}
             <Prov info={vocab.branchConstantProv("Minimum collateral ratio", "MCR", sym)}>{ratio(branch.mcr)}</Prov> per
             trove.
           </>

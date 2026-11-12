@@ -752,7 +752,7 @@ export function makeLiquityForkVocabulary(cfg: LiquityForkVocabularyConfig) {
           verify: txVerify(coords),
           summary: `${terms.ratio} at liquidation. The Trove's whole collateral at the branch's price, divided by the debt the liquidation cleared, on the balances logged at its previous change. The contract gives the Stability Pool depositors (or, in a redistribution, the branch's other Troves) the debt plus the branch's liquidation penalty, pays the liquidator a small part of the collateral, and leaves anything above that for the owner to claim.${
             vals.mcrPct != null
-              ? ` A Trove can be liquidated only below the branch's ${terms.limitText === "minimum" ? "minimum collateral ratio" : terms.limitText} of ${vals.mcrPct}%.`
+              ? ` A Trove can be liquidated only below the branch's ${terms.limitText} of ${vals.mcrPct}%.`
               : ""
           }`,
           contract: troveManagerContract(coords),

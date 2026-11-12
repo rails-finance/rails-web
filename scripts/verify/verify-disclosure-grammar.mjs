@@ -806,9 +806,10 @@ const SHEET_WORDS_SUBJECTS = [
     name: "Ebisu",
     path: "/ethereum/ebisu/WBTC/75911241408635389930317354588378809432274724767733080584082611717827843647638",
     id: "0x8496531fb5d25fc73d0d2df3695176b44d86f057871e9b89a5de224f16590a18-0",
-    risk: ["Collateral ratio", "Liquidates at"],
+    // Ebisu's docs' terms (decision 0065); "Critical ratio" is Rails's.
+    risk: ["Collateralization ratio", "Liquidation price"],
     limits: ["Interest rate"],
-    params: ["Minimum ratio", "Critical ratio"],
+    params: ["Minimum Collateral Ratio", "Critical ratio"],
     optional: [],
     // The escrow states its amount alone on the WBTC branch: no WETH price.
     note: /^0\.0375 WETH held in escrow$/,

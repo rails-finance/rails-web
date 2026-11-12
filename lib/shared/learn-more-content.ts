@@ -1078,7 +1078,7 @@ export function liquityForkBorrowingContent(
       steps: [
         t.ltv
           ? "Each collateral branch is its own market with its own Max LTV; above it, anyone can liquidate the Trove."
-          : `Each collateral branch is its own market with its own ${t.limitText === "minimum" ? "minimum collateral ratio" : t.limitText}; below it, anyone can liquidate the Trove.`,
+          : `Each collateral branch is its own market with its own ${t.limitText}; below it, anyone can liquidate the Trove.`,
         `The chosen interest rate is also the Trove's place in the redemption queue: redemptions sweep the LOWEST rates first, so a higher rate buys ${p.stablecoin} peg protection at a carrying cost.`,
         `Drawing ${p.stablecoin} pays ${forkFeePhrase(t, "a")} added to the debt, and a fixed liquidation reserve is set aside apart from the collateral.`,
       ],
@@ -1137,7 +1137,7 @@ export function liquityForkRedemptionContent(p: LiquityForkLearnMoreParams): Lea
     steps: [
       "It gives up collateral at the branch oracle price and sheds the same value of debt. Net value is preserved.",
       p.terms.ltv ? "Its LTV FALLS as a result." : `Its ${p.terms.ratioText} RISES as a result.`,
-      `A partial redemption that leaves the Trove below the minimum debt makes it ${p.terms.dormantText} (Zombie in the contracts) and takes it out of the rate-ordered queue. The branch's most recent ${p.terms.dormantNoun} with debt left is redeemed first.`,
+      `A partial redemption that leaves the Trove below the minimum debt makes it ${p.terms.dormantText}${p.terms.dormant === "Zombie" ? "" : " (Zombie in the contracts)"} and takes it out of the rate-ordered queue. The branch's most recent ${p.terms.dormantNoun} with debt left is redeemed first.`,
     ],
     links: forkLinks(p, "redemption"),
   };
@@ -1152,7 +1152,7 @@ export function liquityForkLiquidationContent(p: LiquityForkLearnMoreParams): Le
       "Liquidation closes the whole Trove: collateral is seized, debt cleared.",
       "Stability Pool depositors buy the collateral at a discount; redistributed portions land on other Troves as pending gains (collateral AND debt), settled on their next touch.",
       "The Stability Pool and the other Troves take collateral worth at most the debt plus the branch's liquidation penalty. Any collateral above that is the owner's surplus, credited to them in the branch's CollSurplusPool to claim.",
-      `Each branch sets its own ${p.terms.ltv ? "Max LTV" : p.terms.limitText === "minimum" ? "minimum ratio" : p.terms.limitText}, so the same price move can liquidate one branch's Troves and not another's.`,
+      `Each branch sets its own ${p.terms.limitShort}, so the same price move can liquidate one branch's Troves and not another's.`,
     ],
     links: forkLinks(p, "liquidation"),
   };
@@ -1175,7 +1175,7 @@ export function liquityForkBatchContent(p: LiquityForkLearnMoreParams): LearnMor
 export function liquityForkEventFallbackContent(p: LiquityForkLearnMoreParams): LearnMoreContent {
   return {
     title: `How ${p.protocolName} Troves work`,
-    intro: `${p.protocolName} runs the Liquity V2 architecture: per-branch Troves minting ${p.stablecoin} at a user-set interest rate, redemptions at $1 face sweeping the lowest rates first, per-branch ${p.terms.ltv ? "Max LTVs" : p.terms.limitText === "minimum" ? "minimum collateral ratios" : `${p.terms.limitText}s`}, and Stability Pools absorbing liquidations.`,
+    intro: `${p.protocolName} runs the Liquity V2 architecture: per-branch Troves minting ${p.stablecoin} at a user-set interest rate, redemptions at $1 face sweeping the lowest rates first, per-branch ${p.terms.ltv ? "Max LTVs" : "Minimum Collateral Ratios (MCRs)"}, and Stability Pools absorbing liquidations.`,
     detailsHeading: "Key concepts:",
     details: [
       {
@@ -1184,11 +1184,11 @@ export function liquityForkEventFallbackContent(p: LiquityForkLearnMoreParams): 
         // no specific mechanic for, on a Trove that may well be batched. A
         // batched Trove's rate is its manager's, so the rate's author is
         // stated as either route rather than asserted to be the borrower.
-        text: `each Trove carries its own annual rate: set by the borrower, or by the ${p.terms.delegate === "batch manager" ? "interest-batch manager" : p.terms.delegate} the borrower delegates to; interest accrues continuously into the debt, and the rate doubles as the redemption-queue position.`,
+        text: `each Trove carries its own annual rate: set by the borrower, or by the ${p.terms.delegate} the borrower delegates to; interest accrues continuously into the debt, and the rate doubles as the redemption-queue position.`,
       },
       {
         bold: "Per-branch risk",
-        text: `every collateral branch has its own TroveManager, oracle and ${p.terms.ltv ? "Max LTV" : p.terms.limitText === "minimum" ? "minimum collateral ratio" : p.terms.limitText}. One branch's stress does not liquidate another's Troves.`,
+        text: `every collateral branch has its own TroveManager, oracle and ${p.terms.limitText}. One branch's stress does not liquidate another's Troves.`,
       },
       {
         bold: "Redemption queue",

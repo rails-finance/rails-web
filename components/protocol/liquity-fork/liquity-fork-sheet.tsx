@@ -129,9 +129,7 @@ function tips(coll: string, debt: string, noun: string, t: LiquityFamilyTerms) {
       : `The collateral's dollar value divided by the debt after this event, at the branch's ${coll} price at this block.`,
     liquidatesAt: t.ltv
       ? `The ${coll} price at which the Trove's LTV reaches the branch's Max LTV: the debt divided by the collateral times the Max LTV.`
-      : t.limitText === "minimum"
-        ? `The ${coll} price at which the Trove's collateral ratio meets the branch's minimum: the debt times the minimum ratio, divided by the collateral.`
-        : `The ${coll} price at which the Trove's ${t.ratioText} meets the branch's ${t.limitText}: the debt times the MCR, divided by the collateral.`,
+      : `The ${coll} price at which the Trove's ${t.ratioText} meets the branch's ${t.limitText}: the debt times the ${t.limitShort}, divided by the collateral.`,
     rate: `The annual interest rate on the Trove's debt after this event, from the TroveManager's log.`,
     delegateFee: `The batch's annual management fee, set by its ${t.delegate} and charged on top of the interest rate.`,
     minimumRatio: t.ltv
@@ -532,7 +530,7 @@ export function liquityForkSheet({
       : mcr != null
         ? {
             kind: "chain-derived",
-            summary: `The ${collSym} price at which this Trove's ${terms.ratioText} meets the branch's ${terms.limitText}, ${pct(mcr)}. The debt times the ${terms.limitText === "minimum" ? "minimum ratio" : "MCR"}, divided by the collateral, after this event.`,
+            summary: `The ${collSym} price at which this Trove's ${terms.ratioText} meets the branch's ${terms.limitText}, ${pct(mcr)}. The debt times the ${terms.limitShort}, divided by the collateral, after this event.`,
             formula: "debt × minimum ratio ÷ collateral",
             inputs: [
               { label: "debt", value: `${forkAmount(debtAfter)} ${debtSym}`, kind: "chain", note: "after" },

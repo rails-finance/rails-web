@@ -45,7 +45,7 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
       title: "About this position",
       intro: t.ltv
         ? `This Trove was liquidated when its LTV rose ${maxLtv ? `above ${maxLtv}` : "above its branch's Max LTV"}. The panel above reconstructs its final state: peak collateral, ${debtSymbol} debt, and how long it stayed open.`
-        : `This Trove was liquidated when its ${t.ratioText} fell ${minCR || t.limitText === "minimum" ? minCRText : `below its branch's ${t.limitText}`}. The panel above reconstructs its final state: peak collateral, ${debtSymbol} debt, and how long it stayed open.`,
+        : `This Trove was liquidated when its ${t.ratioText} fell ${minCR ? minCRText : `below its branch's ${t.limitText}`}. The panel above reconstructs its final state: peak collateral, ${debtSymbol} debt, and how long it stayed open.`,
       detailsHeading: "Key concepts:",
       details: [
         t.ltv
@@ -55,7 +55,7 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
             }
           : {
               bold: "Liquidation threshold",
-              text: `each ${name} branch sets its own ${t.limitText === "minimum" ? "minimum collateral ratio" : t.limitText}, checked against the branch's own oracle price. Anyone can trigger the liquidation once a Trove falls below it. The minimum named above is the one in force when this Trove was liquidated.`,
+              text: `each ${name} branch sets its own ${t.limitText}, checked against the branch's own oracle price. Anyone can trigger the liquidation once a Trove falls below it. The ${t.limitShort} named above is the one in force when this Trove was liquidated.`,
             },
         {
           bold: "Trove NFT",
@@ -113,7 +113,7 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
   if (isZombie) {
     details.push({
       bold: t.dormantNoun.charAt(0).toUpperCase() + t.dormantNoun.slice(1),
-      text: `a redemption can leave a Trove below its branch's minimum debt. It then leaves the rate-ordered queue: while it is the branch's most recent one still owing ${debtSymbol}, the next redemption on the branch takes from it first. The owner can bring its debt back above the minimum, which returns it to the queue, or close it and take back the collateral${reserve ? ` and the ${reserve} liquidation reserve` : ""}. The contracts tag it Zombie.`,
+      text: `a redemption can leave a Trove below its branch's minimum debt. It then leaves the rate-ordered queue: while it is the branch's most recent one still owing ${debtSymbol}, the next redemption on the branch takes from it first. The owner can bring its debt back above the minimum, which returns it to the queue, or close it and take back the collateral${reserve ? ` and the ${reserve} liquidation reserve` : ""}.${t.dormant === "Zombie" ? "" : " The contracts tag it Zombie."}`,
     });
   }
   details.push(
@@ -123,7 +123,7 @@ export function liquityForkPositionContent(opts: LiquityForkPositionContentParam
     },
     {
       bold: "Branch scoping",
-      text: `each collateral type is its own ${t.branch === "branch" ? "branch" : `${t.branch} (a branch)`} with its own oracle, ${t.ltv ? "Max LTV" : t.limitText === "minimum" ? "minimum ratio" : t.limitText} and redemption queue, so one branch's stress does not liquidate another's Troves.`,
+      text: `each collateral type is its own ${t.branch === "branch" ? "branch" : `${t.branch} (a branch)`} with its own oracle, ${t.limitText} and redemption queue, so one branch's stress does not liquidate another's Troves.`,
     },
     {
       bold: "Trove NFT",

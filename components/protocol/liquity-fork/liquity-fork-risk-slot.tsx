@@ -103,7 +103,7 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
       kind: "derived",
       summary: terms.ltv
         ? `Room to borrow. The further ${debtSym} debt this Trove could carry before its LTV reaches the ${chain.symbol} branch's ${fmtLtv(100 / chain.mcr, 2)} Max LTV, at today's price: the collateral's worth times the Max LTV (1 ÷ MCR), less the debt.`
-        : `Room to borrow. The further ${debtSym} debt this Trove could carry before its ${terms.ratioText} reaches the ${chain.symbol} branch's ${pct(chain.mcr)} ${terms.limitText === "minimum" ? "minimum (MCR)" : terms.limitText}, at today's price: the collateral's worth divided by the MCR, less the debt.`,
+        : `Room to borrow. The further ${debtSym} debt this Trove could carry before its ${terms.ratioText} reaches the ${chain.symbol} branch's ${pct(chain.mcr)} ${terms.limitText}, at today's price: the collateral's worth divided by the MCR, less the debt.`,
       formula: terms.ltv ? "collateral × price × Max LTV − debt" : "collateral × price ÷ MCR − debt",
       inputs: [
         {
@@ -125,7 +125,7 @@ export function liquityForkPanelColumns(chain: LiquityForkTroveChainResponse): P
       label: "Room to borrow",
       tip: terms.ltv
         ? `How much more ${debtSym} this Trove could borrow before its LTV rises to the branch's ${fmtLtv(100 / chain.mcr, 2)} Max LTV, at today's price. Above that Max LTV it can be liquidated.`
-        : `How much more ${debtSym} this Trove could borrow before its ${terms.ratioText} falls to the branch's ${pct(chain.mcr)} ${terms.limitText}, at today's price. Below that ${terms.limitText} it can be liquidated.`,
+        : `How much more ${debtSym} this Trove could borrow before its ${terms.ratioText} falls to the branch's ${pct(chain.mcr)} ${terms.limitText}, at today's price. Below that ${terms.limitShort} it can be liquidated.`,
       value: amount(
         <Prov info={roomProv} value={formatExact(room)} symbol={debtSym}>
           {formatCompact(room)}

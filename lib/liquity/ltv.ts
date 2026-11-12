@@ -96,6 +96,8 @@ export interface LiquityFamilyTerms {
   limit: string;
   /** The same in a sentence ("Max LTV", "Minimum Collateral Ratio (MCR)"). */
   limitText: string;
+  /** The same after its first mention ("Max LTV", "MCR"). */
+  limitShort: string;
   /** Whom a Trove's rate is delegated to, in a sentence ("delegate"). */
   delegate: string;
   /** The docs' plain words for the delegate, given once where it is
@@ -128,6 +130,7 @@ const LIQUITY_V2_TERMS: LiquityFamilyTerms = {
   ratioText: "LTV",
   limit: "Max LTV",
   limitText: "Max LTV",
+  limitShort: "Max LTV",
   delegate: "delegate",
   upfrontFee: "Upfront Borrowing Fee",
   upfrontFeeText: "Upfront Borrowing Fee",
@@ -138,25 +141,6 @@ const LIQUITY_V2_TERMS: LiquityFamilyTerms = {
   liquidationPrice: "Liquidates at",
   branch: "branch",
   ccr: "Critical Collateral Ratio (CCR)",
-};
-
-/** The words the forks shared before their docs were read. */
-const FORK_TERMS: LiquityFamilyTerms = {
-  ltv: false,
-  ratio: "Collateral ratio",
-  ratioText: "collateral ratio",
-  limit: "Minimum ratio",
-  limitText: "minimum",
-  delegate: "batch manager",
-  upfrontFee: "Upfront fee",
-  upfrontFeeText: "one-time borrowing fee",
-  redemptionFee: "Fee kept",
-  dormant: "Dormant",
-  dormantText: "dormant",
-  dormantNoun: "dormant Trove",
-  liquidationPrice: "Liquidates at",
-  branch: "branch",
-  ccr: "Critical ratio",
 };
 
 export const LIQUITY_FAMILY_TERMS: Record<LiquityFamilyTermsId, LiquityFamilyTerms> = {
@@ -175,14 +159,36 @@ export const LIQUITY_FAMILY_TERMS: Record<LiquityFamilyTermsId, LiquityFamilyTer
     upfrontFeeText: "7-day interest fee",
     branch: "borrow market",
   },
-  ebisu: FORK_TERMS,
+  // ebisu.gitbook.io: the "Collateralization Ratio (CR)", read collateral over
+  // debt in all but one formula, against the "Minimum Collateral Ratio
+  // (MCR)"; the "delegate"; the "upfront borrow fee"; the "liquidation
+  // price"; the "zombie position". The docs name no gas deposit, TCR, CCR or
+  // shutdown, so the escrow and the branch ratios keep Rails's labels.
+  ebisu: {
+    ltv: false,
+    ratio: "Collateralization ratio",
+    ratioText: "collateralization ratio",
+    limit: "Minimum Collateral Ratio",
+    limitText: "Minimum Collateral Ratio (MCR)",
+    limitShort: "MCR",
+    delegate: "delegate",
+    upfrontFee: "Upfront borrow fee",
+    upfrontFeeText: "upfront borrow fee",
+    redemptionFee: "Redemption fee",
+    dormant: "Zombie",
+    dormantText: "a zombie position",
+    dormantNoun: "zombie position",
+    liquidationPrice: "Liquidation price",
+    branch: "branch",
+    ccr: "Critical ratio",
+  },
 };
 
 /** A deployment's terms, by its id or its display name ("Liquity V2",
  *  "Base Dollar"). */
 export function liquityFamilyTerms(family: string): LiquityFamilyTerms {
   const key = family.toLowerCase().replace(/[\s-]+/g, "");
-  return LIQUITY_FAMILY_TERMS[(key === "liquityv2" ? "liquity-v2" : key) as LiquityFamilyTermsId] ?? FORK_TERMS;
+  return LIQUITY_FAMILY_TERMS[(key === "liquityv2" ? "liquity-v2" : key) as LiquityFamilyTermsId] ?? LIQUITY_V2_TERMS;
 }
 
 /** A Trove's ratio in its deployment's terms, from the collateral ratio in
