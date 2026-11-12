@@ -56,6 +56,7 @@ import {
   liveCollateralProv,
   liveLiqPriceProv,
   liveInterestProv,
+  liveTermProv,
 } from "@/lib/frankencoin/live-provenance";
 import { ppmToPct, shortAddress } from "@/lib/frankencoin/asset-catalog";
 import { frankencoinPositionModal } from "@/lib/frankencoin/event-templates";
@@ -65,7 +66,7 @@ import type { FrankencoinChainResponse } from "@/lib/api/fetch-frankencoin-posit
 import { AmountText } from "@/components/shared/amount-text";
 import { formatDate, formatDayMonth } from "@/lib/date";
 import { PanelFigure } from "@/components/shared/position-card-panel";
-import { serverReadOf, type ServerRead } from "@/lib/shared/server-head-read";
+import { serverReadOf, stampServerRead, type ServerRead } from "@/lib/shared/server-head-read";
 
 export interface FrankencoinPositionView {
   /** Lowercased Position contract address — the identity. */
@@ -141,6 +142,28 @@ const liqPriceProv = (v: FrankencoinPositionView): Provenance =>
   v.basis === "chain"
     ? liveLiqPriceProv(v.collateralSymbol, v.collateralDecimals, v.position, v.readBy)
     : latestAbsoluteProv("price", v.collateralSymbol, v.collateralDecimals);
+
+/** A panel figure worked from the card's traced reads, stamped with the
+ *  read they share. Each input is a getter on the position, or the latest
+ *  MintingUpdate on the indexed lane. */
+const derivedProv = (
+  v: FrankencoinPositionView,
+  summary: string,
+  formula: string,
+  inputs: { label: string; note: string }[],
+): Provenance =>
+  stampServerRead(
+    {
+      kind: "chain-derived",
+      pclass: "state",
+      summary,
+      contract: { name: "Frankencoin Position", address: v.position },
+      via: `${v.basis === "chain" ? "GET /api/chain/frankencoin/position" : "the latest MintingUpdate"} · ${formula}`,
+      formula,
+      inputs: inputs.map((i) => ({ label: i.label, kind: "chain" as const, pclass: "state" as const, note: i.note })),
+    },
+    v.basis === "chain" ? v.readBy : undefined,
+  );
 
 /** The position's contract address, which is its identity. */
 function PositionAddress({ v }: { v: FrankencoinPositionView }) {
@@ -533,7 +556,22 @@ export function useFrankencoinCardSlots({
       left.push({
         id: "headroom",
         label: "Headroom",
-        value: <AmountText value={Math.max(0, v.collateral * v.liqPrice - v.minted)} format="compact" />,
+        value: (
+          <Prov
+            info={derivedProv(
+              v,
+              "Headroom — the ZCHF more debt the collateral backs at the owner-declared liquidation price: the collateral times that price, less the minted debt.",
+              "collateral × price − minted",
+              [
+                { label: "collateral", note: `the ${sym} the position holds (collateral().balanceOf(position))` },
+                { label: "price", note: "the owner-declared liquidation price (price())" },
+                { label: "minted", note: "the ZCHF minted against it (minted())" },
+              ],
+            )}
+          >
+            <AmountText value={Math.max(0, v.collateral * v.liqPrice - v.minted)} format="compact" />
+          </Prov>
+        ),
         asset: { symbol: "ZCHF" },
         tip: "The ZCHF more debt the collateral backs at the declared liquidation price: the collateral at that price, less the debt.",
       });
@@ -560,7 +598,17 @@ export function useFrankencoinCardSlots({
       label: "Challenge phases",
       value: (
         <>
-          <PanelFigure>{phaseText(live.challengePeriod)}</PanelFigure> each
+          <Prov
+            info={liveTermProv(
+              "challengePeriod()",
+              "Challenge phases — the length of each of a challenge's two phases: the position's challengePeriod() at the latest block, in seconds.",
+              v.position,
+              v.readBy,
+            )}
+          >
+            <PanelFigure>{phaseText(live.challengePeriod)}</PanelFigure>
+          </Prov>{" "}
+          each
         </>
       ),
       tip: "The length of each of a challenge's two phases, from the position's challengePeriod() at the latest block.",
@@ -587,7 +635,22 @@ export function useFrankencoinCardSlots({
       label: "Repays in full",
       value: (
         <TokenFigure symbol="ZCHF">
-          <AmountText value={v.minted - v.reserveHeld} format="compact" />
+          <Prov
+            info={derivedProv(
+              v,
+              "Repays in full — the ZCHF that repays the debt: the minted debt less the reserve share held back at minting (minted × reserveContribution() ÷ 1,000,000), which repaying returns.",
+              "minted − minted × reserveContribution ÷ 1e6",
+              [
+                { label: "minted", note: "the ZCHF minted (minted())" },
+                {
+                  label: "reserveContribution",
+                  note: "the reserve share of each mint, parts per million (reserveContribution())",
+                },
+              ],
+            )}
+          >
+            <AmountText value={v.minted - v.reserveHeld} format="compact" />
+          </Prov>
         </TokenFigure>
       ),
       tip: "The ZCHF that repays the debt: the rest of the debt is the reserve share held back at minting, which repaying returns.",

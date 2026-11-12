@@ -1039,7 +1039,7 @@ async function mobile(theme) {
   // desktop — both read from the one shared coverageRows() helper, so a drift
   // between the two layouts would show up here.
   const mobileLabels = (
-    await page.locator("section.lg\\:hidden div.rounded-2xl.bg-raised span.font-semibold").allTextContents()
+    await page.locator("section.lg\\:hidden div.rounded-2xl.bg-raised a > span.font-semibold").allTextContents()
   ).map((s) => s.trim());
   assert(mobileLabels.length === TOTAL_ROWS, `${TOTAL_ROWS} mobile card labels found`);
   assert(

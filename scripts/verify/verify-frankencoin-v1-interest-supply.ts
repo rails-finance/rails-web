@@ -93,10 +93,11 @@ async function live(): Promise<void> {
     // entry. The "?" (C4) sits at the foot of the position card's Explanation
     // pane (C3), which mounts once the chain read lands: open the pane, then
     // press its "?" (rails-ops reference/app-anatomy.md).
-    const paneToggle = page.locator('button[data-anatomy="C3"]').first();
+    // The pane's code is "C3 K3" since the shared section explainer (549/550), so match by token.
+    const paneToggle = page.locator('button[data-anatomy~="C3"]').first();
     await paneToggle.waitFor({ state: "attached", timeout: 90_000 });
-    const trigger = page.locator('[data-anatomy="C4"] button[aria-label="Learn more"]').first();
-    const dialog = page.locator('[role="dialog"][data-anatomy="C4"]').first();
+    const trigger = page.locator('[data-anatomy~="C4"] button[aria-label="Learn more"]').first();
+    const dialog = page.locator('[role="dialog"][data-anatomy~="C4"]').first();
     let text = "";
     // A press before hydration is lost, so press until the pane and the modal open.
     for (let i = 0; i < 6 && !text; i++) {

@@ -32,6 +32,7 @@ import {
   flowsBuildingLine,
   flowsWaitingLine,
   type FlowsBuilding,
+  type FlowsSkeletonShape,
   LifetimeFlowsSkeleton,
   LifetimeFlowsWaiting,
 } from "@/components/shared/lifetime-flows-skeleton";
@@ -93,6 +94,10 @@ export interface LifetimeFlowsPanelProps {
    *  panel's face keeps figures, bars, chart, controls and the axis caption
    *  (rails-ops TO-DO-ui-jobs §251). */
   outcome?: ReactNode;
+  /** The skeleton's shape where the page knows it before the history lands:
+   *  one side for a savings position, a switch row over the bars. Two sides
+   *  by default. */
+  skeleton?: FlowsSkeletonShape;
 }
 
 const FLOWS_ANATOMY = { explanation: "F8", learnMore: "F9" };
@@ -127,6 +132,7 @@ export function LifetimeFlowsPanel({
   title = "Lifetime flows",
   collapseKey: collapseKeyProp,
   outcome,
+  skeleton,
 }: LifetimeFlowsPanelProps) {
   const pathname = usePathname();
   const collapseKey = collapseKeyProp !== undefined ? collapseKeyProp : flowsCollapseKeyForPathname(pathname);
@@ -289,7 +295,7 @@ export function LifetimeFlowsPanel({
                 <p className="sr-only" role="status">
                   {building ? flowsBuildingLine(building) : flowsWaitingLine(lifeCount)}
                 </p>
-                <LifetimeFlowsSkeleton compact={compact} />
+                <LifetimeFlowsSkeleton compact={compact} {...skeleton} />
                 <LifetimeFlowsWaiting count={lifeCount} line={building ? flowsBuildingLine(building) : undefined} />
               </div>
             )}

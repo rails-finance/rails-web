@@ -24,6 +24,7 @@ import { Prov } from "@/components/shared/provenance";
 import type { PositionPanelColumns, PositionPanelRow } from "@/components/shared/position-card";
 import {
   llamalendBandCountProv,
+  llamalendBandDistanceProv,
   llamalendBandEdgeProv,
   llamalendConvertedProv,
   llamalendHealthFullProv,
@@ -208,7 +209,10 @@ export function llamalendRiskRows(
         <span className="font-semibold text-tone-caution">Converting now</span>
       ) : (
         <>
-          <PanelFigure>{Math.round(((price - pUp) / price) * 100)}%</PanelFigure> from soft-liquidation
+          <Prov info={stampServerRead(llamalendBandDistanceProv(chain.amm), serverReadOf(chain))}>
+            <PanelFigure>{Math.round(((price - pUp) / price) * 100)}%</PanelFigure>
+          </Prov>{" "}
+          from soft-liquidation
         </>
       ),
       tip: "Where the oracle price stands against this position's bands: above them (the fall left before conversion begins), inside them (the AMM is converting collateral) or below them (all of it converted).",
