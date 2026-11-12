@@ -516,6 +516,17 @@ export default function MaplePositionView({
     preferred: preferredPool,
   });
   const flowFocus = flows.read !== "failed" ? flows.focus : null;
+  // The skeleton's shape before the history lands: one side (a deposit holds
+  // no debt), and the pool switch where the wallet has used two pools: the
+  // pools it holds, the pools it closed, and the pools of the rows in hand.
+  const flowsSkeleton = useMemo(() => {
+    const pools = new Set([...(view?.pools ?? []), ...(view?.peakPools ?? [])].map((p) => p.pool));
+    for (const e of mapleEvents) {
+      const pool = (e.context.data as { pool?: string }).pool;
+      if (pool) pools.add(pool);
+    }
+    return { sides: 1 as const, switchRow: pools.size > 1 };
+  }, [view, mapleEvents]);
 
   // The custody view — the factual page for a bridge escrow address. The
   // identity card states what the contract is and links the verified source;
@@ -633,6 +644,7 @@ export default function MaplePositionView({
                     </div>
                   }
                   learnMore={mapleFlowsContent()}
+                  skeleton={flowsSkeleton}
                 />
               )}
               <ChainTruthTimeline
