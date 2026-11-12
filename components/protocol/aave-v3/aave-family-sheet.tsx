@@ -14,6 +14,7 @@
 // borrowed; the weighted max LTV, the liquidation threshold and the eMode
 // category as parameters.
 
+import { isBelowOne } from "@/lib/aave-family/health";
 import { aaveFamilyTermsOfPool, type AaveFamilyTerms } from "@/lib/aave-family/terms";
 import type { Provenance } from "@/components/shared/provenance";
 import {
@@ -470,7 +471,15 @@ export function aaveFamilySheet({
       value:
         drop != null
           ? { text: `${drop.toFixed(0)}%`, info: dropProv }
-          : { none: sameAsset ? WORDS.one_asset : hf == null ? WORDS.no_debt : hf <= 1 ? WORDS.liquidatable : "—" },
+          : {
+              none: sameAsset
+                ? WORDS.one_asset
+                : hf == null
+                  ? WORDS.no_debt
+                  : isBelowOne(hf)
+                    ? WORDS.liquidatable
+                    : "—",
+            },
       change:
         drop != null && dropPrev != null
           ? {
