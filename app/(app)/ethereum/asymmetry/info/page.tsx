@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { GlossaryLink, ProtocolInfoPage, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
+import { ASYMMETRY_DOCS_AND_CHAIN } from "@/lib/asymmetry/docs-and-chain";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -153,6 +154,7 @@ export default function InfoPage() {
       ]}
       views={views}
       search="You can search by Trove id, collateral or owner address. The listing filters by Status, Collateral, Debt (USDaf), Collateral (USD) and Transactions, and sorts by Recent activity, Collateral, Debt (USDaf) or Interest rate."
+      docsAndChain={ASYMMETRY_DOCS_AND_CHAIN}
       docs={{ label: "Asymmetry documentation", href: "https://docs.asymmetry.finance" }}
     />
   );
