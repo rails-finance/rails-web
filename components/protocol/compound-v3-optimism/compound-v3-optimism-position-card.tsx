@@ -73,7 +73,7 @@ function CollateralTable({ c }: { c: OpcReceiptContext }) {
   const p = c.p!;
   if (!p.collateral.length) return null;
   return (
-    <DataTable label={CARD_WORDS.collateral} stacked className="mt-4" data-reserves-table="">
+    <DataTable label={CARD_WORDS.collateral} stacked anatomy="C21" className="mt-4" data-reserves-table="">
       <DataTableHead>
         <DataTableHeader label={COLS.asset} />
         <DataTableHeader label={COLS.amount} align="right" />

@@ -126,7 +126,7 @@ function ReservesTable({ c }: { c: ArcReceiptContext }) {
   const { p } = c;
   if (!p.supplied.length && !p.borrowed.length) return null;
   return (
-    <DataTable label={CARD_WORDS.reserves} stacked className="mt-4" data-reserves-table="">
+    <DataTable label={CARD_WORDS.reserves} stacked anatomy="C21" className="mt-4" data-reserves-table="">
       <DataTableHead>
         <DataTableHeader label={COLS.asset} />
         <DataTableHeader label={COLS.amount} align="right" />
