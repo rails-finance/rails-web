@@ -363,7 +363,7 @@ export function reserveFigures({ r, vocab, assetHref }: RowProps) {
         focusable
         wrap
         align="end"
-        className="focus-ring rounded-sm text-rb-500 underline decoration-dotted"
+        className="focus-ring rounded-sm text-rb-500 tip-underline"
       >
         no price
       </RevealTip>

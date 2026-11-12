@@ -1,19 +1,19 @@
 "use client";
 
 // A read's freshness in H6's form (components/shared/recency-stamp.tsx): the
-// age of the read behind the block-and-clock icon, or its block behind the
-// cube, a press switching the two, the choice shared with H6 for the browser.
+// age of the read behind the block-and-clock icon, its block behind the
+// cube, or its UTC time behind the calendar-clock, a press stepping through
+// them, the choice shared with H6 for the browser (lib/shared/recency-reading.ts).
 // H6 states the chain head; this states one family read on the wallet view
 // (rails-ops decision 0050, point 8). With only a block, it shows the block.
 // The age reads "1 min" with no "ago": the glyph carries the meaning, and the
 // accessible name keeps the full words (ui-jobs 429).
 
 import { useEffect, useState, type MouseEvent } from "react";
-import { Box } from "lucide-react";
+import { Box, CalendarClock } from "lucide-react";
 import { BlockClockIcon } from "@/components/icons/block-clock-icon";
 import { CTRL_GHOST, CTRL_OFF } from "@/lib/shared/ui-grammar";
-
-const READING_KEY = "rails.recency-reading";
+import { nextReading, stampTime, storedReading, storeReading, type Reading } from "@/lib/shared/recency-reading";
 
 export function compactAge(seconds: number): string {
   if (seconds < 60) return "< 1 min";
@@ -37,34 +37,32 @@ export function ReadStamp({
   /** Inside a card's link: a press toggles the reading and does not open the card. */
   inLink?: boolean;
 }) {
-  const [reading, setReading] = useState<"age" | "block">("age");
+  const [reading, setReading] = useState<Reading>("age");
   const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
-    try {
-      if (localStorage.getItem(READING_KEY) === "block") setReading("block");
-    } catch {}
+    setReading(storedReading());
     setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(id);
   }, []);
-  const showAge = at != null && (reading === "age" || block == null);
+  // A reading the read cannot give falls to the next one it can.
+  const can = (r: Reading) => (r === "block" ? block != null : at != null);
+  const shown = can(reading) ? reading : nextReading(reading, can);
   // The age waits for the mount: the server's clock is not the reader's.
   const age = at != null && now != null ? compactAge(Math.max(0, now / 1000 - at)) : null;
   const blockText = block != null ? block.toLocaleString("en-US") : null;
-  const text = showAge ? age : blockText;
+  const text = shown === "age" ? age : shown === "block" ? blockText : at != null ? stampTime(at) : null;
   if (text == null) return null;
-  const Icon = showAge ? BlockClockIcon : Box;
+  const Icon = shown === "age" ? BlockClockIcon : shown === "block" ? Box : CalendarClock;
   const toggle = (e: MouseEvent) => {
     if (inLink) {
       e.preventDefault();
       e.stopPropagation();
     }
-    if (at == null || block == null) return;
-    const next = reading === "age" ? "block" : "age";
+    const next = nextReading(shown, can);
+    if (next === shown) return;
     setReading(next);
-    try {
-      localStorage.setItem(READING_KEY, next);
-    } catch {}
+    storeReading(next);
   };
   return (
     <button

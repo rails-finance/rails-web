@@ -104,7 +104,7 @@ export default async function Home() {
       {/* ═══ The page's lower half (Miles, 5 Nov 2026): one gradient, the mirror
           of the top section's, from the floor S5 stands on back to the top's
           tone at the foot, with 64px more under the last band so the footer
-          (the raised tone, ui-jobs 509) stands clear of it. It starts where the top section ends, so the
+          (which takes the end tone, ui-jobs 602) stands clear of it. It starts where the top section ends, so the
           darkest band stays at S5 however tall the directory opens; the bands
           below draw no ground of their own. ═══ */}
       <div

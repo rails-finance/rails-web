@@ -27,7 +27,8 @@
 // square holds the place.
 //
 // The menu is a portal positioned against the control, so it stands over the
-// page wherever the control sits (H2 below md, the column's corner from md;
+// page wherever the control sits; from md it is placed in page coordinates and
+// scrolls with the page as one piece with the control (ui-jobs 602) (H2 below md, the column's corner from md;
 // components/nav/rail-shell.tsx). Escape, a press outside and a lookup close
 // it, and focus returns to the control; the arrow keys, Home and End move
 // through its items.
@@ -56,6 +57,7 @@ import type { ChainId } from "@/lib/shared/chains";
 import type { SavedLink, WalletSession } from "@/lib/shared/sessions";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
 import { menuEntries } from "@/lib/shared/sessions";
+import { RevealTip } from "@/components/shared/reveal-tip";
 
 const BOOKMARKS_PATH = "/bookmarks";
 /** The control's and the menu's accessible name: what the menu holds as a whole. */
@@ -226,33 +228,52 @@ function ThemeSwitch() {
 
 const ITEMS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]';
 const PROV_HELP =
-  "Keeps the inspector on across the pages that support it: click an underlined figure to see where it comes from.";
+  "Underlines each figure that has a receipt: click one to see the contract call, the block and the maths behind it. Switched on here, it stays on across the pages that support it.";
 
 /** The standing provenance inspector (decision 0062; ui-jobs 571): arms the
  *  inspector on arrival on every page that has passed the coverage gate
- *  (lib/shared/prov-preference-routes.ts). Off by default. */
+ *  (lib/shared/prov-preference-routes.ts). Off by default.
+ *
+ *  The row is one switch; its "?" opens the house tooltip (RevealTip) and is
+ *  a sibling of the switch, standing over the switch's stretched hit area
+ *  (`after:inset-0`), so a press on it explains and never toggles (ui-jobs 602). */
 function ProvInspectorSwitch() {
   const on = useProvPreference();
   return (
-    <button
-      type="button"
-      role="menuitemcheckbox"
-      aria-checked={on}
-      onClick={() => setProvPreference(!on)}
-      className={ITEM}
+    <div
+      // ITEM's row, its ring answering the switch's hover and focus.
+      className="relative flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-[15px] text-foreground has-[[role=menuitemcheckbox]:hover]:ring-1 has-[[role=menuitemcheckbox]:hover]:ring-blue-500 has-[[role=menuitemcheckbox]:focus-visible]:ring-[1.5px] has-[[role=menuitemcheckbox]:focus-visible]:ring-blue-500"
       data-anatomy="H20.1"
-      data-profile-menu-prov={on ? "on" : "off"}
     >
       <Crosshair className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-      <span className="flex min-w-0 flex-1 items-center gap-1.5">
-        <span className="truncate">Provenance inspector</span>
-        <span className="inline-flex shrink-0 text-rb-400" title={PROV_HELP} data-profile-menu-prov-help="">
+      <button
+        type="button"
+        role="menuitemcheckbox"
+        aria-checked={on}
+        onClick={() => setProvPreference(!on)}
+        className="min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:rounded-lg after:content-['']"
+        data-profile-menu-prov={on ? "on" : "off"}
+      >
+        Provenance inspector
+      </button>
+      <RevealTip
+        // `!static`: the bubble stands on the row (the menu clips a bubble
+        // anchored at the "?"), opening up from the row's left edge.
+        className="-ml-1.5 !static"
+        wrap
+        tip={<span className="block w-64 font-normal leading-snug">{PROV_HELP}</span>}
+      >
+        <button
+          type="button"
+          aria-label="About the provenance inspector"
+          className="relative z-10 inline-flex rounded-full p-0.5 text-rb-400 hover:text-foreground focus-visible:outline-2 focus-visible:outline-blue-500"
+          data-profile-menu-prov-help=""
+        >
           <CircleHelp className="size-3.5" aria-hidden="true" />
-          <span className="sr-only">{PROV_HELP}</span>
-        </span>
-      </span>
+        </button>
+      </RevealTip>
       <span
-        className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
+        className={`pointer-events-none relative ml-auto inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
           on ? "bg-teal-500" : "bg-rb-300 dark:bg-rb-700"
         }`}
         aria-hidden="true"
@@ -263,7 +284,7 @@ function ProvInspectorSwitch() {
           }`}
         />
       </span>
-    </button>
+    </div>
   );
 }
 
@@ -278,6 +299,7 @@ export function ProfileMenu() {
   const [place, setPlace] = useState<{
     top: number;
     right: number;
+    room: number;
     phone: boolean;
   } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -310,13 +332,19 @@ export function ProfileMenu() {
   useEffect(() => setOpen(false), [pathname]);
 
   // Placed under the control: from md its right edge on the control's, below
-  // md across the viewport.
+  // md across the viewport. The dropdown is placed in page coordinates
+  // (`position: absolute` against the document), so the browser scrolls it
+  // with the page in the same frame as the control; a fixed box re-placed
+  // from a scroll listener trails the page by a frame (ui-jobs 602). `room`
+  // is the window's height below the control at opening, the dropdown's
+  // ceiling.
   const measure = useCallback(() => {
     const r = trigger.current?.getBoundingClientRect();
     if (!r) return;
     setPlace({
-      top: r.bottom + 8,
-      right: window.innerWidth - r.right,
+      top: r.bottom + 8 + window.scrollY,
+      right: document.documentElement.clientWidth - r.right,
+      room: window.innerHeight - (r.bottom + 8) - DROP_MARGIN,
       phone: window.innerWidth < 768,
     });
   }, []);
@@ -324,11 +352,7 @@ export function ProfileMenu() {
     if (!open) return;
     measure();
     window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, { passive: true });
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure);
-    };
+    return () => window.removeEventListener("resize", measure);
   }, [open, measure]);
 
   // Below md the sheet holds the page still under it, as the wallet panel
@@ -457,18 +481,14 @@ export function ProfileMenu() {
               aria-label={MENU_NAME}
               data-profile-menu=""
               data-profile-menu-variant={place.phone ? "sheet" : "drop"}
-              className={`fixed z-[var(--z-popover)] overflow-y-auto overscroll-contain border border-rb-200 bg-background px-3 pb-4 pt-3 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
+              className={`${place.phone ? "fixed" : "absolute"} z-[var(--z-popover)] overflow-y-auto overscroll-contain border border-rb-200 bg-background px-3 pb-4 pt-3 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
                 place.phone
                   ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] rounded-t-2xl border-x-0 border-b-0 pb-[max(1rem,env(safe-area-inset-bottom))]"
                   : "profile-drop w-80 rounded-xl"
               }`}
               // The dropdown stops above the window's foot and scrolls within
               // itself (ui-jobs 586).
-              style={
-                place.phone
-                  ? undefined
-                  : { top: place.top, right: place.right, maxHeight: `calc(100dvh - ${place.top + DROP_MARGIN}px)` }
-              }
+              style={place.phone ? undefined : { top: place.top, right: place.right, maxHeight: place.room }}
             >
               <ThemeSwitch />
               {/* With nothing saved, the way in, after the theme (Miles, 11

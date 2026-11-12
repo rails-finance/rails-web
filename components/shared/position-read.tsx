@@ -71,6 +71,7 @@ export function PositionReadProvider({
       ) : (
         children
       )}
+      <PositionReadReceipt />
     </PositionReadContext.Provider>
   );
 }
@@ -87,22 +88,12 @@ export function useReportPositionRead(read: PositionRead | null | undefined): vo
   }, [report, kind, block, at]);
 }
 
-/** The stamp, muted, in the card's heading row. */
-export function PositionReadStamp() {
-  const store = useContext(PositionReadContext);
+/** The read in words, its block linking to the chain's explorer. */
+function ReadWords({ read }: { read: PositionRead }) {
   const chainId = useChainId();
-  const read = store?.read;
-  if (!read) return null;
   const { lead, tail } = positionReadWords(read);
   return (
-    <span
-      className="text-[11px] text-rb-500 tabular-nums"
-      data-anatomy="C5.1"
-      data-position-read={read.kind}
-      data-position-read-block={read.block ?? undefined}
-      // The block and the time are the read's own coordinates.
-      data-prov-exempt
-    >
+    <>
       {lead}
       {read.block != null && (
         <>
@@ -118,6 +109,45 @@ export function PositionReadStamp() {
         </>
       )}
       {tail}
+    </>
+  );
+}
+
+/** The stamp, muted, in the card's heading row: drawn only for a stored read,
+ *  to say the latest read failed. Otherwise H6 beside it states the read's age,
+ *  block and time (Miles, 12 Nov 2026; ui-jobs 602). */
+export function PositionReadStamp() {
+  const read = useContext(PositionReadContext)?.read;
+  if (!read || read.kind !== "stored") return null;
+  return (
+    <span
+      className="text-[11px] text-rb-500 tabular-nums"
+      data-anatomy="C5.1"
+      data-position-read={read.kind}
+      data-position-read-block={read.block ?? undefined}
+      // The block and the time are the read's own coordinates.
+      data-prov-exempt
+    >
+      <ReadWords read={read} />
     </span>
+  );
+}
+
+/** The page's receipt, one muted line at the foot of the page above the footer:
+ *  the read behind the figures in full, in the served HTML, quotable where the
+ *  figures carry `data-nosnippet` (Miles, 12 Nov 2026; ui-jobs 602). */
+function PositionReadReceipt() {
+  const read = useContext(PositionReadContext)?.read;
+  if (!read) return null;
+  return (
+    <p
+      className="mt-16 text-[11px] text-rb-500 tabular-nums"
+      data-anatomy="C5.2"
+      data-position-read-receipt={read.kind}
+      data-position-read-block={read.block ?? undefined}
+      data-prov-exempt
+    >
+      <ReadWords read={read} />.
+    </p>
   );
 }
