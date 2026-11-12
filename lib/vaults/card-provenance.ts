@@ -33,6 +33,34 @@ export const vaultStewardProv = (v: VaultSummary, s: VaultSteward, readBy?: Serv
     readBy,
   );
 
+/** The count of vaults a steward runs (rails-ops ui-jobs 554, piece C): the
+ *  directory's MetaMorpho and Maple rows on Base and Ethereum whose steward
+ *  is this address, at each roster's block. */
+export const stewardVaultCountProv = (
+  steward: string,
+  count: number,
+  listed: number,
+  rosters: { protocol: string; chainId: number; block: number }[],
+): Provenance => {
+  const at = rosters
+    .map(
+      (r) =>
+        `${r.protocol === "maple" ? "Maple" : "MetaMorpho"} on ${r.chainId === 1 ? "Ethereum" : "Base"} at block ${n(r.block)}`,
+    )
+    .join(", ");
+  return {
+    kind: "chain-derived",
+    pclass: "state",
+    summary: `Vaults this steward runs — ${n(count)} of the ${n(listed)} MetaMorpho and Maple rows in the vault directory whose steward is ${steward}. Read ${at}.`,
+    via: "vault directory · rows where curator(), else owner(), or poolDelegate() = this address @ each roster's block",
+    formula: "count(rows where steward = address)",
+    verify: {
+      kind: "recompute",
+      text: `To check: at the blocks named, call curator() on each MetaMorpho vault in the directory (owner() where it returns the zero address) and poolDelegate() on each Maple PoolManager, and count the ones that return ${steward}.`,
+    },
+  };
+};
+
 /** A venue's share of this vault: its amount over the table's denominator,
  *  both read at the same block. */
 export const vaultVenueShareProv = (

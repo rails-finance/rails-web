@@ -6,7 +6,8 @@
 // components/vaults/morpho-base-vault-page.tsx from one pinned read of the
 // vault and of Blue, the fee and the guardian at the same block
 // (lib/vaults/config-read.ts); Holders and Who holds it are the census's
-// (lib/vaults/holders-read.ts), Yield the daily store's. What protects it and
+// (lib/vaults/holders-read.ts), Yield the daily store's, the steward's record
+// the /vaults directory's (lib/vaults/steward-record.ts). What protects it and
 // The protocol underneath stream behind their own Suspense.
 //
 // THE PAGE LINKS TO THE FILTERED LISTING, IT DOES NOT LIST. The Holders
@@ -46,6 +47,7 @@ import { loadAssetScales } from "@/lib/vaults/asset-scale";
 import { FocusSourceGate } from "@/components/shared/aim-gate";
 import { readVaultConfig } from "@/lib/vaults/config-read";
 import { loadVaultHolders } from "@/lib/vaults/holders-read";
+import { loadStewardRecord } from "@/lib/vaults/steward-record";
 
 export type MetaMorphoVaultParams = {
   params: Promise<{ vault: string }>;
@@ -102,11 +104,12 @@ export async function MetaMorphoVaultRoute({
   const holderParam = firstParam((await searchParams).holder);
   if (holderParam && holderParam.trim()) redirect(metaMorphoVaultHref(chainId, address, holderParam.trim()));
 
-  const [data, census, series, holders] = await Promise.all([
+  const [data, census, series, holders, stewardRecord] = await Promise.all([
     load(chainId, address, undefined),
     loadVaultCensusRow(chainId, address),
     loadVaultPageSeries(chainId, address),
     loadVaultHolders(chainId, address, "morpho"),
+    loadStewardRecord(chainId, address, null),
   ]);
   const [assetScales, config] = data.chainStale
     ? [{}, null]
@@ -137,6 +140,7 @@ export async function MetaMorphoVaultRoute({
               factory={metaMorphoFactoryAddress(chainId, data.vault.factory)}
               config={config}
               holders={holders}
+              stewardRecord={stewardRecord}
               protects={
                 <Suspense fallback={null}>
                   <VaultProtectsSection

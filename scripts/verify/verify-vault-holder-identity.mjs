@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 // The naming ladder — who gets named, on whose authority, and who stays unnamed.
 // ----------------------------------------------------------------------------
-// Subject: `lib/shared/attested-addresses.ts` and the two surfaces that render
-// it — the position page's shape sentence (`HolderShapeLine`) and the listing
-// card's one mechanism phrase. Half the money in this section is held by code,
+// Subject: `lib/shared/attested-addresses.ts` and the one surface that renders
+// it: the positions listing card's identity line (`vault-position-card.tsx`). An
+// attested holder carries `data-attested-constant` and "<name> in Aave's address
+// book"; any other holder carries the census shape word. Checks read that card
+// for the pair, and the vault page for its backing. N1b (the UNDERLYING_ASSET
+// clause) was retired 2026-11-12 with a0f5c42a, which removed the position
+// page's shape line, the only surface that stated it. Half the money in this section is held by code,
 // and the biggest of those holdings read as "a contract, 1,096 bytes" while being
 // Aave's own GHO peg module parking its reserves in Aave's own vault.
 //
@@ -194,27 +198,35 @@ async function readPage(f) {
   const res = await page.goto(url, { waitUntil: "networkidle", timeout: 120_000 });
   const status = res?.status() ?? 0;
   if (status !== 200) return { url, status };
-  const grab = async (sel, attr) => {
-    const el = page.locator(sel);
-    if ((await el.count()) === 0) return null;
-    return attr ? el.first().getAttribute(attr) : (await el.first().innerText()).replace(/\s+/g, " ").trim();
-  };
   return {
     url,
     status,
-    block: Number(await grab("[data-vault-block]", "data-vault-block")),
-    // The shape line sits in the holder card's (i) since ui-jobs 407 step 4.
-    shapeKind: await grab('[data-figure="holder-shape"]', "data-holder-shape-kind"),
-    shapeLine: await grab('[data-figure="holder-shape"]'),
-    attestedConstant: await grab('[data-figure="holder-shape"]', "data-attested-constant"),
-    attestedVia: await grab('[data-figure="holder-shape"]', "data-attested-via"),
-    cataloguedLine: await grab('[data-figure="holder-catalogued"]'),
     // The body as a READER sees it — innerText, never the flight payload: a
     // string that reaches only the RSC payload is not on the page, and an
     // absence check against the payload would have been the vacuous version of
     // N3 (memory `vaults-section-build`).
     body: (await page.locator("main, body").first().innerText()).replace(/\s+/g, " "),
   };
+}
+
+/** One pair's card on the positions listing, read as a reader sees it. */
+async function readListingCard(f) {
+  const url = `${BASE}/ethereum/aave/vaults/positions?q=${f.holder}`;
+  const res = await page.goto(url, { waitUntil: "networkidle", timeout: 120_000 });
+  const status = res?.status() ?? 0;
+  const key = `${f.vault}:${f.holder}`.toLowerCase();
+  const card = await page.evaluate((key) => {
+    const el = [...document.querySelectorAll("[data-position-card]")].find(
+      (e) => e.getAttribute("data-position-card")?.toLowerCase() === key,
+    );
+    if (!el) return null;
+    const id = el.querySelector("[data-card-vault-symbol]")?.closest("span.flex");
+    return {
+      attestedConstant: el.querySelector("[data-attested-constant]")?.getAttribute("data-attested-constant") ?? null,
+      identity: (id?.innerText ?? "").replace(/\s+/g, " ").trim(),
+    };
+  }, key);
+  return { url, status, card };
 }
 
 // ── N0: the fixtures still are what every check below assumes ───────────────
@@ -297,24 +309,16 @@ const f1 = await readPage(F1);
 const f1Entry = LADDER.entries.find((e) => e.address === F1.holder);
 const f1Published = book ? bookAddress(f1Entry?.constant ?? "") : null;
 const shortConstant = (f1Entry?.constant ?? "").split(".").pop();
+const f1Card = await readListingCard(F1);
 check(
-  "N1 F1's page names it from the book — the constant, the commit, and whose book it is",
-  f1.status === 200 &&
-    f1.shapeKind === "attested" &&
-    f1.attestedConstant === f1Entry?.constant &&
-    f1.attestedVia === "book" &&
-    (f1.shapeLine ?? "").includes(shortConstant ?? " ") &&
-    (f1.shapeLine ?? "").includes(LADDER.commit.slice(0, 10)) &&
-    /Aave publishes this address/.test(f1.shapeLine ?? "") &&
+  "N1 F1's listing card names it from the book — the constant, and whose book it is",
+  f1Card.status === 200 &&
+    f1Card.card?.attestedConstant === f1Entry?.constant &&
+    new RegExp(`${shortConstant} in Aave's address book`).test((f1Card.card?.identity ?? "").replace(/\u2019/g, "'")) &&
     (book ? f1Published === F1.holder : true),
-  `status ${f1.status}, kind ${f1.shapeKind}, constant ${f1.attestedConstant} via ${f1.attestedVia}, book says ${
+  `status ${f1Card.status}, constant ${f1Card.card?.attestedConstant ?? "(no card)"}, book says ${
     f1Published ?? "(not fetched)"
-  } · "${(f1.shapeLine ?? "").slice(0, 170)}"`,
-);
-check(
-  "N1b and it states the read that says WHY this address holds this vault, not the name alone",
-  /UNDERLYING_ASSET\(\) is this vault/.test(f1.shapeLine ?? ""),
-  `"${(f1.shapeLine ?? "").slice(-120)}"`,
+  } · "${(f1Card.card?.identity ?? "").slice(0, 170)}"`,
 );
 
 // ── N6: the listing row says it too, in the card's own register ─────────────
@@ -409,20 +413,22 @@ if (!env.ETHERSCAN_API_KEY) {
     );
   }
 }
+const f5Card = await readListingCard(F5);
 check(
-  "N3c and the refusal is stated rather than silent — the page still says what it can read of that address",
+  "N3c and the refusal is stated rather than silent — F5's listing card carries the shape word, no name",
   f5.status === 200 &&
-    f5.shapeKind !== "attested" &&
-    /is a proxy to 0x/.test(f5.shapeLine ?? "") &&
-    /nothing here names it/.test(f5.shapeLine ?? ""),
-  `kind ${f5.shapeKind} · "${(f5.shapeLine ?? "").slice(0, 150)}"`,
+    f5Card.status === 200 &&
+    f5Card.card != null &&
+    f5Card.card.attestedConstant == null &&
+    /\bproxy\b/.test(f5Card.card.identity),
+  `constant ${f5Card.card?.attestedConstant ?? "none"} · "${(f5Card.card?.identity ?? "(no card)").slice(0, 150)}"`,
 );
 
 // ── N4: the two surfaces about one pair agree ──────────────────────────────
-// F3 is the catalogue holding itself. Its position page names the holder as a
+// F3 is the catalogue holding itself. Its listing card names the holder as a
 // catalogue member; the VAULT page names the same token as this vault's backing
 // with the share it holds. One relationship, stated from both ends.
-const f3 = await readPage(F3);
+const f3Card = await readListingCard(F3);
 const vaultRes = await page.goto(`${BASE}/ethereum/aave/vaults/${F3.vault}`, {
   waitUntil: "networkidle",
   timeout: 120_000,
@@ -432,18 +438,15 @@ const vaultFace = await page.evaluate(() => ({
   sentence: document.querySelector('[data-figure="vault-backed-by"]')?.innerText?.replace(/\s+/g, " ") ?? "",
 }));
 check(
-  "N4 F3's position page names the holder as a catalogue member, and the vault's own page names it as this vault's backing",
-  f3.status === 200 &&
-    f3.shapeKind === "aave-vault" &&
-    // TWO LINES, TWO PHRASES: the catalogued line is the cross-link's own
-    // sentence, the shape line is the code read's. Testing one phrase against
-    // "either line" would pass on whichever happened to carry it.
-    /one vault in Aave/.test(f3.cataloguedLine ?? "") &&
-    /a vault in this same catalogue/.test(f3.shapeLine ?? "") &&
+  "N4 F3's listing card names the holder as a catalogue member, and the vault's own page names it as this vault's backing",
+  f3Card.status === 200 &&
+    f3Card.card != null &&
+    f3Card.card.attestedConstant == null &&
+    /a vault in this catalogue/.test(f3Card.card.identity) &&
     vaultRes?.status() === 200 &&
     vaultFace.backedBy === F3.holder &&
     /holds \d/.test(vaultFace.sentence),
-  `position kind ${f3.shapeKind}; vault page backed-by ${vaultFace.backedBy} · "${vaultFace.sentence.slice(0, 120)}"`,
+  `card "${(f3Card.card?.identity ?? "(no card)").slice(0, 100)}"; vault page backed-by ${vaultFace.backedBy} · "${vaultFace.sentence.slice(0, 120)}"`,
 );
 
 await browser.close();

@@ -19,6 +19,7 @@ import { MAPLE_POOLS } from "@/lib/maple/asset-catalog";
 import { resolveMaplePoolState } from "@/lib/sources/chain/maple-pool-state";
 import { maplePoolHref } from "@/lib/vaults/routes";
 import { resolveYearnVaultHolder } from "@/lib/yearn/vault-holder";
+import { loadStewardRecord } from "@/lib/vaults/steward-record";
 
 // Every figure is a read at the head, and `?holder=` is per request.
 export const dynamic = "force-dynamic";
@@ -57,7 +58,7 @@ export default async function MaplePoolRoute({ params, searchParams }: Props) {
   const lookup = typed ? await resolveYearnVaultHolder(typed) : null;
   if (lookup?.address) redirect(`/ethereum/maple/${lookup.address}`);
 
-  const state = await resolveMaplePoolState();
+  const [state, stewardRecord] = await Promise.all([resolveMaplePoolState(), loadStewardRecord(1, p.pool, null)]);
   const s = state.get(p.key);
 
   return (
@@ -83,6 +84,7 @@ export default async function MaplePoolRoute({ params, searchParams }: Props) {
               pool={p}
               state={s}
               readAt={new Date().toISOString()}
+              stewardRecord={stewardRecord}
               protects={
                 <Suspense fallback={null}>
                   <VaultProtectsSection
