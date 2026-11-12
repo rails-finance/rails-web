@@ -487,7 +487,7 @@ export function LiquityForkBranchesView({
                 className={`text-[11px] font-semibold ${INPLACE_TEXT}`}
               >
                 {showEmpty ? "Hide" : "Show"} {emptyCount} branch{emptyCount === 1 ? "" : "es"} with{" "}
-                {allShut ? "no debt" : "no queued troves"}
+                {allShut ? "no Trove in debt" : "no queued troves"}
               </button>
             )}
           </div>
