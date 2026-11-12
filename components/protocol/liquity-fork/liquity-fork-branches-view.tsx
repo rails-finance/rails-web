@@ -295,9 +295,39 @@ function BranchCard({
       )}
 
       <p className="mt-2.5 text-[11px] leading-relaxed text-rb-500">
-        Liquidates below{" "}
-        <Prov info={vocab.branchConstantProv("Minimum collateral ratio", "MCR", sym)}>{ratio(branch.mcr)}</Prov> per
-        trove. Below CCR the branch stops new borrowing; below{" "}
+        {data.protocol === "liquity-v2" ? (
+          // Liquity V2's docs state the per-Trove limit as a Max LTV, 1 ÷ MCR
+          // (decision 0065); the forks keep the MCR.
+          <>
+            Liquidates above Max LTV{" "}
+            <Prov
+              info={{
+                kind: "derived",
+                summary: `Max LTV for the ${sym} branch. The highest debt a Trove may carry per dollar of collateral, 1 ÷ the branch's minimum collateral ratio (MCR).`,
+                formula: "1 ÷ MCR",
+                inputs: [
+                  {
+                    label: "MCR",
+                    value: ratio(branch.mcr),
+                    kind: "chain",
+                    pclass: "state",
+                    note: "the branch's governance-set constant",
+                  },
+                ],
+              }}
+            >
+              {`${(100 / branch.mcr).toFixed(2)}%`}
+            </Prov>{" "}
+            per trove.
+          </>
+        ) : (
+          <>
+            Liquidates below{" "}
+            <Prov info={vocab.branchConstantProv("Minimum collateral ratio", "MCR", sym)}>{ratio(branch.mcr)}</Prov> per
+            trove.
+          </>
+        )}{" "}
+        Below CCR the branch stops new borrowing; below{" "}
         <Prov info={vocab.branchConstantProv("Shutdown collateral ratio", "SCR", sym)}>{ratio(branch.scr)}</Prov> it can
         be shut down. Each branch sets its own.
       </p>
@@ -398,8 +428,8 @@ export function LiquityForkBranchesView({
           Anyone holding {learnMore.stablecoin} can redeem it against {protocolName} at $1 face value. A redemption
           routes across the branches by how much of each is unbacked, then sweeps the branch it lands on from the LOWEST
           user-set interest rate up, so a borrower&rsquo;s rate is also their place in this queue. Being redeemed
-          isn&rsquo;t a penalty: the trove gives up collateral and sheds the same value of debt, and its collateral
-          ratio rises.
+          isn&rsquo;t a penalty: the trove gives up collateral and sheds the same value of debt, and its{" "}
+          {learnMore.ltv ? "LTV falls" : "collateral ratio rises"}.
         </p>
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-rb-500">
           A branch&rsquo;s queue is its troves in rate order, which is the listing sorted that way. One link per branch

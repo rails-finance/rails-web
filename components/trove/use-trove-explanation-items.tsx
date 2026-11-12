@@ -9,7 +9,8 @@ import { OraclePricesData } from "@/types/api/oracle";
 import { formatPrice, formatUsdValue, formatExact } from "@/lib/utils/format";
 import { formatDateRange, formatDuration } from "@/lib/date";
 import { getBatchManagerByAddress } from "@/lib/services/batch-manager-service";
-import { getLiquidationThreshold, troveLiquidationPrice, formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
+import { troveLiquidationPrice, formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
+import { fmtMaxLtv, liquityV2Mcr, ltvPct } from "@/lib/liquity/ltv";
 import { troveDebtInFrontProv, troveQueueShareProv } from "@/lib/liquity/trove-queue-provenance";
 import { liquityTroveFaceProv, troveAnnualCostProv } from "@/lib/liquity/trove-card-provenance";
 import { liveFromTroveState, viewFromTroveSummary } from "@/lib/liquity/trove-card-view";
@@ -111,7 +112,7 @@ export function useTroveExplanationItems({
 function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus | null): TroveExplanation {
   const items: Bullet[] = [];
   const add = (group: Group, node: React.ReactNode) => items.push({ group, node });
-  const liquidationThreshold = getLiquidationThreshold(trove.collateralType);
+  const maxLtv = fmtMaxLtv(trove.collateralType) ?? "—";
   const truncatedTroveId = trove.id.length > 10 ? `${trove.id.slice(0, 6)}...${trove.id.slice(-4)}` : trove.id;
   const duration = formatDuration(trove.activity.createdAt, trove.activity.lastActivityAt);
   const dateRange = formatDateRange(trove.activity.createdAt, trove.activity.lastActivityAt);
@@ -125,7 +126,7 @@ function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus 
             {truncatedTroveId}
           </HighlightableValue>
         ),
-        threshold: liquidationThreshold,
+        max_ltv: maxLtv,
         coll_type: trove.collateralType,
       })}
     </span>
@@ -313,7 +314,7 @@ function buildOpenItems({
   const currentPrice = hasLiveData ? prices[collateralTokenKey] : null;
   const collateralUsd = hasLiveData && currentPrice ? displayCollateral * currentPrice : null;
   const collateralRatio = hasLiveData && collateralUsd && displayDebt > 0 ? (collateralUsd / displayDebt) * 100 : null;
-  const mcr = getLiquidationThreshold(trove.collateralType);
+  const mcr = liquityV2Mcr(trove.collateralType);
 
   // ── Provenance ────────────────────────────────────────────────────────────
   // The displayed numbers come from one of two chain-rooted origins:
@@ -338,7 +339,7 @@ function buildOpenItems({
     collUsd: collateralUsd,
     crPct: collateralRatio,
     liqPrice: null,
-    mcrPct: mcr,
+    mcrPct: mcr != null ? Math.round(mcr * 100) : undefined,
   });
   const priceProv = collateralPriceInfo(coll_type);
 
@@ -441,24 +442,23 @@ function buildOpenItems({
     );
   }
 
-  if (hasLiveData && collateralRatio) {
-    // The ratio read as a multiple: a 211.6% CR means the collateral is worth
-    // 2.12× the debt (NOT "211.6% more than" it — that reading overstates by
-    // the debt itself). The 110% minimum states once, in the runway bullet.
-    const currentCollateralRatio = collateralRatio.toFixed(1);
-    const crMultiple = (collateralRatio / 100).toFixed(2);
+  const ltv = ltvPct(collateralRatio);
+  if (hasLiveData && ltv != null) {
+    // The LTV read as a multiple: an 84.4% LTV means the debt is worth 0.84×
+    // the collateral. The Max LTV states once, in the runway bullet.
+    const currentLtv = ltv.toFixed(1);
     add(
       "risk",
       <span key="collateral-ratio" className="text-rb-500">
-        {troveNodes("coll_ratio", {
-          ratio: (
+        {troveNodes("ltv_ratio", {
+          ltv: (
             <Prov info={crProv}>
-              <HighlightableValue type="collRatio" state="after" value={parseFloat(currentCollateralRatio)}>
-                {currentCollateralRatio}%
+              <HighlightableValue type="collRatio" state="after" value={parseFloat(currentLtv)}>
+                {currentLtv}%
               </HighlightableValue>
             </Prov>
           ),
-          multiple: crMultiple,
+          multiple: (ltv / 100).toFixed(2),
         })}
       </span>,
     );

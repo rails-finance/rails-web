@@ -11,7 +11,7 @@ import { formatExact } from "@/lib/utils/format";
 import { stateOriginVia } from "@/lib/shared/trove-state-origin";
 import { scalingOf, TROVE_MANAGER } from "@/lib/liquity/event-provenance";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
-import { LIQUIDATION_PRICE_FORMULA, liquidationPriceSummary } from "@/lib/utils/liquidation-utils";
+import { LTV_LIQUIDATION_PRICE_FORMULA, ltvLiquidationPriceSummary, maxLtvInput, mcrInput } from "@/lib/liquity/ltv";
 
 export { trovePeakCollProv, trovePeakDebtProv } from "@/lib/liquity/trove-provenance";
 
@@ -25,7 +25,7 @@ export interface LiquityFaceProv {
 }
 
 export function liquityTroveFaceProv(ctx: LiquityFaceProvContext): LiquityFaceProv {
-  const { v, live, coll, debt, priceUsd, mcrPct } = ctx;
+  const { v, live, coll, debt, priceUsd } = ctx;
   // V2 TroveManager per branch — the contract these chain values ultimately
   // come from (the provenance "contract" slot). Whether read live on-chain or
   // via the rails-server index, the origin is this contract's trove state.
@@ -117,21 +117,19 @@ export function liquityTroveFaceProv(ctx: LiquityFaceProvContext): LiquityFacePr
     formula: "collateral × price",
     inputs: [collLeaf, ...priceLeaf],
   };
+  // Liquity V2's docs state the ratio as LTV, debt over collateral value
+  // (decision 0065): the `cr` slot carries the LTV's receipt.
   const crProv: Provenance = {
     kind: "chain-derived",
-    summary: `Collateral ratio — the collateral's dollar value divided by the debt, at Liquity's current price for ${sym}.`,
-    formula: "(collateral × price) ÷ debt × 100",
-    inputs: [collLeaf, ...priceLeaf, debtLeaf],
+    summary: `LTV — the debt divided by the collateral's dollar value, at Liquity's current price for ${sym}.`,
+    formula: "debt ÷ (collateral × price) × 100",
+    inputs: [debtLeaf, collLeaf, ...priceLeaf],
   };
   const liqProv: Provenance = {
     kind: "derived",
-    summary: liquidationPriceSummary(sym, mcrPct),
-    formula: LIQUIDATION_PRICE_FORMULA,
-    inputs: [
-      debtLeaf,
-      { label: "MCR", value: `${mcrPct ?? "—"}%`, kind: "chain", pclass: "indexed", note: "branch constant" },
-      collLeaf,
-    ],
+    summary: ltvLiquidationPriceSummary(sym, sym),
+    formula: LTV_LIQUIDATION_PRICE_FORMULA,
+    inputs: [debtLeaf, collLeaf, maxLtvInput(sym), mcrInput(sym)],
   };
   return { coll: collProv, debt: debtProv, rate: rateProv, collUsd: collUsdProv, cr: crProv, liq: liqProv };
 }

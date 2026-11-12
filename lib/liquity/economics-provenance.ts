@@ -96,7 +96,7 @@ export const debtLiquidatedProv: Provenance = flow({
 });
 
 export const debtUpfrontFeesProv: Provenance = flow({
-  summary: "Upfront fees — the one-off borrowing fees the contract has added to the trove's debt.",
+  summary: "Upfront Borrowing Fees — the one-off borrowing fees the contract has added to the trove's debt.",
   formula: "Σ debtIncreaseFromUpfrontFee",
 });
 

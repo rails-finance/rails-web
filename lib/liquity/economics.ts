@@ -462,7 +462,15 @@ export function computeLiquityEconomics(
       : [];
   const debtCosts: TowerLine[] = [
     ...(economics.costs.totalUpfrontFees > DUST
-      ? [line("debt-upfront-fees", stableSymbol, economics.costs.totalUpfrontFees, debtUpfrontFeesProv, "Upfront fees")]
+      ? [
+          line(
+            "debt-upfront-fees",
+            stableSymbol,
+            economics.costs.totalUpfrontFees,
+            debtUpfrontFeesProv,
+            "Upfront Borrowing Fees",
+          ),
+        ]
       : []),
     ...(delegateFees > DUST
       ? [line("debt-delegate-fees", stableSymbol, delegateFees, debtDelegateFeesProv, "Delegate fees")]

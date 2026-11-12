@@ -18,7 +18,9 @@ export function troveCardTips(collSymbol: string, debtSymbol: string, ltv: boole
       "debt-in-front": troveWords("card_tip_debt_in_front", { coll_symbol: collSymbol, debt_symbol: debtSymbol }),
       "troves-in-front": troveWords("card_tip_troves_in_front", { coll_symbol: collSymbol }),
       costs: troveWords("card_tip_costs"),
-      "liquidates-at": troveWords("card_tip_liquidates_at", { coll_symbol: collSymbol }),
+      "liquidates-at": troveWords(ltv ? "card_tip_liquidates_at_ltv" : "card_tip_liquidates_at", {
+        coll_symbol: collSymbol,
+      }),
     } as Record<string, string>,
   };
 }

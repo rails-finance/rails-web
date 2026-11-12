@@ -8,7 +8,8 @@
 //     adapter (the same one the wallet view mounts above its cards).
 
 import type { TroveTail } from "./trove-page-data";
-import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
+import { CARD_VOCAB } from "@/lib/shared/card-vocab";
+import { LTV_LABEL, ltvPct } from "@/lib/liquity/ltv";
 import { formatNumber, formatPrice } from "@/lib/utils/format";
 import type { PositionCardModel } from "@/lib/share/position-card";
 import type { TroveSummary } from "@/types/api/trove";
@@ -49,9 +50,8 @@ export function liquityShareCardModel(
       label: CARD_VOCAB.collateral,
       value: `${formatNumber(trove.collateral.amount)} ${collateralDisplay}`,
     });
-    if (trove.metrics.collateralRatio > 0) {
-      stats.push({ label: ratioLabel("cdp"), value: `${trove.metrics.collateralRatio.toFixed(1)}%` });
-    }
+    const ltv = ltvPct(trove.metrics.collateralRatio);
+    if (ltv != null) stats.push({ label: LTV_LABEL, value: `${ltv.toFixed(1)}%` });
   } else {
     // Closed/liquidated troves hold nothing current — state the
     // highest-recorded figures over the trove's life instead, the same peak

@@ -102,7 +102,10 @@ export const LIQUITY_V2_SORT_OPTIONS: SortOption[] = [
   { value: "lastActivity", label: RECENT_ACTIVITY_LABEL },
   { value: "debt", label: "Debt" },
   { value: "coll", label: "Collateral" },
-  { value: "ratio", label: "Ratio" },
+  // LTV, the docs' figure (decision 0065). The backend sorts by the
+  // collateral ratio, its inverse: `ltv` goes out as `ratio` in the other
+  // order.
+  { value: "ltv", label: "LTV" },
   { value: "interestRate", label: "Interest Rate" },
 ];
 
@@ -245,8 +248,8 @@ export function liquityV2FiltersToFetchParams(filters: LiquityV2ListFilters, pag
     individualOnly: filters.individualOnly || undefined,
     ...sizeBounds(filters, { debt: "unit", coll: "usd" }),
     ...transactionBounds(filters.tx),
-    sortBy: filters.sortBy,
-    sortOrder: filters.sortOrder,
+    sortBy: filters.sortBy === "ltv" ? "ratio" : filters.sortBy,
+    sortOrder: filters.sortBy === "ltv" ? (filters.sortOrder === "asc" ? "desc" : "asc") : filters.sortOrder,
     limit: LIQUITY_V2_ITEMS_PER_PAGE,
     offset: (page - 1) * LIQUITY_V2_ITEMS_PER_PAGE,
   };

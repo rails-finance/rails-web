@@ -40,11 +40,11 @@ import { branchMcr } from "@/lib/liquity/event-safety";
 import {
   getLiquidationThreshold,
   LIQUIDATION_PRICE_FORMULA,
-  liquidationPriceSummary,
   troveLiquidationPrice,
 } from "@/lib/utils/liquidation-utils";
 import { compareWithinBlock } from "@/lib/shared/event-order";
 import { forkMcrAt, type ForkMcrStep } from "@/lib/shared/liquity-fork-ops";
+import { fmtMaxLtv, ltvLiquidationPriceSummary } from "@/lib/liquity/ltv";
 
 /** Liquity V2's year (Constants.sol `ONE_YEAR = 365 days`); its forks share it. */
 const ONE_YEAR_S = 31_536_000;
@@ -171,7 +171,14 @@ export function liquityFlowBuckets(surplusClaimed: boolean, family: LiquityFamil
     // Each inflow after Borrowed has its texture; interest is dashed
     // (standards/lexicon.md, lifetime bars' fills).
     { key: LQ.interest, label: "Interest", event: "", side: "debt", dir: "in", hatch: "dashes" },
-    { key: LQ.upfront, label: "Upfront fees", event: "Upfront fee", side: "debt", dir: "in", hatch: "checker" },
+    {
+      key: LQ.upfront,
+      label: "Upfront Borrowing Fees",
+      event: "Upfront Borrowing Fee",
+      side: "debt",
+      dir: "in",
+      hatch: "checker",
+    },
     { key: LQ.batchFee, label: "Batch management fees", event: "", side: "debt", dir: "in", hatch: "dots" },
     {
       key: LQ.redistDebt,
@@ -732,8 +739,10 @@ function liquityPriceMarks(
                     },
                   }
                 : {
-                    formula: `${LIQUIDATION_PRICE_FORMULA.replace("MCR", `${mcrPct}%`)} after each event, with interest accruing between`,
-                    summary: liquidationPriceSummary(collateralType, mcrPct),
+                    // Liquity V2: the level in LTV terms, as its docs state
+                    // the limit (decision 0065).
+                    formula: `debt ÷ (collateral × ${fmtMaxLtv(collateralType) ?? "Max LTV"}) after each event, with interest accruing between`,
+                    summary: ltvLiquidationPriceSummary(collateralType, collateralType),
                   }),
             },
           }

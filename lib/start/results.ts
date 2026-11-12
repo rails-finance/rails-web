@@ -259,7 +259,7 @@ function nearLiquidation(): ResultRow[] {
       entry,
       href: withParams(entry, { sortBy: sort.sortBy, sortOrder: sort.sortOrder }),
       applied: true,
-      detail: label ? `Sorted by ${label.toLowerCase()}` : undefined,
+      detail: label ? `Sorted by ${label === label.toUpperCase() ? label : label.toLowerCase()}` : undefined,
       source: "the listing's sort options",
     });
   }

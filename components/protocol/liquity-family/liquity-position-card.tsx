@@ -59,7 +59,8 @@ import type { PositionPanelRow } from "@/components/shared/position-card-panel";
 import { formatExactFromString, formatPrice, formatUnitsExact, formatUsdValue } from "@/lib/utils/format";
 import { getTokenAddress } from "@/lib/shared/token-addresses";
 import { LIQUITY_V2_BRANCHES } from "@/lib/liquity/asset-catalog";
-import { getLiquidationThreshold, formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
+import { formatLiquidationPrice } from "@/lib/utils/liquidation-utils";
+import { LTV_LABEL, liquityV2Mcr, ltvPct } from "@/lib/liquity/ltv";
 import { LIQUITY_FORK_CARD_CONFIGS, type LiquityForkCardConfig } from "@/lib/shared/liquity-fork-card-config";
 import { liquityTroveFaceProv, trovePeakCollProv, trovePeakDebtProv } from "@/lib/liquity/trove-card-provenance";
 import { liquityPositionContent } from "@/lib/shared/learn-more-content";
@@ -191,7 +192,10 @@ interface LiquityFamilyCardOps {
 // ── V2 (the reference deployment) ────────────────────────────────────────
 const v2Ops: LiquityFamilyCardOps = {
   shortId: (id) => `${id.slice(0, 6)}…${id.slice(-4)}`,
-  mcrPct: (ct) => getLiquidationThreshold(ct),
+  mcrPct: (ct) => {
+    const mcr = liquityV2Mcr(ct);
+    return mcr != null ? Math.round(mcr * 100) : undefined;
+  },
   faceProv: liquityTroveFaceProv,
   peakCollateralProv: () => trovePeakCollProv,
   peakDebtProv: () => trovePeakDebtProv,
@@ -547,6 +551,10 @@ export function useLiquityCardSlots({
   const priceUsd = lv ? lv.priceUsd : (v.priceUsd ?? null);
   const collUsd = lv ? (lv.priceUsd != null ? lv.entireColl * lv.priceUsd : null) : (v.collateralUsd ?? null);
   const crPct = lv ? lv.icrPct : (v.collateralRatioPct ?? null);
+  // Liquity V2 states the ratio the docs' way, as LTV (debt ÷ collateral
+  // value; decision 0065); the forks keep the collateral ratio until their
+  // docs are read.
+  const ltvCard = protocol === "liquity-v2";
 
   // A headline's asset icon opens the asset's popover (ui-jobs 248): the exact
   // figure, the contract, and for the collateral the branch's price where the
@@ -721,8 +729,11 @@ export function useLiquityCardSlots({
       ) : undefined,
     };
   } else {
+    // Liquity V2's docs name the party a delegate (decision 0065); the forks
+    // keep "Batch manager" until their own docs are read.
+    const managerWord = protocol === "liquity-v2" ? "Delegate" : "Batch manager";
     const managerName =
-      v.batch?.managerName ?? (v.batch?.managerAddress ? ops.shortId(v.batch.managerAddress) : "Batch manager");
+      v.batch?.managerName ?? (v.batch?.managerAddress ? ops.shortId(v.batch.managerAddress) : managerWord);
     const manager = (
       <span className="inline-flex items-center gap-1">
         <span className="text-pink-500/90" aria-hidden="true">
@@ -776,24 +787,45 @@ export function useLiquityCardSlots({
             </Prov>
           ) : null,
       },
-      {
-        id: "collateral-ratio",
-        label: ratioLabel("cdp"),
-        value:
-          crPct != null && crPct > 0 ? (
-            <Prov info={fp.cr}>
-              <HighlightableValue
-                type="collRatio"
-                state="after"
-                value={parseFloat(crPct.toFixed(1))}
-                className="text-foreground/80"
-              >
-                <FadeNumber value={crPct} decimals={1} animateOnMount={animate} />%
-              </HighlightableValue>
-            </Prov>
-          ) : null,
-        pending: !(crPct != null && crPct > 0) && pending && debt > 0,
-      },
+      ltvCard
+        ? {
+            id: "collateral-ratio",
+            label: LTV_LABEL,
+            value:
+              ltvPct(crPct) != null ? (
+                <Prov info={fp.cr}>
+                  <HighlightableValue
+                    type="collRatio"
+                    state="after"
+                    value={parseFloat((ltvPct(crPct) as number).toFixed(1))}
+                    className="text-foreground/80"
+                  >
+                    <FadeNumber value={ltvPct(crPct) as number} decimals={1} animateOnMount={animate} />%
+                  </HighlightableValue>
+                </Prov>
+              ) : debt <= 0 ? (
+                <span data-ltv-none="no-debt">—</span>
+              ) : null,
+            pending: ltvPct(crPct) == null && pending && debt > 0,
+          }
+        : {
+            id: "collateral-ratio",
+            label: ratioLabel("cdp"),
+            value:
+              crPct != null && crPct > 0 ? (
+                <Prov info={fp.cr}>
+                  <HighlightableValue
+                    type="collRatio"
+                    state="after"
+                    value={parseFloat(crPct.toFixed(1))}
+                    className="text-foreground/80"
+                  >
+                    <FadeNumber value={crPct} decimals={1} animateOnMount={animate} />%
+                  </HighlightableValue>
+                </Prov>
+              ) : null,
+            pending: !(crPct != null && crPct > 0) && pending && debt > 0,
+          },
       {
         id: "interest-rate",
         label: "Interest rate",
@@ -809,8 +841,8 @@ export function useLiquityCardSlots({
         sub: v.isBatched ? (
           v.batch?.managerAddress ? (
             <RevealTip
-              tip={`Batch manager ${v.batch.managerAddress}`}
-              label={`${managerName}, batch manager ${v.batch.managerAddress}`}
+              tip={`${managerWord} ${v.batch.managerAddress}`}
+              label={`${managerName}, ${managerWord.toLowerCase()} ${v.batch.managerAddress}`}
               focusable={detail}
               className="focus-ring rounded-sm"
             >
@@ -879,7 +911,7 @@ export function useLiquityCardSlots({
       <span data-liq-none="no-debt">None</span>
     ) : null;
   // Each heading's read-more (decision 0038), in the branch's symbols.
-  const tips = troveCardTips(ct, cfg.debtSymbol, ratioLabel("cdp") !== "Collateral ratio");
+  const tips = troveCardTips(ct, cfg.debtSymbol, ltvCard);
   const HEAD_TIP = tips.heads;
   const ROW_TIP = tips.rows;
   const tipRow = (r: PositionPanelRow): PositionPanelRow =>
