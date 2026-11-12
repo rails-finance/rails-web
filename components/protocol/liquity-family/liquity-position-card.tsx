@@ -192,7 +192,8 @@ interface LiquityFamilyCardOps {
   };
   peakCollateralProv: (v: LiquityTroveView) => Provenance;
   peakDebtProv: (v: LiquityTroveView) => Provenance;
-  positionContent: (v: LiquityTroveView) => LearnMoreContent;
+  /** `shutDown`: the Trove's branch is shut down (ui-jobs 612). */
+  positionContent: (v: LiquityTroveView, o?: { shutDown?: boolean }) => LearnMoreContent;
   /** The branch's collateral token, for the headline icon's popover. */
   collateralAddress: (collateralType: string) => string | undefined;
   /** The deployment's stablecoin. */
@@ -356,13 +357,14 @@ function makeForkCardOps(protocol: ForkProtocol, deps: ForkCardDeps): LiquityFam
     },
     peakCollateralProv: (v) => deps.peakCollateralProv({ collateralType: v.collateralType, troveId: v.id }),
     peakDebtProv: (v) => deps.peakDebtProv({ collateralType: v.collateralType, troveId: v.id }),
-    positionContent: (v) =>
+    positionContent: (v, o) =>
       liquityForkPositionContent({
         name: cfg.name,
         debtSymbol: cfg.debtSymbol,
         status: v.status,
         isBatched: v.isBatched,
         isZombie: v.isZombie,
+        shutDown: o?.shutDown,
         // A liquidated Trove is described against the minimum in force when
         // it was liquidated (its last event); governance can have moved it since.
         minCR: (() => {
@@ -648,7 +650,15 @@ export function useLiquityCardSlots({
   const pending = detail && !!v.pricePending; // skeleton slots while a detail-page price is expected
 
   const fp = ops.faceProv({ v, live: lv, coll, debt, rate, priceUsd, collUsd, crPct, liqPrice, mcrPct });
-  const learnMore = ops.positionContent({ ...v, isZombie: zombie });
+  // An open Trove on a shut-down branch (ui-jobs 612): the page's state, else
+  // the catalog's record (the listing). A closed Trove keeps its own word.
+  const shut =
+    v.status === "open"
+      ? shutdown !== undefined
+        ? shutdown
+        : branchShutdownState(recordedShutdown(protocol, ct), null)
+      : null;
+  const learnMore = ops.positionContent({ ...v, isZombie: zombie }, { shutDown: shut != null });
 
   // The owner deep-links to its wallet-filtered listing; lastOwner stands in
   // on a burned/closed trove so a closed row still names who held it.
@@ -680,14 +690,6 @@ export function useLiquityCardSlots({
   );
 
   const ended = v.status === "closed" || v.status === "liquidated";
-  // An open Trove on a shut-down branch (ui-jobs 612): the page's state, else
-  // the catalog's record (the listing). A closed Trove keeps its own word.
-  const shut =
-    v.status === "open"
-      ? shutdown !== undefined
-        ? shutdown
-        : branchShutdownState(recordedShutdown(protocol, ct), null)
-      : null;
   // The pool's collateral below the Trove's own (ui-jobs 607's comparison).
   const poolColl = shut && lv?.branchColl != null && lv.branchColl < coll ? lv.branchColl : null;
   const status: PositionCardStatus | null =
