@@ -22,6 +22,8 @@ import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import { shortAddress } from "@/lib/shared/asset-roster";
 import { InfoHistoryLine } from "@/components/shared/history-tag";
 import { Prov, type Provenance } from "@/components/shared/provenance";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
+import { ProvSection, SectionHeading, SectionMenu } from "@/components/shared/section-menu";
 
 /** Slot I6, the pointer line, where an explorer passes no `guide`: true of a
  *  page whose cards carry all four controls (label tip, (i), ?, ⋮). */
@@ -115,38 +117,83 @@ function InfoReadsSection({ reads, chainId }: { reads: InfoReads; chainId: Chain
   );
 }
 
+/** The docs' words, quoted exactly, and the page they are on. */
+export interface InfoDocsQuote {
+  words: string;
+  href: string;
+}
+
+/** One figure the chain holds, with its receipt where one exists. */
+export interface InfoChainFigure {
+  words: string;
+  prov?: Provenance;
+}
+
 /** One place where the protocol's docs and its contracts or chain say
  *  different things (ui-jobs 609): the difference in one line, the docs'
- *  words as a quoted link, and what the chain holds, with its receipt where
- *  one exists. */
+ *  words as quoted links, and what the chain holds, each figure with its
+ *  receipt where one exists. */
 export interface InfoDocsAndChain {
   /** The difference, one plain sentence. */
   claim: string;
-  docs: { words: string; href: string };
-  chain: { words: string; prov?: Provenance };
+  docs: {
+    /** Words before the quotes, where the docs side is what a page shows
+     *  rather than a sentence it states. */
+    lead?: string;
+    /** The label before the quotes; "Docs" where absent, "Site" for the
+     *  protocol's website. */
+    label?: string;
+    quotes: readonly [InfoDocsQuote, ...InfoDocsQuote[]];
+    /** The day the pages were read, "12 Nov 2026". */
+    read?: string;
+  };
+  /** Drawn in order, separated by semicolons. */
+  chain: readonly [InfoChainFigure, ...InfoChainFigure[]];
 }
 
 export const DOCS_AND_CHAIN_HEADING = "Where the docs and the chain differ";
 
+const DOCS_AND_CHAIN_SCOPE = "docs-and-chain";
+
 /** The docs-and-chain section, after the glossary whose terms it qualifies.
- *  Drawn only where an explorer passes at least one entry. */
+ *  Drawn only where an explorer passes at least one entry. One receipts
+ *  scope, armed by its ⋮; the page's one inspector layer rides with it,
+ *  since no other part of an info page draws a receipt. */
 function InfoDocsAndChainSection({ items }: { items: readonly InfoDocsAndChain[] }) {
   return (
-    <section data-info-docs-chain="">
-      <h2 className={H}>{DOCS_AND_CHAIN_HEADING}</h2>
-      <ul className={UL}>
-        {items.map((d) => (
-          <li key={d.claim} data-info-docs-chain-item="">
-            {d.claim} <span className="text-rb-400">Docs:</span>{" "}
-            <a href={d.docs.href} className={INLINE_LINK} target="_blank" rel="noopener">
-              &ldquo;{d.docs.words}&rdquo;
-            </a>
-            . <span className="text-rb-400">Chain:</span>{" "}
-            {d.chain.prov ? <Prov info={d.chain.prov}>{d.chain.words}</Prov> : d.chain.words}
-          </li>
-        ))}
-      </ul>
-    </section>
+    <div className="mt-5">
+      <ProvSection scope={DOCS_AND_CHAIN_SCOPE} data-anatomy="I9" data-info-docs-chain="">
+        <SectionHeading
+          title={DOCS_AND_CHAIN_HEADING}
+          menu={<SectionMenu scope={DOCS_AND_CHAIN_SCOPE} title={DOCS_AND_CHAIN_HEADING} />}
+        />
+        <ul className={UL}>
+          {items.map((d) => (
+            <li key={d.claim} data-info-docs-chain-item="">
+              {d.claim} <span className="text-rb-400">{d.docs.label ?? "Docs"}:</span>{" "}
+              {d.docs.lead && `${d.docs.lead} `}
+              {d.docs.quotes.map((q, i) => (
+                <span key={i}>
+                  {i > 0 && (i === d.docs.quotes.length - 1 ? " and " : ", ")}
+                  <a href={q.href} className={INLINE_LINK} target="_blank" rel="noopener">
+                    &ldquo;{q.words}&rdquo;
+                  </a>
+                </span>
+              ))}
+              {d.docs.read && ` (read ${d.docs.read})`}. <span className="text-rb-400">Chain:</span>{" "}
+              {d.chain.map((c, i) => (
+                <span key={i}>
+                  {i > 0 && "; "}
+                  {c.prov ? <Prov info={c.prov}>{c.words}</Prov> : c.words}
+                </span>
+              ))}
+              .
+            </li>
+          ))}
+        </ul>
+      </ProvSection>
+      <ProvInspectorLayer />
+    </div>
   );
 }
 

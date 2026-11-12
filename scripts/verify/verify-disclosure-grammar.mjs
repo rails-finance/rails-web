@@ -20,7 +20,7 @@
 //
 // ui-jobs 302: on the event card header (T1) the chevron comes last in the left
 // cluster, after the verb, the amounts and icons that show and any rate pill;
-// an asset icon hides with its amount while Timeline values is on (≥640 px);
+// an asset icon hides with its amount (≥640 px);
 // the chevron appears 0.5 s after the pointer enters the header and hides at
 // once on leave, keyboard focus shows it at once, the position card's rows keep
 // the instant reveal.
@@ -61,19 +61,13 @@ function check(name, ok, detail = "") {
 
 const browser = await chromium.launch();
 
-async function open(width, path, { touch = false, store = null, valuesOff = false } = {}) {
+async function open(width, path, { touch = false, store = null } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height: 1000 },
     hasTouch: touch,
     isMobile: touch,
     extraHTTPHeaders: bypassHeaders(),
   });
-  if (valuesOff)
-    await ctx.addInitScript(() => {
-      try {
-        localStorage.setItem("timeline-display-v3", JSON.stringify({ showTimelineValues: false }));
-      } catch {}
-    });
   if (store)
     await ctx.addInitScript(
       ([k, v]) => {

@@ -32,6 +32,8 @@ import type { LiquityForkConfig, LiquityForkBranchConfig } from "./liquity-fork-
 import type { PositionHeadStamp } from "@/lib/api/fetch-aave-v3-position";
 import { serverLiquityForkBranches } from "@/lib/sources/api/liquity-fork-head";
 import { emptyBranch, settleBranch, settleBranches, type RosterTroveRead } from "./liquity-fork-settle";
+import { readForkShutdown } from "./liquity-fork-shutdown";
+import { branchShutdownState, type BranchShutdownLive, type BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 
 const TM_ABI = parseAbi([
   "function getLatestTroveData(uint256 troveId) view returns ((uint256 entireDebt, uint256 entireColl, uint256 redistBoldDebtGain, uint256 redistCollGain, uint256 accruedInterest, uint256 recordedDebt, uint256 annualInterestRate, uint256 weightedRecordedDebt, uint256 accruedBatchManagementFee, uint256 lastInterestRateAdjTime))",
@@ -127,6 +129,9 @@ export interface LiquityForkBranchState {
   /** True when this branch's reads failed; the row renders as unavailable
    *  rather than as an empty branch. */
   stale: boolean;
+  /** The branch's shutdown: its catalog's record and the live read (ui-jobs 612).
+   *  Absent or null where it reads live or not known, and on a read pinned to a block. */
+  shutdown?: BranchShutdownState | null;
 }
 
 export interface LiquityForkBranchesResponse {
@@ -159,6 +164,23 @@ export async function loadLiquityForkBranchesFromChain(
   cfg: LiquityForkConfig,
   atBlock?: number,
 ): Promise<LiquityForkBranchesResponse> {
+  if (atBlock !== undefined) return loadRoster(cfg, atBlock);
+  // The shutdown read rides beside the roster's: one multicall per deployment, cached.
+  const [roster, live] = await Promise.all([
+    loadRoster(cfg),
+    readForkShutdown(cfg).catch((): Record<string, BranchShutdownLive> => ({})),
+  ]);
+  const byKey = new Map(Object.values(cfg.branches).map((b) => [b.key, b]));
+  return {
+    ...roster,
+    branches: roster.branches.map((b) => ({
+      ...b,
+      shutdown: branchShutdownState(byKey.get(b.key)?.shutdownRecord, live[b.key]),
+    })),
+  };
+}
+
+async function loadRoster(cfg: LiquityForkConfig, atBlock?: number): Promise<LiquityForkBranchesResponse> {
   const configs = Object.values(cfg.branches);
   if (atBlock === undefined) {
     const served = await serverLiquityForkBranches(cfg);

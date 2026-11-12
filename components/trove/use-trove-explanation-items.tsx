@@ -27,6 +27,8 @@ import type { LiquityTroveSurplus } from "@/components/protocol/liquity-family/t
 import { troveWords } from "@/lib/liquity/event-templates";
 import { troveNodes } from "@/lib/liquity/trove-nodes";
 import { SurplusBullet } from "@/components/protocol/liquity-family/surplus-bullet";
+import { ShutdownBullet } from "@/components/protocol/liquity-family/shutdown-bullet";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
 import { formatCompact } from "@/lib/shared/format-compact";
 
 // V2 TroveManager per branch — the contract the chain values are read from.
@@ -53,6 +55,9 @@ interface UseTroveExplanationItemsArgs {
   /** A closed trove's debt just before the close, where the page knows it:
    *  0 when redemption had cleared it and the owner closed a zombie. */
   debtAtClose?: number | null;
+  /** The branch's shutdown (ui-jobs 612): its bullet leads, and the runway,
+   *  the rate's cost and the queue go. */
+  shutdown?: BranchShutdownState | null;
 }
 
 /** The trove pane's content: a subject-first, colon-terminated status lead
@@ -100,13 +105,25 @@ export function useTroveExplanationItems({
   redeemedFirst,
   surplus,
   debtAtClose,
+  shutdown,
 }: UseTroveExplanationItemsArgs): TroveExplanation {
   return useMemo(() => {
     if (trove.status === "liquidated") return buildLiquidatedItems(trove, surplus ?? null);
     if (trove.status === "closed")
       return buildClosedItems(trove, debtAtClose === 0 && trove.activity.redemptionCount > 0);
-    return buildOpenItems({ trove, liveState, prices, debtInFront, queueDebtTotal, redeemedFirst });
-  }, [trove, liveState, prices, debtInFront, trovesAhead, queueDebtTotal, redeemedFirst, surplus, debtAtClose]);
+    return buildOpenItems({ trove, liveState, prices, debtInFront, queueDebtTotal, redeemedFirst, shutdown });
+  }, [
+    trove,
+    liveState,
+    prices,
+    debtInFront,
+    trovesAhead,
+    queueDebtTotal,
+    redeemedFirst,
+    surplus,
+    debtAtClose,
+    shutdown,
+  ]);
 }
 
 function buildLiquidatedItems(trove: TroveSummary, surplus: LiquityTroveSurplus | null): TroveExplanation {
@@ -274,9 +291,11 @@ function buildOpenItems({
   debtInFront,
   queueDebtTotal,
   redeemedFirst,
+  shutdown,
 }: UseTroveExplanationItemsArgs): TroveExplanation {
   const items: Bullet[] = [];
   const add = (group: Group, node: React.ReactNode) => items.push({ group, node });
+  const shut = shutdown ?? null;
   const batchManagerInfo = getBatchManagerByAddress(trove.batch.manager);
 
   const displayDebt = liveState?.debt.entire ?? trove.debt.current;
@@ -442,6 +461,25 @@ function buildOpenItems({
     );
   }
 
+  if (shut) {
+    // A shut-down branch: the shutdown leads the holdings; no runway, cost or queue place follows.
+    items.unshift({
+      group: "holdings",
+      node: (
+        <span key="shutdown" className="text-rb-500">
+          <ShutdownBullet
+            protocol="liquity-v2"
+            state={shut}
+            symbol={trove.collateralType}
+            debtSymbol="BOLD"
+            coll={displayCollateral}
+            debt={displayDebt}
+          />
+        </span>
+      ),
+    });
+  }
+
   const ltv = ltvPct(collateralRatio);
   if (hasLiveData && ltv != null) {
     // The LTV read as a multiple: an 84.4% LTV means the debt is worth 0.84×
@@ -478,7 +516,7 @@ function buildOpenItems({
         })
       : null;
   const liqPriceProv = fp.liq;
-  if (currentPrice && liqPrice && liqPrice > 0) {
+  if (!shut && currentPrice && liqPrice && liqPrice > 0) {
     // The runway: the fall to the liquidation price, both the twins of the
     // card's "% from liquidation" and "Liquidates at" chrome, so both bold.
     const headroomPct = ((currentPrice - liqPrice) / currentPrice) * 100;
@@ -516,7 +554,9 @@ function buildOpenItems({
       </HighlightableValue>
     </Prov>
   );
-  if (trove.batch.isMember) {
+  if (shut) {
+    // No rate change and no accrual after a shutdown: the rate's bullet goes.
+  } else if (trove.batch.isMember) {
     // Who sets the rate and the fee they charge; the yearly costs are the
     // card's costs line, and two figures fill the bullet.
     add(
@@ -566,7 +606,9 @@ function buildOpenItems({
   // runway chip's twin, so it carries the same receipt). The general
   // mechanics are Layer-2 material in the "?" modal (the 2026-07-25
   // Layer-2-in-Layer-1 audit).
-  if (trove.isZombie) {
+  if (shut) {
+    // No queued redemption after a shutdown.
+  } else if (trove.isZombie) {
     // A dormant Trove is outside the branch's rate-sorted list; the next redemption takes it first
     // only as the branch's lastZombieTroveId.
     add(

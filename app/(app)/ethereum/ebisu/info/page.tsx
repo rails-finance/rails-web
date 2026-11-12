@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { ProtocolInfoPage, GlossaryLink, type InfoTerm, type InfoView } from "@/components/shared/protocol-info-page";
+import { EBISU_DOCS_AND_CHAIN } from "@/lib/ebisu/docs-and-chain";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
@@ -178,6 +179,7 @@ export default function InfoPage() {
       glossary={glossary}
       views={views}
       search="You can search by Trove id, collateral or owner. The listing filters by Status, Collateral, Debt (ebUSD), Collateral (USD) and Transactions, which keeps the Troves whose number of transactions falls in a range you choose, and sorts by Recent activity, Collateral, Debt (ebUSD) or Interest rate."
+      docsAndChain={EBISU_DOCS_AND_CHAIN}
       docs={{ label: "Ebisu documentation", href: DOCS }}
     />
   );

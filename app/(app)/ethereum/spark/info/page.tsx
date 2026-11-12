@@ -5,6 +5,7 @@
 
 import Link from "next/link";
 import { GlossaryLink, ProtocolInfoPage } from "@/components/shared/protocol-info-page";
+import { SPARK_DOCS_AND_CHAIN } from "@/lib/spark/docs-and-chain";
 import { infoMetadata } from "@/lib/shared/page-metadata";
 import { sparkGlossary } from "@/lib/spark/event-templates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
@@ -91,6 +92,7 @@ export default function InfoPage() {
           ),
         },
       ]}
+      docsAndChain={SPARK_DOCS_AND_CHAIN}
       docs={{ label: "SparkLend documentation", href: "https://docs.spark.finance/products/sparklend" }}
     />
   );

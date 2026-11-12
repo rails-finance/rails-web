@@ -34,6 +34,8 @@ import type { LiquityForkTroveChainResponse } from "@/lib/api/fetch-liquity-fork
 import { H, ProseExplainer } from "@/lib/shared/explainer-prose";
 import { AmountText } from "@/components/shared/amount-text";
 import { fmtLtv, liquityFamilyTerms } from "@/lib/liquity/ltv";
+import type { BranchShutdownState } from "@/lib/liquity-fork/shutdown";
+import { ShutdownBullet } from "@/components/protocol/liquity-family/shutdown-bullet";
 
 /** Past-tense narration for a closed or liquidated fork Trove — the card's own
  *  terminal figures (the recorded peaks), with the ending mechanism derived
@@ -191,7 +193,11 @@ export function LiquityForkPositionExplanation({
   chain,
   isBatched = false,
   redist,
+  shutdown = null,
 }: {
+  /** The branch's shutdown (ui-jobs 612): its bullet leads, and the bullets on
+   *  borrowing, liquidation, the queue, the branch ratio and accrual go. */
+  shutdown?: BranchShutdownState | null;
   /** Redistributions received over the whole history, where it is loaded. */
   redist?: ForkRedistTally | null;
   chain: LiquityForkTroveChainResponse;
@@ -219,7 +225,12 @@ export function LiquityForkPositionExplanation({
   // colon-terminated (charter §4); the live-vs-recorded caveat (the entire
   // figures carry pending gains and interest, so a reader comparing them to a
   // last-emitted number needs the warning) rides as the first bullet.
-  const lead = hasDebt ? (
+  const shut = shutdown;
+  // The pool emptied under the Trove: its collateral's worth is not stated.
+  const poolEmptied =
+    shut != null && (shut.record?.withdrawal != null || (chain.branchColl ?? Infinity) < chain.entireColl);
+  // A record's bullet states the Trove's two figures, so it stands in for the lead.
+  const lead = shut?.record ? null : hasDebt ? (
     <>
       This Trove holds{" "}
       <H>
@@ -243,7 +254,21 @@ export function LiquityForkPositionExplanation({
 
   const bullets: React.ReactNode[] = [];
 
-  if (chain.priceUsd != null) {
+  if (shut) {
+    bullets.push(
+      <ShutdownBullet
+        key="shutdown"
+        protocol={chain.protocol}
+        state={shut}
+        symbol={sym}
+        debtSymbol={debtSymbol}
+        coll={chain.entireColl}
+        debt={chain.entireDebt}
+      />,
+    );
+  }
+
+  if (chain.priceUsd != null && !poolEmptied) {
     bullets.push(
       <span key="worth">
         At the branch&rsquo;s price, that collateral is worth{" "}
@@ -254,13 +279,15 @@ export function LiquityForkPositionExplanation({
       </span>,
     );
   }
-  bullets.push(
-    <span key="pending-caveat">
-      {hasDebt
-        ? "The figures above include pending redistribution gains and interest built up since the Trove's last change, up to the latest block. The debt keeps growing at the Trove's rate while it is open."
-        : "That collateral figure includes any pending redistribution gains."}
-    </span>,
-  );
+  // Interest stops at a shutdown, so the live-accrual caveat goes with it.
+  if (!shut)
+    bullets.push(
+      <span key="pending-caveat">
+        {hasDebt
+          ? "The figures above include pending redistribution gains and interest built up since the Trove's last change, up to the latest block. The debt keeps growing at the Trove's rate while it is open."
+          : "That collateral figure includes any pending redistribution gains."}
+      </span>,
+    );
 
   if (hasDebt && chain.accruedInterest > 0.01) {
     // A zombie sits outside the redemption queue — its own bullet below narrates
@@ -282,7 +309,7 @@ export function LiquityForkPositionExplanation({
               &rsquo;s management fee built up over the same time, also part of the debt.
             </>
           )}
-          {chain.status !== "zombie" && (
+          {chain.status !== "zombie" && !shut && (
             <> The {terms.delegate}&rsquo;s rate also sets the batch&rsquo;s place in the redemption queue.</>
           )}
         </span>
@@ -294,7 +321,7 @@ export function LiquityForkPositionExplanation({
             <H>{chain.annualInterestRatePct.toFixed(2)}%</H>
           </Prov>{" "}
           annual rate.
-          {chain.status !== "zombie" && <> A higher rate also buys a later place in the redemption queue.</>}
+          {chain.status !== "zombie" && !shut && <> A higher rate also buys a later place in the redemption queue.</>}
         </span>
       ),
     );
@@ -310,6 +337,9 @@ export function LiquityForkPositionExplanation({
       </span>,
     );
   }
+
+  // A shut-down branch: no liquidation line, borrowing room, queue place or branch ratio.
+  if (shut) return <ProseExplainer paragraph={lead} items={bullets} />;
 
   if (hasDebt && chain.icr != null) {
     bullets.push(
