@@ -17,8 +17,7 @@ import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fo
 import type { LiquityForkConfig } from "@/lib/sources/chain/liquity-fork-position";
 import { ASYMMETRY_BRANCHES, DEBT_ADDRESS, DEBT_SYMBOL } from "@/lib/asymmetry/asset-catalog";
 import { protocolForHref } from "@/lib/shared/protocols";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +59,6 @@ export default async function AsymmetryBranchesPage() {
             docsLink: { label: "Asymmetry docs", url: "https://docs.asymmetry.finance" },
           }}
         />
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     </div>

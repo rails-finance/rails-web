@@ -67,7 +67,7 @@ export default async function PendleMarketPage({
   return (
     <>
       <PendleMarketProductPage m={read.data} meta={meta} initialSearch={initialSearch} />
-      {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
+      {/* The inspector, armed from the profile menu's switch. */}
       <ProvInspectorLayer />
     </>
   );

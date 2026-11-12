@@ -53,10 +53,13 @@
 //   (V4_ONLY=1 runs check 11 alone.)
 
 import { chromium } from "playwright";
-import { armScope } from "./lib/prov-inspector.mjs";
+import { armInspector } from "./lib/prov-inspector.mjs";
+import { showCardTab } from "./lib/card-tabs.mjs";
 
 /** Arm one section of the page from its ⋮ (no page-wide toggle, ui-jobs 549/550). */
-const arm = (page, scope) => armScope(page, scope, { menu: `[data-section-menu="${scope}"]` }).catch(() => false);
+// Armed from the profile menu's switch, page-wide (ui-jobs 625); an Escape
+// with no receipt open puts it down, so each read arms again.
+const arm = (page) => armInspector(page).catch(() => false);
 
 /** The upstream market each fixture's reads name (lib/api/fetch-aave-reserve-reads.ts). */
 const API_MARKET = {
@@ -270,7 +273,7 @@ for (const f of process.env.V4_ONLY ? [] : FIXTURES) {
     );
 
   let pop = "";
-  if (await arm(page, "reserve-head")) {
+  if (await arm(page)) {
     await page.locator(`[data-vital="available"] [data-prov-pickable]`).first().click();
     await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
     pop = norm(
@@ -391,7 +394,7 @@ for (const f of process.env.V4_ONLY ? [] : FIXTURES) {
     );
     let hpop = "";
     await page.keyboard.press("Escape");
-    if (await arm(page, "reserve-history")) {
+    if (await arm(page)) {
       await page.locator("[data-history-borrow]").first().click();
       await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
       hpop = norm(
@@ -467,7 +470,7 @@ for (const f of process.env.V4_ONLY ? [] : FIXTURES) {
     check(`${tag} 10b refresh line under each table`, ix.refreshed === 2, String(ix.refreshed));
     let opop = "";
     await page.keyboard.press("Escape");
-    if (await arm(page, "reserve-suppliers")) {
+    if (await arm(page)) {
       await page.locator('[data-holders="suppliers"] [data-holder-amount] [data-prov-pickable]').first().click();
       await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
       opop = norm(
@@ -635,16 +638,9 @@ for (const f of V4_FIXTURES) {
       .waitFor({ timeout: 10000 })
       .catch(() => {});
     bullets = await first.locator("[data-change-explain] li").count();
-    // The row's ⋮ "Inspect provenance" arms the card and turns to its Figures.
-    await first.locator("[data-event-head-menu] [data-event-menu] > button").click();
-    const inspect = page.locator("[data-prov-scope-toggle]:visible").first();
-    if (
-      await inspect.waitFor({ timeout: 10000 }).then(
-        () => true,
-        () => false,
-      )
-    ) {
-      await inspect.click();
+    // Armed from the profile menu's switch; the card turned to its Figures.
+    if (await arm(page)) {
+      await showCardTab(first, "figures").catch(() => {});
       await first.locator('[data-figure="config-change"] [data-prov-pickable]').first().click();
       await page.waitForSelector(".prov-inspect-pop", { timeout: 10000 }).catch(() => {});
       pop = norm(

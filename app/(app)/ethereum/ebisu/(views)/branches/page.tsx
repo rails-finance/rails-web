@@ -18,8 +18,7 @@ import { loadLiquityForkBranchesFromChain } from "@/lib/sources/chain/liquity-fo
 import type { LiquityForkConfig } from "@/lib/sources/chain/liquity-fork-position";
 import { EBISU_BRANCHES, DEBT_ADDRESS, DEBT_SYMBOL } from "@/lib/ebisu/asset-catalog";
 import { protocolForHref } from "@/lib/shared/protocols";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +60,6 @@ export default async function EbisuBranchesPage() {
             docsLink: { label: "Ebisu", url: "https://ebisu.money" },
           }}
         />
-        <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         <ProvInspectorLayer />
       </div>
     </div>

@@ -1,7 +1,8 @@
 // The routes the standing provenance inspector arms on arrival (rails-ops
 // decision 0062 point 6, ui-jobs 571). A route joins once the dev coverage
 // tripwire sweeps it clean: no `data-prov-uncovered`, no unscoped `<Prov>`
-// warning. Any other route behaves as before the preference: armed by hand.
+// warning. The switch is the one way to arm the inspector (ui-jobs 625), so
+// on any other route nothing can be inspected.
 //
 // Entries are App Router templates without route groups. A `[param]` segment
 // matches only where the route served that param (`useParams()`), so a static

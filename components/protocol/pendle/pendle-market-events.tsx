@@ -2,7 +2,7 @@
 
 // A Pendle market's router events, newest first, as a section of the market's
 // page (R2) with its own receipts scope and ⋮ (Download CSV of the loaded
-// rows, Inspect provenance), on the timeline's furniture:
+// rows), on the timeline's furniture:
 // the toolbar strip (L1) with the count (L1.2) and the types-of-event filter
 // (L1.3, the shared FilterDropdown), the rows on the spine as event cards (T1,
 // L3), and "Show 50 more" (L9). Each row names its wallet (the receiver; on a

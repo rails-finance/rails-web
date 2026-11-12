@@ -232,9 +232,9 @@ const ITEMS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbo
 const PROV_HELP =
   "Underlines each figure that has a receipt: click one to see the contract call, the block and the maths behind it. Switched on here, it stays on across the pages that support it.";
 
-/** The standing provenance inspector (decision 0062; ui-jobs 571): arms the
- *  inspector on arrival on every page that has passed the coverage gate
- *  (lib/shared/prov-preference-routes.ts). Off by default.
+/** The provenance inspector's one switch (decision 0062; ui-jobs 571, 625):
+ *  arms the inspector on arrival on every page that has passed the coverage
+ *  gate (lib/shared/prov-preference-routes.ts). Off by default.
  *
  *  The row is one switch; its "?" opens the house tooltip (RevealTip) and is
  *  a sibling of the switch, standing over the switch's stretched hit area
@@ -248,10 +248,9 @@ function ProvInspectorSwitch({ onDone }: { onDone: () => void }) {
       data-anatomy="H20.1"
     >
       <Crosshair className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-      {/* The label over its subtitle line, as the Tools menu's inspector row
-          draws a title over a text-xs line (ProvInspectorToggle). Neither span
-          is positioned, so the switch's hit area and the tip's bubble still
-          stand on the row. */}
+      {/* The label over its subtitle line, a title over a text-xs line.
+          Neither span is positioned, so the switch's hit area and the tip's
+          bubble still stand on the row. */}
       <span className="flex min-w-0 flex-col py-1.5">
         <span className="flex min-w-0 items-center gap-3">
           <button

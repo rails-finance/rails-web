@@ -20,7 +20,7 @@ export default async function CompoundBaseMarketsRoute() {
   return (
     <>
       <CompoundMarketsOverview data={data} chain="base" />
-      {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
+      {/* The inspector, armed from the profile menu's switch. */}
       <ProvInspectorLayer />
     </>
   );

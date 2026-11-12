@@ -69,28 +69,21 @@ export default function ProvenancePage() {
         check it.
       </p>
 
+      <Section title="Turning it on">
+        <p className="body-text">
+          The inspector has one switch: <strong className="text-foreground">Provenance inspector</strong>, under
+          Advanced in the profile menu at the top right. Once on, it stays on from page to page, on the pages that
+          support it. While it is on, <strong className="text-foreground">Exit inspector</strong> stands beside the
+          profile menu and turns it off.
+        </p>
+      </Section>
+
       <Section title="Underlined figures">
         <p className="body-text">
           While the provenance inspector is on, each figure with a receipt has a dotted underline. A click or a tap on
           one opens its receipt beside it; on a phone the receipt opens as a sheet at the foot of the screen. A click
           elsewhere closes it. Escape closes an open receipt, and a second Escape turns the inspector off.
         </p>
-        <ul className="body-text list-disc space-y-2 pl-5">
-          <li>
-            <strong className="text-foreground">Inspect provenance</strong>, in a card&rsquo;s or an event&rsquo;s ⋮
-            menu, underlines the figures in that card alone and draws a ring round it. The row then reads &ldquo;Stop
-            inspecting&rdquo;.
-          </li>
-          <li>
-            <strong className="text-foreground">Inspect provenance</strong>, in a page&rsquo;s Tools menu, does the same
-            for the whole page.
-          </li>
-          <li>
-            <strong className="text-foreground">Provenance inspector</strong>, a switch in the profile menu, turns the
-            inspector on as each page opens, on the pages that support it, with a lighter underline. Turned on from a
-            menu, the inspector offers a &ldquo;Keep this on&rdquo; button that sets the switch.
-          </li>
-        </ul>
       </Section>
 
       <Section title="What a receipt holds">

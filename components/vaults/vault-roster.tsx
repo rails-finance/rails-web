@@ -92,16 +92,15 @@ export interface VaultRosterHead {
   /** The cross-protocol index, linked after the sentence; null on the index. */
   indexHref?: string | null;
   /** The roster's ⋮ at the right of the read-stamp row (`RosterMenu`): its
-   *  pages and "Inspect provenance" on the roster alone. Absent on the index,
-   *  which carries no provenance. */
+   *  pages. Absent on the index. */
   menu?: ReactNode;
 }
 
-/** The roster's scope: its ⋮ arms the inspector on it alone. */
+/** The roster's name (`data-prov-scope`). */
 export const ROSTER_SCOPE = "vault-roster";
 
 /** The family roster's ⋮: every holder, the index and the about page on
- *  Rails, the protocol's docs, then Inspect provenance. */
+ *  Rails, the protocol's docs. */
 export function RosterMenu({
   listingHref,
   infoHref,
@@ -135,9 +134,7 @@ export function RosterMenu({
       : []),
     ...(docs ? [{ item: "docs", ...docs }] : []),
   ];
-  return (
-    <SectionMenu scope={ROSTER_SCOPE} title="Vaults" hint="Click a value on this roster to trace it" links={links} />
-  );
+  return <SectionMenu scope={ROSTER_SCOPE} title="Vaults" links={links} />;
 }
 
 const rawOf = (v: VaultSummary) => BigInt(v.totalAssets?.raw ?? "0");

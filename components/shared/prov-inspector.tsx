@@ -1,23 +1,24 @@
 "use client";
 
-// The provenance inspector tool — the page-level target mode.
+// The provenance inspector — the page-level target mode.
 // ----------------------------------------------------------------------------
-// Two pieces, both talking to the `provInspector` store (provenance.tsx):
+// Armed in one place, the profile menu's switch (H20.1, decision 0062; ui-jobs
+// 625): while it is on, the layer arms each page view on arrival, on the
+// routes in lib/shared/prov-preference-routes.ts. Three ways put it down, all
+// through `putDownInspector`, which turns the switch off too: the switch,
+// "Exit inspector" beside the profile control (<ProvInspectorExit>), and
+// Escape's second press.
 //
-// - <ProvInspectorToggle> — the crosshair control that arms the tool. Arming
-//   turns every scoped <Prov> on the page into a click target (dotted
-//   underline = the coverage map). Two dresses: `dock`, the icon button in the
-//   PriceStrip's leading slot, which is what the Market-type pages still
-//   mount; and `menu`, a row of the Tools dropdown, which is where a position
-//   or detail view now carries it.
-// - <ProvInspectorLayer> — the armed halo + the popover. A pick anchors the
-//   figure's WHOLE receipt at the clicked value: name + figure + class dots
-//   (a button that opens the distance ladder) in the head, then the summary, via, formula, operand rows, and source
-//   coordinates — one card, no second click, so it renders at its final
-//   height and never re-anchors. Sticky mode: the popover moves pick to
-//   pick; click-away closes the popover but keeps the tool armed; Escape
-//   closes the popover first, then the mode. Under 640px the same content
-//   renders as a bottom sheet instead of an anchored popover.
+// - <ProvInspectorLayer> — armed, every scoped <Prov> on the page is a click
+//   target with a light dotted underline (the coverage map). A pick anchors
+//   the figure's WHOLE receipt at the clicked value: name + figure + class
+//   dots (a button that opens the distance ladder) in the head, then the
+//   summary, via, formula, operand rows, and source coordinates — one card,
+//   no second click, so it renders at its final height and never re-anchors.
+//   Sticky mode: the popover moves pick to pick; click-away closes the
+//   popover but keeps the tool armed; Escape closes the popover first, then
+//   the mode. Under 640px the same content renders as a bottom sheet instead
+//   of an anchored popover.
 //
 // This is the only receipt surface (rails-ops
 // `standards/provenance-receipts-grammar.md` §1). The per-card receipts panel
@@ -25,7 +26,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
-import { Crosshair, X } from "lucide-react";
+import { X } from "lucide-react";
 import {
   CLASS_CSS,
   CLASS_META,
@@ -45,234 +46,52 @@ import { useParams, usePathname } from "next/navigation";
 import { setProvPreference, useProvPreference } from "@/lib/shared/prov-preference";
 import { provPreferenceAllows } from "@/lib/shared/prov-preference-routes";
 
-export function ProvInspectorToggle({
-  variant = "dock",
-  onPick,
-  openerRef,
-}: {
-  /** `dock` — the icon button in the PriceStrip's leading slot. `menu` — a row
-   *  of the Tools dropdown, wearing that panel's title/subtitle shape. Same
-   *  button, same class, so anything that reaches for the toggle finds one
-   *  control on either surface. */
-  variant?: "dock" | "menu";
-  /** Called after the click, so the menu that holds the row can close. */
-  onPick?: () => void;
-  /** The control focus returns to when the mode is put down: the menu's
-   *  trigger, for the `menu` row. */
-  openerRef?: React.RefObject<HTMLElement | null>;
-}) {
-  // The page-level tool is pressed while armed page-wide; armed on one section
-  // (ui-jobs 284), a press widens the mode to the page.
-  const armed = useSyncExternalStore(
-    provInspector.subscribe,
-    () => provInspector.getArmed() && provInspector.getScope() == null,
-    () => false,
-  );
-  const label = armed ? "Exit the provenance inspector" : "Provenance inspector: click any value to trace it";
-  const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    const opener = variant === "dock" ? e.currentTarget : (openerRef?.current ?? null);
-    if (armed) putDownInspector();
-    else provInspector.setArmed(true, null, opener);
-    onPick?.();
-  };
-  if (variant === "menu") {
-    return (
-      <button
-        type="button"
-        className="prov-inspect-toggle prov-inspect-toggle-menu"
-        role="menuitem"
-        aria-pressed={armed}
-        aria-label={label}
-        onClick={onClick}
-      >
-        <Crosshair aria-hidden />
-        <span className="min-w-0">
-          <span className="block text-sm font-semibold text-foreground">
-            {armed ? "Stop inspecting" : "Inspect provenance"}
-          </span>
-          <span className="block text-xs text-rb-500">
-            {armed ? "Click any value to trace it · esc exits" : "Click any value to trace where it came from"}
-          </span>
-        </span>
-      </button>
-    );
-  }
-  return (
-    <button
-      type="button"
-      className="prov-inspect-toggle"
-      aria-pressed={armed}
-      aria-label={label}
-      title={armed ? "Exit the provenance inspector (Esc)" : "Provenance inspector: click any value to trace it"}
-      onClick={onClick}
-    >
-      <Crosshair aria-hidden />
-      {armed && <span className="prov-inspect-hint">click any value · esc exits</span>}
-    </button>
-  );
-}
-
 /** Put the inspector down from a control the reader pressed (the exit
- *  button, Escape's second rung, the toggle, the profile menu's switch): one
- *  state, so the standing preference (decision 0062) goes off with it and the
- *  profile switch reads off at once (ui-jobs 624). Leaving a page disarms with
- *  `setArmed(false)` alone and keeps the preference. */
+ *  button, Escape's second rung, the profile menu's switch): one state, so
+ *  the saved preference (decision 0062) goes off with it and the switch reads
+ *  off at once (ui-jobs 624). Leaving a page disarms with `setArmed(false)`
+ *  alone and keeps the preference. */
 export function putDownInspector() {
   provInspector.setArmed(false);
   setProvPreference(false);
 }
 
-/** Arm the inspector on one section (ui-jobs 284): the position card
- *  ("position-card"), Lifetime flows ("flows") or one event (its id). Only the
- *  values inside that section become targets, and that section wears the
- *  ring (`useProvScopeLit`); the exit button and the Escape ladder are the
- *  page-level tool's. Pressed while that section is armed, where a press puts
- *  the mode down. A row of a ⋮ menu. */
-export function ProvScopeToggle({
-  scope,
-  hint,
-  onPick,
-  onArm,
-  openerRef,
-}: {
-  scope: string;
-  /** The menu row's subtitle at rest: what the row arms ("Trace a value on
-   *  this card"). */
-  hint?: string;
-  /** Called after the click, so the menu that holds the row can close. */
-  onPick?: () => void;
-  /** Called as the row arms the scope: a timeline card opens on its Figures
-   *  so the values it traces are on screen (ui-jobs 535). */
-  onArm?: () => void;
-  /** The control focus returns to when the mode is put down; where absent,
-   *  the pressed button. */
-  openerRef?: React.RefObject<HTMLElement | null>;
-}) {
-  const pressed = useSyncExternalStore(
-    provInspector.subscribe,
-    () => provInspector.getArmed() && provInspector.getScope() === scope,
-    () => false,
-  );
-  const onClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    if (!pressed) onArm?.();
-    provInspector.setArmed(!pressed, scope, openerRef?.current ?? e.currentTarget);
-    onPick?.();
-  };
-  return (
-    <button
-      type="button"
-      className="prov-scope-toggle prov-inspect-toggle-menu"
-      role="menuitem"
-      aria-pressed={pressed}
-      data-menu-item="show-provenance"
-      data-prov-scope-toggle={scope}
-      onClick={onClick}
-    >
-      <Crosshair aria-hidden className={PROV_TEAL} />
-      <span className="min-w-0">
-        <span className={`block text-sm font-semibold ${PROV_TEAL}`}>
-          {pressed ? SCOPE_WORDS.hide : SCOPE_WORDS.show}
-        </span>
-        <span className="block text-xs text-rb-500">{pressed ? SCOPE_WORDS.armed_hint : hint}</span>
-      </span>
-    </button>
-  );
-}
-
-/** The provenance teal: the popover's border and the inspector's armed and
- *  dotted marks (teal-600, teal-400 in dark; globals.css), on the menu row's
- *  title and crosshair (ui-jobs 535). */
-const PROV_TEAL = "text-teal-600 dark:text-teal-400";
-
-/** The scoped row's words. */
-const SCOPE_WORDS = {
-  show: "Inspect provenance",
-  hide: "Stop inspecting",
-  armed_hint: "Click a value to trace it · esc exits",
-};
+/** An open menu or modal; the wallet panel stays mounted, `aria-hidden`, while shut. */
+const OPEN_OVERLAY = '[role="menu"], [aria-modal="true"]:not([aria-hidden="true"])';
 
 /** Mount once per page (beside the timeline, outside any card). Renders
- *  nothing at rest; owns the page-wide halo, the Escape
- *  ladder, and the pinned popover. "Exit inspector" stands beside the profile
- *  control (<ProvInspectorExit>). */
+ *  nothing at rest; arms from the saved preference and owns the Escape ladder
+ *  and the pinned popover. */
 export function ProvInspectorLayer() {
   const armed = useSyncExternalStore(provInspector.subscribe, provInspector.getArmed, () => false);
-  const scoped = useSyncExternalStore(
-    provInspector.subscribe,
-    () => provInspector.getScope() != null,
-    () => false,
-  );
   const pin = useSyncExternalStore(provInspector.subscribe, provInspector.getPin, () => null);
-  // Armed by the standing preference (decision 0062): no halo, the lighter
-  // underline (`:root[data-prov-quiet]`, globals.css).
-  const quiet = useSyncExternalStore(provInspector.subscribe, provInspector.getQuiet, () => false);
   const preference = useProvPreference();
   const pathname = usePathname();
   const params = useParams();
   const allowed = provPreferenceAllows(pathname, params);
   // Escape, in rungs: an open popover closes first; a second press disarms.
+  // An Escape that closes an open menu or modal (the profile menu, a ⋮) is
+  // theirs, so it never turns the switch off.
   useEffect(() => {
     if (!armed) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (provInspector.getPin()) provInspector.unpin();
-      else {
-        putDownInspector();
-        provInspector.restoreFocus();
-      }
+      else if (!document.querySelector(OPEN_OVERLAY)) putDownInspector();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [armed]);
   // Leaving the page puts the tool down.
   useEffect(() => () => provInspector.setArmed(false), []);
-  // The standing preference arms each page view on arrival, on the routes
-  // that pass the coverage gate. A disarm holds until the next page; turning
-  // the switch off puts a preference arming down.
+  // The preference arms each page view on arrival, on the routes that pass
+  // the coverage gate; turned off, the inspector goes down.
   useEffect(() => {
-    if (preference && allowed) provInspector.armByPreference();
-    else if (provInspector.getQuiet()) provInspector.setArmed(false);
+    provInspector.setArmed(preference && allowed);
   }, [preference, allowed, pathname]);
-  useEffect(() => {
-    const root = document.documentElement;
-    if (armed && quiet) root.setAttribute("data-prov-quiet", "");
-    else root.removeAttribute("data-prov-quiet");
-    return () => root.removeAttribute("data-prov-quiet");
-  }, [armed, quiet]);
   if (typeof document === "undefined" || !armed) return null;
-  return (
-    <>
-      {/* The armed halo: armed page-wide, the whole viewport wears the tool's
-          teal (the browser-extension "operating" treatment). Armed on one
-          section, that section wears the ring instead (`useProvScopeLit`).
-          Pointer-transparent chrome; sits under the popover. */}
-      {!scoped &&
-        !quiet &&
-        createPortal(<div className="prov-inspect-halo" aria-hidden data-prov-chrome="" />, document.body)}
-      {/* Armed by hand with the preference off, "Keep this on" (decision
-          0062 point 7). The way out is beside the profile control
-          (<ProvInspectorExit>). */}
-      {!quiet &&
-        !preference &&
-        createPortal(
-          <div className="prov-inspect-chips" data-prov-chrome="">
-            <button
-              type="button"
-              className="prov-inspect-keep"
-              data-anatomy="H7.5"
-              data-prov-keep-on=""
-              title={KEEP_ON_TITLE}
-              onClick={() => setProvPreference(true)}
-            >
-              {KEEP_ON_LABEL}
-            </button>
-          </div>,
-          document.body,
-        )}
-      {/* Keyed per pick: a fresh mount per figure resets expansion + position. */}
-      {pin && <InspectorPopover key={`${pin.key}:${pin.tick}`} pin={pin} />}
-    </>
-  );
+  // Keyed per pick: a fresh mount per figure resets expansion + position.
+  return pin ? <InspectorPopover key={`${pin.key}:${pin.tick}`} pin={pin} /> : null;
 }
 
 /** "Exit inspector" (ui-jobs 624.2): beside the profile control (H20), in the
@@ -300,10 +119,6 @@ export function ProvInspectorExit({ onExit }: { onExit?: () => void }) {
     </button>
   );
 }
-
-/** The armed state's offer to keep the inspector on (decision 0062 point 7). */
-const KEEP_ON_LABEL = "Keep this on";
-const KEEP_ON_TITLE = "Arm the inspector on every page that supports it. The profile menu turns it off.";
 
 const POP_WIDTH = 400;
 

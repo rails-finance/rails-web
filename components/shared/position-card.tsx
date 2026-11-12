@@ -66,13 +66,11 @@ import {
   POSITION_CARD_PAD,
 } from "@/lib/shared/ui-grammar";
 import {
-  POSITION_CARD_SCOPE,
   Prov,
   ProvInert,
   ProvReceiptsScope,
   ProvUnscoped,
   type Provenance,
-  useProvScopeLit,
   useReceiptRegistry,
 } from "@/components/shared/provenance";
 import { SectionExplainer, type SectionExplainerSlot } from "@/components/shared/section-explainer";
@@ -807,7 +805,6 @@ function overCap(slots: PositionCardSlots): string | null {
 export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   const registry = useReceiptRegistry();
   const detail = slots.surface === "detail";
-  const lit = useProvScopeLit(detail ? POSITION_CARD_SCOPE : null);
   const closed = slots.outcome != null;
   const { extra: countersExtra, ...meta } = slots.counters ?? {};
   const counters = slots.counters ? (
@@ -1009,8 +1006,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
       data-card-status={slots.status ? slots.status.word.toLowerCase() : "live"}
       data-skel-section={detail ? "detail-card" : "listing-row"}
       data-anatomy={detail ? "P1 C1" : (slots.anatomy ?? "C1")}
-      data-prov-scope={detail ? POSITION_CARD_SCOPE : undefined}
-      data-prov-lit={lit ? "" : undefined}
+      data-prov-scope={detail ? "position-card" : undefined}
       data-card-over-cap={over ?? undefined}
       className={barred ? `${POSITION_CARD_FRAME_BOX} relative flex` : POSITION_CARD_FRAME}
       style={
@@ -1065,9 +1061,7 @@ export function PositionCard({ slots }: { slots: PositionCardSlots }) {
   return detail ? (
     // verify-unscoped-prov's tripwire: return `frame` bare from this branch and
     // every detail card's figures report as unscoped.
-    <ProvReceiptsScope registry={registry} scopeId={POSITION_CARD_SCOPE}>
-      {frame}
-    </ProvReceiptsScope>
+    <ProvReceiptsScope registry={registry}>{frame}</ProvReceiptsScope>
   ) : (
     <ProvUnscoped>{frame}</ProvUnscoped>
   );

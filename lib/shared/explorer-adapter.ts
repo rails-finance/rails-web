@@ -66,7 +66,7 @@ export interface EventPageContract {
   total: number;
   blockNumber: number;
   txHash: string;
-  /** The card's receipts scope, which Inspect provenance arms (ui-jobs 284). */
+  /** The event's id: the card's `data-prov-scope`. */
   eventId: string;
   /** Null at the first or last event. */
   previousHref: string | null;

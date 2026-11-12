@@ -194,7 +194,7 @@ function SeriesTile({
   );
 }
 
-/** The section's scope: its ⋮ arms the inspector on it alone. */
+/** The section's name (`data-prov-scope`). */
 export const STRIP_SCOPE = "vault-strip";
 
 const pointsOf = (w: SeriesWindow): readonly VaultYieldRead[] => ("points" in w ? w.points : []);

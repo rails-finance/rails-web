@@ -45,7 +45,7 @@ export default async function PendleMarketsPage({ searchParams }: { searchParams
   return (
     <>
       <PendleRosterPage roster={read.data} at={at} initialSearch={initialSearch} />
-      {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
+      {/* The inspector, armed from the profile menu's switch. */}
       <ProvInspectorLayer />
     </>
   );

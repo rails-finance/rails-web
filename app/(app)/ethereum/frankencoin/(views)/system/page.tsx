@@ -24,8 +24,7 @@ import { SubPageHeader } from "@/components/shared/sub-page-header";
 import { loadFrankencoinSystemFromChain } from "@/lib/sources/chain/frankencoin-system";
 import { loadFrankencoinBook } from "@/lib/sources/api/frankencoin-system-book";
 import { protocolForHref } from "@/lib/shared/protocols";
-import { PriceStrip } from "@/components/shared/price-strip";
-import { ProvInspectorLayer, ProvInspectorToggle } from "@/components/shared/prov-inspector";
+import { ProvInspectorLayer } from "@/components/shared/prov-inspector";
 import { AimGate } from "@/components/shared/aim-gate";
 import { assetKey } from "@/lib/shared/asset-family";
 import { TOKEN_ADDRESSES } from "@/lib/shared/token-addresses";
@@ -66,7 +65,6 @@ export default async function FrankencoinSystemPage() {
 
         <AimGate keys={FOCUS_KEYS} chain={1} what="Frankencoin's system">
           <FrankencoinSystemView data={data} book={book} />
-          <PriceStrip assets={[]} leading={<ProvInspectorToggle />} />
         </AimGate>
         <ProvInspectorLayer />
       </div>

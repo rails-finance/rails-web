@@ -38,7 +38,7 @@
 
 import { chromium } from "playwright";
 import { BASE, bypassHeaders, hostFetch } from "./lib/host.mjs";
-import { armScope } from "./lib/prov-inspector.mjs";
+import { receiptIn } from "./lib/prov-inspector.mjs";
 import { waitOnFigures } from "./lib/card-tabs.mjs";
 
 const ROUTE = "/api/aave-v3/position-state";
@@ -334,28 +334,12 @@ async function waitForAnswer(card) {
   return "none";
 }
 
-/** The receipt behind a card value, through the inspector armed on the
- *  card: its ⋮ carries "Inspect provenance" for the card alone (scoped
- *  arming, ui-jobs 284), a no-op once armed. */
+/** The receipt behind a card value, through the inspector armed from the
+ *  profile menu's switch (ui-jobs 625). A string finds the figure by its text
+ *  in `scope`; a locator is the figure (an asset's icon, which carries its
+ *  balance's receipt). */
 async function receiptText(page, scope, valueText, card) {
-  const id = await card.getAttribute("data-event-id");
-  if (!id || !(await armScope(page, id, { menu: card.locator("[data-event-menu]").first() }))) return null;
-  // A string finds the figure by its text; a locator is the figure (an
-  // asset's icon, which carries its balance's receipt).
-  const target =
-    typeof valueText === "string"
-      ? scope.locator("span.prov-locate-box").filter({ hasText: valueText }).first()
-      : valueText;
-  if ((await target.count()) === 0) return null;
-  await target.scrollIntoViewIfNeeded();
-  await target.click();
-  const pop = page.locator(".prov-inspect-pop");
-  await pop.waitFor({ state: "visible", timeout: 10000 });
-  const text = await pop.innerText();
-  await page.keyboard.press("Escape");
-  await page.keyboard.press("Escape");
-  await page.waitForTimeout(200);
-  return text;
+  return receiptIn(scope, valueText);
 }
 
 const only = process.env.FIXTURES ? new RegExp(process.env.FIXTURES) : null;
@@ -563,19 +547,22 @@ for (const fx of FIXTURES) {
       `${own} request(s) for this transaction, ${asks.length} in all, ${new Set(asks).size} distinct, ${retried.size} retried after a refusal that can change`,
     );
 
-    // The receipts behind the sheet's figures, on the small page. The
-    // inspector arms from a card's ⋮ on the event's page (scoped arming,
-    // ui-jobs 284), where the breakdown is always on.
+    // The receipts behind the sheet's figures, on the timeline's opened card:
+    // the inspector is armed from the profile menu's switch (ui-jobs 625),
+    // which does not arm event pages.
     if (fx.deep) {
-      const id = await card.getAttribute("data-event-id");
-      await page.goto(`${BASE}/ethereum/aave-v3/${fx.wallet}/event/${encodeURIComponent(id)}?market=${fx.market}`, {
-        waitUntil: "domcontentloaded",
-        timeout: 240000,
-      });
-      const evCard = page.locator(`[data-event-id="${id}"]`).first();
+      const evCard = card;
       const sheet = evCard.locator("[data-sheet]").first();
       await sheet.waitFor({ timeout: 120000 }).catch(() => {});
-      check(`${fx.label}: the event page draws the sheet`, (await sheet.count()) === 1);
+      check(`${fx.label}: the opened card draws the sheet`, (await sheet.count()) === 1);
+      // The event page drew the breakdown with no switch; on the timeline the
+      // card's switch turns it on, so the Debt side lists every asset.
+      if ((await sheet.getAttribute("data-sheet-breakdown").catch(() => null)) === "off")
+        await evCard
+          .locator("[data-sheet-switch]")
+          .first()
+          .click()
+          .catch(() => {});
       const a = state.account;
       const hfRow = sheet.locator('[data-sheet-panel] [data-sheet-row="health-factor"]');
       if (a) {

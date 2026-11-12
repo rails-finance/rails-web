@@ -17,7 +17,7 @@ export default function AaveV3BaseMarketPage() {
   return (
     <>
       <AaveMarketPage market={AAVE_V3_BASE_MARKET} />
-      {/* Each section arms the inspector from its ⋮; no page-wide toggle. */}
+      {/* The inspector, armed from the profile menu's switch. */}
       <ProvInspectorLayer />
     </>
   );
