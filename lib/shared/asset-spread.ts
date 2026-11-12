@@ -7,8 +7,11 @@
 // gap is the largest of those). Before that, on the daily stores, a day
 // compares two lines only where both were read within READ_WINDOW_S of each
 // other (from the blocks the store names), or where either is a constant:
-// two reads hours apart measure the market moving between them. Pure; the
-// asset chart and the Prices list's flags read it.
+// two reads hours apart measure the market moving between them, the blocks'
+// span timed at the chain's rate in each era (./block-rate.ts; Base's Denim,
+// ui-jobs 615). Pure; the asset chart and the Prices list's flags read it.
+
+import { blockSpanSeconds } from "./block-rate";
 
 /** Lines further apart than this are named (1 %): two feeds that each update
  *  on a 0.5 % move can stand up to 1 % apart with neither wrong, and the
@@ -16,7 +19,6 @@
 export const SPREAD_LIMIT = 0.01;
 /** Two reads within ten minutes are one moment. */
 export const READ_WINDOW_S = 600;
-const BLOCK_S: Record<number, number> = { 1: 12, 8453: 2 };
 
 /** `[day, price, block]`, ascending by day. */
 export type SpreadPoint = readonly [number, number, number | null, ...unknown[]];
@@ -81,7 +83,8 @@ export function roundDeviations(
 
 /** Each other line's deviation from `main`, day by day. */
 export function lineSpreads(main: SpreadLine, others: readonly SpreadLine[], chain: number): LineSpread[] {
-  const window = READ_WINDOW_S / (BLOCK_S[chain] ?? 12);
+  // A chain with no rate here counts Ethereum's twelve seconds.
+  const apart = (a: number, b: number) => blockSpanSeconds(chain, a, b) ?? Math.abs(a - b) * 12;
   const at = new Map(main.points.map((p) => [p[0], p]));
   return others.map((o) => {
     const byDay = new Map<number, number>();
@@ -102,7 +105,7 @@ export function lineSpreads(main: SpreadLine, others: readonly SpreadLine[], cha
       // On the rounds both points are the day's close: one moment.
       const sameMoment = roundsFrom != null && p[0] >= roundsFrom;
       const timed = !sameMoment && !main.fixed && !o.fixed;
-      if (timed && (p[2] == null || q[2] == null || Math.abs(p[2] - q[2]) > window)) continue;
+      if (timed && (p[2] == null || q[2] == null || apart(p[2], q[2]) > READ_WINDOW_S)) continue;
       const dev = p[1] / q[1] - 1;
       byDay.set(p[0], dev);
       note(p[0], dev);
