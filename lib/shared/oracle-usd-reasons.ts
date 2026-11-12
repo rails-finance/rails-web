@@ -64,7 +64,7 @@ export const ORACLE_USD_REASON: Record<string, string> = {
   "uniswap-v4-arc": UNISWAP_REASON,
   "compound-v3-optimism":
     "each Comet prices its base and collateral on the feeds its configuration names, so a balance's dollar value is its amount at that price at the block the page reads; the WETH Comet prices in ETH, turned into dollars at the USDC Comet's WETH price",
-  lido: "a stake is ETH at Lido's share rate, and Lido runs no USD feed, so every figure is in ETH",
+  lido: "a stake is ETH at Lido's share rate, and Rails has no on-chain dollar price feed wired for stETH yet, so every figure is in ETH",
   "balancer-v3":
     "a pool share is a claim on the pool's tokens, and Balancer runs no USD feed, so every figure is in the pool's own tokens",
   "balancer-v3-arbitrum":
