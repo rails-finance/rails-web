@@ -36,6 +36,7 @@ import { isLiquityEvent } from "@/lib/shared/types/event-shape";
 import { batchRateDebtMove } from "@/lib/liquity/batch-rate-move";
 import type { DayObs, PriceLevel, PriceMarks } from "@/lib/shared/price-series";
 import { levelByDay } from "@/lib/shared/price-series";
+import { formatDate } from "@/lib/date";
 import { branchMcr } from "@/lib/liquity/event-safety";
 import {
   getLiquidationThreshold,
@@ -263,6 +264,9 @@ export interface LiquityFlowOptions {
    *  the liquidation level beside it, for the branch named (Liquity V1: "ETH",
    *  its 110 % minimum). */
   priceView?: { collateralType: string; fork?: LiquityForkLevel };
+  /** Unix seconds the Trove's branch shut down (ui-jobs 612): interest stops
+   *  accruing then, and the liquidation level ends there. */
+  shutdownAt?: number | null;
 }
 
 /** A fork branch's minimum for the price view's level (Ebisu, Asymmetry,
@@ -438,9 +442,14 @@ export function liquityLiqLevel(
     now: number;
     live?: Pick<LiquityLive, "coll" | "debt"> | null;
     mcrAt?: (ts: number) => number;
+    /** The branch's shutdown: the level stops there, with no live point. */
+    shutdownAt?: number | null;
   },
 ): Pick<PriceLevel, "points" | "end"> | null {
-  const evs = replayLiquity(events).map((r) => r.ev);
+  const shutAt = o.shutdownAt != null && o.shutdownAt < o.now ? o.shutdownAt : null;
+  const evs = replayLiquity(events)
+    .map((r) => r.ev)
+    .filter((e) => shutAt == null || e.ts <= shutAt);
   if (evs.length === 0 || (o.mcrAt == null && branchMcr(o.collateralType) == null)) return null;
   const mcrAt = o.mcrAt;
   const liq = (debt: number, coll: number, ts: number) =>
@@ -456,6 +465,14 @@ export function liquityLiqLevel(
     liquidation: e.kind === "liquidation",
     e,
   }));
+  if (shutAt != null) {
+    // The last point is the level at the shutdown; nothing is drawn after it.
+    const level = levelByDay(steps, {
+      now: shutAt,
+      at: ({ e }, t) => liq(e.debtAfter * accrualFactor(e.rate, e.fee, e.ts, t), e.collAfter, t),
+    });
+    return level && level.end === "today" ? { ...level, end: "shutdown" } : level;
+  }
   return levelByDay(steps, {
     now: o.now,
     at: ({ e }, t) => liq(e.debtAfter * accrualFactor(e.rate, e.fee, e.ts, t), e.collAfter, t),
@@ -535,6 +552,8 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
   const today = Math.floor(o.now / DAY_S);
   const last = replayed[replayed.length - 1].ev;
   const open = last.collAfter > DUST || last.debtAfter > DUST;
+  // Interest stops accruing at the branch's shutdown.
+  const accrueTo = (t: number) => (o.shutdownAt != null ? Math.min(t, o.shutdownAt) : t);
   const livePrice = o.live?.price != null && o.live.price > 0 ? o.live.price : null;
 
   // The collateral's recorded prices, by day (the last each day), the
@@ -560,13 +579,15 @@ export function liquityFlowTimeline(events: LiquityFlowEvent[], o: LiquityFlowOp
     const end = Math.min((d + 1) * DAY_S, o.now);
     while (ei + 1 < replayed.length && replayed[ei + 1].ev.ts <= end) ei++;
     const e = replayed[ei].ev;
-    debtObs.push([d, e.ts <= end ? accrualFactor(e.rate, e.fee, e.ts, end) : 1]);
+    debtObs.push([d, e.ts <= end ? accrualFactor(e.rate, e.fee, e.ts, accrueTo(end)) : 1]);
   }
 
   // Now: the live read where the page has one, else the last recorded
   // balances with the interest built since.
   const nowColl = open ? (o.live?.coll ?? last.collAfter) : 0;
-  const nowDebt = open ? (o.live?.debt ?? last.debtAfter * accrualFactor(last.rate, last.fee, last.ts, o.now)) : 0;
+  const nowDebt = open
+    ? (o.live?.debt ?? last.debtAfter * accrualFactor(last.rate, last.fee, last.ts, accrueTo(o.now)))
+    : 0;
   const pricedNow = livePrice ?? replayed[replayed.length - 1].price;
   const pending: NonNullable<FlowTimeline["live"]["pending"]> = [];
   if (open && o.live) {
@@ -730,8 +751,14 @@ function liquityPriceMarks(
     collateralType,
     now: o.now,
     live: o.live,
+    shutdownAt: o.shutdownAt,
     ...(fork ? { mcrAt: (ts: number) => forkMcrAt(fork, { timestamp: ts }) } : {}),
   });
+  // The how-to-read says where a level cut short by the shutdown ends.
+  const shutWords =
+    level?.end === "shutdown" && o.shutdownAt != null
+      ? ` It ends on ${formatDate(o.shutdownAt)}, when the branch shut down.`
+      : "";
   const mcrPct = getLiquidationThreshold(collateralType);
   const v1 = o.family === "v1";
   const firstDay = Math.floor(replayed[0].ev.ts / DAY_S);
@@ -741,7 +768,7 @@ function liquityPriceMarks(
   return {
     events: marks,
     ...(level && fork
-      ? { level: { ...level, ...forkLevelWords(fork, collateralType) }, help: forkLevelHelp(fork) }
+      ? { level: { ...level, ...forkLevelWords(fork, collateralType) }, help: forkLevelHelp(fork) + shutWords }
       : level
         ? {
             level: {
@@ -765,6 +792,9 @@ function liquityPriceMarks(
           }
         : {}),
     ...(v1 && level ? { help: LIQUITY_V1_LEVEL_HELP } : {}),
+    ...(!v1 && !fork && shutWords
+      ? { help: `on the same days; the red line is where the position liquidates.${shutWords}` }
+      : {}),
     ...(sparseBefore != null ? { sparseBefore } : {}),
   };
 }

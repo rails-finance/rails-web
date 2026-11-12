@@ -415,6 +415,7 @@ export default function AsymmetryTroveDetail({
     surplusClaimed: surplus?.claimed != null,
     fork: flowFork,
     pace: flowPace,
+    shutdownAt: shutdown?.at ?? null,
   });
 
   // The top row's price dropdown: the branch's own oracle
@@ -582,6 +583,8 @@ export default function AsymmetryTroveDetail({
                   name: "Asymmetry",
                   debtSymbol: DEBT_SYMBOL,
                   docsLinks: [...ASYMMETRY_DOCS.trove, ...ASYMMETRY_DOCS.redemption],
+
+                  shutdown,
                 };
                 return (
                   <LifetimeFlowsPanel
@@ -596,6 +599,7 @@ export default function AsymmetryTroveDetail({
                           unpriced={unpricedEvents(flows.events)}
                           lives={troveLives(flows.events)}
                           zombie={chain?.status === "zombie"}
+                          shutDown={shutdown != null}
                         />
                       </div>
                     }

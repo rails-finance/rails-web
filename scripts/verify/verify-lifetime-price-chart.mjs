@@ -103,7 +103,7 @@
 // The forks and Polaris (step 6, `level`, `checkLevelView`): Ebisu WBTC 3876
 // (liquidated) and weETH 1065 (closed), whose level steps by the two minimums'
 // ratio on 4 Jan 2026, Ebisu stcUSD 6774 (open on a shut-down branch: the card
-// states no "Liquidates at", ui-jobs 612) and Basedollar cbETH 6846 (open:
+// states no "Liquidates at" and the level ends on the shutdown's day, ui-jobs 612) and Basedollar cbETH 6846 (open:
 // today's level the card's "Liquidates at"), Asymmetry ysyBOLD 4577, scrvUSD 2145
 // and Basedollar wstETH 1150 (closed: the level ends that day), Polaris USDp
 // 2420 and GOLDp 18 (open: today's level the card's price × 115 % ÷ its ratio),
@@ -877,7 +877,12 @@ const PAGES = [
     level: {
       asset: "stcUSD",
       card: "liquidates-at",
-      help: ["115% Minimum Collateral Ratio (MCR), which no governance log has moved"],
+      // Shut down 20 Aug 2026 22:37 UTC (ui-jobs 612): the level ends that day.
+      shutdownDay: 20685,
+      help: [
+        "115% Minimum Collateral Ratio (MCR), which no governance log has moved",
+        "It ends on 20 Aug 2026, when the branch shut down.",
+      ],
     },
   },
   {
@@ -2376,6 +2381,12 @@ async function checkLevelView(page, tag, pg) {
   if (want.card === "liquidates-at" && shutDown) {
     const rows = await page.$$('[data-panel-row="liquidates-at"]');
     check(`${tag}: a shut-down branch's card states no "Liquidates at"`, rows.length === 0, `${rows.length} rows`);
+    // The level stops at the branch's shutdown: nothing is drawn after it.
+    check(
+      `${tag}: the level ends on the shutdown's day`,
+      Math.max(...days) === want.shutdownDay,
+      `last ${Math.max(...days)}, want ${want.shutdownDay}`,
+    );
   } else if (want.card === "liquidates-at") {
     const card = await page.$eval('[data-panel-row="liquidates-at"] dd', (d) => d.textContent ?? "").catch(() => "");
     const m = card.replace(/,/g, "").match(/\$(\d+(?:\.(\d+))?)(K?)/);

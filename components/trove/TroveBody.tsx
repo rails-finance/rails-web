@@ -72,6 +72,7 @@ export function useTroveFlows({
   open,
   price,
   liveState,
+  shutdownAt = null,
 }: {
   flowEvents: LiquityFlowEvent[];
   collSymbol: string;
@@ -82,6 +83,9 @@ export function useTroveFlows({
   open: boolean;
   price: number | undefined;
   liveState: TroveStateData | undefined;
+  /** Unix seconds the branch shut down (ui-jobs 612): interest and the
+   *  liquidation level stop there. */
+  shutdownAt?: number | null;
 }): { flowTimeline: FlowTimeline | null; flowFocus: FlowFocusValue } {
   const flowTimeline = useMemo(
     () =>
@@ -93,6 +97,7 @@ export function useTroveFlows({
             surplusClaimed,
             now,
             dailyColl: daily.obs,
+            shutdownAt,
             priceView: { collateralType: collSymbol },
             live: open
               ? {
@@ -109,7 +114,19 @@ export function useTroveFlows({
                 }
               : null,
           }),
-    [flowEvents, collSymbol, debtSymbol, surplusClaimed, now, open, price, liveState, daily.settled, daily.obs],
+    [
+      flowEvents,
+      collSymbol,
+      debtSymbol,
+      surplusClaimed,
+      now,
+      open,
+      price,
+      liveState,
+      daily.settled,
+      daily.obs,
+      shutdownAt,
+    ],
   );
   // The panel and the timeline are tied by the day: "Sync to chart",
   // each day's mark, and each card's sum as of its event, read from the same
