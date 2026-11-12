@@ -17,10 +17,10 @@
 // cross-check. No risk color on the figures — the numbers carry the meaning.
 //
 // ⇒ LIQUIDATABLE OUTRANKS IT. When health(user, true) reads below 0, anyone
-// may liquidate the position now, whatever the AMM has converted: the panel's
-// Liquidatable row says so in CRITICAL red (color-grammar.md: the line is the
-// protocol's, so the colour is a claim of fact), and a listing row, which has
-// no panel, says it in its pill.
+// may liquidate the position now, whatever the AMM has converted: the line
+// under the Health headline says so in CRITICAL red (color-grammar.md: the
+// line is the protocol's, so the colour is a claim of fact), and a listing
+// row, which has no health, says it in its pill.
 //
 // ⚠️ USD only where the borrowed token IS crvUSD (~$1): debt is already in
 // crvUSD, collateral through the AMM's own price_oracle. The handful of
@@ -236,8 +236,8 @@ export function useLlamalendCardSlots({
   const open = v.status === "open";
 
   // What the position is doing NOW, neutral unless anyone may liquidate it. A
-  // detail card names Liquidatable in its panel; a listing row has none, so its
-  // pill says it.
+  // detail card says it under its Health headline; a listing row has none, so
+  // its pill says it.
   const liquidatable = open && v.liquidatable === true && v.healthFull != null;
   const status: PositionCardStatus | null =
     v.status === "liquidated"

@@ -149,15 +149,20 @@ const MORPHO_RATIO = {
   held: true,
   help: ["the market oracle's price", "fixed when the market was created", "drawn dotted"],
 };
-/** f(x)'s view (step 6): the card's debt ratio, its "Liquidates from" and
- *  "Rebalances from" lines, today's levels its "Liquidates at" and
- *  "Rebalances at"; days between events dotted. */
+/** f(x)'s view (step 6): the card's debt ratio, its liquidation and
+ *  rebalance lines (in the tips of "Liquidates at" and "Rebalances at",
+ *  TO-DO-position-card 341; past the rebalance line the liquidation line is in
+ *  the "Rebalances at" tip), today's levels those two stats; days between
+ *  events dotted. */
 const FX_RATIO = {
   label: "Debt ratio",
   liquidates: "above",
   head: "debt-ratio",
-  lineRow: "liquidation-line",
-  warnRow: "rebalance-line",
+  lineRow: "liquidation-at",
+  lineTipRows: ["liquidation-at", "rebalance-at"],
+  linePattern: /(\d+(?:\.\d+)?)%,? (?:liquidation line|from which a keeper can liquidate)/,
+  warnRow: "rebalance-at",
+  warnPattern: /(\d+(?:\.\d+)?)% rebalance line/,
   warnVerb: "Rebalances",
   levelRow: "liquidation-at",
   warnLevelRow: "rebalance-at",
@@ -1440,31 +1445,50 @@ async function checkRatio(page, tag, pg) {
       end.block === "" && !end.none && pct(end.text) === pct(head),
       `chart ${end.text}, card ${head}`,
     );
-    const lineCard = r.lineFromHeadTip
-      ? await (async () => {
-          try {
-            await page.locator(`[data-card-head="${r.lineRow}"] [data-heading-tip]`).first().click({ timeout: 3000 });
-            const text = await page.locator('[role="tooltip"]').first().textContent({ timeout: 3000 });
-            await page.keyboard.press("Escape");
-            return text ?? "";
-          } catch {
-            return "";
-          }
-        })()
-      : await page.$eval(`[data-panel-row="${r.lineRow}"] dd`, (d) => d.textContent ?? "").catch(() => "");
+    // A stat's tip, from the first of `ids` the card draws.
+    const rowTip = async (ids) => {
+      for (const id of ids) {
+        const tip = page.locator(`[data-panel-row="${id}"] [data-heading-tip]`).first();
+        if ((await tip.count()) === 0) continue;
+        try {
+          await tip.click({ timeout: 3000 });
+          const text = await page.locator('[role="tooltip"]').first().textContent({ timeout: 3000 });
+          await page.keyboard.press("Escape");
+          return text ?? "";
+        } catch {
+          return "";
+        }
+      }
+      return "";
+    };
+    const lineCard = r.lineTipRows
+      ? await rowTip(r.lineTipRows)
+      : r.lineFromHeadTip
+        ? await (async () => {
+            try {
+              await page.locator(`[data-card-head="${r.lineRow}"] [data-heading-tip]`).first().click({ timeout: 3000 });
+              const text = await page.locator('[role="tooltip"]').first().textContent({ timeout: 3000 });
+              await page.keyboard.press("Escape");
+              return text ?? "";
+            } catch {
+              return "";
+            }
+          })()
+        : await page.$eval(`[data-panel-row="${r.lineRow}"] dd`, (d) => d.textContent ?? "").catch(() => "");
     const cardLine = r.linePattern ? Number(lineCard.match(r.linePattern)?.[1] ?? NaN) : pct(lineCard);
     check(
-      `${tag}: today's line is the card's ${r.lineRow.replace(/-/g, " ")}${r.lineFromHeadTip ? " tip" : ""}`,
+      `${tag}: today's line is the card's ${r.lineRow.replace(/-/g, " ")}${r.lineFromHeadTip || r.lineTipRows ? " tip" : ""}`,
       end.line != null && Math.abs(end.line * 100 - cardLine) < 0.05,
       `chart ${end.line}, card ${lineCard}`,
     );
     if (r.warnRow) {
-      const warnCard = await page
-        .$eval(`[data-panel-row="${r.warnRow}"] dd`, (d) => d.textContent ?? "")
-        .catch(() => "");
+      const warnCard = r.warnPattern
+        ? await rowTip([r.warnRow])
+        : await page.$eval(`[data-panel-row="${r.warnRow}"] dd`, (d) => d.textContent ?? "").catch(() => "");
+      const warnLine = r.warnPattern ? Number(warnCard.match(r.warnPattern)?.[1] ?? NaN) : pct(warnCard);
       check(
-        `${tag}: today's second line is the card's ${r.warnRow.replace(/-/g, " ")}`,
-        end.warn != null && Math.abs(end.warn * 100 - pct(warnCard)) < 0.05,
+        `${tag}: today's second line is the card's ${r.warnRow.replace(/-/g, " ")}${r.warnPattern ? " tip" : ""}`,
+        end.warn != null && Math.abs(end.warn * 100 - warnLine) < 0.05,
         `chart ${end.warn}, card ${warnCard}`,
       );
     }
