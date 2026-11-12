@@ -27,7 +27,8 @@
 // square holds the place.
 //
 // The menu is a portal positioned against the control, so it stands over the
-// page wherever the control sits (H2 below md, the column's corner from md;
+// page wherever the control sits; from md it is placed in page coordinates and
+// scrolls with the page as one piece with the control (ui-jobs 602) (H2 below md, the column's corner from md;
 // components/nav/rail-shell.tsx). Escape, a press outside and a lookup close
 // it, and focus returns to the control; the arrow keys, Home and End move
 // through its items.
@@ -278,6 +279,7 @@ export function ProfileMenu() {
   const [place, setPlace] = useState<{
     top: number;
     right: number;
+    room: number;
     phone: boolean;
   } | null>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -310,13 +312,19 @@ export function ProfileMenu() {
   useEffect(() => setOpen(false), [pathname]);
 
   // Placed under the control: from md its right edge on the control's, below
-  // md across the viewport.
+  // md across the viewport. The dropdown is placed in page coordinates
+  // (`position: absolute` against the document), so the browser scrolls it
+  // with the page in the same frame as the control; a fixed box re-placed
+  // from a scroll listener trails the page by a frame (ui-jobs 602). `room`
+  // is the window's height below the control at opening, the dropdown's
+  // ceiling.
   const measure = useCallback(() => {
     const r = trigger.current?.getBoundingClientRect();
     if (!r) return;
     setPlace({
-      top: r.bottom + 8,
-      right: window.innerWidth - r.right,
+      top: r.bottom + 8 + window.scrollY,
+      right: document.documentElement.clientWidth - r.right,
+      room: window.innerHeight - (r.bottom + 8) - DROP_MARGIN,
       phone: window.innerWidth < 768,
     });
   }, []);
@@ -324,11 +332,7 @@ export function ProfileMenu() {
     if (!open) return;
     measure();
     window.addEventListener("resize", measure);
-    window.addEventListener("scroll", measure, { passive: true });
-    return () => {
-      window.removeEventListener("resize", measure);
-      window.removeEventListener("scroll", measure);
-    };
+    return () => window.removeEventListener("resize", measure);
   }, [open, measure]);
 
   // Below md the sheet holds the page still under it, as the wallet panel
@@ -457,18 +461,14 @@ export function ProfileMenu() {
               aria-label={MENU_NAME}
               data-profile-menu=""
               data-profile-menu-variant={place.phone ? "sheet" : "drop"}
-              className={`fixed z-[var(--z-popover)] overflow-y-auto overscroll-contain border border-rb-200 bg-background px-3 pb-4 pt-3 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
+              className={`${place.phone ? "fixed" : "absolute"} z-[var(--z-popover)] overflow-y-auto overscroll-contain border border-rb-200 bg-background px-3 pb-4 pt-3 shadow-xl dark:border-rb-800 dark:bg-rb-900 ${
                 place.phone
                   ? "profile-sheet inset-x-0 bottom-0 max-h-[85dvh] rounded-t-2xl border-x-0 border-b-0 pb-[max(1rem,env(safe-area-inset-bottom))]"
                   : "profile-drop w-80 rounded-xl"
               }`}
               // The dropdown stops above the window's foot and scrolls within
               // itself (ui-jobs 586).
-              style={
-                place.phone
-                  ? undefined
-                  : { top: place.top, right: place.right, maxHeight: `calc(100dvh - ${place.top + DROP_MARGIN}px)` }
-              }
+              style={place.phone ? undefined : { top: place.top, right: place.right, maxHeight: place.room }}
             >
               <ThemeSwitch />
               {/* With nothing saved, the way in, after the theme (Miles, 11
