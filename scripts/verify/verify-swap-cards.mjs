@@ -351,7 +351,7 @@ for (const fx of FIXTURES) {
       `${fx.label}: a "${fx.kind}" card's swap mark is on the ${own.map((c) => c.mark ?? "none").join(", ")}, expected ${want}`,
     );
   // rails-ops TO-DO-ui-jobs §19: a node swap draws a bare glyph in its axis hues, with both legs,
-  // amounts and all, beside it (Timeline values are on by default).
+  // amounts and all, beside it.
   if (want === "node" && own.length) {
     const wantAxis = fx.axis ?? "supply";
     if (own.every((c) => c.axis === wantAxis)) ok(`${fx.label}: each "${fx.kind}" glyph reads the ${wantAxis} axis`);

@@ -226,6 +226,7 @@ function ThemeSwitch() {
   );
 }
 
+const PROV_ABOUT_PATH = "/about/provenance";
 const ITEMS = '[role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]';
 const PROV_HELP =
   "Underlines each figure that has a receipt: click one to see the contract call, the block and the maths behind it. Switched on here, it stays on across the pages that support it.";
@@ -237,7 +238,7 @@ const PROV_HELP =
  *  The row is one switch; its "?" opens the house tooltip (RevealTip) and is
  *  a sibling of the switch, standing over the switch's stretched hit area
  *  (`after:inset-0`), so a press on it explains and never toggles (ui-jobs 602). */
-function ProvInspectorSwitch() {
+function ProvInspectorSwitch({ onDone }: { onDone: () => void }) {
   const on = useProvPreference();
   return (
     <div
@@ -246,32 +247,52 @@ function ProvInspectorSwitch() {
       data-anatomy="H20.1"
     >
       <Crosshair className="size-5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-      <button
-        type="button"
-        role="menuitemcheckbox"
-        aria-checked={on}
-        onClick={() => setProvPreference(!on)}
-        className="min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:rounded-lg after:content-['']"
-        data-profile-menu-prov={on ? "on" : "off"}
-      >
-        Provenance inspector
-      </button>
-      <RevealTip
-        // `!static`: the bubble stands on the row (the menu clips a bubble
-        // anchored at the "?"), opening up from the row's left edge.
-        className="-ml-1.5 !static"
-        wrap
-        tip={<span className="block w-64 font-normal leading-snug">{PROV_HELP}</span>}
-      >
-        <button
-          type="button"
-          aria-label="About the provenance inspector"
-          className="relative z-10 inline-flex rounded-full p-0.5 text-rb-400 hover:text-foreground focus-visible:outline-2 focus-visible:outline-blue-500"
-          data-profile-menu-prov-help=""
+      {/* The label over its subtitle line, as the Tools menu's inspector row
+          draws a title over a text-xs line (ProvInspectorToggle). Neither span
+          is positioned, so the switch's hit area and the tip's bubble still
+          stand on the row. */}
+      <span className="flex min-w-0 flex-col py-1.5">
+        <span className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={on}
+            onClick={() => setProvPreference(!on)}
+            className="min-w-0 truncate text-left outline-none after:absolute after:inset-0 after:rounded-lg after:content-['']"
+            data-profile-menu-prov={on ? "on" : "off"}
+          >
+            Provenance inspector
+          </button>
+          <RevealTip
+            // `!static`: the bubble stands on the row (the menu clips a bubble
+            // anchored at the "?"), opening up from the row's left edge.
+            className="-ml-1.5 !static"
+            wrap
+            tip={<span className="block w-64 font-normal leading-snug">{PROV_HELP}</span>}
+          >
+            <button
+              type="button"
+              aria-label="About the provenance inspector"
+              className="relative z-10 inline-flex rounded-full p-0.5 text-rb-400 hover:text-foreground focus-visible:outline-2 focus-visible:outline-blue-500"
+              data-profile-menu-prov-help=""
+            >
+              <CircleHelp className="size-3.5" aria-hidden="true" />
+            </button>
+          </RevealTip>
+        </span>
+        {/* The page half of the "?" (ui-jobs 603): a link to /about/provenance,
+            standing over the switch's stretched hit area as the "?" does, so a
+            press on it navigates and never toggles. */}
+        <Link
+          href={PROV_ABOUT_PATH}
+          role="menuitem"
+          onClick={onDone}
+          className="relative z-10 self-start whitespace-nowrap rounded-sm text-xs leading-5 text-rb-500 outline-none hover:text-blue-600 focus-visible:text-blue-600 focus-visible:ring-[1.5px] focus-visible:ring-blue-500 dark:hover:text-[var(--text-link)] dark:focus-visible:text-[var(--text-link)]"
+          data-profile-menu-prov-about=""
         >
-          <CircleHelp className="size-3.5" aria-hidden="true" />
-        </button>
-      </RevealTip>
+          How it works
+        </Link>
+      </span>
       <span
         className={`pointer-events-none relative ml-auto inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${
           on ? "bg-teal-500" : "bg-rb-300 dark:bg-rb-700"
@@ -558,7 +579,7 @@ export function ProfileMenu() {
                   Advanced
                 </p>
                 <div className="mt-1">
-                  <ProvInspectorSwitch />
+                  <ProvInspectorSwitch onDone={done} />
                 </div>
               </div>
             </div>

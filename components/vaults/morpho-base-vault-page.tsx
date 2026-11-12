@@ -153,6 +153,7 @@ export function MorphoBaseVaultPage({
   config,
   holders,
   stewardRecord,
+  badDebt,
 }: {
   /** "What protects it" and "The protocol underneath" (V9, V10), streamed by the route. */
   protects: ReactNode;
@@ -171,6 +172,8 @@ export function MorphoBaseVaultPage({
   holders: VaultHolders | null;
   /** The vaults this steward runs now, from the /vaults directory; null where it did not answer. */
   stewardRecord: StewardRecordRead;
+  /** The bad-debt episodes in the steward's vaults (V14.1), streamed by the route. */
+  badDebt?: ReactNode;
 }) {
   const registry = useReceiptRegistry();
   const { vault, legs, chainId } = data;
@@ -639,7 +642,7 @@ export function MorphoBaseVaultPage({
         </Tile>
 
         <Tile id="steward-record" wide>
-          <VaultStewardRecord record={stewardRecord} role={steward.role} />
+          <VaultStewardRecord record={stewardRecord} role={steward.role} badDebt={badDebt} />
         </Tile>
 
         <Tile id="configuration" wide last>

@@ -641,7 +641,15 @@ export function timelineFilterPills(tl: TimelineEventsState): TimelineFilterPill
     });
   const version = narrowing(tl.versionOptions, tl.visibleVersionKeys, (o) => o.label, "versions");
   if (version)
-    pills.push({ axis: "version", ...version, clearLabel: "Show every version", clear: tl.resetHiddenVersions });
+    // The version pill names the version and drops the verb ("V2 ×"; Miles, 12 Nov 2026, ui-jobs 375);
+    // the tooltip keeps it, and hiding every version still says so.
+    pills.push({
+      axis: "version",
+      ...version,
+      verb: version.every ? version.verb : null,
+      clearLabel: "Show every version",
+      clear: tl.resetHiddenVersions,
+    });
   const counterparty = narrowing(tl.counterpartyOptions, tl.visibleCounterpartyKeys, (o) => o.label, "addresses");
   if (counterparty)
     pills.push({

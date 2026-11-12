@@ -36,6 +36,7 @@ export function GET() {
     `- [About Rails](${SITE_URL}/about): what Rails is, who it is for, and the explorers`,
     `- [Technical architecture](${SITE_URL}/about/architecture): how the data gets from the chain to the page`,
     `- [How the figures are counted](${SITE_URL}/about/figures): the positions covered and the value they hold, explorer by explorer, with the block and prices behind each`,
+    `- [Receipts and the provenance inspector](${SITE_URL}/about/provenance): what an underlined figure is, what its receipt holds, and how to check the figure against the chain`,
     `- [Blog](${SITE_URL}/blog): posts from the Rails team, each with its date`,
     "",
   ].join("\n");
