@@ -71,6 +71,37 @@ export const AAVE_FAMILY_TERMS: Record<AaveFamilyId, AaveFamilyTerms> = {
   },
 };
 
+/** Aave V4's words (ui-jobs 627; rails-ops reference/official-docs/aave-v4.md,
+ *  Terms): aave.com/docs/aave-v4 says "supply APY" and "borrow APY",
+ *  "utilization", "optimal usage ratio", "Collateral Factor", "supply caps,
+ *  borrow caps", "Spoke", "liquidation price", "Target Health Factor",
+ *  "max-bonus threshold", "Dynamic Config". V4 has no E-Mode, so it keeps a
+ *  record of its own beside the Aave V3 Pools'. The rates are the hub's stored
+ *  drawn rate compounded each second (lib/aave-family/apy.ts): the hub accrues
+ *  its drawn index linearly between updates and carries it forward at each
+ *  one, so the year's growth is the compounded rate. */
+export const AAVE_V4_TERMS = {
+  rateForm: "apy",
+  supplyRate: "Supply APY",
+  borrowRate: "Borrow APY",
+  supplyRateText: "supply APY",
+  borrowRateText: "borrow APY",
+  rateUnit: "APY",
+  utilization: "Utilization",
+  utilizationText: "utilization",
+  kink: "Optimal usage ratio",
+  kinkText: "optimal usage ratio",
+  collateralFactor: "Collateral factor",
+  collateralFactorText: "collateral factor",
+  supplyCap: "Supply cap",
+  borrowCap: "Borrow cap",
+  spokes: "Spokes",
+  liquidationPrice: "Liquidation price",
+  targetHealthFactor: "Target health factor",
+  maxBonusThreshold: "Max-bonus threshold",
+  dynamicConfig: "Dynamic Config",
+} as const satisfies Omit<AaveFamilyTerms, "emode" | "emodeLong"> & Record<string, string>;
+
 /** A family's terms by its id, a market key or a page's market word (every
  *  Aave V3 Pool reads Aave's). */
 export function aaveFamilyTerms(

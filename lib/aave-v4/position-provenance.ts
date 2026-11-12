@@ -34,6 +34,7 @@
 // figure says "Aave's oracle", never "Chainlink", and a figure priced off
 // chain says it came from a market feed.
 
+import { APY_FORMULA, COMPOUNDED, rateFraction } from "@/lib/aave-v4/rates";
 import type { Provenance, ProvInput, ProvScaling, ProvVerify } from "@/components/shared/provenance";
 import type { AaveV4PriceSource } from "@/lib/shared/types/protocols/aave-v4";
 import type { OriginEnvelope } from "@/lib/shared/types/event-shape";
@@ -381,7 +382,16 @@ export function deltaProv(detail?: EventProvDetail): Provenance {
  *  events show the true held-debt rate too, not just the moved asset's. */
 export function heldDebtRateProv(detail?: EventProvDetail): Provenance {
   const asset = detail?.asset ? ` (${detail.asset})` : "";
-  const inputs: ProvInput[] = [];
+  const inputs: ProvInput[] = [
+    {
+      label: "drawn rate",
+      ...(apr != null ? { value: rateFraction(apr) } : {}),
+      kind: "chain",
+      pclass: "emitted",
+      note: "the hub's UpdateAsset drawnRate ÷ 10^27, a year",
+    },
+    { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+  ];
   if (detail?.asset) inputs.push({ label: "reserve", value: detail.asset, kind: "chain" });
   if (detail?.blockNumber != null)
     inputs.push({
@@ -393,9 +403,10 @@ export function heldDebtRateProv(detail?: EventProvDetail): Provenance {
   return {
     kind: "chain",
     pclass: "emitted",
-    summary: `Borrow rate on the held debt${asset} — the variable rate the hub set for this asset the last time it accrued interest at or before this event's block. The hub writes the rate as a ray, so dividing by 10^27 gives the rate a year, where 10^27 is 100%.`,
+    summary: `Borrow APY on the held debt${asset} — the variable rate the hub set for this asset the last time it accrued interest at or before this event's block, ${COMPOUNDED}. The hub writes the rate as a ray, so dividing by 10^27 gives the rate a year, where 10^27 is 100%.`,
     contract: { name: "Aave V4 hub" },
-    via: `${INDEX_VIA} · hub UpdateAsset log · drawnRate · ÷10^27`,
+    via: `${INDEX_VIA} · hub UpdateAsset log · drawnRate · ÷10^27, compounded`,
+    formula: APY_FORMULA,
     inputs,
   };
 }
@@ -673,17 +684,24 @@ export const NONCOLL_USD_PROV = usdProv("Supplied, not collateral", {
 });
 
 /** The latest borrow rate, accumulated over this spoke's indexed event stream. */
-export const BORROW_RATE_PROV = accumProv("The latest borrow rate recorded on this spoke", {
-  formula: "most recent on-chain borrow index → APR",
-});
+export const BORROW_RATE_PROV: Provenance = {
+  kind: "derived",
+  summary: `The latest borrow APY recorded on this spoke — the hub's drawn rate at the position's most recent rate event, ${COMPOUNDED}.`,
+  via: "added up across the position's events on this spoke · the latest event's drawn rate, compounded",
+  formula: `most recent on-chain drawn rate → ${APY_FORMULA}`,
+  inputs: [
+    { label: "drawn rate", kind: "chain", pclass: "emitted", note: "the hub's UpdateAsset drawnRate ÷ 10^27, a year" },
+    { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+  ],
+};
 
-/** What the debt costs in a year at the latest borrow rate. */
+/** What the debt costs in a year at the latest borrow APY. */
 export const YEARLY_COST_PROV: Provenance = {
   kind: "derived",
   summary:
-    "What the debt costs in a year at the latest borrow rate — the debt as it stands now times that rate. The rate moves with the hub, so this is today's pace.",
-  via: "debt balance × latest borrow rate",
-  formula: "debt × borrowRate",
+    "What the debt costs in a year at the latest borrow APY — the debt as it stands now times that APY. The rate moves with the hub, so this is today's pace.",
+  via: "debt balance × latest borrow APY",
+  formula: "debt × borrow APY",
 };
 
 const PEAK_PRICE_INPUT: ProvInput = {

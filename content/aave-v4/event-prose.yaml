@@ -65,11 +65,11 @@ placeholders:
   rate_then:
     rounding: ratio_frac
     means: |-
-      The asset's borrow rate the previous event recorded, a year.
+      The asset's borrow APY the previous event recorded.
   rate_now:
     rounding: ratio_frac
     means: |-
-      The asset's borrow rate at this event, a year.
+      The asset's borrow APY at this event.
   life_interest:
     rounding: spoke_amount
     means: |-
@@ -182,11 +182,11 @@ placeholders:
   rate:
     rounding: pct_plain
     means: |-
-      The latest borrow rate recorded on the spoke.
+      The latest borrow APY recorded on the spoke.
   rate_symbol:
     rounding: text
     means: |-
-      The asset the latest borrow rate is for.
+      The asset the latest borrow APY is for.
   yearly:
     rounding: spoke_amount
     means: |-
@@ -415,13 +415,13 @@ position_words:
   capacity: |-
     About {capacity} more could be borrowed before the health factor reaches 1.
   rate: |-
-    The latest borrow rate recorded here is {rate}, about {yearly} a year on the debt as it stands.
+    The latest borrow APY recorded here is {rate}, about {yearly} a year on the debt as it stands.
   rate_plain: |-
-    The latest borrow rate recorded here is {rate}.
+    The latest borrow APY recorded here is {rate}.
   rate_sym: |-
-    The latest {rate_symbol} borrow rate recorded here is {rate}.
+    The latest {rate_symbol} borrow APY recorded here is {rate}.
   rate_sym_yearly: |-
-    The latest {rate_symbol} borrow rate recorded here is {rate}, about {yearly} a year on the debt.
+    The latest {rate_symbol} borrow APY recorded here is {rate}, about {yearly} a year on the debt.
   peaks_both: |-
     At their highest, the supply reached {peak_supply} and the debt {peak_debt}.
   peaks_supply: |-
@@ -535,9 +535,9 @@ shared_sentences:
       Nothing is supplied or owed on this spoke now: the position is closed.
   rate.moved:
     when: |-
-      the asset's borrow rate moved by half or more since the previous event
+      the asset's borrow APY moved by half or more since the previous event
     text: |-
-      The {symbol} borrow rate moved from {rate_then} at the previous event to {rate_now}.
+      The {symbol} borrow APY moved from {rate_then} at the previous event to {rate_now}.
 
 templates:
   - id: aave4.supply
@@ -1614,7 +1614,7 @@ L5:
       - bold: |-
           Liquidity hub
         text: |-
-          the pool that holds supplied assets, backs borrowing and sets each asset's drawn rate.
+          the pool that holds supplied assets, backs borrowing and sets each asset's borrow rate.
       - bold: |-
           Spoke
         text: |-

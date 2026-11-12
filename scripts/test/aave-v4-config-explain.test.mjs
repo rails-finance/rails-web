@@ -156,7 +156,7 @@ test("a first reserve-config row states its values, then what collateral risk do
     "Main lends USDC: borrowing is on.",
     "USDC's collateral risk on Main is 0%.",
     "A liquidator may take seized USDC as USDC supplied on Main, earning interest, in place of the tokens.",
-    "Collateral risk sets the premium a borrower pays on top of the drawn rate when USDC backs the loan.",
+    "Collateral risk sets the premium a borrower pays on top of the borrow rate when USDC backs the loan.",
   ]);
 });
 

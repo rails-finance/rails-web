@@ -17,6 +17,7 @@
 
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { PricedSum, V4Price, V4ReserveFigures } from "@/lib/aave-v4/markets";
+import { APY_FORMULA, COMPOUNDED, rateFraction } from "@/lib/aave-v4/rates";
 
 const STORED_ETH = "GET /api/aave-v4/hubs";
 const STORED_BASE = "GET /api/aave-v4-base/reserves";
@@ -295,18 +296,30 @@ export function storedRatioProv(what: "utilisation" | "credit used", scope: stri
   };
 }
 
-/** A stored hub rate: the drawn rate, the supply rate, the liquidity fee. */
+/** A stored hub rate: the borrow APY (from the drawn rate), the supply APY,
+ *  the liquidity fee. `apr` is the stored rate a year the APY derives from. */
 export function storedRateProv(
-  what: "drawn rate" | "supply rate" | "liquidity fee",
+  what: "borrow APY" | "supply APY" | "liquidity fee",
   scope: string,
   c: StoredCoords,
 ): Provenance {
-  if (what === "drawn rate")
+  if (what === "borrow APY")
     return {
       kind: "chain",
       pclass: lineClass(c),
-      summary: `${scope}, drawn rate. The rate the hub set for the asset when it last accrued interest, the same for every spoke drawing it, as an APR. Borrowers pay it plus a premium set by their collateral's risk.`,
-      via: `${storedLane(c)} · ${onVisit(c) ? "hub getAssetDrawnRate(assetId)" : "hub UpdateAsset log · drawnRate"} ÷ 10^27`,
+      summary: `${scope}, borrow APY. The drawn rate the hub set for the asset when it last accrued interest, the same for every spoke drawing it, ${COMPOUNDED}. Borrowers pay it plus a premium set by their collateral's risk.`,
+      via: `${storedLane(c)} · ${onVisit(c) ? "hub getAssetDrawnRate(assetId)" : "hub UpdateAsset log · drawnRate"} ÷ 10^27, compounded`,
+      formula: APY_FORMULA,
+      inputs: [
+        {
+          label: "drawn rate",
+          ...(apr != null ? { value: rateFraction(apr) } : {}),
+          kind: "chain",
+          pclass: lineClass(c),
+          note: "the hub's drawnRate ÷ 10^27, a year",
+        },
+        { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+      ],
     };
   if (what === "liquidity fee")
     return {
@@ -319,9 +332,22 @@ export function storedRateProv(
     kind: "chain-derived",
     pclass: lineClass(c),
     source: { block: c.block ?? undefined },
-    summary: `${scope}, supply rate. The drawn rate × borrowed ÷ supplied × (1 − liquidity fee), as an APR. Borrowed carries the premium, so the rate includes what borrowers pay above the drawn rate. ${ESTIMATE}`,
-    via: `${storedLane(c)} · drawnRate × (Σ owed ÷ Σ added) × (1 − liquidityFee)`,
-    formula: "drawn rate × utilisation × (1 − liquidity fee)",
+    summary: `${scope}, supply APY. The drawn rate × borrowed ÷ supplied × (1 − liquidity fee), ${COMPOUNDED}. Borrowed carries the premium, so the rate includes what borrowers pay above the drawn rate. ${ESTIMATE}`,
+    via: `${storedLane(c)} · drawnRate × (Σ owed ÷ Σ added) × (1 − liquidityFee), compounded`,
+    formula: `${APY_FORMULA}, rate = drawn rate × utilization × (1 − liquidity fee)`,
+    ...(apr != null
+      ? {
+          inputs: [
+            {
+              label: "rate",
+              value: rateFraction(apr),
+              kind: "chain-derived" as const,
+              pclass: lineClass(c),
+              note: "drawn rate × utilization × (1 − liquidity fee), a year",
+            },
+          ],
+        }
+      : {}),
   };
 }
 
@@ -613,42 +639,53 @@ export function utilisationProv(f: V4ReserveFigures, o: { symbol: string; hub: s
   };
 }
 
-/** The drawn rate: what borrowers pay before the premium. */
+/** The borrow APY: the hub's drawn rate compounded, what borrowers pay
+ *  before the premium. */
 export function drawnRateProv(f: V4ReserveFigures, o: { symbol: string; hub: string }): Provenance {
   return {
     kind: "chain",
     pclass: "state",
     source: { block: f.block },
-    summary: `${o.symbol} borrow rate on the ${o.hub} hub. The drawn rate${atHead(f)}, as an APR. Each borrower pays it plus a premium set by the collateral risk of what it posts.`,
+    summary: `${o.symbol} borrow APY on the ${o.hub} hub. The hub's drawn rate${atHead(f)}, ${COMPOUNDED}. Each borrower pays it plus a premium set by the collateral risk of what it posts.`,
     contract: hubContract(f, o.hub),
-    via: `${headLane(f)} · hub getAssetDrawnRate(assetId) ÷ 10^27`,
-    scaling: f.raw.hub.drawnRateRay
-      ? {
-          raw: f.raw.hub.drawnRateRay,
-          from: "call",
-          places: 27,
-          why: "the hub writes the rate as a ray, 10^27 for 100% a year",
-          unit: "",
-        }
-      : undefined,
+    via: `${headLane(f)} · hub getAssetDrawnRate(assetId) ÷ 10^27, compounded`,
+    formula: APY_FORMULA,
+    inputs: [
+      {
+        label: "drawn rate",
+        ...(f.drawnApr != null ? { value: rateFraction(f.drawnApr) } : {}),
+        kind: "chain",
+        pclass: "state",
+        note: f.raw.hub.drawnRateRay
+          ? `getAssetDrawnRate ${f.raw.hub.drawnRateRay} ÷ 10^27, a year`
+          : "getAssetDrawnRate ÷ 10^27, a year",
+      },
+      { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+    ],
   };
 }
 
-/** The supply rate, the premium included. */
+/** The supply APY, the premium included. */
 export function supplyRateProv(f: V4ReserveFigures, o: { symbol: string; hub: string }): Provenance {
   const pct = (x: number | null) => (x == null ? "unknown" : `${(x * 100).toFixed(2)}%`);
   return {
     kind: "chain-derived",
     pclass: "state",
     source: { block: f.block },
-    summary: `${o.symbol} supply rate on the ${o.hub} hub. As an APR, the drawn rate × utilisation × (1 + premium ÷ drawn) × (1 − liquidity fee)${atHead(f)}. Suppliers earn the premium borrowers pay as well as the drawn rate, less the hub's fee.`,
+    summary: `${o.symbol} supply APY on the ${o.hub} hub. The drawn rate × utilization × (1 + premium ÷ drawn) × (1 − liquidity fee)${atHead(f)}, a rate a year, ${COMPOUNDED}. Suppliers earn the premium borrowers pay as well as the drawn rate, less the hub's fee.`,
     contract: hubContract(f, o.hub),
-    via: `${headLane(f)} · getAssetDrawnRate × usage × (1 + premium ÷ drawn, from getAssetOwed) × (1 − getAssetConfig.liquidityFee)`,
-    formula: "drawn rate × utilisation × (1 + premium ÷ drawn) × (1 − liquidity fee)",
+    via: `${headLane(f)} · getAssetDrawnRate × usage × (1 + premium ÷ drawn, from getAssetOwed) × (1 − getAssetConfig.liquidityFee), compounded`,
+    formula: `${APY_FORMULA}, rate = drawn rate × utilization × (1 + premium ÷ drawn) × (1 − liquidity fee)`,
     inputs: [
-      { label: "drawn rate", value: pct(f.drawnApr), kind: "chain", pclass: "state", note: "hub getAssetDrawnRate" },
       {
-        label: "utilisation",
+        label: "drawn rate",
+        ...(f.drawnApr != null ? { value: rateFraction(f.drawnApr) } : {}),
+        kind: "chain",
+        pclass: "state",
+        note: "hub getAssetDrawnRate ÷ 10^27, a year",
+      },
+      {
+        label: "utilization",
         value: pct(f.utilisation),
         kind: "chain-derived",
         pclass: "state",
@@ -734,10 +771,10 @@ export function curveProv(f: V4ReserveFigures, o: { symbol: string; hub: string 
     kind: "chain-derived",
     pclass: "state",
     source: { block: f.block },
-    summary: `${o.symbol} rate curve on the ${o.hub} hub. The drawn rate the hub's interest rate strategy sets at each utilisation, from its getInterestRateData${atHead(f)}. The supply line multiplies by utilisation, by 1 + premium ÷ drawn and by 1 − the liquidity fee.`,
+    summary: `${o.symbol} rate curve on the ${o.hub} hub. The drawn rate the hub's interest rate strategy sets at each utilization, from its getInterestRateData${atHead(f)}, drawn as APY: each point ${COMPOUNDED}. The supply line multiplies the rate by utilization, by 1 + premium ÷ drawn and by 1 − the liquidity fee before compounding.`,
     contract: f.strategy ? { name: `${o.hub} rate strategy`, address: f.strategy } : undefined,
     via: `${headLane(f)} · strategy getInterestRateData(assetId), basis points`,
-    formula: "base + growth₁ × U ÷ optimal, then + growth₂ × (U − optimal) ÷ (1 − optimal)",
+    formula: `rate = base + growth₁ × U ÷ optimal, then + growth₂ × (U − optimal) ÷ (1 − optimal); APY = ${APY_FORMULA}`,
     inputs,
   };
 }
@@ -759,14 +796,19 @@ export function liquidationConfigProv(f: V4ReserveFigures, spoke: string): Prove
 export function historyRateProv(
   symbol: string,
   hub: string,
-  p: { date: string; closeBlock: number; update: { block: number } },
+  p: { date: string; closeBlock: number; update: { block: number }; drawnApr: number },
 ): Provenance {
   return {
     kind: "chain",
     pclass: "indexed",
     source: { block: p.update.block },
-    summary: `${symbol} drawn rate on the ${hub} hub, ${p.date}. The rate of the hub's last UpdateAsset at or before block ${n(p.closeBlock)}, the day's close (UTC), as an APR.`,
-    via: `${HISTORY} · aave_v4_reserve_rates · UpdateAsset.drawnRate ÷ 10^27`,
+    summary: `${symbol} borrow APY on the ${hub} hub, ${p.date}. The drawn rate of the hub's last UpdateAsset at or before block ${n(p.closeBlock)}, the day's close (UTC), ${COMPOUNDED}.`,
+    via: `${HISTORY} · aave_v4_reserve_rates · UpdateAsset.drawnRate ÷ 10^27, compounded`,
+    formula: APY_FORMULA,
+    inputs: [
+      { label: "drawn rate", value: rateFraction(p.drawnApr), kind: "chain", pclass: "indexed", note: "a year" },
+      { label: "seconds a year", value: "31,536,000", kind: "chain-derived", note: "365 days" },
+    ],
   };
 }
 

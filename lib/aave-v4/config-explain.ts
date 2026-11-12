@@ -131,7 +131,7 @@ const WORDS = {
     `A liquidator may take seized ${n.symbol} as ${n.symbol} supplied on ${n.spoke}, earning interest, in place of the tokens.`,
   sharesOffWhat: (n: N) => `A liquidator takes seized ${n.symbol} as tokens only.`,
   riskWhat: (n: N) =>
-    `Collateral risk sets the premium a borrower pays on top of the drawn rate when ${n.symbol} backs the loan.`,
+    `Collateral risk sets the premium a borrower pays on top of the borrow rate when ${n.symbol} backs the loan.`,
   riskUp: (n: N) => `Borrowers who post ${n.symbol} as collateral on ${n.spoke} now pay a higher premium.`,
   riskDown: (n: N) => `Borrowers who post ${n.symbol} as collateral on ${n.spoke} now pay a lower premium.`,
   reserveLends: (n: N) => `${n.spoke} lends ${n.symbol}: borrowing is on.`,

@@ -73,6 +73,7 @@ import { PARTIAL_LABEL_SUFFIX, partialSumProv } from "@/lib/aave-v4/unpriced";
 import { CARD_VOCAB, ratioLabel } from "@/lib/shared/card-vocab";
 import { useAaveV4Deployment } from "@/lib/aave-v4/deployment";
 import { PanelFigure } from "@/components/shared/position-card-panel";
+import { v4Apy } from "@/lib/aave-v4/rates";
 
 export type { AaveSpokeCardInfo };
 
@@ -572,14 +573,14 @@ export function useAaveV4SpokeCardSlots({
     !supplyOnly && rate !== null
       ? {
           id: "borrow-rate",
-          label: ratePrefix ? `${ratePrefix}borrow rate` : "Borrow rate",
+          label: ratePrefix ? `${ratePrefix}borrow APY` : "Borrow APY",
           // The position's risk premium stands in the tip (TO-DO-position-card 341).
-          tip: `The latest borrow rate recorded on this spoke for the borrowed asset, from its most recent rate event.${
+          tip: `The latest borrow APY recorded on this spoke for the borrowed asset, from its most recent rate event: the hub's borrow rate compounded over a year.${
             riskPremium && riskPremium > 0
               ? ` Aave V4 prices risk per position: the collateral held here carries a risk premium of ${(riskPremium * 100).toFixed(2)}% on top of the hub's base borrow rate.`
               : ""
           }`,
-          value: <Prov info={BORROW_RATE_PROV}>{rate.toFixed(2)}%</Prov>,
+          value: <Prov info={BORROW_RATE_PROV}>{(v4Apy(rate / 100) * 100).toFixed(2)}%</Prov>,
         }
       : null;
   const yearly = yearlyDebtCost(spoke);
@@ -588,7 +589,7 @@ export function useAaveV4SpokeCardSlots({
       ? {
           id: "yearly-cost",
           label: "Costs per year",
-          tip: "What the debt costs in a year at the latest borrow rate, in the borrowed token, if the rate and the debt stay where they are.",
+          tip: "What the debt costs in a year at the latest borrow APY, in the borrowed token, if the rate and the debt stay where they are.",
           value: (
             <TokenFigure symbol={yearly.symbol}>
               <span>

@@ -10,6 +10,7 @@
 // the figures (the collateral factor, the health factor, the risk premium,
 // the spoke) are the card's "?" (`L5.position` in the same file).
 
+import { v4Apy } from "@/lib/aave-v4/rates";
 import type { ReactNode } from "react";
 import {
   type AaveSpokeCardInfo,
@@ -260,7 +261,7 @@ function openBullets(spoke: AaveSpokeCardInfo): { lead: ReactNode; bullets: Bull
   if (spoke.latestBorrowRate != null) {
     const rate = (
       <H>
-        <Prov info={BORROW_RATE_PROV}>{spoke.latestBorrowRate.toFixed(2)}%</Prov>
+        <Prov info={BORROW_RATE_PROV}>{(v4Apy(spoke.latestBorrowRate / 100) * 100).toFixed(2)}%</Prov>
       </H>
     );
     const y = yearlyDebtCost(spoke);

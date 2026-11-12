@@ -5,8 +5,8 @@
 //   - one panel per hub in the vitals band's shape (ProductHeadSection): Assets,
 //     Supplied, Borrowed, Utilisation, Positions, the spokes it lends to, and
 //     under it the hub's assets: Asset · Supplied · Borrowed · Liquidity ·
-//     Utilisation · Drawn rate · Supply rate · Liquidity fee, each row unfolding
-//     its credit lines (Spoke · Add cap · Supplied · Draw cap · Drawn · Credit
+//     Utilization · Borrow APY · Supply APY · Liquidity fee, each row unfolding
+//     its credit lines (Spoke · Supply cap · Supplied · Borrow cap · Borrowed · Credit
 //     used · Status), each spoke linking its reserve page;
 //   - the hub by spoke matrix: hubs across, spokes down, a chip per credit line
 //     shaded by credit used, scrolling inside its frame on a phone.
@@ -37,7 +37,7 @@ import { PricesProvider } from "@/lib/shared/prices-context";
 import { aaveV4Modal } from "@/lib/aave-v4/event-templates";
 import { fmtUsd } from "@/lib/aave-v4/format";
 import { formatCompact } from "@/lib/shared/format-compact";
-import { ratePercentText } from "@/lib/shared/rate-percent";
+import { v4ApyText } from "@/lib/aave-v4/rates";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 import {
   hubsOf,
@@ -318,7 +318,7 @@ function CreditLines({ s, a, prices }: { s: V4Stored; a: V4HubAsset; prices: Pri
   );
 }
 
-const COLS = ["Supplied", "Borrowed", "Liquidity", "Utilisation", "Drawn rate", "Supply rate", "Liquidity fee"];
+const COLS = ["Supplied", "Borrowed", "Liquidity", "Utilization", "Borrow APY", "Supply APY", "Liquidity fee"];
 
 function AssetRow({ s, h, a, prices }: { s: V4Stored; h: V4Hub; a: V4HubAsset; prices: Prices }) {
   const [open, setOpen] = useState(false);
@@ -385,7 +385,7 @@ function AssetRow({ s, h, a, prices }: { s: V4Stored; h: V4Hub; a: V4HubAsset; p
         )}
         {cell(
           a.drawnApr != null ? (
-            <Prov info={storedRateProv("drawn rate", scope, c)}>{ratePercentText(a.drawnApr)}</Prov>
+            <Prov info={storedRateProv("borrow APY", scope, c, a.drawnApr)}>{v4ApyText(a.drawnApr)}</Prov>
           ) : (
             none
           ),
@@ -393,7 +393,7 @@ function AssetRow({ s, h, a, prices }: { s: V4Stored; h: V4Hub; a: V4HubAsset; p
         )}
         {cell(
           a.supplyApr != null ? (
-            <Prov info={storedRateProv("supply rate", scope, c)}>{ratePercentText(a.supplyApr)}</Prov>
+            <Prov info={storedRateProv("supply APY", scope, c, a.supplyApr)}>{v4ApyText(a.supplyApr)}</Prov>
           ) : (
             none
           ),

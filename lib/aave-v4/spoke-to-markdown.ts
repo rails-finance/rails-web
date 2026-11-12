@@ -23,6 +23,7 @@ import type { BaseActivityEvent } from "@/lib/shared/types/event-shape";
 import { isAaveV4Event } from "@/lib/shared/types/event-shape";
 import { type PriceEntry, resolvePrice } from "@/lib/aave/prices";
 import { liquidationBuffer, type AaveSpokeCardInfo, type ReserveStats } from "@/lib/aave-v4/spoke-cards";
+import { v4Apy } from "@/lib/aave-v4/rates";
 import { hubChipParts } from "@/components/protocol/aave-v4/aave-v4-spoke-constants";
 import { actionLabel, getEventActionKey } from "@/lib/shared/event-filter-helpers";
 
@@ -193,7 +194,7 @@ function openHeadlines(args: AaveV4SpokeMarkdownArgs): string[] {
     out.push(`- **Borrowing:** ${card.borrowingSymbols.join(", ")}`);
   }
   if (card.latestBorrowRate != null) {
-    out.push(`- **Borrow rate:** ${num(card.latestBorrowRate, 2)}% APR on current debt`);
+    out.push(`- **Borrow APY:** ${num(v4Apy(card.latestBorrowRate / 100) * 100, 2)}% on current debt`);
   }
   if (card.borrowingPowerUsd > 0) {
     out.push(

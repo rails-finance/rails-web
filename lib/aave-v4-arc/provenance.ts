@@ -4,6 +4,7 @@
 // midnight 30 days back. The page names no function or block (decision 0059
 // point 1); this module is where they live.
 
+import { APY_FORMULA, COMPOUNDED } from "@/lib/aave-v4/rates";
 import type { Provenance, ProvInput } from "@/components/shared/provenance";
 import type { ArcPositionFigures, ArcReserveFigures, ArcWalletSpoke } from "@/lib/aave-v4-arc/position";
 import { AAVE_V4_ARC_CONTRACTS, type ArcPositionRead, type ArcWalletRead } from "@/lib/aave-v4-arc/types";
@@ -118,8 +119,9 @@ export function arcReserveProv(key: ArcReserveFigure, c: ArcReceiptContext, x: A
         pclass: "state",
         source: head,
         contract: hubC,
-        summary: `${x.symbol} borrow rate. The Core hub's drawn rate, a year, read at ${at(r.head)}; the account pays its premium on top.`,
-        via: `${via(`block ${n(r.head.block)}`)} · hub getAssetDrawnRate(${raw.assetId}) ÷ 10^27`,
+        summary: `${x.symbol} borrow APY. The Core hub's drawn rate, read at ${at(r.head)}, ${COMPOUNDED}; the account pays its premium on top.`,
+        via: `${via(`block ${n(r.head.block)}`)} · hub getAssetDrawnRate(${raw.assetId}) ÷ 10^27, compounded`,
+        formula: APY_FORMULA,
         inputs: [
           chain("getAssetDrawnRate", raw.drawnRate ?? "—", "a ray"),
           chain("riskPremium", c.r.account.riskPremium, "basis points of drawn debt, getUserAccountData"),

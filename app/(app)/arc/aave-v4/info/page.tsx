@@ -51,8 +51,8 @@ const views: readonly [InfoView, ...InfoView[]] = [
     body: (
       <p>
         The account page shows what the wallet supplies and owes on one spoke, each in dollars at the spoke&apos;s
-        oracle, its health factor and borrow limit, each supplied asset&apos;s collateral factor, each borrowed
-        asset&apos;s rate, and the interest each balance gathered over the last 30 days.
+        oracle, its health factor and maximum borrowing power, each supplied asset&apos;s collateral factor, each
+        borrowed asset&apos;s borrow APY, and the interest each balance gathered over the last 30 days.
       </p>
     ),
   },
@@ -71,7 +71,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
           <Link href={`${ROUTE}/hubs`} className={INLINE_LINK}>
             Hubs
           </Link>{" "}
-          shows the Core hub&apos;s assets, its credit lines to each spoke and their rates.
+          shows the Core hub&apos;s assets, its credit lines to each spoke and their APYs.
         </li>
       </ul>
     ),

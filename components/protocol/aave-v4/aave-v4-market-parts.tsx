@@ -180,13 +180,13 @@ function SpokeTerms({ f, line, names }: { f: V4ReserveFigures; line: V4Line; nam
       </Line>
       <Line
         term="Collateral risk"
-        title="Sets the premium a borrower pays above the drawn rate when posting this asset"
+        title="Sets the premium a borrower pays above the borrow rate when posting this asset"
       >
         <Prov
           info={p(
             "collateral risk",
             "getReserveConfig(reserveId).collateralRisk",
-            "the risk that sets the premium a borrower posting this asset pays above the drawn rate",
+            "the risk that sets the premium a borrower posting this asset pays above the borrow rate",
           )}
         >
           {f.collateralRisk != null ? pctText(f.collateralRisk) : "not read"}
@@ -260,7 +260,7 @@ function HubTerms({ f, names }: { f: V4ReserveFigures; names: V4Names }) {
         </Prov>
       </Line>
       {f.curve && (
-        <Line term="Optimal usage" title="The utilisation at which the drawn rate starts to climb steeply">
+        <Line term="Optimal usage ratio" title="The utilization at which the borrow rate starts to climb steeply">
           <Prov
             info={p(
               "optimal usage",
