@@ -347,8 +347,8 @@ export function fluidCardSlots({
   const debtName = fluidLegName(v, "borrow", chain);
 
   const heads: PositionCardHead[] = [
-    { id: "collateral", label: CARD_VOCAB.collateral, value: legFigure(v, "supply", chain) },
-    { id: "debt", label: CARD_VOCAB.debt, value: legFigure(v, "borrow", chain) },
+    { id: "collateral", label: CARD_VOCAB.collateral, tier: "amount", value: legFigure(v, "supply", chain) },
+    { id: "debt", label: CARD_VOCAB.debt, tier: "amount", value: legFigure(v, "borrow", chain) },
   ];
   if (riskLive) {
     heads.push({
