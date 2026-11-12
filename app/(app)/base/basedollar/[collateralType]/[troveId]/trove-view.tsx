@@ -471,6 +471,7 @@ export default function BasedollarTroveDetail({
   const terminalPane =
     view && view.status !== "open" ? (
       <LiquityForkClosedExplanation
+        protocol="basedollar"
         status={view.status}
         collateralSymbol={view.collateralType}
         debtSymbol={DEBT_SYMBOL}

@@ -15,7 +15,7 @@ import type { OriginEnvelope } from "@/lib/shared/types/event-shape";
 import { formatExact } from "@/lib/utils/format";
 import { exactDebtAfter, exactDebtBefore } from "@/lib/liquity/utils/interest-calculator";
 import { explorerUrl, MAINNET_CHAIN_ID } from "@/lib/shared/chains";
-import { gasEscrowReceipt, type LiquityGasEscrow } from "@/lib/shared/liquity-gas-escrow";
+import { gasEscrowReceipt, LIQUIDATION_RESERVE_TERMS, type LiquityGasEscrow } from "@/lib/shared/liquity-gas-escrow";
 
 const INDEX_VIA = "rails-server index of decoded Liquity V2 logs";
 
@@ -459,13 +459,7 @@ export const LIQUITY_V2_GAS_ESCROW: LiquityGasEscrow = {
   source: "Constants.sol ETH_GAS_COMPENSATION",
   label: "0.0375 WETH",
   // The docs' name ("a liquidation reserve of 0.0375 ETH"; decision 0065).
-  terms: {
-    name: "Liquidation reserve",
-    sent: "held as the liquidation reserve since the open",
-    held: "held as the liquidation reserve",
-    returned: "liquidation reserve returned",
-    paid: "liquidation reserve paid to the liquidator",
-  },
+  terms: LIQUIDATION_RESERVE_TERMS,
 };
 
 /** The escrow's receipt at an event: the constant, and the transaction whose

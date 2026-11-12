@@ -11,6 +11,7 @@
 // the branch's Stability Pool (or the redistributed troves) realized.
 // Undefined until the block is priced; the card stays token-only meanwhile.
 
+import type { LiquityFamilyTerms } from "@/lib/liquity/ltv";
 import type { EbisuContext, AsymmetryContext, BasedollarContext } from "@/lib/shared/types/event-shape";
 import type {
   LiquityForkCoords,
@@ -135,6 +136,7 @@ export function forkRedemptionStats(
   coords: LiquityForkCoords,
   p: RedemptionProvs,
   debtSymbol: string,
+  terms: LiquityFamilyTerms,
 ): ChainTruthStat[] {
   const red = ctx.redemption;
   if (ctx.eventType !== "redeemCollateral" || !red) return [];
@@ -151,7 +153,7 @@ export function forkRedemptionStats(
   const collOut = Math.abs(forkCollMove(ctx));
   if (fee > 0)
     stats.push({
-      label: "Fee kept",
+      label: terms.redemptionFee,
       value: forkFeeAmount(fee),
       display: forkFeeAmount(fee),
       symbol: ctx.collateralSymbol,
@@ -174,7 +176,7 @@ export function buildForkLiquidationForensics(
   ctx: LiquityForkForensicsContext,
   coords: LiquityForkCoords,
   vocab: LiquityForkForensicsVocab,
-  opts: { stablecoin: string },
+  opts: { stablecoin: string; terms: LiquityFamilyTerms },
 ): LiquidationForensicsProps | undefined {
   const price = ctx.priceAtBlock;
   const seizedAmt = Number(ctx.collBefore);
@@ -202,10 +204,11 @@ export function buildForkLiquidationForensics(
     // Seized over cleared on the whole Trove is its collateral ratio at
     // liquidation; the surplus that came back and where the rest went are the
     // grid's own lines.
+    // In LTV terms (decision 0065) the figure is cleared over seized.
     seizedLabel: "Collateral, at liquidation",
-    premiumLabel: "Collateral ratio at liquidation",
+    premiumLabel: `${opts.terms.ratio} at liquidation`,
     premiumAsRatio: true,
-    premium: seizedUsd / clearedUsd - 1,
+    premium: opts.terms.ltv ? clearedUsd / seizedUsd - 1 : seizedUsd / clearedUsd - 1,
     premiumProv: vocab.liqPremiumProv(coords, {
       seizedUsd: formatUsdValue(seizedUsd),
       clearedUsd: formatUsdValue(clearedUsd),

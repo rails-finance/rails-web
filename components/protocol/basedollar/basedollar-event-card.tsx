@@ -4,6 +4,7 @@
 // (components/protocol/liquity-fork/liquity-fork-event-card.tsx) with this
 // deployment's words, stable and provenance vocabulary.
 
+import { LIQUITY_FAMILY_TERMS } from "@/lib/liquity/ltv";
 import type { BaseActivityEvent, BasedollarContext } from "@/lib/shared/types/event-shape";
 import {
   LiquityForkEventCard,
@@ -14,6 +15,7 @@ import { DEBT_SYMBOL, MIN_DEBT, resolveBranch } from "@/lib/basedollar/asset-cat
 
 // The one live-verified Basedollar link (docs.basedollar.money doesn't answer).
 export const BASEDOLLAR_FORK = {
+  terms: LIQUITY_FAMILY_TERMS.basedollar,
   protocolName: "Basedollar",
   stablecoin: DEBT_SYMBOL,
   minDebt: MIN_DEBT,

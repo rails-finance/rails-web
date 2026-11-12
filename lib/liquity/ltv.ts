@@ -74,3 +74,119 @@ export function maxLtvInput(collateralType: string): ProvInput {
     note: "1 ÷ MCR",
   };
 }
+
+// ── Each deployment's terms ────────────────────────────────────────────────
+// Liquity V2 and the forks that share its card, sheet and panes each take
+// their own docs' words (decision 0065; reference/official-docs/<family>.md,
+// Terms), so the families differ on purpose. A figure the docs do not name
+// keeps Rails's coined label.
+
+/** The Liquity V2 deployments that share the card, the sheet and the panes. */
+export type LiquityFamilyTermsId = "liquity-v2" | "ebisu" | "asymmetry" | "basedollar";
+
+export interface LiquityFamilyTerms {
+  /** The docs state a Trove's risk as LTV, debt ÷ collateral value, against
+   *  a Max LTV (1 ÷ MCR); false, as a collateral ratio against its minimum. */
+  ltv: boolean;
+  /** The Trove's ratio as a label ("LTV", "Collateralization ratio"). */
+  ratio: string;
+  /** The same in a sentence ("LTV", "collateralization ratio"). */
+  ratioText: string;
+  /** The branch's limit as a label ("Max LTV", "Minimum Collateral Ratio"). */
+  limit: string;
+  /** The same in a sentence ("Max LTV", "Minimum Collateral Ratio (MCR)"). */
+  limitText: string;
+  /** Whom a Trove's rate is delegated to, in a sentence ("delegate"). */
+  delegate: string;
+  /** The docs' plain words for the delegate, given once where it is
+   *  explained ("a third party manager"). */
+  delegateGloss?: string;
+  /** The fee drawing debt adds, as a label. */
+  upfrontFee: string;
+  /** The same in a sentence. */
+  upfrontFeeText: string;
+  /** The redeemer's fee left in a redeemed Trove, as a label. */
+  redemptionFee: string;
+  /** A Trove under the minimum debt, as a status word ("Dormant", "Zombie"). */
+  dormant: string;
+  /** The same after "makes it" ("dormant", "a zombie position"). */
+  dormantText: string;
+  /** The same as a noun ("dormant Trove", "zombie position"). */
+  dormantNoun: string;
+  /** The price that liquidates a Trove, as a label. */
+  liquidationPrice: string;
+  /** One collateral's market, as a label or a first mention ("branch",
+   *  "borrow market"). */
+  branch: string;
+  /** The branch ratio below which borrowing is restricted, as a label. */
+  ccr: string;
+}
+
+const LIQUITY_V2_TERMS: LiquityFamilyTerms = {
+  ltv: true,
+  ratio: "LTV",
+  ratioText: "LTV",
+  limit: "Max LTV",
+  limitText: "Max LTV",
+  delegate: "delegate",
+  upfrontFee: "Upfront Borrowing Fee",
+  upfrontFeeText: "Upfront Borrowing Fee",
+  redemptionFee: "Redemption fee",
+  dormant: "Dormant",
+  dormantText: "dormant",
+  dormantNoun: "dormant Trove",
+  liquidationPrice: "Liquidates at",
+  branch: "branch",
+  ccr: "Critical Collateral Ratio (CCR)",
+};
+
+/** The words the forks shared before their docs were read. */
+const FORK_TERMS: LiquityFamilyTerms = {
+  ltv: false,
+  ratio: "Collateral ratio",
+  ratioText: "collateral ratio",
+  limit: "Minimum ratio",
+  limitText: "minimum",
+  delegate: "batch manager",
+  upfrontFee: "Upfront fee",
+  upfrontFeeText: "one-time borrowing fee",
+  redemptionFee: "Fee kept",
+  dormant: "Dormant",
+  dormantText: "dormant",
+  dormantNoun: "dormant Trove",
+  liquidationPrice: "Liquidates at",
+  branch: "branch",
+  ccr: "Critical ratio",
+};
+
+export const LIQUITY_FAMILY_TERMS: Record<LiquityFamilyTermsId, LiquityFamilyTerms> = {
+  "liquity-v2": LIQUITY_V2_TERMS,
+  basedollar: FORK_TERMS,
+  // docs.asymmetry.finance: LTV and the maximum LTV, a "third party manager"
+  // or delegate, the "liquidation reserve", the "borrow market", TCR and CCR.
+  // The docs deny an upfront fee and charge "a fee corresponding to 7 days of
+  // average interest".
+  asymmetry: {
+    ...LIQUITY_V2_TERMS,
+    delegateGloss: "a third party manager",
+    upfrontFee: "7-day interest fee",
+    upfrontFeeText: "7-day interest fee",
+    branch: "borrow market",
+  },
+  ebisu: FORK_TERMS,
+};
+
+/** A deployment's terms, by its id or its display name ("Liquity V2",
+ *  "Base Dollar"). */
+export function liquityFamilyTerms(family: string): LiquityFamilyTerms {
+  const key = family.toLowerCase().replace(/[\s-]+/g, "");
+  return LIQUITY_FAMILY_TERMS[(key === "liquityv2" ? "liquity-v2" : key) as LiquityFamilyTermsId] ?? FORK_TERMS;
+}
+
+/** A Trove's ratio in its deployment's terms, from the collateral ratio in
+ *  percent: the LTV (10000 ÷ CR) or the CR itself. Null where the ratio is
+ *  not a positive finite figure. */
+export function familyRatioPct(t: LiquityFamilyTerms, crPct: number | null | undefined): number | null {
+  if (crPct == null || !isFinite(crPct) || crPct <= 0) return null;
+  return t.ltv ? 10000 / crPct : crPct;
+}

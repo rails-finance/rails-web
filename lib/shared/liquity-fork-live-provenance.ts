@@ -39,6 +39,7 @@ import { BASEDOLLAR_PRICE_GRADES } from "@/lib/basedollar/price-feeds";
 import { EBISU_PRICE_GRADES } from "@/lib/ebisu/price-feeds";
 import { ASYMMETRY_PRICE_GRADES } from "@/lib/asymmetry/price-feeds";
 import { LIQUITY_V2_BRANCHES, DEBT_SYMBOL as LIQUITY_V2_DEBT } from "@/lib/liquity/asset-catalog";
+import { LTV_LIQUIDATION_PRICE_FORMULA, liquityFamilyTerms } from "@/lib/liquity/ltv";
 
 /** One input a branch PriceFeed reads (fork playbook §6 grading). */
 export interface LiquityForkPriceLeg {
@@ -204,6 +205,8 @@ interface ForkLiveConfig {
 
 function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
   const LANE_VIA = `GET /api/chain/${cfg.protocolId}/position`;
+  // The deployment's documented terms for a Trove's ratio (decision 0065).
+  const terms = liquityFamilyTerms(cfg.protocolId);
   const ROSTER_VIA = `GET /api/chain/${cfg.protocolId}/branches`;
   const tmContract = (sym: string) => ({
     name: `${cfg.protocolName} ${sym} TroveManager`,
@@ -271,14 +274,26 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       via: `${LANE_VIA} · TroveManager.getLatestTroveData(): annual interest rate`,
       scaling,
     }),
-    contractIcrProv: (sym) => ({
-      kind: "chain",
-      pclass: "state",
-      verify: recompute("TroveManager", "getCurrentICR"),
-      summary: `Collateral ratio. The TroveManager's OWN getCurrentICR at the branch's own oracle price, computed by the contract at the latest block (the arithmetic identity entireColl × price ÷ entireDebt is verified BigInt-exact by scripts/verify-liquity-forks-chain.mjs).`,
-      contract: tmContract(sym),
-      via: `${LANE_VIA} · TroveManager.getCurrentICR @ head`,
-    }),
+    contractIcrProv: (sym) =>
+      terms.ltv
+        ? {
+            kind: "chain-derived",
+            pclass: "state",
+            verify: recompute("TroveManager", "getCurrentICR"),
+            summary: `LTV. The Trove's entire debt ÷ its collateral's dollar value at the branch's own oracle price: 1 ÷ the TroveManager's OWN getCurrentICR, computed by the contract at the latest block (the arithmetic identity entireColl × price ÷ entireDebt is verified BigInt-exact by scripts/verify-liquity-forks-chain.mjs).`,
+            contract: tmContract(sym),
+            via: `${LANE_VIA} · 1 ÷ TroveManager.getCurrentICR @ head`,
+            formula: "1 ÷ ICR",
+            inputs: [{ label: "ICR", kind: "chain", pclass: "state", note: "TroveManager.getCurrentICR @ head" }],
+          }
+        : {
+            kind: "chain",
+            pclass: "state",
+            verify: recompute("TroveManager", "getCurrentICR"),
+            summary: `${terms.ratio}. The TroveManager's OWN getCurrentICR at the branch's own oracle price, computed by the contract at the latest block (the arithmetic identity entireColl × price ÷ entireDebt is verified BigInt-exact by scripts/verify-liquity-forks-chain.mjs).`,
+            contract: tmContract(sym),
+            via: `${LANE_VIA} · TroveManager.getCurrentICR @ head`,
+          },
     forkPriceProv: (sym, stale) => {
       const g = gradedPrice(sym);
       return {
@@ -310,10 +325,12 @@ function makeVocab(cfg: ForkLiveConfig): LiquityForkLiveVocab {
       kind: "chain-derived",
       pclass: "state",
       verify: recompute("TroveManager", "getLatestTroveData"),
-      summary: `Liquidation price. The ${sym} price at which this trove's collateral ratio hits the branch minimum; entire debt × MCR ÷ entire collateral, every input a chain read at the same block (the liquidation equation rearranged for price).`,
+      summary: terms.ltv
+        ? `Liquidation price. The ${sym} price at which this trove's LTV reaches the branch's Max LTV; entire debt ÷ (entire collateral × Max LTV), Max LTV = 1 ÷ MCR, every input a chain read at the same block (the liquidation equation rearranged for price).`
+        : `Liquidation price. The ${sym} price at which this trove's ${terms.ratioText} hits the branch ${terms.limitText}; entire debt × MCR ÷ entire collateral, every input a chain read at the same block (the liquidation equation rearranged for price).`,
       contract: tmContract(sym),
       via: `${LANE_VIA} · derived ratio`,
-      formula: "entire debt × MCR ÷ entire collateral",
+      formula: terms.ltv ? LTV_LIQUIDATION_PRICE_FORMULA : "entire debt × MCR ÷ entire collateral",
       inputs: [
         { label: "entire debt", kind: "chain", pclass: "state", note: "getLatestTroveData() at the latest block" },
         {

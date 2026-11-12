@@ -7,6 +7,7 @@
 // LiquityForkBranchesView holds the presentation — Asymmetry renders the same
 // component off its own roster.
 
+import { LIQUITY_FAMILY_TERMS } from "@/lib/liquity/ltv";
 import { branchScopeKeys } from "@/lib/shared/asset-family";
 import {
   LiquityForkBranchesView,
@@ -63,6 +64,7 @@ export default async function BasedollarBranchesPage() {
           protocolName="Basedollar"
           basePath="/base/basedollar"
           learnMore={{
+            terms: LIQUITY_FAMILY_TERMS.basedollar,
             protocolName: "Basedollar",
             stablecoin: DEBT_SYMBOL,
             // The one live-verified Basedollar link (docs.basedollar.money doesn't

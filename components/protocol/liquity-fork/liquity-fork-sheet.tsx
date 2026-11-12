@@ -9,9 +9,10 @@
 // timeline carries no price for the previous event, so the collateral's
 // "Last event" row states its amount alone and "Market move" is left out; a
 // block with no price draws no collateral layer.
-// Risk is the collateral ratio and the price that liquidates the Trove;
+// Risk is the Trove's ratio and the price that liquidates the Trove;
 // Limits the interest rate (and the delegate's fee in a batch), with the
-// branch's minimum and critical ratios as the parameters. The debt ahead in
+// branch's limit and critical ratio as the parameters, each in the
+// deployment's documented terms (LiquityFamilyTerms, decision 0065). The debt ahead in
 // the redemption queue is a live read and is not on the sheet, as on Liquity V2.
 //
 // The gas compensation escrow is a footnote under Risk and Limits where the
@@ -56,6 +57,7 @@ import type { LiquityForkEventContext, LiquityForkHeaderBuilders } from "./liqui
 import { forkEscrowTip, type LiquityForkEscrow } from "./liquity-fork-escrow";
 import { gasEscrowMove } from "@/lib/shared/liquity-gas-escrow";
 import { gasEscrowNote } from "@/components/protocol/liquity-family/gas-escrow";
+import { familyRatioPct, fmtLtv, LTV_LIQUIDATION_PRICE_FORMULA, type LiquityFamilyTerms } from "@/lib/liquity/ltv";
 
 /** What the sheet reads of a fork's branch: the collateral token, the
  *  governance ratios and the contract that holds them. */
@@ -82,8 +84,11 @@ export interface LiquityForkSheetArgs {
   flows?: AssetFlow[];
   /** The fork's gas compensation escrow, where its constant is established. */
   escrow?: LiquityForkEscrow;
+  /** The deployment's documented terms. */
+  terms: LiquityFamilyTerms;
 }
 
+// The words every deployment shares; the ones its docs name are its terms.
 const WORDS = {
   open: "Open",
   close: "Close",
@@ -94,21 +99,16 @@ const WORDS = {
   borrow: "Borrow",
   repay: "Repay",
   redistribution: "Redistribution",
-  upfrontFee: "Upfront fee",
   face: "$1.00 face",
-  ratio: "Collateral ratio",
-  liquidatesAt: "Liquidates at",
   rate: "Interest rate",
   delegateFee: "Delegate's fee",
-  minimumRatio: "Minimum ratio",
-  criticalRatio: "Critical ratio",
   closed: "CLOSED",
   notApplicable: "N/A",
   unread: "Not read on this page",
 };
 
 /** Each row's read-more, worded for Miles's prose review. */
-function tips(coll: string, debt: string, noun: string) {
+function tips(coll: string, debt: string, noun: string, t: LiquityFamilyTerms) {
   return {
     collLast: `The Trove's ${coll} after its previous event, from the TroveManager's log.`,
     collBefore: `The Trove's ${coll} just before this event, at the branch's ${coll} price at this block.`,
@@ -124,11 +124,19 @@ function tips(coll: string, debt: string, noun: string) {
     debtUpfront: `A one-off borrowing fee this operation added to the Trove's debt, from the TroveManager's log.`,
     debtRedist: `The debt that liquidated Troves passed to this one, applied at this event.`,
     debtTotal: `The Trove's debt after this event, from the TroveManager's log, at $1 per ${debt}.`,
-    cr: `The collateral's dollar value divided by the debt after this event, at the branch's ${coll} price at this block.`,
-    liquidatesAt: `The ${coll} price at which the Trove's collateral ratio meets the branch's minimum: the debt times the minimum ratio, divided by the collateral.`,
+    cr: t.ltv
+      ? `The debt divided by the collateral's dollar value after this event, at the branch's ${coll} price at this block.`
+      : `The collateral's dollar value divided by the debt after this event, at the branch's ${coll} price at this block.`,
+    liquidatesAt: t.ltv
+      ? `The ${coll} price at which the Trove's LTV reaches the branch's Max LTV: the debt divided by the collateral times the Max LTV.`
+      : t.limitText === "minimum"
+        ? `The ${coll} price at which the Trove's collateral ratio meets the branch's minimum: the debt times the minimum ratio, divided by the collateral.`
+        : `The ${coll} price at which the Trove's ${t.ratioText} meets the branch's ${t.limitText}: the debt times the MCR, divided by the collateral.`,
     rate: `The annual interest rate on the Trove's debt after this event, from the TroveManager's log.`,
-    delegateFee: `The batch's annual management fee, set by its batch manager and charged on top of the interest rate.`,
-    minimumRatio: `The collateral ratio below which a Trove on the ${coll} branch can be liquidated, a constant of the branch's contracts.`,
+    delegateFee: `The batch's annual management fee, set by its ${t.delegate} and charged on top of the interest rate.`,
+    minimumRatio: t.ltv
+      ? `The LTV above which a Trove on the ${coll} branch can be liquidated, 1 ÷ the minimum collateral ratio the branch's contracts were deployed with.`
+      : `The ${t.ratioText} below which a Trove on the ${coll} branch can be liquidated, a constant of the branch's contracts.`,
     criticalRatio: `The branch-wide collateral ratio below which the ${coll} branch restricts borrowing, a constant of the branch's contracts.`,
   };
 }
@@ -180,6 +188,7 @@ export function liquityForkSheet({
   actionLabel,
   flows,
   escrow,
+  terms,
 }: LiquityForkSheetArgs): EventSheet | undefined {
   if (isForkBatchRow(ctx)) return undefined;
 
@@ -205,7 +214,7 @@ export function liquityForkSheet({
   const opDebt = forkDebtMove(ctx).value;
   const hasPrev = !ctx.isOpen && ctx.eventType !== "openTrove" && ctx.eventType !== "openTroveAndJoinBatch";
   const noun = op?.accruedIncludesBatchFees ? "interest and batch fees" : "interest";
-  const TIP = tips(collSym, debtSym, noun);
+  const TIP = tips(collSym, debtSym, noun, terms);
   const DUST_COLL = 1e-9;
 
   // The event's word on a side: an adjust names its act per side.
@@ -338,7 +347,7 @@ export function liquityForkSheet({
   if (upfrontFee >= FORK_DEBT_DUST_FLOAT)
     debtRows.push({
       key: "upfront-fee",
-      label: WORDS.upfrontFee,
+      label: terms.upfrontFee,
       amount: {
         text: forkAmount(upfrontFee),
         symbol: debtSym,
@@ -458,7 +467,7 @@ export function liquityForkSheet({
     ? gasEscrowNote({
         escrow: escrow.constant,
         move: escrowMove,
-        tip: forkEscrowTip(escrow.constant),
+        tip: forkEscrowTip(escrow.constant, terms),
         price: collSym === escrow.constant.symbol ? (price ?? null) : null,
         info: escrow.prov(escrowMove, coords),
         fmt: forkCollAmount,
@@ -468,25 +477,31 @@ export function liquityForkSheet({
   // ── Risk ──
   const open = !isClose && debtAfter > 0 && collAfter > 0;
   const noneFor = (): { none: string } => ({ none: isClose ? WORDS.closed : WORDS.notApplicable });
+  // The ratio in the deployment's terms: LTV is 10000 ÷ the collateral
+  // ratio, each side converted before the change is taken.
+  const ratioAfter = familyRatioPct(terms, f.crAfter);
+  const ratioBefore = familyRatioPct(terms, f.crBefore);
   const crChange =
-    open && f.crAfter != null && f.crBefore != null
+    open && ratioAfter != null && ratioBefore != null
       ? {
-          text: changeText(f.crAfter - f.crBefore, pts),
+          text: changeText(ratioAfter - ratioBefore, pts),
           info: sinceProv(
-            "Collateral ratio change in percentage points, both ratios at this block's price",
+            terms.ltv
+              ? "LTV change in percentage points, both LTVs at this block's price"
+              : `${terms.ratio} change in percentage points, both ratios at this block's price`,
             "after − before",
           ),
         }
       : null;
   const crRow: SheetStat = {
     key: "ratio",
-    label: WORDS.ratio,
+    label: terms.ratio,
     tip: TIP.cr,
     value: !open
       ? noneFor()
-      : f.crAfter != null && price != null
+      : ratioAfter != null && price != null
         ? {
-            text: forkCrText(f.crAfter),
+            text: forkCrText(ratioAfter),
             info: provs.collRatioProv(coords, {
               coll: ctx.collAfter,
               debt: ctx.debtAfter,
@@ -502,21 +517,33 @@ export function liquityForkSheet({
   const liqAfter = open && mcr != null ? (debtAfter * mcr) / collAfter : null;
   const liqPrev = open && mcr != null && collBefore > 0 && debtBefore > 0 ? (debtBefore * mcr) / collBefore : null;
   const liqProv: Provenance | undefined =
-    mcr != null
+    mcr != null && terms.ltv
       ? {
           kind: "chain-derived",
-          summary: `The ${collSym} price at which this Trove's collateral ratio meets the branch's minimum, ${pct(mcr)}. The debt times the minimum ratio, divided by the collateral, after this event.`,
-          formula: "debt × minimum ratio ÷ collateral",
+          summary: `The ${collSym} price at which this Trove's LTV reaches the branch's Max LTV, ${fmtLtv(100 / mcr, 2)}. The debt divided by the collateral times the Max LTV, after this event.`,
+          formula: LTV_LIQUIDATION_PRICE_FORMULA,
           inputs: [
             { label: "debt", value: `${forkAmount(debtAfter)} ${debtSym}`, kind: "chain", note: "after" },
             { label: "collateral", value: `${forkCollAmount(collAfter)} ${collSym}`, kind: "chain", note: "after" },
-            { label: "minimum ratio", value: pct(mcr), kind: "chain", pclass: "state" },
+            { label: "Max LTV", value: fmtLtv(100 / mcr, 2), kind: "derived", note: "1 ÷ MCR" },
+            { label: "MCR", value: pct(mcr), kind: "chain", pclass: "state" },
           ],
         }
-      : undefined;
+      : mcr != null
+        ? {
+            kind: "chain-derived",
+            summary: `The ${collSym} price at which this Trove's ${terms.ratioText} meets the branch's ${terms.limitText}, ${pct(mcr)}. The debt times the ${terms.limitText === "minimum" ? "minimum ratio" : "MCR"}, divided by the collateral, after this event.`,
+            formula: "debt × minimum ratio ÷ collateral",
+            inputs: [
+              { label: "debt", value: `${forkAmount(debtAfter)} ${debtSym}`, kind: "chain", note: "after" },
+              { label: "collateral", value: `${forkCollAmount(collAfter)} ${collSym}`, kind: "chain", note: "after" },
+              { label: "minimum ratio", value: pct(mcr), kind: "chain", pclass: "state" },
+            ],
+          }
+        : undefined;
   const liqRow: SheetStat = {
     key: "liquidates-at",
-    label: WORDS.liquidatesAt,
+    label: terms.liquidationPrice,
     tip: TIP.liquidatesAt,
     value:
       liqAfter != null && liqProv
@@ -528,7 +555,12 @@ export function liquityForkSheet({
       liqAfter != null && liqPrev != null
         ? {
             text: changeText(liqAfter - liqPrev, usd2),
-            info: sinceProv("Liquidation price change, at this event's minimum ratio", "after − before"),
+            info: sinceProv(
+              terms.ltv
+                ? "Liquidation price change, at this event's Max LTV"
+                : "Liquidation price change, at this event's minimum ratio",
+              "after − before",
+            ),
           }
         : null,
   };
@@ -574,15 +606,38 @@ export function liquityForkSheet({
   const params: SheetStat[] =
     branch && mcr != null
       ? [
-          {
-            key: "minimum-ratio",
-            label: WORDS.minimumRatio,
-            tip: TIP.minimumRatio,
-            value: { text: pct(mcr), info: paramProv("minimum collateral ratio (MCR)", mcr) },
-          },
+          terms.ltv
+            ? {
+                key: "max-ltv",
+                label: terms.limit,
+                tip: TIP.minimumRatio,
+                value: {
+                  text: fmtLtv(100 / mcr, 2),
+                  info: {
+                    kind: "derived",
+                    summary: `The ${collSym} branch's Max LTV: ${fmtLtv(100 / mcr, 2)}. 1 ÷ the branch's minimum collateral ratio (MCR), a constant its contracts were deployed with.`,
+                    formula: "1 ÷ MCR",
+                    inputs: [
+                      {
+                        label: "MCR",
+                        value: pct(mcr),
+                        kind: "chain",
+                        pclass: "state",
+                        note: branch.constants.name,
+                      },
+                    ],
+                  },
+                },
+              }
+            : {
+                key: "minimum-ratio",
+                label: terms.limit,
+                tip: TIP.minimumRatio,
+                value: { text: pct(mcr), info: paramProv("minimum collateral ratio (MCR)", mcr) },
+              },
           {
             key: "critical-ratio",
-            label: WORDS.criticalRatio,
+            label: terms.ccr,
             tip: TIP.criticalRatio,
             value: { text: pct(branch.ccr), info: paramProv("critical collateral ratio (CCR)", branch.ccr) },
           },

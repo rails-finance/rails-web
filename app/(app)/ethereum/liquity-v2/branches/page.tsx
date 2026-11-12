@@ -13,6 +13,7 @@
 // body is wrapped in <ProvSource> so every receipt cites the one head block it
 // was read at.
 
+import { LIQUITY_FAMILY_TERMS } from "@/lib/liquity/ltv";
 import {
   LiquityForkBranchesView,
   LiquityForkBranchesStamp,
@@ -74,7 +75,7 @@ export default async function LiquityV2BranchesPage() {
                 protocolName: "Liquity V2",
                 stablecoin: DEBT_SYMBOL,
                 docsLink: { label: "Liquity docs", url: "https://docs.liquity.org" },
-                ltv: true,
+                terms: LIQUITY_FAMILY_TERMS["liquity-v2"],
               }}
             />
           </ProvSource>

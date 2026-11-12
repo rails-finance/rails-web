@@ -6,6 +6,7 @@
 // real figures. The same shared LiquityForkBranchesView Ebisu renders — the
 // fork machinery is one implementation, parameterized.
 
+import { LIQUITY_FAMILY_TERMS } from "@/lib/liquity/ltv";
 import { branchScopeKeys } from "@/lib/shared/asset-family";
 import {
   LiquityForkBranchesView,
@@ -51,6 +52,7 @@ export default async function AsymmetryBranchesPage() {
           protocolName="Asymmetry"
           basePath="/ethereum/asymmetry"
           learnMore={{
+            terms: LIQUITY_FAMILY_TERMS.asymmetry,
             protocolName: "Asymmetry",
             stablecoin: DEBT_SYMBOL,
             // The one live-verified Asymmetry link — the same one the event
