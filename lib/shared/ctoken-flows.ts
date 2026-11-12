@@ -156,6 +156,10 @@ export interface CTokenFlowRow {
   /** The market key, the asset of the model. */
   market: string;
   symbol: string;
+  /** The underlying token's address, for the asset's icon (the timeline's
+   *  `addresses`); null where the market has none (cETH) or the page has
+   *  not read it. */
+  underlying: string | null;
   /** The market's supply and debt just before and after the row; null where
    *  the row states none of that side. */
   supplyBefore: number | null;
@@ -582,6 +586,9 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
       debtUsd += h.debt * p;
     }
   }
+  // Each asset's underlying by symbol, for the icons.
+  const addresses: Record<string, string> = {};
+  for (const r of rows) if (r.underlying && !addresses[r.symbol]) addresses[r.symbol] = r.underlying;
   const todayPrices: Record<string, number> = {};
   for (const m of byMarket.keys()) {
     const p = todayPrice(m) ?? dailyPrices[m]?.at(-1)?.[1];
@@ -604,6 +611,7 @@ export function ctokenFlowTimeline(rows: CTokenFlowRow[], o: CTokenFlowOptions):
     indexes,
     today: open ? today : endDay,
     words: ctokenFlowWords(o.vocab, rp.borrower),
+    ...(Object.keys(addresses).length > 0 ? { addresses } : {}),
   };
 }
 

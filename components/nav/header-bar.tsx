@@ -1,13 +1,12 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useIsHome } from "@/hooks/useIsHome";
 
 import { HomeBrand } from "@/components/nav/home-brand";
 import { ProfileMenu } from "@/components/nav/profile-menu";
 import { SearchLauncher, useSlashToSearch } from "@/components/shared/front-door-search";
 
 export function HeaderBar() {
-  const pathname = usePathname();
   // `/` reaches the search from every page; the bar is mounted on all of them.
   useSlashToSearch();
 
@@ -16,7 +15,7 @@ export function HeaderBar() {
   // instead of stacking above it — otherwise the body background shows through
   // the header strip and breaks the gradient. HomeHero's top padding reserves
   // the room. The chrome is the same on every page (ui-jobs 498).
-  const isHome = pathname === "/";
+  const isHome = useIsHome();
 
   return (
     <header

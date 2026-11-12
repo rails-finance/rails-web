@@ -187,3 +187,22 @@ test("the dollar switch off: every dollar figure is null, the token figures unch
   // The default follows the switch.
   assert.equal(fluidBasePosition(READ).usd.supply === null, !FLUID_BASE_DOLLARS);
 });
+
+test("Fluid Base's explorer path is its roster slug's, with a page behind it", async () => {
+  // The roster session is "fluid-base"; the URL slug is "fluid". protocols.ts imports through
+  // `@/`, so the spec is read as text.
+  const { readFileSync, existsSync } = await import("node:fs");
+  const src = readFileSync(new URL("../../lib/shared/protocols.ts", import.meta.url), "utf8");
+  const spec = src.match(/session: "fluid-base",[^}]*?chainId: 8453,\s*slug: "([^"]+)"/);
+  assert.ok(spec, "the fluid-base spec is in the roster");
+  assert.equal(spec[1], "fluid");
+  const dir = new URL(`../../app/(app)/base/${spec[1]}/`, import.meta.url);
+  assert.ok(existsSync(new URL("page.tsx", dir)), "/base/fluid has a front door");
+  assert.ok(existsSync(new URL("info/page.tsx", dir)), "/base/fluid/info exists");
+  assert.ok(existsSync(new URL("position/[id]/page.tsx", dir)), "/base/fluid/position exists");
+  // No caller builds the path from the session.
+  for (const f of ["fluid-base-position-page", "fluid-base-wallet-positions"]) {
+    const t = readFileSync(new URL(`../../components/protocol/fluid-base/${f}.tsx`, import.meta.url), "utf8");
+    assert.doesNotMatch(t, /explorerHref\(/);
+  }
+});

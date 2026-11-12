@@ -401,7 +401,14 @@ export function Headline({
           </span>
         </RevealTip>
       )}
-      {tokens.length > 0 && <InlineAssetCluster symbols={tokens} size={16} overlap={5} max={3} />}
+      {tokens.length > 0 && (
+        <InlineAssetCluster
+          assets={tokens.map((symbol) => ({ symbol, address: model.addresses?.[symbol] ?? null }))}
+          size={16}
+          overlap={5}
+          max={3}
+        />
+      )}
       <span className="text-xs text-rb-500">{word}</span>
     </div>
   );

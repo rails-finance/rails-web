@@ -181,7 +181,12 @@ function PeakLines({ lines, side }: { lines: MoonwellPeakAmount[]; side: "supply
     <AmountStack>
       {lines.map((r) => (
         <Prov key={r.address} info={side === "supply" ? dep.card.peakSupply(r.symbol) : dep.card.peakDebt(r.symbol)}>
-          <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+          <AssetAmount
+            value={r.amount}
+            symbol={r.symbol}
+            address={r.address}
+            exact={formatUnitsExact(r.amountRaw, r.decimals)}
+          />
         </Prov>
       ))}
     </AmountStack>
@@ -427,6 +432,7 @@ export function useMoonwellCardSlots({
                   <AssetAmount
                     value={supplyAmount(r)}
                     symbol={r.symbol}
+                    address={r.address}
                     exact={r.current != null ? formatUnitsExact(r.mTokensRaw, 8) : String(r.principal)}
                     {...(r.current != null ? { exactUnit: mSymbolOf(r) } : {})}
                   />
@@ -435,7 +441,9 @@ export function useMoonwellCardSlots({
             </AmountStack>
           ),
         assets:
-          vc.supplies.length > 0 ? <InlineAssetCluster symbols={suppliesShown.map((r) => r.symbol)} /> : undefined,
+          vc.supplies.length > 0 ? (
+            <InlineAssetCluster assets={suppliesShown.map((r) => ({ symbol: r.symbol, address: r.address }))} />
+          ) : undefined,
         total:
           collUsd != null ? { usd: collUsd, info: stampServerRead(dep.card.usd("Collateral"), marketBy) } : undefined,
       },
@@ -449,12 +457,20 @@ export function useMoonwellCardSlots({
             <AmountStack>
               {debtDust.lines.map((r) => (
                 <Prov key={r.address} info={borrowProv(r)}>
-                  <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+                  <AssetAmount
+                    value={r.amount}
+                    symbol={r.symbol}
+                    address={r.address}
+                    exact={formatUnitsExact(r.amountRaw, r.decimals)}
+                  />
                 </Prov>
               ))}
             </AmountStack>
           ),
-        assets: v.borrows.length > 0 ? <InlineAssetCluster symbols={borrowsShown.map((r) => r.symbol)} /> : undefined,
+        assets:
+          v.borrows.length > 0 ? (
+            <InlineAssetCluster assets={borrowsShown.map((r) => ({ symbol: r.symbol, address: r.address }))} />
+          ) : undefined,
         total:
           debtUsd != null ? { usd: debtUsd, info: stampServerRead(dep.card.usd("Borrowed"), marketBy) } : undefined,
       },
@@ -470,6 +486,7 @@ export function useMoonwellCardSlots({
             <AssetAmount
               value={supplyAmount(r)}
               symbol={r.symbol}
+              address={r.address}
               exact={r.current != null ? formatUnitsExact(r.mTokensRaw, 8) : String(r.principal)}
               {...(r.current != null ? { exactUnit: mSymbolOf(r) } : {})}
             />
@@ -490,7 +507,12 @@ export function useMoonwellCardSlots({
         ...heads[1],
         value: (
           <Prov info={borrowProv(r)}>
-            <AssetAmount value={r.amount} symbol={r.symbol} exact={formatUnitsExact(r.amountRaw, r.decimals)} />
+            <AssetAmount
+              value={r.amount}
+              symbol={r.symbol}
+              address={r.address}
+              exact={formatUnitsExact(r.amountRaw, r.decimals)}
+            />
           </Prov>
         ),
         assets: undefined,

@@ -17,7 +17,7 @@ import {
 import { FLUID_BASE_CONTRACTS } from "@/lib/fluid-base/types";
 import { FLUID_BASE_DOLLARS } from "@/lib/fluid-base/dollars";
 import { infoMetadata } from "@/lib/shared/page-metadata";
-import { explorerHref } from "@/lib/shared/protocols";
+import { protocolForSession } from "@/lib/shared/protocols";
 import { INLINE_LINK } from "@/lib/shared/ui-grammar";
 
 export const metadata = infoMetadata("fluid-base");
@@ -88,7 +88,7 @@ const views: readonly [InfoView, ...InfoView[]] = [
       <>
         <p>
           Enter a wallet address or ENS name on the{" "}
-          <Link href={explorerHref(8453, "fluid-base")} className={INLINE_LINK}>
+          <Link href={protocolForSession("fluid-base")!.href} className={INLINE_LINK}>
             front door
           </Link>{" "}
           to see that wallet&apos;s Fluid vault positions on Base that hold collateral or debt. Rails shows the newest
