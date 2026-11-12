@@ -138,6 +138,8 @@ import type {
   LiquityTroveView,
 } from "./types";
 import { formatCompact } from "@/lib/shared/format-compact";
+import { branchShutdownState, type BranchShutdownState } from "@/lib/liquity-fork/shutdown";
+import { recordedShutdown } from "@/lib/shared/liquity-family-shutdown";
 
 // The shared card renders inside Link-wrapped rows on
 // listing/umbrella pages, so an inner <a> would nest anchors (invalid HTML,
@@ -528,6 +530,7 @@ export function liveFromForkChain(c: LiquityForkTroveChainResponse): LiquityTrov
     priceUsd: c.priceUsd,
     icrPct: c.icr != null ? c.icr * 100 : null,
     status: c.status,
+    branchColl: c.branchColl,
   };
 }
 
@@ -558,6 +561,9 @@ export interface LiquityPositionCardProps {
   exports?: PositionCardExports | null;
   /** A line at the foot (V2's snapshot and loading status). */
   foot?: ReactNode;
+  /** The branch's shutdown (ui-jobs 612), from the page's `useBranchShutdown`.
+   *  Absent (a listing row), the catalog's record stands alone. */
+  shutdown?: BranchShutdownState | null;
 }
 
 /** The Liquity family's slots for the shared position card: the four
@@ -577,6 +583,7 @@ export function useLiquityCardSlots({
   panel,
   exports,
   foot,
+  shutdown,
 }: LiquityPositionCardProps): PositionCardSlots {
   const cfg = LIQUITY_FORK_CARD_CONFIGS[protocol];
   const ops = OPS[protocol];
@@ -673,14 +680,26 @@ export function useLiquityCardSlots({
   );
 
   const ended = v.status === "closed" || v.status === "liquidated";
+  // An open Trove on a shut-down branch (ui-jobs 612): the page's state, else
+  // the catalog's record (the listing). A closed Trove keeps its own word.
+  const shut =
+    v.status === "open"
+      ? shutdown !== undefined
+        ? shutdown
+        : branchShutdownState(recordedShutdown(protocol, ct), null)
+      : null;
+  // The pool's collateral below the Trove's own (ui-jobs 607's comparison).
+  const poolColl = shut && lv?.branchColl != null && lv.branchColl < coll ? lv.branchColl : null;
   const status: PositionCardStatus | null =
     v.status === "liquidated"
       ? { word: "Liquidated", tone: "danger" }
       : v.status === "closed"
         ? { word: "Closed", tone: "muted" }
-        : zombie
-          ? { word: terms.dormant, tone: "muted" }
-          : null;
+        : shut
+          ? { word: "Shut down", tone: "caution" }
+          : zombie
+            ? { word: terms.dormant, tone: "muted" }
+            : null;
 
   // The listing names the owner; the delegate shows under Interest rate.
   const identity = detail ? undefined : (
@@ -805,7 +824,22 @@ export function useLiquityCardSlots({
         ),
         assets: collIcon(coll, true, lv?.entireCollRaw),
         usd:
-          collUsd !== null && collUsd > 0 ? (
+          poolColl != null ? (
+            <span className="text-rb-500" data-pool-coll="">
+              pool holds{" "}
+              <Prov
+                info={forkLiveVocab(protocol).branchAggregateProv(
+                  "The branch's entire collateral",
+                  "getEntireBranchColl",
+                  ct,
+                )}
+                value={formatExactFromString(null, poolColl)}
+              >
+                {forkCollateralFace(poolColl)}
+              </Prov>{" "}
+              {ct}
+            </span>
+          ) : shut?.record?.withdrawal ? null : collUsd !== null && collUsd > 0 ? (
             <Prov info={fp.collUsd}>
               <HighlightableValue type="collateralUsd" state="after" value={collUsd} className="text-green-400">
                 <FadeNumber value={collUsd} formatFn={formatUsdValue} animateOnMount={animate} />
@@ -962,6 +996,15 @@ export function useLiquityCardSlots({
   const ROW_TIP = tips.rows;
   const tipRow = (r: PositionPanelRow): PositionPanelRow =>
     r.tip || !ROW_TIP[r.id] ? r : { ...r, tip: ROW_TIP[r.id] };
+  // A shut-down branch takes no borrowing, rate change, queued redemption or
+  // liquidation, and its interest stopped at the shutdown: the panel's rows go.
+  if (shut)
+    return {
+      ...detailCommon,
+      heads: detailCommon.heads.map((h) => (h.labelTip || !HEAD_TIP[h.id] ? h : { ...h, labelTip: HEAD_TIP[h.id] })),
+      outcome: undefined,
+      panel: [[], []],
+    };
   return {
     ...detailCommon,
     heads: detailCommon.heads.map((h) => (h.labelTip || !HEAD_TIP[h.id] ? h : { ...h, labelTip: HEAD_TIP[h.id] })),
